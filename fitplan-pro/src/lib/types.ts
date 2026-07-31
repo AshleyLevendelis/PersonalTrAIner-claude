@@ -1,0 +1,345 @@
+export interface ConcurrentActivity {
+  name: string
+  intensity: number
+  days: string[]
+  movement_demands: string[]
+}
+
+export interface UserProfile {
+  id?: string
+  age: number
+  gender: 'male' | 'female'
+  height_cm: number
+  weight_kg: number
+  activity_level: ActivityLevel
+  fitness_goal: FitnessGoal
+  training_days: TrainingDay[]
+  preferred_time: 'morning' | 'evening'
+  dietary_preferences: string[]
+  session_duration_preference: SessionDuration
+  training_time_preference: TrainingTime
+  workout_split_preference: WorkoutSplit
+  macro_calculation_mode: MacroCalculationMode
+  equipment_access: EquipmentAccess
+  training_style: TrainingStyle
+  coaching_persona: CoachingPersona
+  injuries: string[]
+  display_name?: string
+  concurrent_activities?: ConcurrentActivity[]
+  weekly_schedule?: Record<string, string | null>
+  created_at?: string
+  bmr?: number
+  tdee?: number
+  calorie_target?: number
+  protein_g?: number
+  carbs_g?: number
+  fat_g?: number
+}
+
+export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'active' | 'very_active'
+export type FitnessGoal = 'fat_loss' | 'hypertrophy' | 'functional' | 'conditioning'
+export type EquipmentAccess = 'full_gym' | 'home_gym' | 'minimalist' | 'bodyweight'
+export type TrainingStyle = 'functional' | 'bodybuilding' | 'combat' | 'hybrid'
+export type CoachingPersona = 'drill_sergeant' | 'analytical' | 'supportive' | 'hype'
+export type SessionDuration = '30-45' | '45-60' | '60-90' | '90+'
+export type TrainingTime = 'morning' | 'midday' | 'evening' | 'night' | 'varies'
+export type WorkoutSplit = 'ppl' | 'upper_lower' | 'full_body' | 'bro_split' | 'ai_recommendation'
+export type MacroCalculationMode = 'STANDARD_STATIC' | 'DYNAMIC_CSCS'
+
+export interface TrainingDay {
+  day: string
+  available: boolean
+}
+
+export interface MacroTargets {
+  calories: number
+  protein: number
+  carbs: number
+  fat: number
+}
+
+export type ExerciseTier = 'tier_0_primer' | 'tier_1_primary' | 'tier_2_secondary' | 'tier_3_isolation' | 'tier_4_finisher'
+export type FatigueCost = 'low' | 'moderate' | 'high'
+export type MesocycleMovementPattern = 'push' | 'pull' | 'hinge' | 'squat' | 'carry' | 'rotation' | 'isolation'
+
+export interface Exercise {
+  id?: string
+  name: string
+  sets: number
+  reps: string
+  rest: string
+  substitution: string
+  superset_label?: string
+  movement_pattern?: MesocycleMovementPattern
+  tier?: ExerciseTier
+  fatigue_cost?: FatigueCost
+}
+
+export interface MesocycleWeek {
+  week_number: number
+  label: string
+  days: WorkoutDay[]
+}
+
+export interface RecommendedCardio {
+  activity: string
+  duration: number
+  targetRpe: number
+  timing: 'post_session' | 'independent_session' | 'rest_day'
+  reason: string
+}
+
+export interface WorkoutDay {
+  day: string
+  focus: string
+  exercises: Exercise[]
+  conditioning_note?: string
+  recommendedCardio?: RecommendedCardio
+}
+
+export interface ConstraintTraceEntry {
+  exercise: string
+  stage: 'equipment' | 'injury' | 'style' | 'time_cap' | 'exclusion'
+  reason: string
+}
+
+export interface ConstraintTrace {
+  equipment_filtered: ConstraintTraceEntry[]
+  injury_filtered: ConstraintTraceEntry[]
+  style_filtered: ConstraintTraceEntry[]
+  time_cap_adjusted: ConstraintTraceEntry[]
+  exclusion_filtered: ConstraintTraceEntry[]
+  pool_size_after_each_stage: { equipment: number; injury: number; style: number; final: number }
+}
+
+export interface PlanResult {
+  plan: WorkoutDay[]
+  constraint_trace: ConstraintTrace
+}
+
+export interface Meal {
+  id?: string
+  name: string
+  calories: number
+  protein: number
+  carbs: number
+  fat: number
+  portion_size: string
+  prep: string
+  substitution: string
+  ingredients?: string[]
+  is_verified?: boolean
+  sub_calories?: number
+  sub_protein?: number
+  sub_carbs?: number
+  sub_fat?: number
+  sub_portion_size?: string
+  sub_prep?: string
+  sub_ingredients?: string[]
+}
+
+export interface MealPlanDay {
+  meal: string
+  items: Meal[]
+}
+
+export interface EdamamRecipe {
+  name: string
+  image: string
+  source_url: string
+  yield: number
+  total_calories: number
+  total_protein: number
+  total_carbs: number
+  total_fat: number
+  total_weight: number
+  ingredients: Array<{ text: string; weight: number; food: string }>
+  ingredient_lines: string[]
+}
+
+export interface WeeklyMealSlot {
+  id?: string
+  day_of_week: string
+  meal_slot: string
+  recipe: EdamamRecipe
+  scaled_calories: number
+  scaled_protein: number
+  scaled_carbs: number
+  scaled_fat: number
+  scale_factor: number
+  ingredient_lines: string[]
+}
+
+export type WeeklyMealPlan = Record<string, WeeklyMealSlot[]>
+
+export const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] as const
+export type DayName = typeof DAY_NAMES[number]
+
+export type MessageStatus = 'pending' | 'streaming' | 'complete' | 'failed'
+
+export interface ChatMessage {
+  id?: string
+  profile_id?: string
+  role: 'user' | 'assistant'
+  content: string
+  status?: MessageStatus
+  action?: PlanAction
+  quickReplies?: string[]
+  created_at?: string
+}
+
+export interface ReplaceFoodAction {
+  type: 'replace_food'
+  meal_slot: string
+  old_item: string
+  new_item: string
+  calories?: number
+  protein: number
+  carbs: number
+  fat: number
+  portion_size?: string
+  prep?: string
+  ingredients?: string[]
+  is_verified?: boolean
+}
+
+export interface ReplaceExerciseAction {
+  type: 'replace_exercise'
+  day: string
+  old_item: string
+  new_item: string
+  sets: number
+  reps: string
+  rest: string
+  permanent?: boolean
+}
+
+export interface AdjustVolumeAction {
+  type: 'adjust_volume'
+  day: string
+  adjustment: 'reduce_light' | 'reduce_half' | 'reduce_heavy' | 'increase_moderate' | 'increase_heavy'
+  reason: string
+}
+
+export interface BanExerciseAction {
+  type: 'ban_exercise'
+  exercise_name: string
+  reason: string
+}
+
+export interface SchedulePatchItem {
+  day: string
+  action: 'ADD' | 'REMOVE' | 'MOVE'
+  block_name: string
+  exercises?: { name: string; sets: number; reps: string }[]
+}
+
+export interface UpdateScheduleAction {
+  type: 'update_workout_schedule'
+  schedule_patch: SchedulePatchItem[]
+  recalibrated_days?: string[]
+  adaptations?: string
+}
+
+export interface LogWorkoutSessionAction {
+  type: 'log_workout_session'
+  day: string
+  logs: Array<{ exercise_name: string; sets_completed: number; reps_completed: number; weight_kg: number }>
+}
+
+export type PlanAction = ReplaceFoodAction | ReplaceExerciseAction | AdjustVolumeAction | BanExerciseAction | UpdateScheduleAction | LogWorkoutSessionAction
+
+// ============================================================================
+// Daily Tracking Types (connects workout engine to nutrition/carb-cycling)
+// ============================================================================
+
+export interface DailyMetric {
+  id?: string
+  profile_id: string
+  date: string
+  weight_kg: number
+  body_fat_percentage?: number
+  created_at?: string
+  updated_at?: string
+}
+
+export type WorkoutSplitType =
+  | 'REST'
+  | 'FULL_BODY_POWER'
+  | 'PUSH'
+  | 'PULL'
+  | 'LEGS'
+  | 'UPPER'
+  | 'LOWER'
+  | 'CHEST_TRICEPS'
+  | 'BACK_BICEPS'
+  | 'SHOULDERS_ABS'
+  | 'CONDITIONING'
+
+export interface DailyNutritionTarget {
+  id?: string
+  profile_id: string
+  date: string
+  workout_split: WorkoutSplitType
+  target_calories: number
+  target_protein_g: number
+  target_carbs_g: number
+  target_fats_g: number
+  calculated_bmr?: number
+  estimated_eee?: number
+  calculated_tdee?: number
+  created_at?: string
+  updated_at?: string
+}
+
+export interface WorkoutSession {
+  id?: string
+  profile_id: string
+  date: string
+  split_type: string
+  duration_minutes: number
+  is_completed: boolean
+  nutrition_target_id?: string
+  created_at?: string
+  updated_at?: string
+}
+
+export interface WorkoutExerciseRow {
+  id?: string
+  workout_session_id: string
+  exercise_name: string
+  tier: number
+  execution_order: number
+  sets: number
+  reps_scheme: string
+  rest_seconds: number
+  rpe_target?: number
+  is_superset: boolean
+  superset_group_id?: string
+  created_at?: string
+  updated_at?: string
+}
+
+export interface ExerciseSetLog {
+  id?: string
+  user_id: string
+  date: string
+  exercise_name: string
+  set_number: number
+  weight_kg: number
+  reps_completed: number
+  is_bodyweight: boolean
+  completed_at?: string
+}
+
+export interface CardioLog {
+  id?: string
+  user_id: string
+  date: string
+  activity_name: string
+  duration_minutes: number
+  intensity_rpe: number
+  avg_heart_rate?: number | null
+  notes?: string | null
+  completed_at?: string
+}
