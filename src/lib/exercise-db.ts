@@ -1412,3 +1412,52 @@ export function getExerciseEntry(name: string): ExerciseEntry | undefined {
     e => e.name.toLowerCase() === name.toLowerCase()
   )
 }
+
+// ---------------------------------------------------------------------------
+// MOVEMENT FAMILIES
+// ---------------------------------------------------------------------------
+// `substitution_group` captures "these are interchangeable for the same slot".
+// It does NOT capture "these are the same movement wearing different hats".
+//
+// Kettlebell Swings is classified as `activation` / group `swing`, while
+// Kettlebell Swing (Heavy) is `hip_hinge` / group `hip_hinge`. Different
+// pattern, different group — so nothing stopped the engine from programming
+// both in one session. It is the same movement twice, and no trainer would
+// write that.
+//
+// Anything not listed falls back to its substitution_group, so this map only
+// needs to cover genuine cross-classification overlaps.
+
+const MOVEMENT_FAMILIES: Record<string, string> = {
+  'Kettlebell Swings': 'kettlebell_swing',
+  'Kettlebell Swing (Heavy)': 'kettlebell_swing',
+  'Chest Dips': 'dip',
+  'Tricep Dips': 'dip',
+  'Pull-Ups': 'pull_up',
+  'Pull-Ups (Assisted)': 'pull_up',
+  'Lat Pulldown': 'pulldown',
+  'Close-Grip Lat Pulldown': 'pulldown',
+  'Cable Rows': 'cable_row',
+  'Seated Cable Row': 'cable_row',
+  'Shrugs': 'shrug',
+  'Dumbbell Shrugs': 'shrug',
+  'Lateral Raises': 'lateral_raise',
+  'Cable Lateral Raises': 'lateral_raise',
+  'Calf Raises': 'calf_raise',
+  'Seated Calf Raises': 'calf_raise',
+  'Deadlifts': 'deadlift',
+  'Trap Bar Deadlift': 'deadlift',
+  'Box Jumps': 'jump',
+  'Broad Jumps': 'jump',
+  'Push-Ups': 'push_up',
+  'Plyo Push-Ups': 'push_up',
+}
+
+/**
+ * The dedup key for "is this the same movement as that one". Prefer this over
+ * substitution_group when deciding whether two exercises can coexist in a
+ * single session.
+ */
+export function getMovementFamily(entry: ExerciseEntry): string {
+  return MOVEMENT_FAMILIES[entry.name] ?? entry.substitution_group
+}

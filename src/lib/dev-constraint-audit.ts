@@ -2,14 +2,16 @@ import { generateExercisePlan } from './exercise-plan'
 import { EXERCISE_DATABASE } from './exercise-db'
 import type {
   UserProfile, EquipmentAccess, TrainingStyle, SessionDuration,
-  WorkoutDay, ConstraintTrace, PlanResult,
+  WorkoutDay, ConstraintTrace, PlanResult, TrainingExperience,
 } from './types'
+import { getSkillDemand, isSkillAppropriate } from './experience-config'
 
 // All combinations to test
 const ALL_EQUIPMENT: EquipmentAccess[] = ['full_gym', 'home_gym', 'minimalist', 'bodyweight']
 const ALL_INJURIES = ['lower_back', 'knees', 'shoulders', 'neck', 'wrists']
 const ALL_DURATIONS: SessionDuration[] = ['30-45', '45-60', '60-90', '90+']
 const ALL_STYLES: TrainingStyle[] = ['functional', 'bodybuilding', 'combat', 'hybrid']
+const ALL_EXPERIENCE: TrainingExperience[] = ['beginner', 'novice', 'intermediate', 'advanced']
 
 // Injury -> joints that should NOT appear in final exercises
 const INJURED_JOINTS_MAP: Record<string, string[]> = {
@@ -52,7 +54,7 @@ const STYLE_REQUIRED_PATTERNS: Record<TrainingStyle, string[]> = {
 }
 
 export interface AuditFailure {
-  check: 'equipment' | 'injury' | 'duration' | 'style_pattern'
+  check: 'equipment' | 'injury' | 'duration' | 'style_pattern' | 'skill' | 'empty_session'
   combination: string
   details: string
   exercise?: string
@@ -63,6 +65,7 @@ export interface AuditTestCase {
   injuries: string[]
   duration: SessionDuration
   style: TrainingStyle
+  experience: TrainingExperience
   passed: boolean
   failures: AuditFailure[]
   planDays: number
@@ -82,7 +85,8 @@ function buildTestProfile(
   equipment: EquipmentAccess,
   injuries: string[],
   duration: SessionDuration,
-  style: TrainingStyle
+  style: TrainingStyle,
+  experience: TrainingExperience
 ): UserProfile {
   return {
     id: 'audit-test',
@@ -98,6 +102,7 @@ function buildTestProfile(
     equipment_access: equipment,
     injuries,
     training_style: style,
+    training_experience: experience,
     session_duration_preference: duration,
     workout_split_preference: 'ai_recommendation',
     training_days: [
@@ -121,7 +126,9 @@ function buildTestProfile(
 }
 
 function estimateSessionSeconds(day: WorkoutDay): number {
-  let total = 0
+  // Warm-up counts toward the session. If it did not, the duration check would
+  // pass while real sessions ran over the user's stated time by 5-12 minutes.
+  let total = day.warmup?.total_seconds ?? 0
   for (const ex of day.exercises) {
     const restMatch = ex.rest.match(/(\d+)/)
     const restSec = restMatch ? parseInt(restMatch[1]) : 60
@@ -136,10 +143,11 @@ function runSingleAudit(
   equipment: EquipmentAccess,
   injuries: string[],
   duration: SessionDuration,
-  style: TrainingStyle
+  style: TrainingStyle,
+  experience: TrainingExperience
 ): AuditTestCase {
-  const profile = buildTestProfile(equipment, injuries, duration, style)
-  const comboLabel = `${equipment} / ${injuries.length > 0 ? injuries.join('+') : 'none'} / ${duration} / ${style}`
+  const profile = buildTestProfile(equipment, injuries, duration, style, experience)
+  const comboLabel = `${equipment} / ${injuries.length > 0 ? injuries.join('+') : 'none'} / ${duration} / ${style} / ${experience}`
   const failures: AuditFailure[] = []
 
   let result: PlanResult
@@ -147,7 +155,7 @@ function runSingleAudit(
     result = generateExercisePlan(profile)
   } catch (err) {
     return {
-      equipment, injuries, duration, style,
+      equipment, injuries, duration, style, experience,
       passed: false,
       failures: [{ check: 'equipment', combination: comboLabel, details: `Plan generation threw: ${err}` }],
       planDays: 0, totalExercises: 0, estimatedDurationSec: 0,
@@ -242,10 +250,43 @@ function runSingleAudit(
     }
   }
 
+  // CHECK 5: Every scheduled day must contain actual work.
+  // This check exists because the audit previously reported 100% pass while
+  // silently emitting sessions with zero exercises — a plan that passes every
+  // constraint by virtue of being empty is not a plan.
+  for (const day of plan) {
+    if (day.exercises.length === 0) {
+      failures.push({
+        check: 'empty_session',
+        combination: comboLabel,
+        details: `${day.day} (${day.focus}) contains no exercises`,
+      })
+    }
+  }
+
+  // CHECK 6: No exercise exceeds the trainee's skill ceiling.
+  // Exempt when the skill filter had to relax to keep the pool non-empty —
+  // that relaxation is deliberate and is recorded in the trace.
+  const skillRelaxed = result.constraint_trace.skill_filtered.some(
+    e => e.exercise === '(all)'
+  )
+  if (!skillRelaxed) {
+    for (const ex of allExercises) {
+      if (!isSkillAppropriate(ex.name, experience)) {
+        failures.push({
+          check: 'skill',
+          combination: comboLabel,
+          details: `"${ex.name}" has ${getSkillDemand(ex.name)} skill demand, too advanced for "${experience}"`,
+          exercise: ex.name,
+        })
+      }
+    }
+  }
+
   const maxDuration = plan.reduce((max, day) => Math.max(max, estimateSessionSeconds(day)), 0)
 
   return {
-    equipment, injuries, duration, style,
+    equipment, injuries, duration, style, experience,
     passed: failures.length === 0,
     failures,
     planDays: plan.length,
@@ -268,7 +309,9 @@ export function runFullConstraintAudit(
     ['knees', 'shoulders', 'lower_back'],
   ]
 
-  const totalCombinations = ALL_EQUIPMENT.length * injuryCombinations.length * ALL_DURATIONS.length * ALL_STYLES.length
+  const totalCombinations =
+    ALL_EQUIPMENT.length * injuryCombinations.length * ALL_DURATIONS.length *
+    ALL_STYLES.length * ALL_EXPERIENCE.length
   const results: AuditTestCase[] = []
   let done = 0
 
@@ -276,10 +319,12 @@ export function runFullConstraintAudit(
     for (const injuries of injuryCombinations) {
       for (const duration of ALL_DURATIONS) {
         for (const style of ALL_STYLES) {
-          const testCase = runSingleAudit(equipment, injuries, duration, style)
-          results.push(testCase)
-          done++
-          onProgress?.(done, totalCombinations)
+          for (const experience of ALL_EXPERIENCE) {
+            const testCase = runSingleAudit(equipment, injuries, duration, style, experience)
+            results.push(testCase)
+            done++
+            onProgress?.(done, totalCombinations)
+          }
         }
       }
     }

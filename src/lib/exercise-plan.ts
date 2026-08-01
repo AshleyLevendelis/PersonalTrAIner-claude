@@ -2,9 +2,15 @@ import type {
   UserProfile, WorkoutDay, Exercise, FitnessGoal, SessionDuration,
   WorkoutSplit, RecommendedCardio, MesocycleWeek, ExerciseTier,
   FatigueCost, MesocycleMovementPattern, EquipmentAccess, TrainingStyle,
-  ConstraintTrace, ConstraintTraceEntry, PlanResult,
+  ConstraintTrace, ConstraintTraceEntry, PlanResult, TrainingExperience,
 } from './types'
-import { EXERCISE_DATABASE, type ExerciseEntry, type MovementPattern, type AngleVector } from './exercise-db'
+import { EXERCISE_DATABASE, getMovementFamily, type ExerciseEntry, type MovementPattern, type AngleVector } from './exercise-db'
+import {
+  getExperienceConfig, getSkillDemand, isSkillAppropriate, applyRepFloor,
+  type ExperienceConfig,
+} from './experience-config'
+import { buildWarmup, getWarmupReserveSeconds } from './warmup'
+import { prescribeLoad } from './load-prescription'
 
 // ---------------------------------------------------------------------------
 // Track definitions (unchanged — used for day-level focus selection)
@@ -314,29 +320,105 @@ function stageInjuryFilter(
 // STAGE 3: Style filter
 // ---------------------------------------------------------------------------
 
+// Below this many exercises there is not enough material to build distinct
+// sessions across a training week, and style becomes a luxury we cannot afford.
+const MIN_VIABLE_POOL = 12
+
 function stageStyleFilter(
   pool: ExerciseEntry[],
   style: TrainingStyle,
   trace: ConstraintTrace
 ): ExerciseEntry[] {
   const result: ExerciseEntry[] = []
+  const rejected: ExerciseEntry[] = []
+
   for (const ex of pool) {
     if (ex.style_tags.includes(style)) {
       result.push(ex)
     } else {
-      trace.style_filtered.push({
-        exercise: ex.name,
-        stage: 'style',
-        reason: `exercise tags [${ex.style_tags.join(', ')}] do not include '${style}'`,
-      })
+      rejected.push(ex)
     }
   }
+
+  // Style is a preference, not a safety constraint — unlike equipment (you
+  // physically don't have the kit) or injury (it will hurt you). When the
+  // remaining pool is too thin to fill a week, a bodyweight trainee who picked
+  // 'bodybuilding' is better served by a full week of slightly off-style
+  // sessions than by one session and three empty days.
+  if (result.length < MIN_VIABLE_POOL) {
+    trace.style_filtered.push({
+      exercise: '(all)',
+      stage: 'style',
+      reason:
+        `style '${style}' would leave only ${result.length} exercises ` +
+        `(minimum ${MIN_VIABLE_POOL} needed for a full week) — style preference relaxed`,
+    })
+    trace.pool_size_after_each_stage.style = pool.length
+    return pool
+  }
+
+  for (const ex of rejected) {
+    trace.style_filtered.push({
+      exercise: ex.name,
+      stage: 'style',
+      reason: `exercise tags [${ex.style_tags.join(', ')}] do not include '${style}'`,
+    })
+  }
+
   trace.pool_size_after_each_stage.style = result.length
   return result
 }
 
 // ---------------------------------------------------------------------------
-// STAGE 4: Time-cap density optimization
+// STAGE 4: Skill / experience filter
+// ---------------------------------------------------------------------------
+// Removes movements the trainee is not yet ready to attempt. This runs late,
+// after equipment and injury, so that a beginner in a fully-equipped gym still
+// ends up with a workable pool — the exercises being removed here almost always
+// have a lower-skill sibling in the same substitution group (Pull-Ups ->
+// Assisted Pull-Ups -> Lat Pulldown).
+//
+// Guard rail: if filtering would empty the pool entirely, the filter yields.
+// A thin plan with one movement above the trainee's level is far better than
+// no plan at all, and the constraint trace records that it happened.
+
+function stageSkillFilter(
+  pool: ExerciseEntry[],
+  experience: TrainingExperience,
+  trace: ConstraintTrace
+): ExerciseEntry[] {
+  const result: ExerciseEntry[] = []
+  const rejected: ExerciseEntry[] = []
+
+  for (const ex of pool) {
+    if (isSkillAppropriate(ex.name, experience)) {
+      result.push(ex)
+    } else {
+      rejected.push(ex)
+      trace.skill_filtered.push({
+        exercise: ex.name,
+        stage: 'skill',
+        reason: `${getSkillDemand(ex.name)} skill demand exceeds what is appropriate for '${experience}'`,
+      })
+    }
+  }
+
+  if (result.length === 0) {
+    trace.skill_filtered.push({
+      exercise: '(all)',
+      stage: 'skill',
+      reason: 'skill filter would empty the pool — relaxed to keep the plan viable',
+    })
+    trace.pool_size_after_each_stage.skill = pool.length
+    return pool
+  }
+
+  trace.pool_size_after_each_stage.skill = result.length
+  return result
+}
+
+// ---------------------------------------------------------------------------
+// STAGE 5: Time-cap density optimization
 // ---------------------------------------------------------------------------
 
 const ANTAGONIST_PAIRS: [MovementPattern, MovementPattern][] = [
@@ -486,6 +568,34 @@ function stageTimeCap(
     estimated = estimateSessionDuration(dayExercises.map(e => ({ entry: e.entry, sets: e.sets, restSeconds: e.restSeconds })))
   }
 
+  // Phase 5: At the three-exercise floor and still over. Rather than stripping
+  // the session down to one or two movements, trim sets across the board —
+  // a short session should mean fewer sets, not a session missing whole
+  // movement patterns. Two working sets is the floor; below that there is no
+  // meaningful stimulus.
+  for (let pass = 0; pass < 4 && estimated > budgetSeconds; pass++) {
+    let trimmed = false
+    // Trim the biggest time consumers first.
+    const order = dayExercises
+      .map((e, i) => ({ i, cost: e.sets * (e.entry.avg_duration_seconds + e.restSeconds) }))
+      .sort((a, b) => b.cost - a.cost)
+
+    for (const { i } of order) {
+      if (estimated <= budgetSeconds) break
+      if (dayExercises[i].sets <= 2) continue
+      dayExercises[i] = { ...dayExercises[i], sets: dayExercises[i].sets - 1 }
+      trimmed = true
+      trace.time_cap_adjusted.push({
+        exercise: dayExercises[i].entry.name,
+        stage: 'time_cap',
+        reason: `reduced to ${dayExercises[i].sets} sets — session budget is tight at ${Math.round(budgetSeconds / 60)}min`,
+      })
+      estimated = estimateSessionDuration(dayExercises.map(e => ({ entry: e.entry, sets: e.sets, restSeconds: e.restSeconds })))
+    }
+
+    if (!trimmed) break
+  }
+
   return dayExercises
 }
 
@@ -570,6 +680,32 @@ function getExerciseCountForDuration(duration: SessionDuration): { tier1: number
   }
 }
 
+/**
+ * Beginners get one fewer accessory (less volume to recover from, and more
+ * attention per movement); advanced trainees get one more. The tier-1 slot is
+ * never touched — every session needs its main lift.
+ */
+function adjustCountsForExperience(
+  counts: { tier1: number; tier2: number; tier3: number },
+  experience: ExperienceConfig,
+): { tier1: number; tier2: number; tier3: number } {
+  const adjust = experience.exercise_count_adjust
+  if (adjust === 0) return counts
+
+  if (adjust < 0) {
+    // Trim accessories first, then secondary compounds. Never below one each.
+    const tier3 = Math.max(1, counts.tier3 + adjust)
+    const remaining = adjust + (counts.tier3 - tier3)
+    return {
+      tier1: counts.tier1,
+      tier2: Math.max(1, counts.tier2 + remaining),
+      tier3,
+    }
+  }
+
+  return { ...counts, tier3: counts.tier3 + adjust }
+}
+
 function selectExercisesForTrack(
   track: TrackDefinition,
   pool: ExerciseEntry[],
@@ -594,6 +730,8 @@ function selectExercisesForTrack(
     ? shuffle(primerPool.filter(p => !weeklyUsed.has(p.name)))[0] ?? shuffle(primerPool)[0]
     : null
 
+  // Keyed by movement family, not substitution_group, so the same movement
+  // cannot appear twice under two different classifications.
   const usedGroups = new Set<string>()
   const selected: ExerciseEntry[] = []
 
@@ -604,14 +742,19 @@ function selectExercisesForTrack(
         patterns.includes(e.movement_pattern) &&
         !weeklyUsed.has(e.name) &&
         !selected.some(s => s.name === e.name) &&
-        !usedGroups.has(e.substitution_group)
+        !usedGroups.has(getMovementFamily(e))
       )
     )
     for (const c of candidates) {
       if (selected.length >= counts.tier1 + counts.tier2 + counts.tier3) break
       if (count <= 0) break
+      // Re-check the family here, not only in the filter above. `candidates`
+      // is evaluated once, so a family claimed earlier in THIS loop would
+      // otherwise slip through — which is how Chest Dips and Tricep Dips
+      // (both family 'dip') ended up in the same session.
+      if (usedGroups.has(getMovementFamily(c))) continue
       selected.push(c)
-      usedGroups.add(c.substitution_group)
+      usedGroups.add(getMovementFamily(c))
       count--
     }
     return count
@@ -621,17 +764,53 @@ function selectExercisesForTrack(
   pickFromTier('tier2_compound', counts.tier2, [...track.primary_patterns, ...track.secondary_patterns])
   pickFromTier('tier3_isolation', counts.tier3, track.secondary_patterns)
 
+  // FALLBACK: when the pool is small (bodyweight, heavy injury filtering), the
+  // week's earlier sessions can consume everything available and leave nothing
+  // for later days. Repeating a movement across the week is normal training
+  // practice — an empty session is not. So if we came up short, refill while
+  // allowing exercises already used earlier in the week.
+  if (selected.length < counts.tier1 + counts.tier2 + counts.tier3) {
+    const target = counts.tier1 + counts.tier2 + counts.tier3
+    // Prefer bigger movements first so a refilled session still opens with a
+    // compound rather than leading on isolation work.
+    const tierRank = (e: ExerciseEntry) =>
+      ({ tier1_compound: 0, tier2_compound: 1, tier3_isolation: 2 } as Record<string, number>)[e.mechanics_tier] ?? 3
+
+    const refill = (respectFamilies: boolean) => {
+      const candidates = shuffle(
+        trackPool.filter(e =>
+          e.mechanics_tier !== 'primer' &&
+          !selected.some(s => s.name === e.name) &&
+          (!respectFamilies || !usedGroups.has(getMovementFamily(e)))
+        )
+      ).sort((a, b) => tierRank(a) - tierRank(b))
+
+      for (const c of candidates) {
+        if (selected.length >= target) break
+        selected.push(c)
+        usedGroups.add(getMovementFamily(c))
+      }
+    }
+
+    // Keeps one movement per family. refill() already permits exercises used
+    // earlier in the WEEK, which is the point of this fallback — repeating a
+    // movement across days is normal training. Repeating it twice in the SAME
+    // session is not, so families stay enforced even here. A slightly shorter
+    // session beats one padded with Chest Dips next to Tricep Dips.
+    refill(true)
+  }
+
   // Ensure required patterns are present
   for (const reqPattern of track.required_patterns) {
     if (!selected.some(e => e.movement_pattern === reqPattern)) {
       const fill = trackPool.find(e =>
         e.movement_pattern === reqPattern &&
         !selected.some(s => s.name === e.name) &&
-        !usedGroups.has(e.substitution_group)
+        !usedGroups.has(getMovementFamily(e))
       )
       if (fill) {
         selected.push(fill)
-        usedGroups.add(fill.substitution_group)
+        usedGroups.add(getMovementFamily(fill))
       }
     }
   }
@@ -646,12 +825,12 @@ function selectExercisesForTrack(
           e.movement_pattern === reqPattern &&
           !selected.some(s => s.name === e.name) &&
           !forbidden.has(e.movement_pattern) &&
-          !usedGroups.has(e.substitution_group)
+          !usedGroups.has(getMovementFamily(e))
         )
         
         if (fill) {
           selected.push(fill)
-          usedGroups.add(fill.substitution_group)
+          usedGroups.add(getMovementFamily(fill))
         } else {
           // PASS 2: Relaxed search (allow reusing substitution groups)
           const relaxedFill = pool.find(e =>
@@ -662,7 +841,7 @@ function selectExercisesForTrack(
           
           if (relaxedFill) {
             selected.push(relaxedFill)
-            usedGroups.add(relaxedFill.substitution_group)
+            usedGroups.add(getMovementFamily(relaxedFill))
           } else {
             // FALLBACK: Warn but continue (required pattern unavailable)
             console.warn(
@@ -686,7 +865,14 @@ function selectExercisesForTrack(
 // Assign sets/reps/rest using the style config
 // ---------------------------------------------------------------------------
 
-function assignSetsRepsFromConfig(entry: ExerciseEntry, config: StyleConfig): { sets: number; reps: string; rest: string; restSeconds: number } {
+function assignSetsRepsFromConfig(
+  entry: ExerciseEntry,
+  config: StyleConfig,
+  experience: ExperienceConfig,
+): { sets: number; reps: string; rest: string; restSeconds: number } {
+  // Primers and time/distance-based work are not scaled — a 30-second plank is
+  // a 30-second plank regardless of how long you have been training, and
+  // trimming warm-up sets for a beginner would be exactly backwards.
   if (entry.mechanics_tier === 'primer') {
     return { sets: 2, reps: '5', rest: '30s', restSeconds: 30 }
   }
@@ -699,25 +885,29 @@ function assignSetsRepsFromConfig(entry: ExerciseEntry, config: StyleConfig): { 
     return { sets: 3, reps: '40m', rest: '60s', restSeconds: 60 }
   }
 
+  // A beginner never drops below 2 working sets — one set is not a stimulus.
+  const scaleSets = (base: number) =>
+    Math.max(2, Math.round(base * experience.sets_multiplier))
+
   switch (entry.mechanics_tier) {
     case 'tier1_compound':
       return {
-        sets: config.setRange.tier1,
-        reps: config.repRange.tier1,
+        sets: scaleSets(config.setRange.tier1),
+        reps: applyRepFloor(config.repRange.tier1, experience.min_reps),
         rest: `${config.restSeconds.tier1}s`,
         restSeconds: config.restSeconds.tier1,
       }
     case 'tier2_compound':
       return {
-        sets: config.setRange.tier2,
-        reps: config.repRange.tier2,
+        sets: scaleSets(config.setRange.tier2),
+        reps: applyRepFloor(config.repRange.tier2, experience.min_reps),
         rest: `${config.restSeconds.tier2}s`,
         restSeconds: config.restSeconds.tier2,
       }
     default:
       return {
-        sets: config.setRange.tier3,
-        reps: config.repRange.tier3,
+        sets: scaleSets(config.setRange.tier3),
+        reps: applyRepFloor(config.repRange.tier3, experience.min_reps),
         rest: `${config.restSeconds.tier3}s`,
         restSeconds: config.restSeconds.tier3,
       }
@@ -741,27 +931,51 @@ function getSubstitution(entry: ExerciseEntry, pool: ExerciseEntry[], selected: 
 // Track viability check
 // ---------------------------------------------------------------------------
 
-function getViableTrack(
-  candidate: TrackFocus,
-  pool: ExerciseEntry[],
-): TrackFocus {
-  const t = TRACKS[candidate]
+function countAvailableForTrack(t: TrackDefinition, pool: ExerciseEntry[]): number {
   const allPatterns = [...t.primary_patterns, ...t.secondary_patterns]
   const forbidden = new Set(t.forbidden_patterns)
-
-  const available = pool.filter(e =>
+  return pool.filter(e =>
     allPatterns.includes(e.movement_pattern) &&
     !forbidden.has(e.movement_pattern) &&
     e.mechanics_tier !== 'primer'
   ).length
+}
 
+function isTrackViable(t: TrackDefinition, pool: ExerciseEntry[]): boolean {
+  const forbidden = new Set(t.forbidden_patterns)
   const requiredOk = t.required_patterns.every(rp =>
     pool.some(e => e.movement_pattern === rp && !forbidden.has(e.movement_pattern))
   )
+  return countAvailableForTrack(t, pool) >= 3 && requiredOk
+}
 
-  if (available >= 3 && requiredOk) return candidate
-  if (candidate !== 'Full Body Power') return getViableTrack('Full Body Power', pool)
-  return candidate
+/**
+ * Resolves a proposed day focus to one the filtered pool can actually support.
+ *
+ * The previous implementation fell back to 'Full Body Power' and, if that was
+ * also unsupported, returned it regardless — producing days with zero
+ * exercises. That fails hardest exactly where it matters most: a trainee with
+ * multiple injuries, whose pool may contain nothing matching that track's
+ * patterns at all. Now we search every track and take the richest viable one,
+ * only settling for a best-effort choice when nothing clears the bar.
+ */
+function getViableTrack(
+  candidate: TrackFocus,
+  pool: ExerciseEntry[],
+): TrackFocus {
+  if (isTrackViable(TRACKS[candidate], pool)) return candidate
+
+  const ranked = (Object.keys(TRACKS) as TrackFocus[])
+    .map(focus => ({ focus, available: countAvailableForTrack(TRACKS[focus], pool) }))
+    .sort((a, b) => b.available - a.available)
+
+  const viable = ranked.find(r => isTrackViable(TRACKS[r.focus], pool))
+  if (viable) return viable.focus
+
+  // Nothing is viable — the pool is severely constrained. Return whichever
+  // track has the most material so the session is as full as it can be
+  // rather than empty.
+  return ranked[0]?.available > 0 ? ranked[0].focus : candidate
 }
 
 // ---------------------------------------------------------------------------
@@ -885,16 +1099,26 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
     equipment_filtered: [],
     injury_filtered: [],
     style_filtered: [],
+    skill_filtered: [],
     time_cap_adjusted: [],
     exclusion_filtered: [],
-    pool_size_after_each_stage: { equipment: 0, injury: 0, style: 0, final: 0 },
+    pool_size_after_each_stage: { equipment: 0, injury: 0, style: 0, skill: 0, final: 0 },
   }
 
   const trainingStyle: TrainingStyle = profile.training_style || 'hybrid'
   const styleConfig = STYLE_CONFIGS[trainingStyle]
   const duration = profile.session_duration_preference || '45-60'
-  const budgetSeconds = getDurationBudgetSeconds(duration)
-  const counts = getExerciseCountForDuration(duration)
+  const totalBudgetSeconds = getDurationBudgetSeconds(duration)
+  // Hold time back for the warm-up BEFORE exercises are allocated. Adding a
+  // warm-up after the fact would push every session past the length the user
+  // told us they have.
+  const warmupReserve = getWarmupReserveSeconds(totalBudgetSeconds)
+  const budgetSeconds = totalBudgetSeconds - warmupReserve
+  const experience = getExperienceConfig(profile.training_experience)
+  const counts = adjustCountsForExperience(
+    getExerciseCountForDuration(duration),
+    experience,
+  )
 
   // Compute feasible required patterns based on equipment & injury constraints
   const feasiblePatterns = getFeaibleRequiredPatterns(
@@ -925,6 +1149,9 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
   // STAGE 3: Style
   pool = stageStyleFilter(pool, trainingStyle, trace)
 
+  // STAGE 4: Skill / experience
+  pool = stageSkillFilter(pool, profile.training_experience || 'novice', trace)
+
   trace.pool_size_after_each_stage.final = pool.length
 
   // Build the weekly plan
@@ -951,36 +1178,66 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
 
     if (primer) {
       weeklyUsed.add(primer.name)
-      const sr = assignSetsRepsFromConfig(primer, styleConfig)
+      const sr = assignSetsRepsFromConfig(primer, styleConfig, experience)
       daySlots.push({ entry: primer, ...sr })
     }
 
     for (const entry of main) {
       weeklyUsed.add(entry.name)
       allSelectedNames.add(entry.name)
-      const sr = assignSetsRepsFromConfig(entry, styleConfig)
+      const sr = assignSetsRepsFromConfig(entry, styleConfig, experience)
       daySlots.push({ entry, ...sr })
     }
 
-    // STAGE 4: Time-cap optimization per day
+    // STAGE 5: Time-cap optimization per day
     const optimized = stageTimeCap(daySlots, budgetSeconds, trainingStyle, trace)
 
     // Convert to Exercise objects
-    const exercises: Exercise[] = optimized.map(slot => ({
-      name: slot.entry.name,
-      sets: slot.sets,
-      reps: slot.reps,
-      rest: slot.rest,
-      substitution: getSubstitution(slot.entry, pool, allSelectedNames),
-    }))
+    const exercises: Exercise[] = optimized.map(slot => {
+      const isPrimer = slot.entry.mechanics_tier === 'primer'
+      const load = prescribeLoad(slot.entry, profile)
+      return {
+        name: slot.entry.name,
+        sets: slot.sets,
+        reps: slot.reps,
+        rest: slot.rest,
+        substitution: getSubstitution(slot.entry, pool, allSelectedNames),
+        // Primers are deliberately submaximal — prescribing an RPE target on a
+        // warm-up movement invites people to load it, which defeats the point.
+        intensity: isPrimer ? 'Light — movement prep' : experience.target_rpe,
+        load_guidance: isPrimer
+          ? 'Stay light and controlled. This is preparation, not a working set.'
+          : `${experience.load_guidance} ${load.basis}`,
+        suggested_load: isPrimer ? 'Light' : load.display,
+        suggested_load_kg: isPrimer ? null : load.starting_weight_kg,
+      }
+    })
 
     // Build superset pairings
     const paired = buildSupersetPairs(exercises, pool, duration, trainingStyle, trace)
+
+    // Warm-up is derived from what this session actually contains, so a squat
+    // day and a bench day get genuinely different preparation.
+    const sessionEntries = optimized.map(s => s.entry)
+    const mainLift =
+      sessionEntries.find(e => e.mechanics_tier === 'tier1_compound') ??
+      sessionEntries.find(e => e.mechanics_tier === 'tier2_compound') ??
+      null
+
+    const warmup = buildWarmup({
+      patterns: sessionEntries.map(e => e.movement_pattern),
+      mainLift,
+      equipment: profile.equipment_access || 'full_gym',
+      injuries: profile.injuries || [],
+      experience: profile.training_experience || 'novice',
+      budgetSeconds: warmupReserve,
+    })
 
     return {
       day: day.day,
       focus: trackFocus,
       exercises: paired,
+      warmup,
     }
   })
 

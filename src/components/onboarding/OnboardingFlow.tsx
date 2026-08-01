@@ -7,7 +7,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Card, CardContent } from '@/components/ui/card'
 import { ChevronLeft, Dumbbell } from 'lucide-react'
 import { OptionCard } from './OptionCard'
-import type { UserProfile, FitnessGoal, SessionDuration, TrainingTime, WorkoutSplit, EquipmentAccess, TrainingStyle, CoachingPersona, MacroCalculationMode } from '@/lib/types'
+import type { UserProfile, FitnessGoal, SessionDuration, TrainingTime, WorkoutSplit, EquipmentAccess, TrainingStyle, TrainingExperience, CoachingPersona, MacroCalculationMode } from '@/lib/types'
 
 type WeightUnit = 'kg' | 'lbs'
 type HeightUnit = 'cm' | 'ftin'
@@ -20,6 +20,7 @@ interface OnboardingData {
   trainingTime: TrainingTime | null
   equipment: EquipmentAccess | null
   trainingStyle: TrainingStyle | null
+  trainingExperience: TrainingExperience | null
   injuries: string[]
   dietaryPreferences: string[]
   age: string
@@ -29,7 +30,14 @@ interface OnboardingData {
   coachingPersona: CoachingPersona | null
 }
 
-const TOTAL_STEPS = 12
+const TOTAL_STEPS = 13
+
+const EXPERIENCE_OPTIONS: { value: TrainingExperience; icon: string; label: string; description: string }[] = [
+  { value: 'beginner', icon: '🌱', label: 'Beginner', description: 'New to this, or coming back after a long break' },
+  { value: 'novice', icon: '📈', label: 'Novice', description: '6+ months training fairly consistently' },
+  { value: 'intermediate', icon: '🎯', label: 'Intermediate', description: '2+ years, comfortable with the main lifts' },
+  { value: 'advanced', icon: '🏅', label: 'Advanced', description: 'Years of training, progress comes slowly now' },
+]
 
 const GOAL_OPTIONS: { value: FitnessGoal; icon: string; label: string; description: string }[] = [
   { value: 'fat_loss', icon: '🔥', label: 'Fat Loss', description: 'Shred body fat, get lean' },
@@ -140,6 +148,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
     trainingTime: null,
     equipment: null,
     trainingStyle: null,
+    trainingExperience: null,
     injuries: [],
     dietaryPreferences: [],
     age: '',
@@ -247,16 +256,17 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
     switch (step) {
       case 0: return data.displayName.trim().length > 0
       case 1: return !!data.fitnessGoal
-      case 2: return data.trainingDays.length > 0
-      case 3: return !!data.sessionDuration
-      case 4: return !!data.trainingTime
-      case 5: return !!data.equipment
-      case 6: return !!data.trainingStyle
-      case 7: return true
+      case 2: return !!data.trainingExperience
+      case 3: return data.trainingDays.length > 0
+      case 4: return !!data.sessionDuration
+      case 5: return !!data.trainingTime
+      case 6: return !!data.equipment
+      case 7: return !!data.trainingStyle
       case 8: return true
-      case 9: return !!data.age && !!data.heightCm && !!data.weightKg && Number(data.age) > 0 && Number(data.heightCm) > 0 && Number(data.weightKg) > 0
-      case 10: return !!data.coachingPersona
-      case 11: return true
+      case 9: return true
+      case 10: return !!data.age && !!data.heightCm && !!data.weightKg && Number(data.age) > 0 && Number(data.heightCm) > 0 && Number(data.weightKg) > 0
+      case 11: return !!data.coachingPersona
+      case 12: return true
       default: return false
     }
   }
@@ -286,6 +296,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
       macro_calculation_mode: 'STANDARD_STATIC' as MacroCalculationMode,
       equipment_access: data.equipment!,
       training_style: data.trainingStyle!,
+      training_experience: data.trainingExperience!,
       coaching_persona: data.coachingPersona!,
       injuries: data.injuries,
       display_name: data.displayName.trim(),
@@ -341,6 +352,24 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
 
       case 2:
         return (
+          <StepWrapper title="How much training have you done?" subtitle="Be honest — this decides your exercises, volume, and how fast you progress">
+            <div className="grid grid-cols-2 gap-3">
+              {EXPERIENCE_OPTIONS.map(opt => (
+                <OptionCard
+                  key={opt.value}
+                  icon={opt.icon}
+                  label={opt.label}
+                  description={opt.description}
+                  selected={data.trainingExperience === opt.value}
+                  onClick={() => autoAdvance(() => setData(d => ({ ...d, trainingExperience: opt.value })))}
+                />
+              ))}
+            </div>
+          </StepWrapper>
+        )
+
+      case 3:
+        return (
           <StepWrapper title="Which days can you train?" subtitle="Tap all that work for your schedule">
             <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
               {DAYS_OF_WEEK.map(day => (
@@ -366,7 +395,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
           </StepWrapper>
         )
 
-      case 3:
+      case 4:
         return (
           <StepWrapper title="How long are your sessions?" subtitle="We'll scale exercises to fit">
             <div className="grid grid-cols-2 gap-3">
@@ -384,7 +413,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
           </StepWrapper>
         )
 
-      case 4:
+      case 5:
         return (
           <StepWrapper title="When do you usually train?" subtitle="Helps optimize your nutrition timing">
             <div className="grid grid-cols-2 gap-3">
@@ -402,7 +431,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
           </StepWrapper>
         )
 
-      case 5:
+      case 6:
         return (
           <StepWrapper title="What equipment do you have?" subtitle="Your plan will only use what's available">
             <div className="grid grid-cols-2 gap-3">
@@ -420,7 +449,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
           </StepWrapper>
         )
 
-      case 6:
+      case 7:
         return (
           <StepWrapper title="What's your training style?" subtitle="How you prefer to move">
             <div className="grid grid-cols-2 gap-3">
@@ -438,7 +467,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
           </StepWrapper>
         )
 
-      case 7:
+      case 8:
         return (
           <StepWrapper title="Any injuries or problem areas?" subtitle="We'll avoid exercises that stress these">
             <div className="grid grid-cols-2 gap-3">
@@ -462,7 +491,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
           </StepWrapper>
         )
 
-      case 8:
+      case 9:
         return (
           <StepWrapper title="Dietary preferences?" subtitle="Your meal plan will respect these">
             <div className="grid grid-cols-3 gap-2">
@@ -486,7 +515,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
           </StepWrapper>
         )
 
-      case 9:
+      case 10:
         return (
           <StepWrapper title="Your body metrics" subtitle="Used to calculate your targets">
             <div className="space-y-4">
@@ -541,7 +570,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
           </StepWrapper>
         )
 
-      case 10:
+      case 11:
         return (
           <StepWrapper title="How should your AI coach talk?" subtitle="Sets the tone for chat & advice">
             <div className="grid grid-cols-2 gap-3">
@@ -559,7 +588,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
           </StepWrapper>
         )
 
-      case 11:
+      case 12:
         return (
           <StepWrapper title={`Ready to go, ${data.displayName}!`} subtitle="Review your selections">
             <Card className="bg-muted/50 border-dashed">
@@ -571,6 +600,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
                 <ReviewRow label="Time of Day" value={TIME_OPTIONS.find(o => o.value === data.trainingTime)?.label} />
                 <ReviewRow label="Equipment" value={EQUIPMENT_OPTIONS.find(o => o.value === data.equipment)?.label} />
                 <ReviewRow label="Style" value={STYLE_OPTIONS.find(o => o.value === data.trainingStyle)?.label} />
+                <ReviewRow label="Experience" value={EXPERIENCE_OPTIONS.find(o => o.value === data.trainingExperience)?.label} />
                 <ReviewRow label="Injuries" value={data.injuries.length > 0 ? data.injuries.map(i => INJURY_OPTIONS.find(o => o.value === i)?.label).join(', ') : 'None'} />
                 <ReviewRow label="Diet" value={data.dietaryPreferences.length > 0 ? data.dietaryPreferences.map(p => DIETARY_OPTIONS.find(o => o.value === p)?.label).join(', ') : 'No restrictions'} />
                 <ReviewRow label="Metrics" value={`${data.age}y, ${data.gender}, ${data.weightKg}kg, ${data.heightCm}cm`} />
