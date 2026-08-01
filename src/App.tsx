@@ -18,6 +18,7 @@ import { computeBMR, computeStaticTDEE, getStaticDailyMacros } from '@/lib/macro
 import { generateExercisePlan, generateMesocycle } from '@/lib/exercise-plan'
 import { generateWeeklyMealPlan, swapMealSlot, getWeekStartDate } from '@/lib/meal-plan'
 import { supabase } from '@/lib/supabase'
+import { saveMesocycle, restoreMesocycle } from '@/lib/mesocycle-persistence'
 import type { UserProfile, MacroTargets, WorkoutDay, MealPlanDay, PlanAction, WeeklyMealPlan, DayName, SchedulePatchItem, MesocycleWeek } from '@/lib/types'
 import type { ExerciseEntry } from '@/lib/exercise-db'
 
@@ -116,9 +117,10 @@ function App() {
       fat: Number(profileRow.fat_g),
     }
 
-    const [{ data: mealRows }, { data: exerciseRows }] = await Promise.all([
+    const [{ data: mealRows }, { data: exerciseRows }, fullMesocycle] = await Promise.all([
       supabase.from('meal_plans').select('*').eq('profile_id', storedId),
       supabase.from('exercise_plans').select('*').eq('profile_id', storedId),
+      restoreMesocycle(storedId),
     ])
 
     const restoredWeekly: WeeklyMealPlan = {}
@@ -182,9 +184,22 @@ function App() {
       }
     }
 
-    const restoredExercises: WorkoutDay[] = []
-    const restoredMesocycle: MesocycleWeek[] = []
-    if (exerciseRows) {
+    let restoredExercises: WorkoutDay[] = []
+    let restoredMesocycle: MesocycleWeek[] = []
+
+    if (fullMesocycle && fullMesocycle.length > 0) {
+      // Full-fidelity path: every week, load/RPE/phase/warmup data intact,
+      // exactly as generated. Supersedes the exercise_plans reconstruction
+      // below entirely when present.
+      restoredMesocycle = fullMesocycle
+      const week1 = restoredMesocycle.find(w => w.week_number === 1)
+      if (week1) restoredExercises = week1.days
+    } else if (exerciseRows) {
+      // Legacy fallback for profiles created before mesocycle_weeks existed —
+      // reconstructs only the columns exercise_plans actually has (no loads,
+      // no phase info, and in practice only ever week 1: persistWeeklyPlan
+      // historically ran before the mesocycle state was set, so week_number
+      // never got written past 1).
       const hasWeekData = exerciseRows.some(r => r.week_number && r.week_number > 0)
       if (hasWeekData) {
         const weekLabels = [
@@ -348,6 +363,14 @@ function App() {
       } catch (err) {
         // A failure to persist the plan must not block showing it.
         console.error('Persisting weekly plan failed:', err)
+      }
+      try {
+        // Full-fidelity save — every week, with loads/phase/warmup intact.
+        // Passing mesocycleData directly (not the `mesocycle` state) matters:
+        // setMesocycle() below hasn't run yet, so the state is still empty.
+        await saveMesocycle(data.id, mesocycleData)
+      } catch (err) {
+        console.error('Persisting mesocycle failed:', err)
       }
     }
 
