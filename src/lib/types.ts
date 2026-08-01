@@ -89,6 +89,13 @@ export interface MesocycleWeek {
   week_number: number
   label: string
   days: WorkoutDay[]
+  /** Which periodization block this week belongs to (1-indexed). */
+  block_number?: number
+  week_in_block?: number
+  phase_label?: string
+  phase_focus?: string
+  is_deload?: boolean
+  coach_note?: string
 }
 
 export interface RecommendedCardio {

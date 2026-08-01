@@ -11,6 +11,10 @@ import {
 } from './experience-config'
 import { buildWarmup, getWarmupReserveSeconds } from './warmup'
 import { prescribeLoad } from './load-prescription'
+import {
+  getPhaseSequence, getPhaseConfig, rotateVariation, resolveTargetRpe,
+  shiftReps, adjustRest,
+} from './periodization'
 
 // ---------------------------------------------------------------------------
 // Track definitions (unchanged — used for day-level focus selection)
@@ -1094,6 +1098,27 @@ function assignConditioningNotes(days: WorkoutDay[], profile: UserProfile): void
 // MAIN PLAN GENERATION — strict 5-stage pipeline
 // ---------------------------------------------------------------------------
 
+/**
+ * Runs the filter pipeline only, returning the exercises this user may
+ * actually be given. Periodization needs this so a rotated variation cannot
+ * escape the equipment, injury and skill constraints.
+ */
+export function getConstrainedPool(profile: UserProfile, exclusions: string[] = []): ExerciseEntry[] {
+  const throwaway: ConstraintTrace = {
+    equipment_filtered: [], injury_filtered: [], style_filtered: [], skill_filtered: [],
+    time_cap_adjusted: [], exclusion_filtered: [],
+    pool_size_after_each_stage: { equipment: 0, injury: 0, style: 0, skill: 0, final: 0 },
+  }
+  let pool = EXERCISE_DATABASE.filter(
+    e => !exclusions.some(ex => ex.toLowerCase() === e.name.toLowerCase())
+  )
+  pool = stageEquipmentFilter(pool, profile.equipment_access || 'full_gym', throwaway)
+  pool = stageInjuryFilter(pool, [...pool], profile.injuries || [], throwaway)
+  pool = stageStyleFilter(pool, profile.training_style || 'hybrid', throwaway)
+  pool = stageSkillFilter(pool, profile.training_experience || 'novice', throwaway)
+  return pool
+}
+
 export function generateExercisePlan(profile: UserProfile, exclusions: string[] = []): PlanResult {
   const trace: ConstraintTrace = {
     equipment_filtered: [],
@@ -1378,34 +1403,90 @@ function applyWeekModifiers(
   return { ...baseDay, exercises, conditioning_note: condNote }
 }
 
-export function generateMesocycle(profile: UserProfile, baseWorkout?: WorkoutDay[]): MesocycleWeek[] {
-  const baseWeek = baseWorkout ?? generateExercisePlan(profile).plan
+export function generateMesocycle(
+  profile: UserProfile,
+  baseWorkout?: WorkoutDay[],
+  exclusions: string[] = [],
+): MesocycleWeek[] {
+  const baseWeek = baseWorkout ?? generateExercisePlan(profile, exclusions).plan
   const goal = (profile.fitness_goal || 'hypertrophy') as FitnessGoal
+  const experience = profile.training_experience || 'novice'
+  const expConfig = getExperienceConfig(experience)
+  const pool = getConstrainedPool(profile, exclusions)
 
+  const sequence = getPhaseSequence(goal, experience)
   const weeks: MesocycleWeek[] = []
-  for (let w = 1; w <= 4; w++) {
-    const days = baseWeek.map((day) => {
-      const modifiedDay = applyWeekModifiers(day, w, goal)
-      const exercises = modifiedDay.exercises.map((ex) => {
-        const dbEntry = EXERCISE_DATABASE.find(
-          (e) => e.name.toLowerCase() === ex.name.toLowerCase()
-        )
-        return {
-          ...ex,
-          movement_pattern: dbEntry ? mapMovementPattern(dbEntry.movement_pattern) : undefined,
-          tier: dbEntry ? mapTier(dbEntry.mechanics_tier) : undefined,
-          fatigue_cost: dbEntry ? deriveFatigueCost(dbEntry) : undefined,
-        }
+  let weekCounter = 0
+
+  sequence.forEach((phase, blockIndex) => {
+    const phaseConfig = getPhaseConfig(phase)
+
+    // Variations rotate ONCE PER BLOCK, not per week. Changing them weekly
+    // would make progression impossible to read; holding them for four weeks
+    // gives enough repetitions to actually improve at the movement.
+    const blockDays = baseWeek.map(day => ({
+      ...day,
+      exercises: day.exercises.map(ex => ({
+        ...ex,
+        name: rotateVariation(ex.name, blockIndex, pool, experience),
+      })),
+    }))
+
+    for (let w = 1; w <= 4; w++) {
+      weekCounter++
+      const isDeload = w === 4
+
+      const days: WorkoutDay[] = blockDays.map(day => {
+        const exercises: Exercise[] = day.exercises.map(ex => {
+          const setsMultiplier = isDeload ? 0.5 : phaseConfig.sets_multiplier
+          // Weeks 1-3 build within the block; the deload pulls volume back.
+          const weekBuild = isDeload ? 0 : (w - 1) * 0.1
+          // Floor of 2. A deload reduces volume; it does not reduce a movement
+          // to a single set, which is not enough to maintain the pattern.
+          const sets = Math.max(2, Math.round(ex.sets * (setsMultiplier + weekBuild)))
+
+          const repShift = isDeload ? 2 : phaseConfig.rep_shift
+          const restShift = isDeload ? 0 : phaseConfig.rest_adjust_seconds
+
+          const dbEntry = EXERCISE_DATABASE.find(
+            e => e.name.toLowerCase() === ex.name.toLowerCase()
+          )
+
+          return {
+            ...ex,
+            sets,
+            reps: shiftReps(ex.reps, repShift, expConfig.min_reps),
+            rest: adjustRest(ex.rest, restShift),
+            intensity: resolveTargetRpe(phase, experience, w, isDeload),
+            movement_pattern: dbEntry ? mapMovementPattern(dbEntry.movement_pattern) : undefined,
+            tier: dbEntry ? mapTier(dbEntry.mechanics_tier) : undefined,
+            fatigue_cost: dbEntry ? deriveFatigueCost(dbEntry) : undefined,
+          }
+        })
+
+        return { ...day, exercises }
       })
-      return { ...modifiedDay, exercises }
-    })
-    weeks.push({
-      week_number: w,
-      label: MESOCYCLE_WEEK_LABELS[w - 1],
-      days,
-    })
-  }
+
+      weeks.push({
+        week_number: weekCounter,
+        block_number: blockIndex + 1,
+        week_in_block: w,
+        phase_label: phaseConfig.label,
+        phase_focus: phaseConfig.focus,
+        is_deload: isDeload,
+        coach_note: isDeload
+          ? 'Deload week — volume is deliberately cut so you arrive at the next block recovered. Resist the urge to push.'
+          : phaseConfig.coach_note,
+        label: isDeload
+          ? `Week ${weekCounter} — ${phaseConfig.label}: Deload`
+          : `Week ${weekCounter} — ${phaseConfig.label} (wk ${w} of block ${blockIndex + 1})`,
+        days,
+      })
+    }
+  })
+
   return weeks
 }
+
 
 export { MESOCYCLE_WEEK_LABELS }
