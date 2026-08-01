@@ -29,6 +29,8 @@ const SKILL_DEMAND: Record<string, SkillDemand> = {
   'Box Jumps': 'high',
   'Broad Jumps': 'high',
   'Snatch-Grip Deadlift': 'high',
+  'Archer Push-Ups': 'high',
+  'Pistol Squat Progression': 'high',
 
   // Moderate — teachable in a session or two, but a genuine coaching point.
   // A beginner can do these, they just need lighter loads and cueing.
@@ -51,6 +53,8 @@ const SKILL_DEMAND: Record<string, SkillDemand> = {
   'Pallof Press': 'moderate',
   'Cable Woodchops': 'moderate',
   'Hack Squat': 'moderate',
+  'Deficit Push-Ups': 'moderate',
+  'Single-Leg RDL (Bodyweight)': 'moderate',
 }
 
 export function getSkillDemand(exerciseName: string): SkillDemand {
@@ -59,10 +63,28 @@ export function getSkillDemand(exerciseName: string): SkillDemand {
 
 const SKILL_RANK: Record<SkillDemand, number> = { low: 0, moderate: 1, high: 2 }
 
+/**
+ * A capacity gate distinct from the generic skill-demand ceiling above.
+ * Full bodyweight Pull-Ups carries a 'high' skill-demand tag, but a
+ * novice's skill ceiling is ALSO 'high' — the generic check alone would
+ * still hand a novice 5-7 sets of 9-13 unassisted pull-ups, which most
+ * novices simply cannot do (an LLM coach review caught this directly:
+ * "if that's true, 12 sets a week of it is the only real back work they
+ * get" — sarcastically, since it isn't true). This is about relative
+ * pulling STRENGTH, which the generic skill-demand table (technique/
+ * coordination/injury-risk) doesn't capture — so it's gated separately
+ * rather than by inflating the general table.
+ */
+const CAPACITY_GATED: Partial<Record<string, TrainingExperience[]>> = {
+  'Pull-Ups': ['intermediate', 'advanced'],
+}
+
 export function isSkillAppropriate(
   exerciseName: string,
   experience: TrainingExperience,
 ): boolean {
+  const gate = CAPACITY_GATED[exerciseName]
+  if (gate && !gate.includes(experience)) return false
   const demand = getSkillDemand(exerciseName)
   const ceiling = EXPERIENCE_CONFIGS[experience].max_skill_demand
   return SKILL_RANK[demand] <= SKILL_RANK[ceiling]

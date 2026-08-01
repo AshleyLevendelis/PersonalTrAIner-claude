@@ -13,7 +13,7 @@ import { buildWarmup, getWarmupReserveSeconds } from './warmup'
 import { prescribeLoad, categorize, getLoadIncrementKg, isExternallyLoaded, getEquipmentFloorKg, type KnownWorkingWeights } from './load-prescription'
 import {
   getPhaseSequence, getPhaseConfig, rotateVariation, resolveTargetRpe,
-  shiftReps, adjustRest, type PhaseConfig,
+  shiftReps, adjustRest, dedupeAdjacentPhases, type PhaseConfig, type TrainingPhase,
 } from './periodization'
 import { getGoalPolicy, restrictPhaseSequence, resolveConditioningFrequency, RECOVERY_SET_MULTIPLIER, type GoalPolicy } from './goal-policies'
 import { getDurationBudgetSeconds, estimateDaySeconds, estimateSlotsSeconds } from './session-duration'
@@ -749,6 +749,15 @@ function adjustCountsForExperience(
   return { ...counts, tier3: counts.tier3 + adjust }
 }
 
+// A bodyweight/thin-pool session that reuses an exercise across multiple
+// days in the week (the refill() fallback below explicitly allows this —
+// an empty session is worse than a repeat) can otherwise reuse it on EVERY
+// training day. Combined with each day's own per-exercise set ceiling
+// (see getRoleSetCeiling), an uncapped exercise could still land at
+// 4-5 days x 3-4 sets — the review's literal complaint was Hanging Leg
+// Raises at 26 sets/week. Capped at 2 appearances/week; see below.
+const WEEKLY_APPEARANCE_CAP = 2
+
 function selectExercisesForTrack(
   track: TrackDefinition,
   pool: ExerciseEntry[],
@@ -756,6 +765,7 @@ function selectExercisesForTrack(
   weeklyUsed: Set<string>,
   styleConfig: StyleConfig,
   feasibleRequiredPatterns?: MovementPattern[],
+  weeklyAppearanceCount?: Map<string, number>,
 ): { primer: ExerciseEntry | null; main: ExerciseEntry[] } {
   const allPatterns = new Set([...track.primary_patterns, ...track.secondary_patterns])
   const forbidden = new Set(track.forbidden_patterns)
@@ -825,12 +835,13 @@ function selectExercisesForTrack(
     const tierRank = (e: ExerciseEntry) =>
       ({ tier1_compound: 0, tier2_compound: 1, tier3_isolation: 2 } as Record<string, number>)[e.mechanics_tier] ?? 3
 
-    const refill = (respectFamilies: boolean) => {
+    const refill = (respectFamilies: boolean, respectWeeklyCap: boolean) => {
       const candidates = shuffle(
         trackPool.filter(e =>
           e.mechanics_tier !== 'primer' &&
           !selected.some(s => s.name === e.name) &&
-          (!respectFamilies || !usedGroups.has(getMovementFamily(e)))
+          (!respectFamilies || !usedGroups.has(getMovementFamily(e))) &&
+          (!respectWeeklyCap || !weeklyAppearanceCount || (weeklyAppearanceCount.get(e.name) ?? 0) < WEEKLY_APPEARANCE_CAP)
         )
       ).sort((a, b) => tierRank(a) - tierRank(b))
 
@@ -846,7 +857,11 @@ function selectExercisesForTrack(
     // movement across days is normal training. Repeating it twice in the SAME
     // session is not, so families stay enforced even here. A slightly shorter
     // session beats one padded with Chest Dips next to Tricep Dips.
-    refill(true)
+    // Weekly-appearance cap is tried first (see WEEKLY_APPEARANCE_CAP); only
+    // relaxed if that alone can't fill the session — an occasional exercise
+    // over-capped by one appearance beats an empty slot.
+    refill(true, true)
+    if (selected.length < target) refill(true, false)
   }
 
   // Ensure required patterns are present
@@ -1605,13 +1620,14 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
 
   const weeklyUsed = new Set<string>()
   const allSelectedNames = new Set<string>()
+  const weeklyAppearanceCount = new Map<string, number>()
 
   const days: WorkoutDay[] = availableDays.map((day, index) => {
     const rawTrack = split[index % split.length]
     const trackFocus = getViableTrack(rawTrack, pool)
     const track = TRACKS[trackFocus]
 
-    const { primer, main } = selectExercisesForTrack(track, pool, counts, weeklyUsed, styleConfig, feasiblePatterns)
+    const { primer, main } = selectExercisesForTrack(track, pool, counts, weeklyUsed, styleConfig, feasiblePatterns, weeklyAppearanceCount)
 
     // Build exercise list with sets/reps from style config
     const daySlots: { entry: ExerciseEntry; sets: number; reps: string; rest: string; restSeconds: number }[] = []
@@ -1625,6 +1641,7 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
     for (const entry of main) {
       weeklyUsed.add(entry.name)
       allSelectedNames.add(entry.name)
+      weeklyAppearanceCount.set(entry.name, (weeklyAppearanceCount.get(entry.name) ?? 0) + 1)
       const sr = assignSetsRepsFromConfig(entry, styleConfig, experience)
       daySlots.push({ entry, ...sr })
     }
@@ -1699,6 +1716,11 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
 // ---------------------------------------------------------------------------
 // 4-WEEK PERIODIZED MESOCYCLE (preserved)
 // ---------------------------------------------------------------------------
+
+// A bodyweight trainee has no external load to ramp — 'strength' and
+// 'power' phases both assume one. Restricted to the same set beginners get
+// (see periodization.ts's getPhaseSequence), regardless of experience.
+const BODYWEIGHT_ALLOWED_PHASES: TrainingPhase[] = ['anatomical_adaptation', 'hypertrophy', 'metabolic']
 
 const MESOCYCLE_WEEK_LABELS = [
   'Week 1 — Anatomical Adaptation',
@@ -2091,7 +2113,24 @@ export function generateMesocycle(
   // (getPhaseSequence); the goal policy trims further on top — e.g.
   // conditioning never sees a strength or power block regardless of how
   // experienced the trainee is.
-  const sequence = restrictPhaseSequence(getPhaseSequence(goal, experience), policy.allowedPhases)
+  let sequence = restrictPhaseSequence(getPhaseSequence(goal, experience), policy.allowedPhases)
+  // A bodyweight-only trainee has no mechanism to express "heavier" the way
+  // a strength/power block assumes — an LLM coach review caught an advanced
+  // bodyweight profile being handed "Maximal Strength — lower reps, high
+  // intensity" with literally no way to add load. Remapped the same way
+  // experience/goal restrictions above already work: fall back toward
+  // hypertrophy/metabolic work, where reps and leverage are still real
+  // progression levers.
+  if (profile.equipment_access === 'bodyweight') {
+    sequence = restrictPhaseSequence(sequence, BODYWEIGHT_ALLOWED_PHASES)
+  }
+  // Any of the restrictions above (experience, goal, equipment) can each
+  // independently be safe on their own and still stack into two identical
+  // adjacent blocks — a novice's power->strength remap landing right after
+  // an already-'strength' block 3 produced exactly that ("Blocks 3 and 4 are
+  // both 'Maximal Strength'... an identical, duplicated block"). Final pass,
+  // after every restriction has applied.
+  sequence = dedupeAdjacentPhases(sequence)
   const weeks: MesocycleWeek[] = []
   let weekCounter = 0
 

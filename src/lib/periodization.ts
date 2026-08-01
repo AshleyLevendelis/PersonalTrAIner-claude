@@ -139,6 +139,38 @@ export function getPhaseSequence(
   return base
 }
 
+/**
+ * Collapses back-to-back identical phases into something differentiated.
+ * A novice's power->strength remap (just above) can land two 'strength'
+ * blocks in a row when block 3 was ALREADY strength — "Blocks 3 and 4 are
+ * both 'Maximal Strength'... an identical, duplicated block with no
+ * differentiation" was a direct LLM coach review finding. Swaps the SECOND
+ * occurrence for hypertrophy (always allowed, always distinct from a pure
+ * strength block); if hypertrophy is what's repeating, falls back to
+ * anatomical_adaptation instead.
+ */
+export function dedupeAdjacentPhases(sequence: TrainingPhase[]): TrainingPhase[] {
+  const result: TrainingPhase[] = []
+  for (let i = 0; i < sequence.length; i++) {
+    const phase = sequence[i]
+    // Compared against the ALREADY-FIXED previous entry, not the original
+    // array — a naive sequence.map comparing against the original would
+    // flag every phase in a run of 3+ identical phases as "a duplicate of
+    // the first," collapsing all of them to the same replacement instead of
+    // alternating (a bodyweight advanced hypertrophy plan's ['AA',
+    // 'hypertrophy','hypertrophy','hypertrophy'] — after the equipment
+    // restriction below folds 'strength' to 'hypertrophy' — needs to become
+    // ['AA','hypertrophy','anatomical_adaptation','hypertrophy'], not
+    // ['AA','hypertrophy','anatomical_adaptation','anatomical_adaptation']).
+    if (i === 0 || phase !== result[i - 1]) {
+      result.push(phase)
+    } else {
+      result.push(phase === 'hypertrophy' ? 'anatomical_adaptation' : 'hypertrophy')
+    }
+  }
+  return result
+}
+
 // ---------------------------------------------------------------------------
 // Intensity, capped by experience
 // ---------------------------------------------------------------------------
@@ -198,6 +230,7 @@ const REGRESSION_VARIATIONS = new Set([
   'Pull-Ups (Assisted)',
   'Goblet Squats',
   'Push-Ups',
+  'Incline Push-Ups',
   'Loaded Backpack Walk',
   'Farmer Squat Hold (Isometric Carry)',
 ])
