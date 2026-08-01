@@ -1,8 +1,8 @@
-import { generateExercisePlan } from './exercise-plan'
+import { generateExercisePlan, generateMesocycle } from './exercise-plan'
 import { EXERCISE_DATABASE } from './exercise-db'
 import type {
   UserProfile, EquipmentAccess, TrainingStyle, SessionDuration,
-  WorkoutDay, ConstraintTrace, PlanResult, TrainingExperience,
+  WorkoutDay, ConstraintTrace, PlanResult, TrainingExperience, RecoveryCapacity,
 } from './types'
 import { getSkillDemand, isSkillAppropriate } from './experience-config'
 import { categorize, CATEGORY_CAPS_KG } from './load-prescription'
@@ -55,7 +55,9 @@ const STYLE_REQUIRED_PATTERNS: Record<TrainingStyle, string[]> = {
 }
 
 export interface AuditFailure {
-  check: 'equipment' | 'injury' | 'duration' | 'style_pattern' | 'skill' | 'empty_session' | 'load_cap'
+  check:
+    | 'equipment' | 'injury' | 'duration' | 'style_pattern' | 'skill' | 'empty_session' | 'load_cap'
+    | 'superset_pairing' | 'load_progression' | 'set_progression' | 'goal_structure' | 'recovery_volume'
   combination: string
   details: string
   exercise?: string
@@ -125,6 +127,14 @@ function buildTestProfile(
     conditioning_preference: 'tolerate',
     created_at: new Date().toISOString(),
   } as UserProfile
+}
+
+/** A main compound lift — anything a superset should never pair together (see CHECK 8 and isSupersetEligible in exercise-plan.ts, which this mirrors). */
+function isMainCompound(name: string): boolean {
+  const entry = EXERCISE_DATABASE.find(e => e.name === name)
+  if (!entry) return false
+  if (entry.movement_pattern === 'core' || entry.movement_pattern === 'carry') return false
+  return entry.mechanics_tier === 'tier1_compound' || entry.mechanics_tier === 'tier2_compound'
 }
 
 function estimateSessionSeconds(day: WorkoutDay): number {
@@ -312,6 +322,29 @@ function runSingleAudit(
     }
   }
 
+  // CHECK 8: No superset pairs two main compound lifts (Part 3). Groups
+  // exercises by their superset_label letter (A1/A2, B1/B2, ...) and flags
+  // any pair where both sides are tier1/tier2 compound, non-core/carry work.
+  for (const day of plan) {
+    const labeled = day.exercises.filter(e => e.superset_label)
+    const groups = new Map<string, typeof labeled>()
+    for (const ex of labeled) {
+      const letter = ex.superset_label![0]
+      if (!groups.has(letter)) groups.set(letter, [])
+      groups.get(letter)!.push(ex)
+    }
+    for (const pairExercises of groups.values()) {
+      if (pairExercises.length !== 2) continue
+      if (pairExercises.every(e => isMainCompound(e.name))) {
+        failures.push({
+          check: 'superset_pairing',
+          combination: comboLabel,
+          details: `${day.day}: two main compounds superset together — ${pairExercises.map(e => e.name).join(' + ')}`,
+        })
+      }
+    }
+  }
+
   const maxDuration = plan.reduce((max, day) => Math.max(max, estimateSessionSeconds(day)), 0)
 
   return {
@@ -322,6 +355,192 @@ function runSingleAudit(
     totalExercises: allExercises.length,
     estimatedDurationSec: maxDuration,
   }
+}
+
+// ---------------------------------------------------------------------------
+// Mesocycle behavior checks (b/c/d/e) — a sampled pass, not a cross-product
+// ---------------------------------------------------------------------------
+// generateMesocycle() produces 16 weeks per profile, an order of magnitude
+// more expensive than the base plan the equipment x injury x duration x
+// style audit above already runs 2304 times. Crossing recovery_capacity and
+// conditioning_preference into that same grid would mean tens of thousands
+// of 16-week generations. These checks instead run a small, deliberately
+// chosen set of profiles built to isolate exactly the behavior in question —
+// same approach the spec asked for ("sampling ... rather than full
+// cross-product").
+
+function baseMesocycleProfile(overrides: Partial<UserProfile> = {}): UserProfile {
+  return {
+    id: 'audit-meso-test',
+    age: 30,
+    gender: 'male',
+    height_cm: 178,
+    weight_kg: 80,
+    activity_level: 'moderate',
+    fitness_goal: 'hypertrophy',
+    preferred_time: 'morning',
+    bmr: 1800,
+    tdee: 2500,
+    equipment_access: 'full_gym',
+    injuries: [],
+    training_style: 'hybrid',
+    training_experience: 'intermediate',
+    session_duration_preference: '60-90',
+    workout_split_preference: 'upper_lower',
+    training_days: [
+      { day: 'Monday', available: true },
+      { day: 'Tuesday', available: true },
+      { day: 'Wednesday', available: true },
+      { day: 'Thursday', available: true },
+      { day: 'Friday', available: false },
+      { day: 'Saturday', available: false },
+      { day: 'Sunday', available: false },
+    ],
+    weekly_schedule: {},
+    dietary_preferences: [],
+    concurrent_activities: [],
+    exercise_exclusions: [],
+    macro_calculation_mode: 'STANDARD_STATIC',
+    coaching_persona: 'supportive',
+    recovery_capacity: 'moderate',
+    conditioning_preference: 'tolerate',
+    created_at: new Date().toISOString(),
+    ...overrides,
+  } as UserProfile
+}
+
+function countMainCompoundSlots(days: WorkoutDay[]): number {
+  let count = 0
+  for (const day of days) {
+    for (const ex of day.exercises) {
+      const entry = EXERCISE_DATABASE.find(e => e.name.toLowerCase() === ex.name.toLowerCase())
+      if (entry?.mechanics_tier === 'tier1_compound' && entry.movement_pattern !== 'core' && entry.movement_pattern !== 'carry') {
+        count++
+      }
+    }
+  }
+  return count
+}
+
+function sumWeeklySets(days: WorkoutDay[]): number {
+  return days.reduce((sum, day) => sum + day.exercises.reduce((s, ex) => s + ex.sets, 0), 0)
+}
+
+function runMesocycleBehaviorChecks(): AuditTestCase[] {
+  const cases: AuditTestCase[] = []
+
+  // CHECK (b) + (c): within block 1, main-lift load is non-decreasing across
+  // the three loading weeks and drops on deload; sets never increase
+  // week-over-week within the block. Run against a couple of goals since
+  // 'load' vs 'reps'/'maintain' progressionEmphasis changes what "the load"
+  // even means — hypertrophy and fat_loss are both 'load' emphasis (Part 4).
+  for (const goal of ['hypertrophy', 'fat_loss'] as const) {
+    const profile = baseMesocycleProfile({ fitness_goal: goal })
+    const comboLabel = `[mesocycle progression] goal=${goal}`
+    const failures: AuditFailure[] = []
+
+    const meso = generateMesocycle(profile)
+    const block1 = meso.filter(w => w.block_number === 1).sort((a, b) => (a.week_in_block ?? 0) - (b.week_in_block ?? 0))
+
+    for (const day of profile.training_days.filter(d => d.available)) {
+      const weekDays = block1.map(w => w.days.find(d => d.day === day.day))
+      const mainLifts = weekDays.map(d => d?.exercises.find(e => e.tier === 'tier_1_primary'))
+      if (mainLifts.some(e => !e)) continue
+
+      const loads = mainLifts.map(e => e!.suggested_load_kg)
+      const sets = mainLifts.map(e => e!.sets)
+
+      if (loads.every(l => l != null)) {
+        const [w1, w2, w3, w4] = loads as number[]
+        if (!(w1 <= w2 && w2 <= w3)) {
+          failures.push({
+            check: 'load_progression',
+            combination: comboLabel,
+            details: `${day.day} main lift load not non-decreasing across loading weeks: ${w1} -> ${w2} -> ${w3}`,
+            exercise: mainLifts[0]!.name,
+          })
+        }
+        if (!(w4 < w3)) {
+          failures.push({
+            check: 'load_progression',
+            combination: comboLabel,
+            details: `${day.day} main lift deload (${w4}) did not drop below week 3 (${w3})`,
+            exercise: mainLifts[0]!.name,
+          })
+        }
+      }
+
+      const [s1, s2, s3] = sets
+      if (!(s2 <= s1 && s3 <= s2)) {
+        failures.push({
+          check: 'set_progression',
+          combination: comboLabel,
+          details: `${day.day} main lift sets increased within block 1: ${s1} -> ${s2} -> ${s3}`,
+          exercise: mainLifts[0]!.name,
+        })
+      }
+    }
+
+    const allExercises = block1.flatMap(w => w.days.flatMap(d => d.exercises))
+    cases.push({
+      equipment: profile.equipment_access, injuries: profile.injuries, duration: profile.session_duration_preference,
+      style: profile.training_style, experience: profile.training_experience,
+      passed: failures.length === 0, failures,
+      planDays: block1[0]?.days.length ?? 0, totalExercises: allExercises.length, estimatedDurationSec: 0,
+    })
+  }
+
+  // CHECK (d): fat_loss keeps the same main-compound structure as
+  // hypertrophy — same number of tier1_compound slots across the week, i.e.
+  // it's still a lifting program, not converted to circuits/isolation-only
+  // work to hit its lower set-volume target.
+  {
+    const comboLabel = '[mesocycle goal structure] fat_loss vs hypertrophy'
+    const failures: AuditFailure[] = []
+    const hypertrophyDays = generateExercisePlan(baseMesocycleProfile({ fitness_goal: 'hypertrophy' })).plan
+    const fatLossDays = generateExercisePlan(baseMesocycleProfile({ fitness_goal: 'fat_loss' })).plan
+    const hypertrophyMainSlots = countMainCompoundSlots(hypertrophyDays)
+    const fatLossMainSlots = countMainCompoundSlots(fatLossDays)
+    if (fatLossMainSlots < hypertrophyMainSlots) {
+      failures.push({
+        check: 'goal_structure',
+        combination: comboLabel,
+        details: `fat_loss has fewer main-compound slots (${fatLossMainSlots}) than hypertrophy (${hypertrophyMainSlots}) — looks converted away from lifting rather than just lower volume`,
+      })
+    }
+    cases.push({
+      equipment: 'full_gym', injuries: [], duration: '60-90', style: 'hybrid', experience: 'intermediate',
+      passed: failures.length === 0, failures,
+      planDays: fatLossDays.length, totalExercises: fatLossDays.flatMap(d => d.exercises).length, estimatedDurationSec: 0,
+    })
+  }
+
+  // CHECK (e): low recovery_capacity produces lower weekly set volume than
+  // high, all else equal.
+  {
+    const comboLabel = '[mesocycle recovery volume] low vs high recovery_capacity'
+    const failures: AuditFailure[] = []
+    const weeklySets: Record<RecoveryCapacity, number> = { low: 0, moderate: 0, high: 0 }
+    for (const capacity of ['low', 'high'] as RecoveryCapacity[]) {
+      const meso = generateMesocycle(baseMesocycleProfile({ recovery_capacity: capacity }))
+      const week1 = meso.find(w => w.week_number === 1)!
+      weeklySets[capacity] = sumWeeklySets(week1.days)
+    }
+    if (!(weeklySets.low < weeklySets.high)) {
+      failures.push({
+        check: 'recovery_volume',
+        combination: comboLabel,
+        details: `low recovery_capacity weekly sets (${weeklySets.low}) not lower than high (${weeklySets.high})`,
+      })
+    }
+    cases.push({
+      equipment: 'full_gym', injuries: [], duration: '60-90', style: 'hybrid', experience: 'intermediate',
+      passed: failures.length === 0, failures,
+      planDays: 0, totalExercises: 0, estimatedDurationSec: 0,
+    })
+  }
+
+  return cases
 }
 
 export function runFullConstraintAudit(
@@ -359,10 +578,16 @@ export function runFullConstraintAudit(
     }
   }
 
+  // Sampled mesocycle-behavior checks (b/c/d/e) — see runMesocycleBehaviorChecks
+  // for why these run against a handful of targeted profiles instead of
+  // being crossed into the grid above.
+  const mesocycleCases = runMesocycleBehaviorChecks()
+  results.push(...mesocycleCases)
+
   const runTimeMs = performance.now() - startTime
 
   return {
-    totalCombinations,
+    totalCombinations: totalCombinations + mesocycleCases.length,
     passed: results.filter(r => r.passed).length,
     failed: results.filter(r => !r.passed).length,
     results,

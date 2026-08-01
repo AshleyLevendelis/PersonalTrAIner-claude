@@ -1,5 +1,7 @@
 import { runFullConstraintAudit } from '../src/lib/dev-constraint-audit'
 import type { AuditReport } from '../src/lib/dev-constraint-audit'
+import { generateMesocycle } from '../src/lib/exercise-plan'
+import type { UserProfile, FitnessGoal } from '../src/lib/types'
 import * as fs from 'fs'
 import * as path from 'path'
 
@@ -80,6 +82,61 @@ function formatReport(report: AuditReport): string {
   return lines.join('\n')
 }
 
+/**
+ * One profile per goal, otherwise identical, so goal-driven differences are
+ * the only variable. Prints Monday across weeks 1-4 of block 1 for each —
+ * loads should ramp within the block, sets should hold, accessories should
+ * rotate at the week-3 boundary, and the four goals should visibly differ
+ * from each other (volume, phases, conditioning, coach note).
+ */
+function buildGoalSampleReport(): string {
+  const lines: string[] = []
+  lines.push('='.repeat(80))
+  lines.push('GOAL SAMPLE — Monday, Block 1, Weeks 1-4 (same profile otherwise)')
+  lines.push('='.repeat(80))
+
+  const goals: FitnessGoal[] = ['hypertrophy', 'fat_loss', 'conditioning', 'functional']
+
+  for (const goal of goals) {
+    const profile: UserProfile = {
+      age: 30, gender: 'male', height_cm: 180, weight_kg: 85,
+      activity_level: 'moderate', fitness_goal: goal,
+      training_days: [
+        { day: 'Monday', available: true }, { day: 'Tuesday', available: true },
+        { day: 'Wednesday', available: true }, { day: 'Thursday', available: true },
+        { day: 'Friday', available: false }, { day: 'Saturday', available: false }, { day: 'Sunday', available: false },
+      ],
+      preferred_time: 'evening', dietary_preferences: [], session_duration_preference: '60-90',
+      workout_split_preference: 'upper_lower', macro_calculation_mode: 'STANDARD_STATIC',
+      equipment_access: 'full_gym', training_style: 'hybrid', training_experience: 'intermediate',
+      coaching_persona: 'analytical', injuries: [],
+      recovery_capacity: 'moderate', conditioning_preference: 'tolerate',
+    }
+
+    const meso = generateMesocycle(profile)
+    const block1 = meso.filter(w => w.block_number === 1).sort((a, b) => (a.week_in_block ?? 0) - (b.week_in_block ?? 0))
+
+    lines.push('')
+    lines.push(`--- ${goal} ---`)
+    lines.push(`phases: ${[...new Set(meso.map(w => w.phase_label))].join(' -> ')}`)
+    lines.push(`block 1 coach note: ${block1[0]?.coach_note ?? ''}`)
+
+    for (const week of block1) {
+      const monday = week.days.find(d => d.day === 'Monday')
+      if (!monday) continue
+      lines.push(`  week_in_block ${week.week_in_block} (${week.is_deload ? 'deload' : 'loading'}):`)
+      for (const ex of monday.exercises) {
+        const loadStr = ex.suggested_load_kg != null ? `${ex.suggested_load_kg}kg` : (ex.suggested_load ?? '-')
+        lines.push(`    ${ex.tier?.padEnd(16) ?? ''} ${ex.name.padEnd(28)} sets=${ex.sets} reps=${ex.reps.padEnd(8)} load=${loadStr}`)
+      }
+    }
+  }
+
+  lines.push('')
+  lines.push('='.repeat(80))
+  return lines.join('\n')
+}
+
 async function main() {
   console.log('Running Exercise Engine Constraint Audit...')
   console.log('This tests all combinations of equipment, injuries, duration, and style')
@@ -98,9 +155,12 @@ async function main() {
   const formatted = formatReport(report)
   console.log(formatted)
 
+  const goalSample = buildGoalSampleReport()
+  console.log('\n' + goalSample)
+
   // Save to file
   const outputPath = path.join(process.cwd(), 'audit-report.txt')
-  fs.writeFileSync(outputPath, formatted, 'utf-8')
+  fs.writeFileSync(outputPath, formatted + '\n\n' + goalSample, 'utf-8')
   console.log(`\nReport saved to: ${outputPath}`)
 
   // Exit with error code if any tests failed

@@ -1627,14 +1627,15 @@ export function generateMesocycle(
 
             // Week 1 sets the baseline through the normal estimate pipeline
             // (bodyweight/known-weight/RPE/first-block/calibration all still
-            // apply there). When this goal ramps load, weeks 2-3 are that
-            // exact baseline plus one/two fixed increments — not a fresh,
-            // independently RPE-scaled estimate, which is what made load
-            // look flat despite sets climbing. When it doesn't (reps or
-            // maintain emphasis), weeks 2-3 fall through to the normal
-            // per-week estimate below instead of a forced number — RPE
-            // alone drives any movement in the weight. Either way, the
-            // deload is 65-75% of whatever week 3 actually resolved to.
+            // apply there). Weeks 2-3 are ALWAYS a forced number derived from
+            // that baseline, never a fresh independently RPE-scaled estimate
+            // — that re-estimate is exactly what made load swing by 5-10kg
+            // week to week for 'reps'/'maintain' goals before this, despite
+            // being meant to hold flat. When this goal ramps load, weeks 2-3
+            // are baseline plus one/two fixed increments; otherwise ('reps'
+            // or 'maintain' emphasis) the weight holds flat at the baseline
+            // and only reps/RPE move. Either way, the deload is 65-75% of
+            // whatever week 3 actually resolved to.
             //
             // For an accessory that rotates variation mid-block, the
             // baseline number still carries over from week 1's (different)
@@ -1643,9 +1644,9 @@ export function generateMesocycle(
             // but `increment` above is recomputed for whichever variation is
             // actually being lifted this week.
             let forceStartingWeightKg: number | undefined
-            if (rampLoad && baselineKg != null) {
-              if (w === 2) forceStartingWeightKg = baselineKg + increment
-              else if (w === 3) forceStartingWeightKg = baselineKg + 2 * increment
+            if (baselineKg != null) {
+              if (w === 2) forceStartingWeightKg = rampLoad ? baselineKg + increment : baselineKg
+              else if (w === 3) forceStartingWeightKg = rampLoad ? baselineKg + 2 * increment : baselineKg
             }
             if (isDeload) {
               const week3Kg = blockWeek3Kg[dayIdx][exIdx]
