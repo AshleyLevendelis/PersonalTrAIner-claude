@@ -442,6 +442,22 @@ function getOpposingPattern(pattern: MovementPattern): MovementPattern | null {
   return null
 }
 
+/**
+ * Whether an exercise may take EITHER slot in a superset pair. The
+ * ['knee_dominant', 'hip_hinge'] antagonist entry above exists for pairing a
+ * light hinge accessory with a light knee-dominant accessory — it was also,
+ * unfiltered, pairing Barbell Squats with Trap Bar Deadlift as A1/A2, two
+ * heavy tier1/tier2 compounds that each need full, un-halved rest. Isolation
+ * work (tier3) and core/carry work (tagged by pattern, not tier — several
+ * core movements like Ab Wheel Rollout are tier2_compound) are the only
+ * things meant to go in a superset; every genuine compound lift stays out,
+ * regardless of which antagonist pattern pair it happens to match.
+ */
+function isSupersetEligible(entry: ExerciseEntry): boolean {
+  if (entry.movement_pattern === 'core' || entry.movement_pattern === 'carry') return true
+  return entry.mechanics_tier === 'tier3_isolation'
+}
+
 function getDurationBudgetSeconds(duration: SessionDuration): number {
   switch (duration) {
     case '30-45': return 37 * 60
@@ -482,7 +498,7 @@ function buildSupersetPairs(
   for (let i = 0; i < result.length; i++) {
     if (paired.has(i)) continue
     const entryA = pool.find(e => e.name === result[i].name)
-    if (!entryA || entryA.mechanics_tier === 'primer') continue
+    if (!entryA || !isSupersetEligible(entryA)) continue
 
     const opposing = getOpposingPattern(entryA.movement_pattern)
     if (!opposing) continue
@@ -490,7 +506,7 @@ function buildSupersetPairs(
     for (let j = i + 1; j < result.length; j++) {
       if (paired.has(j)) continue
       const entryB = pool.find(e => e.name === result[j].name)
-      if (!entryB || entryB.mechanics_tier === 'primer') continue
+      if (!entryB || !isSupersetEligible(entryB)) continue
 
       if (entryB.movement_pattern === opposing) {
         const letter = String.fromCharCode(65 + labelCounter)
@@ -517,14 +533,19 @@ function stageTimeCap(
 
   if (estimated <= budgetSeconds) return dayExercises
 
-  // Phase 1: Convert to antagonist supersets (halves rest between paired exercises)
+  // Phase 1: Convert to antagonist supersets (halves rest between paired
+  // exercises). Same eligibility gate as buildSupersetPairs — main lifts
+  // keep full rest even under time pressure; only isolation/core/carry work
+  // gets compressed here.
   const paired = new Set<number>()
   for (let i = 0; i < dayExercises.length; i++) {
     if (paired.has(i)) continue
+    if (!isSupersetEligible(dayExercises[i].entry)) continue
     const opposing = getOpposingPattern(dayExercises[i].entry.movement_pattern)
     if (!opposing) continue
     for (let j = i + 1; j < dayExercises.length; j++) {
       if (paired.has(j)) continue
+      if (!isSupersetEligible(dayExercises[j].entry)) continue
       if (dayExercises[j].entry.movement_pattern === opposing) {
         dayExercises[j] = { ...dayExercises[j], restSeconds: Math.round(dayExercises[j].restSeconds * 0.5), rest: `${Math.round(dayExercises[j].restSeconds * 0.5)}s` }
         paired.add(i)
