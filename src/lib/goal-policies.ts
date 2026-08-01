@@ -1,4 +1,4 @@
-import type { FitnessGoal } from './types'
+import type { ConditioningPreference, FitnessGoal, RecoveryCapacity } from './types'
 import type { TrainingPhase } from './periodization'
 
 // ---------------------------------------------------------------------------
@@ -152,4 +152,32 @@ export function restrictPhaseSequence(sequence: TrainingPhase[], allowedPhases: 
     const fallback = PHASE_FALLBACK[phase].find(p => allowed.has(p))
     return fallback ?? 'anatomical_adaptation'
   })
+}
+
+// ---------------------------------------------------------------------------
+// Onboarding-driven modifiers (Part 5)
+// ---------------------------------------------------------------------------
+
+/** Weekly set-volume multiplier from self-reported recovery capacity — stacks with (multiplies on top of) the goal's own setVolumeMultiplier. */
+export const RECOVERY_SET_MULTIPLIER: Record<RecoveryCapacity, number> = {
+  low: 0.75,
+  moderate: 0.9,
+  high: 1.0,
+}
+
+/**
+ * Applies conditioning_preference on top of a goal's base conditioning
+ * frequency. 'avoid' doesn't zero it out unconditionally — fat_loss and
+ * conditioning goals still need SOME conditioning to actually hit the goal,
+ * so they drop to a minimum viable dose instead of nothing; hypertrophy and
+ * functional, where conditioning is optional/supplementary to begin with,
+ * drop all the way to zero appended cardio.
+ */
+export function resolveConditioningFrequency(policy: GoalPolicy, preference: ConditioningPreference | undefined): number {
+  if (preference === 'avoid') {
+    const stillNeedsSome = policy.goal === 'fat_loss' || policy.goal === 'conditioning'
+    return stillNeedsSome ? 1 : 0
+  }
+  if (preference === 'love') return policy.conditioningFrequencyPerWeek + 1
+  return policy.conditioningFrequencyPerWeek
 }

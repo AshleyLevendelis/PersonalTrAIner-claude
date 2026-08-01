@@ -119,9 +119,10 @@ function buildTestProfile(
     dietary_preferences: [],
     concurrent_activities: [],
     exercise_exclusions: [],
-    training_time_preference: 'morning',
     macro_calculation_mode: 'STANDARD_STATIC',
     coaching_persona: 'supportive',
+    recovery_capacity: 'moderate',
+    conditioning_preference: 'tolerate',
     created_at: new Date().toISOString(),
   } as UserProfile
 }

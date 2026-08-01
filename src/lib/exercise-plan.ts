@@ -15,7 +15,7 @@ import {
   getPhaseSequence, getPhaseConfig, rotateVariation, resolveTargetRpe,
   shiftReps, adjustRest,
 } from './periodization'
-import { getGoalPolicy, restrictPhaseSequence, type GoalPolicy } from './goal-policies'
+import { getGoalPolicy, restrictPhaseSequence, resolveConditioningFrequency, RECOVERY_SET_MULTIPLIER, type GoalPolicy } from './goal-policies'
 
 // ---------------------------------------------------------------------------
 // Track definitions (unchanged — used for day-level focus selection)
@@ -1066,7 +1066,7 @@ function assignConditioningNotes(days: WorkoutDay[], profile: UserProfile, polic
   const restDayNames = allDayNames.filter(d => !trainingDayNames.has(d))
 
   const cardioForGoal = getConditioningProfile(goal)
-  let remaining = Math.max(0, Math.round(policy.conditioningFrequencyPerWeek))
+  let remaining = Math.max(0, Math.round(resolveConditioningFrequency(policy, profile.conditioning_preference)))
 
   for (const day of days) {
     if (day.focus !== 'Conditioning & Core') continue
@@ -1220,7 +1220,14 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
   trace.pool_size_after_each_stage.final = pool.length
 
   // Build the weekly plan
-  const availableDays = profile.training_days.filter(d => d.available)
+  let availableDays = profile.training_days.filter(d => d.available)
+  if (profile.recovery_capacity === 'low' && availableDays.length >= 5) {
+    // Low recovery capacity (poor sleep, high stress, a physically demanding
+    // job) can't safely absorb 5+ weekly sessions on top of everything else
+    // it's already carrying — trim the last selected day back to rest rather
+    // than silently overloading someone who told us recovery was the limiter.
+    availableDays = availableDays.slice(0, -1)
+  }
   const splitPref = profile.workout_split_preference || 'ai_recommendation'
   const split = getSplitForDays(availableDays.length, profile.fitness_goal, splitPref, trainingStyle)
 
@@ -1491,6 +1498,7 @@ export function generateMesocycle(
   const expConfig = getExperienceConfig(experience)
   const pool = getConstrainedPool(profile, exclusions)
   const policy = getGoalPolicy(goal)
+  const recoverySetMultiplier = RECOVERY_SET_MULTIPLIER[profile.recovery_capacity || 'moderate']
 
   // Experience already trims power/strength for beginners/novices
   // (getPhaseSequence); the goal policy trims further on top — e.g.
@@ -1576,9 +1584,11 @@ export function generateMesocycle(
           // block — load is the progression lever below, not set count. The
           // deload is the one week that deliberately drops both. The goal's
           // set-volume multiplier scales the whole block up or down (e.g.
-          // fat_loss/conditioning run lighter than hypertrophy) before the
-          // phase and deload multipliers apply.
-          const goalAdjustedBaseSets = ex.sets * policy.setVolumeMultiplier
+          // fat_loss/conditioning run lighter than hypertrophy), and
+          // recovery_capacity scales it again on top (low recovery trains
+          // at 75% the volume of high, all else equal) — before the phase
+          // and deload multipliers apply.
+          const goalAdjustedBaseSets = ex.sets * policy.setVolumeMultiplier * recoverySetMultiplier
           const sets = isDeload
             ? Math.max(2, Math.round(goalAdjustedBaseSets * 0.5))
             : Math.max(2, Math.round(goalAdjustedBaseSets * phaseConfig.sets_multiplier))

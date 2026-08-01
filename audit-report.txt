@@ -5,7 +5,7 @@ EXERCISE ENGINE CONSTRAINT AUDIT REPORT
 Total Combinations Tested: 2304
 Passed: 2304 (100.0%)
 Failed: 0 (0.0%)
-Total Runtime: 805ms (0.80s)
+Total Runtime: 634ms (0.63s)
 
 ✓ ALL TESTS PASSED!
 

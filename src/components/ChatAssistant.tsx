@@ -75,7 +75,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, mealPl
     const name = profile.display_name || ''
     const persona = profile.coaching_persona || 'supportive'
 
-    const trainingTime = profile.training_time_preference || profile.preferred_time || 'morning'
+    const trainingTime = profile.preferred_time || 'morning'
     const sessionPassedCutoff: Record<string, number> = {
       morning: 13,
       midday: 16,
@@ -441,7 +441,6 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, mealPl
         tdee: Math.round(profile.tdee || 0),
       },
       session_duration_preference: profile.session_duration_preference,
-      training_time_preference: profile.training_time_preference,
       workout_split_preference: profile.workout_split_preference,
       coaching_persona: profile.coaching_persona || 'supportive',
       display_name: profile.display_name || '',

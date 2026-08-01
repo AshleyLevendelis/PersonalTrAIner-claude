@@ -7,7 +7,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Card, CardContent } from '@/components/ui/card'
 import { ChevronLeft, Dumbbell } from 'lucide-react'
 import { OptionCard } from './OptionCard'
-import type { UserProfile, FitnessGoal, SessionDuration, TrainingTime, WorkoutSplit, EquipmentAccess, TrainingStyle, TrainingExperience, CoachingPersona, MacroCalculationMode } from '@/lib/types'
+import type { UserProfile, FitnessGoal, SessionDuration, TrainingTime, WorkoutSplit, EquipmentAccess, TrainingStyle, TrainingExperience, CoachingPersona, MacroCalculationMode, RecoveryCapacity, ConditioningPreference } from '@/lib/types'
 
 type WeightUnit = 'kg' | 'lbs'
 type HeightUnit = 'cm' | 'ftin'
@@ -16,6 +16,8 @@ interface OnboardingData {
   displayName: string
   fitnessGoal: FitnessGoal | null
   trainingDays: string[]
+  recoveryCapacity: RecoveryCapacity | null
+  conditioningPreference: ConditioningPreference | null
   sessionDuration: SessionDuration | null
   trainingTime: TrainingTime | null
   equipment: EquipmentAccess | null
@@ -35,7 +37,7 @@ interface OnboardingData {
   knownDeadliftKg: string
 }
 
-const TOTAL_STEPS = 14
+const TOTAL_STEPS = 16
 
 const EXPERIENCE_OPTIONS: { value: TrainingExperience; icon: string; label: string; description: string }[] = [
   { value: 'beginner', icon: '🌱', label: 'Beginner', description: 'New to this, or coming back after a long break' },
@@ -53,6 +55,18 @@ const GOAL_OPTIONS: { value: FitnessGoal; icon: string; label: string; descripti
 
 const DAYS_OF_WEEK = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const DAYS_FULL = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+
+const RECOVERY_OPTIONS: { value: RecoveryCapacity; icon: string; label: string; description: string }[] = [
+  { value: 'low', icon: '🪫', label: 'Stretched Thin', description: 'Poor sleep, high stress, or a physically demanding job' },
+  { value: 'moderate', icon: '🔋', label: 'Getting By', description: 'Decent sleep most nights, manageable stress' },
+  { value: 'high', icon: '🔌', label: 'Well Rested', description: 'Good sleep, low stress, recovery is not a limiter' },
+]
+
+const CONDITIONING_PREF_OPTIONS: { value: ConditioningPreference; icon: string; label: string; description: string }[] = [
+  { value: 'love', icon: '🏃‍♂️', label: 'Love It', description: 'Give me plenty of cardio/conditioning' },
+  { value: 'tolerate', icon: '🙂', label: "It's Fine", description: "I'll do what the program calls for" },
+  { value: 'avoid', icon: '🙅', label: 'Not For Me', description: 'Keep it to the minimum the goal actually needs' },
+]
 
 const DURATION_OPTIONS: { value: SessionDuration; icon: string; label: string; description: string }[] = [
   { value: '30-45', icon: '⚡', label: '30-45 min', description: 'Quick & efficient' },
@@ -149,6 +163,8 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
     displayName: '',
     fitnessGoal: null,
     trainingDays: [],
+    recoveryCapacity: null,
+    conditioningPreference: null,
     sessionDuration: null,
     trainingTime: null,
     equipment: null,
@@ -268,15 +284,17 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
       case 2: return !!data.trainingExperience
       case 3: return data.knowsWorkingLifts !== null
       case 4: return data.trainingDays.length > 0
-      case 5: return !!data.sessionDuration
-      case 6: return !!data.trainingTime
-      case 7: return !!data.equipment
-      case 8: return !!data.trainingStyle
-      case 9: return true
-      case 10: return true
-      case 11: return !!data.age && !!data.heightCm && !!data.weightKg && Number(data.age) > 0 && Number(data.heightCm) > 0 && Number(data.weightKg) > 0
-      case 12: return !!data.coachingPersona
-      case 13: return true
+      case 5: return !!data.recoveryCapacity
+      case 6: return !!data.conditioningPreference
+      case 7: return !!data.sessionDuration
+      case 8: return !!data.trainingTime
+      case 9: return !!data.equipment
+      case 10: return !!data.trainingStyle
+      case 11: return true
+      case 12: return true
+      case 13: return !!data.age && !!data.heightCm && !!data.weightKg && Number(data.age) > 0 && Number(data.heightCm) > 0 && Number(data.weightKg) > 0
+      case 14: return !!data.coachingPersona
+      case 15: return true
       default: return false
     }
   }
@@ -301,13 +319,14 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
       preferred_time: mappedTime,
       dietary_preferences: data.dietaryPreferences,
       session_duration_preference: data.sessionDuration!,
-      training_time_preference: data.trainingTime!,
       workout_split_preference: 'ai_recommendation' as WorkoutSplit,
       macro_calculation_mode: 'STANDARD_STATIC' as MacroCalculationMode,
       equipment_access: data.equipment!,
       training_style: data.trainingStyle!,
       training_experience: data.trainingExperience!,
       coaching_persona: data.coachingPersona!,
+      recovery_capacity: data.recoveryCapacity!,
+      conditioning_preference: data.conditioningPreference!,
       injuries: data.injuries,
       display_name: data.displayName.trim(),
       skip_calibration_week: data.knowsWorkingLifts === true,
@@ -479,6 +498,42 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
 
       case 5:
         return (
+          <StepWrapper title="How's your recovery capacity?" subtitle="Sleep, stress, and a physically demanding job all cut into how much training you can absorb">
+            <div className="grid grid-cols-1 gap-3">
+              {RECOVERY_OPTIONS.map(opt => (
+                <OptionCard
+                  key={opt.value}
+                  icon={opt.icon}
+                  label={opt.label}
+                  description={opt.description}
+                  selected={data.recoveryCapacity === opt.value}
+                  onClick={() => autoAdvance(() => setData(d => ({ ...d, recoveryCapacity: opt.value })))}
+                />
+              ))}
+            </div>
+          </StepWrapper>
+        )
+
+      case 6:
+        return (
+          <StepWrapper title="How do you feel about cardio?" subtitle="Shapes how much conditioning work shows up in your plan">
+            <div className="grid grid-cols-1 gap-3">
+              {CONDITIONING_PREF_OPTIONS.map(opt => (
+                <OptionCard
+                  key={opt.value}
+                  icon={opt.icon}
+                  label={opt.label}
+                  description={opt.description}
+                  selected={data.conditioningPreference === opt.value}
+                  onClick={() => autoAdvance(() => setData(d => ({ ...d, conditioningPreference: opt.value })))}
+                />
+              ))}
+            </div>
+          </StepWrapper>
+        )
+
+      case 7:
+        return (
           <StepWrapper title="How long are your sessions?" subtitle="We'll scale exercises to fit">
             <div className="grid grid-cols-2 gap-3">
               {DURATION_OPTIONS.map(opt => (
@@ -495,7 +550,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
           </StepWrapper>
         )
 
-      case 6:
+      case 8:
         return (
           <StepWrapper title="When do you usually train?" subtitle="Helps optimize your nutrition timing">
             <div className="grid grid-cols-2 gap-3">
@@ -513,7 +568,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
           </StepWrapper>
         )
 
-      case 7:
+      case 9:
         return (
           <StepWrapper title="What equipment do you have?" subtitle="Your plan will only use what's available">
             <div className="grid grid-cols-2 gap-3">
@@ -531,7 +586,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
           </StepWrapper>
         )
 
-      case 8:
+      case 10:
         return (
           <StepWrapper title="What's your training style?" subtitle="How you prefer to move">
             <div className="grid grid-cols-2 gap-3">
@@ -549,7 +604,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
           </StepWrapper>
         )
 
-      case 9:
+      case 11:
         return (
           <StepWrapper title="Any injuries or problem areas?" subtitle="We'll avoid exercises that stress these">
             <div className="grid grid-cols-2 gap-3">
@@ -573,7 +628,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
           </StepWrapper>
         )
 
-      case 10:
+      case 12:
         return (
           <StepWrapper title="Dietary preferences?" subtitle="Your meal plan will respect these">
             <div className="grid grid-cols-3 gap-2">
@@ -597,7 +652,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
           </StepWrapper>
         )
 
-      case 11:
+      case 13:
         return (
           <StepWrapper title="Your body metrics" subtitle="Used to calculate your targets">
             <div className="space-y-4">
@@ -652,7 +707,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
           </StepWrapper>
         )
 
-      case 12:
+      case 14:
         return (
           <StepWrapper title="How should your AI coach talk?" subtitle="Sets the tone for chat & advice">
             <div className="grid grid-cols-2 gap-3">
@@ -670,7 +725,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
           </StepWrapper>
         )
 
-      case 13:
+      case 15:
         return (
           <StepWrapper title={`Ready to go, ${data.displayName}!`} subtitle="Review your selections">
             <Card className="bg-muted/50 border-dashed">
@@ -678,6 +733,8 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
                 <ReviewRow label="Name" value={data.displayName} />
                 <ReviewRow label="Goal" value={GOAL_OPTIONS.find(o => o.value === data.fitnessGoal)?.label} />
                 <ReviewRow label="Training Days" value={`${data.trainingDays.join(', ')} (${data.trainingDays.length} days)`} />
+                <ReviewRow label="Recovery Capacity" value={RECOVERY_OPTIONS.find(o => o.value === data.recoveryCapacity)?.label} />
+                <ReviewRow label="Conditioning" value={CONDITIONING_PREF_OPTIONS.find(o => o.value === data.conditioningPreference)?.label} />
                 <ReviewRow label="Session Length" value={DURATION_OPTIONS.find(o => o.value === data.sessionDuration)?.label} />
                 <ReviewRow label="Time of Day" value={TIME_OPTIONS.find(o => o.value === data.trainingTime)?.label} />
                 <ReviewRow label="Equipment" value={EQUIPMENT_OPTIONS.find(o => o.value === data.equipment)?.label} />

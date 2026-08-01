@@ -17,7 +17,6 @@ export interface UserProfile {
   preferred_time: 'morning' | 'evening'
   dietary_preferences: string[]
   session_duration_preference: SessionDuration
-  training_time_preference: TrainingTime
   workout_split_preference: WorkoutSplit
   macro_calculation_mode: MacroCalculationMode
   equipment_access: EquipmentAccess
@@ -50,6 +49,19 @@ export interface UserProfile {
    * mesocycle is a calibration week instead.
    */
   skip_calibration_week?: boolean
+  /**
+   * Self-reported recovery capacity (sleep, stress, physical job) — scales
+   * weekly set volume (low x0.75, moderate x0.9, high x1.0) and, for low
+   * capacity with 5+ training days selected, trims one day back to rest.
+   */
+  recovery_capacity: RecoveryCapacity
+  /**
+   * How the trainee feels about cardio — scales conditioning frequency in
+   * GOAL_POLICIES (src/lib/goal-policies.ts). 'avoid' still gets a minimum
+   * viable dose for fat_loss/conditioning goals (diet/engine-work still
+   * needs it) but zero appended cardio for hypertrophy/functional.
+   */
+  conditioning_preference: ConditioningPreference
 }
 
 export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'active' | 'very_active'
@@ -59,7 +71,10 @@ export type TrainingStyle = 'functional' | 'bodybuilding' | 'combat' | 'hybrid'
 export type TrainingExperience = 'beginner' | 'novice' | 'intermediate' | 'advanced'
 export type CoachingPersona = 'drill_sergeant' | 'analytical' | 'supportive' | 'hype'
 export type SessionDuration = '30-45' | '45-60' | '60-90' | '90+'
+/** No longer stored on UserProfile (was a duplicate of preferred_time — see the recovery_capacity/conditioning_preference migration). Still used locally by OnboardingFlow's time-of-day question to derive preferred_time. */
 export type TrainingTime = 'morning' | 'midday' | 'evening' | 'night' | 'varies'
+export type RecoveryCapacity = 'low' | 'moderate' | 'high'
+export type ConditioningPreference = 'love' | 'tolerate' | 'avoid'
 export type WorkoutSplit = 'ppl' | 'upper_lower' | 'full_body' | 'bro_split' | 'ai_recommendation'
 export type MacroCalculationMode = 'STANDARD_STATIC' | 'DYNAMIC_CSCS'
 
