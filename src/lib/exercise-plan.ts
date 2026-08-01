@@ -10,7 +10,7 @@ import {
   type ExperienceConfig,
 } from './experience-config'
 import { buildWarmup, getWarmupReserveSeconds } from './warmup'
-import { prescribeLoad } from './load-prescription'
+import { prescribeLoad, type KnownWorkingWeights } from './load-prescription'
 import {
   getPhaseSequence, getPhaseConfig, rotateVariation, resolveTargetRpe,
   shiftReps, adjustRest,
@@ -1220,21 +1220,27 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
     // Convert to Exercise objects
     const exercises: Exercise[] = optimized.map(slot => {
       const isPrimer = slot.entry.mechanics_tier === 'primer'
-      const load = prescribeLoad(slot.entry, profile)
+      // Primers are deliberately submaximal — prescribing an RPE target on a
+      // warm-up movement invites people to load it, which defeats the point.
+      const intensity = isPrimer ? 'Light — movement prep' : experience.target_rpe
+      // This is a first, unverified plan for someone we've never seen lift —
+      // isFirstBlock stays true here regardless of self-reported experience.
+      // No phase yet either (that's a mesocycle concept), so this always
+      // comes back as a straight, flat per-set weight.
+      const load = prescribeLoad(slot.entry, profile, { targetRpeLabel: intensity, isFirstBlock: true, sets: slot.sets })
       return {
         name: slot.entry.name,
         sets: slot.sets,
         reps: slot.reps,
         rest: slot.rest,
         substitution: getSubstitution(slot.entry, pool, allSelectedNames),
-        // Primers are deliberately submaximal — prescribing an RPE target on a
-        // warm-up movement invites people to load it, which defeats the point.
-        intensity: isPrimer ? 'Light — movement prep' : experience.target_rpe,
+        intensity,
         load_guidance: isPrimer
           ? 'Stay light and controlled. This is preparation, not a working set.'
           : `${experience.load_guidance} ${load.basis}`,
         suggested_load: isPrimer ? 'Light' : load.display,
         suggested_load_kg: isPrimer ? null : load.starting_weight_kg,
+        per_set_load: isPrimer ? null : load.per_set,
       }
     })
 
@@ -1418,6 +1424,18 @@ export function generateMesocycle(
   const weeks: MesocycleWeek[] = []
   let weekCounter = 0
 
+  // Onboarding "I know my numbers" path — present only when the trainee
+  // opted out of calibration. Absent (undefined) rather than an
+  // all-undefined object so prescribeLoad's family lookup has nothing to
+  // match against for a trainee who skipped the question entirely.
+  const knownWorkingWeights: KnownWorkingWeights | undefined = profile.skip_calibration_week
+    ? {
+        squat: profile.known_squat_kg,
+        bench: profile.known_bench_kg,
+        deadlift: profile.known_deadlift_kg,
+      }
+    : undefined
+
   sequence.forEach((phase, blockIndex) => {
     const phaseConfig = getPhaseConfig(phase)
 
@@ -1436,6 +1454,12 @@ export function generateMesocycle(
       weekCounter++
       const isDeload = w === 4
 
+      // The very first week of the whole mesocycle, for a trainee who told
+      // onboarding they don't know their numbers — not repeated per block,
+      // since calibration is a one-time "find the weight" exercise, not a
+      // recurring one.
+      const isCalibrationWeek = weekCounter === 1 && profile.skip_calibration_week !== true
+
       const days: WorkoutDay[] = blockDays.map(day => {
         const exercises: Exercise[] = day.exercises.map(ex => {
           const setsMultiplier = isDeload ? 0.5 : phaseConfig.sets_multiplier
@@ -1451,13 +1475,38 @@ export function generateMesocycle(
           const dbEntry = EXERCISE_DATABASE.find(
             e => e.name.toLowerCase() === ex.name.toLowerCase()
           )
+          const isPrimer = dbEntry?.mechanics_tier === 'primer'
+
+          // Primers stay submaximal and un-scaled for the same reason as the
+          // base plan — a warm-up movement should never carry a working-set
+          // RPE or a load that scales with the block.
+          const intensity = isPrimer ? ex.intensity : resolveTargetRpe(phase, experience, w, isDeload)
+
+          // Recomputed every week, not carried over from the base plan: sets,
+          // reps and RPE all change block to block and week to week, and the
+          // load has to track the SAME week's RPE target — otherwise a
+          // deload week ends up prescribing the same weight as a peak week.
+          const load = dbEntry && !isPrimer
+            ? prescribeLoad(dbEntry, profile, {
+                targetRpeLabel: intensity,
+                isFirstBlock: blockIndex === 0,
+                sets,
+                phase,
+                isCalibrationWeek,
+                knownWorkingWeights,
+              })
+            : null
 
           return {
             ...ex,
             sets,
             reps: shiftReps(ex.reps, repShift, expConfig.min_reps),
             rest: adjustRest(ex.rest, restShift),
-            intensity: resolveTargetRpe(phase, experience, w, isDeload),
+            intensity,
+            load_guidance: load ? `${expConfig.load_guidance} ${load.basis}` : ex.load_guidance,
+            suggested_load: load ? load.display : ex.suggested_load,
+            suggested_load_kg: load ? load.starting_weight_kg : ex.suggested_load_kg,
+            per_set_load: load ? load.per_set : (ex.per_set_load ?? null),
             movement_pattern: dbEntry ? mapMovementPattern(dbEntry.movement_pattern) : undefined,
             tier: dbEntry ? mapTier(dbEntry.mechanics_tier) : undefined,
             fatigue_cost: dbEntry ? deriveFatigueCost(dbEntry) : undefined,
@@ -1474,6 +1523,7 @@ export function generateMesocycle(
         phase_label: phaseConfig.label,
         phase_focus: phaseConfig.focus,
         is_deload: isDeload,
+        isCalibrationWeek,
         coach_note: isDeload
           ? 'Deload week — volume is deliberately cut so you arrive at the next block recovered. Resist the urge to push.'
           : phaseConfig.coach_note,

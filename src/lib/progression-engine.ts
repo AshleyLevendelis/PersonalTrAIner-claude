@@ -116,6 +116,36 @@ export async function checkDoubleProgression(
   }
 }
 
+/**
+ * The weight logged for this exercise in the trainee's most recent prior
+ * session — used to progress week 2+ prescriptions off real performance
+ * instead of the bodyweight-multiplier estimate. `sessionDate` scopes the
+ * lookup to sessions strictly before it, so re-running this mid-session
+ * doesn't pick up sets just logged today.
+ */
+export async function getLastSessionLoad(
+  profileId: string,
+  exerciseName: string,
+  sessionDate: string
+): Promise<number | null> {
+  const { data } = await supabase
+    .from('set_logs')
+    .select('weight_kg, completed_at')
+    .eq('user_id', profileId)
+    .eq('exercise_name', exerciseName)
+    .lt('completed_at', sessionDate)
+    .order('completed_at', { ascending: false })
+    .limit(1)
+
+  if (!data || data.length === 0) return null
+  return data[0].weight_kg
+}
+
+/** Applies the same safe overload increment used by checkDoubleProgression, so a logged 80kg becomes ~82kg next week rather than the bodyweight-multiplier estimate. */
+export function getProgressedWeight(lastWeightKg: number): number {
+  return lastWeightKg + calculateIncrement(lastWeightKg)
+}
+
 export async function getLastLoggedWeight(
   userId: string,
   exerciseName: string,

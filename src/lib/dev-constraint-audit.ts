@@ -5,6 +5,7 @@ import type {
   WorkoutDay, ConstraintTrace, PlanResult, TrainingExperience,
 } from './types'
 import { getSkillDemand, isSkillAppropriate } from './experience-config'
+import { categorize, CATEGORY_CAPS_KG } from './load-prescription'
 
 // All combinations to test
 const ALL_EQUIPMENT: EquipmentAccess[] = ['full_gym', 'home_gym', 'minimalist', 'bodyweight']
@@ -54,7 +55,7 @@ const STYLE_REQUIRED_PATTERNS: Record<TrainingStyle, string[]> = {
 }
 
 export interface AuditFailure {
-  check: 'equipment' | 'injury' | 'duration' | 'style_pattern' | 'skill' | 'empty_session'
+  check: 'equipment' | 'injury' | 'duration' | 'style_pattern' | 'skill' | 'empty_session' | 'load_cap'
   combination: string
   details: string
   exercise?: string
@@ -280,6 +281,27 @@ function runSingleAudit(
           exercise: ex.name,
         })
       }
+    }
+  }
+
+  // CHECK 7: No suggested load exceeds its category's absolute first-block
+  // safety cap. `generateExercisePlan` always produces a first, unverified
+  // prescription, so every non-null suggested_load_kg here should have been
+  // capped by prescribeLoad — this check catches a regression in that path.
+  for (const ex of allExercises) {
+    if (ex.suggested_load_kg == null) continue
+    const entry = EXERCISE_DATABASE.find(e => e.name === ex.name)
+    if (!entry) continue
+    const category = categorize(entry)
+    if (!category) continue
+    const cap = CATEGORY_CAPS_KG[category]
+    if (cap != null && ex.suggested_load_kg > cap) {
+      failures.push({
+        check: 'load_cap',
+        combination: comboLabel,
+        details: `Suggested load ${ex.suggested_load_kg}kg exceeds the ${cap}kg first-prescription safety cap for category "${category}"`,
+        exercise: ex.name,
+      })
     }
   }
 

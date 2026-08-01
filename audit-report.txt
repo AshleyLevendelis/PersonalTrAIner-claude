@@ -5,7 +5,7 @@ EXERCISE ENGINE CONSTRAINT AUDIT REPORT
 Total Combinations Tested: 2304
 Passed: 2304 (100.0%)
 Failed: 0 (0.0%)
-Total Runtime: 2782ms (2.78s)
+Total Runtime: 593ms (0.59s)
 
 ✓ ALL TESTS PASSED!
 
@@ -13,7 +13,7 @@ STATISTICS:
 --------------------------------------------------------------------------------
   Avg exercises per plan: 19.6
   Min exercises: 7
-  Max exercises: 42
+  Max exercises: 43
   Avg session duration: 36min
   Max session duration: 86min
 

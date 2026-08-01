@@ -400,7 +400,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, mealPl
 
   // Fix #4: System prompt context assembled once per call, separate from conversation window
   const buildContext = () => {
-    const activeWeek = getActiveMesocycleWeek(profile.created_at)
+    const activeWeek = getActiveMesocycleWeek(profile.created_at, undefined, mesocycle.length > 0 ? mesocycle.length : 4)
     const activeWeekData = mesocycle.length > 0
       ? mesocycle.find(w => w.week_number === activeWeek)?.days || exercisePlan
       : exercisePlan

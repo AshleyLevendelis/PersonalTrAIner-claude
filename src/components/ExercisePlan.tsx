@@ -10,7 +10,7 @@ import { ArrowRightLeft, Ban, Zap, ShieldAlert, Heart, Check, Dumbbell, Plus, Ac
 import React, { useState, useEffect, useCallback } from 'react'
 import { getSmartReplacements, getExerciseEntry } from '@/lib/exercise-db'
 import { upsertWorkoutLog, getLogsForDate, insertCardioLog, getCardioLogsForDate } from '@/lib/daily-tracking'
-import { checkDoubleProgression } from '@/lib/progression-engine'
+import { checkDoubleProgression, getLastSessionLoad, getProgressedWeight } from '@/lib/progression-engine'
 import { logSetOffline, logEntireSessionOffline, saveSessionCache, loadSessionCache, initOfflineSync } from '@/lib/offline-sync'
 import { getActiveMesocycleWeek } from '@/lib/calculations'
 import { checkForPR, seedPRCacheFromHistory, getTopPRSet, getLastSessionForExercise, type PRResult, type SessionSet } from '@/lib/pr-engine'
@@ -75,6 +75,22 @@ function PhaseBanner({ mesoWeek }: { mesoWeek?: MesocycleWeek }) {
   )
 }
 
+/** Prominent week-1 note for trainees who skipped onboarding's known-lifts question — separate from PhaseBanner because this needs to stand out, not blend into the routine phase context. */
+function CalibrationBanner({ mesoWeek }: { mesoWeek?: MesocycleWeek }) {
+  if (!mesoWeek?.isCalibrationWeek) return null
+  return (
+    <div className="flex items-start gap-2 rounded-md border border-amber-300/60 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-700/40 px-3 py-2">
+      <Thermometer className="size-3.5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+      <div className="min-w-0 space-y-0.5">
+        <span className="text-xs font-semibold text-amber-800 dark:text-amber-300">Week 1 — Calibration Week</span>
+        <p className="text-[11px] text-amber-800/80 dark:text-amber-400/80">
+          Find the weight where your last rep feels like RPE 6. Log your session so week 2 scales from your actual performance.
+        </p>
+      </div>
+    </div>
+  )
+}
+
 function RestDayCard({ day, mesoWeek }: { day: string; mesoWeek?: MesocycleWeek }) {
   return (
     <Card className="border-dashed bg-muted/20">
@@ -84,6 +100,7 @@ function RestDayCard({ day, mesoWeek }: { day: string; mesoWeek?: MesocycleWeek 
           <Badge variant="outline" className="text-muted-foreground">Rest & Recovery</Badge>
         </div>
         <PhaseBanner mesoWeek={mesoWeek} />
+        <CalibrationBanner mesoWeek={mesoWeek} />
       </CardHeader>
       <CardContent>
         <div className="flex items-center gap-3 py-4">
@@ -115,6 +132,7 @@ function ActiveRecoveryCard({ workout, mesoWeek }: { workout: WorkoutDay; mesoWe
           </Badge>
         </div>
         <PhaseBanner mesoWeek={mesoWeek} />
+        <CalibrationBanner mesoWeek={mesoWeek} />
       </CardHeader>
       <CardContent>
         {cardio && (
@@ -239,6 +257,7 @@ function SetLogger({
   weekNumber,
   tier,
   suggestedLoadKg,
+  perSetLoadKg,
   onSetCompleted,
   onOpenPlateCalc,
 }: {
@@ -252,6 +271,8 @@ function SetLogger({
   weekNumber?: number
   tier?: string
   suggestedLoadKg?: number | null
+  /** Per-set breakdown (ramping or straight) — indexed by set number - 1. Falls back to suggestedLoadKg for any set beyond this array (e.g. an extra set the user added). */
+  perSetLoadKg?: (number | null)[]
   onSetCompleted?: (exerciseName: string, setNumber: number, weight: number, reps: number, rest: string, sets: number, prescribedReps: string, tier?: string) => void
   onOpenPlateCalc?: (weight: number) => void
 }) {
@@ -392,6 +413,16 @@ function SetLogger({
     setInputs(prev => prev.map((item, i) => i === index ? { ...item, isBodyweight: !item.isBodyweight, weight: '' } : item))
   }
 
+  // Ramping compounds prescribe a lighter weight for set 1 than the top set —
+  // a flat suggestedLoadKg placeholder on every row would suggest the same
+  // weight for the whole ramp. Falls back to the flat value for any set index
+  // beyond the per-set array (e.g. an extra set the user added).
+  const defaultWeightFor = (index: number): string => {
+    const perSet = perSetLoadKg?.[index]
+    if (perSet != null) return String(perSet)
+    return suggestedLoadKg != null ? String(suggestedLoadKg) : '0'
+  }
+
   return (
     <div className="px-4 pb-3 pt-1 space-y-1">
       <div className="grid grid-cols-[auto_1fr_auto_auto_auto_1fr_auto] gap-1.5 items-center text-xs text-muted-foreground font-medium px-1">
@@ -424,7 +455,7 @@ function SetLogger({
               type="number"
               min="0"
               step="0.5"
-              placeholder={isBW ? 'BW' : (ghost?.weight || (suggestedLoadKg != null ? String(suggestedLoadKg) : '0'))}
+              placeholder={isBW ? 'BW' : (ghost?.weight || defaultWeightFor(i))}
               value={isBW ? '' : (inputs[i]?.weight || '')}
               onChange={e => updateInput(i, 'weight', e.target.value)}
               className={`h-7 text-sm ${isSaved ? 'border-green-300 dark:border-green-700' : ''} ${isBW ? 'bg-muted text-muted-foreground' : ''}`}
@@ -505,11 +536,15 @@ const CONDITIONING_PRESETS = [
 ] as const
 
 export function ExercisePlan({ plan, mesocycle, exclusions, profileId, planCreatedAt, logsVersion, devOverrideWeek, devOverrideDay, devBypassLocks, onSwapExercise, onBanExercise }: ExercisePlanProps) {
-  const [currentWeek, setCurrentWeek] = useState(() => devOverrideWeek ?? getActiveMesocycleWeek(planCreatedAt))
+  // generateMesocycle produces 4 weeks PER BLOCK, not 4 weeks total — a
+  // hypertrophy sequence alone is 4 blocks (16 weeks). Falling back to 4 only
+  // applies before the mesocycle has loaded.
+  const totalWeeks = mesocycle && mesocycle.length > 0 ? mesocycle.length : 4
+  const [currentWeek, setCurrentWeek] = useState(() => devOverrideWeek ?? getActiveMesocycleWeek(planCreatedAt, undefined, totalWeeks))
   useEffect(() => {
     if (devOverrideWeek != null) setCurrentWeek(devOverrideWeek)
-    else setCurrentWeek(getActiveMesocycleWeek(planCreatedAt))
-  }, [devOverrideWeek, planCreatedAt])
+    else setCurrentWeek(getActiveMesocycleWeek(planCreatedAt, undefined, totalWeeks))
+  }, [devOverrideWeek, planCreatedAt, totalWeeks])
   const [swapDialog, setSwapDialog] = useState<{ dayIndex: number; exIndex: number; exerciseName: string } | null>(null)
   const [expandedExercises, setExpandedExercises] = useState<Set<string>>(new Set())
   const [expandedWarmups, setExpandedWarmups] = useState<Set<string>>(new Set())
@@ -530,6 +565,7 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profileId, planCreat
   const [loggingSession, setLoggingSession] = useState(false)
   const [plateCalcOpen, setPlateCalcOpen] = useState(false)
   const [plateCalcWeight, setPlateCalcWeight] = useState(0)
+  const [progressedLoads, setProgressedLoads] = useState<Record<string, number>>({})
 
   const hasMesocycle = mesocycle && mesocycle.length > 0
   const activePlan = hasMesocycle
@@ -539,6 +575,23 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profileId, planCreat
     ? mesocycle.find(w => w.week_number === currentWeek)
     : undefined
   const weekLabel = currentMesoWeekObj?.label || ''
+
+  // The mesocycle is several blocks of 4 weeks each (16 weeks for a typical
+  // 4-block sequence), not 4 weeks total — the pagination needs both a block
+  // indicator and, within that, the weeks belonging to the active block.
+  const blockCount = hasMesocycle
+    ? Math.max(...mesocycle.map(w => w.block_number ?? 1))
+    : 1
+  const currentBlockWeeks = hasMesocycle
+    ? mesocycle
+        .filter(w => w.block_number === (currentMesoWeekObj?.block_number ?? 1))
+        .map(w => w.week_number)
+    : [1]
+  const jumpToBlock = (blockNumber: number) => {
+    if (!hasMesocycle) return
+    const firstWeekOfBlock = mesocycle.find(w => w.block_number === blockNumber)?.week_number
+    if (firstWeekOfBlock != null) setCurrentWeek(firstWeekOfBlock)
+  }
 
   const today = new Date().toISOString().split('T')[0]
   const todayName = devOverrideDay ?? new Date().toLocaleDateString('en-US', { weekday: 'long' })
@@ -561,6 +614,40 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profileId, planCreat
       setSessionLogged(cached.sessionLogged)
     }
   }, [])
+
+  // Week 2+: prefer what the trainee actually lifted last session over the
+  // mesocycle's static estimate. Week 1 never has prior data, so this is a
+  // no-op there and the static suggested_load_kg on the exercise stands.
+  useEffect(() => {
+    if (!profileId || currentWeek <= 1) {
+      setProgressedLoads({})
+      return
+    }
+    const todayWorkout = activePlan.find(d => d.day === todayName)
+    if (!todayWorkout) {
+      setProgressedLoads({})
+      return
+    }
+
+    let cancelled = false
+    Promise.all(
+      todayWorkout.exercises
+        .filter(ex => ex.suggested_load_kg != null)
+        .map(async ex => {
+          const lastWeight = await getLastSessionLoad(profileId, ex.name, today)
+          return [ex.name, lastWeight] as const
+        })
+    ).then(results => {
+      if (cancelled) return
+      const next: Record<string, number> = {}
+      for (const [name, lastWeight] of results) {
+        if (lastWeight != null) next[name] = getProgressedWeight(lastWeight)
+      }
+      setProgressedLoads(next)
+    }).catch(() => {})
+
+    return () => { cancelled = true }
+  }, [profileId, currentWeek, todayName, activePlan, today])
 
   useEffect(() => {
     if (profileId && logsVersion && logsVersion > 0) {
@@ -804,13 +891,30 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profileId, planCreat
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              <div className="flex flex-col items-center gap-0.5">
+              <div className="flex flex-col items-center gap-1">
                 <div className="flex items-center gap-2">
                   <Calendar className="h-4 w-4 text-primary" />
                   <span className="text-sm font-semibold">{weekLabel}</span>
                 </div>
+                {blockCount > 1 && (
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: blockCount }, (_, i) => i + 1).map(b => (
+                      <button
+                        key={b}
+                        onClick={() => jumpToBlock(b)}
+                        className={`text-[10px] font-semibold leading-none px-1.5 py-0.5 rounded transition-colors ${
+                          b === currentMesoWeekObj?.block_number
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-primary/10 text-muted-foreground hover:bg-primary/20'
+                        }`}
+                      >
+                        B{b}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 <div className="flex gap-1.5">
-                  {[1, 2, 3, 4].map(w => (
+                  {currentBlockWeeks.map(w => (
                     <button
                       key={w}
                       onClick={() => setCurrentWeek(w)}
@@ -826,8 +930,8 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profileId, planCreat
               <Button
                 variant="ghost"
                 size="sm"
-                disabled={currentWeek >= 4}
-                onClick={() => setCurrentWeek(w => Math.min(4, w + 1))}
+                disabled={currentWeek >= totalWeeks}
+                onClick={() => setCurrentWeek(w => Math.min(totalWeeks, w + 1))}
                 className="h-8 w-8 p-0"
               >
                 <ChevronRight className="h-4 w-4" />
@@ -863,8 +967,9 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profileId, planCreat
               </div>
               <Badge variant="secondary">Primary Focus: {workout.focus}</Badge>
             </div>
-            <div className="mt-2">
+            <div className="mt-2 space-y-2">
               <PhaseBanner mesoWeek={currentMesoWeekObj} />
+              <CalibrationBanner mesoWeek={currentMesoWeekObj} />
             </div>
             {isToday && !sessionLogged && (
               <div className="mt-2">
@@ -956,14 +1061,30 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profileId, planCreat
                             </Badge>
                           )}
                         </div>
-                        {(ex.intensity || ex.suggested_load) && (
-                          <div className="flex items-center gap-2 mt-0.5">
+                        {(ex.intensity || ex.suggested_load || (ex.per_set_load && ex.per_set_load.length > 0)) && (
+                          <div className="flex flex-col gap-0.5 mt-0.5">
                             {ex.intensity && (
                               <span className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground">
                                 <Flame className="size-2.5" />{ex.intensity}
                               </span>
                             )}
-                            {ex.suggested_load && (
+                            {ex.per_set_load && ex.per_set_load.length > 0 ? (
+                              <div className="flex items-center gap-1 flex-wrap">
+                                <Dumbbell className="size-2.5 text-muted-foreground shrink-0" />
+                                {ex.per_set_load.map(s => (
+                                  <span
+                                    key={s.set_number}
+                                    className="inline-flex items-center rounded border px-1 py-0 text-[10px] text-muted-foreground leading-4"
+                                    title={s.display}
+                                  >
+                                    S{s.set_number}: {s.load_kg}kg
+                                  </span>
+                                ))}
+                                {ex.per_set_load[0].display.includes('per hand') && (
+                                  <span className="text-[10px] text-muted-foreground/70">per hand</span>
+                                )}
+                              </div>
+                            ) : ex.suggested_load && (
                               <span className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground">
                                 <Dumbbell className="size-2.5" />{ex.suggested_load}
                               </span>
@@ -1034,7 +1155,8 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profileId, planCreat
                             restTime={ex.rest}
                             weekNumber={currentWeek}
                             tier={ex.tier}
-                            suggestedLoadKg={ex.suggested_load_kg}
+                            suggestedLoadKg={progressedLoads[ex.name] ?? ex.suggested_load_kg}
+                            perSetLoadKg={progressedLoads[ex.name] != null ? undefined : ex.per_set_load?.map(s => s.load_kg)}
                             onSetCompleted={handleSetComplete}
                             onOpenPlateCalc={(w) => { setPlateCalcWeight(w); setPlateCalcOpen(true) }}
                           />

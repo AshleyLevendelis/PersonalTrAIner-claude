@@ -35,6 +35,21 @@ export interface UserProfile {
   protein_g?: number
   carbs_g?: number
   fat_g?: number
+  /**
+   * Working weights the trainee reported during onboarding ("I know my
+   * numbers") — verified data, not a bodyweight-multiplier guess. Present
+   * only when skip_calibration_week is true.
+   */
+  known_squat_kg?: number
+  known_bench_kg?: number
+  known_deadlift_kg?: number
+  /**
+   * True when onboarding collected known working lifts, so week 1 should
+   * seed loads from them instead of running a calibration week. Absent or
+   * false means the trainee didn't know their numbers and week 1 of the
+   * mesocycle is a calibration week instead.
+   */
+  skip_calibration_week?: boolean
 }
 
 export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'active' | 'very_active'
@@ -83,6 +98,14 @@ export interface Exercise {
   suggested_load?: string
   /** Numeric starting weight in kg; null for bodyweight movements. */
   suggested_load_kg?: number | null
+  /**
+   * Per-set load breakdown for externally-loaded work — the last entry is
+   * always the top/working set (same value as suggested_load_kg). Ramps
+   * progressively across sets for compounds in strength/power phases;
+   * flat/straight (every entry equal) otherwise. null for bodyweight
+   * movements or primers, where a single load doesn't apply.
+   */
+  per_set_load?: { set_number: number; load_kg: number; display: string }[] | null
 }
 
 export interface MesocycleWeek {
@@ -96,6 +119,8 @@ export interface MesocycleWeek {
   phase_focus?: string
   is_deload?: boolean
   coach_note?: string
+  /** True for week 1 when the trainee didn't report known working weights — loads are deliberately capped so they can find their numbers. */
+  isCalibrationWeek?: boolean
 }
 
 export interface RecommendedCardio {

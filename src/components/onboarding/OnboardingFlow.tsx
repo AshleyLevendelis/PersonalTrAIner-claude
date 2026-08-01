@@ -28,9 +28,14 @@ interface OnboardingData {
   heightCm: string
   weightKg: string
   coachingPersona: CoachingPersona | null
+  /** null = unanswered; false = "I'm new / not sure" (calibration week); true = "I know my numbers" (known lifts below). */
+  knowsWorkingLifts: boolean | null
+  knownSquatKg: string
+  knownBenchKg: string
+  knownDeadliftKg: string
 }
 
-const TOTAL_STEPS = 13
+const TOTAL_STEPS = 14
 
 const EXPERIENCE_OPTIONS: { value: TrainingExperience; icon: string; label: string; description: string }[] = [
   { value: 'beginner', icon: '🌱', label: 'Beginner', description: 'New to this, or coming back after a long break' },
@@ -156,6 +161,10 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
     heightCm: '',
     weightKg: '',
     coachingPersona: null,
+    knowsWorkingLifts: null,
+    knownSquatKg: '',
+    knownBenchKg: '',
+    knownDeadliftKg: '',
   })
 
   const [weightUnit, setWeightUnit] = useState<WeightUnit>('kg')
@@ -257,16 +266,17 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
       case 0: return data.displayName.trim().length > 0
       case 1: return !!data.fitnessGoal
       case 2: return !!data.trainingExperience
-      case 3: return data.trainingDays.length > 0
-      case 4: return !!data.sessionDuration
-      case 5: return !!data.trainingTime
-      case 6: return !!data.equipment
-      case 7: return !!data.trainingStyle
-      case 8: return true
+      case 3: return data.knowsWorkingLifts !== null
+      case 4: return data.trainingDays.length > 0
+      case 5: return !!data.sessionDuration
+      case 6: return !!data.trainingTime
+      case 7: return !!data.equipment
+      case 8: return !!data.trainingStyle
       case 9: return true
-      case 10: return !!data.age && !!data.heightCm && !!data.weightKg && Number(data.age) > 0 && Number(data.heightCm) > 0 && Number(data.weightKg) > 0
-      case 11: return !!data.coachingPersona
-      case 12: return true
+      case 10: return true
+      case 11: return !!data.age && !!data.heightCm && !!data.weightKg && Number(data.age) > 0 && Number(data.heightCm) > 0 && Number(data.weightKg) > 0
+      case 12: return !!data.coachingPersona
+      case 13: return true
       default: return false
     }
   }
@@ -300,6 +310,10 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
       coaching_persona: data.coachingPersona!,
       injuries: data.injuries,
       display_name: data.displayName.trim(),
+      skip_calibration_week: data.knowsWorkingLifts === true,
+      known_squat_kg: data.knowsWorkingLifts === true && data.knownSquatKg ? Number(data.knownSquatKg) : undefined,
+      known_bench_kg: data.knowsWorkingLifts === true && data.knownBenchKg ? Number(data.knownBenchKg) : undefined,
+      known_deadlift_kg: data.knowsWorkingLifts === true && data.knownDeadliftKg ? Number(data.knownDeadliftKg) : undefined,
     }
     onComplete(profile)
   }
@@ -370,6 +384,74 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
 
       case 3:
         return (
+          <StepWrapper title="Do you know your working lifts?" subtitle="Squat, bench, deadlift — if you train these already, we can skip week 1's calibration">
+            <div className="grid grid-cols-2 gap-3">
+              <OptionCard
+                icon="🌱"
+                label="I'm new / not sure"
+                description="Start with a calibration week to find my numbers"
+                selected={data.knowsWorkingLifts === false}
+                onClick={() => autoAdvance(() => setData(d => ({
+                  ...d,
+                  knowsWorkingLifts: false,
+                  knownSquatKg: '',
+                  knownBenchKg: '',
+                  knownDeadliftKg: '',
+                })))}
+              />
+              <OptionCard
+                icon="🎯"
+                label="I know my numbers"
+                description="Enter my current working weights"
+                selected={data.knowsWorkingLifts === true}
+                onClick={() => setData(d => ({ ...d, knowsWorkingLifts: true }))}
+              />
+            </div>
+            {data.knowsWorkingLifts === true && (
+              <div className="space-y-4 mt-4">
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="ob-squat" className="text-xs font-medium">Squat (kg)</Label>
+                    <Input
+                      id="ob-squat"
+                      type="number"
+                      placeholder="Optional"
+                      value={data.knownSquatKg}
+                      onChange={e => setData(d => ({ ...d, knownSquatKg: e.target.value }))}
+                      min={0}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="ob-bench" className="text-xs font-medium">Bench (kg)</Label>
+                    <Input
+                      id="ob-bench"
+                      type="number"
+                      placeholder="Optional"
+                      value={data.knownBenchKg}
+                      onChange={e => setData(d => ({ ...d, knownBenchKg: e.target.value }))}
+                      min={0}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="ob-deadlift" className="text-xs font-medium">Deadlift (kg)</Label>
+                    <Input
+                      id="ob-deadlift"
+                      type="number"
+                      placeholder="Optional"
+                      value={data.knownDeadliftKg}
+                      onChange={e => setData(d => ({ ...d, knownDeadliftKg: e.target.value }))}
+                      min={0}
+                    />
+                  </div>
+                </div>
+                <ContinueButton onClick={goNext} />
+              </div>
+            )}
+          </StepWrapper>
+        )
+
+      case 4:
+        return (
           <StepWrapper title="Which days can you train?" subtitle="Tap all that work for your schedule">
             <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
               {DAYS_OF_WEEK.map(day => (
@@ -395,7 +477,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
           </StepWrapper>
         )
 
-      case 4:
+      case 5:
         return (
           <StepWrapper title="How long are your sessions?" subtitle="We'll scale exercises to fit">
             <div className="grid grid-cols-2 gap-3">
@@ -413,7 +495,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
           </StepWrapper>
         )
 
-      case 5:
+      case 6:
         return (
           <StepWrapper title="When do you usually train?" subtitle="Helps optimize your nutrition timing">
             <div className="grid grid-cols-2 gap-3">
@@ -431,7 +513,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
           </StepWrapper>
         )
 
-      case 6:
+      case 7:
         return (
           <StepWrapper title="What equipment do you have?" subtitle="Your plan will only use what's available">
             <div className="grid grid-cols-2 gap-3">
@@ -449,7 +531,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
           </StepWrapper>
         )
 
-      case 7:
+      case 8:
         return (
           <StepWrapper title="What's your training style?" subtitle="How you prefer to move">
             <div className="grid grid-cols-2 gap-3">
@@ -467,7 +549,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
           </StepWrapper>
         )
 
-      case 8:
+      case 9:
         return (
           <StepWrapper title="Any injuries or problem areas?" subtitle="We'll avoid exercises that stress these">
             <div className="grid grid-cols-2 gap-3">
@@ -491,7 +573,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
           </StepWrapper>
         )
 
-      case 9:
+      case 10:
         return (
           <StepWrapper title="Dietary preferences?" subtitle="Your meal plan will respect these">
             <div className="grid grid-cols-3 gap-2">
@@ -515,7 +597,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
           </StepWrapper>
         )
 
-      case 10:
+      case 11:
         return (
           <StepWrapper title="Your body metrics" subtitle="Used to calculate your targets">
             <div className="space-y-4">
@@ -570,7 +652,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
           </StepWrapper>
         )
 
-      case 11:
+      case 12:
         return (
           <StepWrapper title="How should your AI coach talk?" subtitle="Sets the tone for chat & advice">
             <div className="grid grid-cols-2 gap-3">
@@ -588,7 +670,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
           </StepWrapper>
         )
 
-      case 12:
+      case 13:
         return (
           <StepWrapper title={`Ready to go, ${data.displayName}!`} subtitle="Review your selections">
             <Card className="bg-muted/50 border-dashed">
@@ -601,6 +683,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
                 <ReviewRow label="Equipment" value={EQUIPMENT_OPTIONS.find(o => o.value === data.equipment)?.label} />
                 <ReviewRow label="Style" value={STYLE_OPTIONS.find(o => o.value === data.trainingStyle)?.label} />
                 <ReviewRow label="Experience" value={EXPERIENCE_OPTIONS.find(o => o.value === data.trainingExperience)?.label} />
+                <ReviewRow label="Week 1" value={getCalibrationSummary(data)} />
                 <ReviewRow label="Injuries" value={data.injuries.length > 0 ? data.injuries.map(i => INJURY_OPTIONS.find(o => o.value === i)?.label).join(', ') : 'None'} />
                 <ReviewRow label="Diet" value={data.dietaryPreferences.length > 0 ? data.dietaryPreferences.map(p => DIETARY_OPTIONS.find(o => o.value === p)?.label).join(', ') : 'No restrictions'} />
                 <ReviewRow label="Metrics" value={`${data.age}y, ${data.gender}, ${data.weightKg}kg, ${data.heightCm}cm`} />
@@ -666,6 +749,16 @@ function ContinueButton({ disabled, onClick, label = 'Continue' }: { disabled?: 
       {label}
     </Button>
   )
+}
+
+function getCalibrationSummary(data: OnboardingData): string {
+  if (!data.knowsWorkingLifts) return "Calibration week — we'll find your numbers"
+  const lifts = [
+    data.knownSquatKg && `Squat ${data.knownSquatKg}kg`,
+    data.knownBenchKg && `Bench ${data.knownBenchKg}kg`,
+    data.knownDeadliftKg && `Deadlift ${data.knownDeadliftKg}kg`,
+  ].filter(Boolean)
+  return lifts.length > 0 ? `Seeded from your numbers (${lifts.join(', ')})` : 'Seeded from your numbers'
 }
 
 function ReviewRow({ label, value }: { label: string; value?: string }) {
