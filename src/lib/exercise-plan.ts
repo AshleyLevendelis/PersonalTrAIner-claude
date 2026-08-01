@@ -1069,7 +1069,21 @@ function isTrackViable(t: TrackDefinition, pool: ExerciseEntry[]): boolean {
   const requiredOk = t.required_patterns.every(rp =>
     pool.some(e => e.movement_pattern === rp && !forbidden.has(e.movement_pattern))
   )
-  return countAvailableForTrack(t, pool) >= 3 && requiredOk
+  // "Squat & Carry"/"Push & Press" only declare 'carry'/nothing in
+  // required_patterns (required_patterns is a single exact pattern; squat
+  // spans two — knee_dominant, single_leg). A knee injury filters out
+  // every squat-pattern exercise while leaving carries untouched, so the
+  // check above alone still called this track "viable" — a knee-injured
+  // user got handed a "Squat & Carry" day with nothing to fill the squat.
+  // ensurePatternPresent (selectExercisesForTrack) can only guarantee the
+  // pattern APPEARS when the pool actually has one; when it genuinely
+  // doesn't, the fix has to happen here, by not choosing this track label
+  // at all.
+  const squatOk = t.label !== 'Squat & Carry' ||
+    pool.some(e => (e.movement_pattern === 'knee_dominant' || e.movement_pattern === 'single_leg') && !forbidden.has(e.movement_pattern))
+  const pushOk = t.label !== 'Push & Press' ||
+    pool.some(e => e.movement_pattern === 'vertical_push' && !forbidden.has(e.movement_pattern))
+  return countAvailableForTrack(t, pool) >= 3 && requiredOk && squatOk && pushOk
 }
 
 /**

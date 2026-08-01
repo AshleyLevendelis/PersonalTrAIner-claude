@@ -1,5 +1,5 @@
 import type { UserProfile, MesocycleWeek, WorkoutDay, Exercise } from './types'
-import { EXERCISE_DATABASE, getMovementFamily, type ExerciseEntry } from './exercise-db'
+import { EXERCISE_DATABASE, getMovementFamily, getVolumeRole, type ExerciseEntry } from './exercise-db'
 import { getConstrainedPool, generateMesocycle } from './exercise-plan'
 import { getGoalPolicy, resolveConditioningFrequency, RECOVERY_SET_MULTIPLIER } from './goal-policies'
 import { EXPERIENCE_RPE_CEILING } from './periodization'
@@ -192,6 +192,77 @@ function scoreStructure(mesocycle: MesocycleWeek[]): DimensionResult {
         detail: `Main lift "${main.name}" rest is "${main.rest}", not a full rest period`,
       })
     }
+
+    // Set-count hierarchy: main >= any accessory/isolation that day. The
+    // LLM review's single most consistent finding — main lifts at 2 sets
+    // next to 7-set accessories. Mirrors the engine's own invariant
+    // (enforceSetHierarchy in exercise-plan.ts) as a regression guard.
+    const roles = day.exercises.map(ex => {
+      const entry = dbEntry(ex.name)
+      return entry ? getVolumeRole(entry) : null
+    })
+    const mainSetsThisDay = day.exercises.filter((_, i) => roles[i] === 'main').map(ex => ex.sets)
+    if (mainSetsThisDay.length > 0) {
+      const mainCeiling = Math.max(...mainSetsThisDay)
+      day.exercises.forEach((ex, i) => {
+        if (roles[i] && roles[i] !== 'main' && ex.sets > mainCeiling) {
+          violatedRules.add('set_hierarchy_inverted')
+          deductions.push({
+            rule: 'set_hierarchy_inverted', day: day.day, weekNumber: 1,
+            detail: `"${ex.name}" (${roles[i]}, ${ex.sets} sets) exceeds this day's main lift (${mainCeiling} sets)`,
+          })
+        }
+      })
+    }
+
+    // Prescription unit: reps format must match the exercise's own
+    // prescription_type — an isometric hold prescribed in meters, or a
+    // conditioning modality prescribed as a rep count, is a unit error,
+    // not a coaching decision.
+    for (const ex of day.exercises) {
+      const entry = dbEntry(ex.name)
+      if (!entry) continue
+      const matches =
+        entry.prescription_type === 'reps' ? /^\d+(\s*-\s*\d+)?$/.test(ex.reps) :
+        entry.prescription_type === 'time' || entry.prescription_type === 'intervals' ? /^\d+(\s*-\s*\d+)?\s*s$/.test(ex.reps) :
+        entry.prescription_type === 'distance_load' ? /^\d+(\s*-\s*\d+)?\s*m$/.test(ex.reps) :
+        true
+      if (!matches) {
+        violatedRules.add('prescription_unit_mismatch')
+        deductions.push({
+          rule: 'prescription_unit_mismatch', day: day.day, weekNumber: 1,
+          detail: `"${ex.name}" is prescription_type '${entry.prescription_type}' but reps is "${ex.reps}"`,
+        })
+      }
+    }
+
+    // Day label must match its content — no "Squat & Carry" without a
+    // squat, no "Push & Press" without an overhead press.
+    const dayPatterns = new Set(day.exercises.map(ex => dbEntry(ex.name)?.movement_pattern).filter(Boolean))
+    if (day.focus === 'Squat & Carry' && !dayPatterns.has('knee_dominant') && !dayPatterns.has('single_leg')) {
+      violatedRules.add('day_label_mismatch')
+      deductions.push({ rule: 'day_label_mismatch', day: day.day, weekNumber: 1, detail: `"${day.day}" is labeled Squat & Carry but contains no squat-pattern exercise` })
+    }
+    if (day.focus === 'Push & Press' && !dayPatterns.has('vertical_push')) {
+      violatedRules.add('day_label_mismatch')
+      deductions.push({ rule: 'day_label_mismatch', day: day.day, weekNumber: 1, detail: `"${day.day}" is labeled Push & Press but contains no overhead-press pattern` })
+    }
+
+    // Superset partners must be physically ADJACENT in the rendered order
+    // — a tagged A1/A2 pair with other exercises between them is not
+    // executable as written.
+    for (const [letter, pair] of supersetGroups) {
+      if (pair.length !== 2) continue
+      const i1 = day.exercises.indexOf(pair[0])
+      const i2 = day.exercises.indexOf(pair[1])
+      if (Math.abs(i1 - i2) !== 1) {
+        violatedRules.add('superset_not_adjacent')
+        deductions.push({
+          rule: 'superset_not_adjacent', day: day.day, weekNumber: 1,
+          detail: `Superset ${letter} (${pair.map(e => e.name).join(' + ')}) is not adjacent in the rendered order`,
+        })
+      }
+    }
   }
 
   return { label: 'Structure', points: scoreFromViolatedRules(violatedRules.size), deductions }
@@ -293,6 +364,23 @@ function scoreProgression(profile: UserProfile, mesocycle: MesocycleWeek[]): Dim
           deductions.push({
             rule: 'calibration_not_conservative', day: day.day, weekNumber: 1,
             detail: `Calibration week load (${l1}kg) is not conservative relative to week 3 (${l3}kg)`,
+          })
+        }
+      }
+
+      // Frozen week: for goals where load intentionally holds flat
+      // (maintain/reps emphasis) — or any bodyweight movement, which never
+      // ramps load regardless of goal — reps must be the thing visibly
+      // climbing. Three weeks distinguishable only by an RPE label was a
+      // direct review finding ("same bar, same reps, 'now it's harder' is
+      // not a plan").
+      if (!expectsLoadRamp) {
+        const loadFrozen = e1.suggested_load_kg == null || e1.suggested_load_kg === e3.suggested_load_kg
+        if (loadFrozen && e1.reps === e3.reps) {
+          violatedRules.add('frozen_week')
+          deductions.push({
+            rule: 'frozen_week', day: day.day, weekNumber: 1,
+            detail: `${e1.name}: load and reps both unchanged from week 1 to week 3 (${e1.reps} @ ${e1.suggested_load_kg ?? 'bodyweight'}) — only the RPE label differs`,
           })
         }
       }
@@ -427,6 +515,76 @@ function scoreSelection(profile: UserProfile, mesocycle: MesocycleWeek[]): Dimen
     }
   }
 
+  // Load coherence — regression guard mirroring enforceLoadCoherence's own
+  // invariants (exercise-plan.ts), with deliberately looser thresholds than
+  // the engine's own enforcement so plate-rounding at the boundary doesn't
+  // flag a plan the engine already fixed.
+  for (const day of week1?.days ?? []) {
+    const mains = day.exercises.filter(ex => {
+      const entry = dbEntry(ex.name)
+      return entry && ex.suggested_load_kg != null && entry.mechanics_tier === 'tier1_compound' && !entry.unilateral
+    })
+    const flat = day.exercises.find(ex => {
+      const entry = dbEntry(ex.name)
+      return entry?.substitution_group === 'bench_press' && entry.angle_vector === 'horizontal' && ex.suggested_load_kg != null
+    })
+    for (const ex of day.exercises) {
+      const entry = dbEntry(ex.name)
+      if (!entry || ex.suggested_load_kg == null) continue
+
+      if (entry.unilateral) {
+        const pattern = entry.movement_pattern === 'horizontal_push' || entry.movement_pattern === 'vertical_push' ? 'push'
+          : entry.movement_pattern === 'horizontal_pull' || entry.movement_pattern === 'vertical_pull' ? 'pull'
+          : entry.movement_pattern === 'knee_dominant' || entry.movement_pattern === 'single_leg' ? 'squat'
+          : entry.movement_pattern === 'hip_hinge' ? 'hinge' : null
+        const main = pattern && mains.find(m => {
+          const me = dbEntry(m.name)!.movement_pattern
+          const mp = me === 'horizontal_push' || me === 'vertical_push' ? 'push'
+            : me === 'horizontal_pull' || me === 'vertical_pull' ? 'pull'
+            : me === 'knee_dominant' || me === 'single_leg' ? 'squat'
+            : me === 'hip_hinge' ? 'hinge' : null
+          return mp === pattern
+        })
+        if (main?.suggested_load_kg != null && ex.suggested_load_kg > main.suggested_load_kg * 0.8) {
+          violatedRules.add('load_incoherent')
+          deductions.push({
+            rule: 'load_incoherent', day: day.day, weekNumber: 1,
+            detail: `Unilateral "${ex.name}" (${ex.suggested_load_kg}kg) outweighs this day's bilateral main lift "${main.name}" (${main.suggested_load_kg}kg)`,
+          })
+        }
+      }
+
+      if (flat && entry.name !== flat.name && entry.substitution_group === 'bench_press' && entry.angle_vector === 'diagonal' && flat.suggested_load_kg != null) {
+        if (ex.suggested_load_kg > flat.suggested_load_kg) {
+          violatedRules.add('load_incoherent')
+          deductions.push({
+            rule: 'load_incoherent', day: day.day, weekNumber: 1,
+            detail: `Incline press "${ex.name}" (${ex.suggested_load_kg}kg) exceeds flat press "${flat.name}" (${flat.suggested_load_kg}kg)`,
+          })
+        }
+      }
+    }
+
+    const mainPress = mains.find(m => {
+      const p = dbEntry(m.name)?.movement_pattern
+      return p === 'horizontal_push' || p === 'vertical_push'
+    })
+    if (mainPress?.suggested_load_kg != null) {
+      for (const ex of day.exercises) {
+        const entry = dbEntry(ex.name)
+        if (!entry || ex.suggested_load_kg == null) continue
+        const isBoundedIsolation = entry.movement_pattern === 'isolation_bicep' || entry.movement_pattern === 'isolation_shoulder'
+        if (isBoundedIsolation && ex.suggested_load_kg > mainPress.suggested_load_kg * 0.65) {
+          violatedRules.add('load_incoherent')
+          deductions.push({
+            rule: 'load_incoherent', day: day.day, weekNumber: 1,
+            detail: `"${ex.name}" (${ex.suggested_load_kg}kg) is not a sane fraction of this day's main press "${mainPress.name}" (${mainPress.suggested_load_kg}kg)`,
+          })
+        }
+      }
+    }
+  }
+
   let pushSets = 0
   let pullSets = 0
   let hasSquat = false
@@ -454,6 +612,8 @@ function scoreSelection(profile: UserProfile, mesocycle: MesocycleWeek[]): Dimen
   const pool = getConstrainedPool(profile, [])
   const poolHasSquat = pool.some(e => e.movement_pattern === 'knee_dominant' || e.movement_pattern === 'single_leg')
   const poolHasHinge = pool.some(e => e.movement_pattern === 'hip_hinge')
+  const poolHasPush = pool.some(e => e.movement_pattern === 'horizontal_push' || e.movement_pattern === 'vertical_push')
+  const poolHasPull = pool.some(e => e.movement_pattern === 'horizontal_pull' || e.movement_pattern === 'vertical_pull')
   if (poolHasSquat && !hasSquat) {
     violatedRules.add('missing_squat_pattern')
     deductions.push({ rule: 'missing_squat_pattern', weekNumber: 1, detail: 'No squat-pattern exercise anywhere in the week despite equipment allowing one' })
@@ -461,6 +621,53 @@ function scoreSelection(profile: UserProfile, mesocycle: MesocycleWeek[]): Dimen
   if (poolHasHinge && !hasHinge) {
     violatedRules.add('missing_hinge_pattern')
     deductions.push({ rule: 'missing_hinge_pattern', weekNumber: 1, detail: 'No hinge-pattern exercise anywhere in the week despite equipment allowing one' })
+  }
+  // The push:pull ratio check above only fires when BOTH sides are nonzero
+  // — a week with zero pull work (pushSets>0, pullSets===0) would otherwise
+  // pass silently instead of failing the ratio it can't even compute.
+  if (poolHasPush && pushSets === 0) {
+    violatedRules.add('missing_push_pattern')
+    deductions.push({ rule: 'missing_push_pattern', weekNumber: 1, detail: 'No push-pattern exercise anywhere in the week despite equipment allowing one' })
+  }
+  if (poolHasPull && pullSets === 0) {
+    violatedRules.add('missing_pull_pattern')
+    deductions.push({ rule: 'missing_pull_pattern', weekNumber: 1, detail: 'No pull-pattern exercise anywhere in the week despite equipment allowing one' })
+  }
+
+  // Same-muscle-group accessories should stay in the same ballpark across
+  // the week — a 26kg curl next to a 2kg shrug in the same week was a
+  // direct review finding.
+  const coherenceGroups = new Map<string, { name: string; kg: number }[]>()
+  const coherenceGroupOf = (p: string): string | null => {
+    if (p === 'isolation_bicep') return 'bicep'
+    if (p === 'isolation_tricep') return 'tricep'
+    if (p === 'isolation_shoulder') return 'shoulder_isolation'
+    if (p === 'isolation_quad') return 'quad_isolation'
+    if (p === 'isolation_hamstring') return 'hamstring_isolation'
+    if (p === 'isolation_calf') return 'calf_isolation'
+    return null
+  }
+  for (const day of week1?.days ?? []) {
+    for (const ex of day.exercises) {
+      const entry = dbEntry(ex.name)
+      if (!entry || ex.suggested_load_kg == null) continue
+      const group = coherenceGroupOf(entry.movement_pattern)
+      if (!group) continue
+      if (!coherenceGroups.has(group)) coherenceGroups.set(group, [])
+      coherenceGroups.get(group)!.push({ name: ex.name, kg: ex.suggested_load_kg })
+    }
+  }
+  for (const [group, items] of coherenceGroups) {
+    if (items.length < 2) continue
+    const min = Math.min(...items.map(i => i.kg))
+    const max = Math.max(...items.map(i => i.kg))
+    if (min > 0 && max / min > 2.5) {
+      violatedRules.add('load_incoherent')
+      deductions.push({
+        rule: 'load_incoherent', weekNumber: 1,
+        detail: `"${group}" load spread this week is ${min}kg-${max}kg (${items.map(i => `${i.name}=${i.kg}kg`).join(', ')})`,
+      })
+    }
   }
 
   return { label: 'Selection', points: scoreFromViolatedRules(violatedRules.size), deductions }
@@ -525,6 +732,23 @@ function scoreGoalAlignment(profile: UserProfile, mesocycle: MesocycleWeek[], co
       expected: expectedFrequency.toFixed(1), actual: String(actualConditioningDays),
     },
   })
+
+  // conditioning/fat_loss: conditioning is the goal (or a major lever) for
+  // these two, so at least one conditioning entry must be a real
+  // prescription — a duration attached — not a bare activity label like
+  // "Zone 2 Aerobic Base" with nothing else. Every conditioning_note this
+  // engine writes now includes one; this is a regression guard.
+  if (goal === 'conditioning' || goal === 'fat_loss') {
+    const conditioningEntries = week1?.days.filter(d => d.conditioning_note && !d.recommendedCardio?.is_filler) ?? []
+    const anyStructured = conditioningEntries.some(d => /\d+\s*min/.test(d.conditioning_note ?? ''))
+    checks.push({
+      pass: conditioningEntries.length === 0 || anyStructured,
+      detail: conditioningEntries.length === 0 || anyStructured ? undefined : {
+        rule: 'conditioning_prescription_vague', weekNumber: 1,
+        detail: `Conditioning entries exist but none specify a duration — "${conditioningEntries[0]?.conditioning_note}" is a label, not a prescription`,
+      },
+    })
+  }
 
   // fat_loss: same main-compound structure and >=85% of hypertrophy's load.
   if (goal === 'fat_loss') {
