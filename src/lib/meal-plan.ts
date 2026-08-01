@@ -95,24 +95,55 @@ function scaleRecipeToSlot(
   return { scaleFactor, protein, carbs, fat, ingredientLines }
 }
 
+const MEAL_PLANNER_TIMEOUT_MS = 20000
+
 async function callMealPlannerEdgeFunction(body: any): Promise<any> {
   const url = `${SUPABASE_URL}/functions/v1/edamam-recipes`
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(body),
-  })
 
-  if (!response.ok) {
-    const errBody = await response.text().catch(() => 'unreadable')
-    console.error('Meal Planner API call failed:', response.status, errBody.slice(0, 300))
+  // A bare fetch here has no timeout and throws on network/CORS failure. If the
+  // edge function is not deployed — or is slow to cold-start — that rejection
+  // propagated all the way up and left onboarding stuck on its spinner forever.
+  // Returning null instead lets the caller fall back to placeholder meals,
+  // which is a far better outcome than a frozen app.
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), MEAL_PLANNER_TIMEOUT_MS)
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    })
+
+    if (!response.ok) {
+      const errBody = await response.text().catch(() => 'unreadable')
+      console.error('Meal Planner API call failed:', response.status, errBody.slice(0, 300))
+      if (response.status === 404) {
+        console.error(
+          'The `edamam-recipes` edge function appears not to be deployed to this ' +
+          'Supabase project. Meals will use placeholders until it is.'
+        )
+      }
+      return null
+    }
+
+    return await response.json()
+  } catch (err) {
+    const aborted = err instanceof Error && err.name === 'AbortError'
+    console.error(
+      aborted
+        ? `Meal Planner API timed out after ${MEAL_PLANNER_TIMEOUT_MS / 1000}s — using placeholders`
+        : `Meal Planner API unreachable — using placeholders:`,
+      err
+    )
     return null
+  } finally {
+    clearTimeout(timer)
   }
-
-  return response.json()
 }
 
 export async function generateWeeklyMealPlan(

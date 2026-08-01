@@ -43,6 +43,7 @@ function App() {
   const [weeklyMealPlan, setWeeklyMealPlan] = useState<WeeklyMealPlan | null>(null)
   const [isRestoring, setIsRestoring] = useState(true)
   const [isGenerating, setIsGenerating] = useState(false)
+  const [setupError, setSetupError] = useState<string | null>(null)
   const [generatingStatus, setGeneratingStatus] = useState('')
   const [exerciseExclusions, setExerciseExclusions] = useState<string[]>([])
   const [devOverrideWeek, setDevOverrideWeek] = useState<number | null>(null)
@@ -267,7 +268,13 @@ function App() {
 
   const handleOnboardingComplete = async (userProfile: UserProfile) => {
     setIsGenerating(true)
+    setSetupError(null)
     setGeneratingStatus('Calculating your macro targets...')
+
+    // Everything below runs inside try/finally. Without it, a single failure
+    // anywhere in this function skipped setIsGenerating(false) entirely and
+    // left the user watching a spinner with no way forward and no error shown.
+    try {
 
     const bmr = computeBMR(userProfile)
     const tdee = computeStaticTDEE(bmr, userProfile.activity_level)
@@ -290,7 +297,7 @@ function App() {
     setGeneratingStatus('Searching Edamam for your personalized weekly recipes...')
     const weeklyPlan = await generateWeeklyMealPlan(enrichedProfile, workout, setGeneratingStatus)
 
-    const { data } = await supabase
+    const { data, error: insertError } = await supabase
       .from('fitness_profiles')
       .insert({
         age: enrichedProfile.age,
@@ -322,10 +329,26 @@ function App() {
       .select('id')
       .maybeSingle()
 
+    if (insertError) {
+      // Surface this rather than swallowing it. The most likely cause after a
+      // schema change is a column the database does not have yet — silently
+      // continuing would leave the user with a plan that vanishes on reload.
+      console.error('Saving profile failed:', insertError)
+      setSetupError(
+        `Your plan was generated but could not be saved: ${insertError.message}. ` +
+        `You can keep using it now, but it will not persist if you reload.`
+      )
+    }
+
     if (data) {
       enrichedProfile.id = data.id
       localStorage.setItem(STORAGE_KEY, data.id)
-      await persistWeeklyPlan(data.id, weeklyPlan, workout)
+      try {
+        await persistWeeklyPlan(data.id, weeklyPlan, workout)
+      } catch (err) {
+        // A failure to persist the plan must not block showing it.
+        console.error('Persisting weekly plan failed:', err)
+      }
     }
 
     setProfile(enrichedProfile)
@@ -333,7 +356,15 @@ function App() {
     setExercisePlan(workout)
     setMesocycle(mesocycleData)
     setWeeklyMealPlan(weeklyPlan)
-    setIsGenerating(false)
+    } catch (err) {
+      console.error('Onboarding failed:', err)
+      setSetupError(
+        err instanceof Error ? err.message : 'Something went wrong while building your plan.'
+      )
+    } finally {
+      // Always runs — the user is never left stranded on the loading screen.
+      setIsGenerating(false)
+    }
   }
 
   const persistWeeklyPlan = async (profileId: string, weeklyPlan: WeeklyMealPlan, workout: WorkoutDay[]) => {
@@ -793,6 +824,23 @@ function App() {
             <Loader2 className="size-8 animate-spin text-primary" />
             <p className="font-medium">{generatingStatus || 'Building your plan...'}</p>
             <p className="text-sm text-muted-foreground">This may take a moment while we optimize your portions</p>
+          </div>
+        </div>
+      )
+    }
+
+    // If setup failed we land here with no profile. Showing the reason and a
+    // way to retry is the difference between a recoverable hiccup and a dead
+    // end the user cannot get past.
+    if (setupError) {
+      return (
+        <div className="min-h-screen bg-background flex items-center justify-center p-4">
+          <div className="max-w-md w-full space-y-4 text-center">
+            <h2 className="text-lg font-semibold">We couldn't finish setting up your plan</h2>
+            <p className="text-sm text-muted-foreground break-words">{setupError}</p>
+            <Button className="w-full" onClick={() => setSetupError(null)}>
+              Try again
+            </Button>
           </div>
         </div>
       )
