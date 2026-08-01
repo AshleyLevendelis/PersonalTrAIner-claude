@@ -1528,31 +1528,38 @@ interface ConditioningProfile {
   restDay: Omit<RecommendedCardio, 'timing' | 'reason'>
 }
 
+// Every activity string below carries its own structure — modality,
+// work:rest/rounds where relevant, and an HR/RPE intensity anchor — because
+// "Zone 2" or "HIIT" alone is a label, not a prescription. A review flagged
+// this directly: rest-day "Long Aerobic Session" entries with "no duration,
+// no HR target, no frequency minimum... that's not a prescription, that's a
+// suggestion." assignConditioningNotes always appends duration on top of
+// these strings; the strings themselves carry everything else.
 function getConditioningProfile(goal: FitnessGoal): ConditioningProfile {
   if (goal === 'fat_loss') {
     return {
-      dedicatedDay: { activity: 'HIIT Metabolic Circuit (30s work / 30s rest)', duration: 25, targetRpe: 8 },
-      postSession: { activity: 'Incline Walk or Cycling (LISS)', duration: 20, targetRpe: 4 },
-      heavyDayBrief: { activity: 'Rowing Intervals or Sled Pushes', duration: 10, targetRpe: 7 },
-      independentBlock: { activity: 'Brisk Walk or Light Cycling (Zone 2)', duration: 30, targetRpe: 4 },
-      restDay: { activity: 'Zone 2 Aerobic Base (walking, cycling, swimming)', duration: 35, targetRpe: 4 },
+      dedicatedDay: { activity: 'HIIT Metabolic Circuit — 8 rounds of 30s max effort / 30s rest', duration: 25, targetRpe: 8 },
+      postSession: { activity: 'Incline Walk or Cycling — Zone 2, conversational pace (~60-70% max HR)', duration: 20, targetRpe: 4 },
+      heavyDayBrief: { activity: 'Rowing Intervals — 6 rounds of 20s hard / 40s easy', duration: 10, targetRpe: 7 },
+      independentBlock: { activity: 'Brisk Walk or Light Cycling — Zone 2, conversational pace', duration: 30, targetRpe: 4 },
+      restDay: { activity: 'Zone 2 Aerobic Base (walking, cycling, swimming) — conversational pace, ~60-70% max HR', duration: 35, targetRpe: 4 },
     }
   }
   if (goal === 'conditioning') {
     return {
-      dedicatedDay: { activity: 'Steady-State Aerobic Base (Zone 2: 120-140 BPM)', duration: 40, targetRpe: 5 },
-      postSession: { activity: 'Aerobic Base Building (Zone 2)', duration: 25, targetRpe: 5 },
-      heavyDayBrief: { activity: 'Easy Cooldown Cardio (HR below 130 BPM)', duration: 12, targetRpe: 3 },
-      independentBlock: { activity: 'Steady-State Run or Cycle (Zone 2)', duration: 35, targetRpe: 5 },
-      restDay: { activity: 'Long Aerobic Session (running, rowing, cycling)', duration: 45, targetRpe: 5 },
+      dedicatedDay: { activity: 'Steady-State Aerobic Base — Zone 2 (120-140 BPM, conversational pace)', duration: 40, targetRpe: 5 },
+      postSession: { activity: 'Aerobic Base Building — Zone 2 (120-140 BPM)', duration: 25, targetRpe: 5 },
+      heavyDayBrief: { activity: 'Easy Cooldown Cardio — HR below 130 BPM', duration: 12, targetRpe: 3 },
+      independentBlock: { activity: 'Steady-State Run or Cycle — Zone 2 (120-140 BPM)', duration: 35, targetRpe: 5 },
+      restDay: { activity: 'Long Aerobic Session (running, rowing, cycling) — Zone 2, 120-140 BPM', duration: 45, targetRpe: 5 },
     }
   }
   return {
-    dedicatedDay: { activity: 'Light Conditioning Circuit', duration: 20, targetRpe: 5 },
-    postSession: { activity: 'Light LISS (incline walk)', duration: 15, targetRpe: 3 },
-    heavyDayBrief: { activity: 'Easy Cooldown Walk', duration: 8, targetRpe: 2 },
-    independentBlock: { activity: 'Light Walk or Mobility Flow', duration: 20, targetRpe: 3 },
-    restDay: { activity: 'Active Recovery Walk or Light Swim', duration: 25, targetRpe: 3 },
+    dedicatedDay: { activity: 'Light Conditioning Circuit — 5 rounds of 30s work / 45s rest', duration: 20, targetRpe: 5 },
+    postSession: { activity: 'Light LISS (incline walk) — conversational pace', duration: 15, targetRpe: 3 },
+    heavyDayBrief: { activity: 'Easy Cooldown Walk — conversational pace', duration: 8, targetRpe: 2 },
+    independentBlock: { activity: 'Light Walk or Mobility Flow — conversational pace', duration: 20, targetRpe: 3 },
+    restDay: { activity: 'Active Recovery Walk or Light Swim — conversational pace, easy effort', duration: 25, targetRpe: 3 },
   }
 }
 
@@ -1582,7 +1589,7 @@ function assignConditioningNotes(days: WorkoutDay[], profile: UserProfile, polic
 
   for (const day of days) {
     if (day.focus !== 'Conditioning & Core') continue
-    day.conditioning_note = cardioForGoal.dedicatedDay.activity
+    day.conditioning_note = `${cardioForGoal.dedicatedDay.activity} (~${cardioForGoal.dedicatedDay.duration} min)`
     day.recommendedCardio = {
       ...cardioForGoal.dedicatedDay,
       timing: 'post_session',
@@ -1597,7 +1604,7 @@ function assignConditioningNotes(days: WorkoutDay[], profile: UserProfile, polic
       day: restDay,
       focus: 'Active Recovery + Cardio',
       exercises: [],
-      conditioning_note: cardioForGoal.restDay.activity,
+      conditioning_note: `${cardioForGoal.restDay.activity} (~${cardioForGoal.restDay.duration} min)`,
       recommendedCardio: {
         ...cardioForGoal.restDay,
         timing: 'rest_day',
@@ -2275,7 +2282,17 @@ export function generateMesocycle(
     : undefined
 
   sequence.forEach((phase, blockIndex) => {
-    const phaseConfig = getPhaseConfig(phase)
+    let phaseConfig = getPhaseConfig(phase)
+    // A metabolic/metcon block at full volume is the right call for someone
+    // who genuinely loves conditioning work. For 'tolerate' (and more so
+    // 'avoid'), a whole block at that intensity is exactly what a review
+    // flagged: conditioning "dumps an entire metcon phase on a client who
+    // only tolerates conditioning." Scaled down rather than removed — the
+    // goal still needs SOME metabolic work, just not the full dose.
+    if (phase === 'metabolic' && profile.conditioning_preference !== 'love') {
+      const scale = profile.conditioning_preference === 'avoid' ? 0.7 : 0.85
+      phaseConfig = { ...phaseConfig, sets_multiplier: phaseConfig.sets_multiplier * scale }
+    }
 
     // Variations rotate ONCE PER BLOCK, not per week. Changing them weekly
     // would make progression impossible to read; holding them for four weeks

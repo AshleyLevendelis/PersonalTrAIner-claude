@@ -125,6 +125,14 @@ export function getPhaseSequence(
   const base = PHASE_SEQUENCES[goal] ?? PHASE_SEQUENCES.hypertrophy
 
   if (experience === 'beginner') {
+    // The conditioning goal's OWN sequence (below) already has zero
+    // strength/power phases and two dedicated metabolic blocks — using the
+    // generic beginner sequence here replaced one of those two metabolic
+    // blocks with a plain hypertrophy block, leaving a beginner conditioning
+    // trainee with "conditioning exactly one block out of four" (a direct
+    // review finding). Keep the goal's own sequence for conditioning; every
+    // other goal still gets the generic, deliberately-varied beginner path.
+    if (goal === 'conditioning') return base
     // Mapping strength and power onto hypertrophy produced three consecutive
     // blocks all labelled "Hypertrophy" — technically safe, but monotonous in
     // exactly the way that makes people stop using an app. Beginners get their
