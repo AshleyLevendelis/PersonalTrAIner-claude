@@ -9,7 +9,9 @@
     "preview": "vite preview",
     "test:workout": "tsx scripts/test-workout-engine.ts",
     "test:audit": "tsx scripts/run-constraint-audit.ts",
-    "test:mesocycle-roundtrip": "tsx scripts/test-mesocycle-roundtrip.ts"
+    "test:mesocycle-roundtrip": "tsx scripts/test-mesocycle-roundtrip.ts",
+    "test:quality": "tsx scripts/run-quality-score.ts",
+    "test:llm-review": "tsx scripts/run-llm-review.ts"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.4",

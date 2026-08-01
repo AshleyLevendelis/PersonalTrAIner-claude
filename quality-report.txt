@@ -1,0 +1,176 @@
+================================================================================
+PLAN QUALITY SCORE REPORT
+================================================================================
+
+Combinations scored: 9216
+Runtime: 57.7s
+Overall average: 7.55 / 10
+
+Per-dimension averages (max 2.0 each):
+  Time fit         0.41  <-- BELOW FLOOR (1.2)
+  Structure        1.99
+  Progression      1.81
+  Selection        1.63
+  Goal alignment   1.71
+
+Score distribution:
+  [0-1)  0
+  [1-2)  0
+  [2-3)  0
+  [3-4)  0
+  [4-5)  0
+  [5-6) # 146
+  [6-7) ############## 2210
+  [7-8) ############################ 4306
+  [8-9) ############# 1955
+  [9-10) #### 599
+
+Plans below the 6.0 floor: 146 / 9216
+
+--------------------------------------------------------------------------------
+10 WORST-SCORING PLANS
+--------------------------------------------------------------------------------
+
+Score 5.0/10 — home_gym / knees / 60-90 / bodybuilding / novice / functional / recovery=low / cardio=love
+  Time fit (0.0/2):
+    [time_fit] wk1 Tuesday: Worst day (week 1 Tuesday) is 32% off budget (expected: 75min (±10%), actual: 51min)
+  Progression (1.2/2):
+    [deload_too_heavy] wk4 Monday: Barbell Bench Press deload (20kg) exceeds 80% of week 3 (22.5kg) (expected: <= 18.0kg, actual: 20kg)
+    [calibration_not_conservative] wk1 Monday: Calibration week load (22.5kg) is not conservative relative to week 3 (22.5kg)
+    [deload_too_heavy] wk4 Tuesday: Barbell Rows deload (20kg) exceeds 80% of week 3 (20kg) (expected: <= 16.0kg, actual: 20kg)
+    [deload_too_heavy] wk4 Thursday: Overhead Press deload (20kg) exceeds 80% of week 3 (20kg) (expected: <= 16.0kg, actual: 20kg)
+  Selection (0.8/2):
+    [duplicate_movement_family] wk1 Friday: Movement family "shrug" appears twice: Dumbbell Shrugs, Shrugs
+    [push_pull_imbalance] wk1: Weekly push:pull set ratio is 1.94 (push=35, pull=18) (expected: 0.6 - 1.6, actual: 1.94)
+    [missing_hinge_pattern] wk1: No hinge-pattern exercise anywhere in the week despite equipment allowing one
+  Goal alignment (1.0/2):
+    [recovery_volume_not_reduced] wk1: low recovery_capacity weekly sets (127) not >=15% below high (132)
+
+Score 5.0/10 — home_gym / neck / 60-90 / combat / novice / functional / recovery=low / cardio=love
+  Time fit (0.0/2):
+    [time_fit] wk1 Friday: Worst day (week 1 Friday) is 20% off budget (expected: 75min (±10%), actual: 60min)
+  Progression (1.2/2):
+    [deload_too_heavy] wk4 Monday: Barbell Bench Press deload (20kg) exceeds 80% of week 3 (22.5kg) (expected: <= 18.0kg, actual: 20kg)
+    [calibration_not_conservative] wk1 Monday: Calibration week load (22.5kg) is not conservative relative to week 3 (22.5kg)
+    [calibration_not_conservative] wk1 Thursday: Calibration week load (32.5kg) is not conservative relative to week 3 (32.5kg)
+  Selection (0.8/2):
+    [duplicate_movement_family] wk1 Friday: Movement family "core_dynamic" appears twice: Hanging Leg Raises, Mountain Climbers
+    [push_pull_imbalance] wk1: Weekly push:pull set ratio is 2.64 (push=37, pull=14) (expected: 0.6 - 1.6, actual: 2.64)
+    [missing_squat_pattern] wk1: No squat-pattern exercise anywhere in the week despite equipment allowing one
+  Goal alignment (1.0/2):
+    [recovery_volume_not_reduced] wk1: low recovery_capacity weekly sets (189) not >=15% below high (187)
+
+Score 5.3/10 — full_gym / none / 90+ / combat / intermediate / conditioning / recovery=low / cardio=love
+  Time fit (0.0/2):
+    [time_fit] wk5 Friday: Worst day (week 5 Friday) is 22% off budget (expected: 100min (±10%), actual: 78min)
+  Progression (1.2/2):
+    [calibration_not_conservative] wk1 Monday: Calibration week load (30kg) is not conservative relative to week 3 (30kg)
+    [deload_too_heavy] wk4 Tuesday: Overhead Press deload (20kg) exceeds 80% of week 3 (20kg) (expected: <= 16.0kg, actual: 20kg)
+    [calibration_not_conservative] wk1 Thursday: Calibration week load (27.5kg) is not conservative relative to week 3 (27.5kg)
+  Selection (0.8/2):
+    [duplicate_movement_family] wk1 Monday: Movement family "bench_press" appears twice: Barbell Bench Press, Dumbbell Bench Press
+    [duplicate_movement_family] wk1 Tuesday: Movement family "bench_press" appears twice: Incline Dumbbell Press, Dumbbell Bench Press
+    [duplicate_movement_family] wk1 Thursday: Movement family "deadlift" appears twice: Trap Bar Deadlift, Deadlifts
+    [duplicate_movement_family] wk1 Friday: Movement family "core_dynamic" appears twice: Hanging Leg Raises, Mountain Climbers
+    [push_pull_imbalance] wk1: Weekly push:pull set ratio is 2.00 (push=36, pull=18) (expected: 0.6 - 1.6, actual: 2.00)
+    [missing_squat_pattern] wk1: No squat-pattern exercise anywhere in the week despite equipment allowing one
+  Goal alignment (1.3/2):
+    [recovery_volume_not_reduced] wk1: low recovery_capacity weekly sets (256) not >=15% below high (257)
+
+Score 5.3/10 — home_gym / knees / 60-90 / bodybuilding / intermediate / conditioning / recovery=low / cardio=love
+  Time fit (0.0/2):
+    [time_fit] wk1 Tuesday: Worst day (week 1 Tuesday) is 30% off budget (expected: 75min (±10%), actual: 52min)
+  Progression (1.2/2):
+    [calibration_not_conservative] wk1 Monday: Calibration week load (30kg) is not conservative relative to week 3 (30kg)
+    [calibration_not_conservative] wk1 Tuesday: Calibration week load (27.5kg) is not conservative relative to week 3 (27.5kg)
+    [deload_too_heavy] wk4 Thursday: Overhead Press deload (20kg) exceeds 80% of week 3 (20kg) (expected: <= 16.0kg, actual: 20kg)
+  Selection (0.8/2):
+    [duplicate_movement_family] wk1 Monday: Movement family "bench_press" appears twice: Barbell Bench Press, Dumbbell Bench Press
+    [duplicate_movement_family] wk1 Friday: Movement family "shrug" appears twice: Shrugs, Dumbbell Shrugs
+    [push_pull_imbalance] wk1: Weekly push:pull set ratio is 1.89 (push=34, pull=18) (expected: 0.6 - 1.6, actual: 1.89)
+    [missing_hinge_pattern] wk1: No hinge-pattern exercise anywhere in the week despite equipment allowing one
+  Goal alignment (1.3/2):
+    [recovery_volume_not_reduced] wk1: low recovery_capacity weekly sets (126) not >=15% below high (135)
+
+Score 5.3/10 — home_gym / knees / 90+ / bodybuilding / novice / conditioning / recovery=low / cardio=love
+  Time fit (0.0/2):
+    [time_fit] wk13 Monday: Worst day (week 13 Monday) is 41% off budget (expected: 100min (±10%), actual: 59min)
+  Progression (1.2/2):
+    [deload_too_heavy] wk4 Monday: Barbell Bench Press deload (20kg) exceeds 80% of week 3 (22.5kg) (expected: <= 18.0kg, actual: 20kg)
+    [calibration_not_conservative] wk1 Monday: Calibration week load (22.5kg) is not conservative relative to week 3 (22.5kg)
+    [deload_too_heavy] wk4 Thursday: Overhead Press deload (20kg) exceeds 80% of week 3 (20kg) (expected: <= 16.0kg, actual: 20kg)
+  Selection (0.8/2):
+    [duplicate_movement_family] wk1 Friday: Movement family "shrug" appears twice: Dumbbell Shrugs, Shrugs
+    [push_pull_imbalance] wk1: Weekly push:pull set ratio is 1.75 (push=42, pull=24) (expected: 0.6 - 1.6, actual: 1.75)
+    [missing_hinge_pattern] wk1: No hinge-pattern exercise anywhere in the week despite equipment allowing one
+  Goal alignment (1.3/2):
+    [recovery_volume_not_reduced] wk1: low recovery_capacity weekly sets (146) not >=15% below high (146)
+
+Score 5.4/10 — full_gym / knees / 90+ / combat / intermediate / functional / recovery=low / cardio=love
+  Time fit (0.0/2):
+    [time_fit] wk1 Friday: Worst day (week 1 Friday) is 29% off budget (expected: 100min (±10%), actual: 71min)
+  Progression (1.2/2):
+    [deload_too_heavy] wk4 Tuesday: Overhead Press deload (20kg) exceeds 80% of week 3 (20kg) (expected: <= 16.0kg, actual: 20kg)
+    [calibration_not_conservative] wk1 Thursday: Calibration week load (27.5kg) is not conservative relative to week 3 (27.5kg)
+  Selection (1.2/2):
+    [duplicate_movement_family] wk1 Monday: Movement family "bench_press" appears twice: Incline Dumbbell Press, Dumbbell Bench Press
+    [duplicate_movement_family] wk1 Friday: Movement family "core_dynamic" appears twice: Hanging Leg Raises, Mountain Climbers
+    [push_pull_imbalance] wk1: Weekly push:pull set ratio is 1.72 (push=31, pull=18) (expected: 0.6 - 1.6, actual: 1.72)
+  Goal alignment (1.0/2):
+    [recovery_volume_not_reduced] wk1: low recovery_capacity weekly sets (236) not >=15% below high (246)
+
+Score 5.4/10 — full_gym / lower_back+knees / 90+ / combat / novice / functional / recovery=low / cardio=love
+  Time fit (0.0/2):
+    [time_fit] wk1 Friday: Worst day (week 1 Friday) is 29% off budget (expected: 100min (±10%), actual: 71min)
+  Progression (1.2/2):
+    [deload_too_heavy] wk4 Monday: Barbell Bench Press deload (20kg) exceeds 80% of week 3 (22.5kg) (expected: <= 18.0kg, actual: 20kg)
+    [calibration_not_conservative] wk1 Monday: Calibration week load (22.5kg) is not conservative relative to week 3 (22.5kg)
+  Selection (1.2/2):
+    [duplicate_movement_family] wk1 Thursday: Movement family "dip" appears twice: Chest Dips, Tricep Dips
+    [duplicate_movement_family] wk1 Friday: Movement family "core_dynamic" appears twice: Hanging Leg Raises, Mountain Climbers
+    [push_pull_imbalance] wk1: Weekly push:pull set ratio is 7.25 (push=58, pull=8) (expected: 0.6 - 1.6, actual: 7.25)
+  Goal alignment (1.0/2):
+    [recovery_volume_not_reduced] wk1: low recovery_capacity weekly sets (242) not >=15% below high (242)
+
+Score 5.4/10 — home_gym / lower_back / 60-90 / combat / novice / functional / recovery=low / cardio=love
+  Time fit (0.0/2):
+    [time_fit] wk1 Friday: Worst day (week 1 Friday) is 23% off budget (expected: 75min (±10%), actual: 58min)
+  Progression (1.2/2):
+    [deload_too_heavy] wk4 Monday: Barbell Bench Press deload (20kg) exceeds 80% of week 3 (22.5kg) (expected: <= 18.0kg, actual: 20kg)
+    [calibration_not_conservative] wk1 Monday: Calibration week load (22.5kg) is not conservative relative to week 3 (22.5kg)
+  Selection (1.2/2):
+    [duplicate_movement_family] wk1 Friday: Movement family "core_dynamic" appears twice: Hanging Leg Raises, Mountain Climbers
+    [push_pull_imbalance] wk1: Weekly push:pull set ratio is 3.00 (push=42, pull=14) (expected: 0.6 - 1.6, actual: 3.00)
+  Goal alignment (1.0/2):
+    [recovery_volume_not_reduced] wk1: low recovery_capacity weekly sets (188) not >=15% below high (183)
+
+Score 5.4/10 — home_gym / knees / 60-90 / bodybuilding / novice / hypertrophy / recovery=low / cardio=love
+  Time fit (0.0/2):
+    [time_fit] wk1 Tuesday: Worst day (week 1 Tuesday) is 32% off budget (expected: 75min (±10%), actual: 51min)
+  Progression (1.6/2):
+    [calibration_not_conservative] wk1 Monday: Calibration week load (22.5kg) is not conservative relative to week 3 (27.5kg)
+    [calibration_not_conservative] wk1 Tuesday: Calibration week load (20kg) is not conservative relative to week 3 (25kg)
+    [calibration_not_conservative] wk1 Thursday: Calibration week load (20kg) is not conservative relative to week 3 (25kg)
+  Selection (0.8/2):
+    [duplicate_movement_family] wk1 Friday: Movement family "shrug" appears twice: Shrugs, Dumbbell Shrugs
+    [push_pull_imbalance] wk1: Weekly push:pull set ratio is 1.89 (push=34, pull=18) (expected: 0.6 - 1.6, actual: 1.89)
+    [missing_hinge_pattern] wk1: No hinge-pattern exercise anywhere in the week despite equipment allowing one
+  Goal alignment (1.0/2):
+    [recovery_volume_not_reduced] wk1: low recovery_capacity weekly sets (127) not >=15% below high (133)
+
+Score 5.4/10 — home_gym / knees / 90+ / bodybuilding / advanced / hypertrophy / recovery=low / cardio=love
+  Time fit (0.0/2):
+    [time_fit] wk3 Tuesday: Worst day (week 3 Tuesday) is 36% off budget (expected: 100min (±10%), actual: 64min)
+  Progression (1.6/2):
+    [calibration_not_conservative] wk1 Monday: Calibration week load (42.5kg) is not conservative relative to week 3 (47.5kg)
+    [calibration_not_conservative] wk1 Thursday: Calibration week load (27.5kg) is not conservative relative to week 3 (32.5kg)
+  Selection (0.8/2):
+    [duplicate_movement_family] wk1 Monday: Movement family "bench_press" appears twice: Barbell Bench Press, Dumbbell Bench Press
+    [duplicate_movement_family] wk1 Thursday: Movement family "bench_press" appears twice: Dumbbell Bench Press, Dumbbell Bench Press
+    [duplicate_movement_family] wk1 Friday: Movement family "shrug" appears twice: Dumbbell Shrugs, Shrugs
+    [push_pull_imbalance] wk1: Weekly push:pull set ratio is 1.68 (push=42, pull=25) (expected: 0.6 - 1.6, actual: 1.68)
+    [missing_hinge_pattern] wk1: No hinge-pattern exercise anywhere in the week despite equipment allowing one
+  Goal alignment (1.0/2):
+    [recovery_volume_not_reduced] wk1: low recovery_capacity weekly sets (148) not >=15% below high (145)
+
+================================================================================

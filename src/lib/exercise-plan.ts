@@ -13,7 +13,7 @@ import { buildWarmup, getWarmupReserveSeconds } from './warmup'
 import { prescribeLoad, categorize, getLoadIncrementKg, isExternallyLoaded, type KnownWorkingWeights } from './load-prescription'
 import {
   getPhaseSequence, getPhaseConfig, rotateVariation, resolveTargetRpe,
-  shiftReps, adjustRest,
+  shiftReps, adjustRest, type PhaseConfig,
 } from './periodization'
 import { getGoalPolicy, restrictPhaseSequence, resolveConditioningFrequency, RECOVERY_SET_MULTIPLIER, type GoalPolicy } from './goal-policies'
 
@@ -229,10 +229,27 @@ const INJURED_JOINTS: Record<string, string[]> = {
 // Utility functions
 // ---------------------------------------------------------------------------
 
+// The only source of randomness in the whole generation pipeline — every
+// other exercise-selection decision is deterministic given the same pool and
+// profile. Defaults to Math.random (a real user's plan should vary run to
+// run); test/audit harnesses call setRandomSource() with a seeded generator
+// so the same profile always produces the same plan and the same score.
+// Production code should never call setRandomSource() — this is a testing
+// seam, not a feature.
+let randomSource: () => number = Math.random
+
+export function setRandomSource(fn: () => number): void {
+  randomSource = fn
+}
+
+export function resetRandomSource(): void {
+  randomSource = Math.random
+}
+
 function shuffle<T>(arr: T[]): T[] {
   const copy = [...arr]
   for (let i = copy.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = Math.floor(randomSource() * (i + 1));
     [copy[i], copy[j]] = [copy[j], copy[i]]
   }
   return copy
@@ -757,8 +774,14 @@ function selectExercisesForTrack(
     : null
 
   // Keyed by movement family, not substitution_group, so the same movement
-  // cannot appear twice under two different classifications.
+  // cannot appear twice under two different classifications. Seeded with the
+  // primer's family (if any) up front — Kettlebell Swings (primer,
+  // 'activation' pattern) and Kettlebell Swing (Heavy) (main, 'hip_hinge'
+  // pattern) share a family via MOVEMENT_FAMILIES despite having different
+  // movement_pattern values, but the primer is picked before this set even
+  // existed, so nothing stopped both from landing in the same session.
   const usedGroups = new Set<string>()
+  if (primer) usedGroups.add(getMovementFamily(primer))
   const selected: ExerciseEntry[] = []
 
   function pickFromTier(tier: string, count: number, patterns: MovementPattern[]) {
@@ -1487,6 +1510,80 @@ function classifyRotationTiers(exercises: Exercise[]): RotationTier[] {
   })
 }
 
+/**
+ * How many extra sets (per day, per exercise index) to add on top of
+ * periodization's normal volume formula so a loading week doesn't run well
+ * under the trainee's stated session length. Only tier2/tier3 accessories
+ * are eligible — primers and the main lift keep exactly what the
+ * warm-up/progression systems prescribed for them — and each exercise is
+ * capped at +3 sets so this fills genuinely wasted time rather than
+ * inflating accessory volume without bound.
+ */
+function computeDurationTopUp(
+  blockDays: WorkoutDay[],
+  rotationTiers: RotationTier[][],
+  profile: UserProfile,
+  policy: GoalPolicy,
+  recoverySetMultiplier: number,
+  phaseConfig: PhaseConfig,
+): number[][] {
+  const totalBudgetSeconds = getDurationBudgetSeconds(profile.session_duration_preference || '45-60')
+  const dayBudgetSeconds = totalBudgetSeconds - getWarmupReserveSeconds(totalBudgetSeconds)
+  const targetSeconds = dayBudgetSeconds * 0.95
+  // A real ceiling, not just a knob to raise until the numbers work out: no
+  // sane program puts 15-20+ sets on one accessory. Raising this past ~6
+  // (tried up to 20 while tuning) stopped fixing anything and started
+  // prescribing "22 sets of Dumbbell Curls" instead — a worse problem than
+  // the one it was meant to solve. When a day has too few distinct eligible
+  // exercises to reach the target within this cap, that's the real
+  // limitation: the exercise SELECTION is too thin for the requested
+  // session length, and no amount of set-stacking on 2-3 movements fixes
+  // that honestly. See generateMesocycle's doc comment for the profiles
+  // this still doesn't fully close.
+  const EXTRA_SETS_CAP = 6
+
+  return blockDays.map((day, dayIdx) => {
+    const entries = day.exercises.map(ex => EXERCISE_DATABASE.find(e => e.name.toLowerCase() === ex.name.toLowerCase()))
+    const baseSets = day.exercises.map(ex =>
+      Math.max(2, Math.round(ex.sets * policy.setVolumeMultiplier * recoverySetMultiplier * phaseConfig.sets_multiplier))
+    )
+    const restSeconds = day.exercises.map(ex => {
+      const match = ex.rest.match(/(\d+)/)
+      const base = match ? parseInt(match[1], 10) : 60
+      return Math.max(20, base + phaseConfig.rest_adjust_seconds)
+    })
+
+    const estimate = (sets: number[]) => sets.reduce((total, s, i) => {
+      const repDuration = entries[i]?.avg_duration_seconds ?? 35
+      return total + s * (repDuration + restSeconds[i])
+    }, 0)
+
+    const extra = day.exercises.map(() => 0)
+    const eligible = day.exercises
+      .map((_, i) => i)
+      .filter(i => entries[i] && entries[i]!.mechanics_tier !== 'primer' && rotationTiers[dayIdx][i] !== 'main')
+
+    if (eligible.length === 0) return extra
+
+    let currentSets = [...baseSets]
+    let guard = 0
+    while (estimate(currentSets) < targetSeconds && guard < 50) {
+      let addedThisPass = false
+      for (const i of eligible) {
+        if (estimate(currentSets) >= targetSeconds) break
+        if (extra[i] >= EXTRA_SETS_CAP) continue
+        currentSets[i]++
+        extra[i]++
+        addedThisPass = true
+      }
+      guard++
+      if (!addedThisPass) break
+    }
+
+    return extra
+  })
+}
+
 export function generateMesocycle(
   profile: UserProfile,
   baseWorkout?: WorkoutDay[],
@@ -1551,6 +1648,18 @@ export function generateMesocycle(
     // accessory's specific variation moves within it (see fortnightOffset).
     const rotationTiers: RotationTier[][] = blockDays.map(day => classifyRotationTiers(day.exercises))
 
+    // Periodization's phase/goal/recovery volume multipliers can shrink a
+    // LOADING week well below the duration the base plan's exercise
+    // SELECTION was originally time-fit for — stageTimeCap (STAGE 5) only
+    // ever runs once, on the unperiodized base plan, and periodization
+    // purely scales sets down from there with nothing to refill the freed
+    // time. A user who asked for 45-60min sessions could otherwise get a
+    // 20-30min week 1 despite it not even being a deload. Sized once per
+    // block from week 1's structure and applied flatly across weeks 1-3 (not
+    // deload — a shorter recovery week is intentional) so "sets stay flat
+    // within a block" still holds.
+    const blockExtraSets: number[][] = computeDurationTopUp(blockDays, rotationTiers, profile, policy, recoverySetMultiplier, phaseConfig)
+
     for (let w = 1; w <= 4; w++) {
       weekCounter++
       const isDeload = w === 4
@@ -1591,7 +1700,10 @@ export function generateMesocycle(
           const goalAdjustedBaseSets = ex.sets * policy.setVolumeMultiplier * recoverySetMultiplier
           const sets = isDeload
             ? Math.max(2, Math.round(goalAdjustedBaseSets * 0.5))
-            : Math.max(2, Math.round(goalAdjustedBaseSets * phaseConfig.sets_multiplier))
+            // + the once-per-block duration top-up (see computeDurationTopUp)
+            // — a fixed per-slot amount, so this still holds sets flat
+            // across weeks 1-3 despite being duration-driven.
+            : Math.max(2, Math.round(goalAdjustedBaseSets * phaseConfig.sets_multiplier)) + blockExtraSets[dayIdx][exIdx]
 
           const dbEntry = EXERCISE_DATABASE.find(
             e => e.name.toLowerCase() === weeklyName.toLowerCase()

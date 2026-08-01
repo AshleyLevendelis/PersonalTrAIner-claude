@@ -8,12 +8,25 @@ import { getSkillDemand, isSkillAppropriate } from './experience-config'
 import { categorize, CATEGORY_CAPS_KG } from './load-prescription'
 import { getReplacementCandidates, swapExerciseInMesocycle, banExerciseFromMesocycle, containsExerciseName } from './mesocycle-edit'
 
-// All combinations to test
-const ALL_EQUIPMENT: EquipmentAccess[] = ['full_gym', 'home_gym', 'minimalist', 'bodyweight']
-const ALL_INJURIES = ['lower_back', 'knees', 'shoulders', 'neck', 'wrists']
-const ALL_DURATIONS: SessionDuration[] = ['30-45', '45-60', '60-90', '90+']
-const ALL_STYLES: TrainingStyle[] = ['functional', 'bodybuilding', 'combat', 'hybrid']
-const ALL_EXPERIENCE: TrainingExperience[] = ['beginner', 'novice', 'intermediate', 'advanced']
+// All combinations to test — exported so other harnesses (e.g.
+// scripts/run-quality-score.ts) reuse the exact same dimensions rather than
+// maintaining a second, driftable copy.
+export const ALL_EQUIPMENT: EquipmentAccess[] = ['full_gym', 'home_gym', 'minimalist', 'bodyweight']
+export const ALL_INJURIES = ['lower_back', 'knees', 'shoulders', 'neck', 'wrists']
+export const ALL_DURATIONS: SessionDuration[] = ['30-45', '45-60', '60-90', '90+']
+export const ALL_STYLES: TrainingStyle[] = ['functional', 'bodybuilding', 'combat', 'hybrid']
+export const ALL_EXPERIENCE: TrainingExperience[] = ['beginner', 'novice', 'intermediate', 'advanced']
+
+/** Empty + each single injury + a few realistic multi-injury combos — same set the constraint audit grid uses. */
+export function getInjuryCombinations(): string[][] {
+  return [
+    [],
+    ...ALL_INJURIES.map(i => [i]),
+    ['lower_back', 'knees'],
+    ['shoulders', 'wrists'],
+    ['knees', 'shoulders', 'lower_back'],
+  ]
+}
 
 // Injury -> joints that should NOT appear in final exercises
 const INJURED_JOINTS_MAP: Record<string, string[]> = {
@@ -629,14 +642,7 @@ export async function runFullConstraintAudit(
 ): Promise<AuditReport> {
   const startTime = performance.now()
 
-  // Generate all injury combinations (empty + each single injury + a couple combos)
-  const injuryCombinations: string[][] = [
-    [],
-    ...ALL_INJURIES.map(i => [i]),
-    ['lower_back', 'knees'],
-    ['shoulders', 'wrists'],
-    ['knees', 'shoulders', 'lower_back'],
-  ]
+  const injuryCombinations = getInjuryCombinations()
 
   const totalCombinations =
     ALL_EQUIPMENT.length * injuryCombinations.length * ALL_DURATIONS.length *
