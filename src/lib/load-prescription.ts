@@ -106,6 +106,20 @@ export interface LoadPrescriptionOptions {
    * sets → add Xkg next session"). Purely cosmetic; does not affect the load.
    */
   repRangeLabel?: string
+  /**
+   * Whether THIS exercise's weight is actually the thing climbing week to
+   * week within the block, independent of `forceStartingWeightKg` being
+   * set. generateMesocycle always forces a number for weeks 2-3 (baseline,
+   * possibly plus increments) — but for 'reps'/'maintain' goal policies (and
+   * any bodyweight movement) that forced number is the SAME baseline every
+   * week; reps are the real lever. Without this, `basis` told every trainee
+   * "hit your reps, add load next time" even on exercises the engine will
+   * never add load to — a real reported bug ("the app can't progress them
+   * either" read one review, on a plan whose reps WERE climbing but whose
+   * coach note only ever talked about weight). Defaults true (the pre-
+   * existing behavior) for any caller that doesn't pass it.
+   */
+  loadIsProgressing?: boolean
 }
 
 // ---------------------------------------------------------------------------
@@ -313,7 +327,7 @@ export function getEquipmentFloorKg(entry: ExerciseEntry): number {
 }
 
 /** Round to something actually loadable rather than a number like 43.7kg. */
-function roundToPlate(kg: number, mode: LoadingMode): number {
+export function roundToPlate(kg: number, mode: LoadingMode): number {
   const floor = LOADING_FLOOR_KG[mode]
   switch (mode) {
     case 'dumbbell':
@@ -461,6 +475,13 @@ function buildProgressionBasis(repRangeLabel: string | undefined, incrementKg: n
   return `Hit ${target} on every set this session? Add ${incrementText} next time. Otherwise hold this weight and chase more reps first.`
 }
 
+/** For 'reps'/'maintain'-emphasis goals (and any bodyweight movement): the weight is intentionally NOT the progression lever this block, so the basis says what actually IS — the climbing rep target — instead of a load-progression rule that will never fire. */
+function buildRepsProgressionBasis(repRangeLabel: string | undefined): string {
+  return repRangeLabel
+    ? `Weight holds here by design — the rep target (${repRangeLabel} this week) is what's climbing through the block. Add reps, not load.`
+    : `Weight holds here by design this block — reps are the lever climbing week to week, not load.`
+}
+
 export function prescribeLoad(
   entry: ExerciseEntry,
   profile: UserProfile,
@@ -573,7 +594,9 @@ export function prescribeLoad(
   const per_set = buildPerSetLoads(rounded, options.sets ?? 1, mode, isDumbbell, ramping)
 
   const basis = options.forceStartingWeightKg != null
-    ? buildProgressionBasis(options.repRangeLabel, getLoadIncrementKg(entry, category), isDumbbell)
+    ? (options.loadIsProgressing === false
+        ? buildRepsProgressionBasis(options.repRangeLabel)
+        : buildProgressionBasis(options.repRangeLabel, getLoadIncrementKg(entry, category), isDumbbell))
     : options.isCalibrationWeek
       ? 'Calibration week — deliberately light. Find the weight where your last rep feels like the target RPE, then log it.'
       : fromKnownWeight

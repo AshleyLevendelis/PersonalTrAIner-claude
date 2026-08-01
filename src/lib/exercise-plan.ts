@@ -10,7 +10,7 @@ import {
   type ExperienceConfig,
 } from './experience-config'
 import { buildWarmup, getWarmupReserveSeconds } from './warmup'
-import { prescribeLoad, categorize, getLoadIncrementKg, isExternallyLoaded, getEquipmentFloorKg, type KnownWorkingWeights } from './load-prescription'
+import { prescribeLoad, categorize, getLoadIncrementKg, isExternallyLoaded, getEquipmentFloorKg, loadingMode, roundToPlate, type KnownWorkingWeights } from './load-prescription'
 import {
   getPhaseSequence, getPhaseConfig, rotateVariation, resolveTargetRpe,
   shiftReps, adjustRest, dedupeAdjacentPhases, type PhaseConfig, type TrainingPhase,
@@ -1115,6 +1115,133 @@ function enforceSetHierarchy(exercises: Exercise[]): Exercise[] {
   )
 }
 
+// ---------------------------------------------------------------------------
+// Load coherence — cross-exercise sanity pass
+// ---------------------------------------------------------------------------
+// prescribeLoad estimates every exercise independently — it has no idea what
+// the day's main lift is loaded at, or what a sibling accessory in the same
+// muscle group is showing THIS SAME WEEK. That's how an LLM coach review
+// found a 26kg/hand curl next to a 2kg shrug in the same week, and a
+// unilateral Bulgarian split squat outweighing the bilateral back squat it
+// shared a session with. Runs once per week, after every exercise's load is
+// resolved, and pulls outliers back toward what's actually coherent.
+
+const RELATED_PRESS_FRACTION_CEILING = 0.55 // curls/laterals/shrugs vs. the day's main press
+const UNILATERAL_VS_MAIN_FRACTION_CEILING = 0.65 // unilateral accessory vs. the day's bilateral main, same broad pattern
+const SAME_MUSCLE_GROUP_MAX_RATIO = 2 // heaviest same-group accessory vs. lightest, within the week
+
+type BroadPattern = 'push' | 'pull' | 'squat' | 'hinge' | null
+
+function broadPattern(pattern: MovementPattern): BroadPattern {
+  switch (pattern) {
+    case 'horizontal_push': case 'vertical_push': return 'push'
+    case 'horizontal_pull': case 'vertical_pull': return 'pull'
+    case 'knee_dominant': case 'single_leg': return 'squat'
+    case 'hip_hinge': return 'hinge'
+    default: return null
+  }
+}
+
+/** Same-muscle-group coherence bucket — exercises whose absolute load should stay in the same ballpark within a week. Laterals and shrugs share a bucket deliberately: both are the same "small, high-rep shoulder-girdle isolation" complaint class in the review. */
+function coherenceGroup(entry: ExerciseEntry): string | null {
+  switch (entry.movement_pattern) {
+    case 'isolation_bicep': return 'bicep'
+    case 'isolation_tricep': return 'tricep'
+    case 'isolation_shoulder': return 'shoulder_isolation'
+    case 'isolation_quad': return 'quad_isolation'
+    case 'isolation_hamstring': return 'hamstring_isolation'
+    case 'isolation_calf': return 'calf_isolation'
+    default: return null
+  }
+}
+
+/** Overwrites an exercise's load fields in place to a new (plate-rounded) target — used only to pull an outlier DOWN toward coherence, never to invent a heavier number. Any set-by-set ramp collapses to a flat value at the new target; a load already being clamped down is not a candidate for a strength-phase ramp anyway. */
+function rebuildLoadForExercise(ex: Exercise, entry: ExerciseEntry, targetKg: number): void {
+  const mode = loadingMode(entry)
+  const rounded = roundToPlate(targetKg, mode)
+  const isDumbbell = mode === 'dumbbell'
+  const display = isDumbbell ? `~${rounded}kg per hand` : `~${rounded}kg`
+  ex.suggested_load_kg = rounded
+  ex.suggested_load = display
+  if (ex.per_set_load && ex.per_set_load.length > 0) {
+    ex.per_set_load = ex.per_set_load.map(s => ({ ...s, load_kg: rounded, display }))
+  }
+}
+
+function enforceLoadCoherence(days: WorkoutDay[]): void {
+  for (const day of days) {
+    const mainLifts = day.exercises.filter(ex => {
+      const entry = findEntry(ex.name)
+      return entry && ex.suggested_load_kg != null && entry.mechanics_tier === 'tier1_compound' && !entry.unilateral
+    })
+
+    // Unilateral accessory vs. this day's bilateral main lift, same broad pattern.
+    for (const ex of day.exercises) {
+      const entry = findEntry(ex.name)
+      if (!entry || !entry.unilateral || ex.suggested_load_kg == null) continue
+      const pattern = broadPattern(entry.movement_pattern)
+      if (!pattern) continue
+      const main = mainLifts.find(m => broadPattern(findEntry(m.name)!.movement_pattern) === pattern)
+      if (!main || main.suggested_load_kg == null) continue
+      const ceiling = main.suggested_load_kg * UNILATERAL_VS_MAIN_FRACTION_CEILING
+      if (ex.suggested_load_kg > ceiling) rebuildLoadForExercise(ex, entry, ceiling)
+    }
+
+    // Incline press vs. flat press, same day — incline should never exceed flat.
+    const flat = day.exercises.find(ex => {
+      const entry = findEntry(ex.name)
+      return entry?.substitution_group === 'bench_press' && entry.angle_vector === 'horizontal' && ex.suggested_load_kg != null
+    })
+    if (flat?.suggested_load_kg != null) {
+      for (const ex of day.exercises) {
+        const entry = findEntry(ex.name)
+        if (!entry || entry.name === flat.name || ex.suggested_load_kg == null) continue
+        const isInclinePress = entry.substitution_group === 'bench_press' && entry.angle_vector === 'diagonal' && entry.movement_pattern === 'horizontal_push'
+        if (isInclinePress && ex.suggested_load_kg > flat.suggested_load_kg) {
+          rebuildLoadForExercise(ex, entry, flat.suggested_load_kg * 0.9)
+        }
+      }
+    }
+
+    // Curls/laterals/shrugs vs. this day's main press.
+    const mainPress = mainLifts.find(m => {
+      const p = findEntry(m.name)?.movement_pattern
+      return p === 'horizontal_push' || p === 'vertical_push'
+    })
+    if (mainPress?.suggested_load_kg != null) {
+      const ceiling = mainPress.suggested_load_kg * RELATED_PRESS_FRACTION_CEILING
+      for (const ex of day.exercises) {
+        const entry = findEntry(ex.name)
+        if (!entry || ex.suggested_load_kg == null) continue
+        const isBoundedIsolation = entry.movement_pattern === 'isolation_bicep' || entry.movement_pattern === 'isolation_shoulder'
+        if (isBoundedIsolation && ex.suggested_load_kg > ceiling) rebuildLoadForExercise(ex, entry, ceiling)
+      }
+    }
+  }
+
+  // Same-muscle-group accessories within ~2x of each other, across the whole week.
+  const groups = new Map<string, { ex: Exercise; entry: ExerciseEntry }[]>()
+  for (const day of days) {
+    for (const ex of day.exercises) {
+      const entry = findEntry(ex.name)
+      if (!entry || ex.suggested_load_kg == null) continue
+      const group = coherenceGroup(entry)
+      if (!group) continue
+      if (!groups.has(group)) groups.set(group, [])
+      groups.get(group)!.push({ ex, entry })
+    }
+  }
+  for (const items of groups.values()) {
+    if (items.length < 2) continue
+    const min = Math.min(...items.map(i => i.ex.suggested_load_kg!))
+    if (min <= 0) continue
+    const ceiling = min * SAME_MUSCLE_GROUP_MAX_RATIO
+    for (const { ex, entry } of items) {
+      if (ex.suggested_load_kg! > ceiling) rebuildLoadForExercise(ex, entry, ceiling)
+    }
+  }
+}
+
 type BalancePattern = 'push' | 'pull' | 'squat' | 'hinge' | null
 
 function classifyForBalance(pattern: MovementPattern): BalancePattern {
@@ -1707,6 +1834,7 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
 
   balanceWeeklyStructure(days, pool, weeklyUsed, allSelectedNames, experience, profile, trace, styleConfig)
   assignConditioningNotes(days, profile, policy)
+  enforceLoadCoherence(days)
 
   const budgetedDays = days.map(d => enforceDayDurationBudget(d, totalBudgetSeconds))
 
@@ -2314,11 +2442,14 @@ export function generateMesocycle(
           // one prescribeLoad can't categorize) — progress these via reps
           // regardless of the goal's progressionEmphasis, since there's no
           // weight for that setting to apply to. Loaded exercises follow the
-          // goal: 'reps' ramps the rep target the same way, 'load' ramps
-          // weight instead (see forceStartingWeightKg below), 'maintain'
-          // ramps neither.
+          // goal: 'reps' AND 'maintain' both ramp the rep target — 'maintain'
+          // previously ramped neither reps nor load, which is how a plan
+          // ended up with three visually identical weeks distinguishable
+          // only by an RPE label (a direct LLM coach review finding: "same
+          // bar, same reps, 'now it's harder' is not a plan"). Only 'load'
+          // emphasis holds reps flat, since load itself is that goal's lever.
           const isBodyweight = !!dbEntry && !isPrimer && !isExternallyLoaded(dbEntry)
-          const rampReps = isBodyweight || policy.progressionEmphasis === 'reps'
+          const rampReps = isBodyweight || policy.progressionEmphasis === 'reps' || policy.progressionEmphasis === 'maintain'
           const rampLoad = !isBodyweight && policy.progressionEmphasis === 'load'
           const repShift = isDeload
             ? (deloadAtFloor
@@ -2387,6 +2518,7 @@ export function generateMesocycle(
               knownWorkingWeights,
               forceStartingWeightKg,
               repRangeLabel: reps,
+              loadIsProgressing: rampLoad,
             })
 
             if (w === 1) blockBaselineKg[dayIdx][exIdx] = load.starting_weight_kg
@@ -2422,6 +2554,8 @@ export function generateMesocycle(
         // the main lift itself is deliberately at its lowest point.
         return { ...day, exercises: isDeload ? exercises : enforceSetHierarchy(exercises) }
       })
+
+      enforceLoadCoherence(days)
 
       // Deload weeks are SUPPOSED to run short (half volume, by design) — a
       // filler there would fight the whole point of the recovery week, so
