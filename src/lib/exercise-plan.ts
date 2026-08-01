@@ -10,7 +10,7 @@ import {
   type ExperienceConfig,
 } from './experience-config'
 import { buildWarmup, getWarmupReserveSeconds } from './warmup'
-import { prescribeLoad, type KnownWorkingWeights } from './load-prescription'
+import { prescribeLoad, categorize, getLoadIncrementKg, isExternallyLoaded, type KnownWorkingWeights } from './load-prescription'
 import {
   getPhaseSequence, getPhaseConfig, rotateVariation, resolveTargetRpe,
   shiftReps, adjustRest,
@@ -1450,6 +1450,13 @@ export function generateMesocycle(
       })),
     }))
 
+    // Double progression's within-block memory: each exercise's week-1
+    // ("baseline") load, keyed by [dayIndex][exerciseIndex] — weeks 2-3 are
+    // that SAME number plus fixed increments, not independently re-estimated,
+    // and the deload is a fraction of week 3. Reset every block since a new
+    // block means a new baseline (and possibly a rotated variation).
+    const blockBaselineKg: (number | null)[][] = blockDays.map(day => day.exercises.map(() => null))
+
     for (let w = 1; w <= 4; w++) {
       weekCounter++
       const isDeload = w === 4
@@ -1460,47 +1467,73 @@ export function generateMesocycle(
       // recurring one.
       const isCalibrationWeek = weekCounter === 1 && profile.skip_calibration_week !== true
 
-      const days: WorkoutDay[] = blockDays.map(day => {
-        const exercises: Exercise[] = day.exercises.map(ex => {
-          const setsMultiplier = isDeload ? 0.5 : phaseConfig.sets_multiplier
-          // Weeks 1-3 build within the block; the deload pulls volume back.
-          const weekBuild = isDeload ? 0 : (w - 1) * 0.1
-          // Floor of 2. A deload reduces volume; it does not reduce a movement
-          // to a single set, which is not enough to maintain the pattern.
-          const sets = Math.max(2, Math.round(ex.sets * (setsMultiplier + weekBuild)))
-
-          const repShift = isDeload ? 2 : phaseConfig.rep_shift
-          const restShift = isDeload ? 0 : phaseConfig.rest_adjust_seconds
+      const days: WorkoutDay[] = blockDays.map((day, dayIdx) => {
+        const exercises: Exercise[] = day.exercises.map((ex, exIdx) => {
+          // Sets stay near-constant across the three loading weeks of a
+          // block — load is the progression lever below, not set count. The
+          // deload is the one week that deliberately drops both.
+          const sets = isDeload
+            ? Math.max(2, Math.round(ex.sets * 0.5))
+            : Math.max(2, Math.round(ex.sets * phaseConfig.sets_multiplier))
 
           const dbEntry = EXERCISE_DATABASE.find(
             e => e.name.toLowerCase() === ex.name.toLowerCase()
           )
           const isPrimer = dbEntry?.mechanics_tier === 'primer'
+          const category = dbEntry ? categorize(dbEntry) : null
+
+          // No externally loaded weight to ramp (true bodyweight movement, or
+          // one prescribeLoad can't categorize) — progress these via reps
+          // instead: one extra rep-range notch per week within the block.
+          // The deload keeps the existing, larger "easier" notch either way.
+          const isBodyweightProgression = !!dbEntry && !isPrimer && !isExternallyLoaded(dbEntry)
+          const repShift = isDeload
+            ? phaseConfig.rep_shift + 2
+            : phaseConfig.rep_shift + (isBodyweightProgression ? w - 1 : 0)
+          const restShift = isDeload ? 0 : phaseConfig.rest_adjust_seconds
+          const reps = shiftReps(ex.reps, repShift, expConfig.min_reps)
 
           // Primers stay submaximal and un-scaled for the same reason as the
           // base plan — a warm-up movement should never carry a working-set
           // RPE or a load that scales with the block.
           const intensity = isPrimer ? ex.intensity : resolveTargetRpe(phase, experience, w, isDeload)
 
-          // Recomputed every week, not carried over from the base plan: sets,
-          // reps and RPE all change block to block and week to week, and the
-          // load has to track the SAME week's RPE target — otherwise a
-          // deload week ends up prescribing the same weight as a peak week.
-          const load = dbEntry && !isPrimer
-            ? prescribeLoad(dbEntry, profile, {
-                targetRpeLabel: intensity,
-                isFirstBlock: blockIndex === 0,
-                sets,
-                phase,
-                isCalibrationWeek,
-                knownWorkingWeights,
-              })
-            : null
+          let load = null as ReturnType<typeof prescribeLoad> | null
+          if (dbEntry && !isPrimer) {
+            const baselineKg = blockBaselineKg[dayIdx][exIdx]
+            const increment = getLoadIncrementKg(dbEntry, category)
+
+            // Week 1 sets the baseline through the normal estimate pipeline
+            // (bodyweight/known-weight/RPE/first-block/calibration all still
+            // apply there). Weeks 2-3 are that exact baseline plus one/two
+            // fixed increments — not a fresh, independently RPE-scaled
+            // estimate, which is what made load look flat despite sets
+            // climbing. The deload is 65-75% of week 3's number.
+            let forceStartingWeightKg: number | undefined
+            if (baselineKg != null) {
+              if (w === 2) forceStartingWeightKg = baselineKg + increment
+              else if (w === 3) forceStartingWeightKg = baselineKg + 2 * increment
+              else if (isDeload) forceStartingWeightKg = (baselineKg + 2 * increment) * 0.7
+            }
+
+            load = prescribeLoad(dbEntry, profile, {
+              targetRpeLabel: intensity,
+              isFirstBlock: blockIndex === 0,
+              sets,
+              phase,
+              isCalibrationWeek,
+              knownWorkingWeights,
+              forceStartingWeightKg,
+              repRangeLabel: reps,
+            })
+
+            if (w === 1) blockBaselineKg[dayIdx][exIdx] = load.starting_weight_kg
+          }
 
           return {
             ...ex,
             sets,
-            reps: shiftReps(ex.reps, repShift, expConfig.min_reps),
+            reps,
             rest: adjustRest(ex.rest, restShift),
             intensity,
             load_guidance: load ? `${expConfig.load_guidance} ${load.basis}` : ex.load_guidance,

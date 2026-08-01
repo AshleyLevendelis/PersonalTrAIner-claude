@@ -89,6 +89,23 @@ export interface LoadPrescriptionOptions {
    * guess for a stranger.
    */
   knownWorkingWeights?: KnownWorkingWeights
+  /**
+   * Skips the bodyweight/known-weight estimate entirely and uses this number
+   * as the top-set weight (still plate-rounded, still capped through the
+   * per-set ramp builder). Used by the within-block double-progression ramp
+   * in generateMesocycle() — week 2/3 are "week 1's baseline + N increments,"
+   * not a fresh RPE-derived estimate — and by the live logged-history
+   * override once real set data exists. `targetRpeLabel` should still be
+   * passed alongside this for phase/RPE display purposes even though it no
+   * longer affects the number.
+   */
+  forceStartingWeightKg?: number
+  /**
+   * The prescribed rep range for this exercise this week, e.g. '8-12' — used
+   * only to phrase the double-progression rule in `basis` ("hit 12 on all
+   * sets → add Xkg next session"). Purely cosmetic; does not affect the load.
+   */
+  repRangeLabel?: string
 }
 
 // ---------------------------------------------------------------------------
@@ -254,7 +271,7 @@ function ageAdjustment(age: number): number {
   return Math.max(0.7, 1 - (age - 40) * 0.007)
 }
 
-type LoadingMode = 'barbell' | 'ez_bar' | 'dumbbell' | 'single_implement' | 'stack'
+export type LoadingMode = 'barbell' | 'ez_bar' | 'dumbbell' | 'single_implement' | 'stack'
 
 /**
  * The exercise database distinguishes plural 'dumbbells' (two implements, one
@@ -264,7 +281,7 @@ type LoadingMode = 'barbell' | 'ez_bar' | 'dumbbell' | 'single_implement' | 'sta
  * hand" case is what produced a goblet squat prescribed "~60kg per hand": a
  * single-implement lift got the two-implement halving and label anyway.
  */
-function loadingMode(entry: ExerciseEntry): LoadingMode {
+export function loadingMode(entry: ExerciseEntry): LoadingMode {
   if (entry.equipment.includes('dumbbells')) return 'dumbbell'
   if (entry.equipment.includes('dumbbell') || entry.equipment.includes('kettlebell')) return 'single_implement'
   // An EZ bar is roughly 10kg, not 20kg. Flooring it at bar weight like an
@@ -291,6 +308,30 @@ function roundToPlate(kg: number, mode: LoadingMode): number {
       // Cable and machine stacks have no bar to floor against — applying the
       // barbell's 20kg minimum here inflated light isolation work.
       return Math.max(5, Math.round(kg / 2.5) * 2.5)
+  }
+}
+
+/**
+ * The double-progression increment for one "notch" of overload — how much
+ * gets added once a trainee has earned it (hit the top of their rep range on
+ * every set). Sized by how finely each loading mode actually steps in a real
+ * gym: barbell plates jump in 2.5kg pairs, dumbbell racks commonly step in
+ * 2kg per hand, stacks/machines vary but 2.5kg is the safe common case except
+ * for heavy leg-press-style stacks which usually step in bigger increments.
+ * Bodyweight movements have no numeric increment — see isExternallyLoaded()
+ * callers, which progress those via reps instead and should never call this.
+ */
+export function getLoadIncrementKg(entry: ExerciseEntry, category: string | null): number {
+  const mode = loadingMode(entry)
+  switch (mode) {
+    case 'barbell':
+    case 'ez_bar':
+      return 2.5
+    case 'dumbbell':
+    case 'single_implement':
+      return 2
+    case 'stack':
+      return category === 'leg_press' ? 5 : 2.5
   }
 }
 
@@ -388,6 +429,18 @@ function buildPerSetLoads(
   })
 }
 
+/**
+ * Phrases the double-progression rule against the actual rep range and
+ * increment size, so "the rep range must be meaningful" isn't just a number
+ * — the trainee is told exactly what triggers the next bump.
+ */
+function buildProgressionBasis(repRangeLabel: string | undefined, incrementKg: number, isDumbbell: boolean): string {
+  const topOfRange = repRangeLabel?.match(/(\d+)\s*$/)?.[1]
+  const incrementText = isDumbbell ? `${incrementKg}kg per hand` : `${incrementKg}kg`
+  const target = topOfRange ? `${topOfRange} reps` : 'the top of your rep range'
+  return `Hit ${target} on every set this session? Add ${incrementText} next time. Otherwise hold this weight and chase more reps first.`
+}
+
 export function prescribeLoad(
   entry: ExerciseEntry,
   profile: UserProfile,
@@ -416,68 +469,80 @@ export function prescribeLoad(
     }
   }
 
-  const experience = profile.training_experience || 'novice'
-  const bodyweight = profile.weight_kg || 75
-
-  // A trainee-reported working weight replaces the population estimate
-  // entirely when it's available for this exercise's family — it's real,
-  // verified data rather than a guess from bodyweight/sex/age.
-  const knownFamily = KNOWN_WEIGHT_FAMILY[category]
-  const knownAnchor = knownFamily ? options.knownWorkingWeights?.[knownFamily] : undefined
-  const fromKnownWeight = knownAnchor != null && knownAnchor > 0
-
-  let estimate = fromKnownWeight
-    ? knownAnchor!
-    : bodyweight *
-      BODYWEIGHT_MULTIPLIERS[category][experience] *
-      sexAdjustment(category, profile.gender) *
-      ageAdjustment(profile.age || 30)
-
-  // Reconcile the estimate against the actual effort this week is asking
-  // for — the standards above assume a firm ~RPE 8 working set, not whatever
-  // this particular phase/week targets.
-  let fraction = rpeEffortFraction(options.targetRpeLabel)
-
-  const isFirstBlock = options.isFirstBlock !== false
-  if (isFirstBlock && !fromKnownWeight) {
-    // No verified lifting history yet. Regardless of what the RPE math alone
-    // would allow, the very first block stays capped at 50-60% of the
-    // reference working weight — the user corrects upward via RPE feedback,
-    // not by trusting an untested number. A known, self-reported working
-    // weight skips this clamp — it isn't an untested number.
-    fraction = Math.min(fraction, FIRST_BLOCK_MAX_FRACTION)
-  }
-
-  if (options.isCalibrationWeek) {
-    // Week 1 with no known numbers: the point is to FIND the weight where
-    // RPE 6 lands, not to hand over a confident-looking number. Overrides
-    // whatever the RPE label alone would allow, same mechanism as the
-    // first-block clamp above.
-    fraction = Math.min(fraction, CALIBRATION_MAX_FRACTION)
-  }
-
-  estimate *= fraction
-
   const mode = loadingMode(entry)
   const isDumbbell = mode === 'dumbbell'
 
-  // A per-hand dumbbell prescription is half the standard's total — but only
-  // for TWO-implement lifts (plural 'dumbbells'). A single dumbbell or
-  // kettlebell (goblet squats, carries, swings) is not halved and is not
-  // labeled "per hand" — see loadingMode().
-  if (isDumbbell) estimate = estimate / 2
+  let rounded: number
+  let fromKnownWeight = false
 
-  let rounded = roundToPlate(estimate, mode)
+  if (options.forceStartingWeightKg != null) {
+    // Within-block double-progression ramp (or a live logged-history
+    // override) — the caller has already worked out the exact top-set
+    // number (baseline + N increments, or last session's weight ± an
+    // increment). Nothing here should re-derive or re-scale it; only round
+    // it to something loadable.
+    rounded = roundToPlate(options.forceStartingWeightKg, mode)
+  } else {
+    const experience = profile.training_experience || 'novice'
+    const bodyweight = profile.weight_kg || 75
 
-  // Absolute ceiling regardless of profile. This is a hard safety net, not
-  // the primary mechanism — the RPE/first-block scaling above should already
-  // land well under it — but it guarantees a bad multiplier or an unusually
-  // heavy profile can never hand a first, unverified prescription a
-  // dangerous number. Skipped for a known working weight — that's not an
-  // unverified guess this cap exists to catch.
-  if (isFirstBlock && !fromKnownWeight) {
-    const cap = CATEGORY_CAPS_KG[category]
-    if (cap != null) rounded = Math.min(rounded, cap)
+    // A trainee-reported working weight replaces the population estimate
+    // entirely when it's available for this exercise's family — it's real,
+    // verified data rather than a guess from bodyweight/sex/age.
+    const knownFamily = KNOWN_WEIGHT_FAMILY[category]
+    const knownAnchor = knownFamily ? options.knownWorkingWeights?.[knownFamily] : undefined
+    fromKnownWeight = knownAnchor != null && knownAnchor > 0
+
+    let estimate = fromKnownWeight
+      ? knownAnchor!
+      : bodyweight *
+        BODYWEIGHT_MULTIPLIERS[category][experience] *
+        sexAdjustment(category, profile.gender) *
+        ageAdjustment(profile.age || 30)
+
+    // Reconcile the estimate against the actual effort this week is asking
+    // for — the standards above assume a firm ~RPE 8 working set, not
+    // whatever this particular phase/week targets.
+    let fraction = rpeEffortFraction(options.targetRpeLabel)
+
+    const isFirstBlock = options.isFirstBlock !== false
+    if (isFirstBlock && !fromKnownWeight) {
+      // No verified lifting history yet. Regardless of what the RPE math
+      // alone would allow, the very first block stays capped at 50-60% of
+      // the reference working weight — the user corrects upward via RPE
+      // feedback, not by trusting an untested number. A known, self-reported
+      // working weight skips this clamp — it isn't an untested number.
+      fraction = Math.min(fraction, FIRST_BLOCK_MAX_FRACTION)
+    }
+
+    if (options.isCalibrationWeek) {
+      // Week 1 with no known numbers: the point is to FIND the weight where
+      // RPE 6 lands, not to hand over a confident-looking number. Overrides
+      // whatever the RPE label alone would allow, same mechanism as the
+      // first-block clamp above.
+      fraction = Math.min(fraction, CALIBRATION_MAX_FRACTION)
+    }
+
+    estimate *= fraction
+
+    // A per-hand dumbbell prescription is half the standard's total — but
+    // only for TWO-implement lifts (plural 'dumbbells'). A single dumbbell
+    // or kettlebell (goblet squats, carries, swings) is not halved and is
+    // not labeled "per hand" — see loadingMode().
+    if (isDumbbell) estimate = estimate / 2
+
+    rounded = roundToPlate(estimate, mode)
+
+    // Absolute ceiling regardless of profile. This is a hard safety net, not
+    // the primary mechanism — the RPE/first-block scaling above should
+    // already land well under it — but it guarantees a bad multiplier or an
+    // unusually heavy profile can never hand a first, unverified
+    // prescription a dangerous number. Skipped for a known working weight —
+    // that's not an unverified guess this cap exists to catch.
+    if (isFirstBlock && !fromKnownWeight) {
+      const cap = CATEGORY_CAPS_KG[category]
+      if (cap != null) rounded = Math.min(rounded, cap)
+    }
   }
 
   // Only compounds in a strength/power phase ramp; hypertrophy-phase work and
@@ -487,12 +552,14 @@ export function prescribeLoad(
   const ramping = isCompoundTier && (options.phase === 'strength' || options.phase === 'power')
   const per_set = buildPerSetLoads(rounded, options.sets ?? 1, mode, isDumbbell, ramping)
 
-  const basis = options.isCalibrationWeek
-    ? 'Calibration week — deliberately light. Find the weight where your last rep feels like the target RPE, then log it.'
-    : fromKnownWeight
-      ? 'Seeded from the working weight you reported for this lift. Let the effort target correct it if it has changed.'
-      : 'Starting estimate from your bodyweight and experience — not a tested max. ' +
-        'Let the effort target correct it: too easy, add load next set; too hard, drop it.'
+  const basis = options.forceStartingWeightKg != null
+    ? buildProgressionBasis(options.repRangeLabel, getLoadIncrementKg(entry, category), isDumbbell)
+    : options.isCalibrationWeek
+      ? 'Calibration week — deliberately light. Find the weight where your last rep feels like the target RPE, then log it.'
+      : fromKnownWeight
+        ? 'Seeded from the working weight you reported for this lift. Let the effort target correct it if it has changed.'
+        : 'Starting estimate from your bodyweight and experience — not a tested max. ' +
+          'Let the effort target correct it: too easy, add load next set; too hard, drop it.'
 
   return {
     starting_weight_kg: rounded,

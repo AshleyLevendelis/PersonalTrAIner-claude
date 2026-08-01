@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
 import { getExerciseEntry } from './exercise-db'
+import { categorize, getLoadIncrementKg, isExternallyLoaded } from './load-prescription'
 import type { ExerciseTier } from './types'
 
 export interface ProgressionResult {
@@ -141,9 +142,71 @@ export async function getLastSessionLoad(
   return data[0].weight_kg
 }
 
-/** Applies the same safe overload increment used by checkDoubleProgression, so a logged 80kg becomes ~82kg next week rather than the bodyweight-multiplier estimate. */
-export function getProgressedWeight(lastWeightKg: number): number {
-  return lastWeightKg + calculateIncrement(lastWeightKg)
+export interface DoubleProgressionRecommendation {
+  weightKg: number
+  /** True when every logged set from the last session hit the top of the rep range and the weight bumped up. */
+  didProgress: boolean
+  note: string
+}
+
+/**
+ * True double progression from the trainee's actual last session, per the
+ * rule this app now shows next to every loaded exercise: hit the top of the
+ * rep range on every set → the weight goes up by one loading-mode-sized
+ * increment; anything short of that → hold the weight and chase reps first.
+ * This is what "week 2 suggests 82.5kg" means in practice — it is NOT the
+ * generic 2.5%-of-current-weight bump `calculateIncrement` uses for the
+ * same-session progressive-overload toast in `checkDoubleProgression`; that
+ * one is unrelated and untouched.
+ */
+export async function getDoubleProgressionRecommendation(
+  profileId: string,
+  exerciseName: string,
+  sessionDate: string,
+  prescribedRepRangeHigh: number,
+): Promise<DoubleProgressionRecommendation | null> {
+  const { data: mostRecent } = await supabase
+    .from('set_logs')
+    .select('week_number, day, completed_at')
+    .eq('user_id', profileId)
+    .eq('exercise_name', exerciseName)
+    .lt('completed_at', sessionDate)
+    .order('completed_at', { ascending: false })
+    .limit(1)
+
+  const last = mostRecent?.[0]
+  if (!last) return null
+
+  const { data: sessionSets } = await supabase
+    .from('set_logs')
+    .select('weight_kg, reps_completed')
+    .eq('user_id', profileId)
+    .eq('exercise_name', exerciseName)
+    .eq('week_number', last.week_number)
+    .eq('day', last.day)
+
+  if (!sessionSets || sessionSets.length === 0) return null
+
+  const lastWeight = sessionSets[0].weight_kg
+  const hitTopOnAllSets = sessionSets.every(s => s.reps_completed >= prescribedRepRangeHigh)
+
+  if (!hitTopOnAllSets) {
+    return {
+      weightKg: lastWeight,
+      didProgress: false,
+      note: `Held at ${lastWeight}kg — didn't hit ${prescribedRepRangeHigh} reps on every set last time. Aim for more reps before adding load.`,
+    }
+  }
+
+  const entry = getExerciseEntry(exerciseName)
+  const increment = entry && isExternallyLoaded(entry) ? getLoadIncrementKg(entry, categorize(entry)) : calculateIncrement(lastWeight)
+  const weightKg = lastWeight + increment
+
+  return {
+    weightKg,
+    didProgress: true,
+    note: `Hit ${prescribedRepRangeHigh} reps on every set last time — up to ${weightKg}kg. Reps reset toward the bottom of the range.`,
+  }
 }
 
 export async function getLastLoggedWeight(

@@ -10,7 +10,7 @@ import { ArrowRightLeft, Ban, Zap, ShieldAlert, Heart, Check, Dumbbell, Plus, Ac
 import React, { useState, useEffect, useCallback } from 'react'
 import { getSmartReplacements, getExerciseEntry } from '@/lib/exercise-db'
 import { upsertWorkoutLog, getLogsForDate, insertCardioLog, getCardioLogsForDate } from '@/lib/daily-tracking'
-import { checkDoubleProgression, getLastSessionLoad, getProgressedWeight } from '@/lib/progression-engine'
+import { checkDoubleProgression, getDoubleProgressionRecommendation } from '@/lib/progression-engine'
 import { logSetOffline, logEntireSessionOffline, saveSessionCache, loadSessionCache, initOfflineSync } from '@/lib/offline-sync'
 import { getActiveMesocycleWeek } from '@/lib/calculations'
 import { checkForPR, seedPRCacheFromHistory, getTopPRSet, getLastSessionForExercise, type PRResult, type SessionSet } from '@/lib/pr-engine'
@@ -566,6 +566,7 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profileId, planCreat
   const [plateCalcOpen, setPlateCalcOpen] = useState(false)
   const [plateCalcWeight, setPlateCalcWeight] = useState(0)
   const [progressedLoads, setProgressedLoads] = useState<Record<string, number>>({})
+  const [progressionNotes, setProgressionNotes] = useState<Record<string, { note: string; didProgress: boolean }>>({})
 
   const hasMesocycle = mesocycle && mesocycle.length > 0
   const activePlan = hasMesocycle
@@ -615,17 +616,22 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profileId, planCreat
     }
   }, [])
 
-  // Week 2+: prefer what the trainee actually lifted last session over the
-  // mesocycle's static estimate. Week 1 never has prior data, so this is a
-  // no-op there and the static suggested_load_kg on the exercise stands.
+  // Week 2+: true double progression from what the trainee actually lifted
+  // last session, not the mesocycle's flat estimate. Hit the top of the rep
+  // range on every set last time -> weight goes up one increment; anything
+  // short of that -> hold the weight, the note says to chase reps first.
+  // Week 1 never has prior data, so this is a no-op there and the static
+  // suggested_load_kg from generateMesocycle stands.
   useEffect(() => {
     if (!profileId || currentWeek <= 1) {
       setProgressedLoads({})
+      setProgressionNotes({})
       return
     }
     const todayWorkout = activePlan.find(d => d.day === todayName)
     if (!todayWorkout) {
       setProgressedLoads({})
+      setProgressionNotes({})
       return
     }
 
@@ -634,16 +640,22 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profileId, planCreat
       todayWorkout.exercises
         .filter(ex => ex.suggested_load_kg != null)
         .map(async ex => {
-          const lastWeight = await getLastSessionLoad(profileId, ex.name, today)
-          return [ex.name, lastWeight] as const
+          const recommendation = await getDoubleProgressionRecommendation(
+            profileId, ex.name, today, parseRepsHigh(ex.reps)
+          )
+          return [ex.name, recommendation] as const
         })
     ).then(results => {
       if (cancelled) return
-      const next: Record<string, number> = {}
-      for (const [name, lastWeight] of results) {
-        if (lastWeight != null) next[name] = getProgressedWeight(lastWeight)
+      const nextLoads: Record<string, number> = {}
+      const nextNotes: Record<string, { note: string; didProgress: boolean }> = {}
+      for (const [name, recommendation] of results) {
+        if (!recommendation) continue
+        nextLoads[name] = recommendation.weightKg
+        nextNotes[name] = { note: recommendation.note, didProgress: recommendation.didProgress }
       }
-      setProgressedLoads(next)
+      setProgressedLoads(nextLoads)
+      setProgressionNotes(nextNotes)
     }).catch(() => {})
 
     return () => { cancelled = true }
@@ -718,6 +730,13 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profileId, planCreat
     if (rangeMatch) return parseInt(rangeMatch[1])
     const single = parseInt(reps)
     return isNaN(single) ? 10 : single
+  }
+
+  function parseRepsHigh(reps: string): number {
+    const rangeMatch = reps.match(/^(\d+)\s*-\s*(\d+)$/)
+    if (rangeMatch) return parseInt(rangeMatch[2])
+    const single = parseInt(reps)
+    return isNaN(single) ? 12 : single
   }
 
   const handleSetComplete = useCallback((
@@ -1087,6 +1106,11 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profileId, planCreat
                             ) : ex.suggested_load && (
                               <span className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground">
                                 <Dumbbell className="size-2.5" />{ex.suggested_load}
+                              </span>
+                            )}
+                            {progressionNotes[ex.name] && (
+                              <span className={`text-[10px] italic ${progressionNotes[ex.name].didProgress ? 'text-green-700 dark:text-green-400' : 'text-muted-foreground/80'}`}>
+                                {progressionNotes[ex.name].note}
                               </span>
                             )}
                           </div>
