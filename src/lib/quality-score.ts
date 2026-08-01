@@ -1,10 +1,12 @@
-import type { UserProfile, MesocycleWeek, WorkoutDay, Exercise, SessionDuration } from './types'
+import type { UserProfile, MesocycleWeek, WorkoutDay, Exercise } from './types'
 import { EXERCISE_DATABASE, getMovementFamily, type ExerciseEntry } from './exercise-db'
 import { getConstrainedPool, generateMesocycle } from './exercise-plan'
 import { getGoalPolicy, resolveConditioningFrequency, RECOVERY_SET_MULTIPLIER } from './goal-policies'
 import { EXPERIENCE_RPE_CEILING } from './periodization'
 import { setRandomSource, resetRandomSource } from './exercise-plan'
 import { seededRngFromKey } from './seeded-random'
+import { DURATION_BUDGET_SECONDS, estimateDaySeconds } from './session-duration'
+import { getEquipmentFloorKg, loadingMode } from './load-prescription'
 
 // ---------------------------------------------------------------------------
 // PLAN QUALITY SCORING
@@ -64,29 +66,28 @@ function isMainCompound(ex: Exercise): boolean {
 // 1. Time fit
 // ---------------------------------------------------------------------------
 
-const DURATION_BUDGETS: Record<SessionDuration, number> = {
-  '30-45': 37 * 60,
-  '45-60': 52 * 60,
-  '60-90': 75 * 60,
-  '90+': 100 * 60,
-}
-
-function estimateDaySeconds(day: WorkoutDay): number {
-  let total = day.warmup?.total_seconds ?? 0
-  for (const ex of day.exercises) {
-    const restMatch = ex.rest.match(/(\d+)/)
-    const restSec = restMatch ? parseInt(restMatch[1], 10) : 60
-    const entry = dbEntry(ex.name)
-    const repDuration = entry?.avg_duration_seconds ?? 35
-    total += ex.sets * (repDuration + restSec)
+/**
+ * Overrun and underrun are not the same failure. Running long eats into
+ * whatever the trainee had scheduled after the session — a real cost, and
+ * worth staying strict about (±10%/±20%). Running short costs nothing but an
+ * unmet expectation; the exercise selection simply didn't need the full
+ * window that day. Underrun gets a genuinely gentler curve, not just the
+ * same thresholds relabeled.
+ */
+function scoreTimeRatio(seconds: number, budget: number): number {
+  const diff = seconds - budget
+  if (diff >= 0) {
+    const ratio = diff / budget
+    return ratio <= 0.10 ? 2 : ratio <= 0.20 ? 1 : 0
   }
-  return total
+  const ratio = -diff / budget
+  return ratio <= 0.20 ? 2 : ratio <= 0.35 ? 1 : 0
 }
 
 function scoreTimeFit(profile: UserProfile, mesocycle: MesocycleWeek[]): DimensionResult {
-  const budget = DURATION_BUDGETS[profile.session_duration_preference || '45-60']
-  let worstRatio = 0
-  let worst: { week: number; day: string; seconds: number } | null = null
+  const budget = DURATION_BUDGET_SECONDS[profile.session_duration_preference || '45-60']
+  let worstScore = 2
+  let worst: { week: number; day: string; seconds: number; ratio: number; isOver: boolean } | null = null
 
   for (const week of mesocycle) {
     // Deload weeks are DESIGNED to be lighter and shorter — half the sets,
@@ -98,27 +99,27 @@ function scoreTimeFit(profile: UserProfile, mesocycle: MesocycleWeek[]): Dimensi
     for (const day of week.days) {
       if (day.exercises.length === 0) continue
       const seconds = estimateDaySeconds(day)
-      const ratio = Math.abs(seconds - budget) / budget
-      if (ratio > worstRatio) {
-        worstRatio = ratio
-        worst = { week: week.week_number, day: day.day, seconds }
+      const dayScore = scoreTimeRatio(seconds, budget)
+      if (dayScore < worstScore) {
+        const diff = seconds - budget
+        worstScore = dayScore
+        worst = { week: week.week_number, day: day.day, seconds, ratio: Math.abs(diff) / budget, isOver: diff >= 0 }
       }
     }
   }
 
-  const points = worstRatio <= 0.10 ? 2 : worstRatio <= 0.20 ? 1 : 0
   const deductions: Deduction[] = []
-  if (points < 2 && worst) {
+  if (worstScore < 2 && worst) {
     deductions.push({
       rule: 'time_fit',
-      detail: `Worst day (week ${worst.week} ${worst.day}) is ${(worstRatio * 100).toFixed(0)}% off budget`,
+      detail: `Worst day (week ${worst.week} ${worst.day}) is ${(worst.ratio * 100).toFixed(0)}% ${worst.isOver ? 'over' : 'under'} budget`,
       weekNumber: worst.week,
       day: worst.day,
-      expected: `${Math.round(budget / 60)}min (±10%)`,
+      expected: `${Math.round(budget / 60)}min`,
       actual: `${Math.round(worst.seconds / 60)}min`,
     })
   }
-  return { label: 'Time fit', points, deductions }
+  return { label: 'Time fit', points: worstScore, deductions }
 }
 
 // ---------------------------------------------------------------------------
@@ -207,11 +208,13 @@ function parseRpeHigh(label: string | undefined): number | null {
   return match[2] ? parseFloat(match[2]) : parseFloat(match[1])
 }
 
-// Below this, an exercise is very likely pinned at its loading mode's
-// absolute floor (bar weight, minimum dumbbell increment) — there is no
-// lower number available, so "not conservative enough" isn't a meaningful
-// complaint regardless of goal or calibration status.
-const LOAD_FLOOR_KG = 20
+/** Top of a rep range like '9-11' or a bare '9' — null for time/distance prescriptions ('30-45s', '40m'). */
+function parseRepsHigh(reps: string): number | null {
+  const range = reps.match(/^(\d+)\s*-\s*(\d+)$/)
+  if (range) return parseInt(range[2], 10)
+  const single = reps.match(/^(\d+)$/)
+  return single ? parseInt(single[1], 10) : null
+}
 
 function scoreProgression(profile: UserProfile, mesocycle: MesocycleWeek[]): DimensionResult {
   const block1 = mesocycle.filter(w => w.block_number === 1).sort((a, b) => (a.week_in_block ?? 0) - (b.week_in_block ?? 0))
@@ -246,15 +249,46 @@ function scoreProgression(profile: UserProfile, mesocycle: MesocycleWeek[]): Dim
             expected: 'non-decreasing with a real increase', actual: `${l1}->${l2}->${l3}`,
           })
         }
+
+        // The equipment floor this main lift is loaded on — an empty bar,
+        // the lightest dumbbell pair, a stack's bottom pin. Below this,
+        // there is nowhere lower for a load number to go, so neither
+        // "deload isn't light enough" nor "calibration isn't conservative
+        // enough" are meaningful complaints on their own.
+        const mainEntry = dbEntry(e4.name)
+        const floor = mainEntry ? getEquipmentFloorKg(mainEntry) : 0
+
         if (e4.suggested_load_kg != null && e4.suggested_load_kg > l3 * 0.8) {
-          violatedRules.add('deload_too_heavy')
-          deductions.push({
-            rule: 'deload_too_heavy', day: day.day, weekNumber: 4,
-            detail: `${e4.name} deload (${e4.suggested_load_kg}kg) exceeds 80% of week 3 (${l3}kg)`,
-            expected: `<= ${(l3 * 0.8).toFixed(1)}kg`, actual: `${e4.suggested_load_kg}kg`,
-          })
+          // Exempt only when the load genuinely can't drop further (at the
+          // floor) AND the engine still reduced something — the bar-floor
+          // deload path (generateMesocycle) cuts sets first, then reps once
+          // sets themselves are already at their 2-set floor (a low-volume
+          // novice/beginner block can hit that floor well before deload
+          // week even arrives). A plan that left load at the floor AND left
+          // both sets and reps untouched is still a real deload failure.
+          const atFloor = e4.suggested_load_kg <= floor
+          const repsHigh3 = parseRepsHigh(e3.reps)
+          const repsHigh4 = parseRepsHigh(e4.reps)
+          const repsReduced = repsHigh3 != null && repsHigh4 != null && repsHigh4 < repsHigh3
+          const volumeReduced = e4.sets < e3.sets || repsReduced
+          if (!(atFloor && volumeReduced)) {
+            violatedRules.add('deload_too_heavy')
+            deductions.push({
+              rule: 'deload_too_heavy', day: day.day, weekNumber: 4,
+              detail: `${e4.name} deload (${e4.suggested_load_kg}kg) exceeds 80% of week 3 (${l3}kg)`,
+              expected: `<= ${(l3 * 0.8).toFixed(1)}kg`, actual: `${e4.suggested_load_kg}kg`,
+            })
+          }
         }
-        if (w1.isCalibrationWeek && l3 > LOAD_FLOOR_KG && l1 > l3 * 0.55) {
+        // For 'maintain'/'reps' policies (functional, conditioning), week 3
+        // is never re-estimated — it's forced to week 1's own baseline
+        // unchanged (see generateMesocycle: forceStartingWeightKg = baselineKg
+        // when !rampLoad), because load isn't the progression lever for these
+        // goals. l1 === l3 there is the system working as designed, not a
+        // calibration that failed to stay conservative — comparing against
+        // week 3 only means something when the goal actually expects week 3
+        // to have climbed away from it.
+        if (expectsLoadRamp && w1.isCalibrationWeek && l3 > floor && l1 > l3 * 0.55) {
           violatedRules.add('calibration_not_conservative')
           deductions.push({
             rule: 'calibration_not_conservative', day: day.day, weekNumber: 1,
@@ -349,23 +383,42 @@ function scoreSelection(profile: UserProfile, mesocycle: MesocycleWeek[]): Dimen
     }
   }
 
+  const style = profile.training_style || 'hybrid'
+  const goal = profile.fitness_goal
+  // Bodybuilding/hypertrophy programming routinely pairs a compound (Barbell
+  // Bench Press) with an accessory on a different implement (Dumbbell Bench
+  // Press) for extra stimulus at a different angle/stability demand — that's
+  // normal programming, not the same movement written down twice. Two
+  // entries on the SAME implement (or this pairing under any other
+  // style/goal) still reads as a duplicate.
+  const crossImplementExemptionApplies = style === 'bodybuilding' || goal === 'hypertrophy'
+
   for (const day of week1?.days ?? []) {
-    const families = new Map<string, string[]>()
+    const families = new Map<string, Exercise[]>()
     for (const ex of day.exercises) {
       const entry = dbEntry(ex.name)
       if (!entry) continue
       const family = getMovementFamily(entry)
       if (!families.has(family)) families.set(family, [])
-      families.get(family)!.push(ex.name)
+      families.get(family)!.push(ex)
     }
-    for (const [family, names] of families) {
-      if (names.length > 1) {
-        violatedRules.add('duplicate_movement_family')
-        deductions.push({
-          rule: 'duplicate_movement_family', day: day.day, weekNumber: 1,
-          detail: `Movement family "${family}" appears twice: ${names.join(', ')}`,
-        })
-      }
+    for (const [family, exs] of families) {
+      if (exs.length <= 1) continue
+
+      const entries = exs.map(e => dbEntry(e.name)!)
+      const isMainPlusAccessoryPair =
+        exs.length === 2 &&
+        entries.filter(e => e.mechanics_tier === 'tier1_compound').length === 1 &&
+        entries.filter(e => e.mechanics_tier !== 'tier1_compound').length === 1
+      const differentImplements = exs.length === 2 && loadingMode(entries[0]) !== loadingMode(entries[1])
+      const exempt = crossImplementExemptionApplies && isMainPlusAccessoryPair && differentImplements
+      if (exempt) continue
+
+      violatedRules.add('duplicate_movement_family')
+      deductions.push({
+        rule: 'duplicate_movement_family', day: day.day, weekNumber: 1,
+        detail: `Movement family "${family}" appears twice: ${exs.map(e => e.name).join(', ')}`,
+      })
     }
   }
 
@@ -450,8 +503,13 @@ function scoreGoalAlignment(profile: UserProfile, mesocycle: MesocycleWeek[], co
   const checks: Check[] = []
 
   // Conditioning frequency vs conditioning_preference — always applicable.
+  // Excludes duration-filler notes (applyDurationFiller in exercise-plan.ts,
+  // is_filler: true): those exist to fill a day that ran short on time, not
+  // to satisfy the goal's weekly conditioning-frequency target, and counting
+  // them here would inflate the count for anyone whose conditioning
+  // preference expected fewer (or zero) sessions.
   const week1 = mesocycle.find(w => w.week_number === 1)
-  const actualConditioningDays = week1?.days.filter(d => d.conditioning_note).length ?? 0
+  const actualConditioningDays = week1?.days.filter(d => d.conditioning_note && !d.recommendedCardio?.is_filler).length ?? 0
   const expectedFrequency = resolveConditioningFrequency(policy, profile.conditioning_preference)
   const conditioningOk = Math.abs(actualConditioningDays - expectedFrequency) <= 1
   checks.push({

@@ -212,6 +212,14 @@ export function rotateVariation(
   blockIndex: number,
   pool: ExerciseEntry[],
   experience: TrainingExperience,
+  /**
+   * Names already spoken for elsewhere in the SAME session this week — e.g.
+   * another exercise on the same day, or the day's own main lift. When the
+   * naturally-computed rotation would collide with one of these, the
+   * function tries the next candidate in the same list instead of handing
+   * back a name that's already in use.
+   */
+  avoidNames?: Set<string>,
 ): string {
   const current = EXERCISE_DATABASE.find(
     e => e.name.toLowerCase() === exerciseName.toLowerCase()
@@ -235,11 +243,31 @@ export function rotateVariation(
     // the user should be able to see the same plan twice.
     .sort((a, b) => a.name.localeCompare(b.name))
 
+  // Nothing to rotate between — same behavior with or without avoidNames,
+  // since there is no second candidate to fall back to.
   if (variations.length <= 1) return current.name
 
+  // `current` can be legitimately absent from its own candidate list — e.g.
+  // it's flagged as a regression for this trainee's experience level
+  // (isRegressionFor), so the filter above excludes it from being a
+  // candidate to rotate BACK to. Falling back to index 0 in that case used
+  // to silently swap to an unrelated exercise (alphabetically first in the
+  // group) with no regard for what else was already selected that day —
+  // that's how "Dumbbell Bench Press" ended up picked twice for one session.
+  // Walking the list from a stable start and skipping anything in
+  // `avoidNames` fixes both: a genuinely absent `current` still rotates
+  // sensibly, and a collision with a sibling exercise gets skipped rather
+  // than silently accepted.
   const currentIndex = variations.findIndex(v => v.name === current.name)
   const start = currentIndex >= 0 ? currentIndex : 0
-  return variations[(start + blockIndex) % variations.length].name
+
+  for (let attempt = 0; attempt < variations.length; attempt++) {
+    const candidate = variations[(start + blockIndex + attempt) % variations.length]
+    if (!avoidNames?.has(candidate.name)) return candidate.name
+  }
+  // Every variation collides with something already on the day — hand back
+  // the original name rather than force a duplicate.
+  return current.name
 }
 
 // ---------------------------------------------------------------------------

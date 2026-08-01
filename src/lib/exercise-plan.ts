@@ -10,12 +10,13 @@ import {
   type ExperienceConfig,
 } from './experience-config'
 import { buildWarmup, getWarmupReserveSeconds } from './warmup'
-import { prescribeLoad, categorize, getLoadIncrementKg, isExternallyLoaded, type KnownWorkingWeights } from './load-prescription'
+import { prescribeLoad, categorize, getLoadIncrementKg, isExternallyLoaded, getEquipmentFloorKg, type KnownWorkingWeights } from './load-prescription'
 import {
   getPhaseSequence, getPhaseConfig, rotateVariation, resolveTargetRpe,
   shiftReps, adjustRest, type PhaseConfig,
 } from './periodization'
 import { getGoalPolicy, restrictPhaseSequence, resolveConditioningFrequency, RECOVERY_SET_MULTIPLIER, type GoalPolicy } from './goal-policies'
+import { getDurationBudgetSeconds, estimateDaySeconds } from './session-duration'
 
 // ---------------------------------------------------------------------------
 // Track definitions (unchanged — used for day-level focus selection)
@@ -474,16 +475,6 @@ function getOpposingPattern(pattern: MovementPattern): MovementPattern | null {
 function isSupersetEligible(entry: ExerciseEntry): boolean {
   if (entry.movement_pattern === 'core' || entry.movement_pattern === 'carry') return true
   return entry.mechanics_tier === 'tier3_isolation'
-}
-
-function getDurationBudgetSeconds(duration: SessionDuration): number {
-  switch (duration) {
-    case '30-45': return 37 * 60
-    case '45-60': return 52 * 60
-    case '60-90': return 75 * 60
-    case '90+': return 100 * 60
-    default: return 52 * 60
-  }
 }
 
 function estimateSessionDuration(exercises: { entry: ExerciseEntry; sets: number; restSeconds: number }[]): number {
@@ -1028,6 +1019,228 @@ function getViableTrack(
 }
 
 // ---------------------------------------------------------------------------
+// Weekly structural balancing (push:pull ratio, squat/hinge/push/pull coverage)
+// ---------------------------------------------------------------------------
+// Each day is selected independently (selectExercisesForTrack knows nothing
+// about any other day's picks), so nothing upstream can see — let alone
+// correct — a WEEKLY imbalance: five days that each individually look fine
+// but collectively lean 3:1 push over pull, or never touch a hip hinge all
+// week despite the equipment allowing one. This runs once, after every day's
+// exercises are fully built, and corrects both by swapping the weakest
+// eligible accessory slot it can find.
+
+function findEntry(name: string): ExerciseEntry | undefined {
+  return EXERCISE_DATABASE.find(e => e.name.toLowerCase() === name.toLowerCase())
+}
+
+type BalancePattern = 'push' | 'pull' | 'squat' | 'hinge' | null
+
+function classifyForBalance(pattern: MovementPattern): BalancePattern {
+  switch (pattern) {
+    case 'horizontal_push':
+    case 'vertical_push':
+      return 'push'
+    case 'horizontal_pull':
+    case 'vertical_pull':
+      return 'pull'
+    case 'knee_dominant':
+    case 'single_leg':
+      return 'squat'
+    case 'hip_hinge':
+      return 'hinge'
+    default:
+      return null
+  }
+}
+
+/**
+ * Rebuilds one Exercise object for a swapped-in replacement. Reuses the
+ * ORIGINAL slot's sets/reps/rest — tier2 and tier3 accessories share the
+ * same base set count across every training style (see STYLE_CONFIGS), so
+ * this is not an approximation — and recomputes only what's specific to the
+ * new exercise: load, the "swap for" suggestion, and load guidance. Drops
+ * any superset_label, since it was built against the OLD exercise's
+ * antagonist movement pattern and may no longer describe a real pairing.
+ */
+function rebuildExerciseForSwap(
+  oldExercise: Exercise,
+  newEntry: ExerciseEntry,
+  experience: ExperienceConfig,
+  profile: UserProfile,
+  pool: ExerciseEntry[],
+  allSelectedNames: Set<string>,
+): Exercise {
+  const isPrimer = newEntry.mechanics_tier === 'primer'
+  const intensity = isPrimer ? oldExercise.intensity : experience.target_rpe
+  const load = prescribeLoad(newEntry, profile, { targetRpeLabel: intensity, isFirstBlock: true, sets: oldExercise.sets })
+  return {
+    ...oldExercise,
+    name: newEntry.name,
+    substitution: getSubstitution(newEntry, pool, allSelectedNames),
+    intensity,
+    load_guidance: isPrimer ? oldExercise.load_guidance : `${experience.load_guidance} ${load.basis}`,
+    suggested_load: isPrimer ? 'Light' : load.display,
+    suggested_load_kg: isPrimer ? null : load.starting_weight_kg,
+    per_set_load: isPrimer ? null : load.per_set,
+    superset_label: undefined,
+  }
+}
+
+function balanceWeeklyStructure(
+  days: WorkoutDay[],
+  pool: ExerciseEntry[],
+  weeklyUsed: Set<string>,
+  allSelectedNames: Set<string>,
+  experience: ExperienceConfig,
+  profile: UserProfile,
+  trace: ConstraintTrace,
+): void {
+  const dayFamilies = (dayIdx: number): Set<string> =>
+    new Set(
+      days[dayIdx].exercises
+        .map(ex => findEntry(ex.name))
+        .filter((e): e is ExerciseEntry => !!e)
+        .map(e => getMovementFamily(e))
+    )
+
+  function findAccessorySlot(want: (p: BalancePattern) => boolean): { dayIdx: number; exIdx: number } | null {
+    for (let dayIdx = 0; dayIdx < days.length; dayIdx++) {
+      const exercises = days[dayIdx].exercises
+      for (let exIdx = 0; exIdx < exercises.length; exIdx++) {
+        const entry = findEntry(exercises[exIdx].name)
+        if (!entry || entry.mechanics_tier === 'tier1_compound' || entry.mechanics_tier === 'primer') continue
+        if (want(classifyForBalance(entry.movement_pattern))) return { dayIdx, exIdx }
+      }
+    }
+    return null
+  }
+
+  function swap(dayIdx: number, exIdx: number, replacement: ExerciseEntry, reason: string): void {
+    const oldName = days[dayIdx].exercises[exIdx].name
+    trace.structure_adjusted.push({
+      exercise: oldName, stage: 'structure',
+      reason: `${reason} — swapped "${oldName}" for "${replacement.name}" on ${days[dayIdx].day}`,
+    })
+    weeklyUsed.delete(oldName)
+    weeklyUsed.add(replacement.name)
+    allSelectedNames.delete(oldName)
+    allSelectedNames.add(replacement.name)
+    days[dayIdx].exercises[exIdx] = rebuildExerciseForSwap(
+      days[dayIdx].exercises[exIdx], replacement, experience, profile, pool, allSelectedNames,
+    )
+  }
+
+  // --- Weekly pattern coverage: squat, hinge, push, pull ---
+  const patternsPresent = new Set<BalancePattern>()
+  for (const day of days) {
+    for (const ex of day.exercises) {
+      const entry = findEntry(ex.name)
+      if (entry) patternsPresent.add(classifyForBalance(entry.movement_pattern))
+    }
+  }
+  const poolHasPattern = (test: (p: BalancePattern) => boolean) =>
+    pool.some(e => test(classifyForBalance(e.movement_pattern)))
+
+  for (const missing of ['squat', 'hinge', 'push', 'pull'] as const) {
+    if (patternsPresent.has(missing)) continue
+    // Equipment/injuries genuinely leave nothing of this pattern available —
+    // nothing to add, and nothing worth flagging as a gap.
+    if (!poolHasPattern(p => p === missing)) continue
+
+    // Sacrifice the weakest accessory slot: prefer a tier3 isolation slot,
+    // scanning from the end of the week backward so the days built around
+    // heavier/earlier tracks are disturbed last.
+    let slot: { dayIdx: number; exIdx: number } | null = null
+    for (let dayIdx = days.length - 1; dayIdx >= 0 && !slot; dayIdx--) {
+      const exercises = days[dayIdx].exercises
+      for (let exIdx = exercises.length - 1; exIdx >= 0; exIdx--) {
+        if (findEntry(exercises[exIdx].name)?.mechanics_tier === 'tier3_isolation') { slot = { dayIdx, exIdx }; break }
+      }
+    }
+    if (!slot) {
+      for (let dayIdx = days.length - 1; dayIdx >= 0 && !slot; dayIdx--) {
+        const exercises = days[dayIdx].exercises
+        for (let exIdx = exercises.length - 1; exIdx >= 0; exIdx--) {
+          const entry = findEntry(exercises[exIdx].name)
+          if (entry && entry.mechanics_tier !== 'tier1_compound' && entry.mechanics_tier !== 'primer') { slot = { dayIdx, exIdx }; break }
+        }
+      }
+    }
+    if (!slot) continue
+
+    const usedFamilies = dayFamilies(slot.dayIdx)
+    const eligible = (e: ExerciseEntry) =>
+      classifyForBalance(e.movement_pattern) === missing &&
+      e.mechanics_tier !== 'tier1_compound' && e.mechanics_tier !== 'primer' &&
+      !usedFamilies.has(getMovementFamily(e))
+    const replacement = pool.find(e => eligible(e) && !weeklyUsed.has(e.name)) ?? pool.find(eligible)
+
+    if (replacement) {
+      swap(slot.dayIdx, slot.exIdx, replacement, `weekly pattern coverage missing '${missing}'`)
+      patternsPresent.add(missing)
+    } else {
+      trace.structure_adjusted.push({
+        exercise: '(weekly pattern coverage)', stage: 'structure',
+        reason: `'${missing}' pattern is available in the constrained pool but no swappable accessory slot could add it without a movement-family duplicate`,
+      })
+    }
+  }
+
+  // --- Weekly push:pull ratio ---
+  // Set counts for tier2/tier3 accessories share the same base value across
+  // every training style (see STYLE_CONFIGS), so exercise COUNT among
+  // swap-eligible accessories is a reliable proxy for the SET-based ratio the
+  // quality scorer actually checks — periodization's multipliers (applied
+  // later, per mesocycle week) scale push and pull work by the same factor,
+  // so whatever ratio is set here survives into every week.
+  const MAX_SWAPS = 6
+  for (let attempt = 0; attempt < MAX_SWAPS; attempt++) {
+    let pushCount = 0
+    let pullCount = 0
+    for (const day of days) {
+      for (const ex of day.exercises) {
+        const entry = findEntry(ex.name)
+        if (!entry) continue
+        const cls = classifyForBalance(entry.movement_pattern)
+        if (cls === 'push') pushCount++
+        if (cls === 'pull') pullCount++
+      }
+    }
+    if (pushCount === 0 || pullCount === 0) break
+    const ratio = pushCount / pullCount
+    if (ratio >= 0.6 && ratio <= 1.6) break
+
+    const excessIsPush = ratio > 1.6
+    const target = findAccessorySlot(p => p === (excessIsPush ? 'push' : 'pull'))
+    if (!target) {
+      trace.structure_adjusted.push({
+        exercise: '(weekly push:pull)', stage: 'structure',
+        reason: `push:pull ratio ${ratio.toFixed(2)} is outside 0.6-1.6 and no swappable accessory remains to correct it`,
+      })
+      break
+    }
+
+    const usedFamilies = dayFamilies(target.dayIdx)
+    const wantPattern = excessIsPush ? 'pull' : 'push'
+    const eligible = (e: ExerciseEntry) =>
+      classifyForBalance(e.movement_pattern) === wantPattern &&
+      e.mechanics_tier !== 'tier1_compound' && e.mechanics_tier !== 'primer' &&
+      !usedFamilies.has(getMovementFamily(e))
+    const replacement = pool.find(e => eligible(e) && !weeklyUsed.has(e.name)) ?? pool.find(eligible)
+
+    if (!replacement) {
+      trace.structure_adjusted.push({
+        exercise: '(weekly push:pull)', stage: 'structure',
+        reason: `push:pull ratio ${ratio.toFixed(2)} needs a ${wantPattern} swap on ${days[target.dayIdx].day} but no valid replacement exists in the constrained pool`,
+      })
+      break
+    }
+
+    swap(target.dayIdx, target.exIdx, replacement, `push:pull exercise-count ratio ${ratio.toFixed(2)}`)
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Conditioning notes (preserved)
 // ---------------------------------------------------------------------------
 
@@ -1168,7 +1381,7 @@ function assignConditioningNotes(days: WorkoutDay[], profile: UserProfile, polic
 export function getConstrainedPool(profile: UserProfile, exclusions: string[] = []): ExerciseEntry[] {
   const throwaway: ConstraintTrace = {
     equipment_filtered: [], injury_filtered: [], style_filtered: [], skill_filtered: [],
-    time_cap_adjusted: [], exclusion_filtered: [],
+    time_cap_adjusted: [], exclusion_filtered: [], structure_adjusted: [],
     pool_size_after_each_stage: { equipment: 0, injury: 0, style: 0, skill: 0, final: 0 },
   }
   let pool = EXERCISE_DATABASE.filter(
@@ -1189,6 +1402,7 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
     skill_filtered: [],
     time_cap_adjusted: [],
     exclusion_filtered: [],
+    structure_adjusted: [],
     pool_size_after_each_stage: { equipment: 0, injury: 0, style: 0, skill: 0, final: 0 },
   }
 
@@ -1339,6 +1553,7 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
     }
   })
 
+  balanceWeeklyStructure(days, pool, weeklyUsed, allSelectedNames, experience, profile, trace)
   assignConditioningNotes(days, profile, policy)
 
   return { plan: days, constraint_trace: trace }
@@ -1519,6 +1734,57 @@ function classifyRotationTiers(exercises: Exercise[]): RotationTier[] {
  * capped at +3 sets so this fills genuinely wasted time rather than
  * inflating accessory volume without bound.
  */
+/**
+ * Runs the top-up's "keep adding sets until the day fills the target
+ * duration" loop against a given starting point, optionally bounded by a
+ * per-exercise ceiling on top of the flat EXTRA_SETS_CAP. Shared by both the
+ * unconstrained (high-recovery) path and the recovery-ratio-preserving path
+ * below so the two can't silently diverge in how they estimate duration.
+ */
+function simulateSetTopUp(
+  baseSets: number[],
+  eligible: number[],
+  entries: (ExerciseEntry | undefined)[],
+  restSeconds: number[],
+  targetSeconds: number,
+  extraCap: number,
+  ceilingSets?: number[],
+): number[] {
+  const estimate = (sets: number[]) => sets.reduce((total, s, i) => {
+    const repDuration = entries[i]?.avg_duration_seconds ?? 35
+    return total + s * (repDuration + restSeconds[i])
+  }, 0)
+
+  const extra = baseSets.map(() => 0)
+  if (eligible.length === 0) return extra
+
+  const currentSets = [...baseSets]
+  let guard = 0
+  while (estimate(currentSets) < targetSeconds && guard < 50) {
+    let addedThisPass = false
+    for (const i of eligible) {
+      if (estimate(currentSets) >= targetSeconds) break
+      if (extra[i] >= extraCap) continue
+      if (ceilingSets && currentSets[i] >= ceilingSets[i]) continue
+      currentSets[i]++
+      extra[i]++
+      addedThisPass = true
+    }
+    guard++
+    if (!addedThisPass) break
+  }
+  return extra
+}
+
+/**
+ * How many extra sets (per day, per exercise index) to add on top of
+ * periodization's normal volume formula so a loading week doesn't run well
+ * under the trainee's stated session length. Only tier2/tier3 accessories
+ * are eligible — primers and the main lift keep exactly what the
+ * warm-up/progression systems prescribed for them — and each exercise is
+ * capped at +3 sets so this fills genuinely wasted time rather than
+ * inflating accessory volume without bound.
+ */
 function computeDurationTopUp(
   blockDays: WorkoutDay[],
   rotationTiers: RotationTier[][],
@@ -1542,46 +1808,106 @@ function computeDurationTopUp(
   // this still doesn't fully close.
   const EXTRA_SETS_CAP = 6
 
+  // What fraction of a high-recovery peer's volume this profile is supposed
+  // to sit at, BEFORE top-up. Below 1.0 for low/moderate recovery. Chasing
+  // the same duration TARGET every recovery tier chases, with no memory of
+  // that ratio, is what let the top-up quietly re-add back everything
+  // recovery_capacity had just cut — a low-recovery and a high-recovery plan
+  // could land at nearly identical weekly sets despite one being deliberately
+  // built at 75% the volume of the other. See RECOVERY_SET_MULTIPLIER.
+  const recoveryRatio = recoverySetMultiplier / RECOVERY_SET_MULTIPLIER.high
+
   return blockDays.map((day, dayIdx) => {
     const entries = day.exercises.map(ex => EXERCISE_DATABASE.find(e => e.name.toLowerCase() === ex.name.toLowerCase()))
-    const baseSets = day.exercises.map(ex =>
-      Math.max(2, Math.round(ex.sets * policy.setVolumeMultiplier * recoverySetMultiplier * phaseConfig.sets_multiplier))
-    )
     const restSeconds = day.exercises.map(ex => {
       const match = ex.rest.match(/(\d+)/)
       const base = match ? parseInt(match[1], 10) : 60
       return Math.max(20, base + phaseConfig.rest_adjust_seconds)
     })
-
-    const estimate = (sets: number[]) => sets.reduce((total, s, i) => {
-      const repDuration = entries[i]?.avg_duration_seconds ?? 35
-      return total + s * (repDuration + restSeconds[i])
-    }, 0)
-
-    const extra = day.exercises.map(() => 0)
     const eligible = day.exercises
       .map((_, i) => i)
       .filter(i => entries[i] && entries[i]!.mechanics_tier !== 'primer' && rotationTiers[dayIdx][i] !== 'main')
 
-    if (eligible.length === 0) return extra
+    const baseSets = day.exercises.map(ex =>
+      Math.max(2, Math.round(ex.sets * policy.setVolumeMultiplier * recoverySetMultiplier * phaseConfig.sets_multiplier))
+    )
 
-    let currentSets = [...baseSets]
-    let guard = 0
-    while (estimate(currentSets) < targetSeconds && guard < 50) {
-      let addedThisPass = false
-      for (const i of eligible) {
-        if (estimate(currentSets) >= targetSeconds) break
-        if (extra[i] >= EXTRA_SETS_CAP) continue
-        currentSets[i]++
-        extra[i]++
-        addedThisPass = true
-      }
-      guard++
-      if (!addedThisPass) break
+    if (recoveryRatio >= 1) {
+      // High recovery (or nothing eligible): no recovery-driven deficit to
+      // guard against restoring, so top-up behaves exactly as before this
+      // fix — bounded only by EXTRA_SETS_CAP.
+      return simulateSetTopUp(baseSets, eligible, entries, restSeconds, targetSeconds, EXTRA_SETS_CAP)
     }
 
-    return extra
+    // The reference this profile's ceiling scales off of: what a
+    // high-recovery peer of this SAME profile would end up with after its
+    // own (uncapped) top-up.
+    const baseSetsAtHigh = day.exercises.map(ex =>
+      Math.max(2, Math.round(ex.sets * policy.setVolumeMultiplier * RECOVERY_SET_MULTIPLIER.high * phaseConfig.sets_multiplier))
+    )
+    const extraAtHigh = simulateSetTopUp(baseSetsAtHigh, eligible, entries, restSeconds, targetSeconds, EXTRA_SETS_CAP)
+    const ceilingSets = baseSetsAtHigh.map((s, i) => Math.max(2, Math.round((s + extraAtHigh[i]) * recoveryRatio)))
+
+    return simulateSetTopUp(baseSets, eligible, entries, restSeconds, targetSeconds, EXTRA_SETS_CAP, ceilingSets)
   })
+}
+
+// Below this underrun, a day is "close enough" and gets no filler — matches
+// the quality scorer's tighter (10%/20%) overrun bands staying strict while
+// underrun gets real headroom before anything is appended.
+const FILLER_TRIGGER_SECONDS = 15 * 60
+
+/**
+ * When a session still runs meaningfully short after duration top-up — most
+ * often because the top-up hit its recovery-scaled ceiling before reaching
+ * the time budget, sometimes because the exercise pool was simply too thin
+ * to fill more sets — the honest move is to fill the gap with something that
+ * doesn't ADD lifting volume, not to keep stacking sets past what recovery
+ * or exercise selection can support. Low/moderate recovery (or an explicit
+ * 'avoid' conditioning preference) gets mobility only; everything else gets
+ * a light goal-appropriate conditioning finisher. Never overwrites a
+ * conditioning note the day already has from assignConditioningNotes.
+ */
+function applyDurationFiller(
+  days: WorkoutDay[],
+  profile: UserProfile,
+  policy: GoalPolicy,
+  totalBudgetSeconds: number,
+): void {
+  const recovery = profile.recovery_capacity || 'moderate'
+  const mobilityOnly = recovery === 'low' || recovery === 'moderate' || profile.conditioning_preference === 'avoid'
+
+  for (const day of days) {
+    if (day.exercises.length === 0 || day.conditioning_note) continue
+    const actualSeconds = estimateDaySeconds(day)
+    const underBySeconds = totalBudgetSeconds - actualSeconds
+    if (underBySeconds <= FILLER_TRIGGER_SECONDS) continue
+
+    const fillerMinutes = Math.min(20, Math.round(underBySeconds / 60))
+
+    if (mobilityOnly) {
+      day.conditioning_note = `Optional mobility flow (~${fillerMinutes} min) — today's session ran under your time budget; the extra time goes to mobility, not more lifting volume.`
+      day.recommendedCardio = {
+        activity: 'Mobility & Movement Prep Flow',
+        duration: fillerMinutes,
+        targetRpe: 2,
+        timing: 'post_session',
+        reason: 'Session finished under the time budget; recovery capacity means the extra time goes to mobility, not additional training volume.',
+        is_filler: true,
+      }
+      continue
+    }
+
+    const cardioForGoal = getConditioningProfile(profile.fitness_goal)
+    day.conditioning_note = `Optional finisher: ${cardioForGoal.heavyDayBrief.activity} (~${fillerMinutes} min) — today's session ran under your time budget.`
+    day.recommendedCardio = {
+      ...cardioForGoal.heavyDayBrief,
+      duration: fillerMinutes,
+      timing: 'post_session',
+      reason: 'Session finished under the time budget; a light finisher fills the remaining time without adding lifting volume.',
+      is_filler: true,
+    }
+  }
 }
 
 export function generateMesocycle(
@@ -1596,6 +1922,7 @@ export function generateMesocycle(
   const pool = getConstrainedPool(profile, exclusions)
   const policy = getGoalPolicy(goal)
   const recoverySetMultiplier = RECOVERY_SET_MULTIPLIER[profile.recovery_capacity || 'moderate']
+  const totalBudgetSeconds = getDurationBudgetSeconds(profile.session_duration_preference || '45-60')
 
   // Experience already trims power/strength for beginners/novices
   // (getPhaseSequence); the goal policy trims further on top — e.g.
@@ -1623,13 +1950,20 @@ export function generateMesocycle(
     // Variations rotate ONCE PER BLOCK, not per week. Changing them weekly
     // would make progression impossible to read; holding them for four weeks
     // gives enough repetitions to actually improve at the movement.
-    const blockDays = baseWeek.map(day => ({
-      ...day,
-      exercises: day.exercises.map(ex => ({
-        ...ex,
-        name: rotateVariation(ex.name, blockIndex, pool, experience),
-      })),
-    }))
+    const blockDays = baseWeek.map(day => {
+      // Per-day dedup: a block rotation is computed independently per
+      // exercise, with no visibility into what its day-mates just resolved
+      // to. Without this set, a rotation that falls back past a
+      // regression-excluded current exercise (see rotateVariation) can land
+      // on a name another slot in the SAME day already has.
+      const usedNamesThisDay = new Set<string>()
+      const exercises = day.exercises.map(ex => {
+        const rotated = rotateVariation(ex.name, blockIndex, pool, experience, usedNamesThisDay)
+        usedNamesThisDay.add(rotated)
+        return { ...ex, name: rotated }
+      })
+      return { ...day, exercises }
+    })
 
     // Double progression's within-block memory: each exercise's week-1
     // ("baseline") load, keyed by [dayIndex][exerciseIndex] — weeks 2-3 are
@@ -1671,6 +2005,16 @@ export function generateMesocycle(
       const isCalibrationWeek = weekCounter === 1 && profile.skip_calibration_week !== true
 
       const days: WorkoutDay[] = blockDays.map((day, dayIdx) => {
+        // Fixed for this week (main/core never rotate weekly), so these
+        // names are known up front — seeding the avoidance set with them
+        // means an accessory rotation can never collide with a sibling slot
+        // on the same day, whether that sibling is fixed or an
+        // already-resolved accessory earlier in this same array.
+        const usedWeeklyNames = new Set<string>(
+          day.exercises
+            .filter((_, i) => rotationTiers[dayIdx][i] !== 'accessory')
+            .map(ex => ex.name)
+        )
         const exercises: Exercise[] = day.exercises.map((ex, exIdx) => {
           // Accessories rotate on a 2-week sub-cycle within the block (weeks
           // 1-2 stay on the block's starting variation, weeks 3-4 move one
@@ -1686,8 +2030,29 @@ export function generateMesocycle(
           // the block-level rotation above picked, for the whole block,
           // regardless of goal — see GoalPolicy.mainRotationWeeks.
           const weeklyName = tier === 'accessory'
-            ? rotateVariation(ex.name, Math.floor((w - 1) / policy.accessoryRotationWeeks), pool, experience)
+            ? rotateVariation(ex.name, Math.floor((w - 1) / policy.accessoryRotationWeeks), pool, experience, usedWeeklyNames)
             : ex.name
+          if (tier === 'accessory') usedWeeklyNames.add(weeklyName)
+
+          const dbEntry = EXERCISE_DATABASE.find(
+            e => e.name.toLowerCase() === weeklyName.toLowerCase()
+          )
+          const isPrimer = dbEntry?.mechanics_tier === 'primer'
+          const category = dbEntry ? categorize(dbEntry) : null
+
+          // A deload normally backs off by dropping the WEIGHT (70% of week
+          // 3). When week 3 was already resolving near the equipment floor
+          // (empty bar, lightest dumbbell pair), 70% of it rounds straight
+          // back up to that same floor — there is nowhere lower for the
+          // number to go. Detected here, before `sets` is computed, so the
+          // recovery reduction that weight can no longer provide gets pushed
+          // into volume instead.
+          const isLoadedNonPrimer = !!dbEntry && !isPrimer && isExternallyLoaded(dbEntry)
+          const equipmentFloor = isLoadedNonPrimer ? getEquipmentFloorKg(dbEntry!) : null
+          const week3KgForFloorCheck = isDeload ? blockWeek3Kg[dayIdx][exIdx] : null
+          const deloadAtFloor =
+            isDeload && equipmentFloor != null && week3KgForFloorCheck != null &&
+            week3KgForFloorCheck * 0.7 < equipmentFloor
 
           // Sets stay near-constant across the three loading weeks of a
           // block — load is the progression lever below, not set count. The
@@ -1698,18 +2063,20 @@ export function generateMesocycle(
           // at 75% the volume of high, all else equal) — before the phase
           // and deload multipliers apply.
           const goalAdjustedBaseSets = ex.sets * policy.setVolumeMultiplier * recoverySetMultiplier
+          const standardDeloadSets = Math.max(2, Math.round(goalAdjustedBaseSets * 0.5))
+          // Bar-floor deload: weight can't drop, so cut sets further than a
+          // normal deload (0.5x -> 0.25x), respecting the 2-set floor. If
+          // that floor was ALREADY hit at the standard 0.5x cut, there's no
+          // more room in sets either — the rep target absorbs the rest of
+          // the reduction instead (see repShift below).
+          const floorDeloadSets = Math.max(2, Math.round(goalAdjustedBaseSets * 0.25))
+          const deloadNeedsRepCut = deloadAtFloor && floorDeloadSets === standardDeloadSets
           const sets = isDeload
-            ? Math.max(2, Math.round(goalAdjustedBaseSets * 0.5))
+            ? (deloadAtFloor ? floorDeloadSets : standardDeloadSets)
             // + the once-per-block duration top-up (see computeDurationTopUp)
             // — a fixed per-slot amount, so this still holds sets flat
             // across weeks 1-3 despite being duration-driven.
             : Math.max(2, Math.round(goalAdjustedBaseSets * phaseConfig.sets_multiplier)) + blockExtraSets[dayIdx][exIdx]
-
-          const dbEntry = EXERCISE_DATABASE.find(
-            e => e.name.toLowerCase() === weeklyName.toLowerCase()
-          )
-          const isPrimer = dbEntry?.mechanics_tier === 'primer'
-          const category = dbEntry ? categorize(dbEntry) : null
 
           // No externally loaded weight to ramp (true bodyweight movement, or
           // one prescribeLoad can't categorize) — progress these via reps
@@ -1722,7 +2089,14 @@ export function generateMesocycle(
           const rampReps = isBodyweight || policy.progressionEmphasis === 'reps'
           const rampLoad = !isBodyweight && policy.progressionEmphasis === 'load'
           const repShift = isDeload
-            ? phaseConfig.rep_shift + 2
+            ? (deloadAtFloor
+                // Weight held flat (can't drop further) — reps carry the
+                // recovery reduction instead of the usual +2 "back off"
+                // bump, which would INCREASE volume here, the opposite of
+                // the point. If sets also had no room to cut, reps drop
+                // outright rather than just holding flat.
+                ? (deloadNeedsRepCut ? phaseConfig.rep_shift - 2 : phaseConfig.rep_shift)
+                : phaseConfig.rep_shift + 2)
             : phaseConfig.rep_shift + (rampReps ? w - 1 : 0)
           const restShift = isDeload ? 0 : phaseConfig.rest_adjust_seconds
           const reps = shiftReps(ex.reps, repShift, expConfig.min_reps)
@@ -1762,7 +2136,14 @@ export function generateMesocycle(
             }
             if (isDeload) {
               const week3Kg = blockWeek3Kg[dayIdx][exIdx]
-              if (week3Kg != null) forceStartingWeightKg = week3Kg * 0.7
+              if (week3Kg != null) {
+                // At the equipment floor, prescribeLoad's own rounding would
+                // clamp 70% right back up to the floor anyway — set it
+                // explicitly so the intent ("weight held at the floor,
+                // volume did the reducing") is unambiguous rather than an
+                // accident of rounding.
+                forceStartingWeightKg = deloadAtFloor ? equipmentFloor! : week3Kg * 0.7
+              }
             }
 
             load = prescribeLoad(dbEntry, profile, {
@@ -1787,7 +2168,11 @@ export function generateMesocycle(
             reps,
             rest: adjustRest(ex.rest, restShift),
             intensity,
-            load_guidance: load ? `${expConfig.load_guidance} ${load.basis}` : ex.load_guidance,
+            load_guidance: deloadAtFloor
+              ? (deloadNeedsRepCut
+                  ? 'Bar stays the same — reduced reps this week. Recovery comes from doing less, not lifting lighter.'
+                  : 'Bar stays the same — reduced sets this week. Recovery comes from doing less, not lifting lighter.')
+              : (load ? `${expConfig.load_guidance} ${load.basis}` : ex.load_guidance),
             suggested_load: load ? load.display : ex.suggested_load,
             suggested_load_kg: load ? load.starting_weight_kg : ex.suggested_load_kg,
             per_set_load: load ? load.per_set : (ex.per_set_load ?? null),
@@ -1799,6 +2184,13 @@ export function generateMesocycle(
 
         return { ...day, exercises }
       })
+
+      // Deload weeks are SUPPOSED to run short (half volume, by design) — a
+      // filler there would fight the whole point of the recovery week, so
+      // this only applies to loading weeks.
+      if (!isDeload) {
+        applyDurationFiller(days, profile, policy, totalBudgetSeconds)
+      }
 
       weeks.push({
         week_number: weekCounter,

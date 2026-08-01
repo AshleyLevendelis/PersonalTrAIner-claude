@@ -19,7 +19,8 @@ import { RestTimer } from '@/components/RestTimer'
 import { PlateCalculator } from '@/components/PlateCalculator'
 import { OfflineStatusIndicator } from '@/components/OfflineStatusIndicator'
 import type { ExerciseEntry } from '@/lib/exercise-db'
-import type { WorkoutDay, ExerciseSetLog, CardioLog, MesocycleWeek, UserProfile } from '@/lib/types'
+import type { WorkoutDay, ExerciseSetLog, CardioLog, MesocycleWeek, UserProfile, SessionDuration } from '@/lib/types'
+import { estimateDaySeconds, getDurationBudgetSeconds } from '@/lib/session-duration'
 
 interface ExercisePlanProps {
   plan: WorkoutDay[]
@@ -89,6 +90,42 @@ function CalibrationBanner({ mesoWeek }: { mesoWeek?: MesocycleWeek }) {
           Find the weight where your last rep feels like RPE 6. Log your session so week 2 scales from your actual performance.
         </p>
       </div>
+    </div>
+  )
+}
+
+/**
+ * Honest per-day duration estimate — the whole point is to say plainly when
+ * a session is deliberately shorter than the user's stated budget (deload,
+ * or an exercise selection that just didn't need the full window) rather
+ * than let a short session read as a mistake.
+ */
+function SessionDurationNote({
+  day,
+  isDeload,
+  durationPref,
+}: {
+  day: WorkoutDay
+  isDeload: boolean
+  durationPref: SessionDuration
+}) {
+  if (day.exercises.length === 0) return null
+  const estSeconds = estimateDaySeconds(day)
+  const budgetSeconds = getDurationBudgetSeconds(durationPref)
+  const estMin = Math.round(estSeconds / 60)
+  const underBySeconds = budgetSeconds - estSeconds
+  const isLight = !isDeload && underBySeconds > 15 * 60
+
+  return (
+    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+      <Clock className="size-3 shrink-0" />
+      <span>~{estMin} min estimated</span>
+      {isDeload && <span className="italic">— deload week, deliberately lighter</span>}
+      {isLight && (
+        <span className="italic">
+          — runs under your ~{Math.round(budgetSeconds / 60)} min budget today; that's the exercise selection, not a mistake
+        </span>
+      )}
     </div>
   )
 }
@@ -993,6 +1030,11 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
             <div className="mt-2 space-y-2">
               <PhaseBanner mesoWeek={currentMesoWeekObj} />
               <CalibrationBanner mesoWeek={currentMesoWeekObj} />
+              <SessionDurationNote
+                day={workout}
+                isDeload={!!currentMesoWeekObj?.is_deload}
+                durationPref={profile?.session_duration_preference || '45-60'}
+              />
             </div>
             {isToday && !sessionLogged && (
               <div className="mt-2">

@@ -144,6 +144,15 @@ export interface RecommendedCardio {
   targetRpe: number
   timing: 'post_session' | 'independent_session' | 'rest_day'
   reason: string
+  /**
+   * True when this entry exists only to fill a day that ran short on time
+   * (see applyDurationFiller in exercise-plan.ts) rather than counting
+   * toward the goal's actual weekly conditioning-frequency target. Distinct
+   * from the assignConditioningNotes-driven entries, which DO count toward
+   * that target — conflating the two inflated the conditioning-day count for
+   * any user whose conditioning_preference expected fewer (or zero) sessions.
+   */
+  is_filler?: boolean
 }
 
 export interface WorkoutDay {
@@ -157,7 +166,7 @@ export interface WorkoutDay {
 
 export interface ConstraintTraceEntry {
   exercise: string
-  stage: 'equipment' | 'injury' | 'style' | 'skill' | 'time_cap' | 'exclusion'
+  stage: 'equipment' | 'injury' | 'style' | 'skill' | 'time_cap' | 'exclusion' | 'structure'
   reason: string
 }
 
@@ -168,6 +177,8 @@ export interface ConstraintTrace {
   skill_filtered: ConstraintTraceEntry[]
   time_cap_adjusted: ConstraintTraceEntry[]
   exclusion_filtered: ConstraintTraceEntry[]
+  /** Weekly-aggregate corrections (push:pull balance, squat/hinge/push/pull pattern coverage) that no single day's own selection can see — see balanceWeeklyStructure in exercise-plan.ts. */
+  structure_adjusted: ConstraintTraceEntry[]
   pool_size_after_each_stage: { equipment: number; injury: number; style: number; skill: number; final: number }
 }
 

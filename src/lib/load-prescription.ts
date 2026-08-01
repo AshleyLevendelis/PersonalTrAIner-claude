@@ -292,22 +292,42 @@ export function loadingMode(entry: ExerciseEntry): LoadingMode {
   return 'stack'
 }
 
+/**
+ * The lowest weight a given loading mode can actually put in someone's
+ * hands — an empty 20kg bar, a 10kg EZ bar, the lightest dumbbell pair a gym
+ * stocks (2kg), a cable stack's bottom pin (5kg). `roundToPlate` enforces
+ * this as a floor; anything (deload math, calibration-week clamps) that needs
+ * to know "is this exercise already as light as it can go" reads the same
+ * table rather than re-deriving it.
+ */
+const LOADING_FLOOR_KG: Record<LoadingMode, number> = {
+  dumbbell: 2,
+  single_implement: 2,
+  barbell: 20,
+  ez_bar: 10,
+  stack: 5,
+}
+
+export function getEquipmentFloorKg(entry: ExerciseEntry): number {
+  return LOADING_FLOOR_KG[loadingMode(entry)]
+}
+
 /** Round to something actually loadable rather than a number like 43.7kg. */
 function roundToPlate(kg: number, mode: LoadingMode): number {
+  const floor = LOADING_FLOOR_KG[mode]
   switch (mode) {
     case 'dumbbell':
     case 'single_implement':
       // Dumbbells and kettlebells commonly step in 2kg increments at the light end.
-      return Math.max(2, Math.round(kg / 2) * 2)
+      return Math.max(floor, Math.round(kg / 2) * 2)
     case 'barbell':
-      // 20kg bar plus plate pairs. Below bar weight, prescribe the bar itself.
-      return kg <= 20 ? 20 : Math.round(kg / 2.5) * 2.5
     case 'ez_bar':
-      return kg <= 10 ? 10 : Math.round(kg / 2.5) * 2.5
+      // Bar plus plate pairs. Below bar weight, prescribe the bar itself.
+      return kg <= floor ? floor : Math.round(kg / 2.5) * 2.5
     case 'stack':
       // Cable and machine stacks have no bar to floor against — applying the
       // barbell's 20kg minimum here inflated light isolation work.
-      return Math.max(5, Math.round(kg / 2.5) * 2.5)
+      return Math.max(floor, Math.round(kg / 2.5) * 2.5)
   }
 }
 
