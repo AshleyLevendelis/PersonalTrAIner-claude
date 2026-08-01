@@ -1409,6 +1409,42 @@ function applyWeekModifiers(
   return { ...baseDay, exercises, conditioning_note: condNote }
 }
 
+// ---------------------------------------------------------------------------
+// Two-tier rotation
+// ---------------------------------------------------------------------------
+// Main lifts need to stay put for the trainee to actually track progress on
+// them — that's what the whole double-progression system above is for.
+// Accessories don't carry that same tracking weight and get stale faster, so
+// they're allowed to move on a tighter cycle. Core/carry work is exempt
+// entirely; it already rotates at block boundaries like everything else and
+// doesn't need a faster cycle on top of that.
+
+type RotationTier = 'main' | 'accessory' | 'core'
+
+/**
+ * Tags each exercise in a (block-level, pre-week-modifiers) day by rotation
+ * tier. Computed once per day per block — position and tier don't change
+ * week to week within a block, only an accessory's specific variation does.
+ */
+function classifyRotationTiers(exercises: Exercise[]): RotationTier[] {
+  let mainCount = 0
+  return exercises.map(ex => {
+    const dbEntry = EXERCISE_DATABASE.find(e => e.name.toLowerCase() === ex.name.toLowerCase())
+    if (!dbEntry || dbEntry.mechanics_tier === 'primer') return 'core'
+    if (dbEntry.movement_pattern === 'core' || dbEntry.movement_pattern === 'carry') return 'core'
+
+    // "First 1-2 externally-loaded compounds" — in practice this is almost
+    // always exactly one exercise (getExerciseCountForDuration always asks
+    // for a single tier1 slot), but the cap stays at 2 to match the spec for
+    // any future session shape that requests more.
+    if (dbEntry.mechanics_tier === 'tier1_compound' && isExternallyLoaded(dbEntry) && mainCount < 2) {
+      mainCount++
+      return 'main'
+    }
+    return 'accessory'
+  })
+}
+
 export function generateMesocycle(
   profile: UserProfile,
   baseWorkout?: WorkoutDay[],
@@ -1457,6 +1493,10 @@ export function generateMesocycle(
     // block means a new baseline (and possibly a rotated variation).
     const blockBaselineKg: (number | null)[][] = blockDays.map(day => day.exercises.map(() => null))
 
+    // Rotation tier per (day, exercise) — fixed for the whole block; only an
+    // accessory's specific variation moves within it (see fortnightOffset).
+    const rotationTiers: RotationTier[][] = blockDays.map(day => classifyRotationTiers(day.exercises))
+
     for (let w = 1; w <= 4; w++) {
       weekCounter++
       const isDeload = w === 4
@@ -1469,6 +1509,18 @@ export function generateMesocycle(
 
       const days: WorkoutDay[] = blockDays.map((day, dayIdx) => {
         const exercises: Exercise[] = day.exercises.map((ex, exIdx) => {
+          // Accessories rotate on a 2-week sub-cycle within the block (weeks
+          // 1-2 stay on the block's starting variation, weeks 3-4 move one
+          // step further through the same constrained-pool candidate list
+          // rotateVariation() already builds for block-boundary rotation —
+          // same substitution group, same tier, skill-appropriate, never a
+          // downgrade). Main lifts and core/carry work stay on whatever the
+          // block-level rotation above picked, for the whole block.
+          const tier = rotationTiers[dayIdx][exIdx]
+          const weeklyName = tier === 'accessory'
+            ? rotateVariation(ex.name, w <= 2 ? 0 : 1, pool, experience)
+            : ex.name
+
           // Sets stay near-constant across the three loading weeks of a
           // block — load is the progression lever below, not set count. The
           // deload is the one week that deliberately drops both.
@@ -1477,7 +1529,7 @@ export function generateMesocycle(
             : Math.max(2, Math.round(ex.sets * phaseConfig.sets_multiplier))
 
           const dbEntry = EXERCISE_DATABASE.find(
-            e => e.name.toLowerCase() === ex.name.toLowerCase()
+            e => e.name.toLowerCase() === weeklyName.toLowerCase()
           )
           const isPrimer = dbEntry?.mechanics_tier === 'primer'
           const category = dbEntry ? categorize(dbEntry) : null
@@ -1509,6 +1561,13 @@ export function generateMesocycle(
             // fixed increments — not a fresh, independently RPE-scaled
             // estimate, which is what made load look flat despite sets
             // climbing. The deload is 65-75% of week 3's number.
+            //
+            // For an accessory that rotates variation at the week-3 fortnight
+            // boundary, the baseline number still carries over from week 1's
+            // (different) variation — rotateVariation only offers same
+            // substitution-group/tier candidates, so the magnitude stays
+            // reasonable — but `increment` above is recomputed for whichever
+            // variation is actually being lifted this week.
             let forceStartingWeightKg: number | undefined
             if (baselineKg != null) {
               if (w === 2) forceStartingWeightKg = baselineKg + increment
@@ -1532,6 +1591,7 @@ export function generateMesocycle(
 
           return {
             ...ex,
+            name: weeklyName,
             sets,
             reps,
             rest: adjustRest(ex.rest, restShift),
