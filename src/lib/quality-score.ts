@@ -355,7 +355,12 @@ function scoreSelection(profile: UserProfile, mesocycle: MesocycleWeek[]): Dimen
     // level (any accessory anywhere changing counts) rather than per-day,
     // since a single day's constrained pool can legitimately have zero
     // alternatives even when the week as a whole has room to rotate.
-    let anyAccessoryRotated = false
+    // Beginners/novices deliberately hold accessories for the whole block
+    // (expConfig.repeat_movements_for_practice — they need repetition to
+    // learn a movement, not week-3 variety), so this check only applies to
+    // intermediate/advanced, whose accessories ARE supposed to sub-cycle.
+    const experience = profile.training_experience || 'novice'
+    let anyAccessoryRotated = experience === 'beginner' || experience === 'novice'
     let anyAccessoryHadAlternative = false
     const pool = getConstrainedPool(profile, [])
     for (const day of w2.days) {

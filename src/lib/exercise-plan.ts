@@ -525,7 +525,30 @@ function buildSupersetPairs(
     }
   }
 
-  return result
+  // Labeling alone doesn't make a pair ADJACENT in the rendered order — the
+  // A2 partner can still be found sitting several exercises later in the
+  // list. An LLM coach review caught exactly that: "Farmer's Walk is tagged
+  // [A1] and Dead Bug [A2], but they're separated by four other exercises
+  // in the list. Nobody can execute that superset as written." Walk the
+  // original order and pull each A2 to sit immediately after its A1;
+  // everything else keeps its relative position.
+  const ordered: Exercise[] = []
+  const emitted = new Set<number>()
+  for (let i = 0; i < result.length; i++) {
+    if (emitted.has(i)) continue
+    ordered.push(result[i])
+    emitted.add(i)
+    if (result[i].superset_label?.endsWith('1')) {
+      const letter = result[i].superset_label![0]
+      const partnerIdx = result.findIndex((e, idx) => !emitted.has(idx) && e.superset_label === `${letter}2`)
+      if (partnerIdx !== -1) {
+        ordered.push(result[partnerIdx])
+        emitted.add(partnerIdx)
+      }
+    }
+  }
+
+  return ordered
 }
 
 function stageTimeCap(
@@ -917,6 +940,35 @@ function selectExercisesForTrack(
       }
     }
   }
+
+  // A day is named after what it's supposed to contain — "Squat & Carry"
+  // with no squat, or "Push & Press" with no overhead press, is exactly
+  // what an LLM coach review caught ("Squat & Carry" days containing zero
+  // squat/lunge/split-squat reps). track.required_patterns only covers a
+  // SINGLE exact pattern; squat spans two (knee_dominant, single_leg), and
+  // "Push & Press" had no requirement at all. Same push-a-fill-in fallback
+  // as the required-pattern loop above, scoped to just these two labels.
+  const ensurePatternPresent = (patterns: MovementPattern[]) => {
+    if (patterns.some(p => selected.some(e => e.movement_pattern === p))) return
+    // Never fills with a SECOND tier1_compound — that slot is reserved to
+    // exactly one exercise per day (pickFromTier('tier1_compound', ...)
+    // above already claimed it). Filling with another main lift here
+    // silently doubled a day's main-compound count, which broke the
+    // fat_loss-vs-hypertrophy main-compound-slot comparison the goal-
+    // alignment scorer relies on.
+    const fill = trackPool.find(e =>
+      patterns.includes(e.movement_pattern) &&
+      e.mechanics_tier !== 'tier1_compound' &&
+      !selected.some(s => s.name === e.name) &&
+      !usedGroups.has(getMovementFamily(e))
+    )
+    if (fill) {
+      selected.push(fill)
+      usedGroups.add(getMovementFamily(fill))
+    }
+  }
+  if (track.label === 'Squat & Carry') ensurePatternPresent(['knee_dominant', 'single_leg'])
+  if (track.label === 'Push & Press') ensurePatternPresent(['vertical_push'])
 
   // Sort: tier1 compounds first, then tier2, then tier3
   const tierOrder = { tier1_compound: 0, tier2_compound: 1, tier3_isolation: 2, cardio: 3, primer: 4 }
@@ -1325,6 +1377,24 @@ function balanceWeeklyStructure(
         .map(e => getMovementFamily(e))
     )
 
+  // The raw movement_pattern(s) each BalancePattern can be realized by —
+  // used to check a candidate swap against the HOST DAY's own track
+  // definition, not just against family-duplication. Without this, the
+  // weekly-coverage/push-pull passes could (and did) push a horizontal_push
+  // exercise onto a "Pull & Hinge" day, which forbids that pattern for a
+  // reason: an LLM coach review found exactly that — "Dumbbell Bench Press"
+  // landing on a day named after pulling.
+  const BALANCE_PATTERN_RAW: Record<Exclude<BalancePattern, null>, MovementPattern[]> = {
+    push: ['horizontal_push', 'vertical_push'],
+    pull: ['horizontal_pull', 'vertical_pull'],
+    squat: ['knee_dominant', 'single_leg'],
+    hinge: ['hip_hinge'],
+  }
+  const dayForbidden = (dayIdx: number): Set<MovementPattern> =>
+    new Set(TRACKS[days[dayIdx].focus as TrackFocus]?.forbidden_patterns ?? [])
+  const dayAllowsPattern = (dayIdx: number, pattern: Exclude<BalancePattern, null>): boolean =>
+    BALANCE_PATTERN_RAW[pattern].some(p => !dayForbidden(dayIdx).has(p))
+
   function findAccessorySlot(want: (p: BalancePattern) => boolean): { dayIdx: number; exIdx: number } | null {
     for (let dayIdx = 0; dayIdx < days.length; dayIdx++) {
       const exercises = days[dayIdx].exercises
@@ -1374,6 +1444,7 @@ function balanceWeeklyStructure(
     // heavier/earlier tracks are disturbed last.
     let slot: { dayIdx: number; exIdx: number } | null = null
     for (let dayIdx = days.length - 1; dayIdx >= 0 && !slot; dayIdx--) {
+      if (!dayAllowsPattern(dayIdx, missing)) continue
       const exercises = days[dayIdx].exercises
       for (let exIdx = exercises.length - 1; exIdx >= 0; exIdx--) {
         if (findEntry(exercises[exIdx].name)?.mechanics_tier === 'tier3_isolation') { slot = { dayIdx, exIdx }; break }
@@ -1381,6 +1452,7 @@ function balanceWeeklyStructure(
     }
     if (!slot) {
       for (let dayIdx = days.length - 1; dayIdx >= 0 && !slot; dayIdx--) {
+        if (!dayAllowsPattern(dayIdx, missing)) continue
         const exercises = days[dayIdx].exercises
         for (let exIdx = exercises.length - 1; exIdx >= 0; exIdx--) {
           const entry = findEntry(exercises[exIdx].name)
@@ -1391,10 +1463,12 @@ function balanceWeeklyStructure(
     if (!slot) continue
 
     const usedFamilies = dayFamilies(slot.dayIdx)
+    const forbidden = dayForbidden(slot.dayIdx)
     const eligible = (e: ExerciseEntry) =>
       classifyForBalance(e.movement_pattern) === missing &&
       e.mechanics_tier !== 'tier1_compound' && e.mechanics_tier !== 'primer' &&
-      !usedFamilies.has(getMovementFamily(e))
+      !usedFamilies.has(getMovementFamily(e)) &&
+      !forbidden.has(e.movement_pattern)
     const replacement = pool.find(e => eligible(e) && !weeklyUsed.has(e.name)) ?? pool.find(eligible)
 
     if (replacement) {
@@ -1433,8 +1507,13 @@ function balanceWeeklyStructure(
     if (ratio >= 0.6 && ratio <= 1.6) break
 
     const excessIsPush = ratio > 1.6
+    const wantPattern = excessIsPush ? 'pull' : 'push'
+    // Only pull FROM (and swap INTO) a day whose track actually allows the
+    // pattern we want to add — same reasoning as the weekly-coverage pass
+    // above: the fix must not plant a push exercise on a Pull & Hinge day.
     const target = findAccessorySlot(p => p === (excessIsPush ? 'push' : 'pull'))
-    if (!target) {
+    const validTarget = target && dayAllowsPattern(target.dayIdx, wantPattern) ? target : null
+    if (!validTarget) {
       trace.structure_adjusted.push({
         exercise: '(weekly push:pull)', stage: 'structure',
         reason: `push:pull ratio ${ratio.toFixed(2)} is outside 0.6-1.6 and no swappable accessory remains to correct it`,
@@ -1442,23 +1521,24 @@ function balanceWeeklyStructure(
       break
     }
 
-    const usedFamilies = dayFamilies(target.dayIdx)
-    const wantPattern = excessIsPush ? 'pull' : 'push'
+    const usedFamilies = dayFamilies(validTarget.dayIdx)
+    const forbidden = dayForbidden(validTarget.dayIdx)
     const eligible = (e: ExerciseEntry) =>
       classifyForBalance(e.movement_pattern) === wantPattern &&
       e.mechanics_tier !== 'tier1_compound' && e.mechanics_tier !== 'primer' &&
-      !usedFamilies.has(getMovementFamily(e))
+      !usedFamilies.has(getMovementFamily(e)) &&
+      !forbidden.has(e.movement_pattern)
     const replacement = pool.find(e => eligible(e) && !weeklyUsed.has(e.name)) ?? pool.find(eligible)
 
     if (!replacement) {
       trace.structure_adjusted.push({
         exercise: '(weekly push:pull)', stage: 'structure',
-        reason: `push:pull ratio ${ratio.toFixed(2)} needs a ${wantPattern} swap on ${days[target.dayIdx].day} but no valid replacement exists in the constrained pool`,
+        reason: `push:pull ratio ${ratio.toFixed(2)} needs a ${wantPattern} swap on ${days[validTarget.dayIdx].day} but no valid replacement exists in the constrained pool`,
       })
       break
     }
 
-    swap(target.dayIdx, target.exIdx, replacement, `push:pull exercise-count ratio ${ratio.toFixed(2)}`)
+    swap(validTarget.dayIdx, validTarget.exIdx, replacement, `push:pull exercise-count ratio ${ratio.toFixed(2)}`)
   }
 }
 
@@ -2304,8 +2384,23 @@ export function generateMesocycle(
       // regression-excluded current exercise (see rotateVariation) can land
       // on a name another slot in the SAME day already has.
       const usedNamesThisDay = new Set<string>()
-      const exercises = day.exercises.map(ex => {
-        const rotated = rotateVariation(ex.name, blockIndex, pool, experience, usedNamesThisDay)
+      // Pre-rotation families for every slot on this day — a stable proxy
+      // for what each slot's family will still be AFTER its own rotation,
+      // since rotateVariation only ever offers same-substitution_group/
+      // same-pattern/same-tier candidates, which (bar an explicit
+      // MOVEMENT_FAMILIES override) share one family throughout. Lets each
+      // slot's own rotation avoid landing on a family another slot already
+      // holds — the gap that let Deficit Push-Ups and Archer Push-Ups (two
+      // different names, same 'bench_press' family) land in one session.
+      const dayFamiliesByIndex = day.exercises.map(ex => {
+        const e = findEntry(ex.name)
+        return e ? getMovementFamily(e) : null
+      })
+      const exercises = day.exercises.map((ex, exIdx) => {
+        const avoidFamilies = new Set(
+          dayFamiliesByIndex.filter((f, i) => f && i !== exIdx) as string[]
+        )
+        const rotated = rotateVariation(ex.name, blockIndex, pool, experience, usedNamesThisDay, avoidFamilies)
         usedNamesThisDay.add(rotated)
         if (rotated === ex.name) return { ...ex, name: rotated }
         // A rotation can land on an exercise with a different prescription
@@ -2386,10 +2481,24 @@ export function generateMesocycle(
           // hypertrophy-default 2-week fortnight. Main/core stay on whatever
           // the block-level rotation above picked, for the whole block,
           // regardless of goal — see GoalPolicy.mainRotationWeeks.
-          const weeklyName = tier === 'accessory'
-            ? rotateVariation(ex.name, Math.floor((w - 1) / policy.accessoryRotationWeeks), pool, experience, usedWeeklyNames)
+          //
+          // Beginners/novices need REPETITION to actually learn a movement
+          // (expConfig.repeat_movements_for_practice — declared in
+          // experience-config.ts but never wired up until now) — a
+          // mid-block accessory swap works against that the same way it
+          // would for a main lift, so they hold the block-level variation
+          // for all four weeks. Intermediate+ keep the sub-cycle.
+          const rotatesWeekly = tier === 'accessory' && !expConfig.repeat_movements_for_practice
+          const weeklyFamilies = new Set(
+            day.exercises
+              .map((e, i) => (i === exIdx ? null : findEntry(e.name)))
+              .filter((e): e is ExerciseEntry => !!e)
+              .map(e => getMovementFamily(e))
+          )
+          const weeklyName = rotatesWeekly
+            ? rotateVariation(ex.name, Math.floor((w - 1) / policy.accessoryRotationWeeks), pool, experience, usedWeeklyNames, weeklyFamilies)
             : ex.name
-          if (tier === 'accessory') usedWeeklyNames.add(weeklyName)
+          if (rotatesWeekly) usedWeeklyNames.add(weeklyName)
 
           const dbEntry = EXERCISE_DATABASE.find(
             e => e.name.toLowerCase() === weeklyName.toLowerCase()

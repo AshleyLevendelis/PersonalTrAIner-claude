@@ -261,6 +261,15 @@ export function rotateVariation(
    * back a name that's already in use.
    */
   avoidNames?: Set<string>,
+  /**
+   * Movement FAMILIES already spoken for elsewhere in the same day (see
+   * getMovementFamily) — broader than avoidNames: two different exercises
+   * can collide by family (Deficit Push-Ups and Archer Push-Ups are
+   * different names, same 'bench_press' family) and rotation landing on
+   * one while another slot already holds the other is the same duplicate
+   * bug avoidNames exists to prevent, just missed by an exact-name check.
+   */
+  avoidFamilies?: Set<string>,
 ): string {
   const current = EXERCISE_DATABASE.find(
     e => e.name.toLowerCase() === exerciseName.toLowerCase()
@@ -304,7 +313,9 @@ export function rotateVariation(
 
   for (let attempt = 0; attempt < variations.length; attempt++) {
     const candidate = variations[(start + blockIndex + attempt) % variations.length]
-    if (!avoidNames?.has(candidate.name)) return candidate.name
+    if (avoidNames?.has(candidate.name)) continue
+    if (avoidFamilies?.has(getMovementFamily(candidate)) && candidate.name !== current.name) continue
+    return candidate.name
   }
   // Every variation collides with something already on the day — hand back
   // the original name rather than force a duplicate.
