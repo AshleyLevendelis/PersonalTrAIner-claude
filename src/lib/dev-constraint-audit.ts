@@ -254,8 +254,14 @@ function runSingleAudit(
   // CHECK 5: Every scheduled day must contain actual work.
   // This check exists because the audit previously reported 100% pass while
   // silently emitting sessions with zero exercises — a plan that passes every
-  // constraint by virtue of being empty is not a plan.
+  // constraint by virtue of being empty is not a plan. 'Active Recovery +
+  // Cardio' is the one deliberate exception: assignConditioningNotes() (Part
+  // 4 goal policies) pushes these as exercise-less rest-day placeholders
+  // carrying only a conditioning note, for every goal now rather than just
+  // fat_loss/conditioning — that's a real, intentional zero-exercise day,
+  // not a broken one.
   for (const day of plan) {
+    if (day.focus === 'Active Recovery + Cardio') continue
     if (day.exercises.length === 0) {
       failures.push({
         check: 'empty_session',

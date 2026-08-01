@@ -15,6 +15,7 @@ import {
   getPhaseSequence, getPhaseConfig, rotateVariation, resolveTargetRpe,
   shiftReps, adjustRest,
 } from './periodization'
+import { getGoalPolicy, restrictPhaseSequence, type GoalPolicy } from './goal-policies'
 
 // ---------------------------------------------------------------------------
 // Track definitions (unchanged — used for day-level focus selection)
@@ -1043,7 +1044,18 @@ function getConditioningProfile(goal: FitnessGoal): ConditioningProfile {
   }
 }
 
-function assignConditioningNotes(days: WorkoutDay[], profile: UserProfile): void {
+/**
+ * Fills in conditioning notes/cardio recommendations up to the goal policy's
+ * weekly frequency budget — dedicated conditioning-track days always get
+ * filled (they exist specifically for this) and count against the budget;
+ * remaining slots go to rest days first (zero interference with lifting),
+ * then light training days, then heavy days last and only ever briefly.
+ * Previously this only ran for fat_loss/conditioning and otherwise assigned
+ * cardio to nearly every day unconditionally — hypertrophy's "1 optional
+ * finisher/week" and functional's "moderate" targets need an actual budget,
+ * not an all-or-nothing switch.
+ */
+function assignConditioningNotes(days: WorkoutDay[], profile: UserProfile, policy: GoalPolicy): void {
   const duration = profile.session_duration_preference || '45-60'
   const isTimeLimited = duration === '30-45'
   const goal = profile.fitness_goal
@@ -1054,53 +1066,21 @@ function assignConditioningNotes(days: WorkoutDay[], profile: UserProfile): void
   const restDayNames = allDayNames.filter(d => !trainingDayNames.has(d))
 
   const cardioForGoal = getConditioningProfile(goal)
+  let remaining = Math.max(0, Math.round(policy.conditioningFrequencyPerWeek))
 
   for (const day of days) {
-    const isHeavy = heavyTrackDays.has(day.focus)
-
-    if (day.focus === 'Conditioning & Core') {
-      day.conditioning_note = cardioForGoal.dedicatedDay.activity
-      day.recommendedCardio = {
-        ...cardioForGoal.dedicatedDay,
-        timing: 'post_session',
-        reason: 'Dedicated conditioning day -- full session devoted to metabolic work.',
-      }
-      continue
+    if (day.focus !== 'Conditioning & Core') continue
+    day.conditioning_note = cardioForGoal.dedicatedDay.activity
+    day.recommendedCardio = {
+      ...cardioForGoal.dedicatedDay,
+      timing: 'post_session',
+      reason: 'Dedicated conditioning day -- full session devoted to metabolic work.',
     }
-
-    if (isTimeLimited) {
-      if (!isHeavy) {
-        day.recommendedCardio = {
-          ...cardioForGoal.independentBlock,
-          timing: 'independent_session',
-          reason: 'Scheduled as a separate session to preserve your strict lifting window.',
-        }
-        day.conditioning_note = `Independent session: ${cardioForGoal.independentBlock.activity} (${cardioForGoal.independentBlock.duration} min)`
-      }
-      continue
-    }
-
-    if (!isHeavy) {
-      day.conditioning_note = `${cardioForGoal.postSession.activity} (${cardioForGoal.postSession.duration} min post-session)`
-      day.recommendedCardio = {
-        ...cardioForGoal.postSession,
-        timing: 'post_session',
-        reason: 'Appended after main lifts on a lighter training day.',
-      }
-    } else {
-      day.conditioning_note = `${cardioForGoal.heavyDayBrief.activity} (${cardioForGoal.heavyDayBrief.duration} min)`
-      day.recommendedCardio = {
-        ...cardioForGoal.heavyDayBrief,
-        timing: 'post_session',
-        reason: 'Brief conditioning post-lift to avoid interference with heavy compound work.',
-      }
-    }
+    remaining--
   }
 
-  const maxRestDayCardio = goal === 'fat_loss' ? 3 : goal === 'conditioning' ? 2 : 1
-  const restDaysToFill = restDayNames.slice(0, maxRestDayCardio)
-
-  for (const restDay of restDaysToFill) {
+  for (const restDay of restDayNames) {
+    if (remaining <= 0) break
     days.push({
       day: restDay,
       focus: 'Active Recovery + Cardio',
@@ -1112,6 +1092,44 @@ function assignConditioningNotes(days: WorkoutDay[], profile: UserProfile): void
         reason: 'Programmed on a rest day for recovery-compatible conditioning.',
       },
     })
+    remaining--
+  }
+
+  const remainingTrainingDays = days.filter(
+    d => d.focus !== 'Conditioning & Core' && d.focus !== 'Active Recovery + Cardio'
+  )
+  const lightDays = remainingTrainingDays.filter(d => !heavyTrackDays.has(d.focus))
+  const heavyDays = remainingTrainingDays.filter(d => heavyTrackDays.has(d.focus))
+
+  for (const day of lightDays) {
+    if (remaining <= 0) break
+    if (isTimeLimited) {
+      day.recommendedCardio = {
+        ...cardioForGoal.independentBlock,
+        timing: 'independent_session',
+        reason: 'Scheduled as a separate session to preserve your strict lifting window.',
+      }
+      day.conditioning_note = `Independent session: ${cardioForGoal.independentBlock.activity} (${cardioForGoal.independentBlock.duration} min)`
+    } else {
+      day.conditioning_note = `${cardioForGoal.postSession.activity} (${cardioForGoal.postSession.duration} min post-session)`
+      day.recommendedCardio = {
+        ...cardioForGoal.postSession,
+        timing: 'post_session',
+        reason: 'Appended after main lifts on a lighter training day.',
+      }
+    }
+    remaining--
+  }
+
+  for (const day of heavyDays) {
+    if (remaining <= 0) break
+    day.conditioning_note = `${cardioForGoal.heavyDayBrief.activity} (${cardioForGoal.heavyDayBrief.duration} min)`
+    day.recommendedCardio = {
+      ...cardioForGoal.heavyDayBrief,
+      timing: 'post_session',
+      reason: 'Brief conditioning post-lift to avoid interference with heavy compound work.',
+    }
+    remaining--
   }
 }
 
@@ -1165,6 +1183,7 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
     getExerciseCountForDuration(duration),
     experience,
   )
+  const policy = getGoalPolicy(profile.fitness_goal || 'hypertrophy')
 
   // Compute feasible required patterns based on equipment & injury constraints
   const feasiblePatterns = getFeaibleRequiredPatterns(
@@ -1205,9 +1224,6 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
   const splitPref = profile.workout_split_preference || 'ai_recommendation'
   const split = getSplitForDays(availableDays.length, profile.fitness_goal, splitPref, trainingStyle)
 
-  const needsConditioningIntegration =
-    profile.fitness_goal === 'fat_loss' ||
-    profile.fitness_goal === 'conditioning'
 
   const weeklyUsed = new Set<string>()
   const allSelectedNames = new Set<string>()
@@ -1293,9 +1309,7 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
     }
   })
 
-  if (needsConditioningIntegration) {
-    assignConditioningNotes(days, profile)
-  }
+  assignConditioningNotes(days, profile, policy)
 
   return { plan: days, constraint_trace: trace }
 }
@@ -1476,8 +1490,13 @@ export function generateMesocycle(
   const experience = profile.training_experience || 'novice'
   const expConfig = getExperienceConfig(experience)
   const pool = getConstrainedPool(profile, exclusions)
+  const policy = getGoalPolicy(goal)
 
-  const sequence = getPhaseSequence(goal, experience)
+  // Experience already trims power/strength for beginners/novices
+  // (getPhaseSequence); the goal policy trims further on top — e.g.
+  // conditioning never sees a strength or power block regardless of how
+  // experienced the trainee is.
+  const sequence = restrictPhaseSequence(getPhaseSequence(goal, experience), policy.allowedPhases)
   const weeks: MesocycleWeek[] = []
   let weekCounter = 0
 
@@ -1513,6 +1532,12 @@ export function generateMesocycle(
     // and the deload is a fraction of week 3. Reset every block since a new
     // block means a new baseline (and possibly a rotated variation).
     const blockBaselineKg: (number | null)[][] = blockDays.map(day => day.exercises.map(() => null))
+    // Week 3's ACTUAL resolved load — tracked separately from the baseline
+    // because a 'reps' or 'maintain' progressionEmphasis exercise never gets
+    // a forced baseline+increment number, so week 3's real weight can't be
+    // derived from the baseline formula. The deload always backs off from
+    // whatever week 3 actually ended up being, regardless of emphasis.
+    const blockWeek3Kg: (number | null)[][] = blockDays.map(day => day.exercises.map(() => null))
 
     // Rotation tier per (day, exercise) — fixed for the whole block; only an
     // accessory's specific variation moves within it (see fortnightOffset).
@@ -1538,16 +1563,25 @@ export function generateMesocycle(
           // downgrade). Main lifts and core/carry work stay on whatever the
           // block-level rotation above picked, for the whole block.
           const tier = rotationTiers[dayIdx][exIdx]
+          // Accessory rotation cadence is goal-tunable (Part 4) — 'maintain'
+          // policies rotate faster (variety over strict overload) than the
+          // hypertrophy-default 2-week fortnight. Main/core stay on whatever
+          // the block-level rotation above picked, for the whole block,
+          // regardless of goal — see GoalPolicy.mainRotationWeeks.
           const weeklyName = tier === 'accessory'
-            ? rotateVariation(ex.name, w <= 2 ? 0 : 1, pool, experience)
+            ? rotateVariation(ex.name, Math.floor((w - 1) / policy.accessoryRotationWeeks), pool, experience)
             : ex.name
 
           // Sets stay near-constant across the three loading weeks of a
           // block — load is the progression lever below, not set count. The
-          // deload is the one week that deliberately drops both.
+          // deload is the one week that deliberately drops both. The goal's
+          // set-volume multiplier scales the whole block up or down (e.g.
+          // fat_loss/conditioning run lighter than hypertrophy) before the
+          // phase and deload multipliers apply.
+          const goalAdjustedBaseSets = ex.sets * policy.setVolumeMultiplier
           const sets = isDeload
-            ? Math.max(2, Math.round(ex.sets * 0.5))
-            : Math.max(2, Math.round(ex.sets * phaseConfig.sets_multiplier))
+            ? Math.max(2, Math.round(goalAdjustedBaseSets * 0.5))
+            : Math.max(2, Math.round(goalAdjustedBaseSets * phaseConfig.sets_multiplier))
 
           const dbEntry = EXERCISE_DATABASE.find(
             e => e.name.toLowerCase() === weeklyName.toLowerCase()
@@ -1557,12 +1591,17 @@ export function generateMesocycle(
 
           // No externally loaded weight to ramp (true bodyweight movement, or
           // one prescribeLoad can't categorize) — progress these via reps
-          // instead: one extra rep-range notch per week within the block.
-          // The deload keeps the existing, larger "easier" notch either way.
-          const isBodyweightProgression = !!dbEntry && !isPrimer && !isExternallyLoaded(dbEntry)
+          // regardless of the goal's progressionEmphasis, since there's no
+          // weight for that setting to apply to. Loaded exercises follow the
+          // goal: 'reps' ramps the rep target the same way, 'load' ramps
+          // weight instead (see forceStartingWeightKg below), 'maintain'
+          // ramps neither.
+          const isBodyweight = !!dbEntry && !isPrimer && !isExternallyLoaded(dbEntry)
+          const rampReps = isBodyweight || policy.progressionEmphasis === 'reps'
+          const rampLoad = !isBodyweight && policy.progressionEmphasis === 'load'
           const repShift = isDeload
             ? phaseConfig.rep_shift + 2
-            : phaseConfig.rep_shift + (isBodyweightProgression ? w - 1 : 0)
+            : phaseConfig.rep_shift + (rampReps ? w - 1 : 0)
           const restShift = isDeload ? 0 : phaseConfig.rest_adjust_seconds
           const reps = shiftReps(ex.reps, repShift, expConfig.min_reps)
 
@@ -1578,22 +1617,29 @@ export function generateMesocycle(
 
             // Week 1 sets the baseline through the normal estimate pipeline
             // (bodyweight/known-weight/RPE/first-block/calibration all still
-            // apply there). Weeks 2-3 are that exact baseline plus one/two
-            // fixed increments — not a fresh, independently RPE-scaled
-            // estimate, which is what made load look flat despite sets
-            // climbing. The deload is 65-75% of week 3's number.
+            // apply there). When this goal ramps load, weeks 2-3 are that
+            // exact baseline plus one/two fixed increments — not a fresh,
+            // independently RPE-scaled estimate, which is what made load
+            // look flat despite sets climbing. When it doesn't (reps or
+            // maintain emphasis), weeks 2-3 fall through to the normal
+            // per-week estimate below instead of a forced number — RPE
+            // alone drives any movement in the weight. Either way, the
+            // deload is 65-75% of whatever week 3 actually resolved to.
             //
-            // For an accessory that rotates variation at the week-3 fortnight
-            // boundary, the baseline number still carries over from week 1's
-            // (different) variation — rotateVariation only offers same
-            // substitution-group/tier candidates, so the magnitude stays
-            // reasonable — but `increment` above is recomputed for whichever
-            // variation is actually being lifted this week.
+            // For an accessory that rotates variation mid-block, the
+            // baseline number still carries over from week 1's (different)
+            // variation — rotateVariation only offers same substitution-
+            // group/tier candidates, so the magnitude stays reasonable —
+            // but `increment` above is recomputed for whichever variation is
+            // actually being lifted this week.
             let forceStartingWeightKg: number | undefined
-            if (baselineKg != null) {
+            if (rampLoad && baselineKg != null) {
               if (w === 2) forceStartingWeightKg = baselineKg + increment
               else if (w === 3) forceStartingWeightKg = baselineKg + 2 * increment
-              else if (isDeload) forceStartingWeightKg = (baselineKg + 2 * increment) * 0.7
+            }
+            if (isDeload) {
+              const week3Kg = blockWeek3Kg[dayIdx][exIdx]
+              if (week3Kg != null) forceStartingWeightKg = week3Kg * 0.7
             }
 
             load = prescribeLoad(dbEntry, profile, {
@@ -1608,6 +1654,7 @@ export function generateMesocycle(
             })
 
             if (w === 1) blockBaselineKg[dayIdx][exIdx] = load.starting_weight_kg
+            if (w === 3) blockWeek3Kg[dayIdx][exIdx] = load.starting_weight_kg
           }
 
           return {
@@ -1640,7 +1687,12 @@ export function generateMesocycle(
         isCalibrationWeek,
         coach_note: isDeload
           ? 'Deload week — volume is deliberately cut so you arrive at the next block recovered. Resist the urge to push.'
-          : phaseConfig.coach_note,
+          // The goal's own framing shows once per block, alongside the
+          // phase's — repeating it every week would bury the phase-specific
+          // note under the same paragraph four times over.
+          : w === 1
+            ? `${phaseConfig.coach_note} ${policy.coachNote}`
+            : phaseConfig.coach_note,
         label: isDeload
           ? `Week ${weekCounter} — ${phaseConfig.label}: Deload`
           : `Week ${weekCounter} — ${phaseConfig.label} (wk ${w} of block ${blockIndex + 1})`,
