@@ -1479,3 +1479,25 @@ const MOVEMENT_FAMILIES: Record<string, string> = {
 export function getMovementFamily(entry: ExerciseEntry): string {
   return MOVEMENT_FAMILIES[entry.name] ?? entry.substitution_group
 }
+
+// ---------------------------------------------------------------------------
+// VOLUME ROLE — the set-count hierarchy every session must respect
+// ---------------------------------------------------------------------------
+// Deliberately keyed off mechanics_tier alone, NOT `isExternallyLoaded` —
+// bodyweight tier1 compounds (Pull-Ups) are still a main lift for volume
+// purposes even though they have no external load to ramp, and conflating
+// "main lift" with "has a barbell" is how Pull-Ups ended up topped up to
+// 7x9-13 alongside 2-set accessories. `null` for primers, which sit outside
+// the hierarchy entirely (fixed 2 sets, never scaled).
+
+export type VolumeRole = 'main' | 'accessory' | 'isolation'
+
+export function getVolumeRole(entry: ExerciseEntry): VolumeRole | null {
+  if (entry.mechanics_tier === 'primer') return null
+  if (entry.movement_pattern === 'core' || entry.movement_pattern === 'carry') return 'isolation'
+  switch (entry.mechanics_tier) {
+    case 'tier1_compound': return 'main'
+    case 'tier2_compound': return 'accessory'
+    default: return 'isolation'
+  }
+}

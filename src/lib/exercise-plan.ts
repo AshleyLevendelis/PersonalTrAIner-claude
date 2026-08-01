@@ -4,7 +4,7 @@ import type {
   FatigueCost, MesocycleMovementPattern, EquipmentAccess, TrainingStyle,
   ConstraintTrace, ConstraintTraceEntry, PlanResult, TrainingExperience,
 } from './types'
-import { EXERCISE_DATABASE, getMovementFamily, type ExerciseEntry, type MovementPattern, type AngleVector } from './exercise-db'
+import { EXERCISE_DATABASE, getMovementFamily, getVolumeRole, type ExerciseEntry, type MovementPattern, type AngleVector, type VolumeRole } from './exercise-db'
 import {
   getExperienceConfig, getSkillDemand, isSkillAppropriate, applyRepFloor,
   type ExperienceConfig,
@@ -16,7 +16,7 @@ import {
   shiftReps, adjustRest, type PhaseConfig,
 } from './periodization'
 import { getGoalPolicy, restrictPhaseSequence, resolveConditioningFrequency, RECOVERY_SET_MULTIPLIER, type GoalPolicy } from './goal-policies'
-import { getDurationBudgetSeconds, estimateDaySeconds } from './session-duration'
+import { getDurationBudgetSeconds, estimateDaySeconds, estimateSlotsSeconds } from './session-duration'
 
 // ---------------------------------------------------------------------------
 // Track definitions (unchanged — used for day-level focus selection)
@@ -477,12 +477,8 @@ function isSupersetEligible(entry: ExerciseEntry): boolean {
   return entry.mechanics_tier === 'tier3_isolation'
 }
 
-function estimateSessionDuration(exercises: { entry: ExerciseEntry; sets: number; restSeconds: number }[]): number {
-  let total = 0
-  for (const ex of exercises) {
-    total += ex.sets * (ex.entry.avg_duration_seconds + ex.restSeconds)
-  }
-  return total
+function estimateSessionDuration(exercises: { entry: ExerciseEntry; sets: number; reps: string; restSeconds: number }[]): number {
+  return estimateSlotsSeconds(exercises)
 }
 
 interface SupersetLabel {
@@ -538,7 +534,7 @@ function stageTimeCap(
   style: TrainingStyle,
   trace: ConstraintTrace,
 ): { entry: ExerciseEntry; sets: number; reps: string; rest: string; restSeconds: number }[] {
-  let estimated = estimateSessionDuration(dayExercises.map(e => ({ entry: e.entry, sets: e.sets, restSeconds: e.restSeconds })))
+  let estimated = estimateSessionDuration(dayExercises.map(e => ({ entry: e.entry, sets: e.sets, reps: e.reps, restSeconds: e.restSeconds })))
 
   if (estimated <= budgetSeconds) return dayExercises
 
@@ -564,7 +560,7 @@ function stageTimeCap(
     }
   }
 
-  estimated = estimateSessionDuration(dayExercises.map(e => ({ entry: e.entry, sets: e.sets, restSeconds: e.restSeconds })))
+  estimated = estimateSessionDuration(dayExercises.map(e => ({ entry: e.entry, sets: e.sets, reps: e.reps, restSeconds: e.restSeconds })))
   if (estimated <= budgetSeconds) return dayExercises
 
   // Phase 2: Reduce rest by 15s across the board
@@ -573,7 +569,7 @@ function stageTimeCap(
     dayExercises[i] = { ...dayExercises[i], restSeconds: newRest, rest: `${newRest}s` }
   }
 
-  estimated = estimateSessionDuration(dayExercises.map(e => ({ entry: e.entry, sets: e.sets, restSeconds: e.restSeconds })))
+  estimated = estimateSessionDuration(dayExercises.map(e => ({ entry: e.entry, sets: e.sets, reps: e.reps, restSeconds: e.restSeconds })))
   if (estimated <= budgetSeconds) return dayExercises
 
   // Phase 3: Drop sets from isolation exercises first
@@ -588,7 +584,7 @@ function stageTimeCap(
         })
       }
     }
-    estimated = estimateSessionDuration(dayExercises.map(e => ({ entry: e.entry, sets: e.sets, restSeconds: e.restSeconds })))
+    estimated = estimateSessionDuration(dayExercises.map(e => ({ entry: e.entry, sets: e.sets, reps: e.reps, restSeconds: e.restSeconds })))
   }
 
   // Phase 4: Only as last resort, remove lowest-tier exercises from the end
@@ -599,7 +595,7 @@ function stageTimeCap(
       stage: 'time_cap',
       reason: `dropped entirely — still over ${Math.round(budgetSeconds / 60)}min budget after superset conversion and set reduction`,
     })
-    estimated = estimateSessionDuration(dayExercises.map(e => ({ entry: e.entry, sets: e.sets, restSeconds: e.restSeconds })))
+    estimated = estimateSessionDuration(dayExercises.map(e => ({ entry: e.entry, sets: e.sets, reps: e.reps, restSeconds: e.restSeconds })))
   }
 
   // Phase 5: At the three-exercise floor and still over. Rather than stripping
@@ -607,24 +603,31 @@ function stageTimeCap(
   // a short session should mean fewer sets, not a session missing whole
   // movement patterns. Two working sets is the floor; below that there is no
   // meaningful stimulus.
+  // Main lifts are trimmed last, and only once every accessory/isolation
+  // slot is already at the 2-set floor — cutting the main lift's volume to
+  // hit a time budget is the wrong lever when an accessory still has sets
+  // to give up first.
   for (let pass = 0; pass < 4 && estimated > budgetSeconds; pass++) {
     let trimmed = false
-    // Trim the biggest time consumers first.
     const order = dayExercises
-      .map((e, i) => ({ i, cost: e.sets * (e.entry.avg_duration_seconds + e.restSeconds) }))
+      .map((e, i) => ({ i, cost: e.sets * (e.entry.avg_duration_seconds + e.restSeconds), isMain: e.entry.mechanics_tier === 'tier1_compound' }))
       .sort((a, b) => b.cost - a.cost)
 
-    for (const { i } of order) {
+    for (const priority of [false, true]) {
+      for (const { i, isMain } of order) {
+        if (isMain !== priority) continue
+        if (estimated <= budgetSeconds) break
+        if (dayExercises[i].sets <= 2) continue
+        dayExercises[i] = { ...dayExercises[i], sets: dayExercises[i].sets - 1 }
+        trimmed = true
+        trace.time_cap_adjusted.push({
+          exercise: dayExercises[i].entry.name,
+          stage: 'time_cap',
+          reason: `reduced to ${dayExercises[i].sets} sets — session budget is tight at ${Math.round(budgetSeconds / 60)}min`,
+        })
+        estimated = estimateSessionDuration(dayExercises.map(e => ({ entry: e.entry, sets: e.sets, reps: e.reps, restSeconds: e.restSeconds })))
+      }
       if (estimated <= budgetSeconds) break
-      if (dayExercises[i].sets <= 2) continue
-      dayExercises[i] = { ...dayExercises[i], sets: dayExercises[i].sets - 1 }
-      trimmed = true
-      trace.time_cap_adjusted.push({
-        exercise: dayExercises[i].entry.name,
-        stage: 'time_cap',
-        reason: `reduced to ${dayExercises[i].sets} sets — session budget is tight at ${Math.round(budgetSeconds / 60)}min`,
-      })
-      estimated = estimateSessionDuration(dayExercises.map(e => ({ entry: e.entry, sets: e.sets, restSeconds: e.restSeconds })))
     }
 
     if (!trimmed) break
@@ -704,12 +707,18 @@ function getSplitForDays(dayCount: number, goal: FitnessGoal, splitPref: Workout
 // Exercise selection for a given track from the filtered pool
 // ---------------------------------------------------------------------------
 
+// With the set-count hierarchy in place (main >= accessory >= isolation,
+// each individually capped — see enforceSetHierarchy), a longer session can
+// no longer be filled by stacking extra sets onto 2-3 accessories; it needs
+// more DISTINCT exercises instead. These counts were raised for 60-90/90+
+// specifically to close the gap that opened once accessory/isolation top-up
+// stopped being allowed to run unbounded.
 function getExerciseCountForDuration(duration: SessionDuration): { tier1: number; tier2: number; tier3: number } {
   switch (duration) {
     case '30-45': return { tier1: 1, tier2: 2, tier3: 1 }
     case '45-60': return { tier1: 1, tier2: 2, tier3: 2 }
-    case '60-90': return { tier1: 1, tier2: 3, tier3: 2 }
-    case '90+': return { tier1: 1, tier2: 4, tier3: 3 }
+    case '60-90': return { tier1: 1, tier2: 4, tier3: 3 }
+    case '90+': return { tier1: 1, tier2: 5, tier3: 4 }
     default: return { tier1: 1, tier2: 2, tier3: 2 }
   }
 }
@@ -1031,6 +1040,57 @@ function getViableTrack(
 
 function findEntry(name: string): ExerciseEntry | undefined {
   return EXERCISE_DATABASE.find(e => e.name.toLowerCase() === name.toLowerCase())
+}
+
+// ---------------------------------------------------------------------------
+// Set-count hierarchy (main >= accessory >= isolation)
+// ---------------------------------------------------------------------------
+// The LLM coach review's #1 convergent finding: main lifts landing at 2 sets
+// while accessories/isolation sat at 7. Root cause was two-fold — the
+// duration top-up (below) filled ONLY accessories with no ceiling relative to
+// the main lift, while phase/goal/recovery multipliers could independently
+// crush the main lift's own set count with nothing stopping it. These
+// functions are the hard floor/ceiling every non-deload set count must
+// respect, plus a same-day cross-check that an accessory can never end up
+// with more sets than that day's main lift.
+
+/** 90+ min sessions are the one case a main lift is allowed past 5 sets — "dedicated long sessions" in the review's own language. */
+function getRoleSetCeiling(role: VolumeRole, isLongSession: boolean): number {
+  switch (role) {
+    case 'main': return isLongSession ? 6 : 5
+    case 'accessory': return 4
+    case 'isolation': return 3
+  }
+}
+
+function getRoleSetFloor(role: VolumeRole): number {
+  return role === 'main' ? 3 : 2
+}
+
+function clampToVolumeRole(sets: number, role: VolumeRole | null, isLongSession: boolean): number {
+  if (!role) return sets
+  return Math.min(getRoleSetCeiling(role, isLongSession), Math.max(getRoleSetFloor(role), sets))
+}
+
+/**
+ * Same-day cross-check: an accessory or isolation exercise's sets must never
+ * exceed that day's main lift(s). The per-exercise role clamp above bounds
+ * each exercise independently (main floor 3, accessory ceiling 4) — which on
+ * its own still allows a 3-set main next to a 4-set accessory. Days with no
+ * main lift at all (pure carry/core sessions) are left alone; there is
+ * nothing to hold the hierarchy against.
+ */
+function enforceSetHierarchy(exercises: Exercise[]): Exercise[] {
+  const roles = exercises.map(ex => {
+    const entry = findEntry(ex.name)
+    return entry ? getVolumeRole(entry) : null
+  })
+  const mainSets = exercises.filter((_, i) => roles[i] === 'main').map(ex => ex.sets)
+  if (mainSets.length === 0) return exercises
+  const mainCeiling = Math.max(...mainSets)
+  return exercises.map((ex, i) =>
+    roles[i] && roles[i] !== 'main' && ex.sets > mainCeiling ? { ...ex, sets: mainCeiling } : ex
+  )
 }
 
 type BalancePattern = 'push' | 'pull' | 'squat' | 'hinge' | null
@@ -1548,7 +1608,7 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
     return {
       day: day.day,
       focus: trackFocus,
-      exercises: paired,
+      exercises: enforceSetHierarchy(paired),
       warmup,
     }
   })
@@ -1749,11 +1809,15 @@ function simulateSetTopUp(
   targetSeconds: number,
   extraCap: number,
   ceilingSets?: number[],
+  reps?: string[],
 ): number[] {
-  const estimate = (sets: number[]) => sets.reduce((total, s, i) => {
-    const repDuration = entries[i]?.avg_duration_seconds ?? 35
-    return total + s * (repDuration + restSeconds[i])
-  }, 0)
+  // Reuses the same honest per-set formula the scorer/UI read (see
+  // session-duration.ts) so top-up fills a day to the same target the final
+  // rendered duration will actually be scored against, not a cheaper
+  // estimate that quietly under-fills.
+  const estimate = (sets: number[]) => estimateSlotsSeconds(
+    sets.map((s, i) => ({ entry: entries[i], sets: s, reps: reps?.[i] ?? '10', restSeconds: restSeconds[i] }))
+  )
 
   const extra = baseSets.map(() => 0)
   if (eligible.length === 0) return extra
@@ -1817,6 +1881,12 @@ function computeDurationTopUp(
   // built at 75% the volume of the other. See RECOVERY_SET_MULTIPLIER.
   const recoveryRatio = recoverySetMultiplier / RECOVERY_SET_MULTIPLIER.high
 
+  // A main lift only ever gets extra top-up sets in a 90+ min "dedicated
+  // long session" — everywhere else, spare time goes to accessories and
+  // isolation work exclusively, never by inflating the main lift past its
+  // own set-hierarchy ceiling (see enforceSetHierarchy).
+  const isLongSession = (profile.session_duration_preference || '45-60') === '90+'
+
   return blockDays.map((day, dayIdx) => {
     const entries = day.exercises.map(ex => EXERCISE_DATABASE.find(e => e.name.toLowerCase() === ex.name.toLowerCase()))
     const restSeconds = day.exercises.map(ex => {
@@ -1824,9 +1894,16 @@ function computeDurationTopUp(
       const base = match ? parseInt(match[1], 10) : 60
       return Math.max(20, base + phaseConfig.rest_adjust_seconds)
     })
+    const roles = entries.map(e => e ? getVolumeRole(e) : null)
+    const roleCeilings = day.exercises.map((_, i) => roles[i] ? getRoleSetCeiling(roles[i]!, isLongSession) : EXTRA_SETS_CAP + 99)
+    const reps = day.exercises.map(ex => ex.reps)
     const eligible = day.exercises
       .map((_, i) => i)
-      .filter(i => entries[i] && entries[i]!.mechanics_tier !== 'primer' && rotationTiers[dayIdx][i] !== 'main')
+      .filter(i => entries[i] && entries[i]!.mechanics_tier !== 'primer' && (roles[i] !== 'main' || isLongSession))
+      // Accessories/isolation are ordered before mains so round-robin growth
+      // fills them first — mains only start climbing once every accessory
+      // slot has already hit its own (lower) ceiling.
+      .sort((a, b) => (roles[a] === 'main' ? 1 : 0) - (roles[b] === 'main' ? 1 : 0))
 
     const baseSets = day.exercises.map(ex =>
       Math.max(2, Math.round(ex.sets * policy.setVolumeMultiplier * recoverySetMultiplier * phaseConfig.sets_multiplier))
@@ -1834,21 +1911,23 @@ function computeDurationTopUp(
 
     if (recoveryRatio >= 1) {
       // High recovery (or nothing eligible): no recovery-driven deficit to
-      // guard against restoring, so top-up behaves exactly as before this
-      // fix — bounded only by EXTRA_SETS_CAP.
-      return simulateSetTopUp(baseSets, eligible, entries, restSeconds, targetSeconds, EXTRA_SETS_CAP)
+      // guard against restoring, so top-up is bounded only by the role
+      // ceiling and EXTRA_SETS_CAP.
+      return simulateSetTopUp(baseSets, eligible, entries, restSeconds, targetSeconds, EXTRA_SETS_CAP, roleCeilings, reps)
     }
 
     // The reference this profile's ceiling scales off of: what a
     // high-recovery peer of this SAME profile would end up with after its
-    // own (uncapped) top-up.
+    // own (uncapped, but still role-bounded) top-up.
     const baseSetsAtHigh = day.exercises.map(ex =>
       Math.max(2, Math.round(ex.sets * policy.setVolumeMultiplier * RECOVERY_SET_MULTIPLIER.high * phaseConfig.sets_multiplier))
     )
-    const extraAtHigh = simulateSetTopUp(baseSetsAtHigh, eligible, entries, restSeconds, targetSeconds, EXTRA_SETS_CAP)
-    const ceilingSets = baseSetsAtHigh.map((s, i) => Math.max(2, Math.round((s + extraAtHigh[i]) * recoveryRatio)))
+    const extraAtHigh = simulateSetTopUp(baseSetsAtHigh, eligible, entries, restSeconds, targetSeconds, EXTRA_SETS_CAP, roleCeilings, reps)
+    const ceilingSets = baseSetsAtHigh.map((s, i) =>
+      Math.min(roleCeilings[i], Math.max(2, Math.round((s + extraAtHigh[i]) * recoveryRatio)))
+    )
 
-    return simulateSetTopUp(baseSets, eligible, entries, restSeconds, targetSeconds, EXTRA_SETS_CAP, ceilingSets)
+    return simulateSetTopUp(baseSets, eligible, entries, restSeconds, targetSeconds, EXTRA_SETS_CAP, ceilingSets, reps)
   })
 }
 
@@ -1883,7 +1962,13 @@ function applyDurationFiller(
     const underBySeconds = totalBudgetSeconds - actualSeconds
     if (underBySeconds <= FILLER_TRIGGER_SECONDS) continue
 
-    const fillerMinutes = Math.min(20, Math.round(underBySeconds / 60))
+    // Capped higher than the old 20min ceiling now that the honest duration
+    // model (session-duration.ts) charges real per-exercise setup overhead
+    // and rep-scaled work time — a thin equipment/experience pool (e.g.
+    // minimalist + beginner) genuinely cannot fill a 90+ min session with
+    // quality distinct lifting, and the honest move is a longer mobility/
+    // conditioning close-out, not pretending the gap doesn't exist.
+    const fillerMinutes = Math.min(30, Math.round(underBySeconds / 60))
 
     if (mobilityOnly) {
       day.conditioning_note = `Optional mobility flow (~${fillerMinutes} min) — today's session ran under your time budget; the extra time goes to mobility, not more lifting volume.`
@@ -2071,12 +2156,24 @@ export function generateMesocycle(
           // the reduction instead (see repShift below).
           const floorDeloadSets = Math.max(2, Math.round(goalAdjustedBaseSets * 0.25))
           const deloadNeedsRepCut = deloadAtFloor && floorDeloadSets === standardDeloadSets
+          // Main >= accessory >= isolation, every loading week. Deload is
+          // exempt — its whole point is going below these ranges — but every
+          // non-deload set count is clamped to its role's floor/ceiling
+          // (see getRoleSetFloor/Ceiling) regardless of what the goal/phase/
+          // recovery multiplier chain above computed, so a beginner's
+          // anatomical-adaptation week can no longer crush a main lift to 2
+          // sets while duration top-up inflates an accessory to 7.
+          const volumeRole = dbEntry ? getVolumeRole(dbEntry) : null
           const sets = isDeload
             ? (deloadAtFloor ? floorDeloadSets : standardDeloadSets)
             // + the once-per-block duration top-up (see computeDurationTopUp)
             // — a fixed per-slot amount, so this still holds sets flat
             // across weeks 1-3 despite being duration-driven.
-            : Math.max(2, Math.round(goalAdjustedBaseSets * phaseConfig.sets_multiplier)) + blockExtraSets[dayIdx][exIdx]
+            : clampToVolumeRole(
+                Math.max(2, Math.round(goalAdjustedBaseSets * phaseConfig.sets_multiplier)) + blockExtraSets[dayIdx][exIdx],
+                volumeRole,
+                (profile.session_duration_preference || '45-60') === '90+',
+              )
 
           // No externally loaded weight to ramp (true bodyweight movement, or
           // one prescribeLoad can't categorize) — progress these via reps
@@ -2182,7 +2279,12 @@ export function generateMesocycle(
           }
         })
 
-        return { ...day, exercises }
+        // Per-exercise role clamping bounds each slot independently but
+        // can't see its day-mates — a 3-set (floor) main next to a 4-set
+        // (ceiling) accessory both pass their own clamp yet still invert the
+        // hierarchy. This closes that gap. Skipped on deload weeks, where
+        // the main lift itself is deliberately at its lowest point.
+        return { ...day, exercises: isDeload ? exercises : enforceSetHierarchy(exercises) }
       })
 
       // Deload weeks are SUPPOSED to run short (half volume, by design) — a
