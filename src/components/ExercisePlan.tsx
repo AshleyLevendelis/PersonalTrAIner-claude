@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Separator } from '@/components/ui/separator'
 import { Input } from '@/components/ui/input'
-import { ArrowRightLeft, Ban, Zap, ShieldAlert, Heart, Check, Dumbbell, Plus, Activity, Clock, Flame, ChevronLeft, ChevronRight, Calendar, CheckCircle2, Trophy } from 'lucide-react'
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible'
+import { ArrowRightLeft, Ban, Zap, ShieldAlert, Heart, Check, Dumbbell, Plus, Activity, Clock, Flame, ChevronLeft, ChevronRight, ChevronDown, Calendar, CheckCircle2, Trophy, Sparkles, Thermometer } from 'lucide-react'
 import React, { useState, useEffect, useCallback } from 'react'
 import { getSmartReplacements, getExerciseEntry } from '@/lib/exercise-db'
 import { upsertWorkoutLog, getLogsForDate, insertCardioLog, getCardioLogsForDate } from '@/lib/daily-tracking'
@@ -46,14 +47,43 @@ function getRepsLabel(reps: string): string {
   return 'Reps'
 }
 
-function RestDayCard({ day }: { day: string }) {
+/** Week-level periodization context (phase, focus, coach note) — shown at the top of every day so it's visible regardless of what that day's session looks like. */
+function PhaseBanner({ mesoWeek }: { mesoWeek?: MesocycleWeek }) {
+  if (!mesoWeek || (!mesoWeek.phase_label && !mesoWeek.phase_focus && !mesoWeek.coach_note)) return null
+  return (
+    <div className="flex items-start gap-2 rounded-md border border-primary/15 bg-primary/5 px-3 py-2">
+      <Sparkles className="size-3.5 text-primary mt-0.5 shrink-0" />
+      <div className="min-w-0 space-y-0.5">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {mesoWeek.phase_label && (
+            <span className="text-xs font-semibold text-primary">{mesoWeek.phase_label}</span>
+          )}
+          {mesoWeek.is_deload && (
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-amber-300 text-amber-700 dark:border-amber-700 dark:text-amber-400">
+              Deload
+            </Badge>
+          )}
+        </div>
+        {mesoWeek.phase_focus && (
+          <p className="text-[11px] text-muted-foreground">{mesoWeek.phase_focus}</p>
+        )}
+        {mesoWeek.coach_note && (
+          <p className="text-[11px] text-muted-foreground/80 italic">{mesoWeek.coach_note}</p>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function RestDayCard({ day, mesoWeek }: { day: string; mesoWeek?: MesocycleWeek }) {
   return (
     <Card className="border-dashed bg-muted/20">
-      <CardHeader className="pb-3">
+      <CardHeader className="pb-3 space-y-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base text-muted-foreground">{day}</CardTitle>
           <Badge variant="outline" className="text-muted-foreground">Rest & Recovery</Badge>
         </div>
+        <PhaseBanner mesoWeek={mesoWeek} />
       </CardHeader>
       <CardContent>
         <div className="flex items-center gap-3 py-4">
@@ -72,11 +102,11 @@ function RestDayCard({ day }: { day: string }) {
   )
 }
 
-function ActiveRecoveryCard({ workout }: { workout: WorkoutDay }) {
+function ActiveRecoveryCard({ workout, mesoWeek }: { workout: WorkoutDay; mesoWeek?: MesocycleWeek }) {
   const cardio = workout.recommendedCardio
   return (
     <Card className="border-orange-200/60 dark:border-orange-900/30 bg-gradient-to-br from-orange-50/30 to-background dark:from-orange-950/10 dark:to-background">
-      <CardHeader className="pb-3">
+      <CardHeader className="pb-3 space-y-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base">{workout.day}</CardTitle>
           <Badge className="bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300 border-0">
@@ -84,6 +114,7 @@ function ActiveRecoveryCard({ workout }: { workout: WorkoutDay }) {
             {workout.focus}
           </Badge>
         </div>
+        <PhaseBanner mesoWeek={mesoWeek} />
       </CardHeader>
       <CardContent>
         {cardio && (
@@ -123,6 +154,69 @@ function ActiveRecoveryCard({ workout }: { workout: WorkoutDay }) {
   )
 }
 
+function WarmupSection({ warmup, open, onToggle }: { warmup: WorkoutDay['warmup']; open: boolean; onToggle: () => void }) {
+  if (!warmup) return null
+  const totalMinutes = Math.round(warmup.total_seconds / 60)
+
+  return (
+    <Collapsible open={open} onOpenChange={onToggle} className="border-b border-border/30">
+      <CollapsibleTrigger className="w-full flex items-center justify-between px-4 py-2 text-left hover:bg-accent/30 transition-colors">
+        <span className="flex items-center gap-2 text-xs font-medium text-foreground">
+          <Thermometer className="size-3.5 text-primary" />
+          Warm-Up
+          <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">~{totalMinutes} min</Badge>
+        </span>
+        <ChevronDown className={`size-3.5 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
+      </CollapsibleTrigger>
+      <CollapsibleContent className="px-4 pb-3 space-y-3">
+        {warmup.general.length > 0 && (
+          <div className="space-y-1">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">General</p>
+            {warmup.general.map((item, i) => (
+              <div key={i} className="text-xs">
+                <span className="font-medium">{item.name}</span>
+                <span className="text-muted-foreground"> — {item.prescription}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        {warmup.mobility.length > 0 && (
+          <div className="space-y-1">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Mobility</p>
+            {warmup.mobility.map((item, i) => (
+              <div key={i} className="text-xs">
+                <span className="font-medium">{item.name}</span>
+                <span className="text-muted-foreground"> — {item.prescription}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        {warmup.ramp_up && (
+          <div className="space-y-1">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+              Ramp-Up — {warmup.ramp_up.exercise}
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {warmup.ramp_up.sets.map(set => (
+                <span
+                  key={set.set_number}
+                  className="inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] text-muted-foreground"
+                  title={set.note}
+                >
+                  Set {set.set_number}: {set.load_percent}% × {set.reps}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+        {warmup.coach_note && (
+          <p className="text-[11px] text-muted-foreground/80 italic">{warmup.coach_note}</p>
+        )}
+      </CollapsibleContent>
+    </Collapsible>
+  )
+}
+
 interface SetInputState {
   weight: string
   reps: string
@@ -144,6 +238,7 @@ function SetLogger({
   restTime,
   weekNumber,
   tier,
+  suggestedLoadKg,
   onSetCompleted,
   onOpenPlateCalc,
 }: {
@@ -156,6 +251,7 @@ function SetLogger({
   restTime?: string
   weekNumber?: number
   tier?: string
+  suggestedLoadKg?: number | null
   onSetCompleted?: (exerciseName: string, setNumber: number, weight: number, reps: number, rest: string, sets: number, prescribedReps: string, tier?: string) => void
   onOpenPlateCalc?: (weight: number) => void
 }) {
@@ -328,7 +424,7 @@ function SetLogger({
               type="number"
               min="0"
               step="0.5"
-              placeholder={isBW ? 'BW' : (ghost?.weight || '0')}
+              placeholder={isBW ? 'BW' : (ghost?.weight || (suggestedLoadKg != null ? String(suggestedLoadKg) : '0'))}
               value={isBW ? '' : (inputs[i]?.weight || '')}
               onChange={e => updateInput(i, 'weight', e.target.value)}
               className={`h-7 text-sm ${isSaved ? 'border-green-300 dark:border-green-700' : ''} ${isBW ? 'bg-muted text-muted-foreground' : ''}`}
@@ -416,6 +512,7 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profileId, planCreat
   }, [devOverrideWeek, planCreatedAt])
   const [swapDialog, setSwapDialog] = useState<{ dayIndex: number; exIndex: number; exerciseName: string } | null>(null)
   const [expandedExercises, setExpandedExercises] = useState<Set<string>>(new Set())
+  const [expandedWarmups, setExpandedWarmups] = useState<Set<string>>(new Set())
   const [todayLogs, setTodayLogs] = useState<ExerciseSetLog[]>([])
   const [customExercises, setCustomExercises] = useState<Record<string, string[]>>({})
   const [addingCustom, setAddingCustom] = useState<string | null>(null)
@@ -438,9 +535,10 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profileId, planCreat
   const activePlan = hasMesocycle
     ? mesocycle.find(w => w.week_number === currentWeek)?.days || plan
     : plan
-  const weekLabel = hasMesocycle
-    ? mesocycle.find(w => w.week_number === currentWeek)?.label || ''
-    : ''
+  const currentMesoWeekObj = hasMesocycle
+    ? mesocycle.find(w => w.week_number === currentWeek)
+    : undefined
+  const weekLabel = currentMesoWeekObj?.label || ''
 
   const today = new Date().toISOString().split('T')[0]
   const todayName = devOverrideDay ?? new Date().toLocaleDateString('en-US', { weekday: 'long' })
@@ -493,6 +591,15 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profileId, planCreat
 
   const toggleExercise = (key: string) => {
     setExpandedExercises(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
+
+  const toggleWarmup = (key: string) => {
+    setExpandedWarmups(prev => {
       const next = new Set(prev)
       if (next.has(key)) next.delete(key)
       else next.add(key)
@@ -733,11 +840,11 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profileId, planCreat
         const workout = activePlan.find(d => d.day === dayName)
 
         if (!workout) {
-          return <RestDayCard key={dayName} day={dayName} />
+          return <RestDayCard key={dayName} day={dayName} mesoWeek={currentMesoWeekObj} />
         }
 
         if (workout.exercises.length === 0) {
-          return <ActiveRecoveryCard key={dayName} workout={workout} />
+          return <ActiveRecoveryCard key={dayName} workout={workout} mesoWeek={currentMesoWeekObj} />
         }
 
         const dayIndex = activePlan.indexOf(workout)
@@ -755,6 +862,9 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profileId, planCreat
                 )}
               </div>
               <Badge variant="secondary">Primary Focus: {workout.focus}</Badge>
+            </div>
+            <div className="mt-2">
+              <PhaseBanner mesoWeek={currentMesoWeekObj} />
             </div>
             {isToday && !sessionLogged && (
               <div className="mt-2">
@@ -800,6 +910,11 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profileId, planCreat
               </p>
             </div>
           )}
+          <WarmupSection
+            warmup={workout.warmup}
+            open={expandedWarmups.has(dayName)}
+            onToggle={() => toggleWarmup(dayName)}
+          />
           <CardContent className="p-0">
             <Table>
               <TableHeader>
@@ -841,6 +956,20 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profileId, planCreat
                             </Badge>
                           )}
                         </div>
+                        {(ex.intensity || ex.suggested_load) && (
+                          <div className="flex items-center gap-2 mt-0.5">
+                            {ex.intensity && (
+                              <span className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground">
+                                <Flame className="size-2.5" />{ex.intensity}
+                              </span>
+                            )}
+                            {ex.suggested_load && (
+                              <span className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground">
+                                <Dumbbell className="size-2.5" />{ex.suggested_load}
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </TableCell>
                       <TableCell className="text-center">{ex.sets}</TableCell>
                       <TableCell className="text-center">
@@ -905,6 +1034,7 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profileId, planCreat
                             restTime={ex.rest}
                             weekNumber={currentWeek}
                             tier={ex.tier}
+                            suggestedLoadKg={ex.suggested_load_kg}
                             onSetCompleted={handleSetComplete}
                             onOpenPlateCalc={(w) => { setPlateCalcWeight(w); setPlateCalcOpen(true) }}
                           />
