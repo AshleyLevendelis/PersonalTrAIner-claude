@@ -119,8 +119,8 @@ export function DevTestPage({ profile, exercisePlan, mealPlan, onBack }: DevTest
     setAuditProgress({ done: 0, total: 0 })
 
     // Run in a timeout to allow UI to update
-    setTimeout(() => {
-      const report = runFullConstraintAudit((done, total) => {
+    setTimeout(async () => {
+      const report = await runFullConstraintAudit((done, total) => {
         setAuditProgress({ done, total })
       })
       setAuditReport(report)

@@ -1,4 +1,5 @@
-import { TrainingStyle } from './types'
+import { TrainingStyle, type TrainingExperience } from './types'
+import { isRegressionFor } from './periodization'
 
 export type MovementPattern =
   | 'horizontal_push'
@@ -1366,8 +1367,24 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
 ]
 
+/**
+ * Candidates for swapping OUT `exerciseName`. `pool` must be a constraint-
+ * filtered pool (getConstrainedPool(profile, exclusions) from
+ * exercise-plan.ts) — equipment/injury/style/skill already applied — NOT
+ * the raw EXERCISE_DATABASE. Passing the raw database here was the original
+ * bug: it could suggest a barbell exercise to a bodyweight-only user, a
+ * movement loading an injured joint, or something above the trainee's skill
+ * level, because none of the 5-stage pipeline ran on the candidate list.
+ *
+ * `experience` applies the same "never a downgrade" regression guard
+ * rotateVariation() uses at generation time (periodization.ts) — an
+ * advanced lifter swapping out Barbell Squats should never be offered
+ * Goblet Squats as a same-tier alternative.
+ */
 export function getSmartReplacements(
   exerciseName: string,
+  pool: ExerciseEntry[],
+  experience: TrainingExperience,
   exclusions: string[] = []
 ): { exercise: ExerciseEntry; note: string }[] {
   const current = EXERCISE_DATABASE.find(
@@ -1378,10 +1395,11 @@ export function getSmartReplacements(
   const excludedSet = new Set(exclusions.map(e => e.toLowerCase()))
   excludedSet.add(exerciseName.toLowerCase())
 
-  const candidates = EXERCISE_DATABASE.filter(e => {
+  const candidates = pool.filter(e => {
     if (excludedSet.has(e.name.toLowerCase())) return false
     if (e.movement_pattern !== current.movement_pattern) return false
     if (e.name === current.name) return false
+    if (isRegressionFor(e.name, experience) && !isRegressionFor(current.name, experience)) return false
     return true
   })
 

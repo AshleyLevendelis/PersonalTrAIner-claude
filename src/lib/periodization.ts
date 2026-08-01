@@ -202,7 +202,7 @@ const REGRESSION_VARIATIONS = new Set([
   'Farmer Squat Hold (Isometric Carry)',
 ])
 
-function isRegressionFor(name: string, experience: TrainingExperience): boolean {
+export function isRegressionFor(name: string, experience: TrainingExperience): boolean {
   if (experience === 'beginner' || experience === 'novice') return false
   return REGRESSION_VARIATIONS.has(name)
 }

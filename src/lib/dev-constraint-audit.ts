@@ -1,4 +1,4 @@
-import { generateExercisePlan, generateMesocycle } from './exercise-plan'
+import { generateExercisePlan, generateMesocycle, getConstrainedPool } from './exercise-plan'
 import { EXERCISE_DATABASE } from './exercise-db'
 import type {
   UserProfile, EquipmentAccess, TrainingStyle, SessionDuration,
@@ -6,6 +6,7 @@ import type {
 } from './types'
 import { getSkillDemand, isSkillAppropriate } from './experience-config'
 import { categorize, CATEGORY_CAPS_KG } from './load-prescription'
+import { getReplacementCandidates, swapExerciseInMesocycle, banExerciseFromMesocycle, containsExerciseName } from './mesocycle-edit'
 
 // All combinations to test
 const ALL_EQUIPMENT: EquipmentAccess[] = ['full_gym', 'home_gym', 'minimalist', 'bodyweight']
@@ -58,6 +59,7 @@ export interface AuditFailure {
   check:
     | 'equipment' | 'injury' | 'duration' | 'style_pattern' | 'skill' | 'empty_session' | 'load_cap'
     | 'superset_pairing' | 'load_progression' | 'set_progression' | 'goal_structure' | 'recovery_volume'
+    | 'swap_constraint' | 'swap_load' | 'ban_purge'
   combination: string
   details: string
   exercise?: string
@@ -371,7 +373,11 @@ function runSingleAudit(
 
 function baseMesocycleProfile(overrides: Partial<UserProfile> = {}): UserProfile {
   return {
-    id: 'audit-meso-test',
+    // Deliberately no `id` — recomputeLoad()'s logged-history lookup
+    // (progression-engine.ts -> supabase.ts) only runs when profile.id is
+    // set, and this audit has no live database to query against. Omitting
+    // it keeps these checks exercising the constraint-pool/estimate path,
+    // which is what's actually being verified here.
     age: 30,
     gender: 'male',
     height_cm: 178,
@@ -426,7 +432,7 @@ function sumWeeklySets(days: WorkoutDay[]): number {
   return days.reduce((sum, day) => sum + day.exercises.reduce((s, ex) => s + ex.sets, 0), 0)
 }
 
-function runMesocycleBehaviorChecks(): AuditTestCase[] {
+async function runMesocycleBehaviorChecks(): Promise<AuditTestCase[]> {
   const cases: AuditTestCase[] = []
 
   // CHECK (b) + (c): within block 1, main-lift load is non-decreasing across
@@ -540,12 +546,87 @@ function runMesocycleBehaviorChecks(): AuditTestCase[] {
     })
   }
 
+  // CHECK (Part 7): swapped-in exercises pass every constraint stage, their
+  // load is independently derived (never the outgoing exercise's kg), and a
+  // banned exercise is gone from EVERY week of the persisted mesocycle.
+  {
+    const comboLabel = '[mesocycle swap/ban] constraint compliance + load independence + ban purge'
+    const failures: AuditFailure[] = []
+    const profile = baseMesocycleProfile({ injuries: ['shoulders'] })
+    const mesocycle = generateMesocycle(profile)
+    const week1 = mesocycle.find(w => w.week_number === 1)!
+    const dayWithMain = week1.days.find(d => d.exercises.some(e => e.tier === 'tier_1_primary'))
+
+    if (dayWithMain) {
+      const dayName = dayWithMain.day
+      const exIndex = dayWithMain.exercises.findIndex(e => e.tier === 'tier_1_primary')
+      const outgoing = dayWithMain.exercises[exIndex]
+
+      const candidates = getReplacementCandidates(outgoing.name, profile, [])
+      const poolNames = new Set(getConstrainedPool(profile, []).map(e => e.name))
+      for (const c of candidates) {
+        if (!poolNames.has(c.exercise.name)) {
+          failures.push({
+            check: 'swap_constraint', combination: comboLabel,
+            details: `candidate "${c.exercise.name}" is not in the constraint-filtered pool (equipment/injury/style/skill)`,
+            exercise: c.exercise.name,
+          })
+        }
+      }
+
+      if (candidates.length > 0) {
+        const replacement = candidates[0].exercise
+        const swapped = await swapExerciseInMesocycle({
+          mesocycle, profile, currentWeekNumber: 1, dayName, exIndex, newExercise: replacement, scope: 'today',
+        })
+        const swappedEx = swapped.find(w => w.week_number === 1)!.days.find(d => d.day === dayName)!.exercises[exIndex]
+        if (swappedEx.name !== replacement.name) {
+          failures.push({ check: 'swap_constraint', combination: comboLabel, details: 'swap did not change the exercise name' })
+        }
+        // Independence is only provable, not merely "different," when the
+        // two exercises use different loading modes/standards — same
+        // category (e.g. two barbell squats) can legitimately land on the
+        // same kg by coincidence. Barbell -> non-barbell candidates are
+        // common in this constraint pool and make a carry-over bug obvious.
+        if (swappedEx.suggested_load_kg === outgoing.suggested_load_kg) {
+          failures.push({
+            check: 'swap_load', combination: comboLabel,
+            details: `swapped-in load (${swappedEx.suggested_load_kg}kg) exactly equals the outgoing exercise's load — looks carried over rather than independently derived`,
+            exercise: swappedEx.name,
+          })
+        }
+      }
+    }
+
+    // Ban purge: pick any exercise present in the mesocycle and confirm it's
+    // gone from every week afterward.
+    const anyExercise = mesocycle.flatMap(w => w.days.flatMap(d => d.exercises))[0]
+    if (anyExercise) {
+      const afterBan = await banExerciseFromMesocycle({
+        mesocycle, profile, bannedName: anyExercise.name, exclusions: [anyExercise.name],
+      })
+      if (containsExerciseName(afterBan, anyExercise.name)) {
+        failures.push({
+          check: 'ban_purge', combination: comboLabel,
+          details: `"${anyExercise.name}" still appears somewhere in the mesocycle after being banned`,
+          exercise: anyExercise.name,
+        })
+      }
+    }
+
+    cases.push({
+      equipment: 'full_gym', injuries: ['shoulders'], duration: '60-90', style: 'hybrid', experience: 'intermediate',
+      passed: failures.length === 0, failures,
+      planDays: 0, totalExercises: 0, estimatedDurationSec: 0,
+    })
+  }
+
   return cases
 }
 
-export function runFullConstraintAudit(
+export async function runFullConstraintAudit(
   onProgress?: (done: number, total: number) => void
-): AuditReport {
+): Promise<AuditReport> {
   const startTime = performance.now()
 
   // Generate all injury combinations (empty + each single injury + a couple combos)
@@ -581,7 +662,7 @@ export function runFullConstraintAudit(
   // Sampled mesocycle-behavior checks (b/c/d/e) — see runMesocycleBehaviorChecks
   // for why these run against a handful of targeted profiles instead of
   // being crossed into the grid above.
-  const mesocycleCases = runMesocycleBehaviorChecks()
+  const mesocycleCases = await runMesocycleBehaviorChecks()
   results.push(...mesocycleCases)
 
   const runTimeMs = performance.now() - startTime

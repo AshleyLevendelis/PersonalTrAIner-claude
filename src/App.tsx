@@ -18,7 +18,8 @@ import { computeBMR, computeStaticTDEE, getStaticDailyMacros } from '@/lib/macro
 import { generateExercisePlan, generateMesocycle } from '@/lib/exercise-plan'
 import { generateWeeklyMealPlan, swapMealSlot, getWeekStartDate } from '@/lib/meal-plan'
 import { supabase } from '@/lib/supabase'
-import { saveMesocycle, restoreMesocycle } from '@/lib/mesocycle-persistence'
+import { saveMesocycle, saveMesocycleWeek, restoreMesocycle } from '@/lib/mesocycle-persistence'
+import { swapExerciseInMesocycle, banExerciseFromMesocycle, type SwapScope } from '@/lib/mesocycle-edit'
 import type { UserProfile, MacroTargets, WorkoutDay, MealPlanDay, PlanAction, WeeklyMealPlan, DayName, SchedulePatchItem, MesocycleWeek } from '@/lib/types'
 import type { ExerciseEntry } from '@/lib/exercise-db'
 
@@ -736,54 +737,74 @@ function App() {
   }
 
   const handleBanExercise = async (exerciseName: string) => {
+    if (!profile) return
     const updated = [...exerciseExclusions, exerciseName]
     setExerciseExclusions(updated)
 
-    setExercisePlan(prev =>
-      prev.map(day => ({
-        ...day,
-        exercises: day.exercises.map(ex => {
-          if (ex.name.toLowerCase() === exerciseName.toLowerCase()) {
-            return { ...ex, name: ex.substitution || ex.name, substitution: '' }
-          }
-          return ex
-        }),
-      }))
-    )
-
-    if (profile?.id) {
+    if (profile.id) {
       await supabase
         .from('fitness_profiles')
         .update({ exercise_exclusions: updated })
         .eq('id', profile.id)
     }
+
+    // Single source of truth is the mesocycle — exercisePlan (the flat,
+    // non-periodized base plan) is display-only fallback for when no
+    // mesocycle exists yet and is never mutated by swap/ban directly.
+    if (mesocycle.length === 0) return
+    const updatedMesocycle = await banExerciseFromMesocycle({
+      mesocycle,
+      profile,
+      bannedName: exerciseName,
+      exclusions: updated,
+    })
+    setMesocycle(updatedMesocycle)
+    if (profile.id) {
+      try {
+        await saveMesocycle(profile.id, updatedMesocycle)
+      } catch (err) {
+        console.error('Persisting ban failed:', err)
+      }
+    }
   }
 
-  const handleSwapExercise = async (dayIndex: number, exIndex: number, newExercise: ExerciseEntry) => {
-    const day = exercisePlan[dayIndex]
-    const oldEx = day.exercises[exIndex]
+  const handleSwapExercise = async (
+    weekNumber: number,
+    dayName: string,
+    exIndex: number,
+    newExercise: ExerciseEntry,
+    scope: SwapScope
+  ) => {
+    if (!profile || mesocycle.length === 0) return
 
-    const updatedPlan = exercisePlan.map((d, di) => {
-      if (di !== dayIndex) return d
-      return {
-        ...d,
-        exercises: d.exercises.map((ex, ei) => {
-          if (ei !== exIndex) return ex
-          return {
-            ...ex,
-            name: newExercise.name,
-            substitution: oldEx.name,
-          }
-        }),
-      }
+    const updatedMesocycle = await swapExerciseInMesocycle({
+      mesocycle,
+      profile,
+      currentWeekNumber: weekNumber,
+      dayName,
+      exIndex,
+      newExercise,
+      scope,
     })
-    setExercisePlan(updatedPlan)
+    setMesocycle(updatedMesocycle)
 
-    if (oldEx.id) {
-      await supabase.from('exercise_plans').update({
-        name: newExercise.name,
-        substitution: oldEx.name,
-      }).eq('id', oldEx.id)
+    if (!profile.id) return
+    try {
+      if (scope === 'today') {
+        const week = updatedMesocycle.find(w => w.week_number === weekNumber)
+        if (week) await saveMesocycleWeek(profile.id, week)
+      } else {
+        // 'permanent' touches every remaining week of the current block —
+        // still a handful of rows, cheap enough to upsert individually
+        // rather than resaving the whole mesocycle.
+        const touchedBlock = updatedMesocycle.find(w => w.week_number === weekNumber)?.block_number
+        const touchedWeeks = updatedMesocycle.filter(
+          w => w.block_number === touchedBlock && w.week_number >= weekNumber
+        )
+        await Promise.all(touchedWeeks.map(w => saveMesocycleWeek(profile.id!, w)))
+      }
+    } catch (err) {
+      console.error('Persisting swap failed:', err)
     }
   }
 
@@ -945,6 +966,7 @@ function App() {
               plan={exercisePlan}
               mesocycle={mesocycle}
               exclusions={exerciseExclusions}
+              profile={profile ?? undefined}
               profileId={profile?.id}
               planCreatedAt={profile?.created_at}
               logsVersion={logsVersion}

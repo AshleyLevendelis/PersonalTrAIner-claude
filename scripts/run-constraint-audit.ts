@@ -143,7 +143,7 @@ async function main() {
   console.log('')
 
   let lastProgress = 0
-  const report = runFullConstraintAudit((done, total) => {
+  const report = await runFullConstraintAudit((done, total) => {
     const percent = Math.round((done / total) * 100)
     if (percent % 10 === 0 && percent !== lastProgress) {
       console.log(`  Progress: ${done}/${total} (${percent}%)`)

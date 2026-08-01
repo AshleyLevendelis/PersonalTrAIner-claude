@@ -8,7 +8,8 @@ import { Input } from '@/components/ui/input'
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible'
 import { ArrowRightLeft, Ban, Zap, ShieldAlert, Heart, Check, Dumbbell, Plus, Activity, Clock, Flame, ChevronLeft, ChevronRight, ChevronDown, Calendar, CheckCircle2, Trophy, Sparkles, Thermometer } from 'lucide-react'
 import React, { useState, useEffect, useCallback } from 'react'
-import { getSmartReplacements, getExerciseEntry } from '@/lib/exercise-db'
+import { getExerciseEntry } from '@/lib/exercise-db'
+import { getReplacementCandidates, type SwapScope } from '@/lib/mesocycle-edit'
 import { upsertWorkoutLog, getLogsForDate, insertCardioLog, getCardioLogsForDate } from '@/lib/daily-tracking'
 import { checkDoubleProgression, getDoubleProgressionRecommendation } from '@/lib/progression-engine'
 import { logSetOffline, logEntireSessionOffline, saveSessionCache, loadSessionCache, initOfflineSync } from '@/lib/offline-sync'
@@ -18,20 +19,21 @@ import { RestTimer } from '@/components/RestTimer'
 import { PlateCalculator } from '@/components/PlateCalculator'
 import { OfflineStatusIndicator } from '@/components/OfflineStatusIndicator'
 import type { ExerciseEntry } from '@/lib/exercise-db'
-import type { WorkoutDay, ExerciseSetLog, CardioLog, MesocycleWeek } from '@/lib/types'
+import type { WorkoutDay, ExerciseSetLog, CardioLog, MesocycleWeek, UserProfile } from '@/lib/types'
 
 interface ExercisePlanProps {
   plan: WorkoutDay[]
   mesocycle?: MesocycleWeek[]
   exclusions: string[]
+  profile?: UserProfile
   profileId?: string
   planCreatedAt?: string
   logsVersion?: number
   devOverrideWeek?: number | null
   devOverrideDay?: string | null
   devBypassLocks?: boolean
-  onSwapExercise: (dayIndex: number, exIndex: number, newExercise: ExerciseEntry) => void
-  onBanExercise: (exerciseName: string) => void
+  onSwapExercise: (weekNumber: number, dayName: string, exIndex: number, newExercise: ExerciseEntry, scope: SwapScope) => void | Promise<void>
+  onBanExercise: (exerciseName: string) => void | Promise<void>
 }
 
 const DAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
@@ -535,7 +537,7 @@ const CONDITIONING_PRESETS = [
   { label: '15m Zone 2', icon: '🫀', activity: 'Zone 2 Cardio', duration: 15, rpe: 5 },
 ] as const
 
-export function ExercisePlan({ plan, mesocycle, exclusions, profileId, planCreatedAt, logsVersion, devOverrideWeek, devOverrideDay, devBypassLocks, onSwapExercise, onBanExercise }: ExercisePlanProps) {
+export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, planCreatedAt, logsVersion, devOverrideWeek, devOverrideDay, devBypassLocks, onSwapExercise, onBanExercise }: ExercisePlanProps) {
   // generateMesocycle produces 4 weeks PER BLOCK, not 4 weeks total — a
   // hypertrophy sequence alone is 4 blocks (16 weeks). Falling back to 4 only
   // applies before the mesocycle has loaded.
@@ -545,7 +547,10 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profileId, planCreat
     if (devOverrideWeek != null) setCurrentWeek(devOverrideWeek)
     else setCurrentWeek(getActiveMesocycleWeek(planCreatedAt, undefined, totalWeeks))
   }, [devOverrideWeek, planCreatedAt, totalWeeks])
-  const [swapDialog, setSwapDialog] = useState<{ dayIndex: number; exIndex: number; exerciseName: string } | null>(null)
+  const [swapDialog, setSwapDialog] = useState<{ dayName: string; exIndex: number; exerciseName: string } | null>(null)
+  const [pendingSwap, setPendingSwap] = useState<ExerciseEntry | null>(null)
+  const [swapBusy, setSwapBusy] = useState(false)
+  const [banBusy, setBanBusy] = useState<string | null>(null)
   const [expandedExercises, setExpandedExercises] = useState<Set<string>>(new Set())
   const [expandedWarmups, setExpandedWarmups] = useState<Set<string>>(new Set())
   const [todayLogs, setTodayLogs] = useState<ExerciseSetLog[]>([])
@@ -682,8 +687,8 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profileId, planCreat
     }
   }, [logsVersion])
 
-  const replacements = swapDialog
-    ? getSmartReplacements(swapDialog.exerciseName, exclusions)
+  const replacements = swapDialog && profile
+    ? getReplacementCandidates(swapDialog.exerciseName, profile, exclusions)
     : []
 
   const currentEntry = swapDialog ? getExerciseEntry(swapDialog.exerciseName) : undefined
@@ -970,7 +975,6 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profileId, planCreat
           return <ActiveRecoveryCard key={dayName} workout={workout} mesoWeek={currentMesoWeekObj} />
         }
 
-        const dayIndex = activePlan.indexOf(workout)
         const isToday = devBypassLocks || dayName === todayName
 
         return (
@@ -1149,7 +1153,7 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profileId, planCreat
                             variant="ghost"
                             size="icon"
                             className="size-7"
-                            onClick={() => setSwapDialog({ dayIndex, exIndex, exerciseName: ex.name })}
+                            onClick={() => { setPendingSwap(null); setSwapDialog({ dayName, exIndex, exerciseName: ex.name }) }}
                             aria-label="Swap exercise"
                           >
                             <ArrowRightLeft className="size-3.5" />
@@ -1158,10 +1162,22 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profileId, planCreat
                             variant="ghost"
                             size="icon"
                             className="size-7 text-destructive hover:text-destructive"
-                            onClick={() => onBanExercise(ex.name)}
+                            disabled={banBusy === ex.name}
+                            onClick={async () => {
+                              setBanBusy(ex.name)
+                              try {
+                                await onBanExercise(ex.name)
+                              } finally {
+                                setBanBusy(null)
+                              }
+                            }}
                             aria-label="Ban exercise"
                           >
-                            <Ban className="size-3.5" />
+                            {banBusy === ex.name ? (
+                              <div className="size-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                              <Ban className="size-3.5" />
+                            )}
                           </Button>
                         </div>
                       </TableCell>
@@ -1483,19 +1499,23 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profileId, planCreat
       </React.Fragment>
       )})}
 
-      <Dialog open={!!swapDialog} onOpenChange={(open) => { if (!open) setSwapDialog(null) }}>
+      <Dialog open={!!swapDialog} onOpenChange={(open) => { if (!open && !swapBusy) { setSwapDialog(null); setPendingSwap(null) } }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <ArrowRightLeft className="size-4" />
-              Smart Exercise Swap
+              {pendingSwap ? 'Apply this swap' : 'Smart Exercise Swap'}
             </DialogTitle>
             <DialogDescription>
-              Biomechanically similar replacements for <span className="font-semibold text-foreground">{swapDialog?.exerciseName}</span>
+              {pendingSwap ? (
+                <>Swap <span className="font-semibold text-foreground">{swapDialog?.exerciseName}</span> for <span className="font-semibold text-foreground">{pendingSwap.name}</span></>
+              ) : (
+                <>Constraint-checked replacements for <span className="font-semibold text-foreground">{swapDialog?.exerciseName}</span></>
+              )}
             </DialogDescription>
           </DialogHeader>
 
-          {currentEntry && (
+          {!pendingSwap && currentEntry && (
             <div className="flex flex-wrap gap-1.5 pb-2">
               <Badge variant="outline" className="text-xs">{currentEntry.movement_pattern.replace(/_/g, ' ')}</Badge>
               <Badge variant="outline" className="text-xs">{currentEntry.mechanics_tier.replace(/_/g, ' ')}</Badge>
@@ -1506,47 +1526,100 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profileId, planCreat
             </div>
           )}
 
-          <Separator />
+          {!pendingSwap && <Separator />}
 
-          {replacements.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-4 text-center">
-              No alternative exercises found in the database for this movement pattern.
-            </p>
-          ) : (
-            <div className="space-y-2 max-h-80 overflow-y-auto">
-              {replacements.map(({ exercise, note }) => (
-                <button
-                  key={exercise.name}
-                  className="w-full text-left rounded-md border p-3 hover:bg-accent hover:border-primary/30 transition-colors"
-                  onClick={() => {
-                    if (swapDialog) {
-                      onSwapExercise(swapDialog.dayIndex, swapDialog.exIndex, exercise)
-                      setSwapDialog(null)
-                    }
-                  }}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="space-y-1">
-                      <p className="font-medium text-sm">{exercise.name}</p>
-                      <div className="flex flex-wrap gap-1">
-                        <Badge variant="secondary" className="text-xs">{exercise.mechanics_tier.replace(/_/g, ' ')}</Badge>
-                        {exercise.joint_stress === 'low' && currentEntry?.joint_stress !== 'low' && (
-                          <Badge className="text-xs bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
-                            lower stress
-                          </Badge>
+          {!pendingSwap && (
+            replacements.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4 text-center">
+                No alternative exercises fit your equipment, injuries, style, and skill level for this movement pattern.
+              </p>
+            ) : (
+              <div className="space-y-2 max-h-80 overflow-y-auto">
+                {replacements.map(({ exercise, note }) => (
+                  <button
+                    key={exercise.name}
+                    className="w-full text-left rounded-md border p-3 hover:bg-accent hover:border-primary/30 transition-colors"
+                    onClick={() => setPendingSwap(exercise)}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="space-y-1">
+                        <p className="font-medium text-sm">{exercise.name}</p>
+                        <div className="flex flex-wrap gap-1">
+                          <Badge variant="secondary" className="text-xs">{exercise.mechanics_tier.replace(/_/g, ' ')}</Badge>
+                          {exercise.joint_stress === 'low' && currentEntry?.joint_stress !== 'low' && (
+                            <Badge className="text-xs bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                              lower stress
+                            </Badge>
+                          )}
+                        </div>
+                        {note && (
+                          <p className="text-xs text-muted-foreground mt-1 flex items-start gap-1">
+                            <Zap className="size-3 mt-0.5 shrink-0 text-primary" />
+                            <span>{note}</span>
+                          </p>
                         )}
                       </div>
-                      {note && (
-                        <p className="text-xs text-muted-foreground mt-1 flex items-start gap-1">
-                          <Zap className="size-3 mt-0.5 shrink-0 text-primary" />
-                          <span>{note}</span>
-                        </p>
-                      )}
+                      <ArrowRightLeft className="size-4 shrink-0 text-muted-foreground mt-1" />
                     </div>
-                    <ArrowRightLeft className="size-4 shrink-0 text-muted-foreground mt-1" />
-                  </div>
-                </button>
-              ))}
+                  </button>
+                ))}
+              </div>
+            )
+          )}
+
+          {pendingSwap && (
+            <div className="space-y-2 py-1">
+              <button
+                className="w-full text-left rounded-md border p-3 hover:bg-accent hover:border-primary/30 transition-colors disabled:opacity-50"
+                disabled={swapBusy}
+                onClick={async () => {
+                  if (!swapDialog) return
+                  setSwapBusy(true)
+                  try {
+                    await onSwapExercise(currentWeek, swapDialog.dayName, swapDialog.exIndex, pendingSwap, 'today')
+                  } finally {
+                    setSwapBusy(false)
+                    setSwapDialog(null)
+                    setPendingSwap(null)
+                  }
+                }}
+              >
+                <p className="font-medium text-sm">Just for today</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Only this session changes. Next time this day comes around it reverts, and your original lift's progression keeps going from its last logged session.
+                </p>
+              </button>
+              <button
+                className="w-full text-left rounded-md border p-3 hover:bg-accent hover:border-primary/30 transition-colors disabled:opacity-50"
+                disabled={swapBusy}
+                onClick={async () => {
+                  if (!swapDialog) return
+                  setSwapBusy(true)
+                  try {
+                    await onSwapExercise(currentWeek, swapDialog.dayName, swapDialog.exIndex, pendingSwap, 'permanent')
+                  } finally {
+                    setSwapBusy(false)
+                    setSwapDialog(null)
+                    setPendingSwap(null)
+                  }
+                }}
+              >
+                <p className="font-medium text-sm">Replace in my plan</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Swaps it for the rest of this training block.
+                  {currentEntry?.mechanics_tier === 'tier1_compound'
+                    ? ' Main lift — this resets to a conservative starting weight so you can find it fresh, rather than inheriting a number that belonged to a different movement.'
+                    : ' Loads recompute for the new movement right away.'}
+                </p>
+              </button>
+              <Button variant="ghost" size="sm" disabled={swapBusy} onClick={() => setPendingSwap(null)}>
+                {swapBusy ? (
+                  <span className="inline-flex items-center gap-2">
+                    <span className="size-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                    Applying...
+                  </span>
+                ) : 'Back'}
+              </Button>
             </div>
           )}
         </DialogContent>

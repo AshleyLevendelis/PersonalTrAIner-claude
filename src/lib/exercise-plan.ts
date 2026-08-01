@@ -1395,7 +1395,7 @@ function addRestSeconds(rest: string, seconds: number): string {
   return rest
 }
 
-function mapMovementPattern(pattern: MovementPattern): MesocycleMovementPattern {
+export function mapMovementPattern(pattern: MovementPattern): MesocycleMovementPattern {
   const mapping: Record<string, MesocycleMovementPattern> = {
     horizontal_push: 'push',
     vertical_push: 'push',
@@ -1417,7 +1417,7 @@ function mapMovementPattern(pattern: MovementPattern): MesocycleMovementPattern 
   return mapping[pattern] || 'isolation'
 }
 
-function mapTier(mechanicsTier: string): ExerciseTier {
+export function mapTier(mechanicsTier: string): ExerciseTier {
   const mapping: Record<string, ExerciseTier> = {
     tier1_compound: 'tier_1_primary',
     tier2_compound: 'tier_2_secondary',
@@ -1427,7 +1427,7 @@ function mapTier(mechanicsTier: string): ExerciseTier {
   return mapping[mechanicsTier] || 'tier_3_isolation'
 }
 
-function deriveFatigueCost(entry: ExerciseEntry): FatigueCost {
+export function deriveFatigueCost(entry: ExerciseEntry): FatigueCost {
   if (entry.mechanics_tier === 'tier1_compound') return 'high'
   if (entry.mechanics_tier === 'tier2_compound') return 'moderate'
   return 'low'
