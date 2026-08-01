@@ -39,13 +39,26 @@ interface ExercisePlanProps {
 
 const DAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
-function isTimeBased(reps: string): boolean {
+// Prefers the exercise's own `prescription_type` (see exercise-db.ts) —
+// authoritative and set at generation time — over sniffing the reps STRING,
+// which is what used to misreport a distance-based carry logged in meters
+// as "Time" just because the string happened to contain a stray 'm'/'s'.
+// The string heuristic remains only as a fallback for data generated before
+// prescription_type existed.
+function isTimeBased(reps: string, prescriptionType?: string): boolean {
+  if (prescriptionType) return prescriptionType !== 'reps'
   return reps.includes('s') || reps.includes('min') || reps.includes('m')
 }
 
-function getRepsLabel(reps: string): string {
+function getRepsLabel(reps: string, prescriptionType?: string): string {
+  switch (prescriptionType) {
+    case 'time': return 'Hold'
+    case 'distance_load': return 'Distance'
+    case 'intervals': return 'Work'
+    case 'reps': return 'Reps'
+  }
   if (reps.includes('min')) return 'Duration'
-  if (reps.endsWith('s') || reps.includes('-') && reps.endsWith('s')) return 'Time'
+  if (reps.endsWith('s')) return 'Time'
   if (reps.endsWith('m')) return 'Distance'
   return 'Reps'
 }
@@ -292,6 +305,7 @@ function SetLogger({
   todayLogs,
   onLogSaved,
   prescribedReps,
+  prescriptionType,
   restTime,
   weekNumber,
   tier,
@@ -306,6 +320,8 @@ function SetLogger({
   todayLogs: ExerciseSetLog[]
   onLogSaved: (log: ExerciseSetLog) => void
   prescribedReps?: string
+  /** Drives the logging column's label — a distance carry logs meters, a hold logs seconds, an interval logs work seconds, never a generic "Reps". See PrescriptionType in exercise-db.ts. */
+  prescriptionType?: string
   restTime?: string
   weekNumber?: number
   tier?: string
@@ -315,6 +331,9 @@ function SetLogger({
   onSetCompleted?: (exerciseName: string, setNumber: number, weight: number, reps: number, rest: string, sets: number, prescribedReps: string, tier?: string) => void
   onOpenPlateCalc?: (weight: number) => void
 }) {
+  const logColumnLabel = prescriptionType
+    ? getRepsLabel(prescribedReps ?? '', prescriptionType)
+    : 'Reps'
   const today = new Date().toISOString().split('T')[0]
   const existingLogs = todayLogs.filter(l => l.exercise_name === exerciseName)
 
@@ -470,7 +489,7 @@ function SetLogger({
         <span className="w-7"></span>
         <span className="w-7"></span>
         <span className="w-8"></span>
-        <span>Reps</span>
+        <span>{logColumnLabel}</span>
         <span className="w-8"></span>
       </div>
       {Array.from({ length: displaySets }, (_, i) => {
@@ -1165,9 +1184,9 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
                       <TableCell className="text-center">{ex.sets}</TableCell>
                       <TableCell className="text-center">
                         <div className="flex flex-col items-center">
-                          {isTimeBased(ex.reps) && (
+                          {isTimeBased(ex.reps, ex.prescription_type) && (
                             <span className="text-[10px] uppercase tracking-wider text-muted-foreground leading-none mb-0.5">
-                              {getRepsLabel(ex.reps)}
+                              {getRepsLabel(ex.reps, ex.prescription_type)}
                             </span>
                           )}
                           <span>{ex.reps}</span>
@@ -1234,6 +1253,7 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
                             todayLogs={todayLogs}
                             onLogSaved={handleLogSaved}
                             prescribedReps={ex.reps}
+                            prescriptionType={ex.prescription_type}
                             restTime={ex.rest}
                             weekNumber={currentWeek}
                             tier={ex.tier}

@@ -919,46 +919,53 @@ function assignSetsRepsFromConfig(
   config: StyleConfig,
   experience: ExperienceConfig,
 ): { sets: number; reps: string; rest: string; restSeconds: number } {
-  // Primers and time/distance-based work are not scaled — a 30-second plank is
-  // a 30-second plank regardless of how long you have been training, and
-  // trimming warm-up sets for a beginner would be exactly backwards.
+  // Primers are not scaled — a 5-rep activation drill is a 5-rep activation
+  // drill regardless of how long you have been training.
   if (entry.mechanics_tier === 'primer') {
     return { sets: 2, reps: '5', rest: '30s', restSeconds: 30 }
-  }
-
-  const isCore = ['core', 'carry'].includes(entry.movement_pattern)
-  if (isCore && entry.movement_pattern === 'core') {
-    return { sets: 3, reps: '30-45s', rest: '45s', restSeconds: 45 }
-  }
-  if (entry.movement_pattern === 'carry') {
-    return { sets: 3, reps: '40m', rest: '60s', restSeconds: 60 }
   }
 
   // A beginner never drops below 2 working sets — one set is not a stimulus.
   const scaleSets = (base: number) =>
     Math.max(2, Math.round(base * experience.sets_multiplier))
 
-  switch (entry.mechanics_tier) {
-    case 'tier1_compound':
-      return {
-        sets: scaleSets(config.setRange.tier1),
-        reps: applyRepFloor(config.repRange.tier1, experience.min_reps),
-        rest: `${config.restSeconds.tier1}s`,
-        restSeconds: config.restSeconds.tier1,
-      }
-    case 'tier2_compound':
-      return {
-        sets: scaleSets(config.setRange.tier2),
-        reps: applyRepFloor(config.repRange.tier2, experience.min_reps),
-        rest: `${config.restSeconds.tier2}s`,
-        restSeconds: config.restSeconds.tier2,
-      }
+  // Dispatched on prescription_type, not movement_pattern — two exercises
+  // can share a pattern ('carry') while needing entirely different units
+  // (Farmer Squat Hold is a hold, Farmer's Walk is a measured distance).
+  // See PrescriptionType's doc comment in exercise-db.ts.
+  switch (entry.prescription_type) {
+    case 'time':
+      return { sets: 3, reps: '30-45s', rest: '45s', restSeconds: 45 }
+    case 'distance_load':
+      return { sets: 3, reps: '40m', rest: '60s', restSeconds: 60 }
+    case 'intervals':
+      // Rounds of work:rest, never a rep count — a jump-rope or battle-rope
+      // set is not "15-18 reps."
+      return { sets: scaleSets(6), reps: '30s', rest: '30s', restSeconds: 30 }
+    case 'reps':
     default:
-      return {
-        sets: scaleSets(config.setRange.tier3),
-        reps: applyRepFloor(config.repRange.tier3, experience.min_reps),
-        rest: `${config.restSeconds.tier3}s`,
-        restSeconds: config.restSeconds.tier3,
+      switch (entry.mechanics_tier) {
+        case 'tier1_compound':
+          return {
+            sets: scaleSets(config.setRange.tier1),
+            reps: applyRepFloor(config.repRange.tier1, experience.min_reps),
+            rest: `${config.restSeconds.tier1}s`,
+            restSeconds: config.restSeconds.tier1,
+          }
+        case 'tier2_compound':
+          return {
+            sets: scaleSets(config.setRange.tier2),
+            reps: applyRepFloor(config.repRange.tier2, experience.min_reps),
+            rest: `${config.restSeconds.tier2}s`,
+            restSeconds: config.restSeconds.tier2,
+          }
+        default:
+          return {
+            sets: scaleSets(config.setRange.tier3),
+            reps: applyRepFloor(config.repRange.tier3, experience.min_reps),
+            rest: `${config.restSeconds.tier3}s`,
+            restSeconds: config.restSeconds.tier3,
+          }
       }
   }
 }
@@ -1129,15 +1136,27 @@ function rebuildExerciseForSwap(
   profile: UserProfile,
   pool: ExerciseEntry[],
   allSelectedNames: Set<string>,
+  styleConfig: StyleConfig,
 ): Exercise {
   const isPrimer = newEntry.mechanics_tier === 'primer'
   const intensity = isPrimer ? oldExercise.intensity : experience.target_rpe
   const load = prescribeLoad(newEntry, profile, { targetRpeLabel: intensity, isFirstBlock: true, sets: oldExercise.sets })
+  // The weekly-structure swap can pull its replacement from a slot whose
+  // OLD exercise had an entirely different prescription_type (the weakest-
+  // accessory-slot search for missing pattern coverage picks any
+  // tier3_isolation exercise, including a core/carry hold) — reusing
+  // oldExercise.reps unchanged is how "Dumbbell Rows: 3x30-45s" happened.
+  // Reps are always re-derived from the NEW exercise; only sets/rest are
+  // carried over, since those genuinely share the same base value across
+  // every STYLE_CONFIGS style (see the doc comment above).
+  const reps = isPrimer ? oldExercise.reps : assignSetsRepsFromConfig(newEntry, styleConfig, experience).reps
   return {
     ...oldExercise,
     name: newEntry.name,
+    reps,
     substitution: getSubstitution(newEntry, pool, allSelectedNames),
     intensity,
+    prescription_type: newEntry.prescription_type,
     load_guidance: isPrimer ? oldExercise.load_guidance : `${experience.load_guidance} ${load.basis}`,
     suggested_load: isPrimer ? 'Light' : load.display,
     suggested_load_kg: isPrimer ? null : load.starting_weight_kg,
@@ -1154,6 +1173,7 @@ function balanceWeeklyStructure(
   experience: ExperienceConfig,
   profile: UserProfile,
   trace: ConstraintTrace,
+  styleConfig: StyleConfig,
 ): void {
   const dayFamilies = (dayIdx: number): Set<string> =>
     new Set(
@@ -1186,7 +1206,7 @@ function balanceWeeklyStructure(
     allSelectedNames.delete(oldName)
     allSelectedNames.add(replacement.name)
     days[dayIdx].exercises[exIdx] = rebuildExerciseForSwap(
-      days[dayIdx].exercises[exIdx], replacement, experience, profile, pool, allSelectedNames,
+      days[dayIdx].exercises[exIdx], replacement, experience, profile, pool, allSelectedNames, styleConfig,
     )
   }
 
@@ -1298,6 +1318,60 @@ function balanceWeeklyStructure(
 
     swap(target.dayIdx, target.exIdx, replacement, `push:pull exercise-count ratio ${ratio.toFixed(2)}`)
   }
+}
+
+// ---------------------------------------------------------------------------
+// Final day-budget enforcement
+// ---------------------------------------------------------------------------
+// stageTimeCap (STAGE 5) fits each day to budget at SELECTION time — but two
+// passes run after it and can both push a day back over: balanceWeeklyStructure
+// swaps a slot's exercise for weekly pattern/push-pull coverage (same sets,
+// but a different exercise's own work-time), and assignConditioningNotes can
+// append a real post-session cardio block on top (a "Conditioning & Core" day
+// gets both a full slate of accessories AND a 20-40min dedicated cardio
+// note). This is the final honest-budget backstop, run last, that actually
+// measures the day exactly as scored (estimateDaySeconds, unit-formula-
+// identical) and trims accessory/isolation sets — main lifts last, same
+// hierarchy as stageTimeCap and enforceSetHierarchy — until it fits.
+function enforceDayDurationBudget(day: WorkoutDay, budgetSeconds: number): WorkoutDay {
+  if (day.exercises.length === 0) return day
+  let exercises = day.exercises
+  let guard = 0
+  while (estimateDaySeconds({ ...day, exercises }) > budgetSeconds && guard < 30) {
+    guard++
+    const trimmable = exercises
+      .map((ex, i) => ({ i, sets: ex.sets, entry: findEntry(ex.name) }))
+      .filter(t => t.sets > 2 && t.entry && t.entry.mechanics_tier !== 'primer')
+    if (trimmable.length === 0) break
+    const nonMain = trimmable.filter(t => t.entry!.mechanics_tier !== 'tier1_compound')
+    const candidates = nonMain.length > 0 ? nonMain : trimmable
+    candidates.sort((a, b) => b.sets - a.sets)
+    const target = candidates[0].i
+    exercises = exercises.map((ex, i) => (i === target ? { ...ex, sets: ex.sets - 1 } : ex))
+  }
+  let trimmedDay: WorkoutDay = { ...day, exercises }
+
+  // Every exercise is already at its 2-set floor and the day is still over
+  // budget — the remaining overage is almost always a fixed-duration
+  // post-session conditioning block (a dedicated "Conditioning & Core"
+  // track day's cardio finisher can run 20-40min on its own). That's the
+  // one remaining elastic cost: shorten it rather than leaving the session
+  // over the trainee's stated time.
+  const overBy = estimateDaySeconds(trimmedDay) - budgetSeconds
+  if (overBy > 0 && trimmedDay.recommendedCardio?.timing === 'post_session') {
+    const shrunkMinutes = Math.max(10, trimmedDay.recommendedCardio.duration - Math.ceil(overBy / 60))
+    if (shrunkMinutes < trimmedDay.recommendedCardio.duration) {
+      trimmedDay = {
+        ...trimmedDay,
+        recommendedCardio: { ...trimmedDay.recommendedCardio, duration: shrunkMinutes },
+        conditioning_note: trimmedDay.conditioning_note?.replace(
+          /\(?~?\d+\s*min/, `(~${shrunkMinutes} min`
+        ) ?? trimmedDay.conditioning_note,
+      }
+    }
+  }
+
+  return trimmedDay
 }
 
 // ---------------------------------------------------------------------------
@@ -1576,6 +1650,7 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
         rest: slot.rest,
         substitution: getSubstitution(slot.entry, pool, allSelectedNames),
         intensity,
+        prescription_type: slot.entry.prescription_type,
         load_guidance: isPrimer
           ? 'Stay light and controlled. This is preparation, not a working set.'
           : `${experience.load_guidance} ${load.basis}`,
@@ -1613,10 +1688,12 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
     }
   })
 
-  balanceWeeklyStructure(days, pool, weeklyUsed, allSelectedNames, experience, profile, trace)
+  balanceWeeklyStructure(days, pool, weeklyUsed, allSelectedNames, experience, profile, trace, styleConfig)
   assignConditioningNotes(days, profile, policy)
 
-  return { plan: days, constraint_trace: trace }
+  const budgetedDays = days.map(d => enforceDayDurationBudget(d, totalBudgetSeconds))
+
+  return { plan: budgetedDays, constraint_trace: trace }
 }
 
 // ---------------------------------------------------------------------------
@@ -2004,6 +2081,7 @@ export function generateMesocycle(
   const goal = (profile.fitness_goal || 'hypertrophy') as FitnessGoal
   const experience = profile.training_experience || 'novice'
   const expConfig = getExperienceConfig(experience)
+  const styleConfig = STYLE_CONFIGS[profile.training_style || 'hybrid']
   const pool = getConstrainedPool(profile, exclusions)
   const policy = getGoalPolicy(goal)
   const recoverySetMultiplier = RECOVERY_SET_MULTIPLIER[profile.recovery_capacity || 'moderate']
@@ -2045,7 +2123,17 @@ export function generateMesocycle(
       const exercises = day.exercises.map(ex => {
         const rotated = rotateVariation(ex.name, blockIndex, pool, experience, usedNamesThisDay)
         usedNamesThisDay.add(rotated)
-        return { ...ex, name: rotated }
+        if (rotated === ex.name) return { ...ex, name: rotated }
+        // A rotation can land on an exercise with a different prescription
+        // TYPE, not just a different name — same substitution_group/tier is
+        // no guarantee (Farmer Squat Hold, a time-based hold, shares the
+        // 'carry' group/tier with Farmer's Walk, a distance-based walk).
+        // Re-derive reps from the NEW exercise's own prescription_type
+        // rather than carrying over the old exercise's format, which is
+        // exactly how an isometric hold ended up prescribed in meters.
+        const newEntry = findEntry(rotated)
+        const reps = newEntry ? assignSetsRepsFromConfig(newEntry, styleConfig, expConfig).reps : ex.reps
+        return { ...ex, name: rotated, reps }
       })
       return { ...day, exercises }
     })
@@ -2124,6 +2212,14 @@ export function generateMesocycle(
           )
           const isPrimer = dbEntry?.mechanics_tier === 'primer'
           const category = dbEntry ? categorize(dbEntry) : null
+          // Same re-derivation as the block-level rotation above — a weekly
+          // accessory sub-rotation can also land on a different prescription
+          // TYPE (same substitution_group/tier is no guarantee of matching
+          // units), so the base reps text is recomputed from the new
+          // exercise rather than inherited from the old one.
+          const baseReps = weeklyName !== ex.name && dbEntry && !isPrimer
+            ? assignSetsRepsFromConfig(dbEntry, styleConfig, expConfig).reps
+            : ex.reps
 
           // A deload normally backs off by dropping the WEIGHT (70% of week
           // 3). When week 3 was already resolving near the equipment floor
@@ -2196,7 +2292,7 @@ export function generateMesocycle(
                 : phaseConfig.rep_shift + 2)
             : phaseConfig.rep_shift + (rampReps ? w - 1 : 0)
           const restShift = isDeload ? 0 : phaseConfig.rest_adjust_seconds
-          const reps = shiftReps(ex.reps, repShift, expConfig.min_reps)
+          const reps = shiftReps(baseReps, repShift, expConfig.min_reps)
 
           // Primers stay submaximal and un-scaled for the same reason as the
           // base plan — a warm-up movement should never carry a working-set
@@ -2276,6 +2372,7 @@ export function generateMesocycle(
             movement_pattern: dbEntry ? mapMovementPattern(dbEntry.movement_pattern) : undefined,
             tier: dbEntry ? mapTier(dbEntry.mechanics_tier) : undefined,
             fatigue_cost: dbEntry ? deriveFatigueCost(dbEntry) : undefined,
+            prescription_type: dbEntry?.prescription_type ?? ex.prescription_type,
           }
         })
 

@@ -102,6 +102,8 @@ export interface Exercise {
   rest: string
   substitution: string
   superset_label?: string
+  /** How `reps` should be read/rendered — 'reps' (a count), 'time' (a hold duration), 'distance_load' (a measured walk with an explicit kg load), 'intervals' (rounds of work:rest). See PrescriptionType in exercise-db.ts. */
+  prescription_type?: import('./exercise-db').PrescriptionType
   movement_pattern?: MesocycleMovementPattern
   tier?: ExerciseTier
   fatigue_cost?: FatigueCost

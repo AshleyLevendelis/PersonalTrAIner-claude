@@ -7,6 +7,7 @@ import type {
 import { getSkillDemand, isSkillAppropriate } from './experience-config'
 import { categorize, CATEGORY_CAPS_KG } from './load-prescription'
 import { getReplacementCandidates, swapExerciseInMesocycle, banExerciseFromMesocycle, containsExerciseName } from './mesocycle-edit'
+import { estimateDaySeconds, DURATION_BUDGET_SECONDS } from './session-duration'
 
 // All combinations to test — exported so other harnesses (e.g.
 // scripts/run-quality-score.ts) reuse the exact same dimensions rather than
@@ -52,14 +53,6 @@ const EQUIPMENT_SETS: Record<EquipmentAccess, Set<string> | null> = {
   bodyweight: new Set(['bodyweight', 'pull-up bar']),
 }
 
-// Duration budgets in seconds (with 15% tolerance)
-const DURATION_BUDGETS: Record<SessionDuration, number> = {
-  '30-45': 37 * 60,
-  '45-60': 52 * 60,
-  '60-90': 75 * 60,
-  '90+': 100 * 60,
-}
-
 // Style-required patterns
 const STYLE_REQUIRED_PATTERNS: Record<TrainingStyle, string[]> = {
   combat: ['core', 'carry'],
@@ -72,7 +65,7 @@ export interface AuditFailure {
   check:
     | 'equipment' | 'injury' | 'duration' | 'style_pattern' | 'skill' | 'empty_session' | 'load_cap'
     | 'superset_pairing' | 'load_progression' | 'set_progression' | 'goal_structure' | 'recovery_volume'
-    | 'swap_constraint' | 'swap_load' | 'ban_purge'
+    | 'swap_constraint' | 'swap_load' | 'ban_purge' | 'prescription_unit'
   combination: string
   details: string
   exercise?: string
@@ -152,18 +145,20 @@ function isMainCompound(name: string): boolean {
   return entry.mechanics_tier === 'tier1_compound' || entry.mechanics_tier === 'tier2_compound'
 }
 
-function estimateSessionSeconds(day: WorkoutDay): number {
-  // Warm-up counts toward the session. If it did not, the duration check would
-  // pass while real sessions ran over the user's stated time by 5-12 minutes.
-  let total = day.warmup?.total_seconds ?? 0
-  for (const ex of day.exercises) {
-    const restMatch = ex.rest.match(/(\d+)/)
-    const restSec = restMatch ? parseInt(restMatch[1]) : 60
-    const entry = EXERCISE_DATABASE.find(e => e.name === ex.name)
-    const repDuration = entry?.avg_duration_seconds || 35
-    total += ex.sets * (repDuration + restSec)
+// Delegates to the same honest formula the engine itself trims against
+// (session-duration.ts) — a second, independently-drifting copy here is
+// exactly how this audit could pass while real sessions ran long.
+const estimateSessionSeconds = estimateDaySeconds
+
+/** 'reps' -> a bare count/range; 'time'/'intervals' -> a duration ending in 's'; 'distance_load' -> a distance ending in 'm'. Catches an exercise whose reps format doesn't match its own prescription_type — e.g. an isometric hold prescribed in meters. */
+function repsMatchesPrescriptionType(reps: string, type: string | undefined): boolean {
+  switch (type) {
+    case 'reps': return /^\d+(\s*-\s*\d+)?$/.test(reps)
+    case 'time':
+    case 'intervals': return /^\d+(\s*-\s*\d+)?\s*s$/.test(reps)
+    case 'distance_load': return /^\d+(\s*-\s*\d+)?\s*m$/.test(reps)
+    default: return true
   }
-  return total
 }
 
 function runSingleAudit(
@@ -235,7 +230,7 @@ function runSingleAudit(
   }
 
   // CHECK 3: Session duration within tolerance of time cap (15% over allowed)
-  const budget = DURATION_BUDGETS[duration]
+  const budget = DURATION_BUDGET_SECONDS[duration]
   const tolerance = 1.15
   for (const day of plan) {
     const estSec = estimateSessionSeconds(day)
@@ -357,6 +352,20 @@ function runSingleAudit(
           details: `${day.day}: two main compounds superset together — ${pairExercises.map(e => e.name).join(' + ')}`,
         })
       }
+    }
+  }
+
+  // CHECK 9: every exercise's reps format matches its own prescription_type.
+  for (const ex of allExercises) {
+    const entry = EXERCISE_DATABASE.find(e => e.name === ex.name)
+    if (!entry) continue
+    if (!repsMatchesPrescriptionType(ex.reps, entry.prescription_type)) {
+      failures.push({
+        check: 'prescription_unit',
+        combination: comboLabel,
+        details: `"${ex.name}" is prescription_type '${entry.prescription_type}' but reps is "${ex.reps}"`,
+        exercise: ex.name,
+      })
     }
   }
 
@@ -556,6 +565,44 @@ async function runMesocycleBehaviorChecks(): Promise<AuditTestCase[]> {
       equipment: 'full_gym', injuries: [], duration: '60-90', style: 'hybrid', experience: 'intermediate',
       passed: failures.length === 0, failures,
       planDays: 0, totalExercises: 0, estimatedDurationSec: 0,
+    })
+  }
+
+  // CHECK (f): prescription units survive rotation across the FULL 16-week
+  // mesocycle, not just the base week-1 plan. Block-level and weekly
+  // accessory rotation can land on an exercise with a different
+  // prescription_type than the one it replaced (Farmer Squat Hold, a
+  // time-based hold, shares a substitution_group/tier with Farmer's Walk, a
+  // distance-based walk) — this is where that regression would actually show
+  // up, since the single-plan checks above never rotate.
+  for (const goal of ['hypertrophy', 'conditioning'] as const) {
+    const profile = baseMesocycleProfile({ fitness_goal: goal, equipment_access: 'full_gym' })
+    const comboLabel = `[mesocycle prescription units] goal=${goal}`
+    const failures: AuditFailure[] = []
+    const meso = generateMesocycle(profile)
+    let totalExercises = 0
+    for (const week of meso) {
+      for (const day of week.days) {
+        for (const ex of day.exercises) {
+          totalExercises++
+          const entry = EXERCISE_DATABASE.find(e => e.name.toLowerCase() === ex.name.toLowerCase())
+          if (!entry) continue
+          if (!repsMatchesPrescriptionType(ex.reps, entry.prescription_type)) {
+            failures.push({
+              check: 'prescription_unit',
+              combination: `${comboLabel} wk${week.week_number} ${day.day}`,
+              details: `"${ex.name}" is prescription_type '${entry.prescription_type}' but reps is "${ex.reps}"`,
+              exercise: ex.name,
+            })
+          }
+        }
+      }
+    }
+    cases.push({
+      equipment: profile.equipment_access, injuries: [], duration: profile.session_duration_preference,
+      style: profile.training_style, experience: profile.training_experience,
+      passed: failures.length === 0, failures,
+      planDays: 0, totalExercises, estimatedDurationSec: 0,
     })
   }
 
