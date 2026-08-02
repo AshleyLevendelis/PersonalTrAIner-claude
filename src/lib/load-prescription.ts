@@ -527,6 +527,36 @@ export function isExternallyLoaded(entry: ExerciseEntry): boolean {
   return entry.equipment.some(e => LOADED_EQUIPMENT.has(e))
 }
 
+// SAFETY: a backpack (or other improvised carry implement) is not a
+// farmer's handle — there's no rigid frame, the load rides on straps and
+// shifts with stride, and failure modes are strap tearing or the wearer
+// losing control of a suddenly-shifting load, not just "too heavy to hold."
+// A review caught a bodyweight-only NOVICE, in their very first calibration
+// week, prescribed a 35-40kg Loaded Backpack Walk with "no assessment, no
+// bodyweight-relative anchor, no note on how to build the load" — flagged
+// as "the one line in the plan that could actually hurt someone." The
+// carry-fraction-of-deadlift model that produces that number is otherwise
+// correct for a real farmer's/suitcase carry (rigid handles, two hands or
+// braced posture) — the fix here is a hard, absolute ceiling specific to
+// IMPROVISED implements, applied after every other calculation, that
+// nothing else in this file may exceed regardless of how the estimate was
+// derived (standards table, known weight, or a forced within-block ramp
+// value). These numbers are deliberately conservative absolutes, not
+// bodyweight-relative — a heavier novice doesn't get a heavier backpack
+// ceiling, because the strap/posture failure mode doesn't scale with the
+// carrier's own strength the way a barbell lift does.
+export const IMPROVISED_CARRY_CEILING_KG: Record<TrainingExperience, number> = {
+  beginner: 8,
+  novice: 12,
+  intermediate: 20,
+  advanced: 25,
+}
+
+/** A carry-type exercise loaded with an improvised implement (a weighted backpack, not a real farmer's handle/trap bar) — see IMPROVISED_CARRY_CEILING_KG's doc comment for why this needs its own hard ceiling. */
+export function isImprovisedCarry(entry: ExerciseEntry): boolean {
+  return entry.prescription_type === 'distance_load' && entry.equipment.includes('weighted backpack')
+}
+
 // A calibration week (no verified numbers yet) starts a shade under the
 // standards-derived estimate rather than trusting it outright — the point is
 // to find the real number quickly, not to hand over a confident-looking one.
@@ -809,6 +839,15 @@ export function prescribeLoad(
     if (perSideLoad) estimate = estimate / 2
 
     rounded = roundToPlate(estimate, mode)
+  }
+
+  // SAFETY ceiling — applied last, after both the estimate path and the
+  // forced-ramp/deload path above, so nothing (a within-block double-
+  // progression increment, a known-weight anchor, a deload back-off) can
+  // push an improvised-carry prescription past it. See
+  // IMPROVISED_CARRY_CEILING_KG's doc comment.
+  if (isImprovisedCarry(entry)) {
+    rounded = Math.min(rounded, IMPROVISED_CARRY_CEILING_KG[profile.training_experience || 'novice'])
   }
 
   // Only compounds in a strength/power phase ramp; hypertrophy-phase work and

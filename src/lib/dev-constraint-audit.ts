@@ -5,7 +5,7 @@ import type {
   WorkoutDay, ConstraintTrace, PlanResult, TrainingExperience, RecoveryCapacity,
 } from './types'
 import { getSkillDemand, isSkillAppropriate } from './experience-config'
-import { categorize } from './load-prescription'
+import { categorize, isImprovisedCarry, IMPROVISED_CARRY_CEILING_KG } from './load-prescription'
 
 // A genuine outer-bound safety backstop — not a conservatism patch (the
 // capability-model round replaced the old CATEGORY_CAPS_KG, which existed to
@@ -82,6 +82,7 @@ export interface AuditFailure {
     | 'equipment' | 'injury' | 'duration' | 'style_pattern' | 'skill' | 'empty_session' | 'load_cap'
     | 'superset_pairing' | 'load_progression' | 'set_progression' | 'goal_structure' | 'recovery_volume'
     | 'swap_constraint' | 'swap_load' | 'ban_purge' | 'prescription_unit' | 'capability_gate'
+    | 'improvised_carry_cap' | 'pattern_coverage' | 'rotation_relative_load' | 'phase_sequence'
   combination: string
   details: string
   exercise?: string
@@ -360,6 +361,27 @@ function runSingleAudit(
         check: 'load_cap',
         combination: comboLabel,
         details: `Suggested load ${ex.suggested_load_kg}kg exceeds the ${cap}kg outer-bound safety ceiling for category "${category}"`,
+        exercise: ex.name,
+      })
+    }
+  }
+
+  // CHECK 7b: SAFETY — no improvised-carry (backpack) prescription ever
+  // exceeds its tier's absolute ceiling (IMPROVISED_CARRY_CEILING_KG). This
+  // must be impossible to regress: a review caught a bodyweight-only novice
+  // handed a 35-40kg backpack carry in their first calibration week with no
+  // safety framing at all, flagged as the one genuinely dangerous finding
+  // across every review round.
+  for (const ex of allExercises) {
+    if (ex.suggested_load_kg == null) continue
+    const entry = EXERCISE_DATABASE.find(e => e.name === ex.name)
+    if (!entry || !isImprovisedCarry(entry)) continue
+    const ceiling = IMPROVISED_CARRY_CEILING_KG[experience]
+    if (ex.suggested_load_kg > ceiling) {
+      failures.push({
+        check: 'improvised_carry_cap',
+        combination: comboLabel,
+        details: `"${ex.name}" suggested load ${ex.suggested_load_kg}kg exceeds the ${ceiling}kg improvised-carry safety ceiling for "${experience}"`,
         exercise: ex.name,
       })
     }
