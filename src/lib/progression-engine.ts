@@ -1,7 +1,7 @@
 import { supabase } from './supabase'
 import { getExerciseEntry, getExerciseId } from './exercise-db'
 import { categorize, getLoadIncrementKg, isExternallyLoaded } from './load-prescription'
-import { getLastSessionSets, getSetsForDate } from './set-log-store'
+import { getLastSessionSets, getSetsForDate, isMalformedZeroWeight } from './set-log-store'
 import type { ExerciseTier, ExerciseSetLog } from './types'
 
 // ---------------------------------------------------------------------------
@@ -79,6 +79,10 @@ export async function checkDoubleProgression(
   const exerciseId = getExerciseId(exerciseName)
   const todaySets = (await getSetsForDate(userId, sessionDate))
     .filter(s => (s.exercise_id ?? getExerciseId(s.exercise_name)) === exerciseId && !s.is_warmup)
+    // A malformed 0kg/non-bodyweight row (chat-logged with no weight stated,
+    // pre C0 fix #2) carries no real signal — must not count toward "did
+    // every prescribed set land", nor toward the weight this progresses from.
+    .filter(s => !isMalformedZeroWeight(s))
     .sort((a, b) => a.set_number - b.set_number)
 
   if (!isProgressable(exerciseName, tier)) {
@@ -173,18 +177,19 @@ export async function getLastLoggedWeight(
 ): Promise<{ weight_kg: number; reps_completed: number } | null> {
   let query = supabase
     .from('exercise_set_logs')
-    .select('weight_kg, reps_completed')
+    .select('weight_kg, reps_completed, is_bodyweight')
     .eq('user_id', userId)
     .eq('exercise_id', getExerciseId(exerciseName))
     .eq('is_warmup', false)
     .order('completed_at', { ascending: false })
-    .limit(1)
+    .limit(10)
 
   if (weekNumber !== undefined) {
     query = query.eq('week_number', weekNumber)
   }
 
   const { data } = await query
-  if (!data || data.length === 0) return null
-  return { weight_kg: Number(data[0].weight_kg), reps_completed: data[0].reps_completed }
+  const row = (data ?? []).find(r => !isMalformedZeroWeight({ weight_kg: Number(r.weight_kg), is_bodyweight: r.is_bodyweight }))
+  if (!row) return null
+  return { weight_kg: Number(row.weight_kg), reps_completed: row.reps_completed }
 }

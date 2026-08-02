@@ -628,6 +628,19 @@ interface ServerSetRow {
   completed_at: string
 }
 
+/**
+ * A row that carries no real signal: 0kg logged for a movement not marked
+ * bodyweight. Before C0 fix #2, chat's tool schema defaulted an unstated
+ * weight to 0 and wrote it as if it were the real working weight; historical
+ * rows shaped like that (or anything else that slips one through in the
+ * future) must never be read as "the last working weight was 0" by ghosts or
+ * progression — treat them as if they don't exist rather than let them poison
+ * a recommendation or bury a real prior session.
+ */
+export function isMalformedZeroWeight(row: { weight_kg: number; is_bodyweight: boolean }): boolean {
+  return row.weight_kg === 0 && !row.is_bodyweight
+}
+
 function serverRowToView(row: ServerSetRow, date: string): ExerciseSetLog {
   return {
     user_id: row.user_id,
@@ -712,7 +725,11 @@ export async function getLastSessionSets(
       .lt('completed_at', beforeDate)
       .order('completed_at', { ascending: false })
       .limit(60)
-    const rows = (data || []) as ServerSetRow[]
+    // Malformed rows are filtered out BEFORE picking "the latest session" —
+    // a session that's entirely malformed (e.g. an old chat-logged 0kg entry)
+    // must be skipped in favor of the last session with real data, not
+    // returned as an empty/wrong "most recent" result.
+    const rows = ((data || []) as ServerSetRow[]).filter(r => !isMalformedZeroWeight(r))
     if (rows.length > 0) {
       const latestSession = rows[0].session_id
       serverLatest = rows[0].completed_at
@@ -732,6 +749,7 @@ export async function getLastSessionSets(
     const s = op.set
     if (s.userId !== userId || s.exerciseId !== exerciseId || s.isWarmup) continue
     if (s.completedAt >= beforeDate) continue
+    if (isMalformedZeroWeight({ weight_kg: s.weightKg, is_bodyweight: s.isBodyweight })) continue
     const group = pendingByDate.get(s.date) ?? []
     group.push(s)
     pendingByDate.set(s.date, group)

@@ -150,6 +150,19 @@ function fakeFrom(table: string) {
 
 const fakeClient = { from: fakeFrom }
 
+/** Test-only helper: get-or-create a workout_sessions row directly against the fake db, for tests that need to plant rows below set-log-store's own API (e.g. simulating a pre-fix malformed row). */
+function ensureWorkoutSessionForTest(profileId: string, date: string, day: string): string {
+  const existing = db.workout_sessions.find(s => s.profile_id === profileId && s.date === date)
+  if (existing) return existing.id as string
+  const row = {
+    id: crypto.randomUUID(), profile_id: profileId, date, day,
+    split_type: 'training', duration_minutes: 45, is_completed: false,
+    started_at: `${date}T08:00:00.000Z`,
+  }
+  db.workout_sessions.push(row)
+  return row.id
+}
+
 // --- Test harness -----------------------------------------------------------
 
 let failures = 0
@@ -365,6 +378,68 @@ async function main() {
   await flushPending()
   check('retrying a still-bad item dead-letters again rather than wedging the queue', getDeadLetterItems().length === 1 && getSyncState().queuedCount === 0)
   discardDeadLetterItem(getDeadLetterItems()[0].clientId)
+
+  // ---- 9. Chat 0kg rows never poison progression/ghosts (fix #2) ----------
+  // The edge function itself runs on Deno and isn't executable from this Node
+  // harness, so this exercises the downstream guard directly: a malformed row
+  // (weight_kg=0, is_bodyweight=false — what a pre-fix chat log without a
+  // stated weight used to write) must be invisible to ghosts and progression,
+  // as if it never happened, falling back to the last REAL session.
+  console.log('\n[9] chat 0kg rows excluded from progression/ghosts as malformed (fix #2)')
+  const ohp = 'Overhead Press'
+  const ohpId = getExerciseId(ohp)
+  const ohpSessionEarlier = isoDatePlusDays(-7)
+  const ohpSessionMalformed = isoDatePlusDays(-1)
+
+  // A real prior session with a genuine working weight.
+  for (let s = 1; s <= 2; s++) {
+    saveSet({ userId, date: ohpSessionEarlier, weekNumber: 1, day, exerciseId: ohpId, exerciseName: ohp, setNumber: s, weightKg: 35, repsCompleted: 10 })
+  }
+  await flushPending()
+  // A malformed row landing AFTER it chronologically — simulating a pre-fix
+  // chat log that had no weight stated, written directly (bypassing saveSet,
+  // which the app itself never does, but the read-side guard must not trust
+  // the write path to have been correct).
+  const malformedSession = await ensureWorkoutSessionForTest(userId, ohpSessionMalformed, day)
+  db.exercise_set_logs.push({
+    id: crypto.randomUUID(), session_id: malformedSession, user_id: userId,
+    exercise_id: ohpId, exercise_name: ohp, week_number: 2, day,
+    set_number: 1, weight_kg: 0, reps_completed: 10, rpe: null, unit: 'reps',
+    is_bodyweight: false, is_warmup: false, completed_at: `${ohpSessionMalformed}T12:00:00.000Z`,
+  })
+
+  const ohpGhosts = await getLastSessionSets(userId, ohpId, W2)
+  check('malformed-only latest session is skipped; ghosts fall back to the last REAL session',
+    ohpGhosts.length === 2 && ohpGhosts.every(g => g.weight_kg === 35), ohpGhosts)
+
+  // checkDoubleProgression: today's own sets are a mix of malformed + real —
+  // the malformed one must not count toward "every prescribed set landed".
+  const mixedEx = 'Incline Dumbbell Press'
+  const mixedId = getExerciseId(mixedEx)
+  const mixedSession = await ensureWorkoutSessionForTest(userId, W1, day)
+  db.exercise_set_logs.push(
+    { id: crypto.randomUUID(), session_id: mixedSession, user_id: userId, exercise_id: mixedId, exercise_name: mixedEx, week_number: 1, day, set_number: 1, weight_kg: 0, reps_completed: 10, rpe: null, unit: 'reps', is_bodyweight: false, is_warmup: false, completed_at: `${W1}T09:00:00.000Z` },
+    { id: crypto.randomUUID(), session_id: mixedSession, user_id: userId, exercise_id: mixedId, exercise_name: mixedEx, week_number: 1, day, set_number: 2, weight_kg: 22.5, reps_completed: 12, rpe: 7, unit: 'reps', is_bodyweight: false, is_warmup: false, completed_at: `${W1}T09:02:00.000Z` },
+  )
+  const mixedProgression = await checkDoubleProgression(userId, mixedEx, W1, 2, '8-12')
+  check('malformed set excluded from the prescribed-set count -> no premature overload toast',
+    mixedProgression === null, mixedProgression ?? undefined)
+
+  // Priority-order mirror of the edge function's resolveWeight (documents the
+  // intended order; the Deno source is the source of truth and isn't
+  // executable here — see supabase/functions/chat-gemini/index.ts).
+  function mirrorResolveWeight(stated: number | undefined, isBW: boolean | undefined, lastLogged: number | null, planSuggested: number | null) {
+    if (isBW) return { weightKg: 0, source: 'bodyweight' }
+    if (typeof stated === 'number' && stated > 0) return { weightKg: stated, source: 'stated' }
+    if (lastLogged != null) return { weightKg: lastLogged, source: 'history' }
+    if (planSuggested != null) return { weightKg: planSuggested, source: 'plan' }
+    return null
+  }
+  check('resolveWeight order: explicit stated weight wins over everything', mirrorResolveWeight(100, false, 80, 70)?.source === 'stated')
+  check('resolveWeight order: bodyweight flag short-circuits even if a weight is stated as 0', mirrorResolveWeight(undefined, true, 80, 70)?.source === 'bodyweight')
+  check('resolveWeight order: falls back to last logged history when unstated', mirrorResolveWeight(undefined, false, 80, 70)?.source === 'history')
+  check('resolveWeight order: falls back to plan suggestion when no history', mirrorResolveWeight(undefined, false, null, 70)?.source === 'plan')
+  check('resolveWeight order: unresolved (null) when nothing is available — caller must skip + ask', mirrorResolveWeight(undefined, false, null, null) === null)
 
   // ---- Summary -------------------------------------------------------------
   if (failures > 0) {

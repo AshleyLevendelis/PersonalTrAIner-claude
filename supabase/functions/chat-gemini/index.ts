@@ -74,6 +74,7 @@ interface UnifiedSetRow {
   weight_kg: number;
   reps_completed: number;
   rpe?: number | null;
+  is_bodyweight: boolean;
 }
 
 /** Upserts set rows into exercise_set_logs on the natural key — same semantics as set-log-store.ts. */
@@ -93,11 +94,11 @@ async function upsertUnifiedSets(
     week_number: null,
     day,
     set_number: r.set_number,
-    weight_kg: r.weight_kg || 0,
+    weight_kg: r.weight_kg,
     reps_completed: r.reps_completed,
     rpe: r.rpe ?? null,
     unit: "reps",
-    is_bodyweight: (r.weight_kg || 0) === 0,
+    is_bodyweight: r.is_bodyweight,
     is_warmup: false,
     completed_at: new Date().toISOString(),
   }));
@@ -118,6 +119,90 @@ async function upsertUnifiedSets(
     const errText = await resp.text();
     throw new Error(`exercise_set_logs upsert failed (${resp.status}): ${errText}`);
   }
+}
+
+// ---------------------------------------------------------------------------
+// Weight resolution (C0 fix #2) — the tool schema can no longer default an
+// unstated weight to 0 and have it treated as a real lift. When the user
+// doesn't state a weight AND the exercise isn't bodyweight, resolve it from
+// (in order) the trainee's last logged working weight for that exercise,
+// then the current plan's suggested load. If neither exists, the set is
+// skipped entirely — never written as a fabricated 0kg row — and the model
+// asks the user for the weight instead.
+// ---------------------------------------------------------------------------
+
+/** Most recent logged working weight (weight_kg > 0, never a warmup) for this exercise — mirrors set-log-store.ts's getLastSessionSets base-weight semantics closely enough for a one-shot lookup. */
+async function getLastLoggedWeight(
+  supabaseUrl: string,
+  serviceKey: string,
+  profileId: string,
+  exerciseSlug: string,
+): Promise<number | null> {
+  const resp = await fetch(
+    `${supabaseUrl}/rest/v1/exercise_set_logs?user_id=eq.${profileId}&exercise_id=eq.${exerciseSlug}&is_warmup=eq.false&weight_kg=gt.0&order=completed_at.desc&limit=1&select=weight_kg`,
+    { headers: { Authorization: `Bearer ${serviceKey}`, Apikey: serviceKey } },
+  );
+  if (!resp.ok) return null;
+  const rows = await resp.json();
+  return rows[0]?.weight_kg != null ? Number(rows[0].weight_kg) : null;
+}
+
+/** The current mesocycle's suggested_load_kg for this exercise name, searched across every persisted week (small, bounded per profile). */
+async function getPlanSuggestedWeight(
+  supabaseUrl: string,
+  serviceKey: string,
+  profileId: string,
+  exerciseName: string,
+): Promise<number | null> {
+  const resp = await fetch(
+    `${supabaseUrl}/rest/v1/mesocycle_weeks?profile_id=eq.${profileId}&select=days`,
+    { headers: { Authorization: `Bearer ${serviceKey}`, Apikey: serviceKey } },
+  );
+  if (!resp.ok) return null;
+  const weeks = await resp.json();
+  const target = exerciseName.trim().toLowerCase();
+  for (const week of weeks) {
+    for (const day of week.days || []) {
+      for (const ex of day.exercises || []) {
+        if (
+          typeof ex.name === "string" && ex.name.trim().toLowerCase() === target &&
+          typeof ex.suggested_load_kg === "number" && ex.suggested_load_kg > 0
+        ) {
+          return ex.suggested_load_kg;
+        }
+      }
+    }
+  }
+  return null;
+}
+
+interface ResolvedWeight {
+  weightKg: number;
+  isBodyweight: boolean;
+  /** Set when the weight came from somewhere other than the user's own statement — surfaced in the confirmation reply so it's never silently assumed. */
+  inferredFrom?: "history" | "plan";
+}
+
+/** Resolves one exercise's weight per the fix #2 order: explicit > bodyweight > last logged > plan suggestion > unresolved (caller must skip the write and ask). */
+async function resolveWeight(
+  supabaseUrl: string,
+  serviceKey: string,
+  profileId: string,
+  exerciseName: string,
+  statedWeightKg: number | null | undefined,
+  statedIsBodyweight: boolean | null | undefined,
+): Promise<ResolvedWeight | null> {
+  if (statedIsBodyweight) return { weightKg: 0, isBodyweight: true };
+  if (typeof statedWeightKg === "number" && statedWeightKg > 0) return { weightKg: statedWeightKg, isBodyweight: false };
+
+  const slug = slugifyExerciseName(exerciseName);
+  const lastLogged = await getLastLoggedWeight(supabaseUrl, serviceKey, profileId, slug);
+  if (lastLogged != null) return { weightKg: lastLogged, isBodyweight: false, inferredFrom: "history" };
+
+  const planSuggested = await getPlanSuggestedWeight(supabaseUrl, serviceKey, profileId, exerciseName);
+  if (planSuggested != null) return { weightKg: planSuggested, isBodyweight: false, inferredFrom: "plan" };
+
+  return null; // Unresolved — caller skips the write and asks the user.
 }
 
 const toolDeclarations = [
@@ -316,10 +401,14 @@ const toolDeclarations = [
               },
               weight_kg: {
                 type: "number",
-                description: "Weight used in kg (0 for bodyweight exercises)",
+                description: "Weight used in kg, ONLY if the user actually stated one. Omit this field entirely if they didn't mention a weight — do NOT guess or default to 0. Zero has a specific meaning here: it means bodyweight (see is_bodyweight), never 'unstated'.",
+              },
+              is_bodyweight: {
+                type: "boolean",
+                description: "True if this is a bodyweight-only movement (push-ups, pull-ups, dips, planks, etc.) or the user explicitly said 'bodyweight'/'no weight'. Leave false/omitted if a weight is simply unmentioned for a normally-loaded exercise — the app will resolve it from history instead of assuming bodyweight.",
               },
             },
-            required: ["exercise_name", "sets_completed", "reps_completed", "weight_kg"],
+            required: ["exercise_name", "sets_completed", "reps_completed"],
           },
         },
       },
@@ -420,14 +509,18 @@ const toolDeclarations = [
         },
         weight_kg: {
           type: "number",
-          description: "Weight in kg (0 for bodyweight)",
+          description: "Weight in kg, ONLY if the user actually stated one. Omit this field entirely if unmentioned — do NOT guess or default to 0. Zero specifically means bodyweight (see is_bodyweight), never 'unstated'.",
+        },
+        is_bodyweight: {
+          type: "boolean",
+          description: "True if this is a bodyweight-only movement or the user explicitly said 'bodyweight'/'no weight'. Leave false/omitted if a weight is simply unmentioned for a normally-loaded exercise.",
         },
         rpe: {
           type: "number",
           description: "Rate of perceived exertion (1-10), if mentioned",
         },
       },
-      required: ["exercise_name", "set_number", "reps", "weight_kg"],
+      required: ["exercise_name", "set_number", "reps"],
     },
   },
 ];
@@ -879,7 +972,7 @@ PERIODIZATION COACHING RULES:
 
 === NATURAL LANGUAGE WORKOUT LOGGING ===
 - When the user describes exercises they completed (e.g. "Just did bench 3x8 at 90kg", "Finished my push day", "Hit squats for 4 sets of 6 at 100"), ALWAYS invoke the log_workout_session tool to record their performance.
-- Parse exercise names, sets, reps, and weights from the user's message. If weight isn't mentioned, use 0 (bodyweight).
+- Parse exercise names, sets, reps, and weights from the user's message. If a weight isn't mentioned, do NOT guess or default to 0 — omit weight_kg from that log entry entirely and let the app resolve it from their history or plan. Only set is_bodyweight (and weight_kg: 0) when the movement is genuinely bodyweight-only (push-ups, pull-ups, dips, planks, etc.) or the user explicitly says "bodyweight"/"no weight".
 - If the day isn't mentioned, default to today.
 - After logging, congratulate them and note if they hit the top of their rep range (which triggers progressive overload).
 - If the user asks about their progress, reference logged data to show improvement trends.
@@ -1268,28 +1361,47 @@ Keep this context in mind to ensure your greetings and questions naturally align
 
       if (name === "log_workout_session") {
         const dayOfWeek = args.day || new Date().toLocaleDateString("en-US", { weekday: "long" });
-        const logs = args.logs as Array<{ exercise_name: string; sets_completed: number; reps_completed: number; weight_kg: number }>;
+        const logs = args.logs as Array<{ exercise_name: string; sets_completed: number; reps_completed: number; weight_kg?: number; is_bodyweight?: boolean }>;
         const profileId = context.profile_id;
 
         let dbSuccess = true;
         let dbError = "";
         let insertedSets = 0;
+        const loggedSummaries: string[] = [];
+        const needsWeight: string[] = [];
+        const inferredNotes: string[] = [];
 
         if (profileId && logs && logs.length > 0) {
           try {
             const todayDate = new Date().toISOString().split("T")[0];
-            const rows: UnifiedSetRow[] = logs.flatMap((log) =>
-              Array.from({ length: log.sets_completed }, (_, i) => ({
-                exercise_name: log.exercise_name,
-                set_number: i + 1,
-                weight_kg: log.weight_kg || 0,
-                reps_completed: log.reps_completed,
-              }))
-            );
+            const rows: UnifiedSetRow[] = [];
 
-            const sessionId = await ensureWorkoutSession(supabaseUrl, serviceKey, profileId, todayDate, dayOfWeek);
-            await upsertUnifiedSets(supabaseUrl, serviceKey, profileId, sessionId, dayOfWeek, rows);
-            insertedSets = rows.length;
+            for (const log of logs) {
+              const resolved = await resolveWeight(supabaseUrl, serviceKey, profileId, log.exercise_name, log.weight_kg, log.is_bodyweight);
+              if (!resolved) {
+                needsWeight.push(log.exercise_name);
+                continue;
+              }
+              for (let i = 0; i < log.sets_completed; i++) {
+                rows.push({
+                  exercise_name: log.exercise_name,
+                  set_number: i + 1,
+                  weight_kg: resolved.weightKg,
+                  reps_completed: log.reps_completed,
+                  is_bodyweight: resolved.isBodyweight,
+                });
+              }
+              if (resolved.inferredFrom) {
+                inferredNotes.push(`${log.exercise_name} (used your ${resolved.inferredFrom === "history" ? "last logged" : "plan's suggested"} ${resolved.weightKg}kg — say the actual weight if that's off)`);
+              }
+              loggedSummaries.push(`**${log.exercise_name}**: ${log.sets_completed}x${log.reps_completed} @ ${resolved.weightKg}kg`);
+            }
+
+            if (rows.length > 0) {
+              const sessionId = await ensureWorkoutSession(supabaseUrl, serviceKey, profileId, todayDate, dayOfWeek);
+              await upsertUnifiedSets(supabaseUrl, serviceKey, profileId, sessionId, dayOfWeek, rows);
+              insertedSets = rows.length;
+            }
           } catch (err) {
             dbSuccess = false;
             dbError = `Database error: ${err instanceof Error ? err.message : "unknown"}`;
@@ -1305,13 +1417,20 @@ Keep this context in mind to ensure your greetings and questions naturally align
         };
 
         let confirmText: string;
-        if (dbSuccess && insertedSets > 0) {
-          const logSummary = (logs || [])
-            .map((l) => `**${l.exercise_name}**: ${l.sets_completed}x${l.reps_completed} @ ${l.weight_kg}kg`)
-            .join("\n- ");
-          confirmText = textPart?.text || `Logged your workout for ${dayOfWeek}:\n- ${logSummary}\n\n${insertedSets} sets saved — I'll track your progression.`;
-        } else {
+        if (!dbSuccess) {
           confirmText = `I tried to log your workout but the save failed${dbError ? `: ${dbError}` : ""}. Your performance data was not recorded — please try again or log it manually.`;
+        } else {
+          const parts: string[] = [];
+          if (insertedSets > 0) {
+            parts.push(`Logged your workout for ${dayOfWeek}:\n- ${loggedSummaries.join("\n- ")}\n\n${insertedSets} sets saved — I'll track your progression.`);
+          }
+          if (inferredNotes.length > 0) {
+            parts.push(`Weight wasn't stated for: ${inferredNotes.join(", ")}.`);
+          }
+          if (needsWeight.length > 0) {
+            parts.push(`I couldn't log ${needsWeight.join(", ")} — no weight stated and no history or plan suggestion to fall back on. What weight did you use?`);
+          }
+          confirmText = parts.length > 0 ? parts.join("\n\n") : (textPart?.text || "Got it — no sets to log there.");
         }
 
         return new Response(
@@ -1403,19 +1522,24 @@ Keep this context in mind to ensure your greetings and questions naturally align
         const profileId = context.profile_id;
         let dbSuccess = true;
         let dbError = "";
+        let resolved: ResolvedWeight | null = null;
 
         if (profileId) {
           try {
-            const todayDate = new Date().toISOString().split("T")[0];
-            const dayOfWeek = new Date().toLocaleDateString("en-US", { weekday: "long" });
-            const sessionId = await ensureWorkoutSession(supabaseUrl, serviceKey, profileId, todayDate, dayOfWeek);
-            await upsertUnifiedSets(supabaseUrl, serviceKey, profileId, sessionId, dayOfWeek, [{
-              exercise_name: args.exercise_name,
-              set_number: args.set_number,
-              weight_kg: args.weight_kg || 0,
-              reps_completed: args.reps,
-              rpe: args.rpe ?? null,
-            }]);
+            resolved = await resolveWeight(supabaseUrl, serviceKey, profileId, args.exercise_name, args.weight_kg, args.is_bodyweight);
+            if (resolved) {
+              const todayDate = new Date().toISOString().split("T")[0];
+              const dayOfWeek = new Date().toLocaleDateString("en-US", { weekday: "long" });
+              const sessionId = await ensureWorkoutSession(supabaseUrl, serviceKey, profileId, todayDate, dayOfWeek);
+              await upsertUnifiedSets(supabaseUrl, serviceKey, profileId, sessionId, dayOfWeek, [{
+                exercise_name: args.exercise_name,
+                set_number: args.set_number,
+                weight_kg: resolved.weightKg,
+                reps_completed: args.reps,
+                rpe: args.rpe ?? null,
+                is_bodyweight: resolved.isBodyweight,
+              }]);
+            }
           } catch (err) {
             dbSuccess = false;
             dbError = `Database error: ${err instanceof Error ? err.message : "unknown"}`;
@@ -1424,16 +1548,21 @@ Keep this context in mind to ensure your greetings and questions naturally align
         }
 
         let confirmText: string;
-        if (dbSuccess) {
-          confirmText = textPart?.text || `Logged set ${args.set_number} of **${args.exercise_name}**: ${args.reps} reps @ ${args.weight_kg}kg${args.rpe ? ` (RPE ${args.rpe})` : ""}.`;
-        } else {
+        if (!dbSuccess) {
           confirmText = `I tried to log your set but the save failed${dbError ? `: ${dbError}` : ""}. Please try again.`;
+        } else if (!resolved) {
+          confirmText = `I couldn't log that set for **${args.exercise_name}** — no weight stated and no history or plan suggestion to fall back on. What weight did you use?`;
+        } else {
+          const inferredNote = resolved.inferredFrom
+            ? ` (used your ${resolved.inferredFrom === "history" ? "last logged" : "plan's suggested"} weight — say the actual weight if that's off)`
+            : "";
+          confirmText = textPart?.text || `Logged set ${args.set_number} of **${args.exercise_name}**: ${args.reps} reps @ ${resolved.weightKg}kg${args.rpe ? ` (RPE ${args.rpe})` : ""}.${inferredNote}`;
         }
 
         return new Response(
           JSON.stringify({
             reply: confirmText,
-            action: dbSuccess ? { type: "log_workout_set", ...args } : undefined,
+            action: dbSuccess && resolved ? { type: "log_workout_set", ...args, weight_kg: resolved.weightKg } : undefined,
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
