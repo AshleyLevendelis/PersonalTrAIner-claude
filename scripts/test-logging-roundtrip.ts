@@ -90,6 +90,20 @@ function fakeFrom(table: string) {
       return { data: single ? inserted[0] ?? null : inserted, error: null }
     }
     if (op === 'upsert') {
+      // A real multi-row `INSERT ... ON CONFLICT DO UPDATE` fails ATOMICALLY
+      // (Postgres 21000) if two rows in the SAME statement share the arbiter
+      // key — independent of whether that key also pre-exists in the table.
+      // The fix #7/#16 regression test needs this simulated accurately: it's
+      // exactly the case a naive per-row fake would paper over by silently
+      // merging the second row into the first instead of rejecting the batch.
+      if (onConflict && payload.length > 1) {
+        const seen = new Set<string>()
+        for (const raw of payload) {
+          const key = onConflict.map(c => raw[c]).join('|')
+          if (seen.has(key)) return { data: null, error: { code: '21000', message: 'ON CONFLICT DO UPDATE command cannot affect row a second time' } }
+          seen.add(key)
+        }
+      }
       for (const raw of payload) {
         if (numericOverflow(raw)) return { data: null, error: { code: '22003', message: 'numeric field overflow' } }
         const existing = onConflict ? db[table].find(r => onConflict!.every(c => r[c] === raw[c])) : undefined
@@ -574,6 +588,50 @@ async function main() {
     afterManualSave.length === 1 && afterManualSave[0].weight_kg === 12.5, afterManualSave)
   check('the manually-saved set is therefore skippable by natural key (set_number 1)',
     afterManualSave.some(l => l.set_number === 1))
+
+  // ---- 14. Slug-colliding batch degrades gracefully instead of 21000-failing (fix #7/#16) --
+  console.log('\n[14] same-slug batch collision renumbers instead of failing the whole batch (fix #7/#16)')
+
+  // First, prove the fake itself now honestly simulates Postgres: an
+  // in-batch arbiter-key collision, sent with NO dedup, must 21000 the whole
+  // statement — this is what silently passed before the fake was fixed.
+  const rawCollisionSession = ensureWorkoutSessionForTest(userId, isoDatePlusDays(-20), day)
+  const rawCollision = await (fakeClient.from('exercise_set_logs') as any).upsert([
+    { session_id: rawCollisionSession, user_id: userId, exercise_id: 'push-ups', exercise_name: 'Push-Ups', set_number: 1, weight_kg: 0, reps_completed: 10, is_bodyweight: true, is_warmup: false },
+    { session_id: rawCollisionSession, user_id: userId, exercise_id: 'push-ups', exercise_name: 'Push ups', set_number: 1, weight_kg: 0, reps_completed: 8, is_bodyweight: true, is_warmup: false },
+  ], { onConflict: 'user_id,session_id,exercise_id,set_number,is_warmup' })
+  check('fake DB rejects an undeduped in-batch collision with 21000 (sanity check the scenario is real)',
+    rawCollision.error?.code === '21000', rawCollision.error)
+
+  // Now the real path: writeHistoricalSession (the same layer chat's
+  // upsertUnifiedSets mirrors) must degrade gracefully on the identical
+  // input — no thrown error, and both sets land with distinct set numbers.
+  const pushupsSlug = getExerciseId('Push-Ups')
+  const otherPushupsSlug = getExerciseId('Push ups') // different capitalization/punctuation, same slug
+  check('sanity: both name variants slug to the same exercise_id', pushupsSlug === otherPushupsSlug, { pushupsSlug, otherPushupsSlug })
+
+  const collisionDate = isoDatePlusDays(-21)
+  let collisionThrew = false
+  try {
+    await writeHistoricalSession({
+      userId, date: collisionDate, weekNumber: 1, day,
+      sets: [
+        { exerciseId: pushupsSlug, exerciseName: 'Push-Ups', setNumber: 1, weightKg: 0, repsCompleted: 10, isBodyweight: true, completedAt: `${collisionDate}T09:00:00.000Z` },
+        { exerciseId: otherPushupsSlug, exerciseName: 'Push ups', setNumber: 1, weightKg: 0, repsCompleted: 8, isBodyweight: true, completedAt: `${collisionDate}T09:01:00.000Z` },
+      ],
+    })
+  } catch {
+    collisionThrew = true
+  }
+  check('writeHistoricalSession does NOT throw on a same-slug (exerciseId, setNumber) collision', !collisionThrew)
+
+  const collisionSession = db.workout_sessions.find(s => s.profile_id === userId && s.date === collisionDate)
+  const collisionRows = db.exercise_set_logs.filter(r => r.session_id === collisionSession?.id && r.exercise_id === pushupsSlug)
+  check('both colliding sets landed, renumbered to distinct set_numbers (continuous numbering)',
+    collisionRows.length === 2 && new Set(collisionRows.map(r => r.set_number)).size === 2,
+    collisionRows.map(r => ({ set_number: r.set_number, reps: r.reps_completed })))
+  check('renumbering is continuous (1 and 2), not arbitrary',
+    collisionRows.map(r => r.set_number).sort().join(',') === '1,2')
 
   // ---- Summary -------------------------------------------------------------
   if (failures > 0) {

@@ -778,6 +778,32 @@ export async function getLastSessionSets(
 }
 
 /**
+ * A batch containing two sets that resolve to the same (exerciseId,
+ * setNumber, isWarmup) — e.g. a seeded day listing "Push Ups" and "Push-Ups"
+ * as separate exercises, both slugging to the same id — makes the upsert
+ * reject the WHOLE batch with Postgres 21000 ("ON CONFLICT DO UPDATE cannot
+ * affect row a second time"), dropping every set in it, not just the
+ * colliding one (C0 fix #7/#16). Renumbers any collision to continue after
+ * the highest set number already used for that exercise in this batch.
+ */
+function dedupeAndRenumberSets<T extends { exerciseId: string; setNumber: number; isWarmup?: boolean }>(sets: T[]): T[] {
+  const maxSetByExercise = new Map<string, number>()
+  const seenKeys = new Set<string>()
+  return sets.map(s => {
+    const groupKey = `${s.exerciseId}|${s.isWarmup ?? false}`
+    let setNumber = s.setNumber
+    let key = `${groupKey}|${setNumber}`
+    while (seenKeys.has(key)) {
+      setNumber = (maxSetByExercise.get(groupKey) ?? setNumber) + 1
+      key = `${groupKey}|${setNumber}`
+    }
+    seenKeys.add(key)
+    maxSetByExercise.set(groupKey, Math.max(maxSetByExercise.get(groupKey) ?? 0, setNumber))
+    return setNumber === s.setNumber ? s : { ...s, setNumber }
+  })
+}
+
+/**
  * Direct synced write for HISTORICAL data (dev seeding, backfill tooling) —
  * bypasses the pending store because these rows need explicit completed_at
  * timestamps in the past, which saveSet (deliberately) doesn't accept.
@@ -817,7 +843,7 @@ export async function writeHistoricalSession(params: {
     )
   }
   const sessionId = await ensureSessionSynced(params.userId, params.date, 'seeded')
-  const rows = params.sets.map(s => ({
+  const rows = dedupeAndRenumberSets(params.sets).map(s => ({
     session_id: sessionId,
     user_id: params.userId,
     exercise_id: s.exerciseId,

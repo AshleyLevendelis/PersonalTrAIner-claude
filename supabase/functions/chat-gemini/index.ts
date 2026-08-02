@@ -77,6 +77,33 @@ interface UnifiedSetRow {
   is_bodyweight: boolean;
 }
 
+/**
+ * A batched upsert whose payload contains two rows resolving to the same
+ * (exercise_id, set_number) — e.g. "Push-Ups" and "Push ups", both slugging
+ * to push-ups — makes Postgres reject the WHOLE statement with 21000 ("ON
+ * CONFLICT DO UPDATE command cannot affect row a second time"), dropping
+ * every exercise in the batch, not just the colliding one (C0 fix #7/#16).
+ * Renumbers any collision to continue after the highest set_number already
+ * used for that slug in this batch, so a collision degrades to continuous
+ * numbering across name variants instead of failing outright.
+ */
+function dedupeAndRenumberBatch(rows: UnifiedSetRow[]): UnifiedSetRow[] {
+  const maxSetBySlug = new Map<string, number>();
+  const seenKeys = new Set<string>();
+  return rows.map((r) => {
+    const slug = slugifyExerciseName(r.exercise_name);
+    let setNumber = r.set_number;
+    let key = `${slug}|${setNumber}`;
+    while (seenKeys.has(key)) {
+      setNumber = (maxSetBySlug.get(slug) ?? setNumber) + 1;
+      key = `${slug}|${setNumber}`;
+    }
+    seenKeys.add(key);
+    maxSetBySlug.set(slug, Math.max(maxSetBySlug.get(slug) ?? 0, setNumber));
+    return setNumber === r.set_number ? r : { ...r, set_number: setNumber };
+  });
+}
+
 /** Upserts set rows into exercise_set_logs on the natural key — same semantics as set-log-store.ts. */
 async function upsertUnifiedSets(
   supabaseUrl: string,
@@ -86,7 +113,7 @@ async function upsertUnifiedSets(
   day: string,
   rows: UnifiedSetRow[],
 ): Promise<void> {
-  const payload = rows.map((r) => ({
+  const payload = dedupeAndRenumberBatch(rows).map((r) => ({
     session_id: sessionId,
     user_id: profileId,
     exercise_id: slugifyExerciseName(r.exercise_name),
@@ -1375,6 +1402,14 @@ Keep this context in mind to ensure your greetings and questions naturally align
           try {
             const todayDate = new Date().toISOString().split("T")[0];
             const rows: UnifiedSetRow[] = [];
+            // Two logs[] entries can name the same exercise differently
+            // ("Push-Ups" then "Push ups" later in one message) — both slug
+            // to the same exercise_id, so set numbering must continue across
+            // them rather than each entry restarting at 1 (which is exactly
+            // what upsertUnifiedSets's dedupeAndRenumberBatch also guards,
+            // but doing it right here keeps the numbers meaningful instead of
+            // arbitrarily bumped).
+            const setCounterBySlug = new Map<string, number>();
 
             for (const log of logs) {
               const resolved = await resolveWeight(supabaseUrl, serviceKey, profileId, log.exercise_name, log.weight_kg, log.is_bodyweight);
@@ -1382,15 +1417,19 @@ Keep this context in mind to ensure your greetings and questions naturally align
                 needsWeight.push(log.exercise_name);
                 continue;
               }
+              const slug = slugifyExerciseName(log.exercise_name);
+              let setNumber = setCounterBySlug.get(slug) ?? 0;
               for (let i = 0; i < log.sets_completed; i++) {
+                setNumber += 1;
                 rows.push({
                   exercise_name: log.exercise_name,
-                  set_number: i + 1,
+                  set_number: setNumber,
                   weight_kg: resolved.weightKg,
                   reps_completed: log.reps_completed,
                   is_bodyweight: resolved.isBodyweight,
                 });
               }
+              setCounterBySlug.set(slug, setNumber);
               if (resolved.inferredFrom) {
                 inferredNotes.push(`${log.exercise_name} (used your ${resolved.inferredFrom === "history" ? "last logged" : "plan's suggested"} ${resolved.weightKg}kg — say the actual weight if that's off)`);
               }
