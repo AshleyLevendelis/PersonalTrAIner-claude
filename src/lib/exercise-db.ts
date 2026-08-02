@@ -1,5 +1,6 @@
 import { TrainingStyle, type TrainingExperience } from './types'
 import { isRegressionFor } from './periodization'
+import { isExternallyLoaded } from './load-prescription'
 
 export type MovementPattern =
   | 'horizontal_push'
@@ -1809,11 +1810,20 @@ export function getSmartReplacements(
   const excludedSet = new Set(exclusions.map(e => e.toLowerCase()))
   excludedSet.add(exerciseName.toLowerCase())
 
+  // Same loading-class guard as periodization.ts's rotateVariation, applied
+  // here too — manual swap/ban went through a completely separate candidate
+  // function with no such guard, so a user swapping out a loaded Dumbbell
+  // Row could still land on a bodyweight Inverted Row. Bodyweight -> loaded
+  // is fine (an upgrade); loaded -> bodyweight is the regression this
+  // blocks.
+  const currentIsLoaded = isExternallyLoaded(current)
+
   const candidates = pool.filter(e => {
     if (excludedSet.has(e.name.toLowerCase())) return false
     if (e.movement_pattern !== current.movement_pattern) return false
     if (e.name === current.name) return false
     if (isRegressionFor(e.name, experience) && !isRegressionFor(current.name, experience)) return false
+    if (currentIsLoaded && !isExternallyLoaded(e)) return false
     return true
   })
 

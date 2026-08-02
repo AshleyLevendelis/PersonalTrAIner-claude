@@ -1,6 +1,7 @@
 import type { FitnessGoal, TrainingExperience, WorkoutDay, Exercise } from './types'
 import { EXERCISE_DATABASE, getMovementFamily, meetsCapabilityRequirement, type ExerciseEntry } from './exercise-db'
 import { getExperienceConfig, isSkillAppropriate } from './experience-config'
+import { isExternallyLoaded } from './load-prescription'
 
 // ---------------------------------------------------------------------------
 // PERIODIZATION
@@ -276,6 +277,18 @@ export function rotateVariation(
   )
   if (!current) return exerciseName
 
+  // Loading class must never regress on rotation: an externally-loaded
+  // exercise (Dumbbell Rows, Kettlebell Swings) may only rotate to another
+  // externally-loaded variation — never to a bodyweight one — even when
+  // that bodyweight variation shares substitution group/pattern/tier and
+  // isn't on the hardcoded REGRESSION_VARIATIONS list below. A review round
+  // caught this repeatedly: "Dumbbell Rows @28kg/hand becomes bodyweight
+  // Inverted Row," "48kg Kettlebell Swing becomes bodyweight Single-Leg
+  // RDL" — both destroy trackable overload and read as the plan "protecting
+  // muscle in a deficit" while literally deleting the load. Bodyweight ->
+  // loaded is fine (an upgrade); bodyweight -> bodyweight is fine (lateral).
+  const currentIsLoaded = isExternallyLoaded(current)
+
   const variations = pool
     .filter(
       e =>
@@ -288,7 +301,8 @@ export function rotateVariation(
         // Pull-Ups to Pull-Ups (Assisted) — variations that cannot be loaded
         // heavily enough to drive adaptation at that level.
         e.mechanics_tier === current.mechanics_tier &&
-        !isRegressionFor(e.name, experience)
+        !isRegressionFor(e.name, experience) &&
+        (!currentIsLoaded || isExternallyLoaded(e))
     )
     // Stable ordering so rotation is deterministic rather than random —
     // the user should be able to see the same plan twice.
