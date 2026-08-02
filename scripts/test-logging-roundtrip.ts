@@ -548,6 +548,33 @@ async function main() {
   check('a genuinely past-dated seed write succeeds and is tagged split_type=seeded',
     seededSession?.split_type === 'seeded', seededSession)
 
+  // ---- 13. Bulk-log race mechanism: re-querying sees a concurrent manual save (fix #6) --
+  // ExercisePlan.tsx's handleLogEntireSession is a React component and isn't
+  // executable in this Node harness — no component-test infra exists in this
+  // repo. What IS testable, and what the fix actually depends on: a fresh
+  // getSetsForDate call made right before writing an exercise's sets sees any
+  // set saved since the LAST query, including one from a concurrent manual
+  // save that landed between two calls. That is the exact mechanism the
+  // component-level fix (re-query per exercise instead of a click-time
+  // closure) relies on to never overwrite a manually-logged set.
+  console.log('\n[13] fresh getSetsForDate sees a concurrent manual save between two calls (fix #6 mechanism)')
+  const raceEx = 'Cable Tricep Pushdown'
+  const raceExId = getExerciseId(raceEx)
+  const raceDate = isoDatePlusDays(2) // a fresh date, untouched by earlier sections
+
+  const beforeManualSave = (await getSetsForDate(userId, raceDate)).filter(l => l.exercise_name === raceEx)
+  check('nothing logged for this exercise yet (click-time snapshot would be empty)', beforeManualSave.length === 0)
+
+  // Simulates a manual SetLogger save happening concurrently, e.g. while the
+  // bulk loop is awaiting an earlier exercise's ghost lookup.
+  saveSet({ userId, date: raceDate, weekNumber: 1, day, exerciseId: raceExId, exerciseName: raceEx, setNumber: 1, weightKg: 12.5, repsCompleted: 15 })
+
+  const afterManualSave = (await getSetsForDate(userId, raceDate)).filter(l => l.exercise_name === raceEx)
+  check('a re-query made right before writing this exercise sees the manual save',
+    afterManualSave.length === 1 && afterManualSave[0].weight_kg === 12.5, afterManualSave)
+  check('the manually-saved set is therefore skippable by natural key (set_number 1)',
+    afterManualSave.some(l => l.set_number === 1))
+
   // ---- Summary -------------------------------------------------------------
   if (failures > 0) {
     console.error(`\n${failures} logging round-trip check(s) FAILED.`)

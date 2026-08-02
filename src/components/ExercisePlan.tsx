@@ -925,14 +925,24 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
       const newCompleted: Record<string, boolean> = { ...completedSetsMap }
       const savedLogs: ExerciseSetLog[] = []
       const skipped: string[] = []
+      const raceSkipped: string[] = []
       let loggedCount = 0
 
       for (const ex of todayWorkout.exercises) {
         const exerciseId = ex.id ?? getExerciseId(ex.name)
         const entry = getExerciseEntry(ex.name)
         const isBodyweightMovement = entry ? !isExternallyLoaded(entry) : false
+
+        // Re-checked at WRITE time, not the click-time todayLogs closure —
+        // the previous exercise's ghost lookup below awaits a network call,
+        // and a set manually saved via SetLogger during that window must
+        // never be silently overwritten by this exercise's bulk write.
+        let currentLogs: ExerciseSetLog[] = todayLogs
+        try {
+          currentLogs = await getSetsForDate(profileId, today)
+        } catch { /* offline — fall back to the click-time snapshot */ }
         const alreadyLogged = new Set(
-          todayLogs.filter(l => l.exercise_name === ex.name).map(l => l.set_number)
+          currentLogs.filter(l => l.exercise_name === ex.name).map(l => l.set_number)
         )
 
         let lastSets: ExerciseSetLog[] = []
@@ -941,8 +951,18 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
         } catch { /* offline — fall back to prescription */ }
 
         const repsLow = parseRepsLow(ex.reps)
+        let raceSkippedCount = 0
         for (let s = 1; s <= ex.sets; s++) {
-          if (alreadyLogged.has(s)) continue
+          if (alreadyLogged.has(s)) {
+            // Keep the UI's completedSetsMap in sync with what actually got
+            // logged (by the manual save this loop deferred to) — otherwise
+            // this function's own end-of-run setCompletedSetsMap(newCompleted)
+            // would overwrite React state with a stale snapshot that never
+            // saw the manual save, and the checkmark would vanish.
+            newCompleted[`${ex.name}-${s}`] = true
+            raceSkippedCount++
+            continue
+          }
 
           const ghostWeight = lastSets.find(ls => ls.set_number === s)?.weight_kg
           const weight = isBodyweightMovement
@@ -978,6 +998,7 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
           newReps[`${ex.name}-${s}`] = repsLow
           newCompleted[`${ex.name}-${s}`] = true
         }
+        if (raceSkippedCount > 0) raceSkipped.push(`${ex.name} (${raceSkippedCount} already logged)`)
       }
 
       setSetWeights(newWeights)
@@ -1000,10 +1021,11 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
         weekNumber: currentWeek,
       })
 
-      if (skipped.length > 0) {
-        setProgressionToast(
-          `Logged ${loggedCount} sets. Skipped ${skipped.join(', ')} — no known weight yet; log those manually so progression has real numbers.`
-        )
+      if (skipped.length > 0 || raceSkipped.length > 0) {
+        const parts = [`Logged ${loggedCount} sets.`]
+        if (raceSkipped.length > 0) parts.push(`Kept your manually-logged sets as-is: ${raceSkipped.join(', ')}.`)
+        if (skipped.length > 0) parts.push(`Skipped ${skipped.join(', ')} — no known weight yet; log those manually so progression has real numbers.`)
+        setProgressionToast(parts.join(' '))
         setTimeout(() => setProgressionToast(null), 8000)
       }
     } finally {
