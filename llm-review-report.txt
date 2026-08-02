@@ -959,3 +959,432 @@ VERDICT: **Yes.** The skeleton is competent, but the first time this client load
 
 ================================================================================
 
+================================================================================
+LLM COACH REVIEW — 2026-08-02T09:08:06.112Z
+================================================================================
+
+--------------------------------------------------------------------------------
+Hypertrophy / Beginner / Full Gym
+--------------------------------------------------------------------------------
+SCORE: 4.4
+
+TOP 3 ISSUES:
+1. **Lower body is barely trained, and the split is badly imbalanced for a hypertrophy client with a full gym.** Thursday is the only genuine leg day: 3 sets of barbell squats plus *bodyweight* step-ups and an overhead carry. Hamstrings get 3 sets of deadlifts (Tue) and bodyweight single-leg RDLs. Quads: ~3 hard sets a week. Calves: zero. Leg curl, leg press, hack squat, hip thrust, glute work: zero, in a full gym. Meanwhile the back gets lat pulldowns Tuesday plus an entire Friday of barbell rows + assisted pull-ups + seated cable rows — 12+ sets. Chest gets bench + push-ups once per week (Monday only), quads once per week. For beginner hypertrophy you want ~2x/week frequency per muscle; this program gives 2x for back and 1x for everything else.
+
+2. **The load progression numbers are arbitrary and don't survive arithmetic.** Wk1→Wk3: bench 22.5→27.5kg (+22%), Arnold press 8→12kg/hand (+50%), overhead tricep extension 8→12kg (+50%), cable curls 7.5→12.5kg (+67%), overhead carry 10→14kg/hand (+40%). Isolation work does not progress three times faster than the bench press, and no beginner adds 67% to a cable curl in two weeks *while also* increasing reps (11-15→13-17) *and* RPE (5-6→6-7) — that's three progression variables moved at once. The Week 1 anchors are also internally incoherent: a trainee benching 22.5kg (bar + 2.5kg) is not Arnold pressing 16kg total, and is not doing 15-18 overhead tricep extensions with 8kg. And in the deload, rest goes *up* to 90s while the hard Week 3 bench sits at 75s — backwards on both weeks.
+
+3. **The macrocycle wastes half the client's year, and the coach note contradicts the prescription.** Block 3 repeats "Anatomical Adaptation — connective tissue, movement quality, work capacity." A trainee who just completed 8 weeks of lifting does not need to re-do tendon prep; that's a copy-paste template, not a plan. So a hypertrophy client spends 50% of the macrocycle not training for hypertrophy. On top of that, the Week 1 note promises "working sets taken close to failure," then prescribes RPE 5-6 and 6-7 for four straight weeks — nothing in this block is close to failure. Related sloppiness: rep ranges of "11-15," "13-17" and planks of "33-48 seconds" are obvious generator output; no coach writes a 15-second plank window, and it torches credibility with the client.
+
+TOP 3 STRENGTHS:
+1. **The weekly logistics are genuinely well-built for this profile.** Mon/Tue lift, Wed easy aerobic, Thu/Fri lift, weekend fully off — no back-to-back-to-back grind, and the sessions actually fit the 45-60min window (Friday's six items at 45-75s rest lands around 40 minutes). It respects "moderate recovery capacity" in session density even if it errs on days per week.
+2. **A dedicated calibration week with conservative loads and an explicit explanation is the right call for a beginner.** Telling the client "loads are deliberately conservative while you find your real working weight; the ramp starts next week" prevents the classic beginner mistake of maxing out in week one and being wrecked by week two.
+3. **Movement selection is appropriate and low-risk, and the deload is scheduled rather than reactive
+
+--------------------------------------------------------------------------------
+Hypertrophy / Advanced / Bodyweight
+--------------------------------------------------------------------------------
+SCORE: 3.8
+
+TOP 3 ISSUES:
+
+1. **Pushing volume is nearly nonexistent for a hypertrophy client.** Across the entire week there is exactly ONE pressing exercise — Archer Push-Ups (Mon, Wk1) / Deficit Push-Ups (Mon, Wk3), 4 sets. That's 4 sets/week for chest, shoulders and triceps, against 12 sets of pull-ups plus 4 sets of rowing (Mon/Tue/Fri). There is zero vertical pressing (no pike push-up, no handstand progression), zero dip or triceps work. An advanced trainee will get 3:1 pull:push and a shoulder-health problem inside 8 weeks. Meanwhile Friday runs Hanging Leg Raise + Plank + Dead Bug + Side Plank — four core exercises in a 6-exercise session. That's a core day pretending to be an upper body day. Take three of those slots and give them to pressing.
+
+2. **The prescribed intensity can't drive hypertrophy in an advanced bodyweight trainee, and the program contradicts itself about it.** The coach note says "working sets taken close to failure," then every set is written at RPE 5-6 (Wk1) and RPE 6-7 (Wk3). Air Squats 4x13-17 @ RPE 6-7 and Calf Raises 3x17-20 @ RPE 6-7 are not a stimulus for an advanced athlete — they're a warm-up. With bodyweight-only, overload must come from *harder mechanical variations* (assisted → full pistol, feet-elevated → ring/archer push-up, tuck → straddle), not from adding two reps to an air squat. The progression model here is "add reps at the same easy RPE," which is a beginner's model applied to an advanced client.
+
+3. **Two hard bugs in loading and exercise continuity.** (a) Client equipment is *bodyweight*, yet Backpack Row is prescribed at ~55kg in Wk1 and ~65kg in Wk3 — nobody has a 65kg backpack, and an 18% jump in two weeks is arbitrary anyway. (b) The main lower-body slot changes every block-week: Monday Wk1 Split Squat → Wk3 Step-Ups; Thursday Wk1 Pistol Squat Progression → Wk3 Split Squat. You cannot track progressive overload on a lift that keeps getting swapped. Thursday also stacks Split Squat + Air Squat + Calf Raise — three low-tension quad/calf items and no posterior chain.
+
+Also flag: half the macrocycle (Blocks 1 and 3) is "Anatomical Adaptation — connective tissue and movement quality" for an *advanced* trainee whose goal is hypertrophy. Repeating a base-building block in month 3 wastes 4 weeks of a 16-week plan.
+
+TOP 3 STRENGTHS:
+
+1. **Weekly structure and recovery placement are sound.** Mon/Tue — Wed active recovery — Thu/Fri, two full days off, matches a moderate-recovery profile and a 45–60min budget without stacking four hard days back to back.
+
+2. **The deload is a real deload, not a token one.** Week 4 Monday cuts sets from 4 to 2, drops RPE to 5-6, extends rest to 75–90s, and keeps movement patterns identical — that's the correct way to do it, and the coach note explicitly tells the client the cut isn't a punishment for stalling.
+
+3. **Sensible time-saving and volume detail.** The A1/A2 pairing of Farmer Squat Hold with Hanging Leg Raises on Thursday is a legitimate non-competing superset, rest periods are differentiated by exercise type (75s pull-ups vs 30s planks vs 45s isolation), and the calibration-week framing plus week-to-week RPE progression (5-6 → 6-7) shows a coherent, if too-timid, ramp.
+
+VERDICT: **Yes.** An advanced client paying for a hypertrophy program will notice by week 2 that he's doing 12 sets of pull-ups and 4 sets of push-ups per week with no shoulder or triceps work at all, and he'll bin the plan the first time the app tells him to load a backpack with 65kg he doesn't own. The air-squat-at-RPE-6 progression model would insult anyone who has actually trained hard.
+
+--------------------------------------------------------------------------------
+Hypertrophy / Intermediate / Minimalist
+--------------------------------------------------------------------------------
+SCORE: 4.4
+
+TOP 3 ISSUES:
+1. **The main lifts get swapped out mid-block, so there is nothing to progress.** Monday's press goes Arnold Press 4x11-15 @14kg (Wk1) → DB Shoulder Press 4x11-15 @18kg (Wk3). Monday's push goes Deficit Push-Up → Archer Push-Up. Tuesday's row goes Inverted Row → Towel Row → back to Inverted Row on Friday Wk3. Worst of all, Tuesday's hinge goes from a 48kg Kettlebell Swing (Wk1) to a **bodyweight** Single-Leg RDL (Wk3) — that's a massive de-load dressed up as progression. An intermediate chasing hypertrophy needs the same 6-8 anchor lifts for the whole block so load can actually climb. This program can't demonstrate overload on a single movement.
+
+2. **The prescribed intensity contradicts the program's own stated logic, and the load jumps are fantasy.** The coach note says volume is "taken close to failure," then every working set in Weeks 1 and 3 is RPE 5-6 or 6-7 — 4-5 reps in reserve. For an intermediate, three weeks of 11-20 rep sets at RPE 6 is maintenance work, not a stimulus. Meanwhile the loads jump in ways nobody hits: Lateral Raises 6kg → 10kg for 15-18 reps in two weeks (+67%), Shrugs 12kg → 20kg (+67%), Overhead Carry 18 → 22kg per hand. That's an algorithm applying a percentage, not a coach reading a logbook.
+
+3. **Lower body is undertrained and the equipment brief is broken.** Legs get one day out of four: Goblet Squat @28kg and bodyweight Split Squats for 13-17 reps by Week 3. There is no loaded hinge anywhere in Week 3. Total weekly hard leg sets ≈ 7-8, against roughly 12 sets of direct core (Hanging Leg Raise, Pallof, Dead Bug, Ab Wheel twice) and 6 sets of biceps curls — with **zero** direct triceps work. And "minimalist equipment" apparently includes a 48kg kettlebell, dumbbells to 22kg/hand, an ab wheel, sliders, a pull-up bar, a plyo box and a 45kg backpack. Pick a lane.
+
+TOP 3 STRENGTHS:
+1. **Weekly structure and recovery placement are sound for a moderate-recovery client.** Four lifting days with the Wednesday active-recovery split between the two upper-heavy blocks, two genuine rest days, and ~45-60min session lengths that actually match the constraint. Nobody is going to break from this schedule.
+2. **The deload is a real deload, and it's correctly built.** Week 4 Monday cuts sets from 4 to 2 and load from 18kg to 12kg while holding rep range and adding rest — volume down ~50%, intensity down, movement pattern retained. That's textbook, and most auto-generated plans get it wrong by cutting reps instead of sets.
+3. **Antagonist/isometric pairing and honest coach notes.** The A1/A2 Overhead Carry + Dead Bug pairing on Thursday is a smart time-saver for a 45-60min cap, and flagging Week 1 explicitly as a calibration week with conservative loads is the right way to set expectations with an intermediate who'll otherwise sandbag or overshoot.
+
+VERDICT: Yes. A paying intermediate would look at Week 3 and see he's doing bodyweight split squats and bodyweight single-leg RDLs at RPE 6 after paying for a hypertrophy program — his hinge loading went *down* from 48kg to zero, his push-up variation changed twice, and he has no way to answer "am I stronger than three weeks ago?" on any lift. Add three weeks of curls with no triceps work and one leg day, and he's cancelling before Block 2.
+
+--------------------------------------------------------------------------------
+Fat Loss / Novice / Home Gym
+--------------------------------------------------------------------------------
+SCORE: 5.2
+
+TOP 3 ISSUES:
+1. **The accessory load progression from Week 1 to Week 3 is fabricated, not physiological.** Dumbbell Curls go 6kg → 10kg per hand (+67%), Rear Delt Flyes 8kg → 12kg (+50%), Skull Crushers 12.5kg → 17.5kg (+40%), Arnold Press 10kg → 14kg (+40%), Overhead Carry 14kg → 18kg (+29%) — and the rep ranges *stay the same or go up* (Pallof Press 15-18 → 17-20). Nobody adds 50% to a rear delt flye in two weeks, least of all a novice eating in a deficit. Meanwhile the main lifts move sanely (+5kg on bench, +5kg on squat). The algorithm is clearly applying a percentage bump to every line item regardless of whether it's a 35kg bench or a 6kg curl. By Thursday of Week 3 this client is failing sets on isolation work and concluding the program doesn't work.
+2. **The split is wrong for the client and has a structural hole.** A novice gets one squat session (Thursday) and one press session (Monday) per week — that's the lowest useful frequency for motor learning, and it's the opposite of what a beginner needs. Worse, there is **no vertical pull anywhere in the week** — Barbell Rows, Backpack Row, and Rear Delt Flyes are all horizontal/scap work. And Friday is a genuine junk day: Backpack Row, Dumbbell Curls, Dead Bug, Rear Delt Flyes, Shrugs. Shrugs and a second curl variation on a 45-60min fat-loss novice program are a waste of a training slot. Three full-body days plus conditioning would beat this five-day pseudo-bodypart split on every metric that matters here.
+3. **Six training days with one rest day for a "moderate recovery" novice in a deficit, and the warm-ups are randomly assigned.** Mon/Tue lift, Wed Zone 2, Thu/Fri lift, Sat Zone 2, Sunday off. That's a lot of imposed structure for someone new to training who's also under-eating. Separately: Bodyweight Squat Marches before a bench day, Band Pull-Aparts before squats, Med Ball Slams before an arm day — the movement prep has no relationship to the session it precedes. That's a giveaway that warm-ups are being pulled from a pool at random, and any competent lifter will notice within a week.
+
+TOP 3 STRENGTHS:
+1. **The framing note is correct and unusually honest.** "Diet drives the fat loss here, not the workout — this program is built to protect the muscle you already have" is exactly what a fat-loss lifting block should say. The explicit refusal to convert lifting into circuit training ("conditioning is appended on top, never substituted") is the single most important decision in this plan and it got made right.
+2. **Conditioning is correctly dosed to the profile.** `conditioning_preference=tolerate` got two Zone 2 sessions, not four HIIT sessions. Duration progresses 35min → 41min by Week 3, it's on non-lifting days, and it doesn't compete with leg recovery. That's a coach-level decision, not a template default.
+3. **The deload is real and the calibration week is real.** Week 4 cuts bench from 3 sets to 2 and from 40kg to 27.5kg with rest extended to 90s — that's an actual deload, not the fake "same weight, one less set" version most apps ship. And explicitly telling a novice that Week 1 loads are provisional while they find working weights is the right way to handle prescribing absolute kg to someone you've never watched lift.
+
+VERDICT: No — but only because the client is a novice who won't know what they're looking at until Week 3, when they fail 15-18 reps of skull crushers at 17.5kg two weeks after doing 12.5kg. The bones are sound (deload, conditioning dosing, honest fat-loss framing), but the accessory progression math is broken enough to break trust on its own, and a five-day split with zero vertical pulling and a shrug/curl day is not what you give a beginner with 45 minutes and a fat-loss goal. Fix the progression logic to be movement-specific and collapse this into three full-body days, and it's a 7.5.
+
+--------------------------------------------------------------------------------
+Fat Loss / Advanced / Full Gym
+--------------------------------------------------------------------------------
+SCORE: 5.2
+
+TOP 3 ISSUES:
+
+1. **The program regresses loaded work as it "progresses," and there is no hinge at all.** Week 1 Tuesday has Dumbbell Rows @28kg/hand and Lying Leg Curl @42.5kg; by Week 3 those are Inverted Row (bodyweight) and Sliding Leg Curl (bodyweight). Thursday's Step-Ups go from 18kg/hand to bodyweight. That is a reduction in mechanical tension in the exact block where you told the client you were "protecting the muscle you already have while in a deficit." Worse, the day literally called "Pull & Hinge" contains no hinge — Week 1 gives bodyweight Single-Leg RDL, Week 3 gives bodyweight Good Morning. An advanced lifter with a full gym and a 92.5kg squat gets zero loaded posterior chain work across the entire block. No deadlift, no barbell RDL, no hip thrust, no 45° back extension. Hamstrings and glutes are the first thing to go in a deficit and you've left them untrained.
+
+2. **The load numbers aren't cross-calibrated against each other or against reality.** Dumbbell Curls at 26kg per hand for 15-18 reps at RPE 6-7 (Week 3 Tuesday) is a strength-athlete number for a set of 5 — and then two days later the same trainee does Incline Dumbbell Curls at 16kg. Skull Crushers at 27.5kg for 15-18 @ RPE 5-6 in a calibration week is similarly optimistic. Meanwhile the same athlete presses 32kg dumbbells for 11-15 but only rows 28kg and squats 92.5kg for 9-13 at RPE 5. Either the strength estimates are pulled from unrelated formulas per-exercise, or nobody sanity-checked them side by side. A client who can't get the 26s off his knees for one rep loses trust in every other number on the page.
+
+3. **Structure is wrong for the client: 2 pull days to 1 push day, everything trained once a week, and RPE never exceeds 6-7.** Chest and shoulders get Monday only. Legs get Thursday only. Meanwhile Tuesday and Friday are both back-and-biceps, giving roughly a 2:1 pull:push ratio. For an advanced trainee in a caloric deficit, once-weekly frequency at a ceiling of RPE 7 is not enough proximity to failure to defend muscle mass. On top of that, Block 1 is an "Anatomical Adaptation / connective tissue" phase — that's a beginner block. An advanced lifter has years of tendon adaptation; four weeks of RPE 5-6 at the top of a fat-loss macrocycle is four weeks spent not defending muscle. Then Block 3 is a full metabolic conditioning block, which drops load further at the deepest point of the deficit — directly contradicting your own coach note.
+
+TOP 3 STRENGTHS:
+
+1. **The coaching philosophy in the Week 1 note is correct and rare.** "Diet drives the fat loss here, not the workout" and "conditioning is appended on top, never substituted for lifting" is exactly the right message for an advanced fat-loss client, and the app resisted the standard mistake of turning a fat-loss plan into circuit training with 5kg dumbbells. Prescribing Zone 2 at 35-41 min for a moderate-recovery client who merely tolerates conditioning is the right call over HIIT.
+
+2. **Session architecture within each day is sound.** Compounds first, isolation last, rest periods scaled to demand (75s on OHP/pull-ups down to 30s on shrugs and woodchops), trunk work in every single session, the Trap Bar Carry / Pallof A1-A2 pairing is a smart anti-rotation-under-load combo, and Sunday is a genuine full off day rather than fake "active recovery."
+
+3. **The deload is honestly framed and structurally correct in principle** — cutting from 3 sets to 2 and explicitly telling the client it's scheduled, "not because progress stalled." That single sentence prevents the most common client behavior problem in a deload week. (Execution is a separate matter — see below.)
+
+VERDICT: **Yes.** An advanced trainee will open Week 3, see his 28kg dumbbell rows replaced by bodyweight inverted rows and his loaded step-ups replaced by un
+
+--------------------------------------------------------------------------------
+Fat Loss / Beginner / Bodyweight
+--------------------------------------------------------------------------------
+SCORE: 4.5
+
+TOP 3 ISSUES:
+
+1. **Friday ("Upper Pull & Core") is a throwaway session, and total pushing volume across the week is 4 sets.** Friday is one real exercise (Towel Row) followed by Side Plank, Plank, and Dead Bug — three isometric core drills stacked back to back. That's maybe 20 minutes of work against a 45–60 min budget, and it's the third exposure that week for side plank (also Monday), plank (also Thursday), and dead bug (also Tuesday). Meanwhile the only horizontal press in the entire microcycle is Monday's Incline Push-Ups 4x11-15. Chest, shoulders and triceps get one exercise per week in a caloric deficit — that is exactly the tissue the coach note claims this program is "built to protect." There is also zero vertical pulling anywhere (Backpack Row and Towel Row are both horizontal) and no overhead or pike pressing.
+
+2. **The coach note contradicts the client's equipment profile, repeatedly.** "Weights stay real weights and progression keeps climbing" and "Calibration week — loads are deliberately conservative while you find your real working weight" are written for a barbell client. This person has a backpack. Same problem in the Week 4 note: "load and volume both step back" — load on Incline Push-Ups, Glute Bridge, Air Squat and Side Plank is bodyweight and cannot step back; only sets moved (4→2). Monday is titled "Full Body Power" and contains no power work — four movements at RPE 5-6 for 11-15 reps. This is boilerplate text that wasn't filtered against the profile, and a client will spot it.
+
+3. **The progression mechanism is wrong for a bodyweight beginner.** Week 1 → Week 3 on Air Squat goes 4x11-15 @ RPE 5-6 → 4x13-17 @ RPE 6-7. Adding two reps to a set of 15 air squats doesn't drive adaptation, it just drifts into local endurance — by Block 2 ("moderate loads, higher volume") this exercise will be a 20-rep set at RPE 7 and functionally useless as a hypertrophy stimulus. Bodyweight progression has to come from leverage and tempo: lowering the incline on the push-up, moving Split Squat toward rear-foot-elevated, adding a 3-second eccentric, moving Glute Bridge to single-leg. None of that exists here. Meanwhile the one variable that *can* be loaded — the backpack — jumps 22.5kg → 27.5kg in two weeks (+22%) for a beginner, on both the Row and the 40m Carry. That's the one place the program is too aggressive, and it's the opposite of the "connective tissue adapts slowly, do not rush it" note.
+
+TOP 3 STRENGTHS:
+
+1. **The fat-loss framing is honest and correct.** "Diet drives the fat loss here, not the workout — this program is built to protect the muscle you already have" is the right message, and the structure backs it: resistance training is the priority, Zone 2 is appended on Wednesday/Saturday rather than replacing lifting days. No burpee-circuit-as-fat-loss nonsense. For a "tolerate" conditioning client, two conversational-pace sessions at 35 min scaling to 41 min is well-judged dosing.
+
+2. **Volume and frequency are appropriate for a beginner with moderate recovery.** Four lifting days, two easy aerobic days, one full day off, 3-4 working exercises per session, RPE capped at 6-7 in the base block. Nobody is getting buried in week 1. The Thursday A1/A2 pairing of Loaded Backpack Walk with Plank is a sensible use of carry rest time.
+
+3. **A real deload exists and is structured correctly.** Sets cut 4→2, reps and RPE held, rest extended 60s→75s, warm-up preserved. That's the textbook way to deload — drop volume, keep intensity and movement exposure — and the note explicitly pre-empts the client's instinct to push through it. Most app-generated plans either skip the deload or cut intensity and keep volume, which is backwards.
+
+VERDICT: **Yes.** A client who reads "weights stay real weights" and "find your real working weight" in a bodyweight-only program will immediately conclude the plan wasn't written for them, and the first time they finish Friday's plank-plank-dead-bug session in 22 minutes they'll know it too. The skeleton is defensible — the sequencing, deload and conditioning dose are fine — but one pressing exercise per week and a copy-paste warm-up on all four days is not a program someone should pay for.
+
+--------------------------------------------------------------------------------
+Conditioning / Beginner / Minimalist
+--------------------------------------------------------------------------------
+SCORE: 5.2
+
+TOP 3 ISSUES:
+
+1. **Push volume is unrealistic for a beginner and swamps pulling.** Week 1 Monday prescribes Incline Push-Ups 4x11-15 *plus* Push-Ups 4x11-15 *plus* Arnold Press 4x11-15 — that's 88-120 push-up reps and 12 pressing sets in one session for someone who has never trained. Most beginners cannot do 4x15 strict push-ups at all, let alone at RPE 5-6, so the prescription is unachievable on day one and gets *harder* (4x13-17) by Week 3. Meanwhile the entire week contains four sets of horizontal pull (Towel Row) and zero vertical pull. A 3:1 press-to-pull ratio in a beginner is how you build a client with cranky front shoulders in eight weeks. Also, incline push-ups and push-ups in the same session is the same movement pattern twice — pick one and regress/progress it.
+
+2. **Nothing actually progresses except reps, and the hinge is buried in the warm-up.** Arnold Press sits at 8kg and Goblet Squat at 12kg from Week 1 through Week 3 — the only progression is rep creep (11-15 → 13-17) and an RPE bump. That drifts every lift into local muscular endurance and, at 12kg for 17 reps, the goblet squat stops training the legs and just becomes a grip/cardio drill. Simultaneously the Loaded Backpack Walk jumps 22.5 → 27.5kg (+22%) in two weeks, which is the one place the app *did* load progressively and it's the most aggressive jump in the plan. Worse: Kettlebell Swings — the single most useful minimalist tool for a conditioning goal — appear only as 2x8 "light movement prep." There is no loaded hinge anywhere in the training week. That's a hole in a minimalist program, not a stylistic choice.
+
+3. **The Friday "Conditioning & Core" day is half a session, and conditioning barely progresses.** 6 min warm-up + 3 sets of dead bug + 14 intervals of 33s work / 20s rest = roughly 22-25 minutes against a 45-60 min session slot. For a client whose *primary goal is conditioning*, this is the day that should be the centerpiece. Week 1 → Week 3 progression is 33s → 35s intervals, a 6% change that is inside the noise floor. There is also no baseline test anywhere — no timed mile, no max push-up test, no resting HR — so neither coach nor client can tell in eight weeks whether the conditioning goal was met. And the coach note says "two to three full-body sessions," then the plan delivers four split-pattern lifting days plus two aerobic days plus a conditioning day: six days a week for a *beginner* with *moderate* recovery. The note and the plan contradict each other.
+
+TOP 3 STRENGTHS:
+
+1. **The block sequencing and calibration/deload logic are sound and honestly explained.** Starting a conditioning-goal beginner in Anatomical Adaptation with a stated tendon-adaptation rationale is correct, the calibration-week framing ("loads are deliberately conservative while you find your real working weight") sets accurate expectations, and the Week 4 deload is a proper one — sets halved 4→2, Arnold Press dropped 8→6kg, rest extended 60→75s, with an explicit "resist the urge to push." Most apps fake deloads by shaving one set. This one didn't.
+
+2. **The lifting is correctly subordinated to the conditioning goal, and it says so out loud.** "Lifting supports the engine work here, not the other way around" is exactly the right framing for this client, and the plan backs it with two dedicated Zone 2 sessions that progress sensibly (45 → 53 min) with an actual HR prescription (120-140 BPM) rather than a vague "go for a jog."
+
+3. **Equipment constraints are respected without cheating.** Towel rows, backpack carries, incline push-ups, goblet squats, jump rope — every exercise is genuinely doable with minimal kit, and the A1/A2 pairing of Loaded Backpack Walk with Side Plank on Thursday is smart time management that keeps that session inside the 45-60 min window.
+
+VERDICT: No — but only just. The skeleton is legitimate (real deload, real Zone 2 progression, honest coach notes, equipment-appropriate), so a client won't call this a scam; they'll call it frustrating. What will actually happen is they'll fail the Week 1 push-up prescription outright, feel like they're behind on day one, and then notice by Week 3 that the goblet squat and Arnold Press weights haven't moved at all. Fix the push-up volume, promote the kettlebell swing out of the warm-up, add a second pulling movement, and put a benchmark test in Week 1 and this is a 7.5.
+
+--------------------------------------------------------------------------------
+Conditioning / Intermediate / Full Gym
+--------------------------------------------------------------------------------
+SCORE: 5.2
+
+TOP 3 ISSUES:
+1. **The client's stated goal is conditioning, and the conditioning is the least-designed part of the program.** Friday's session progresses from 7x33s to 7x35s over three weeks — two seconds. Zone 2 goes 45min to 53min. Blocks 2 and 4 have literally the same description ("short rest, sustained output") with no distinction between aerobic base, threshold, VO2max, or anaerobic capacity work. There is no benchmark test, no pace/watt/distance target, and no retest anywhere. Worse, the intervals are prescribed at RPE 5-6 (Wk1) and 6-7 (Wk3) — you cannot drive a conditioning adaptation with an intensity cap that low on 33-second efforts. That's not intervals, that's circuit filler. A client who came here to get fitter has no way to know at week 12 whether they did.
+2. **Exercise churn between Week 1 and Week 3 destroys progressive overload in the one block that's supposed to be about grooving movement.** DB Shoulder Press→Arnold Press, Overhead Tricep Ext→Skull Crushers, Inverted Row→Seated Cable Row, Glute Bridge→Good Mornings, Walking Lunges→Bulgarian Split Squats, Lying Leg Curl→Sliding Leg Curl. The last one is an outright regression (32.5kg loaded → bodyweight). And Good Mornings at 55kg for 13-17 reps, on the same day as 3x9-13 deadlifts at 97.5kg, is a lot of high-rep lumbar loading to introduce cold in week 3 of a block whose own coach note says "do not rush it." Meanwhile bench jumps 45→50kg *and* reps 11-15→13-17 *and* RPE 5-6→6-7 — all three progression levers pulled at once in an anatomical adaptation block.
+3. **No vertical pull in the entire week, and pressing volume roughly quadruples pulling volume.** Monday has Bench, Dips, Shoulder Press, and Tricep Extensions — four pressing movements. Tuesday has exactly one horizontal row. This is a full gym; there is a pull-up bar and a lat pulldown sitting unused, and the program already prescribes Hanging Leg Raises so we know the bar exists. Over a 12+ week macrocycle that imbalance is a shoulder problem waiting to happen, especially with dips in there.
+
+TOP 3 STRENGTHS:
+1. **The calibration week is handled properly and honestly.** Conservative loads with an explicit note that "the block's real ramp starts next week" is exactly how you avoid an intermediate sandbagging or blowing themselves up in week 1 on numbers an app guessed at. Most auto-generated programs skip this entirely.
+2. **The coach note correctly subordinates lifting to the goal.** "Lifting supports the engine work here, not the other way around — two to three full-body sessions keep you strong enough to train hard" is the right hierarchy for a conditioning client, and it's stated plainly enough that the client won't sabotage the plan by chasing PRs. The Zone 2 volume (2x/week) plus a genuine full rest day on Sunday is a defensible aerobic base structure.
+3. **Session design respects the 45-60min constraint without cutting corners.** The A1/A2 pairing of Suitcase Carry with Pallof Press on Thursday is a smart use of the rest interval, warm-ups are prescribed with real time allocations, and the rest periods (75s on the main lift, 45-60s on accessories) actually add up to a session that fits the window.
+
+VERDICT: No — but only because the program is safe and trainable, not because it's good
+
+--------------------------------------------------------------------------------
+Conditioning / Advanced / Home Gym
+--------------------------------------------------------------------------------
+(review failed: TypeError: fetch failed)
+
+--------------------------------------------------------------------------------
+Functional / Novice / Bodyweight
+--------------------------------------------------------------------------------
+(review failed: TypeError: fetch failed)
+
+--------------------------------------------------------------------------------
+Functional / Advanced / Full Gym
+--------------------------------------------------------------------------------
+SCORE: 5.4
+
+TOP 3 ISSUES:
+1. **The exercise rotation destroys progressive overload for an advanced lifter, and it's worst on the accessory slots.** Tuesday's second hinge goes from Single-Leg RDL (bodyweight) in Week 1 to **bodyweight Glute Bridge** in Week 3 — that's a regression, not a rotation, and it's zero stimulus for an advanced trainee in a full gym. Same story Monday: Archer Push-Ups (W1) → DB Bench Press at 38kg/hand for 13-17 reps (W3) — two totally different exercises, so the 38kg is a guess with no calibration data behind it. Then the deload introduces a *third* new movement (Incline DB Press) in the week that's supposed to dissipate fatigue, not create novel soreness. Meanwhile Close-Grip Lat Pulldown sits at 55kg in both W1 and W3 and Leg Extensions at 45kg in both — the exercises that *don't* rotate don't progress either. Also flagged: Assisted Pull-Ups for 13-17 reps and bodyweight Calf Raises on an "advanced" profile is a profile-read failure.
+2. **Load progression rates are internally inconsistent and backwards.** W1→W3: Overhead Press 42.5→47.5kg (+11.8%), Barbell Row 57.5→62.5 (+8.7%), Squat 92.5→97.5 (+5.4%), Trap Bar 115→120 (+4.3%). Small upper-body lifts are being pushed roughly twice as fast as the big lower-body lifts, which is the inverse of how those lifts actually progress. On a "moderate recovery capacity" profile you'll blow up the press before the squat ever gets challenging. Bonus error: Week 3 "Shrugs: ~26kg **per hand**" for a barbell movement, and 24-26kg/hand shrugs sitting next to 30kg/hand DB Shrugs on Friday — the same movement is prescribed twice a week at two different, both trivial, loads.
+3. **Goal says "functional," the program is a low-rent bodybuilding split, and the conditioning is a no-show.** Across four sessions you have direct arm work on all four days (Overhead Tricep Ext, Cable Curls, Barbell Curls, Tricep Pushdowns, Hammer Curls, DB Curls), shrugs on two days, and leg extensions — inside a 45-60 min cap where 11-12 min is already eaten by warm-up. That's ~25% of the session budget on movements with no transfer to the stated goal. Meanwhile the client tolerates conditioning and gets two 25-30 min "walk or light swim" sessions — that is recovery, not conditioning, and there is no sled, carry medley, or interval work anywhere. The "movement prep" is also mis-assigned: **Plyo Push-Ups before a deadlift/row day** and Bodyweight Squ
+
+--------------------------------------------------------------------------------
+Functional / Intermediate / Home Gym
+--------------------------------------------------------------------------------
+SCORE: 4.3
+
+TOP 3 ISSUES:
+
+1. **The load prescriptions are not real numbers — several are physically undoable.** Week 3 Tuesday prescribes "Kettlebell Swing (Heavy) 3x13-17 @ ~56kg" for a client whose barbell row is 50kg and squat is 75kg. A 56kg bell for sets of 17 at RPE 6-7 is a fantasy. Same day-plus-two: Week 3 Thursday, Bulgarian Split Squats at "~38kg per hand" (76kg of dumbbells) for 13-17 reps, from a client back-squatting 75kg for 9-13. And nobody owns 38kg dumbbells in a home gym. "Suitcase Carry ~24kg **per hand**" is a contradiction in terms — a suitcase carry is one-sided by definition. These errors are all in the same block, so it's not a one-off typo; the load engine is guessing.
+
+2. **Exercises rotate between W1 and W3 in ways that erase progression and sometimes go backwards.** Dumbbell Rows @22kg/hand (W1 Friday) becomes Towel Row @ bodyweight (W3 Friday) — that's a significant load *reduction* in week 3 of a block that's supposed to be ramping. Glute Bridge (BW) → 56kg KB Swing, Step-Ups (BW) → loaded Bulgarian Split Squats: those aren't progressions, they're different exercises with no shared baseline, so the client has no idea if they got stronger. The coach note pre-excuses this ("exercises rotate faster") — that's a defect being marketed as a philosophy. In an anatomical adaptation block, whose entire justification is repeated consistent loading of slow-adapting connective tissue, rotating the main accessories is self-contradictory.
+
+3. **"Functional" goal, bodybuilding accessory program, and no hinge.** There is not a single loaded hip hinge in Week 1 — Glute Bridge (bodyweight) does not cover deadlift/RDL/good morning. Meanwhile every single day ends with two isolation exercises: lateral raises + shrugs, sliding leg curl + Pallof, calf raises, hammer curls. That's ~40% of the working sets going to lateral delts, traps, calves and biceps for a client who asked for functional capacity in 45-60 minutes. Also, "conditioning: tolerate" is answered with a 25-30 min conversational walk — that's recovery, not conditioning, and it's the same walk on both days for the whole block.
+
+TOP 3 STRENGTHS:
+
+1. **The weekly skeleton is right for the profile.** Four lifting days on a movement-pattern split (push / pull-hinge / squat-carry / upper pull-core), two easy days, one full rest day. That's a sane match for moderate recovery capacity and 45-60 min windows, and the session lengths actually fit — 5 exercises × 3 sets at 45-75s rest lands around 50 minutes.
+
+2. **The periodization scaffolding and honesty around it.** Calibration week with RPE capped at 5-6, a deload at week 4 that cuts both sets (3→2) and load (bench 50→35kg), and a coach note that explicitly says the deload is planned rather than a response to stalling. Most app-generated plans either skip the deload or bury it. This one names it and explains it.
+
+3. **The core and bracing selection is genuinely on-theme.** Pallof press, ab wheel rollout, side plank, suitcase carry, hanging leg raises — anti-rotation, anti-extension, anti-lateral-flexion, all covered, no crunches. The A1/A2 pairing of ab wheel with the carry on Thursday is a smart time-saver. This is the one place the "functional" label is actually earned.
+
+VERDICT: **Yes.** The first time this client loads up Week 3 Tuesday and finds out he's been told to swing a 56kg kettlebell for 17 reps — or Thursday, to split-squat 38kg dumbbells for 17 reps off a 75kg back squat — he'll conclude, correctly, that nobody checked the numbers. Add a Week 3 row that's *lighter* than Week 1's, and the client is paying for a plan whose own progression doesn't progress.
+
+================================================================================
+
+================================================================================
+LLM COACH REVIEW — 2026-08-02T10:04:44.831Z
+================================================================================
+
+--------------------------------------------------------------------------------
+Hypertrophy / Beginner / Full Gym
+--------------------------------------------------------------------------------
+SCORE: 4.8
+
+TOP 3 ISSUES:
+1. **The split doesn't match the goal — chest and quads get trained once a week, back gets two days.** Monday is the only push session (bench, Arnold press, push-ups, tricep ext). Thursday is the only quad session (squats + bodyweight step-ups = 6 direct sets). Meanwhile Tuesday (lat pulldown) and Friday (rows, assisted pull-ups, cable row) give the back 12+ sets across two days. For a hypertrophy client on four training days, you have room for 2x/week frequency on everything, and instead the program built a lopsided pull-biased split. On top of that: zero direct hamstring work (bodyweight single-leg RDL for 11-15 reps is a balance drill, not a hamstring stimulus), zero calves, zero lateral raises, zero glute work — with a full gym available.
+
+2. **Accessories don't progress at all between Week 1 and Week 3 — the "progression" is rep creep with static load.** Arnold Press: 8kg in Week 1, 8kg in Week 3. Overhead Tricep Extension: 8kg both weeks. Cable Curls: 7.5kg both weeks. The only change is reps drifting (15-18 → 17-20 on triceps) and a rewritten RPE label. You cannot raise the prescribed RPE by a point while holding load constant and adding reps and call that overload — the RPE label is decorative. Only the four barbell/machine lifts actually load up.
+
+3. **Half the macrocycle isn't hypertrophy training, and the intensity in the AA blocks is too low to do anything.** Block 3 repeats Anatomical Adaptation *after* a completed hypertrophy block — connective tissue does not need re-introducing at week 13 for someone who's been squatting and deadlifting for three months. Combine that with RPE 5-6/6-7 throughout Block 1 and a Week 4 deload after three weeks that never approached failure, and this client spends roughly 25% of the year training below the threshold that drives growth. The coach note even says "taken close to failure" — nothing in Weeks 1-4 is within four reps of failure. The prescription contradicts its own rationale.
+
+TOP 3 STRENGTHS:
+1. **The calibration week is handled honestly and well.** Explicitly telling a beginner that Week 1 loads are conservative placeholders and the ramp starts in Week 2 prevents the classic novice mistake of anchoring their whole block to a bad first guess. The load jumps (bench 22.5→27.5, squat 32.5→37.5, deadlift 45→50 over two weeks) are appropriately aggressive for a novice coming off a deliberately light start.
+2. **Session architecture fits the 45-60min constraint and the moderate recovery capacity.** 12-18 working sets per session at 45-75s rest lands inside the window with the 10-min warm-up included. Four lifting days, one easy aerobic day, two full rest days — that's a sustainable weekly load for a beginner, and it respects the "tolerate" conditioning setting rather than burying them in intervals.
+3. **Exercise selection is fundamentally sound and teachable.** Compound-first ordering, assisted pull-ups instead of ego pull-ups, dead bug and plank instead of loaded spinal flexion, carries paired antagonistically with core work. Nothing here will hurt a novice, and the movement pattern coverage (horizontal/vertical push and pull, squat, hinge) is complete.
+
+VERDICT: No — but only because beginners grow on almost anything, and this client will add size and strength for the first 12 weeks regardless. The firing risk hits at Block 3, when a now-experienced trainee opens their app and sees they've been sent back to the same 3x11-15 @ RPE 5-6 "connective tissue" block they already did in January, with their Arnold presses still at 8kg.
+
+--------------------------------------------------------------------------------
+Hypertrophy / Advanced / Bodyweight
+--------------------------------------------------------------------------------
+SCORE: 3.4
+
+TOP 3 ISSUES:
+
+1. **Pushing volume is essentially absent, and it's the single worst flaw in the plan.** Across the entire week the client performs exactly one horizontal push movement — Archer Push-Ups (Week 1 Monday) / Deficit Push-Ups (Week 3 Monday) — for 4 sets. That's 4 hard sets of chest/triceps per week for an advanced hypertrophy client. There is zero vertical pressing (no pike push-ups, no handstand progression, no dips), zero direct triceps. Meanwhile Pull-Ups appear three times a week at 4 sets each (12 sets), plus 2 sets of rowing. That's a 3:1 pull:push ratio. Friday is labeled "Upper Pull & Core" and is 4 sets of pull-ups followed by four consecutive core exercises (Hanging Leg Raises, Plank, Dead Bug, Side Plank) — a ~35-minute day of junk isometric volume that should have been the push day. This client will get a bigger back and no chest or shoulders.
+
+2. **The equipment and load prescriptions contradict the profile and each other.** Profile says bodyweight-only, yet Tuesday Week 1 prescribes Backpack Row @ ~55kg, climbing to ~65kg in Week 3. Nobody has a 65kg backpack, and if they did they wouldn't be on a bodyweight plan. Separately, the coach note claims "load climbing week to week within each block" — on a bodyweight program there is no load to climb. The only real progression levers (leverage/mechanical advantage, tempo, proximity to failure) are never programmed. Worse, the exercises churn between weeks: Monday W1 is Split Squat + Glute Bridge + Archer Push-Ups, Monday W3 is Step-Ups + Single-Leg RDL + Deficit Push-Ups. You cannot progressively overload a movement you swapped out. Thursday actually *regresses* — Pistol Squat Progression in Week 1 becomes Split Squat in Week 3.
+
+3. **Wrong block structure and wrong intensity for an advanced trainee chasing hypertrophy.** Half the macrocycle (Blocks 1 and 3) is "Anatomical Adaptation — connective tissue, movement quality." An advanced trainee does not need four-plus weeks of tendon prep, and certainly not twice. Intensity tops out at RPE 6-7 in Week 3 — that's 3-4 reps in reserve on Air Squats and bodyweight Step-Ups. For an advanced trainee that is not a stimulus, it's a warm-up. The RPE math is also broken: Pull-Ups 4x9-13 @ RPE 5-6 implies a 16-18 rep max, which almost no one has. And the isometric "progression" from 33-48s to 35-50s planks is a 2-second increase — an obvious artifact of an algorithm scaling numbers rather than a coach writing a plan.
+
+TOP 3 STRENGTHS:
+
+1. **Weekly structure and recovery placement are sound.** Four training days with the conditioning/active-recovery day parked on Wednesday, splitting the week, and two full rest days for a moderate-recovery client. That's appropriate and the sessions plausibly land in the 45-60 min window on Mon/Tue/Thu.
+
+2. **The deload is correctly executed.** Sets cut from 4 to 2 (roughly 50% volume reduction), rest extended from 60s to 75-90s, RPE pulled back to 5-6, rep ranges and exercise selection held constant. That's textbook — you keep the movement pattern and cut the work, rather than changing everything. The coach note explicitly heading off the "push anyway" instinct is a nice touch.
+
+3. **Warm-ups are scheduled with real time budgets, and the calibration-week framing is honest.** Telling the client up front that Week 1 loads are deliberately conservative and the real ramp starts Week 2 prevents the classic "this is too easy, I'll add sets" self-sabotage. Rest periods (75s on pull-ups, 60s on accessories, 30s on core) are also sensibly differentiated rather than one blanket number.
+
+VERDICT: **Yes.** Four hard sets of pushing per week with no vertical press or dips will not build an advanced trainee's upper body, and a client who paid for a hypertrophy program will notice within a month that their chest and shoulders haven't changed while they've done 60+ sets of planks. The 65kg backpack row on a bodyweight-only plan is the kind of error that tells the client no human read this before it was sent.
+
+--------------------------------------------------------------------------------
+Hypertrophy / Intermediate / Minimalist
+--------------------------------------------------------------------------------
+SCORE: 4.3
+
+TOP 3 ISSUES:
+
+1. **The program contradicts its own progression model — load barely moves, and half the lifts change between weeks.** The Week 1 coach note promises "load climbing week to week within each block," but from Week 1 → Week 3 the Dumbbell Shoulder Press stays at 14kg, Lateral Raises stay at 6kg, Curls stay at 8kg, Walking Lunges stay at 14kg, and Shrugs stay at 12kg. The only "progression" is rep creep (11-15 → 13-17, 15-18 → 17-20), which for an intermediate on 6kg lateral raises means marching toward 20-rep junk sets. Worse, the movements themselves get swapped mid-block: Deficit Push-Ups → Archer Push-Ups, Arnold Press → DB Shoulder Press, Inverted Row → Towel Row, DB Curls ↔ Hammer Curls. You cannot progressively overload a lift you keep replacing. And Archer Push-Ups for 4x13-17 at RPE 6-7 is not a plausible prescription — that's 13-17 reps *per side* on a movement most intermediates can't do for 5 clean reps.
+
+2. **Volume allocation is wrong for a hypertrophy goal.** Chest gets exactly one exercise, one day a week (Monday push-ups, 4 sets). Quads get one day (Thursday, 8 sets). Meanwhile core gets Hanging Leg Raises, Pallof, Ab Wheel twice, Dead Bug — five movements, ~14 sets/week, more than chest and quads combined. There is no loaded hinge anywhere: hamstrings/glutes get kettlebell swings and a sliding leg curl. For an intermediate chasing muscle, chest and quad frequency of 1x/week with zero direct hinge strength work is a structural failure, not a stylistic choice. Shrugs 3x15-18 @ 12kg is pure filler eating time that should go to a second chest or quad exposure.
+
+3. **The equipment inventory is incoherent, and Block 3 breaks the profile.** This is flagged "minimalist," yet the plan calls for a 48kg kettlebell escalating to 56kg, and a 50kg backpack row — while simultaneously assuming the client's heaviest dumbbells are 14kg for pressing. Nobody owns that combination. Separately, Block 3 is "Maximal Strength — lower reps, longer rest, high intensity" for a hypertrophy client whose heaviest pressing implement is 14kg dumbbells. You cannot train low-rep maximal strength with that kit; that block will either be unloadable or turn into slow bodyweight grinding. It's a template block dropped in without checking the profile. Minor but telling: the warm-up "movement prep" is randomly assigned — kettlebell swings before push day, plyo push-ups before squat day, broad jumps before upper pull day. Nothing is warming up what's about to be trained.
+
+TOP 3 STRENGTHS:
+
+1. **The weekly skeleton genuinely matches "moderate recovery capacity."** Four lifting days, a Wednesday active-recovery walk, and two consecutive full rest days is the right shape. Conditioning is dosed at 25-30 min easy for a client who merely "tolerates" it — the program correctly resisted bolting on metcons.
+
+2. **The deload is a real deload, not a fake one.** Week 4 cuts sets 4→2, drops load 14kg→10kg on the press and 6kg→4kg on raises, drops RPE to 5-6, and *increases* rest to 75s. That's a properly executed volume-and-intensity step-back, and the coach note explicitly frames it as planned rather than a response to stalling. Most app-generated plans get this wrong.
+
+3. **Time budgeting and session density are handled competently.** Set counts (17-18 working sets), rest periods (45-75s), and the A1/A2 pairing of Overhead Carry with Dead Bug on Thursday keep sessions inside the 45-60 min window without cramming. The calibration-week framing is also honest and useful — telling a client the first week's loads are deliberately conservative prevents them from misreading light weights as a broken program.
+
+VERDICT: Yes. A paying intermediate would notice by Week 3 that his dumbbell press weight hasn't moved in three weeks, that his chest is trained four sets a week, and that Week 2 asks for a 56kg kettlebell he doesn't own — and the plan's own coach note claims loads are climbing when they aren't. The rest-day structure and deload are competent, but the core job of a hypertrophy program is progressive overload on a stable set of movements, and this plan does neither.
+
+--------------------------------------------------------------------------------
+Fat Loss / Novice / Home Gym
+--------------------------------------------------------------------------------
+SCORE: 5.4
+
+TOP 3 ISSUES:
+1. **Friday is a filler day, and there is no vertical pull anywhere in the week.** "Upper Pull & Core" is Backpack Row, DB Curls (6kg, going to 20 reps), Dead Bug, Rear Delt Flyes (8kg), Shrugs. That's a bodybuilder's arm-and-trap accessory day handed to a novice in a deficit who's already trained Push, Pull/Hinge and Squat that week. Meanwhile the entire microcycle contains zero vertical pulling — every back movement is horizontal (Barbell Row Tues, Backpack Row Fri). A novice home-gym client needs a pull-up/band-assisted pull-up/lat pulldown progression far more than 3x20 shrugs at 22kg per hand. Either make Friday a fourth full-body session or cut it and run 3 days + conditioning.
+
+2. **Equipment logic is broken, and the loads are asserted, not tested.** This client is prescribed a 40kg Barbell Row on Tuesday and a 37.5kg *Backpack Row* on Friday. If he has a barbell, a trap bar and a squat setup, the backpack row does not exist — and you cannot micro-load a backpack from 32.5 to 37.5kg anyway. Worse, week 1 is labelled a "calibration week" but then hands an untested novice absolute numbers: 57.5kg squat for 3x9-13, 70kg trap bar, 35kg bench. Calibration means you give a rep target and an RPE cap and let the load fall out of it. Prescribing a specific kilo to someone who has never squatted is a guess dressed up as a program, and half of them will be 20kg off in either direction.
+
+3. **Triple progression on top of a 6-day week for a "moderate recovery" novice in a deficit.** Week 1 → Week 3: load goes up (bench 35→40), reps go up (Arnold 11-15→13-17), *and* the RPE cap goes up (5-6→6-7) simultaneously. Pick one variable. Compounding all three in a block whose own coach note says "do not rush it" is self-contradictory. And on the isolation work the load doesn't move at all — Skull Crushers stay at 12.5kg while reps climb to 17-20, DB Curls stay at 6kg to 20 reps. That's junk volume that adds fatigue and session time with no stimulus. Separately, the Overhead Carry jumps 14→18kg single-side (+29%) in two weeks, faster than any barbell lift in the program, on the movement with the most shoulder-stability risk for a beginner. Four lifting days plus two 35-41min Zone 2 sessions = six committed days for a beginner eating less; adherence will break before the program does.
+
+TOP 3 STRENGTHS:
+1. **The deload is a real deload.** Bench drops 40→27.5kg and 3 sets→2, roughly a 45% cut in tonnage. Far too many auto-generated plans call a 10% load reduction a deload. This one actually steps back on both axes and says why.
+2. **The fat-loss philosophy is correct and it's held consistently in weeks 1 and 3.** "Diet drives the fat loss, this program protects the muscle you already have" is the right message, and the plan backs it up — real barbell loads, real rest periods (75s on compounds), progression that keeps climbing, and conditioning kept as separate Zone 2 sessions instead of turning the lifting into a sweaty circuit. That is the single most common failure mode in fat-loss programming and this plan avoids it.
+3. **Sensible day split and warm-up discipline.** Push / Pull-Hinge / Squat-Carry is a clean rotation with a rest day between Tuesday and Thursday, each session opens with a movement-specific prep drill (KB swings before deadlifts, band pull-aparts before squats/carries), and loaded carries and anti-rotation work are in a beginner program where they usually get skipped.
+
+VERDICT: No — but it should get a rewrite before it ships. The skeleton, the deload and the fat-loss framing are genuinely sound, so a novice will make progress on it. What would actually erode trust is the client noticing he's been told to row a backpack the same week he's rowing a barbell, and finding that the "calibration week" already decided he squats 57.5kg. Fix the equipment filter, turn Friday into a full-body day with a vertical pull, and stop raising load, reps and RPE in the same week.
+
+--------------------------------------------------------------------------------
+Fat Loss / Advanced / Full Gym
+--------------------------------------------------------------------------------
+SCORE: 5.2
+
+TOP 3 ISSUES:
+1. **Nothing in this entire macrocycle is heavy, and there is no loaded hinge anywhere.** Every working set across Weeks 1, 3 and the deload sits at RPE 5-7 in the 9-20 rep range, and all four blocks (AA → Hypertrophy → MetCon → Hypertrophy) keep it there. For an advanced lifter in a calorie deficit, high-intensity loading (80%+ / RPE 8) is the primary muscle-and-strength retention signal — this program never provides it. Worse, "Pull & Hinge" Tuesday prescribes *Single-Leg RDL (Bodyweight)* in Week 1 and *Bodyweight Good Morning* in Week 3 as the hinge, with a 42.5kg leg curl as the only other posterior-chain work. An advanced trainee with a full gym and no listed injury has no deadlift, no barbell RDL, no hip thrust. That is the single biggest hole in the plan.
+2. **Weekly split is badly unbalanced and exercises churn week-to-week, so progression can't be tracked.** Two pull days (Tue + Fri), one push day (Mon), one leg day (Thu) — chest and quads get trained once every seven days while biceps get direct work three times. Then Week 3 swaps DB Bench→Incline DB Press, DB Rows→Seated Cable Row, Step-Ups→Walking Lunges, Skull Crushers→Pushdowns, Seated Calf→Standing Calf. Week 1 is explicitly labelled a "calibration week" to find working weights — then half those lifts disappear by Week 3, which makes the calibration pointless.
+3. **Load prescriptions are internally inconsistent and in places not real numbers.** Seated Cable Row appears at 32.5kg on Week 3 Tuesday and 65kg on Week 3 Friday — same movement, same week, double the load. Dumbbell Curls at 24kg per hand for 15-18 reps at RPE 6-7 is a near-elite curl load prescribed for a submaximal high-rep set, while Hammer Curls and Incline Curls in the same week sit at 12kg. Cable Lateral Raises go *down* from 8kg (Wk1) to 7.5kg (Wk3) while everything else climbs. An advanced client will spot these in the first ten minutes and stop trusting the numbers.
+
+TOP 3 STRENGTHS:
+1. **The coach note is honest and correct.** "Diet drives the fat loss here, not the workout — this program is built to protect the muscle you already have" and "conditioning is appended on top, never substituted for lifting" is exactly the right framing for a fat-loss client, and the plan actually honours it — no bastardised circuit training, no 20-rep "fat-burning" barbell complexes.
+2. **Recovery management fits the "moderate" flag.** Two Zone 2 sessions (35→41min, progressing) instead of daily HIIT, Wednesday and Saturday placed between hard days, Sunday fully off, and a real programmed deload at Week 4 that is explicitly framed as planned rather than a response to stalling. That's a sane weekly architecture for someone in a deficit.
+3. **Main-lift progression is real and appropriately modest.** OHP 42.5→47.5kg, Squat 92.5→97.5kg, Barbell Row 57.5→62.5kg, with RPE stepping 5-6→6-7 over two weeks. Loads climb rather than degrade, which is the correct behaviour in a cut. The A1/A2 pairing of Trap Bar Carry with Pallof Press also shows some awareness of the 45-60min time cap.
+
+VERDICT: Yes. An advanced lifter who sees bodyweight good mornings listed as their hinge on a full-gym plan, no set above RPE 7 in a 16+ week macrocycle, and a cable row prescribed at 32.5kg on Tuesday and 65kg on Friday will conclude — correctly — that this wasn't written by someone who looked at their training age. The recovery structure and messaging are good enough that this isn't a dangerous program, just an under-loaded one that will cost them strength during the deficit.
+
+--------------------------------------------------------------------------------
+Fat Loss / Beginner / Bodyweight
+--------------------------------------------------------------------------------
+SCORE: 4.3
+
+TOP 3 ISSUES:
+1. **Upper-body pushing is functionally untrained.** Incline Push-Ups on Monday, 4 sets, is the *entire* horizontal press volume for the week — and there is zero vertical/overhead pressing anywhere in the block (no pike push-ups, no bench dips, no decline progression). Meanwhile pulling gets Backpack Row (Tue) + Towel Row (Fri) and core gets 9+ sets a week. For a client in a caloric deficit whose stated purpose is "protect the muscle you already have," the chest, shoulders and triceps are getting one submaximal exercise every seven days. That's the single biggest failure in the plan.
+2. **The progression model is rep-creep plus fake RPE.** Week 1 → Week 3 changes 11-15 reps to 13-17 reps and relabels RPE 5-6 as 6-7. On Air Squat and Glute Bridge that is meaningless — a beginner who can do 15 air squats can usually do 40, so "Air Squat 4x15 @ RPE 6-7" is actually RPE 2-3, and the same is true of the bodyweight Glute Bridge and Bodyweight Good Morning. With bodyweight-only equipment, progression has to come from leverage and unilateral work (incline → flat → decline push-up; air squat → split squat → skater squat; glute bridge → single-leg → elevated), plus tempo. None of that is programmed. The coach note claims "progression keeps climbing" — it doesn't, it just adds reps to exercises that were already too easy.
+3. **Friday is filler, and the sessions don't hit the prescribed duration.** Friday is Towel Row + Side Plank + Plank + Dead Bug: one real strength exercise and three isometric core drills, ~20-25 minutes including warm-up. Monday and Thursday land around 30-35 min against a 45-60 min slot. Worse, the coach note explicitly promises "conditioning is appended on top, never substituted for lifting" — and then appends conditioning to exactly zero of the four lifting days. The client is told one thing and handed another, with 20+ minutes of unused session time sitting right there for it.
+
+TOP 3 STRENGTHS:
+1. **Exercise selection is genuinely equipment-honest.** Backpack Row, Towel Row, Sliding Leg Curl, Incline Push-Ups, Loaded Backpack Walk — nothing here assumes a pull-up bar, rings, or bands the client doesn't have. That's more discipline than most auto-generated bodyweight plans show, and the Sliding Leg Curl in particular is a smart pick for knee-flexion hamstring work with no gear.
+2. **The fat-loss framing and conditioning dose are correct for the profile.** Telling a beginner that diet drives fat loss and lifting exists to protect lean mass is the right message. Prescribing two Zone 2 sessions of 35→41 min rather than daily HIIT circuits is appropriate for "moderate" recovery capacity in a deficit, and the 35→41 min progression is a sane rate.
+3. **Weekly architecture and recovery logic are sound.** Four lifting days with conditioning slotted Wed/Sat, a true off day Sunday, the Loaded Backpack Walk paired A1/A2 with Plank for time efficiency, and rest periods (45-60s) that match the higher-rep intent. The deload note ("load and volume both step back so you arrive at the next block recovered, not because progress stalled") is exactly how you should explain a deload to a nervous beginner.
+
+VERDICT: Yes. A beginner paying for a 45-60 minute program is getting 30-minute sessions where one full day is three plank variations and a row, is doing four sets of push-ups per week as their only pressing, and is being told their "RPE 6-7" bodyweight squats are progressing when they aren't — and the plan breaks its own written promise to append conditioning to lifting days. They'll either get bored and quit or notice they can't do a single full push-up after four weeks and ask what they've been paying for.
+
+--------------------------------------------------------------------------------
+Conditioning / Beginner / Minimalist
+--------------------------------------------------------------------------------
+SCORE: 4.3
+
+TOP 3 ISSUES:
+1. **The stated goal is conditioning, and the conditioning is the weakest part of the plan.** Friday is literally named "Conditioning & Core" and contains ~8 minutes of actual work (Mountain Climbers 7x33s + Jump Rope 7x33s, 20s rest) inside a 45-60min session window. Worse, the progression from Week 1 to Week 3 is 33s → 35s per interval. Two seconds. Over three weeks. That is not a stimulus, it's a rounding error. Meanwhile the aerobic work is two identical Zone 2 sessions that jump 45min → 53min with no threshold work, no tempo, no intervals, no repeatable test to measure whether the engine is actually improving. There is no conditioning progression model here at all.
+2. **The coach note contradicts the program it's attached to.** Week 1's note says "two to three full-body sessions keep you strong enough to train hard, while dedicated conditioning is the main driver." The plan then prescribes four lifting days on a push/pull/squat split — not full-body, and not two to three — plus two 45min aerobic sessions, for a *beginner* with *moderate* recovery capacity. That's 6 training days. Either the note is wrong or the plan is wrong; both were shipped to the client. And the lifting is push-dominant: Monday alone has Incline Push-Ups + Arnold Press + Push-Ups = 8 pressing sets, against a grand total of 4 pulling sets (Towel Row) in the entire week. 2:1 push:pull on a beginner is how you build cranky shoulders.
+3. **Load progression is either absent or reckless, with nothing in between.** Goblet Squat sits at 12kg from Week 1 to Week 3. Arnold Press sits at 8kg. Dumbbell Curls sit at 4kg for 17-20 reps — that's a warm-up for a warm-up and it's occupying time in a conditioning program. Then the Loaded Backpack Walk leaps 22.5kg → 27.5kg, a 22% jump in two weeks, on the one movement where a beginner is least likely to notice their spine position degrading under a shifting, non-rigid load. Also, the rep and time prescriptions (2x11-15, 3x33-48s, 7x33s, 2x35-50s) are transparent multiplication artifacts. No coach writes "hold a plank for 33 to 48 seconds." A client sees that and knows a computer wrote it.
+
+TOP 3 STRENGTHS:
+1. **Exercise selection genuinely respects the minimalist equipment constraint** without resorting to nonsense. Towel Row, Loaded Backpack Walk, Incline Push-Ups, Single-Leg RDL, Goblet Squat, Pallof Press — these are real, coachable movements that cover the primary patterns with a backpack, a KB, light DBs and a band. Nobody's being asked to improvise a lat pulldown out of a bedsheet.
+2. **The deload is structured correctly.** Sets cut (4→2), load backed off (8kg→6kg Arnold Press), RPE dropped a full band (6-7→5-6), rest extended (60s→75s), but reps held at Week 3 levels so the movement pattern stays grooved. That's a proper volume-led deload, not a token week off, and the note explicitly pre-empts the "am I losing progress" question. Well done.
+3. **The Week 1 calibration framing and the tendon/connective-tissue rationale are the right message for a beginner.** Telling a novice up front that loads are deliberately conservative and that the ramp starts in Week 2 prevents the classic Week 1 ego-load blowout, and framing anatomical adaptation around slower-adapting tissue gives them a reason to comply instead of skipping ahead.
+
+VERDICT: Yes. The client asked for conditioning and received a four-day lifting split where the designated conditioning day contains eight minutes of work and progresses by two seconds over three weeks — and then the macrocycle hands them a *hypertrophy* block in Block 3, which will strand whatever aerobic base Block 2 built. Add a coach note promising "two to three full-body sessions" sitting on top of four body-part-split days, and any client who reads carefully will conclude, correctly, that nobody actually looked at this before sending it.
+
+--------------------------------------------------------------------------------
+Conditioning / Intermediate / Full Gym
+--------------------------------------------------------------------------------
+SCORE: 5.4
+
+TOP 3 ISSUES:
+1. **The conditioning goal has no actual conditioning programming behind it.** Friday's session is 7x33s rowing → 7x35s in week 3. Twenty-one intervals across three modalities, all at RPE 5-6, all with 20s rest, all with zero output targets — no watts, no pace, no distance, no calories. That's junk intensity: too hard to be aerobic development, far too easy to be anaerobic work, and nothing is measurable so neither you nor the client can tell if the engine improved. Zone 2 progresses 45min → 53min and intervals progress by two seconds. For a client whose primary goal is conditioning, that is the least-progressed variable in the entire plan. There's no threshold work, no VO2max work, no benchmark test at the start or end of any block.
+2. **Zero vertical pulling in the entire week, and a 4:1 press-to-pull ratio.** Monday runs bench, dips, and shoulder press/Arnold, plus direct triceps. The only pulling in the week is one row (inverted row wk1, seated cable row wk3). Full gym available, no pull-up, no chin-up, no lat pulldown, no face pull, no rear delt anywhere. Run that for four blocks with a client doing 40m suitcase carries and battle ropes on top and you're building a shoulder problem. Meanwhile there are six separate core exercises per week — more direct ab work than back work.
+3. **Session length doesn't match the brief, and the density doesn't match the goal.** Monday is ~10min warm-up plus 13 working sets with 45-75s rests: roughly 33-35 minutes door to door against a 45-60min budget. Same for Friday. So the client is being asked to train six consecutive days with moderate recovery capacity, and the lifting sessions still come in 15-25 minutes short. Worse, everything except the suitcase carry/Pallof pair is straight sets with full rest — standard hypertrophy-lite structure. For a conditioning client with a full gym and unused session time, those lifting days should be circuited, EMOM'd or paired to build work capacity. The one thing the program's stated goal demands is exactly the thing the lifting days don't do.
+
+TOP 3 STRENGTHS:
+
+
+--------------------------------------------------------------------------------
+Conditioning / Advanced / Home Gym
+--------------------------------------------------------------------------------
+SCORE: 4.2
+
+TOP 3 ISSUES:
+
+1. **The goal is conditioning, but nothing in this program is actually hard conditioning.** Every interval in the Friday session is capped at RPE 5-6 (Week 1) and RPE 6-7 (Week 3) — that is not a stimulus that moves VO2max or lactate threshold in an *advanced* trainee. Zone 2 at 120-140 BPM twice a week is the only other cardiovascular work. There is no threshold work, no VO2max intervals (4x4, 30/30s, 5x3min), no repeat-sprint work, nothing above RPE 7 for the entire 4-week block. Worse, the Friday layout is 7 straight sets of jump rope, *then* 7 straight sets of burpees, *then* 7 of mountain climbers, 33s on / 20s off. Seven consecutive sets of jump rope will fail on calf fatigue long before the cardiovascular system is taxed. That's not conditioning, it's a bad circuit-class filler block. An advanced conditioning client will finish Week 3 fitter at nothing.
+
+2. **Exercises are swapped between Week 1 and Week 3 inside the same block, and several swaps are outright downgrades or hazards.** Dumbbell Rows @ 28kg *per hand* (Wk1) become Backpack Row @ 27.5kg *total* (Wk3) — that's roughly a 50% cut in load for the only rowing movement in the week, in a home gym that clearly owns dumbbells and a 125kg barbell. Pistol Squat Progression becomes bodyweight Split Squat. Meanwhile Glute Bridge (bodyweight) becomes Good Mornings at 70kg for 13-17 reps on 45s rest — programmed *after* 3x9-13 deadlifts at RPE 6-7 on the same day. High-rep loaded good mornings on a pre-fatigued erector chain is how you write a lower back strain into a program on purpose. You cannot progressively overload a lift you keep replacing, and an advanced trainee will notice immediately that Week 3 is not Week 1 plus a bit.
+
+3. **No vertical pull anywhere in the week, and the push:pull ratio is badly skewed.** Monday runs Overhead Press, Archer/Deficit Push-Ups, Chest Dips, and Skull Crushers — four pressing movements. The entire week's pulling is one row variation plus curls. Hanging Leg Raises are prescribed on Thursday, which means a pull-up bar exists in this gym. There is no reason for a chin-up or pull-up to be absent. Layered on top: deadlifts jump 115kg → 125kg (+8.7%) and OHP 42.5 → 47.5kg (+11.8%) in two weeks, *while* RPE targets rise 5-6 → 6-7 and accessory rep ranges rise, for a client flagged moderate recovery capacity training 
+
+--------------------------------------------------------------------------------
+Functional / Novice / Bodyweight
+--------------------------------------------------------------------------------
+SCORE: 4.5
+
+TOP 3 ISSUES:
+1. **The ~35kg Loaded Backpack Walk on Thursday, Week 1 — escalating to ~40kg by Week 3.** This is a bodyweight-equipment novice in a *calibration* week, and the program hands them 77 lbs on their back for 3x40m. Where is that number coming from? There's no assessment, no bodyweight-relative anchor, no note on how to build the load, and no acknowledgment that most novices don't own a pack that will hold 35kg without the straps failing. It also contradicts the stated equipment constraint. This is the one line in the plan that could actually hurt someone, and it jumps 5kg in two weeks while everything else in the program moves by two reps.
+2. **No mechanism for bodyweight progression, and the horizontal press is programmed backwards.** Monday runs Push-Ups 4x11-15 *followed by* Incline Push-Ups 4x11-15 — that's a regression placed after the harder variation, 8 straight sets of the same movement pattern, and it's the only pressing in the entire week. There is zero vertical pressing (pike/wall push-up) and zero vertical pulling anywhere in the week. Worse, progression is handled purely by adding two reps to the range and bumping RPE. In bodyweight training you progress by changing leverage — hand elevation, foot elevation, tempo, unilateral variants, ROM. A novice who can't do 11 clean push-ups has no listed regression; one who can do 17 is just doing endurance work at RPE 6. The whole plan has one progression lever and it's the wrong one.
+3. **Friday is not a training session, and core work is stacked to the point of redundancy.** Friday (both Week 1 and Week 3) is Towel Row plus Dead Bug, Side Plank, and Plank. That is one strength exercise and three anti-extension/anti-lateral-flexion isometrics — roughly 20-25 minutes of work in a 45-60 minute slot, against Monday's six exercises. Meanwhile the client gets Dead Bug Monday, Plank Tuesday, Side Plank Thursday, and all three again Friday: six core slots a week, nearly all the same isometric bracing quality, none of them progressed by anything but adding two seconds.
+
+TOP 3 STRENGTHS:
+1. **The weekly architecture actually matches the profile.** Four lifting days, two conversational-pace recovery/conditioning days (25min → 30min, a sane progression), one genuinely off day — that's correct for a novice with moderate recovery capacity who merely "tolerates" conditioning. Nobody got buried under five hard days.
+2. **The deload is a real deload.** Sets cut 4→2, RPE pulled from 6-7 back to 5-6, rest extended 60s→75s, reps held constant. Volume down, intensity down, movement pattern retained. Most app-generated deloads shave one set and call it a week; this one is defensible.
+3. **Calibration week and the RPE anchoring are handled honestly.** Starting a novice at RPE 5-6 and telling them explicitly that loads are conservative and the ramp starts in Week 2 prevents the classic beginner mistake of going to failure on push-ups in session one. The coach notes explain *why* (tendon adaptation lags muscle), which is correct and worth saying.
+
+VERDICT: **Yes.** The Friday session alone — one row and three planks in a 60-minute slot — reads as a program that ran out of exercises, and a client will notice they're paying for a plan that repeats Anatomical Adaptation again in Block 3 as if the first 8 weeks never happened. Add a 35kg backpack dropped on a novice in calibration week with no build-up instruction, and you've got a plan that's simultaneously too soft where it matters and unjustifiably aggressive in the one place it shouldn't be.
+
+--------------------------------------------------------------------------------
+Functional / Advanced / Full Gym
+--------------------------------------------------------------------------------
+SCORE: 5.3
+
+TOP 3 ISSUES:
+
+1. **Nothing is progressable because the exercise roster churns every two weeks — fatal for an advanced trainee.** Between Week 1 and Week 3, Archer Push-Ups → Dumbbell Bench Press, Single-Leg RDL → Glute Bridge, Step-Ups → Bulgarian Split Squats, Cable Curls → Hammer Curls, Bodyweight Calf Raises → 82.5kg Calf Raises. "Cable Rows" became "Seated Cable Row" — the same lift with a different name, which tells me the rotation is automated, not intentional. Only the four barbell lifts actually accumulate a trackable load history. Worse, several rotated-in loads are frozen anyway: Close-Grip Lat Pulldown sits at 55kg in both weeks, Leg Extensions at 45kg, Cable Woodchops at 32.5kg, DB Shrugs at 30kg. An advanced lifter needs a stable movement pool for at least a full 4-week block so overload is measurable. The coach note pre-emptively excuses this ("favors variety over chasing a number on the bar"), which reads as a rationalization of a design flaw.
+
+2. **Load calibration is internally incoherent and several prescriptions are impossible.** Dumbbell Bench Press 3x13-17 @ 38kg per hand at RPE 6-7 (Week 3 Monday) — that's 76kg of dumbbells for 15+ reps with 4 RIR, from a lifter whose barbell OHP is 47.5kg for 11 reps and whose squat is 97.5kg. Those two numbers cannot coexist in the same human. Same problem with Hammer Curls at 22kg/hand for 17-20 reps @ RPE 6-7, sitting next to Barbell Curls at 22.5kg total. Monday's Shrugs are "24kg per hand" while Friday's DB Shrugs are 30kg/hand — same movement, same week, 25% apart with no rationale. The client will hit Week 3 Monday, fail the prescription badly, and lose trust in every other number on the page.
+
+3. **The content contradicts both "advanced" and "functional," and the warm-ups are misassigned.** For an advanced lifter with a full gym you've prescribed Assisted Pull-Ups for 13-17 reps, bodyweight Glute Bridges 3x13-17, bodyweight Calf Raises, and Push-Ups 3x17-20 
+
+--------------------------------------------------------------------------------
+Functional / Intermediate / Home Gym
+--------------------------------------------------------------------------------
+SCORE: 4.5
+
+TOP 3 ISSUES:
+1. **The load prescriptions are fantasy, and in a home gym they're often physically impossible.** Week 3 Tuesday prescribes Kettlebell Swing (Heavy) at ~56kg for 13-17 reps, and Week 3 Thursday prescribes Bulgarian Split Squats at ~38kg *per hand* (76kg of dumbbells) for 13-17 reps — for a trainee whose bench is 50kg and back squat is 75kg. Nobody with a 75kg squat is doing 15 rep BSS with 76kg in their hands, and almost no home gym owns a 56kg bell or 38kg dumbbells. Meanwhile the suitcase carry jumps 24kg→28kg in two weeks while the bench moves 45→50kg. These numbers were not sanity-checked against each other or against the equipment profile.
+2. **There is no hinge pattern anywhere in the program, on a "functional" goal.** Tuesday is literally labeled "Pull & Hinge" and the hinge slot in Week 1 is a bodyweight Glute Bridge. No deadlift, no RDL, no good morning, no loaded hip hinge in the entire block. For a functional-goal client, hip extension under load is the single most transferable pattern there is, and it's absent — while Week 3 Monday spends 6 sets on shrugs and lateral raises at 17-20 reps.
+3. **Exercises rotate between weeks inside the same block, which makes progression unmeasurable.** Week 1 Thursday: bodyweight Step-Ups. Week 3 Thursday: loaded Bulgarian Split Squats. Week 1 Tuesday: bodyweight Glute Bridge. Week 3: heavy KB Swings. The deload swaps Arnold Press for DB Shoulder Press and Hammer/Barbell Curls disappear entirely. You cannot tell whether the client got stronger, and jumping an unloaded step-up straight to a heavily loaded split squat is the opposite of what an anatomical-adaptation block is supposed to do for connective tissue. The note about "favoring variety" is a rationalization, not a plan.
+
+Secondary but real: Week 3 Monday is 15 working sets at 13-20 reps plus a 10-minute warm-up. With the listed rests that's 60-70+ minutes on a 45-60 minute budget, and only one exercise pair (Thursday A1/A2) is supersetted. Also, Hanging Leg Raises appear on both Tuesday and Friday at 3x13-17 — few intermediates can do 17 hanging leg raises with any control, so those sets will be junk.
+
+TOP 3 STRENGTHS:
+1. **Block sequencing and the calibration/deload framing are genuinely well done.** AA → hypertrophy → max strength → power is the right order for an intermediate, the calibration-week note sets correct expectations ("the block's real ramp starts next week"), and the deload actually cuts sets 3→2 *and* drops load *and* lengthens rest, with an explicit "this isn't because you stalled" explanation. Most apps deload by vibes or not at all.
+2. **The weekly skeleton fits the recovery profile.** Four lifting days with push/pull/squat-carry/upper-pull split, hard days separated by a Wednesday easy day, Sunday fully off, and conditioning kept to conversational-pace walks for someone who only "tolerates" it. That's an appropriate dose for moderate recovery capacity — no one is getting buried here.
+3. **Every set has a rest period, a rep range, and an RPE target, and there's real functional content in the details.** Suitcase Carry for 40m, Pallof Press, ab wheel, side plank — anti-rotation and anti-lateral-flexion work is actually programmed rather than replaced with crunches. Rep ranges instead of fixed numbers is the right call for an autoregulated intermediate.
+
+VERDICT: Yes. A client who reads Week 3 and sees a 56kg kettlebell swing for 15 reps and a 38kg-per-hand Bulgarian split squat — equipment they almost certainly don't own, at loads far beyond their 75kg squat — will immediately conclude no human reviewed this plan, and that erases whatever credit the sound block structure earned. Combine that with a "functional" program containing zero loaded hinges but six sets of shrugs and lateral raises, and the exercise-rotation-mid-block problem, and you have a program that looks intelligent in the outline and falls apart in the prescription.
+
+================================================================================
+
