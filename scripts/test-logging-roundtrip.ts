@@ -633,6 +633,34 @@ async function main() {
   check('renumbering is continuous (1 and 2), not arbitrary',
     collisionRows.map(r => r.set_number).sort().join(',') === '1,2')
 
+  // ---- 15. saveSet stamps completed_at from the dev clock, not real time (fix #8) --
+  console.log('\n[15] dev-clock-aware completed_at: a simulated session never self-references (fix #8)')
+  const { setDevClockOverride, getAppNow } = await import('../src/lib/dev-clock')
+  const devUserId = crypto.randomUUID()
+  const simulatedDate = isoDatePlusDays(30) // far enough forward that "real time" would clearly precede it
+  const devEx = 'Barbell Row'
+  const devExId = getExerciseId(devEx)
+
+  setDevClockOverride(devUserId, simulatedDate)
+  check('getAppNow now returns the simulated date for this user', getLocalDateString(getAppNow(devUserId)) === simulatedDate)
+
+  saveSet({ userId: devUserId, date: simulatedDate, weekNumber: 3, day, exerciseId: devExId, exerciseName: devEx, setNumber: 1, weightKg: 50, repsCompleted: 10 })
+  await flushPending()
+
+  const devRow = db.exercise_set_logs.find(r => r.user_id === devUserId && r.exercise_id === devExId)
+  check('completed_at was stamped from the simulated date, not real wall-clock time',
+    !!devRow && devRow.completed_at.startsWith(simulatedDate), devRow?.completed_at)
+
+  // The strictly-before-sessionDate query for THIS SAME simulated session
+  // must NOT see the set it just logged (the exact self-reference bug #8
+  // fixes — under real-clock timestamps this would incorrectly pass the
+  // `.lt('completed_at', beforeDate)` filter).
+  const selfRefCheck = await getLastSessionSets(devUserId, devExId, simulatedDate)
+  check('the just-logged simulated-session set does not self-reference as "last session before itself"',
+    selfRefCheck.length === 0, selfRefCheck)
+
+  setDevClockOverride(devUserId, null) // clean up the override
+
   // ---- Summary -------------------------------------------------------------
   if (failures > 0) {
     console.error(`\n${failures} logging round-trip check(s) FAILED.`)

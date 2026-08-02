@@ -339,7 +339,13 @@ export function saveSet(input: SaveSetInput): ExerciseSetLog {
     unit: input.unit ?? 'reps',
     isBodyweight: input.isBodyweight ?? false,
     isWarmup: input.isWarmup ?? false,
-    completedAt: new Date().toISOString(),
+    // Dev-clock aware (C0 fix #8) — a real wall-clock timestamp under a
+    // simulated date would satisfy getLastSessionSets's strictly-before-
+    // sessionDate filter for the CURRENT simulated session (its real
+    // completedAt always sorts "before" a later simulated date), making the
+    // module read its own in-progress session as "the last one". Real users
+    // are unaffected: getAppNow with no override is exactly `new Date()`.
+    completedAt: getAppNow(input.userId).toISOString(),
     attempts: 0,
   }
 
