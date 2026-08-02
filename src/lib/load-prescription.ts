@@ -448,28 +448,68 @@ export function roundToPlate(kg: number, mode: LoadingMode): number {
   }
 }
 
-/**
- * The double-progression increment for one "notch" of overload — how much
- * gets added once a trainee has earned it (hit the top of their rep range on
- * every set). Sized by how finely each loading mode actually steps in a real
- * gym: barbell plates jump in 2.5kg pairs, dumbbell racks commonly step in
- * 2kg per hand, stacks/machines vary but 2.5kg is the safe common case except
- * for heavy leg-press-style stacks which usually step in bigger increments.
- * Bodyweight movements have no numeric increment — see isExternallyLoaded()
- * callers, which progress those via reps instead and should never call this.
- */
-export function getLoadIncrementKg(entry: ExerciseEntry, category: string | null): number {
-  const mode = loadingMode(entry)
+// Target percentage step for one "notch" of overload. A flat per-mode kg
+// increment (the previous design) is fine on a heavy main lift but is a
+// disaster on a light accessory: +2kg on a 6kg dumbbell curl is a 33% jump,
+// which an LLM coach review flagged outright as "not physiological... an
+// algorithm applying a percentage, not a coach reading a logbook." Main
+// compounds (the day's one tier1_compound flagship lift) step ~2.5-5%;
+// everything else — secondary compounds and isolation alike — steps
+// ~5-10%. Both bands use their midpoint rather than a range because the
+// real granularity comes from snapping to the loading mode's actual plate/
+// dumbbell/stack step below, not from this rate directly.
+const MAIN_LIFT_STEP_RATE = 0.035
+const ACCESSORY_STEP_RATE = 0.075
+
+// The real step size a loading mode actually offers, in TOTAL kg moved per
+// notch — not "per hand." A two-implement dumbbell pair changes both
+// dumbbells together (2kg/hand = 4kg total), and physiological stress
+// scales with total mass moved, not the per-hand number alone; sizing the
+// percentage check off the per-hand figure would let a per-hand increment
+// silently represent double the intended relative jump.
+function realStepTotalKg(mode: LoadingMode, category: string | null): number {
   switch (mode) {
     case 'barbell':
     case 'ez_bar':
       return 2.5
     case 'dumbbell':
+      return 4
     case 'single_implement':
       return 2
     case 'stack':
       return category === 'leg_press' ? 5 : 2.5
   }
+}
+
+/**
+ * The double-progression increment for one "notch" of overload — how much
+ * gets added once a trainee has earned it (hit the top of their rep range on
+ * every set). `currentWeightKg` must be in the SAME units the caller tracks
+ * as "the current weight" (the per-hand number for a two-implement dumbbell
+ * pair, the total for everything else) — the return value is in those same
+ * units, so callers can add it directly to their baseline.
+ *
+ * The raw percentage target is snapped to the loading mode's real step
+ * granularity and floored at one real step (you can't add half a plate
+ * pair). That snapped step can still be a large PERCENTAGE on a light
+ * baseline — callers are expected to compare the returned increment against
+ * the baseline themselves and, when it exceeds roughly 12%, hold load flat
+ * and progress reps instead until the baseline has grown enough to afford a
+ * real step (see the loadStepUnaffordable logic in generateMesocycle).
+ *
+ * Bodyweight movements have no numeric increment — see isExternallyLoaded()
+ * callers, which progress those via reps instead and should never call this.
+ */
+export function getLoadIncrementKg(entry: ExerciseEntry, category: string | null, currentWeightKg: number): number {
+  const mode = loadingMode(entry)
+  const isDumbbellPair = mode === 'dumbbell'
+  const totalCurrentKg = Math.max(0, isDumbbellPair ? currentWeightKg * 2 : currentWeightKg)
+  const isMain = entry.mechanics_tier === 'tier1_compound'
+  const rate = isMain ? MAIN_LIFT_STEP_RATE : ACCESSORY_STEP_RATE
+  const rawStepTotalKg = totalCurrentKg * rate
+  const stepGranularity = realStepTotalKg(mode, category)
+  const snappedTotalKg = Math.max(stepGranularity, Math.round(rawStepTotalKg / stepGranularity) * stepGranularity)
+  return isDumbbellPair ? snappedTotalKg / 2 : snappedTotalKg
 }
 
 // Equipment that carries a selectable external load in kilograms. Note the
@@ -538,6 +578,41 @@ function getSetPercents(sets: number, ramping: boolean): number[] {
 }
 
 /**
+ * How a load number should be labeled. 'per_hand' is for genuine
+ * two-implement pairs (Dumbbell Bench Press — both dumbbells move together,
+ * each hand holds the SAME number). 'single_side' is for a single implement
+ * carried/pressed unilaterally (Suitcase Carry, Overhead Carry — ONE
+ * kettlebell, ONE side working at a time) — a review caught "Suitcase Carry
+ * ~24kg per hand" and correctly called it "a contradiction in terms — a
+ * suitcase carry is one-sided by definition." Driven off implement count
+ * (loadingMode) and entry.unilateral, not a per-exercise name list, so any
+ * future single-implement unilateral movement gets the right label for
+ * free. 'total' is everything else (barbells, bilateral single-implement
+ * work like goblet squats, stacks).
+ */
+export type LoadLabelMode = 'per_hand' | 'single_side' | 'total'
+
+export function loadLabelMode(isDumbbell: boolean, isUnilateralSingleImplement: boolean): LoadLabelMode {
+  if (isDumbbell) return 'per_hand'
+  if (isUnilateralSingleImplement) return 'single_side'
+  return 'total'
+}
+
+/** Any exercise's `entry.unilateral && loadingMode(entry) === 'single_implement'` case — the correct, general test for "single implement worked one side at a time" that every display-label call site should use instead of re-deriving it. */
+export function labelModeForEntry(entry: ExerciseEntry): LoadLabelMode {
+  const mode = loadingMode(entry)
+  return loadLabelMode(mode === 'dumbbell', mode === 'single_implement' && entry.unilateral)
+}
+
+export function formatLoad(kg: number, labelMode: LoadLabelMode): string {
+  switch (labelMode) {
+    case 'per_hand': return `~${kg}kg per hand`
+    case 'single_side': return `~${kg}kg (single side)`
+    case 'total': return `~${kg}kg`
+  }
+}
+
+/**
  * Builds the per-set display array. `topSetKg` is the same fully-adjusted
  * (standards-derived, RPE/reps-scaled) number used for starting_weight_kg —
  * ramping sets are lighter fractions of it, never a separately-derived
@@ -547,7 +622,7 @@ function buildPerSetLoads(
   topSetKg: number,
   sets: number,
   mode: LoadingMode,
-  isDumbbell: boolean,
+  labelMode: LoadLabelMode,
   ramping: boolean,
 ): PerSetLoad[] {
   const percents = getSetPercents(sets, ramping)
@@ -556,7 +631,7 @@ function buildPerSetLoads(
     return {
       set_number: i + 1,
       load_kg: kg,
-      display: isDumbbell ? `~${kg}kg per hand` : `~${kg}kg`,
+      display: formatLoad(kg, labelMode),
     }
   })
 }
@@ -566,9 +641,9 @@ function buildPerSetLoads(
  * increment size, so "the rep range must be meaningful" isn't just a number
  * — the trainee is told exactly what triggers the next bump.
  */
-function buildProgressionBasis(repRangeLabel: string | undefined, incrementKg: number, isDumbbell: boolean): string {
+function buildProgressionBasis(repRangeLabel: string | undefined, incrementKg: number, labelMode: LoadLabelMode): string {
   const topOfRange = repRangeLabel?.match(/(\d+)\s*$/)?.[1]
-  const incrementText = isDumbbell ? `${incrementKg}kg per hand` : `${incrementKg}kg`
+  const incrementText = formatLoad(incrementKg, labelMode).replace(/^~/, '')
   const target = topOfRange ? `${topOfRange} reps` : 'the top of your rep range'
   return `Hit ${target} on every set this session? Add ${incrementText} next time. Otherwise hold this weight and chase more reps first.`
 }
@@ -667,6 +742,7 @@ export function prescribeLoad(
   // loaded at a time, same as a per-hand dumbbell number.
   const isUnilateralSingleImplement = mode === 'single_implement' && entry.unilateral
   const perSideLoad = isDumbbell || isUnilateralSingleImplement
+  const labelMode = loadLabelMode(isDumbbell, isUnilateralSingleImplement)
 
   let rounded: number
   let fromKnownWeight = false
@@ -740,12 +816,12 @@ export function prescribeLoad(
   // across all sets.
   const isCompoundTier = entry.mechanics_tier === 'tier1_compound' || entry.mechanics_tier === 'tier2_compound'
   const ramping = isCompoundTier && (options.phase === 'strength' || options.phase === 'power')
-  const per_set = buildPerSetLoads(rounded, options.sets ?? 1, mode, perSideLoad, ramping)
+  const per_set = buildPerSetLoads(rounded, options.sets ?? 1, mode, labelMode, ramping)
 
   const basis = options.forceStartingWeightKg != null
     ? (options.loadIsProgressing === false
         ? buildRepsProgressionBasis(options.repRangeLabel)
-        : buildProgressionBasis(options.repRangeLabel, getLoadIncrementKg(entry, category), perSideLoad))
+        : buildProgressionBasis(options.repRangeLabel, getLoadIncrementKg(entry, category, rounded), labelMode))
     : options.isCalibrationWeek
       ? 'Calibration week — a shade under your estimated working weight. Find where your last rep feels like the target RPE, then log it.'
       : fromKnownWeight
@@ -755,7 +831,7 @@ export function prescribeLoad(
 
   return {
     starting_weight_kg: rounded,
-    display: perSideLoad ? `~${rounded}kg per hand` : `~${rounded}kg`,
+    display: formatLoad(rounded, labelMode),
     basis,
     confidence: 'estimated',
     per_set,

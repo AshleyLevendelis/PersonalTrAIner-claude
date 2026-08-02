@@ -199,7 +199,7 @@ export async function getDoubleProgressionRecommendation(
   }
 
   const entry = getExerciseEntry(exerciseName)
-  const increment = entry && isExternallyLoaded(entry) ? getLoadIncrementKg(entry, categorize(entry)) : calculateIncrement(lastWeight)
+  const increment = entry && isExternallyLoaded(entry) ? getLoadIncrementKg(entry, categorize(entry), lastWeight) : calculateIncrement(lastWeight)
   const weightKg = lastWeight + increment
 
   return {

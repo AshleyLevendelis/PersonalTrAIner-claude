@@ -1167,6 +1167,9 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
                                 {ex.per_set_load[0].display.includes('per hand') && (
                                   <span className="text-[10px] text-muted-foreground/70">per hand</span>
                                 )}
+                                {ex.per_set_load[0].display.includes('single side') && (
+                                  <span className="text-[10px] text-muted-foreground/70">single side</span>
+                                )}
                               </div>
                             ) : ex.suggested_load && (
                               <span className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground">

@@ -10,7 +10,7 @@ import {
   type ExperienceConfig,
 } from './experience-config'
 import { buildWarmup, getWarmupReserveSeconds } from './warmup'
-import { prescribeLoad, categorize, getLoadIncrementKg, isExternallyLoaded, getEquipmentFloorKg, loadingMode, roundToPlate, type KnownWorkingWeights } from './load-prescription'
+import { prescribeLoad, categorize, getLoadIncrementKg, isExternallyLoaded, getEquipmentFloorKg, loadingMode, roundToPlate, formatLoad, labelModeForEntry, type KnownWorkingWeights } from './load-prescription'
 import {
   getPhaseSequence, getPhaseConfig, rotateVariation, resolveTargetRpe,
   shiftReps, adjustRest, dedupeAdjacentPhases, type PhaseConfig, type TrainingPhase,
@@ -1286,8 +1286,13 @@ function coherenceGroup(entry: ExerciseEntry): string | null {
 function rebuildLoadForExercise(ex: Exercise, entry: ExerciseEntry, targetKg: number): void {
   const mode = loadingMode(entry)
   const rounded = roundToPlate(targetKg, mode)
-  const isDumbbell = mode === 'dumbbell'
-  const display = isDumbbell ? `~${rounded}kg per hand` : `~${rounded}kg`
+  // Shared with prescribeLoad's own label logic (load-prescription.ts) so a
+  // coherence-clamped Suitcase Carry or Overhead Carry still reads "(single
+  // side)" instead of silently losing that qualifier — this used to
+  // re-derive its own isDumbbell-only check, which is exactly the
+  // single-implement-unilateral gap that produced the "per hand" bug on a
+  // one-sided carry in the first place.
+  const display = formatLoad(rounded, labelModeForEntry(entry))
   ex.suggested_load_kg = rounded
   ex.suggested_load = display
   if (ex.per_set_load && ex.per_set_load.length > 0) {
@@ -1614,6 +1619,127 @@ function balanceWeeklyStructure(
     }
 
     swap(validTarget.dayIdx, validTarget.exIdx, replacement, `push:pull exercise-count ratio ${ratio.toFixed(2)}`)
+  }
+}
+
+// No @types/node global in this project (it's a Vite/browser app that also
+// runs under plain tsx for scripts) — reach through globalThis rather than
+// referencing `process` directly so this compiles in both contexts without
+// pulling in Node's type definitions project-wide.
+const BALANCE_DEV_LOGGING = (globalThis as { process?: { env?: { NODE_ENV?: string } } }).process?.env?.NODE_ENV !== 'production'
+
+function logWeeklyBalanceDecision(message: string): void {
+  if (BALANCE_DEV_LOGGING) console.debug(`[weekly-pattern-balance] ${message}`)
+}
+
+/**
+ * Final per-week structural check — runs on the ACTUALLY SHIPPED week, after
+ * periodization, weekly accessory rotation, and duration-budget trimming.
+ * balanceWeeklyStructure (above) only ever runs once, on the base
+ * unperiodized template; a review round found set-count imbalances that
+ * survived it anyway ("4 sets of pushing against 20 sets of pulling") —
+ * duration-budget trimming and phase/goal set multipliers run AFTER that
+ * pass and can each independently reshape how many SETS land on each
+ * pattern, with nothing re-checking the aggregate once they're done.
+ *
+ * Deliberately does NOT swap exercise identities the way
+ * balanceWeeklyStructure does — a swap this late would need a fresh,
+ * periodization-aware load/rep rebuild (this week might be week 3 of a
+ * ramping block) that rebuildExerciseForSwap doesn't do; it always
+ * re-prescribes as if it were a first-block estimate. Nudging existing
+ * SET COUNTS within each exercise's already-established role floor/ceiling
+ * is cheap, safe, and never touches load or reps.
+ *
+ * Target band is asymmetric, not the naive 0.8-1.4 either direction: push
+ * volume should never exceed pull (shoulder-health convention — external
+ * rotation/rear delt work is chronically undertrained in generated
+ * programs), but pull is allowed to run up to 1.5x push before it's
+ * flagged as its own imbalance.
+ */
+function enforceWeeklyPatternBalance(days: WorkoutDay[]): void {
+  const trainingDays = days.filter(d => d.exercises.length > 0)
+
+  function patternSetTotal(pattern: 'push' | 'pull'): number {
+    let total = 0
+    for (const day of trainingDays) {
+      for (const ex of day.exercises) {
+        const entry = findEntry(ex.name)
+        if (entry && classifyForBalance(entry.movement_pattern) === pattern) total += ex.sets
+      }
+    }
+    return total
+  }
+
+  // Only accessory/isolation slots are nudged — main lifts are governed by
+  // the phase's own set-count logic and enforceSetHierarchy elsewhere, and
+  // nudging one to fix a pattern ratio would fight that. A same-day ceiling
+  // (that day's own main lift's set count, if it has one) is respected on
+  // the way up so a nudge can't invert the main >= accessory hierarchy
+  // enforceSetHierarchy establishes.
+  function findAdjustable(pattern: 'push' | 'pull', direction: 'up' | 'down'): Exercise | null {
+    for (const day of trainingDays) {
+      const dayMainSets = Math.max(
+        0,
+        ...day.exercises
+          .map(ex => (findEntry(ex.name) ? getVolumeRole(findEntry(ex.name)!) : null) === 'main' ? ex.sets : -1)
+      )
+      for (const ex of day.exercises) {
+        const entry = findEntry(ex.name)
+        if (!entry || classifyForBalance(entry.movement_pattern) !== pattern) continue
+        const role = getVolumeRole(entry)
+        if (role !== 'accessory' && role !== 'isolation') continue
+        const ceiling = getRoleSetCeiling(role, false)
+        const floor = getRoleSetFloor(role)
+        if (direction === 'up' && ex.sets < ceiling && (dayMainSets === 0 || ex.sets + 1 <= dayMainSets)) return ex
+        if (direction === 'down' && ex.sets > floor) return ex
+      }
+    }
+    return null
+  }
+
+  const MAX_ADJUSTMENTS = 4
+  for (let i = 0; i < MAX_ADJUSTMENTS; i++) {
+    const pushSets = patternSetTotal('push')
+    const pullSets = patternSetTotal('pull')
+    if (pushSets === 0 || pullSets === 0) break
+    if (pushSets <= pullSets && pullSets <= pushSets * 1.5) break
+
+    const pushIsExcess = pushSets > pullSets
+    const bumpTarget = findAdjustable(pushIsExcess ? 'pull' : 'push', 'up')
+    if (bumpTarget) {
+      bumpTarget.sets += 1
+      logWeeklyBalanceDecision(`push:${pushSets} pull:${pullSets} sets — bumped "${bumpTarget.name}" to ${bumpTarget.sets} sets`)
+      continue
+    }
+    const trimTarget = findAdjustable(pushIsExcess ? 'push' : 'pull', 'down')
+    if (trimTarget) {
+      trimTarget.sets -= 1
+      logWeeklyBalanceDecision(`push:${pushSets} pull:${pullSets} sets — trimmed "${trimTarget.name}" to ${trimTarget.sets} sets`)
+      continue
+    }
+    logWeeklyBalanceDecision(`push:${pushSets} pull:${pullSets} sets is outside the 1:1-1:1.5 band but no adjustable accessory/isolation slot remains`)
+    break
+  }
+
+  // Leg-pattern day coverage: diagnostic only (not auto-corrected) — adding
+  // a whole missing exercise to a day this late would need the same
+  // periodization-aware rebuild the swap-based balancer above can't safely
+  // do post-periodization either. balanceWeeklyStructure's missing-pattern
+  // pass already covers this at the template level; this just confirms the
+  // shipped week didn't lose that coverage to later trimming.
+  if (trainingDays.length >= 2) {
+    const legDayCount = trainingDays.filter(day =>
+      day.exercises.some(ex => {
+        const entry = findEntry(ex.name)
+        if (!entry) return false
+        const pattern = classifyForBalance(entry.movement_pattern)
+        const role = getVolumeRole(entry)
+        return (pattern === 'squat' || pattern === 'hinge') && (role === 'main' || role === 'accessory')
+      })
+    ).length
+    if (legDayCount < 2) {
+      logWeeklyBalanceDecision(`only ${legDayCount} of ${trainingDays.length} training day(s) carry a real leg pattern (knee/hip-dominant, main or accessory role)`)
+    }
   }
 }
 
@@ -2800,8 +2926,30 @@ export function generateMesocycle(
           // "reps not weight" identity belongs, so only the true main lift
           // is exempted from policy below.
           const isMainCompound = !!dbEntry && dbEntry.mechanics_tier === 'tier1_compound'
-          const rampReps = (isBodyweight || ((policy.progressionEmphasis === 'reps' || policy.progressionEmphasis === 'maintain') && !isMainCompound)) && !isCarry
-          const rampLoad = !isBodyweight && (policy.progressionEmphasis === 'load' || isCarry || isMainCompound)
+          const rampLoadCandidate = !isBodyweight && (policy.progressionEmphasis === 'load' || isCarry || isMainCompound)
+
+          // A percentage-sized step snapped to the loading mode's real
+          // granularity (see getLoadIncrementKg) can still be a large
+          // percentage on a LIGHT baseline — the minimum real dumbbell notch
+          // is 2kg/hand, which is 33% of a 6kg curl no matter how gently the
+          // target rate is set. Carries are exempt: a carry's only lever is
+          // load (distance is fixed, and shiftReps deliberately never
+          // touches it), so there's nothing to fall back to. When the step
+          // is unaffordable, hold load flat this block and ramp reps
+          // instead — the load catches up once the baseline itself has
+          // grown enough to afford a real step (this can legitimately take
+          // a whole block or more on light isolation work; that's correct,
+          // not a bug).
+          let loadStepUnaffordable = false
+          if (rampLoadCandidate && !isCarry && dbEntry) {
+            const affordabilityBaseline = blockBaselineKg[dayIdx][exIdx]
+            if (affordabilityBaseline != null && affordabilityBaseline > 0) {
+              const stepKg = getLoadIncrementKg(dbEntry, category, affordabilityBaseline)
+              loadStepUnaffordable = stepKg / affordabilityBaseline > 0.12
+            }
+          }
+          const rampLoad = rampLoadCandidate && !loadStepUnaffordable
+          const rampReps = (isBodyweight || loadStepUnaffordable || ((policy.progressionEmphasis === 'reps' || policy.progressionEmphasis === 'maintain') && !isMainCompound)) && !isCarry
           const repShift = isDeload
             ? (deloadAtFloor
                 // Weight held flat (can't drop further) — reps carry the
@@ -2823,7 +2971,7 @@ export function generateMesocycle(
           let load = null as ReturnType<typeof prescribeLoad> | null
           if (dbEntry && !isPrimer) {
             const baselineKg = blockBaselineKg[dayIdx][exIdx]
-            const increment = getLoadIncrementKg(dbEntry, category)
+            const increment = getLoadIncrementKg(dbEntry, category, baselineKg ?? 0)
 
             // Week 1 sets the baseline through the normal estimate pipeline
             // (bodyweight/known-weight/RPE/first-block/calibration all still
@@ -2914,6 +3062,12 @@ export function generateMesocycle(
       // this only applies to loading weeks.
       if (!isDeload) {
         applyDurationFiller(days, profile, policy, totalBudgetSeconds)
+        // Runs last, after rotation, periodization and duration-budget
+        // trimming have all had their say — see enforceWeeklyPatternBalance's
+        // doc comment. Deload weeks are exempt (like the duration filler
+        // above): their volume is deliberately, uniformly cut, and nudging
+        // set counts would fight that.
+        enforceWeeklyPatternBalance(days)
       }
 
       weeks.push({

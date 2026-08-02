@@ -184,7 +184,14 @@ interface ReviewResult {
   reviewText: string
 }
 
-async function callAnthropic(apiKey: string, planText: string): Promise<string> {
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+const NETWORK_RETRY_ATTEMPTS = 2
+const NETWORK_RETRY_BACKOFF_MS = [2000, 4000]
+
+async function callAnthropicOnce(apiKey: string, planText: string): Promise<string> {
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -211,6 +218,33 @@ async function callAnthropic(apiKey: string, planText: string): Promise<string> 
     return '(review declined by the model — no content returned)'
   }
   return data.content.find(block => block.type === 'text')?.text ?? '(no text content in response)'
+}
+
+/**
+ * Two profiles previously failed with `TypeError: fetch failed` — a
+ * transient connection-level error (DNS/socket reset), not a real API
+ * response — while every other profile in the same run succeeded, so it
+ * wasn't a billing or auth problem. Retries ONLY that class of failure:
+ * `fetch()` itself throwing before a response comes back. An actual API
+ * error response (`!response.ok`, e.g. the 400 "credit balance too low"
+ * seen in an earlier run) is a real answer from the server, not a network
+ * fault — retrying it blindly wastes quota and won't change the outcome,
+ * so those still surface immediately without a retry.
+ */
+async function callAnthropic(apiKey: string, planText: string): Promise<string> {
+  let lastError: unknown
+  for (let attempt = 0; attempt <= NETWORK_RETRY_ATTEMPTS; attempt++) {
+    try {
+      return await callAnthropicOnce(apiKey, planText)
+    } catch (err) {
+      const isNetworkError = err instanceof TypeError
+      if (!isNetworkError || attempt === NETWORK_RETRY_ATTEMPTS) throw err
+      lastError = err
+      console.log(`  Network error (attempt ${attempt + 1}/${NETWORK_RETRY_ATTEMPTS + 1}): ${err} — retrying in ${NETWORK_RETRY_BACKOFF_MS[attempt] / 1000}s...`)
+      await sleep(NETWORK_RETRY_BACKOFF_MS[attempt])
+    }
+  }
+  throw lastError
 }
 
 async function main() {
