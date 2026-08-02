@@ -601,26 +601,11 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, mealPl
     }
 
     if (action.type === 'log_workout_session') {
-      const logs = (action as any).logs as Array<{ exercise_name: string; sets_completed: number; reps_completed: number; weight_kg: number }> | undefined
-      if (logs && logs.length > 0 && profile.id) {
-        const todayDate = new Date().toISOString().split('T')[0]
-        const rows = logs.flatMap(log =>
-          Array.from({ length: log.sets_completed }, (_, i) => ({
-            user_id: profile.id,
-            date: todayDate,
-            exercise_name: log.exercise_name,
-            set_number: i + 1,
-            weight_kg: log.weight_kg,
-            reps_completed: log.reps_completed,
-            is_bodyweight: log.weight_kg === 0,
-            completed_at: new Date().toISOString(),
-          }))
-        )
-        await supabase.from('workout_logs').upsert(rows, {
-          onConflict: 'user_id,date,exercise_name,set_number',
-        })
-        onLogsUpdated?.()
-      }
+      // The edge function already wrote these sets into the unified store
+      // (exercise_set_logs, session-linked) before this action arrived — the
+      // pre-C0 client-side duplicate write is gone (single write path).
+      // Just tell the exercise tab to refetch so the rows light up.
+      onLogsUpdated?.()
       return true
     }
 

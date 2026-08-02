@@ -7,8 +7,9 @@ import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Bug, Clock, CalendarClock, Database, ChevronDown, ToggleLeft, ToggleRight, Zap, AlertTriangle } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
-import type { MesocycleWeek, WorkoutDay } from '@/lib/types'
+import { writeHistoricalSession, clearAllSetLogs } from '@/lib/set-log-store'
+import { getExerciseId } from '@/lib/exercise-db'
+import type { MesocycleWeek, WorkoutDay, Exercise } from '@/lib/types'
 
 interface DevTestPanelProps {
   profileId?: string
@@ -75,40 +76,47 @@ export function DevTestPanel({
     setSeedResult(null)
 
     try {
+      // Unified store (C0): one historical session per (day, week), sets
+      // upserted on the natural key — re-seeding overwrites instead of piling
+      // up duplicate rows the way the legacy set_logs inserts did.
+      const seedDay = async (
+        exercises: Exercise[], weekNumber: number, dayName: string, baseDate: Date,
+      ): Promise<number> => {
+        const dateStr = baseDate.toISOString().split('T')[0]
+        const sets = exercises.flatMap(exercise => {
+          const weight = generateRealisticWeight(exercise.name)
+          const reps = parseRepsToNumber(exercise.reps)
+          return Array.from({ length: exercise.sets }, (_, i) => {
+            const actualReps = reps + Math.floor(Math.random() * 2) - 1
+            return {
+              exerciseId: exercise.id ?? getExerciseId(exercise.name),
+              exerciseName: exercise.name,
+              setNumber: i + 1,
+              weightKg: weight === 0 ? 0 : weight + (weekNumber - 1) * 2.5,
+              repsCompleted: Math.max(1, actualReps),
+              rpe: Math.round((6 + Math.random() * 2.5) * 10) / 10,
+              isBodyweight: weight === 0,
+              completedAt: new Date(baseDate.getTime() + (i + 1) * 120000).toISOString(),
+            }
+          })
+        })
+        await writeHistoricalSession({ userId: profileId, date: dateStr, weekNumber, day: dayName, sets })
+        return sets.length
+      }
+
       const weeksToSeed = mesocycle.length > 0
         ? mesocycle.filter(w => w.week_number <= seedUpToWeek)
         : []
 
-      const planToSeed = weeksToSeed.length > 0 ? weeksToSeed : null
       let totalLogs = 0
 
-      if (planToSeed) {
-        for (const week of planToSeed) {
+      if (weeksToSeed.length > 0) {
+        for (const week of weeksToSeed) {
           for (const day of week.days) {
             if (!day.exercises || day.exercises.length === 0) continue
             const baseDate = new Date()
             baseDate.setDate(baseDate.getDate() - ((4 - week.week_number) * 7) - DAYS_OF_WEEK.indexOf(day.day))
-
-            for (const exercise of day.exercises) {
-              const weight = generateRealisticWeight(exercise.name)
-              const reps = parseRepsToNumber(exercise.reps)
-
-              for (let setNum = 1; setNum <= exercise.sets; setNum++) {
-                const actualReps = reps + Math.floor(Math.random() * 2) - 1
-                const { error } = await supabase.from('set_logs').insert({
-                  user_id: profileId,
-                  exercise_name: exercise.name,
-                  week_number: week.week_number,
-                  day: day.day,
-                  set_number: setNum,
-                  weight_kg: weight + (week.week_number - 1) * 2.5,
-                  reps_completed: Math.max(1, actualReps),
-                  rpe: 6 + Math.random() * 2.5,
-                  completed_at: baseDate.toISOString(),
-                })
-                if (!error) totalLogs++
-              }
-            }
+            totalLogs += await seedDay(day.exercises, week.week_number, day.day, baseDate)
           }
         }
       } else {
@@ -117,27 +125,7 @@ export function DevTestPanel({
           for (let wk = 1; wk <= seedUpToWeek; wk++) {
             const baseDate = new Date()
             baseDate.setDate(baseDate.getDate() - ((seedUpToWeek - wk) * 7) - DAYS_OF_WEEK.indexOf(day.day))
-
-            for (const exercise of day.exercises) {
-              const weight = generateRealisticWeight(exercise.name)
-              const reps = parseRepsToNumber(exercise.reps)
-
-              for (let setNum = 1; setNum <= exercise.sets; setNum++) {
-                const actualReps = reps + Math.floor(Math.random() * 2) - 1
-                const { error } = await supabase.from('set_logs').insert({
-                  user_id: profileId,
-                  exercise_name: exercise.name,
-                  week_number: wk,
-                  day: day.day,
-                  set_number: setNum,
-                  weight_kg: weight + (wk - 1) * 2.5,
-                  reps_completed: Math.max(1, actualReps),
-                  rpe: 6 + Math.random() * 2.5,
-                  completed_at: baseDate.toISOString(),
-                })
-                if (!error) totalLogs++
-              }
-            }
+            totalLogs += await seedDay(day.exercises, wk, day.day, baseDate)
           }
         }
       }
@@ -154,14 +142,15 @@ export function DevTestPanel({
   const handleClearMockLogs = useCallback(async () => {
     if (!profileId) return
     setSeedingWeeks(true)
-    const { error } = await supabase.from('set_logs').delete().eq('user_id', profileId)
-    if (error) {
-      setSeedResult({ success: false, message: `Delete failed: ${error.message}` })
-    } else {
-      setSeedResult({ success: true, message: 'All set_logs cleared for this profile' })
+    try {
+      await clearAllSetLogs(profileId)
+      setSeedResult({ success: true, message: 'All logged sets + sessions cleared for this profile' })
       onLogsSeeded()
+    } catch (err) {
+      setSeedResult({ success: false, message: `Delete failed: ${err instanceof Error ? err.message : 'unknown'}` })
+    } finally {
+      setSeedingWeeks(false)
     }
-    setSeedingWeeks(false)
   }, [profileId, onLogsSeeded])
 
   const activeWeekLabel = overrideWeek ? MESOCYCLE_LABELS[overrideWeek] || `Week ${overrideWeek}` : 'Live'

@@ -484,18 +484,11 @@ function App() {
       )
     } else if (action.type === 'replace_exercise') {
       if (action.permanent === false) {
-        // Session-only swap: log as workout for today but don't modify the plan template
-        const todayName = new Date().toLocaleDateString('en-US', { weekday: 'long' })
-        if (profile?.id) {
-          await supabase.from('workout_logs').insert({
-            profile_id: profile.id,
-            day: todayName,
-            exercise_name: action.new_item,
-            sets_completed: action.sets,
-            reps_completed: parseInt(action.reps) || 0,
-            weight_kg: 0,
-          })
-        }
+        // Session-only swap: nothing to persist — the swap only affects what
+        // the user does today, and actual performance gets logged through
+        // set-log-store when they log sets. (The pre-C0 code here inserted a
+        // workout_logs row whose columns didn't match the table — it had been
+        // silently failing with a 400 since it was written.)
       } else {
         // Permanent swap: update the plan template and mesocycle
         setExercisePlan(prev =>

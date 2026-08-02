@@ -138,10 +138,32 @@ export async function getWeeklyTracking(profileId: string, startDate: string, en
   }
 }
 
+/**
+ * Marks a session finished. Stamps finished_at, and — when the session knows
+ * when it started (set-log-store stamps started_at on the first set of the
+ * day) — records the real elapsed duration instead of the default estimate.
+ */
 export async function markSessionCompleted(sessionId: string) {
+  const finishedAt = new Date()
+  const { data: session } = await supabase
+    .from('workout_sessions')
+    .select('started_at')
+    .eq('id', sessionId)
+    .maybeSingle()
+
+  const update: Record<string, unknown> = {
+    is_completed: true,
+    finished_at: finishedAt.toISOString(),
+    updated_at: finishedAt.toISOString(),
+  }
+  if (session?.started_at) {
+    const elapsedMin = Math.round((finishedAt.getTime() - new Date(session.started_at).getTime()) / 60000)
+    if (elapsedMin > 0 && elapsedMin < 24 * 60) update.duration_minutes = elapsedMin
+  }
+
   const { error } = await supabase
     .from('workout_sessions')
-    .update({ is_completed: true, updated_at: new Date().toISOString() })
+    .update(update)
     .eq('id', sessionId)
 
   if (error) throw error
@@ -162,7 +184,7 @@ export async function getWeeklyDashboard(
   startDate: string,
   endDate: string
 ): Promise<WeeklyDashboardDay[]> {
-  const [metrics, nutrition, sessionsResult, logsResult, cardioResult] = await Promise.all([
+  const [metrics, nutrition, sessionsResult, cardioResult] = await Promise.all([
     getDailyMetrics(profileId, startDate, endDate),
     getNutritionTargets(profileId, startDate, endDate),
     supabase
@@ -172,13 +194,6 @@ export async function getWeeklyDashboard(
       .gte('date', startDate)
       .lte('date', endDate)
       .order('date', { ascending: true }),
-    supabase
-      .from('workout_logs')
-      .select('*')
-      .eq('user_id', profileId)
-      .gte('date', startDate)
-      .lte('date', endDate)
-      .order('set_number', { ascending: true }),
     supabase
       .from('cardio_logs')
       .select('*')
@@ -190,19 +205,35 @@ export async function getWeeklyDashboard(
 
   if (sessionsResult.error) throw sessionsResult.error
   const sessions = sessionsResult.data as WorkoutSession[]
-  const allLogs = (logsResult.data || []) as ExerciseSetLog[]
   const allCardio = (cardioResult.data || []) as CardioLog[]
 
+  // Set logs hang off sessions in the unified store (C0) — fetch by session id
+  // and stamp each row with its session's date for the per-day view.
   const sessionIds = sessions.map(s => s.id).filter(Boolean) as string[]
   let allExercises: WorkoutExerciseRow[] = []
+  let allLogs: ExerciseSetLog[] = []
   if (sessionIds.length > 0) {
-    const { data, error } = await supabase
-      .from('workout_exercises')
-      .select('*')
-      .in('workout_session_id', sessionIds)
-      .order('execution_order', { ascending: true })
-    if (error) throw error
-    allExercises = (data || []) as WorkoutExerciseRow[]
+    const [exercisesResult, logsResult] = await Promise.all([
+      supabase
+        .from('workout_exercises')
+        .select('*')
+        .in('workout_session_id', sessionIds)
+        .order('execution_order', { ascending: true }),
+      supabase
+        .from('exercise_set_logs')
+        .select('*')
+        .in('session_id', sessionIds)
+        .order('exercise_name')
+        .order('set_number', { ascending: true }),
+    ])
+    if (exercisesResult.error) throw exercisesResult.error
+    allExercises = (exercisesResult.data || []) as WorkoutExerciseRow[]
+    const dateBySession = new Map(sessions.map(s => [s.id, s.date]))
+    allLogs = ((logsResult.data || []) as (ExerciseSetLog & { session_id: string })[]).map(row => ({
+      ...row,
+      weight_kg: Number(row.weight_kg),
+      date: dateBySession.get(row.session_id) ?? '',
+    }))
   }
 
   const days: WeeklyDashboardDay[] = []
@@ -255,54 +286,10 @@ export async function instantiateWorkoutSession(
   return data as WorkoutSession
 }
 
-export async function upsertWorkoutLog(
-  userId: string,
-  date: string,
-  exerciseName: string,
-  setNumber: number,
-  weightKg: number,
-  repsCompleted: number,
-  isBodyweight: boolean = false,
-): Promise<ExerciseSetLog> {
-  const { data, error } = await supabase
-    .from('workout_logs')
-    .upsert(
-      {
-        user_id: userId,
-        date,
-        exercise_name: exerciseName,
-        set_number: setNumber,
-        weight_kg: isBodyweight ? 0 : weightKg,
-        reps_completed: repsCompleted,
-        is_bodyweight: isBodyweight,
-        completed_at: new Date().toISOString(),
-      },
-      { onConflict: 'user_id,date,exercise_name,set_number' }
-    )
-    .select()
-    .maybeSingle()
+// Set WRITES live exclusively in set-log-store.ts (C0 Part 3) — the legacy
+// upsertWorkoutLog/getLogsForDate pair is gone with the workout_logs table.
 
-  if (error) throw error
-  if (!data) throw new Error('Failed to save workout log')
-  return data as ExerciseSetLog
-}
-
-export async function getLogsForDate(
-  userId: string,
-  date: string,
-): Promise<ExerciseSetLog[]> {
-  const { data, error } = await supabase
-    .from('workout_logs')
-    .select('*')
-    .eq('user_id', userId)
-    .eq('date', date)
-    .order('exercise_name')
-    .order('set_number')
-
-  if (error) throw error
-  return (data || []) as ExerciseSetLog[]
-}
-
+/** Recent working-set history from the unified store (chat/AI context). */
 export async function getRecentLogs(
   userId: string,
   days: number = 14,
@@ -312,16 +299,21 @@ export async function getRecentLogs(
   const sinceStr = since.toISOString().split('T')[0]
 
   const { data, error } = await supabase
-    .from('workout_logs')
+    .from('exercise_set_logs')
     .select('*')
     .eq('user_id', userId)
-    .gte('date', sinceStr)
-    .order('date', { ascending: false })
+    .eq('is_warmup', false)
+    .gte('completed_at', sinceStr)
+    .order('completed_at', { ascending: false })
     .order('exercise_name')
     .order('set_number')
 
   if (error) throw error
-  return (data || []) as ExerciseSetLog[]
+  return ((data || []) as (ExerciseSetLog & { session_id?: string })[]).map(row => ({
+    ...row,
+    weight_kg: Number(row.weight_kg),
+    date: row.date || (row.completed_at ?? '').slice(0, 10),
+  }))
 }
 
 export function formatLogsForAI(logs: ExerciseSetLog[]): string {

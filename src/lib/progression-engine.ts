@@ -1,7 +1,20 @@
 import { supabase } from './supabase'
-import { getExerciseEntry } from './exercise-db'
+import { getExerciseEntry, getExerciseId } from './exercise-db'
 import { categorize, getLoadIncrementKg, isExternallyLoaded } from './load-prescription'
-import type { ExerciseTier } from './types'
+import { getLastSessionSets, getSetsForDate } from './set-log-store'
+import type { ExerciseTier, ExerciseSetLog } from './types'
+
+// ---------------------------------------------------------------------------
+// All progression reads run against the unified store (exercise_set_logs via
+// set-log-store's merged reads — C0 Part 4), keyed by exercise_id, working
+// sets only. The documented §3 contract is preserved exactly: recency by
+// completed_at, strictly-before-sessionDate scoping, the every-set-hit-top-
+// reps gate, equipment-aware increments. What changed vs the legacy set_logs
+// reads: duplicates can no longer exist (unique key upstream), sets arrive
+// ordered by set_number, and the progression base weight is the MAX working-
+// set weight — not whichever row the database happened to return first
+// (landmine L3: with ramped loading, "first row" could be a light early set).
+// ---------------------------------------------------------------------------
 
 export interface ProgressionResult {
   exerciseName: string
@@ -9,14 +22,6 @@ export interface ProgressionResult {
   newWeight: number
   reason: string
   type: 'overload' | 'primer_complete'
-}
-
-interface SetLogRow {
-  exercise_name: string
-  weight_kg: number
-  reps_completed: number
-  rpe: number | null
-  set_number: number
 }
 
 const NON_PROGRESSABLE_TIERS: Set<string> = new Set([
@@ -53,26 +58,31 @@ function calculateIncrement(currentWeight: number): number {
   return Math.max(1, Math.round(increment * 2) / 2)
 }
 
+/** The progression base: the heaviest working set of the session (kills L3 — never "whichever row came back first"). */
+function maxWorkingWeight(sets: ExerciseSetLog[]): number {
+  return sets.reduce((max, s) => Math.max(max, s.weight_kg), 0)
+}
+
+/**
+ * Same-session progressive-overload check (the toast after a completed set).
+ * Reads today's merged sets — including ones still pending sync — so it works
+ * mid-session even if the network is behind.
+ */
 export async function checkDoubleProgression(
   userId: string,
   exerciseName: string,
-  weekNumber: number,
-  day: string,
+  sessionDate: string,
   prescribedSets: number,
   prescribedReps: string,
   tier?: ExerciseTier
 ): Promise<ProgressionResult | null> {
-  if (!isProgressable(exerciseName, tier)) {
-    const { data: logs } = await supabase
-      .from('set_logs')
-      .select('exercise_name, weight_kg, reps_completed, rpe, set_number')
-      .eq('user_id', userId)
-      .eq('exercise_name', exerciseName)
-      .eq('week_number', weekNumber)
-      .eq('day', day)
-      .order('set_number', { ascending: true })
+  const exerciseId = getExerciseId(exerciseName)
+  const todaySets = (await getSetsForDate(userId, sessionDate))
+    .filter(s => (s.exercise_id ?? getExerciseId(s.exercise_name)) === exerciseId && !s.is_warmup)
+    .sort((a, b) => a.set_number - b.set_number)
 
-    if (logs && logs.length >= prescribedSets) {
+  if (!isProgressable(exerciseName, tier)) {
+    if (todaySets.length >= prescribedSets) {
       return {
         exerciseName,
         currentWeight: 0,
@@ -84,27 +94,18 @@ export async function checkDoubleProgression(
     return null
   }
 
-  const { data: logs } = await supabase
-    .from('set_logs')
-    .select('exercise_name, weight_kg, reps_completed, rpe, set_number')
-    .eq('user_id', userId)
-    .eq('exercise_name', exerciseName)
-    .eq('week_number', weekNumber)
-    .eq('day', day)
-    .order('set_number', { ascending: true })
+  if (todaySets.length < prescribedSets) return null
 
-  if (!logs || logs.length < prescribedSets) return null
-
-  const relevantSets = logs.slice(0, prescribedSets) as SetLogRow[]
+  const relevantSets = todaySets.slice(0, prescribedSets)
   const { high: topReps } = parseRepRange(prescribedReps)
 
   const allAtTop = relevantSets.every(s => s.reps_completed >= topReps)
-  const avgRpe = relevantSets.reduce((sum, s) => sum + (s.rpe || 7), 0) / relevantSets.length
+  const avgRpe = relevantSets.reduce((sum, s) => sum + (s.rpe ?? 7), 0) / relevantSets.length
   const rpeQualifies = avgRpe <= 8
 
   if (!allAtTop || !rpeQualifies) return null
 
-  const currentWeight = relevantSets[0].weight_kg
+  const currentWeight = maxWorkingWeight(relevantSets)
   const increment = calculateIncrement(currentWeight)
   const newWeight = currentWeight + increment
 
@@ -117,31 +118,6 @@ export async function checkDoubleProgression(
   }
 }
 
-/**
- * The weight logged for this exercise in the trainee's most recent prior
- * session — used to progress week 2+ prescriptions off real performance
- * instead of the bodyweight-multiplier estimate. `sessionDate` scopes the
- * lookup to sessions strictly before it, so re-running this mid-session
- * doesn't pick up sets just logged today.
- */
-export async function getLastSessionLoad(
-  profileId: string,
-  exerciseName: string,
-  sessionDate: string
-): Promise<number | null> {
-  const { data } = await supabase
-    .from('set_logs')
-    .select('weight_kg, completed_at')
-    .eq('user_id', profileId)
-    .eq('exercise_name', exerciseName)
-    .lt('completed_at', sessionDate)
-    .order('completed_at', { ascending: false })
-    .limit(1)
-
-  if (!data || data.length === 0) return null
-  return data[0].weight_kg
-}
-
 export interface DoubleProgressionRecommendation {
   weightKg: number
   /** True when every logged set from the last session hit the top of the rep range and the weight bumped up. */
@@ -151,13 +127,11 @@ export interface DoubleProgressionRecommendation {
 
 /**
  * True double progression from the trainee's actual last session, per the
- * rule this app now shows next to every loaded exercise: hit the top of the
- * rep range on every set → the weight goes up by one loading-mode-sized
+ * rule this app shows next to every loaded exercise: hit the top of the rep
+ * range on every set → the weight goes up by one loading-mode-sized
  * increment; anything short of that → hold the weight and chase reps first.
- * This is what "week 2 suggests 82.5kg" means in practice — it is NOT the
- * generic 2.5%-of-current-weight bump `calculateIncrement` uses for the
- * same-session progressive-overload toast in `checkDoubleProgression`; that
- * one is unrelated and untouched.
+ * `sessionDate` scopes the lookup to sessions strictly before it, so
+ * re-running this mid-session doesn't pick up sets just logged today.
  */
 export async function getDoubleProgressionRecommendation(
   profileId: string,
@@ -165,29 +139,11 @@ export async function getDoubleProgressionRecommendation(
   sessionDate: string,
   prescribedRepRangeHigh: number,
 ): Promise<DoubleProgressionRecommendation | null> {
-  const { data: mostRecent } = await supabase
-    .from('set_logs')
-    .select('week_number, day, completed_at')
-    .eq('user_id', profileId)
-    .eq('exercise_name', exerciseName)
-    .lt('completed_at', sessionDate)
-    .order('completed_at', { ascending: false })
-    .limit(1)
+  const exerciseId = getExerciseId(exerciseName)
+  const sessionSets = await getLastSessionSets(profileId, exerciseId, sessionDate)
+  if (sessionSets.length === 0) return null
 
-  const last = mostRecent?.[0]
-  if (!last) return null
-
-  const { data: sessionSets } = await supabase
-    .from('set_logs')
-    .select('weight_kg, reps_completed')
-    .eq('user_id', profileId)
-    .eq('exercise_name', exerciseName)
-    .eq('week_number', last.week_number)
-    .eq('day', last.day)
-
-  if (!sessionSets || sessionSets.length === 0) return null
-
-  const lastWeight = sessionSets[0].weight_kg
+  const lastWeight = maxWorkingWeight(sessionSets)
   const hitTopOnAllSets = sessionSets.every(s => s.reps_completed >= prescribedRepRangeHigh)
 
   if (!hitTopOnAllSets) {
@@ -209,16 +165,18 @@ export async function getDoubleProgressionRecommendation(
   }
 }
 
+/** Most recent logged working set for an exercise (optionally scoped to a mesocycle week). */
 export async function getLastLoggedWeight(
   userId: string,
   exerciseName: string,
   weekNumber?: number
 ): Promise<{ weight_kg: number; reps_completed: number } | null> {
   let query = supabase
-    .from('set_logs')
+    .from('exercise_set_logs')
     .select('weight_kg, reps_completed')
     .eq('user_id', userId)
-    .eq('exercise_name', exerciseName)
+    .eq('exercise_id', getExerciseId(exerciseName))
+    .eq('is_warmup', false)
     .order('completed_at', { ascending: false })
     .limit(1)
 
@@ -228,78 +186,5 @@ export async function getLastLoggedWeight(
 
   const { data } = await query
   if (!data || data.length === 0) return null
-  return { weight_kg: data[0].weight_kg, reps_completed: data[0].reps_completed }
-}
-
-export async function logSet(params: {
-  userId: string
-  exerciseName: string
-  exercisePlanId?: string
-  weekNumber: number
-  day: string
-  setNumber: number
-  weightKg: number
-  repsCompleted: number
-  rpe?: number
-}): Promise<void> {
-  await supabase.from('set_logs').insert({
-    user_id: params.userId,
-    exercise_plan_id: params.exercisePlanId || null,
-    exercise_name: params.exerciseName,
-    week_number: params.weekNumber,
-    day: params.day,
-    set_number: params.setNumber,
-    weight_kg: params.weightKg,
-    reps_completed: params.repsCompleted,
-    rpe: params.rpe || null,
-  })
-}
-
-export async function logEntireSession(params: {
-  userId: string
-  weekNumber: number
-  day: string
-  exercises: Array<{
-    name: string
-    sets: number
-    reps: string
-    weight_kg: number
-    exercisePlanId?: string
-  }>
-}): Promise<void> {
-  const rows = params.exercises.flatMap(ex => {
-    const { high } = parseRepRange(ex.reps)
-    return Array.from({ length: ex.sets }, (_, i) => ({
-      user_id: params.userId,
-      exercise_plan_id: ex.exercisePlanId || null,
-      exercise_name: ex.name,
-      week_number: params.weekNumber,
-      day: params.day,
-      set_number: i + 1,
-      weight_kg: ex.weight_kg,
-      reps_completed: high,
-      rpe: null,
-    }))
-  })
-
-  if (rows.length > 0) {
-    await supabase.from('set_logs').insert(rows)
-  }
-}
-
-export async function getSessionLogs(
-  userId: string,
-  weekNumber: number,
-  day: string
-): Promise<SetLogRow[]> {
-  const { data } = await supabase
-    .from('set_logs')
-    .select('exercise_name, weight_kg, reps_completed, rpe, set_number')
-    .eq('user_id', userId)
-    .eq('week_number', weekNumber)
-    .eq('day', day)
-    .order('exercise_name')
-    .order('set_number', { ascending: true })
-
-  return (data || []) as SetLogRow[]
+  return { weight_kg: Number(data[0].weight_kg), reps_completed: data[0].reps_completed }
 }

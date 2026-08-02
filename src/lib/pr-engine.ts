@@ -126,14 +126,16 @@ export function getTopPRSet(
   return { setNumber: bestSetNumber, result: bestResult }
 }
 
+/** Seeds the localStorage PR cache from unified-store history (working sets only). PR storage itself stays localStorage this round — DB-backed PRs land in C2. */
 export async function seedPRCacheFromHistory(userId: string): Promise<void> {
   const existing = getPRCache(userId)
   if (Object.keys(existing).length > 0) return
 
   const { data, error } = await supabase
-    .from('workout_logs')
+    .from('exercise_set_logs')
     .select('exercise_name, weight_kg, reps_completed')
     .eq('user_id', userId)
+    .eq('is_warmup', false)
     .gt('weight_kg', 0)
     .gt('reps_completed', 0)
 
@@ -151,31 +153,4 @@ export async function seedPRCacheFromHistory(userId: string): Promise<void> {
     }
   }
   savePRCache(userId, cache)
-}
-
-export async function getLastSessionForExercise(
-  userId: string,
-  exerciseName: string,
-  excludeDate: string,
-): Promise<{ weight_kg: number; reps_completed: number; set_number: number }[]> {
-  const { data, error } = await supabase
-    .from('workout_logs')
-    .select('weight_kg, reps_completed, set_number, date')
-    .eq('user_id', userId)
-    .eq('exercise_name', exerciseName)
-    .neq('date', excludeDate)
-    .order('date', { ascending: false })
-    .order('set_number', { ascending: true })
-    .limit(10)
-
-  if (error || !data || data.length === 0) return []
-
-  const latestDate = data[0].date
-  return data
-    .filter(row => row.date === latestDate)
-    .map(row => ({
-      weight_kg: Number(row.weight_kg),
-      reps_completed: row.reps_completed,
-      set_number: row.set_number,
-    }))
 }

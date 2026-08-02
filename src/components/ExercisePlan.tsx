@@ -844,10 +844,10 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
       weekNumber: currentWeek,
     })
 
-    // Check progression in the background (only if online)
-    if (navigator.onLine) {
+    // Check progression in the background (merged store reads — works offline too)
+    {
       checkDoubleProgression(
-        profileId, exerciseName, currentWeek, todayName, prescribedSets, prescribedReps, tier as any
+        profileId, exerciseName, today, prescribedSets, prescribedReps, tier as any
       ).then(progression => {
         if (progression) {
           if (progression.type === 'primer_complete') {

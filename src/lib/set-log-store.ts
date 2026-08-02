@@ -599,6 +599,67 @@ export async function getLastSessionSets(
   return serverSets
 }
 
+/**
+ * Direct synced write for HISTORICAL data (dev seeding, backfill tooling) —
+ * bypasses the pending store because these rows need explicit completed_at
+ * timestamps in the past, which saveSet (deliberately) doesn't accept.
+ * Same session-ensure + natural-key upsert semantics as the flush path.
+ */
+export async function writeHistoricalSession(params: {
+  userId: string
+  date: string
+  weekNumber: number | null
+  day: string
+  sets: Array<{
+    exerciseId: string
+    exerciseName: string
+    setNumber: number
+    weightKg: number
+    repsCompleted: number
+    rpe?: number | null
+    unit?: SetUnit
+    isBodyweight?: boolean
+    isWarmup?: boolean
+    completedAt: string
+  }>
+}): Promise<void> {
+  if (params.sets.length === 0) return
+  const sessionId = await ensureSessionSynced(params.userId, params.date)
+  const rows = params.sets.map(s => ({
+    session_id: sessionId,
+    user_id: params.userId,
+    exercise_id: s.exerciseId,
+    exercise_name: s.exerciseName,
+    week_number: params.weekNumber,
+    day: params.day,
+    set_number: s.setNumber,
+    weight_kg: s.weightKg,
+    reps_completed: s.repsCompleted,
+    rpe: s.rpe ?? null,
+    unit: s.unit ?? 'reps',
+    is_bodyweight: s.isBodyweight ?? false,
+    is_warmup: s.isWarmup ?? false,
+    completed_at: s.completedAt,
+  }))
+  const { error } = await supabase
+    .from('exercise_set_logs')
+    .upsert(rows, { onConflict: 'user_id,session_id,exercise_id,set_number,is_warmup' })
+  if (error) throw error
+}
+
+/** Dev tool: wipe a profile's unified logging data (sets + their session rows + local caches). */
+export async function clearAllSetLogs(userId: string): Promise<void> {
+  const { error: setsError } = await supabase.from('exercise_set_logs').delete().eq('user_id', userId)
+  if (setsError) throw setsError
+  const { error: sessionsError } = await supabase.from('workout_sessions').delete().eq('profile_id', userId)
+  if (sessionsError) throw sessionsError
+  if (hasStorage()) {
+    localStorage.removeItem(PENDING_KEY)
+    localStorage.removeItem(SESSION_REGISTRY_KEY)
+  }
+  notifyListeners()
+}
+
 /** All working+warmup sets attached to a synced session id (Part 4 dashboard read). */
 export async function getSetsForSession(sessionId: string): Promise<ExerciseSetLog[]> {
   const { data } = await supabase

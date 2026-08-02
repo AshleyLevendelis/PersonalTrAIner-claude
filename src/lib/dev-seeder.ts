@@ -1,4 +1,6 @@
 import { supabase } from './supabase'
+import { writeHistoricalSession, clearAllSetLogs } from './set-log-store'
+import { getExerciseId } from './exercise-db'
 import type { UserProfile, WorkoutDay, MealPlanDay } from './types'
 
 function randomBetween(min: number, max: number): number {
@@ -70,7 +72,7 @@ export async function seedSyntheticData(
       baseDate.setDate(baseDate.getDate() - ((weeksToSeed - wk) * 7) - (((new Date().getDay()) - dayIndex + 7) % 7))
       const dateStr = baseDate.toISOString().split('T')[0]
 
-      const rows: any[] = []
+      const sets: Parameters<typeof writeHistoricalSession>[0]['sets'] = []
       for (const exercise of day.exercises) {
         const weight = generateRealisticWeight(exercise.name, wk)
         const targetReps = parseReps(exercise.reps)
@@ -83,24 +85,26 @@ export async function seedSyntheticData(
           const baseRpe = 6 + (wk * 0.3) + (setNum * 0.3)
           const rpe = Math.min(10, Math.round(baseRpe * 10) / 10 + randomBetween(-0.5, 0.5))
 
-          rows.push({
-            user_id: profile.id,
-            date: dateStr,
-            exercise_name: exercise.name,
-            set_number: setNum,
-            weight_kg: weight,
-            reps_completed: repsCompleted,
-            is_bodyweight: weight === 0,
-            completed_at: new Date(baseDate.getTime() + setNum * 120000).toISOString(),
+          sets.push({
+            exerciseId: exercise.id ?? getExerciseId(exercise.name),
+            exerciseName: exercise.name,
+            setNumber: setNum,
+            weightKg: weight,
+            repsCompleted,
+            rpe: Math.round(rpe * 10) / 10,
+            isBodyweight: weight === 0,
+            completedAt: new Date(baseDate.getTime() + setNum * 120000).toISOString(),
           })
         }
       }
 
-      if (rows.length > 0) {
-        const { error } = await supabase.from('workout_logs').upsert(rows, {
-          onConflict: 'user_id,date,exercise_name,set_number',
-        })
-        if (!error) workoutLogs += rows.length
+      if (sets.length > 0) {
+        try {
+          await writeHistoricalSession({ userId: profile.id, date: dateStr, weekNumber: wk, day: day.day, sets })
+          workoutLogs += sets.length
+        } catch {
+          // Partial seed failures are tolerated, matching the legacy behavior.
+        }
       }
 
       stepsDone++
@@ -163,13 +167,13 @@ export async function seedSyntheticData(
 }
 
 export async function clearSyntheticData(profileId: string): Promise<{ success: boolean; message: string }> {
-  const [workoutRes, mealRes] = await Promise.all([
-    supabase.from('workout_logs').delete().eq('user_id', profileId),
-    supabase.from('daily_food_logs').delete().eq('profile_id', profileId),
-  ])
-
   const errors: string[] = []
-  if (workoutRes.error) errors.push(`workout_logs: ${workoutRes.error.message}`)
+  try {
+    await clearAllSetLogs(profileId)
+  } catch (err) {
+    errors.push(`set logs: ${err instanceof Error ? err.message : 'unknown'}`)
+  }
+  const mealRes = await supabase.from('daily_food_logs').delete().eq('profile_id', profileId)
   if (mealRes.error) errors.push(`daily_food_logs: ${mealRes.error.message}`)
 
   if (errors.length > 0) {
