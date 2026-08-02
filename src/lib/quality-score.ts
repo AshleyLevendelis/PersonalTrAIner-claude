@@ -314,14 +314,6 @@ function scoreProgression(profile: UserProfile, mesocycle: MesocycleWeek[]): Dim
 
       if (e1.suggested_load_kg != null && e2.suggested_load_kg != null && e3.suggested_load_kg != null) {
         const [l1, l2, l3] = [e1.suggested_load_kg, e2.suggested_load_kg, e3.suggested_load_kg]
-        if (expectsLoadRamp && !(l1 <= l2 && l2 <= l3 && l3 > l1)) {
-          violatedRules.add('load_not_progressing')
-          deductions.push({
-            rule: 'load_not_progressing', day: day.day, weekNumber: 1,
-            detail: `${e1.name} load across loading weeks: ${l1} -> ${l2} -> ${l3}`,
-            expected: 'non-decreasing with a real increase', actual: `${l1}->${l2}->${l3}`,
-          })
-        }
 
         // The equipment floor this main lift is loaded on — an empty bar,
         // the lightest dumbbell pair, a stack's bottom pin. Below this,
@@ -330,6 +322,25 @@ function scoreProgression(profile: UserProfile, mesocycle: MesocycleWeek[]): Dim
         // enough" are meaningful complaints on their own.
         const mainEntry = dbEntry(e4.name)
         const floor = mainEntry ? getEquipmentFloorKg(mainEntry) : 0
+
+        // Same reasoning applies to "not progressing": since the C0
+        // calibration-conservatism fix, an unverified beginner/novice lift
+        // whose true standards estimate sits near the equipment floor can
+        // have its week 1/2/3 estimates (0.55/0.65/0.75 of standard) all
+        // round down to that same floor — e.g. an empty 20kg barbell row
+        // for three straight weeks. That's the engine correctly refusing to
+        // invent a heavier number than the lift needs, not stalled
+        // progression; only flag flat/decreasing load when there was
+        // somewhere for it to actually go.
+        const pinnedAtFloor = l1 <= floor && l2 <= floor && l3 <= floor
+        if (expectsLoadRamp && !pinnedAtFloor && !(l1 <= l2 && l2 <= l3 && l3 > l1)) {
+          violatedRules.add('load_not_progressing')
+          deductions.push({
+            rule: 'load_not_progressing', day: day.day, weekNumber: 1,
+            detail: `${e1.name} load across loading weeks: ${l1} -> ${l2} -> ${l3}`,
+            expected: 'non-decreasing with a real increase', actual: `${l1}->${l2}->${l3}`,
+          })
+        }
 
         if (e4.suggested_load_kg != null && e4.suggested_load_kg > l3 * 0.8) {
           // Exempt only when the load genuinely can't drop further (at the
@@ -353,17 +364,22 @@ function scoreProgression(profile: UserProfile, mesocycle: MesocycleWeek[]): Dim
             })
           }
         }
-        // Threshold recalibrated for the capability-model round's strength
-        // rebuild (load-prescription.ts): calibration conservatism is now a
-        // real 0.85x MULTIPLIER on an accurate standards-based estimate,
-        // not the old 0.45x hard ceiling on a deliberately-lowballed one.
-        // Week 3 is that same calibrated baseline plus two small FIXED-kg
-        // increments, so on a realistic (larger) base weight the increments
-        // are a much smaller fraction of the total than they were under the
-        // old, much-lower baseline — l1/l3 now legitimately lands anywhere
-        // from ~0.80 (near the equipment floor, where +5kg is a big jump)
-        // to ~0.95 (a heavy lift, where +5kg barely moves the ratio). 0.55
-        // would flag nearly every plan under the new model.
+        // Threshold recalibrated for the C0 calibration-conservatism round
+        // (load-prescription.ts): a flat 0.85x MULTIPLIER on the standards
+        // estimate produced near-max first-session loads for self-reported
+        // "advanced" trainees with no verified numbers (up to 130kg on a
+        // first-ever deadlift) — it's now tiered by training_experience
+        // (0.55 beginner/novice, 0.50 intermediate, 0.45 advanced) when the
+        // load is unverified, and unchanged (~0.85-0.9) when it's anchored
+        // to a known working weight. Weeks 2-3 of block 1, when still
+        // unverified, no longer carry the calibrated baseline forward with
+        // small fixed-kg increments — they step up from a FRESH standards
+        // estimate at 65%/75%, so l1/l3 lands well under this 0.97 ceiling
+        // (roughly 0.45-0.55 divided by 0.75) for any unverified profile.
+        // Known-weight-anchored lifts keep the old baseline-plus-increment
+        // path, so l1/l3 for those can still sit close to 1.0 on a heavy
+        // lift — which is exactly why this check only fires when the ratio
+        // is suspiciously close to 1 (>0.97), not merely high.
         if (expectsLoadRamp && w1.isCalibrationWeek && l3 > floor && l1 > l3 * 0.97) {
           violatedRules.add('calibration_not_conservative')
           deductions.push({

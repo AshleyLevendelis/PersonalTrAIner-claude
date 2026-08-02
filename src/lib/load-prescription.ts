@@ -92,14 +92,25 @@ export interface LoadPrescriptionOptions {
   phase?: string
   /**
    * True for week 1 of a trainee's first block when they told onboarding
-   * they don't know their numbers. Applies a mild 0.85x conservatism
-   * multiplier on top of the standards-derived estimate — the point is to
-   * start a shade under an unverified number, not to override the RPE/reps
+   * they don't know their numbers. Applies an experience-tiered conservatism
+   * multiplier on top of the standards-derived estimate (see
+   * CALIBRATION_WEEK_CONSERVATISM_BY_EXPERIENCE) — the point is to start
+   * meaningfully under an unverified number, not to override the RPE/reps
    * math with an artificial ceiling the way the old hard clamp did. Skipped
    * for a known working weight, which isn't an unverified guess this exists
    * to protect against.
    */
   isCalibrationWeek?: boolean
+  /**
+   * Weeks 2-3 of a trainee's FIRST block, for an exercise with no known
+   * working weight — steps a fresh, this-week estimate toward full value
+   * (see FIRST_BLOCK_UNVERIFIED_RAMP_FRACTION's doc comment) instead of
+   * either the normal double-progression increment or a full re-snap.
+   * Mutually exclusive with forceStartingWeightKg in practice (the caller
+   * picks one path per exercise per week) and, like isCalibrationWeek,
+   * ignored when the load comes from a verified known working weight.
+   */
+  firstBlockUnverifiedRampFraction?: number
   /**
    * Verified working weights from onboarding ("I know my numbers"). When the
    * exercise's movement family has an entry here, it replaces the
@@ -568,13 +579,53 @@ export function isImprovisedLoadImplement(entry: ExerciseEntry): boolean {
   return entry.equipment.includes('weighted backpack')
 }
 
-// A calibration week (no verified numbers yet) starts a shade under the
-// standards-derived estimate rather than trusting it outright — the point is
-// to find the real number quickly, not to hand over a confident-looking one.
-// This is a MULTIPLIER on the estimate, not a ceiling clamp: the RPE/reps
-// math still drives the number, this just nudges the whole thing down a bit
-// for the one week where "unverified" matters most.
-const CALIBRATION_WEEK_CONSERVATISM = 0.85
+// A calibration week (no verified numbers yet) starts under the standards-
+// derived estimate rather than trusting it outright — the point is to find
+// the real number quickly, not to hand over a confident-looking one. This is
+// a MULTIPLIER on the estimate, not a ceiling clamp: the RPE/reps math still
+// drives the number, this just nudges the whole thing down for the one week
+// where "unverified" matters most.
+//
+// Tiered by experience, not flat — a flat 0.85 (this file's prior value)
+// treats every tier's standards-table claim as equally trustworthy, but they
+// are not equally RISKY when wrong. The self-report this multiplier exists
+// to protect against ("advanced", "I don't know my numbers") is completely
+// unverified either way, and the standards table's spread across tiers is
+// large (deadlift: 1.0x bodyweight at beginner, 2.5x at advanced) — an
+// overconfident "advanced" claim carries the largest absolute-kg downside
+// precisely because the table takes it at face value. Trust decreases as
+// that downside grows: a beginner overclaiming novice-level numbers is off
+// by a modest margin; an intermediate overclaiming advanced is off by a
+// dangerous one on a 217kg-estimated deadlift. A real calibration-week
+// reproduction (37yo/87kg male, advanced, unknown lifts) landed a first-ever
+// deadlift working set at 130kg under the old flat 0.85 — these values bring
+// that same profile to ~70-72.5kg instead.
+const CALIBRATION_WEEK_CONSERVATISM_BY_EXPERIENCE: Record<TrainingExperience, number> = {
+  beginner: 0.55,
+  novice: 0.55,
+  intermediate: 0.50,
+  advanced: 0.45,
+}
+
+// Weeks 2-3 of a trainee's FIRST block, for an exercise that's STILL
+// unverified (no known working weight — calibration only ever runs once, at
+// week 1, so by week 2 there's no fresh "isCalibrationWeek" discount to lean
+// on). Left alone, these weeks would inherit week 1's calibration-dampened
+// number and add only the normal small double-progression notch on top of
+// it (~3.5%/7.5%) — technically correct as a within-block ramp, but for a
+// deeply-dampened week 1 baseline (0.45x of a 217kg estimate is ~98kg), that
+// notch alone would leave week 3 still far below what the lifter can
+// probably actually do, reading as an oddly timid "ramp" in the UI. Instead,
+// weeks 2 and 3 step toward the full standards estimate directly — 65%, then
+// 75% of THAT WEEK's own RPE/reps-scaled estimate — never snapping to 100%
+// (still unverified) and never just coasting on week 1's tiny increment.
+// Only applies pre-verification: the moment real logged history exists for
+// this exercise, the live progression engine (getDoubleProgressionRecommendation
+// in progression-engine.ts) overrides these static numbers entirely, as today.
+export const FIRST_BLOCK_UNVERIFIED_RAMP_FRACTION: Record<number, number> = {
+  2: 0.65,
+  3: 0.75,
+}
 
 // Maps a standards category onto the onboarding "known working weight" field
 // that anchors it. Only the categories a trainee would actually self-report
@@ -586,6 +637,21 @@ const KNOWN_WEIGHT_FAMILY: Partial<Record<string, keyof KnownWorkingWeights>> = 
   goblet_squat: 'squat',
   bench: 'bench',
   deadlift: 'deadlift',
+}
+
+/**
+ * Same "is this exercise anchored to a real, verified number" check
+ * prescribeLoad runs internally (as `fromKnownWeight`) — exposed so callers
+ * building week 2-3 forceStartingWeightKg (exercise-plan.ts) can decide
+ * whether an exercise is still eligible for the first-block unverified ramp
+ * (FIRST_BLOCK_UNVERIFIED_RAMP_FRACTION) without duplicating the category ->
+ * known-weight-field mapping.
+ */
+export function hasKnownWorkingWeight(category: string | null, knownWorkingWeights: KnownWorkingWeights | undefined): boolean {
+  if (!category) return false
+  const family = KNOWN_WEIGHT_FAMILY[category]
+  const anchor = family ? knownWorkingWeights?.[family] : undefined
+  return anchor != null && anchor > 0
 }
 
 // ---------------------------------------------------------------------------
@@ -834,11 +900,17 @@ export function prescribeLoad(
     }
 
     if (options.isCalibrationWeek && !fromKnownWeight) {
-      // Week 1 with no known numbers: start a shade under the estimate
+      // Week 1 with no known numbers: start meaningfully under the estimate
       // while it gets verified. A multiplier on the real number, not a
-      // ceiling that overrides the RPE/reps math (see CALIBRATION_WEEK_
-      // CONSERVATISM's doc comment).
-      estimate *= CALIBRATION_WEEK_CONSERVATISM
+      // ceiling that overrides the RPE/reps math (see
+      // CALIBRATION_WEEK_CONSERVATISM_BY_EXPERIENCE's doc comment for why
+      // this is tiered rather than flat).
+      const experienceTier = profile.training_experience || 'novice'
+      estimate *= CALIBRATION_WEEK_CONSERVATISM_BY_EXPERIENCE[experienceTier]
+    } else if (options.firstBlockUnverifiedRampFraction != null && !fromKnownWeight) {
+      // Block 1, weeks 2-3, still no verified number for this exercise — see
+      // FIRST_BLOCK_UNVERIFIED_RAMP_FRACTION's doc comment.
+      estimate *= options.firstBlockUnverifiedRampFraction
     }
 
     // A per-side prescription is half the standard's total — two-implement
@@ -872,12 +944,14 @@ export function prescribeLoad(
     ? (options.loadIsProgressing === false
         ? buildRepsProgressionBasis(options.repRangeLabel)
         : buildProgressionBasis(options.repRangeLabel, getLoadIncrementKg(entry, category, rounded), labelMode))
-    : options.isCalibrationWeek
-      ? 'Calibration week — a shade under your estimated working weight. Find where your last rep feels like the target RPE, then log it.'
-      : fromKnownWeight
-        ? 'Seeded from the working weight you reported for this lift. Let the effort target correct it if it has changed.'
-        : 'Starting estimate from strength standards for your bodyweight, sex and experience — not a tested max. ' +
-          'Let the effort target correct it: too easy, add load next set; too hard, drop it.'
+    : options.isCalibrationWeek && !fromKnownWeight
+      ? 'Loads start deliberately light — find the weight where the last rep feels like RPE 6, log it, and next week builds from YOUR numbers.'
+      : options.firstBlockUnverifiedRampFraction != null && !fromKnownWeight
+        ? 'Still no logged number for this lift, so this week steps up from calibration while staying conservative. Log it and let the effort target correct it.'
+        : fromKnownWeight
+          ? 'Seeded from the working weight you reported for this lift. Let the effort target correct it if it has changed.'
+          : 'Starting estimate from strength standards for your bodyweight, sex and experience — not a tested max. ' +
+            'Let the effort target correct it: too easy, add load next set; too hard, drop it.'
 
   return {
     starting_weight_kg: rounded,
