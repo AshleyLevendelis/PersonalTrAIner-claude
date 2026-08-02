@@ -16,7 +16,7 @@ import { checkDoubleProgression, getDoubleProgressionRecommendation } from '@/li
 import { saveSessionCache, loadSessionCache } from '@/lib/offline-sync'
 import { saveSet, getSetsForDate, getLastSessionSets, initSetLogStore, prescriptionUnit } from '@/lib/set-log-store'
 import { getActiveMesocycleWeek } from '@/lib/calculations'
-import { getAppNow } from '@/lib/dev-clock'
+import { getAppNow, getSessionDateContext } from '@/lib/dev-clock'
 import { checkForPR, seedPRCacheFromHistory, getTopPRSet, type PRResult, type SessionSet } from '@/lib/pr-engine'
 import { RestTimer } from '@/components/RestTimer'
 import { PlateCalculator } from '@/components/PlateCalculator'
@@ -699,9 +699,18 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
     if (firstWeekOfBlock != null) setCurrentWeek(firstWeekOfBlock)
   }
 
-  const appNow = getAppNow(profileId)
-  const today = appNow.toISOString().split('T')[0]
-  const todayName = devOverrideDay ?? appNow.toLocaleDateString('en-US', { weekday: 'long' })
+  // Computed ONCE per active session (mount, or when the dev-clock override
+  // actually changes) rather than re-derived from a fresh clock read on
+  // every render — the latter is what let an evening session silently
+  // straddle a day boundary (UTC before this fix; local midnight in the rare
+  // case someone keeps the tab open past it) mid-workout. See
+  // getSessionDateContext's doc comment.
+  const [sessionDateContext, setSessionDateContext] = useState(() => getSessionDateContext(profileId))
+  useEffect(() => {
+    setSessionDateContext(getSessionDateContext(profileId))
+  }, [profileId, devOverrideWeek, devOverrideDay])
+  const today = sessionDateContext.date
+  const todayName = devOverrideDay ?? sessionDateContext.day
 
   useEffect(() => {
     if (profileId) {

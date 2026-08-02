@@ -441,6 +441,28 @@ async function main() {
   check('resolveWeight order: falls back to plan suggestion when no history', mirrorResolveWeight(undefined, false, null, 70)?.source === 'plan')
   check('resolveWeight order: unresolved (null) when nothing is available — caller must skip + ask', mirrorResolveWeight(undefined, false, null, null) === null)
 
+  // ---- 10. Evening session must never straddle UTC midnight (fix #3) ------
+  console.log('\n[10] local-calendar-date session identity — no UTC-midnight split (fix #3)')
+  const { getLocalDateString, getSessionDateContext } = await import('../src/lib/dev-clock')
+  const originalTz = process.env.TZ
+  process.env.TZ = 'America/New_York' // UTC-4 in August (EDT)
+  try {
+    // 10pm US Eastern on Aug 2 is 2am UTC on Aug 3 — the exact shape of the
+    // reported bug (an evening session crossing UTC midnight while it's
+    // still the same calendar day for the trainee).
+    const lateEveningUtc = new Date('2026-08-03T02:00:00Z')
+    check('getLocalDateString uses the LOCAL calendar day, not UTC\'s',
+      getLocalDateString(lateEveningUtc) === '2026-08-02', getLocalDateString(lateEveningUtc))
+    check('the old UTC-based derivation would have split here (sanity check the scenario is real)',
+      lateEveningUtc.toISOString().split('T')[0] === '2026-08-03')
+
+    const ctx = getSessionDateContext(undefined)
+    check('getSessionDateContext returns date+day from the same instant, both local',
+      ctx.date.length === 10 && typeof ctx.day === 'string' && ctx.day.length > 0, ctx)
+  } finally {
+    process.env.TZ = originalTz
+  }
+
   // ---- Summary -------------------------------------------------------------
   if (failures > 0) {
     console.error(`\n${failures} logging round-trip check(s) FAILED.`)
