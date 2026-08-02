@@ -527,34 +527,45 @@ export function isExternallyLoaded(entry: ExerciseEntry): boolean {
   return entry.equipment.some(e => LOADED_EQUIPMENT.has(e))
 }
 
-// SAFETY: a backpack (or other improvised carry implement) is not a
-// farmer's handle — there's no rigid frame, the load rides on straps and
-// shifts with stride, and failure modes are strap tearing or the wearer
-// losing control of a suddenly-shifting load, not just "too heavy to hold."
-// A review caught a bodyweight-only NOVICE, in their very first calibration
-// week, prescribed a 35-40kg Loaded Backpack Walk with "no assessment, no
-// bodyweight-relative anchor, no note on how to build the load" — flagged
-// as "the one line in the plan that could actually hurt someone." The
-// carry-fraction-of-deadlift model that produces that number is otherwise
-// correct for a real farmer's/suitcase carry (rigid handles, two hands or
-// braced posture) — the fix here is a hard, absolute ceiling specific to
-// IMPROVISED implements, applied after every other calculation, that
-// nothing else in this file may exceed regardless of how the estimate was
-// derived (standards table, known weight, or a forced within-block ramp
+// SAFETY: a backpack (or other improvised implement) is not a farmer's
+// handle or a dumbbell — there's no rigid frame, the load rides on straps
+// and shifts with movement, and failure modes are strap tearing or the
+// wearer losing control of a suddenly-shifting load, not just "too heavy to
+// hold." A review caught a bodyweight-only NOVICE, in their very first
+// calibration week, prescribed a 35-40kg Loaded Backpack Walk with "no
+// assessment, no bodyweight-relative anchor, no note on how to build the
+// load" — flagged as "the one line in the plan that could actually hurt
+// someone." The carry-fraction-of-deadlift model that produces that number
+// is otherwise correct for a real farmer's/suitcase carry (rigid handles,
+// two hands or braced posture) — the fix here is a hard, absolute ceiling
+// specific to IMPROVISED implements, applied after every other calculation,
+// that nothing else in this file may exceed regardless of how the estimate
+// was derived (standards table, known weight, or a forced within-block ramp
 // value). These numbers are deliberately conservative absolutes, not
 // bodyweight-relative — a heavier novice doesn't get a heavier backpack
 // ceiling, because the strap/posture failure mode doesn't scale with the
 // carrier's own strength the way a barbell lift does.
-export const IMPROVISED_CARRY_CEILING_KG: Record<TrainingExperience, number> = {
+//
+// Originally scoped to carries only (isImprovisedCarry) — a follow-up
+// review round found Backpack Row prescribed at 45-65kg (a "row" category
+// estimate anchored to the full row strength standard, completely
+// unrelated to what a backpack can actually deliver) sitting right next to
+// a correctly-capped ~25kg Loaded Backpack Walk in the SAME plan, which a
+// reviewer called out as internally incoherent on top of being
+// individually absurd. Any exercise using the 'weighted backpack' equipment
+// tag needs this ceiling, not just carry-prescribed ones — the strap/
+// posture failure mode doesn't care whether the movement is a walk or a
+// row.
+export const IMPROVISED_IMPLEMENT_CEILING_KG: Record<TrainingExperience, number> = {
   beginner: 8,
   novice: 12,
   intermediate: 20,
   advanced: 25,
 }
 
-/** A carry-type exercise loaded with an improvised implement (a weighted backpack, not a real farmer's handle/trap bar) — see IMPROVISED_CARRY_CEILING_KG's doc comment for why this needs its own hard ceiling. */
-export function isImprovisedCarry(entry: ExerciseEntry): boolean {
-  return entry.prescription_type === 'distance_load' && entry.equipment.includes('weighted backpack')
+/** Any exercise loaded via an improvised implement (a weighted backpack, not a real farmer's handle/dumbbell/barbell) — regardless of whether it's a carry, a row, or anything else. See IMPROVISED_IMPLEMENT_CEILING_KG's doc comment for why this needs its own hard ceiling. */
+export function isImprovisedLoadImplement(entry: ExerciseEntry): boolean {
+  return entry.equipment.includes('weighted backpack')
 }
 
 // A calibration week (no verified numbers yet) starts a shade under the
@@ -844,10 +855,10 @@ export function prescribeLoad(
   // SAFETY ceiling — applied last, after both the estimate path and the
   // forced-ramp/deload path above, so nothing (a within-block double-
   // progression increment, a known-weight anchor, a deload back-off) can
-  // push an improvised-carry prescription past it. See
-  // IMPROVISED_CARRY_CEILING_KG's doc comment.
-  if (isImprovisedCarry(entry)) {
-    rounded = Math.min(rounded, IMPROVISED_CARRY_CEILING_KG[profile.training_experience || 'novice'])
+  // push an improvised-implement prescription past it. See
+  // IMPROVISED_IMPLEMENT_CEILING_KG's doc comment.
+  if (isImprovisedLoadImplement(entry)) {
+    rounded = Math.min(rounded, IMPROVISED_IMPLEMENT_CEILING_KG[profile.training_experience || 'novice'])
   }
 
   // Only compounds in a strength/power phase ramp; hypertrophy-phase work and

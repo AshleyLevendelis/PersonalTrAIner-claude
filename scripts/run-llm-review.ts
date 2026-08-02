@@ -94,6 +94,24 @@ function renderDay(day: WorkoutDay): string {
   const lines = [`  ${day.day} (${day.focus}):`]
   if (day.warmup) {
     lines.push(`    Warm-up (~${Math.round(day.warmup.total_seconds / 60)}min)`)
+    // Previously only the duration was printed here — the engine generates
+    // real ramp-up sets (empty-bar/50%/70%/85%/92% build-up) for every
+    // externally-loaded main lift, but nothing in this script ever showed
+    // them to the reviewer, who then flagged "no ramp-up sets... goes
+    // straight from a bodyweight warm-up to a cold 97.5kg deadlift" as a
+    // safety issue. Traced and confirmed: the engine and the UI
+    // (ExercisePlan.tsx) both already render ramp_up correctly — this
+    // script's renderDay was the only place blind to it.
+    for (const item of day.warmup.general) {
+      lines.push(`      - ${item.name}: ${item.prescription}`)
+    }
+    for (const item of day.warmup.mobility) {
+      lines.push(`      - ${item.name}: ${item.prescription}`)
+    }
+    if (day.warmup.ramp_up) {
+      const sets = day.warmup.ramp_up.sets.map(s => `${s.load_percent}%x${s.reps}`).join(', ')
+      lines.push(`      Ramp-up (${day.warmup.ramp_up.exercise}): ${sets}`)
+    }
   }
   for (const ex of day.exercises) {
     const load = ex.suggested_load ?? (ex.suggested_load_kg != null ? `${ex.suggested_load_kg}kg` : 'bodyweight')

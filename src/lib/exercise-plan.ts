@@ -2182,6 +2182,53 @@ function progressConditioningWeek(days: WorkoutDay[], weekInBlock: number, isDel
 }
 
 // ---------------------------------------------------------------------------
+// Rest by fatigue cost, not just tier (Pre-ship safety patch)
+// ---------------------------------------------------------------------------
+// assignSetsRepsFromConfig assigns rest purely off mechanics_tier (tier1
+// compounds all get the same base rest, regardless of WHICH tier1 compound
+// it is) — so a heavy hip-hinge/knee-dominant lift and a horizontal press
+// start the week equally rested. stageTimeCap's duration-budget trimming
+// (Phase 2: "reduce rest by 15s across the board") then runs PER DAY,
+// independently, only when THAT day is over budget — so whichever day
+// happens to be tightest gets its rest cut, regardless of which lift is
+// actually more systemically fatiguing. A review caught the resulting
+// inversion directly: "Deadlifts 3x9-13 @ 92.5kg with 60s rest... while
+// bench gets 75s... backwards." This is a hard, whole-week floor applied
+// LAST, after every rest-modifying stage (style assignment, time-cap
+// trimming, phase rest_adjust_seconds) has already run: a tier1_compound
+// hip_hinge/knee_dominant exercise's rest must never fall below the
+// highest tier1_compound horizontal_push/vertical_push rest anywhere else
+// in the same week, full stop.
+function enforceFatigueCostRestFloor(days: WorkoutDay[]): void {
+  const restSecondsOf = (rest: string): number | null => {
+    const m = rest.match(/^(\d+)s$/)
+    return m ? Number(m[1]) : null
+  }
+  let maxUpperBodyRestSeconds = 0
+  for (const day of days) {
+    for (const ex of day.exercises) {
+      const entry = findEntry(ex.name)
+      if (!entry || entry.mechanics_tier !== 'tier1_compound') continue
+      if (entry.movement_pattern !== 'horizontal_push' && entry.movement_pattern !== 'vertical_push') continue
+      const seconds = restSecondsOf(ex.rest)
+      if (seconds != null) maxUpperBodyRestSeconds = Math.max(maxUpperBodyRestSeconds, seconds)
+    }
+  }
+  if (maxUpperBodyRestSeconds === 0) return
+  for (const day of days) {
+    for (const ex of day.exercises) {
+      const entry = findEntry(ex.name)
+      if (!entry || entry.mechanics_tier !== 'tier1_compound') continue
+      if (entry.movement_pattern !== 'hip_hinge' && entry.movement_pattern !== 'knee_dominant') continue
+      const seconds = restSecondsOf(ex.rest)
+      if (seconds != null && seconds < maxUpperBodyRestSeconds) {
+        ex.rest = `${maxUpperBodyRestSeconds}s`
+      }
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Final day-budget enforcement
 // ---------------------------------------------------------------------------
 // stageTimeCap (STAGE 5) fits each day to budget at SELECTION time — but two
@@ -2610,6 +2657,11 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
   enforceLoadCoherence(days)
 
   const budgetedDays = days.map(d => enforceDayDurationBudget(d, totalBudgetSeconds))
+  // Last step, after every rest-modifying stage (style assignment,
+  // stageTimeCap's per-day trimming, this duration-budget pass) — the
+  // periodized mesocycle inherits this base plan's warmup/rest fields
+  // unchanged via object spread, so fixing it once here is sufficient.
+  enforceFatigueCostRestFloor(budgetedDays)
 
   return { plan: budgetedDays, constraint_trace: trace }
 }
@@ -3430,6 +3482,31 @@ export function generateMesocycle(
             if (baselineKg != null) {
               if (w === 2) forceStartingWeightKg = rampLoad ? baselineKg + increment : baselineKg
               else if (w === 3) forceStartingWeightKg = rampLoad ? baselineKg + 2 * increment : baselineKg
+            }
+
+            // Pre-ship safety patch: a carried-forward baseline assumes the
+            // SAME exercise (or a same-magnitude rotation) — but
+            // rotateVariation only guarantees same substitution-group/tier,
+            // not same real-world load. A review caught a "~56kg per hand"
+            // Dumbbell Rows prescription that was really a week-1 Backpack
+            // Row's (broken, since-capped) baseline carried forward across
+            // a rotation into an unrelated implement — a capped or broken
+            // anchor must never propagate through a rotation. Whenever the
+            // carried-forward number diverges by more than 25% from what a
+            // FRESH, this-week estimate for the exercise ACTUALLY in this
+            // slot would produce, discard the carried value and re-derive.
+            // A legitimate (non-rotated) ramp only drifts a few percent
+            // above a fresh estimate by week 3 (see load-prescription.ts's
+            // percentage-based increments), so this is a pure backstop for
+            // contamination, not a constraint on normal progression.
+            if (forceStartingWeightKg != null) {
+              const freshReference = prescribeLoad(dbEntry, profile, {
+                targetRpeLabel: intensity, isFirstBlock: blockIndex === 0, sets, phase,
+                isCalibrationWeek, knownWorkingWeights, repRangeLabel: reps, loadIsProgressing: rampLoad,
+              })
+              if (freshReference.starting_weight_kg != null && forceStartingWeightKg > freshReference.starting_weight_kg * 1.25) {
+                forceStartingWeightKg = freshReference.starting_weight_kg
+              }
             }
             if (isDeload) {
               const week3Kg = blockWeek3Kg[dayIdx][exIdx]

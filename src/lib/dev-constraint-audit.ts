@@ -5,7 +5,7 @@ import type {
   WorkoutDay, ConstraintTrace, PlanResult, TrainingExperience, RecoveryCapacity, FitnessGoal,
 } from './types'
 import { getSkillDemand, isSkillAppropriate } from './experience-config'
-import { categorize, isImprovisedCarry, IMPROVISED_CARRY_CEILING_KG, estimateEffectiveTotalKg, isExternallyLoaded } from './load-prescription'
+import { categorize, isImprovisedLoadImplement, IMPROVISED_IMPLEMENT_CEILING_KG, estimateEffectiveTotalKg, isExternallyLoaded, prescribeLoad } from './load-prescription'
 
 // A genuine outer-bound safety backstop — not a conservatism patch (the
 // capability-model round replaced the old CATEGORY_CAPS_KG, which existed to
@@ -366,22 +366,29 @@ function runSingleAudit(
     }
   }
 
-  // CHECK 7b: SAFETY — no improvised-carry (backpack) prescription ever
-  // exceeds its tier's absolute ceiling (IMPROVISED_CARRY_CEILING_KG). This
-  // must be impossible to regress: a review caught a bodyweight-only novice
-  // handed a 35-40kg backpack carry in their first calibration week with no
-  // safety framing at all, flagged as the one genuinely dangerous finding
-  // across every review round.
+  // CHECK 7b: SAFETY — no improvised-implement (backpack) prescription
+  // ever exceeds its tier's absolute ceiling (IMPROVISED_IMPLEMENT_CEILING_KG),
+  // on ANY exercise using that equipment (originally carry-only; a
+  // follow-up review round found Backpack Row uncapped at 45-65kg — see
+  // isImprovisedLoadImplement's doc comment). This must be impossible to
+  // regress: a review caught a bodyweight-only novice handed a 35-40kg
+  // backpack carry in their first calibration week with no safety framing
+  // at all, flagged as the one genuinely dangerous finding across every
+  // review round. This checks the base (unperiodized) plan only — see
+  // runMesocycleBehaviorChecks for the same check run across every week of
+  // a full periodized mesocycle, which the base-plan snapshot can't catch
+  // (a ramp/rotation could theoretically push a capped exercise back over
+  // in a later week).
   for (const ex of allExercises) {
     if (ex.suggested_load_kg == null) continue
     const entry = EXERCISE_DATABASE.find(e => e.name === ex.name)
-    if (!entry || !isImprovisedCarry(entry)) continue
-    const ceiling = IMPROVISED_CARRY_CEILING_KG[experience]
+    if (!entry || !isImprovisedLoadImplement(entry)) continue
+    const ceiling = IMPROVISED_IMPLEMENT_CEILING_KG[experience]
     if (ex.suggested_load_kg > ceiling) {
       failures.push({
         check: 'improvised_carry_cap',
         combination: comboLabel,
-        details: `"${ex.name}" suggested load ${ex.suggested_load_kg}kg exceeds the ${ceiling}kg improvised-carry safety ceiling for "${experience}"`,
+        details: `"${ex.name}" suggested load ${ex.suggested_load_kg}kg exceeds the ${ceiling}kg improvised-implement safety ceiling for "${experience}"`,
         exercise: ex.name,
       })
     }
@@ -833,6 +840,92 @@ async function runMesocycleBehaviorChecks(): Promise<AuditTestCase[]> {
       passed: failures.length === 0, failures,
       planDays: 0, totalExercises: 0, estimatedDurationSec: 0,
     })
+  }
+
+  // CHECK: improvised-implement cap + rotation category-standard guard
+  // across a FULL periodized mesocycle (Pre-ship safety patch). CHECK 7b
+  // only snapshots the base (unperiodized) plan; this walks every week of
+  // every block for a spread of equipment x experience profiles, checking
+  // (a) no improvised-implement (backpack) prescription ever exceeds its
+  // tier ceiling in ANY week, and (b) whenever an exercise's name changes
+  // between consecutive non-deload weeks (rotation), its load doesn't
+  // exceed a fresh, this-week estimate for that exercise by more than 25%
+  // — the exact regression a review caught: a carried-forward baseline
+  // from a since-capped Backpack Row propagating into an unrelated
+  // Dumbbell Rows slot as "~56kg per hand."
+  {
+    const equipmentOptions: EquipmentAccess[] = ['full_gym', 'home_gym', 'minimalist', 'bodyweight']
+    for (const equipment of equipmentOptions) {
+      for (const experience of ALL_EXPERIENCE) {
+        const comboLabel = `[mesocycle safety] equipment=${equipment} experience=${experience}`
+        const failures: AuditFailure[] = []
+        const profile = baseMesocycleProfile({ equipment_access: equipment, training_experience: experience })
+        const meso = generateMesocycle(profile)
+
+        const ceiling = IMPROVISED_IMPLEMENT_CEILING_KG[experience]
+        for (const week of meso) {
+          for (const day of week.days) {
+            for (const ex of day.exercises) {
+              if (ex.suggested_load_kg == null) continue
+              const entry = EXERCISE_DATABASE.find(e => e.name === ex.name)
+              if (!entry || !isImprovisedLoadImplement(entry)) continue
+              if (ex.suggested_load_kg > ceiling) {
+                failures.push({
+                  check: 'improvised_carry_cap',
+                  combination: comboLabel,
+                  details: `week ${week.week_number} ${day.day} "${ex.name}" ${ex.suggested_load_kg}kg exceeds the ${ceiling}kg improvised-implement ceiling for "${experience}"`,
+                  exercise: ex.name,
+                })
+              }
+            }
+          }
+        }
+
+        for (let block = 1; block <= 4; block++) {
+          const blockWeeks = meso.filter(w => w.block_number === block).sort((a, b) => (a.week_in_block ?? 0) - (b.week_in_block ?? 0))
+          for (let i = 1; i < blockWeeks.length; i++) {
+            const prevWeek = blockWeeks[i - 1]
+            const week = blockWeeks[i]
+            if (prevWeek.is_deload || week.is_deload) continue
+            for (const day of week.days) {
+              const prevDay = prevWeek.days.find(d => d.day === day.day)
+              if (!prevDay) continue
+              for (let exIdx = 0; exIdx < day.exercises.length; exIdx++) {
+                const ex = day.exercises[exIdx]
+                const prevEx = prevDay.exercises[exIdx]
+                if (!prevEx || prevEx.name === ex.name) continue
+                if (ex.suggested_load_kg == null || ex.intensity == null) continue
+                const entry = EXERCISE_DATABASE.find(e => e.name === ex.name)
+                if (!entry || !isExternallyLoaded(entry)) continue
+                const fresh = prescribeLoad(entry, profile, {
+                  targetRpeLabel: ex.intensity, repRangeLabel: ex.reps, sets: ex.sets,
+                })
+                if (fresh.starting_weight_kg == null || fresh.starting_weight_kg <= 0) continue
+                // Both suggested_load_kg and fresh.starting_weight_kg are in
+                // the same units (per-hand for a dumbbell pair, total
+                // otherwise — prescribeLoad's own convention), so they
+                // compare directly without needing to know loadingMode here.
+                const ratio = ex.suggested_load_kg / fresh.starting_weight_kg
+                if (ratio > 1.25) {
+                  failures.push({
+                    check: 'rotation_relative_load',
+                    combination: comboLabel,
+                    details: `week ${week.week_number} ${day.day} rotated "${prevEx.name}" -> "${ex.name}" at ${ex.suggested_load_kg}kg, ${(ratio * 100).toFixed(0)}% of a fresh ${fresh.starting_weight_kg}kg estimate for that exercise — exceeds the 125% category-standard band`,
+                    exercise: ex.name,
+                  })
+                }
+              }
+            }
+          }
+        }
+
+        cases.push({
+          equipment, injuries: [], duration: '45-60', style: 'hybrid', experience,
+          passed: failures.length === 0, failures,
+          planDays: 0, totalExercises: 0, estimatedDurationSec: 0,
+        })
+      }
+    }
   }
 
   // CHECK: macrocycle phase-sequence sanity (Final Generator round, Fix 4)
