@@ -41,6 +41,8 @@ function App() {
   const [macros, setMacros] = useState<MacroTargets | null>(null)
   const [exercisePlan, setExercisePlan] = useState<WorkoutDay[]>([])
   const [mesocycle, setMesocycle] = useState<MesocycleWeek[]>([])
+  /** When the CURRENT mesocycle was generated — anchors live-week detection (falls back to profile.created_at for legacy profiles without persisted weeks). */
+  const [mesocycleCreatedAt, setMesocycleCreatedAt] = useState<string | null>(null)
   const [mealPlan, setMealPlan] = useState<MealPlanDay[]>([])
   const [weeklyMealPlan, setWeeklyMealPlan] = useState<WeeklyMealPlan | null>(null)
   const [isRestoring, setIsRestoring] = useState(true)
@@ -189,11 +191,15 @@ function App() {
     let restoredExercises: WorkoutDay[] = []
     let restoredMesocycle: MesocycleWeek[] = []
 
-    if (fullMesocycle && fullMesocycle.length > 0) {
+    if (fullMesocycle && fullMesocycle.weeks.length > 0) {
       // Full-fidelity path: every week, load/RPE/phase/warmup data intact,
       // exactly as generated. Supersedes the exercise_plans reconstruction
       // below entirely when present.
-      restoredMesocycle = fullMesocycle
+      restoredMesocycle = fullMesocycle.weeks
+      // Live-week detection anchors to the PLAN's creation, not the profile's
+      // (C0 Part 6) — a profile created months before its current plan would
+      // otherwise open weeks deep into (or past) a cycle it just started.
+      setMesocycleCreatedAt(fullMesocycle.createdAt)
       const week1 = restoredMesocycle.find(w => w.week_number === 1)
       if (week1) restoredExercises = week1.days
     } else if (exerciseRows) {
@@ -381,6 +387,7 @@ function App() {
     setMacros(calculatedMacros)
     setExercisePlan(workout)
     setMesocycle(mesocycleData)
+    setMesocycleCreatedAt(new Date().toISOString())
     setWeeklyMealPlan(weeklyPlan)
     } catch (err) {
       console.error('Onboarding failed:', err)
@@ -754,7 +761,10 @@ function App() {
     setMesocycle(updatedMesocycle)
     if (profile.id) {
       try {
-        await saveMesocycle(profile.id, updatedMesocycle)
+        // Preserve the plan's original creation time — this is an EDIT of the
+        // live plan, not a new plan; without it the resave would rewind
+        // live-week detection to week 1.
+        await saveMesocycle(profile.id, updatedMesocycle, mesocycleCreatedAt ?? profile.created_at)
       } catch (err) {
         console.error('Persisting ban failed:', err)
       }
@@ -961,7 +971,7 @@ function App() {
               exclusions={exerciseExclusions}
               profile={profile ?? undefined}
               profileId={profile?.id}
-              planCreatedAt={profile?.created_at}
+              planCreatedAt={mesocycleCreatedAt ?? profile?.created_at}
               logsVersion={logsVersion}
               devOverrideWeek={devOverrideWeek}
               devOverrideDay={devOverrideDay}
@@ -989,6 +999,7 @@ function App() {
               macros={macros}
               exercisePlan={exercisePlan}
               mesocycle={mesocycle}
+              planCreatedAt={mesocycleCreatedAt ?? profile?.created_at}
               mealPlan={mealPlan}
               exerciseExclusions={exerciseExclusions}
               onPlanUpdate={handlePlanUpdate}

@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Send, MessageCircle, Sparkles, CheckCircle2, ArrowDown, RotateCcw, AlertCircle } from 'lucide-react'
 import { generateChatResponse } from '@/lib/chat-assistant'
 import { calculateCalories, getActiveMesocycleWeek } from '@/lib/calculations'
+import { getAppNow } from '@/lib/dev-clock'
 import { supabase } from '@/lib/supabase'
 import { getRecentLogs, formatLogsForAI, getRecentCardioLogs, formatCardioLogsForAI } from '@/lib/daily-tracking'
 import type { ChatMessage, UserProfile, MacroTargets, WorkoutDay, MealPlanDay, MesocycleWeek, PlanAction } from '@/lib/types'
@@ -60,13 +61,15 @@ interface ChatAssistantProps {
   macros: MacroTargets
   exercisePlan: WorkoutDay[]
   mesocycle: MesocycleWeek[]
+  /** When the CURRENT plan was generated — the live-week anchor (C0 Part 6). Falls back to profile.created_at upstream. */
+  planCreatedAt?: string
   mealPlan: MealPlanDay[]
   exerciseExclusions: string[]
   onPlanUpdate: (action: PlanAction) => void | Promise<void>
   onLogsUpdated?: () => void
 }
 
-export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, mealPlan, exerciseExclusions, onPlanUpdate, onLogsUpdated }: ChatAssistantProps) {
+export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, onPlanUpdate, onLogsUpdated }: ChatAssistantProps) {
   const buildInitialGreeting = (): string => {
     const now = new Date()
     const hour = now.getHours()
@@ -400,7 +403,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, mealPl
 
   // Fix #4: System prompt context assembled once per call, separate from conversation window
   const buildContext = () => {
-    const activeWeek = getActiveMesocycleWeek(profile.created_at, undefined, mesocycle.length > 0 ? mesocycle.length : 4)
+    const activeWeek = getActiveMesocycleWeek(planCreatedAt ?? profile.created_at, getAppNow(profile.id), mesocycle.length > 0 ? mesocycle.length : 4)
     const activeWeekData = mesocycle.length > 0
       ? mesocycle.find(w => w.week_number === activeWeek)?.days || exercisePlan
       : exercisePlan

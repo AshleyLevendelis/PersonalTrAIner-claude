@@ -16,6 +16,7 @@ import { checkDoubleProgression, getDoubleProgressionRecommendation } from '@/li
 import { saveSessionCache, loadSessionCache } from '@/lib/offline-sync'
 import { saveSet, getSetsForDate, getLastSessionSets, initSetLogStore, prescriptionUnit } from '@/lib/set-log-store'
 import { getActiveMesocycleWeek } from '@/lib/calculations'
+import { getAppNow } from '@/lib/dev-clock'
 import { checkForPR, seedPRCacheFromHistory, getTopPRSet, type PRResult, type SessionSet } from '@/lib/pr-engine'
 import { RestTimer } from '@/components/RestTimer'
 import { PlateCalculator } from '@/components/PlateCalculator'
@@ -608,11 +609,15 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
   // hypertrophy sequence alone is 4 blocks (16 weeks). Falling back to 4 only
   // applies before the mesocycle has loaded.
   const totalWeeks = mesocycle && mesocycle.length > 0 ? mesocycle.length : 4
-  const [currentWeek, setCurrentWeek] = useState(() => devOverrideWeek ?? getActiveMesocycleWeek(planCreatedAt, undefined, totalWeeks))
+  // getAppNow: the DevTestPage clock override drives the whole live path —
+  // week detection, "today" highlighting, AND the date logs are written under
+  // (C0 Part 6: this was half-wired before; time travel only affected the
+  // dev page itself, never the real plan view).
+  const [currentWeek, setCurrentWeek] = useState(() => devOverrideWeek ?? getActiveMesocycleWeek(planCreatedAt, getAppNow(profileId), totalWeeks))
   useEffect(() => {
     if (devOverrideWeek != null) setCurrentWeek(devOverrideWeek)
-    else setCurrentWeek(getActiveMesocycleWeek(planCreatedAt, undefined, totalWeeks))
-  }, [devOverrideWeek, planCreatedAt, totalWeeks])
+    else setCurrentWeek(getActiveMesocycleWeek(planCreatedAt, getAppNow(profileId), totalWeeks))
+  }, [devOverrideWeek, planCreatedAt, totalWeeks, profileId])
   const [swapDialog, setSwapDialog] = useState<{ dayName: string; exIndex: number; exerciseName: string } | null>(null)
   const [pendingSwap, setPendingSwap] = useState<ExerciseEntry | null>(null)
   const [swapBusy, setSwapBusy] = useState(false)
@@ -665,8 +670,9 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
     if (firstWeekOfBlock != null) setCurrentWeek(firstWeekOfBlock)
   }
 
-  const today = new Date().toISOString().split('T')[0]
-  const todayName = devOverrideDay ?? new Date().toLocaleDateString('en-US', { weekday: 'long' })
+  const appNow = getAppNow(profileId)
+  const today = appNow.toISOString().split('T')[0]
+  const todayName = devOverrideDay ?? appNow.toLocaleDateString('en-US', { weekday: 'long' })
 
   useEffect(() => {
     if (profileId) {

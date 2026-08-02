@@ -27,10 +27,15 @@ export function getGoalLabel(goal: FitnessGoal): string {
 
 /**
  * Which week of the mesocycle is "live" today, based on elapsed time since
- * the plan was created. `totalWeeks` must reflect the ACTUAL mesocycle length
- * (block count × 4) — hard-coding 4 here wrapped the active week back to 1-4
- * forever, even once `generateMesocycle` started producing 16 weeks across 4
- * blocks, so nobody would ever be shown live week 5+.
+ * the PLAN was created (C0 Part 6: the anchor is the mesocycle's creation
+ * time from mesocycle_weeks — falling back to profile creation only for
+ * legacy profiles with no persisted mesocycle). `totalWeeks` must reflect the
+ * ACTUAL mesocycle length (block count × 4).
+ *
+ * Past the final week the result CLAMPS at totalWeeks rather than wrapping
+ * back to week 1 (landmine L5: the old modulo silently restarted the cycle —
+ * week-1 calibration loads, "week 1 of N" labels — for a trainee who'd
+ * finished it). Post-cycle regeneration is a Phase B / coach concern.
  */
 export function getActiveMesocycleWeek(planCreatedAt: string | undefined, now?: Date, totalWeeks: number = 4): number {
   if (!planCreatedAt) return 1
@@ -39,6 +44,6 @@ export function getActiveMesocycleWeek(planCreatedAt: string | undefined, now?: 
   const elapsedMs = current.getTime() - start.getTime()
   const elapsedDays = Math.floor(elapsedMs / (1000 * 60 * 60 * 24))
   const weeks = Math.max(1, totalWeeks)
-  const weekIndex = Math.floor(elapsedDays / 7) % weeks
+  const weekIndex = Math.min(Math.max(0, Math.floor(elapsedDays / 7)), weeks - 1)
   return weekIndex + 1
 }
