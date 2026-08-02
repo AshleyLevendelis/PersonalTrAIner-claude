@@ -705,16 +705,25 @@ export async function getSetsForDate(userId: string, date: string): Promise<Exer
 /**
  * The trainee's most recent session for an exercise strictly before
  * `beforeDate` — ghost values and progression both hang off this. Working
- * sets only. Merges in any still-unsynced local sets (e.g. yesterday logged
- * in airplane mode), preferring whichever session is most recent.
+ * sets only.
+ *
+ * A session that's mid-sync (some sets already landed server-side, others
+ * still in the pending store — the normal outcome of a FIFO flush that's
+ * still running, or one that stalled offline) is genuinely split across both
+ * sources. Earlier versions of this function picked ONE source wholesale
+ * (whichever looked "more recent") and silently dropped the other half of
+ * that same session. This merges them instead: same-session identity is
+ * (user, local date, exercise_id); within that session, sets are deduped on
+ * (set_number, is_warmup) with the pending copy winning — it's either a
+ * same-session edit made after the last successful sync, or the not-yet-
+ * synced half of a session that hasn't fully landed either way.
  */
 export async function getLastSessionSets(
   userId: string,
   exerciseId: string,
   beforeDate: string,
 ): Promise<ExerciseSetLog[]> {
-  let serverSets: ExerciseSetLog[] = []
-  let serverLatest = ''
+  let serverRows: ServerSetRow[] = []
   try {
     const { data } = await supabase
       .from('exercise_set_logs')
@@ -729,42 +738,42 @@ export async function getLastSessionSets(
     // a session that's entirely malformed (e.g. an old chat-logged 0kg entry)
     // must be skipped in favor of the last session with real data, not
     // returned as an empty/wrong "most recent" result.
-    const rows = ((data || []) as ServerSetRow[]).filter(r => !isMalformedZeroWeight(r))
-    if (rows.length > 0) {
-      const latestSession = rows[0].session_id
-      serverLatest = rows[0].completed_at
-      serverSets = rows
-        .filter(r => r.session_id === latestSession)
-        .sort((a, b) => a.set_number - b.set_number)
-        .map(r => serverRowToView(r, r.completed_at.slice(0, 10)))
-    }
+    serverRows = ((data || []) as ServerSetRow[]).filter(r => !isMalformedZeroWeight(r))
   } catch {
-    // Offline — fall through to pending.
+    // Offline — pending-only view below.
   }
 
-  // Pending sets for this exercise before the cutoff, grouped by date.
-  const pendingByDate = new Map<string, PendingSet[]>()
-  for (const op of loadPending()) {
-    if (op.kind !== 'upsert') continue
-    const s = op.set
-    if (s.userId !== userId || s.exerciseId !== exerciseId || s.isWarmup) continue
-    if (s.completedAt >= beforeDate) continue
-    if (isMalformedZeroWeight({ weight_kg: s.weightKg, is_bodyweight: s.isBodyweight })) continue
-    const group = pendingByDate.get(s.date) ?? []
-    group.push(s)
-    pendingByDate.set(s.date, group)
+  const pendingSets = loadPending()
+    .filter((op): op is { kind: 'upsert'; set: PendingSet } => op.kind === 'upsert')
+    .map(op => op.set)
+    .filter(s => s.userId === userId && s.exerciseId === exerciseId && !s.isWarmup)
+    .filter(s => s.completedAt < beforeDate)
+    .filter(s => !isMalformedZeroWeight({ weight_kg: s.weightKg, is_bodyweight: s.isBodyweight }))
+
+  // Server rows carry an authoritative session_id but not a date column
+  // directly — completed_at's date portion is the established proxy (see
+  // getSetsForSession). Pending sets carry their local session date directly
+  // (the same `date` field saveSet stamps every set of a session with).
+  const dateBySessionId = new Map<string, string>()
+  for (const r of serverRows) {
+    if (!dateBySessionId.has(r.session_id)) dateBySessionId.set(r.session_id, r.completed_at.slice(0, 10))
   }
-  if (pendingByDate.size > 0) {
-    const sortedDates = [...pendingByDate.keys()].sort()
-    const latestPendingDate = sortedDates[sortedDates.length - 1]
-    const latestPending = pendingByDate.get(latestPendingDate)!
-    const sortedTimes = latestPending.map(s => s.completedAt).sort()
-    const pendingLatest = sortedTimes[sortedTimes.length - 1]
-    if (pendingLatest > serverLatest) {
-      return latestPending.sort((a, b) => a.setNumber - b.setNumber).map(toView)
-    }
+
+  const candidateDates = [...new Set([...dateBySessionId.values(), ...pendingSets.map(s => s.date)])].sort()
+  if (candidateDates.length === 0) return []
+  const latestDate = candidateDates[candidateDates.length - 1]
+
+  const bySetKey = new Map<string, ExerciseSetLog>()
+  for (const r of serverRows) {
+    if (dateBySessionId.get(r.session_id) !== latestDate) continue
+    bySetKey.set(`${r.set_number}|${r.is_warmup}`, serverRowToView(r, latestDate))
   }
-  return serverSets
+  for (const s of pendingSets) {
+    if (s.date !== latestDate) continue
+    bySetKey.set(`${s.setNumber}|${s.isWarmup}`, toView(s)) // pending wins on a shared key
+  }
+
+  return [...bySetKey.values()].sort((a, b) => a.set_number - b.set_number)
 }
 
 /**

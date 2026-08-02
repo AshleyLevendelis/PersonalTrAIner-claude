@@ -463,6 +463,53 @@ async function main() {
     process.env.TZ = originalTz
   }
 
+  // ---- 11. Partial-sync session merges instead of one side shadowing the other (fix #4) --
+  console.log('\n[11] partially-synced session merges pending + server (fix #4)')
+  const lunges = 'Walking Lunges'
+  const lungesId = getExerciseId(lunges)
+  const lungesDate = isoDatePlusDays(-3)
+  // Sets 1-2 synced to the server (as if flushed and then connectivity dropped).
+  const lungesSession = ensureWorkoutSessionForTest(userId, lungesDate, day)
+  db.exercise_set_logs.push(
+    { id: crypto.randomUUID(), session_id: lungesSession, user_id: userId, exercise_id: lungesId, exercise_name: lunges, week_number: 1, day, set_number: 1, weight_kg: 16, reps_completed: 12, rpe: null, unit: 'reps', is_bodyweight: false, is_warmup: false, completed_at: `${lungesDate}T09:00:00.000Z` },
+    { id: crypto.randomUUID(), session_id: lungesSession, user_id: userId, exercise_id: lungesId, exercise_name: lunges, week_number: 1, day, set_number: 2, weight_kg: 16, reps_completed: 11, rpe: null, unit: 'reps', is_bodyweight: false, is_warmup: false, completed_at: `${lungesDate}T09:02:00.000Z` },
+  )
+  // Sets 3-4 of the SAME session still sitting in the pending store — kept
+  // there by going offline immediately after queueing them. navigator.onLine
+  // false is what actually matters: it makes flushPending() bail out
+  // synchronously before doFlush ever starts, so the (microtask-deferred)
+  // fake network call never fires — merely toggling fakeOffline isn't enough,
+  // since that flag is only read once the deferred call actually runs, by
+  // which point synchronous test code may have already flipped it back.
+  navShim.onLine = false
+  saveSet({ userId, date: lungesDate, weekNumber: 1, day, exerciseId: lungesId, exerciseName: lunges, setNumber: 3, weightKg: 16, repsCompleted: 10 })
+  saveSet({ userId, date: lungesDate, weekNumber: 1, day, exerciseId: lungesId, exerciseName: lunges, setNumber: 4, weightKg: 16, repsCompleted: 8 })
+  navShim.onLine = true
+
+  // Back online for the READ itself — this is the actual scenario: server
+  // has sets 1-2, the pending store still has sets 3-4, and the merge must
+  // combine both rather than one shadowing the other.
+  const mergedLunges = await getLastSessionSets(userId, lungesId, W2)
+  check('merged session has all 4 sets (2 server-synced + 2 still pending)',
+    mergedLunges.length === 4 && mergedLunges.map(s => s.set_number).join(',') === '1,2,3,4',
+    mergedLunges.map(s => s.set_number))
+  check('server-synced sets keep their values', mergedLunges[0].reps_completed === 12 && mergedLunges[1].reps_completed === 11)
+  check('pending sets keep their values', mergedLunges[2].reps_completed === 10 && mergedLunges[3].reps_completed === 8)
+
+  // Pending wins on a shared key: editing an already-synced set (still
+  // pending sync) must show the edited value, not the stale server one.
+  navShim.onLine = false
+  saveSet({ userId, date: lungesDate, weekNumber: 1, day, exerciseId: lungesId, exerciseName: lunges, setNumber: 1, weightKg: 18, repsCompleted: 12 })
+  navShim.onLine = true
+  const afterEdit = await getLastSessionSets(userId, lungesId, W2)
+  check('pending edit of an already-synced set wins over the stale server copy',
+    afterEdit.find(s => s.set_number === 1)?.weight_kg === 18, afterEdit.find(s => s.set_number === 1))
+  check('still exactly 4 sets after the edit (no duplicate key)', afterEdit.length === 4, afterEdit.length)
+
+  // Clean up so later flushPending() calls in prior sections' leftover state
+  // (none expected, but keep the pending store tidy for anything after this).
+  await flushPending()
+
   // ---- Summary -------------------------------------------------------------
   if (failures > 0) {
     console.error(`\n${failures} logging round-trip check(s) FAILED.`)
