@@ -10,7 +10,7 @@ import {
   type ExperienceConfig,
 } from './experience-config'
 import { buildWarmup, getWarmupReserveSeconds } from './warmup'
-import { prescribeLoad, categorize, getLoadIncrementKg, isExternallyLoaded, getEquipmentFloorKg, loadingMode, roundToPlate, formatLoad, labelModeForEntry, type KnownWorkingWeights } from './load-prescription'
+import { prescribeLoad, categorize, getLoadIncrementKg, isExternallyLoaded, getEquipmentFloorKg, loadingMode, roundToPlate, formatLoad, labelModeForEntry, hasKnownWorkingWeight, FIRST_BLOCK_UNVERIFIED_RAMP_FRACTION, type KnownWorkingWeights } from './load-prescription'
 import {
   getPhaseSequence, getPhaseConfig, rotateVariation, resolveTargetRpe,
   shiftReps, adjustRest, dedupeAdjacentPhases, type PhaseConfig, type TrainingPhase,
@@ -2631,16 +2631,17 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
     const paired = buildSupersetPairs(exercises, pool, duration, trainingStyle, trace)
 
     // Warm-up is derived from what this session actually contains, so a squat
-    // day and a bench day get genuinely different preparation.
+    // day and a bench day get genuinely different preparation. Every
+    // compound gets a ramp candidate (C0 calibration round, Fix 2) — buildWarmup
+    // itself decides which ones actually qualify (see needsRampUp). `exercises`
+    // is built in the same order as `optimized`, so a straight index zip pairs
+    // each entry with the load it was actually prescribed.
     const sessionEntries = optimized.map(s => s.entry)
-    const mainLift =
-      sessionEntries.find(e => e.mechanics_tier === 'tier1_compound') ??
-      sessionEntries.find(e => e.mechanics_tier === 'tier2_compound') ??
-      null
+    const compounds = optimized.map((s, i) => ({ entry: s.entry, suggestedLoadKg: exercises[i]?.suggested_load_kg ?? null }))
 
     const warmup = buildWarmup({
       patterns: sessionEntries.map(e => e.movement_pattern),
-      mainLift,
+      compounds,
       equipment: profile.equipment_access || 'full_gym',
       injuries: profile.injuries || [],
       experience: profile.training_experience || 'novice',
@@ -2695,7 +2696,7 @@ function buildProgressionNote(
     return 'Deload week — load and volume both step back so you arrive at the next block recovered, not because progress stalled.'
   }
   if (isCalibrationWeek) {
-    return 'Calibration week — loads are deliberately conservative while you find your real working weight; the block\'s real ramp starts next week.'
+    return 'Loads start deliberately light — find the weight where the last rep feels like RPE 6, log it, and next week builds from YOUR numbers.'
   }
   const rampsLoad = policy.progressionEmphasis === 'load'
   if (weekInBlock === 1) {
@@ -3485,9 +3486,26 @@ export function generateMesocycle(
             // but `increment` above is recomputed for whichever variation is
             // actually being lifted this week.
             let forceStartingWeightKg: number | undefined
+            let firstBlockUnverifiedRampFraction: number | undefined
             if (baselineKg != null) {
-              if (w === 2) forceStartingWeightKg = rampLoad ? baselineKg + increment : baselineKg
-              else if (w === 3) forceStartingWeightKg = rampLoad ? baselineKg + 2 * increment : baselineKg
+              // Block 1, weeks 2-3, still no verified working weight for this
+              // exercise: step a FRESH this-week estimate toward full value
+              // (see FIRST_BLOCK_UNVERIFIED_RAMP_FRACTION's doc comment)
+              // instead of the normal small increment on top of an already
+              // heavily-dampened calibration baseline — that increment alone
+              // would leave week 3 still far below what the lifter can
+              // probably do. Scoped to rampLoad only — a 'reps'/'maintain'
+              // accessory that intentionally holds flat at baseline is
+              // unaffected; its progression lever is reps, not this.
+              const unverifiedForCategory = !hasKnownWorkingWeight(category, knownWorkingWeights)
+              const useFirstBlockRamp = blockIndex === 0 && rampLoad && unverifiedForCategory && (w === 2 || w === 3)
+              if (useFirstBlockRamp) {
+                firstBlockUnverifiedRampFraction = FIRST_BLOCK_UNVERIFIED_RAMP_FRACTION[w]
+              } else if (w === 2) {
+                forceStartingWeightKg = rampLoad ? baselineKg + increment : baselineKg
+              } else if (w === 3) {
+                forceStartingWeightKg = rampLoad ? baselineKg + 2 * increment : baselineKg
+              }
             }
 
             // Pre-ship safety patch: a carried-forward baseline assumes the
@@ -3534,6 +3552,7 @@ export function generateMesocycle(
               isCalibrationWeek,
               knownWorkingWeights,
               forceStartingWeightKg,
+              firstBlockUnverifiedRampFraction,
               repRangeLabel: reps,
               loadIsProgressing: rampLoad,
             })

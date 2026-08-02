@@ -5,7 +5,7 @@ import type {
   WorkoutDay, ConstraintTrace, PlanResult, TrainingExperience, RecoveryCapacity, FitnessGoal,
 } from './types'
 import { getSkillDemand, isSkillAppropriate } from './experience-config'
-import { categorize, isImprovisedLoadImplement, IMPROVISED_IMPLEMENT_CEILING_KG, estimateEffectiveTotalKg, isExternallyLoaded, prescribeLoad } from './load-prescription'
+import { categorize, isImprovisedLoadImplement, IMPROVISED_IMPLEMENT_CEILING_KG, estimateEffectiveTotalKg, isExternallyLoaded, prescribeLoad, getEquipmentFloorKg, loadingMode } from './load-prescription'
 
 // A genuine outer-bound safety backstop — not a conservatism patch (the
 // capability-model round replaced the old CATEGORY_CAPS_KG, which existed to
@@ -83,6 +83,7 @@ export interface AuditFailure {
     | 'superset_pairing' | 'load_progression' | 'set_progression' | 'goal_structure' | 'recovery_volume'
     | 'swap_constraint' | 'swap_load' | 'ban_purge' | 'prescription_unit' | 'capability_gate'
     | 'improvised_carry_cap' | 'pattern_coverage' | 'rotation_relative_load' | 'phase_sequence'
+    | 'ramp_up_missing' | 'calibration_load_ceiling'
   combination: string
   details: string
   exercise?: string
@@ -363,6 +364,30 @@ function runSingleAudit(
         details: `Suggested load ${ex.suggested_load_kg}kg exceeds the ${cap}kg outer-bound safety ceiling for category "${category}"`,
         exercise: ex.name,
       })
+    }
+  }
+
+  // CHECK 7a: GUARDRAIL (C0 calibration round, Fix 2) — every tier1_compound
+  // in every generated session has its own ramp block. This is what actually
+  // failed before Fix 2: a day with two main lifts (e.g. Squats then
+  // Deadlifts) ramped only whichever came first in exercise order, sending
+  // the second in cold. A hard failing check, not a soft quality-score
+  // deduction — a heavy lift with no warm-up lead-in is a safety property,
+  // not a style preference.
+  for (const day of plan) {
+    const rampedNames = new Set((day.warmup?.ramp_ups ?? []).map(r => r.exercise))
+    for (const ex of day.exercises) {
+      const entry = EXERCISE_DATABASE.find(e => e.name === ex.name)
+      if (entry?.mechanics_tier !== 'tier1_compound') continue
+      if (!isExternallyLoaded(entry)) continue // bodyweight tier1 (e.g. Pull-Ups) has nothing to ramp
+      if (!rampedNames.has(ex.name)) {
+        failures.push({
+          check: 'ramp_up_missing',
+          combination: comboLabel,
+          details: `"${ex.name}" is a tier1_compound on ${day.day} with no ramp-up block in warmup.ramp_ups`,
+          exercise: ex.name,
+        })
+      }
     }
   }
 
@@ -973,6 +998,88 @@ async function runMesocycleBehaviorChecks(): Promise<AuditTestCase[]> {
         }
       }
     }
+  }
+
+  // GUARDRAIL (C0 calibration round, Fix 1): calibration-week working-set
+  // load for an UNVERIFIED profile (no known working weights — the exact
+  // "I don't know my numbers" case that produced a 130kg first-ever deadlift
+  // under the old flat 0.85x multiplier) must never exceed 60% of what the
+  // standards table estimates for that same exercise at that same week's
+  // reps/RPE without calibration dampening. A hard failing check, not a soft
+  // quality-score deduction — this is what should have caught the original
+  // defect and didn't, because the quality gate's calibration check only
+  // ever compared week 1 against week 3 (relative), never against an
+  // absolute bound. Run across every experience tier since the risk is
+  // largest exactly where the standards table is most aggressive (advanced).
+  for (const experience of ALL_EXPERIENCE) {
+    const comboLabel = `[calibration load ceiling] experience=${experience}`
+    const failures: AuditFailure[] = []
+    const profile = baseMesocycleProfile({ training_experience: experience })
+    const meso = generateMesocycle(profile)
+    const week1 = meso.find(w => w.week_number === 1)
+
+    if (!week1?.isCalibrationWeek) {
+      failures.push({
+        check: 'calibration_load_ceiling',
+        combination: comboLabel,
+        details: `week 1 is not flagged isCalibrationWeek for an unverified profile (training_experience=${experience}, no known working weights) — the calibration path this guardrail checks did not run at all`,
+      })
+    } else {
+      for (const day of week1.days) {
+        for (const ex of day.exercises) {
+          if (ex.suggested_load_kg == null) continue
+          const entry = EXERCISE_DATABASE.find(e => e.name === ex.name)
+          if (!entry) continue
+          const category = categorize(entry)
+          if (!category) continue
+          // Improvised-implement loads (weighted backpack carries/rows) are
+          // governed by their own absolute IMPROVISED_IMPLEMENT_CEILING_KG
+          // clamp, applied unconditionally at the end of prescribeLoad — so
+          // the "undamped" reference estimate below is capped by the SAME
+          // constant as the calibration-week estimate, making a 60% ratio
+          // structurally unsatisfiable regardless of how conservative
+          // calibration dampening is. That absolute ceiling is the real
+          // safety mechanism for this equipment class; this check doesn't
+          // apply to it.
+          if (isImprovisedLoadImplement(entry)) continue
+
+          // Same exercise, same week's own reps/RPE, WITHOUT calibration
+          // dampening — the reference the 60% ceiling is measured against.
+          const fullEstimate = prescribeLoad(entry, profile, {
+            targetRpeLabel: ex.intensity,
+            sets: ex.sets,
+            repRangeLabel: ex.reps,
+          })
+          if (fullEstimate.starting_weight_kg == null || fullEstimate.starting_weight_kg <= 0) continue
+
+          const ceiling = fullEstimate.starting_weight_kg * 0.6
+          // Equipment rounding (plate/dumbbell/stack increments) is a
+          // physical constraint, not a conservatism failure — a 60% ceiling
+          // of 7.2kg is unachievable when dumbbells step in 2kg increments.
+          // Exempt overshoot no larger than half the exercise's own rounding
+          // increment (the maximum error `roundToPlate` can introduce), and
+          // separately exempt anything already sitting at the equipment
+          // floor (can't go lower regardless of the math).
+          const floor = getEquipmentFloorKg(entry)
+          const roundingTolerance = loadingMode(entry) === 'barbell' || loadingMode(entry) === 'stack' ? 1.25 : 1
+          if (ex.suggested_load_kg > ceiling + roundingTolerance && ex.suggested_load_kg > floor) {
+            failures.push({
+              check: 'calibration_load_ceiling',
+              combination: comboLabel,
+              details: `"${ex.name}" calibration-week load ${ex.suggested_load_kg}kg exceeds 60% of the undamped standards estimate (${fullEstimate.starting_weight_kg}kg) — ceiling is ${ceiling.toFixed(1)}kg (equipment floor is ${floor}kg)`,
+              exercise: ex.name,
+            })
+          }
+        }
+      }
+    }
+
+    cases.push({
+      equipment: profile.equipment_access, injuries: [], duration: profile.session_duration_preference,
+      style: profile.training_style, experience,
+      passed: failures.length === 0, failures,
+      planDays: week1?.days.length ?? 0, totalExercises: week1?.days.flatMap(d => d.exercises).length ?? 0, estimatedDurationSec: 0,
+    })
   }
 
   return cases
