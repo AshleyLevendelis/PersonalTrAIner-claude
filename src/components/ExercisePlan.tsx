@@ -270,13 +270,17 @@ function WarmupSection({ warmup, open, onToggle }: { warmup: WorkoutDay['warmup'
             ))}
           </div>
         )}
-        {warmup.ramp_up && (
-          <div className="space-y-1">
+        {/* One block per qualifying heavy compound (C0 calibration round, Fix 2)
+            — every tier1_compound, plus a heavy-enough tier2_compound, gets its
+            OWN clearly-labeled ramp so a second main lift on the same day is
+            never presented as if it needs no lead-in. */}
+        {warmup.ramp_ups.map(ramp => (
+          <div key={ramp.exercise} className="space-y-1">
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
-              Ramp-Up — {warmup.ramp_up.exercise}
+              Ramp-Up — {ramp.exercise}{ramp.abbreviated && <span className="normal-case font-normal italic"> (quick — you're already warm)</span>}
             </p>
             <div className="flex flex-wrap gap-1.5">
-              {warmup.ramp_up.sets.map(set => (
+              {ramp.sets.map(set => (
                 <span
                   key={set.set_number}
                   className="inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] text-muted-foreground"
@@ -287,7 +291,7 @@ function WarmupSection({ warmup, open, onToggle }: { warmup: WorkoutDay['warmup'
               ))}
             </div>
           </div>
-        )}
+        ))}
         {warmup.coach_note && (
           <p className="text-[11px] text-muted-foreground/80 italic">{warmup.coach_note}</p>
         )}

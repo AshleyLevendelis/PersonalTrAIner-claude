@@ -33,13 +33,26 @@ export interface RampSet {
   note: string
 }
 
+export interface RampBlock {
+  exercise: string
+  sets: RampSet[]
+  /** True for every ramp after the session's first heavy lift — a shorter build-up since the lifter is already warm, never a full cold-start scheme. */
+  abbreviated: boolean
+}
+
 export interface WarmupBlock {
   general: WarmupItem[]
   mobility: WarmupItem[]
-  ramp_up: {
-    exercise: string
-    sets: RampSet[]
-  } | null
+  /**
+   * One entry per qualifying heavy compound in the session (C0 calibration
+   * round, Fix 2) — every tier1_compound, plus any tier2_compound loaded past
+   * RAMP_TIER2_THRESHOLD_KG. A day with two main lifts (e.g. Squats then
+   * Deadlifts) used to ramp only whichever came first in exercise order,
+   * sending the second heavy compound in cold. In session order; the first
+   * entry is always the full, experience-scaled scheme, everything after is
+   * abbreviated. Empty array, never null, when nothing in the session qualifies.
+   */
+  ramp_ups: RampBlock[]
   total_seconds: number
   coach_note: string
 }
@@ -280,24 +293,45 @@ const RAMP_SCHEMES: Record<TrainingExperience, { load_percent: number; reps: num
 
 const SECONDS_PER_RAMP_SET = 50
 
+// A later heavy compound in the same session isn't starting cold — the
+// lifter's already raised core temperature and moved load on the first one.
+// A shorter build-up (no empty-bar rehearsal set) is standard practice for a
+// second main lift; a full 5-step cold-start scheme for every heavy compound
+// in a session would eat an unreasonable amount of session time for no real
+// safety benefit past the first one.
+const ABBREVIATED_RAMP_SCHEME: { load_percent: number; reps: number }[] = [
+  { load_percent: 50, reps: 5 },
+  { load_percent: 70, reps: 3 },
+  { load_percent: 85, reps: 2 },
+]
+
+// A tier2_compound (secondary/accessory compound work — Dumbbell Rows,
+// Arnold Press, single-leg dumbbell work) doesn't automatically need a ramp
+// the way a tier1 main lift does, but a HEAVY one does — a 90kg Hack Squat
+// or 80kg Dumbbell Row is not meaningfully different from a main lift's
+// working weight and deserves the same lead-in. Kept separate from
+// mechanics_tier so a genuinely light tier2 accessory isn't force-ramped.
+const RAMP_TIER2_THRESHOLD_KG = 60
+
 /**
  * Ramp-up sets only make sense on externally loaded movements. You cannot do a
  * 50% push-up, and ramping an isolation exercise is not standard practice.
+ * `suggestedLoadKg` gates tier2_compound specifically — see
+ * RAMP_TIER2_THRESHOLD_KG's doc comment; tier1_compound always qualifies
+ * regardless of load, since ANY main lift benefits from a progressive lead-in.
  */
-function needsRampUp(entry: ExerciseEntry): boolean {
-  const isLoaded = isExternallyLoaded(entry)
-  const isBigEnough =
-    entry.mechanics_tier === 'tier1_compound' || entry.mechanics_tier === 'tier2_compound'
-  return isLoaded && isBigEnough
+function needsRampUp(entry: ExerciseEntry, suggestedLoadKg: number | null): boolean {
+  if (!isExternallyLoaded(entry)) return false
+  if (entry.mechanics_tier === 'tier1_compound') return true
+  if (entry.mechanics_tier === 'tier2_compound') return (suggestedLoadKg ?? 0) > RAMP_TIER2_THRESHOLD_KG
+  return false
 }
 
-function buildRampSets(
+function buildRampSetsFor(
   entry: ExerciseEntry,
-  experience: TrainingExperience,
-): { exercise: string; sets: RampSet[] } | null {
-  if (!needsRampUp(entry)) return null
-
-  const scheme = RAMP_SCHEMES[experience]
+  scheme: { load_percent: number; reps: number }[],
+  abbreviated: boolean,
+): RampBlock {
   const sets: RampSet[] = scheme.map((s, i) => ({
     set_number: i + 1,
     load_percent: s.load_percent,
@@ -308,7 +342,7 @@ function buildRampSets(
         : `${s.load_percent}% of today's working weight`,
   }))
 
-  return { exercise: entry.name, sets }
+  return { exercise: entry.name, sets, abbreviated }
 }
 
 // ---------------------------------------------------------------------------
@@ -317,7 +351,15 @@ function buildRampSets(
 
 export interface WarmupContext {
   patterns: MovementPattern[]
-  mainLift: ExerciseEntry | null
+  /**
+   * Every compound exercise in today's session, in session order, alongside
+   * its prescribed working weight — needsRampUp decides which actually
+   * qualify (every tier1_compound; a tier2_compound only past
+   * RAMP_TIER2_THRESHOLD_KG). Replaces a single `mainLift` (C0 calibration
+   * round, Fix 2): a day with two main lifts used to ramp only whichever
+   * came first, sending the second in cold.
+   */
+  compounds: { entry: ExerciseEntry; suggestedLoadKg: number | null }[]
   equipment: EquipmentAccess
   injuries: string[]
   experience: TrainingExperience
@@ -328,11 +370,25 @@ export interface WarmupContext {
 export function buildWarmup(ctx: WarmupContext): WarmupBlock {
   const baseGeneral = GENERAL_WARMUPS[ctx.equipment] ?? GENERAL_WARMUPS.bodyweight
 
-  // On a short session, general temperature-raising work is what gets
-  // compressed — not the joint-specific prep. Five minutes on a bike is
-  // disproportionate when the whole session is 35 minutes, whereas skipping
-  // hip mobility before squats is never the right trade.
-  const general: WarmupItem[] = ctx.budgetSeconds < 480
+  // Every qualifying compound gets a ramp — the first, full scheme; every
+  // later one, abbreviated. Built before general/mobility sizing because
+  // ramps are the one part of a warm-up that must NEVER be dropped for
+  // budget: if a multi-main-lift day's ramps don't fit, general/mobility are
+  // what shrink (see below), not the ramp coverage itself.
+  const rampTargets = ctx.compounds.filter(c => needsRampUp(c.entry, c.suggestedLoadKg))
+  const rampUps: RampBlock[] = rampTargets.map((c, i) =>
+    buildRampSetsFor(c.entry, i === 0 ? RAMP_SCHEMES[ctx.experience] : ABBREVIATED_RAMP_SCHEME, i !== 0)
+  )
+  const rampSeconds = rampUps.reduce((n, r) => n + r.sets.length * SECONDS_PER_RAMP_SET, 0)
+
+  // On a short session, or whenever the ramps alone leave little/no room for
+  // general temperature-raising work, general is what gets compressed first
+  // — not the joint-specific mobility prep, and never a ramp. Five minutes on
+  // a bike is disproportionate when the whole session is 35 minutes; it's
+  // even more clearly the thing to cut when two heavy compounds already need
+  // 8 ramp sets between them.
+  const generalWouldOverrun = baseGeneral.duration_seconds + rampSeconds > ctx.budgetSeconds
+  const general: WarmupItem[] = (ctx.budgetSeconds < 480 || generalWouldOverrun)
     ? [{
         ...baseGeneral,
         prescription: baseGeneral.prescription.replace(/^\d+(-\d+)?\s*min/, '3 min'),
@@ -361,19 +417,17 @@ export function buildWarmup(ctx: WarmupContext): WarmupBlock {
     return score(b) - score(a)
   })
 
-  const rampUp = ctx.mainLift ? buildRampSets(ctx.mainLift, ctx.experience) : null
-  const rampSeconds = rampUp ? rampUp.sets.length * SECONDS_PER_RAMP_SET : 0
-
   let spent = general.reduce((n, g) => n + g.duration_seconds, 0) + rampSeconds
   const mobility: WarmupItem[] = []
   const coveredJoints = new Set<string>()
 
-  // Mobility is not the discretionary part of a warm-up. When a ramp-up is
-  // present it can consume the whole reserve, which would leave a deadlift day
-  // with no hip or spine preparation at all — the opposite of what the ramp-up
-  // is there to support. So the two highest-value drills are guaranteed, and
-  // only the drills beyond that are budget-dependent.
-  const GUARANTEED_DRILLS = 2
+  // Mobility is not normally the discretionary part of a warm-up — two
+  // highest-value drills are usually guaranteed regardless of budget, same
+  // as before multi-lift ramps existed. But when the ramps alone have
+  // already consumed the whole reserve (a real possibility now that a
+  // squat+deadlift day can need 8 ramp sets), mobility is what yields —
+  // ramps are never cut to make room for it.
+  const GUARANTEED_DRILLS = spent >= ctx.budgetSeconds ? 0 : 2
 
   for (const drill of ranked) {
     const guaranteed = mobility.length < GUARANTEED_DRILLS
@@ -396,14 +450,14 @@ export function buildWarmup(ctx: WarmupContext): WarmupBlock {
   }
 
   const uncovered = [...targetJoints].filter(j => !coveredJoints.has(j))
-  const coachNote = rampUp
-    ? `Ramp up on ${rampUp.exercise} before your working sets — these do not count toward your working volume.`
+  const coachNote = rampUps.length > 0
+    ? `Ramp up on ${rampUps.map(r => r.exercise).join(', then ')} before your working sets — these do not count toward your working volume.`
     : 'No loaded ramp-up needed today. Move through the mobility work deliberately rather than rushing it.'
 
   return {
     general,
     mobility,
-    ramp_up: rampUp,
+    ramp_ups: rampUps,
     total_seconds: spent,
     coach_note:
       uncovered.length > 0 && ctx.injuries.length > 0
