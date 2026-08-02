@@ -617,9 +617,17 @@ function stageTimeCap(
     estimated = estimateSessionDuration(dayExercises.map(e => ({ entry: e.entry, sets: e.sets, reps: e.reps, restSeconds: e.restSeconds })))
   }
 
-  // Phase 4: Only as last resort, remove lowest-tier exercises from the end
+  // Phase 4: Only as last resort, remove lowest-tier exercises from the end.
+  // Cardio/interval work is skipped here the same way it's protected in
+  // Phase 5 below — on a dedicated conditioning day it usually sits at the
+  // END of the array (selection sorts tier1->tier2->tier3->cardio), so a
+  // blind pop() would remove the conditioning content FIRST on exactly the
+  // day it matters most.
   while (estimated > budgetSeconds && dayExercises.length > 3) {
-    const removed = dayExercises.pop()!
+    let removeIdx = dayExercises.length - 1
+    while (removeIdx >= 0 && dayExercises[removeIdx].entry.mechanics_tier === 'cardio') removeIdx--
+    if (removeIdx < 0 || dayExercises.length <= 3) break
+    const removed = dayExercises.splice(removeIdx, 1)[0]
     trace.time_cap_adjusted.push({
       exercise: removed.entry.name,
       stage: 'time_cap',
@@ -640,14 +648,24 @@ function stageTimeCap(
   for (let pass = 0; pass < 4 && estimated > budgetSeconds; pass++) {
     let trimmed = false
     const order = dayExercises
-      .map((e, i) => ({ i, cost: e.sets * (e.entry.avg_duration_seconds + e.restSeconds), isMain: e.entry.mechanics_tier === 'tier1_compound' }))
+      .map((e, i) => ({
+        i,
+        cost: e.sets * (e.entry.avg_duration_seconds + e.restSeconds),
+        // Cardio/interval work is protected the same as the main lift —
+        // trimmed only once every accessory/isolation slot has already
+        // given up sets. A conditioning "round" floors at 4, not 2 (see
+        // getRoleSetFloor) — an interval circuit cut to 2 rounds isn't a
+        // conditioning stimulus.
+        isMain: e.entry.mechanics_tier === 'tier1_compound' || e.entry.mechanics_tier === 'cardio',
+        floor: e.entry.mechanics_tier === 'cardio' ? 4 : 2,
+      }))
       .sort((a, b) => b.cost - a.cost)
 
     for (const priority of [false, true]) {
-      for (const { i, isMain } of order) {
+      for (const { i, isMain, floor } of order) {
         if (isMain !== priority) continue
         if (estimated <= budgetSeconds) break
-        if (dayExercises[i].sets <= 2) continue
+        if (dayExercises[i].sets <= floor) continue
         dayExercises[i] = { ...dayExercises[i], sets: dayExercises[i].sets - 1 }
         trimmed = true
         trace.time_cap_adjusted.push({
@@ -847,6 +865,23 @@ function selectExercisesForTrack(
       count--
     }
     return count
+  }
+
+  // Cardio-tier exercises have mechanics_tier 'cardio', which never matches
+  // tier1_compound/tier2_compound/tier3_isolation below — so on a track
+  // whose whole point IS conditioning (primary_patterns includes 'cardio'),
+  // cardio exercises could ONLY ever reach selection through the refill()
+  // fallback further down, which only fires when the tier picks undershoot
+  // the target. Core-pattern tier2/tier3 exercises (Plank, Hanging Leg
+  // Raises, Ab Wheel...) are plentiful enough to satisfy that target on
+  // their own, so refill() rarely triggered — a "Conditioning & Core" day
+  // ended up almost entirely core with one or two token cardio entries, a
+  // direct, repeated LLM coach review finding. Reserving real cardio slots
+  // FIRST, before core competes for the same count, fixes that at the
+  // source.
+  if (track.primary_patterns.includes('cardio')) {
+    const cardioCount = Math.max(2, Math.ceil((counts.tier1 + counts.tier2 + counts.tier3) / 2))
+    pickFromTier('cardio', cardioCount, track.primary_patterns)
   }
 
   pickFromTier('tier1_compound', counts.tier1, track.primary_patterns)
@@ -1155,11 +1190,18 @@ function getRoleSetCeiling(role: VolumeRole, isLongSession: boolean): number {
     case 'main': return isLongSession ? 6 : 5
     case 'accessory': return 4
     case 'isolation': return 3
+    // A conditioning "set" is 20-60s of interval work, not a fatiguing
+    // strength set — rounds, not sets. Sharing the isolation ceiling (3) is
+    // exactly how a dedicated conditioning day's interval work got trimmed
+    // to "3 rounds = 3 minutes of work."
+    case 'conditioning': return isLongSession ? 10 : 8
   }
 }
 
 function getRoleSetFloor(role: VolumeRole): number {
-  return role === 'main' ? 3 : 2
+  if (role === 'main') return 3
+  if (role === 'conditioning') return 4
+  return 2
 }
 
 function clampToVolumeRole(sets: number, role: VolumeRole | null, isLongSession: boolean): number {
@@ -1183,8 +1225,14 @@ function enforceSetHierarchy(exercises: Exercise[]): Exercise[] {
   const mainSets = exercises.filter((_, i) => roles[i] === 'main').map(ex => ex.sets)
   if (mainSets.length === 0) return exercises
   const mainCeiling = Math.max(...mainSets)
+  // Conditioning rounds are exempt — a conditioning "set" isn't the same
+  // unit of fatigue as a strength set, so it isn't subordinate to the main
+  // lift's set count the way an accessory is (see getVolumeRole's doc
+  // comment and Part 4's "never trim the conditioning" requirement).
   return exercises.map((ex, i) =>
-    roles[i] && roles[i] !== 'main' && ex.sets > mainCeiling ? { ...ex, sets: mainCeiling } : ex
+    roles[i] && roles[i] !== 'main' && roles[i] !== 'conditioning' && ex.sets > mainCeiling
+      ? { ...ex, sets: mainCeiling }
+      : ex
   )
 }
 
@@ -1563,6 +1611,34 @@ function balanceWeeklyStructure(
   }
 }
 
+/**
+ * Zone 2 / dedicated-conditioning entries must not be byte-identical every
+ * week — a direct, repeated LLM coach review finding ("three identical
+ * 45-min Zone 2 sessions... no duration progression"). assignConditioningNotes
+ * runs once on the base (pre-mesocycle) plan, so without this every week
+ * inherited the exact same conditioning_note/recommendedCardio verbatim.
+ * Nudges duration modestly across a block's three loading weeks and steps
+ * it back down for the deload, matching the same shape load/reps
+ * progression already takes. Regenerates the note text via a targeted
+ * number replacement rather than rebuilding the string, so each branch's
+ * own framing ("post-session", "Independent session:", etc. — see
+ * assignConditioningNotes) survives untouched.
+ */
+function progressConditioningWeek(days: WorkoutDay[], weekInBlock: number, isDeload: boolean): void {
+  const fraction = isDeload ? -0.15 : weekInBlock === 1 ? 0 : weekInBlock === 2 ? 0.1 : 0.18
+  if (fraction === 0) return
+  for (const day of days) {
+    if (!day.recommendedCardio || day.recommendedCardio.is_filler) continue
+    const base = day.recommendedCardio.duration
+    const duration = Math.max(10, Math.round(base * (1 + fraction)))
+    if (duration === base) continue
+    day.recommendedCardio = { ...day.recommendedCardio, duration }
+    if (day.conditioning_note) {
+      day.conditioning_note = day.conditioning_note.replace(/\d+(?=\s*min)/, String(duration))
+    }
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Final day-budget enforcement
 // ---------------------------------------------------------------------------
@@ -1583,11 +1659,20 @@ function enforceDayDurationBudget(day: WorkoutDay, budgetSeconds: number): Worko
   while (estimateDaySeconds({ ...day, exercises }) > budgetSeconds && guard < 30) {
     guard++
     const trimmable = exercises
-      .map((ex, i) => ({ i, sets: ex.sets, entry: findEntry(ex.name) }))
-      .filter(t => t.sets > 2 && t.entry && t.entry.mechanics_tier !== 'primer')
+      .map((ex, i) => {
+        const entry = findEntry(ex.name)
+        const role = entry ? getVolumeRole(entry) : null
+        const floor = role ? getRoleSetFloor(role) : 2
+        return { i, sets: ex.sets, entry, role, floor }
+      })
+      .filter(t => t.entry && t.entry.mechanics_tier !== 'primer' && t.sets > t.floor)
     if (trimmable.length === 0) break
-    const nonMain = trimmable.filter(t => t.entry!.mechanics_tier !== 'tier1_compound')
-    const candidates = nonMain.length > 0 ? nonMain : trimmable
+    // Accessories/isolation trim first; main lift AND conditioning rounds
+    // are protected until nothing else is left to give — "accessories/core
+    // trim to fit what remains, never the conditioning" (Part 4).
+    const protectedRoles = new Set(['main', 'conditioning'])
+    const nonProtected = trimmable.filter(t => !t.role || !protectedRoles.has(t.role))
+    const candidates = nonProtected.length > 0 ? nonProtected : trimmable
     candidates.sort((a, b) => b.sets - a.sets)
     const target = candidates[0].i
     exercises = exercises.map((ex, i) => (i === target ? { ...ex, sets: ex.sets - 1 } : ex))
@@ -1690,6 +1775,29 @@ function assignConditioningNotes(days: WorkoutDay[], profile: UserProfile, polic
 
   for (const day of days) {
     if (day.focus !== 'Conditioning & Core') continue
+    // The day's own selected exercises now reliably include real interval
+    // work (selectExercisesForTrack reserves cardio-tier slots before core
+    // competes for them) — a SEPARATE dedicatedDay cardio block on top of
+    // that would double-count this day's duration (recommendedCardio with
+    // timing 'post_session' is added ON TOP of the exercises in
+    // estimateDaySeconds), which is exactly the kind of padding that made
+    // a "Conditioning & Core" day look like it needed constant trimming.
+    const hasInDayConditioning = day.exercises.some(ex => {
+      const entry = findEntry(ex.name)
+      return entry && getVolumeRole(entry) === 'conditioning'
+    })
+    if (hasInDayConditioning) {
+      // No separate note/cardio block here — the exercises already ARE the
+      // conditioning prescription. Deliberately leaves conditioning_note
+      // unset (rather than a placeholder string) so applyDurationFiller
+      // (exercise-plan.ts, runs later per mesocycle week) can still top the
+      // day up with more mobility/conditioning if it's genuinely short
+      // after real interval content — a placeholder note here would have
+      // silently blocked that fallback (it skips any day that already has
+      // one) for exactly the thin-equipment-pool profiles that need it most.
+      remaining--
+      continue
+    }
     day.conditioning_note = `${cardioForGoal.dedicatedDay.activity} (~${cardioForGoal.dedicatedDay.duration} min)`
     day.recommendedCardio = {
       ...cardioForGoal.dedicatedDay,
@@ -1699,8 +1807,18 @@ function assignConditioningNotes(days: WorkoutDay[], profile: UserProfile, polic
     remaining--
   }
 
-  for (const restDay of restDayNames) {
-    if (remaining <= 0) break
+  // At least one TRUE rest day survives per week for moderate/low recovery
+  // — filling every "rest" day with a 45min Zone 2 session is how a review
+  // found "seven training days a week... that's not a rest day, that's a
+  // euphemism" on a client flagged moderate recovery. High recovery can
+  // genuinely absorb cardio on every rest day; moderate/low cannot.
+  const recovery = profile.recovery_capacity || 'moderate'
+  const maxCardioRestDays = recovery === 'high'
+    ? restDayNames.length
+    : Math.max(0, restDayNames.length - 1)
+
+  restDayNames.slice(0, maxCardioRestDays).forEach(restDay => {
+    if (remaining <= 0) return
     days.push({
       day: restDay,
       focus: 'Active Recovery + Cardio',
@@ -1713,7 +1831,7 @@ function assignConditioningNotes(days: WorkoutDay[], profile: UserProfile, polic
       },
     })
     remaining--
-  }
+  })
 
   const remainingTrainingDays = days.filter(
     d => d.focus !== 'Conditioning & Core' && d.focus !== 'Active Recovery + Cardio'
@@ -1953,6 +2071,48 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
 // 4-WEEK PERIODIZED MESOCYCLE (preserved)
 // ---------------------------------------------------------------------------
 
+/**
+ * A short, honest sentence describing what's actually different about THIS
+ * week versus last, appended to the phase/goal coach note. An LLM coach
+ * review's most repeated complaint across every profile was some version of
+ * "nothing is progressing" or "the RPE label is the only thing that
+ * changes" — even in cases (Part E, prior round) where reps genuinely WERE
+ * climbing for 'reps'/'maintain'-emphasis goals, because nothing ever SAID
+ * so at the week level. This is deliberately generic (goal/week-number
+ * driven, not per-exercise) since the note has to describe an entire
+ * week's worth of exercises in one sentence — the per-exercise basis text
+ * (load-prescription.ts) still carries the exact numbers.
+ */
+function buildProgressionNote(
+  weekInBlock: number,
+  isDeload: boolean,
+  isCalibrationWeek: boolean,
+  policy: GoalPolicy,
+): string {
+  if (isDeload) {
+    return 'Deload week — load and volume both step back so you arrive at the next block recovered, not because progress stalled.'
+  }
+  if (isCalibrationWeek) {
+    return 'Calibration week — loads are deliberately conservative while you find your real working weight; the block\'s real ramp starts next week.'
+  }
+  const rampsLoad = policy.progressionEmphasis === 'load'
+  if (weekInBlock === 1) {
+    return rampsLoad
+      ? 'Baseline week — this sets the working weight every later week in the block adds load on top of.'
+      : 'Baseline week — weight holds flat this block by design; this sets the rep target every later week builds on.'
+  }
+  if (rampsLoad) {
+    return weekInBlock === 2
+      ? 'Load goes up this week on the main lifts — same rep target, more weight than last week.'
+      : 'Load goes up again this week — the heaviest working sets of the block before the deload.'
+  }
+  // 'reps' or 'maintain' emphasis: weight intentionally holds flat, reps are
+  // the real lever. Named explicitly so this doesn't read as stagnation.
+  return weekInBlock === 2
+    ? 'Weight holds flat by design — reps climb this week. That IS the progression for this goal, not a missing one.'
+    : 'Weight still holds flat, reps climb again — building work capacity before the next block changes the stimulus.'
+}
+
 // A bodyweight trainee has no external load to ramp — 'strength' and
 // 'power' phases both assume one. Restricted to the same set beginners get
 // (see periodization.ts's getPhaseSequence), regardless of experience.
@@ -2055,7 +2215,14 @@ export function mapTier(mechanicsTier: string): ExerciseTier {
     tier1_compound: 'tier_1_primary',
     tier2_compound: 'tier_2_secondary',
     tier3_isolation: 'tier_3_isolation',
-    activation: 'tier_0_primer',
+    // A real pre-existing bug: MechanicsTier's actual value for a primer is
+    // 'primer' (exercise-db.ts) — 'activation' is a movement_pattern value,
+    // never a mechanics_tier one, so this key never matched and EVERY
+    // primer silently fell through to the 'tier_3_isolation' default
+    // below. Surfaced by the capability round's frozen_week check, which
+    // was (correctly) trying to exempt primers by tier and finding none
+    // tagged 'tier_0_primer' to exempt.
+    primer: 'tier_0_primer',
   }
   return mapping[mechanicsTier] || 'tier_3_isolation'
 }
@@ -2596,8 +2763,16 @@ export function generateMesocycle(
           // bar, same reps, 'now it's harder' is not a plan"). Only 'load'
           // emphasis holds reps flat, since load itself is that goal's lever.
           const isBodyweight = !!dbEntry && !isPrimer && !isExternallyLoaded(dbEntry)
-          const rampReps = isBodyweight || policy.progressionEmphasis === 'reps' || policy.progressionEmphasis === 'maintain'
-          const rampLoad = !isBodyweight && policy.progressionEmphasis === 'load'
+          // A loaded carry's "reps" field is a fixed distance ('40m') —
+          // shiftReps deliberately never touches it (distance is the wrong
+          // lever for a carry). For a 'reps'/'maintain'-emphasis goal that
+          // would otherwise leave BOTH load and distance frozen every week
+          // — a carry has no progression lever at all under those goals
+          // unless load is the one that moves instead, same reasoning as
+          // bodyweight always ramping reps regardless of goal.
+          const isCarry = dbEntry?.prescription_type === 'distance_load'
+          const rampReps = (isBodyweight || policy.progressionEmphasis === 'reps' || policy.progressionEmphasis === 'maintain') && !isCarry
+          const rampLoad = !isBodyweight && (policy.progressionEmphasis === 'load' || isCarry)
           const repShift = isDeload
             ? (deloadAtFloor
                 // Weight held flat (can't drop further) — reps carry the
@@ -2703,6 +2878,7 @@ export function generateMesocycle(
       })
 
       enforceLoadCoherence(days)
+      progressConditioningWeek(days, w, isDeload)
 
       // Deload weeks are SUPPOSED to run short (half volume, by design) — a
       // filler there would fight the whole point of the recovery week, so
@@ -2719,14 +2895,17 @@ export function generateMesocycle(
         phase_focus: phaseConfig.focus,
         is_deload: isDeload,
         isCalibrationWeek,
-        coach_note: isDeload
-          ? 'Deload week — volume is deliberately cut so you arrive at the next block recovered. Resist the urge to push.'
-          // The goal's own framing shows once per block, alongside the
-          // phase's — repeating it every week would bury the phase-specific
-          // note under the same paragraph four times over.
-          : w === 1
-            ? `${phaseConfig.coach_note} ${policy.coachNote}`
-            : phaseConfig.coach_note,
+        coach_note: [
+          isDeload
+            ? 'Deload week — volume is deliberately cut so you arrive at the next block recovered. Resist the urge to push.'
+            // The goal's own framing shows once per block, alongside the
+            // phase's — repeating it every week would bury the phase-specific
+            // note under the same paragraph four times over.
+            : w === 1
+              ? `${phaseConfig.coach_note} ${policy.coachNote}`
+              : phaseConfig.coach_note,
+          buildProgressionNote(w, isDeload, isCalibrationWeek, policy),
+        ].join(' '),
         label: isDeload
           ? `Week ${weekCounter} — ${phaseConfig.label}: Deload`
           : `Week ${weekCounter} — ${phaseConfig.label} (wk ${w} of block ${blockIndex + 1})`,

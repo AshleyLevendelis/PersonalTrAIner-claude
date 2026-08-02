@@ -359,28 +359,23 @@ function scoreProgression(profile: UserProfile, mesocycle: MesocycleWeek[]): Dim
         // calibration that failed to stay conservative — comparing against
         // week 3 only means something when the goal actually expects week 3
         // to have climbed away from it.
-        if (expectsLoadRamp && w1.isCalibrationWeek && l3 > floor && l1 > l3 * 0.55) {
+        //
+        // Threshold recalibrated for the capability-model round's strength
+        // rebuild (load-prescription.ts): calibration conservatism is now a
+        // real 0.85x MULTIPLIER on an accurate standards-based estimate,
+        // not the old 0.45x hard ceiling on a deliberately-lowballed one.
+        // Week 3 is that same calibrated baseline plus two small FIXED-kg
+        // increments, so on a realistic (larger) base weight the increments
+        // are a much smaller fraction of the total than they were under the
+        // old, much-lower baseline — l1/l3 now legitimately lands anywhere
+        // from ~0.80 (near the equipment floor, where +5kg is a big jump)
+        // to ~0.95 (a heavy lift, where +5kg barely moves the ratio). 0.55
+        // would flag nearly every plan under the new model.
+        if (expectsLoadRamp && w1.isCalibrationWeek && l3 > floor && l1 > l3 * 0.97) {
           violatedRules.add('calibration_not_conservative')
           deductions.push({
             rule: 'calibration_not_conservative', day: day.day, weekNumber: 1,
             detail: `Calibration week load (${l1}kg) is not conservative relative to week 3 (${l3}kg)`,
-          })
-        }
-      }
-
-      // Frozen week: for goals where load intentionally holds flat
-      // (maintain/reps emphasis) — or any bodyweight movement, which never
-      // ramps load regardless of goal — reps must be the thing visibly
-      // climbing. Three weeks distinguishable only by an RPE label was a
-      // direct review finding ("same bar, same reps, 'now it's harder' is
-      // not a plan").
-      if (!expectsLoadRamp) {
-        const loadFrozen = e1.suggested_load_kg == null || e1.suggested_load_kg === e3.suggested_load_kg
-        if (loadFrozen && e1.reps === e3.reps) {
-          violatedRules.add('frozen_week')
-          deductions.push({
-            rule: 'frozen_week', day: day.day, weekNumber: 1,
-            detail: `${e1.name}: load and reps both unchanged from week 1 to week 3 (${e1.reps} @ ${e1.suggested_load_kg ?? 'bodyweight'}) — only the RPE label differs`,
           })
         }
       }
@@ -403,6 +398,62 @@ function scoreProgression(profile: UserProfile, mesocycle: MesocycleWeek[]): Dim
           })
         }
       }
+    }
+  }
+
+  // Frozen week, checked across EVERY block and EVERY consecutive non-deload
+  // week pair (w1->w2, w2->w3) for EVERY exercise, not just block 1's main
+  // lift at the w1-vs-w3 distance — "no two consecutive non-deload weeks
+  // identical in both load and reps for any exercise" is the capability
+  // round's own literal rubric requirement. Skipped when the exercise NAME
+  // changed between the two weeks (an accessory rotation mid-block is a
+  // deliberate variety mechanism, not a frozen-week failure — there's no
+  // meaningful "same load, same reps" comparison across two different
+  // exercises).
+  for (let block = 1; block <= 4; block++) {
+    const blockWeeks = mesocycle
+      .filter(w => w.block_number === block)
+      .sort((a, b) => (a.week_in_block ?? 0) - (b.week_in_block ?? 0))
+    const pairs: [MesocycleWeek | undefined, MesocycleWeek | undefined][] = [
+      [blockWeeks[0], blockWeeks[1]], [blockWeeks[1], blockWeeks[2]],
+    ]
+    for (const [wa, wb] of pairs) {
+      if (!wa || !wb || wa.is_deload || wb.is_deload) continue
+      for (const dayA of wa.days) {
+        const dayB = wb.days.find(d => d.day === dayA.day)
+        if (!dayB) continue
+        dayA.exercises.forEach((exA, i) => {
+          const exB = dayB.exercises[i]
+          if (!exB || exB.name !== exA.name) return
+          // Primers are fixed by design (2 sets, reps '5', no load) — a
+          // warm-up movement isn't a progression target, so it never
+          // ramping isn't a "nothing is progressing" failure.
+          if (exA.tier === 'tier_0_primer') return
+          const loadFrozen = exA.suggested_load_kg == null
+            ? exB.suggested_load_kg == null
+            : exA.suggested_load_kg === exB.suggested_load_kg
+          if (loadFrozen && exA.reps === exB.reps) {
+            violatedRules.add('frozen_week')
+            deductions.push({
+              rule: 'frozen_week', day: dayA.day, weekNumber: wa.week_number,
+              detail: `${exA.name}: load and reps both unchanged from week ${wa.week_number} to week ${wb.week_number} (${exA.reps} @ ${exA.suggested_load_kg ?? 'bodyweight'}) — only the RPE label differs`,
+            })
+          }
+        })
+      }
+    }
+  }
+
+  // Every week must carry a progression note explaining what's different —
+  // trivially true by construction now (buildProgressionNote in
+  // exercise-plan.ts runs unconditionally), kept here as a regression guard.
+  for (const week of mesocycle) {
+    if (!week.coach_note || week.coach_note.trim().length === 0) {
+      violatedRules.add('missing_progression_note')
+      deductions.push({
+        rule: 'missing_progression_note', weekNumber: week.week_number,
+        detail: `Week ${week.week_number} has no coach note explaining what's progressing`,
+      })
     }
   }
 

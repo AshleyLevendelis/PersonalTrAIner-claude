@@ -1917,10 +1917,17 @@ export function meetsCapabilityRequirement(entry: ExerciseEntry, experience: Tra
 // 7x9-13 alongside 2-set accessories. `null` for primers, which sit outside
 // the hierarchy entirely (fixed 2 sets, never scaled).
 
-export type VolumeRole = 'main' | 'accessory' | 'isolation'
+export type VolumeRole = 'main' | 'accessory' | 'isolation' | 'conditioning'
 
 export function getVolumeRole(entry: ExerciseEntry): VolumeRole | null {
   if (entry.mechanics_tier === 'primer') return null
+  // A "set" of interval work (30-60s of jump rope, battle ropes, mountain
+  // climbers) is a fundamentally different unit than a strength set — capping
+  // it at the isolation ceiling (3) is exactly how a dedicated conditioning
+  // day's interval work ended up trimmed to "3x30s = 3 minutes of work,"
+  // a direct, repeated LLM coach review finding. Checked before the
+  // core/carry fallback below since cardio mechanics_tier never overlaps them.
+  if (entry.mechanics_tier === 'cardio') return 'conditioning'
   if (entry.movement_pattern === 'core' || entry.movement_pattern === 'carry') return 'isolation'
   switch (entry.mechanics_tier) {
     case 'tier1_compound': return 'main'

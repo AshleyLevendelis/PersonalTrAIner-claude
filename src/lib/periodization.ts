@@ -345,6 +345,12 @@ export function getPhaseConfig(phase: TrainingPhase): PhaseConfig {
 }
 
 /** Shifts a rep range up or down while keeping its spread. */
+// Seconds floor for a time-based hold/interval shift — deliberately NOT
+// `minReps` (calibrated for rep counts like 3-8; using it as a seconds
+// floor would be a unit mismatch), just a sane lower bound so a shrinking
+// deload/AA shift can't push a hold to something silly like 2 seconds.
+const MIN_HOLD_SECONDS = 10
+
 export function shiftReps(reps: string, delta: number, minReps: number): string {
   const range = reps.match(/^(\d+)\s*-\s*(\d+)$/)
   if (range) {
@@ -354,7 +360,25 @@ export function shiftReps(reps: string, delta: number, minReps: number): string 
   }
   const single = reps.match(/^(\d+)$/)
   if (single) return String(Math.max(minReps, Number(single[1]) + delta))
-  // Time-based ('30-45s') and distance prescriptions pass through untouched.
+
+  // Time-based holds/intervals ('30-45s', '30s') shift the SECONDS the same
+  // way a rep range shifts reps — without this, an isometric hold (plank,
+  // dead bug, side plank) or an interval's work duration NEVER changes
+  // week to week, since a plain rep-range shift can't touch them. That's a
+  // real "nothing is progressing" gap: bodyweight holds otherwise have no
+  // load to ramp AND no reps to ramp.
+  const timeRange = reps.match(/^(\d+)\s*-\s*(\d+)\s*s$/)
+  if (timeRange) {
+    const low = Math.max(MIN_HOLD_SECONDS, Number(timeRange[1]) + delta)
+    const spread = Number(timeRange[2]) - Number(timeRange[1])
+    return `${low}-${low + spread}s`
+  }
+  const timeSingle = reps.match(/^(\d+)\s*s$/)
+  if (timeSingle) return `${Math.max(MIN_HOLD_SECONDS, Number(timeSingle[1]) + delta)}s`
+
+  // Distance prescriptions ('40m') pass through untouched — see the isCarry
+  // handling in exercise-plan.ts, which routes carries to ramp LOAD instead
+  // since distance is the wrong lever for a loaded carry.
   return reps
 }
 
