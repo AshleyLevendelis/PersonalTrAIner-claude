@@ -68,8 +68,53 @@ in a later round once everything is verified against the new store.
      every other table in this single-tenant, no-sign-in app).
 
 5. Important Notes
-   - Idempotent: IF NOT EXISTS / ON CONFLICT DO NOTHING throughout; safe to
-     re-run.
+   - "Safe to re-run" is narrower than it sounds — read this before ever
+     re-running this file (a restore, a staging copy, a second environment,
+     ANYTHING other than the one production apply this migration already
+     received against empty `workout_logs`/`set_logs`):
+     - IF NOT EXISTS / ON CONFLICT DO NOTHING make re-running safe against
+       DUPLICATION — you will not get doubled rows.
+     - Re-running is NOT safe against RESURRECTING deletions: if a user (or
+       `clearAllSetLogs`) deleted a backfilled session/set after the first
+       run, and you run this file again while the legacy source rows are
+       still sitting in `workout_logs`/`set_logs`, the ON CONFLICT DO NOTHING
+       inserts see no conflict and silently recreate what was deleted.
+     - The backfill logic below (step 3) was ONLY ever exercised against
+       empty legacy tables in production (verified: both were empty when
+       this migration first ran, so the 0=0 counts matched and steps b-d were
+       structural no-ops). Its actual behavior against a database with real
+       legacy history has NOT been exercised, and an adversarial review
+       surfaced four latent defects in that path that would only bite THEN:
+       - Step (a) fabricates a visible workout_sessions row (and a "45 min /
+         Completed" card in the weekly planner) for every historical logged
+         day — including days the user never actually finished a full
+         session, since workout_logs only ever recorded individual sets.
+       - Step (d)'s `weight_kg = 0` skip (meant to drop the L6 bulk-button
+         fabrications) cannot distinguish those from a GENUINE all-bodyweight
+         session logged entirely via the old bulk button — both are
+         structurally identical zero-weight set_logs rows with no
+         workout_logs counterpart. A real re-run would silently drop real
+         bodyweight training history, not just fabricated rows.
+       - Step (d)'s counterpart matching (workout_logs vs set_logs, used to
+         decide what step (b) already covered) joins on DATE EQUALITY only —
+         a set logged right at the client's local-midnight boundary, where
+         the two legacy tables' date/timestamp columns could disagree by a
+         day, would be counted as unmatched and inserted a second time under
+         the wrong day's session.
+       - Step (b)'s ON CONFLICT DO NOTHING silently absorbs any row that
+         collides on the NEW slug-derived exercise_id (e.g. legacy
+         "Push-Ups" and "Push Ups" as distinct workout_logs rows, both
+         slugging to the same id) — and unlike step (d), nothing counts or
+         RAISE NOTICEs these drops, so the "every skip is auditable" claim
+         below does not fully hold for step (b) specifically.
+     - None of the above is a live-app bug — it only matters if this exact
+       migration file is executed again against a database that has real
+       pre-existing `workout_logs`/`set_logs` data. Before doing that:
+       reconcile against a fresh export of both legacy tables, or add
+       explicit guards (an `is_completed` heuristic for step (a), an
+       `is_bodyweight` carry-through for step (d), a tighter time-window
+       join for the counterpart match, and a skip counter for step (b))
+       first.
    - `workout_logs` and `set_logs` are NOT dropped and NOT written to by the
      app after this round — legacy, read-only, kept for verification.
 */
