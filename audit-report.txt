@@ -2,20 +2,148 @@
 EXERCISE ENGINE CONSTRAINT AUDIT REPORT
 ================================================================================
 
-Total Combinations Tested: 2311
-Passed: 2311 (100.0%)
-Failed: 0 (0.0%)
-Total Runtime: 11497ms (11.50s)
+Total Combinations Tested: 2343
+Passed: 2302 (98.3%)
+Failed: 41 (1.7%)
+Total Runtime: 4548ms (4.55s)
 
-✓ ALL TESTS PASSED!
+FAILURE BREAKDOWN:
+--------------------------------------------------------------------------------
+  pattern_coverage: 41 failure(s)
+
+FAILED COMBINATIONS:
+--------------------------------------------------------------------------------
+
+  Combination: minimalist / wrists / 30-45 / bodybuilding
+    ✗ [pattern_coverage] weekly plan has zero 'vertical_push' pattern exercises despite the constrained pool having 2 eligible candidate(s)
+
+  Combination: minimalist / wrists / 30-45 / bodybuilding
+    ✗ [pattern_coverage] weekly plan has zero 'vertical_push' pattern exercises despite the constrained pool having 2 eligible candidate(s)
+
+  Combination: minimalist / wrists / 45-60 / bodybuilding
+    ✗ [pattern_coverage] weekly plan has zero 'vertical_push' pattern exercises despite the constrained pool having 2 eligible candidate(s)
+
+  Combination: minimalist / wrists / 45-60 / bodybuilding
+    ✗ [pattern_coverage] weekly plan has zero 'vertical_push' pattern exercises despite the constrained pool having 2 eligible candidate(s)
+
+  Combination: minimalist / wrists / 60-90 / bodybuilding
+    ✗ [pattern_coverage] weekly plan has zero 'vertical_push' pattern exercises despite the constrained pool having 2 eligible candidate(s)
+
+  Combination: minimalist / wrists / 60-90 / bodybuilding
+    ✗ [pattern_coverage] weekly plan has zero 'vertical_push' pattern exercises despite the constrained pool having 2 eligible candidate(s)
+
+  Combination: minimalist / wrists / 90+ / bodybuilding
+    ✗ [pattern_coverage] weekly plan has zero 'vertical_push' pattern exercises despite the constrained pool having 2 eligible candidate(s)
+
+  Combination: minimalist / wrists / 90+ / bodybuilding
+    ✗ [pattern_coverage] weekly plan has zero 'vertical_push' pattern exercises despite the constrained pool having 2 eligible candidate(s)
+
+  Combination: bodyweight / none / 30-45 / bodybuilding
+    ✗ [pattern_coverage] weekly plan has zero 'vertical_pull' pattern exercises despite the constrained pool having 1 eligible candidate(s)
+
+  Combination: bodyweight / none / 30-45 / bodybuilding
+    ✗ [pattern_coverage] weekly plan has zero 'vertical_pull' pattern exercises despite the constrained pool having 1 eligible candidate(s)
+
+  Combination: bodyweight / none / 45-60 / bodybuilding
+    ✗ [pattern_coverage] weekly plan has zero 'vertical_pull' pattern exercises despite the constrained pool having 1 eligible candidate(s)
+
+  Combination: bodyweight / lower_back / 30-45 / bodybuilding
+    ✗ [pattern_coverage] weekly plan has zero 'vertical_pull' pattern exercises despite the constrained pool having 1 eligible candidate(s)
+
+  Combination: bodyweight / lower_back / 30-45 / bodybuilding
+    ✗ [pattern_coverage] weekly plan has zero 'vertical_pull' pattern exercises despite the constrained pool having 1 eligible candidate(s)
+
+  Combination: bodyweight / lower_back / 45-60 / bodybuilding
+    ✗ [pattern_coverage] weekly plan has zero 'vertical_pull' pattern exercises despite the constrained pool having 1 eligible candidate(s)
+
+  Combination: bodyweight / knees / 30-45 / bodybuilding
+    ✗ [pattern_coverage] weekly plan has zero 'horizontal_push' pattern exercises despite the constrained pool having 2 eligible candidate(s)
+
+  Combination: bodyweight / knees / 30-45 / hybrid
+    ✗ [pattern_coverage] weekly plan has zero 'horizontal_push' pattern exercises despite the constrained pool having 2 eligible candidate(s)
+
+  Combination: bodyweight / knees / 30-45 / hybrid
+    ✗ [pattern_coverage] weekly plan has zero 'horizontal_push' pattern exercises despite the constrained pool having 3 eligible candidate(s)
+
+  Combination: bodyweight / knees / 45-60 / bodybuilding
+    ✗ [pattern_coverage] weekly plan has zero 'horizontal_push' pattern exercises despite the constrained pool having 2 eligible candidate(s)
+
+  Combination: bodyweight / knees / 45-60 / hybrid
+    ✗ [pattern_coverage] weekly plan has zero 'horizontal_push' pattern exercises despite the constrained pool having 2 eligible candidate(s)
+
+  Combination: bodyweight / knees / 45-60 / hybrid
+    ✗ [pattern_coverage] weekly plan has zero 'horizontal_push' pattern exercises despite the constrained pool having 3 eligible candidate(s)
+
+  Combination: bodyweight / knees / 60-90 / bodybuilding
+    ✗ [pattern_coverage] weekly plan has zero 'horizontal_push' pattern exercises despite the constrained pool having 2 eligible candidate(s)
+
+  Combination: bodyweight / knees / 60-90 / hybrid
+    ✗ [pattern_coverage] weekly plan has zero 'horizontal_push' pattern exercises despite the constrained pool having 2 eligible candidate(s)
+
+  Combination: bodyweight / knees / 60-90 / hybrid
+    ✗ [pattern_coverage] weekly plan has zero 'horizontal_push' pattern exercises despite the constrained pool having 3 eligible candidate(s)
+
+  Combination: bodyweight / knees / 90+ / bodybuilding
+    ✗ [pattern_coverage] weekly plan has zero 'horizontal_push' pattern exercises despite the constrained pool having 2 eligible candidate(s)
+
+  Combination: bodyweight / knees / 90+ / hybrid
+    ✗ [pattern_coverage] weekly plan has zero 'horizontal_push' pattern exercises despite the constrained pool having 2 eligible candidate(s)
+
+  Combination: bodyweight / knees / 90+ / hybrid
+    ✗ [pattern_coverage] weekly plan has zero 'horizontal_push' pattern exercises despite the constrained pool having 3 eligible candidate(s)
+
+  Combination: bodyweight / neck / 30-45 / bodybuilding
+    ✗ [pattern_coverage] weekly plan has zero 'vertical_pull' pattern exercises despite the constrained pool having 1 eligible candidate(s)
+
+  Combination: bodyweight / neck / 30-45 / bodybuilding
+    ✗ [pattern_coverage] weekly plan has zero 'vertical_pull' pattern exercises despite the constrained pool having 1 eligible candidate(s)
+
+  Combination: bodyweight / neck / 45-60 / bodybuilding
+    ✗ [pattern_coverage] weekly plan has zero 'vertical_pull' pattern exercises despite the constrained pool having 1 eligible candidate(s)
+
+  Combination: bodyweight / lower_back+knees / 30-45 / bodybuilding
+    ✗ [pattern_coverage] weekly plan has zero 'horizontal_push' pattern exercises despite the constrained pool having 2 eligible candidate(s)
+
+  Combination: bodyweight / lower_back+knees / 30-45 / hybrid
+    ✗ [pattern_coverage] weekly plan has zero 'horizontal_push' pattern exercises despite the constrained pool having 2 eligible candidate(s)
+
+  Combination: bodyweight / lower_back+knees / 30-45 / hybrid
+    ✗ [pattern_coverage] weekly plan has zero 'horizontal_push' pattern exercises despite the constrained pool having 3 eligible candidate(s)
+
+  Combination: bodyweight / lower_back+knees / 45-60 / bodybuilding
+    ✗ [pattern_coverage] weekly plan has zero 'horizontal_push' pattern exercises despite the constrained pool having 2 eligible candidate(s)
+
+  Combination: bodyweight / lower_back+knees / 45-60 / hybrid
+    ✗ [pattern_coverage] weekly plan has zero 'horizontal_push' pattern exercises despite the constrained pool having 2 eligible candidate(s)
+
+  Combination: bodyweight / lower_back+knees / 45-60 / hybrid
+    ✗ [pattern_coverage] weekly plan has zero 'horizontal_push' pattern exercises despite the constrained pool having 3 eligible candidate(s)
+
+  Combination: bodyweight / lower_back+knees / 60-90 / bodybuilding
+    ✗ [pattern_coverage] weekly plan has zero 'horizontal_push' pattern exercises despite the constrained pool having 2 eligible candidate(s)
+
+  Combination: bodyweight / lower_back+knees / 60-90 / hybrid
+    ✗ [pattern_coverage] weekly plan has zero 'horizontal_push' pattern exercises despite the constrained pool having 2 eligible candidate(s)
+
+  Combination: bodyweight / lower_back+knees / 60-90 / hybrid
+    ✗ [pattern_coverage] weekly plan has zero 'horizontal_push' pattern exercises despite the constrained pool having 3 eligible candidate(s)
+
+  Combination: bodyweight / lower_back+knees / 90+ / bodybuilding
+    ✗ [pattern_coverage] weekly plan has zero 'horizontal_push' pattern exercises despite the constrained pool having 2 eligible candidate(s)
+
+  Combination: bodyweight / lower_back+knees / 90+ / hybrid
+    ✗ [pattern_coverage] weekly plan has zero 'horizontal_push' pattern exercises despite the constrained pool having 2 eligible candidate(s)
+
+  Combination: bodyweight / lower_back+knees / 90+ / hybrid
+    ✗ [pattern_coverage] weekly plan has zero 'horizontal_push' pattern exercises despite the constrained pool having 3 eligible candidate(s)
 
 STATISTICS:
 --------------------------------------------------------------------------------
-  Avg exercises per plan: 23.5
+  Avg exercises per plan: 23.3
   Min exercises: 0
   Max exercises: 576
-  Avg session duration: 46min
-  Max session duration: 100min
+  Avg session duration: 45min
+  Max session duration: 93min
 
 ================================================================================
 
@@ -28,179 +156,175 @@ phases: Anatomical Adaptation -> Hypertrophy -> Maximal Strength
 block 1 coach note: Higher reps, lighter loads, shorter rest. This phase prepares tendons and ligaments, which adapt more slowly than muscle. Do not rush it. Volume drives growth here — the program is built around moderate-rep working sets taken close to failure, with load climbing week to week within each block. Calibration week — loads are deliberately conservative while you find your real working weight; the block's real ramp starts next week.
   week_in_block 1 (loading):
     tier_0_primer    Kettlebell Swings            sets=2 reps=8        load=Light
-    tier_1_primary   Overhead Press               sets=3 reps=9-13     load=32.5kg
-    tier_2_secondary Dumbbell Bench Press         sets=3 reps=11-15    load=24kg
+    tier_1_primary   Barbell Bench Press          sets=3 reps=9-13     load=47.5kg
+    tier_2_secondary Arnold Press                 sets=3 reps=11-15    load=16kg
     tier_2_secondary Chest Dips                   sets=3 reps=11-15    load=Bodyweight
     tier_2_secondary Push-Ups                     sets=3 reps=11-15    load=Bodyweight
     tier_2_secondary Hanging Leg Raises           sets=3 reps=11-15    load=Bodyweight
-    tier_3_isolation Lateral Raises               sets=3 reps=15-18    load=6kg
-    tier_3_isolation Side Plank                   sets=3 reps=33-48s   load=Bodyweight
     tier_3_isolation Overhead Tricep Extension    sets=3 reps=15-18    load=18kg
+    tier_3_isolation Dumbbell Shrugs              sets=3 reps=15-18    load=24kg
+    tier_3_isolation Plank                        sets=3 reps=33-48s   load=Bodyweight
   week_in_block 2 (loading):
     tier_0_primer    Kettlebell Swings            sets=2 reps=8        load=Light
-    tier_1_primary   Overhead Press               sets=3 reps=9-13     load=35kg
-    tier_2_secondary Dumbbell Bench Press         sets=3 reps=11-15    load=26kg
+    tier_1_primary   Barbell Bench Press          sets=3 reps=9-13     load=50kg
+    tier_2_secondary Arnold Press                 sets=3 reps=12-16    load=16kg
     tier_2_secondary Chest Dips                   sets=3 reps=12-16    load=Bodyweight
     tier_2_secondary Push-Ups                     sets=3 reps=12-16    load=Bodyweight
     tier_2_secondary Hanging Leg Raises           sets=3 reps=12-16    load=Bodyweight
-    tier_3_isolation Lateral Raises               sets=3 reps=16-19    load=6kg
-    tier_3_isolation Side Plank                   sets=3 reps=34-49s   load=Bodyweight
     tier_3_isolation Overhead Tricep Extension    sets=3 reps=15-18    load=20kg
+    tier_3_isolation Dumbbell Shrugs              sets=3 reps=15-18    load=26kg
+    tier_3_isolation Plank                        sets=3 reps=34-49s   load=Bodyweight
   week_in_block 3 (loading):
     tier_0_primer    Kettlebell Swings            sets=2 reps=8        load=Light
-    tier_1_primary   Overhead Press               sets=3 reps=9-13     load=37.5kg
-    tier_2_secondary Incline Dumbbell Press       sets=3 reps=11-15    load=28kg
+    tier_1_primary   Barbell Bench Press          sets=3 reps=9-13     load=52.5kg
+    tier_2_secondary Dumbbell Shoulder Press      sets=3 reps=13-17    load=16kg
     tier_2_secondary Chest Dips                   sets=3 reps=13-17    load=Bodyweight
     tier_2_secondary Push-Ups                     sets=3 reps=13-17    load=Bodyweight
     tier_2_secondary Hanging Leg Raises           sets=3 reps=13-17    load=Bodyweight
-    tier_3_isolation Cable Lateral Raises         sets=3 reps=17-20    load=5kg
-    tier_3_isolation Side Plank                   sets=3 reps=35-50s   load=Bodyweight
     tier_3_isolation Skull Crushers               sets=3 reps=17-20    load=17.5kg
+    tier_3_isolation Shrugs                       sets=3 reps=15-18    load=24kg
+    tier_3_isolation Plank                        sets=3 reps=35-50s   load=Bodyweight
   week_in_block 4 (deload):
     tier_0_primer    Kettlebell Swings            sets=2 reps=10       load=Light
-    tier_1_primary   Overhead Press               sets=2 reps=11-15    load=27.5kg
-    tier_2_secondary Incline Dumbbell Press       sets=2 reps=13-17    load=20kg
+    tier_1_primary   Barbell Bench Press          sets=2 reps=11-15    load=37.5kg
+    tier_2_secondary Dumbbell Shoulder Press      sets=2 reps=13-17    load=12kg
     tier_2_secondary Chest Dips                   sets=2 reps=13-17    load=Bodyweight
     tier_2_secondary Push-Ups                     sets=2 reps=13-17    load=Bodyweight
     tier_2_secondary Hanging Leg Raises           sets=2 reps=13-17    load=Bodyweight
-    tier_3_isolation Cable Lateral Raises         sets=2 reps=13-16    load=5kg
-    tier_3_isolation Side Plank                   sets=2 reps=35-50s   load=Bodyweight
     tier_3_isolation Skull Crushers               sets=2 reps=17-20    load=12.5kg
+    tier_3_isolation Shrugs                       sets=2 reps=17-20    load=16kg
+    tier_3_isolation Plank                        sets=2 reps=35-50s   load=Bodyweight
 
 --- fat_loss ---
 phases: Anatomical Adaptation -> Hypertrophy -> Metabolic Conditioning
 block 1 coach note: Higher reps, lighter loads, shorter rest. This phase prepares tendons and ligaments, which adapt more slowly than muscle. Do not rush it. Diet drives the fat loss here, not the workout — this program is built to protect the muscle you already have while you're in a deficit. Weights stay real weights and progression keeps climbing; conditioning is appended on top, never substituted for lifting. Calibration week — loads are deliberately conservative while you find your real working weight; the block's real ramp starts next week.
   week_in_block 1 (loading):
-    tier_0_primer    Kettlebell Swings            sets=2 reps=8        load=Light
-    tier_1_primary   Overhead Press               sets=3 reps=9-13     load=32.5kg
-    tier_2_secondary Incline Machine Press        sets=3 reps=11-15    load=47.5kg
-    tier_2_secondary Hanging Leg Raises           sets=3 reps=11-15    load=Bodyweight
+    tier_0_primer    Plyo Push-Ups                sets=2 reps=8        load=Light
+    tier_1_primary   Barbell Bench Press          sets=3 reps=9-13     load=47.5kg
+    tier_2_secondary Arnold Press                 sets=3 reps=11-15    load=16kg
     tier_2_secondary Chest Dips                   sets=3 reps=11-15    load=Bodyweight
-    tier_2_secondary Push-Ups                     sets=3 reps=11-15    load=Bodyweight
-    tier_3_isolation Skull Crushers               sets=3 reps=15-18    load=20kg
-    tier_3_isolation Plank                        sets=3 reps=33-48s   load=Bodyweight
+    tier_2_secondary Hanging Leg Raises           sets=3 reps=11-15    load=Bodyweight
+    tier_2_secondary Ab Wheel Rollout             sets=3 reps=11-15    load=Bodyweight
+    tier_3_isolation Overhead Tricep Extension    sets=3 reps=15-18    load=18kg
     tier_3_isolation Lateral Raises               sets=3 reps=15-18    load=6kg
+    tier_3_isolation Cable Woodchops              sets=3 reps=15-18    load=22.5kg
   week_in_block 2 (loading):
-    tier_0_primer    Kettlebell Swings            sets=2 reps=8        load=Light
-    tier_1_primary   Overhead Press               sets=3 reps=9-13     load=35kg
-    tier_2_secondary Incline Machine Press        sets=3 reps=11-15    load=50kg
-    tier_2_secondary Hanging Leg Raises           sets=3 reps=12-16    load=Bodyweight
+    tier_0_primer    Plyo Push-Ups                sets=2 reps=8        load=Light
+    tier_1_primary   Barbell Bench Press          sets=3 reps=9-13     load=50kg
+    tier_2_secondary Arnold Press                 sets=3 reps=12-16    load=16kg
     tier_2_secondary Chest Dips                   sets=3 reps=12-16    load=Bodyweight
-    tier_2_secondary Push-Ups                     sets=3 reps=12-16    load=Bodyweight
-    tier_3_isolation Skull Crushers               sets=3 reps=16-19    load=20kg
-    tier_3_isolation Plank                        sets=3 reps=34-49s   load=Bodyweight
+    tier_2_secondary Hanging Leg Raises           sets=3 reps=12-16    load=Bodyweight
+    tier_2_secondary Ab Wheel Rollout             sets=3 reps=12-16    load=Bodyweight
+    tier_3_isolation Overhead Tricep Extension    sets=3 reps=15-18    load=20kg
     tier_3_isolation Lateral Raises               sets=3 reps=16-19    load=6kg
+    tier_3_isolation Cable Woodchops              sets=3 reps=15-18    load=25kg
   week_in_block 3 (loading):
-    tier_0_primer    Kettlebell Swings            sets=2 reps=8        load=Light
-    tier_1_primary   Overhead Press               sets=3 reps=9-13     load=37.5kg
-    tier_2_secondary Dumbbell Bench Press         sets=3 reps=11-15    load=56kg
-    tier_2_secondary Hanging Leg Raises           sets=3 reps=13-17    load=Bodyweight
+    tier_0_primer    Plyo Push-Ups                sets=2 reps=8        load=Light
+    tier_1_primary   Barbell Bench Press          sets=3 reps=9-13     load=52.5kg
+    tier_2_secondary Dumbbell Shoulder Press      sets=3 reps=13-17    load=16kg
     tier_2_secondary Chest Dips                   sets=3 reps=13-17    load=Bodyweight
-    tier_2_secondary Push-Ups                     sets=3 reps=13-17    load=Bodyweight
-    tier_3_isolation Tricep Pushdowns             sets=3 reps=17-20    load=20kg
-    tier_3_isolation Plank                        sets=3 reps=35-50s   load=Bodyweight
+    tier_2_secondary Hanging Leg Raises           sets=3 reps=13-17    load=Bodyweight
+    tier_2_secondary Ab Wheel Rollout             sets=3 reps=13-17    load=Bodyweight
+    tier_3_isolation Skull Crushers               sets=3 reps=17-20    load=17.5kg
     tier_3_isolation Cable Lateral Raises         sets=3 reps=17-20    load=5kg
+    tier_3_isolation Cable Woodchops              sets=3 reps=15-18    load=27.5kg
   week_in_block 4 (deload):
-    tier_0_primer    Kettlebell Swings            sets=2 reps=10       load=Light
-    tier_1_primary   Overhead Press               sets=2 reps=11-15    load=27.5kg
-    tier_2_secondary Dumbbell Bench Press         sets=2 reps=13-17    load=40kg
-    tier_2_secondary Hanging Leg Raises           sets=2 reps=13-17    load=Bodyweight
+    tier_0_primer    Plyo Push-Ups                sets=2 reps=10       load=Light
+    tier_1_primary   Barbell Bench Press          sets=2 reps=11-15    load=37.5kg
+    tier_2_secondary Dumbbell Shoulder Press      sets=2 reps=13-17    load=12kg
     tier_2_secondary Chest Dips                   sets=2 reps=13-17    load=Bodyweight
-    tier_2_secondary Push-Ups                     sets=2 reps=13-17    load=Bodyweight
-    tier_3_isolation Tricep Pushdowns             sets=2 reps=17-20    load=15kg
-    tier_3_isolation Plank                        sets=2 reps=35-50s   load=Bodyweight
+    tier_2_secondary Hanging Leg Raises           sets=2 reps=13-17    load=Bodyweight
+    tier_2_secondary Ab Wheel Rollout             sets=2 reps=13-17    load=Bodyweight
+    tier_3_isolation Skull Crushers               sets=2 reps=17-20    load=12.5kg
     tier_3_isolation Cable Lateral Raises         sets=2 reps=13-16    load=5kg
+    tier_3_isolation Cable Woodchops              sets=2 reps=17-20    load=20kg
 
 --- conditioning ---
 phases: Anatomical Adaptation -> Metabolic Conditioning -> Hypertrophy
 block 1 coach note: Higher reps, lighter loads, shorter rest. This phase prepares tendons and ligaments, which adapt more slowly than muscle. Do not rush it. Lifting supports the engine work here, not the other way around — two to three full-body sessions keep you strong enough to train hard, while dedicated conditioning is the main driver of this goal. Calibration week — loads are deliberately conservative while you find your real working weight; the block's real ramp starts next week.
   week_in_block 1 (loading):
-    tier_0_primer    Bodyweight Squat Marches     sets=2 reps=8        load=Light
+    tier_0_primer    Broad Jumps                  sets=2 reps=8        load=Light
     tier_1_primary   Barbell Bench Press          sets=3 reps=9-13     load=47.5kg
-    tier_2_secondary Ab Wheel Rollout             sets=3 reps=11-15    load=Bodyweight
-    tier_2_secondary Push-Ups                     sets=3 reps=11-15    load=Bodyweight
-    tier_2_secondary Hanging Leg Raises           sets=3 reps=11-15    load=Bodyweight
-    tier_2_secondary Chest Dips                   sets=3 reps=11-15    load=Bodyweight
     tier_2_secondary Dumbbell Shoulder Press      sets=3 reps=11-15    load=16kg
-    tier_3_isolation Tricep Pushdowns             sets=3 reps=15-18    load=20kg
-    tier_3_isolation Dumbbell Shrugs              sets=3 reps=15-18    load=12kg
-    tier_3_isolation Lateral Raises               sets=3 reps=15-18    load=6kg
+    tier_2_secondary Chest Dips                   sets=3 reps=11-15    load=Bodyweight
+    tier_2_secondary Hanging Leg Raises           sets=3 reps=11-15    load=Bodyweight
+    tier_2_secondary Push-Ups                     sets=3 reps=11-15    load=Bodyweight
+    tier_3_isolation Overhead Tricep Extension    sets=3 reps=15-18    load=18kg
+    tier_3_isolation Cable Lateral Raises         sets=3 reps=15-18    load=12.5kg
+    tier_3_isolation Side Plank                   sets=3 reps=33-48s   load=Bodyweight
   week_in_block 2 (loading):
-    tier_0_primer    Bodyweight Squat Marches     sets=2 reps=9        load=Light
+    tier_0_primer    Broad Jumps                  sets=2 reps=9        load=Light
     tier_1_primary   Barbell Bench Press          sets=3 reps=9-13     load=50kg
-    tier_2_secondary Ab Wheel Rollout             sets=3 reps=12-16    load=Bodyweight
-    tier_2_secondary Push-Ups                     sets=3 reps=12-16    load=Bodyweight
-    tier_2_secondary Hanging Leg Raises           sets=3 reps=12-16    load=Bodyweight
-    tier_2_secondary Chest Dips                   sets=3 reps=12-16    load=Bodyweight
     tier_2_secondary Dumbbell Shoulder Press      sets=3 reps=12-16    load=16kg
-    tier_3_isolation Tricep Pushdowns             sets=3 reps=16-19    load=20kg
-    tier_3_isolation Dumbbell Shrugs              sets=3 reps=16-19    load=12kg
-    tier_3_isolation Lateral Raises               sets=3 reps=16-19    load=6kg
+    tier_2_secondary Chest Dips                   sets=3 reps=12-16    load=Bodyweight
+    tier_2_secondary Hanging Leg Raises           sets=3 reps=12-16    load=Bodyweight
+    tier_2_secondary Push-Ups                     sets=3 reps=12-16    load=Bodyweight
+    tier_3_isolation Overhead Tricep Extension    sets=3 reps=16-19    load=18kg
+    tier_3_isolation Cable Lateral Raises         sets=3 reps=16-19    load=12.5kg
+    tier_3_isolation Side Plank                   sets=3 reps=34-49s   load=Bodyweight
   week_in_block 3 (loading):
-    tier_0_primer    Bodyweight Squat Marches     sets=2 reps=10       load=Light
+    tier_0_primer    Broad Jumps                  sets=2 reps=10       load=Light
     tier_1_primary   Barbell Bench Press          sets=3 reps=9-13     load=52.5kg
-    tier_2_secondary Ab Wheel Rollout             sets=3 reps=13-17    load=Bodyweight
-    tier_2_secondary Push-Ups                     sets=3 reps=13-17    load=Bodyweight
-    tier_2_secondary Hanging Leg Raises           sets=3 reps=13-17    load=Bodyweight
-    tier_2_secondary Chest Dips                   sets=3 reps=13-17    load=Bodyweight
     tier_2_secondary Arnold Press                 sets=3 reps=13-17    load=16kg
-    tier_3_isolation Overhead Tricep Extension    sets=3 reps=17-20    load=20kg
-    tier_3_isolation Shrugs                       sets=3 reps=17-20    load=10kg
-    tier_3_isolation Cable Lateral Raises         sets=3 reps=17-20    load=5kg
+    tier_2_secondary Chest Dips                   sets=3 reps=13-17    load=Bodyweight
+    tier_2_secondary Hanging Leg Raises           sets=3 reps=13-17    load=Bodyweight
+    tier_2_secondary Push-Ups                     sets=3 reps=13-17    load=Bodyweight
+    tier_3_isolation Skull Crushers               sets=3 reps=17-20    load=17.5kg
+    tier_3_isolation Lateral Raises               sets=3 reps=17-20    load=10kg
+    tier_3_isolation Side Plank                   sets=3 reps=35-50s   load=Bodyweight
   week_in_block 4 (deload):
-    tier_0_primer    Bodyweight Squat Marches     sets=2 reps=10       load=Light
+    tier_0_primer    Broad Jumps                  sets=2 reps=10       load=Light
     tier_1_primary   Barbell Bench Press          sets=2 reps=11-15    load=37.5kg
-    tier_2_secondary Ab Wheel Rollout             sets=2 reps=13-17    load=Bodyweight
-    tier_2_secondary Push-Ups                     sets=2 reps=13-17    load=Bodyweight
-    tier_2_secondary Hanging Leg Raises           sets=2 reps=13-17    load=Bodyweight
-    tier_2_secondary Chest Dips                   sets=2 reps=13-17    load=Bodyweight
     tier_2_secondary Arnold Press                 sets=2 reps=13-17    load=12kg
-    tier_3_isolation Overhead Tricep Extension    sets=2 reps=17-20    load=14kg
-    tier_3_isolation Shrugs                       sets=2 reps=17-20    load=10kg
-    tier_3_isolation Cable Lateral Raises         sets=2 reps=13-16    load=5kg
+    tier_2_secondary Chest Dips                   sets=2 reps=13-17    load=Bodyweight
+    tier_2_secondary Hanging Leg Raises           sets=2 reps=13-17    load=Bodyweight
+    tier_2_secondary Push-Ups                     sets=2 reps=13-17    load=Bodyweight
+    tier_3_isolation Skull Crushers               sets=2 reps=17-20    load=12.5kg
+    tier_3_isolation Lateral Raises               sets=2 reps=17-20    load=8kg
+    tier_3_isolation Side Plank                   sets=2 reps=35-50s   load=Bodyweight
 
 --- functional ---
 phases: Anatomical Adaptation -> Hypertrophy -> Maximal Strength -> Power & Expression
 block 1 coach note: Higher reps, lighter loads, shorter rest. This phase prepares tendons and ligaments, which adapt more slowly than muscle. Do not rush it. This program favors variety and movement quality over chasing a number on the bar — exercises rotate faster, and the aim is consistent, sustainable training rather than maximal overload. Calibration week — loads are deliberately conservative while you find your real working weight; the block's real ramp starts next week.
   week_in_block 1 (loading):
     tier_0_primer    Band Pull-Aparts             sets=2 reps=8        load=Light
-    tier_1_primary   Overhead Press               sets=3 reps=9-13     load=32.5kg
-    tier_2_secondary Push-Ups                     sets=3 reps=11-15    load=Bodyweight
-    tier_2_secondary Incline Machine Press        sets=3 reps=11-15    load=47.5kg
+    tier_1_primary   Barbell Bench Press          sets=3 reps=9-13     load=47.5kg
+    tier_2_secondary Dumbbell Shoulder Press      sets=3 reps=11-15    load=16kg
     tier_2_secondary Chest Dips                   sets=3 reps=11-15    load=Bodyweight
+    tier_2_secondary Push-Ups                     sets=3 reps=11-15    load=Bodyweight
     tier_2_secondary Hanging Leg Raises           sets=3 reps=11-15    load=Bodyweight
-    tier_3_isolation Cable Woodchops              sets=3 reps=15-18    load=22.5kg
-    tier_3_isolation Overhead Tricep Extension    sets=3 reps=15-18    load=18kg
-    tier_3_isolation Shrugs                       sets=3 reps=15-18    load=18kg
+    tier_3_isolation Tricep Pushdowns             sets=3 reps=15-18    load=20kg
+    tier_3_isolation Dumbbell Shrugs              sets=3 reps=15-18    load=24kg
+    tier_3_isolation Side Plank                   sets=3 reps=33-48s   load=Bodyweight
   week_in_block 2 (loading):
     tier_0_primer    Band Pull-Aparts             sets=2 reps=9        load=Light
-    tier_1_primary   Overhead Press               sets=3 reps=9-13     load=35kg
-    tier_2_secondary Push-Ups                     sets=3 reps=12-16    load=Bodyweight
-    tier_2_secondary Dumbbell Bench Press         sets=3 reps=12-16    load=48kg
+    tier_1_primary   Barbell Bench Press          sets=3 reps=9-13     load=50kg
+    tier_2_secondary Arnold Press                 sets=3 reps=12-16    load=16kg
     tier_2_secondary Chest Dips                   sets=3 reps=12-16    load=Bodyweight
+    tier_2_secondary Push-Ups                     sets=3 reps=12-16    load=Bodyweight
     tier_2_secondary Hanging Leg Raises           sets=3 reps=12-16    load=Bodyweight
-    tier_3_isolation Cable Woodchops              sets=3 reps=16-19    load=22.5kg
-    tier_3_isolation Skull Crushers               sets=3 reps=16-19    load=17.5kg
-    tier_3_isolation Dumbbell Shrugs              sets=3 reps=16-19    load=20kg
+    tier_3_isolation Overhead Tricep Extension    sets=3 reps=16-19    load=20kg
+    tier_3_isolation Shrugs                       sets=3 reps=16-19    load=24kg
+    tier_3_isolation Side Plank                   sets=3 reps=34-49s   load=Bodyweight
   week_in_block 3 (loading):
     tier_0_primer    Band Pull-Aparts             sets=2 reps=10       load=Light
-    tier_1_primary   Overhead Press               sets=3 reps=9-13     load=37.5kg
-    tier_2_secondary Push-Ups                     sets=3 reps=13-17    load=Bodyweight
-    tier_2_secondary Incline Dumbbell Press       sets=3 reps=13-17    load=48kg
+    tier_1_primary   Barbell Bench Press          sets=3 reps=9-13     load=52.5kg
+    tier_2_secondary Dumbbell Shoulder Press      sets=3 reps=13-17    load=16kg
     tier_2_secondary Chest Dips                   sets=3 reps=13-17    load=Bodyweight
+    tier_2_secondary Push-Ups                     sets=3 reps=13-17    load=Bodyweight
     tier_2_secondary Hanging Leg Raises           sets=3 reps=13-17    load=Bodyweight
-    tier_3_isolation Cable Woodchops              sets=3 reps=17-20    load=22.5kg
-    tier_3_isolation Tricep Pushdowns             sets=3 reps=17-20    load=17.5kg
-    tier_3_isolation Shrugs                       sets=3 reps=17-20    load=20kg
+    tier_3_isolation Skull Crushers               sets=3 reps=17-20    load=20kg
+    tier_3_isolation Dumbbell Shrugs              sets=3 reps=17-20    load=24kg
+    tier_3_isolation Side Plank                   sets=3 reps=35-50s   load=Bodyweight
   week_in_block 4 (deload):
     tier_0_primer    Band Pull-Aparts             sets=2 reps=10       load=Light
-    tier_1_primary   Overhead Press               sets=2 reps=11-15    load=27.5kg
-    tier_2_secondary Push-Ups                     sets=2 reps=13-17    load=Bodyweight
-    tier_2_secondary Incline Machine Press        sets=2 reps=13-17    load=32.5kg
+    tier_1_primary   Barbell Bench Press          sets=2 reps=11-15    load=37.5kg
+    tier_2_secondary Arnold Press                 sets=2 reps=13-17    load=12kg
     tier_2_secondary Chest Dips                   sets=2 reps=13-17    load=Bodyweight
+    tier_2_secondary Push-Ups                     sets=2 reps=13-17    load=Bodyweight
     tier_2_secondary Hanging Leg Raises           sets=2 reps=13-17    load=Bodyweight
-    tier_3_isolation Cable Woodchops              sets=2 reps=17-20    load=15kg
-    tier_3_isolation Overhead Tricep Extension    sets=2 reps=17-20    load=12kg
-    tier_3_isolation Dumbbell Shrugs              sets=2 reps=17-20    load=16kg
+    tier_3_isolation Tricep Pushdowns             sets=2 reps=17-20    load=15kg
+    tier_3_isolation Shrugs                       sets=2 reps=17-20    load=16kg
+    tier_3_isolation Side Plank                   sets=2 reps=35-50s   load=Bodyweight
 
 ================================================================================

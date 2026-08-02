@@ -2,10 +2,10 @@ import { generateExercisePlan, generateMesocycle, getConstrainedPool } from './e
 import { EXERCISE_DATABASE, meetsCapabilityRequirement } from './exercise-db'
 import type {
   UserProfile, EquipmentAccess, TrainingStyle, SessionDuration,
-  WorkoutDay, ConstraintTrace, PlanResult, TrainingExperience, RecoveryCapacity,
+  WorkoutDay, ConstraintTrace, PlanResult, TrainingExperience, RecoveryCapacity, FitnessGoal,
 } from './types'
 import { getSkillDemand, isSkillAppropriate } from './experience-config'
-import { categorize, isImprovisedCarry, IMPROVISED_CARRY_CEILING_KG } from './load-prescription'
+import { categorize, isImprovisedCarry, IMPROVISED_CARRY_CEILING_KG, estimateEffectiveTotalKg, isExternallyLoaded } from './load-prescription'
 
 // A genuine outer-bound safety backstop — not a conservatism patch (the
 // capability-model round replaced the old CATEGORY_CAPS_KG, which existed to
@@ -387,6 +387,71 @@ function runSingleAudit(
     }
   }
 
+  // CHECK 7c: weekly pattern-coverage guarantees (Final Generator round,
+  // Fix 1) — squat, hinge, horizontal/vertical push, horizontal/vertical
+  // pull each appear at least once across the week's plan, UNLESS the
+  // constrained pool for this combo genuinely has none of that pattern
+  // (equipment/injury exclusion — nothing to guarantee in that case). Plus
+  // legs (squat or hinge, non-isolation role) on >=2 days for 4+ day
+  // splits. Mirrors classifyForCoverage/enforceWeeklyPatternBalance in
+  // exercise-plan.ts; duplicated here rather than exported since this file
+  // already keeps its own copies of similar engine internals (see
+  // EQUIPMENT_SETS above) for audit independence.
+  {
+    type CoveragePattern = 'squat' | 'hinge' | 'horizontal_push' | 'vertical_push' | 'horizontal_pull' | 'vertical_pull'
+    const classifyForCoverage = (pattern: string): CoveragePattern | null => {
+      switch (pattern) {
+        case 'horizontal_push': return 'horizontal_push'
+        case 'vertical_push': return 'vertical_push'
+        case 'horizontal_pull': return 'horizontal_pull'
+        case 'vertical_pull': return 'vertical_pull'
+        case 'knee_dominant': case 'single_leg': return 'squat'
+        case 'hip_hinge': return 'hinge'
+        default: return null
+      }
+    }
+    const pool = getConstrainedPool(profile, [])
+    const present = new Set<CoveragePattern>()
+    for (const ex of allExercises) {
+      const entry = EXERCISE_DATABASE.find(e => e.name === ex.name)
+      const cov = entry ? classifyForCoverage(entry.movement_pattern) : null
+      if (cov) present.add(cov)
+    }
+    const patterns: CoveragePattern[] = ['squat', 'hinge', 'horizontal_push', 'vertical_push', 'horizontal_pull', 'vertical_pull']
+    for (const p of patterns) {
+      if (present.has(p)) continue
+      const poolHasIt = pool.some(e => classifyForCoverage(e.movement_pattern) === p)
+      if (!poolHasIt) continue
+      failures.push({
+        check: 'pattern_coverage',
+        combination: comboLabel,
+        details: `weekly plan has zero '${p}' pattern exercises despite the constrained pool having ${pool.filter(e => classifyForCoverage(e.movement_pattern) === p).length} eligible candidate(s)`,
+      })
+    }
+
+    if (plan.length >= 4) {
+      const legDayCount = plan.filter(day =>
+        day.exercises.some(ex => {
+          const entry = EXERCISE_DATABASE.find(e => e.name === ex.name)
+          if (!entry) return false
+          const cov = classifyForCoverage(entry.movement_pattern)
+          return (cov === 'squat' || cov === 'hinge') && entry.mechanics_tier !== 'tier3_isolation'
+        })
+      ).length
+      const poolHasLeg = pool.some(e => {
+        const cov = classifyForCoverage(e.movement_pattern)
+        return cov === 'squat' || cov === 'hinge'
+      })
+      if (legDayCount < 2 && poolHasLeg) {
+        failures.push({
+          check: 'pattern_coverage',
+          combination: comboLabel,
+          details: `legs trained on only ${legDayCount} of ${plan.length} days (need >=2 on a 4+ day split) despite squat/hinge candidates existing in the constrained pool`,
+        })
+      }
+    }
+  }
+
   // CHECK 8: No superset pairs two main compound lifts (Part 3). Groups
   // exercises by their superset_label letter (A1/A2, B1/B2, ...) and flags
   // any pair where both sides are tier1/tier2 compound, non-core/carry work.
@@ -562,6 +627,40 @@ async function runMesocycleBehaviorChecks(): Promise<AuditTestCase[]> {
           exercise: mainLifts[0]!.name,
         })
       }
+
+      // CHECK: rotation relative-load guard (Final Generator round, Fix 3)
+      // — whenever an exercise's NAME changed between week 1 and week 3
+      // (block-boundary or within-block accessory rotation), and both the
+      // old and new exercise are externally loaded, the new one's effective
+      // total load must stay within the +-40% band preservesRelativeLoad
+      // enforces at generation time. This is a backstop, not the primary
+      // enforcement (rotateVariation/getSmartReplacements already filter
+      // candidates by it) — it exists to catch a regression in that
+      // enforcement, the same role CHECK 7's load_cap plays for the
+      // strength-standards formula.
+      const w1Exercises = weekDays[0]?.exercises ?? []
+      const w3Exercises = weekDays[2]?.exercises ?? []
+      for (let i = 0; i < Math.min(w1Exercises.length, w3Exercises.length); i++) {
+        const oldName = w1Exercises[i].name
+        const newName = w3Exercises[i].name
+        if (oldName === newName) continue
+        const oldEntry = EXERCISE_DATABASE.find(e => e.name === oldName)
+        const newEntry = EXERCISE_DATABASE.find(e => e.name === newName)
+        if (!oldEntry || !newEntry) continue
+        if (!isExternallyLoaded(oldEntry) || !isExternallyLoaded(newEntry)) continue
+        const oldKg = estimateEffectiveTotalKg(oldEntry, profile)
+        const newKg = estimateEffectiveTotalKg(newEntry, profile)
+        if (oldKg == null || oldKg <= 0 || newKg == null) continue
+        const ratio = newKg / oldKg
+        if (ratio < 0.6 || ratio > 1.4) {
+          failures.push({
+            check: 'rotation_relative_load',
+            combination: comboLabel,
+            details: `${day.day} rotated "${oldName}" (~${oldKg.toFixed(1)}kg) -> "${newName}" (~${newKg.toFixed(1)}kg), a ${(ratio * 100).toFixed(0)}% relative load — outside the 60-140% band`,
+            exercise: newName,
+          })
+        }
+      }
     }
 
     const allExercises = block1.flatMap(w => w.days.flatMap(d => d.exercises))
@@ -734,6 +833,53 @@ async function runMesocycleBehaviorChecks(): Promise<AuditTestCase[]> {
       passed: failures.length === 0, failures,
       planDays: 0, totalExercises: 0, estimatedDurationSec: 0,
     })
+  }
+
+  // CHECK: macrocycle phase-sequence sanity (Final Generator round, Fix 4)
+  // — across every goal x experience x equipment combination: (a)
+  // "Anatomical Adaptation" appears only as block 1, never reintroduced
+  // later; (b) no two CONSECUTIVE blocks share the same phase label. A
+  // review round repeatedly flagged "Block 3 repeats Anatomical Adaptation
+  // after a completed hypertrophy block... throws away a full mesocycle."
+  {
+    const goals: FitnessGoal[] = ['hypertrophy', 'fat_loss', 'conditioning', 'functional']
+    for (const goal of goals) {
+      for (const experience of ALL_EXPERIENCE) {
+        for (const equipment of ['full_gym', 'bodyweight'] as EquipmentAccess[]) {
+          const comboLabel = `[phase sequence] goal=${goal} experience=${experience} equipment=${equipment}`
+          const failures: AuditFailure[] = []
+          const profile = baseMesocycleProfile({ fitness_goal: goal, training_experience: experience, equipment_access: equipment })
+          const meso = generateMesocycle(profile)
+          const blockLabels: string[] = []
+          for (let block = 1; block <= 4; block++) {
+            const week = meso.find(w => w.block_number === block)
+            if (week?.phase_label) blockLabels.push(week.phase_label)
+          }
+          const aaIndices = blockLabels.map((l, i) => (l === 'Anatomical Adaptation' ? i : -1)).filter(i => i >= 0)
+          if (aaIndices.length > 1 || (aaIndices.length === 1 && aaIndices[0] !== 0)) {
+            failures.push({
+              check: 'phase_sequence',
+              combination: comboLabel,
+              details: `"Anatomical Adaptation" appears at block position(s) ${aaIndices.map(i => i + 1).join(', ')} — must appear only as block 1: [${blockLabels.join(' -> ')}]`,
+            })
+          }
+          for (let i = 1; i < blockLabels.length; i++) {
+            if (blockLabels[i] === blockLabels[i - 1]) {
+              failures.push({
+                check: 'phase_sequence',
+                combination: comboLabel,
+                details: `blocks ${i} and ${i + 1} are both "${blockLabels[i]}" — consecutive identical phases: [${blockLabels.join(' -> ')}]`,
+              })
+            }
+          }
+          cases.push({
+            equipment, injuries: [], duration: '45-60', style: 'hybrid', experience,
+            passed: failures.length === 0, failures,
+            planDays: 0, totalExercises: 0, estimatedDurationSec: 0,
+          })
+        }
+      }
+    }
   }
 
   return cases
