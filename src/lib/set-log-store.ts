@@ -20,8 +20,12 @@ import type { ExerciseSetLog } from './types'
 
 const PENDING_KEY = 'fitplan_setlog_pending_v1'
 const SESSION_REGISTRY_KEY = 'fitplan_setlog_sessions_v1'
+const DEAD_LETTER_KEY = 'fitplan_setlog_deadletter_v1'
 /** The pre-C0 offline queue (offline-sync.ts). Drained into the pending store on init so nothing a user queued before updating the app is lost. */
 const LEGACY_QUEUE_KEY = 'offline_log_queue'
+
+/** Per-item ceiling on transient-error retries before giving up and dead-lettering (defense in depth — most failures are classified permanent/immediate, this bounds the rest). */
+const MAX_SYNC_ATTEMPTS = 5
 
 export type SetUnit = 'reps' | 'seconds' | 'meters'
 
@@ -87,6 +91,30 @@ export interface SyncState {
   isOnline: boolean
   isSyncing: boolean
   queuedCount: number
+  /** Items that permanently failed to sync (or exhausted retries) and need manual attention — see DeadLetterItem. */
+  deadLetterCount: number
+}
+
+/** A pending op that will never succeed as-is (a rejected constraint, e.g. a typo'd weight) or that exhausted its retry budget — moved out of the sync queue so it can no longer block later, healthy ops (kills the poison-pill head-of-line block). */
+export interface DeadLetterItem {
+  op: PendingOp
+  reason: 'permanent' | 'max-attempts'
+  errorMessage: string
+  failedAt: string
+}
+
+/** Display-friendly summary of a dead-lettered item for the UI. */
+export interface DeadLetterSummary {
+  clientId: string
+  kind: 'upsert' | 'delete'
+  exerciseName: string
+  setNumber: number
+  date: string
+  weightKg?: number
+  repsCompleted?: number
+  reason: DeadLetterItem['reason']
+  errorMessage: string
+  failedAt: string
 }
 
 /** Maps a prescription_type to the unit a logged value is recorded in. */
@@ -148,6 +176,92 @@ function opNaturalKey(op: PendingOp): string {
     : naturalKey(op.del.userId, op.del.date, op.del.exerciseId, op.del.setNumber, op.del.isWarmup)
 }
 
+function clientIdOf(op: PendingOp): string {
+  return op.kind === 'upsert' ? op.set.clientId : op.del.clientId
+}
+
+// ---------------------------------------------------------------------------
+// Dead-letter store — items that will never sync as-is (rejected by a
+// constraint) or that exhausted their retry budget. Kept separate from the
+// pending queue so one bad item can never block the rest (the poison-pill
+// fix) and so the UI has something concrete to show the user.
+// ---------------------------------------------------------------------------
+
+function loadDeadLetter(): DeadLetterItem[] {
+  if (!hasStorage()) return []
+  try {
+    const raw = localStorage.getItem(DEAD_LETTER_KEY)
+    return raw ? JSON.parse(raw) : []
+  } catch {
+    return []
+  }
+}
+
+function saveDeadLetter(items: DeadLetterItem[]): void {
+  if (!hasStorage()) return
+  localStorage.setItem(DEAD_LETTER_KEY, JSON.stringify(items))
+}
+
+/** Removes an op from the pending queue and files it in the dead-letter store. */
+function moveToDeadLetter(op: PendingOp, error: unknown, reason: DeadLetterItem['reason']): void {
+  const errorMessage = (error as { message?: string } | null)?.message ?? String(error)
+  const item: DeadLetterItem = { op, reason, errorMessage, failedAt: new Date().toISOString() }
+  saveDeadLetter([...loadDeadLetter(), item])
+  const clientId = clientIdOf(op)
+  savePending(loadPending().filter(o => clientIdOf(o) !== clientId))
+}
+
+function summarize(item: DeadLetterItem): DeadLetterSummary {
+  const base = { reason: item.reason, errorMessage: item.errorMessage, failedAt: item.failedAt }
+  if (item.op.kind === 'upsert') {
+    const s = item.op.set
+    return { ...base, clientId: s.clientId, kind: 'upsert', exerciseName: s.exerciseName, setNumber: s.setNumber, date: s.date, weightKg: s.weightKg, repsCompleted: s.repsCompleted }
+  }
+  const d = item.op.del
+  return { ...base, clientId: d.clientId, kind: 'delete', exerciseName: d.exerciseId, setNumber: d.setNumber, date: d.date }
+}
+
+/** Everything currently stuck in the dead-letter store, for the "N sets failed to sync" UI. */
+export function getDeadLetterItems(): DeadLetterSummary[] {
+  return loadDeadLetter().map(summarize)
+}
+
+/** Re-queues a dead-lettered item with a fresh clientId and zeroed attempts, then kicks off a flush. Use after the user has fixed whatever made it permanently fail (or just wants to try again). */
+export function retryDeadLetterItem(clientId: string): void {
+  const items = loadDeadLetter()
+  const item = items.find(i => clientIdOf(i.op) === clientId)
+  if (!item) return
+  saveDeadLetter(items.filter(i => i !== item))
+
+  const freshOp: PendingOp = item.op.kind === 'upsert'
+    ? { kind: 'upsert', set: { ...item.op.set, clientId: generateClientId(), attempts: 0 } }
+    : { kind: 'delete', del: { ...item.op.del, clientId: generateClientId(), attempts: 0 } }
+  const ops = loadPending().filter(op => opNaturalKey(op) !== opNaturalKey(freshOp))
+  ops.push(freshOp)
+  savePending(ops)
+  notifyListeners()
+  void flushPending()
+}
+
+/** Permanently discards a dead-lettered item — the user chose not to retry it. */
+export function discardDeadLetterItem(clientId: string): void {
+  saveDeadLetter(loadDeadLetter().filter(i => clientIdOf(i.op) !== clientId))
+  notifyListeners()
+}
+
+/**
+ * Classifies a sync failure so doFlush knows whether retrying the identical
+ * payload could ever succeed. A Postgrest/Postgres error carries a `.code`
+ * (constraint violation, numeric overflow, FK violation, ...) — the server
+ * received and rejected the request, so retrying verbatim can never help.
+ * No `.code` at all (a thrown TypeError from a failed fetch, a timeout, a
+ * DNS failure) means the request never reached the server — worth retrying.
+ */
+function classifyError(error: unknown): 'network' | 'permanent' {
+  const code = (error as { code?: string } | null)?.code
+  return code ? 'permanent' : 'network'
+}
+
 // ---------------------------------------------------------------------------
 // Sync state pub/sub (consumed by OfflineStatusIndicator)
 // ---------------------------------------------------------------------------
@@ -161,6 +275,7 @@ function currentState(): SyncState {
     isOnline: typeof navigator !== 'undefined' ? navigator.onLine : true,
     isSyncing,
     queuedCount: loadPending().length,
+    deadLetterCount: loadDeadLetter().length,
   }
 }
 
@@ -376,92 +491,119 @@ export function flushPending(): Promise<void> {
   return flushPromise
 }
 
+async function syncUpsert(set: PendingSet): Promise<void> {
+  const sessionId = await ensureSessionSynced(set.userId, set.date)
+  const { error } = await supabase
+    .from('exercise_set_logs')
+    .upsert({
+      session_id: sessionId,
+      user_id: set.userId,
+      exercise_id: set.exerciseId,
+      exercise_name: set.exerciseName,
+      week_number: set.weekNumber,
+      day: set.day,
+      set_number: set.setNumber,
+      weight_kg: set.weightKg,
+      reps_completed: set.repsCompleted,
+      rpe: set.rpe,
+      unit: set.unit,
+      is_bodyweight: set.isBodyweight,
+      is_warmup: set.isWarmup,
+      completed_at: set.completedAt,
+      client_id: set.clientId,
+    }, { onConflict: 'user_id,session_id,exercise_id,set_number,is_warmup' })
+  if (error) throw error
+}
+
+async function syncDelete(del: PendingDelete): Promise<void> {
+  const registry = loadRegistry()
+  const cachedServerId = registry[`${del.userId}|${del.date}`]?.serverId
+  let sessionId = cachedServerId
+  if (!sessionId) {
+    const { data } = await supabase
+      .from('workout_sessions')
+      .select('id')
+      .eq('profile_id', del.userId)
+      .eq('date', del.date)
+      .maybeSingle()
+    sessionId = data?.id
+  }
+  if (!sessionId) return // Never synced server-side — nothing to delete.
+  const { error } = await supabase
+    .from('exercise_set_logs')
+    .delete()
+    .match({
+      user_id: del.userId,
+      session_id: sessionId,
+      exercise_id: del.exerciseId,
+      set_number: del.setNumber,
+      is_warmup: del.isWarmup,
+    })
+  if (error) throw error
+}
+
+/**
+ * Drains the pending queue. Reloads pending fresh on every iteration (rather
+ * than a fixed snapshot) so ops queued WHILE this flush is already running —
+ * the common case: several saveSet calls in one synchronous burst all share
+ * the same in-flight flush promise — still get drained by it, not stranded
+ * until some later flush. `skipThisPass` is what keeps that safe: an item
+ * that fails transiently is set aside for the REST of this pass (so the loop
+ * always makes forward progress toward newer/other items) without being
+ * retried in a tight loop; it's picked up again on the next flush.
+ *
+ * Critically, no single op's failure — permanent (a rejected constraint) or
+ * transient (a network hiccup) — ever stops the pass. This is what kills the
+ * poison-pill bug (a bad set used to sit at the head of a strict FIFO and
+ * block every later set, on any date, forever).
+ */
 async function doFlush(): Promise<void> {
   isSyncing = true
   notifyListeners()
+  const skipThisPass = new Set<string>()
 
   try {
-    // FIFO; reload the store on every removal so ops saved mid-flush survive.
-    let ops = loadPending()
-    while (ops.length > 0) {
-      const op = ops[0]
-      try {
-        if (op.kind === 'upsert') {
-          const sessionId = await ensureSessionSynced(op.set.userId, op.set.date)
-          const { error } = await supabase
-            .from('exercise_set_logs')
-            .upsert({
-              session_id: sessionId,
-              user_id: op.set.userId,
-              exercise_id: op.set.exerciseId,
-              exercise_name: op.set.exerciseName,
-              week_number: op.set.weekNumber,
-              day: op.set.day,
-              set_number: op.set.setNumber,
-              weight_kg: op.set.weightKg,
-              reps_completed: op.set.repsCompleted,
-              rpe: op.set.rpe,
-              unit: op.set.unit,
-              is_bodyweight: op.set.isBodyweight,
-              is_warmup: op.set.isWarmup,
-              completed_at: op.set.completedAt,
-              client_id: op.set.clientId,
-            }, { onConflict: 'user_id,session_id,exercise_id,set_number,is_warmup' })
-          if (error) throw error
-        } else {
-          const registry = loadRegistry()
-          const serverId = registry[`${op.del.userId}|${op.del.date}`]?.serverId
-          let sessionId = serverId
-          if (!sessionId) {
-            const { data } = await supabase
-              .from('workout_sessions')
-              .select('id')
-              .eq('profile_id', op.del.userId)
-              .eq('date', op.del.date)
-              .maybeSingle()
-            sessionId = data?.id
-          }
-          if (sessionId) {
-            const { error } = await supabase
-              .from('exercise_set_logs')
-              .delete()
-              .match({
-                user_id: op.del.userId,
-                session_id: sessionId,
-                exercise_id: op.del.exerciseId,
-                set_number: op.del.setNumber,
-                is_warmup: op.del.isWarmup,
-              })
-            if (error) throw error
-          }
-          // No session server-side means the set never synced — nothing to delete.
-        }
+    while (true) {
+      const op = loadPending().find(o => !skipThisPass.has(clientIdOf(o)))
+      if (!op) break
+      const clientId = clientIdOf(op)
 
-        const clientId = op.kind === 'upsert' ? op.set.clientId : op.del.clientId
-        savePending(loadPending().filter(o => (o.kind === 'upsert' ? o.set.clientId : o.del.clientId) !== clientId))
+      try {
+        if (op.kind === 'upsert') await syncUpsert(op.set)
+        else await syncDelete(op.del)
+
+        savePending(loadPending().filter(o => clientIdOf(o) !== clientId))
         consecutiveFailures = 0
         notifyListeners()
-        ops = loadPending()
-      } catch {
-        // Persist the attempt count and back off; everything still pending
-        // stays exactly where it is.
-        const clientId = op.kind === 'upsert' ? op.set.clientId : op.del.clientId
+      } catch (err) {
+        if (classifyError(err) === 'permanent') {
+          moveToDeadLetter(op, err, 'permanent')
+          notifyListeners()
+          continue
+        }
+
         const persisted = loadPending()
-        for (const o of persisted) {
-          if ((o.kind === 'upsert' ? o.set.clientId : o.del.clientId) === clientId) {
-            if (o.kind === 'upsert') o.set.attempts += 1
-            else o.del.attempts += 1
+        const target = persisted.find(o => clientIdOf(o) === clientId)
+        if (target) {
+          const attempts = (target.kind === 'upsert' ? target.set.attempts : target.del.attempts) + 1
+          if (target.kind === 'upsert') target.set.attempts = attempts
+          else target.del.attempts = attempts
+          savePending(persisted)
+          if (attempts >= MAX_SYNC_ATTEMPTS) {
+            moveToDeadLetter(target, err, 'max-attempts')
+            notifyListeners()
+            continue
           }
         }
-        savePending(persisted)
+        skipThisPass.add(clientId)
         consecutiveFailures += 1
-        scheduleRetry()
-        break
+        notifyListeners()
       }
     }
   } finally {
     isSyncing = false
     notifyListeners()
+    if (loadPending().length > 0) scheduleRetry()
   }
 }
 

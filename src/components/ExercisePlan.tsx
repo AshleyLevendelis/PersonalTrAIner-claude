@@ -42,6 +42,12 @@ interface ExercisePlanProps {
 
 const DAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
+// exercise_set_logs.weight_kg is numeric(6,2) — anything past this is a typo
+// (a fat-fingered "10005" instead of "100.5"), not a real lift, and used to
+// slip past the UI, sync, and permanently poison the flush queue.
+const MAX_WEIGHT_KG = 9999.99
+const MAX_REPS = 999
+
 // Prefers the exercise's own `prescription_type` (see exercise-db.ts) —
 // authoritative and set at generation time — over sniffing the reps STRING,
 // which is what used to misreport a distance-based carry logged in meters
@@ -370,6 +376,7 @@ function SetLogger({
   })
 
   const [prBadgeSet, setPrBadgeSet] = useState<{ setNumber: number; result: PRResult } | null>(null)
+  const [rowErrors, setRowErrors] = useState<Record<number, string>>({})
   const [animatingPr, setAnimatingPr] = useState(false)
   const [ghostValues, setGhostValues] = useState<GhostValues[]>([])
 
@@ -443,6 +450,21 @@ function SetLogger({
     if (!input.isBodyweight && weight === 0 && reps === 0) return
     if (input.isBodyweight && reps === 0) return
 
+    // Reject out-of-range input at entry — never let a typo (10000+ kg,
+    // negative weight, absurd reps) reach the sync queue, where it would
+    // permanently fail against the DB's numeric(6,2)/integer columns.
+    if (!input.isBodyweight && (!Number.isFinite(weight) || weight < 0 || weight > MAX_WEIGHT_KG)) {
+      setRowErrors(prev => ({ ...prev, [setIndex]: `Weight must be between 0 and ${MAX_WEIGHT_KG}kg` }))
+      return
+    }
+    if (!Number.isInteger(reps) || reps < 0 || reps > MAX_REPS) {
+      setRowErrors(prev => ({ ...prev, [setIndex]: `Reps must be a whole number from 0 to ${MAX_REPS}` }))
+      return
+    }
+    if (rowErrors[setIndex]) {
+      setRowErrors(prev => { const next = { ...prev }; delete next[setIndex]; return next })
+    }
+
     // Auto-fill inputs with ghost values if they were blank
     const updatedInputs = inputs.map((item, i) =>
       i === setIndex ? { ...item, weight: input.isBodyweight ? '' : String(weight), reps: String(reps) } : item
@@ -484,6 +506,7 @@ function SetLogger({
 
   const updateInput = (index: number, field: 'weight' | 'reps', value: string) => {
     setInputs(prev => prev.map((item, i) => i === index ? { ...item, [field]: value } : item))
+    if (rowErrors[index]) setRowErrors(prev => { const next = { ...prev }; delete next[index]; return next })
   }
 
   const toggleBodyweight = (index: number) => {
@@ -518,8 +541,8 @@ function SetLogger({
         const ghost = ghostValues[i]
 
         return (
+          <React.Fragment key={i}>
           <div
-            key={i}
             className={`grid grid-cols-[auto_1fr_auto_auto_auto_1fr_auto] gap-1.5 items-center rounded-md px-1 py-0.5 transition-colors ${
               isSaved ? 'bg-green-50 dark:bg-green-950/20' : ''
             }`}
@@ -530,11 +553,12 @@ function SetLogger({
             <Input
               type="number"
               min="0"
+              max={MAX_WEIGHT_KG}
               step="0.5"
               placeholder={isBW ? 'BW' : (ghost?.weight || defaultWeightFor(i))}
               value={isBW ? '' : (inputs[i]?.weight || '')}
               onChange={e => updateInput(i, 'weight', e.target.value)}
-              className={`h-7 text-sm ${isSaved ? 'border-green-300 dark:border-green-700' : ''} ${isBW ? 'bg-muted text-muted-foreground' : ''}`}
+              className={`h-7 text-sm ${isSaved ? 'border-green-300 dark:border-green-700' : ''} ${isBW ? 'bg-muted text-muted-foreground' : ''} ${rowErrors[i] ? 'border-destructive' : ''}`}
               disabled={isBW}
             />
             <Button
@@ -559,11 +583,12 @@ function SetLogger({
             <Input
               type="number"
               min="0"
+              max={MAX_REPS}
               step="1"
               placeholder={ghost?.reps || '0'}
               value={inputs[i]?.reps || ''}
               onChange={e => updateInput(i, 'reps', e.target.value)}
-              className={`h-7 text-sm w-14 ${isSaved ? 'border-green-300 dark:border-green-700' : ''}`}
+              className={`h-7 text-sm w-14 ${isSaved ? 'border-green-300 dark:border-green-700' : ''} ${rowErrors[i] ? 'border-destructive' : ''}`}
             />
             <div className="flex items-center gap-1">
               {isPRSet && prBadgeSet?.result && (
@@ -582,6 +607,10 @@ function SetLogger({
               </Button>
             </div>
           </div>
+          {rowErrors[i] && (
+            <p className="text-[10px] text-destructive px-1 -mt-0.5">{rowErrors[i]}</p>
+          )}
+          </React.Fragment>
         )
       })}
       <Button

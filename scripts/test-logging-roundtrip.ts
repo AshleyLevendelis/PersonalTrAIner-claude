@@ -68,6 +68,13 @@ function fakeFrom(table: string) {
   let updateObj: Row | null = null
   let single = false
 
+  // Mirrors exercise_set_logs.weight_kg NUMERIC(6,2) — a real Postgres
+  // numeric-field-overflow, code 22003, is exactly how a fat-fingered weight
+  // (e.g. 10005 instead of 100.5) fails in production. Used by the poison-pill
+  // dead-letter regression test.
+  const numericOverflow = (row: Row): boolean =>
+    table === 'exercise_set_logs' && typeof row.weight_kg === 'number' && (row.weight_kg > 9999.99 || row.weight_kg < 0)
+
   const exec = (): { data: unknown; error: { code?: string; message: string } | null } => {
     if (fakeOffline) return { data: null, error: { message: 'network unavailable (fake offline)' } }
     if (op === 'insert') {
@@ -75,6 +82,7 @@ function fakeFrom(table: string) {
       for (const raw of payload) {
         const row: Row = { id: crypto.randomUUID(), ...raw }
         if (table === 'workout_sessions') row.is_completed = row.is_completed ?? false
+        if (numericOverflow(row)) return { data: null, error: { code: '22003', message: 'numeric field overflow' } }
         if (uniqueViolation(table, row)) return { data: null, error: { code: '23505', message: 'duplicate key value violates unique constraint' } }
         db[table].push(row)
         inserted.push(row)
@@ -83,6 +91,7 @@ function fakeFrom(table: string) {
     }
     if (op === 'upsert') {
       for (const raw of payload) {
+        if (numericOverflow(raw)) return { data: null, error: { code: '22003', message: 'numeric field overflow' } }
         const existing = onConflict ? db[table].find(r => onConflict!.every(c => r[c] === raw[c])) : undefined
         if (existing) {
           Object.assign(existing, raw)
@@ -313,6 +322,49 @@ async function main() {
     set_number: 1, weight_kg: 1, reps_completed: 1, is_warmup: false,
   })
   check('raw duplicate insert is rejected by the unique constraint', dupe.error?.code === '23505')
+
+  // ---- 8. Poison-pill: dead-letter, never head-of-line block --------------
+  console.log('\n[8] poison-pill queue item — dead-letters, queue keeps draining (fix #1)')
+  const { getDeadLetterItems, retryDeadLetterItem, discardDeadLetterItem } = await import('../src/lib/set-log-store')
+  const squats2 = 'Front Squats'
+  const squats2Id = getExerciseId(squats2)
+  const rows3 = 'Seated Cable Row'
+  const rows3Id = getExerciseId(rows3)
+  // A typo'd weight (numeric(6,2) max is 9999.99) — permanently rejected by
+  // the DB on every retry. Queued directly via saveSet to simulate data that
+  // reached the store before/without the new client-side bound (e.g. a stale
+  // client, or a future caller that forgets to validate).
+  saveSet({ userId, date: W2, weekNumber: 2, day, exerciseId: squats2Id, exerciseName: squats2, setNumber: 1, weightKg: 10005, repsCompleted: 8 })
+  // A perfectly healthy set queued right after the poison item.
+  saveSet({ userId, date: W2, weekNumber: 2, day, exerciseId: rows3Id, exerciseName: rows3, setNumber: 1, weightKg: 45, repsCompleted: 10 })
+  await flushPending()
+
+  check('healthy set queued after the poison item still syncs (no head-of-line block)',
+    db.exercise_set_logs.some(r => r.exercise_id === rows3Id && r.weight_kg === 45))
+  check('poisoned set never reaches the server', !db.exercise_set_logs.some(r => r.exercise_id === squats2Id))
+  check('poisoned set is not stuck in the pending queue', getSyncState().queuedCount === 0, getSyncState())
+  const deadLetter = getDeadLetterItems()
+  check('poisoned set is dead-lettered exactly once', deadLetter.filter(d => d.exerciseName === squats2).length === 1, deadLetter)
+  check('dead-letter reason is permanent (constraint violation, not a retry-exhaustion)',
+    deadLetter.find(d => d.exerciseName === squats2)?.reason === 'permanent')
+  check('sync state reports the dead-lettered item', getSyncState().deadLetterCount === 1, getSyncState())
+
+  // Discard: removed from dead-letter, never resurfaces.
+  const poisonedId = deadLetter.find(d => d.exerciseName === squats2)!.clientId
+  discardDeadLetterItem(poisonedId)
+  check('discarded dead-letter item is gone', getDeadLetterItems().length === 0)
+
+  // Retry: re-queues with a fresh id; still permanently fails (same bad
+  // weight) but must dead-letter again WITHOUT blocking anything queued
+  // alongside it — proves retry doesn't regress to head-of-line blocking.
+  saveSet({ userId, date: W2, weekNumber: 2, day, exerciseId: squats2Id, exerciseName: squats2, setNumber: 1, weightKg: 10005, repsCompleted: 8 })
+  await flushPending()
+  const secondDeadLetter = getDeadLetterItems()
+  check('re-queued poison item dead-letters again', secondDeadLetter.length === 1, secondDeadLetter)
+  retryDeadLetterItem(secondDeadLetter[0].clientId)
+  await flushPending()
+  check('retrying a still-bad item dead-letters again rather than wedging the queue', getDeadLetterItems().length === 1 && getSyncState().queuedCount === 0)
+  discardDeadLetterItem(getDeadLetterItems()[0].clientId)
 
   // ---- Summary -------------------------------------------------------------
   if (failures > 0) {
