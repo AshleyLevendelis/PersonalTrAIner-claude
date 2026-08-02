@@ -15,6 +15,19 @@ import type { ExerciseEntry } from './exercise-db'
 // you", and every output carries that framing with it.
 //
 // Once real set logs exist, history should override this entirely.
+//
+// REBUILD NOTE (capability-model round): the previous version anchored every
+// estimate to a flat "% of bodyweight at ~RPE 8" multiplier, then passed it
+// through THREE separate compensating clamps (a first-block 0.6x ceiling, a
+// calibration-week 0.45x ceiling, and an absolute CATEGORY_CAPS_KG cap) to
+// paper over how far off that flat multiplier could land. Stacked together,
+// those clamps are what produced "2kg curls" and "4kg shrugs" for real
+// working sets — not a rounding error, the compounding of three separate
+// safety nets that were each reasonable alone. This version replaces the
+// source (a real bodyweight-relative strength-standards table, by sex and
+// experience, converted to a working weight via an actual RPE/reps -> %1RM
+// relationship) so the clamps are no longer needed to keep numbers sane, and
+// deletes them.
 
 export interface PerSetLoad {
   set_number: number
@@ -52,16 +65,19 @@ export interface KnownWorkingWeights {
 export interface LoadPrescriptionOptions {
   /**
    * The RPE/effort label this exercise is actually prescribed at for this
-   * specific week, e.g. 'RPE 5-6' or 'RPE 8-9'. The bodyweight-multiplier
-   * standards below assume a firm, close-to-the-set working weight — a week
-   * that targets RPE 5-6 must not get that same weight.
+   * specific week, e.g. 'RPE 5-6' or 'RPE 8-9'. Fed into percentOf1RM below
+   * along with the actual rep range — a phase asking for RPE 5-6 at 13-17
+   * reps and a phase asking for RPE 8-9 at 6-8 reps need very different
+   * fractions of the lifter's estimated 1RM, not just "RPE went down so
+   * knock a flat percentage off."
    */
   targetRpeLabel?: string
   /**
    * Whether this is the trainee's first block on this program — i.e. we have
-   * never seen them lift. Defaults to true, because "unverified" is the safe
-   * assumption when the caller doesn't say otherwise: a guess that's too
-   * light costs a rep in reserve, a guess that's too heavy costs an injury.
+   * never seen them lift. No longer clamps the estimate (see REBUILD NOTE
+   * above) — kept for API compatibility and because a future safety feature
+   * may want it — but the accuracy of the estimate now comes from the
+   * standards model itself, not from capping unverified numbers.
    */
   isFirstBlock?: boolean
   /** Number of working sets prescribed, used to build the per-set breakdown. Defaults to 1. */
@@ -76,34 +92,38 @@ export interface LoadPrescriptionOptions {
   phase?: string
   /**
    * True for week 1 of a trainee's first block when they told onboarding
-   * they don't know their numbers. Overrides the RPE-derived fraction with a
-   * hard, conservative cap — the goal that week is finding the weight where
-   * RPE 6 actually lands, not confirming a guess.
+   * they don't know their numbers. Applies a mild 0.85x conservatism
+   * multiplier on top of the standards-derived estimate — the point is to
+   * start a shade under an unverified number, not to override the RPE/reps
+   * math with an artificial ceiling the way the old hard clamp did. Skipped
+   * for a known working weight, which isn't an unverified guess this exists
+   * to protect against.
    */
   isCalibrationWeek?: boolean
   /**
    * Verified working weights from onboarding ("I know my numbers"). When the
    * exercise's movement family has an entry here, it replaces the
-   * bodyweight-multiplier estimate as the anchor and the first-block safety
-   * clamp is skipped — this is real, self-reported data, not a population
-   * guess for a stranger.
+   * standards-table estimate as the anchor — real, self-reported data, not
+   * a population guess for a stranger. Treated as an approximate 10-rep,
+   * RPE-8 working weight and scaled to whatever this week's actual reps/RPE
+   * are via the same percentOf1RM relationship used everywhere else.
    */
   knownWorkingWeights?: KnownWorkingWeights
   /**
-   * Skips the bodyweight/known-weight estimate entirely and uses this number
-   * as the top-set weight (still plate-rounded, still capped through the
-   * per-set ramp builder). Used by the within-block double-progression ramp
-   * in generateMesocycle() — week 2/3 are "week 1's baseline + N increments,"
-   * not a fresh RPE-derived estimate — and by the live logged-history
-   * override once real set data exists. `targetRpeLabel` should still be
-   * passed alongside this for phase/RPE display purposes even though it no
-   * longer affects the number.
+   * Skips the estimate entirely and uses this number as the top-set weight
+   * (still plate-rounded, still run through the per-set ramp builder). Used
+   * by the within-block double-progression ramp in generateMesocycle() —
+   * week 2/3 are "week 1's baseline + N increments," not a fresh estimate —
+   * and by the live logged-history override once real set data exists.
+   * `targetRpeLabel` should still be passed alongside this for phase/RPE
+   * display purposes even though it no longer affects the number.
    */
   forceStartingWeightKg?: number
   /**
-   * The prescribed rep range for this exercise this week, e.g. '8-12' — used
-   * only to phrase the double-progression rule in `basis` ("hit 12 on all
-   * sets → add Xkg next session"). Purely cosmetic; does not affect the load.
+   * The prescribed rep range for this exercise this week, e.g. '8-12'. Now
+   * does double duty: it's the actual input to percentOf1RM (not just cosmetic
+   * text for the progression-basis message), so an inaccurate or missing
+   * value directly affects the load, not just the wording.
    */
   repRangeLabel?: string
   /**
@@ -114,66 +134,95 @@ export interface LoadPrescriptionOptions {
    * any bodyweight movement) that forced number is the SAME baseline every
    * week; reps are the real lever. Without this, `basis` told every trainee
    * "hit your reps, add load next time" even on exercises the engine will
-   * never add load to — a real reported bug ("the app can't progress them
-   * either" read one review, on a plan whose reps WERE climbing but whose
-   * coach note only ever talked about weight). Defaults true (the pre-
-   * existing behavior) for any caller that doesn't pass it.
+   * never add load to. Defaults true (the pre-existing behavior) for any
+   * caller that doesn't pass it.
    */
   loadIsProgressing?: boolean
 }
 
 // ---------------------------------------------------------------------------
-// Strength standards
+// Strength standards — 1RM as a multiple of bodyweight
 // ---------------------------------------------------------------------------
-// Multiples of bodyweight for a working set in the 8-10 rep range, drawn from
-// commonly used training standards. These are population averages: individual
-// variation is enormous, which is exactly why the RPE target does the real
-// work and this only sets a starting point.
+// Approximate population strength standards in the shape published strength-
+// standards sites (strengthlevel.com, symmetricstrength.com) use — an
+// Untrained/Novice/Intermediate/Advanced ladder of 1RM-to-bodyweight ratios,
+// collapsed onto this app's four experience tiers, split by sex. These are
+// population averages for a genuine 1-rep max, not a working weight — the
+// working weight for an actual prescribed set is derived from these via
+// percentOf1RM() below, using the exercise's real rep range and RPE target.
+//
+// Values are directional approximations of commonly-cited standards, not a
+// scrape of any single source: squat/deadlift/bench are the three most
+// consistently published lifts and anchor the shape of the table; overhead
+// press and row are sized relative to bench using their typical published
+// ratios (OHP ~60-65% of bench, row ~100-110% of bench at every tier).
 
-const BODYWEIGHT_MULTIPLIERS: Record<string, Record<TrainingExperience, number>> = {
-  // Lower body pressing and hinging support the most load.
-  squat: { beginner: 0.45, novice: 0.75, intermediate: 1.05, advanced: 1.4 },
-  deadlift: { beginner: 0.55, novice: 0.9, intermediate: 1.3, advanced: 1.75 },
-  hinge_accessory: { beginner: 0.35, novice: 0.6, intermediate: 0.85, advanced: 1.15 },
-  leg_press: { beginner: 0.9, novice: 1.5, intermediate: 2.1, advanced: 2.8 },
-  // Upper body pressing.
-  bench: { beginner: 0.35, novice: 0.6, intermediate: 0.85, advanced: 1.15 },
-  overhead: { beginner: 0.22, novice: 0.4, intermediate: 0.55, advanced: 0.75 },
-  // Pulling.
-  row: { beginner: 0.3, novice: 0.55, intermediate: 0.75, advanced: 1.0 },
-  pulldown: { beginner: 0.35, novice: 0.6, intermediate: 0.8, advanced: 1.05 },
-  // Isolation work is a small fraction of bodyweight.
-  isolation_upper: { beginner: 0.08, novice: 0.13, intermediate: 0.18, advanced: 0.24 },
-  isolation_lower: { beginner: 0.15, novice: 0.25, intermediate: 0.35, advanced: 0.5 },
-  carry: { beginner: 0.25, novice: 0.4, intermediate: 0.6, advanced: 0.85 },
-  // A goblet squat is loaded with a single dumbbell or kettlebell held at the
-  // chest, not a barbell on the back — it does not scale with bodyweight the
-  // way a back squat does. Sized to land roughly 12-24kg for most users
-  // rather than inheriting the full 'squat' standard (which produced the
-  // "~60kg per hand" bug: a barbell-squat estimate, halved and mislabeled).
-  goblet_squat: { beginner: 0.15, novice: 0.2, intermediate: 0.25, advanced: 0.32 },
+type LiftFamily = 'squat' | 'bench' | 'deadlift' | 'overhead' | 'row'
+
+const STRENGTH_STANDARDS_1RM_PER_BW: Record<LiftFamily, Record<'male' | 'female', Record<TrainingExperience, number>>> = {
+  squat: {
+    male: { beginner: 0.75, novice: 1.25, intermediate: 1.5, advanced: 2.0 },
+    female: { beginner: 0.5, novice: 0.75, intermediate: 1.0, advanced: 1.5 },
+  },
+  bench: {
+    male: { beginner: 0.5, novice: 0.75, intermediate: 1.0, advanced: 1.5 },
+    female: { beginner: 0.27, novice: 0.45, intermediate: 0.6, advanced: 0.85 },
+  },
+  deadlift: {
+    male: { beginner: 1.0, novice: 1.5, intermediate: 2.0, advanced: 2.5 },
+    female: { beginner: 0.65, novice: 1.0, intermediate: 1.35, advanced: 1.75 },
+  },
+  overhead: {
+    male: { beginner: 0.35, novice: 0.5, intermediate: 0.65, advanced: 0.9 },
+    female: { beginner: 0.2, novice: 0.3, intermediate: 0.4, advanced: 0.55 },
+  },
+  row: {
+    male: { beginner: 0.5, novice: 0.75, intermediate: 1.0, advanced: 1.25 },
+    female: { beginner: 0.3, novice: 0.45, intermediate: 0.6, advanced: 0.8 },
+  },
 }
 
-// ---------------------------------------------------------------------------
-// Absolute safety ceilings for a FIRST prescription
-// ---------------------------------------------------------------------------
-// These are unverified estimates for someone we have never seen lift. No
-// combination of bodyweight, sex, and age adjustments should be able to push
-// a first-block suggestion past what's safe to hand a stranger, regardless of
-// how the formula above computes out.
-export const CATEGORY_CAPS_KG: Partial<Record<string, number>> = {
-  squat: 80,
-  goblet_squat: 32,
-  deadlift: 80,
-  hinge_accessory: 60,
-  leg_press: 120,
-  bench: 60,
-  overhead: 45,
-  row: 60,
-  pulldown: 65,
-  isolation_upper: 20,
-  isolation_lower: 30,
-  carry: 40,
+/**
+ * "Derived family" compounds — real working lifts, but not one of the five
+ * standards lifts above. Each is a fixed scale of a parent lift's 1RM: a
+ * goblet squat (single dumbbell/kettlebell at the chest) is nowhere near a
+ * barbell back squat's load; a leg press moves far MORE than a back squat
+ * (seated, partial ROM, no stabilizer demand); a lat pulldown tracks a row;
+ * an RDL/good-morning/heavy kettlebell swing sits under a full deadlift.
+ */
+const DERIVED_COMPOUND_SCALE: Record<string, { parent: LiftFamily; scale: number }> = {
+  pulldown: { parent: 'row', scale: 1.0 },
+  leg_press: { parent: 'squat', scale: 2.2 },
+  goblet_squat: { parent: 'squat', scale: 0.35 },
+  hinge_accessory: { parent: 'deadlift', scale: 0.55 },
+}
+
+/**
+ * Isolation/accessory loads are NOT bodyweight-relative on their own — a
+ * coach sizes a curl as "start around a quarter of your bench," not as a
+ * fraction of bodyweight. Each entry is a fixed fraction of a related
+ * compound's 1RM — but unlike the compound categories, that fraction is
+ * calibrated to represent a REFERENCE WORKING WEIGHT (an achievable ~10-rep,
+ * RPE-8 set), not a theoretical 1RM. Isolation movements are technique- and
+ * joint-position-limited, not truly limited by a testable 1-rep max the way
+ * a squat is — treating the fraction as a 1RM and then ALSO discounting it
+ * through percentOf1RM (which itself already encodes an ~77% discount at
+ * the 10-rep/RPE-8 reference point) double-discounts the number. That
+ * double-discount is exactly what produced "2kg curls" and "2kg lateral
+ * raises" even after raising these fractions once — the fraction was
+ * correct for a 1RM interpretation, but was being treated as one and THEN
+ * cut again. See resolveIsolationReferenceKg below for how this is applied.
+ */
+const ISOLATION_FRACTION_OF_COMPOUND: Record<string, { parent: LiftFamily; fraction: number }> = {
+  isolation_bicep: { parent: 'bench', fraction: 0.28 }, // curls: a solid 10-rep working set is roughly a quarter of a bench working weight
+  isolation_tricep: { parent: 'bench', fraction: 0.32 }, // pushdowns/extensions — triceps are the smaller presser muscle but the movement is more mechanically efficient than a curl
+  isolation_chest: { parent: 'bench', fraction: 0.38 }, // flyes/pec deck — a real working weight, not a curl-sized number
+  isolation_shoulder: { parent: 'bench', fraction: 0.19 }, // lateral raises, per hand — small lever arm, genuinely light relative to pressing strength, but not a 2kg toy
+  shrug: { parent: 'deadlift', fraction: 0.42 }, // shrugs, per hand (DB) or total (barbell) — traps are strong but this is a short-ROM isolation move, not a hinge
+  isolation_quad: { parent: 'squat', fraction: 0.4 }, // leg extension — single-joint but quads are a large muscle group
+  isolation_hamstring: { parent: 'deadlift', fraction: 0.3 }, // leg curl
+  isolation_calf: { parent: 'squat', fraction: 0.65 }, // calves are strong relative to most isolation work
+  carry: { parent: 'deadlift', fraction: 0.35 }, // farmer's/suitcase carry per hand — grip/bracing limited, not a true hinge 1RM
 }
 
 /**
@@ -190,22 +239,42 @@ function parseRpeMidpoint(label: string | undefined): number {
   return 6
 }
 
-const REFERENCE_RPE = 8
+/** Midpoint of a rep range like '9-13' or a bare '9' — null when it isn't a rep count (time/distance prescriptions). */
+function parseRepsMidpoint(label: string | undefined): number | null {
+  if (!label) return null
+  const range = label.match(/^(\d+)\s*-\s*(\d+)$/)
+  if (range) return (parseInt(range[1], 10) + parseInt(range[2], 10)) / 2
+  const single = label.match(/^(\d+)$/)
+  if (single) return parseInt(single[1], 10)
+  return null
+}
 
 /**
- * The bodyweight-multiplier standards above assume a firm, close-to-the-set
- * working weight — roughly RPE 8. A phase asking for RPE 5-6 is asking for a
- * genuinely easier set, so the suggested load must come down to match, not
- * stay at the RPE-8 weight with an instruction to leave more reps in the
- * tank. ~12% of the estimate per RPE point below the reference, floored so a
- * light target never approaches zero and capped so a peak week doesn't
- * balloon far past the reference estimate.
+ * %1RM for a given rep count performed at a given RPE, using the standard
+ * reps-in-reserve model: RPE R with N reps performed is equivalent in
+ * intensity to a set of N + (10 - R) reps taken to true failure. Converted
+ * to %1RM via an Epley-derived reps-to-%1RM relationship
+ * (%1RM = 100 / (1 + (repsToFailure - 1) / 30)), which is the same family of
+ * formula most RPE charts (Tuchscherer-style) are built from.
+ *
+ * This REPLACES the old rpeEffortFraction, which only looked at RPE and
+ * applied a flat 12%-per-point discount off an assumed "reference RPE 8"
+ * working weight — it had no way to tell a 5-rep RPE-8 set from a 20-rep
+ * RPE-8 set, which is exactly how a high-rep anatomical-adaptation phase and
+ * a low-rep strength phase ended up prescribed the same load for the same
+ * RPE label.
  */
-function rpeEffortFraction(targetRpeLabel: string | undefined): number {
-  const rpe = parseRpeMidpoint(targetRpeLabel)
-  const fraction = 1 - (REFERENCE_RPE - rpe) * 0.12
-  return Math.max(0.55, Math.min(1.05, fraction))
+function percentOf1RM(reps: number, rpe: number): number {
+  const repsToFailure = Math.max(1, reps + (10 - rpe))
+  return 100 / (1 + (repsToFailure - 1) / 30)
 }
+
+// The reference point a self-reported "known working weight" is assumed to
+// represent — a working set the trainee can currently do for real, not a
+// tested 1RM. Used only to scale a known weight to whatever THIS week's
+// actual reps/RPE are, relative to that baseline.
+const KNOWN_WEIGHT_REFERENCE_REPS = 10
+const KNOWN_WEIGHT_REFERENCE_RPE = 8
 
 /** Maps an exercise onto a standards category. */
 export function categorize(entry: ExerciseEntry): string | null {
@@ -213,12 +282,24 @@ export function categorize(entry: ExerciseEntry): string | null {
 
   // Isolation work is checked FIRST, before any pattern matching. A Cable Fly
   // and a Pec Deck share the `horizontal_push` pattern with the bench press,
-  // and falling through to the bench standard prescribed ~67kg for a fly —
-  // a load that would put a shoulder at real risk. Mechanics tier is the
-  // reliable signal here, not movement pattern.
+  // and falling through to the bench standard would prescribe them the same
+  // load as an actual bench press — a load that would put a shoulder at
+  // real risk. Mechanics tier is the reliable signal here, not pattern.
   if (entry.mechanics_tier === 'tier3_isolation' || n.includes('fly') || n.includes('pec deck')) {
-    const lower = ['isolation_quad', 'isolation_hamstring', 'isolation_calf', 'knee_dominant', 'hip_hinge']
-    return lower.includes(entry.movement_pattern) ? 'isolation_lower' : 'isolation_upper'
+    // Shrugs and lateral raises share movement_pattern 'isolation_shoulder'
+    // in the exercise DB but need very different anchors (shrugs track
+    // deadlift; lateral raises track bench) — name is the only signal that
+    // distinguishes them.
+    if (n.includes('shrug')) return 'shrug'
+    switch (entry.movement_pattern) {
+      case 'isolation_bicep': return 'isolation_bicep'
+      case 'isolation_tricep': return 'isolation_tricep'
+      case 'isolation_shoulder': return 'isolation_shoulder'
+      case 'isolation_quad': return 'isolation_quad'
+      case 'isolation_hamstring': return 'isolation_hamstring'
+      case 'isolation_calf': return 'isolation_calf'
+      default: return 'isolation_chest' // Cable Flyes / Pec Deck: horizontal_push pattern, chest isolation in practice
+    }
   }
 
   // Checked before the generic 'squat' match below — a goblet squat is a
@@ -250,29 +331,20 @@ export function categorize(entry: ExerciseEntry): string | null {
     case 'carry':
       return 'carry'
     case 'isolation_bicep':
+      return 'isolation_bicep'
     case 'isolation_tricep':
+      return 'isolation_tricep'
     case 'isolation_shoulder':
-      return 'isolation_upper'
+      return 'isolation_shoulder'
     case 'isolation_quad':
+      return 'isolation_quad'
     case 'isolation_hamstring':
+      return 'isolation_hamstring'
     case 'isolation_calf':
-      return 'isolation_lower'
+      return 'isolation_calf'
     default:
       return null
   }
-}
-
-/**
- * Women's absolute upper-body strength relative to bodyweight is meaningfully
- * lower than men's, while lower-body differences are much smaller. Applying a
- * single multiplier to both sexes systematically over-prescribes upper-body
- * starting loads for women. Adjusting is more accurate and, more importantly,
- * safer than not adjusting.
- */
-function sexAdjustment(category: string, gender: 'male' | 'female'): number {
-  if (gender === 'male') return 1
-  const upperBody = ['bench', 'overhead', 'row', 'pulldown', 'isolation_upper']
-  return upperBody.includes(category) ? 0.6 : 0.75
 }
 
 /**
@@ -384,23 +456,19 @@ export function isExternallyLoaded(entry: ExerciseEntry): boolean {
   return entry.equipment.some(e => LOADED_EQUIPMENT.has(e))
 }
 
-// Upper bound of the "50-60% of the calculated working weight" first-block
-// range. Applied as a ceiling on the RPE-derived fraction below (not a
-// separate multiplier stacked on top of it) so a first block that legitimately
-// targets a lower RPE still tracks that RPE — it just can never exceed this.
-const FIRST_BLOCK_MAX_FRACTION = 0.6
-
-// Midpoint of the "40-50% of the calculated standard" calibration-week range.
-// Applied the same way as FIRST_BLOCK_MAX_FRACTION — a ceiling on the
-// RPE-derived fraction, not a separate multiplier — so calibration week stays
-// deliberately light regardless of what RPE label that week happens to carry.
-const CALIBRATION_MAX_FRACTION = 0.45
+// A calibration week (no verified numbers yet) starts a shade under the
+// standards-derived estimate rather than trusting it outright — the point is
+// to find the real number quickly, not to hand over a confident-looking one.
+// This is a MULTIPLIER on the estimate, not a ceiling clamp: the RPE/reps
+// math still drives the number, this just nudges the whole thing down a bit
+// for the one week where "unverified" matters most.
+const CALIBRATION_WEEK_CONSERVATISM = 0.85
 
 // Maps a standards category onto the onboarding "known working weight" field
 // that anchors it. Only the categories a trainee would actually self-report
 // against the big three lifts are included — leg press or hinge-accessory
-// work still falls back to the bodyweight-multiplier estimate, since a
-// squat number is not a reliable stand-in for those.
+// work still falls back to the standards-table estimate, since a squat
+// number is not a reliable stand-in for those.
 const KNOWN_WEIGHT_FAMILY: Partial<Record<string, keyof KnownWorkingWeights>> = {
   squat: 'squat',
   goblet_squat: 'squat',
@@ -419,8 +487,8 @@ const KNOWN_WEIGHT_FAMILY: Partial<Record<string, keyof KnownWorkingWeights>> = 
 // number arrived at progressively.
 
 // Ascending percent-of-top-set ladder, keyed by set count. The last entry is
-// always 100 — the top set is exactly the RPE/first-block-adjusted estimate
-// computed above, never higher.
+// always 100 — the top set is exactly the RPE/reps-adjusted estimate computed
+// above, never higher.
 const RAMP_PERCENT_TABLE: Record<number, number[]> = {
   1: [100],
   2: [90, 100],
@@ -440,10 +508,9 @@ function getSetPercents(sets: number, ramping: boolean): number[] {
 
 /**
  * Builds the per-set display array. `topSetKg` is the same fully-adjusted
- * (RPE-scaled, first-block-clamped, capped) number used for
- * starting_weight_kg — ramping sets are lighter fractions of it, never a
- * separately-derived number, so the top set always matches what the rest of
- * the UI shows.
+ * (standards-derived, RPE/reps-scaled) number used for starting_weight_kg —
+ * ramping sets are lighter fractions of it, never a separately-derived
+ * number, so the top set always matches what the rest of the UI shows.
  */
 function buildPerSetLoads(
   topSetKg: number,
@@ -480,6 +547,49 @@ function buildRepsProgressionBasis(repRangeLabel: string | undefined): string {
   return repRangeLabel
     ? `Weight holds here by design — the rep target (${repRangeLabel} this week) is what's climbing through the block. Add reps, not load.`
     : `Weight holds here by design this block — reps are the lever climbing week to week, not load.`
+}
+
+function resolveParentOneRepMaxKg(lift: LiftFamily, profile: UserProfile): number {
+  const experience = profile.training_experience || 'novice'
+  const bodyweight = profile.weight_kg || 75
+  const gender = profile.gender === 'female' ? 'female' : 'male'
+  const age = ageAdjustment(profile.age || 30)
+  return bodyweight * STRENGTH_STANDARDS_1RM_PER_BW[lift][gender][experience] * age
+}
+
+/**
+ * Resolves a COMPOUND standards category (a real lift, or a derived-family
+ * scale of one) to the 1RM the standards model implies for this profile.
+ * percentOf1RM() then converts that into an actual working weight for the
+ * reps/RPE this set is prescribed at. Returns null for isolation categories
+ * — see resolveIsolationReferenceKg, which is NOT a 1RM and must not be
+ * run through this same path (see that function's doc comment for why).
+ */
+function resolveCompoundOneRepMaxKg(category: string, profile: UserProfile): number | null {
+  if (category in STRENGTH_STANDARDS_1RM_PER_BW) {
+    return resolveParentOneRepMaxKg(category as LiftFamily, profile)
+  }
+  const derived = DERIVED_COMPOUND_SCALE[category]
+  if (derived) {
+    return resolveParentOneRepMaxKg(derived.parent, profile) * derived.scale
+  }
+  return null
+}
+
+/**
+ * Resolves an ISOLATION category to a REFERENCE WORKING WEIGHT (achievable
+ * for ~10 reps at RPE 8) — not a 1RM. Isolation loads scale off this
+ * reference by the RATIO of percentOf1RM at the actual reps/RPE to
+ * percentOf1RM at the reference point, rather than being multiplied by a
+ * fresh percentOf1RM(actual)/100 the way a true 1RM would be. Multiplying a
+ * reference-working-weight by %1RM(actual)/100 would discount it as if it
+ * WERE a 1RM (which already has its own ~77% discount baked into the
+ * reference point) and cut the number twice.
+ */
+function resolveIsolationReferenceKg(category: string, profile: UserProfile): number | null {
+  const isolation = ISOLATION_FRACTION_OF_COMPOUND[category]
+  if (!isolation) return null
+  return resolveParentOneRepMaxKg(isolation.parent, profile) * isolation.fraction
 }
 
 export function prescribeLoad(
@@ -524,8 +634,14 @@ export function prescribeLoad(
     // it to something loadable.
     rounded = roundToPlate(options.forceStartingWeightKg, mode)
   } else {
-    const experience = profile.training_experience || 'novice'
-    const bodyweight = profile.weight_kg || 75
+    // Carries are dosed by distance ("40m"), not reps — parsing that label
+    // as a rep count would read "40m" as 40 reps and wildly overshoot the
+    // %1RM curve. A fixed moderate reference (8) keeps the RPE label doing
+    // real work without the (mis-parsed) distance leaking into the formula.
+    const repsMidpoint = category === 'carry'
+      ? 8
+      : parseRepsMidpoint(options.repRangeLabel) ?? 10
+    const rpeMidpoint = parseRpeMidpoint(options.targetRpeLabel)
 
     // A trainee-reported working weight replaces the population estimate
     // entirely when it's available for this exercise's family — it's real,
@@ -534,37 +650,34 @@ export function prescribeLoad(
     const knownAnchor = knownFamily ? options.knownWorkingWeights?.[knownFamily] : undefined
     fromKnownWeight = knownAnchor != null && knownAnchor > 0
 
-    let estimate = fromKnownWeight
-      ? knownAnchor!
-      : bodyweight *
-        BODYWEIGHT_MULTIPLIERS[category][experience] *
-        sexAdjustment(category, profile.gender) *
-        ageAdjustment(profile.age || 30)
-
-    // Reconcile the estimate against the actual effort this week is asking
-    // for — the standards above assume a firm ~RPE 8 working set, not
-    // whatever this particular phase/week targets.
-    let fraction = rpeEffortFraction(options.targetRpeLabel)
-
-    const isFirstBlock = options.isFirstBlock !== false
-    if (isFirstBlock && !fromKnownWeight) {
-      // No verified lifting history yet. Regardless of what the RPE math
-      // alone would allow, the very first block stays capped at 50-60% of
-      // the reference working weight — the user corrects upward via RPE
-      // feedback, not by trusting an untested number. A known, self-reported
-      // working weight skips this clamp — it isn't an untested number.
-      fraction = Math.min(fraction, FIRST_BLOCK_MAX_FRACTION)
+    let estimate: number
+    if (fromKnownWeight) {
+      // Treat the reported number as an approximate 10-rep/RPE-8 working
+      // weight, then scale it to whatever THIS set's actual reps/RPE are —
+      // the same relationship used for the population estimate below, just
+      // anchored to a real number instead of a standards table.
+      const baselinePercent = percentOf1RM(KNOWN_WEIGHT_REFERENCE_REPS, KNOWN_WEIGHT_REFERENCE_RPE)
+      const targetPercent = percentOf1RM(repsMidpoint, rpeMidpoint)
+      estimate = knownAnchor! * (targetPercent / baselinePercent)
+    } else {
+      const oneRepMax = resolveCompoundOneRepMaxKg(category, profile)
+      if (oneRepMax != null) {
+        estimate = (oneRepMax * percentOf1RM(repsMidpoint, rpeMidpoint)) / 100
+      } else {
+        const referenceKg = resolveIsolationReferenceKg(category, profile)
+        const referencePercent = percentOf1RM(KNOWN_WEIGHT_REFERENCE_REPS, KNOWN_WEIGHT_REFERENCE_RPE)
+        const targetPercent = percentOf1RM(repsMidpoint, rpeMidpoint)
+        estimate = referenceKg != null ? referenceKg * (targetPercent / referencePercent) : 0
+      }
     }
 
-    if (options.isCalibrationWeek) {
-      // Week 1 with no known numbers: the point is to FIND the weight where
-      // RPE 6 lands, not to hand over a confident-looking number. Overrides
-      // whatever the RPE label alone would allow, same mechanism as the
-      // first-block clamp above.
-      fraction = Math.min(fraction, CALIBRATION_MAX_FRACTION)
+    if (options.isCalibrationWeek && !fromKnownWeight) {
+      // Week 1 with no known numbers: start a shade under the estimate
+      // while it gets verified. A multiplier on the real number, not a
+      // ceiling that overrides the RPE/reps math (see CALIBRATION_WEEK_
+      // CONSERVATISM's doc comment).
+      estimate *= CALIBRATION_WEEK_CONSERVATISM
     }
-
-    estimate *= fraction
 
     // A per-hand dumbbell prescription is half the standard's total — but
     // only for TWO-implement lifts (plural 'dumbbells'). A single dumbbell
@@ -573,17 +686,6 @@ export function prescribeLoad(
     if (isDumbbell) estimate = estimate / 2
 
     rounded = roundToPlate(estimate, mode)
-
-    // Absolute ceiling regardless of profile. This is a hard safety net, not
-    // the primary mechanism — the RPE/first-block scaling above should
-    // already land well under it — but it guarantees a bad multiplier or an
-    // unusually heavy profile can never hand a first, unverified
-    // prescription a dangerous number. Skipped for a known working weight —
-    // that's not an unverified guess this cap exists to catch.
-    if (isFirstBlock && !fromKnownWeight) {
-      const cap = CATEGORY_CAPS_KG[category]
-      if (cap != null) rounded = Math.min(rounded, cap)
-    }
   }
 
   // Only compounds in a strength/power phase ramp; hypertrophy-phase work and
@@ -598,10 +700,10 @@ export function prescribeLoad(
         ? buildRepsProgressionBasis(options.repRangeLabel)
         : buildProgressionBasis(options.repRangeLabel, getLoadIncrementKg(entry, category), isDumbbell))
     : options.isCalibrationWeek
-      ? 'Calibration week — deliberately light. Find the weight where your last rep feels like the target RPE, then log it.'
+      ? 'Calibration week — a shade under your estimated working weight. Find where your last rep feels like the target RPE, then log it.'
       : fromKnownWeight
         ? 'Seeded from the working weight you reported for this lift. Let the effort target correct it if it has changed.'
-        : 'Starting estimate from your bodyweight and experience — not a tested max. ' +
+        : 'Starting estimate from strength standards for your bodyweight, sex and experience — not a tested max. ' +
           'Let the effort target correct it: too easy, add load next set; too hard, drop it.'
 
   return {

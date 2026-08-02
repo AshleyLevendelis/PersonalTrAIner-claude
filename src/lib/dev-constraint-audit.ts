@@ -5,7 +5,21 @@ import type {
   WorkoutDay, ConstraintTrace, PlanResult, TrainingExperience, RecoveryCapacity,
 } from './types'
 import { getSkillDemand, isSkillAppropriate } from './experience-config'
-import { categorize, CATEGORY_CAPS_KG } from './load-prescription'
+import { categorize } from './load-prescription'
+
+// A genuine outer-bound safety backstop — not a conservatism patch (the
+// capability-model round replaced the old CATEGORY_CAPS_KG, which existed to
+// compensate for an inaccurate base estimate, with a real strength-standards
+// table that no longer needs propping up). These numbers are generous enough
+// that a correct estimate for ANY profile should never approach them; if one
+// does, that's a formula regression, not a legitimately heavy lifter.
+const SAFETY_CEILING_KG: Partial<Record<string, number>> = {
+  squat: 260, deadlift: 320, bench: 220, overhead: 140, row: 200,
+  pulldown: 180, leg_press: 400, goblet_squat: 60, hinge_accessory: 180,
+  isolation_bicep: 45, isolation_tricep: 55, isolation_chest: 60,
+  isolation_shoulder: 25, shrug: 140, isolation_quad: 90,
+  isolation_hamstring: 80, isolation_calf: 140, carry: 90,
+}
 import { getReplacementCandidates, swapExerciseInMesocycle, banExerciseFromMesocycle, containsExerciseName } from './mesocycle-edit'
 import { estimateDaySeconds, DURATION_BUDGET_SECONDS } from './session-duration'
 
@@ -312,21 +326,20 @@ function runSingleAudit(
   }
 
   // CHECK 7: No suggested load exceeds its category's absolute first-block
-  // safety cap. `generateExercisePlan` always produces a first, unverified
-  // prescription, so every non-null suggested_load_kg here should have been
-  // capped by prescribeLoad — this check catches a regression in that path.
+  // safety ceiling (see SAFETY_CEILING_KG above) — a formula regression
+  // backstop, not a conservatism cap.
   for (const ex of allExercises) {
     if (ex.suggested_load_kg == null) continue
     const entry = EXERCISE_DATABASE.find(e => e.name === ex.name)
     if (!entry) continue
     const category = categorize(entry)
     if (!category) continue
-    const cap = CATEGORY_CAPS_KG[category]
+    const cap = SAFETY_CEILING_KG[category]
     if (cap != null && ex.suggested_load_kg > cap) {
       failures.push({
         check: 'load_cap',
         combination: comboLabel,
-        details: `Suggested load ${ex.suggested_load_kg}kg exceeds the ${cap}kg first-prescription safety cap for category "${category}"`,
+        details: `Suggested load ${ex.suggested_load_kg}kg exceeds the ${cap}kg outer-bound safety ceiling for category "${category}"`,
         exercise: ex.name,
       })
     }
