@@ -1,7 +1,7 @@
-import type { FitnessGoal, TrainingExperience, WorkoutDay, Exercise } from './types'
+import type { FitnessGoal, TrainingExperience, WorkoutDay, Exercise, UserProfile } from './types'
 import { EXERCISE_DATABASE, getMovementFamily, meetsCapabilityRequirement, type ExerciseEntry } from './exercise-db'
 import { getExperienceConfig, isSkillAppropriate } from './experience-config'
-import { isExternallyLoaded } from './load-prescription'
+import { isExternallyLoaded, preservesRelativeLoad } from './load-prescription'
 
 // ---------------------------------------------------------------------------
 // PERIODIZATION
@@ -136,10 +136,23 @@ export function getPhaseSequence(
     if (goal === 'conditioning') return base
     // Mapping strength and power onto hypertrophy produced three consecutive
     // blocks all labelled "Hypertrophy" — technically safe, but monotonous in
-    // exactly the way that makes people stop using an app. Beginners get their
-    // own sequence instead: still no maximal or explosive work, but four
+    // exactly the way that makes people stop using an app. Beginners get
+    // their own sequence instead: still no power/explosive work, but four
     // distinct phases with different stimulus and different names.
-    return ['anatomical_adaptation', 'hypertrophy', 'metabolic', 'hypertrophy']
+    //
+    // The third block used to be unconditionally 'metabolic' — fine for
+    // fat_loss (which allows it), but hypertrophy/functional goals don't
+    // allow 'metabolic' at all, so restrictPhaseSequence silently rejected
+    // it and fell back through 'hypertrophy', creating an adjacent
+    // hypertrophy/hypertrophy run that dedupeAdjacentPhases then "fixed" by
+    // reintroducing anatomical_adaptation at block 3 — reproducing, one
+    // step removed, the exact "Block 3 repeats Anatomical Adaptation"
+    // defect a review round kept citing. 'strength' is beginner-safe here:
+    // resolveTargetRpe independently caps intensity at RPE 7 for beginners
+    // regardless of the phase's own target, so a "Maximal Strength"-labeled
+    // block for a beginner is still dosed at the same ceiling every other
+    // phase already respects — only the label and rep range differ.
+    return ['anatomical_adaptation', 'hypertrophy', goal === 'fat_loss' ? 'metabolic' : 'strength', 'hypertrophy']
   }
   if (experience === 'novice') {
     // Novices can handle a strength block, but not true power work yet.
@@ -153,12 +166,27 @@ export function getPhaseSequence(
  * A novice's power->strength remap (just above) can land two 'strength'
  * blocks in a row when block 3 was ALREADY strength — "Blocks 3 and 4 are
  * both 'Maximal Strength'... an identical, duplicated block with no
- * differentiation" was a direct LLM coach review finding. Swaps the SECOND
- * occurrence for hypertrophy (always allowed, always distinct from a pure
- * strength block); if hypertrophy is what's repeating, falls back to
- * anatomical_adaptation instead.
+ * differentiation" was a direct LLM coach review finding.
+ *
+ * `allowedPhases`, when passed (Final Generator round, Fix 4), is the
+ * EFFECTIVE allowed set for this profile (goal policy intersected with the
+ * bodyweight equipment restriction, if any) — used to pick a genuinely safe
+ * substitute rather than guessing. Without it, this falls back to the old
+ * hypertrophy<->anatomical_adaptation alternation.
+ *
+ * Critically, this now refuses to reintroduce anatomical_adaptation once it
+ * has already opened the sequence (position 0), except as an absolute last
+ * resort. The old unconditional "swap for AA" behavior is exactly what
+ * caused "Block 3 repeats Anatomical Adaptation after a completed
+ * hypertrophy block" — a beginner's ['AA','hypertrophy','metabolic',
+ * 'hypertrophy'] sequence, restricted for a goal that doesn't allow
+ * 'metabolic' (hypertrophy, functional), fell back to 'hypertrophy' at
+ * position 2, creating an adjacent hypertrophy/hypertrophy run that this
+ * function then "fixed" by reintroducing AA — reproducing the exact defect
+ * it exists to prevent, just one step removed from the original cause.
  */
-export function dedupeAdjacentPhases(sequence: TrainingPhase[]): TrainingPhase[] {
+export function dedupeAdjacentPhases(sequence: TrainingPhase[], allowedPhases?: TrainingPhase[]): TrainingPhase[] {
+  const allowed = allowedPhases ? new Set(allowedPhases) : null
   const result: TrainingPhase[] = []
   for (let i = 0; i < sequence.length; i++) {
     const phase = sequence[i]
@@ -166,16 +194,44 @@ export function dedupeAdjacentPhases(sequence: TrainingPhase[]): TrainingPhase[]
     // array — a naive sequence.map comparing against the original would
     // flag every phase in a run of 3+ identical phases as "a duplicate of
     // the first," collapsing all of them to the same replacement instead of
-    // alternating (a bodyweight advanced hypertrophy plan's ['AA',
-    // 'hypertrophy','hypertrophy','hypertrophy'] — after the equipment
-    // restriction below folds 'strength' to 'hypertrophy' — needs to become
-    // ['AA','hypertrophy','anatomical_adaptation','hypertrophy'], not
-    // ['AA','hypertrophy','anatomical_adaptation','anatomical_adaptation']).
+    // alternating.
     if (i === 0 || phase !== result[i - 1]) {
       result.push(phase)
-    } else {
-      result.push(phase === 'hypertrophy' ? 'anatomical_adaptation' : 'hypertrophy')
+      continue
     }
+
+    const priorAA = result.includes('anatomical_adaptation')
+    // Priority: (1) a phase already used elsewhere in the sequence at a
+    // non-adjacent spot — it's already known-safe for this profile, since
+    // it survived whatever restriction produced `sequence` — excluding the
+    // one that's currently repeating and excluding AA once it's already
+    // opened the cycle; (2) hypertrophy, universally allowed and safe,
+    // unless IT is what's repeating; (3) any OTHER phase from the allowed
+    // set not yet tried (covers cases where the intended differentiator —
+    // e.g. 'metabolic' or 'strength' — was stripped out by an earlier
+    // restriction step before ever reaching `sequence`, so it can't be
+    // found in `result` at all); (4) anatomical_adaptation, but only if it
+    // has never appeared yet.
+    const usedElsewhere = [...new Set(result)].filter(p => p !== phase)
+    const ALL_PHASES: TrainingPhase[] = ['anatomical_adaptation', 'hypertrophy', 'strength', 'power', 'metabolic']
+    const candidates: TrainingPhase[] = [
+      ...usedElsewhere.filter(p => p !== 'anatomical_adaptation' || !priorAA),
+      ...(phase !== 'hypertrophy' ? (['hypertrophy'] as TrainingPhase[]) : []),
+      ...ALL_PHASES.filter(p => p !== phase && p !== 'hypertrophy' && (p !== 'anatomical_adaptation' || !priorAA)),
+      ...(priorAA ? [] : (['anatomical_adaptation'] as TrainingPhase[])),
+    ]
+    // Absolute last resort, when the allowed set is so narrow that nothing
+    // in `candidates` clears it (e.g. a bodyweight hypertrophy trainee,
+    // where the goal-policy allowed set intersected with the equipment
+    // restriction leaves only {anatomical_adaptation, hypertrophy}): accept
+    // the repeat rather than reintroduce AA once it's already opened the
+    // sequence. A macrocycle with two hypertrophy-labeled blocks back to
+    // back is a minor, forgivable monotony; being sent back to tendon-prep
+    // after two months of real training is the specific, sharply-worded
+    // defect this function exists to prevent.
+    const pick = candidates.find(p => !allowed || allowed.has(p))
+      ?? (priorAA ? phase : (phase === 'hypertrophy' ? 'anatomical_adaptation' : 'hypertrophy'))
+    result.push(pick)
   }
   return result
 }
@@ -255,6 +311,12 @@ export function rotateVariation(
   pool: ExerciseEntry[],
   experience: TrainingExperience,
   /**
+   * Needed for the relative-load guard below (preservesRelativeLoad) — the
+   * loading-class guard alone lets a 28kg dumbbell row rotate to a 27.5kg
+   * backpack row (both "loaded"), which is still a stealth ~50% regression.
+   */
+  profile: UserProfile,
+  /**
    * Names already spoken for elsewhere in the SAME session this week — e.g.
    * another exercise on the same day, or the day's own main lift. When the
    * naturally-computed rotation would collide with one of these, the
@@ -302,7 +364,10 @@ export function rotateVariation(
         // heavily enough to drive adaptation at that level.
         e.mechanics_tier === current.mechanics_tier &&
         !isRegressionFor(e.name, experience) &&
-        (!currentIsLoaded || isExternallyLoaded(e))
+        (!currentIsLoaded || isExternallyLoaded(e)) &&
+        // Fix 3: loaded -> loaded rotation must also preserve roughly the
+        // same loading demand, not just clear the "is it loaded at all" bar.
+        preservesRelativeLoad(current, e, profile)
     )
     // Stable ordering so rotation is deterministic rather than random —
     // the user should be able to see the same plan twice.

@@ -876,3 +876,56 @@ export function prescribeLoad(
     per_set,
   }
 }
+
+// ---------------------------------------------------------------------------
+// Relative-load rotation guard (Final Generator round, Fix 3)
+// ---------------------------------------------------------------------------
+// The loading-class guard (Calibration round) stops a loaded exercise from
+// rotating to a bodyweight one, but a review caught the adjacent failure
+// mode it can't see: "Dumbbell Rows @28kg/hand becomes Backpack Row
+// @27.5kg total" is loaded -> loaded, so it passes the class check cleanly,
+// but 56kg total (28 x2) collapsing to 27.5kg is still a stealth ~50%
+// regression. This estimates each side's TOTAL effective load at a fixed,
+// consistent reference point (10 reps @ RPE 7 — not any specific week's
+// real prescription, just an apples-to-apples yardstick) so rotation
+// candidates can be filtered by "does this preserve roughly the same
+// loading demand" independent of whichever week happens to be rotating.
+
+const RELATIVE_LOAD_REFERENCE_REPS = 10
+const RELATIVE_LOAD_REFERENCE_RPE = 7
+
+/**
+ * A consistent, week-independent estimate of the TOTAL (not per-hand) load
+ * a profile would be prescribed on this exercise — used only to compare two
+ * exercises' relative demand for rotation purposes, never shown to a user.
+ * Returns null for bodyweight/uncategorizable movements, which have no load
+ * to compare.
+ */
+export function estimateEffectiveTotalKg(entry: ExerciseEntry, profile: UserProfile): number | null {
+  const load = prescribeLoad(entry, profile, {
+    targetRpeLabel: `RPE ${RELATIVE_LOAD_REFERENCE_RPE}`,
+    repRangeLabel: String(RELATIVE_LOAD_REFERENCE_REPS),
+    sets: 1,
+  })
+  if (load.starting_weight_kg == null) return null
+  // A two-implement dumbbell pair's starting_weight_kg is already the
+  // per-hand number — double it back to total load moved, the quantity
+  // that actually matters for "did this rotation preserve the demand."
+  return loadingMode(entry) === 'dumbbell' ? load.starting_weight_kg * 2 : load.starting_weight_kg
+}
+
+/**
+ * True when `candidate` preserves roughly the same loading demand as
+ * `current` for this profile — within +-40% of current's effective total
+ * load. Exercises with no comparable load (bodyweight either side) always
+ * pass this check; the loading-class guard elsewhere is what governs
+ * bodyweight <-> loaded transitions, this only judges loaded <-> loaded.
+ */
+export function preservesRelativeLoad(current: ExerciseEntry, candidate: ExerciseEntry, profile: UserProfile): boolean {
+  const currentKg = estimateEffectiveTotalKg(current, profile)
+  if (currentKg == null || currentKg <= 0) return true
+  const candidateKg = estimateEffectiveTotalKg(candidate, profile)
+  if (candidateKg == null) return true
+  const ratio = candidateKg / currentKg
+  return ratio >= 0.6 && ratio <= 1.4
+}

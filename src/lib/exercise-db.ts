@@ -1,6 +1,6 @@
-import { TrainingStyle, type TrainingExperience } from './types'
+import { TrainingStyle, type TrainingExperience, type UserProfile } from './types'
 import { isRegressionFor } from './periodization'
-import { isExternallyLoaded } from './load-prescription'
+import { isExternallyLoaded, preservesRelativeLoad } from './load-prescription'
 
 export type MovementPattern =
   | 'horizontal_push'
@@ -1800,7 +1800,14 @@ export function getSmartReplacements(
   exerciseName: string,
   pool: ExerciseEntry[],
   experience: TrainingExperience,
-  exclusions: string[] = []
+  exclusions: string[] = [],
+  /**
+   * Needed for the relative-load guard below (preservesRelativeLoad) —
+   * optional and defaulted to undefined for any pre-existing caller that
+   * doesn't have a profile handy; the relative-load check is skipped
+   * (falls back to loading-class only) when omitted.
+   */
+  profile?: UserProfile,
 ): { exercise: ExerciseEntry; note: string }[] {
   const current = EXERCISE_DATABASE.find(
     e => e.name.toLowerCase() === exerciseName.toLowerCase()
@@ -1824,6 +1831,10 @@ export function getSmartReplacements(
     if (e.name === current.name) return false
     if (isRegressionFor(e.name, experience) && !isRegressionFor(current.name, experience)) return false
     if (currentIsLoaded && !isExternallyLoaded(e)) return false
+    // Fix 3: loaded -> loaded must also preserve roughly the same loading
+    // demand — the class guard above alone lets a 28kg dumbbell row swap
+    // to a 27.5kg backpack row (both "loaded"), a stealth ~50% regression.
+    if (profile && !preservesRelativeLoad(current, e, profile)) return false
     return true
   })
 

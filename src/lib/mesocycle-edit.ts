@@ -30,7 +30,7 @@ export function getReplacementCandidates(
   exclusions: string[],
 ): { exercise: ExerciseEntry; note: string }[] {
   const pool = getConstrainedPool(profile, exclusions)
-  return getSmartReplacements(exerciseName, pool, profile.training_experience || 'novice', exclusions)
+  return getSmartReplacements(exerciseName, pool, profile.training_experience || 'novice', exclusions, profile)
 }
 
 function parseRepsHigh(reps: string): number | null {

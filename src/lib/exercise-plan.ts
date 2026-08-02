@@ -41,6 +41,56 @@ interface TrackDefinition {
   forbidden_patterns: MovementPattern[]
   primer_patterns: MovementPattern[]
   required_patterns: MovementPattern[]
+  slots: TrackSlot[]
+}
+
+// ---------------------------------------------------------------------------
+// Pattern-guaranteed slots (Final Generator Round, Fix 1)
+// ---------------------------------------------------------------------------
+// The pre-existing selection model filtered the pool down to a track's
+// primary/secondary patterns, shuffled, and picked N — "filter then hope."
+// primary_patterns for "Push & Press" is [horizontal_push, vertical_push]
+// as an OR, so a session could legally land two horizontal presses and zero
+// vertical ones; "Pull & Hinge" only REQUIRED hip_hinge, never horizontal
+// AND vertical pull separately. Reviews converged on exactly this: "zero
+// vertical pull in the entire week," "zero vertical pressing... no pike
+// push-up, no handstand progression," repeated across nearly every profile
+// despite "pull" or "push" broadly being present.
+//
+// Slots are filled IN ORDER, each one guaranteed a specific pattern (or
+// nearest-pattern substitute, logged, if equipment/injury genuinely leaves
+// nothing) rather than a shared pool everything competes for. Filled first,
+// before the legacy pickFromTier/refill pass (kept below to top up to the
+// duration-based exercise count) — see selectExercisesForTrack.
+interface TrackSlot {
+  /** Patterns that satisfy this slot, in preference order. */
+  patterns: MovementPattern[]
+  /** Preferred DB tier — falls back to any tier if nothing at the preferred one is eligible. */
+  tier: 'tier1_compound' | 'tier2_compound' | 'tier3_isolation' | 'cardio'
+  /** Never silently dropped — falls through to NEAREST_PATTERN_FALLBACK and logs via trace if even that fails. */
+  required: boolean
+}
+
+// Last-resort substitution when a required slot's own patterns have zero
+// eligible candidates anywhere in the constrained pool (equipment/injury
+// genuinely forbids the whole category) — the nearest coaching-equivalent
+// pattern, not a random one, so a missing vertical press becomes a second
+// horizontal press rather than an unrelated isolation exercise.
+const NEAREST_PATTERN_FALLBACK: Partial<Record<MovementPattern, MovementPattern[]>> = {
+  vertical_push: ['horizontal_push'],
+  horizontal_push: ['vertical_push'],
+  vertical_pull: ['horizontal_pull'],
+  horizontal_pull: ['vertical_pull'],
+  hip_hinge: ['knee_dominant', 'single_leg'],
+  knee_dominant: ['hip_hinge', 'single_leg'],
+  single_leg: ['knee_dominant', 'hip_hinge'],
+  carry: ['core'],
+  isolation_bicep: ['horizontal_pull'],
+  isolation_tricep: ['horizontal_push'],
+  isolation_shoulder: ['vertical_push'],
+  isolation_quad: ['knee_dominant'],
+  isolation_hamstring: ['hip_hinge'],
+  isolation_calf: ['knee_dominant'],
 }
 
 const TRACKS: Record<TrackFocus, TrackDefinition> = {
@@ -51,6 +101,13 @@ const TRACKS: Record<TrackFocus, TrackDefinition> = {
     forbidden_patterns: ['isolation_bicep', 'horizontal_pull', 'vertical_pull'],
     primer_patterns: ['activation'],
     required_patterns: [],
+    slots: [
+      { patterns: ['horizontal_push'], tier: 'tier1_compound', required: true },
+      { patterns: ['vertical_push'], tier: 'tier2_compound', required: true },
+      { patterns: ['isolation_tricep'], tier: 'tier3_isolation', required: false },
+      { patterns: ['isolation_shoulder'], tier: 'tier3_isolation', required: false },
+      { patterns: ['core'], tier: 'tier3_isolation', required: false },
+    ],
   },
   'Pull & Hinge': {
     label: 'Pull & Hinge',
@@ -59,6 +116,14 @@ const TRACKS: Record<TrackFocus, TrackDefinition> = {
     forbidden_patterns: ['isolation_tricep', 'horizontal_push', 'vertical_push'],
     primer_patterns: ['activation'],
     required_patterns: ['hip_hinge'],
+    slots: [
+      { patterns: ['hip_hinge'], tier: 'tier1_compound', required: true },
+      { patterns: ['vertical_pull'], tier: 'tier2_compound', required: true },
+      { patterns: ['horizontal_pull'], tier: 'tier2_compound', required: true },
+      { patterns: ['isolation_bicep'], tier: 'tier3_isolation', required: false },
+      { patterns: ['isolation_hamstring'], tier: 'tier3_isolation', required: false },
+      { patterns: ['core'], tier: 'tier3_isolation', required: false },
+    ],
   },
   'Squat & Carry': {
     label: 'Squat & Carry',
@@ -67,6 +132,14 @@ const TRACKS: Record<TrackFocus, TrackDefinition> = {
     forbidden_patterns: ['horizontal_push', 'horizontal_pull', 'isolation_bicep', 'isolation_tricep'],
     primer_patterns: ['activation'],
     required_patterns: ['carry'],
+    slots: [
+      { patterns: ['knee_dominant'], tier: 'tier1_compound', required: true },
+      { patterns: ['carry'], tier: 'tier2_compound', required: true },
+      { patterns: ['single_leg'], tier: 'tier2_compound', required: false },
+      { patterns: ['isolation_quad'], tier: 'tier3_isolation', required: false },
+      { patterns: ['isolation_calf'], tier: 'tier3_isolation', required: false },
+      { patterns: ['core'], tier: 'tier3_isolation', required: false },
+    ],
   },
   'Upper Pull & Core': {
     label: 'Upper Pull & Core',
@@ -75,6 +148,13 @@ const TRACKS: Record<TrackFocus, TrackDefinition> = {
     forbidden_patterns: ['isolation_tricep', 'horizontal_push'],
     primer_patterns: ['activation'],
     required_patterns: ['core'],
+    slots: [
+      { patterns: ['vertical_pull'], tier: 'tier1_compound', required: true },
+      { patterns: ['horizontal_pull'], tier: 'tier2_compound', required: true },
+      { patterns: ['isolation_bicep'], tier: 'tier3_isolation', required: false },
+      { patterns: ['isolation_shoulder'], tier: 'tier3_isolation', required: false },
+      { patterns: ['core'], tier: 'tier3_isolation', required: true },
+    ],
   },
   'Full Body Power': {
     label: 'Full Body Power',
@@ -83,6 +163,13 @@ const TRACKS: Record<TrackFocus, TrackDefinition> = {
     forbidden_patterns: [],
     primer_patterns: ['activation'],
     required_patterns: [],
+    slots: [
+      { patterns: ['knee_dominant', 'hip_hinge'], tier: 'tier1_compound', required: true },
+      { patterns: ['horizontal_push'], tier: 'tier2_compound', required: true },
+      { patterns: ['vertical_pull', 'horizontal_pull'], tier: 'tier2_compound', required: true },
+      { patterns: ['single_leg'], tier: 'tier2_compound', required: false },
+      { patterns: ['core'], tier: 'tier3_isolation', required: false },
+    ],
   },
   'Conditioning & Core': {
     label: 'Conditioning & Core',
@@ -91,6 +178,10 @@ const TRACKS: Record<TrackFocus, TrackDefinition> = {
     forbidden_patterns: [],
     primer_patterns: ['activation'],
     required_patterns: ['core'],
+    slots: [
+      { patterns: ['cardio'], tier: 'cardio', required: true },
+      { patterns: ['core'], tier: 'tier3_isolation', required: true },
+    ],
   },
   'Chest & Triceps': {
     label: 'Chest & Triceps',
@@ -99,6 +190,12 @@ const TRACKS: Record<TrackFocus, TrackDefinition> = {
     forbidden_patterns: ['horizontal_pull', 'vertical_pull', 'hip_hinge', 'knee_dominant', 'single_leg', 'carry', 'isolation_bicep', 'isolation_hamstring', 'isolation_quad', 'isolation_calf'],
     primer_patterns: ['activation'],
     required_patterns: [],
+    slots: [
+      { patterns: ['horizontal_push'], tier: 'tier1_compound', required: true },
+      { patterns: ['horizontal_push'], tier: 'tier2_compound', required: false },
+      { patterns: ['isolation_tricep'], tier: 'tier3_isolation', required: false },
+      { patterns: ['isolation_tricep'], tier: 'tier3_isolation', required: false },
+    ],
   },
   'Back & Biceps': {
     label: 'Back & Biceps',
@@ -107,6 +204,12 @@ const TRACKS: Record<TrackFocus, TrackDefinition> = {
     forbidden_patterns: ['horizontal_push', 'vertical_push', 'hip_hinge', 'knee_dominant', 'single_leg', 'carry', 'isolation_tricep', 'isolation_shoulder', 'isolation_quad', 'isolation_calf'],
     primer_patterns: ['activation'],
     required_patterns: [],
+    slots: [
+      { patterns: ['vertical_pull'], tier: 'tier1_compound', required: true },
+      { patterns: ['horizontal_pull'], tier: 'tier2_compound', required: true },
+      { patterns: ['isolation_bicep'], tier: 'tier3_isolation', required: false },
+      { patterns: ['isolation_bicep'], tier: 'tier3_isolation', required: false },
+    ],
   },
   'Legs & Calves': {
     label: 'Legs & Calves',
@@ -115,14 +218,40 @@ const TRACKS: Record<TrackFocus, TrackDefinition> = {
     forbidden_patterns: ['horizontal_push', 'horizontal_pull', 'vertical_push', 'vertical_pull', 'isolation_bicep', 'isolation_tricep', 'isolation_shoulder'],
     primer_patterns: ['activation'],
     required_patterns: [],
+    slots: [
+      { patterns: ['knee_dominant'], tier: 'tier1_compound', required: true },
+      { patterns: ['hip_hinge'], tier: 'tier2_compound', required: true },
+      { patterns: ['single_leg'], tier: 'tier2_compound', required: false },
+      { patterns: ['isolation_quad'], tier: 'tier3_isolation', required: false },
+      { patterns: ['isolation_hamstring'], tier: 'tier3_isolation', required: false },
+      { patterns: ['isolation_calf'], tier: 'tier3_isolation', required: false },
+    ],
   },
   'Shoulders & Abs': {
     label: 'Shoulders & Abs',
-    primary_patterns: ['vertical_push', 'isolation_shoulder'],
+    primary_patterns: ['vertical_push', 'isolation_shoulder', 'single_leg', 'knee_dominant', 'hip_hinge'],
     secondary_patterns: ['core'],
-    forbidden_patterns: ['horizontal_push', 'horizontal_pull', 'vertical_pull', 'hip_hinge', 'knee_dominant', 'single_leg', 'carry', 'isolation_bicep', 'isolation_tricep', 'isolation_quad', 'isolation_calf'],
+    // hip_hinge/knee_dominant/single_leg deliberately NOT forbidden — see
+    // the leg-accessory slot below. A traditional 4-day body-part split
+    // (Chest & Triceps / Back & Biceps / Legs & Calves / Shoulders & Abs)
+    // otherwise trains legs on exactly one day out of four; every other
+    // day's forbidden_patterns explicitly excludes squat/hinge by design
+    // (a chest day isn't supposed to do legs), which left NOTHING for
+    // balanceWeeklyStructure's leg-day-coverage pass to add to. Reviews
+    // and this round's own audit both converged on "legs trained once a
+    // week" for exactly this split.
+    forbidden_patterns: ['horizontal_push', 'horizontal_pull', 'vertical_pull', 'carry', 'isolation_bicep', 'isolation_tricep', 'isolation_quad', 'isolation_calf'],
     primer_patterns: ['activation'],
     required_patterns: ['core'],
+    slots: [
+      { patterns: ['vertical_push'], tier: 'tier1_compound', required: true },
+      // A light unilateral leg accessory — not a second leg day, just
+      // enough real exposure to satisfy "legs >=2 days/week" without
+      // turning a shoulders day into a squat day.
+      { patterns: ['single_leg', 'knee_dominant', 'hip_hinge'], tier: 'tier2_compound', required: true },
+      { patterns: ['isolation_shoulder'], tier: 'tier3_isolation', required: false },
+      { patterns: ['core'], tier: 'tier3_isolation', required: true },
+    ],
   },
 }
 
@@ -569,6 +698,14 @@ function stageTimeCap(
   budgetSeconds: number,
   style: TrainingStyle,
   trace: ConstraintTrace,
+  /**
+   * Names that filled a REQUIRED track slot (selectExercisesForTrack) —
+   * Phase 4 below must never remove one of these outright under duration
+   * pressure, or Fix 1's "never silently drop the slot" guarantee gets
+   * silently undone one stage later. They can still lose SETS (Phase 5),
+   * just not disappear entirely.
+   */
+  protectedNames: Set<string> = new Set(),
 ): { entry: ExerciseEntry; sets: number; reps: string; rest: string; restSeconds: number }[] {
   let estimated = estimateSessionDuration(dayExercises.map(e => ({ entry: e.entry, sets: e.sets, reps: e.reps, restSeconds: e.restSeconds })))
 
@@ -628,10 +765,14 @@ function stageTimeCap(
   // Phase 5 below — on a dedicated conditioning day it usually sits at the
   // END of the array (selection sorts tier1->tier2->tier3->cardio), so a
   // blind pop() would remove the conditioning content FIRST on exactly the
-  // day it matters most.
+  // day it matters most. Required-slot exercises (protectedNames) are
+  // skipped the same way — dropping a Fix-1 guaranteed pattern here would
+  // silently undo the "never silently drop the slot" promise one stage
+  // later; those exercises can still lose sets in Phase 5, just not
+  // disappear outright.
   while (estimated > budgetSeconds && dayExercises.length > 3) {
     let removeIdx = dayExercises.length - 1
-    while (removeIdx >= 0 && dayExercises[removeIdx].entry.mechanics_tier === 'cardio') removeIdx--
+    while (removeIdx >= 0 && (dayExercises[removeIdx].entry.mechanics_tier === 'cardio' || protectedNames.has(dayExercises[removeIdx].entry.name))) removeIdx--
     if (removeIdx < 0 || dayExercises.length <= 3) break
     const removed = dayExercises.splice(removeIdx, 1)[0]
     trace.time_cap_adjusted.push({
@@ -818,9 +959,10 @@ function selectExercisesForTrack(
   counts: { tier1: number; tier2: number; tier3: number },
   weeklyUsed: Set<string>,
   styleConfig: StyleConfig,
+  trace: ConstraintTrace,
   feasibleRequiredPatterns?: MovementPattern[],
   weeklyAppearanceCount?: Map<string, number>,
-): { primer: ExerciseEntry | null; main: ExerciseEntry[] } {
+): { primer: ExerciseEntry | null; main: ExerciseEntry[]; requiredNames: Set<string> } {
   const allPatterns = new Set([...track.primary_patterns, ...track.secondary_patterns])
   const forbidden = new Set(track.forbidden_patterns)
 
@@ -847,6 +989,67 @@ function selectExercisesForTrack(
   const usedGroups = new Set<string>()
   if (primer) usedGroups.add(getMovementFamily(primer))
   const selected: ExerciseEntry[] = []
+  // Names that filled a REQUIRED slot — stageTimeCap must never silently
+  // drop one of these under duration pressure (that's exactly the "never
+  // silently drop the slot" guarantee Fix 1 exists to provide); it may
+  // still trim their SETS, just not remove them outright.
+  const requiredNames = new Set<string>()
+
+  // Pattern-guaranteed slots — filled FIRST, in order, before the legacy
+  // pickFromTier/refill pass below tops up to the duration-based count. See
+  // TrackSlot's doc comment for why this replaced pure filter-then-shuffle.
+  const slotForbidden = new Set(track.forbidden_patterns)
+  function findForSlot(patterns: MovementPattern[], tier: TrackSlot['tier'] | null, respectWeeklyUsed: boolean): ExerciseEntry | null {
+    const candidates = shuffle(
+      pool.filter(e =>
+        patterns.includes(e.movement_pattern) &&
+        !slotForbidden.has(e.movement_pattern) &&
+        (tier === null || e.mechanics_tier === tier) &&
+        !selected.some(s => s.name === e.name) &&
+        !usedGroups.has(getMovementFamily(e)) &&
+        (!respectWeeklyUsed || !weeklyUsed.has(e.name))
+      )
+    )
+    return candidates[0] ?? null
+  }
+  function fillSlot(slot: TrackSlot): void {
+    // Preferred tier wins over "fresh this week" — reusing the same main
+    // lift on a second day (normal in full-body/PPL splits) is a better
+    // outcome than downgrading a squat slot to a lunge just to avoid
+    // repetition, so tier preference is resolved FIRST, freshness second:
+    // preferred tier + fresh -> preferred tier + reused ok -> any tier +
+    // fresh -> any tier + reused ok -> nearest-pattern substitute (required
+    // slots only, logged) -> give up (required slots only, logged).
+    const pick =
+      findForSlot(slot.patterns, slot.tier, true) ??
+      findForSlot(slot.patterns, slot.tier, false) ??
+      findForSlot(slot.patterns, null, true) ??
+      findForSlot(slot.patterns, null, false)
+    if (pick) {
+      selected.push(pick)
+      usedGroups.add(getMovementFamily(pick))
+      if (slot.required) requiredNames.add(pick.name)
+      return
+    }
+    if (!slot.required) return
+    const nearest = slot.patterns.flatMap(p => NEAREST_PATTERN_FALLBACK[p] ?? [])
+    const substitute = nearest.length > 0 ? (findForSlot(nearest, null, true) ?? findForSlot(nearest, null, false)) : null
+    if (substitute) {
+      selected.push(substitute)
+      usedGroups.add(getMovementFamily(substitute))
+      requiredNames.add(substitute.name)
+      trace.structure_adjusted.push({
+        exercise: substitute.name, stage: 'structure',
+        reason: `"${track.label}" required slot for [${slot.patterns.join('/')}] had no eligible exercise — substituted nearest pattern "${substitute.movement_pattern}"`,
+      })
+      return
+    }
+    trace.structure_adjusted.push({
+      exercise: '(none)', stage: 'structure',
+      reason: `"${track.label}" required slot for [${slot.patterns.join('/')}] could not be filled even with a nearest-pattern substitute — equipment/injury genuinely leaves nothing eligible`,
+    })
+  }
+  for (const slot of track.slots) fillSlot(slot)
 
   function pickFromTier(tier: string, count: number, patterns: MovementPattern[]) {
     const candidates = shuffle(
@@ -1022,7 +1225,7 @@ function selectExercisesForTrack(
   const tierOrder = { tier1_compound: 0, tier2_compound: 1, tier3_isolation: 2, cardio: 3, primer: 4 }
   selected.sort((a, b) => (tierOrder[a.mechanics_tier] ?? 3) - (tierOrder[b.mechanics_tier] ?? 3))
 
-  return { primer, main: selected }
+  return { primer, main: selected, requiredNames }
 }
 
 // ---------------------------------------------------------------------------
@@ -1448,6 +1651,16 @@ function balanceWeeklyStructure(
   profile: UserProfile,
   trace: ConstraintTrace,
   styleConfig: StyleConfig,
+  /**
+   * Names that filled a REQUIRED slot somewhere in the week
+   * (selectExercisesForTrack) — the push:pull/coverage passes below must
+   * never swap-away or remove one of these. A review-round regression: the
+   * push:pull ratio pass' "remove weakest exercise" fallback (Fix 2) once
+   * removed the exact Dumbbell Shoulder Press that Fix 1's required
+   * vertical_push slot had just placed, because nothing here knew it was
+   * protected — the guarantee and the balancer were fighting each other.
+   */
+  protectedNames: Set<string> = new Set(),
 ): void {
   const dayFamilies = (dayIdx: number): Set<string> =>
     new Set(
@@ -1475,12 +1688,44 @@ function balanceWeeklyStructure(
   const dayAllowsPattern = (dayIdx: number, pattern: Exclude<BalancePattern, null>): boolean =>
     BALANCE_PATTERN_RAW[pattern].some(p => !dayForbidden(dayIdx).has(p))
 
+  // Finer-grained coverage check than BalancePattern's push/pull — Fix 1's
+  // day-templates now guarantee horizontal+vertical push/pull PER DAY, but
+  // this weekly pass is the backstop for splits where no single day's
+  // template carries both (a 2-3 day split, or a required slot that fell
+  // through to a nearest-pattern substitute). "push" broadly present was
+  // never the review complaint; "zero vertical pull in the entire week"
+  // while horizontal pull was plentiful was.
+  type CoveragePattern = 'squat' | 'hinge' | 'horizontal_push' | 'vertical_push' | 'horizontal_pull' | 'vertical_pull'
+  const COVERAGE_PATTERNS: CoveragePattern[] = ['squat', 'hinge', 'horizontal_push', 'vertical_push', 'horizontal_pull', 'vertical_pull']
+  function classifyForCoverage(pattern: MovementPattern): CoveragePattern | null {
+    switch (pattern) {
+      case 'horizontal_push': return 'horizontal_push'
+      case 'vertical_push': return 'vertical_push'
+      case 'horizontal_pull': return 'horizontal_pull'
+      case 'vertical_pull': return 'vertical_pull'
+      case 'knee_dominant': case 'single_leg': return 'squat'
+      case 'hip_hinge': return 'hinge'
+      default: return null
+    }
+  }
+  const COVERAGE_PATTERN_RAW: Record<CoveragePattern, MovementPattern[]> = {
+    squat: ['knee_dominant', 'single_leg'],
+    hinge: ['hip_hinge'],
+    horizontal_push: ['horizontal_push'],
+    vertical_push: ['vertical_push'],
+    horizontal_pull: ['horizontal_pull'],
+    vertical_pull: ['vertical_pull'],
+  }
+  const dayAllowsCoveragePattern = (dayIdx: number, pattern: CoveragePattern): boolean =>
+    COVERAGE_PATTERN_RAW[pattern].some(p => !dayForbidden(dayIdx).has(p))
+
   function findAccessorySlot(want: (p: BalancePattern) => boolean): { dayIdx: number; exIdx: number } | null {
     for (let dayIdx = 0; dayIdx < days.length; dayIdx++) {
       const exercises = days[dayIdx].exercises
       for (let exIdx = 0; exIdx < exercises.length; exIdx++) {
         const entry = findEntry(exercises[exIdx].name)
         if (!entry || entry.mechanics_tier === 'tier1_compound' || entry.mechanics_tier === 'primer') continue
+        if (protectedNames.has(exercises[exIdx].name)) continue
         if (want(classifyForBalance(entry.movement_pattern))) return { dayIdx, exIdx }
       }
     }
@@ -1502,39 +1747,105 @@ function balanceWeeklyStructure(
     )
   }
 
-  // --- Weekly pattern coverage: squat, hinge, push, pull ---
-  const patternsPresent = new Set<BalancePattern>()
+  // Final Generator round, Fix 2: when there's no accessory slot LEFT to
+  // swap (every slot on every eligible day already carries the pattern
+  // that's already in excess), swapping can't close the gap — the week
+  // needs one more exercise, not a substitution. Builds a fresh Exercise
+  // the same way the base-plan construction loop does (no movement_pattern/
+  // tier/fatigue_cost — those are only added later, during periodization).
+  function addExercise(dayIdx: number, entry: ExerciseEntry, reason: string): void {
+    trace.structure_adjusted.push({
+      exercise: entry.name, stage: 'structure',
+      reason: `${reason} — added "${entry.name}" to ${days[dayIdx].day} (no swap candidate could close the gap)`,
+    })
+    weeklyUsed.add(entry.name)
+    allSelectedNames.add(entry.name)
+    const isPrimer = entry.mechanics_tier === 'primer'
+    const intensity = isPrimer ? 'Light — movement prep' : experience.target_rpe
+    const sr = assignSetsRepsFromConfig(entry, styleConfig, experience)
+    const load = prescribeLoad(entry, profile, { targetRpeLabel: intensity, isFirstBlock: true, sets: sr.sets })
+    days[dayIdx].exercises.push({
+      name: entry.name,
+      sets: sr.sets,
+      reps: sr.reps,
+      rest: sr.rest,
+      substitution: getSubstitution(entry, pool, allSelectedNames),
+      intensity,
+      prescription_type: entry.prescription_type,
+      load_guidance: isPrimer ? 'Stay light and controlled. This is preparation, not a working set.' : `${experience.load_guidance} ${load.basis}`,
+      suggested_load: isPrimer ? 'Light' : load.display,
+      suggested_load_kg: isPrimer ? null : load.starting_weight_kg,
+      per_set_load: isPrimer ? null : load.per_set,
+    })
+  }
+
+  // Mirror of addExercise — removes the weakest excess-pattern accessory
+  // outright rather than trimming it toward a floor that can't fall any
+  // further. Never removes a day's last exercise, and never a superset
+  // partner (would orphan the label onto a pairing that no longer exists).
+  function removeWeakestExercise(pattern: Exclude<BalancePattern, null>, reason: string): boolean {
+    for (let dayIdx = days.length - 1; dayIdx >= 0; dayIdx--) {
+      const exercises = days[dayIdx].exercises
+      if (exercises.length <= 1) continue
+      for (let exIdx = exercises.length - 1; exIdx >= 0; exIdx--) {
+        const entry = findEntry(exercises[exIdx].name)
+        if (!entry || entry.mechanics_tier === 'tier1_compound' || entry.mechanics_tier === 'primer') continue
+        if (classifyForBalance(entry.movement_pattern) !== pattern) continue
+        if (exercises[exIdx].superset_label) continue
+        if (protectedNames.has(exercises[exIdx].name)) continue
+        trace.structure_adjusted.push({
+          exercise: exercises[exIdx].name, stage: 'structure',
+          reason: `${reason} — removed "${exercises[exIdx].name}" from ${days[dayIdx].day}`,
+        })
+        weeklyUsed.delete(exercises[exIdx].name)
+        allSelectedNames.delete(exercises[exIdx].name)
+        exercises.splice(exIdx, 1)
+        return true
+      }
+    }
+    return false
+  }
+
+  // --- Weekly pattern coverage: squat, hinge, horizontal/vertical push,
+  // horizontal/vertical pull — each guaranteed >=1x/week where the
+  // constrained pool has anything eligible at all. Six distinct checks, not
+  // four collapsed ones (see CoveragePattern's doc comment above) — this is
+  // the weekly-level backstop behind Fix 1's per-day slot guarantees.
+  const coveragePresent = new Set<CoveragePattern>()
   for (const day of days) {
     for (const ex of day.exercises) {
       const entry = findEntry(ex.name)
-      if (entry) patternsPresent.add(classifyForBalance(entry.movement_pattern))
+      const cov = entry ? classifyForCoverage(entry.movement_pattern) : null
+      if (cov) coveragePresent.add(cov)
     }
   }
-  const poolHasPattern = (test: (p: BalancePattern) => boolean) =>
-    pool.some(e => test(classifyForBalance(e.movement_pattern)))
+  const poolHasCoveragePattern = (pattern: CoveragePattern) =>
+    pool.some(e => classifyForCoverage(e.movement_pattern) === pattern)
 
-  for (const missing of ['squat', 'hinge', 'push', 'pull'] as const) {
-    if (patternsPresent.has(missing)) continue
+  for (const missing of COVERAGE_PATTERNS) {
+    if (coveragePresent.has(missing)) continue
     // Equipment/injuries genuinely leave nothing of this pattern available —
     // nothing to add, and nothing worth flagging as a gap.
-    if (!poolHasPattern(p => p === missing)) continue
+    if (!poolHasCoveragePattern(missing)) continue
 
     // Sacrifice the weakest accessory slot: prefer a tier3 isolation slot,
     // scanning from the end of the week backward so the days built around
     // heavier/earlier tracks are disturbed last.
     let slot: { dayIdx: number; exIdx: number } | null = null
     for (let dayIdx = days.length - 1; dayIdx >= 0 && !slot; dayIdx--) {
-      if (!dayAllowsPattern(dayIdx, missing)) continue
+      if (!dayAllowsCoveragePattern(dayIdx, missing)) continue
       const exercises = days[dayIdx].exercises
       for (let exIdx = exercises.length - 1; exIdx >= 0; exIdx--) {
+        if (protectedNames.has(exercises[exIdx].name)) continue
         if (findEntry(exercises[exIdx].name)?.mechanics_tier === 'tier3_isolation') { slot = { dayIdx, exIdx }; break }
       }
     }
     if (!slot) {
       for (let dayIdx = days.length - 1; dayIdx >= 0 && !slot; dayIdx--) {
-        if (!dayAllowsPattern(dayIdx, missing)) continue
+        if (!dayAllowsCoveragePattern(dayIdx, missing)) continue
         const exercises = days[dayIdx].exercises
         for (let exIdx = exercises.length - 1; exIdx >= 0; exIdx--) {
+          if (protectedNames.has(exercises[exIdx].name)) continue
           const entry = findEntry(exercises[exIdx].name)
           if (entry && entry.mechanics_tier !== 'tier1_compound' && entry.mechanics_tier !== 'primer') { slot = { dayIdx, exIdx }; break }
         }
@@ -1545,7 +1856,7 @@ function balanceWeeklyStructure(
     const usedFamilies = dayFamilies(slot.dayIdx)
     const forbidden = dayForbidden(slot.dayIdx)
     const eligible = (e: ExerciseEntry) =>
-      classifyForBalance(e.movement_pattern) === missing &&
+      classifyForCoverage(e.movement_pattern) === missing &&
       e.mechanics_tier !== 'tier1_compound' && e.mechanics_tier !== 'primer' &&
       !usedFamilies.has(getMovementFamily(e)) &&
       !forbidden.has(e.movement_pattern)
@@ -1553,12 +1864,78 @@ function balanceWeeklyStructure(
 
     if (replacement) {
       swap(slot.dayIdx, slot.exIdx, replacement, `weekly pattern coverage missing '${missing}'`)
-      patternsPresent.add(missing)
+      coveragePresent.add(missing)
+      // This exercise IS the week's only source of `missing` right now —
+      // protect it from the push:pull pass below, which runs after this
+      // loop and would otherwise be free to remove the exact thing this
+      // pass just added (observed: coverage adds a vertical press for
+      // weekly coverage, then push:pull removes it two passes later
+      // because it doesn't know that's the only vertical press in the
+      // week).
+      protectedNames.add(replacement.name)
     } else {
       trace.structure_adjusted.push({
         exercise: '(weekly pattern coverage)', stage: 'structure',
         reason: `'${missing}' pattern is available in the constrained pool but no swappable accessory slot could add it without a movement-family duplicate`,
       })
+    }
+  }
+
+  // --- Legs trained >=2 days/week on 4+ day splits ---
+  // A "leg day" here is any day carrying a real squat or hinge pattern in a
+  // non-isolation role (tier1/tier2) — satisfied by the day's OWN main lift
+  // or a tier2 accessory, not by calf raises. Reviews repeatedly cited
+  // single-leg-day weeks even on 4-5 day splits with plenty of room
+  // ("quads get one day... hamstrings get zero direct work").
+  if (days.length >= 4) {
+    const isLegDay = (dayIdx: number): boolean =>
+      days[dayIdx].exercises.some(ex => {
+        const entry = findEntry(ex.name)
+        if (!entry) return false
+        const cov = classifyForCoverage(entry.movement_pattern)
+        return (cov === 'squat' || cov === 'hinge') && entry.mechanics_tier !== 'tier3_isolation'
+      })
+    const legDayCount = days.filter((_, i) => isLegDay(i)).length
+    if (legDayCount < 2) {
+      // Add a squat/hinge accessory to the strongest remaining non-leg day
+      // rather than a random one — prefer a day whose track already allows
+      // knee_dominant/hip_hinge (Full Body Power, Pull & Hinge's own hinge
+      // slot already covers it, so this mainly matters for Push & Press /
+      // Upper Pull & Core / Chest-Triceps-style days).
+      let slot: { dayIdx: number; exIdx: number } | null = null
+      for (let dayIdx = days.length - 1; dayIdx >= 0 && !slot; dayIdx--) {
+        if (isLegDay(dayIdx)) continue
+        if (!dayAllowsCoveragePattern(dayIdx, 'squat') && !dayAllowsCoveragePattern(dayIdx, 'hinge')) continue
+        const exercises = days[dayIdx].exercises
+        for (let exIdx = exercises.length - 1; exIdx >= 0; exIdx--) {
+          if (protectedNames.has(exercises[exIdx].name)) continue
+          if (findEntry(exercises[exIdx].name)?.mechanics_tier === 'tier3_isolation') { slot = { dayIdx, exIdx }; break }
+        }
+      }
+      if (slot) {
+        const usedFamilies = dayFamilies(slot.dayIdx)
+        const forbidden = dayForbidden(slot.dayIdx)
+        const eligible = (e: ExerciseEntry) =>
+          (classifyForCoverage(e.movement_pattern) === 'squat' || classifyForCoverage(e.movement_pattern) === 'hinge') &&
+          e.mechanics_tier !== 'tier1_compound' && e.mechanics_tier !== 'primer' &&
+          !usedFamilies.has(getMovementFamily(e)) &&
+          !forbidden.has(e.movement_pattern)
+        const replacement = pool.find(e => eligible(e) && !weeklyUsed.has(e.name)) ?? pool.find(eligible)
+        if (replacement) {
+          swap(slot.dayIdx, slot.exIdx, replacement, `legs trained on only ${legDayCount} day(s), need >=2 on a ${days.length}-day split`)
+          protectedNames.add(replacement.name)
+        } else {
+          trace.structure_adjusted.push({
+            exercise: '(weekly leg-day coverage)', stage: 'structure',
+            reason: `legs trained on only ${legDayCount} day(s) of ${days.length} — no swappable accessory slot could add a second leg exposure`,
+          })
+        }
+      } else {
+        trace.structure_adjusted.push({
+          exercise: '(weekly leg-day coverage)', stage: 'structure',
+          reason: `legs trained on only ${legDayCount} day(s) of ${days.length} — every remaining day's track forbids squat/hinge patterns`,
+        })
+      }
     }
   }
 
@@ -1569,7 +1946,18 @@ function balanceWeeklyStructure(
   // quality scorer actually checks — periodization's multipliers (applied
   // later, per mesocycle week) scale push and pull work by the same factor,
   // so whatever ratio is set here survives into every week.
-  const MAX_SWAPS = 6
+  //
+  // Band is asymmetric, not the naive 0.8-1.4/0.6-1.6 either direction: push
+  // volume should never exceed pull (shoulder-health convention — external
+  // rotation/rear delt work is chronically undertrained in generated
+  // programs), but pull is allowed to run up to 1.5x push. Matches
+  // enforceWeeklyPatternBalance's later per-week pass so both layers agree
+  // on what "balanced" means. Raised from a 6-swap budget to 20 (Fix 2) —
+  // with Fix 1's day-templates already guaranteeing pattern PRESENCE per
+  // day, this pass now mainly closes residual volume gaps and should rarely
+  // need many iterations; heavy firing here in dev logs is a template bug
+  // signal, not expected steady-state behavior.
+  const MAX_SWAPS = 20
   for (let attempt = 0; attempt < MAX_SWAPS; attempt++) {
     let pushCount = 0
     let pullCount = 0
@@ -1583,42 +1971,60 @@ function balanceWeeklyStructure(
       }
     }
     if (pushCount === 0 || pullCount === 0) break
-    const ratio = pushCount / pullCount
-    if (ratio >= 0.6 && ratio <= 1.6) break
+    if (pushCount <= pullCount && pullCount <= pushCount * 1.5) break
 
-    const excessIsPush = ratio > 1.6
+    const excessIsPush = pushCount > pullCount
     const wantPattern = excessIsPush ? 'pull' : 'push'
+    const excessPattern = excessIsPush ? 'push' : 'pull'
     // Only pull FROM (and swap INTO) a day whose track actually allows the
     // pattern we want to add — same reasoning as the weekly-coverage pass
     // above: the fix must not plant a push exercise on a Pull & Hinge day.
-    const target = findAccessorySlot(p => p === (excessIsPush ? 'push' : 'pull'))
+    const target = findAccessorySlot(p => p === excessPattern)
     const validTarget = target && dayAllowsPattern(target.dayIdx, wantPattern) ? target : null
-    if (!validTarget) {
-      trace.structure_adjusted.push({
-        exercise: '(weekly push:pull)', stage: 'structure',
-        reason: `push:pull ratio ${ratio.toFixed(2)} is outside 0.6-1.6 and no swappable accessory remains to correct it`,
-      })
-      break
-    }
 
-    const usedFamilies = dayFamilies(validTarget.dayIdx)
-    const forbidden = dayForbidden(validTarget.dayIdx)
+    const usedFamilies = validTarget ? dayFamilies(validTarget.dayIdx) : null
+    const forbidden = validTarget ? dayForbidden(validTarget.dayIdx) : null
     const eligible = (e: ExerciseEntry) =>
       classifyForBalance(e.movement_pattern) === wantPattern &&
       e.mechanics_tier !== 'tier1_compound' && e.mechanics_tier !== 'primer' &&
-      !usedFamilies.has(getMovementFamily(e)) &&
-      !forbidden.has(e.movement_pattern)
-    const replacement = pool.find(e => eligible(e) && !weeklyUsed.has(e.name)) ?? pool.find(eligible)
+      !usedFamilies!.has(getMovementFamily(e)) &&
+      !forbidden!.has(e.movement_pattern)
+    const replacement = validTarget ? (pool.find(e => eligible(e) && !weeklyUsed.has(e.name)) ?? pool.find(eligible)) : null
 
-    if (!replacement) {
-      trace.structure_adjusted.push({
-        exercise: '(weekly push:pull)', stage: 'structure',
-        reason: `push:pull ratio ${ratio.toFixed(2)} needs a ${wantPattern} swap on ${days[validTarget.dayIdx].day} but no valid replacement exists in the constrained pool`,
-      })
-      break
+    if (validTarget && replacement) {
+      swap(validTarget.dayIdx, validTarget.exIdx, replacement, `push:pull exercise-count ratio ${(pushCount / pullCount).toFixed(2)}`)
+      continue
     }
 
-    swap(validTarget.dayIdx, validTarget.exIdx, replacement, `push:pull exercise-count ratio ${ratio.toFixed(2)}`)
+    // No swappable slot, or nothing in the pool to swap in — Fix 2's added
+    // authority: add a whole new exercise instead of giving up. Falls back
+    // to removing an excess-pattern exercise if there's genuinely nothing
+    // in the pool to add either.
+    const addTarget = days.findIndex((_, i) => dayAllowsPattern(i, wantPattern))
+    const addCandidate = addTarget >= 0
+      ? pool.find(e =>
+          classifyForBalance(e.movement_pattern) === wantPattern &&
+          e.mechanics_tier !== 'tier1_compound' && e.mechanics_tier !== 'primer' &&
+          !dayFamilies(addTarget).has(getMovementFamily(e)) &&
+          !dayForbidden(addTarget).has(e.movement_pattern) &&
+          !weeklyUsed.has(e.name)
+        )
+      : undefined
+
+    if (addTarget >= 0 && addCandidate) {
+      addExercise(addTarget, addCandidate, `push:pull exercise-count ratio ${(pushCount / pullCount).toFixed(2)}`)
+      continue
+    }
+
+    if (removeWeakestExercise(excessPattern, `push:pull exercise-count ratio ${(pushCount / pullCount).toFixed(2)}`)) {
+      continue
+    }
+
+    trace.structure_adjusted.push({
+      exercise: '(weekly push:pull)', stage: 'structure',
+      reason: `push:pull ratio ${(pushCount / pullCount).toFixed(2)} is outside the 1:1-1:1.5 band and no swap, add, or remove could correct it`,
+    })
+    break
   }
 }
 
@@ -1697,7 +2103,11 @@ function enforceWeeklyPatternBalance(days: WorkoutDay[]): void {
     return null
   }
 
-  const MAX_ADJUSTMENTS = 4
+  // Raised from 4 (Calibration round) -- +-4 sets could never close the
+  // 3:1-4:1 push:pull ratios reviews kept citing. +-20 sets is enough
+  // headroom for any realistic weekly gap; Fix 1's day-templates should
+  // mean this rarely needs more than a couple of nudges in practice now.
+  const MAX_ADJUSTMENTS = 20
   for (let i = 0; i < MAX_ADJUSTMENTS; i++) {
     const pushSets = patternSetTotal('push')
     const pullSets = patternSetTotal('pull')
@@ -2106,13 +2516,18 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
   const weeklyUsed = new Set<string>()
   const allSelectedNames = new Set<string>()
   const weeklyAppearanceCount = new Map<string, number>()
+  // Accumulated across every day — fed to balanceWeeklyStructure so it
+  // never swaps away or removes an exercise that's the one thing satisfying
+  // a Fix 1 required-slot guarantee elsewhere in the week.
+  const weeklyRequiredNames = new Set<string>()
 
   const days: WorkoutDay[] = availableDays.map((day, index) => {
     const rawTrack = split[index % split.length]
     const trackFocus = getViableTrack(rawTrack, pool)
     const track = TRACKS[trackFocus]
 
-    const { primer, main } = selectExercisesForTrack(track, pool, counts, weeklyUsed, styleConfig, feasiblePatterns, weeklyAppearanceCount)
+    const { primer, main, requiredNames } = selectExercisesForTrack(track, pool, counts, weeklyUsed, styleConfig, trace, feasiblePatterns, weeklyAppearanceCount)
+    for (const name of requiredNames) weeklyRequiredNames.add(name)
 
     // Build exercise list with sets/reps from style config
     const daySlots: { entry: ExerciseEntry; sets: number; reps: string; rest: string; restSeconds: number }[] = []
@@ -2132,7 +2547,7 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
     }
 
     // STAGE 5: Time-cap optimization per day
-    const optimized = stageTimeCap(daySlots, budgetSeconds, trainingStyle, trace)
+    const optimized = stageTimeCap(daySlots, budgetSeconds, trainingStyle, trace, requiredNames)
 
     // Convert to Exercise objects
     const exercises: Exercise[] = optimized.map(slot => {
@@ -2190,7 +2605,7 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
     }
   })
 
-  balanceWeeklyStructure(days, pool, weeklyUsed, allSelectedNames, experience, profile, trace, styleConfig)
+  balanceWeeklyStructure(days, pool, weeklyUsed, allSelectedNames, experience, profile, trace, styleConfig, weeklyRequiredNames)
   assignConditioningNotes(days, profile, policy)
   enforceLoadCoherence(days)
 
@@ -2656,6 +3071,22 @@ export function generateMesocycle(
   // experience/goal restrictions above already work: fall back toward
   // hypertrophy/metabolic work, where reps and leverage are still real
   // progression levers.
+  // BODYWEIGHT_ALLOWED_PHASES is already the authoritative "what's a
+  // legitimate phase for equipment-free training" list, independent of
+  // goal — using it directly (rather than intersecting with the goal
+  // policy's own allowed set again) is what lets dedup reach for
+  // 'metabolic' as a bodyweight hypertrophy/functional trainee's block 3/4
+  // differentiator even though those goals don't normally feature
+  // conditioning work. Without this, the intersection left only
+  // {anatomical_adaptation, hypertrophy} for that combination — nowhere
+  // for dedup to go except accept three straight "Hypertrophy" blocks
+  // (better than reintroducing AA, but still the exact monotony problem
+  // this function exists to solve). Bodyweight metabolic/conditioning
+  // circuits are a legitimate, common variation regardless of the
+  // trainee's primary goal.
+  const effectiveAllowedPhases = profile.equipment_access === 'bodyweight'
+    ? BODYWEIGHT_ALLOWED_PHASES
+    : policy.allowedPhases
   if (profile.equipment_access === 'bodyweight') {
     sequence = restrictPhaseSequence(sequence, BODYWEIGHT_ALLOWED_PHASES)
   }
@@ -2664,8 +3095,12 @@ export function generateMesocycle(
   // adjacent blocks — a novice's power->strength remap landing right after
   // an already-'strength' block 3 produced exactly that ("Blocks 3 and 4 are
   // both 'Maximal Strength'... an identical, duplicated block"). Final pass,
-  // after every restriction has applied.
-  sequence = dedupeAdjacentPhases(sequence)
+  // after every restriction has applied. Passing the effective allowed set
+  // (Fix 4) lets the dedup reach for a genuinely different, still-valid
+  // phase instead of just alternating hypertrophy/anatomical_adaptation —
+  // see dedupeAdjacentPhases's doc comment for why the old unconditional
+  // alternation could reintroduce AA mid-macrocycle.
+  sequence = dedupeAdjacentPhases(sequence, effectiveAllowedPhases)
   const weeks: MesocycleWeek[] = []
   let weekCounter = 0
 
@@ -2720,7 +3155,7 @@ export function generateMesocycle(
         const avoidFamilies = new Set(
           dayFamiliesByIndex.filter((f, i) => f && i !== exIdx) as string[]
         )
-        const rotated = rotateVariation(ex.name, blockIndex, pool, experience, usedNamesThisDay, avoidFamilies)
+        const rotated = rotateVariation(ex.name, blockIndex, pool, experience, profile, usedNamesThisDay, avoidFamilies)
         usedNamesThisDay.add(rotated)
         if (rotated === ex.name) return { ...ex, name: rotated }
         // A rotation can land on an exercise with a different prescription
@@ -2816,7 +3251,7 @@ export function generateMesocycle(
               .map(e => getMovementFamily(e))
           )
           const weeklyName = rotatesWeekly
-            ? rotateVariation(ex.name, Math.floor((w - 1) / policy.accessoryRotationWeeks), pool, experience, usedWeeklyNames, weeklyFamilies)
+            ? rotateVariation(ex.name, Math.floor((w - 1) / policy.accessoryRotationWeeks), pool, experience, profile, usedWeeklyNames, weeklyFamilies)
             : ex.name
           if (rotatesWeekly) usedWeeklyNames.add(weeklyName)
 
