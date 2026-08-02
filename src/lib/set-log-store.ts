@@ -349,7 +349,7 @@ async function ensureSessionSynced(userId: string, date: string): Promise<string
 // Background flush
 // ---------------------------------------------------------------------------
 
-let flushing = false
+let flushPromise: Promise<void> | null = null
 let retryTimer: ReturnType<typeof setTimeout> | null = null
 let consecutiveFailures = 0
 
@@ -362,12 +362,21 @@ function scheduleRetry(): void {
   }, delayMs)
 }
 
-export async function flushPending(): Promise<void> {
-  if (flushing) return
-  if (typeof navigator !== 'undefined' && !navigator.onLine) return
-  if (loadPending().length === 0) return
+/**
+ * Drains the pending store to the server. Concurrent calls share the
+ * in-flight flush's promise — so `await flushPending()` always means "the
+ * flush that covers my write has finished", never a silent no-op because a
+ * background flush happened to be mid-air.
+ */
+export function flushPending(): Promise<void> {
+  if (flushPromise) return flushPromise
+  if (typeof navigator !== 'undefined' && !navigator.onLine) return Promise.resolve()
+  if (loadPending().length === 0) return Promise.resolve()
+  flushPromise = doFlush().finally(() => { flushPromise = null })
+  return flushPromise
+}
 
-  flushing = true
+async function doFlush(): Promise<void> {
   isSyncing = true
   notifyListeners()
 
@@ -451,7 +460,6 @@ export async function flushPending(): Promise<void> {
       }
     }
   } finally {
-    flushing = false
     isSyncing = false
     notifyListeners()
   }
@@ -737,7 +745,7 @@ export function initSetLogStore(): void {
 /** Test seam — resets module state between test scenarios. */
 export function __resetForTests(): void {
   listeners = []
-  flushing = false
+  flushPromise = null
   isSyncing = false
   consecutiveFailures = 0
   initialized = false
