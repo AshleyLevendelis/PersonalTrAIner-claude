@@ -63,6 +63,15 @@ export interface CapabilityRequirement {
 
 export interface ExerciseEntry {
   name: string
+  /**
+   * Stable identity key for logging and history (C0 Part 2). Every log row
+   * carries this so a future rename of `name` can't sever a trainee's
+   * history (discovery landmine L7). Always the slug of the name at the time
+   * the entry was added — verified collision-free across the database; if a
+   * future entry's slug collides, hand-dedupe it here (the literal wins over
+   * the slugifier, which is why these are written out rather than computed).
+   */
+  id: string
   movement_pattern: MovementPattern
   mechanics_tier: MechanicsTier
   prescription_type: PrescriptionType
@@ -85,6 +94,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   // HORIZONTAL PUSH
   {
     name: 'Barbell Bench Press',
+    id: 'barbell-bench-press',
     movement_pattern: 'horizontal_push',
     mechanics_tier: 'tier1_compound',
     prescription_type: 'reps',
@@ -102,6 +112,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Dumbbell Bench Press',
+    id: 'dumbbell-bench-press',
     movement_pattern: 'horizontal_push',
     mechanics_tier: 'tier2_compound',
     prescription_type: 'reps',
@@ -119,6 +130,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Incline Dumbbell Press',
+    id: 'incline-dumbbell-press',
     movement_pattern: 'horizontal_push',
     mechanics_tier: 'tier2_compound',
     prescription_type: 'reps',
@@ -136,6 +148,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Incline Machine Press',
+    id: 'incline-machine-press',
     movement_pattern: 'horizontal_push',
     mechanics_tier: 'tier2_compound',
     prescription_type: 'reps',
@@ -153,6 +166,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Cable Flyes',
+    id: 'cable-flyes',
     movement_pattern: 'horizontal_push',
     mechanics_tier: 'tier3_isolation',
     prescription_type: 'reps',
@@ -170,6 +184,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Pec Deck Machine',
+    id: 'pec-deck-machine',
     movement_pattern: 'horizontal_push',
     mechanics_tier: 'tier3_isolation',
     prescription_type: 'reps',
@@ -187,6 +202,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Push-Ups',
+    id: 'push-ups',
     movement_pattern: 'horizontal_push',
     mechanics_tier: 'tier2_compound',
     prescription_type: 'reps',
@@ -204,6 +220,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Incline Push-Ups',
+    id: 'incline-push-ups',
     movement_pattern: 'horizontal_push',
     mechanics_tier: 'tier2_compound',
     prescription_type: 'reps',
@@ -221,6 +238,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Deficit Push-Ups',
+    id: 'deficit-push-ups',
     movement_pattern: 'horizontal_push',
     mechanics_tier: 'tier2_compound',
     prescription_type: 'reps',
@@ -239,6 +257,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Archer Push-Ups',
+    id: 'archer-push-ups',
     movement_pattern: 'horizontal_push',
     mechanics_tier: 'tier2_compound',
     prescription_type: 'reps',
@@ -257,6 +276,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Chest Dips',
+    id: 'chest-dips',
     movement_pattern: 'horizontal_push',
     mechanics_tier: 'tier2_compound',
     prescription_type: 'reps',
@@ -277,6 +297,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   // HORIZONTAL PULL
   {
     name: 'Barbell Rows',
+    id: 'barbell-rows',
     movement_pattern: 'horizontal_pull',
     mechanics_tier: 'tier1_compound',
     prescription_type: 'reps',
@@ -294,6 +315,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Cable Rows',
+    id: 'cable-rows',
     movement_pattern: 'horizontal_pull',
     mechanics_tier: 'tier2_compound',
     prescription_type: 'reps',
@@ -311,6 +333,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Seated Cable Row',
+    id: 'seated-cable-row',
     movement_pattern: 'horizontal_pull',
     mechanics_tier: 'tier2_compound',
     prescription_type: 'reps',
@@ -328,6 +351,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Dumbbell Rows',
+    id: 'dumbbell-rows',
     movement_pattern: 'horizontal_pull',
     mechanics_tier: 'tier2_compound',
     prescription_type: 'reps',
@@ -345,6 +369,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'T-Bar Rows',
+    id: 't-bar-rows',
     movement_pattern: 'horizontal_pull',
     mechanics_tier: 'tier2_compound',
     prescription_type: 'reps',
@@ -362,6 +387,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Inverted Row',
+    id: 'inverted-row',
     movement_pattern: 'horizontal_pull',
     mechanics_tier: 'tier2_compound',
     prescription_type: 'reps',
@@ -379,6 +405,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Towel Row',
+    id: 'towel-row',
     movement_pattern: 'horizontal_pull',
     mechanics_tier: 'tier2_compound',
     prescription_type: 'reps',
@@ -396,6 +423,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Backpack Row',
+    id: 'backpack-row',
     movement_pattern: 'horizontal_pull',
     mechanics_tier: 'tier2_compound',
     prescription_type: 'reps',
@@ -419,6 +447,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Face Pulls',
+    id: 'face-pulls',
     movement_pattern: 'horizontal_pull',
     mechanics_tier: 'tier3_isolation',
     prescription_type: 'reps',
@@ -436,6 +465,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Reverse Pec Deck',
+    id: 'reverse-pec-deck',
     movement_pattern: 'horizontal_pull',
     mechanics_tier: 'tier3_isolation',
     prescription_type: 'reps',
@@ -453,6 +483,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Rear Delt Flyes',
+    id: 'rear-delt-flyes',
     movement_pattern: 'horizontal_pull',
     mechanics_tier: 'tier3_isolation',
     prescription_type: 'reps',
@@ -472,6 +503,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   // VERTICAL PULL
   {
     name: 'Lat Pulldown',
+    id: 'lat-pulldown',
     movement_pattern: 'vertical_pull',
     mechanics_tier: 'tier2_compound',
     prescription_type: 'reps',
@@ -489,6 +521,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Pull-Ups',
+    id: 'pull-ups',
     movement_pattern: 'vertical_pull',
     mechanics_tier: 'tier1_compound',
     prescription_type: 'reps',
@@ -507,6 +540,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Pull-Ups (Assisted)',
+    id: 'pull-ups-assisted',
     movement_pattern: 'vertical_pull',
     mechanics_tier: 'tier2_compound',
     prescription_type: 'reps',
@@ -524,6 +558,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Close-Grip Lat Pulldown',
+    id: 'close-grip-lat-pulldown',
     movement_pattern: 'vertical_pull',
     mechanics_tier: 'tier2_compound',
     prescription_type: 'reps',
@@ -541,6 +576,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Straight-Arm Pulldown',
+    id: 'straight-arm-pulldown',
     movement_pattern: 'vertical_pull',
     mechanics_tier: 'tier3_isolation',
     prescription_type: 'reps',
@@ -560,6 +596,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   // VERTICAL PUSH
   {
     name: 'Overhead Press',
+    id: 'overhead-press',
     movement_pattern: 'vertical_push',
     mechanics_tier: 'tier1_compound',
     prescription_type: 'reps',
@@ -577,6 +614,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Dumbbell Shoulder Press',
+    id: 'dumbbell-shoulder-press',
     movement_pattern: 'vertical_push',
     mechanics_tier: 'tier2_compound',
     prescription_type: 'reps',
@@ -594,6 +632,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Arnold Press',
+    id: 'arnold-press',
     movement_pattern: 'vertical_push',
     mechanics_tier: 'tier2_compound',
     prescription_type: 'reps',
@@ -611,6 +650,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Lateral Raises',
+    id: 'lateral-raises',
     movement_pattern: 'isolation_shoulder',
     mechanics_tier: 'tier3_isolation',
     prescription_type: 'reps',
@@ -628,6 +668,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Cable Lateral Raises',
+    id: 'cable-lateral-raises',
     movement_pattern: 'isolation_shoulder',
     mechanics_tier: 'tier3_isolation',
     prescription_type: 'reps',
@@ -645,6 +686,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Shrugs',
+    id: 'shrugs',
     movement_pattern: 'isolation_shoulder',
     mechanics_tier: 'tier3_isolation',
     prescription_type: 'reps',
@@ -662,6 +704,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Dumbbell Shrugs',
+    id: 'dumbbell-shrugs',
     movement_pattern: 'isolation_shoulder',
     mechanics_tier: 'tier3_isolation',
     prescription_type: 'reps',
@@ -681,6 +724,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   // HIP HINGE
   {
     name: 'Deadlifts',
+    id: 'deadlifts',
     movement_pattern: 'hip_hinge',
     mechanics_tier: 'tier1_compound',
     prescription_type: 'reps',
@@ -698,6 +742,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Trap Bar Deadlift',
+    id: 'trap-bar-deadlift',
     movement_pattern: 'hip_hinge',
     mechanics_tier: 'tier1_compound',
     prescription_type: 'reps',
@@ -715,6 +760,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Romanian Deadlifts',
+    id: 'romanian-deadlifts',
     movement_pattern: 'hip_hinge',
     mechanics_tier: 'tier2_compound',
     prescription_type: 'reps',
@@ -732,6 +778,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Good Mornings',
+    id: 'good-mornings',
     movement_pattern: 'hip_hinge',
     mechanics_tier: 'tier2_compound',
     prescription_type: 'reps',
@@ -749,6 +796,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Kettlebell Swing (Heavy)',
+    id: 'kettlebell-swing-heavy',
     movement_pattern: 'hip_hinge',
     mechanics_tier: 'tier2_compound',
     prescription_type: 'reps',
@@ -766,6 +814,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Glute Bridge',
+    id: 'glute-bridge',
     movement_pattern: 'hip_hinge',
     mechanics_tier: 'tier2_compound',
     prescription_type: 'reps',
@@ -783,6 +832,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Single-Leg RDL (Bodyweight)',
+    id: 'single-leg-rdl-bodyweight',
     movement_pattern: 'hip_hinge',
     mechanics_tier: 'tier2_compound',
     prescription_type: 'reps',
@@ -800,6 +850,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Bodyweight Good Morning',
+    id: 'bodyweight-good-morning',
     movement_pattern: 'hip_hinge',
     mechanics_tier: 'tier2_compound',
     prescription_type: 'reps',
@@ -817,6 +868,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Sliding Leg Curl',
+    id: 'sliding-leg-curl',
     movement_pattern: 'isolation_hamstring',
     mechanics_tier: 'tier3_isolation',
     prescription_type: 'reps',
@@ -834,6 +886,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Lying Leg Curl',
+    id: 'lying-leg-curl',
     movement_pattern: 'isolation_hamstring',
     mechanics_tier: 'tier3_isolation',
     prescription_type: 'reps',
@@ -851,6 +904,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Nordic Hamstring Curl',
+    id: 'nordic-hamstring-curl',
     movement_pattern: 'isolation_hamstring',
     mechanics_tier: 'tier2_compound',
     prescription_type: 'reps',
@@ -871,6 +925,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   // KNEE DOMINANT
   {
     name: 'Barbell Squats',
+    id: 'barbell-squats',
     movement_pattern: 'knee_dominant',
     mechanics_tier: 'tier1_compound',
     prescription_type: 'reps',
@@ -888,6 +943,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Leg Press',
+    id: 'leg-press',
     movement_pattern: 'knee_dominant',
     mechanics_tier: 'tier2_compound',
     prescription_type: 'reps',
@@ -905,6 +961,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Goblet Squats',
+    id: 'goblet-squats',
     movement_pattern: 'knee_dominant',
     mechanics_tier: 'tier2_compound',
     prescription_type: 'reps',
@@ -922,6 +979,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Hack Squat',
+    id: 'hack-squat',
     movement_pattern: 'knee_dominant',
     mechanics_tier: 'tier2_compound',
     prescription_type: 'reps',
@@ -939,6 +997,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Leg Extensions',
+    id: 'leg-extensions',
     movement_pattern: 'isolation_quad',
     mechanics_tier: 'tier3_isolation',
     prescription_type: 'reps',
@@ -958,6 +1017,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   // SINGLE LEG
   {
     name: 'Walking Lunges',
+    id: 'walking-lunges',
     movement_pattern: 'single_leg',
     mechanics_tier: 'tier2_compound',
     prescription_type: 'reps',
@@ -975,6 +1035,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Bulgarian Split Squats',
+    id: 'bulgarian-split-squats',
     movement_pattern: 'single_leg',
     mechanics_tier: 'tier2_compound',
     prescription_type: 'reps',
@@ -992,6 +1053,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Step-Ups',
+    id: 'step-ups',
     movement_pattern: 'single_leg',
     mechanics_tier: 'tier2_compound',
     prescription_type: 'reps',
@@ -1010,6 +1072,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
 
   {
     name: 'Air Squat',
+    id: 'air-squat',
     movement_pattern: 'knee_dominant',
     mechanics_tier: 'tier2_compound',
     prescription_type: 'reps',
@@ -1027,6 +1090,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Split Squat (Bodyweight)',
+    id: 'split-squat-bodyweight',
     movement_pattern: 'single_leg',
     mechanics_tier: 'tier2_compound',
     prescription_type: 'reps',
@@ -1044,6 +1108,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Step-Ups (Bodyweight)',
+    id: 'step-ups-bodyweight',
     movement_pattern: 'single_leg',
     mechanics_tier: 'tier2_compound',
     prescription_type: 'reps',
@@ -1061,6 +1126,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Pistol Squat Progression',
+    id: 'pistol-squat-progression',
     movement_pattern: 'single_leg',
     mechanics_tier: 'tier2_compound',
     prescription_type: 'reps',
@@ -1081,6 +1147,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   // CARRY / LOADED CARRY
   {
     name: "Farmer's Walk",
+    id: 'farmer-s-walk',
     movement_pattern: 'carry',
     mechanics_tier: 'tier2_compound',
     prescription_type: 'distance_load',
@@ -1098,6 +1165,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Suitcase Carry',
+    id: 'suitcase-carry',
     movement_pattern: 'carry',
     mechanics_tier: 'tier2_compound',
     prescription_type: 'distance_load',
@@ -1115,6 +1183,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Overhead Carry',
+    id: 'overhead-carry',
     movement_pattern: 'carry',
     mechanics_tier: 'tier2_compound',
     prescription_type: 'distance_load',
@@ -1132,6 +1201,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Trap Bar Carry',
+    id: 'trap-bar-carry',
     movement_pattern: 'carry',
     mechanics_tier: 'tier2_compound',
     prescription_type: 'distance_load',
@@ -1149,6 +1219,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Loaded Backpack Walk',
+    id: 'loaded-backpack-walk',
     movement_pattern: 'carry',
     mechanics_tier: 'tier2_compound',
     prescription_type: 'distance_load',
@@ -1167,6 +1238,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Farmer Squat Hold (Isometric Carry)',
+    id: 'farmer-squat-hold-isometric-carry',
     movement_pattern: 'carry',
     mechanics_tier: 'tier2_compound',
     prescription_type: 'time',
@@ -1186,6 +1258,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   // CALF
   {
     name: 'Calf Raises',
+    id: 'calf-raises',
     movement_pattern: 'isolation_calf',
     mechanics_tier: 'tier3_isolation',
     prescription_type: 'reps',
@@ -1203,6 +1276,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Seated Calf Raises',
+    id: 'seated-calf-raises',
     movement_pattern: 'isolation_calf',
     mechanics_tier: 'tier3_isolation',
     prescription_type: 'reps',
@@ -1221,6 +1295,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
 
   {
     name: 'Calf Raises (Bodyweight)',
+    id: 'calf-raises-bodyweight',
     movement_pattern: 'isolation_calf',
     mechanics_tier: 'tier3_isolation',
     prescription_type: 'reps',
@@ -1240,6 +1315,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   // BICEPS
   {
     name: 'Barbell Curls',
+    id: 'barbell-curls',
     movement_pattern: 'isolation_bicep',
     mechanics_tier: 'tier3_isolation',
     prescription_type: 'reps',
@@ -1257,6 +1333,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Dumbbell Curls',
+    id: 'dumbbell-curls',
     movement_pattern: 'isolation_bicep',
     mechanics_tier: 'tier3_isolation',
     prescription_type: 'reps',
@@ -1274,6 +1351,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Hammer Curls',
+    id: 'hammer-curls',
     movement_pattern: 'isolation_bicep',
     mechanics_tier: 'tier3_isolation',
     prescription_type: 'reps',
@@ -1291,6 +1369,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Cable Curls',
+    id: 'cable-curls',
     movement_pattern: 'isolation_bicep',
     mechanics_tier: 'tier3_isolation',
     prescription_type: 'reps',
@@ -1308,6 +1387,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Incline Dumbbell Curls',
+    id: 'incline-dumbbell-curls',
     movement_pattern: 'isolation_bicep',
     mechanics_tier: 'tier3_isolation',
     prescription_type: 'reps',
@@ -1327,6 +1407,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   // TRICEPS
   {
     name: 'Tricep Dips',
+    id: 'tricep-dips',
     movement_pattern: 'isolation_tricep',
     mechanics_tier: 'tier2_compound',
     prescription_type: 'reps',
@@ -1345,6 +1426,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Tricep Pushdowns',
+    id: 'tricep-pushdowns',
     movement_pattern: 'isolation_tricep',
     mechanics_tier: 'tier3_isolation',
     prescription_type: 'reps',
@@ -1362,6 +1444,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Overhead Tricep Extension',
+    id: 'overhead-tricep-extension',
     movement_pattern: 'isolation_tricep',
     mechanics_tier: 'tier3_isolation',
     prescription_type: 'reps',
@@ -1379,6 +1462,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Skull Crushers',
+    id: 'skull-crushers',
     movement_pattern: 'isolation_tricep',
     mechanics_tier: 'tier3_isolation',
     prescription_type: 'reps',
@@ -1398,6 +1482,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   // CARDIO
   {
     name: 'Treadmill Intervals',
+    id: 'treadmill-intervals',
     movement_pattern: 'cardio',
     mechanics_tier: 'cardio',
     prescription_type: 'intervals',
@@ -1415,6 +1500,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Cycling Intervals',
+    id: 'cycling-intervals',
     movement_pattern: 'cardio',
     mechanics_tier: 'cardio',
     prescription_type: 'intervals',
@@ -1432,6 +1518,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Jump Rope',
+    id: 'jump-rope',
     movement_pattern: 'cardio',
     mechanics_tier: 'cardio',
     prescription_type: 'intervals',
@@ -1449,6 +1536,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Burpees',
+    id: 'burpees',
     movement_pattern: 'cardio',
     mechanics_tier: 'cardio',
     prescription_type: 'intervals',
@@ -1466,6 +1554,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Rowing Machine',
+    id: 'rowing-machine',
     movement_pattern: 'cardio',
     mechanics_tier: 'cardio',
     prescription_type: 'intervals',
@@ -1483,6 +1572,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Elliptical',
+    id: 'elliptical',
     movement_pattern: 'cardio',
     mechanics_tier: 'cardio',
     prescription_type: 'intervals',
@@ -1500,6 +1590,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Battle Ropes',
+    id: 'battle-ropes',
     movement_pattern: 'cardio',
     mechanics_tier: 'cardio',
     prescription_type: 'intervals',
@@ -1517,6 +1608,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Mountain Climbers',
+    id: 'mountain-climbers',
     movement_pattern: 'cardio',
     mechanics_tier: 'cardio',
     prescription_type: 'intervals',
@@ -1536,6 +1628,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   // CORE
   {
     name: 'Plank',
+    id: 'plank',
     movement_pattern: 'core',
     mechanics_tier: 'tier3_isolation',
     prescription_type: 'time',
@@ -1553,6 +1646,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Dead Bug',
+    id: 'dead-bug',
     movement_pattern: 'core',
     mechanics_tier: 'tier3_isolation',
     prescription_type: 'time',
@@ -1570,6 +1664,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Pallof Press',
+    id: 'pallof-press',
     movement_pattern: 'core',
     mechanics_tier: 'tier3_isolation',
     prescription_type: 'reps',
@@ -1587,6 +1682,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Hanging Leg Raises',
+    id: 'hanging-leg-raises',
     movement_pattern: 'core',
     mechanics_tier: 'tier2_compound',
     prescription_type: 'reps',
@@ -1605,6 +1701,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Ab Wheel Rollout',
+    id: 'ab-wheel-rollout',
     movement_pattern: 'core',
     mechanics_tier: 'tier2_compound',
     prescription_type: 'reps',
@@ -1623,6 +1720,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Cable Woodchops',
+    id: 'cable-woodchops',
     movement_pattern: 'core',
     mechanics_tier: 'tier3_isolation',
     prescription_type: 'reps',
@@ -1640,6 +1738,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Side Plank',
+    id: 'side-plank',
     movement_pattern: 'core',
     mechanics_tier: 'tier3_isolation',
     prescription_type: 'time',
@@ -1659,6 +1758,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   // ACTIVATION / PRIMING
   {
     name: 'Box Jumps',
+    id: 'box-jumps',
     movement_pattern: 'activation',
     mechanics_tier: 'primer',
     prescription_type: 'reps',
@@ -1677,6 +1777,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Bodyweight Squat Marches',
+    id: 'bodyweight-squat-marches',
     movement_pattern: 'activation',
     mechanics_tier: 'primer',
     prescription_type: 'reps',
@@ -1694,6 +1795,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Band Pull-Aparts',
+    id: 'band-pull-aparts',
     movement_pattern: 'activation',
     mechanics_tier: 'primer',
     prescription_type: 'reps',
@@ -1711,6 +1813,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Medicine Ball Slams',
+    id: 'medicine-ball-slams',
     movement_pattern: 'activation',
     mechanics_tier: 'primer',
     prescription_type: 'reps',
@@ -1729,6 +1832,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Broad Jumps',
+    id: 'broad-jumps',
     movement_pattern: 'activation',
     mechanics_tier: 'primer',
     prescription_type: 'reps',
@@ -1747,6 +1851,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Kettlebell Swings',
+    id: 'kettlebell-swings',
     movement_pattern: 'activation',
     mechanics_tier: 'primer',
     prescription_type: 'reps',
@@ -1764,6 +1869,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   {
     name: 'Plyo Push-Ups',
+    id: 'plyo-push-ups',
     movement_pattern: 'activation',
     mechanics_tier: 'primer',
     prescription_type: 'reps',
@@ -1864,6 +1970,29 @@ export function getExerciseEntry(name: string): ExerciseEntry | undefined {
   return EXERCISE_DATABASE.find(
     e => e.name.toLowerCase() === name.toLowerCase()
   )
+}
+
+/**
+ * The slug scheme behind every ExerciseEntry.id. The SQL backfill in the C0
+ * migration derives exercise_id with the Postgres equivalent of exactly this
+ * expression — keep the two in sync if this ever changes.
+ */
+export function slugifyExerciseName(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+}
+
+/**
+ * Stable exercise identity for log rows (C0 Part 2). Database entries resolve
+ * to their hand-written id (exact name match, case-insensitive — same rule as
+ * getExerciseEntry). Anything else (user-typed custom exercises, chat-parsed
+ * names) falls back to the slug of the raw name, which is deterministic, so
+ * the same custom name always maps to the same history. MOVEMENT_FAMILIES is
+ * deliberately NOT consulted here: it groups distinct movements ("same
+ * movement wearing different hats") for session dedup — collapsing those to
+ * one id would merge genuinely different lifts' histories.
+ */
+export function getExerciseId(name: string): string {
+  return getExerciseEntry(name)?.id ?? slugifyExerciseName(name)
 }
 
 // ---------------------------------------------------------------------------

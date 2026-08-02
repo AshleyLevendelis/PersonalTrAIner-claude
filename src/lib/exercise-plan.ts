@@ -4,7 +4,7 @@ import type {
   FatigueCost, MesocycleMovementPattern, EquipmentAccess, TrainingStyle,
   ConstraintTrace, ConstraintTraceEntry, PlanResult, TrainingExperience,
 } from './types'
-import { EXERCISE_DATABASE, getMovementFamily, getVolumeRole, meetsCapabilityRequirement, type ExerciseEntry, type MovementPattern, type AngleVector, type VolumeRole } from './exercise-db'
+import { EXERCISE_DATABASE, getMovementFamily, getVolumeRole, meetsCapabilityRequirement, getExerciseId, type ExerciseEntry, type MovementPattern, type AngleVector, type VolumeRole } from './exercise-db'
 import {
   getExperienceConfig, getSkillDemand, isSkillAppropriate, applyRepFloor,
   type ExperienceConfig,
@@ -1629,6 +1629,7 @@ function rebuildExerciseForSwap(
   const reps = isPrimer ? oldExercise.reps : assignSetsRepsFromConfig(newEntry, styleConfig, experience).reps
   return {
     ...oldExercise,
+    id: newEntry.id,
     name: newEntry.name,
     reps,
     substitution: getSubstitution(newEntry, pool, allSelectedNames),
@@ -1765,6 +1766,7 @@ function balanceWeeklyStructure(
     const sr = assignSetsRepsFromConfig(entry, styleConfig, experience)
     const load = prescribeLoad(entry, profile, { targetRpeLabel: intensity, isFirstBlock: true, sets: sr.sets })
     days[dayIdx].exercises.push({
+      id: entry.id,
       name: entry.name,
       sets: sr.sets,
       reps: sr.reps,
@@ -2608,6 +2610,7 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
       // comes back as a straight, flat per-set weight.
       const load = prescribeLoad(slot.entry, profile, { targetRpeLabel: intensity, isFirstBlock: true, sets: slot.sets })
       return {
+        id: slot.entry.id,
         name: slot.entry.name,
         sets: slot.sets,
         reps: slot.reps,
@@ -3219,7 +3222,10 @@ export function generateMesocycle(
         // exactly how an isometric hold ended up prescribed in meters.
         const newEntry = findEntry(rotated)
         const reps = newEntry ? assignSetsRepsFromConfig(newEntry, styleConfig, expConfig).reps : ex.reps
-        return { ...ex, name: rotated, reps }
+        // The rotated slot is a different movement — its logging identity must
+        // follow (a stale id would thread the old lift's history into the new
+        // one's ghosts/progression).
+        return { ...ex, id: newEntry?.id ?? getExerciseId(rotated), name: rotated, reps }
       })
       return { ...day, exercises }
     })

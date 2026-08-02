@@ -90,6 +90,7 @@ async function recomputeLoad(
 function applyReplacement(slot: Exercise, entry: ExerciseEntry, load: LoadPrescription): Exercise {
   return {
     ...slot,
+    id: entry.id,
     name: entry.name,
     substitution: '',
     superset_label: undefined,
