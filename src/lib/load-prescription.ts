@@ -195,6 +195,17 @@ const DERIVED_COMPOUND_SCALE: Record<string, { parent: LiftFamily; scale: number
   leg_press: { parent: 'squat', scale: 2.2 },
   goblet_squat: { parent: 'squat', scale: 0.35 },
   hinge_accessory: { parent: 'deadlift', scale: 0.55 },
+  // Two-dumbbell unilateral leg work (walking lunge, step-up, split squat,
+  // Bulgarian split squat) was falling through to the generic 'squat'
+  // category via movement_pattern 'single_leg' — anchoring a per-hand
+  // dumbbell number to the SAME 1RM a barbell back squat uses, then only
+  // halving it for "per hand". An advanced lifter with a 180kg squat got
+  // ~55kg per hand for 15-rep walking lunges (a review-flagged "88kg of
+  // dumbbells for a 30-rep unilateral set... grip and mid-back fail long
+  // before the legs"). These lifts are stability- and grip-limited, not
+  // leg-strength-limited the way a bilateral back squat is — a real working
+  // pair tops out well under half of squat 1RM, total.
+  single_leg_dumbbell: { parent: 'squat', scale: 0.4 },
 }
 
 /**
@@ -223,6 +234,16 @@ const ISOLATION_FRACTION_OF_COMPOUND: Record<string, { parent: LiftFamily; fract
   isolation_hamstring: { parent: 'deadlift', fraction: 0.3 }, // leg curl
   isolation_calf: { parent: 'squat', fraction: 0.65 }, // calves are strong relative to most isolation work
   carry: { parent: 'deadlift', fraction: 0.35 }, // farmer's/suitcase carry per hand — grip/bracing limited, not a true hinge 1RM
+  // An overhead carry is a loaded static hold overhead — pressing-capacity
+  // limited, not grip/hinge limited like a farmer's or suitcase carry. It
+  // was falling into the generic 'carry' bucket above (name match on
+  // "carry"), anchoring it to DEADLIFT — a review caught a "36kg overhead
+  // carry" prescribed to a client whose Arnold Press was 10kg per hand:
+  // "if you can't press 10kg overhead for reps, you cannot hold 36kg
+  // overhead and walk." A held overhead load can exceed a strict-press
+  // working weight somewhat (no concentric rep to complete), but it must
+  // still track pressing strength, not hinge strength.
+  overhead_carry: { parent: 'overhead', fraction: 0.85 },
 }
 
 /**
@@ -314,7 +335,16 @@ export function categorize(entry: ExerciseEntry): string | null {
   if (n.includes('bench') || n.includes('chest press') || n.includes('machine press')) return 'bench'
   if (n.includes('pulldown')) return 'pulldown'
   if (n.includes('row')) return 'row'
+  // Checked before the generic carry match below — an overhead carry is
+  // pressing-limited, not grip/hinge-limited (see overhead_carry's doc
+  // comment above).
+  if (n.includes('overhead') && n.includes('carry')) return 'overhead_carry'
   if (n.includes('carry') || n.includes('farmer')) return 'carry'
+  // Two-dumbbell unilateral leg work — see single_leg_dumbbell's doc comment
+  // above for why this can't share the bilateral 'squat' standard.
+  if (n.includes('lunge') || n.includes('step-up') || n.includes('step up') || n.includes('split squat') || n.includes('bulgarian')) {
+    return 'single_leg_dumbbell'
+  }
 
   switch (entry.movement_pattern) {
     case 'horizontal_push':
@@ -326,8 +356,9 @@ export function categorize(entry: ExerciseEntry): string | null {
     case 'hip_hinge':
       return 'hinge_accessory'
     case 'knee_dominant':
-    case 'single_leg':
       return 'squat'
+    case 'single_leg':
+      return 'single_leg_dumbbell'
     case 'carry':
       return 'carry'
     case 'isolation_bicep':
@@ -449,7 +480,7 @@ export function getLoadIncrementKg(entry: ExerciseEntry, category: string | null
 const LOADED_EQUIPMENT = new Set([
   'barbell', 'dumbbell', 'dumbbells', 'EZ bar', 'kettlebell', 'trap bar',
   't-bar', 'cable machine', 'machine', 'leg press machine',
-  'hack squat machine', 'farmer handles', 'medicine ball',
+  'hack squat machine', 'farmer handles', 'medicine ball', 'weighted backpack',
 ])
 
 export function isExternallyLoaded(entry: ExerciseEntry): boolean {
@@ -622,6 +653,20 @@ export function prescribeLoad(
 
   const mode = loadingMode(entry)
   const isDumbbell = mode === 'dumbbell'
+  // A two-implement dumbbell pair (Farmer's Walk) is halved and labeled "per
+  // hand" via isDumbbell above. But a SINGLE implement carried unilaterally
+  // (Suitcase Carry, Overhead Carry — one kettlebell, one side working) was
+  // getting the single_implement mode's "no halving" treatment meant for
+  // BILATERAL single-implement lifts like a goblet squat (held centrally,
+  // both sides loading it). That treated a one-arm overhead carry as if the
+  // whole body were pressing it, producing "hold 66kg overhead in one hand"
+  // for a lifter who presses 42.5kg overhead with a barbell — a review
+  // flagged exactly this ("if you can't press 10kg overhead for reps, you
+  // cannot hold 36kg overhead and walk"). `entry.unilateral` is the correct
+  // signal: single implement + unilateral means only one side is ever
+  // loaded at a time, same as a per-hand dumbbell number.
+  const isUnilateralSingleImplement = mode === 'single_implement' && entry.unilateral
+  const perSideLoad = isDumbbell || isUnilateralSingleImplement
 
   let rounded: number
   let fromKnownWeight = false
@@ -638,7 +683,7 @@ export function prescribeLoad(
     // as a rep count would read "40m" as 40 reps and wildly overshoot the
     // %1RM curve. A fixed moderate reference (8) keeps the RPE label doing
     // real work without the (mis-parsed) distance leaking into the formula.
-    const repsMidpoint = category === 'carry'
+    const repsMidpoint = (category === 'carry' || category === 'overhead_carry')
       ? 8
       : parseRepsMidpoint(options.repRangeLabel) ?? 10
     const rpeMidpoint = parseRpeMidpoint(options.targetRpeLabel)
@@ -679,11 +724,13 @@ export function prescribeLoad(
       estimate *= CALIBRATION_WEEK_CONSERVATISM
     }
 
-    // A per-hand dumbbell prescription is half the standard's total — but
-    // only for TWO-implement lifts (plural 'dumbbells'). A single dumbbell
-    // or kettlebell (goblet squats, carries, swings) is not halved and is
-    // not labeled "per hand" — see loadingMode().
-    if (isDumbbell) estimate = estimate / 2
+    // A per-side prescription is half the standard's total — two-implement
+    // dumbbell lifts (plural 'dumbbells') AND single-implement unilateral
+    // carries (one kettlebell, one side working). A single dumbbell or
+    // kettlebell used BILATERALLY (goblet squats, two-handed swings) is not
+    // halved and is not labeled "per hand" — see loadingMode() and
+    // isUnilateralSingleImplement above.
+    if (perSideLoad) estimate = estimate / 2
 
     rounded = roundToPlate(estimate, mode)
   }
@@ -693,12 +740,12 @@ export function prescribeLoad(
   // across all sets.
   const isCompoundTier = entry.mechanics_tier === 'tier1_compound' || entry.mechanics_tier === 'tier2_compound'
   const ramping = isCompoundTier && (options.phase === 'strength' || options.phase === 'power')
-  const per_set = buildPerSetLoads(rounded, options.sets ?? 1, mode, isDumbbell, ramping)
+  const per_set = buildPerSetLoads(rounded, options.sets ?? 1, mode, perSideLoad, ramping)
 
   const basis = options.forceStartingWeightKg != null
     ? (options.loadIsProgressing === false
         ? buildRepsProgressionBasis(options.repRangeLabel)
-        : buildProgressionBasis(options.repRangeLabel, getLoadIncrementKg(entry, category), isDumbbell))
+        : buildProgressionBasis(options.repRangeLabel, getLoadIncrementKg(entry, category), perSideLoad))
     : options.isCalibrationWeek
       ? 'Calibration week — a shade under your estimated working weight. Find where your last rep feels like the target RPE, then log it.'
       : fromKnownWeight
@@ -708,7 +755,7 @@ export function prescribeLoad(
 
   return {
     starting_weight_kg: rounded,
-    display: isDumbbell ? `~${rounded}kg per hand` : `~${rounded}kg`,
+    display: perSideLoad ? `~${rounded}kg per hand` : `~${rounded}kg`,
     basis,
     confidence: 'estimated',
     per_set,

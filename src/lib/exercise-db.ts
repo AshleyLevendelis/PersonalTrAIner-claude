@@ -400,7 +400,13 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     prescription_type: 'reps',
     angle_vector: 'horizontal',
     primary_muscles: ['lats', 'rhomboids', 'biceps'],
-    equipment: ['bodyweight'],
+    // 'weighted backpack' (not just 'bodyweight') so this actually gets a
+    // real load prescription — reviews flagged both this and Loaded
+    // Backpack Walk as tagged "load: Bodyweight" with zero weight and zero
+    // progression despite the coach_note_swap literally instructing "pack
+    // it with books to progress." A backpack IS an external load; the
+    // equipment tag now says so.
+    equipment: ['bodyweight', 'weighted backpack'],
     joint_stress: 'low',
     form_cues: ['Support on a bench or sturdy surface with one hand', 'Pull a loaded backpack to your hip', 'Drive the elbow past the torso', 'Lower with control'],
     coach_note_swap: 'A real loaded row for a bodyweight-only trainee — pack it with books to progress past what your own bodyweight can offer.',
@@ -1147,7 +1153,8 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     prescription_type: 'distance_load',
     angle_vector: 'none',
     primary_muscles: ['traps', 'core', 'glutes', 'legs'],
-    equipment: ['bodyweight'],
+    // See Backpack Row's equipment comment — same fix, same reason.
+    equipment: ['bodyweight', 'weighted backpack'],
     joint_stress: 'low',
     form_cues: ['Load weight onto a backpack evenly', 'Stand tall with chest up', 'Walk with controlled steps', 'Brace core throughout', 'Complete duration before switching load distribution'],
     coach_note_swap: 'Bodyweight-compatible carry using a weighted backpack or heavy backpack. Great for combating time-crunched scenarios.',

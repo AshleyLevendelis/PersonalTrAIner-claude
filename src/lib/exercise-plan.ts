@@ -176,12 +176,18 @@ const EQUIPMENT_SETS: Record<EquipmentAccess, Set<string> | null> = {
     'barbell', 'dumbbells', 'dumbbell', 'bench', 'incline bench', 'pull-up bar',
     'dip bars', 'kettlebell', 'resistance band', 'plyo box', 'ab wheel',
     'bodyweight', 'EZ bar', 'squat rack', 'trap bar', 'medicine ball', 'jump rope',
+    'weighted backpack',
   ]),
   minimalist: new Set([
     'kettlebell', 'resistance band', 'bodyweight', 'dumbbells', 'dumbbell',
     'pull-up bar', 'jump rope', 'medicine ball', 'plyo box', 'ab wheel',
+    'weighted backpack',
   ]),
-  bodyweight: new Set(['bodyweight', 'pull-up bar']),
+  // Anyone can put weight in a backpack regardless of tier — it's the one
+  // genuinely progressive external load available to a bodyweight-only
+  // client, which is exactly why it's included at every tier, not gated
+  // like real gym equipment.
+  bodyweight: new Set(['bodyweight', 'pull-up bar', 'weighted backpack']),
 }
 
 // ---------------------------------------------------------------------------
@@ -2771,8 +2777,31 @@ export function generateMesocycle(
           // unless load is the one that moves instead, same reasoning as
           // bodyweight always ramping reps regardless of goal.
           const isCarry = dbEntry?.prescription_type === 'distance_load'
-          const rampReps = (isBodyweight || policy.progressionEmphasis === 'reps' || policy.progressionEmphasis === 'maintain') && !isCarry
-          const rampLoad = !isBodyweight && (policy.progressionEmphasis === 'load' || isCarry)
+          // The day's flagship lift — tier1_compound ONLY (mapTier() maps
+          // this 1:1 to the tier_1_primary slot; tier2_compound is
+          // secondary/accessory work like Dumbbell Rows, Arnold Press, or
+          // the single_leg_dumbbell family, NOT the day's main lift) —
+          // always progresses by weight, independent of the goal's
+          // progressionEmphasis. 'reps'/'maintain' goals previously held it
+          // dead flat for the entire block — a review round converged hard
+          // on this ("Bench is 45kg in Week 1 and 45kg in Week 3... the app
+          // promised a ramp and it never ramps", repeated near-verbatim
+          // across every conditioning/functional profile) even with a coach
+          // note explaining the design. No real coach leaves the actual
+          // squat/bench/deadlift/OHP number untouched for three straight
+          // weeks regardless of program philosophy. An earlier version of
+          // this override also included tier2_compound, which caught
+          // secondary/accessory slots (Arnold Press, DB Rows, split squats)
+          // and produced a NEW review finding — "50-67% two-week jumps on
+          // curls and tricep extensions" — by forcing full main-lift-style
+          // ramping onto accessory work that should have stayed on the
+          // goal's own (usually gentler, reps-led) accessory progression.
+          // Accessories are exactly where a goal's "variety over load" or
+          // "reps not weight" identity belongs, so only the true main lift
+          // is exempted from policy below.
+          const isMainCompound = !!dbEntry && dbEntry.mechanics_tier === 'tier1_compound'
+          const rampReps = (isBodyweight || ((policy.progressionEmphasis === 'reps' || policy.progressionEmphasis === 'maintain') && !isMainCompound)) && !isCarry
+          const rampLoad = !isBodyweight && (policy.progressionEmphasis === 'load' || isCarry || isMainCompound)
           const repShift = isDeload
             ? (deloadAtFloor
                 // Weight held flat (can't drop further) — reps carry the

@@ -76,9 +76,20 @@ function buildProfile(rp: RepresentativeProfile): UserProfile {
   }
 }
 
+// Days with zero exercises are not all the same thing: a true off day and a
+// dedicated Zone-2/active-recovery day both have `exercises.length === 0`,
+// but calling both "rest" is exactly the mislabeling multiple reviews
+// caught ("Wednesday and Saturday say 'rest' and then prescribe 45 min of
+// Zone 2... either call them what they are or drop the session"). Use the
+// day's actual focus/conditioning_note instead of a blanket "rest" label.
+const ALL_WEEK_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+
 function renderDay(day: WorkoutDay): string {
   if (day.exercises.length === 0) {
-    return `  ${day.day}: rest${day.conditioning_note ? ` — ${day.conditioning_note}` : ''}`
+    if (day.conditioning_note) {
+      return `  ${day.day}: active recovery / conditioning day — ${day.conditioning_note}`
+    }
+    return `  ${day.day}: rest (no training, no conditioning scheduled)`
   }
   const lines = [`  ${day.day} (${day.focus}):`]
   if (day.warmup) {
@@ -90,6 +101,20 @@ function renderDay(day: WorkoutDay): string {
     lines.push(`    - ${ex.name}${superset}: ${ex.sets}x${ex.reps} @ ${ex.intensity ?? '-'}, load ${load}, rest ${ex.rest}`)
   }
   return lines.join('\n')
+}
+
+// A day absent from week.days entirely is a genuine day off — nothing
+// trains it, nothing claims it. Previously invisible to the reviewer (the
+// render loop only walked week.days), which combined with the "rest" label
+// on cardio days above to make every profile look like a 6-7 day training
+// week with zero real rest — a repeated top-3 finding that was actually a
+// rendering artifact of this script, not the generated plan.
+function renderWeekDays(days: WorkoutDay[]): string[] {
+  const byName = new Map(days.map(d => [d.day, d]))
+  return ALL_WEEK_DAYS.map(name => {
+    const day = byName.get(name)
+    return day ? renderDay(day) : `  ${name}: off (no training, no conditioning scheduled)`
+  })
 }
 
 function renderPlanAsText(profile: UserProfile, mesocycle: MesocycleWeek[]): string {
@@ -114,13 +139,13 @@ function renderPlanAsText(profile: UserProfile, mesocycle: MesocycleWeek[]): str
   if (week1) {
     lines.push(`--- WEEK 1 (${week1.phase_label}${week1.isCalibrationWeek ? ', CALIBRATION WEEK' : ''}) ---`)
     if (week1.coach_note) lines.push(`Coach note: ${week1.coach_note}`)
-    for (const day of week1.days) lines.push(renderDay(day))
+    lines.push(...renderWeekDays(week1.days))
     lines.push('')
   }
 
   if (week3) {
     lines.push(`--- WEEK 3 (${week3.phase_label}) ---`)
-    for (const day of week3.days) lines.push(renderDay(day))
+    lines.push(...renderWeekDays(week3.days))
     lines.push('')
   }
 

@@ -294,11 +294,13 @@ function scoreProgression(profile: UserProfile, mesocycle: MesocycleWeek[]): Dim
   const violatedRules = new Set<string>()
   const experience = profile.training_experience || 'novice'
   const ceiling = EXPERIENCE_RPE_CEILING[experience]
-  // 'reps'/'maintain' goal policies (conditioning, functional — see
-  // goal-policies.ts) deliberately hold the main lift's WEIGHT flat within a
-  // block and ramp reps or nothing instead; only 'load' emphasis (hypertrophy,
-  // fat_loss) is expected to show a real weight increase week to week.
-  const expectsLoadRamp = getGoalPolicy(profile.fitness_goal).progressionEmphasis === 'load'
+  // Every day's tier_1_primary (its flagship compound) now ramps load
+  // regardless of the goal's progressionEmphasis — see exercise-plan.ts's
+  // isMainCompound override. 'reps'/'maintain' policies (conditioning,
+  // functional) still hold ACCESSORY weight flat and ramp reps instead, but
+  // this check only ever looks at the tier_1_primary slot, which always
+  // expects a real climb now.
+  const expectsLoadRamp = true
 
   if (w1 && w2 && w3 && w4) {
     for (const day of w1.days) {
@@ -351,15 +353,6 @@ function scoreProgression(profile: UserProfile, mesocycle: MesocycleWeek[]): Dim
             })
           }
         }
-        // For 'maintain'/'reps' policies (functional, conditioning), week 3
-        // is never re-estimated — it's forced to week 1's own baseline
-        // unchanged (see generateMesocycle: forceStartingWeightKg = baselineKg
-        // when !rampLoad), because load isn't the progression lever for these
-        // goals. l1 === l3 there is the system working as designed, not a
-        // calibration that failed to stay conservative — comparing against
-        // week 3 only means something when the goal actually expects week 3
-        // to have climbed away from it.
-        //
         // Threshold recalibrated for the capability-model round's strength
         // rebuild (load-prescription.ts): calibration conservatism is now a
         // real 0.85x MULTIPLIER on an accurate standards-based estimate,

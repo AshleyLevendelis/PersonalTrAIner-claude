@@ -59,12 +59,14 @@ const EQUIPMENT_SETS: Record<EquipmentAccess, Set<string> | null> = {
     'barbell', 'dumbbells', 'dumbbell', 'bench', 'incline bench', 'pull-up bar',
     'dip bars', 'kettlebell', 'resistance band', 'plyo box', 'ab wheel',
     'bodyweight', 'EZ bar', 'squat rack', 'trap bar', 'medicine ball', 'jump rope',
+    'weighted backpack',
   ]),
   minimalist: new Set([
     'kettlebell', 'resistance band', 'bodyweight', 'dumbbells', 'dumbbell',
     'pull-up bar', 'jump rope', 'medicine ball', 'plyo box', 'ab wheel',
+    'weighted backpack',
   ]),
-  bodyweight: new Set(['bodyweight', 'pull-up bar']),
+  bodyweight: new Set(['bodyweight', 'pull-up bar', 'weighted backpack']),
 }
 
 // Style-required patterns
