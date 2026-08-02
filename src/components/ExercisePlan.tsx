@@ -8,13 +8,15 @@ import { Input } from '@/components/ui/input'
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible'
 import { ArrowRightLeft, Ban, Zap, ShieldAlert, Heart, Check, Dumbbell, Plus, Activity, Clock, Flame, ChevronLeft, ChevronRight, ChevronDown, Calendar, CheckCircle2, Trophy, Sparkles, Thermometer } from 'lucide-react'
 import React, { useState, useEffect, useCallback } from 'react'
-import { getExerciseEntry } from '@/lib/exercise-db'
+import { getExerciseEntry, getExerciseId } from '@/lib/exercise-db'
+import { isExternallyLoaded } from '@/lib/load-prescription'
 import { getReplacementCandidates, type SwapScope } from '@/lib/mesocycle-edit'
-import { upsertWorkoutLog, getLogsForDate, insertCardioLog, getCardioLogsForDate } from '@/lib/daily-tracking'
+import { insertCardioLog, getCardioLogsForDate } from '@/lib/daily-tracking'
 import { checkDoubleProgression, getDoubleProgressionRecommendation } from '@/lib/progression-engine'
-import { logSetOffline, logEntireSessionOffline, saveSessionCache, loadSessionCache, initOfflineSync } from '@/lib/offline-sync'
+import { saveSessionCache, loadSessionCache } from '@/lib/offline-sync'
+import { saveSet, getSetsForDate, getLastSessionSets, initSetLogStore, prescriptionUnit } from '@/lib/set-log-store'
 import { getActiveMesocycleWeek } from '@/lib/calculations'
-import { checkForPR, seedPRCacheFromHistory, getTopPRSet, getLastSessionForExercise, type PRResult, type SessionSet } from '@/lib/pr-engine'
+import { checkForPR, seedPRCacheFromHistory, getTopPRSet, type PRResult, type SessionSet } from '@/lib/pr-engine'
 import { RestTimer } from '@/components/RestTimer'
 import { PlateCalculator } from '@/components/PlateCalculator'
 import { OfflineStatusIndicator } from '@/components/OfflineStatusIndicator'
@@ -300,8 +302,11 @@ interface GhostValues {
 
 function SetLogger({
   exerciseName,
+  exerciseId,
   totalSets,
   profileId,
+  sessionDate,
+  dayName,
   todayLogs,
   onLogSaved,
   prescribedReps,
@@ -315,8 +320,14 @@ function SetLogger({
   onOpenPlateCalc,
 }: {
   exerciseName: string
+  /** Stable logging identity (C0) — plan-attached id, or the slug of a custom exercise's name. */
+  exerciseId: string
   totalSets: number
   profileId: string
+  /** The session's date (YYYY-MM-DD) — owned by the parent so the whole day shares one clock. */
+  sessionDate: string
+  /** Weekday name for progression keying. */
+  dayName: string
   todayLogs: ExerciseSetLog[]
   onLogSaved: (log: ExerciseSetLog) => void
   prescribedReps?: string
@@ -334,7 +345,7 @@ function SetLogger({
   const logColumnLabel = prescriptionType
     ? getRepsLabel(prescribedReps ?? '', prescriptionType)
     : 'Reps'
-  const today = new Date().toISOString().split('T')[0]
+  const today = sessionDate
   const existingLogs = todayLogs.filter(l => l.exercise_name === exerciseName)
 
   const [extraSets, setExtraSets] = useState(0)
@@ -357,14 +368,13 @@ function SetLogger({
     return saved
   })
 
-  const [savingSet, setSavingSet] = useState<number | null>(null)
   const [prBadgeSet, setPrBadgeSet] = useState<{ setNumber: number; result: PRResult } | null>(null)
   const [animatingPr, setAnimatingPr] = useState(false)
   const [ghostValues, setGhostValues] = useState<GhostValues[]>([])
 
-  // Load ghost values from last session
+  // Load ghost values from last session (unified store — merges unsynced local sets)
   useEffect(() => {
-    getLastSessionForExercise(profileId, exerciseName, today).then(lastSets => {
+    getLastSessionSets(profileId, exerciseId, today).then(lastSets => {
       const ghosts: GhostValues[] = Array.from({ length: Math.max(totalSets + extraSets, lastSets.length) }, (_, i) => {
         const prev = lastSets.find(s => s.set_number === i + 1)
         return {
@@ -374,7 +384,7 @@ function SetLogger({
       })
       setGhostValues(ghosts)
     }).catch(() => {})
-  }, [profileId, exerciseName])
+  }, [profileId, exerciseId])
 
   useEffect(() => {
     const logMaxSet = existingLogs.length > 0 ? Math.max(...existingLogs.map(l => l.set_number)) : 0
@@ -418,7 +428,7 @@ function SetLogger({
     setInputs(prev => [...prev, { weight: '', reps: '', isBodyweight: false }])
   }
 
-  const handleSaveSet = async (setIndex: number) => {
+  const handleSaveSet = (setIndex: number) => {
     const setNumber = setIndex + 1
     const input = inputs[setIndex]
     const ghost = ghostValues[setIndex]
@@ -438,28 +448,36 @@ function SetLogger({
     )
     setInputs(updatedInputs)
 
-    setSavingSet(setNumber)
-    try {
-      const log = await upsertWorkoutLog(profileId, today, exerciseName, setNumber, weight, reps, input.isBodyweight)
-      const newSaved = new Set([...savedSets, setNumber])
-      setSavedSets(newSaved)
-      onLogSaved(log)
+    // Local-first: the set is persisted (and the check turns green) the moment
+    // this returns — even in airplane mode. The store syncs in the background
+    // and re-saving the same set upserts rather than duplicating (L2/L4).
+    const log = saveSet({
+      userId: profileId,
+      date: today,
+      weekNumber: weekNumber ?? null,
+      day: dayName,
+      exerciseId,
+      exerciseName,
+      setNumber,
+      weightKg: weight,
+      repsCompleted: reps,
+      unit: prescriptionUnit(prescriptionType),
+      isBodyweight: input.isBodyweight,
+    })
+    const newSaved = new Set([...savedSets, setNumber])
+    setSavedSets(newSaved)
+    onLogSaved(log)
 
-      // PR check + single top-set re-evaluation
-      const pr = checkForPR(profileId, exerciseName, weight, reps)
-      if (pr) {
-        setAnimatingPr(true)
-        setTimeout(() => setAnimatingPr(false), 2000)
-      }
-      reEvaluatePR(newSaved, updatedInputs)
+    // PR check + single top-set re-evaluation
+    const pr = checkForPR(profileId, exerciseName, weight, reps)
+    if (pr) {
+      setAnimatingPr(true)
+      setTimeout(() => setAnimatingPr(false), 2000)
+    }
+    reEvaluatePR(newSaved, updatedInputs)
 
-      if (onSetCompleted && prescribedReps) {
-        onSetCompleted(exerciseName, setNumber, weight, reps, restTime || '60s', totalSets, prescribedReps, tier)
-      }
-    } catch (err) {
-      console.error('Failed to save set:', err)
-    } finally {
-      setSavingSet(null)
+    if (onSetCompleted && prescribedReps) {
+      onSetCompleted(exerciseName, setNumber, weight, reps, restTime || '60s', totalSets, prescribedReps, tier)
     }
   }
 
@@ -494,7 +512,6 @@ function SetLogger({
       </div>
       {Array.from({ length: displaySets }, (_, i) => {
         const isSaved = savedSets.has(i + 1)
-        const isSaving = savingSet === i + 1
         const isBW = inputs[i]?.isBodyweight || false
         const isPRSet = prBadgeSet?.setNumber === i + 1
         const ghost = ghostValues[i]
@@ -517,7 +534,7 @@ function SetLogger({
               value={isBW ? '' : (inputs[i]?.weight || '')}
               onChange={e => updateInput(i, 'weight', e.target.value)}
               className={`h-7 text-sm ${isSaved ? 'border-green-300 dark:border-green-700' : ''} ${isBW ? 'bg-muted text-muted-foreground' : ''}`}
-              disabled={isSaving || isBW}
+              disabled={isBW}
             />
             <Button
               variant="outline"
@@ -534,7 +551,6 @@ function SetLogger({
               size="sm"
               className="h-7 w-7 text-[10px] font-bold px-0"
               onClick={() => toggleBodyweight(i)}
-              disabled={isSaving}
               aria-label="Toggle bodyweight"
             >
               BW
@@ -547,7 +563,6 @@ function SetLogger({
               value={inputs[i]?.reps || ''}
               onChange={e => updateInput(i, 'reps', e.target.value)}
               className={`h-7 text-sm w-14 ${isSaved ? 'border-green-300 dark:border-green-700' : ''}`}
-              disabled={isSaving}
             />
             <div className="flex items-center gap-1">
               {isPRSet && prBadgeSet?.result && (
@@ -561,13 +576,8 @@ function SetLogger({
                 size="icon"
                 className={`size-7 shrink-0 ${isSaved ? 'text-green-600 dark:text-green-400' : ''}`}
                 onClick={() => handleSaveSet(i)}
-                disabled={isSaving}
               >
-                {isSaving ? (
-                  <div className="size-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <Check className="size-3.5" />
-                )}
+                <Check className="size-3.5" />
               </Button>
             </div>
           </div>
@@ -660,14 +670,14 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
 
   useEffect(() => {
     if (profileId) {
-      getLogsForDate(profileId, today).then(setTodayLogs).catch(console.error)
+      getSetsForDate(profileId, today).then(setTodayLogs).catch(console.error)
       getCardioLogsForDate(profileId, today).then(setCardioFinishers).catch(console.error)
       seedPRCacheFromHistory(profileId).catch(console.error)
     }
   }, [profileId, today])
 
   useEffect(() => {
-    initOfflineSync()
+    initSetLogStore()
     const cached = loadSessionCache()
     if (cached && cached.weekNumber === currentWeek) {
       setCompletedSetsMap(cached.completedSets)
@@ -724,7 +734,7 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
 
   useEffect(() => {
     if (profileId && logsVersion && logsVersion > 0) {
-      getLogsForDate(profileId, today).then(logs => {
+      getSetsForDate(profileId, today).then(logs => {
         setTodayLogs(logs)
         // Sync input fields from fetched logs so UI reflects chat-logged sets
         const newReps: Record<string, number> = { ...setReps }
@@ -813,26 +823,18 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
     if (!profileId) return
     const key = `${exerciseName}-${setNumber}`
 
-    // Optimistic: update UI immediately
+    // Optimistic: update UI immediately (todayLogs itself was already updated
+    // by SetLogger's onLogSaved with the store's persisted view)
     const newCompleted = { ...completedSetsMap, [key]: true }
     setCompletedSetsMap(newCompleted)
-
-    handleLogSaved({
-      user_id: profileId,
-      date: today,
-      exercise_name: exerciseName,
-      set_number: setNumber,
-      weight_kg: weightKg,
-      reps_completed: repsCompleted,
-      is_bodyweight: weightKg === 0,
-    })
 
     const restSeconds = parseRestSeconds(restStr)
     if (restSeconds > 0) {
       setRestTimer({ seconds: restSeconds, exerciseName })
     }
 
-    // Persist to localStorage immediately
+    // Persist UI state to localStorage immediately (the set itself was already
+    // persisted local-first by SetLogger via set-log-store — no second write here)
     saveSessionCache({
       completedSets: newCompleted,
       setWeights,
@@ -840,17 +842,6 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
       sessionLogged,
       day: todayName,
       weekNumber: currentWeek,
-    })
-
-    // Fire-and-forget network write (queues offline)
-    logSetOffline({
-      userId: profileId,
-      exerciseName,
-      weekNumber: currentWeek,
-      day: todayName,
-      setNumber,
-      weightKg,
-      repsCompleted,
     })
 
     // Check progression in the background (only if online)
@@ -872,86 +863,109 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
     }
   }, [profileId, currentWeek, todayName, today, completedSetsMap, setWeights, setReps, sessionLogged])
 
-  const handleLogEntireSession = useCallback(() => {
+  // Bulk-logs today's session with the same values a manual save would use:
+  // last-session ghosts first, then the progressed/prescribed load, prescribed
+  // reps at the low end of the range, rpe null. An externally-loaded exercise
+  // with NO known weight is skipped and named in the toast — never logged as a
+  // fabricated 0 kg set (discovery landmine L6). Bodyweight movements log 0 kg
+  // with is_bodyweight, which is real data, not fabrication.
+  const handleLogEntireSession = useCallback(async () => {
     if (!profileId) return
     const todayWorkout = activePlan.find(d => d.day === todayName)
     if (!todayWorkout) return
 
     setLoggingSession(true)
-    const exercises = todayWorkout.exercises.map(ex => {
-      const weightKey = `${ex.name}-1`
-      return {
-        name: ex.name,
-        sets: ex.sets,
-        reps: ex.reps,
-        weight_kg: setWeights[weightKey] || 0,
+    try {
+      const newWeights: Record<string, number> = { ...setWeights }
+      const newReps: Record<string, number> = { ...setReps }
+      const newCompleted: Record<string, boolean> = { ...completedSetsMap }
+      const savedLogs: ExerciseSetLog[] = []
+      const skipped: string[] = []
+      let loggedCount = 0
+
+      for (const ex of todayWorkout.exercises) {
+        const exerciseId = ex.id ?? getExerciseId(ex.name)
+        const entry = getExerciseEntry(ex.name)
+        const isBodyweightMovement = entry ? !isExternallyLoaded(entry) : false
+        const alreadyLogged = new Set(
+          todayLogs.filter(l => l.exercise_name === ex.name).map(l => l.set_number)
+        )
+
+        let lastSets: ExerciseSetLog[] = []
+        try {
+          lastSets = await getLastSessionSets(profileId, exerciseId, today)
+        } catch { /* offline — fall back to prescription */ }
+
+        const repsLow = parseRepsLow(ex.reps)
+        for (let s = 1; s <= ex.sets; s++) {
+          if (alreadyLogged.has(s)) continue
+
+          const ghostWeight = lastSets.find(ls => ls.set_number === s)?.weight_kg
+          const weight = isBodyweightMovement
+            ? 0
+            : ghostWeight
+              ?? progressedLoads[ex.name]
+              ?? ex.per_set_load?.[s - 1]?.load_kg
+              ?? ex.suggested_load_kg
+              ?? null
+
+          if (weight == null) {
+            if (!skipped.includes(ex.name)) skipped.push(ex.name)
+            continue
+          }
+
+          const log = saveSet({
+            userId: profileId,
+            date: today,
+            weekNumber: currentWeek,
+            day: todayName,
+            exerciseId,
+            exerciseName: ex.name,
+            setNumber: s,
+            weightKg: weight,
+            repsCompleted: repsLow,
+            rpe: null,
+            unit: prescriptionUnit(ex.prescription_type),
+            isBodyweight: isBodyweightMovement,
+          })
+          savedLogs.push(log)
+          loggedCount++
+          newWeights[`${ex.name}-${s}`] = weight
+          newReps[`${ex.name}-${s}`] = repsLow
+          newCompleted[`${ex.name}-${s}`] = true
+        }
       }
-    })
 
-    // Populate set input state with prescribed values for every set row
-    const newWeights: Record<string, number> = { ...setWeights }
-    const newReps: Record<string, number> = { ...setReps }
-    todayWorkout.exercises.forEach(ex => {
-      const prescribedWeight = setWeights[`${ex.name}-1`] || 0
-      const parsedReps = parseRepsLow(ex.reps)
-      for (let s = 1; s <= ex.sets; s++) {
-        newWeights[`${ex.name}-${s}`] = prescribedWeight
-        newReps[`${ex.name}-${s}`] = parsedReps
+      setSetWeights(newWeights)
+      setSetReps(newReps)
+      setCompletedSetsMap(newCompleted)
+      setSessionLogged(true)
+
+      setTodayLogs(prev => {
+        const existing = new Set(prev.map(l => `${l.exercise_name}-${l.set_number}`))
+        const toAdd = savedLogs.filter(l => !existing.has(`${l.exercise_name}-${l.set_number}`))
+        return [...prev, ...toAdd]
+      })
+
+      saveSessionCache({
+        completedSets: newCompleted,
+        setWeights: newWeights,
+        setReps: newReps,
+        sessionLogged: true,
+        day: todayName,
+        weekNumber: currentWeek,
+      })
+
+      if (skipped.length > 0) {
+        setProgressionToast(
+          `Logged ${loggedCount} sets. Skipped ${skipped.join(', ')} — no known weight yet; log those manually so progression has real numbers.`
+        )
+        setTimeout(() => setProgressionToast(null), 8000)
       }
-    })
-    setSetWeights(newWeights)
-    setSetReps(newReps)
-
-    // Optimistic: mark all sets complete immediately
-    const allKeys: Record<string, boolean> = {}
-    todayWorkout.exercises.forEach(ex => {
-      for (let s = 1; s <= ex.sets; s++) {
-        allKeys[`${ex.name}-${s}`] = true
-      }
-    })
-    const newCompleted = { ...completedSetsMap, ...allKeys }
-    setCompletedSetsMap(newCompleted)
-    setSessionLogged(true)
-    setLoggingSession(false)
-
-    // Also inject todayLogs so SetLogger rows turn green
-    const syntheticLogs: ExerciseSetLog[] = todayWorkout.exercises.flatMap(ex => {
-      const w = newWeights[`${ex.name}-1`] || 0
-      const r = newReps[`${ex.name}-1`] || parseRepsLow(ex.reps)
-      return Array.from({ length: ex.sets }, (_, i) => ({
-        user_id: profileId,
-        date: today,
-        exercise_name: ex.name,
-        set_number: i + 1,
-        weight_kg: w,
-        reps_completed: r,
-        is_bodyweight: w === 0,
-      }))
-    })
-    setTodayLogs(prev => {
-      const existing = new Set(prev.map(l => `${l.exercise_name}-${l.set_number}`))
-      const toAdd = syntheticLogs.filter(l => !existing.has(`${l.exercise_name}-${l.set_number}`))
-      return [...prev, ...toAdd]
-    })
-
-    // Persist to localStorage
-    saveSessionCache({
-      completedSets: newCompleted,
-      setWeights: newWeights,
-      setReps: newReps,
-      sessionLogged: true,
-      day: todayName,
-      weekNumber: currentWeek,
-    })
-
-    // Fire-and-forget network write (queues offline)
-    logEntireSessionOffline({
-      userId: profileId,
-      weekNumber: currentWeek,
-      day: todayName,
-      exercises,
-    })
-  }, [profileId, activePlan, todayName, currentWeek, setWeights, completedSetsMap, setReps])
+    } finally {
+      setLoggingSession(false)
+    }
+  }, [profileId, activePlan, todayName, today, currentWeek, setWeights, setReps, completedSetsMap, todayLogs, progressedLoads])
 
   return (
     <div className="space-y-4">
@@ -1251,8 +1265,11 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
                         <td colSpan={6} className="p-0 border-b border-border/50">
                           <SetLogger
                             exerciseName={ex.name}
+                            exerciseId={ex.id ?? getExerciseId(ex.name)}
                             totalSets={ex.sets}
                             profileId={profileId}
+                            sessionDate={today}
+                            dayName={todayName}
                             todayLogs={todayLogs}
                             onLogSaved={handleLogSaved}
                             prescribedReps={ex.reps}
@@ -1310,13 +1327,17 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
                           <td colSpan={6} className="p-0 border-b border-border/50">
                             <SetLogger
                               exerciseName={customName}
+                              exerciseId={getExerciseId(customName)}
                               totalSets={3}
                               profileId={profileId}
+                              sessionDate={today}
+                              dayName={todayName}
                               todayLogs={todayLogs}
                               onLogSaved={handleLogSaved}
                               onSetCompleted={handleSetComplete}
                               prescribedReps="8-12"
                               restTime="60s"
+                              weekNumber={currentWeek}
                               onOpenPlateCalc={(w) => { setPlateCalcWeight(w); setPlateCalcOpen(true) }}
                             />
                           </td>

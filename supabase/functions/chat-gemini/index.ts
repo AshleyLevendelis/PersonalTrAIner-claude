@@ -7,6 +7,119 @@ const corsHeaders = {
     "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
+// ---------------------------------------------------------------------------
+// C0 unified logging (Part 3): chat writes land in the SAME store the app and
+// the progression engine read — exercise_set_logs, session-linked — instead of
+// the legacy workout_logs table nothing reads anymore. Keep the slug scheme in
+// lockstep with slugifyExerciseName in src/lib/exercise-db.ts.
+// ---------------------------------------------------------------------------
+
+function slugifyExerciseName(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+}
+
+/** Get-or-create the day's workout_sessions row ((profile_id, date) is unique) and return its id. */
+async function ensureWorkoutSession(
+  supabaseUrl: string,
+  serviceKey: string,
+  profileId: string,
+  date: string,
+  day: string,
+): Promise<string> {
+  const headers = {
+    Authorization: `Bearer ${serviceKey}`,
+    Apikey: serviceKey,
+    "Content-Type": "application/json",
+  };
+  const selectResp = await fetch(
+    `${supabaseUrl}/rest/v1/workout_sessions?profile_id=eq.${profileId}&date=eq.${date}&select=id`,
+    { headers },
+  );
+  if (selectResp.ok) {
+    const rows = await selectResp.json();
+    if (rows.length > 0) return rows[0].id;
+  }
+  const insertResp = await fetch(`${supabaseUrl}/rest/v1/workout_sessions`, {
+    method: "POST",
+    headers: { ...headers, Prefer: "return=representation,resolution=ignore-duplicates" },
+    body: JSON.stringify({
+      profile_id: profileId,
+      date,
+      split_type: "training",
+      duration_minutes: 45,
+      is_completed: false,
+      started_at: new Date().toISOString(),
+      day,
+    }),
+  });
+  if (insertResp.ok) {
+    const rows = await insertResp.json();
+    if (rows.length > 0) return rows[0].id;
+  }
+  // Conflict race — the row exists now; re-select.
+  const retryResp = await fetch(
+    `${supabaseUrl}/rest/v1/workout_sessions?profile_id=eq.${profileId}&date=eq.${date}&select=id`,
+    { headers },
+  );
+  if (retryResp.ok) {
+    const rows = await retryResp.json();
+    if (rows.length > 0) return rows[0].id;
+  }
+  throw new Error(`Failed to resolve workout session (${insertResp.status})`);
+}
+
+interface UnifiedSetRow {
+  exercise_name: string;
+  set_number: number;
+  weight_kg: number;
+  reps_completed: number;
+  rpe?: number | null;
+}
+
+/** Upserts set rows into exercise_set_logs on the natural key — same semantics as set-log-store.ts. */
+async function upsertUnifiedSets(
+  supabaseUrl: string,
+  serviceKey: string,
+  profileId: string,
+  sessionId: string,
+  day: string,
+  rows: UnifiedSetRow[],
+): Promise<void> {
+  const payload = rows.map((r) => ({
+    session_id: sessionId,
+    user_id: profileId,
+    exercise_id: slugifyExerciseName(r.exercise_name),
+    exercise_name: r.exercise_name,
+    week_number: null,
+    day,
+    set_number: r.set_number,
+    weight_kg: r.weight_kg || 0,
+    reps_completed: r.reps_completed,
+    rpe: r.rpe ?? null,
+    unit: "reps",
+    is_bodyweight: (r.weight_kg || 0) === 0,
+    is_warmup: false,
+    completed_at: new Date().toISOString(),
+  }));
+  const resp = await fetch(
+    `${supabaseUrl}/rest/v1/exercise_set_logs?on_conflict=user_id,session_id,exercise_id,set_number,is_warmup`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${serviceKey}`,
+        Apikey: serviceKey,
+        "Content-Type": "application/json",
+        Prefer: "return=minimal,resolution=merge-duplicates",
+      },
+      body: JSON.stringify(payload),
+    },
+  );
+  if (!resp.ok) {
+    const errText = await resp.text();
+    throw new Error(`exercise_set_logs upsert failed (${resp.status}): ${errText}`);
+  }
+}
+
 const toolDeclarations = [
   {
     name: "replace_food",
@@ -617,8 +730,11 @@ Deno.serve(async (req: Request) => {
     if (context.profile_id) {
       try {
         const cutoff = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+        // Unified store (C0): the same table chat's own writes land in, so the
+        // assistant always sees sets it just logged (pre-C0 it read set_logs
+        // but wrote workout_logs — its own writes were invisible to it).
         const logsResponse = await fetch(
-          `${supabaseUrl}/rest/v1/set_logs?user_id=eq.${context.profile_id}&completed_at=gte.${cutoff}&order=completed_at.desc`,
+          `${supabaseUrl}/rest/v1/exercise_set_logs?user_id=eq.${context.profile_id}&completed_at=gte.${cutoff}&is_warmup=eq.false&order=completed_at.desc`,
           {
             headers: {
               Authorization: `Bearer ${serviceKey}`,
@@ -1162,41 +1278,18 @@ Keep this context in mind to ensure your greetings and questions naturally align
         if (profileId && logs && logs.length > 0) {
           try {
             const todayDate = new Date().toISOString().split("T")[0];
-            const rows = logs.flatMap((log) =>
+            const rows: UnifiedSetRow[] = logs.flatMap((log) =>
               Array.from({ length: log.sets_completed }, (_, i) => ({
-                user_id: profileId,
-                date: todayDate,
                 exercise_name: log.exercise_name,
                 set_number: i + 1,
                 weight_kg: log.weight_kg || 0,
                 reps_completed: log.reps_completed,
-                is_bodyweight: (log.weight_kg || 0) === 0,
-                completed_at: new Date().toISOString(),
               }))
             );
 
-            const upsertResp = await fetch(
-              `${supabaseUrl}/rest/v1/workout_logs`,
-              {
-                method: "POST",
-                headers: {
-                  Authorization: `Bearer ${serviceKey}`,
-                  Apikey: serviceKey,
-                  "Content-Type": "application/json",
-                  Prefer: "return=minimal,resolution=merge-duplicates",
-                },
-                body: JSON.stringify(rows),
-              }
-            );
-
-            if (upsertResp.ok) {
-              insertedSets = rows.length;
-            } else {
-              const errText = await upsertResp.text();
-              console.error(`workout_logs upsert failed: ${upsertResp.status}`, errText);
-              dbSuccess = false;
-              dbError = `Database write failed (${upsertResp.status})`;
-            }
+            const sessionId = await ensureWorkoutSession(supabaseUrl, serviceKey, profileId, todayDate, dayOfWeek);
+            await upsertUnifiedSets(supabaseUrl, serviceKey, profileId, sessionId, dayOfWeek, rows);
+            insertedSets = rows.length;
           } catch (err) {
             dbSuccess = false;
             dbError = `Database error: ${err instanceof Error ? err.message : "unknown"}`;
@@ -1315,38 +1408,18 @@ Keep this context in mind to ensure your greetings and questions naturally align
           try {
             const todayDate = new Date().toISOString().split("T")[0];
             const dayOfWeek = new Date().toLocaleDateString("en-US", { weekday: "long" });
-            const insertResp = await fetch(
-              `${supabaseUrl}/rest/v1/workout_logs`,
-              {
-                method: "POST",
-                headers: {
-                  Authorization: `Bearer ${serviceKey}`,
-                  Apikey: serviceKey,
-                  "Content-Type": "application/json",
-                  Prefer: "return=minimal,resolution=merge-duplicates",
-                },
-                body: JSON.stringify({
-                  user_id: profileId,
-                  date: todayDate,
-                  exercise_name: args.exercise_name,
-                  set_number: args.set_number,
-                  weight_kg: args.weight_kg || 0,
-                  reps_completed: args.reps,
-                  is_bodyweight: (args.weight_kg || 0) === 0,
-                  completed_at: new Date().toISOString(),
-                }),
-              }
-            );
-
-            if (!insertResp.ok) {
-              const errText = await insertResp.text();
-              console.error(`workout_logs insert failed: ${insertResp.status}`, errText);
-              dbSuccess = false;
-              dbError = `Database write failed (${insertResp.status})`;
-            }
+            const sessionId = await ensureWorkoutSession(supabaseUrl, serviceKey, profileId, todayDate, dayOfWeek);
+            await upsertUnifiedSets(supabaseUrl, serviceKey, profileId, sessionId, dayOfWeek, [{
+              exercise_name: args.exercise_name,
+              set_number: args.set_number,
+              weight_kg: args.weight_kg || 0,
+              reps_completed: args.reps,
+              rpe: args.rpe ?? null,
+            }]);
           } catch (err) {
             dbSuccess = false;
             dbError = `Database error: ${err instanceof Error ? err.message : "unknown"}`;
+            console.error("log_workout_set DB error:", err);
           }
         }
 

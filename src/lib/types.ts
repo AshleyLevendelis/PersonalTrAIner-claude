@@ -397,10 +397,16 @@ export interface ExerciseSetLog {
   user_id: string
   date: string
   exercise_name: string
+  /** Stable slug identity (C0) — present on every row written through set-log-store; absent only on pre-C0 legacy shapes. */
+  exercise_id?: string
   set_number: number
   weight_kg: number
   reps_completed: number
   is_bodyweight: boolean
+  /** What reps_completed counts: reps, seconds (holds/intervals), or meters (carries). */
+  unit?: 'reps' | 'seconds' | 'meters'
+  rpe?: number | null
+  is_warmup?: boolean
   completed_at?: string
 }
 

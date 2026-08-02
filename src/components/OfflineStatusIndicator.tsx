@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Zap, RefreshCw, CheckCircle2 } from 'lucide-react'
-import { subscribeSyncState, type SyncState } from '@/lib/offline-sync'
+import { subscribeSyncState, type SyncState } from '@/lib/set-log-store'
 
 export function OfflineStatusIndicator() {
   const [state, setState] = useState<SyncState>({
