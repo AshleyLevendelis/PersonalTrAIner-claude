@@ -3,14 +3,14 @@ PLAN QUALITY SCORE REPORT
 ================================================================================
 
 Combinations scored: 9216
-Runtime: 265.2s
-Overall average: 8.34 / 10
+Runtime: 315.5s
+Overall average: 8.35 / 10
 
 Per-dimension averages (max 2.0 each):
   Time fit         0.88  <-- BELOW FLOOR (1.2)
   Structure        1.99
   Progression      1.91
-  Selection        1.67
+  Selection        1.68
   Goal alignment   1.89
 
 Score distribution:
@@ -19,81 +19,110 @@ Score distribution:
   [2-3)  0
   [3-4)  0
   [4-5)  0
-  [5-6)  3
+  [5-6)  4
   [6-7) # 209
-  [7-8) ################# 2603
-  [8-9) ########################## 3962
-  [9-10) ################ 2439
+  [7-8) ################ 2513
+  [8-9) ########################## 4008
+  [9-10) ################ 2482
 
-Plans below the 6.0 floor: 3 / 9216
+Plans below the 6.0 floor: 4 / 9216
 
 --------------------------------------------------------------------------------
 10 WORST-SCORING PLANS
 --------------------------------------------------------------------------------
 
-Score 5.8/10 — full_gym / none / 90+ / combat / novice / hypertrophy / recovery=low / cardio=love
+Score 5.8/10 — home_gym / none / 30-45 / combat / novice / hypertrophy / recovery=low / cardio=love
   Time fit (0.0/2):
-    [time_fit] wk1 Friday: Worst day (week 1 Friday) is 37% under budget (expected: 100min, actual: 63min)
+    [time_fit] wk9 Friday: Worst day (week 9 Friday) is 20% over budget (expected: 37min, actual: 45min)
+  Structure (1.6/2):
+    [main_lift_short_rest] wk1 Tuesday: Main lift "Barbell Bench Press" rest is "45s", not a full rest period
   Progression (1.6/2):
-    [calibration_not_conservative] wk1 Monday: Calibration week load (57.5kg) is not conservative relative to week 3 (62.5kg)
+    [calibration_not_conservative] wk1 Monday: Calibration week load (70kg) is not conservative relative to week 3 (75kg)
+    [calibration_not_conservative] wk1 Tuesday: Calibration week load (35kg) is not conservative relative to week 3 (40kg)
+    [calibration_not_conservative] wk1 Thursday: Calibration week load (70kg) is not conservative relative to week 3 (75kg)
+  Selection (1.6/2):
+    [push_pull_imbalance] wk1: Weekly push:pull set ratio is 3.00 (push=9, pull=3) (expected: 0.6 - 1.6, actual: 3.00)
+  Goal alignment (1.0/2):
+    [recovery_volume_not_reduced] wk1: low recovery_capacity weekly sets (60) not >=15% below high (69)
+
+Score 5.8/10 — home_gym / none / 90+ / combat / novice / hypertrophy / recovery=low / cardio=love
+  Time fit (0.0/2):
+    [time_fit] wk1 Friday: Worst day (week 1 Friday) is 52% under budget (expected: 100min, actual: 48min)
+  Progression (1.6/2):
+    [calibration_not_conservative] wk1 Monday: Calibration week load (35kg) is not conservative relative to week 3 (40kg)
     [calibration_not_conservative] wk1 Tuesday: Calibration week load (22.5kg) is not conservative relative to week 3 (27.5kg)
     [calibration_not_conservative] wk1 Thursday: Calibration week load (35kg) is not conservative relative to week 3 (40kg)
   Selection (1.2/2):
     [duplicate_movement_family] wk1 Monday: Movement family "deadlift" appears twice: Trap Bar Deadlift, Deadlifts
-    [duplicate_movement_family] wk1 Thursday: Movement family "deadlift" appears twice: Deadlifts, Trap Bar Deadlift
-    [push_pull_imbalance] wk1: Weekly push:pull set ratio is 1.75 (push=14, pull=8) (expected: 0.6 - 1.6, actual: 1.75)
+    [duplicate_movement_family] wk1 Thursday: Movement family "deadlift" appears twice: Trap Bar Deadlift, Deadlifts
+    [push_pull_imbalance] wk1: Weekly push:pull set ratio is 2.00 (push=16, pull=8) (expected: 0.6 - 1.6, actual: 2.00)
   Goal alignment (1.0/2):
-    [recovery_volume_not_reduced] wk1: low recovery_capacity weekly sets (124) not >=15% below high (157)
+    [recovery_volume_not_reduced] wk1: low recovery_capacity weekly sets (97) not >=15% below high (116)
 
-Score 5.8/10 — full_gym / shoulders / 30-45 / combat / novice / hypertrophy / recovery=low / cardio=love
+Score 5.8/10 — home_gym / neck / 60-90 / combat / novice / hypertrophy / recovery=low / cardio=love
   Time fit (0.0/2):
-    [time_fit] wk9 Friday: Worst day (week 9 Friday) is 21% over budget (expected: 37min, actual: 45min)
-  Structure (1.6/2):
-    [main_lift_short_rest] wk1 Thursday: Main lift "Deadlifts" rest is "45s", not a full rest period
+    [time_fit] wk1 Friday: Worst day (week 1 Friday) is 37% under budget (expected: 75min, actual: 47min)
   Progression (1.6/2):
-    [calibration_not_conservative] wk1 Monday: Calibration week load (57.5kg) is not conservative relative to week 3 (62.5kg)
-    [calibration_not_conservative] wk1 Tuesday: Calibration week load (57.5kg) is not conservative relative to week 3 (62.5kg)
-    [calibration_not_conservative] wk1 Thursday: Calibration week load (70kg) is not conservative relative to week 3 (75kg)
-  Selection (1.6/2):
-    [duplicate_movement_family] wk1 Friday: Movement family "core_stability" appears twice: Side Plank, Pallof Press, Dead Bug
+    [calibration_not_conservative] wk1 Monday: Calibration week load (35kg) is not conservative relative to week 3 (40kg)
+    [calibration_not_conservative] wk1 Thursday: Calibration week load (35kg) is not conservative relative to week 3 (40kg)
+  Selection (1.2/2):
+    [duplicate_movement_family] wk1 Monday: Movement family "deadlift" appears twice: Deadlifts, Trap Bar Deadlift
+    [duplicate_movement_family] wk1 Thursday: Movement family "deadlift" appears twice: Trap Bar Deadlift, Deadlifts
+    [push_pull_imbalance] wk1: Weekly push:pull set ratio is 2.00 (push=12, pull=6) (expected: 0.6 - 1.6, actual: 2.00)
   Goal alignment (1.0/2):
-    [recovery_volume_not_reduced] wk1: low recovery_capacity weekly sets (58) not >=15% below high (65)
+    [recovery_volume_not_reduced] wk1: low recovery_capacity weekly sets (83) not >=15% below high (92)
 
-Score 5.8/10 — home_gym / neck / 90+ / combat / beginner / hypertrophy / recovery=low / cardio=love
+Score 5.8/10 — home_gym / neck / 90+ / bodybuilding / novice / hypertrophy / recovery=low / cardio=love
   Time fit (0.0/2):
-    [time_fit] wk1 Friday: Worst day (week 1 Friday) is 56% under budget (expected: 100min, actual: 44min)
+    [time_fit] wk1 Tuesday: Worst day (week 1 Tuesday) is 39% under budget (expected: 100min, actual: 61min)
+  Progression (1.6/2):
+    [calibration_not_conservative] wk1 Monday: Calibration week load (35kg) is not conservative relative to week 3 (40kg)
+    [calibration_not_conservative] wk1 Tuesday: Calibration week load (35kg) is not conservative relative to week 3 (40kg)
+    [calibration_not_conservative] wk1 Thursday: Calibration week load (57.5kg) is not conservative relative to week 3 (62.5kg)
+    [calibration_not_conservative] wk1 Friday: Calibration week load (70kg) is not conservative relative to week 3 (75kg)
+  Selection (1.2/2):
+    [duplicate_movement_family] wk1 Thursday: Movement family "deadlift" appears twice: Trap Bar Deadlift, Deadlifts
+    [duplicate_movement_family] wk1 Friday: Movement family "deadlift" appears twice: Deadlifts, Trap Bar Deadlift
+    [push_pull_imbalance] wk1: Weekly push:pull set ratio is 2.00 (push=14, pull=7) (expected: 0.6 - 1.6, actual: 2.00)
+  Goal alignment (1.0/2):
+    [recovery_volume_not_reduced] wk1: low recovery_capacity weekly sets (70) not >=15% below high (84)
+
+Score 6.2/10 — full_gym / none / 30-45 / functional / beginner / hypertrophy / recovery=low / cardio=love
+  Time fit (0.0/2):
+    [time_fit] wk1 Friday: Worst day (week 1 Friday) is 35% under budget (expected: 37min, actual: 24min)
   Progression (1.6/2):
     [calibration_not_conservative] wk1 Monday: Calibration week load (45kg) is not conservative relative to week 3 (50kg)
     [calibration_not_conservative] wk1 Tuesday: Calibration week load (22.5kg) is not conservative relative to week 3 (27.5kg)
-    [calibration_not_conservative] wk1 Thursday: Calibration week load (22.5kg) is not conservative relative to week 3 (27.5kg)
-  Selection (1.2/2):
-    [duplicate_movement_family] wk1 Thursday: Movement family "deadlift" appears twice: Trap Bar Deadlift, Deadlifts
-    [push_pull_imbalance] wk1: Weekly push:pull set ratio is 1.75 (push=14, pull=8) (expected: 0.6 - 1.6, actual: 1.75)
+    [calibration_not_conservative] wk1 Thursday: Calibration week load (45kg) is not conservative relative to week 3 (50kg)
+    [calibration_not_conservative] wk1 Friday: Calibration week load (32.5kg) is not conservative relative to week 3 (37.5kg)
+  Selection (1.6/2):
+    [push_pull_imbalance] wk1: Weekly push:pull set ratio is 2.00 (push=6, pull=3) (expected: 0.6 - 1.6, actual: 2.00)
   Goal alignment (1.0/2):
-    [recovery_volume_not_reduced] wk1: low recovery_capacity weekly sets (84) not >=15% below high (102)
+    [recovery_volume_not_reduced] wk1: low recovery_capacity weekly sets (39) not >=15% below high (47)
 
 Score 6.2/10 — full_gym / none / 90+ / combat / novice / functional / recovery=low / cardio=love
   Time fit (0.0/2):
     [time_fit] wk1 Friday: Worst day (week 1 Friday) is 37% under budget (expected: 100min, actual: 63min)
   Selection (1.2/2):
-    [duplicate_movement_family] wk1 Thursday: Movement family "deadlift" appears twice: Deadlifts, Trap Bar Deadlift
+    [duplicate_movement_family] wk1 Thursday: Movement family "deadlift" appears twice: Trap Bar Deadlift, Deadlifts
     [push_pull_imbalance] wk1: Weekly push:pull set ratio is 1.75 (push=14, pull=8) (expected: 0.6 - 1.6, actual: 1.75)
   Goal alignment (1.0/2):
-    [recovery_volume_not_reduced] wk1: low recovery_capacity weekly sets (119) not >=15% below high (153)
+    [recovery_volume_not_reduced] wk1: low recovery_capacity weekly sets (110) not >=15% below high (134)
 
-Score 6.2/10 — full_gym / knees / 30-45 / combat / intermediate / functional / recovery=low / cardio=love
+Score 6.2/10 — full_gym / lower_back / 90+ / combat / advanced / hypertrophy / recovery=low / cardio=love
   Time fit (0.0/2):
-    [time_fit] wk13 Friday: Worst day (week 13 Friday) is 22% over budget (expected: 37min, actual: 45min)
-  Structure (1.6/2):
-    [main_lift_short_rest] wk1 Thursday: Main lift "Pull-Ups" rest is "45s", not a full rest period
+    [time_fit] wk1 Friday: Worst day (week 1 Friday) is 35% under budget (expected: 100min, actual: 65min)
+  Progression (1.6/2):
+    [calibration_not_conservative] wk1 Tuesday: Calibration week load (75kg) is not conservative relative to week 3 (80kg)
   Selection (1.6/2):
-    [duplicate_movement_family] wk1 Friday: Movement family "core_dynamic" appears twice: Hanging Leg Raises, Mountain Climbers
+    [duplicate_movement_family] wk1 Monday: Movement family "hip_hinge" appears twice: Glute Bridge, Single-Leg RDL (Bodyweight)
+    [duplicate_movement_family] wk1 Thursday: Movement family "hip_hinge" appears twice: Single-Leg RDL (Bodyweight), Glute Bridge
   Goal alignment (1.0/2):
-    [recovery_volume_not_reduced] wk1: low recovery_capacity weekly sets (58) not >=15% below high (68)
+    [recovery_volume_not_reduced] wk1: low recovery_capacity weekly sets (116) not >=15% below high (136)
 
 Score 6.2/10 — full_gym / knees / 60-90 / combat / beginner / hypertrophy / recovery=low / cardio=love
   Time fit (0.0/2):
-    [time_fit] wk1 Friday: Worst day (week 1 Friday) is 35% under budget (expected: 75min, actual: 49min)
+    [time_fit] wk1 Friday: Worst day (week 1 Friday) is 36% under budget (expected: 75min, actual: 48min)
   Progression (1.6/2):
     [calibration_not_conservative] wk1 Monday: Calibration week load (22.5kg) is not conservative relative to week 3 (27.5kg)
     [calibration_not_conservative] wk1 Tuesday: Calibration week load (20kg) is not conservative relative to week 3 (25kg)
@@ -101,11 +130,22 @@ Score 6.2/10 — full_gym / knees / 60-90 / combat / beginner / hypertrophy / re
   Selection (1.6/2):
     [push_pull_imbalance] wk1: Weekly push:pull set ratio is 2.00 (push=12, pull=6) (expected: 0.6 - 1.6, actual: 2.00)
   Goal alignment (1.0/2):
-    [recovery_volume_not_reduced] wk1: low recovery_capacity weekly sets (65) not >=15% below high (80)
+    [recovery_volume_not_reduced] wk1: low recovery_capacity weekly sets (62) not >=15% below high (77)
+
+Score 6.2/10 — full_gym / shoulders / 30-45 / combat / novice / hypertrophy / recovery=low / cardio=love
+  Time fit (0.0/2):
+    [time_fit] wk9 Friday: Worst day (week 9 Friday) is 21% over budget (expected: 37min, actual: 45min)
+  Progression (1.6/2):
+    [calibration_not_conservative] wk1 Monday: Calibration week load (57.5kg) is not conservative relative to week 3 (62.5kg)
+    [calibration_not_conservative] wk1 Thursday: Calibration week load (35kg) is not conservative relative to week 3 (40kg)
+  Selection (1.6/2):
+    [duplicate_movement_family] wk1 Friday: Movement family "core_stability" appears twice: Side Plank, Plank, Dead Bug
+  Goal alignment (1.0/2):
+    [recovery_volume_not_reduced] wk1: low recovery_capacity weekly sets (54) not >=15% below high (70)
 
 Score 6.2/10 — full_gym / shoulders / 90+ / combat / novice / hypertrophy / recovery=low / cardio=love
   Time fit (0.0/2):
-    [time_fit] wk1 Tuesday: Worst day (week 1 Tuesday) is 35% under budget (expected: 100min, actual: 65min)
+    [time_fit] wk1 Tuesday: Worst day (week 1 Tuesday) is 36% under budget (expected: 100min, actual: 64min)
   Progression (1.6/2):
     [calibration_not_conservative] wk1 Monday: Calibration week load (57.5kg) is not conservative relative to week 3 (62.5kg)
     [calibration_not_conservative] wk1 Thursday: Calibration week load (35kg) is not conservative relative to week 3 (40kg)
@@ -113,40 +153,6 @@ Score 6.2/10 — full_gym / shoulders / 90+ / combat / novice / hypertrophy / re
     [duplicate_movement_family] wk1 Monday: Movement family "deadlift" appears twice: Deadlifts, Trap Bar Deadlift
     [duplicate_movement_family] wk1 Thursday: Movement family "deadlift" appears twice: Deadlifts, Trap Bar Deadlift
   Goal alignment (1.0/2):
-    [recovery_volume_not_reduced] wk1: low recovery_capacity weekly sets (100) not >=15% below high (126)
-
-Score 6.2/10 — full_gym / neck / 90+ / combat / advanced / hypertrophy / recovery=low / cardio=love
-  Time fit (0.0/2):
-    [time_fit] wk1 Friday: Worst day (week 1 Friday) is 35% under budget (expected: 100min, actual: 65min)
-  Progression (1.6/2):
-    [calibration_not_conservative] wk1 Monday: Calibration week load (75kg) is not conservative relative to week 3 (80kg)
-    [calibration_not_conservative] wk1 Thursday: Calibration week load (62.5kg) is not conservative relative to week 3 (67.5kg)
-  Selection (1.6/2):
-    [duplicate_movement_family] wk1 Monday: Movement family "deadlift" appears twice: Trap Bar Deadlift, Deadlifts
-    [duplicate_movement_family] wk1 Thursday: Movement family "deadlift" appears twice: Trap Bar Deadlift, Deadlifts
-  Goal alignment (1.0/2):
-    [recovery_volume_not_reduced] wk1: low recovery_capacity weekly sets (132) not >=15% below high (158)
-
-Score 6.2/10 — full_gym / lower_back+knees / 30-45 / bodybuilding / intermediate / hypertrophy / recovery=low / cardio=love
-  Time fit (0.0/2):
-    [time_fit] wk9 Thursday: Worst day (week 9 Thursday) is 38% under budget (expected: 37min, actual: 23min)
-  Progression (1.6/2):
-    [calibration_not_conservative] wk1 Monday: Calibration week load (47.5kg) is not conservative relative to week 3 (52.5kg)
-  Selection (1.6/2):
-    [duplicate_movement_family] wk1 Friday: Movement family "shrug" appears twice: Shrugs, Dumbbell Shrugs
-  Goal alignment (1.0/2):
-    [recovery_volume_not_reduced] wk1: low recovery_capacity weekly sets (36) not >=15% below high (44)
-
-Score 6.2/10 — full_gym / shoulders+wrists / 90+ / combat / advanced / hypertrophy / recovery=low / cardio=love
-  Time fit (0.0/2):
-    [time_fit] wk1 Friday: Worst day (week 1 Friday) is 50% under budget (expected: 100min, actual: 50min)
-  Progression (1.6/2):
-    [calibration_not_conservative] wk1 Monday: Calibration week load (125kg) is not conservative relative to week 3 (130kg)
-    [calibration_not_conservative] wk1 Tuesday: Calibration week load (125kg) is not conservative relative to week 3 (130kg)
-    [calibration_not_conservative] wk1 Thursday: Calibration week load (125kg) is not conservative relative to week 3 (130kg)
-  Selection (1.6/2):
-    [duplicate_movement_family] wk1 Thursday: Movement family "hip_hinge" appears twice: Glute Bridge, Single-Leg RDL (Bodyweight)
-  Goal alignment (1.0/2):
-    [recovery_volume_not_reduced] wk1: low recovery_capacity weekly sets (92) not >=15% below high (119)
+    [recovery_volume_not_reduced] wk1: low recovery_capacity weekly sets (99) not >=15% below high (111)
 
 ================================================================================

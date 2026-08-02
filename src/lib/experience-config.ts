@@ -64,27 +64,18 @@ export function getSkillDemand(exerciseName: string): SkillDemand {
 const SKILL_RANK: Record<SkillDemand, number> = { low: 0, moderate: 1, high: 2 }
 
 /**
- * A capacity gate distinct from the generic skill-demand ceiling above.
- * Full bodyweight Pull-Ups carries a 'high' skill-demand tag, but a
- * novice's skill ceiling is ALSO 'high' — the generic check alone would
- * still hand a novice 5-7 sets of 9-13 unassisted pull-ups, which most
- * novices simply cannot do (an LLM coach review caught this directly:
- * "if that's true, 12 sets a week of it is the only real back work they
- * get" — sarcastically, since it isn't true). This is about relative
- * pulling STRENGTH, which the generic skill-demand table (technique/
- * coordination/injury-risk) doesn't capture — so it's gated separately
- * rather than by inflating the general table.
+ * The old capacity gate lived here as a name-keyed table (Pull-Ups only).
+ * It's now the DB entry's own `capability_requirement` field (exercise-
+ * db.ts) — a per-exercise minimum experience tier checked in addition to
+ * this generic 3-level ceiling, with a named regression, applied to a much
+ * broader set of skill movements than just pull-ups (see exercise-plan.ts's
+ * stageSkillFilter, which checks meetsCapabilityRequirement alongside this
+ * function rather than this function alone).
  */
-const CAPACITY_GATED: Partial<Record<string, TrainingExperience[]>> = {
-  'Pull-Ups': ['intermediate', 'advanced'],
-}
-
 export function isSkillAppropriate(
   exerciseName: string,
   experience: TrainingExperience,
 ): boolean {
-  const gate = CAPACITY_GATED[exerciseName]
-  if (gate && !gate.includes(experience)) return false
   const demand = getSkillDemand(exerciseName)
   const ceiling = EXPERIENCE_CONFIGS[experience].max_skill_demand
   return SKILL_RANK[demand] <= SKILL_RANK[ceiling]

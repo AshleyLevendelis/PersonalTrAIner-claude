@@ -1,5 +1,5 @@
 import type { FitnessGoal, TrainingExperience, WorkoutDay, Exercise } from './types'
-import { EXERCISE_DATABASE, getMovementFamily, type ExerciseEntry } from './exercise-db'
+import { EXERCISE_DATABASE, getMovementFamily, meetsCapabilityRequirement, type ExerciseEntry } from './exercise-db'
 import { getExperienceConfig, isSkillAppropriate } from './experience-config'
 
 // ---------------------------------------------------------------------------
@@ -282,6 +282,7 @@ export function rotateVariation(
         e.substitution_group === current.substitution_group &&
         e.movement_pattern === current.movement_pattern &&
         isSkillAppropriate(e.name, experience) &&
+        meetsCapabilityRequirement(e, experience) &&
         // Rotation must not become a downgrade. Without this, an advanced
         // lifter got rotated from Barbell Squats to Goblet Squats and from
         // Pull-Ups to Pull-Ups (Assisted) — variations that cannot be loaded

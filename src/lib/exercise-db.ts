@@ -41,6 +41,25 @@ export type MechanicsTier = 'tier1_compound' | 'tier2_compound' | 'tier3_isolati
  */
 export type PrescriptionType = 'reps' | 'time' | 'distance_load' | 'intervals'
 
+/**
+ * A hard capability gate distinct from SKILL_DEMAND's generic ceiling
+ * (experience-config.ts). SKILL_DEMAND's 3-level 'low'/'moderate'/'high'
+ * ceiling can't express "novice ceiling is 'high', but Archer Push-Ups and
+ * Pistol Squats — both genuinely 'high' — still shouldn't reach a novice."
+ * capability_requirement is a specific minimum tier per exercise, checked in
+ * addition to (not instead of) the general skill-demand ceiling, with a
+ * named regression so a beginner/novice below the gate has somewhere to
+ * land instead of the pattern just disappearing. An LLM coach review caught
+ * this directly: a novice handed 5-7 sets of unassisted pull-ups, archer
+ * push-ups, and pistol squats, none of which most novices can perform for a
+ * single clean rep.
+ */
+export interface CapabilityRequirement {
+  minExperience: TrainingExperience
+  /** The exercise name selection should substitute for anyone below minExperience. */
+  regression: string
+}
+
 export interface ExerciseEntry {
   name: string
   movement_pattern: MovementPattern
@@ -54,6 +73,8 @@ export interface ExerciseEntry {
   coach_note_swap?: string
   loads_joints: string[]
   style_tags: TrainingStyle[]
+  /** Hard experience gate + regression — see CapabilityRequirement. Absent means no gate beyond the generic SKILL_DEMAND ceiling. */
+  capability_requirement?: CapabilityRequirement
   substitution_group: string
   unilateral: boolean
   avg_duration_seconds: number
@@ -210,6 +231,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     coach_note_swap: 'Extends the range of motion on the same bodyweight leverage — more stimulus without adding load.',
     loads_joints: ['shoulder', 'wrist'],
     style_tags: ['bodybuilding', 'functional', 'combat', 'hybrid'],
+    capability_requirement: { minExperience: 'novice', regression: 'Push-Ups' },
     substitution_group: 'bench_press',
     unilateral: false,
     avg_duration_seconds: 32,
@@ -227,6 +249,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     coach_note_swap: 'Shifts most of the load to one arm — the far end of the push-up leverage ladder before a true one-arm push-up.',
     loads_joints: ['shoulder', 'wrist'],
     style_tags: ['bodybuilding', 'functional', 'combat', 'hybrid'],
+    capability_requirement: { minExperience: 'intermediate', regression: 'Push-Ups' },
     substitution_group: 'bench_press',
     unilateral: true,
     avg_duration_seconds: 35,
@@ -244,6 +267,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     coach_note_swap: 'Heavy loaded stretch on the lower pecs and triceps.',
     loads_joints: ['shoulder'],
     style_tags: ['bodybuilding', 'functional', 'combat', 'hybrid'],
+    capability_requirement: { minExperience: 'intermediate', regression: 'Tricep Dips' },
     substitution_group: 'dip',
     unilateral: false,
     avg_duration_seconds: 35,
@@ -469,6 +493,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     coach_note_swap: 'The gold standard for relative upper-body pulling strength.',
     loads_joints: ['shoulder'],
     style_tags: ['bodybuilding', 'functional', 'combat', 'hybrid'],
+    capability_requirement: { minExperience: 'intermediate', regression: 'Pull-Ups (Assisted)' },
     substitution_group: 'vertical_pull',
     unilateral: false,
     avg_duration_seconds: 35,
@@ -830,6 +855,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     coach_note_swap: 'Eccentric hamstring strength — reduces injury risk significantly.',
     loads_joints: ['knee'],
     style_tags: ['functional', 'combat', 'hybrid'],
+    capability_requirement: { minExperience: 'advanced', regression: 'Sliding Leg Curl' },
     substitution_group: 'leg_curl',
     unilateral: false,
     avg_duration_seconds: 30,
@@ -1039,6 +1065,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     coach_note_swap: 'The single-leg squat ceiling for a trainee with no external load available — genuinely heavy on one leg.',
     loads_joints: ['knee'],
     style_tags: ['functional', 'combat', 'hybrid'],
+    capability_requirement: { minExperience: 'advanced', regression: 'Split Squat (Bodyweight)' },
     substitution_group: 'single_leg',
     unilateral: true,
     avg_duration_seconds: 35,
@@ -1303,6 +1330,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     coach_note_swap: 'Heavy bodyweight tricep loading with pressing crossover.',
     loads_joints: ['shoulder'],
     style_tags: ['bodybuilding', 'functional', 'combat', 'hybrid'],
+    capability_requirement: { minExperience: 'novice', regression: 'Push-Ups' },
     substitution_group: 'dip',
     unilateral: false,
     avg_duration_seconds: 35,
@@ -1562,6 +1590,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     coach_note_swap: 'Advanced core flexion under load — builds visible ab development.',
     loads_joints: ['shoulder'],
     style_tags: ['bodybuilding', 'functional', 'combat', 'hybrid'],
+    capability_requirement: { minExperience: 'intermediate', regression: 'Dead Bug' },
     substitution_group: 'core_dynamic',
     unilateral: false,
     avg_duration_seconds: 30,
@@ -1579,6 +1608,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     coach_note_swap: 'Progressive anti-extension that challenges the entire anterior chain.',
     loads_joints: ['shoulder', 'wrist'],
     style_tags: ['functional', 'combat', 'hybrid'],
+    capability_requirement: { minExperience: 'intermediate', regression: 'Plank' },
     substitution_group: 'core_stability',
     unilateral: false,
     avg_duration_seconds: 35,
@@ -1632,9 +1662,27 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     coach_note_swap: 'CNS primer that activates fast-twitch motor units for heavy lifting.',
     loads_joints: ['knee'],
     style_tags: ['functional', 'combat', 'hybrid'],
+    capability_requirement: { minExperience: 'intermediate', regression: 'Bodyweight Squat Marches' },
     substitution_group: 'explosive_lower',
     unilateral: false,
     avg_duration_seconds: 18,
+  },
+  {
+    name: 'Bodyweight Squat Marches',
+    movement_pattern: 'activation',
+    mechanics_tier: 'primer',
+    prescription_type: 'reps',
+    angle_vector: 'vertical',
+    primary_muscles: ['glutes', 'quadriceps', 'hip flexors'],
+    equipment: ['bodyweight'],
+    joint_stress: 'low',
+    form_cues: ['High-knee march in place or walking', 'Controlled tempo, no jumping', 'Drive the knee to hip height', 'Land softly'],
+    coach_note_swap: 'Low-impact lower-body primer — raises heart rate and preps the hip/knee patterns without the landing forces of a jump.',
+    loads_joints: [],
+    style_tags: ['functional', 'combat', 'hybrid'],
+    substitution_group: 'low_impact_activation',
+    unilateral: false,
+    avg_duration_seconds: 15,
   },
   {
     name: 'Band Pull-Aparts',
@@ -1666,6 +1714,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     coach_note_swap: 'Full-body power primer that lights up the CNS before heavy compound work.',
     loads_joints: ['shoulder'],
     style_tags: ['functional', 'combat', 'hybrid'],
+    capability_requirement: { minExperience: 'novice', regression: 'Bodyweight Squat Marches' },
     substitution_group: 'explosive_upper',
     unilateral: false,
     avg_duration_seconds: 18,
@@ -1683,6 +1732,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     coach_note_swap: 'Horizontal power development primes hip extensors for hinge work.',
     loads_joints: ['knee'],
     style_tags: ['functional', 'combat', 'hybrid'],
+    capability_requirement: { minExperience: 'intermediate', regression: 'Bodyweight Squat Marches' },
     substitution_group: 'explosive_lower',
     unilateral: false,
     avg_duration_seconds: 15,
@@ -1717,6 +1767,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     coach_note_swap: 'Upper-body power activation for pressing days.',
     loads_joints: ['wrist', 'shoulder'],
     style_tags: ['functional', 'combat', 'hybrid'],
+    capability_requirement: { minExperience: 'intermediate', regression: 'Band Pull-Aparts' },
     substitution_group: 'explosive_upper',
     unilateral: false,
     avg_duration_seconds: 18,
@@ -1835,6 +1886,25 @@ const MOVEMENT_FAMILIES: Record<string, string> = {
  */
 export function getMovementFamily(entry: ExerciseEntry): string {
   return MOVEMENT_FAMILIES[entry.name] ?? entry.substitution_group
+}
+
+// ---------------------------------------------------------------------------
+// CAPABILITY GATING
+// ---------------------------------------------------------------------------
+
+const EXPERIENCE_RANK: Record<TrainingExperience, number> = {
+  beginner: 0, novice: 1, intermediate: 2, advanced: 3,
+}
+
+/**
+ * Whether this trainee's experience clears the exercise's capability_
+ * requirement, if it has one. Entries with no capability_requirement are
+ * always fine (they're still subject to the generic SKILL_DEMAND ceiling in
+ * experience-config.ts, checked separately).
+ */
+export function meetsCapabilityRequirement(entry: ExerciseEntry, experience: TrainingExperience): boolean {
+  if (!entry.capability_requirement) return true
+  return EXPERIENCE_RANK[experience] >= EXPERIENCE_RANK[entry.capability_requirement.minExperience]
 }
 
 // ---------------------------------------------------------------------------

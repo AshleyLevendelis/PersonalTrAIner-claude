@@ -4,7 +4,7 @@ import type {
   FatigueCost, MesocycleMovementPattern, EquipmentAccess, TrainingStyle,
   ConstraintTrace, ConstraintTraceEntry, PlanResult, TrainingExperience,
 } from './types'
-import { EXERCISE_DATABASE, getMovementFamily, getVolumeRole, type ExerciseEntry, type MovementPattern, type AngleVector, type VolumeRole } from './exercise-db'
+import { EXERCISE_DATABASE, getMovementFamily, getVolumeRole, meetsCapabilityRequirement, type ExerciseEntry, type MovementPattern, type AngleVector, type VolumeRole } from './exercise-db'
 import {
   getExperienceConfig, getSkillDemand, isSkillAppropriate, applyRepFloor,
   type ExperienceConfig,
@@ -414,7 +414,14 @@ function stageSkillFilter(
   const rejected: ExerciseEntry[] = []
 
   for (const ex of pool) {
-    if (isSkillAppropriate(ex.name, experience)) {
+    if (!meetsCapabilityRequirement(ex, experience)) {
+      rejected.push(ex)
+      trace.skill_filtered.push({
+        exercise: ex.name,
+        stage: 'skill',
+        reason: `requires ${ex.capability_requirement!.minExperience}+ experience — '${experience}' gets "${ex.capability_requirement!.regression}" instead`,
+      })
+    } else if (isSkillAppropriate(ex.name, experience)) {
       result.push(ex)
     } else {
       rejected.push(ex)

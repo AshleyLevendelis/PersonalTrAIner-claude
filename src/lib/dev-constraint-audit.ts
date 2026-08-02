@@ -1,5 +1,5 @@
 import { generateExercisePlan, generateMesocycle, getConstrainedPool } from './exercise-plan'
-import { EXERCISE_DATABASE } from './exercise-db'
+import { EXERCISE_DATABASE, meetsCapabilityRequirement } from './exercise-db'
 import type {
   UserProfile, EquipmentAccess, TrainingStyle, SessionDuration,
   WorkoutDay, ConstraintTrace, PlanResult, TrainingExperience, RecoveryCapacity,
@@ -79,7 +79,7 @@ export interface AuditFailure {
   check:
     | 'equipment' | 'injury' | 'duration' | 'style_pattern' | 'skill' | 'empty_session' | 'load_cap'
     | 'superset_pairing' | 'load_progression' | 'set_progression' | 'goal_structure' | 'recovery_volume'
-    | 'swap_constraint' | 'swap_load' | 'ban_purge' | 'prescription_unit'
+    | 'swap_constraint' | 'swap_load' | 'ban_purge' | 'prescription_unit' | 'capability_gate'
   combination: string
   details: string
   exercise?: string
@@ -322,6 +322,24 @@ function runSingleAudit(
           exercise: ex.name,
         })
       }
+    }
+  }
+
+  // CHECK 6b: capability_requirement gate — a beginner/novice must never
+  // receive a gated skill movement (pull-ups, archer/deficit push-ups,
+  // pistols, Nordic curls, hanging leg raises, ab wheel, plyometric
+  // primers) in ANY slot, including primers. Distinct from CHECK 6 above:
+  // SKILL_DEMAND's 3-level ceiling alone lets a novice (ceiling 'high')
+  // through on several of these.
+  for (const ex of allExercises) {
+    const entry = EXERCISE_DATABASE.find(e => e.name === ex.name)
+    if (!entry || !meetsCapabilityRequirement(entry, experience)) {
+      failures.push({
+        check: 'capability_gate',
+        combination: comboLabel,
+        details: `"${ex.name}" requires ${entry?.capability_requirement?.minExperience}+ experience but this profile is "${experience}"`,
+        exercise: ex.name,
+      })
     }
   }
 
