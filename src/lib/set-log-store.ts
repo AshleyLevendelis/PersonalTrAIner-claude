@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { getAppNow, getLocalDateString } from './dev-clock'
 import type { ExerciseSetLog } from './types'
 
 // ---------------------------------------------------------------------------
@@ -399,7 +400,7 @@ export function deleteSet(params: {
 // Session resolution (Part 5 — auto-create today's workout_sessions row)
 // ---------------------------------------------------------------------------
 
-async function ensureSessionSynced(userId: string, date: string): Promise<string> {
+async function ensureSessionSynced(userId: string, date: string, splitType: string = 'training'): Promise<string> {
   const regKey = `${userId}|${date}`
   const registry = loadRegistry()
   const entry = registry[regKey]
@@ -430,7 +431,7 @@ async function ensureSessionSynced(userId: string, date: string): Promise<string
       .insert({
         profile_id: userId,
         date,
-        split_type: 'training',
+        split_type: splitType,
         duration_minutes: 45,
         is_completed: false,
         started_at: entry?.startedAt ?? new Date().toISOString(),
@@ -781,6 +782,14 @@ export async function getLastSessionSets(
  * bypasses the pending store because these rows need explicit completed_at
  * timestamps in the past, which saveSet (deliberately) doesn't accept.
  * Same session-ensure + natural-key upsert semantics as the flush path.
+ *
+ * Hard-refuses to write to today (or later) — the ONLY callers of this
+ * function are dev/seed tooling, which must never be able to overwrite a
+ * real logged set in today's live session (that natural-key upsert would
+ * silently clobber it). "Today" here follows getAppNow for whichever
+ * profile is being seeded, so it respects an active dev-clock override too.
+ * Seeded sessions are tagged split_type='seeded' so they're distinguishable
+ * from genuinely logged training.
  */
 export async function writeHistoricalSession(params: {
   userId: string
@@ -801,7 +810,13 @@ export async function writeHistoricalSession(params: {
   }>
 }): Promise<void> {
   if (params.sets.length === 0) return
-  const sessionId = await ensureSessionSynced(params.userId, params.date)
+  const todayLocal = getLocalDateString(getAppNow(params.userId))
+  if (params.date >= todayLocal) {
+    throw new Error(
+      `writeHistoricalSession refuses to write to ${params.date} — must be strictly before today (${todayLocal}) so seed/historical data can never touch a live session.`
+    )
+  }
+  const sessionId = await ensureSessionSynced(params.userId, params.date, 'seeded')
   const rows = params.sets.map(s => ({
     session_id: sessionId,
     user_id: params.userId,

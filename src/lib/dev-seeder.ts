@@ -1,6 +1,7 @@
 import { supabase } from './supabase'
 import { writeHistoricalSession, clearAllSetLogs } from './set-log-store'
 import { getExerciseId } from './exercise-db'
+import { getLocalDateString } from './dev-clock'
 import type { UserProfile, WorkoutDay, MealPlanDay } from './types'
 
 function randomBetween(min: number, max: number): number {
@@ -61,6 +62,7 @@ export async function seedSyntheticData(
 
   // --- Seed Workout Logs ---
   onProgress?.({ total: totalSteps, current: 0, phase: 'Generating workout history...' })
+  const todayLocal = getLocalDateString(new Date())
 
   for (let wk = 1; wk <= weeksToSeed; wk++) {
     for (const day of exercisePlan) {
@@ -70,7 +72,15 @@ export async function seedSyntheticData(
       if (dayIndex === -1) continue
       const baseDate = new Date()
       baseDate.setDate(baseDate.getDate() - ((weeksToSeed - wk) * 7) - (((new Date().getDay()) - dayIndex + 7) % 7))
-      const dateStr = baseDate.toISOString().split('T')[0]
+      // Local date, not UTC — and skipped outright if it lands on today so
+      // seeding can never overwrite a real logged set in the live session
+      // (writeHistoricalSession also hard-refuses this as a backstop).
+      const dateStr = getLocalDateString(baseDate)
+      if (dateStr >= todayLocal) {
+        stepsDone++
+        onProgress?.({ total: totalSteps, current: stepsDone, phase: `Week ${wk} workouts...` })
+        continue
+      }
 
       const sets: Parameters<typeof writeHistoricalSession>[0]['sets'] = []
       for (const exercise of day.exercises) {

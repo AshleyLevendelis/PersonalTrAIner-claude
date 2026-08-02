@@ -953,18 +953,20 @@ function App() {
           </TabsContent>
 
           <TabsContent value="exercise">
-            <DevTestPanel
-              profileId={profile?.id}
-              mesocycle={mesocycle}
-              exercisePlan={exercisePlan}
-              overrideWeek={devOverrideWeek}
-              overrideDay={devOverrideDay}
-              devBypassLocks={devBypassLocks}
-              onOverrideWeekChange={setDevOverrideWeek}
-              onOverrideDayChange={setDevOverrideDay}
-              onBypassLocksChange={setDevBypassLocks}
-              onLogsSeeded={() => setLogsVersion(v => v + 1)}
-            />
+            {isDevAccount(profile) && (
+              <DevTestPanel
+                profileId={profile?.id}
+                mesocycle={mesocycle}
+                exercisePlan={exercisePlan}
+                overrideWeek={devOverrideWeek}
+                overrideDay={devOverrideDay}
+                devBypassLocks={devBypassLocks}
+                onOverrideWeekChange={setDevOverrideWeek}
+                onOverrideDayChange={setDevOverrideDay}
+                onBypassLocksChange={setDevBypassLocks}
+                onLogsSeeded={() => setLogsVersion(v => v + 1)}
+              />
+            )}
             <ExercisePlan
               plan={exercisePlan}
               mesocycle={mesocycle}

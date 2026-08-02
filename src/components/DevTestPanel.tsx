@@ -9,6 +9,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Bug, Clock, CalendarClock, Database, ChevronDown, ToggleLeft, ToggleRight, Zap, AlertTriangle } from 'lucide-react'
 import { writeHistoricalSession, clearAllSetLogs } from '@/lib/set-log-store'
 import { getExerciseId } from '@/lib/exercise-db'
+import { getAppNow, getLocalDateString } from '@/lib/dev-clock'
 import type { MesocycleWeek, WorkoutDay, Exercise } from '@/lib/types'
 
 interface DevTestPanelProps {
@@ -79,10 +80,19 @@ export function DevTestPanel({
       // Unified store (C0): one historical session per (day, week), sets
       // upserted on the natural key — re-seeding overwrites instead of piling
       // up duplicate rows the way the legacy set_logs inserts did.
+      const todayLocal = getLocalDateString(getAppNow(profileId))
+      let skippedTodayCount = 0
       const seedDay = async (
         exercises: Exercise[], weekNumber: number, dayName: string, baseDate: Date,
       ): Promise<number> => {
-        const dateStr = baseDate.toISOString().split('T')[0]
+        // Local date, not UTC — and hard-clamped strictly before today so
+        // seeding can never land on (and silently overwrite) a real logged
+        // set in today's live session.
+        const dateStr = getLocalDateString(baseDate)
+        if (dateStr >= todayLocal) {
+          skippedTodayCount++
+          return 0
+        }
         const sets = exercises.flatMap(exercise => {
           const weight = generateRealisticWeight(exercise.name)
           const reps = parseRepsToNumber(exercise.reps)
@@ -130,7 +140,10 @@ export function DevTestPanel({
         }
       }
 
-      setSeedResult({ success: true, message: `Seeded ${totalLogs} set logs across weeks 1-${seedUpToWeek}` })
+      const skippedNote = skippedTodayCount > 0
+        ? ` (skipped ${skippedTodayCount} day${skippedTodayCount === 1 ? '' : 's'} that landed on today — mock data never touches your live session)`
+        : ''
+      setSeedResult({ success: true, message: `Seeded ${totalLogs} set logs across weeks 1-${seedUpToWeek}${skippedNote}` })
       onLogsSeeded()
     } catch (err) {
       setSeedResult({ success: false, message: `Error: ${err instanceof Error ? err.message : 'Unknown'}` })

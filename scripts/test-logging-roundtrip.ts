@@ -510,6 +510,44 @@ async function main() {
   // (none expected, but keep the pending store tidy for anything after this).
   await flushPending()
 
+  // ---- 12. Seeder can never touch today's live session (fix #5) -----------
+  console.log('\n[12] writeHistoricalSession refuses today/future dates; tags seeded sessions (fix #5)')
+  const { writeHistoricalSession } = await import('../src/lib/set-log-store')
+  const seedEx = 'Seated Leg Curl'
+  const seedExId = getExerciseId(seedEx)
+
+  let rejectedToday = false
+  try {
+    await writeHistoricalSession({
+      userId, date: W1, weekNumber: 1, day,
+      sets: [{ exerciseId: seedExId, exerciseName: seedEx, setNumber: 1, weightKg: 30, repsCompleted: 10, completedAt: `${W1}T10:00:00.000Z` }],
+    })
+  } catch {
+    rejectedToday = true
+  }
+  check('writeHistoricalSession rejects a today-dated write', rejectedToday)
+  check('nothing was written for the rejected today-dated call', !db.exercise_set_logs.some(r => r.exercise_id === seedExId))
+
+  let rejectedFuture = false
+  try {
+    await writeHistoricalSession({
+      userId, date: isoDatePlusDays(1), weekNumber: 1, day,
+      sets: [{ exerciseId: seedExId, exerciseName: seedEx, setNumber: 1, weightKg: 30, repsCompleted: 10, completedAt: `${isoDatePlusDays(1)}T10:00:00.000Z` }],
+    })
+  } catch {
+    rejectedFuture = true
+  }
+  check('writeHistoricalSession rejects a future-dated write', rejectedFuture)
+
+  const seedDate = isoDatePlusDays(-14)
+  await writeHistoricalSession({
+    userId, date: seedDate, weekNumber: 1, day,
+    sets: [{ exerciseId: seedExId, exerciseName: seedEx, setNumber: 1, weightKg: 30, repsCompleted: 10, completedAt: `${seedDate}T10:00:00.000Z` }],
+  })
+  const seededSession = db.workout_sessions.find(s => s.profile_id === userId && s.date === seedDate)
+  check('a genuinely past-dated seed write succeeds and is tagged split_type=seeded',
+    seededSession?.split_type === 'seeded', seededSession)
+
   // ---- Summary -------------------------------------------------------------
   if (failures > 0) {
     console.error(`\n${failures} logging round-trip check(s) FAILED.`)
