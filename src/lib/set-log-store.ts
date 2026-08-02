@@ -498,8 +498,7 @@ export function flushPending(): Promise<void> {
   return flushPromise
 }
 
-async function syncUpsert(set: PendingSet): Promise<void> {
-  const sessionId = await ensureSessionSynced(set.userId, set.date)
+async function upsertSetRow(sessionId: string, set: PendingSet): Promise<void> {
   const { error } = await supabase
     .from('exercise_set_logs')
     .upsert({
@@ -520,6 +519,37 @@ async function syncUpsert(set: PendingSet): Promise<void> {
       client_id: set.clientId,
     }, { onConflict: 'user_id,session_id,exercise_id,set_number,is_warmup' })
   if (error) throw error
+}
+
+/** Drops a cached serverId so the next ensureSessionSynced call re-resolves (or recreates) the session from scratch. */
+function invalidateSessionRegistry(userId: string, date: string): void {
+  const registry = loadRegistry()
+  const key = `${userId}|${date}`
+  if (registry[key]?.serverId) {
+    delete registry[key].serverId
+    saveRegistry(registry)
+  }
+}
+
+async function syncUpsert(set: PendingSet): Promise<void> {
+  const sessionId = await ensureSessionSynced(set.userId, set.date)
+  try {
+    await upsertSetRow(sessionId, set)
+  } catch (err) {
+    // 23503 = foreign_key_violation. The cached session_id is stale — most
+    // likely a dev-tool wipe (clearAllSetLogs) deleted the workout_sessions
+    // row on another device/tab, leaving this device's registry pointing at
+    // nothing. Drop the cache and retry ONCE with a freshly resolved (or
+    // recreated) session before giving up; a second failure still falls
+    // through to the normal permanent-error dead-letter path.
+    if ((err as { code?: string } | null)?.code === '23503') {
+      invalidateSessionRegistry(set.userId, set.date)
+      const freshSessionId = await ensureSessionSynced(set.userId, set.date)
+      await upsertSetRow(freshSessionId, set)
+      return
+    }
+    throw err
+  }
 }
 
 async function syncDelete(del: PendingDelete): Promise<void> {

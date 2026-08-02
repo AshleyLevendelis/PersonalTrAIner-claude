@@ -304,16 +304,25 @@ export async function getRecentLogs(
     .eq('user_id', userId)
     .eq('is_warmup', false)
     .gte('completed_at', sinceStr)
-    .order('completed_at', { ascending: false })
-    .order('exercise_name')
-    .order('set_number')
+    .order('completed_at', { ascending: true })
 
   if (error) throw error
-  return ((data || []) as (ExerciseSetLog & { session_id?: string })[]).map(row => ({
+  const rows = ((data || []) as (ExerciseSetLog & { session_id?: string })[]).map(row => ({
     ...row,
     weight_kg: Number(row.weight_kg),
     date: row.date || (row.completed_at ?? '').slice(0, 10),
   }))
+
+  // Most-recent DAY first (so the chat context leads with what just
+  // happened), but ASCENDING within a day — completed_at is a fine-grained,
+  // effectively-unique timestamp now, so sorting purely by it (descending)
+  // reversed every session's set order (a ramp read as 80kg, 70kg, 60kg
+  // instead of the order it was actually performed in).
+  return rows.sort((a, b) => {
+    const dayCompare = b.date.localeCompare(a.date)
+    if (dayCompare !== 0) return dayCompare
+    return (a.completed_at ?? '').localeCompare(b.completed_at ?? '')
+  })
 }
 
 export function formatLogsForAI(logs: ExerciseSetLog[]): string {

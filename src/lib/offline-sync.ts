@@ -24,13 +24,19 @@ export function saveSessionCache(data: SessionCacheData): void {
   localStorage.setItem(SESSION_CACHE_KEY, JSON.stringify({ ...data, savedAt: new Date().toISOString() }))
 }
 
-export function loadSessionCache(): SessionCacheData | null {
+/**
+ * `expectedDay` must come from the same dev-clock-aware weekday helper the
+ * caller uses to save the cache (getSessionDateContext in dev-clock.ts) —
+ * comparing against a fresh `new Date()` here instead would disagree with a
+ * dev-clock override and drop the cache (checkmarks, "Session logged!"
+ * badge) every time a QA session time-travels to a different weekday.
+ */
+export function loadSessionCache(expectedDay: string): SessionCacheData | null {
   try {
     const raw = localStorage.getItem(SESSION_CACHE_KEY)
     if (!raw) return null
     const data = JSON.parse(raw)
-    const today = new Date().toLocaleDateString('en-US', { weekday: 'long' })
-    if (data.day !== today) {
+    if (data.day !== expectedDay) {
       localStorage.removeItem(SESSION_CACHE_KEY)
       return null
     }

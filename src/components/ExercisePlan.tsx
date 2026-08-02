@@ -7,7 +7,7 @@ import { Separator } from '@/components/ui/separator'
 import { Input } from '@/components/ui/input'
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible'
 import { ArrowRightLeft, Ban, Zap, ShieldAlert, Heart, Check, Dumbbell, Plus, Activity, Clock, Flame, ChevronLeft, ChevronRight, ChevronDown, Calendar, CheckCircle2, Trophy, Sparkles, Thermometer } from 'lucide-react'
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { getExerciseEntry, getExerciseId } from '@/lib/exercise-db'
 import { isExternallyLoaded } from '@/lib/load-prescription'
 import { getReplacementCandidates, type SwapScope } from '@/lib/mesocycle-edit'
@@ -664,6 +664,22 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
   const [restTimer, setRestTimer] = useState<{ seconds: number; exerciseName: string } | null>(null)
   const [sessionLogged, setSessionLogged] = useState(false)
   const [progressionToast, setProgressionToast] = useState<string | null>(null)
+  const progressionToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // A new toast must never get silently wiped by an EARLIER toast's stale
+  // auto-dismiss timer — e.g. a progression toast's 5s timer firing after a
+  // bulk-log skip-warning has already replaced it. Always clear whatever
+  // timer is pending before arming a new one.
+  const showProgressionToast = useCallback((message: string, durationMs: number) => {
+    if (progressionToastTimerRef.current) clearTimeout(progressionToastTimerRef.current)
+    setProgressionToast(message)
+    progressionToastTimerRef.current = setTimeout(() => {
+      progressionToastTimerRef.current = null
+      setProgressionToast(null)
+    }, durationMs)
+  }, [])
+  useEffect(() => () => {
+    if (progressionToastTimerRef.current) clearTimeout(progressionToastTimerRef.current)
+  }, [])
   const [setWeights, setSetWeights] = useState<Record<string, number>>({})
   const [setReps, setSetReps] = useState<Record<string, number>>({})
   const [completedSetsMap, setCompletedSetsMap] = useState<Record<string, boolean>>({})
@@ -722,14 +738,18 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
 
   useEffect(() => {
     initSetLogStore()
-    const cached = loadSessionCache()
+    // Compared against todayName — the SAME dev-clock-aware value
+    // saveSessionCache below stores the cache under — never the real
+    // wall-clock weekday, which would disagree during dev-clock time travel
+    // and drop the cache (checkmarks, "Session logged!" badge) every time.
+    const cached = loadSessionCache(todayName)
     if (cached && cached.weekNumber === currentWeek) {
       setCompletedSetsMap(cached.completedSets)
       setSetWeights(cached.setWeights)
       setSetReps(cached.setReps)
       setSessionLogged(cached.sessionLogged)
     }
-  }, [])
+  }, [todayName])
 
   // Week 2+: true double progression from what the trainee actually lifted
   // last session, not the mesocycle's flat estimate. Hit the top of the rep
@@ -895,17 +915,17 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
       ).then(progression => {
         if (progression) {
           if (progression.type === 'primer_complete') {
-            setProgressionToast(`Primer complete! Great neural velocity.`)
+            showProgressionToast(`Primer complete! Great neural velocity.`, 5000)
           } else {
-            setProgressionToast(
-              `Progressive Overload Unlocked: +${(progression.newWeight - progression.currentWeight).toFixed(1)}kg target set for next week on ${progression.exerciseName}!`
+            showProgressionToast(
+              `Progressive Overload Unlocked: +${(progression.newWeight - progression.currentWeight).toFixed(1)}kg target set for next week on ${progression.exerciseName}!`,
+              5000
             )
           }
-          setTimeout(() => setProgressionToast(null), 5000)
         }
       }).catch(() => {})
     }
-  }, [profileId, currentWeek, todayName, today, completedSetsMap, setWeights, setReps, sessionLogged])
+  }, [profileId, currentWeek, todayName, today, completedSetsMap, setWeights, setReps, sessionLogged, showProgressionToast])
 
   // Bulk-logs today's session with the same values a manual save would use:
   // last-session ghosts first, then the progressed/prescribed load, prescribed
@@ -1004,7 +1024,13 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
       setSetWeights(newWeights)
       setSetReps(newReps)
       setCompletedSetsMap(newCompleted)
-      setSessionLogged(true)
+      // Only claim the session is logged if this run (or a concurrent manual
+      // save it detected) actually wrote something — an all-skipped run
+      // (every exercise lacking a known weight) must leave the "Complete &
+      // Log All Sets" button available rather than replacing it with a
+      // "Session logged!" badge that isn't true.
+      const sessionHasData = loggedCount > 0 || raceSkipped.length > 0
+      if (sessionHasData) setSessionLogged(true)
 
       setTodayLogs(prev => {
         const existing = new Set(prev.map(l => `${l.exercise_name}-${l.set_number}`))
@@ -1016,7 +1042,7 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
         completedSets: newCompleted,
         setWeights: newWeights,
         setReps: newReps,
-        sessionLogged: true,
+        sessionLogged: sessionHasData ? true : sessionLogged,
         day: todayName,
         weekNumber: currentWeek,
       })
@@ -1025,13 +1051,12 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
         const parts = [`Logged ${loggedCount} sets.`]
         if (raceSkipped.length > 0) parts.push(`Kept your manually-logged sets as-is: ${raceSkipped.join(', ')}.`)
         if (skipped.length > 0) parts.push(`Skipped ${skipped.join(', ')} — no known weight yet; log those manually so progression has real numbers.`)
-        setProgressionToast(parts.join(' '))
-        setTimeout(() => setProgressionToast(null), 8000)
+        showProgressionToast(parts.join(' '), 8000)
       }
     } finally {
       setLoggingSession(false)
     }
-  }, [profileId, activePlan, todayName, today, currentWeek, setWeights, setReps, completedSetsMap, todayLogs, progressedLoads])
+  }, [profileId, activePlan, todayName, today, currentWeek, setWeights, setReps, completedSetsMap, todayLogs, progressedLoads, sessionLogged, showProgressionToast])
 
   return (
     <div className="space-y-4">

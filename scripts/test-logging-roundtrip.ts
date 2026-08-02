@@ -75,6 +75,13 @@ function fakeFrom(table: string) {
   const numericOverflow = (row: Row): boolean =>
     table === 'exercise_set_logs' && typeof row.weight_kg === 'number' && (row.weight_kg > 9999.99 || row.weight_kg < 0)
 
+  // Mirrors exercise_set_logs.session_id REFERENCES workout_sessions(id) —
+  // a stale cached session id (e.g. the session was deleted by a dev-tool
+  // wipe on another device) fails with a real FK violation, 23503, in
+  // production. Used by the #11 (FK retry-once) regression test.
+  const fkViolation = (row: Row): boolean =>
+    table === 'exercise_set_logs' && row.session_id != null && !db.workout_sessions.some(s => s.id === row.session_id)
+
   const exec = (): { data: unknown; error: { code?: string; message: string } | null } => {
     if (fakeOffline) return { data: null, error: { message: 'network unavailable (fake offline)' } }
     if (op === 'insert') {
@@ -83,6 +90,7 @@ function fakeFrom(table: string) {
         const row: Row = { id: crypto.randomUUID(), ...raw }
         if (table === 'workout_sessions') row.is_completed = row.is_completed ?? false
         if (numericOverflow(row)) return { data: null, error: { code: '22003', message: 'numeric field overflow' } }
+        if (fkViolation(row)) return { data: null, error: { code: '23503', message: 'insert or update on table "exercise_set_logs" violates foreign key constraint' } }
         if (uniqueViolation(table, row)) return { data: null, error: { code: '23505', message: 'duplicate key value violates unique constraint' } }
         db[table].push(row)
         inserted.push(row)
@@ -106,6 +114,7 @@ function fakeFrom(table: string) {
       }
       for (const raw of payload) {
         if (numericOverflow(raw)) return { data: null, error: { code: '22003', message: 'numeric field overflow' } }
+        if (fkViolation(raw)) return { data: null, error: { code: '23503', message: 'insert or update on table "exercise_set_logs" violates foreign key constraint' } }
         const existing = onConflict ? db[table].find(r => onConflict!.every(c => r[c] === raw[c])) : undefined
         if (existing) {
           Object.assign(existing, raw)
@@ -660,6 +669,54 @@ async function main() {
     selfRefCheck.length === 0, selfRefCheck)
 
   setDevClockOverride(devUserId, null) // clean up the override
+
+  // ---- 16. Stale cached session id self-heals on FK failure (fix #11) -----
+  console.log('\n[16] a stale cached serverId recovers via retry-once instead of dead-lettering (fix #11)')
+  const fkEx = 'Hack Squat'
+  const fkExId = getExerciseId(fkEx)
+  const fkDate = isoDatePlusDays(3)
+
+  saveSet({ userId, date: fkDate, weekNumber: 1, day, exerciseId: fkExId, exerciseName: fkEx, setNumber: 1, weightKg: 60, repsCompleted: 10 })
+  await flushPending()
+  const originalSession = db.workout_sessions.find(s => s.profile_id === userId && s.date === fkDate)
+  check('sanity: the set synced under a real session', !!originalSession && db.exercise_set_logs.some(r => r.session_id === originalSession.id && r.exercise_id === fkExId))
+
+  // Simulate a wipe on another device: the session row is gone server-side,
+  // but THIS device's local registry (localStorage) still caches its id —
+  // exactly what clearAllSetLogs run elsewhere would leave behind.
+  db.workout_sessions = db.workout_sessions.filter(s => s.id !== originalSession!.id)
+  db.exercise_set_logs = db.exercise_set_logs.filter(r => r.session_id !== originalSession!.id)
+
+  saveSet({ userId, date: fkDate, weekNumber: 1, day, exerciseId: fkExId, exerciseName: fkEx, setNumber: 2, weightKg: 62.5, repsCompleted: 8 })
+  await flushPending()
+
+  check('the set synced successfully despite the stale cached session (self-healed, not dead-lettered)',
+    getDeadLetterItems().length === 0, getDeadLetterItems())
+  const newSession = db.workout_sessions.find(s => s.profile_id === userId && s.date === fkDate)
+  check('a fresh session was created to replace the deleted one', !!newSession && newSession.id !== originalSession!.id)
+  check('set 2 landed under the fresh session', db.exercise_set_logs.some(r => r.session_id === newSession?.id && r.set_number === 2))
+
+  // ---- 17. Recent-logs chat context: newest day first, chronological within it (fix #12) --
+  console.log('\n[17] getRecentLogs: newest day first, ascending (performed order) within a day (fix #12)')
+  const { getRecentLogs } = await import('../src/lib/daily-tracking')
+  const rampEx = 'Incline Barbell Press'
+  const rampExId = getExerciseId(rampEx)
+  const rampDate = isoDatePlusDays(-2)
+  const rampSession = ensureWorkoutSessionForTest(userId, rampDate, day)
+  db.exercise_set_logs.push(
+    { id: crypto.randomUUID(), session_id: rampSession, user_id: userId, exercise_id: rampExId, exercise_name: rampEx, week_number: 1, day, set_number: 1, weight_kg: 60, reps_completed: 12, rpe: null, unit: 'reps', is_bodyweight: false, is_warmup: false, completed_at: `${rampDate}T09:00:00.000Z` },
+    { id: crypto.randomUUID(), session_id: rampSession, user_id: userId, exercise_id: rampExId, exercise_name: rampEx, week_number: 1, day, set_number: 2, weight_kg: 70, reps_completed: 10, rpe: null, unit: 'reps', is_bodyweight: false, is_warmup: false, completed_at: `${rampDate}T09:02:00.000Z` },
+    { id: crypto.randomUUID(), session_id: rampSession, user_id: userId, exercise_id: rampExId, exercise_name: rampEx, week_number: 1, day, set_number: 3, weight_kg: 80, reps_completed: 8, rpe: null, unit: 'reps', is_bodyweight: false, is_warmup: false, completed_at: `${rampDate}T09:05:00.000Z` },
+  )
+  const recent = await getRecentLogs(userId, 14)
+  const rampRows = recent.filter(l => l.exercise_id === rampExId || l.exercise_name === rampEx)
+  check('ramp reads in the order actually performed (60, 70, 80), not reversed',
+    rampRows.map(r => r.weight_kg).join(',') === '60,70,80', rampRows.map(r => r.weight_kg))
+  // Newest-day-first across the whole result: the fix#8 test's simulated-date
+  // row aside, every date present should appear in descending order.
+  const dayOrder = [...new Set(recent.map(l => l.date))]
+  const sortedDesc = [...dayOrder].sort().reverse()
+  check('days are ordered newest-first', dayOrder.join(',') === sortedDesc.join(','), { dayOrder, sortedDesc })
 
   // ---- Summary -------------------------------------------------------------
   if (failures > 0) {
