@@ -62,7 +62,20 @@ export interface UserProfile {
    * needs it) but zero appended cardio for hypertrophy/functional.
    */
   conditioning_preference: ConditioningPreference
+  /**
+   * M0 nutrition inputs. weight_kg above is formally "onboarding weight,
+   * immutable" — the live weight series lives in daily_metrics, and
+   * nutrition-targets.ts prefers the latest weigh-in over this value.
+   * meals_per_day (2|3|4) + include_snacks drive slot ratios from M1;
+   * cooking_time_preference steers pool generation. All optional with
+   * matching DB defaults so pre-M0 profiles keep working.
+   */
+  meals_per_day?: number
+  include_snacks?: boolean
+  cooking_time_preference?: CookingTimePreference
 }
+
+export type CookingTimePreference = 'quick' | 'moderate' | 'loves_cooking'
 
 export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'active' | 'very_active'
 export type FitnessGoal = 'fat_loss' | 'hypertrophy' | 'functional' | 'conditioning'

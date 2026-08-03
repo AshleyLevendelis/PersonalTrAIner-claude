@@ -7,7 +7,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Card, CardContent } from '@/components/ui/card'
 import { ChevronLeft, Dumbbell } from 'lucide-react'
 import { OptionCard } from './OptionCard'
-import type { UserProfile, FitnessGoal, SessionDuration, TrainingTime, WorkoutSplit, EquipmentAccess, TrainingStyle, TrainingExperience, CoachingPersona, MacroCalculationMode, RecoveryCapacity, ConditioningPreference } from '@/lib/types'
+import type { UserProfile, FitnessGoal, SessionDuration, TrainingTime, WorkoutSplit, EquipmentAccess, TrainingStyle, TrainingExperience, CoachingPersona, MacroCalculationMode, RecoveryCapacity, ConditioningPreference, ActivityLevel, CookingTimePreference } from '@/lib/types'
 
 type WeightUnit = 'kg' | 'lbs'
 type HeightUnit = 'cm' | 'ftin'
@@ -35,9 +35,13 @@ interface OnboardingData {
   knownSquatKg: string
   knownBenchKg: string
   knownDeadliftKg: string
+  activityLevel: ActivityLevel | null
+  mealsPerDay: 2 | 3 | 4 | null
+  includeSnacks: boolean
+  cookingTime: CookingTimePreference | null
 }
 
-const TOTAL_STEPS = 16
+const TOTAL_STEPS = 19
 
 const EXPERIENCE_OPTIONS: { value: TrainingExperience; icon: string; label: string; description: string }[] = [
   { value: 'beginner', icon: '🌱', label: 'Beginner', description: 'New to this, or coming back after a long break' },
@@ -127,6 +131,29 @@ const DIETARY_OPTIONS: { value: string; icon: string; label: string }[] = [
   { value: 'low-fodmap', icon: '🧬', label: 'Low-FODMAP' },
 ]
 
+// Maps to the STATIC_PAL multipliers in macro-calculator.ts (1.2 / 1.375 /
+// 1.55 / 1.725). Four options rather than five: 'very_active' (1.9,
+// athlete-tier) stays reachable via the type but isn't offered — day-to-day
+// self-reports at that level are nearly always overestimates.
+const ACTIVITY_OPTIONS: { value: ActivityLevel; icon: string; label: string; description: string }[] = [
+  { value: 'sedentary', icon: '🪑', label: 'Sedentary', description: 'Desk job, little movement outside training' },
+  { value: 'light', icon: '🚶', label: 'Lightly Active', description: 'On my feet some of the day, short walks' },
+  { value: 'moderate', icon: '🏃', label: 'Moderately Active', description: 'Regular movement most days' },
+  { value: 'active', icon: '⚡', label: 'Very Active', description: 'Physical job or on the move all day' },
+]
+
+const MEALS_PER_DAY_OPTIONS: { value: 2 | 3 | 4; icon: string; label: string; description: string }[] = [
+  { value: 2, icon: '🍽️', label: '2 meals', description: 'Bigger plates, longer gaps' },
+  { value: 3, icon: '🍽️', label: '3 meals', description: 'Classic breakfast / lunch / dinner' },
+  { value: 4, icon: '🍽️', label: '4 meals', description: 'Smaller, more frequent plates' },
+]
+
+const COOKING_TIME_OPTIONS: { value: CookingTimePreference; icon: string; label: string; description: string }[] = [
+  { value: 'quick', icon: '⏱️', label: 'Quick', description: 'Under 15 minutes — keep it simple' },
+  { value: 'moderate', icon: '🍳', label: 'Moderate', description: 'Happy to spend up to ~30 minutes' },
+  { value: 'loves_cooking', icon: '👨‍🍳', label: 'Happy to Cook', description: 'Real recipes, real prep — I enjoy it' },
+]
+
 const PERSONA_OPTIONS: { value: CoachingPersona; icon: string; label: string; description: string }[] = [
   { value: 'drill_sergeant', icon: '🎖️', label: 'Drill Sergeant', description: 'No excuses, push harder' },
   { value: 'analytical', icon: '🧠', label: 'Analytical', description: 'Data-driven, precise' },
@@ -181,6 +208,10 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
     knownSquatKg: '',
     knownBenchKg: '',
     knownDeadliftKg: '',
+    activityLevel: null,
+    mealsPerDay: null,
+    includeSnacks: true,
+    cookingTime: null,
   })
 
   const [weightUnit, setWeightUnit] = useState<WeightUnit>('kg')
@@ -292,9 +323,12 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
       case 10: return !!data.trainingStyle
       case 11: return true
       case 12: return true
-      case 13: return !!data.age && !!data.heightCm && !!data.weightKg && Number(data.age) > 0 && Number(data.heightCm) > 0 && Number(data.weightKg) > 0
-      case 14: return !!data.coachingPersona
-      case 15: return true
+      case 13: return data.mealsPerDay !== null
+      case 14: return !!data.cookingTime
+      case 15: return !!data.age && !!data.heightCm && !!data.weightKg && Number(data.age) > 0 && Number(data.heightCm) > 0 && Number(data.weightKg) > 0
+      case 16: return !!data.activityLevel
+      case 17: return !!data.coachingPersona
+      case 18: return true
       default: return false
     }
   }
@@ -313,7 +347,10 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
       gender: data.gender,
       height_cm: Number(data.heightCm),
       weight_kg: Number(data.weightKg),
-      activity_level: 'moderate',
+      activity_level: data.activityLevel ?? 'moderate',
+      meals_per_day: data.mealsPerDay ?? 3,
+      include_snacks: data.includeSnacks,
+      cooking_time_preference: data.cookingTime ?? 'moderate',
       fitness_goal: data.fitnessGoal!,
       training_days: trainingDaysFull,
       preferred_time: mappedTime,
@@ -654,6 +691,61 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
 
       case 13:
         return (
+          <StepWrapper title="How many meals a day?" subtitle="Your meal structure — we'll size portions to fit">
+            <div className="grid grid-cols-3 gap-3">
+              {MEALS_PER_DAY_OPTIONS.map(opt => (
+                <OptionCard
+                  key={opt.value}
+                  icon={opt.icon}
+                  label={opt.label}
+                  description={opt.description}
+                  selected={data.mealsPerDay === opt.value}
+                  onClick={() => setData(d => ({ ...d, mealsPerDay: opt.value }))}
+                />
+              ))}
+            </div>
+            <div className="grid grid-cols-2 gap-3 mt-3">
+              <OptionCard
+                icon="🍎"
+                label="Snacks too"
+                description="Include a snack slot"
+                selected={data.includeSnacks}
+                compact
+                onClick={() => setData(d => ({ ...d, includeSnacks: true }))}
+              />
+              <OptionCard
+                icon="🚫"
+                label="No snacks"
+                description="Meals only"
+                selected={!data.includeSnacks}
+                compact
+                onClick={() => setData(d => ({ ...d, includeSnacks: false }))}
+              />
+            </div>
+            <ContinueButton disabled={!canProceed()} onClick={goNext} />
+          </StepWrapper>
+        )
+
+      case 14:
+        return (
+          <StepWrapper title="How much time for cooking?" subtitle="Meals will match the effort you actually want to spend">
+            <div className="grid grid-cols-1 gap-3">
+              {COOKING_TIME_OPTIONS.map(opt => (
+                <OptionCard
+                  key={opt.value}
+                  icon={opt.icon}
+                  label={opt.label}
+                  description={opt.description}
+                  selected={data.cookingTime === opt.value}
+                  onClick={() => autoAdvance(() => setData(d => ({ ...d, cookingTime: opt.value })))}
+                />
+              ))}
+            </div>
+          </StepWrapper>
+        )
+
+      case 15:
+        return (
           <StepWrapper title="Your body metrics" subtitle="Used to calculate your targets">
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
@@ -707,7 +799,25 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
           </StepWrapper>
         )
 
-      case 14:
+      case 16:
+        return (
+          <StepWrapper title="How active is your day-to-day?" subtitle="Outside of training — this sets your calorie burn baseline">
+            <div className="grid grid-cols-2 gap-3">
+              {ACTIVITY_OPTIONS.map(opt => (
+                <OptionCard
+                  key={opt.value}
+                  icon={opt.icon}
+                  label={opt.label}
+                  description={opt.description}
+                  selected={data.activityLevel === opt.value}
+                  onClick={() => autoAdvance(() => setData(d => ({ ...d, activityLevel: opt.value })))}
+                />
+              ))}
+            </div>
+          </StepWrapper>
+        )
+
+      case 17:
         return (
           <StepWrapper title="How should your AI coach talk?" subtitle="Sets the tone for chat & advice">
             <div className="grid grid-cols-2 gap-3">
@@ -725,7 +835,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
           </StepWrapper>
         )
 
-      case 15:
+      case 18:
         return (
           <StepWrapper title={`Ready to go, ${data.displayName}!`} subtitle="Review your selections">
             <Card className="bg-muted/50 border-dashed">
@@ -744,6 +854,9 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
                 <ReviewRow label="Injuries" value={data.injuries.length > 0 ? data.injuries.map(i => INJURY_OPTIONS.find(o => o.value === i)?.label).join(', ') : 'None'} />
                 <ReviewRow label="Diet" value={data.dietaryPreferences.length > 0 ? data.dietaryPreferences.map(p => DIETARY_OPTIONS.find(o => o.value === p)?.label).join(', ') : 'No restrictions'} />
                 <ReviewRow label="Metrics" value={`${data.age}y, ${data.gender}, ${data.weightKg}kg, ${data.heightCm}cm`} />
+                <ReviewRow label="Daily Activity" value={ACTIVITY_OPTIONS.find(o => o.value === data.activityLevel)?.label} />
+                <ReviewRow label="Meals" value={`${data.mealsPerDay ?? 3} per day${data.includeSnacks ? ' + snacks' : ', no snacks'}`} />
+                <ReviewRow label="Cooking Time" value={COOKING_TIME_OPTIONS.find(o => o.value === data.cookingTime)?.label} />
                 <ReviewRow label="Coach Persona" value={PERSONA_OPTIONS.find(o => o.value === data.coachingPersona)?.label} />
               </CardContent>
             </Card>
