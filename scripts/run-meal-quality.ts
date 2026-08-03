@@ -52,7 +52,8 @@ const ALL_MEALS_PER_DAY = [2, 3, 4]
 const ALL_COOKING_TIME: CookingTimePreference[] = ['quick', 'moderate', 'loves_cooking']
 
 interface GridProfile {
-  id: string
+  /** Label-only key (dietary pref + index) — NOT a real profile id. meal_plan_slots.profile_id is a real FK to fitness_profiles(id), so a fabricated string here would fail with a uuid-syntax or FK-violation error; see createThrowawayProfile below for the actual DB-backed id each grade run uses. */
+  key: string
   label: string
   profile: UserProfile
 }
@@ -80,7 +81,7 @@ function buildGrid(): GridProfile[] {
       dietary_preferences: prefs, meals_per_day: mealsPerDay, include_snacks: mealsPerDay < 4,
       cooking_time_preference: cookingTime,
     }
-    grid.push({ id: `quality-${diet}-${i}`, label: `${diet} / ${goal} / ${sex} / ${weight}kg / ${mealsPerDay}mpd / ${cookingTime}`, profile })
+    grid.push({ key: `quality-${diet}-${i}`, label: `${diet} / ${goal} / ${sex} / ${weight}kg / ${mealsPerDay}mpd / ${cookingTime}`, profile })
   })
   return grid
 }
@@ -104,7 +105,46 @@ interface ProfileResult {
 
 const MIN_POOL_SIZE = 3
 
-async function gradeProfile(g: GridProfile): Promise<ProfileResult> {
+/**
+ * meal_plan_slots.profile_id is a real FK to fitness_profiles(id) — a
+ * fabricated string id fails outright (uuid-syntax error, previously
+ * swallowed silently by persistPools' per-slot try/catch, which meant this
+ * harness never actually exercised the real write path). Inserts a minimal
+ * real fitness_profiles row and returns its DB-generated UUID; only the
+ * seven NOT NULL columns plus the fields generateMealPools reads are set.
+ */
+async function createThrowawayProfile(profile: UserProfile): Promise<string> {
+  const { supabase } = await import('../src/lib/supabase')
+  const { data, error } = await supabase
+    .from('fitness_profiles')
+    .insert({
+      age: profile.age,
+      gender: profile.gender,
+      height_cm: profile.height_cm,
+      weight_kg: profile.weight_kg,
+      activity_level: profile.activity_level,
+      fitness_goal: profile.fitness_goal,
+      preferred_time: profile.preferred_time,
+      dietary_preferences: profile.dietary_preferences,
+      meals_per_day: profile.meals_per_day,
+      include_snacks: profile.include_snacks,
+      cooking_time_preference: profile.cooking_time_preference,
+      display_name: `[quality-harness] ${profile.fitness_goal}`,
+    })
+    .select('id')
+    .single()
+
+  if (error || !data) throw new Error(`Failed to create throwaway profile: ${error?.message}`)
+  return data.id as string
+}
+
+/** ON DELETE CASCADE on meal_plan_slots.profile_id handles the pool rows too — one delete cleans up everything this profile touched. */
+async function deleteThrowawayProfile(profileId: string): Promise<void> {
+  const { supabase } = await import('../src/lib/supabase')
+  await supabase.from('fitness_profiles').delete().eq('id', profileId)
+}
+
+async function gradeProfile(g: GridProfile, profileId: string): Promise<ProfileResult> {
   const targets = getStaticDailyMacros(g.profile)
   const result: ProfileResult = {
     label: g.label, poolCounts: {}, hardFailures: [], variety: 0, totalOptions: 0,
@@ -112,7 +152,7 @@ async function gradeProfile(g: GridProfile): Promise<ProfileResult> {
   }
 
   const { accepted, shortfalls } = await generateMealPools({
-    profileId: g.id,
+    profileId,
     targets,
     dietaryPreferences: g.profile.dietary_preferences,
     mealsPerDay: g.profile.meals_per_day,
@@ -134,7 +174,12 @@ async function gradeProfile(g: GridProfile): Promise<ProfileResult> {
 
     for (const opt of options) {
       allNames.add(opt.name)
-      for (const tag of opt.tags) result.cuisines.add(tag)
+      // opt.tags is [cuisine, prepBand, proteinSourceName] in that fixed
+      // order (see verifyProposal in meal-generation.ts) — only index 0 is
+      // an actual cuisine. Iterating every tag here previously polluted this
+      // soft metric with prep-band values and, worse, protein-source names
+      // like "chicken breast"/"lean ground lamb" reported as "cuisines".
+      if (opt.tags[0]) result.cuisines.add(opt.tags[0])
 
       // (a) zero dietary violations
       const dietResult = validateMealAgainstDiet(opt.ingredients, g.profile.dietary_preferences)
@@ -194,11 +239,6 @@ async function gradeProfile(g: GridProfile): Promise<ProfileResult> {
   return result
 }
 
-async function cleanupProfile(profileId: string): Promise<void> {
-  const { supabase } = await import('../src/lib/supabase')
-  await supabase.from('meal_plan_slots').delete().eq('profile_id', profileId)
-}
-
 async function main() {
   const profileLimitArg = process.argv.find(a => a.startsWith('--profiles='))
   const profileLimit = profileLimitArg ? parseInt(profileLimitArg.split('=')[1], 10) : undefined
@@ -218,15 +258,17 @@ async function main() {
 
   console.log('Running Meal Quality Harness...')
   console.log(`Grading ${grid.length} profiles (dietary preference is the priority axis; goal/sex/weight/meals-per-day/cooking-time round-robin across them)...`)
-  console.log('This calls the real generate-meals function and writes to meal_plan_slots for synthetic quality-* profile ids.')
+  console.log('This calls the real generate-meals function and writes to meal_plan_slots against a real, throwaway fitness_profiles row per grid entry.')
   console.log('')
 
   const results: ProfileResult[] = []
   for (let i = 0; i < grid.length; i++) {
     const g = grid[i]
     process.stdout.write(`  [${i + 1}/${grid.length}] ${g.label} ... `)
+    let profileId: string | null = null
     try {
-      const r = await gradeProfile(g)
+      profileId = await createThrowawayProfile(g.profile)
+      const r = await gradeProfile(g, profileId)
       results.push(r)
       console.log(`${r.hardFailures.length === 0 ? 'OK' : `${r.hardFailures.length} FAIL(S)`} (${r.totalOptions} options, variety ${r.variety})`)
     } catch (err) {
@@ -234,7 +276,7 @@ async function main() {
       console.error(err)
       results.push({ label: g.label, poolCounts: {}, hardFailures: [{ profileLabel: g.label, check: 'pool_size', detail: `generation threw: ${err instanceof Error ? err.message : String(err)}` }], variety: 0, totalOptions: 0, cuisines: new Set(), prepMatch: 0, prepTotal: 0 })
     } finally {
-      await cleanupProfile(g.id)
+      if (profileId) await deleteThrowawayProfile(profileId)
     }
   }
 
@@ -278,7 +320,7 @@ async function main() {
 
   lines.push('SOFT METRICS:')
   lines.push('-'.repeat(80))
-  lines.push(`  Distinct cuisines used: ${totalCuisines.size} (${[...totalCuisines].filter(c => c && c !== 'quick' && c !== 'standard' && c !== 'unspecified').slice(0, 15).join(', ')})`)
+  lines.push(`  Distinct cuisines used: ${totalCuisines.size} (${[...totalCuisines].slice(0, 15).join(', ')})`)
   lines.push(`  Prep-time-preference match rate: ${prepTotal > 0 ? Math.round((prepMatch / prepTotal) * 100) : 0}% (${prepMatch}/${prepTotal})`)
   for (const r of results) {
     lines.push(`  ${r.label}: variety=${r.variety}, pools=${JSON.stringify(r.poolCounts)}`)

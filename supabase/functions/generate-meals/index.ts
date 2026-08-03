@@ -105,6 +105,36 @@ function cookingTimeGuidance(pref: string | undefined): string {
   return "Keep prep to a realistic 20-30 minutes with straightforward steps.";
 }
 
+// ---------------------------------------------------------------------------
+// Protein-density steering: the verification pipeline (meal-generation.ts)
+// scales every proposal to the slot's CALORIE target and then requires the
+// scaled result to still meet the PROTEIN floor — uniform scaling can't fix
+// a proposal whose unscaled protein:calorie ratio was already too low, so a
+// calorie-plausible but protein-thin proposal is a guaranteed rejection, not
+// a near-miss. Naming concrete protein-dense bases per diet type (rather
+// than a generic "include protein") measurably raised pool fill rates in
+// practice — this list is diet-aware because the vegan/vegetarian bases that
+// actually deliver protein density are a different set than the omnivore
+// ones, and a generic prompt kept reaching for lower-density plant staples.
+// ---------------------------------------------------------------------------
+function proteinDenseGuidance(preferences: string[]): string {
+  const isVegan = preferences.includes("vegan");
+  const isVegetarian = preferences.includes("vegetarian") || isVegan;
+  const isPescatarian = preferences.includes("pescatarian");
+
+  const bases = isVegan
+    ? "tofu, tempeh, seitan, edamame, lentils, chickpeas, black beans, soy mince/TVP, high-protein pasta, vegan protein powder"
+    : isVegetarian
+    ? "tofu, tempeh, seitan, lentils, chickpeas, edamame, high-protein pasta, Greek yoghurt, cottage cheese, eggs, whey protein"
+    : isPescatarian
+    ? "salmon, tuna, cod, prawns, white fish, eggs, Greek yoghurt, cottage cheese, whey protein, tofu, lentils"
+    : "chicken breast, turkey, lean beef mince, pork tenderloin, salmon, tuna, cod, prawns, eggs, Greek yoghurt, cottage cheese, whey protein";
+
+  return `\n\nPROTEIN DENSITY (CRITICAL — this is the #1 cause of proposals being rejected):
+Every dish's PRIMARY protein source must be protein-dense, not just protein-present. Build around: ${bases}.
+The verification pipeline scales your ingredients to hit the CALORIE target, then checks the result still clears the PROTEIN target — a dish that reaches the right calories by leaning on carbs or fat with only a token amount of protein will scale down to a calorie-correct but protein-SHORT result and be rejected outright, even if your unscaled numbers looked close. If you need to trade off to fit the calorie budget, undershoot carbs or fat before you undershoot protein — protein is the target that must clear the floor after scaling, calories are what scaling corrects for.`;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
@@ -133,8 +163,10 @@ Deno.serve(async (req: Request) => {
     const dietaryBlock = buildDietarySafetyBlock(dietary_preferences || []);
     const cookingGuidance = cookingTimeGuidance(cooking_time_preference);
 
+    const proteinGuidance = proteinDenseGuidance(dietary_preferences || []);
+
     const slotDescriptions = typedSlots.map(
-      (s) => `- ${s.slot}: propose ${s.count} DIFFERENT dish variants, each targeting ~${s.calories} kcal, ${s.protein}g protein, ${s.carbs}g carbs, ${s.fat}g fat`
+      (s) => `- ${s.slot}: propose ${s.count} DIFFERENT dish variants, each targeting ~${s.calories} kcal — and ${s.protein}g PROTEIN is the number that must not fall short (carbs ~${s.carbs}g, fat ~${s.fat}g are secondary and can flex)`
     ).join("\n");
 
     const prompt = `You are a chef and sports nutritionist proposing meal options for an app that will independently verify every number — your job is variety and plausibility, not precision; code will re-measure and scale every ingredient you list.
@@ -143,12 +175,13 @@ CUISINE VARIETY: draw inspiration from a mix of these cuisines across your propo
 
 PREP TIME: ${cookingGuidance}
 ${dietaryBlock}
+${proteinGuidance}
 
 RULES:
 1. Each dish needs a specific, appetizing name (not "Chicken and Rice" — something like "Sichuan Mapo Tofu with Charred Bok Choy").
 2. Every ingredient MUST be ONE parseable line with an exact quantity and unit: "165g chicken breast", "2 tbsp olive oil", "1 medium egg", "200g cooked basmati rice". No ranges, no "to taste", no combined items.
 3. Include all cooking fats with exact amounts.
-4. Aim your ingredient quantities roughly at the stated macro targets — exact precision isn't required (the app rescales), but stay in the right neighborhood so rescaling doesn't need to be extreme.
+4. Aim your ingredient quantities roughly at the stated macro targets — exact precision isn't required (the app rescales), but stay in the right neighborhood so rescaling doesn't need to be extreme. Protein especially: undershooting it is the #1 rejection reason (see PROTEIN DENSITY above) — when in doubt, size the protein source generously.
 5. Report which single cuisine (from the list above, or "Other") each dish draws from as the "cuisine" field.
 
 SLOTS TO GENERATE:
