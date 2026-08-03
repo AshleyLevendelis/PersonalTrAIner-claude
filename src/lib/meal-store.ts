@@ -288,20 +288,26 @@ export async function getPools(profileId: string): Promise<Partial<Record<MealSl
 }
 
 /**
- * Swaps in a different option from the same slot's stored pool, recording a
- * `swapped_in` meal_event. `chooseName` picks that specific pool option (the
- * UI's per-alternative "swap to this" buttons); omitted, picks a random
- * option excluding `currentName` (the chat's simpler "swap this for
- * something else" case). Returns null when there's no other option in the
- * pool to switch to — every caller must surface that as "swap not applied,"
- * never invent one.
+ * Swaps which option from the same slot's stored pool is the current pick.
+ * `chooseName` picks that specific pool option (the UI's per-alternative
+ * "swap to this" buttons); omitted, picks a random option excluding
+ * `currentName` (the chat's simpler "swap this for something else" case).
+ * Returns null when there's no other option in the pool to switch to —
+ * every caller must surface that as "swap not applied," never invent one.
+ *
+ * Vision-architecture patch round, fix 5: this used to also call
+ * recordMealEvent (eventType 'swapped_in'), which getTodayLedger counts
+ * toward `eaten` — so browsing/picking a pool alternative inflated
+ * calories-in before anything was actually eaten. Swapping which option is
+ * assigned to a slot is a plan-state change, not a consumption event; it no
+ * longer touches the ledger. Ledger events come only from explicit
+ * eaten/confirm actions.
  */
 export async function swapPoolMeal(
   profileId: string,
   slot: MealSlotName,
   currentName?: string,
   chooseName?: string,
-  source: MealEventSource = 'manual',
 ): Promise<PoolOption | null> {
   const pools = await getPools(profileId)
   const options = pools[slot] ?? []
@@ -316,16 +322,6 @@ export async function swapPoolMeal(
     chosen = alternatives[Math.floor(Math.random() * alternatives.length)]
   }
   if (!chosen) return null
-
-  recordMealEvent({
-    profileId,
-    date: new Date().toISOString().split('T')[0],
-    slot,
-    eventType: 'swapped_in',
-    mealName: chosen.name,
-    macros: { kcal: chosen.macros.calories, protein: chosen.macros.protein, carbs: chosen.macros.carbs, fat: chosen.macros.fat },
-    source,
-  })
 
   return chosen
 }

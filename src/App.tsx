@@ -615,7 +615,7 @@ function App() {
   // the pool itself doesn't change, only which option is "today's pick".
   const handleSwapMealSlot = async (slot: MealSlotName, chooseName: string) => {
     if (!profile?.id) return
-    const applied = await swapPoolMeal(profile.id, slot, chosenMeals[slot]?.name, chooseName, 'manual')
+    const applied = await swapPoolMeal(profile.id, slot, chosenMeals[slot]?.name, chooseName)
     if (!applied) return
     setManualMealPicks(prev => ({ ...prev, [slot]: applied.name }))
   }

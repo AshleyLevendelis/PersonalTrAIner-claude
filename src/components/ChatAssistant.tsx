@@ -531,7 +531,6 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         action.meal_slot.toLowerCase() as MealSlotName,
         action.old_item,
         action.new_item,
-        'chat',
       )
       if (!applied) return false
 

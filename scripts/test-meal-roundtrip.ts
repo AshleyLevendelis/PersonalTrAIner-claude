@@ -20,8 +20,10 @@
  *   6. Poison-pill safety: a permanently-rejected event dead-letters without
  *      blocking later events
  *   7. (M1) Full pool round trip: a verified proposal persists into
- *      meal_plan_slots, getPools reads it back, swapPoolMeal swaps and
- *      records a swapped_in event, and getTodayLedger reflects it
+ *      meal_plan_slots, getPools reads it back, swapPoolMeal swaps — and
+ *      (vision-architecture patch round, fix 5) does NOT touch the ledger;
+ *      swapping which pool option is assigned is a plan-state change, not
+ *      a consumption event
  *   8. (M1) Vegan fixture: a meat-containing AI proposal is rejected by the
  *      verification pipeline before it ever reaches persistence
  *   9. (M1) Scaler convergence: scaleToTarget lands a mis-portioned proposal
@@ -288,7 +290,7 @@ async function main() {
   check('queue fully drained (nothing stuck behind the poison row)', pendingAfterPoison.length === 0, pendingAfterPoison)
 
   // -------------------------------------------------------------------------
-  console.log('\n[7] Full pool round trip: generation -> persistence -> pool read -> swap -> ledger event')
+  console.log('\n[7] Full pool round trip: generation -> persistence -> pool read -> swap (no ledger event)')
   {
     const { verifyProposal, computeSlotBudgets } = await import('../src/lib/meal-generation')
     const { getPools, swapPoolMeal } = await import('../src/lib/meal-store')
@@ -328,13 +330,17 @@ async function main() {
     const pools = await getPools(PROFILE_ID)
     check('getPools reads both persisted options back, ordered by pool_index', pools.lunch?.length === 2 && pools.lunch[0].name === optionA!.name, pools.lunch)
 
-    const swapped = await swapPoolMeal(PROFILE_ID, 'lunch', optionA!.name, undefined, 'manual')
+    const ledgerBefore = await getTodayLedger(PROFILE_ID, TODAY, targets)
+    const eventCountBefore = ledgerBefore.events.length
+    const eatenBefore = ledgerBefore.eaten
+
+    const swapped = await swapPoolMeal(PROFILE_ID, 'lunch', optionA!.name, undefined)
     check('swapPoolMeal returns the OTHER pool option', swapped?.name === optionB!.name, swapped)
 
     await flushPending()
     const poolLedger = await getTodayLedger(PROFILE_ID, TODAY, targets)
-    const swapEvent = poolLedger.events.find(e => e.eventType === 'swapped_in' && e.mealName === optionB!.name)
-    check('the swap recorded a swapped_in ledger event for the chosen option', swapEvent !== undefined, poolLedger.events)
+    check('the swap recorded no ledger event at all', poolLedger.events.length === eventCountBefore, poolLedger.events)
+    check('getTodayLedger eaten totals are unaffected by the swap', JSON.stringify(poolLedger.eaten) === JSON.stringify(eatenBefore), poolLedger.eaten)
   }
 
   // -------------------------------------------------------------------------
