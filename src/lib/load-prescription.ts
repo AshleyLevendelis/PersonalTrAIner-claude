@@ -40,7 +40,17 @@ export interface LoadPrescription {
   starting_weight_kg: number | null
   display: string
   basis: string
-  confidence: 'estimated' | 'from_history'
+  /**
+   * Where starting_weight_kg came from — 'known_weight' when anchored to a
+   * working weight the trainee reported during onboarding (real, verified
+   * data), 'estimate' otherwise (a population standards-table guess, however
+   * it was subsequently ramped/capped/dampened — calibration, the unverified
+   * per-week step, or a plain fresh estimate are all still unverified). UI
+   * layers that also know about logged history (the live progression engine)
+   * layer a third 'logged' state on top of this; prescribeLoad itself has no
+   * visibility into that.
+   */
+  load_source: 'estimate' | 'known_weight'
   /**
    * Per-set breakdown for externally-loaded work — null under the same
    * conditions as starting_weight_kg (bodyweight movement, uncategorizable
@@ -832,7 +842,7 @@ export function prescribeLoad(
       starting_weight_kg: null,
       display: 'Bodyweight',
       basis: 'Progress by adding reps or slowing the tempo before adding load.',
-      confidence: 'estimated',
+      load_source: 'estimate',
       per_set: null,
     }
   }
@@ -843,7 +853,7 @@ export function prescribeLoad(
       starting_weight_kg: null,
       display: 'Choose by feel',
       basis: 'Pick a load that matches the target effort and note what you used.',
-      confidence: 'estimated',
+      load_source: 'estimate',
       per_set: null,
     }
   }
@@ -867,7 +877,15 @@ export function prescribeLoad(
   const labelMode = loadLabelMode(isDumbbell, isUnilateralSingleImplement)
 
   let rounded: number
-  let fromKnownWeight = false
+  // Hoisted above the forceStartingWeightKg branch — that path short-circuits
+  // to a caller-supplied number (a within-block baseline+increment carry-
+  // forward) without re-deriving anything, but the underlying baseline can
+  // still trace back to a known working weight from week 1. load_source
+  // needs to reflect that regardless of which branch actually computed the
+  // number, so this can't live inside the estimate-only else branch below.
+  const knownFamily = KNOWN_WEIGHT_FAMILY[category]
+  const knownAnchor = knownFamily ? options.knownWorkingWeights?.[knownFamily] : undefined
+  const fromKnownWeight = knownAnchor != null && knownAnchor > 0
 
   if (options.forceStartingWeightKg != null) {
     // Within-block double-progression ramp (or a live logged-history
@@ -885,13 +903,6 @@ export function prescribeLoad(
       ? 8
       : parseRepsMidpoint(options.repRangeLabel) ?? 10
     const rpeMidpoint = parseRpeMidpoint(options.targetRpeLabel)
-
-    // A trainee-reported working weight replaces the population estimate
-    // entirely when it's available for this exercise's family — it's real,
-    // verified data rather than a guess from bodyweight/sex/age.
-    const knownFamily = KNOWN_WEIGHT_FAMILY[category]
-    const knownAnchor = knownFamily ? options.knownWorkingWeights?.[knownFamily] : undefined
-    fromKnownWeight = knownAnchor != null && knownAnchor > 0
 
     let estimate: number
     if (fromKnownWeight) {
@@ -977,7 +988,7 @@ export function prescribeLoad(
     starting_weight_kg: rounded,
     display: formatLoad(rounded, labelMode),
     basis,
-    confidence: 'estimated',
+    load_source: fromKnownWeight ? 'known_weight' : 'estimate',
     per_set,
   }
 }

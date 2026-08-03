@@ -38,6 +38,15 @@ export interface RampBlock {
   sets: RampSet[]
   /** True for every ramp after the session's first heavy lift — a shorter build-up since the lifter is already warm, never a full cold-start scheme. */
   abbreviated: boolean
+  /**
+   * Provenance of the WORKING weight these ramp percentages are relative to
+   * (see WarmupContext.compounds) — 'estimate' when the day's working set
+   * itself is still an unverified standards-table guess, so the UI can apply
+   * the same muted "suggested" styling to the ramp percentages as it does to
+   * the working-set chip they're building toward. undefined when unknown
+   * (e.g. a bodyweight compound has no load provenance to inherit).
+   */
+  loadSource?: 'estimate' | 'known_weight'
 }
 
 export interface WarmupBlock {
@@ -331,6 +340,7 @@ function buildRampSetsFor(
   entry: ExerciseEntry,
   scheme: { load_percent: number; reps: number }[],
   abbreviated: boolean,
+  loadSource: 'estimate' | 'known_weight' | undefined,
 ): RampBlock {
   const sets: RampSet[] = scheme.map((s, i) => ({
     set_number: i + 1,
@@ -342,7 +352,7 @@ function buildRampSetsFor(
         : `${s.load_percent}% of today's working weight`,
   }))
 
-  return { exercise: entry.name, sets, abbreviated }
+  return { exercise: entry.name, sets, abbreviated, loadSource }
 }
 
 // ---------------------------------------------------------------------------
@@ -359,7 +369,7 @@ export interface WarmupContext {
    * round, Fix 2): a day with two main lifts used to ramp only whichever
    * came first, sending the second in cold.
    */
-  compounds: { entry: ExerciseEntry; suggestedLoadKg: number | null }[]
+  compounds: { entry: ExerciseEntry; suggestedLoadKg: number | null; loadSource?: 'estimate' | 'known_weight' }[]
   equipment: EquipmentAccess
   injuries: string[]
   experience: TrainingExperience
@@ -377,7 +387,7 @@ export function buildWarmup(ctx: WarmupContext): WarmupBlock {
   // what shrink (see below), not the ramp coverage itself.
   const rampTargets = ctx.compounds.filter(c => needsRampUp(c.entry, c.suggestedLoadKg))
   const rampUps: RampBlock[] = rampTargets.map((c, i) =>
-    buildRampSetsFor(c.entry, i === 0 ? RAMP_SCHEMES[ctx.experience] : ABBREVIATED_RAMP_SCHEME, i !== 0)
+    buildRampSetsFor(c.entry, i === 0 ? RAMP_SCHEMES[ctx.experience] : ABBREVIATED_RAMP_SCHEME, i !== 0, c.loadSource)
   )
   const rampSeconds = rampUps.reduce((n, r) => n + r.sets.length * SECONDS_PER_RAMP_SET, 0)
 

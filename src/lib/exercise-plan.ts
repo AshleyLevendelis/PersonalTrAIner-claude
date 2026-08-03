@@ -1638,6 +1638,7 @@ function rebuildExerciseForSwap(
     load_guidance: isPrimer ? oldExercise.load_guidance : `${experience.load_guidance} ${load.basis}`,
     suggested_load: isPrimer ? 'Light' : load.display,
     suggested_load_kg: isPrimer ? null : load.starting_weight_kg,
+    load_source: isPrimer ? undefined : load.load_source,
     per_set_load: isPrimer ? null : load.per_set,
     superset_label: undefined,
   }
@@ -1777,6 +1778,7 @@ function balanceWeeklyStructure(
       load_guidance: isPrimer ? 'Stay light and controlled. This is preparation, not a working set.' : `${experience.load_guidance} ${load.basis}`,
       suggested_load: isPrimer ? 'Light' : load.display,
       suggested_load_kg: isPrimer ? null : load.starting_weight_kg,
+      load_source: isPrimer ? undefined : load.load_source,
       per_set_load: isPrimer ? null : load.per_set,
     })
   }
@@ -2623,6 +2625,7 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
           : `${experience.load_guidance} ${load.basis}`,
         suggested_load: isPrimer ? 'Light' : load.display,
         suggested_load_kg: isPrimer ? null : load.starting_weight_kg,
+        load_source: isPrimer ? undefined : load.load_source,
         per_set_load: isPrimer ? null : load.per_set,
       }
     })
@@ -2637,7 +2640,11 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
     // is built in the same order as `optimized`, so a straight index zip pairs
     // each entry with the load it was actually prescribed.
     const sessionEntries = optimized.map(s => s.entry)
-    const compounds = optimized.map((s, i) => ({ entry: s.entry, suggestedLoadKg: exercises[i]?.suggested_load_kg ?? null }))
+    const compounds = optimized.map((s, i) => ({
+      entry: s.entry,
+      suggestedLoadKg: exercises[i]?.suggested_load_kg ?? null,
+      loadSource: exercises[i]?.load_source,
+    }))
 
     const warmup = buildWarmup({
       patterns: sessionEntries.map(e => e.movement_pattern),
@@ -3609,6 +3616,7 @@ export function generateMesocycle(
               : (load ? `${expConfig.load_guidance} ${load.basis}` : ex.load_guidance),
             suggested_load: load ? load.display : ex.suggested_load,
             suggested_load_kg: load ? load.starting_weight_kg : ex.suggested_load_kg,
+            load_source: load ? load.load_source : ex.load_source,
             per_set_load: load ? load.per_set : (ex.per_set_load ?? null),
             movement_pattern: dbEntry ? mapMovementPattern(dbEntry.movement_pattern) : undefined,
             tier: dbEntry ? mapTier(dbEntry.mechanics_tier) : undefined,

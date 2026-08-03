@@ -116,6 +116,17 @@ export interface Exercise {
   /** Numeric starting weight in kg; null for bodyweight movements. */
   suggested_load_kg?: number | null
   /**
+   * Where suggested_load_kg came from: 'known_weight' when anchored to a
+   * working weight the trainee reported during onboarding, 'estimate' when
+   * it's a population standards-table guess (however it was subsequently
+   * ramped/capped) — see LoadPrescription.load_source in load-prescription.ts.
+   * undefined for bodyweight movements/primers, where no weight is shown.
+   * The UI layers a third 'logged' state on top of this once real logged
+   * history exists for the exercise (see getDoubleProgressionRecommendation)
+   * — that state is never persisted here, only computed at render time.
+   */
+  load_source?: 'estimate' | 'known_weight'
+  /**
    * Per-set load breakdown for externally-loaded work — the last entry is
    * always the top/working set (same value as suggested_load_kg). Ramps
    * progressively across sets for compounds in strength/power phases;

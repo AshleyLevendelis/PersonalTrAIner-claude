@@ -59,6 +59,35 @@ function isTimeBased(reps: string, prescriptionType?: string): boolean {
   return reps.includes('s') || reps.includes('min') || reps.includes('m')
 }
 
+// ---------------------------------------------------------------------------
+// Load provenance (UX round: communicate estimates vs. logged data honestly)
+// ---------------------------------------------------------------------------
+// Three states a displayed weight can be in, and the ONLY three — the whole
+// point of this round is that a user can always tell which one they're
+// looking at. 'estimate' is unverified (population standards table, however
+// it was subsequently ramped/capped); 'known_weight' is a real number the
+// trainee reported during onboarding; 'logged' is the live progression
+// engine's recommendation from an actual past session. 'logged' can only be
+// known here in the UI layer (see the progressedLoads effect below) — the
+// mesocycle generator has no visibility into logged history.
+type LoadSource = 'estimate' | 'known_weight' | 'logged'
+
+const ESTIMATE_CHIP_CLASS = 'border-dashed border-muted-foreground/40 text-muted-foreground/70'
+const CONFIDENT_CHIP_CLASS = 'border-foreground/25 bg-foreground/5 text-foreground/90 font-medium'
+
+function loadChipClass(source: LoadSource | undefined): string {
+  return source === 'estimate' ? ESTIMATE_CHIP_CLASS : CONFIDENT_CHIP_CLASS
+}
+
+const ESTIMATE_EXPLAINER = "A starting suggestion — we haven't seen you lift yet. Find your real weight and log it; the plan rebuilds from your numbers."
+
+/** Small trailing microcopy next to a load chip — only 'estimate' and 'logged' get one; 'known_weight' is confident enough to need no label. */
+function LoadSourceLabel({ source }: { source: LoadSource | undefined }) {
+  if (source === 'estimate') return <span className="text-[9px] italic text-muted-foreground/60">suggested</span>
+  if (source === 'logged') return <span className="text-[9px] italic text-muted-foreground/60">from your last session</span>
+  return null
+}
+
 function getRepsLabel(reps: string, prescriptionType?: string): string {
   switch (prescriptionType) {
     case 'time': return 'Hold'
@@ -110,6 +139,9 @@ function CalibrationBanner({ mesoWeek }: { mesoWeek?: MesocycleWeek }) {
         <span className="text-xs font-semibold text-amber-800 dark:text-amber-300">Week 1 — Calibration Week</span>
         <p className="text-[11px] text-amber-800/80 dark:text-amber-400/80">
           Find the weight where your last rep feels like RPE 6. Log your session so week 2 scales from your actual performance.
+        </p>
+        <p className="text-[11px] text-amber-800/80 dark:text-amber-400/80">
+          The printed weights are conservative on purpose. If a set feels easy, keep adding weight until the last rep feels like RPE 6 — then log the weight you actually used. What you log becomes your plan.
         </p>
       </div>
     </div>
@@ -279,16 +311,22 @@ function WarmupSection({ warmup, open, onToggle }: { warmup: WorkoutDay['warmup'
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
               Ramp-Up — {ramp.exercise}{ramp.abbreviated && <span className="normal-case font-normal italic"> (quick — you're already warm)</span>}
             </p>
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap items-center gap-1.5">
               {ramp.sets.map(set => (
                 <span
                   key={set.set_number}
-                  className="inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] text-muted-foreground"
+                  className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] ${ramp.loadSource === 'estimate' ? ESTIMATE_CHIP_CLASS : 'text-muted-foreground'}`}
                   title={set.note}
                 >
                   Set {set.set_number}: {set.load_percent}% × {set.reps}
                 </span>
               ))}
+              {/* Ramp percentages are relative to the working weight — if that
+                  weight is itself still unverified, say so once per ramp block
+                  rather than on every set chip. */}
+              {ramp.loadSource === 'estimate' && (
+                <span className="text-[9px] italic text-muted-foreground/60">% of a suggested weight</span>
+              )}
             </div>
           </div>
         ))}
@@ -329,6 +367,8 @@ function SetLogger({
   perSetLoadKg,
   onSetCompleted,
   onOpenPlateCalc,
+  loadIsEstimate,
+  onFirstEverLog,
 }: {
   exerciseName: string
   /** Stable logging identity (C0) — plan-attached id, or the slug of a custom exercise's name. */
@@ -352,6 +392,10 @@ function SetLogger({
   perSetLoadKg?: (number | null)[]
   onSetCompleted?: (exerciseName: string, setNumber: number, weight: number, reps: number, rest: string, sets: number, prescribedReps: string, tier?: string) => void
   onOpenPlateCalc?: (weight: number) => void
+  /** Whether suggested_load_kg/perSetLoadKg is an unverified estimate — flips the weight input's helper copy from "here's the default" to "log what you actually lifted." */
+  loadIsEstimate?: boolean
+  /** Fired once, the first time ANY set is saved for an exercise that had no prior logged history at all (see the ghost-values check in handleSaveSet) — the parent dedupes to a session-local one-time celebration. */
+  onFirstEverLog?: (exerciseName: string) => void
 }) {
   const logColumnLabel = prescriptionType
     ? getRepsLabel(prescribedReps ?? '', prescriptionType)
@@ -495,6 +539,14 @@ function SetLogger({
     setSavedSets(newSaved)
     onLogSaved(log)
 
+    // First-ever-log celebration: ghostValues comes from getLastSessionSets
+    // (the most recent PRIOR session's sets) — if every ghost is blank, this
+    // exercise has no logged history before today. Fires on every save while
+    // that holds; the parent dedupes to once per exercise per page load.
+    if (onFirstEverLog && ghostValues.every(g => !g.weight)) {
+      onFirstEverLog(exerciseName)
+    }
+
     // PR check + single top-set re-evaluation
     const pr = checkForPR(profileId, exerciseName, weight, reps)
     if (pr) {
@@ -531,7 +583,7 @@ function SetLogger({
     <div className="px-4 pb-3 pt-1 space-y-1">
       <div className="grid grid-cols-[auto_1fr_auto_auto_auto_1fr_auto] gap-1.5 items-center text-xs text-muted-foreground font-medium px-1">
         <span className="w-5">#</span>
-        <span>Weight</span>
+        <span>{loadIsEstimate ? 'Weight — log actual' : 'Weight'}</span>
         <span className="w-7"></span>
         <span className="w-7"></span>
         <span className="w-8"></span>
@@ -657,6 +709,21 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
   const [banBusy, setBanBusy] = useState<string | null>(null)
   const [expandedExercises, setExpandedExercises] = useState<Set<string>>(new Set())
   const [expandedWarmups, setExpandedWarmups] = useState<Set<string>>(new Set())
+  // Which exercises' load chip has its provenance explainer expanded — keyed
+  // by exerciseKey (same key as expandedExercises), independent per exercise.
+  const [explainedLoadChips, setExplainedLoadChips] = useState<Set<string>>(new Set())
+  const toggleLoadExplainer = useCallback((key: string) => {
+    setExplainedLoadChips(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }, [])
+  // One-time-per-exercise "you now have real data" celebration — session
+  // local only, no persistence, so it can only ever fire once per page load
+  // even if the same exercise's set is logged/edited multiple times today.
+  const [celebratedFirstLog, setCelebratedFirstLog] = useState<Set<string>>(new Set())
   const [todayLogs, setTodayLogs] = useState<ExerciseSetLog[]>([])
   const [customExercises, setCustomExercises] = useState<Record<string, string[]>>({})
   const [addingCustom, setAddingCustom] = useState<string | null>(null)
@@ -854,6 +921,21 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
       return [...prev, log]
     })
   }
+
+  // One-time-per-exercise celebration when an exercise that previously only
+  // had estimates gets its first real logged number. celebratedFirstLog is
+  // session-local (no persistence, per the UX round's scope) — SetLogger
+  // calls this on every save while the exercise still has no prior history,
+  // so the dedupe lives entirely here.
+  const handleFirstEverLog = useCallback((exerciseName: string) => {
+    setCelebratedFirstLog(prev => {
+      if (prev.has(exerciseName)) return prev
+      showProgressionToast(`Got it — ${exerciseName} now builds from your real numbers.`, 4000)
+      const next = new Set(prev)
+      next.add(exerciseName)
+      return next
+    })
+  }, [showProgressionToast])
 
   const getCompletedSetsCount = (exerciseName: string): number => {
     return todayLogs.filter(l => l.exercise_name === exerciseName).length
@@ -1232,6 +1314,15 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
                   const isExpanded = expandedExercises.has(exerciseKey)
                   const completedSets = getCompletedSetsCount(ex.name)
                   const allSetsLogged = completedSets >= ex.sets
+                  // 'logged' wins whenever the live progression engine found
+                  // real history for this exercise (week 2+ only — see the
+                  // progressedLoads effect); otherwise whatever the plan
+                  // itself recorded, defaulting to 'estimate' for legacy
+                  // plans generated before load_source existed.
+                  const loadSource: LoadSource | undefined = ex.suggested_load_kg == null
+                    ? undefined
+                    : progressedLoads[ex.name] != null ? 'logged' : (ex.load_source ?? 'estimate')
+                  const loadExplained = explainedLoadChips.has(exerciseKey)
 
                   return (
                   <React.Fragment key={exIndex}>
@@ -1262,12 +1353,18 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
                               </span>
                             )}
                             {ex.per_set_load && ex.per_set_load.length > 0 ? (
-                              <div className="flex items-center gap-1 flex-wrap">
+                              <div
+                                className={`flex items-center gap-1 flex-wrap ${loadSource === 'estimate' ? 'cursor-pointer' : ''}`}
+                                role={loadSource === 'estimate' ? 'button' : undefined}
+                                tabIndex={loadSource === 'estimate' ? 0 : undefined}
+                                onClick={loadSource === 'estimate' ? () => toggleLoadExplainer(exerciseKey) : undefined}
+                                onKeyDown={loadSource === 'estimate' ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleLoadExplainer(exerciseKey) } } : undefined}
+                              >
                                 <Dumbbell className="size-2.5 text-muted-foreground shrink-0" />
                                 {ex.per_set_load.map(s => (
                                   <span
                                     key={s.set_number}
-                                    className="inline-flex items-center rounded border px-1 py-0 text-[10px] text-muted-foreground leading-4"
+                                    className={`inline-flex items-center rounded border px-1 py-0 text-[10px] leading-4 ${loadChipClass(loadSource)}`}
                                     title={s.display}
                                   >
                                     S{s.set_number}: {s.load_kg}kg
@@ -1279,11 +1376,24 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
                                 {ex.per_set_load[0].display.includes('single side') && (
                                   <span className="text-[10px] text-muted-foreground/70">single side</span>
                                 )}
+                                <LoadSourceLabel source={loadSource} />
                               </div>
                             ) : ex.suggested_load && (
-                              <span className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground">
-                                <Dumbbell className="size-2.5" />{ex.suggested_load}
-                              </span>
+                              <div
+                                className={`inline-flex items-center gap-1 w-fit ${loadSource === 'estimate' ? 'cursor-pointer' : ''}`}
+                                role={loadSource === 'estimate' ? 'button' : undefined}
+                                tabIndex={loadSource === 'estimate' ? 0 : undefined}
+                                onClick={loadSource === 'estimate' ? () => toggleLoadExplainer(exerciseKey) : undefined}
+                                onKeyDown={loadSource === 'estimate' ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleLoadExplainer(exerciseKey) } } : undefined}
+                              >
+                                <span className={`inline-flex items-center gap-0.5 rounded border px-1 py-0 text-[10px] leading-4 ${ex.suggested_load_kg != null ? loadChipClass(loadSource) : 'text-muted-foreground border-transparent px-0'}`}>
+                                  <Dumbbell className="size-2.5" />{ex.suggested_load}
+                                </span>
+                                <LoadSourceLabel source={loadSource} />
+                              </div>
+                            )}
+                            {loadSource === 'estimate' && loadExplained && (
+                              <p className="text-[10px] text-muted-foreground/80 italic max-w-xs">{ESTIMATE_EXPLAINER}</p>
                             )}
                             {progressionNotes[ex.name] && (
                               <span className={`text-[10px] italic ${progressionNotes[ex.name].didProgress ? 'text-green-700 dark:text-green-400' : 'text-muted-foreground/80'}`}>
@@ -1376,6 +1486,8 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
                             perSetLoadKg={progressedLoads[ex.name] != null ? undefined : ex.per_set_load?.map(s => s.load_kg)}
                             onSetCompleted={handleSetComplete}
                             onOpenPlateCalc={(w) => { setPlateCalcWeight(w); setPlateCalcOpen(true) }}
+                            loadIsEstimate={loadSource === 'estimate'}
+                            onFirstEverLog={handleFirstEverLog}
                           />
                         </td>
                       </tr>
