@@ -5,12 +5,13 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
-import { Send, MessageCircle, Sparkles, CheckCircle2, ArrowDown, RotateCcw, AlertCircle } from 'lucide-react'
+import { Send, MessageCircle, Sparkles, CheckCircle2, ArrowDown, RotateCcw, AlertCircle, Trash2 } from 'lucide-react'
 import { generateChatResponse } from '@/lib/chat-assistant'
 import { calculateCalories, getActiveMesocycleWeek } from '@/lib/calculations'
 import { getAppNow } from '@/lib/dev-clock'
 import { supabase } from '@/lib/supabase'
 import { getRecentLogs, formatLogsForAI, getRecentCardioLogs, formatCardioLogsForAI } from '@/lib/daily-tracking'
+import { saveChatCache, loadChatCache, clearChatCache } from '@/lib/chat-cache'
 import type { ChatMessage, UserProfile, MacroTargets, WorkoutDay, MealPlanDay, MesocycleWeek, PlanAction } from '@/lib/types'
 
 const ACTION_TAG_RE = /\[ACTION:\s*.*?\]/gi
@@ -176,13 +177,21 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     }
   }
 
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      role: 'assistant',
-      content: buildInitialGreeting(),
-      status: 'complete',
-    }
-  ])
+  // Lazy init: restore the last-seen conversation from the synchronous
+  // localStorage mirror instantly, before the (async, fire-and-forget-backed)
+  // Supabase history fetch below even starts — see chat-cache.ts for why this
+  // matters (the DB write for the most recent reply can race a chat-suggested
+  // external link's tab backgrounding and never land).
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    const cached = profile.id ? loadChatCache(profile.id) : null
+    return cached ?? [
+      {
+        role: 'assistant',
+        content: buildInitialGreeting(),
+        status: 'complete',
+      }
+    ]
+  })
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [isRecalibrating, setIsRecalibrating] = useState(false)
@@ -256,6 +265,13 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     }
   }, [profile.id])
 
+  // Synchronous write-through mirror (see chat-cache.ts) — fires on every
+  // messages change, so the cache is never behind what's rendered on screen
+  // even if the corresponding Supabase write never completes.
+  useEffect(() => {
+    if (profile.id) saveChatCache(profile.id, messages)
+  }, [profile.id, messages])
+
   // Fix #3: Last 20 messages, no date filter, includes id + status + created_at
   const loadChatHistory = async () => {
     if (!profile.id) return
@@ -276,7 +292,12 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
           action: row.action_data as PlanAction | undefined,
           created_at: row.created_at,
         }))
-        setMessages(loaded)
+        // Never regress below what the localStorage-cache-restored state
+        // already shows — the DB fetch can legitimately be behind if the
+        // most recent write(s) hadn't landed yet (see chat-cache.ts). A
+        // shorter DB result means it's missing something the user already
+        // saw, not that the conversation actually shrank.
+        setMessages(prev => (loaded.length >= prev.length ? loaded : prev))
         setHasMoreMessages((count ?? 0) > PAGE_SIZE)
       }
       setHistoryLoaded(true)
@@ -857,6 +878,21 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     finalizePlaceholder(placeholderId, cleanedText, finalStatus, action)
   }
 
+  // Resets to a single fresh greeting: clears the in-memory list, the
+  // localStorage mirror, and the server rows (so a reload doesn't resurrect
+  // the old conversation via loadChatHistory).
+  const handleClearChat = () => {
+    if (!window.confirm('Clear this conversation? This cannot be undone.')) return
+    setMessages([{ role: 'assistant', content: buildInitialGreeting(), status: 'complete' }])
+    setHasMoreMessages(false)
+    setQuickRepliesDismissed(false)
+    setLastFailedInput(null)
+    if (profile.id) {
+      clearChatCache(profile.id)
+      supabase.from('chat_messages').delete().eq('profile_id', profile.id).then()
+    }
+  }
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
@@ -956,14 +992,25 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
             <MessageCircle className="size-5 text-primary" />
             <CardTitle className="text-base">Fitness Assistant</CardTitle>
           </div>
-          <Button
-            variant={useAI ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setUseAI(prev => !prev)}
-          >
-            <Sparkles className="size-3" />
-            {useAI ? 'AI On' : 'AI Off'}
-          </Button>
+          <div className="flex items-center gap-1.5">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleClearChat}
+              aria-label="Clear chat"
+              title="Clear chat"
+            >
+              <Trash2 className="size-3.5" />
+            </Button>
+            <Button
+              variant={useAI ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setUseAI(prev => !prev)}
+            >
+              <Sparkles className="size-3" />
+              {useAI ? 'AI On' : 'AI Off'}
+            </Button>
+          </div>
         </div>
         {useAI && (
           <Badge variant="secondary" className="w-fit text-xs mt-1">
