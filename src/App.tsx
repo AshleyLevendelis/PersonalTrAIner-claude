@@ -989,6 +989,7 @@ function App() {
               exercisePlan={exercisePlan}
               latestWeightKg={latestWeightKg}
               onMacroModeChange={handleMacroModeChange}
+              onWeightLogged={handleWeightLogged}
             />
           </TabsContent>
 
@@ -1047,6 +1048,7 @@ function App() {
               latestWeightKg={latestWeightKg}
               onPlanUpdate={handlePlanUpdate}
               onLogsUpdated={() => setLogsVersion(v => v + 1)}
+              onWeightLogged={handleWeightLogged}
             />
           </TabsContent>
         </Tabs>

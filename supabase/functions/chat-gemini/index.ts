@@ -444,6 +444,21 @@ const toolDeclarations = [
     },
   },
   {
+    name: "log_weight",
+    description:
+      "Records the user's body-weight for today. Call whenever the user reports a weigh-in (e.g. 'I weighed 86.4 this morning', 'scale said 190 lbs today'). Convert pounds to kilograms before calling (1 lb = 0.453592 kg). One entry per day — a second weigh-in today overwrites the first.",
+    parameters: {
+      type: "object",
+      properties: {
+        weight_kg: {
+          type: "number",
+          description: "Body weight in kilograms (convert from lbs if the user used pounds)",
+        },
+      },
+      required: ["weight_kg"],
+    },
+  },
+  {
     name: "log_meal",
     description:
       "Logs a meal the user has eaten. Call when the user says they ate something (e.g. 'I had a chicken salad for lunch', 'Just ate 2 eggs and toast'). Extract meal slot, food items, and estimated macros from the description.",
@@ -1406,6 +1421,61 @@ Keep this context in mind to ensure your greetings and questions naturally align
 
         return new Response(
           JSON.stringify({ reply: confirmText, action: actionPayload }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (name === "log_weight") {
+        // Server-side write is fine here (single table, (profile_id, date)
+        // unique upsert, no offline-sync complexity — same reasoning as
+        // cardio logs). The client refreshes targets when the action
+        // arrives, so a chat weigh-in updates the Nutrition tab's numbers
+        // exactly like the tab's own capture field does.
+        const profileId = context.profile_id;
+        const weightKg = Number(args.weight_kg);
+        if (!profileId || !Number.isFinite(weightKg) || weightKg < 25 || weightKg > 350) {
+          return new Response(
+            JSON.stringify({ reply: "That weight doesn't look right — could you give it to me in kilograms (e.g. 86.4)?" }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        let dbSuccess = true;
+        try {
+          const todayDate = new Date().toISOString().split("T")[0];
+          const resp = await fetch(
+            `${supabaseUrl}/rest/v1/daily_metrics?on_conflict=profile_id,date`,
+            {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${serviceKey}`,
+                Apikey: serviceKey,
+                "Content-Type": "application/json",
+                Prefer: "resolution=merge-duplicates,return=minimal",
+              },
+              body: JSON.stringify({
+                profile_id: profileId,
+                date: todayDate,
+                weight_kg: weightKg,
+                updated_at: new Date().toISOString(),
+              }),
+            }
+          );
+          if (!resp.ok) {
+            console.error(`daily_metrics upsert failed: ${resp.status}`, await resp.text());
+            dbSuccess = false;
+          }
+        } catch (err) {
+          console.error("log_weight error:", err);
+          dbSuccess = false;
+        }
+
+        const confirmText = dbSuccess
+          ? (textPart?.text || `Logged **${weightKg} kg** for today. Your targets recalculate from your latest weigh-in.`)
+          : "I couldn't save that weigh-in — please try again in a moment.";
+
+        return new Response(
+          JSON.stringify({ reply: confirmText, action: dbSuccess ? { type: "log_weight", weight_kg: weightKg } : undefined }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }

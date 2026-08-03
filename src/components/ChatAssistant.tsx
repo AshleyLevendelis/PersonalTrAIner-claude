@@ -72,9 +72,11 @@ interface ChatAssistantProps {
   latestWeightKg?: number | null
   onPlanUpdate: (action: PlanAction) => void | Promise<void>
   onLogsUpdated?: () => void
+  /** Fired when a chat log_weight action lands so the app recomputes living targets. */
+  onWeightLogged?: () => void | Promise<void>
 }
 
-export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, onPlanUpdate, onLogsUpdated }: ChatAssistantProps) {
+export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged }: ChatAssistantProps) {
   const buildInitialGreeting = (): string => {
     const now = new Date()
     const hour = now.getHours()
@@ -495,6 +497,13 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
 
   const applyPlanAction = async (action: PlanAction): Promise<boolean> => {
     if (!profile.id) return false
+
+    if (action.type === 'log_weight') {
+      // The edge function already wrote daily_metrics; the app just needs
+      // to recompute living targets from the new latest weigh-in.
+      await onWeightLogged?.()
+      return true
+    }
 
     if (action.type === 'replace_food') {
       const computedCalories = calculateCalories(action.protein, action.carbs, action.fat)
