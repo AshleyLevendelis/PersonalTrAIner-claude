@@ -967,7 +967,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         </div>
         {useAI && (
           <Badge variant="secondary" className="w-fit text-xs mt-1">
-            Powered by Gemini 2.5 Flash
+            Powered by Gemini 3.5 Flash
           </Badge>
         )}
       </CardHeader>
