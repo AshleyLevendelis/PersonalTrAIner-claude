@@ -619,21 +619,12 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     }
 
     if (action.type === 'ban_exercise') {
-      const exerciseName = (action as any).exercise_name || (action as any).old_item || ''
-      if (exerciseName && profile.id) {
-        const { data: profileRow } = await supabase
-          .from('fitness_profiles')
-          .select('exercise_exclusions')
-          .eq('id', profile.id)
-          .maybeSingle()
-        const current: string[] = profileRow?.exercise_exclusions || []
-        if (!current.includes(exerciseName)) {
-          await supabase
-            .from('fitness_profiles')
-            .update({ exercise_exclusions: [...current, exerciseName] })
-            .eq('id', profile.id)
-        }
-      }
+      // Vision-architecture patch round, fix 4: this used to write
+      // exercise_exclusions here (from a fresh DB read) AND App.tsx's
+      // handleBanExercise wrote it again moments later (from possibly-stale
+      // exerciseExclusions React state), so the second write could clobber
+      // the first. Single write path now: this branch only forwards the
+      // action; handleBanExercise does the one fresh-read-then-write.
       onPlanUpdate(action)
       return true
     }

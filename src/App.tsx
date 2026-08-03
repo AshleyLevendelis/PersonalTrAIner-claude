@@ -661,7 +661,24 @@ function App() {
 
   const handleBanExercise = async (exerciseName: string) => {
     if (!profile) return
-    const updated = [...exerciseExclusions, exerciseName]
+    // Vision-architecture patch round, fix 4: this used to build `updated`
+    // from exerciseExclusions React state, which could be stale relative to
+    // a write ChatAssistant.tsx had just made moments earlier — the second
+    // (this) write would then clobber the first with a list missing the
+    // exercise the chat action just added. Single write path: read fresh
+    // from the DB right before appending, so this is the only writer and it
+    // always starts from the current row.
+    let current = exerciseExclusions
+    if (profile.id) {
+      const { data: profileRow } = await supabase
+        .from('fitness_profiles')
+        .select('exercise_exclusions')
+        .eq('id', profile.id)
+        .maybeSingle()
+      current = profileRow?.exercise_exclusions || []
+    }
+    if (current.includes(exerciseName)) return
+    const updated = [...current, exerciseName]
     setExerciseExclusions(updated)
 
     if (profile.id) {
