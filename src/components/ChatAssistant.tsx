@@ -557,30 +557,22 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     }
 
     if (action.type === 'replace_exercise') {
-      if (action.permanent !== false) {
-        const { data, error } = await supabase
-          .from('exercise_plans')
-          .update({
-            name: action.new_item,
-            sets: action.sets,
-            reps: action.reps,
-            rest: action.rest,
-          })
-          .eq('profile_id', profile.id)
-          .ilike('day', action.day)
-          .ilike('name', `%${action.old_item}%`)
-          .select('id')
-
-        if (error) {
-          console.error('Failed to update exercise plan:', error)
-          return false
-        }
-
-        if (!data || data.length === 0) return false
+      // Fail-closed on anything permanent (vision-architecture patch round,
+      // fix 1). The old guard was `permanent !== false` — true, an OMITTED
+      // permanent, and any other value all took the write branch, while the
+      // server only declines the explicit `permanent === true` case
+      // (chat-gemini/index.ts). An omitted `permanent` therefore slipped
+      // past BOTH guards and reached this UPDATE. It also wrote to
+      // `exercise_plans`, a table the Exercise tab doesn't render from once
+      // a mesocycle exists — the same class of dishonest write the trace
+      // report found elsewhere. Only the explicit session-only case
+      // (`permanent === false`) is allowed through; a real permanent swap
+      // waits for Phase B's confirm-gated rebuild through mesocycle-edit.
+      if (action.permanent === false) {
+        onPlanUpdate(action)
+        return true
       }
-
-      onPlanUpdate(action)
-      return true
+      return false
     }
 
     if (action.type === 'adjust_volume') {

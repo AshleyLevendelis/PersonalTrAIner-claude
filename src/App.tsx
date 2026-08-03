@@ -448,58 +448,16 @@ function App() {
     // through meal-store.swapPoolMeal inside ChatAssistant's action handler
     // (an honest no-op until M1 fills the pools), same layer as the UI.
     if (action.type === 'replace_exercise') {
-      if (action.permanent === false) {
-        // Session-only swap: nothing to persist — the swap only affects what
-        // the user does today, and actual performance gets logged through
-        // set-log-store when they log sets. (The pre-C0 code here inserted a
-        // workout_logs row whose columns didn't match the table — it had been
-        // silently failing with a 400 since it was written.)
-      } else {
-        // Permanent swap: update the plan template and mesocycle
-        setExercisePlan(prev =>
-          prev.map(day => {
-            if (day.day.toLowerCase() !== action.day.toLowerCase()) return day
-            return {
-              ...day,
-              exercises: day.exercises.map(ex => {
-                const nameLower = ex.name.toLowerCase()
-                const oldLower = action.old_item.toLowerCase()
-                if (nameLower !== oldLower && !nameLower.includes(oldLower)) return ex
-                return {
-                  ...ex,
-                  name: action.new_item,
-                  sets: action.sets,
-                  reps: action.reps,
-                  rest: action.rest,
-                }
-              }),
-            }
-          })
-        )
-        setMesocycle(prev =>
-          prev.map(week => ({
-            ...week,
-            days: week.days.map(day => {
-              if (day.day.toLowerCase() !== action.day.toLowerCase()) return day
-              return {
-                ...day,
-                exercises: day.exercises.map(ex => {
-                  const nameLower = ex.name.toLowerCase()
-                  const oldLower = action.old_item.toLowerCase()
-                  if (nameLower !== oldLower && !nameLower.includes(oldLower)) return ex
-                  return {
-                    ...ex,
-                    name: action.new_item,
-                    sets: action.sets,
-                    reps: action.reps,
-                    rest: action.rest,
-                  }
-                }),
-              }
-            }),
-          }))
-        )
-      }
+      // Session-only swap: nothing to persist — the swap only affects what
+      // the user does today, and actual performance gets logged through
+      // set-log-store when they log sets. ChatAssistant now only forwards
+      // this action when permanent === false (vision-architecture patch
+      // round, fix 1) — the permanent branch that used to live here mutated
+      // exercisePlan/mesocycle client state directly, with no saveMesocycle
+      // call, so a "permanent" swap looked applied until the next refresh
+      // and then silently reverted. Removed rather than left unreachable;
+      // a real permanent swap arrives with Phase B's confirm-gated rebuild
+      // through mesocycle-edit.
     } else if (action.type === 'adjust_volume') {
       setExercisePlan(prev =>
         prev.map(day => {
