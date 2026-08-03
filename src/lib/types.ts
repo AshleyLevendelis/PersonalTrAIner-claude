@@ -239,35 +239,6 @@ export interface MealPlanDay {
   items: Meal[]
 }
 
-export interface EdamamRecipe {
-  name: string
-  image: string
-  source_url: string
-  yield: number
-  total_calories: number
-  total_protein: number
-  total_carbs: number
-  total_fat: number
-  total_weight: number
-  ingredients: Array<{ text: string; weight: number; food: string }>
-  ingredient_lines: string[]
-}
-
-export interface WeeklyMealSlot {
-  id?: string
-  day_of_week: string
-  meal_slot: string
-  recipe: EdamamRecipe
-  scaled_calories: number
-  scaled_protein: number
-  scaled_carbs: number
-  scaled_fat: number
-  scale_factor: number
-  ingredient_lines: string[]
-}
-
-export type WeeklyMealPlan = Record<string, WeeklyMealSlot[]>
-
 export const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] as const
 export type DayName = typeof DAY_NAMES[number]
 

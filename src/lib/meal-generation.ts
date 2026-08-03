@@ -441,3 +441,35 @@ export function assembleDay(
 
   return { chosen, totals, withinTolerance, alternatives: pools }
 }
+
+/**
+ * Adapts today's assembled picks into the legacy MealPlanDay[] shape the
+ * chat context and its offline canned-response fallback (chat-assistant.ts)
+ * already consume — keeps those two modules untouched by the M1 pool-model
+ * rewrite rather than rippling the shape change through them too.
+ */
+export function chosenToMealPlanDays(chosen: Partial<Record<MealSlotName, PoolOption>>): import('./types').MealPlanDay[] {
+  const SLOT_ORDER: MealSlotName[] = ['breakfast', 'lunch', 'dinner', 'snack']
+  return SLOT_ORDER.filter(s => chosen[s]).map(slot => {
+    const option = chosen[slot]!
+    return {
+      meal: slot.charAt(0).toUpperCase() + slot.slice(1),
+      items: [{
+        name: option.name,
+        calories: Math.round(option.macros.calories),
+        protein: Math.round(option.macros.protein),
+        carbs: Math.round(option.macros.carbs),
+        fat: Math.round(option.macros.fat),
+        portion_size: option.ingredients.map(i => `${i.quantity}${i.unit} ${i.name}`).join(', '),
+        prep: '',
+        substitution: '',
+        ingredients: option.ingredients.map(i => `${i.quantity}${i.unit} ${i.name}`),
+        // Unlike M0's ban on this field (the old Edamam-verification claim
+        // was fictional), true here is honest: this macro figure passed the
+        // real food-db + diet-rules + portion-scaler pipeline. This adapter
+        // output is chat-context-only, never persisted or shown as a badge.
+        is_verified: true,
+      }],
+    }
+  })
+}

@@ -17,12 +17,12 @@ import { calculateCalories } from '@/lib/calculations'
 import { computeBMR, computeStaticTDEE } from '@/lib/macro-calculator'
 import { computeTargets, getLatestWeightKg, snapshotTargetsIfChanged } from '@/lib/nutrition-targets'
 import { generateExercisePlan, generateMesocycle } from '@/lib/exercise-plan'
-import { generateWeeklyMealPlan, getWeekStartDate, deriveDailyMealView } from '@/lib/meal-plan'
-import { swapPoolMeal } from '@/lib/meal-store'
+import { getPools, swapPoolMeal, type MealSlotName } from '@/lib/meal-store'
+import { generateMealPools, assembleDay, chosenToMealPlanDays, type PoolOption } from '@/lib/meal-generation'
 import { supabase } from '@/lib/supabase'
 import { saveMesocycle, saveMesocycleWeek, restoreMesocycle } from '@/lib/mesocycle-persistence'
 import { swapExerciseInMesocycle, banExerciseFromMesocycle, type SwapScope } from '@/lib/mesocycle-edit'
-import type { UserProfile, MacroTargets, WorkoutDay, MealPlanDay, PlanAction, WeeklyMealPlan, DayName, SchedulePatchItem, MesocycleWeek } from '@/lib/types'
+import type { UserProfile, MacroTargets, WorkoutDay, PlanAction, SchedulePatchItem, MesocycleWeek } from '@/lib/types'
 import type { ExerciseEntry } from '@/lib/exercise-db'
 
 const STORAGE_KEY = 'fitplan_profile_id'
@@ -47,13 +47,36 @@ function App() {
   const [mesocycle, setMesocycle] = useState<MesocycleWeek[]>([])
   /** When the CURRENT mesocycle was generated — anchors live-week detection (falls back to profile.created_at for legacy profiles without persisted weeks). */
   const [mesocycleCreatedAt, setMesocycleCreatedAt] = useState<string | null>(null)
-  const [weeklyMealPlan, setWeeklyMealPlan] = useState<WeeklyMealPlan | null>(null)
-  // The legacy per-slot view is now a PURE DERIVATION of the weekly plan
-  // (M0 Part 6) — the old standalone mealPlan state was the dead object chat
-  // swaps mutated while nothing rendered it. Derived fresh each render so
-  // the chat's meal context and the Meals tab can never disagree.
-  const todayDayName = new Date().toLocaleDateString('en-US', { weekday: 'long' })
-  const mealPlan: MealPlanDay[] = deriveDailyMealView(weeklyMealPlan, todayDayName)
+  // Meal pools (M1): every generated option per slot, keyed by slot — the
+  // single source of truth for meals. Replaces the old day-of-week
+  // WeeklyMealPlan entirely (pool options aren't day-specific; any option is
+  // valid for its slot any day, per the M0 architecture decision).
+  const [mealPools, setMealPools] = useState<Partial<Record<MealSlotName, PoolOption[]>>>({})
+  const [isGeneratingMeals, setIsGeneratingMeals] = useState(false)
+  /** Slot -> pool-option name the user explicitly picked this session, overriding assembleDay's automatic choice for that slot until the next regenerate. */
+  const [manualMealPicks, setManualMealPicks] = useState<Partial<Record<MealSlotName, string>>>({})
+  // assembleDay is pure — deriving today's picks from pools+targets on every
+  // render (rather than storing them) means a pool refresh or a target
+  // change (a new weigh-in) can never leave a stale assembled day on screen.
+  const assembledMeals = macros ? assembleDay(mealPools, macros) : null
+  const chosenMeals: Partial<Record<MealSlotName, PoolOption>> = { ...assembledMeals?.chosen }
+  for (const [slot, name] of Object.entries(manualMealPicks) as [MealSlotName, string][]) {
+    const override = mealPools[slot]?.find(o => o.name === name)
+    if (override) chosenMeals[slot] = override
+  }
+  const mealTotals: MacroTargets = Object.values(chosenMeals).reduce(
+    (acc, o) => ({
+      calories: acc.calories + (o?.macros.calories ?? 0),
+      protein: acc.protein + (o?.macros.protein ?? 0),
+      carbs: acc.carbs + (o?.macros.carbs ?? 0),
+      fat: acc.fat + (o?.macros.fat ?? 0),
+    }),
+    { calories: 0, protein: 0, carbs: 0, fat: 0 },
+  )
+  // Chat context + its offline canned-response fallback still consume the
+  // legacy MealPlanDay[] shape — adapted fresh from today's picks so the
+  // chat and the Meals tab can never disagree.
+  const mealPlan = chosenToMealPlanDays(chosenMeals)
   const [isRestoring, setIsRestoring] = useState(true)
   const [isGenerating, setIsGenerating] = useState(false)
   const [setupError, setSetupError] = useState<string | null>(null)
@@ -126,49 +149,11 @@ function App() {
     const restoredExclusions: string[] = profileRow.exercise_exclusions || []
     setExerciseExclusions(restoredExclusions)
 
-    const [{ data: mealRows }, { data: exerciseRows }, fullMesocycle] = await Promise.all([
-      supabase.from('meal_plans').select('*').eq('profile_id', storedId),
+    const [restoredPools, { data: exerciseRows }, fullMesocycle] = await Promise.all([
+      getPools(storedId),
       supabase.from('exercise_plans').select('*').eq('profile_id', storedId),
       restoreMesocycle(storedId),
     ])
-
-    // The legacy no-day_of_week branch (grouped restoredMeals) is gone with
-    // the standalone mealPlan state (M0 Part 6) — the per-day view derives
-    // from the weekly plan now.
-    const restoredWeekly: WeeklyMealPlan = {}
-    if (mealRows) {
-      const hasWeeklyData = mealRows.some(r => r.day_of_week)
-      if (hasWeeklyData) {
-        for (const row of mealRows) {
-          const day = row.day_of_week || 'Monday'
-          if (!restoredWeekly[day]) restoredWeekly[day] = []
-          restoredWeekly[day].push({
-            id: row.id,
-            day_of_week: day,
-            meal_slot: row.meal_slot,
-            recipe: {
-              name: row.name,
-              image: '',
-              source_url: '',
-              yield: 1,
-              total_calories: row.calories,
-              total_protein: row.protein,
-              total_carbs: row.carbs,
-              total_fat: row.fat,
-              total_weight: 300,
-              ingredients: (row.ingredients || []).map((i: string) => ({ text: i, weight: 0, food: i })),
-              ingredient_lines: row.ingredients || [],
-            },
-            scaled_calories: row.calories,
-            scaled_protein: row.protein,
-            scaled_carbs: row.carbs,
-            scaled_fat: row.fat,
-            scale_factor: 1,
-            ingredient_lines: row.ingredients || [],
-          })
-        }
-      }
-    }
 
     let restoredExercises: WorkoutDay[] = []
     let restoredMesocycle: MesocycleWeek[] = []
@@ -274,7 +259,7 @@ function App() {
     setProfile(restoredProfile)
     setLatestWeightKg(restoredWeight)
     setMacros(liveTargets)
-    if (Object.keys(restoredWeekly).length > 0) setWeeklyMealPlan(restoredWeekly)
+    setMealPools(restoredPools)
     setExercisePlan(restoredExercises)
     setMesocycle(restoredMesocycle)
     setIsRestoring(false)
@@ -314,9 +299,6 @@ function App() {
     const planResult = generateExercisePlan(enrichedProfile, exerciseExclusions)
     const workout = planResult.plan
     const mesocycleData = generateMesocycle(enrichedProfile, workout)
-
-    setGeneratingStatus('Building your meal structure...')
-    const weeklyPlan = generateWeeklyMealPlan(enrichedProfile, workout, setGeneratingStatus)
 
     const { data, error: insertError } = await supabase
       .from('fitness_profiles')
@@ -365,14 +347,15 @@ function App() {
       )
     }
 
+    let generatedPools: Partial<Record<MealSlotName, PoolOption[]>> = {}
     if (data) {
       enrichedProfile.id = data.id
       localStorage.setItem(STORAGE_KEY, data.id)
       try {
-        await persistWeeklyPlan(data.id, weeklyPlan, workout)
+        await persistLegacyExercisePlan(data.id, workout)
       } catch (err) {
         // A failure to persist the plan must not block showing it.
-        console.error('Persisting weekly plan failed:', err)
+        console.error('Persisting exercise plan failed:', err)
       }
       try {
         // Full-fidelity save — every week, with loads/phase/warmup intact.
@@ -382,6 +365,22 @@ function App() {
       } catch (err) {
         console.error('Persisting mesocycle failed:', err)
       }
+      try {
+        setGeneratingStatus('Building your meal pools...')
+        const result = await generateMealPools({
+          profileId: data.id,
+          targets: calculatedMacros,
+          dietaryPreferences: enrichedProfile.dietary_preferences,
+          mealsPerDay: enrichedProfile.meals_per_day,
+          includeSnacks: enrichedProfile.include_snacks,
+          cookingTimePreference: enrichedProfile.cooking_time_preference,
+        })
+        generatedPools = result.accepted
+      } catch (err) {
+        // Meal generation failing must not block the rest of the plan —
+        // the Meals tab shows its own empty state with a manual retry.
+        console.error('Meal pool generation failed:', err)
+      }
     }
 
     setProfile(enrichedProfile)
@@ -389,7 +388,7 @@ function App() {
     setExercisePlan(workout)
     setMesocycle(mesocycleData)
     setMesocycleCreatedAt(new Date().toISOString())
-    setWeeklyMealPlan(weeklyPlan)
+    setMealPools(generatedPools)
     } catch (err) {
       console.error('Onboarding failed:', err)
       setSetupError(
@@ -401,27 +400,8 @@ function App() {
     }
   }
 
-  const persistWeeklyPlan = async (profileId: string, weeklyPlan: WeeklyMealPlan, workout: WorkoutDay[]) => {
-    const weekStart = getWeekStartDate()
-    const mealRows = Object.values(weeklyPlan).flat().map(slot => ({
-      profile_id: profileId,
-      meal_slot: slot.meal_slot,
-      day_of_week: slot.day_of_week,
-      week_start_date: weekStart,
-      name: slot.recipe.name,
-      calories: slot.scaled_calories,
-      protein: slot.scaled_protein,
-      carbs: slot.scaled_carbs,
-      fat: slot.scaled_fat,
-      portion_size: slot.ingredient_lines.join(', '),
-      prep: '',
-      substitution: '',
-      ingredients: slot.ingredient_lines,
-      // Never claimed true anymore (M0): the verified badge used to mean
-      // "Edamam-checked", and nothing in the system can verify a number.
-      is_verified: false,
-    }))
-
+  /** Legacy exercise_plans mirror — meal persistence now goes through generateMealPools -> meal_plan_slots (M1); this only handles the exercise-side legacy table. */
+  const persistLegacyExercisePlan = async (profileId: string, workout: WorkoutDay[]) => {
     const exerciseRows = mesocycle.length > 0
       ? mesocycle.flatMap(week =>
           week.days.flatMap(day =>
@@ -458,10 +438,7 @@ function App() {
           }))
         )
 
-    await Promise.all([
-      supabase.from('meal_plans').insert(mealRows),
-      supabase.from('exercise_plans').insert(exerciseRows),
-    ])
+    await supabase.from('exercise_plans').insert(exerciseRows)
   }
 
   const handlePlanUpdate = async (action: PlanAction) => {
@@ -660,38 +637,56 @@ function App() {
     }
   }
 
-  // ONE meal-mutation layer (M0 Part 6): the UI swap goes through
+  // ONE meal-mutation layer (M1): the UI swap goes through
   // meal-store.swapPoolMeal — the same call the chat's replace_food handler
-  // makes. Its old body called the retired Edamam path and wrote meal_plans
-  // columns the live schema doesn't have; both were dead. swapPoolMeal is an
-  // honest M0 stub (always null) until M1 fills the pools, so the swap
-  // button currently no-ops exactly as it always effectively did.
-  const handleSwapMeal = async (dayName: DayName, mealSlot: string) => {
+  // makes (App.tsx handlePlanUpdate is unaffected; that path was already
+  // wired to swapPoolMeal in M0). Picking a specific alternative just
+  // records the choice as a session-local override (manualMealPicks) —
+  // the pool itself doesn't change, only which option is "today's pick".
+  const handleSwapMealSlot = async (slot: MealSlotName, chooseName: string) => {
     if (!profile?.id) return
-    const currentSlots = weeklyMealPlan?.[dayName]
-    const currentMeal = currentSlots?.find(s => s.meal_slot === mealSlot)
+    const applied = await swapPoolMeal(profile.id, slot, chosenMeals[slot]?.name, chooseName, 'manual')
+    if (!applied) return
+    setManualMealPicks(prev => ({ ...prev, [slot]: applied.name }))
+  }
 
-    const poolMeal = await swapPoolMeal(
-      profile.id,
-      mealSlot.toLowerCase() as import('@/lib/meal-store').MealSlotName,
-      currentMeal?.recipe.name,
-    )
-    if (!poolMeal || !weeklyMealPlan) return
+  const handleRegenerateMealSlot = async (slot: MealSlotName) => {
+    if (!profile?.id || !macros) return
+    setIsGeneratingMeals(true)
+    try {
+      const result = await generateMealPools({
+        profileId: profile.id,
+        targets: macros,
+        dietaryPreferences: profile.dietary_preferences,
+        mealsPerDay: profile.meals_per_day,
+        includeSnacks: profile.include_snacks,
+        cookingTimePreference: profile.cooking_time_preference,
+        onlySlots: [slot],
+      })
+      setMealPools(prev => ({ ...prev, ...result.accepted }))
+      setManualMealPicks(prev => { const next = { ...prev }; delete next[slot]; return next })
+    } finally {
+      setIsGeneratingMeals(false)
+    }
+  }
 
-    const updatedDaySlots = (weeklyMealPlan[dayName] || []).map(s =>
-      s.meal_slot === mealSlot
-        ? {
-            ...s,
-            recipe: { ...s.recipe, name: poolMeal.name, ingredient_lines: poolMeal.ingredients },
-            scaled_calories: poolMeal.macros.kcal,
-            scaled_protein: poolMeal.macros.protein,
-            scaled_carbs: poolMeal.macros.carbs,
-            scaled_fat: poolMeal.macros.fat,
-            ingredient_lines: poolMeal.ingredients,
-          }
-        : s
-    )
-    setWeeklyMealPlan({ ...weeklyMealPlan, [dayName]: updatedDaySlots })
+  const handleRegenerateAllMeals = async () => {
+    if (!profile?.id || !macros) return
+    setIsGeneratingMeals(true)
+    try {
+      const result = await generateMealPools({
+        profileId: profile.id,
+        targets: macros,
+        dietaryPreferences: profile.dietary_preferences,
+        mealsPerDay: profile.meals_per_day,
+        includeSnacks: profile.include_snacks,
+        cookingTimePreference: profile.cooking_time_preference,
+      })
+      setMealPools(result.accepted)
+      setManualMealPicks({})
+    } finally {
+      setIsGeneratingMeals(false)
+    }
   }
 
   const handleBanExercise = async (exerciseName: string) => {
@@ -780,7 +775,8 @@ function App() {
     setMacros(null)
     setExercisePlan([])
     setMesocycle([])
-    setWeeklyMealPlan(null)
+    setMealPools({})
+    setManualMealPicks({})
     setExerciseExclusions([])
     setLogsVersion(0)
   }
@@ -962,12 +958,14 @@ function App() {
 
           <TabsContent value="meals">
             <MealPlan
-              weeklyPlan={weeklyMealPlan}
-              legacyPlan={mealPlan}
-              profile={profile}
-              exercisePlan={exercisePlan}
-              macros={macros}
-              onSwapMeal={handleSwapMeal}
+              pools={mealPools}
+              chosen={chosenMeals}
+              totals={mealTotals}
+              targets={macros}
+              isGenerating={isGeneratingMeals}
+              onSwapSlot={handleSwapMealSlot}
+              onRegenerateSlot={handleRegenerateMealSlot}
+              onRegenerateAll={handleRegenerateAllMeals}
             />
           </TabsContent>
 

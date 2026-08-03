@@ -499,7 +499,8 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     }
   }
 
-  const applyPlanAction = async (action: PlanAction): Promise<boolean> => {
+  /** Returns true on a clean success, false on failure, or a correction-note string when the action succeeded but not exactly as the model's own reply text described (see the replace_food branch). */
+  const applyPlanAction = async (action: PlanAction): Promise<boolean | string> => {
     if (!profile.id) return false
 
     if (action.type === 'log_weight') {
@@ -519,24 +520,40 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       // stub (always null until M1 fills the pools), so the chat appends
       // its standard "change was not applied" note instead of claiming a
       // swap happened.
+      // Try the model's suggested new_item as an exact pool-option match
+      // first (chooseName); meal-store falls back to nothing if it doesn't
+      // match rather than silently picking something else — a mismatch
+      // means the user asked for a specific dish outside the verified pool,
+      // and the standard "action failed" text below is the honest response
+      // (no unverified AI-invented meal is ever accepted into the plan).
       const applied = await swapPoolMeal(
         profile.id,
         action.meal_slot.toLowerCase() as MealSlotName,
         action.old_item,
+        action.new_item,
+        'chat',
       )
       if (!applied) return false
 
       await upsertFavorite({
-        new_item: action.new_item,
+        new_item: applied.name,
         meal_slot: action.meal_slot,
-        protein: action.protein,
-        carbs: action.carbs,
-        fat: action.fat,
+        protein: applied.macros.protein,
+        carbs: applied.macros.carbs,
+        fat: applied.macros.fat,
         portion_size: action.portion_size,
         prep: action.prep,
       })
 
-      return true
+      // The model's own reply text was generated before this ran and may
+      // name a dish that isn't what the verified pool actually returned
+      // (chooseName only matches when the model happened to guess an exact
+      // pool option name — it has no visibility into the pool). Surface the
+      // real result as a correction note rather than let an inaccurate
+      // AI-written sentence stand as if it were true.
+      return applied.name === action.new_item
+        ? true
+        : `Swapped to **${applied.name}** (${Math.round(applied.macros.calories)} kcal, ${Math.round(applied.macros.protein)}g protein) — the closest verified match in your meal pool for that slot.`
     }
 
     if (action.type === 'replace_exercise') {
@@ -742,6 +759,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         const success = await applyPlanAction(action)
         if (success) {
           if (navigator.vibrate) navigator.vibrate([10, 50, 10])
+          if (typeof success === 'string') responseText += `\n\n_${success}_`
         } else {
           responseText += '\n\n_Action failed — the change was not applied._'
           action = undefined

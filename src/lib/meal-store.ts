@@ -19,7 +19,10 @@
 // ---------------------------------------------------------------------------
 
 import { supabase } from './supabase'
-import type { MacroTargets, WeeklyMealPlan } from './types'
+import type { MacroTargets } from './types'
+// Type-only import — meal-generation.ts only imports MealSlotName (a type)
+// from this module, so this doesn't create a real circular dependency.
+import type { PoolOption } from './meal-generation'
 
 export interface MealMacros {
   kcal: number
@@ -254,52 +257,77 @@ export async function getTodayLedger(
 }
 
 // ---------------------------------------------------------------------------
-// Pool surface — M0 stubs, filled by M1 from meal_plan_slots
+// Pool surface (M1) — real reads/writes against meal_plan_slots
 // ---------------------------------------------------------------------------
 
-export interface PoolMeal {
-  slot: MealSlotName
-  poolIndex: number
-  name: string
-  ingredients: string[]
-  macros: MealMacros
-  tags: string[]
+/** Reads a profile's full stored pool, grouped by slot and ordered by pool_index. Empty object (not an error) when nothing has been generated yet. */
+export async function getPools(profileId: string): Promise<Partial<Record<MealSlotName, PoolOption[]>>> {
+  const { data, error } = await supabase
+    .from('meal_plan_slots')
+    .select('slot, pool_index, name, ingredients, macros, tags')
+    .eq('profile_id', profileId)
+    .order('pool_index', { ascending: true })
+
+  if (error || !data) return {}
+
+  const grouped: Partial<Record<MealSlotName, PoolOption[]>> = {}
+  for (const row of data) {
+    const slot = row.slot as MealSlotName
+    const macros = row.macros ?? { kcal: 0, protein: 0, carbs: 0, fat: 0 }
+    const option: PoolOption = {
+      slot,
+      name: row.name,
+      ingredients: row.ingredients ?? [],
+      macros: { calories: macros.kcal ?? 0, protein: macros.protein ?? 0, carbs: macros.carbs ?? 0, fat: macros.fat ?? 0 },
+      tags: row.tags ?? [],
+    }
+    if (!grouped[slot]) grouped[slot] = []
+    grouped[slot]!.push(option)
+  }
+  return grouped
 }
 
 /**
- * M0: derives a read-only pseudo-pool view from the interim placeholder plan
- * so callers can already code against the pool shape. M1 replaces this with
- * a meal_plan_slots read.
- */
-export function getPools(weeklyPlan: WeeklyMealPlan | null): PoolMeal[] {
-  if (!weeklyPlan) return []
-  const anyDay = Object.values(weeklyPlan)[0] ?? []
-  return anyDay.map((slot, i) => ({
-    slot: slot.meal_slot.toLowerCase() as MealSlotName,
-    poolIndex: i,
-    name: slot.recipe.name,
-    ingredients: slot.ingredient_lines,
-    macros: {
-      kcal: slot.scaled_calories,
-      protein: slot.scaled_protein,
-      carbs: slot.scaled_carbs,
-      fat: slot.scaled_fat,
-    },
-    tags: [],
-  }))
-}
-
-/**
- * M0: pool swapping does not exist yet (the pools themselves arrive in M1) —
- * always resolves null, which every caller must surface as "swap not
- * applied" rather than pretending. The signature is the M1 contract.
+ * Swaps in a different option from the same slot's stored pool, recording a
+ * `swapped_in` meal_event. `chooseName` picks that specific pool option (the
+ * UI's per-alternative "swap to this" buttons); omitted, picks a random
+ * option excluding `currentName` (the chat's simpler "swap this for
+ * something else" case). Returns null when there's no other option in the
+ * pool to switch to — every caller must surface that as "swap not applied,"
+ * never invent one.
  */
 export async function swapPoolMeal(
-  _profileId: string,
-  _slot: MealSlotName,
-  _currentName?: string,
-): Promise<PoolMeal | null> {
-  return null
+  profileId: string,
+  slot: MealSlotName,
+  currentName?: string,
+  chooseName?: string,
+  source: MealEventSource = 'manual',
+): Promise<PoolOption | null> {
+  const pools = await getPools(profileId)
+  const options = pools[slot] ?? []
+  if (options.length === 0) return null
+
+  let chosen: PoolOption | undefined
+  if (chooseName) {
+    chosen = options.find(o => o.name === chooseName)
+  } else {
+    const alternatives = currentName ? options.filter(o => o.name !== currentName) : options
+    if (alternatives.length === 0) return null
+    chosen = alternatives[Math.floor(Math.random() * alternatives.length)]
+  }
+  if (!chosen) return null
+
+  recordMealEvent({
+    profileId,
+    date: new Date().toISOString().split('T')[0],
+    slot,
+    eventType: 'swapped_in',
+    mealName: chosen.name,
+    macros: { kcal: chosen.macros.calories, protein: chosen.macros.protein, carbs: chosen.macros.carbs, fat: chosen.macros.fat },
+    source,
+  })
+
+  return chosen
 }
 
 /** Flush when connectivity returns — mirrors set-log-store's listener. */
