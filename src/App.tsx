@@ -17,7 +17,8 @@ import { calculateCalories } from '@/lib/calculations'
 import { computeBMR, computeStaticTDEE } from '@/lib/macro-calculator'
 import { computeTargets, getLatestWeightKg, snapshotTargetsIfChanged } from '@/lib/nutrition-targets'
 import { generateExercisePlan, generateMesocycle } from '@/lib/exercise-plan'
-import { generateWeeklyMealPlan, swapMealSlot, getWeekStartDate } from '@/lib/meal-plan'
+import { generateWeeklyMealPlan, getWeekStartDate, deriveDailyMealView } from '@/lib/meal-plan'
+import { swapPoolMeal } from '@/lib/meal-store'
 import { supabase } from '@/lib/supabase'
 import { saveMesocycle, saveMesocycleWeek, restoreMesocycle } from '@/lib/mesocycle-persistence'
 import { swapExerciseInMesocycle, banExerciseFromMesocycle, type SwapScope } from '@/lib/mesocycle-edit'
@@ -46,8 +47,13 @@ function App() {
   const [mesocycle, setMesocycle] = useState<MesocycleWeek[]>([])
   /** When the CURRENT mesocycle was generated — anchors live-week detection (falls back to profile.created_at for legacy profiles without persisted weeks). */
   const [mesocycleCreatedAt, setMesocycleCreatedAt] = useState<string | null>(null)
-  const [mealPlan, setMealPlan] = useState<MealPlanDay[]>([])
   const [weeklyMealPlan, setWeeklyMealPlan] = useState<WeeklyMealPlan | null>(null)
+  // The legacy per-slot view is now a PURE DERIVATION of the weekly plan
+  // (M0 Part 6) — the old standalone mealPlan state was the dead object chat
+  // swaps mutated while nothing rendered it. Derived fresh each render so
+  // the chat's meal context and the Meals tab can never disagree.
+  const todayDayName = new Date().toLocaleDateString('en-US', { weekday: 'long' })
+  const mealPlan: MealPlanDay[] = deriveDailyMealView(weeklyMealPlan, todayDayName)
   const [isRestoring, setIsRestoring] = useState(true)
   const [isGenerating, setIsGenerating] = useState(false)
   const [setupError, setSetupError] = useState<string | null>(null)
@@ -126,8 +132,10 @@ function App() {
       restoreMesocycle(storedId),
     ])
 
+    // The legacy no-day_of_week branch (grouped restoredMeals) is gone with
+    // the standalone mealPlan state (M0 Part 6) — the per-day view derives
+    // from the weekly plan now.
     const restoredWeekly: WeeklyMealPlan = {}
-    const restoredMeals: MealPlanDay[] = []
     if (mealRows) {
       const hasWeeklyData = mealRows.some(r => r.day_of_week)
       if (hasWeeklyData) {
@@ -157,31 +165,6 @@ function App() {
             scaled_fat: row.fat,
             scale_factor: 1,
             ingredient_lines: row.ingredients || [],
-          })
-        }
-      } else {
-        const grouped = new Map<string, typeof mealRows>()
-        for (const row of mealRows) {
-          const existing = grouped.get(row.meal_slot) || []
-          existing.push(row)
-          grouped.set(row.meal_slot, existing)
-        }
-        for (const [slot, items] of grouped) {
-          restoredMeals.push({
-            meal: slot,
-            items: items.map(r => ({
-              id: r.id,
-              name: r.name,
-              calories: r.calories,
-              protein: r.protein,
-              carbs: r.carbs,
-              fat: r.fat,
-              portion_size: r.portion_size || '',
-              prep: r.prep || '',
-              substitution: r.substitution || '',
-              ingredients: r.ingredients ?? undefined,
-              is_verified: r.is_verified ?? false,
-            })),
           })
         }
       }
@@ -291,7 +274,6 @@ function App() {
     setProfile(restoredProfile)
     setLatestWeightKg(restoredWeight)
     setMacros(liveTargets)
-    setMealPlan(restoredMeals)
     if (Object.keys(restoredWeekly).length > 0) setWeeklyMealPlan(restoredWeekly)
     setExercisePlan(restoredExercises)
     setMesocycle(restoredMesocycle)
@@ -483,34 +465,12 @@ function App() {
   }
 
   const handlePlanUpdate = async (action: PlanAction) => {
-    if (action.type === 'replace_food') {
-      const computedCalories = calculateCalories(action.protein, action.carbs, action.fat)
-      setMealPlan(prev =>
-        prev.map(day => {
-          if (day.meal.toLowerCase() !== action.meal_slot.toLowerCase()) return day
-          return {
-            ...day,
-            items: day.items.map(item => {
-              const nameLower = item.name.toLowerCase()
-              const oldLower = action.old_item.toLowerCase()
-              if (nameLower !== oldLower && !nameLower.includes(oldLower)) return item
-              return {
-                ...item,
-                name: action.new_item,
-                calories: computedCalories,
-                protein: action.protein,
-                carbs: action.carbs,
-                fat: action.fat,
-                portion_size: action.portion_size || item.portion_size,
-                prep: action.prep || item.prep,
-                ingredients: action.ingredients ?? item.ingredients,
-                is_verified: action.is_verified ?? item.is_verified,
-              }
-            }),
-          }
-        })
-      )
-    } else if (action.type === 'replace_exercise') {
+    // The old replace_food branch is gone (M0 Part 6): it mutated the dead
+    // standalone mealPlan state that nothing rendered — the exact disjoint
+    // write path the discovery round flagged. Chat meal swaps now route
+    // through meal-store.swapPoolMeal inside ChatAssistant's action handler
+    // (an honest no-op until M1 fills the pools), same layer as the UI.
+    if (action.type === 'replace_exercise') {
       if (action.permanent === false) {
         // Session-only swap: nothing to persist — the swap only affects what
         // the user does today, and actual performance gets logged through
@@ -700,62 +660,38 @@ function App() {
     }
   }
 
+  // ONE meal-mutation layer (M0 Part 6): the UI swap goes through
+  // meal-store.swapPoolMeal — the same call the chat's replace_food handler
+  // makes. Its old body called the retired Edamam path and wrote meal_plans
+  // columns the live schema doesn't have; both were dead. swapPoolMeal is an
+  // honest M0 stub (always null) until M1 fills the pools, so the swap
+  // button currently no-ops exactly as it always effectively did.
   const handleSwapMeal = async (dayName: DayName, mealSlot: string) => {
-    if (!profile) return
+    if (!profile?.id) return
     const currentSlots = weeklyMealPlan?.[dayName]
     const currentMeal = currentSlots?.find(s => s.meal_slot === mealSlot)
 
-    const newSlot = await swapMealSlot(
-      profile,
-      dayName,
-      mealSlot,
-      exercisePlan,
-      currentMeal?.recipe.name
+    const poolMeal = await swapPoolMeal(
+      profile.id,
+      mealSlot.toLowerCase() as import('@/lib/meal-store').MealSlotName,
+      currentMeal?.recipe.name,
     )
+    if (!poolMeal || !weeklyMealPlan) return
 
-    if (newSlot && weeklyMealPlan) {
-      const updatedDaySlots = (weeklyMealPlan[dayName] || []).map(s =>
-        s.meal_slot === mealSlot ? newSlot : s
-      )
-      setWeeklyMealPlan({ ...weeklyMealPlan, [dayName]: updatedDaySlots })
-
-      if (profile.id) {
-        if (currentMeal?.id) {
-          await supabase.from('meal_plans').update({
-            name: newSlot.recipe.name,
-            calories: newSlot.scaled_calories,
-            protein: newSlot.scaled_protein,
-            carbs: newSlot.scaled_carbs,
-            fat: newSlot.scaled_fat,
-            portion_size: newSlot.ingredient_lines.join(', '),
-            ingredients: newSlot.ingredient_lines,
-          }).eq('id', currentMeal.id)
-        } else {
-          await supabase.from('meal_plans').insert({
-            profile_id: profile.id,
-            meal_slot: mealSlot,
-            day_of_week: dayName,
-            week_start_date: getWeekStartDate(),
-            name: newSlot.recipe.name,
-            calories: newSlot.scaled_calories,
-            protein: newSlot.scaled_protein,
-            carbs: newSlot.scaled_carbs,
-            fat: newSlot.scaled_fat,
-            portion_size: newSlot.ingredient_lines.join(', '),
-            ingredients: newSlot.ingredient_lines,
-            // See persistWeeklyPlan — verified is never claimed anymore (M0).
-            is_verified: false,
-          })
-        }
-      }
-    }
-  }
-
-  const handleSwapSubstitution = async (mealIndex: number, itemIndex: number) => {
-    const meal = mealPlan[mealIndex]
-    if (!meal) return
-    const item = meal.items[itemIndex]
-    if (!item?.substitution) return
+    const updatedDaySlots = (weeklyMealPlan[dayName] || []).map(s =>
+      s.meal_slot === mealSlot
+        ? {
+            ...s,
+            recipe: { ...s.recipe, name: poolMeal.name, ingredient_lines: poolMeal.ingredients },
+            scaled_calories: poolMeal.macros.kcal,
+            scaled_protein: poolMeal.macros.protein,
+            scaled_carbs: poolMeal.macros.carbs,
+            scaled_fat: poolMeal.macros.fat,
+            ingredient_lines: poolMeal.ingredients,
+          }
+        : s
+    )
+    setWeeklyMealPlan({ ...weeklyMealPlan, [dayName]: updatedDaySlots })
   }
 
   const handleBanExercise = async (exerciseName: string) => {
@@ -844,7 +780,6 @@ function App() {
     setMacros(null)
     setExercisePlan([])
     setMesocycle([])
-    setMealPlan([])
     setWeeklyMealPlan(null)
     setExerciseExclusions([])
     setLogsVersion(0)

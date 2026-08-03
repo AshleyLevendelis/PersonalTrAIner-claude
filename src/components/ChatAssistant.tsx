@@ -13,6 +13,7 @@ import { getAppNow } from '@/lib/dev-clock'
 import { supabase } from '@/lib/supabase'
 import { getRecentLogs, formatLogsForAI, getRecentCardioLogs, formatCardioLogsForAI } from '@/lib/daily-tracking'
 import { saveChatCache, loadChatCache, clearChatCache } from '@/lib/chat-cache'
+import { swapPoolMeal, type MealSlotName } from '@/lib/meal-store'
 import type { ChatMessage, UserProfile, MacroTargets, WorkoutDay, MealPlanDay, MesocycleWeek, PlanAction } from '@/lib/types'
 
 const ACTION_TAG_RE = /\[ACTION:\s*.*?\]/gi
@@ -506,33 +507,21 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     }
 
     if (action.type === 'replace_food') {
-      const computedCalories = calculateCalories(action.protein, action.carbs, action.fat)
-      const { data, error } = await supabase
-        .from('meal_plans')
-        .update({
-          name: action.new_item,
-          calories: computedCalories,
-          protein: action.protein,
-          carbs: action.carbs,
-          fat: action.fat,
-          portion_size: action.portion_size || null,
-          prep: action.prep || null,
-          ingredients: action.ingredients || null,
-          is_verified: action.is_verified || false,
-        })
-        .eq('profile_id', profile.id)
-        .ilike('meal_slot', action.meal_slot)
-        .ilike('name', `%${action.old_item}%`)
-        .select('id')
-
-      if (error) {
-        console.error('Failed to update meal plan:', error)
-        return false
-      }
-
-      if (!data || data.length === 0) return false
-
-      onPlanUpdate(action)
+      // ONE meal-mutation layer (M0 Part 6): this is the same
+      // meal-store.swapPoolMeal call the Meals tab's swap button makes. The
+      // old body here wrote the deprecated meal_plans table directly (rows
+      // that never matched on live) and then mutated the dead legacy
+      // mealPlan state via onPlanUpdate — the exact disjoint chat write
+      // path the discovery round flagged. swapPoolMeal is an honest M0
+      // stub (always null until M1 fills the pools), so the chat appends
+      // its standard "change was not applied" note instead of claiming a
+      // swap happened.
+      const applied = await swapPoolMeal(
+        profile.id,
+        action.meal_slot.toLowerCase() as MealSlotName,
+        action.old_item,
+      )
+      if (!applied) return false
 
       await upsertFavorite({
         new_item: action.new_item,

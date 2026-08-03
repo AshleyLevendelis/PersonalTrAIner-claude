@@ -1,9 +1,9 @@
 import type {
   UserProfile,
-  WeeklyMealSlot,
   WeeklyMealPlan,
   DayName,
   WorkoutDay,
+  MealPlanDay,
 } from './types'
 import { DAY_NAMES } from './types'
 import { calculateDailyMacros } from './macro-calculator'
@@ -86,22 +86,35 @@ export function generateWeeklyMealPlan(
   return weeklyPlan
 }
 
-/**
- * @deprecated The Edamam-backed swap this implemented never worked in
- * production (see the retirement note above); it now always resolves null,
- * which callers already handled as "swap unavailable". M1's pool model
- * (meal-store.swapPoolMeal) replaces it.
- */
-export async function swapMealSlot(
-  _profile: UserProfile,
-  _dayName: DayName,
-  _mealSlot: string,
-  _exercisePlan: WorkoutDay[],
-  _currentRecipeName?: string
-): Promise<WeeklyMealSlot | null> {
-  return null
-}
-
 export function getWeekStartDate(): string {
   return getMonday(new Date())
+}
+
+/**
+ * Today's slots in the legacy MealPlanDay shape — a PURE DERIVED VIEW of the
+ * weekly plan (M0 Part 6). This replaces the old standalone `mealPlan` React
+ * state, which the discovery round found was empty in practice, mutated by
+ * chat swaps that nothing rendered, and fed to the chat as its "CURRENT MEAL
+ * PLAN" (i.e. the model was told the plan was blank while the Meals tab
+ * showed a full week). Deriving from the single weekly source means the chat
+ * and the Meals tab can no longer disagree.
+ */
+export function deriveDailyMealView(weeklyPlan: WeeklyMealPlan | null, dayName: string): MealPlanDay[] {
+  const slots = weeklyPlan?.[dayName as DayName]
+  if (!slots || slots.length === 0) return []
+  return slots.map(slot => ({
+    meal: slot.meal_slot,
+    items: [{
+      name: slot.recipe.name,
+      calories: slot.scaled_calories,
+      protein: slot.scaled_protein,
+      carbs: slot.scaled_carbs,
+      fat: slot.scaled_fat,
+      portion_size: slot.ingredient_lines.join(', '),
+      prep: '',
+      substitution: '',
+      ingredients: slot.ingredient_lines,
+      is_verified: false,
+    }],
+  }))
 }
