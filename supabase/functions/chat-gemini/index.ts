@@ -553,58 +553,6 @@ const toolDeclarations = [
   },
 ];
 
-interface CalibrationResult {
-  ingredients: string[];
-  calories: number;
-  protein: number;
-  carbs: number;
-  fat: number;
-  is_verified: boolean;
-  iterations: number;
-  within_target: boolean;
-}
-
-async function calibrateMeal(
-  ingredients: string[],
-  target: { calories: number; protein: number; carbs: number; fat: number },
-  mealName: string
-): Promise<CalibrationResult> {
-  try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 25000);
-    const response = await fetch(`${supabaseUrl}/functions/v1/macro-calibration`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${serviceKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ ingredients, target, meal_name: mealName }),
-      signal: controller.signal,
-    });
-    clearTimeout(timeout);
-
-    if (!response.ok) {
-      console.error("Macro calibration failed:", response.status);
-      return {
-        ingredients,
-        calories: 0, protein: 0, carbs: 0, fat: 0,
-        is_verified: false, iterations: 0, within_target: false,
-      };
-    }
-
-    return await response.json();
-  } catch (err) {
-    console.error("calibrateMeal error:", err);
-    return {
-      ingredients,
-      calories: 0, protein: 0, carbs: 0, fat: 0,
-      is_verified: false, iterations: 0, within_target: false,
-    };
-  }
-}
-
 function getMealSlotBudget(
   macros: { calories: number; protein: number; carbs: number; fat: number },
   mealSlot: string
@@ -1229,60 +1177,37 @@ Keep this context in mind to ensure your greetings and questions naturally align
       const textPart = parts.find((p: { text?: string }) => p.text);
 
       if (name === "replace_food" && Array.isArray(args.ingredients) && args.ingredients.length > 0) {
+        // M0 retirement: this used to run a 3-iteration calibrateMeal loop
+        // against the macro-calibration function, whose Edamam-backed
+        // verification step (nutrition-analysis) was never deployed and had
+        // no credentials — so calibration failed on step 1 of every single
+        // call and this path ALWAYS fell through to the estimated-macros
+        // fallback below, after burning latency for nothing. The loop call
+        // is gone; the macro-calibration function itself (and its
+        // proportional scaler, which M1 reuses) is untouched. Macros here
+        // are the model's own estimates and are labeled accordingly —
+        // is_verified is never claimed true.
         const slotBudget = getMealSlotBudget(context.macros, args.meal_slot);
-
-        const calibration = await calibrateMeal(
-          args.ingredients,
-          slotBudget,
-          args.new_item
-        );
-
-        const calibrationFailed = !calibration.is_verified || (calibration.protein === 0 && calibration.carbs === 0 && calibration.fat === 0);
-
-        if (calibrationFailed) {
-          const estimated = args.estimated_macros;
-          const fallbackProtein = estimated?.protein || slotBudget.protein;
-          const fallbackCarbs = estimated?.carbs || slotBudget.carbs;
-          const fallbackFat = estimated?.fat || slotBudget.fat;
-          const fallbackCalories = estimated?.calories || ((fallbackProtein * 4) + (fallbackCarbs * 4) + (fallbackFat * 9));
-
-          console.warn(`Calibration failed for "${args.new_item}" in ${args.meal_slot}. Using Gemini estimated_macros fallback: ${fallbackCalories} kcal, P:${fallbackProtein} C:${fallbackCarbs} F:${fallbackFat}`);
-
-          const actionPayload = {
-            type: name,
-            meal_slot: args.meal_slot,
-            old_item: args.old_item,
-            new_item: args.new_item,
-            protein: fallbackProtein,
-            carbs: fallbackCarbs,
-            fat: fallbackFat,
-            portion_size: args.ingredients.join(", "),
-            prep: args.prep,
-            ingredients: args.ingredients,
-            is_verified: false,
-          };
-          const confirmationText = textPart?.text || `Done! I've replaced **${args.old_item}** with **${args.new_item}** in your ${args.meal_slot} (${args.ingredients.join(", ")}). Estimated: ${fallbackCalories} kcal, ${fallbackProtein}g protein, ${fallbackCarbs}g carbs, ${fallbackFat}g fat.`;
-
-          return new Response(
-            JSON.stringify({ reply: confirmationText, action: actionPayload }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
+        const estimated = args.estimated_macros;
+        const protein = estimated?.protein || slotBudget.protein;
+        const carbs = estimated?.carbs || slotBudget.carbs;
+        const fat = estimated?.fat || slotBudget.fat;
+        const calories = estimated?.calories || ((protein * 4) + (carbs * 4) + (fat * 9));
 
         const actionPayload = {
           type: name,
           meal_slot: args.meal_slot,
           old_item: args.old_item,
           new_item: args.new_item,
-          protein: calibration.protein,
-          carbs: calibration.carbs,
-          fat: calibration.fat,
-          portion_size: calibration.ingredients.join(", "),
+          protein,
+          carbs,
+          fat,
+          portion_size: args.ingredients.join(", "),
           prep: args.prep,
-          ingredients: calibration.ingredients,
-          is_verified: true,
+          ingredients: args.ingredients,
+          is_verified: false,
         };
-        const confirmationText = textPart?.text || `Done! I've replaced **${args.old_item}** with **${args.new_item}** in your ${args.meal_slot} (${calibration.ingredients.join(", ")}). Verified: ${calibration.calories} kcal, ${calibration.protein}g protein, ${calibration.carbs}g carbs, ${calibration.fat}g fat.${calibration.within_target ? " (Within 3% of target)" : ` (Calibrated over ${calibration.iterations} iteration${calibration.iterations !== 1 ? "s" : ""})`}`;
+        const confirmationText = textPart?.text || `Done! I've replaced **${args.old_item}** with **${args.new_item}** in your ${args.meal_slot} (${args.ingredients.join(", ")}). Estimated: ${calories} kcal, ${protein}g protein, ${carbs}g carbs, ${fat}g fat.`;
 
         return new Response(
           JSON.stringify({ reply: confirmationText, action: actionPayload }),
@@ -1486,57 +1411,18 @@ Keep this context in mind to ensure your greetings and questions naturally align
       }
 
       if (name === "log_meal") {
-        const profileId = context.profile_id;
-        let dbSuccess = true;
-        let dbError = "";
-
-        if (profileId) {
-          try {
-            const todayDate = new Date().toISOString().split("T")[0];
-            const insertResp = await fetch(
-              `${supabaseUrl}/rest/v1/daily_food_logs`,
-              {
-                method: "POST",
-                headers: {
-                  Authorization: `Bearer ${serviceKey}`,
-                  Apikey: serviceKey,
-                  "Content-Type": "application/json",
-                  Prefer: "return=minimal",
-                },
-                body: JSON.stringify({
-                  profile_id: profileId,
-                  date: todayDate,
-                  meal_slot: args.meal_slot,
-                  food_name: args.food_name,
-                  calories: args.estimated_calories,
-                  protein: args.estimated_protein,
-                  carbs: args.estimated_carbs,
-                  fat: args.estimated_fat,
-                }),
-              }
-            );
-
-            if (!insertResp.ok) {
-              const errText = await insertResp.text();
-              console.error(`daily_food_logs insert failed: ${insertResp.status}`, errText);
-              dbSuccess = false;
-              dbError = `Database write failed (${insertResp.status})`;
-            }
-          } catch (err) {
-            dbSuccess = false;
-            dbError = `Database error: ${err instanceof Error ? err.message : "unknown"}`;
-          }
-        }
-
-        let confirmText: string;
-        if (dbSuccess) {
-          confirmText = textPart?.text || `Logged **${args.food_name}** for ${args.meal_slot}: ${args.estimated_calories} kcal (P: ${args.estimated_protein}g, C: ${args.estimated_carbs}g, F: ${args.estimated_fat}g).`;
-        } else {
-          confirmText = `I tried to log your meal but the save failed${dbError ? `: ${dbError}` : ""}. The meal was not recorded — please try again.`;
-        }
+        // M0 retirement: this used to insert into `daily_food_logs`, a table
+        // that exists in NO migration and not on the live database — every
+        // log attempt since the tool shipped has failed. Rather than keep a
+        // write path into a void, the tool now says plainly that meal
+        // logging isn't live yet. M2 wires this to the real meal_events
+        // ledger through the shared meal-store layer.
+        const confirmText =
+          `Meal logging arrives in the next update — I can't record **${args.food_name}** yet. ` +
+          `For now, keep an eye on your ${args.meal_slot} against its budget: this looks like roughly ${args.estimated_calories} kcal (P: ${args.estimated_protein}g, C: ${args.estimated_carbs}g, F: ${args.estimated_fat}g).`;
 
         return new Response(
-          JSON.stringify({ reply: confirmText, action: dbSuccess ? { type: "log_meal", ...args } : undefined }),
+          JSON.stringify({ reply: confirmText }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }

@@ -122,51 +122,10 @@ export async function seedSyntheticData(
     }
   }
 
-  // --- Seed Meal Logs ---
-  onProgress?.({ total: totalSteps, current: stepsDone, phase: 'Generating meal history...' })
-
-  const mealSlots = ['breakfast', 'lunch', 'dinner', 'snack_1', 'snack_2']
-  for (let wk = 1; wk <= weeksToSeed; wk++) {
-    for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
-      const baseDate = new Date()
-      baseDate.setDate(baseDate.getDate() - ((weeksToSeed - wk) * 7) - (6 - dayOffset))
-      const dateStr = baseDate.toISOString().split('T')[0]
-
-      const rows: any[] = []
-      for (const slot of mealSlots) {
-        const mealTemplate = mealPlan.find(m => m.meal.toLowerCase().replace(/\s+/g, '_') === slot)
-        if (!mealTemplate || mealTemplate.items.length === 0) continue
-
-        const item = mealTemplate.items[randomInt(0, mealTemplate.items.length - 1)]
-        // Add some variance to macros (80-120% of plan)
-        const variance = randomBetween(0.8, 1.2)
-
-        rows.push({
-          profile_id: profile.id,
-          date: dateStr,
-          meal_slot: slot,
-          food_name: item.name,
-          calories: Math.round(item.calories * variance),
-          protein: Math.round(item.protein * variance),
-          carbs: Math.round(item.carbs * variance),
-          fat: Math.round(item.fat * variance),
-          logged_at: baseDate.toISOString(),
-        })
-      }
-
-      if (rows.length > 0) {
-        const { error } = await supabase.from('daily_food_logs').insert(rows)
-        if (!error) mealLogs += rows.length
-        else if (error.code !== '23505') {
-          // Ignore duplicate key errors, count the rest
-          console.warn('Meal seed partial error:', error.message)
-        }
-      }
-
-      stepsDone++
-      onProgress?.({ total: totalSteps, current: stepsDone, phase: `Week ${wk} meals...` })
-    }
-  }
+  // Meal-history seeding removed (M0): it wrote to `daily_food_logs`, a
+  // table that exists in no migration and not on the live database — every
+  // seed insert failed silently. M2 re-adds meal seeding against the real
+  // meal_events ledger once the meal-store write path exists.
 
   return {
     success: true,
@@ -183,8 +142,8 @@ export async function clearSyntheticData(profileId: string): Promise<{ success: 
   } catch (err) {
     errors.push(`set logs: ${err instanceof Error ? err.message : 'unknown'}`)
   }
-  const mealRes = await supabase.from('daily_food_logs').delete().eq('profile_id', profileId)
-  if (mealRes.error) errors.push(`daily_food_logs: ${mealRes.error.message}`)
+  // daily_food_logs cleanup removed (M0) — the table never existed; see the
+  // seeding note above.
 
   if (errors.length > 0) {
     return { success: false, message: `Partial failure: ${errors.join('; ')}` }

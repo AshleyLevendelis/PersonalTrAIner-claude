@@ -317,8 +317,8 @@ function App() {
     const workout = planResult.plan
     const mesocycleData = generateMesocycle(enrichedProfile, workout)
 
-    setGeneratingStatus('Searching Edamam for your personalized weekly recipes...')
-    const weeklyPlan = await generateWeeklyMealPlan(enrichedProfile, workout, setGeneratingStatus)
+    setGeneratingStatus('Building your meal structure...')
+    const weeklyPlan = generateWeeklyMealPlan(enrichedProfile, workout, setGeneratingStatus)
 
     const { data, error: insertError } = await supabase
       .from('fitness_profiles')
@@ -416,7 +416,9 @@ function App() {
       prep: '',
       substitution: '',
       ingredients: slot.ingredient_lines,
-      is_verified: true,
+      // Never claimed true anymore (M0): the verified badge used to mean
+      // "Edamam-checked", and nothing in the system can verify a number.
+      is_verified: false,
     }))
 
     const exerciseRows = mesocycle.length > 0
@@ -722,7 +724,8 @@ function App() {
             fat: newSlot.scaled_fat,
             portion_size: newSlot.ingredient_lines.join(', '),
             ingredients: newSlot.ingredient_lines,
-            is_verified: true,
+            // See persistWeeklyPlan — verified is never claimed anymore (M0).
+            is_verified: false,
           })
         }
       }
