@@ -28,7 +28,7 @@
 // shortfall; it is never padded with a placeholder claiming false macros.
 // ---------------------------------------------------------------------------
 
-import { supabase } from './supabase'
+import { supabase, resolveEnv } from './supabase'
 import { computeMealMacros, type Macros100g } from './food-db'
 import { validateMealAgainstDiet } from './diet-rules'
 import { parseIngredientLines, scaleToTarget, isWithinCalorieTolerance, meetsProteinFloor } from './portion-scaler'
@@ -122,14 +122,18 @@ async function requestProposals(
 
   if (slots.length === 0) return []
 
-  const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-meals`
+  // Dual-context env resolution (browser Vite vs. a plain-Node tsx script —
+  // the quality harness calls this same pipeline outside Vite) mirrors
+  // supabase.ts's own resolveClient, which needed the identical fallback.
+  const env = resolveEnv()
+  const apiUrl = `${env.VITE_SUPABASE_URL}/functions/v1/generate-meals`
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 45000)
   try {
     const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        Authorization: `Bearer ${env.VITE_SUPABASE_ANON_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ slots, dietary_preferences: dietaryPreferences, cooking_time_preference: cookingTimePreference }),
