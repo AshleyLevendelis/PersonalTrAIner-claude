@@ -133,7 +133,14 @@ function App() {
       meals_per_day: profileRow.meals_per_day ?? 3,
       include_snacks: profileRow.include_snacks ?? true,
       cooking_time_preference: profileRow.cooking_time_preference || 'moderate',
-      injuries: profileRow.exercise_exclusions || [],
+      // Vision-architecture patch round, fix 2: injuries (onboarding's
+      // body-part codes: 'lower_back'/'knees'/...) and exercise_exclusions
+      // (ban_exercise's exact exercise names) used to share this one
+      // column — reading exercise_exclusions back as "injuries" meant a
+      // ban silently corrupted the injury list with an exercise name that
+      // never matches INJURED_JOINTS, and vice versa at onboarding. Now a
+      // dedicated column.
+      injuries: profileRow.injuries || [],
       display_name: profileRow.display_name || '',
       concurrent_activities: profileRow.concurrent_activities || [],
       weekly_schedule: profileRow.weekly_schedule || {},
@@ -324,7 +331,12 @@ function App() {
         meals_per_day: enrichedProfile.meals_per_day ?? 3,
         include_snacks: enrichedProfile.include_snacks ?? true,
         cooking_time_preference: enrichedProfile.cooking_time_preference ?? 'moderate',
-        exercise_exclusions: enrichedProfile.injuries || [],
+        // Vision-architecture patch round, fix 2: injuries (body-part codes
+        // from onboarding) and exercise_exclusions (exact exercise names
+        // banned later via ban_exercise) are separate columns now — see the
+        // restore-path comment above for why sharing one broke both.
+        injuries: enrichedProfile.injuries || [],
+        exercise_exclusions: [],
         display_name: enrichedProfile.display_name || null,
         bmr: enrichedProfile.bmr,
         tdee: enrichedProfile.tdee,
