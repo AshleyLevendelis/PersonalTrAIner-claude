@@ -141,6 +141,13 @@ function App() {
       // never matches INJURED_JOINTS, and vice versa at onboarding. Now a
       // dedicated column.
       injuries: profileRow.injuries || [],
+      // Vision-architecture patch round, fix 6: read the known-lift columns
+      // back so a reload doesn't silently revert to "no known lifts,
+      // calibration week 1" after onboarding collected real numbers.
+      skip_calibration_week: profileRow.skip_calibration_week ?? false,
+      known_squat_kg: profileRow.known_squat_kg != null ? Number(profileRow.known_squat_kg) : undefined,
+      known_bench_kg: profileRow.known_bench_kg != null ? Number(profileRow.known_bench_kg) : undefined,
+      known_deadlift_kg: profileRow.known_deadlift_kg != null ? Number(profileRow.known_deadlift_kg) : undefined,
       display_name: profileRow.display_name || '',
       concurrent_activities: profileRow.concurrent_activities || [],
       weekly_schedule: profileRow.weekly_schedule || {},
@@ -337,6 +344,15 @@ function App() {
         // restore-path comment above for why sharing one broke both.
         injuries: enrichedProfile.injuries || [],
         exercise_exclusions: [],
+        // Vision-architecture patch round, fix 6: these four already flowed
+        // into generateMesocycle via enrichedProfile (see
+        // OnboardingFlow.tsx), so the first mesocycle honored them — but
+        // they were never written here, so a reload always restored a
+        // profile with no known lifts and a calibration week 1.
+        skip_calibration_week: enrichedProfile.skip_calibration_week ?? false,
+        known_squat_kg: enrichedProfile.known_squat_kg ?? null,
+        known_bench_kg: enrichedProfile.known_bench_kg ?? null,
+        known_deadlift_kg: enrichedProfile.known_deadlift_kg ?? null,
         display_name: enrichedProfile.display_name || null,
         bmr: enrichedProfile.bmr,
         tdee: enrichedProfile.tdee,
