@@ -308,3 +308,136 @@ async function persistPools(profileId: string, accepted: Partial<Record<MealSlot
     if (error) console.error(`Failed to persist pool for slot ${slot}:`, error)
   }
 }
+
+// ---------------------------------------------------------------------------
+// DAY ASSEMBLY (M1 Part 4) — pick one option per slot that hits the day's
+// totals, not just each slot's own budget in isolation. Slot budgets are
+// derived from a fixed ratio split, so a pool option that's individually
+// within its slot's ±7% tolerance can still combine with others into a day
+// that's off — this is the actual daily-total gate, at the tighter ±5%
+// calories / >=95% protein tolerance the day as a whole must meet.
+// ---------------------------------------------------------------------------
+
+export const DAY_CALORIE_TOLERANCE = 0.05
+export const DAY_PROTEIN_FLOOR_RATIO = 0.95
+
+export interface AssembledDay {
+  /** One chosen option per active slot. */
+  chosen: Partial<Record<MealSlotName, PoolOption>>
+  totals: MacroTargets
+  withinTolerance: boolean
+  /** The full pools passed in, so the UI can offer swaps against every alternative, not just the chosen option. */
+  alternatives: Partial<Record<MealSlotName, PoolOption[]>>
+}
+
+function sumOptionMacros(options: PoolOption[]): MacroTargets {
+  return options.reduce(
+    (acc, o) => ({
+      calories: acc.calories + o.macros.calories,
+      protein: acc.protein + o.macros.protein,
+      carbs: acc.carbs + o.macros.carbs,
+      fat: acc.fat + o.macros.fat,
+    }),
+    { calories: 0, protein: 0, carbs: 0, fat: 0 },
+  )
+}
+
+function dayWithinTolerance(totals: MacroTargets, targets: MacroTargets): boolean {
+  if (targets.calories <= 0) return true
+  const calOk = Math.abs(totals.calories - targets.calories) / targets.calories <= DAY_CALORIE_TOLERANCE
+  const proteinOk = targets.protein <= 0 || totals.protein >= targets.protein * DAY_PROTEIN_FLOOR_RATIO
+  return calOk && proteinOk
+}
+
+/**
+ * Picks one option per active slot from `pools` to land the day's totals
+ * within ±5% calories and >=95% protein of `targets`. Pools are small (a few
+ * options per slot), so this is a full cartesian search over every
+ * combination rather than a heuristic — cheap and exact. Among combinations
+ * that hit tolerance, and as a tiebreak among all combinations otherwise,
+ * prefers ones that don't repeat a name in `recentNames` (best-effort day-to-
+ * day variety; a slot whose entire pool was used recently can still repeat —
+ * this is a preference, not a hard constraint the pool must satisfy).
+ *
+ * If NO combination reaches tolerance, applies one bounded proportional
+ * scale to the day's single largest-calorie slot (closing exactly the gap
+ * the OTHER chosen slots leave) rather than shipping an out-of-tolerance day
+ * or perturbing every slot's choice. If even that scale would be absurd
+ * (>2.5x/<0.4x), the closest combination ships as-is with withinTolerance:false
+ * — an honest miss, not a forced number.
+ */
+export function assembleDay(
+  pools: Partial<Record<MealSlotName, PoolOption[]>>,
+  targets: MacroTargets,
+  recentNames: Partial<Record<MealSlotName, string[]>> = {},
+): AssembledDay {
+  const slots = (Object.keys(pools) as MealSlotName[]).filter(s => (pools[s]?.length ?? 0) > 0)
+
+  if (slots.length === 0) {
+    return { chosen: {}, totals: { calories: 0, protein: 0, carbs: 0, fat: 0 }, withinTolerance: false, alternatives: pools }
+  }
+
+  type BestCombo = { combo: Partial<Record<MealSlotName, PoolOption>>; totals: MacroTargets; score: number }
+  // Held in a wrapper object (not a bare `let`) so TS's control-flow narrowing
+  // doesn't get confused by the closure below mutating it across calls.
+  const state: { best: BestCombo | null } = { best: null }
+
+  function search(index: number, combo: Partial<Record<MealSlotName, PoolOption>>): void {
+    if (index === slots.length) {
+      const chosenOptions = slots.map(s => combo[s]!)
+      const totals = sumOptionMacros(chosenOptions)
+      const calDiff = targets.calories > 0 ? Math.abs(totals.calories - targets.calories) / targets.calories : 0
+      const proteinDeficit = Math.max(0, targets.protein - totals.protein)
+      const repeatsAny = slots.some(s => recentNames[s]?.includes(combo[s]!.name))
+      // Lower score wins: calorie closeness dominates, protein shortfall is a
+      // smaller nudge (already gated at the pipeline level, rarely large
+      // here), and a same-as-recent combo is only a mild tiebreak penalty —
+      // variety is a preference, never worth shipping a worse-fitting day for.
+      const score = calDiff + proteinDeficit * 0.002 + (repeatsAny ? 0.01 : 0)
+      if (!state.best || score < state.best.score) state.best = { combo: { ...combo }, totals, score }
+      return
+    }
+    for (const option of pools[slots[index]]!) {
+      combo[slots[index]] = option
+      search(index + 1, combo)
+    }
+  }
+  search(0, {})
+
+  if (!state.best) {
+    return { chosen: {}, totals: { calories: 0, protein: 0, carbs: 0, fat: 0 }, withinTolerance: false, alternatives: pools }
+  }
+
+  let chosen = state.best.combo
+  let totals = state.best.totals
+  let withinTolerance = dayWithinTolerance(totals, targets)
+
+  if (!withinTolerance) {
+    const entries = Object.entries(chosen) as [MealSlotName, PoolOption][]
+    const [largestSlot, largestOption] = entries.reduce((a, b) => (b[1].macros.calories > a[1].macros.calories ? b : a))
+
+    const othersTotal = sumOptionMacros(entries.filter(([s]) => s !== largestSlot).map(([, o]) => o))
+    const neededForLargest: Macros100g = {
+      kcal: Math.max(0, targets.calories - othersTotal.calories),
+      protein: Math.max(0, targets.protein - othersTotal.protein),
+      carbs: Math.max(0, targets.carbs - othersTotal.carbs),
+      fat: Math.max(0, targets.fat - othersTotal.fat),
+    }
+
+    const scaleResult = scaleToTarget(
+      largestOption.ingredients,
+      { kcal: largestOption.macros.calories, protein: largestOption.macros.protein, carbs: largestOption.macros.carbs, fat: largestOption.macros.fat },
+      neededForLargest,
+    )
+
+    if (!scaleResult.rejectedReason) {
+      const recomputed = computeMealMacros(scaleResult.ingredients)
+      const adjustedOption: PoolOption = { ...largestOption, ingredients: scaleResult.ingredients, macros: macrosToTargets(recomputed) }
+      chosen = { ...chosen, [largestSlot]: adjustedOption }
+      totals = sumOptionMacros(Object.values(chosen) as PoolOption[])
+      withinTolerance = dayWithinTolerance(totals, targets)
+    }
+  }
+
+  return { chosen, totals, withinTolerance, alternatives: pools }
+}
