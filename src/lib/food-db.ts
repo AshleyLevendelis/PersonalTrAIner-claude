@@ -188,7 +188,7 @@ export const FOOD_DB: FoodEntry[] = [
 
   // ===== FAT: oils, nuts, seeds ========================================
   f('olive oil', ['extra virgin olive oil'], { kcal: 884, protein: 0, carbs: 0, fat: 100 }, 'fat', {}, { tbsp: 14, tsp: 4.5 }),
-  f('vegetable oil', ['sunflower oil', 'cooking oil', 'rapeseed oil'], { kcal: 884, protein: 0, carbs: 0, fat: 100 }, 'fat', {}, { tbsp: 14, tsp: 4.5 }),
+  f('vegetable oil', ['sunflower oil', 'cooking oil', 'rapeseed oil', 'canola oil'], { kcal: 884, protein: 0, carbs: 0, fat: 100 }, 'fat', {}, { tbsp: 14, tsp: 4.5 }),
   f('coconut oil', [], { kcal: 862, protein: 0, carbs: 0, fat: 100 }, 'fat', {}, { tbsp: 13, tsp: 4.5 }),
   f('avocado', [], { kcal: 160, protein: 2, carbs: 8.5, fat: 14.7 }, 'fruit', {}, { whole: 150, half: 75 }),
   f('almonds', ['almond'], { kcal: 579, protein: 21.2, carbs: 22, fat: 49.9 }, 'fat', { contains_nuts: true }),
