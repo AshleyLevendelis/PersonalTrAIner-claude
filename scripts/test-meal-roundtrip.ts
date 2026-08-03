@@ -1,10 +1,12 @@
 /**
- * M0 Part 7 — meal foundation round-trip integration test.
+ * M0/M1 Part 7 — meal foundation + meal generation round-trip integration
+ * test.
  *
  * Same harness philosophy as test-logging-roundtrip.ts: an in-memory fake
- * Supabase (matching meal_events' unique partial index on client_id and
- * daily_metrics' (profile_id, date) constraint) plus a localStorage shim,
- * injected via setSupabaseClient(). Covers:
+ * Supabase (matching meal_events' unique partial index on client_id,
+ * daily_metrics' (profile_id, date) constraint, and meal_plan_slots' plain
+ * insert/delete/select shape) plus a localStorage shim, injected via
+ * setSupabaseClient(). Covers:
  *
  *   1. Living targets: a daily_metrics weigh-in CHANGES computed targets
  *      (weight sensitivity), and no weigh-in falls back to onboarding weight
@@ -17,6 +19,13 @@
  *      cannot create a second row (23505 treated as already-synced)
  *   6. Poison-pill safety: a permanently-rejected event dead-letters without
  *      blocking later events
+ *   7. (M1) Full pool round trip: a verified proposal persists into
+ *      meal_plan_slots, getPools reads it back, swapPoolMeal swaps and
+ *      records a swapped_in event, and getTodayLedger reflects it
+ *   8. (M1) Vegan fixture: a meat-containing AI proposal is rejected by the
+ *      verification pipeline before it ever reaches persistence
+ *   9. (M1) Scaler convergence: scaleToTarget lands a mis-portioned proposal
+ *      within tolerance, and rejects rather than forces an absurd factor
  */
 
 // --- Environment shims (before importing any lib modules) -------------------
@@ -45,7 +54,7 @@ const UNIQUES: Record<string, string[][]> = {
 
 const VALID_EVENT_TYPES = new Set(['confirmed', 'swapped_in', 'extra', 'skipped'])
 
-const db: Record<string, Row[]> = { meal_events: [], daily_metrics: [], daily_nutrition_targets: [] }
+const db: Record<string, Row[]> = { meal_events: [], daily_metrics: [], daily_nutrition_targets: [], meal_plan_slots: [] }
 
 function cmp(a: unknown, b: unknown): number {
   if (typeof a === 'number' && typeof b === 'number') return a - b
@@ -277,6 +286,109 @@ async function main() {
   check('the GOOD event behind it still synced', db.meal_events.some(r => r.client_id === good.clientId), undefined)
   const pendingAfterPoison = JSON.parse(storeMap.get('fitplan_mealevent_pending_v1') ?? '[]')
   check('queue fully drained (nothing stuck behind the poison row)', pendingAfterPoison.length === 0, pendingAfterPoison)
+
+  // -------------------------------------------------------------------------
+  console.log('\n[7] Full pool round trip: generation -> persistence -> pool read -> swap -> ledger event')
+  {
+    const { verifyProposal, computeSlotBudgets } = await import('../src/lib/meal-generation')
+    const { getPools, swapPoolMeal } = await import('../src/lib/meal-store')
+
+    const targets = getStaticDailyMacros(baseProfile)
+    const lunchBudget = computeSlotBudgets(targets, 3, false).lunch!
+
+    const proposalA = {
+      slot: 'lunch', name: 'Verified Chicken Rice Bowl',
+      ingredients: ['200g chicken breast', '220g cooked basmati rice', '1 tbsp olive oil', '100g broccoli'],
+      prep: '20 min', cuisine: 'Other',
+    }
+    const proposalB = {
+      slot: 'lunch', name: 'Verified Salmon Bowl',
+      // Protein-dense on purpose (salmon-heavy, rice-light): the pipeline's
+      // post-scale protein floor is strict, and a proposal whose unscaled
+      // protein:calorie ratio sits below the budget's ratio can miss the
+      // floor even at a perfectly sane scale factor (a prior version of this
+      // fixture — 180g salmon / 200g rice — did exactly that in testing).
+      ingredients: ['300g salmon', '80g cooked basmati rice', '100g broccoli'],
+      prep: '20 min', cuisine: 'Other',
+    }
+    const rejectLog: string[] = []
+    const optionA = verifyProposal(proposalA, 'lunch', lunchBudget, [], rejectLog)
+    const optionB = verifyProposal(proposalB, 'lunch', lunchBudget, [], rejectLog)
+    check('both proposals verified and accepted', optionA !== null && optionB !== null, rejectLog)
+
+    // Persist exactly like meal-generation.ts's persistPools does.
+    await fakeClient.from('meal_plan_slots').delete().eq('profile_id', PROFILE_ID).eq('slot', 'lunch')
+    const rows = [optionA!, optionB!].map((opt, i) => ({
+      profile_id: PROFILE_ID, slot: 'lunch', pool_index: i, name: opt.name, ingredients: opt.ingredients,
+      macros: { kcal: opt.macros.calories, protein: opt.macros.protein, carbs: opt.macros.carbs, fat: opt.macros.fat },
+      tags: opt.tags,
+    }))
+    await fakeClient.from('meal_plan_slots').insert(rows)
+
+    const pools = await getPools(PROFILE_ID)
+    check('getPools reads both persisted options back, ordered by pool_index', pools.lunch?.length === 2 && pools.lunch[0].name === optionA!.name, pools.lunch)
+
+    const swapped = await swapPoolMeal(PROFILE_ID, 'lunch', optionA!.name, undefined, 'manual')
+    check('swapPoolMeal returns the OTHER pool option', swapped?.name === optionB!.name, swapped)
+
+    await flushPending()
+    const poolLedger = await getTodayLedger(PROFILE_ID, TODAY, targets)
+    const swapEvent = poolLedger.events.find(e => e.eventType === 'swapped_in' && e.mealName === optionB!.name)
+    check('the swap recorded a swapped_in ledger event for the chosen option', swapEvent !== undefined, poolLedger.events)
+  }
+
+  // -------------------------------------------------------------------------
+  console.log('\n[8] Vegan fixture: a meat-containing AI proposal is rejected before persistence')
+  {
+    const { verifyProposal, computeSlotBudgets } = await import('../src/lib/meal-generation')
+    const targets = getStaticDailyMacros(baseProfile)
+    const dinnerBudget = computeSlotBudgets(targets, 3, false).dinner!
+
+    // A mocked generator response — exactly the shape generate-meals returns,
+    // with no network call involved. Chicken makes this an automatic vegan
+    // violation regardless of how well it hits the macro budget.
+    const meatProposal = {
+      slot: 'dinner', name: 'Herb-Roasted Chicken Thigh with Rice',
+      ingredients: ['220g chicken thigh', '200g cooked basmati rice', '100g green beans'],
+      prep: '25 min', cuisine: 'Other',
+    }
+    const rejectLog: string[] = []
+    const result = verifyProposal(meatProposal, 'dinner', dinnerBudget, ['vegan'], rejectLog)
+    check('meat proposal against vegan prefs is rejected (null, not persisted)', result === null, result)
+    check('rejection log names the diet violation', rejectLog.some(l => l.includes('vegan') && l.includes('contains_meat')), rejectLog)
+
+    // The same proposal, unrestricted, must NOT be rejected by diet rules —
+    // confirms the vegan case above is the diet check firing, not some other
+    // unrelated failure (e.g. coverage) masking the real signal.
+    const unrestrictedLog: string[] = []
+    const unrestrictedResult = verifyProposal(meatProposal, 'dinner', dinnerBudget, [], unrestrictedLog)
+    check('the SAME proposal with no dietary restriction is not diet-rejected', unrestrictedLog.every(l => !l.includes('diet violation')), unrestrictedLog)
+  }
+
+  // -------------------------------------------------------------------------
+  console.log('\n[9] Scaler convergence: within-tolerance scaling succeeds, absurd factors are rejected')
+  {
+    const { parseIngredientLines } = await import('../src/lib/portion-scaler')
+    const { scaleToTarget, isWithinCalorieTolerance, meetsProteinFloor, computeScaleFactor, isScaleFactorAbsurd, CALORIE_TOLERANCE } = await import('../src/lib/portion-scaler')
+    const { computeMealMacros } = await import('../src/lib/food-db')
+
+    // Moderately oversized proposal (~20% over target) — a sane scale should converge.
+    const parsed = parseIngredientLines(['250g chicken breast', '260g cooked basmati rice', '1 tbsp olive oil'])
+    const actual = computeMealMacros(parsed)
+    const target = { kcal: Math.round(actual.kcal * 0.83), protein: Math.round(actual.protein * 0.83) - 2, carbs: Math.round(actual.carbs * 0.83), fat: Math.round(actual.fat * 0.83) }
+    const scaled = scaleToTarget(parsed, { kcal: actual.kcal, protein: actual.protein, carbs: actual.carbs, fat: actual.fat }, target)
+    check('a moderate scale is not rejected as absurd', scaled.rejectedReason === undefined, scaled.rejectedReason)
+    const recomputed = computeMealMacros(scaled.ingredients)
+    check(`scaled result lands within +/-${CALORIE_TOLERANCE * 100}% of target calories`, isWithinCalorieTolerance(recomputed.kcal, target.kcal), { got: recomputed.kcal, target: target.kcal })
+    check('scaled result meets the protein floor', meetsProteinFloor(recomputed.protein, target.protein), { got: recomputed.protein, target: target.protein })
+
+    // Absurd case: target is a fraction of what the proposal could plausibly become.
+    const tinyTarget = { kcal: Math.round(actual.kcal * 0.2), protein: 5, carbs: 5, fat: 2 }
+    const absurdScale = computeScaleFactor(actual.kcal, tinyTarget.kcal)
+    check('a 5x-undershoot scale factor is flagged absurd', isScaleFactorAbsurd(absurdScale), absurdScale)
+    const absurdResult = scaleToTarget(parsed, { kcal: actual.kcal, protein: actual.protein, carbs: actual.carbs, fat: actual.fat }, tinyTarget)
+    check('scaleToTarget rejects rather than forcing the absurd factor', absurdResult.rejectedReason !== undefined, absurdResult.rejectedReason)
+  }
 
   // -------------------------------------------------------------------------
   if (failures > 0) {
