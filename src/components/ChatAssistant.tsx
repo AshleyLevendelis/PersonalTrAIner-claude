@@ -485,7 +485,10 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       macros,
       dietary_preferences: profile.dietary_preferences || [],
       concurrent_activities: profile.concurrent_activities || [],
-      weekly_schedule: profile.weekly_schedule || {},
+      // weekly_schedule intentionally no longer sent (trace-report fix): the
+      // edge function stopped reading it from context — it only ever fed a
+      // field the update_workout_schedule tool wrote and nothing else read,
+      // which could only desync from the mesocycle the Exercise tab renders.
       exercise_exclusions: exerciseExclusions,
       training_days_count: profile.training_days.filter(d => d.available).length,
       exercise_summary: exerciseSummary,

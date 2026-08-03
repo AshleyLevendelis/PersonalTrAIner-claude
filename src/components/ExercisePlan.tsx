@@ -401,7 +401,16 @@ function SetLogger({
     ? getRepsLabel(prescribedReps ?? '', prescriptionType)
     : 'Reps'
   const today = sessionDate
-  const existingLogs = todayLogs.filter(l => l.exercise_name === exerciseName)
+  // Trace-report fix: matching by bare exercise_name let two DIFFERENT plan
+  // slots that happen to share a display name (e.g. the same lift appearing
+  // in two sessions, or a renamed/duplicated row) merge their logged sets
+  // into one row's chip count, inflating it past the prescribed Sets value.
+  // exercise_id is the stable per-slot identity (see exerciseId prop above)
+  // and is present on every row written since C0 — only pre-C0 legacy rows
+  // lack it, hence the name fallback.
+  const existingLogs = todayLogs.filter(l =>
+    l.exercise_id ? l.exercise_id === exerciseId : l.exercise_name === exerciseName
+  )
 
   const [extraSets, setExtraSets] = useState(0)
   const displaySets = totalSets + extraSets
@@ -428,7 +437,12 @@ function SetLogger({
   const [animatingPr, setAnimatingPr] = useState(false)
   const [ghostValues, setGhostValues] = useState<GhostValues[]>([])
 
-  // Load ghost values from last session (unified store — merges unsynced local sets)
+  // Load ghost values from last session (unified store — merges unsynced local sets).
+  // Already scoped by exerciseId (unlike the pre-fix existingLogs above), so this
+  // isn't the chip-overcount bug — but note this array can still be longer than
+  // displaySets (the count actually rendered, see the loop below); it's sized
+  // defensively for a last session that had more sets than today prescribes, not
+  // read past displaySets by anything today.
   useEffect(() => {
     getLastSessionSets(profileId, exerciseId, today).then(lastSets => {
       const ghosts: GhostValues[] = Array.from({ length: Math.max(totalSets + extraSets, lastSets.length) }, (_, i) => {

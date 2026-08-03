@@ -281,7 +281,7 @@ const toolDeclarations = [
   {
     name: "replace_exercise",
     description:
-      "Replace an exercise in the user's workout plan with a biomechanically similar alternative. ONLY call this when the user gives an explicit command to modify their plan (e.g. 'swap bench press for push-ups', 'replace squats with leg press') OR when you have proposed a swap due to pain/fatigue and the user has confirmed. Before executing, briefly explain WHY this swap preserves muscle stimulus and ask for confirmation. Filter for exercises matching the same movement pattern.",
+      "Replace an exercise in the user's workout plan with a biomechanically similar alternative. ONLY call this when the user gives an explicit command to modify their plan (e.g. 'swap bench press for push-ups', 'replace squats with leg press') OR when you have proposed a swap due to pain/fatigue and the user has confirmed. Before executing, briefly explain WHY this swap preserves muscle stimulus and ask for confirmation. Filter for exercises matching the same movement pattern. NOTE: permanent swaps (permanent: true) are not safely wired up yet and will be declined — session-only swaps (the default) still work.",
     parameters: {
       type: "object",
       properties: {
@@ -320,7 +320,7 @@ const toolDeclarations = [
   {
     name: "adjust_volume",
     description:
-      "Adjust the total training volume (sets/reps) for a specific day's session. MUST be called whenever the user mentions time constraints ('only have 20 minutes', 'short on time'), energy levels ('feeling great', 'give me more'), fatigue ('exhausted', 'tired'), or volume changes ('cut in half', 'reduce volume', 'add more sets'). Never respond conversationally about volume changes without calling this tool.",
+      "Adjust the total training volume (sets/reps) for a specific day's session. NOT SAFELY WIRED UP YET — calling this will decline with a message pointing the user at the in-app controls. Prefer discussing volume changes conversationally (what to do, why) and let the user apply it in the app, rather than calling this tool.",
     parameters: {
       type: "object",
       properties: {
@@ -364,7 +364,7 @@ const toolDeclarations = [
   {
     name: "update_workout_schedule",
     description:
-      "Updates the user's weekly training layout. Use when a user wants to swap days, reschedule a workout, clear/remove a day, add a new training day (including custom/skill sessions like muscle-up training), or make multiple schedule changes at once. Supports ADD (introduce a new day), REMOVE (drop a day), and MOVE (relocate an existing session). Include ALL changes in one call when multiple days are affected.",
+      "NOT SAFELY WIRED UP YET — calling this will decline with a message pointing the user at the in-app controls. It used to write to a profile field the app doesn't actually render from, so schedule 'changes' looked applied in chat but never showed up on the Exercise tab. Prefer discussing schedule changes conversationally (what to do, why) and let the user apply it in the app.",
     parameters: {
       type: "object",
       properties: {
@@ -653,136 +653,6 @@ interface ConcurrentActivity {
   movement_demands: string[];
 }
 
-interface RecalibrationResult {
-  updated_schedule: Record<string, string | null>;
-  recalibrated_days: string[];
-  adaptations: string;
-}
-
-function evaluateFatigueOverlap(
-  day: string,
-  blockFocus: string,
-  concurrentActivities: ConcurrentActivity[],
-  exerciseSummary: string
-): { hasConflict: boolean; conflictDetails: string } {
-  const activitiesOnDay = concurrentActivities.filter(a =>
-    a.days.map(d => d.toLowerCase()).includes(day.toLowerCase())
-  );
-
-  if (activitiesOnDay.length === 0) {
-    return { hasConflict: false, conflictDetails: "" };
-  }
-
-  const axialPatterns = ["hip_hinge", "knee_dominant", "vertical_push", "vertical_pull"];
-  const blockLower = blockFocus.toLowerCase();
-  const hasAxialLoad = axialPatterns.some(p => blockLower.includes(p) || blockLower.includes("leg") || blockLower.includes("squat") || blockLower.includes("dead"));
-
-  for (const activity of activitiesOnDay) {
-    if (activity.intensity >= 0.7 && hasAxialLoad) {
-      const overlappingDemands = activity.movement_demands.filter(d =>
-        axialPatterns.some(p => d.toLowerCase().includes(p)) || d.toLowerCase().includes("spinal")
-      );
-      if (overlappingDemands.length > 0) {
-        return {
-          hasConflict: true,
-          conflictDetails: `High-intensity ${activity.name} (${Math.round(activity.intensity * 100)}%) on ${day} conflicts with axial/spinal loading in ${blockFocus}. Overlapping demands: ${overlappingDemands.join(", ")}.`,
-        };
-      }
-    }
-
-    if (activity.intensity >= 0.8) {
-      return {
-        hasConflict: true,
-        conflictDetails: `Very high-intensity ${activity.name} (${Math.round(activity.intensity * 100)}%) on ${day} creates excessive fatigue accumulation when combined with ${blockFocus}. Recommending unilateral/stability-focused substitutions.`,
-      };
-    }
-  }
-
-  return { hasConflict: false, conflictDetails: "" };
-}
-
-interface SchedulePatchItem {
-  day: string;
-  action: "ADD" | "REMOVE" | "MOVE";
-  block_name: string;
-  exercises?: { name: string; sets: number; reps: string }[];
-}
-
-async function executeRecalibrationPipeline(
-  profileId: string,
-  schedulePatch: SchedulePatchItem[],
-  context: { concurrent_activities?: ConcurrentActivity[]; exercise_summary: string; weekly_schedule?: Record<string, string | null> },
-  supabaseUrl: string,
-  serviceKey: string
-): Promise<RecalibrationResult> {
-  const currentSchedule: Record<string, string | null> = context.weekly_schedule || {};
-  const updatedSchedule = { ...currentSchedule };
-
-  const concurrentActivities: ConcurrentActivity[] = context.concurrent_activities || [];
-  const recalibratedDays: string[] = [];
-  const adaptationNotes: string[] = [];
-
-  for (const item of schedulePatch) {
-    const { day, action, block_name } = item;
-
-    if (action === "REMOVE") {
-      updatedSchedule[day] = null;
-      adaptationNotes.push(`${day}: Cleared (rest day).`);
-      continue;
-    }
-
-    if (action === "MOVE") {
-      // Find and clear the source day that previously held this block
-      for (const [existingDay, existingBlock] of Object.entries(currentSchedule)) {
-        if (existingBlock && existingDay !== day && existingBlock.toLowerCase().replace(/[^a-z]/g, '') === block_name.toLowerCase().replace(/[^a-z]/g, '')) {
-          const sourceHandledByOtherPatch = schedulePatch.some(
-            p => p.day === existingDay && p !== item && p.action !== 'REMOVE'
-          );
-          if (!sourceHandledByOtherPatch) {
-            updatedSchedule[existingDay] = null;
-            adaptationNotes.push(`${existingDay}: Cleared (session moved to ${day}).`);
-          }
-          break;
-        }
-      }
-    }
-
-    updatedSchedule[day] = block_name;
-
-    const { hasConflict, conflictDetails } = evaluateFatigueOverlap(
-      day,
-      block_name,
-      concurrentActivities,
-      context.exercise_summary
-    );
-
-    if (hasConflict) {
-      recalibratedDays.push(day);
-      adaptationNotes.push(`${day}: RECALIBRATED — ${conflictDetails} Substituting bilateral compounds with unilateral stability-tracking variations to reduce spinal load while preserving movement pattern stimulus.`);
-    } else {
-      adaptationNotes.push(`${day}: ${block_name} assigned (${action}) — no fatigue conflicts detected.`);
-    }
-  }
-
-  const headers = {
-    Authorization: `Bearer ${serviceKey}`,
-    "Content-Type": "application/json",
-    Apikey: serviceKey,
-  };
-
-  await fetch(`${supabaseUrl}/rest/v1/fitness_profiles?id=eq.${profileId}`, {
-    method: "PATCH",
-    headers: { ...headers, Prefer: "return=minimal" },
-    body: JSON.stringify({ weekly_schedule: updatedSchedule }),
-  });
-
-  return {
-    updated_schedule: updatedSchedule,
-    recalibrated_days: recalibratedDays,
-    adaptations: adaptationNotes.join("\n"),
-  };
-}
-
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
@@ -1015,11 +885,8 @@ FUNCTION CALL RULES (CRITICAL):
 - NEVER write tool names, parameter names, or enum values (like "reduce_half", "adjust_volume", "update_workout_schedule", "schedule_patch", "MOVE") in your visible text response. These exist only for native tool invocations. Your text must read like a human personal trainer — no code, no parameter labels, no function syntax.
 - Trigger replace_food or replace_exercise when the user gives a DIRECT COMMAND to modify their plan. Command verbs include: "replace", "swap", "change", "switch", "use X instead".
 - For replace_exercise: ALWAYS discuss the biomechanical reasoning first, then ask for confirmation. Only call the tool AFTER the user confirms (or if they gave a direct, unambiguous command like "swap X for Y").
-- Exercise swaps default to SESSION-ONLY (permanent: false). This means the swap only applies to today's workout and the original exercise returns next time that day comes up. Only set permanent: true when the user explicitly says they want a permanent change (e.g. "for the rest of the plan", "permanently", "I never want to do X", "always use Y instead").
-- Trigger update_workout_schedule when the user requests to swap training days, reschedule a workout, clear a day, move a specific training focus, ADD a new training day, or REMOVE an existing training day (e.g., "move legs to Friday", "swap my Wednesday and Thursday", "make Saturday a rest day", "add a muscle-up session on Saturday", "drop my Wednesday workout"). Execute this tool IMMEDIATELY upon receiving a clear scheduling command. If the user requests multiple changes at once (e.g., "drop Wednesday and add Saturday for skill work"), include ALL operations in a single schedule_patch array.
-- Trigger adjust_volume when the user mentions time constraints ("only have 20 minutes"), volume changes ("cut in half", "reduce sets"), energy levels ("feeling great, give me more"), or fatigue ("I'm exhausted today"). Use reduce_half for "cut in half", "only 20 minutes", or any major time/volume reduction. Use reduce_light for minor fatigue. Use reduce_heavy for extreme fatigue + removing exercises.
-- CRITICAL: When the user asks to adjust volume, cut sets, shorten a workout, or reduce training time, you MUST execute the adjust_volume tool call. NEVER promise or acknowledge a volume reduction in plain text without invoking adjust_volume. If the user says "cut my volume in half" — call the tool immediately with adjustment="reduce_half".
-- CRITICAL: When the user requests schedule changes (adding, moving, removing, or swapping training days), you MUST execute update_workout_schedule. NEVER describe a schedule change conversationally without invoking the tool.
+- Exercise swaps default to SESSION-ONLY (permanent: false). This means the swap only applies to today's workout and the original exercise returns next time that day comes up. Only set permanent: true when the user explicitly says they want a permanent change (e.g. "for the rest of the plan", "permanently", "I never want to do X", "always use Y instead") — be aware permanent swaps currently decline (see tool description) and the user will be redirected to the in-app swap button instead.
+- PLAN CHANGES NOT YET SAFE TO EXECUTE: update_workout_schedule (adding/moving/removing training days) and adjust_volume (adjusting sets for a session) are not safely wired up yet — calling either will always decline. For any request along these lines (rescheduling, clearing a day, adding a skill session, cutting volume, extra sets, fatigue/time-constraint adjustments), do NOT call the tool. Instead, briefly describe what you'd suggest and why, then tell the user to make it themselves via the in-app controls (the schedule editor for schedule changes, the swap (⇄) button or set-count controls on the exercise for volume changes).
 - Answer exercise form/technique questions ("How do I do X?", "What muscles does X work?") directly in your text response. Provide step-by-step form cues, target muscles, common mistakes, and coaching tips.
 - Trigger ban_exercise when the user says "I hate X", "never give me X", "remove X permanently", or explicitly flags an exercise to blacklist.
 - When a food command is given, execute it immediately. Scale portions to the meal slot budget above. Do NOT ask for macro details.
@@ -1029,34 +896,12 @@ FUNCTION CALL RULES (CRITICAL):
 - When genuinely unsure if the user wants a change applied, ask "Would you like me to make this change to your plan?"
 - ESTIMATED_MACROS REQUIREMENT: When calling replace_food, you MUST include the "estimated_macros" field with your own calculated calorie, protein, carbs, and fat totals derived from the ingredient quantities you provided.
 
-CONTEXT-INFERENCE RULE (CRITICAL — prevents tool failures):
-- When a user gives a short confirmation or context-dependent reply like "Yes, add Saturday", "Sure, remove Wednesday", "Do it", "Go ahead", "Yes", "Sounds good", or any brief affirmative that refers to a previously-discussed schedule change, you MUST infer the full tool arguments from the conversation history. NEVER leave required tool parameters empty or partial.
-- If you proposed adding a specific day/session in your previous message, a simple "Yes" or "Do it" means: execute that exact proposal immediately using the tool with complete parameters.
-- If you cannot confidently determine what the user is confirming, ask ONE clarifying question. Do NOT attempt a tool call with incomplete parameters.
-
-PROACTIVE EXECUTION RULE (CRITICAL — prevents permission loops):
-- When the user grants agency ("You decide", "Sounds good", "Go ahead", "Whatever works best", "Just do it"), execute the database modification IMMEDIATELY in that same turn. Do NOT ask for re-confirmation. Do NOT propose the change and then wait for another approval.
-- When you recommend adding exercises to existing days: if the user says "Sounds good" or "Add them", execute ALL proposed changes in a single tool call and confirm what was done AFTER execution.
-- TIME-CAP MANAGEMENT: If adding an exercise would push a session beyond the user's session duration preference (shown in profile), automatically identify the lowest-priority exercise in that day's plan, swap it out, and execute the change. Inform the user what was swapped and why in your response text AFTER the tool call completes. Do not ask permission for the swap.
-
 VIDEO & DEMONSTRATION REQUESTS:
 - When a user asks for a video, demonstration, or visual guide for any exercise, NEVER respond with "I can't send videos" or similar disclaimers.
 - Instead, ALWAYS provide a clickable YouTube search link formatted as: [Watch [Exercise Name] Tutorial on YouTube](https://www.youtube.com/results?search_query=[Exercise+Name]+tutorial+form)
 - You may also include brief text-based form cues alongside the link for immediate reference.
 
-SCHEDULE RECALIBRATION RULES:
-- The user's training schedule is FULLY DYNAMIC. They can add new training days beyond their original onboarding selection, drop existing days, or request custom/skill-specific sessions at any time. Do NOT enforce the original training day count as a maximum or minimum.
-- When adding a day (action: "ADD"), always supply an exercises array with specific exercises, sets, and reps tailored to the user's goal for that session. For skill-specific requests (e.g., "muscle-up training"), design a progression-appropriate session.
-- When removing a day (action: "REMOVE"), set block_name to "Rest".
-- When moving a day (action: "MOVE"), specify the new target day and the block_name of the session being relocated.
-- When update_workout_schedule is invoked, the backend automatically validates the new layout against the user's concurrent activities and fatigue matrix. If unsafe overlap is detected (e.g., heavy axial loading on a day with high-intensity sport demands), the system auto-substitutes bilateral compounds with unilateral stability variations.
-- You MUST inform the user of any recalibrations that occurred and explain the sports-science logic behind the adaptations.
-
-EXECUTION-FIRST GATE:
-Never textually confirm a schedule change (e.g., "Done!" or "Updated!") UNLESS the update_workout_schedule tool has been called AND completed successfully. If the tool has not been called, you MUST call it before confirming.
-
 ${context.concurrent_activities && context.concurrent_activities.length > 0 ? `CONCURRENT ACTIVITIES (external training demands):\n${context.concurrent_activities.map((a: { name: string; intensity: number; days: string[]; movement_demands: string[] }) => `- ${a.name}: intensity ${Math.round(a.intensity * 100)}%, days: ${a.days.join(", ")}, demands: ${a.movement_demands.join(", ")}`).join("\n")}` : ""}
-${context.weekly_schedule ? `CURRENT WEEKLY SCHEDULE:\n${Object.entries(context.weekly_schedule as Record<string, string | null>).map(([day, block]) => `- ${day}: ${block || "Rest"}`).join("\n")}` : ""}
 
 USER PROFILE:
 - Age: ${context.profile.age} years | Gender: ${context.profile.gender}
@@ -1231,104 +1076,19 @@ Keep this context in mind to ensure your greetings and questions naturally align
       }
 
       if (name === "update_workout_schedule") {
-        // Soft-validate: attempt to normalize any shape into a valid SchedulePatchItem[]
-        let normalizedPatch: SchedulePatchItem[] = [];
-
-        try {
-          // Gemini may use alternative key names for the schedule data
-          const patchData = args.schedule_patch || args.changes || args.updates || args.schedule || args.patch;
-
-          if (patchData) {
-            if (Array.isArray(patchData)) {
-              // Already an array - validate each item has at minimum a day field
-              normalizedPatch = patchData
-                .filter((item: Record<string, unknown>) => item && item.day)
-                .map((item: Record<string, unknown>) => ({
-                  day: String(item.day),
-                  action: (item.action as string || "ADD").toUpperCase() as "ADD" | "REMOVE" | "MOVE",
-                  block_name: String(item.block_name || item.session || item.name || "Rest"),
-                  exercises: item.exercises as { name: string; sets: number; reps: string }[] | undefined,
-                }));
-            } else if (typeof patchData === "object") {
-              // Old Record<string, string|null> format - backward compat
-              normalizedPatch = Object.entries(patchData as Record<string, string | null>)
-                .filter(([day]) => day)
-                .map(([day, block]: [string, string | null]) => ({
-                  day,
-                  action: block ? "MOVE" as const : "REMOVE" as const,
-                  block_name: block || "Rest",
-                }));
-            }
-          } else if (args.day) {
-            // Gemini passed a flat single-item (day + action) instead of wrapping in schedule_patch
-            normalizedPatch = [{
-              day: String(args.day),
-              action: (args.action as string || "ADD").toUpperCase() as "ADD" | "REMOVE" | "MOVE",
-              block_name: String(args.block_name || args.session || args.name || "Custom"),
-              exercises: args.exercises as { name: string; sets: number; reps: string }[] | undefined,
-            }];
-          }
-        } catch (parseErr) {
-          console.error("Schedule patch normalization failed. Raw args:", JSON.stringify(args), "Error:", parseErr);
-        }
-
-        if (normalizedPatch.length === 0) {
-          console.error("Empty normalizedPatch after parsing. Raw args received from Gemini:", JSON.stringify(args));
-          const fallbackReply = textPart?.text || "I need a bit more detail to update your schedule. Which day would you like to change, and what should happen?";
-          return new Response(
-            JSON.stringify({ reply: fallbackReply }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-
-        const profileId = context.profile_id;
-        let recalibration;
-        try {
-          recalibration = await executeRecalibrationPipeline(
-            profileId || "",
-            normalizedPatch,
-            {
-              concurrent_activities: context.concurrent_activities || [],
-              exercise_summary: context.exercise_summary || "",
-              weekly_schedule: context.weekly_schedule || {},
-            },
-            supabaseUrl,
-            serviceKey
-          );
-        } catch (err) {
-          console.error("Schedule recalibration failed:", err);
-          const fallbackReply = textPart?.text || "I ran into an issue updating your schedule. Could you try rephrasing what you'd like to swap?";
-          return new Response(
-            JSON.stringify({ reply: fallbackReply }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-
-        const actionPayload = {
-          type: "update_workout_schedule",
-          schedule_patch: normalizedPatch,
-          recalibrated_days: recalibration.recalibrated_days,
-          adaptations: recalibration.adaptations,
-        };
-
-        const rawScheduleText = textPart?.text || generateScheduleConfirmation(recalibration);
-        // Strip any system-log-style lines that may have leaked into the AI's text response
-        const scheduleReply = rawScheduleText
-          .split("\n")
-          .filter((line: string) => {
-            const l = line.trim();
-            if (l.match(/assigned \((ADD|REMOVE|MOVE)\)/i)) return false;
-            if (l.match(/no fatigue conflicts detected/i)) return false;
-            if (l.match(/active training days configured/i)) return false;
-            if (l.match(/RECALIBRATED —/)) return false;
-            if (l.match(/^Schedule updated —/)) return false;
-            return true;
-          })
-          .join("\n")
-          .trim() || "Done! Your schedule has been updated.";
-
+        // Trace-report fix: this used to PATCH fitness_profiles.weekly_schedule
+        // directly, server-side, on every call — no confirmation gate, and the
+        // Exercise tab renders from mesocycle_weeks, which this never touched.
+        // Every "Schedule updated" reply was true of a field nothing displays,
+        // while silently diverging it from the schedule the user actually
+        // sees (confirmed live: a real profile ended up with three different,
+        // mutually disagreeing schedules — chat's claim, weekly_schedule, and
+        // the mesocycle). Declines honestly until a real propose-then-confirm
+        // rebuild through mesocycle-edit.ts lands (Phase B). No DB write, no action.
         return new Response(
-          JSON.stringify({ reply: scheduleReply, action: actionPayload }),
+          JSON.stringify({
+            reply: "I can't safely make plan changes yet — that's coming in an update soon. For now, use the swap (⇄) button on the exercise itself.",
+          }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
@@ -1570,6 +1330,35 @@ Keep this context in mind to ensure your greetings and questions naturally align
         );
       }
 
+      if (name === "adjust_volume") {
+        // Trace-report fix: this only ever mutated the client's flat
+        // exercisePlan/exercise_plans fallback state, never mesocycle_weeks —
+        // dead for any user with an active mesocycle (i.e. everyone
+        // post-C0). Declines honestly instead of claiming a change that
+        // never reached the Exercise tab.
+        return new Response(
+          JSON.stringify({
+            reply: "I can't safely make plan changes yet — that's coming in an update soon. For now, use the swap (⇄) button on the exercise itself.",
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (name === "replace_exercise" && args.permanent === true) {
+        // Trace-report fix: the permanent path mutated client mesocycle
+        // state directly (bypassing mesocycle-edit.ts) and never called
+        // saveMesocycle — the swap looked applied until the next refresh,
+        // then silently reverted. Session-only swaps (the default,
+        // permanent false/omitted) are unaffected and still fall through
+        // to the normal action below — they never claimed persistence.
+        return new Response(
+          JSON.stringify({
+            reply: "I can't safely make permanent plan changes yet — that's coming in an update soon. For now, use the swap (⇄) button on the exercise itself for a lasting change, or just tell me to swap it for today.",
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
       const confirmationText = textPart?.text || generateConfirmation(name, args);
 
       return new Response(
@@ -1623,25 +1412,12 @@ Keep this context in mind to ensure your greetings and questions naturally align
 
 function generateConfirmation(name: string, args: Record<string, unknown>): string {
   if (name === "replace_exercise") {
-    return `Done! I've swapped **${args.old_item}** for **${args.new_item}** on ${args.day}. You'll do ${args.sets} sets of ${args.reps} with ${args.rest} rest.`;
-  }
-  if (name === "adjust_volume") {
-    return `Done! I've adjusted the volume for your ${args.day} session (${args.adjustment}). ${args.reason || ""}`;
+    // Only reached for session-only swaps (permanent !== true) — the
+    // permanent path declines earlier and never gets here.
+    return `Done! I've swapped **${args.old_item}** for **${args.new_item}** on ${args.day} for today's session. You'll do ${args.sets} sets of ${args.reps} with ${args.rest} rest.`;
   }
   if (name === "ban_exercise") {
     return `Got it — I've permanently removed **${args.exercise_name}** from your plan. It will never appear in future workout cycles. ${args.reason ? `Reason noted: ${args.reason}` : ""}`;
   }
   return "Your plan has been updated.";
-}
-
-function generateScheduleConfirmation(recalibration: RecalibrationResult): string {
-  const recalCount = recalibration.recalibrated_days.length;
-
-  let reply = "Done! I've updated your training schedule.";
-
-  if (recalCount > 0) {
-    reply += ` I also made some smart adjustments to ${recalCount} day${recalCount > 1 ? "s" : ""} to avoid fatigue overlap with your other activities.`;
-  }
-
-  return reply;
 }
