@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { GEMINI_MODEL } from "../_shared/gemini.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -217,13 +218,18 @@ Return ONLY valid JSON in this exact format (no markdown, no explanation):
 
 Generate meals for these slots: ${slots.map((s: MealSlot) => s.slot).join(", ")}`;
 
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${geminiKey}`;
     const geminiBody = JSON.stringify({
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       generationConfig: {
         temperature: 1.0,
         maxOutputTokens: 4096,
         responseMimeType: "application/json",
+        // gemini-3.5-flash defaults to "thinking" mode, and thinking tokens
+        // come out of maxOutputTokens — confirmed truncating the JSON output
+        // mid-object (sometimes before the closing brace, sometimes
+        // mid-string). Not needed for straight structured extraction.
+        thinkingConfig: { thinkingBudget: 0 },
       },
     });
 

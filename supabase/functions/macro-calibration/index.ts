@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { GEMINI_MODEL } from "../_shared/gemini.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -174,7 +175,7 @@ Return the adjusted ingredients array for "${mealName}":`;
 
   try {
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${geminiKey}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -183,6 +184,11 @@ Return the adjusted ingredients array for "${mealName}":`;
           generationConfig: {
             temperature: 0.1,
             maxOutputTokens: 1024,
+            // See generate-meals/index.ts — gemini-3.5-flash's default
+            // "thinking" mode eats into maxOutputTokens and was confirmed to
+            // truncate structured JSON output there; this call has an even
+            // smaller budget (1024) so is at least as exposed.
+            thinkingConfig: { thinkingBudget: 0 },
           },
         }),
       }

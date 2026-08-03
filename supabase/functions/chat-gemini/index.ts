@@ -1,8 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-
-// gemini-2.5-flash was retired for new API keys (404: "no longer available
-// to new users") — bump this one constant when Google retires the next one.
-const GEMINI_MODEL = "gemini-3.5-flash";
+import { GEMINI_MODEL } from "../_shared/gemini.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -1196,6 +1193,12 @@ Keep this context in mind to ensure your greetings and questions naturally align
           generationConfig: {
             temperature: 0.7,
             maxOutputTokens: 4096,
+            // See generate-meals/index.ts — gemini-3.5-flash's default
+            // "thinking" mode eats into maxOutputTokens and was confirmed to
+            // truncate structured JSON output there. Function-call args are
+            // exactly the kind of structured output that would silently
+            // corrupt the same way, so disabled preventively here too.
+            thinkingConfig: { thinkingBudget: 0 },
           },
         }),
       }
