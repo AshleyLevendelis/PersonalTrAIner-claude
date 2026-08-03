@@ -82,9 +82,9 @@ export const FOOD_DB: FoodEntry[] = [
   f('chicken mince', ['ground chicken', 'minced chicken'], { kcal: 143, protein: 21.7, carbs: 0, fat: 6 }, 'protein', { contains_meat: true }),
   f('turkey breast', ['turkey breasts', 'sliced turkey'], { kcal: 135, protein: 29, carbs: 0, fat: 1.7 }, 'protein', { contains_meat: true }),
   f('turkey mince', ['ground turkey', 'minced turkey'], { kcal: 148, protein: 27, carbs: 0, fat: 4 }, 'protein', { contains_meat: true }),
-  f('beef mince 5% fat', ['lean beef mince', 'extra lean beef mince', '5% beef mince', 'lean ground beef'], { kcal: 137, protein: 22, carbs: 0, fat: 5 }, 'protein', { contains_meat: true }),
+  f('beef mince 5% fat', ['lean beef mince', 'extra lean beef mince', '5% beef mince', 'lean ground beef', 'lean minced beef'], { kcal: 137, protein: 22, carbs: 0, fat: 5 }, 'protein', { contains_meat: true }),
   f('beef mince 20% fat', ['beef mince', 'ground beef', '20% beef mince', 'regular beef mince'], { kcal: 254, protein: 17.2, carbs: 0, fat: 20 }, 'protein', { contains_meat: true }),
-  f('beef steak sirloin', ['sirloin steak', 'beef steak', 'steak'], { kcal: 183, protein: 27, carbs: 0, fat: 7.7 }, 'protein', { contains_meat: true }),
+  f('beef steak sirloin', ['sirloin steak', 'beef steak', 'steak', 'lean beef sirloin', 'beef sirloin strips', 'beef eye round', 'thin beef eye round slices'], { kcal: 183, protein: 27, carbs: 0, fat: 7.7 }, 'protein', { contains_meat: true }),
   f('beef rump steak', ['rump steak'], { kcal: 173, protein: 28, carbs: 0, fat: 6.5 }, 'protein', { contains_meat: true }),
   f('lamb mince', ['ground lamb', 'minced lamb'], { kcal: 218, protein: 25, carbs: 0, fat: 13 }, 'protein', { contains_meat: true }),
   f('lamb chop', ['lamb chops'], { kcal: 235, protein: 25, carbs: 0, fat: 15 }, 'protein', { contains_meat: true }),
@@ -119,7 +119,7 @@ export const FOOD_DB: FoodEntry[] = [
   f('egg yolk', ['egg yolks'], { kcal: 322, protein: 16, carbs: 3.6, fat: 27 }, 'protein', { contains_egg: true }, { medium: 17, large: 20 }),
   f('greek yoghurt 0%', ['fat free greek yogurt', 'greek yoghurt fat free', '0% greek yogurt'], { kcal: 57, protein: 10, carbs: 3.6, fat: 0.2 }, 'dairy', { contains_dairy: true }),
   f('greek yoghurt full fat', ['greek yogurt', 'full fat greek yoghurt', 'greek style yoghurt'], { kcal: 97, protein: 9, carbs: 4, fat: 5 }, 'dairy', { contains_dairy: true }),
-  f('natural yoghurt', ['plain yoghurt', 'natural yogurt'], { kcal: 61, protein: 4.3, carbs: 4.7, fat: 3.3 }, 'dairy', { contains_dairy: true }),
+  f('natural yoghurt', ['plain yoghurt', 'natural yogurt', 'low fat yogurt', 'low fat yoghurt'], { kcal: 61, protein: 4.3, carbs: 4.7, fat: 3.3 }, 'dairy', { contains_dairy: true }),
   f('cottage cheese', [], { kcal: 98, protein: 11, carbs: 3.4, fat: 4.3 }, 'dairy', { contains_dairy: true }),
   f('whey protein powder', ['protein powder', 'whey protein', 'whey isolate'], { kcal: 380, protein: 80, carbs: 8, fat: 5 }, 'protein', { contains_dairy: true }, { scoop: 30 }),
   f('milk whole', ['whole milk', 'full fat milk'], { kcal: 61, protein: 3.2, carbs: 4.8, fat: 3.3 }, 'dairy', { contains_dairy: true }),
@@ -315,7 +315,7 @@ export const FOOD_DB: FoodEntry[] = [
   f('brioche', [], { kcal: 375, protein: 8.5, carbs: 50, fat: 15 }, 'carb', { contains_gluten: true, contains_egg: true, contains_dairy: true, is_high_carb: true }),
   f('croissant', [], { kcal: 406, protein: 8.2, carbs: 45, fat: 21 }, 'carb', { contains_gluten: true, contains_dairy: true, is_high_carb: true }),
   f('naan bread', ['naan'], { kcal: 310, protein: 9, carbs: 50, fat: 8 }, 'carb', { contains_gluten: true, contains_dairy: true, is_high_carb: true }, { whole: 90 }),
-  f('chapati', ['roti'], { kcal: 297, protein: 8.9, carbs: 52, fat: 6.9 }, 'carb', { contains_gluten: true, is_high_carb: true }, { whole: 40 }),
+  f('chapati', ['roti', 'whole wheat roti', 'whole wheat rotis'], { kcal: 297, protein: 8.9, carbs: 52, fat: 6.9 }, 'carb', { contains_gluten: true, is_high_carb: true }, { whole: 40 }),
   f('gnocchi', [], { kcal: 150, protein: 3.3, carbs: 31, fat: 0.7 }, 'carb', { contains_gluten: true, is_high_carb: true }),
   f('gluten free bread', [], { kcal: 250, protein: 3, carbs: 48, fat: 4 }, 'carb', { is_high_carb: true }, { slice: 30 }),
   f('gluten free pasta', ['rice pasta', 'corn pasta'], { kcal: 160, protein: 3.5, carbs: 34, fat: 0.8 }, 'carb', { is_high_carb: true }),
@@ -384,6 +384,64 @@ export const FOOD_DB: FoodEntry[] = [
   f('beef jerky', [], { kcal: 410, protein: 33, carbs: 11, fat: 26 }, 'protein', { contains_meat: true, is_processed_meat: true }),
   f('vegan protein powder', ['pea protein powder', 'plant protein powder'], { kcal: 375, protein: 75, carbs: 10, fat: 5 }, 'protein', {}, { scoop: 30 }),
   f('protein pasta', ['high protein pasta'], { kcal: 350, protein: 40, carbs: 38, fat: 3 }, 'carb', { contains_soy: true, contains_egg: true, is_high_carb: true }),
+
+  // ===== Added from a live test:meal-quality run — every entry below fixes
+  // a specific unmatched-ingredient string a real Gemini generation produced
+  // (see the M1 Part 6 quality-harness follow-up). =========================
+
+  // --- herbs, spices & seasoning blends (near-zero macros at typical use) ---
+  f('coriander', ['fresh cilantro', 'cilantro', 'fresh coriander', 'coriander leaves', 'cilantro chopped'], { kcal: 23, protein: 2.1, carbs: 3.7, fat: 0.5 }, 'condiment', {}),
+  f('dill', ['fresh dill'], { kcal: 43, protein: 3.5, carbs: 7, fat: 1.1 }, 'condiment', {}),
+  f('basil', ['fresh thai basil', 'thai basil', 'holy basil leaves', 'basil leaves'], { kcal: 23, protein: 3.2, carbs: 2.7, fat: 0.6 }, 'condiment', {}),
+  f('lemongrass', ['minced lemongrass'], { kcal: 99, protein: 1.8, carbs: 25, fat: 0.5 }, 'condiment', { is_high_fodmap: true }),
+  f('turmeric powder', ['turmeric'], { kcal: 312, protein: 9.7, carbs: 65, fat: 3.3 }, 'condiment', {}),
+  f('bay leaves', ['bay leaf'], { kcal: 313, protein: 7.6, carbs: 75, fat: 8.4 }, 'condiment', {}),
+  f('star anise', [], { kcal: 337, protein: 17.6, carbs: 50, fat: 15.9 }, 'condiment', {}),
+  f('curry leaves', [], { kcal: 108, protein: 6.1, carbs: 18.7, fat: 1 }, 'condiment', {}),
+  f('garam masala', [], { kcal: 379, protein: 13.5, carbs: 58, fat: 13.8 }, 'condiment', {}),
+  f('chana masala spice mix', ['chana masala'], { kcal: 300, protein: 12, carbs: 55, fat: 6 }, 'condiment', { is_legume: false }),
+  f('chaat masala', [], { kcal: 270, protein: 8, carbs: 55, fat: 4 }, 'condiment', {}),
+  f('berbere spice mix', ['berbere'], { kcal: 320, protein: 12, carbs: 55, fat: 8 }, 'condiment', {}),
+  f('cajun seasoning', ['cajun seasoning blend', 'cajun spices', 'cajun spice seasoning'], { kcal: 250, protein: 9, carbs: 50, fat: 5 }, 'condiment', {}),
+  f('jerk seasoning paste', ['jerk seasoning'], { kcal: 150, protein: 4, carbs: 25, fat: 4 }, 'condiment', { is_high_fodmap: true }),
+  f('suya spice rub', ['suya spice'], { kcal: 400, protein: 18, carbs: 20, fat: 28 }, 'condiment', { contains_nuts: true }),
+  f('chili powder', [], { kcal: 282, protein: 13.5, carbs: 50, fat: 14.3 }, 'condiment', {}),
+  f('cayenne pepper', ['ground cayenne'], { kcal: 318, protein: 12, carbs: 57, fat: 17 }, 'condiment', {}),
+  f('capers', [], { kcal: 23, protein: 2.4, carbs: 4.9, fat: 0.9 }, 'condiment', {}),
+
+  // --- sauces & pastes -------------------------------------------------------
+  f('oyster sauce', [], { kcal: 51, protein: 1.4, carbs: 11, fat: 0.3 }, 'condiment', { contains_shellfish: true }, { tbsp: 18 }),
+  f('hoisin sauce', [], { kcal: 220, protein: 2.6, carbs: 44, fat: 3.4 }, 'condiment', { contains_soy: true, contains_gluten: true, is_refined_sugar: true }, { tbsp: 18 }),
+  f('sweet chili sauce', [], { kcal: 197, protein: 0.6, carbs: 49, fat: 0.1 }, 'condiment', { is_refined_sugar: true }, { tbsp: 18 }),
+  f('tamarind paste', ['tamarind soup base mix', 'tamarind soup base powder'], { kcal: 239, protein: 2.8, carbs: 62.5, fat: 0.6 }, 'condiment', { is_high_fodmap: true }, { tbsp: 15 }),
+  f('white vinegar', [], { kcal: 18, protein: 0, carbs: 0.4, fat: 0 }, 'condiment', {}, { tbsp: 15 }),
+  f('jam', ['lingonberry jam', 'fruit jam'], { kcal: 250, protein: 0.4, carbs: 62, fat: 0.1 }, 'condiment', { is_refined_sugar: true }, { tbsp: 20 }),
+
+  // --- veg / aromatics ---------------------------------------------------------
+  f('shallots', ['shallot'], { kcal: 72, protein: 2.5, carbs: 16.8, fat: 0.1 }, 'veg', { is_high_fodmap: true }),
+  f('bamboo shoots', ['canned bamboo shoots'], { kcal: 27, protein: 2.6, carbs: 5.2, fat: 0.3 }, 'veg', {}),
+  f('taro root', ['taro root cubed', 'taro'], { kcal: 112, protein: 1.5, carbs: 26.5, fat: 0.2 }, 'carb', { is_high_carb: true }),
+  f('yellow yam', ['boiled yellow yam', 'yam'], { kcal: 118, protein: 1.5, carbs: 27.9, fat: 0.2 }, 'carb', { is_high_carb: true }),
+  f('plantain', ['yellow plantain sliced thin', 'sweet plantain', 'baked plantain chips'], { kcal: 122, protein: 1.3, carbs: 32, fat: 0.4 }, 'carb', { is_high_carb: true }),
+  f('cornmeal', [], { kcal: 370, protein: 8, carbs: 79, fat: 3.6 }, 'carb', { is_high_carb: true }),
+  f('barley', ['whole barley grains', 'pearl barley'], { kcal: 123, protein: 2.3, carbs: 28.2, fat: 0.4 }, 'carb', { contains_gluten: true, is_high_carb: true }),
+
+  // --- protein / dairy variants ------------------------------------------------
+  f('ackee', ['canned ackee', 'canned ackee drained'], { kcal: 151, protein: 2.9, carbs: 0.8, fat: 15.2 }, 'fruit', {}),
+  f('paneer', ['low fat paneer'], { kcal: 265, protein: 18.3, carbs: 3.6, fat: 20.8 }, 'dairy', { contains_dairy: true }),
+  f('skyr', ['icelandic skyr'], { kcal: 63, protein: 11, carbs: 4, fat: 0.2 }, 'dairy', { contains_dairy: true }),
+  f('sulguni cheese', ['sulguni'], { kcal: 280, protein: 22, carbs: 2, fat: 21 }, 'dairy', { contains_dairy: true }),
+  f('sesame seeds', ['roasted sesame seeds'], { kcal: 573, protein: 17.7, carbs: 23.4, fat: 49.7 }, 'fat', {}),
+  f('hemp seeds', [], { kcal: 553, protein: 31.6, carbs: 8.7, fat: 48.8 }, 'fat', {}),
+  f('peanut oil', [], { kcal: 884, protein: 0, carbs: 0, fat: 100 }, 'fat', {}, { tbsp: 14, tsp: 4.5 }),
+  f('safflower oil', [], { kcal: 884, protein: 0, carbs: 0, fat: 100 }, 'fat', {}, { tbsp: 14, tsp: 4.5 }),
+  f('red snapper', ['red snapper fillet'], { kcal: 100, protein: 20.5, carbs: 0, fat: 1.3 }, 'protein', { contains_fish: true }),
+  f('beef broth', ['beef bone broth', 'beef stock'], { kcal: 15, protein: 2.5, carbs: 0.5, fat: 0.3 }, 'condiment', {}),
+  f('chicken broth', ['chicken stock'], { kcal: 12, protein: 1.5, carbs: 0.9, fat: 0.3 }, 'condiment', {}),
+  f('rice paper wrappers', ['rice paper'], { kcal: 333, protein: 0.7, carbs: 82, fat: 0.2 }, 'carb', { is_high_carb: true }, { whole: 10 }),
+  f('injera flatbread', ['injera'], { kcal: 220, protein: 7, carbs: 45, fat: 1.5 }, 'carb', { is_high_carb: true }),
+  f('calamansi juice', ['calamansi'], { kcal: 29, protein: 0.5, carbs: 9.5, fat: 0.2 }, 'fruit', {}),
+  f('water', ['warm water', 'cold water', 'boiling water'], { kcal: 0, protein: 0, carbs: 0, fat: 0 }, 'other', {}),
 ]
 
 // ---------------------------------------------------------------------------
@@ -422,15 +480,24 @@ function containsWordSequence(haystack: string[], needle: string[]): boolean {
   return false
 }
 
+/** Strips a trailing 's' from tokens long enough that it's almost certainly a plural, not part of the word itself (avoids "hummus" -> "hummu", "asparagus" -> "asparagu"). Deliberately conservative: only used as a last-resort fallback below, never in the primary matching passes. */
+function depluralizeToken(token: string): string {
+  return token.length > 4 && token.endsWith('s') && !token.endsWith('ss') ? token.slice(0, -1) : token
+}
+
 /**
  * Alias- and fuzzy-tolerant lookup. Tries exact/alias match first, then a
  * word-sequence match against known entries (handles "grilled chicken breast
  * fillet" resolving to "chicken breast" — matched on whole words, so "corn"
- * cannot match inside "unicorn"), then a token-overlap match. Returns null on
- * a genuine miss — callers must NOT guess a nutritional profile for an
- * unresolved ingredient (see diet-rules.ts's fail-closed handling).
+ * cannot match inside "unicorn"), then a token-overlap match, then (only if
+ * every other pass missed) a single retry with each query token
+ * conservatively depluralized — catches "scallions" resolving to the
+ * "scallion" alias without loosening the primary passes that guard against
+ * false positives. Returns null on a genuine miss — callers must NOT guess a
+ * nutritional profile for an unresolved ingredient (see diet-rules.ts's
+ * fail-closed handling).
  */
-export function lookupIngredient(name: string): FoodEntry | null {
+export function lookupIngredient(name: string, _isPluralRetry = false): FoodEntry | null {
   const key = normalize(name)
   if (!key) return null
 
@@ -466,7 +533,13 @@ export function lookupIngredient(name: string): FoodEntry | null {
       if (!bestOverlap || overlap > bestOverlap.score) bestOverlap = { entry, score: overlap }
     }
   }
-  return bestOverlap?.entry ?? null
+  if (bestOverlap) return bestOverlap.entry
+
+  if (!_isPluralRetry) {
+    const depluralized = keyTokens.map(depluralizeToken).join(' ')
+    if (depluralized !== key) return lookupIngredient(depluralized, true)
+  }
+  return null
 }
 
 export interface MealIngredientLine {
