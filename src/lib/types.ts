@@ -319,7 +319,17 @@ export interface LogWeightAction {
   weight_kg: number
 }
 
-export type PlanAction = ReplaceFoodAction | ReplaceExerciseAction | AdjustVolumeAction | BanExerciseAction | UpdateScheduleAction | LogWorkoutSessionAction | LogWeightAction
+export interface LogWorkoutSetAction {
+  type: 'log_workout_set'
+  exercise_name: string
+  set_number: number
+  reps: number
+  weight_kg: number
+  is_bodyweight?: boolean
+  rpe?: number
+}
+
+export type PlanAction = ReplaceFoodAction | ReplaceExerciseAction | AdjustVolumeAction | BanExerciseAction | UpdateScheduleAction | LogWorkoutSessionAction | LogWeightAction | LogWorkoutSetAction
 
 // ============================================================================
 // Daily Tracking Types (connects workout engine to nutrition/carb-cycling)

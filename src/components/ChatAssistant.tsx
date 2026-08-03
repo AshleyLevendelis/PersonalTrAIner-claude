@@ -654,6 +654,17 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       return true
     }
 
+    if (action.type === 'log_workout_set') {
+      // Same single-write-path pattern as log_workout_session, just for one
+      // set (chat-gemini/index.ts's log_workout_set handler). Fix 3
+      // (vision-architecture patch round): this type was missing from the
+      // PlanAction union, so applyPlanAction fell through to `return false`
+      // below and the user was told "Action failed" about a write that had
+      // already landed.
+      onLogsUpdated?.()
+      return true
+    }
+
     return false
   }
 
