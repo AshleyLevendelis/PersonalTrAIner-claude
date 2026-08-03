@@ -407,6 +407,7 @@ export const FOOD_DB: FoodEntry[] = [
   f('suya spice rub', ['suya spice'], { kcal: 400, protein: 18, carbs: 20, fat: 28 }, 'condiment', { contains_nuts: true }),
   f('chili powder', [], { kcal: 282, protein: 13.5, carbs: 50, fat: 14.3 }, 'condiment', {}),
   f('cayenne pepper', ['ground cayenne'], { kcal: 318, protein: 12, carbs: 57, fat: 17 }, 'condiment', {}),
+  f('tajin seasoning', ['tajin'], { kcal: 300, protein: 2, carbs: 70, fat: 1 }, 'condiment', {}),
   f('capers', [], { kcal: 23, protein: 2.4, carbs: 4.9, fat: 0.9 }, 'condiment', {}),
 
   // --- sauces & pastes -------------------------------------------------------
