@@ -14,7 +14,8 @@ import { DevTestPage } from '@/components/DevTestPage'
 import { isDevAccount } from '@/lib/dev-clock'
 
 import { calculateCalories } from '@/lib/calculations'
-import { computeBMR, computeStaticTDEE, getStaticDailyMacros } from '@/lib/macro-calculator'
+import { computeBMR, computeStaticTDEE } from '@/lib/macro-calculator'
+import { computeTargets, getLatestWeightKg, snapshotTargetsIfChanged } from '@/lib/nutrition-targets'
 import { generateExercisePlan, generateMesocycle } from '@/lib/exercise-plan'
 import { generateWeeklyMealPlan, swapMealSlot, getWeekStartDate } from '@/lib/meal-plan'
 import { supabase } from '@/lib/supabase'
@@ -39,6 +40,8 @@ function App() {
   const hash = useHashRoute()
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [macros, setMacros] = useState<MacroTargets | null>(null)
+  /** Latest daily_metrics weigh-in — overrides the (immutable) onboarding weight in every target computation. Null until the user first weighs in. */
+  const [latestWeightKg, setLatestWeightKg] = useState<number | null>(null)
   const [exercisePlan, setExercisePlan] = useState<WorkoutDay[]>([])
   const [mesocycle, setMesocycle] = useState<MesocycleWeek[]>([])
   /** When the CURRENT mesocycle was generated — anchors live-week detection (falls back to profile.created_at for legacy profiles without persisted weeks). */
@@ -116,13 +119,6 @@ function App() {
 
     const restoredExclusions: string[] = profileRow.exercise_exclusions || []
     setExerciseExclusions(restoredExclusions)
-
-    const restoredMacros: MacroTargets = {
-      calories: Number(profileRow.calorie_target),
-      protein: Number(profileRow.protein_g),
-      carbs: Number(profileRow.carbs_g),
-      fat: Number(profileRow.fat_g),
-    }
 
     const [{ data: mealRows }, { data: exerciseRows }, fullMesocycle] = await Promise.all([
       supabase.from('meal_plans').select('*').eq('profile_id', storedId),
@@ -283,13 +279,27 @@ function App() {
       }
     }
 
+    // Living targets (M0): computed on read from the profile + the latest
+    // weigh-in, never from the frozen fitness_profiles macro columns (still
+    // written at onboarding for back-compat; nothing reads them anymore).
+    const restoredWeight = await getLatestWeightKg(restoredProfile.id!).catch(() => null)
+    const liveTargets = computeTargets(restoredProfile, {
+      latestWeightKg: restoredWeight,
+      exercisePlan: restoredExercises,
+    })
+
     setProfile(restoredProfile)
-    setMacros(restoredMacros)
+    setLatestWeightKg(restoredWeight)
+    setMacros(liveTargets)
     setMealPlan(restoredMeals)
     if (Object.keys(restoredWeekly).length > 0) setWeeklyMealPlan(restoredWeekly)
     setExercisePlan(restoredExercises)
     setMesocycle(restoredMesocycle)
     setIsRestoring(false)
+
+    // Version today's targets when they differ from the last snapshot —
+    // fire-and-forget; the M3 trend loop reads this history.
+    snapshotTargetsIfChanged(restoredProfile.id!, restoredProfile, liveTargets, restoredWeight)
   }
 
   const handleOnboardingComplete = async (userProfile: UserProfile) => {
@@ -304,7 +314,10 @@ function App() {
 
     const bmr = computeBMR(userProfile)
     const tdee = computeStaticTDEE(bmr, userProfile.activity_level)
-    const calculatedMacros = getStaticDailyMacros(userProfile)
+    // No weigh-ins can exist yet at onboarding, so computeTargets here is
+    // equivalent to the static calculation — but going through the one
+    // shared entry point keeps every consumer on identical numbers.
+    const calculatedMacros = computeTargets(userProfile)
 
     const enrichedProfile: UserProfile = {
       ...userProfile,
@@ -839,13 +852,30 @@ function App() {
 
   const handleMacroModeChange = async (mode: import('@/lib/types').MacroCalculationMode) => {
     if (!profile) return
-    setProfile(prev => prev ? { ...prev, macro_calculation_mode: mode } : prev)
+    const updated = { ...profile, macro_calculation_mode: mode }
+    setProfile(updated)
+    // Living targets: mode is one of computeTargets' inputs, so the shared
+    // macros state must recompute the moment it changes — the chat and the
+    // Nutrition tab both read this state and must always agree.
+    const targets = computeTargets(updated, { latestWeightKg, exercisePlan })
+    setMacros(targets)
     if (profile.id) {
+      snapshotTargetsIfChanged(profile.id, updated, targets, latestWeightKg)
       await supabase
         .from('fitness_profiles')
         .update({ macro_calculation_mode: mode })
         .eq('id', profile.id)
     }
+  }
+
+  /** Re-derives targets after a new weigh-in lands (Part 5's capture calls this). */
+  const handleWeightLogged = async () => {
+    if (!profile?.id) return
+    const weight = await getLatestWeightKg(profile.id).catch(() => null)
+    setLatestWeightKg(weight)
+    const targets = computeTargets(profile, { latestWeightKg: weight, exercisePlan })
+    setMacros(targets)
+    snapshotTargetsIfChanged(profile.id, profile, targets, weight)
   }
 
   if (isRestoring) {
@@ -957,6 +987,7 @@ function App() {
               profile={profile}
               macros={macros}
               exercisePlan={exercisePlan}
+              latestWeightKg={latestWeightKg}
               onMacroModeChange={handleMacroModeChange}
             />
           </TabsContent>
@@ -1013,6 +1044,7 @@ function App() {
               planCreatedAt={mesocycleCreatedAt ?? profile?.created_at}
               mealPlan={mealPlan}
               exerciseExclusions={exerciseExclusions}
+              latestWeightKg={latestWeightKg}
               onPlanUpdate={handlePlanUpdate}
               onLogsUpdated={() => setLogsVersion(v => v + 1)}
             />

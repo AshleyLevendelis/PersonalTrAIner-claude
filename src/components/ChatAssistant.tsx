@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Send, MessageCircle, Sparkles, CheckCircle2, ArrowDown, RotateCcw, AlertCircle, Trash2 } from 'lucide-react'
 import { generateChatResponse } from '@/lib/chat-assistant'
 import { calculateCalories, getActiveMesocycleWeek } from '@/lib/calculations'
+import { computeBMR, computeStaticTDEE } from '@/lib/macro-calculator'
 import { getAppNow } from '@/lib/dev-clock'
 import { supabase } from '@/lib/supabase'
 import { getRecentLogs, formatLogsForAI, getRecentCardioLogs, formatCardioLogsForAI } from '@/lib/daily-tracking'
@@ -59,6 +60,7 @@ interface FavoriteMeal {
 
 interface ChatAssistantProps {
   profile: UserProfile
+  /** Living targets from computeTargets (M0) — the SAME numbers the Nutrition tab shows, respecting the user's selected macro mode. */
   macros: MacroTargets
   exercisePlan: WorkoutDay[]
   mesocycle: MesocycleWeek[]
@@ -66,11 +68,13 @@ interface ChatAssistantProps {
   planCreatedAt?: string
   mealPlan: MealPlanDay[]
   exerciseExclusions: string[]
+  /** Latest daily_metrics weigh-in — keeps the chat's bmr/tdee/weight context in lockstep with the Nutrition tab (living targets, M0). */
+  latestWeightKg?: number | null
   onPlanUpdate: (action: PlanAction) => void | Promise<void>
   onLogsUpdated?: () => void
 }
 
-export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, onPlanUpdate, onLogsUpdated }: ChatAssistantProps) {
+export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, onPlanUpdate, onLogsUpdated }: ChatAssistantProps) {
   const buildInitialGreeting = (): string => {
     const now = new Date()
     const hour = now.getHours()
@@ -447,6 +451,10 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     const todayStr = now.toISOString().slice(0, 10)
     const workoutLoggedToday = workoutLogHistory.includes(todayStr)
 
+    const effectiveWeightKg = latestWeightKg != null && latestWeightKg > 0 ? latestWeightKg : profile.weight_kg
+    const liveBmr = computeBMR({ ...profile, weight_kg: effectiveWeightKg })
+    const liveTdee = computeStaticTDEE(liveBmr, profile.activity_level)
+
     return {
       current_date: now.toISOString(),
       current_time_formatted: currentTimeFormatted,
@@ -457,12 +465,15 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         age: profile.age,
         gender: profile.gender,
         height_cm: profile.height_cm,
-        weight_kg: profile.weight_kg,
+        // Living targets (M0): current weight and live-computed BMR/TDEE,
+        // not the frozen onboarding columns — the chat's numbers must match
+        // the Nutrition tab exactly.
+        weight_kg: effectiveWeightKg,
         activity_level: profile.activity_level,
         fitness_goal: profile.fitness_goal,
         preferred_time: profile.preferred_time,
-        bmr: Math.round(profile.bmr || 0),
-        tdee: Math.round(profile.tdee || 0),
+        bmr: liveBmr,
+        tdee: liveTdee,
       },
       session_duration_preference: profile.session_duration_preference,
       workout_split_preference: profile.workout_split_preference,

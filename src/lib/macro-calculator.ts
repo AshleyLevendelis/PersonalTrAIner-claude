@@ -80,10 +80,20 @@ function classifyTrainingIntensity(focus: string): 'rest' | 'moderate' | 'high' 
   return 'moderate'
 }
 
-function applyGoalAdjustment(tdee: number, goal: FitnessGoal): number {
+/**
+ * Sex-differentiated minimum-calorie rail (M0): the old flat 1200 floor was
+ * the standard FEMALE guideline applied to everyone; sustained sub-1500
+ * intakes for males risk inadequate micronutrient coverage under the same
+ * guidance the 1200 figure comes from.
+ */
+function calorieFloor(gender: 'male' | 'female'): number {
+  return gender === 'male' ? 1500 : 1200
+}
+
+function applyGoalAdjustment(tdee: number, goal: FitnessGoal, gender: 'male' | 'female'): number {
   switch (goal) {
     case 'fat_loss':
-      return Math.max(1200, tdee - 500)
+      return Math.max(calorieFloor(gender), tdee - 500)
     case 'hypertrophy':
       return tdee + 300
     default:
@@ -114,20 +124,25 @@ function getCarbsPerKg(intensity: 'rest' | 'moderate' | 'high', goal: FitnessGoa
 function computeStaticMacros(profile: UserProfile): MacroTargets {
   const bmr = computeBMR(profile)
   const tdee = computeStaticTDEE(bmr, profile.activity_level)
-  const calories = applyGoalAdjustment(tdee, profile.fitness_goal)
+  const calorieTarget = applyGoalAdjustment(tdee, profile.fitness_goal, profile.gender)
 
+  // The calories field is always recomputed from the FINAL macros (M0),
+  // matching what dynamic mode already did — the old code returned the
+  // pre-allocation target, which silently disagreed with the macro sum by
+  // a couple of kcal from rounding, and by 100+ kcal whenever the 50g carb
+  // floor or the calorie rail engaged.
   if (profile.fitness_goal === 'conditioning') {
-    const protein = Math.round((calories * 0.20) / 4)
-    const fat = Math.round((calories * 0.25) / 9)
-    const carbs = Math.round((calories * 0.55) / 4)
-    return { calories, protein, carbs, fat }
+    const protein = Math.round((calorieTarget * 0.20) / 4)
+    const fat = Math.round((calorieTarget * 0.25) / 9)
+    const carbs = Math.round((calorieTarget * 0.55) / 4)
+    return { calories: protein * 4 + carbs * 4 + fat * 9, protein, carbs, fat }
   }
 
   const protein = Math.round(2.0 * profile.weight_kg)
-  const fat = Math.round((calories * 0.25) / 9)
-  const carbs = Math.round((calories - protein * 4 - fat * 9) / 4)
+  const fat = Math.round((calorieTarget * 0.25) / 9)
+  const carbs = Math.max(50, Math.round((calorieTarget - protein * 4 - fat * 9) / 4))
 
-  return { calories, protein, carbs: Math.max(carbs, 50), fat }
+  return { calories: protein * 4 + carbs * 4 + fat * 9, protein, carbs, fat }
 }
 
 function computeDynamicDay(
@@ -150,7 +165,7 @@ function computeDynamicDay(
   }
 
   const dailyTDEE = Math.round(neatTDEE + eee)
-  const calories = applyGoalAdjustment(dailyTDEE, profile.fitness_goal)
+  const calories = applyGoalAdjustment(dailyTDEE, profile.fitness_goal, profile.gender)
 
   const protein = Math.round(2.2 * weight)
   const carbsPerKg = getCarbsPerKg(intensity, profile.fitness_goal)

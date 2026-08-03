@@ -4,22 +4,31 @@ import { Separator } from '@/components/ui/separator'
 import { Flame, Beef, Wheat, Droplets, Calculator, Layers } from 'lucide-react'
 import type { MacroTargets, UserProfile, WorkoutDay, MacroCalculationMode } from '@/lib/types'
 import { getActivityLabel, getGoalLabel } from '@/lib/calculations'
-import { calculateWeeklySchedule } from '@/lib/macro-calculator'
+import { calculateWeeklySchedule, computeBMR, computeStaticTDEE } from '@/lib/macro-calculator'
 
 export interface NutritionDisplayProps {
   profile: UserProfile
   macros: MacroTargets
   exercisePlan?: WorkoutDay[]
+  /** Latest daily_metrics weigh-in — overrides the immutable onboarding weight in every displayed number (living targets, M0). */
+  latestWeightKg?: number | null
   onMacroModeChange?: (mode: MacroCalculationMode) => void
 }
 
-export function NutritionDisplay({ profile, macros, exercisePlan = [], onMacroModeChange }: NutritionDisplayProps) {
-  const bmr = Math.round(profile.bmr || 0)
-  const tdee = Math.round(profile.tdee || 0)
+export function NutritionDisplay({ profile, macros, exercisePlan = [], latestWeightKg, onMacroModeChange }: NutritionDisplayProps) {
+  // Living targets (M0): BMR/TDEE were previously read from the frozen
+  // fitness_profiles columns (computed once at onboarding); they're now
+  // derived live from the same effective-weight profile the macros use, so
+  // a new weigh-in updates every number on this tab together.
+  const effectiveProfile = latestWeightKg != null && latestWeightKg > 0
+    ? { ...profile, weight_kg: latestWeightKg }
+    : profile
+  const bmr = computeBMR(effectiveProfile)
+  const tdee = computeStaticTDEE(bmr, effectiveProfile.activity_level)
   const mode = profile.macro_calculation_mode || 'STANDARD_STATIC'
 
   const weeklySchedule = mode === 'DYNAMIC_CSCS'
-    ? calculateWeeklySchedule(profile, exercisePlan)
+    ? calculateWeeklySchedule(effectiveProfile, exercisePlan)
     : null
 
   return (
@@ -90,7 +99,7 @@ export function NutritionDisplay({ profile, macros, exercisePlan = [], onMacroMo
             <div className="flex justify-between"><span className="text-muted-foreground">Age</span><span>{profile.age} years</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Gender</span><span className="capitalize">{profile.gender}</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Height</span><span>{profile.height_cm} cm</span></div>
-            <div className="flex justify-between"><span className="text-muted-foreground">Weight</span><span>{profile.weight_kg} kg</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Weight</span><span>{effectiveProfile.weight_kg} kg{latestWeightKg != null && latestWeightKg > 0 ? '' : ' (onboarding)'}</span></div>
             <div className="flex justify-between items-center"><span className="text-muted-foreground">Activity</span><span className="text-right text-xs max-w-[180px]">{getActivityLabel(profile.activity_level)}</span></div>
             <div className="flex justify-between items-center"><span className="text-muted-foreground">Goal</span><Badge variant="secondary">{getGoalLabel(profile.fitness_goal)}</Badge></div>
           </CardContent>
