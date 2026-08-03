@@ -102,15 +102,17 @@ export interface LoadPrescriptionOptions {
    */
   isCalibrationWeek?: boolean
   /**
-   * Weeks 2-3 of a trainee's FIRST block, for an exercise with no known
-   * working weight — steps a fresh, this-week estimate toward full value
-   * (see FIRST_BLOCK_UNVERIFIED_RAMP_FRACTION's doc comment) instead of
-   * either the normal double-progression increment or a full re-snap.
-   * Mutually exclusive with forceStartingWeightKg in practice (the caller
-   * picks one path per exercise per week) and, like isCalibrationWeek,
-   * ignored when the load comes from a verified known working weight.
+   * Every loading week after calibration, for an exercise with no known
+   * working weight — the load this same exercise resolved to on its last
+   * loading week (deload weeks excluded). The result is that value plus one
+   * unverifiedRampStepKg step, capped by this week's fresh standards
+   * estimate (see UNVERIFIED_RAMP_STEP_KG's doc comment) — never a re-snap
+   * to the full estimate. Mutually exclusive with forceStartingWeightKg in
+   * practice (the caller picks one path per exercise per week) and, like
+   * isCalibrationWeek, ignored when the load comes from a verified known
+   * working weight.
    */
-  firstBlockUnverifiedRampFraction?: number
+  unverifiedPreviousLoadingWeekKg?: number
   /**
    * Verified working weights from onboarding ("I know my numbers"). When the
    * exercise's movement family has an entry here, it replaces the
@@ -607,24 +609,37 @@ const CALIBRATION_WEEK_CONSERVATISM_BY_EXPERIENCE: Record<TrainingExperience, nu
   advanced: 0.45,
 }
 
-// Weeks 2-3 of a trainee's FIRST block, for an exercise that's STILL
-// unverified (no known working weight — calibration only ever runs once, at
-// week 1, so by week 2 there's no fresh "isCalibrationWeek" discount to lean
-// on). Left alone, these weeks would inherit week 1's calibration-dampened
-// number and add only the normal small double-progression notch on top of
-// it (~3.5%/7.5%) — technically correct as a within-block ramp, but for a
-// deeply-dampened week 1 baseline (0.45x of a 217kg estimate is ~98kg), that
-// notch alone would leave week 3 still far below what the lifter can
-// probably actually do, reading as an oddly timid "ramp" in the UI. Instead,
-// weeks 2 and 3 step toward the full standards estimate directly — 65%, then
-// 75% of THAT WEEK's own RPE/reps-scaled estimate — never snapping to 100%
-// (still unverified) and never just coasting on week 1's tiny increment.
-// Only applies pre-verification: the moment real logged history exists for
-// this exercise, the live progression engine (getDoubleProgressionRecommendation
-// in progression-engine.ts) overrides these static numbers entirely, as today.
-export const FIRST_BLOCK_UNVERIFIED_RAMP_FRACTION: Record<number, number> = {
-  2: 0.65,
-  3: 0.75,
+// Every loading week after a trainee's calibration week, for as long as an
+// exercise stays unverified (no known working weight, no logged history) —
+// not just the first block. A percentage-of-standards schedule (this file
+// previously used 65%/75% of the fresh estimate for block 1 weeks 2-3 only)
+// still converges toward the full estimate on a timetable; block 2 week 1
+// then re-ran the normal estimate pipeline with no discount at all and
+// snapped straight to 100% of standards — for a real calibration-week
+// reproduction (37yo/87kg male, advanced, unknown lifts) that meant squats
+// 55kg -> 135kg and trap-bar deadlift -> 167.5kg at the block boundary, the
+// same near-max-unverified-load defect this file's calibration multiplier
+// exists to prevent, just deferred four weeks.
+//
+// The actual invariant: an unverified lift can never move by more than one
+// loading-mode increment between consecutive LOADING weeks (deload weeks are
+// not a reference point — the next block's week 1 steps from the last real
+// loading week). The standards estimate is consulted only as a ceiling in
+// case the step would overshoot it (near the equipment floor, or a light
+// standards estimate), never as a target to close in on. This runs
+// indefinitely — it only stops once the exercise gets a known/logged weight
+// and the live progression engine (getDoubleProgressionRecommendation in
+// progression-engine.ts) takes over, as today.
+const UNVERIFIED_RAMP_STEP_KG: Record<LoadingMode, number> = {
+  barbell: 5,
+  ez_bar: 5,
+  dumbbell: 2,
+  single_implement: 2,
+  stack: 5,
+}
+
+export function unverifiedRampStepKg(entry: ExerciseEntry): number {
+  return UNVERIFIED_RAMP_STEP_KG[loadingMode(entry)]
 }
 
 // Maps a standards category onto the onboarding "known working weight" field
@@ -642,10 +657,10 @@ const KNOWN_WEIGHT_FAMILY: Partial<Record<string, keyof KnownWorkingWeights>> = 
 /**
  * Same "is this exercise anchored to a real, verified number" check
  * prescribeLoad runs internally (as `fromKnownWeight`) — exposed so callers
- * building week 2-3 forceStartingWeightKg (exercise-plan.ts) can decide
- * whether an exercise is still eligible for the first-block unverified ramp
- * (FIRST_BLOCK_UNVERIFIED_RAMP_FRACTION) without duplicating the category ->
- * known-weight-field mapping.
+ * building forceStartingWeightKg / unverifiedPreviousLoadingWeekKg
+ * (exercise-plan.ts) can decide whether an exercise is still eligible for
+ * the unverified per-week step ramp (UNVERIFIED_RAMP_STEP_KG) without
+ * duplicating the category -> known-weight-field mapping.
  */
 export function hasKnownWorkingWeight(category: string | null, knownWorkingWeights: KnownWorkingWeights | undefined): boolean {
   if (!category) return false
@@ -907,10 +922,6 @@ export function prescribeLoad(
       // this is tiered rather than flat).
       const experienceTier = profile.training_experience || 'novice'
       estimate *= CALIBRATION_WEEK_CONSERVATISM_BY_EXPERIENCE[experienceTier]
-    } else if (options.firstBlockUnverifiedRampFraction != null && !fromKnownWeight) {
-      // Block 1, weeks 2-3, still no verified number for this exercise — see
-      // FIRST_BLOCK_UNVERIFIED_RAMP_FRACTION's doc comment.
-      estimate *= options.firstBlockUnverifiedRampFraction
     }
 
     // A per-side prescription is half the standard's total — two-implement
@@ -920,6 +931,15 @@ export function prescribeLoad(
     // halved and is not labeled "per hand" — see loadingMode() and
     // isUnilateralSingleImplement above.
     if (perSideLoad) estimate = estimate / 2
+
+    if (options.unverifiedPreviousLoadingWeekKg != null && !fromKnownWeight) {
+      // Every loading week after calibration, still no verified number for
+      // this exercise — see UNVERIFIED_RAMP_STEP_KG's doc comment. Applied
+      // post per-side-halving so the previous value and the step are in the
+      // same units (per-hand for dumbbells, total otherwise) as what's
+      // actually stored and displayed.
+      estimate = Math.min(options.unverifiedPreviousLoadingWeekKg + unverifiedRampStepKg(entry), estimate)
+    }
 
     rounded = roundToPlate(estimate, mode)
   }
@@ -946,8 +966,8 @@ export function prescribeLoad(
         : buildProgressionBasis(options.repRangeLabel, getLoadIncrementKg(entry, category, rounded), labelMode))
     : options.isCalibrationWeek && !fromKnownWeight
       ? 'Loads start deliberately light — find the weight where the last rep feels like RPE 6, log it, and next week builds from YOUR numbers.'
-      : options.firstBlockUnverifiedRampFraction != null && !fromKnownWeight
-        ? 'Still no logged number for this lift, so this week steps up from calibration while staying conservative. Log it and let the effort target correct it.'
+      : options.unverifiedPreviousLoadingWeekKg != null && !fromKnownWeight
+        ? 'Still no logged number for this lift, so this week goes up by one small step from last time, capped by the standards estimate. Log it and let the effort target correct it.'
         : fromKnownWeight
           ? 'Seeded from the working weight you reported for this lift. Let the effort target correct it if it has changed.'
           : 'Starting estimate from strength standards for your bodyweight, sex and experience — not a tested max. ' +

@@ -10,7 +10,7 @@ import {
   type ExperienceConfig,
 } from './experience-config'
 import { buildWarmup, getWarmupReserveSeconds } from './warmup'
-import { prescribeLoad, categorize, getLoadIncrementKg, isExternallyLoaded, getEquipmentFloorKg, loadingMode, roundToPlate, formatLoad, labelModeForEntry, hasKnownWorkingWeight, FIRST_BLOCK_UNVERIFIED_RAMP_FRACTION, type KnownWorkingWeights } from './load-prescription'
+import { prescribeLoad, categorize, getLoadIncrementKg, isExternallyLoaded, getEquipmentFloorKg, loadingMode, roundToPlate, formatLoad, labelModeForEntry, hasKnownWorkingWeight, unverifiedRampStepKg, type KnownWorkingWeights } from './load-prescription'
 import {
   getPhaseSequence, getPhaseConfig, rotateVariation, resolveTargetRpe,
   shiftReps, adjustRest, dedupeAdjacentPhases, type PhaseConfig, type TrainingPhase,
@@ -3172,6 +3172,15 @@ export function generateMesocycle(
       }
     : undefined
 
+  // Persists ACROSS blocks (unlike blockBaselineKg/blockWeek3Kg below, which
+  // reset every block) — the last loading week's actual resolved load for a
+  // still-unverified exercise, keyed by [dayIndex][exerciseIndex]. Stable
+  // indexing across blocks since day/slot structure doesn't change (only the
+  // variation NAME in a slot rotates). Deload weeks never write to this —
+  // the next block's week 1 steps from the last real loading week, not the
+  // deload number. See UNVERIFIED_RAMP_STEP_KG's doc comment.
+  const lastUnverifiedLoadingWeekKg: (number | null)[][] = baseWeek.map(day => day.exercises.map(() => null))
+
   sequence.forEach((phase, blockIndex) => {
     let phaseConfig = getPhaseConfig(phase)
     // A metabolic/metcon block at full volume is the right call for someone
@@ -3263,6 +3272,17 @@ export function generateMesocycle(
     for (let w = 1; w <= 4; w++) {
       weekCounter++
       const isDeload = w === 4
+      // Which (day, exercise) slots this week are eligible to feed
+      // lastUnverifiedLoadingWeekKg — populated during the exercises.map
+      // below, consumed AFTER enforceLoadCoherence runs (see the tracker
+      // write-back after that call): the coherence pass can independently
+      // clamp a slot down some weeks and not others (its ceiling depends on
+      // sibling exercises in the same coherence group, which move on their
+      // own schedule), so the step-cap must anchor to whatever was actually
+      // DISPLAYED last week, not the pre-coherence estimate — otherwise a
+      // week whose clamp happens to release produces a jump larger than one
+      // step even though the pre-coherence number was correctly capped.
+      const unverifiedLoadingFlags: boolean[][] = blockDays.map(day => day.exercises.map(() => false))
 
       // The very first week of the whole mesocycle, for a trainee who told
       // onboarding they don't know their numbers — not repeated per block,
@@ -3486,22 +3506,23 @@ export function generateMesocycle(
             // but `increment` above is recomputed for whichever variation is
             // actually being lifted this week.
             let forceStartingWeightKg: number | undefined
-            let firstBlockUnverifiedRampFraction: number | undefined
-            if (baselineKg != null) {
-              // Block 1, weeks 2-3, still no verified working weight for this
-              // exercise: step a FRESH this-week estimate toward full value
-              // (see FIRST_BLOCK_UNVERIFIED_RAMP_FRACTION's doc comment)
-              // instead of the normal small increment on top of an already
-              // heavily-dampened calibration baseline — that increment alone
-              // would leave week 3 still far below what the lifter can
-              // probably do. Scoped to rampLoad only — a 'reps'/'maintain'
-              // accessory that intentionally holds flat at baseline is
-              // unaffected; its progression lever is reps, not this.
-              const unverifiedForCategory = !hasKnownWorkingWeight(category, knownWorkingWeights)
-              const useFirstBlockRamp = blockIndex === 0 && rampLoad && unverifiedForCategory && (w === 2 || w === 3)
-              if (useFirstBlockRamp) {
-                firstBlockUnverifiedRampFraction = FIRST_BLOCK_UNVERIFIED_RAMP_FRACTION[w]
-              } else if (w === 2) {
+            let unverifiedPreviousLoadingWeekKg: number | undefined
+            // Still no verified working weight for this exercise: every
+            // loading week after calibration steps from the last loading
+            // week's ACTUAL resolved load (not just within block 1 — see
+            // UNVERIFIED_RAMP_STEP_KG's doc comment for why the old
+            // block-1-only, percentage-of-standards ramp let block 2 week 1
+            // snap straight back to the full undamped estimate). Scoped to
+            // rampLoad only — a 'reps'/'maintain' accessory that
+            // intentionally holds flat at baseline is unaffected; its
+            // progression lever is reps, not this.
+            const unverifiedForCategory = !hasKnownWorkingWeight(category, knownWorkingWeights)
+            if (rampLoad && unverifiedForCategory && !isDeload && !isCalibrationWeek) {
+              const previous = lastUnverifiedLoadingWeekKg[dayIdx][exIdx]
+              if (previous != null) unverifiedPreviousLoadingWeekKg = previous
+            }
+            if (unverifiedPreviousLoadingWeekKg == null && baselineKg != null) {
+              if (w === 2) {
                 forceStartingWeightKg = rampLoad ? baselineKg + increment : baselineKg
               } else if (w === 3) {
                 forceStartingWeightKg = rampLoad ? baselineKg + 2 * increment : baselineKg
@@ -3552,13 +3573,26 @@ export function generateMesocycle(
               isCalibrationWeek,
               knownWorkingWeights,
               forceStartingWeightKg,
-              firstBlockUnverifiedRampFraction,
+              unverifiedPreviousLoadingWeekKg,
               repRangeLabel: reps,
               loadIsProgressing: rampLoad,
             })
 
             if (w === 1) blockBaselineKg[dayIdx][exIdx] = load.starting_weight_kg
             if (w === 3) blockWeek3Kg[dayIdx][exIdx] = load.starting_weight_kg
+            // Deload weeks are read-only for this tracker (see its
+            // declaration) — the next block's week 1 must step from the
+            // last real loading week, not the deload back-off. Written
+            // regardless of THIS week's own rampLoad value (unlike the read
+            // above) — an accessory can flip between holding flat and
+            // ramping week to week (loadStepUnaffordable depends on the
+            // block's baseline, and a within-block variation rotation via
+            // fortnightOffset can change loading mode/category mid-block).
+            // Actually written AFTER enforceLoadCoherence runs (see below);
+            // this just marks the slot as eligible.
+            if (!isDeload && unverifiedForCategory) {
+              unverifiedLoadingFlags[dayIdx][exIdx] = true
+            }
           }
 
           return {
@@ -3592,6 +3626,19 @@ export function generateMesocycle(
       })
 
       enforceLoadCoherence(days)
+
+      // Anchor to the FINAL, post-coherence displayed number — see
+      // unverifiedLoadingFlags's declaration for why this can't be written
+      // during the exercises.map above.
+      for (let dayIdx = 0; dayIdx < days.length; dayIdx++) {
+        const dayExercises = days[dayIdx].exercises
+        for (let exIdx = 0; exIdx < dayExercises.length; exIdx++) {
+          if (!unverifiedLoadingFlags[dayIdx][exIdx]) continue
+          const finalKg = dayExercises[exIdx].suggested_load_kg
+          if (finalKg != null) lastUnverifiedLoadingWeekKg[dayIdx][exIdx] = finalKg
+        }
+      }
+
       progressConditioningWeek(days, w, isDeload)
 
       // Deload weeks are SUPPOSED to run short (half volume, by design) — a

@@ -5,7 +5,7 @@ import type {
   WorkoutDay, ConstraintTrace, PlanResult, TrainingExperience, RecoveryCapacity, FitnessGoal,
 } from './types'
 import { getSkillDemand, isSkillAppropriate } from './experience-config'
-import { categorize, isImprovisedLoadImplement, IMPROVISED_IMPLEMENT_CEILING_KG, estimateEffectiveTotalKg, isExternallyLoaded, prescribeLoad, getEquipmentFloorKg, loadingMode } from './load-prescription'
+import { categorize, isImprovisedLoadImplement, IMPROVISED_IMPLEMENT_CEILING_KG, estimateEffectiveTotalKg, isExternallyLoaded, prescribeLoad, getEquipmentFloorKg, loadingMode, unverifiedRampStepKg } from './load-prescription'
 
 // A genuine outer-bound safety backstop — not a conservatism patch (the
 // capability-model round replaced the old CATEGORY_CAPS_KG, which existed to
@@ -83,7 +83,7 @@ export interface AuditFailure {
     | 'superset_pairing' | 'load_progression' | 'set_progression' | 'goal_structure' | 'recovery_volume'
     | 'swap_constraint' | 'swap_load' | 'ban_purge' | 'prescription_unit' | 'capability_gate'
     | 'improvised_carry_cap' | 'pattern_coverage' | 'rotation_relative_load' | 'phase_sequence'
-    | 'ramp_up_missing' | 'calibration_load_ceiling'
+    | 'ramp_up_missing' | 'calibration_load_ceiling' | 'block_transition_jump'
   combination: string
   details: string
   exercise?: string
@@ -1079,6 +1079,89 @@ async function runMesocycleBehaviorChecks(): Promise<AuditTestCase[]> {
       style: profile.training_style, experience,
       passed: failures.length === 0, failures,
       planDays: week1?.days.length ?? 0, totalExercises: week1?.days.flatMap(d => d.exercises).length ?? 0, estimatedDurationSec: 0,
+    })
+  }
+
+  // GUARDRAIL (calibration round, Fix: block-transition jump): the
+  // calibration_load_ceiling check above only inspects week 1 — it couldn't
+  // catch the follow-on defect where an unverified lift's load snapped
+  // straight to the full undamped standards estimate at the START of block
+  // 2 (a real reproduction: squats 55kg in block 1 week 1 -> 135kg in block
+  // 2 week 1). The fix makes every loading week for a still-unverified lift
+  // step by at most one unverifiedRampStepKg increment from its last
+  // LOADING week (deload weeks are never the reference) — this check
+  // verifies that holds at every block transition, not just the first.
+  // Matched by (day index, exercise slot index), not by name: a block
+  // transition is exactly where rotateVariation is most likely to swap the
+  // exercise name (Deadlifts -> Trap Bar Deadlift), so name-matching would
+  // blind the check to the case it exists to catch.
+  for (const experience of ALL_EXPERIENCE) {
+    const comboLabel = `[block transition jump] experience=${experience}`
+    const failures: AuditFailure[] = []
+    const profile = baseMesocycleProfile({ training_experience: experience })
+    const meso = generateMesocycle(profile)
+    const sortedWeeks = [...meso].sort((a, b) => a.week_number - b.week_number)
+
+    const dayCount = sortedWeeks[0]?.days.length ?? 0
+    for (let dayIdx = 0; dayIdx < dayCount; dayIdx++) {
+      const exCount = sortedWeeks[0]?.days[dayIdx]?.exercises.length ?? 0
+      for (let exIdx = 0; exIdx < exCount; exIdx++) {
+        let lastLoadingWeekKg: number | null = null
+        let lastLoadingWeekNum: number | null = null
+        let currentBlockNum: number | null = null
+        let blockFirstLoadingKg: number | null = null
+        // Only exercises that actually ramp load WITHIN a block are subject
+        // to the step cap at the NEXT block's boundary — a 'reps'/'maintain'
+        // accessory that intentionally holds flat within its block (Shrugs
+        // held at 8kg all of block 1) is allowed to re-baseline from a fresh
+        // estimate at the next block's week 1, same as it always has; the
+        // fix is scoped to rampLoad exercises only (see load-prescription.ts
+        // and exercise-plan.ts), and this proxy — did the load rise at all
+        // during the prior block — approximates that without needing to
+        // replicate the goal-policy progressionEmphasis logic here.
+        let blockRamped = false
+        for (const week of sortedWeeks) {
+          const ex = week.days[dayIdx]?.exercises[exIdx]
+          if (!ex) continue
+          const entry = EXERCISE_DATABASE.find(e => e.name === ex.name)
+          if (!entry || !isExternallyLoaded(entry) || isImprovisedLoadImplement(entry)) continue
+          if (ex.suggested_load_kg == null) continue
+          if (week.is_deload) continue
+
+          const blockNum = week.block_number ?? null
+          if (blockNum !== currentBlockNum) {
+            if (lastLoadingWeekKg != null && blockRamped) {
+              const step = unverifiedRampStepKg(entry)
+              const floor = getEquipmentFloorKg(entry)
+              const roundingTolerance = loadingMode(entry) === 'barbell' || loadingMode(entry) === 'stack' ? 1.25 : 1
+              const ceiling = lastLoadingWeekKg + step + roundingTolerance
+              if (ex.suggested_load_kg > ceiling && ex.suggested_load_kg > floor) {
+                failures.push({
+                  check: 'block_transition_jump',
+                  combination: comboLabel,
+                  details: `"${ex.name}" week ${week.week_number} load ${ex.suggested_load_kg}kg jumps more than one step (${step}kg) from week ${lastLoadingWeekNum}'s ${lastLoadingWeekKg}kg — ceiling is ${ceiling.toFixed(1)}kg`,
+                  exercise: ex.name,
+                })
+              }
+            }
+            currentBlockNum = blockNum
+            blockFirstLoadingKg = ex.suggested_load_kg
+            blockRamped = false
+          } else if (blockFirstLoadingKg != null && ex.suggested_load_kg > blockFirstLoadingKg) {
+            blockRamped = true
+          }
+
+          lastLoadingWeekKg = ex.suggested_load_kg
+          lastLoadingWeekNum = week.week_number
+        }
+      }
+    }
+
+    cases.push({
+      equipment: profile.equipment_access, injuries: [], duration: profile.session_duration_preference,
+      style: profile.training_style, experience,
+      passed: failures.length === 0, failures,
+      planDays: sortedWeeks[0]?.days.length ?? 0, totalExercises: sortedWeeks[0]?.days.flatMap(d => d.exercises).length ?? 0, estimatedDurationSec: 0,
     })
   }
 
