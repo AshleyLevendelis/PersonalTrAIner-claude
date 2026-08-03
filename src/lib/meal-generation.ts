@@ -1,0 +1,310 @@
+// ---------------------------------------------------------------------------
+// MEAL GENERATION (M1) — pool builder: AI proposes, code verifies & enforces
+// ---------------------------------------------------------------------------
+// generate-meals (the edge function) is a pure proposal engine: given slot
+// macro budgets, it returns named dishes with quantified ingredient strings.
+// It is NOT trusted for macros or dietary safety — every proposal goes
+// through this module's verification pipeline before it's allowed anywhere
+// near meal_plan_slots:
+//
+//   1. Parse ingredient strings -> structured lines (portion-scaler.ts)
+//   2. Resolve every line against food-db.ts; reject if resolved-mass
+//      coverage < MIN_COVERAGE (an under-resolved meal's real macros are
+//      unknowable, not just imprecise)
+//   3. validateMealAgainstDiet — any violation rejects outright (diet-rules.ts
+//      fails closed on unresolved ingredients too, so this also catches most
+//      cases 2 already caught, redundantly and intentionally)
+//   4. Compute REAL macros from food-db — the AI's own claimed numbers are
+//      never read, only its ingredient list
+//   5. Scale portions to the slot budget (portion-scaler.ts); an absurd
+//      scale factor (>2.5x or <0.4x) rejects rather than forcing
+//   6. Recompute macros on the SCALED ingredients and require the result
+//      within CALORIE_TOLERANCE of target calories and at/above target
+//      protein
+//
+// A proposal surviving all six is accepted into a slot's pool. Filling a
+// pool is bounded-retry (a few generation rounds, not infinite) — a slot
+// that can't reach its target pool size keeps whatever passed and logs the
+// shortfall; it is never padded with a placeholder claiming false macros.
+// ---------------------------------------------------------------------------
+
+import { supabase } from './supabase'
+import { computeMealMacros, type Macros100g } from './food-db'
+import { validateMealAgainstDiet } from './diet-rules'
+import { parseIngredientLines, scaleToTarget, isWithinCalorieTolerance, meetsProteinFloor } from './portion-scaler'
+import type { MacroTargets, CookingTimePreference } from './types'
+import type { MealSlotName } from './meal-store'
+
+export const MIN_COVERAGE = 0.8
+export const DEFAULT_POOL_SIZE = 5
+export const MAX_GENERATION_ROUNDS = 3
+
+const ALL_SLOTS: MealSlotName[] = ['breakfast', 'lunch', 'dinner', 'snack']
+
+/** Ratios of the daily target each active slot gets, by meals-per-day (snack-less base case). Mirrors the interim placeholder plan's SLOT_RATIOS but keyed to this module's slot set. */
+const BASE_RATIOS: Record<2 | 3 | 4, Partial<Record<MealSlotName, number>>> = {
+  2: { breakfast: 0.45, dinner: 0.55 },
+  3: { breakfast: 0.30, lunch: 0.40, dinner: 0.30 },
+  4: { breakfast: 0.25, lunch: 0.30, dinner: 0.30, snack: 0.15 },
+}
+
+function scaleTargets(targets: MacroTargets, ratio: number): MacroTargets {
+  return {
+    calories: Math.round(targets.calories * ratio),
+    protein: Math.round(targets.protein * ratio),
+    carbs: Math.round(targets.carbs * ratio),
+    fat: Math.round(targets.fat * ratio),
+  }
+}
+
+/**
+ * Slot budgets for a day, derived from daily targets + meals_per_day +
+ * include_snacks. mealsPerDay outside {2,3,4} falls back to 3 (the onboarding
+ * default). include_snacks on a 2/3-meal profile carves out a flat 10% for a
+ * snack slot and proportionally shrinks the others to make room for it;
+ * 4-meal profiles already have a snack slot in their base ratios.
+ */
+export function computeSlotBudgets(
+  targets: MacroTargets,
+  mealsPerDay: number | undefined,
+  includeSnacks: boolean | undefined,
+): Partial<Record<MealSlotName, MacroTargets>> {
+  const mpd: 2 | 3 | 4 = mealsPerDay === 2 ? 2 : mealsPerDay === 4 ? 4 : 3
+  let ratios: Partial<Record<MealSlotName, number>> = { ...BASE_RATIOS[mpd] }
+
+  if (includeSnacks && ratios.snack == null) {
+    const snackShare = 0.10
+    const scale = 1 - snackShare
+    const scaled: Partial<Record<MealSlotName, number>> = {}
+    for (const slot of Object.keys(ratios) as MealSlotName[]) {
+      scaled[slot] = (ratios[slot] ?? 0) * scale
+    }
+    scaled.snack = snackShare
+    ratios = scaled
+  }
+
+  const budgets: Partial<Record<MealSlotName, MacroTargets>> = {}
+  for (const slot of ALL_SLOTS) {
+    const ratio = ratios[slot]
+    if (ratio != null) budgets[slot] = scaleTargets(targets, ratio)
+  }
+  return budgets
+}
+
+export interface PoolOption {
+  slot: MealSlotName
+  name: string
+  ingredients: { name: string; quantity: number; unit: string }[]
+  macros: MacroTargets
+  tags: string[]
+}
+
+export interface RawProposal {
+  slot: string
+  name: string
+  ingredients: string[]
+  prep: string
+  cuisine: string
+}
+
+async function requestProposals(
+  slotCounts: Partial<Record<MealSlotName, number>>,
+  budgets: Partial<Record<MealSlotName, MacroTargets>>,
+  dietaryPreferences: string[],
+  cookingTimePreference: CookingTimePreference | undefined,
+): Promise<RawProposal[]> {
+  const slots = (Object.entries(slotCounts) as [MealSlotName, number][])
+    .filter(([, count]) => count > 0)
+    .map(([slot, count]) => {
+      const budget = budgets[slot]!
+      return { slot, calories: budget.calories, protein: budget.protein, carbs: budget.carbs, fat: budget.fat, count }
+    })
+
+  if (slots.length === 0) return []
+
+  const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-meals`
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 45000)
+  try {
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ slots, dietary_preferences: dietaryPreferences, cooking_time_preference: cookingTimePreference }),
+      signal: controller.signal,
+    })
+    if (!response.ok) return []
+    const data = await response.json()
+    return Array.isArray(data.meals) ? data.meals : []
+  } catch {
+    return []
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
+function macrosToTargets(m: Macros100g): MacroTargets {
+  return { calories: m.kcal, protein: m.protein, carbs: m.carbs, fat: m.fat }
+}
+
+/**
+ * Runs one proposal through the full verification pipeline. Returns the
+ * accepted PoolOption, or null with a logged reason if it fails any stage.
+ */
+/** Exported so tests (and the vegan-fixture rejection test in particular) can run a synthetic AI proposal through the exact verification pipeline without hitting the network. */
+export function verifyProposal(
+  proposal: RawProposal,
+  slot: MealSlotName,
+  budget: MacroTargets,
+  dietaryPreferences: string[],
+  rejectLog: string[],
+): PoolOption | null {
+  const parsed = parseIngredientLines(proposal.ingredients)
+  if (parsed.length === 0) {
+    rejectLog.push(`[${slot}] "${proposal.name}": no ingredients parsed`)
+    return null
+  }
+
+  const computed = computeMealMacros(parsed)
+  if (computed.coverage < MIN_COVERAGE) {
+    rejectLog.push(`[${slot}] "${proposal.name}": coverage ${(computed.coverage * 100).toFixed(0)}% below ${MIN_COVERAGE * 100}% floor — unmatched: ${computed.unmatched.join(', ')}`)
+    return null
+  }
+
+  const dietResult = validateMealAgainstDiet(parsed, dietaryPreferences)
+  if (!dietResult.ok) {
+    rejectLog.push(`[${slot}] "${proposal.name}": diet violation(s) — ${dietResult.violations.map(v => v.reason).join('; ')}`)
+    return null
+  }
+
+  const target100g: Macros100g = { kcal: budget.calories, protein: budget.protein, carbs: budget.carbs, fat: budget.fat }
+  const scaled = scaleToTarget(parsed, { kcal: computed.kcal, protein: computed.protein, carbs: computed.carbs, fat: computed.fat }, target100g)
+  if (scaled.rejectedReason) {
+    rejectLog.push(`[${slot}] "${proposal.name}": ${scaled.rejectedReason}`)
+    return null
+  }
+
+  const finalComputed = computeMealMacros(scaled.ingredients)
+  if (finalComputed.coverage < MIN_COVERAGE) {
+    rejectLog.push(`[${slot}] "${proposal.name}": post-scale coverage dropped below floor (unexpected — scaling shouldn't change resolution)`)
+    return null
+  }
+  if (!isWithinCalorieTolerance(finalComputed.kcal, budget.calories) || !meetsProteinFloor(finalComputed.protein, budget.protein)) {
+    rejectLog.push(`[${slot}] "${proposal.name}": post-scale result (${finalComputed.kcal} kcal, ${finalComputed.protein}g protein) missed target (${budget.calories} kcal, ${budget.protein}g protein) even at a sane scale factor (${scaled.scaleFactor.toFixed(2)}x) — likely a macro-ratio mismatch scaling alone can't fix`)
+    return null
+  }
+
+  const prepBand = /\b(1[0-5]|[1-9])\s*(min|minute)/i.test(proposal.prep) ? 'quick' : proposal.prep.length > 0 ? 'standard' : 'unspecified'
+  const keyProtein = parsed.find(l => {
+    const entry = computed.lines.find(ln => ln.input === l)?.entry
+    return entry?.category === 'protein'
+  })
+
+  return {
+    slot,
+    name: proposal.name,
+    ingredients: scaled.ingredients,
+    macros: macrosToTargets(finalComputed),
+    tags: [proposal.cuisine, prepBand, keyProtein?.name ?? ''].filter(Boolean),
+  }
+}
+
+export interface GenerateMealPoolsResult {
+  accepted: Partial<Record<MealSlotName, PoolOption[]>>
+  rejectionLog: string[]
+  shortfalls: { slot: MealSlotName; requested: number; filled: number }[]
+}
+
+/**
+ * Builds a full week's worth of meal pools for a profile: for every active
+ * slot (per meals_per_day/include_snacks), requests candidate dishes in
+ * bounded rounds, verifies each, and returns whatever passed. Persists
+ * accepted options into meal_plan_slots, replacing that profile's existing
+ * pool for each touched slot (regenerate-per-slot semantics — Part 5's UI
+ * control calls this with a single slot to avoid nuking the whole week).
+ */
+export async function generateMealPools(params: {
+  profileId: string
+  targets: MacroTargets
+  dietaryPreferences: string[]
+  mealsPerDay?: number
+  includeSnacks?: boolean
+  cookingTimePreference?: CookingTimePreference
+  poolSize?: number
+  /** Restrict generation to these slots only (per-slot regenerate). Omit to fill every active slot. */
+  onlySlots?: MealSlotName[]
+}): Promise<GenerateMealPoolsResult> {
+  const poolSize = params.poolSize ?? DEFAULT_POOL_SIZE
+  const budgets = computeSlotBudgets(params.targets, params.mealsPerDay, params.includeSnacks)
+  const activeSlots = (Object.keys(budgets) as MealSlotName[]).filter(
+    s => !params.onlySlots || params.onlySlots.includes(s)
+  )
+
+  const accepted: Partial<Record<MealSlotName, PoolOption[]>> = {}
+  const rejectionLog: string[] = []
+  for (const slot of activeSlots) accepted[slot] = []
+
+  for (let round = 0; round < MAX_GENERATION_ROUNDS; round++) {
+    const remaining: Partial<Record<MealSlotName, number>> = {}
+    for (const slot of activeSlots) {
+      const need = poolSize - (accepted[slot]?.length ?? 0)
+      if (need > 0) remaining[slot] = need
+    }
+    if (Object.keys(remaining).length === 0) break
+
+    // Ask for a couple of spares beyond what's needed per round, since some
+    // proposals will fail verification — cheaper than a strict 1:1 retry loop.
+    const requestCounts: Partial<Record<MealSlotName, number>> = {}
+    for (const [slot, need] of Object.entries(remaining) as [MealSlotName, number][]) {
+      requestCounts[slot] = need + 2
+    }
+
+    const proposals = await requestProposals(requestCounts, budgets, params.dietaryPreferences, params.cookingTimePreference)
+    for (const proposal of proposals) {
+      const slot = proposal.slot as MealSlotName
+      if (!activeSlots.includes(slot)) continue
+      if ((accepted[slot]?.length ?? 0) >= poolSize) continue
+
+      const budget = budgets[slot]
+      if (!budget) continue
+
+      const option = verifyProposal(proposal, slot, budget, params.dietaryPreferences, rejectionLog)
+      if (option) accepted[slot]!.push(option)
+    }
+  }
+
+  const shortfalls = activeSlots
+    .map(slot => ({ slot, requested: poolSize, filled: accepted[slot]?.length ?? 0 }))
+    .filter(s => s.filled < s.requested)
+
+  if (shortfalls.length > 0) {
+    console.warn('generateMealPools: some slots did not reach target pool size', shortfalls, rejectionLog)
+  }
+
+  await persistPools(params.profileId, accepted)
+
+  return { accepted, rejectionLog, shortfalls }
+}
+
+/** Replaces a profile's stored pool for each touched slot with the newly accepted options. */
+async function persistPools(profileId: string, accepted: Partial<Record<MealSlotName, PoolOption[]>>): Promise<void> {
+  for (const [slot, options] of Object.entries(accepted) as [MealSlotName, PoolOption[]][]) {
+    if (options.length === 0) continue
+
+    await supabase.from('meal_plan_slots').delete().eq('profile_id', profileId).eq('slot', slot)
+
+    const rows = options.map((opt, i) => ({
+      profile_id: profileId,
+      slot,
+      pool_index: i,
+      name: opt.name,
+      ingredients: opt.ingredients,
+      macros: { kcal: opt.macros.calories, protein: opt.macros.protein, carbs: opt.macros.carbs, fat: opt.macros.fat },
+      tags: opt.tags,
+    }))
+    const { error } = await supabase.from('meal_plan_slots').insert(rows)
+    if (error) console.error(`Failed to persist pool for slot ${slot}:`, error)
+  }
+}

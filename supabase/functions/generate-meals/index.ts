@@ -8,12 +8,27 @@ const corsHeaders = {
     "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-interface MealSlot {
+// ---------------------------------------------------------------------------
+// M1 REWIRE: this function used to be a dead, never-actually-called "generate
+// one day's meals with one substitution each" endpoint. It's now the variety
+// ENGINE behind src/lib/meal-generation.ts's pool builder: it proposes named
+// dishes with quantified ingredients for a batch of (slot, budget) requests;
+// it does NOT verify anything. The AI's own claimed macros are not even
+// asked for anymore — meal-generation.ts resolves every ingredient through
+// food-db.ts, enforces diet-rules.ts, and scales portions with
+// portion-scaler.ts. This function's only job is proposing plausible,
+// varied, named dishes with parseable quantities; code owns every number and
+// every dietary rule downstream.
+// ---------------------------------------------------------------------------
+
+interface SlotRequest {
   slot: string;
   calories: number;
   protein: number;
   carbs: number;
   fat: number;
+  /** How many distinct dish variants to propose for this slot. */
+  count: number;
 }
 
 interface GeneratedMeal {
@@ -21,9 +36,7 @@ interface GeneratedMeal {
   name: string;
   ingredients: string[];
   prep: string;
-  substitution: string;
-  sub_ingredients: string[];
-  sub_prep: string;
+  cuisine: string;
 }
 
 const GLOBAL_CUISINES = [
@@ -45,24 +58,8 @@ const GLOBAL_CUISINES = [
   "Georgian",
   "Cajun / Creole",
   "Scandinavian (Nordic)",
-];
-
-const UNCONVENTIONAL_PROTEINS = [
-  "bison or venison",
-  "duck breast",
-  "lamb leg or shoulder",
-  "pork tenderloin or pork loin",
-  "turkey thigh",
-  "tempeh or seitan",
-  "shrimp or prawns",
-  "white fish (cod, halibut, sea bass, barramundi)",
-  "scallops",
-  "elk or ostrich",
-  "rabbit",
-  "mahi-mahi or swordfish",
-  "sardines or mackerel",
-  "plant-based mince (soy, pea protein)",
-  "cottage cheese or paneer",
+  "British / Classic",
+  "Italian",
 ];
 
 function pickRandom<T>(arr: T[], count: number): T[] {
@@ -70,62 +67,42 @@ function pickRandom<T>(arr: T[], count: number): T[] {
   return shuffled.slice(0, Math.min(count, arr.length));
 }
 
+/**
+ * Prompt-level dietary guidance. This is explicitly a NICETY — a good-faith
+ * attempt to get the first proposal right and reduce wasted regeneration
+ * rounds — not the guard. diet-rules.ts's validateMealAgainstDiet is the
+ * guard, applied to every proposal after this function returns.
+ */
 function buildDietarySafetyBlock(preferences: string[]): string {
   if (!preferences || preferences.length === 0) return "";
 
   const rules: string[] = [];
+  const has = (p: string) => preferences.includes(p);
 
-  if (preferences.includes("vegetarian")) {
-    rules.push("VEGETARIAN: Use ZERO meat, poultry, or fish. Eggs and dairy are allowed.");
-  }
-  if (preferences.includes("vegan")) {
-    rules.push("VEGAN: Use ZERO animal products - no meat, fish, dairy, eggs, honey, or gelatin.");
-  }
-  if (preferences.includes("pescatarian")) {
-    rules.push("PESCATARIAN: No meat or poultry. Fish and seafood are allowed. Eggs and dairy are allowed.");
-  }
-  if (preferences.includes("halal")) {
-    rules.push("HALAL: No pork, no alcohol-based ingredients, all meat must be halal-certified. No gelatin from non-halal sources.");
-  }
-  if (preferences.includes("kosher")) {
-    rules.push("KOSHER: No pork, no shellfish, no mixing of meat and dairy in the same meal. Meat must be from kosher animals.");
-  }
-  if (preferences.includes("dairy-free")) {
-    rules.push("DAIRY-FREE: No milk, cheese, yogurt, butter, cream, whey protein, or any dairy derivative. Use plant-based alternatives.");
-  }
-  if (preferences.includes("gluten-free")) {
-    rules.push("GLUTEN-FREE: No wheat, barley, rye, spelt, or regular oats. No pasta, bread, wraps, or flour unless explicitly gluten-free. Use rice, quinoa, buckwheat, corn, or certified GF oats.");
-  }
-  if (preferences.includes("nut-free")) {
-    rules.push("NUT-FREE: No tree nuts (almonds, walnuts, cashews, pistachios, pecans, etc.) and no peanuts. No nut butters, nut milks, or nut flours.");
-  }
-  if (preferences.includes("low-carb")) {
-    rules.push("LOW-CARB: Minimize carbohydrate sources. No rice, pasta, bread, potatoes, or high-sugar fruits. Prioritize leafy greens, above-ground vegetables, and healthy fats.");
-  }
-  if (preferences.includes("keto")) {
-    rules.push("KETO: Strictly cap total carbohydrates under 50g for the ENTIRE day. Prioritize fatty proteins (salmon, ribeye, thighs), healthy oils (olive, avocado, coconut), nuts, seeds, and above-ground vegetables. Do NOT use grains, tubers, legumes, or high-sugar fruits (banana, mango, grapes). Distribute the 50g carb cap proportionally across meal slots.");
-  }
-  if (preferences.includes("pork-free")) {
-    rules.push("PORK-FREE: Exclude ALL pork products entirely — no bacon, ham, prosciutto, pancetta, pork tenderloin, pork loin, chorizo, or any pork-derived ingredient.");
-  }
-  if (preferences.includes("egg-free")) {
-    rules.push("EGG-FREE: No whole eggs, egg whites, egg yolks, or any egg-derived ingredients (mayonnaise, meringue, egg wash). Zero matching allergens may pass into the ingredients array.");
-  }
-  if (preferences.includes("soy-free")) {
-    rules.push("SOY-FREE: No tofu, tempeh, TVP (textured vegetable protein), soy sauce, tamari, edamame, miso, soy milk, or soy lecithin. Zero matching allergens may pass into the ingredients array.");
-  }
-  if (preferences.includes("seafood-free")) {
-    rules.push("SEAFOOD-FREE: No fish of any kind (salmon, tuna, cod, halibut, sardines, mackerel, swordfish, sea bass, barramundi) and no shellfish (shrimp, prawns, crab, lobster, scallops, mussels). Zero matching allergens may pass into the ingredients array.");
-  }
+  if (has("vegetarian")) rules.push("VEGETARIAN: no meat, poultry, or fish. Eggs and dairy are fine.");
+  if (has("vegan")) rules.push("VEGAN: zero animal products — no meat, fish, dairy, eggs, or honey.");
+  if (has("pescatarian")) rules.push("PESCATARIAN: no meat or poultry; fish, shellfish, eggs, and dairy are fine.");
+  if (has("keto") || has("low-carb")) rules.push("LOW-CARB/KETO: avoid grains, potatoes, sugary fruit, and legumes. Lean on protein, non-starchy veg, and fat.");
+  if (has("halal")) rules.push("HALAL: no pork, no alcohol-based ingredients.");
+  if (has("kosher")) rules.push("KOSHER: no pork, no shellfish, and never combine meat and dairy in the same dish.");
+  if (has("paleo")) rules.push("PALEO: no grains, legumes, dairy, or refined sugar.");
+  if (has("dairy-free")) rules.push("DAIRY-FREE: no milk, cheese, yoghurt, butter, cream, or whey.");
+  if (has("gluten-free")) rules.push("GLUTEN-FREE: no wheat, barley, rye, or regular pasta/bread — use rice, quinoa, corn, or certified gluten-free alternatives.");
+  if (has("nut-free")) rules.push("NUT-FREE: no tree nuts or peanuts, no nut butters or nut milks.");
+  if (has("egg-free")) rules.push("EGG-FREE: no eggs or egg-derived ingredients.");
+  if (has("soy-free")) rules.push("SOY-FREE: no tofu, tempeh, soy sauce, edamame, or soy milk.");
+  if (has("shellfish-free")) rules.push("SHELLFISH-FREE: no prawns, crab, lobster, mussels, or scallops.");
+  if (has("low-fodmap")) rules.push("LOW-FODMAP: avoid garlic, onion, wheat, and high-fructose fruit where possible.");
 
-  return `\n\nCRITICAL DIETARY SAFETY RULES (HIGHEST PRIORITY - VIOLATION IS UNACCEPTABLE):
-The user has the following dietary restrictions: [${preferences.join(", ")}]
-You MUST strictly adhere to ALL of the following constraints. Breaking any of these rules could cause allergic reactions, religious violations, or health issues.
+  if (rules.length === 0) return "";
 
-${rules.join("\n")}
+  return `\n\nDIETARY REQUIREMENTS (${preferences.join(", ")}):\n${rules.join("\n")}\nFind a compliant alternative for any ingredient that would violate these — never include a restricted ingredient "just this once".`;
+}
 
-Strictly enforce all allergy guardrails (Egg-Free, Soy-Free, Seafood-Free, Pork-Free). If any of these boundaries are active, zero matching allergens may pass into the ingredients array.
-If any ingredient conflicts with these restrictions, you MUST find a suitable alternative that fits the macro targets. NEVER include a restricted ingredient "just this once" or suggest the user "could substitute" later.`;
+function cookingTimeGuidance(pref: string | undefined): string {
+  if (pref === "quick") return "Keep prep to 15 minutes or less: minimal steps, few ingredients, no long marinades or slow-cooked elements.";
+  if (pref === "loves_cooking") return "Feel free to use real recipes with proper technique and a few more steps — this user enjoys cooking.";
+  return "Keep prep to a realistic 20-30 minutes with straightforward steps.";
 }
 
 Deno.serve(async (req: Request) => {
@@ -134,11 +111,11 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const { macros, fitness_goal, slots, dietary_preferences } = await req.json();
+    const { slots, dietary_preferences, cooking_time_preference } = await req.json();
 
-    if (!macros || !fitness_goal || !Array.isArray(slots)) {
+    if (!Array.isArray(slots) || slots.length === 0) {
       return new Response(
-        JSON.stringify({ error: "macros, fitness_goal, and slots array are required" }),
+        JSON.stringify({ error: "slots array is required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -151,84 +128,51 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const selectedCuisines = pickRandom(GLOBAL_CUISINES, 4);
-    const selectedProteins = pickRandom(UNCONVENTIONAL_PROTEINS, 3);
+    const typedSlots = slots as SlotRequest[];
+    const selectedCuisines = pickRandom(GLOBAL_CUISINES, Math.min(6, GLOBAL_CUISINES.length));
+    const dietaryBlock = buildDietarySafetyBlock(dietary_preferences || []);
+    const cookingGuidance = cookingTimeGuidance(cooking_time_preference);
 
-    const cuisineAssignments = (slots as MealSlot[]).map((s, i) => {
-      const cuisine = selectedCuisines[i % selectedCuisines.length];
-      return `- ${s.slot}: Draw inspiration from ${cuisine} cuisine`;
-    }).join("\n");
-
-    const slotDescriptions = (slots as MealSlot[]).map(
-      (s) => `- ${s.slot}: ${s.calories} kcal, ${s.protein}g protein, ${s.carbs}g carbs, ${s.fat}g fat`
+    const slotDescriptions = typedSlots.map(
+      (s) => `- ${s.slot}: propose ${s.count} DIFFERENT dish variants, each targeting ~${s.calories} kcal, ${s.protein}g protein, ${s.carbs}g carbs, ${s.fat}g fat`
     ).join("\n");
 
-    const dietaryBlock = buildDietarySafetyBlock(dietary_preferences || []);
+    const prompt = `You are a chef and sports nutritionist proposing meal options for an app that will independently verify every number — your job is variety and plausibility, not precision; code will re-measure and scale every ingredient you list.
 
-    const prompt = `You are an award-winning international chef AND sports nutritionist. Generate a complete, novel meal plan for ONE day that is both nutritionally precise AND culinarily exciting.
+CUISINE VARIETY: draw inspiration from a mix of these cuisines across your proposals: ${selectedCuisines.join(", ")}. Vary the protein source and cooking style across variants within the same slot — do not propose near-duplicate dishes.
 
-CULINARY VARIETY MANDATE (NON-NEGOTIABLE):
-You MUST design meals inspired by diverse global cuisines. Here are your cuisine assignments for today:
-${cuisineAssignments}
-
-PROTEIN DIVERSITY REQUIREMENT:
-For today's plan, prioritize these protein sources (pick at least 2 different ones across the day): ${selectedProteins.join(", ")}.
-
-BANNED MEALS (DO NOT GENERATE THESE):
-- "Greek Yogurt Parfait" or any generic yogurt bowl
-- "Chicken and Rice" or "Grilled Chicken Breast with Brown Rice"
-- "Pan-Seared Salmon" with any default side
-- "Overnight Oats" (plain/generic)
-- "Protein Shake" as a standalone meal
-- Any meal whose name is just "[Protein] with [Carb] and [Vegetable]"
-
-You must invent specific, flavorful, culturally authentic dishes with proper dish names (e.g., "Sichuan Mapo Tofu with Charred Bok Choy over Forbidden Rice", "Tunisian Shakshuka with Merguez & Crusty Sourdough", "Korean Bibimbap with Gochujang Beef & Pickled Daikon").
+PREP TIME: ${cookingGuidance}
 ${dietaryBlock}
 
-CRITICAL RULES:
-1. Each meal must be a specific named dish with cultural identity and personality.
-2. Dynamic Quantity Scaling: Scale ingredient quantities so the physical weights add up to each slot's target macros. Do NOT use standard template portions. Calculate gram weights using known nutritional densities.
-3. Macro Priority Matrix: First scale lean protein to hit the protein target, then scale carbs, then fats to fill remaining calories.
-4. Every ingredient MUST include an exact gram weight or measurement (e.g., "165g pork tenderloin", "2 tbsp tahini", "130g cooked farro").
-5. Include ALL cooking fats with exact amounts.
-6. For each meal, also provide ONE substitution alternative (a different dish from a DIFFERENT cuisine that hits similar macros for the same slot).
-7. Each ingredient string must be ONE single parseable item (e.g., "200g plain Greek yogurt" not "200g Greek yogurt with berries and almonds").
+RULES:
+1. Each dish needs a specific, appetizing name (not "Chicken and Rice" — something like "Sichuan Mapo Tofu with Charred Bok Choy").
+2. Every ingredient MUST be ONE parseable line with an exact quantity and unit: "165g chicken breast", "2 tbsp olive oil", "1 medium egg", "200g cooked basmati rice". No ranges, no "to taste", no combined items.
+3. Include all cooking fats with exact amounts.
+4. Aim your ingredient quantities roughly at the stated macro targets — exact precision isn't required (the app rescales), but stay in the right neighborhood so rescaling doesn't need to be extreme.
+5. Report which single cuisine (from the list above, or "Other") each dish draws from as the "cuisine" field.
 
-USER CONTEXT:
-- Fitness Goal: ${fitness_goal}
-- Daily Targets: ${macros.calories} kcal, ${macros.protein}g protein, ${macros.carbs}g carbs, ${macros.fat}g fat
-
-MEAL SLOT BUDGETS:
+SLOTS TO GENERATE:
 ${slotDescriptions}
 
-Return ONLY valid JSON in this exact format (no markdown, no explanation):
+Return ONLY valid JSON, no markdown:
 {
   "meals": [
-    {
-      "slot": "Breakfast",
-      "name": "Specific Dish Name Here",
-      "ingredients": ["Xg ingredient1", "Xg ingredient2"],
-      "prep": "Brief cooking instructions.",
-      "substitution": "Alternative Dish Name (Different Cuisine)",
-      "sub_ingredients": ["Xg ingredient1", "Xg ingredient2"],
-      "sub_prep": "Brief cooking instructions for alternative."
-    }
+    { "slot": "breakfast", "name": "Dish Name", "ingredients": ["165g ingredient", "1 tbsp ingredient"], "prep": "Brief steps.", "cuisine": "Thai" }
   ]
 }
 
-Generate meals for these slots: ${slots.map((s: MealSlot) => s.slot).join(", ")}`;
+Generate exactly the requested count of variants for each slot listed above, all in the "meals" array.`;
 
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${geminiKey}`;
     const geminiBody = JSON.stringify({
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       generationConfig: {
         temperature: 1.0,
-        maxOutputTokens: 4096,
+        maxOutputTokens: 6144,
         responseMimeType: "application/json",
         // gemini-3.5-flash defaults to "thinking" mode, and thinking tokens
-        // come out of maxOutputTokens — confirmed truncating the JSON output
-        // mid-object (sometimes before the closing brace, sometimes
-        // mid-string). Not needed for straight structured extraction.
+        // come out of maxOutputTokens — confirmed truncating structured JSON
+        // output mid-object. Not needed for straight structured extraction.
         thinkingConfig: { thinkingBudget: 0 },
       },
     });
@@ -290,7 +234,7 @@ Generate meals for these slots: ${slots.map((s: MealSlot) => s.slot).join(", ")}
     if (!jsonMatch) {
       console.error("Could not parse JSON from Gemini response:", cleaned.slice(0, 500));
       return new Response(
-        JSON.stringify({ error: "Failed to parse meal plan from AI response" }),
+        JSON.stringify({ error: "Failed to parse meal proposals from AI response" }),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -308,19 +252,17 @@ Generate meals for these slots: ${slots.map((s: MealSlot) => s.slot).join(", ")}
 
     if (!parsed.meals || !Array.isArray(parsed.meals)) {
       return new Response(
-        JSON.stringify({ error: "Invalid meal plan structure from AI" }),
+        JSON.stringify({ error: "Invalid meal proposal structure from AI" }),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     const validatedMeals: GeneratedMeal[] = parsed.meals.map((meal: GeneratedMeal) => ({
-      slot: meal.slot || "Unknown",
+      slot: meal.slot || "unknown",
       name: meal.name || "Unnamed Dish",
       ingredients: Array.isArray(meal.ingredients) ? meal.ingredients : [],
       prep: meal.prep || "",
-      substitution: meal.substitution || "",
-      sub_ingredients: Array.isArray(meal.sub_ingredients) ? meal.sub_ingredients : [],
-      sub_prep: meal.sub_prep || "",
+      cuisine: meal.cuisine || "Other",
     }));
 
     return new Response(
