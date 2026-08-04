@@ -1,3 +1,20 @@
+// ---------------------------------------------------------------------------
+// LAYOUT-DESIGN.md §2.4 / §7.3: this component is no longer the session
+// surface — TodayPanel (P2) owns that entirely. What remains here is the
+// PROGRAM BROWSE STAND-IN: a read-only, week-paginated view of the whole
+// mesocycle, reachable at #/exercise/program. Swap/ban stay functional
+// (they're plan edits, not session acts); every logging affordance —
+// SetLogger, the bulk-log button, off-plan detection, cardio entry, the
+// session cache — is gone, because it can never be reached here again
+// (isToday no longer exists as a concept in this component; TodayPanel is
+// the only surface that ever logs a set). Deleting them here, now, rather
+// than leaving them unreachable-but-present, is what keeps
+// getLastSessionSets down to the hook's single fetcher (F1) instead of
+// three call sites across two components.
+//
+// This file is retired entirely in P4, replaced by ProgramWeekList/Detail.
+// ---------------------------------------------------------------------------
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
@@ -6,21 +23,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Separator } from '@/components/ui/separator'
 import { Input } from '@/components/ui/input'
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible'
-import { ArrowRightLeft, Ban, Zap, ShieldAlert, Heart, Check, Dumbbell, Plus, Activity, Clock, Flame, ChevronLeft, ChevronRight, ChevronDown, Calendar, CheckCircle2, Trophy, Sparkles, Thermometer } from 'lucide-react'
-import React, { useState, useEffect, useCallback, useRef } from 'react'
-import { getExerciseEntry, getExerciseId, searchExerciseCatalog } from '@/lib/exercise-db'
+import { ArrowRightLeft, Ban, Zap, ShieldAlert, Heart, Dumbbell, Activity, Clock, Flame, ChevronLeft, ChevronRight, ChevronDown, Calendar, Sparkles, Thermometer } from 'lucide-react'
+import React, { useState, useCallback } from 'react'
+import { getExerciseEntry, searchExerciseCatalog } from '@/lib/exercise-db'
 import { getExerciseCompatibilityWarnings } from '@/lib/exercise-plan'
-import { isExternallyLoaded, loadingMode, roundToPlate, getEquipmentFloorKg } from '@/lib/load-prescription'
 import { getReplacementCandidates, type SwapScope } from '@/lib/mesocycle-edit'
-import { insertCardioLog, getCardioLogsForDate } from '@/lib/daily-tracking'
-import { checkDoubleProgression, getDoubleProgressionRecommendation } from '@/lib/progression-engine'
-import { saveSessionCache, loadSessionCache } from '@/lib/offline-sync'
-import { saveSet, getSetsForDate, getLastSessionSets, prescriptionUnit } from '@/lib/set-log-store'
 import { useActiveSession } from '@/hooks/useActiveSession'
-import { checkForPR, seedPRCacheFromHistory, getTopPRSet, type PRResult, type SessionSet } from '@/lib/pr-engine'
-import { PlateCalculator } from '@/components/PlateCalculator'
+import { formatRampSets, type RampDisplay } from '@/lib/session-derive'
 import type { ExerciseEntry } from '@/lib/exercise-db'
-import type { WorkoutDay, Exercise, ExerciseSetLog, CardioLog, MesocycleWeek, UserProfile, SessionDuration } from '@/lib/types'
+import type { WorkoutDay, MesocycleWeek, UserProfile, SessionDuration } from '@/lib/types'
 import { estimateDaySeconds, getDurationBudgetSeconds } from '@/lib/session-duration'
 
 interface ExercisePlanProps {
@@ -39,35 +50,18 @@ interface ExercisePlanProps {
 
 const DAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
-// exercise_set_logs.weight_kg is numeric(6,2) — anything past this is a typo
-// (a fat-fingered "10005" instead of "100.5"), not a real lift, and used to
-// slip past the UI, sync, and permanently poison the flush queue.
-const MAX_WEIGHT_KG = 9999.99
-const MAX_REPS = 999
-
-// Prefers the exercise's own `prescription_type` (see exercise-db.ts) —
-// authoritative and set at generation time — over sniffing the reps STRING,
-// which is what used to misreport a distance-based carry logged in meters
-// as "Time" just because the string happened to contain a stray 'm'/'s'.
-// The string heuristic remains only as a fallback for data generated before
-// prescription_type existed.
 function isTimeBased(reps: string, prescriptionType?: string): boolean {
   if (prescriptionType) return prescriptionType !== 'reps'
   return reps.includes('s') || reps.includes('min') || reps.includes('m')
 }
 
 // ---------------------------------------------------------------------------
-// Load provenance (UX round: communicate estimates vs. logged data honestly)
+// Load provenance — browse surfaces show plan-derived loads and honest
+// provenance only (§2.2): 'estimate' or 'known_weight', never 'logged'
+// (that requires the live progression engine, which only runs for today's
+// session in TodayPanel).
 // ---------------------------------------------------------------------------
-// Three states a displayed weight can be in, and the ONLY three — the whole
-// point of this round is that a user can always tell which one they're
-// looking at. 'estimate' is unverified (population standards table, however
-// it was subsequently ramped/capped); 'known_weight' is a real number the
-// trainee reported during onboarding; 'logged' is the live progression
-// engine's recommendation from an actual past session. 'logged' can only be
-// known here in the UI layer (see the progressedLoads effect below) — the
-// mesocycle generator has no visibility into logged history.
-type LoadSource = 'estimate' | 'known_weight' | 'logged'
+type LoadSource = 'estimate' | 'known_weight'
 
 const ESTIMATE_CHIP_CLASS = 'border-dashed border-muted-foreground/40 text-muted-foreground/70'
 const CONFIDENT_CHIP_CLASS = 'border-foreground/25 bg-foreground/5 text-foreground/90 font-medium'
@@ -78,10 +72,8 @@ function loadChipClass(source: LoadSource | undefined): string {
 
 const ESTIMATE_EXPLAINER = "A starting suggestion — we haven't seen you lift yet. Find your real weight and log it; the plan rebuilds from your numbers."
 
-/** Small trailing microcopy next to a load chip — only 'estimate' and 'logged' get one; 'known_weight' is confident enough to need no label. */
 function LoadSourceLabel({ source }: { source: LoadSource | undefined }) {
   if (source === 'estimate') return <span className="text-[9px] italic text-muted-foreground/60">suggested</span>
-  if (source === 'logged') return <span className="text-[9px] italic text-muted-foreground/60">from your last session</span>
   return null
 }
 
@@ -98,7 +90,7 @@ function getRepsLabel(reps: string, prescriptionType?: string): string {
   return 'Reps'
 }
 
-/** Week-level periodization context (phase, focus, coach note) — shown at the top of every day so it's visible regardless of what that day's session looks like. */
+/** Week-level periodization context (phase, focus, coach note) — browse-only now; the session view compresses this into the context line (§1.2). */
 function PhaseBanner({ mesoWeek }: { mesoWeek?: MesocycleWeek }) {
   if (!mesoWeek || (!mesoWeek.phase_label && !mesoWeek.phase_focus && !mesoWeek.coach_note)) return null
   return (
@@ -126,7 +118,7 @@ function PhaseBanner({ mesoWeek }: { mesoWeek?: MesocycleWeek }) {
   )
 }
 
-/** Prominent week-1 note for trainees who skipped onboarding's known-lifts question — separate from PhaseBanner because this needs to stand out, not blend into the routine phase context. */
+/** Prominent week-1 note for trainees who skipped onboarding's known-lifts question — browse-only now; the session view carries the equivalent instruction as an inline cue on the first loaded exercise. */
 function CalibrationBanner({ mesoWeek }: { mesoWeek?: MesocycleWeek }) {
   if (!mesoWeek?.isCalibrationWeek) return null
   return (
@@ -145,12 +137,6 @@ function CalibrationBanner({ mesoWeek }: { mesoWeek?: MesocycleWeek }) {
   )
 }
 
-/**
- * Honest per-day duration estimate — the whole point is to say plainly when
- * a session is deliberately shorter than the user's stated budget (deload,
- * or an exercise selection that just didn't need the full window) rather
- * than let a short session read as a mistake.
- */
 function SessionDurationNote({
   day,
   isDeload,
@@ -262,32 +248,39 @@ function ActiveRecoveryCard({ workout, mesoWeek }: { workout: WorkoutDay; mesoWe
   )
 }
 
-/**
- * Ramp-visibility fix: computes concrete kg targets for an exercise's
- * ramp_up (exercise-plan.ts attaches the day's warmup ramp onto the
- * matching Exercise — see types.ts's doc comment on ramp_up). Percent-based
- * (RampSet.load_percent is relative to THIS week's suggested_load_kg, not a
- * stored absolute), so this recomputes fresh every render rather than
- * trusting a cached kg value — correct automatically as suggested_load_kg
- * changes week to week. Guards against a stale ramp_up.exercise (a variation
- * rotation can change ex.name without clearing the old ramp — see
- * exercise-plan.ts's rotateVariation call sites) by refusing to render
- * anything that doesn't name-match the exercise it's attached to. Every
- * step is floored at the equipment's real loadable minimum (an empty bar is
- * ~20kg, never 0) so "0% of working weight" never displays as an unsafe 0kg.
- */
-function formatRampSets(ex: Exercise): { setNumber: number; kg: number; reps: number }[] | null {
-  if (!ex.ramp_up || ex.ramp_up.exercise !== ex.name) return null
-  if (ex.suggested_load_kg == null) return null
-  const entry = getExerciseEntry(ex.name)
-  if (!entry) return null
-  const mode = loadingMode(entry)
-  const floor = getEquipmentFloorKg(entry)
-  return ex.ramp_up.sets.map(s => ({
-    setNumber: s.set_number,
-    kg: roundToPlate(Math.max((ex.suggested_load_kg! * s.load_percent) / 100, floor), mode),
-    reps: s.reps,
-  }))
+/** Renders session-derive's RampDisplay — the same three-shape kg/bodyweight/stale variant the session view's RampStrip uses (§7.5), so a browsed ramp block never silently drops relative to what today's view shows. */
+function RampBadge({ ramp }: { ramp: RampDisplay }) {
+  if (ramp.kind === 'stale') {
+    return (
+      <div className="flex items-center gap-1 mt-0.5 rounded border border-muted-foreground/30 bg-muted/30 px-1.5 py-1">
+        <Thermometer className="size-2.5 text-muted-foreground shrink-0" />
+        <span className="text-[10px] text-muted-foreground">Build up in 3-4 lighter sets before set 1</span>
+      </div>
+    )
+  }
+  return (
+    <div
+      className="flex items-center gap-1 flex-wrap mt-0.5 rounded border border-orange-300/60 bg-orange-50 dark:bg-orange-950/20 dark:border-orange-900/50 px-1.5 py-1"
+      title="Ramp-up sets — build to your working weight before the sets below. These don't count toward working volume."
+    >
+      <Thermometer className="size-2.5 text-orange-600 dark:text-orange-400 shrink-0" />
+      <span className="text-[10px] font-medium text-orange-700 dark:text-orange-400">Ramp:</span>
+      {ramp.kind === 'kg'
+        ? ramp.sets.map((s, i) => (
+            <span key={s.setNumber} className="text-[10px] text-orange-700 dark:text-orange-400">
+              {i > 0 && <span className="text-orange-400 dark:text-orange-600">·</span>} {s.kg}kg×{s.reps}
+            </span>
+          ))
+        : ramp.sets.map((s, i) => (
+            <span key={s.setNumber} className="text-[10px] text-orange-700 dark:text-orange-400">
+              {i > 0 && <span className="text-orange-400 dark:text-orange-600">·</span>} ×{s.reps}
+            </span>
+          ))}
+      {ramp.kind === 'bodyweight' && (
+        <span className="text-[9px] italic text-muted-foreground/60">→ bodyweight</span>
+      )}
+    </div>
+  )
 }
 
 function WarmupSection({ warmup, open, onToggle }: { warmup: WorkoutDay['warmup']; open: boolean; onToggle: () => void }) {
@@ -327,34 +320,6 @@ function WarmupSection({ warmup, open, onToggle }: { warmup: WorkoutDay['warmup'
             ))}
           </div>
         )}
-        {/* One block per qualifying heavy compound (C0 calibration round, Fix 2)
-            — every tier1_compound, plus a heavy-enough tier2_compound, gets its
-            OWN clearly-labeled ramp so a second main lift on the same day is
-            never presented as if it needs no lead-in. */}
-        {warmup.ramp_ups.map(ramp => (
-          <div key={ramp.exercise} className="space-y-1">
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
-              Ramp-Up — {ramp.exercise}{ramp.abbreviated && <span className="normal-case font-normal italic"> (quick — you're already warm)</span>}
-            </p>
-            <div className="flex flex-wrap items-center gap-1.5">
-              {ramp.sets.map(set => (
-                <span
-                  key={set.set_number}
-                  className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] ${ramp.loadSource === 'estimate' ? ESTIMATE_CHIP_CLASS : 'text-muted-foreground'}`}
-                  title={set.note}
-                >
-                  Set {set.set_number}: {set.load_percent}% × {set.reps}
-                </span>
-              ))}
-              {/* Ramp percentages are relative to the working weight — if that
-                  weight is itself still unverified, say so once per ramp block
-                  rather than on every set chip. */}
-              {ramp.loadSource === 'estimate' && (
-                <span className="text-[9px] italic text-muted-foreground/60">% of a suggested weight</span>
-              )}
-            </div>
-          </div>
-        ))}
         {warmup.coach_note && (
           <p className="text-[11px] text-muted-foreground/80 italic">{warmup.coach_note}</p>
         )}
@@ -363,410 +328,25 @@ function WarmupSection({ warmup, open, onToggle }: { warmup: WorkoutDay['warmup'
   )
 }
 
-interface SetInputState {
-  weight: string
-  reps: string
-  isBodyweight: boolean
-}
-
-interface GhostValues {
-  weight: string
-  reps: string
-}
-
-function SetLogger({
-  exerciseName,
-  exerciseId,
-  totalSets,
-  profileId,
-  sessionDate,
-  dayName,
-  todayLogs,
-  onLogSaved,
-  prescribedReps,
-  prescriptionType,
-  restTime,
-  weekNumber,
-  tier,
-  suggestedLoadKg,
-  perSetLoadKg,
-  onSetCompleted,
-  onOpenPlateCalc,
-  loadIsEstimate,
-  onFirstEverLog,
-}: {
-  exerciseName: string
-  /** Stable logging identity (C0) — plan-attached id, or the slug of a custom exercise's name. */
-  exerciseId: string
-  totalSets: number
-  profileId: string
-  /** The session's date (YYYY-MM-DD) — owned by the parent so the whole day shares one clock. */
-  sessionDate: string
-  /** Weekday name for progression keying. */
-  dayName: string
-  todayLogs: ExerciseSetLog[]
-  onLogSaved: (log: ExerciseSetLog) => void
-  prescribedReps?: string
-  /** Drives the logging column's label — a distance carry logs meters, a hold logs seconds, an interval logs work seconds, never a generic "Reps". See PrescriptionType in exercise-db.ts. */
-  prescriptionType?: string
-  restTime?: string
-  weekNumber?: number
-  tier?: string
-  suggestedLoadKg?: number | null
-  /** Per-set breakdown (ramping or straight) — indexed by set number - 1. Falls back to suggestedLoadKg for any set beyond this array (e.g. an extra set the user added). */
-  perSetLoadKg?: (number | null)[]
-  onSetCompleted?: (exerciseName: string, setNumber: number, weight: number, reps: number, rest: string, sets: number, prescribedReps: string, tier?: string) => void
-  onOpenPlateCalc?: (weight: number) => void
-  /** Whether suggested_load_kg/perSetLoadKg is an unverified estimate — flips the weight input's helper copy from "here's the default" to "log what you actually lifted." */
-  loadIsEstimate?: boolean
-  /** Fired once, the first time ANY set is saved for an exercise that had no prior logged history at all (see the ghost-values check in handleSaveSet) — the parent dedupes to a session-local one-time celebration. */
-  onFirstEverLog?: (exerciseName: string) => void
-}) {
-  const logColumnLabel = prescriptionType
-    ? getRepsLabel(prescribedReps ?? '', prescriptionType)
-    : 'Reps'
-  const today = sessionDate
-  // Trace-report fix: matching by bare exercise_name let two DIFFERENT plan
-  // slots that happen to share a display name (e.g. the same lift appearing
-  // in two sessions, or a renamed/duplicated row) merge their logged sets
-  // into one row's chip count, inflating it past the prescribed Sets value.
-  // exercise_id is the stable per-slot identity (see exerciseId prop above)
-  // and is present on every row written since C0 — only pre-C0 legacy rows
-  // lack it, hence the name fallback.
-  const existingLogs = todayLogs.filter(l =>
-    l.exercise_id ? l.exercise_id === exerciseId : l.exercise_name === exerciseName
-  )
-
-  const [extraSets, setExtraSets] = useState(0)
-  const displaySets = totalSets + extraSets
-
-  const [inputs, setInputs] = useState<SetInputState[]>(() =>
-    Array.from({ length: displaySets }, (_, i) => {
-      const existing = existingLogs.find(l => l.set_number === i + 1)
-      return {
-        weight: existing ? String(existing.weight_kg) : '',
-        reps: existing ? String(existing.reps_completed) : '',
-        isBodyweight: existing?.is_bodyweight || false,
-      }
-    })
-  )
-
-  const [savedSets, setSavedSets] = useState<Set<number>>(() => {
-    const saved = new Set<number>()
-    existingLogs.forEach(l => saved.add(l.set_number))
-    return saved
-  })
-
-  const [prBadgeSet, setPrBadgeSet] = useState<{ setNumber: number; result: PRResult } | null>(null)
-  const [rowErrors, setRowErrors] = useState<Record<number, string>>({})
-  const [animatingPr, setAnimatingPr] = useState(false)
-  const [ghostValues, setGhostValues] = useState<GhostValues[]>([])
-
-  // Load ghost values from last session (unified store — merges unsynced local sets).
-  // Already scoped by exerciseId (unlike the pre-fix existingLogs above), so this
-  // isn't the chip-overcount bug — but note this array can still be longer than
-  // displaySets (the count actually rendered, see the loop below); it's sized
-  // defensively for a last session that had more sets than today prescribes, not
-  // read past displaySets by anything today.
-  useEffect(() => {
-    getLastSessionSets(profileId, exerciseId, today).then(lastSets => {
-      const ghosts: GhostValues[] = Array.from({ length: Math.max(totalSets + extraSets, lastSets.length) }, (_, i) => {
-        const prev = lastSets.find(s => s.set_number === i + 1)
-        return {
-          weight: prev ? String(prev.weight_kg) : '',
-          reps: prev ? String(prev.reps_completed) : '',
-        }
-      })
-      setGhostValues(ghosts)
-    }).catch(() => {})
-  }, [profileId, exerciseId])
-
-  useEffect(() => {
-    const logMaxSet = existingLogs.length > 0 ? Math.max(...existingLogs.map(l => l.set_number)) : 0
-    const extra = Math.max(0, logMaxSet - totalSets)
-    setExtraSets(extra)
-    const total = totalSets + extra
-
-    const newInputs = Array.from({ length: total }, (_, i) => {
-      const existing = existingLogs.find(l => l.set_number === i + 1)
-      if (existing) {
-        return {
-          weight: String(existing.weight_kg),
-          reps: String(existing.reps_completed),
-          isBodyweight: existing.is_bodyweight,
-        }
-      }
-      return inputs[i] || { weight: '', reps: '', isBodyweight: false }
-    })
-    setInputs(newInputs)
-    const saved = new Set<number>()
-    existingLogs.forEach(l => saved.add(l.set_number))
-    setSavedSets(saved)
-  }, [todayLogs, exerciseName])
-
-  // Re-evaluate single top-set PR across all saved sets
-  const reEvaluatePR = (updatedSavedSets: Set<number>, updatedInputs: SetInputState[]) => {
-    const sessionSets: SessionSet[] = []
-    updatedSavedSets.forEach(setNum => {
-      const input = updatedInputs[setNum - 1]
-      if (!input) return
-      const w = input.isBodyweight ? 0 : (parseFloat(input.weight) || 0)
-      const r = parseInt(input.reps) || 0
-      if (w > 0 && r > 0) sessionSets.push({ setNumber: setNum, weight: w, reps: r })
-    })
-    const topPR = getTopPRSet(profileId, exerciseName, sessionSets)
-    setPrBadgeSet(topPR)
-  }
-
-  const handleAddExtraSet = () => {
-    setExtraSets(prev => prev + 1)
-    setInputs(prev => [...prev, { weight: '', reps: '', isBodyweight: false }])
-  }
-
-  const handleSaveSet = (setIndex: number) => {
-    const setNumber = setIndex + 1
-    const input = inputs[setIndex]
-    const ghost = ghostValues[setIndex]
-
-    // Use ghost values if input is empty
-    const weightStr = input.weight || (input.isBodyweight ? '0' : ghost?.weight || '')
-    const repsStr = input.reps || ghost?.reps || ''
-    const weight = input.isBodyweight ? 0 : (parseFloat(weightStr) || 0)
-    const reps = parseInt(repsStr) || 0
-
-    if (!input.isBodyweight && weight === 0 && reps === 0) return
-    if (input.isBodyweight && reps === 0) return
-
-    // Reject out-of-range input at entry — never let a typo (10000+ kg,
-    // negative weight, absurd reps) reach the sync queue, where it would
-    // permanently fail against the DB's numeric(6,2)/integer columns.
-    if (!input.isBodyweight && (!Number.isFinite(weight) || weight < 0 || weight > MAX_WEIGHT_KG)) {
-      setRowErrors(prev => ({ ...prev, [setIndex]: `Weight must be between 0 and ${MAX_WEIGHT_KG}kg` }))
-      return
-    }
-    if (!Number.isInteger(reps) || reps < 0 || reps > MAX_REPS) {
-      setRowErrors(prev => ({ ...prev, [setIndex]: `Reps must be a whole number from 0 to ${MAX_REPS}` }))
-      return
-    }
-    if (rowErrors[setIndex]) {
-      setRowErrors(prev => { const next = { ...prev }; delete next[setIndex]; return next })
-    }
-
-    // Auto-fill inputs with ghost values if they were blank
-    const updatedInputs = inputs.map((item, i) =>
-      i === setIndex ? { ...item, weight: input.isBodyweight ? '' : String(weight), reps: String(reps) } : item
-    )
-    setInputs(updatedInputs)
-
-    // Local-first: the set is persisted (and the check turns green) the moment
-    // this returns — even in airplane mode. The store syncs in the background
-    // and re-saving the same set upserts rather than duplicating (L2/L4).
-    const log = saveSet({
-      userId: profileId,
-      date: today,
-      weekNumber: weekNumber ?? null,
-      day: dayName,
-      exerciseId,
-      exerciseName,
-      setNumber,
-      weightKg: weight,
-      repsCompleted: reps,
-      unit: prescriptionUnit(prescriptionType),
-      isBodyweight: input.isBodyweight,
-    })
-    const newSaved = new Set([...savedSets, setNumber])
-    setSavedSets(newSaved)
-    onLogSaved(log)
-
-    // First-ever-log celebration: ghostValues comes from getLastSessionSets
-    // (the most recent PRIOR session's sets) — if every ghost is blank, this
-    // exercise has no logged history before today. Fires on every save while
-    // that holds; the parent dedupes to once per exercise per page load.
-    if (onFirstEverLog && ghostValues.every(g => !g.weight)) {
-      onFirstEverLog(exerciseName)
-    }
-
-    // PR check + single top-set re-evaluation
-    const pr = checkForPR(profileId, exerciseName, weight, reps)
-    if (pr) {
-      setAnimatingPr(true)
-      setTimeout(() => setAnimatingPr(false), 2000)
-    }
-    reEvaluatePR(newSaved, updatedInputs)
-
-    if (onSetCompleted && prescribedReps) {
-      onSetCompleted(exerciseName, setNumber, weight, reps, restTime || '60s', totalSets, prescribedReps, tier)
-    }
-  }
-
-  const updateInput = (index: number, field: 'weight' | 'reps', value: string) => {
-    setInputs(prev => prev.map((item, i) => i === index ? { ...item, [field]: value } : item))
-    if (rowErrors[index]) setRowErrors(prev => { const next = { ...prev }; delete next[index]; return next })
-  }
-
-  const toggleBodyweight = (index: number) => {
-    setInputs(prev => prev.map((item, i) => i === index ? { ...item, isBodyweight: !item.isBodyweight, weight: '' } : item))
-  }
-
-  // Ramping compounds prescribe a lighter weight for set 1 than the top set —
-  // a flat suggestedLoadKg placeholder on every row would suggest the same
-  // weight for the whole ramp. Falls back to the flat value for any set index
-  // beyond the per-set array (e.g. an extra set the user added).
-  const defaultWeightFor = (index: number): string => {
-    const perSet = perSetLoadKg?.[index]
-    if (perSet != null) return String(perSet)
-    return suggestedLoadKg != null ? String(suggestedLoadKg) : '0'
-  }
-
-  return (
-    <div className="px-4 pb-3 pt-1 space-y-1">
-      <div className="grid grid-cols-[auto_1fr_auto_auto_auto_1fr_auto] gap-1.5 items-center text-xs text-muted-foreground font-medium px-1">
-        <span className="w-5">#</span>
-        <span>{loadIsEstimate ? 'Weight — log actual' : 'Weight'}</span>
-        <span className="w-7"></span>
-        <span className="w-7"></span>
-        <span className="w-8"></span>
-        <span>{logColumnLabel}</span>
-        <span className="w-8"></span>
-      </div>
-      {Array.from({ length: displaySets }, (_, i) => {
-        const isSaved = savedSets.has(i + 1)
-        const isBW = inputs[i]?.isBodyweight || false
-        const isPRSet = prBadgeSet?.setNumber === i + 1
-        const ghost = ghostValues[i]
-
-        return (
-          <React.Fragment key={i}>
-          <div
-            className={`grid grid-cols-[auto_1fr_auto_auto_auto_1fr_auto] gap-1.5 items-center rounded-md px-1 py-0.5 transition-colors ${
-              isSaved ? 'bg-green-50 dark:bg-green-950/20' : ''
-            }`}
-          >
-            <span className={`w-5 text-xs font-medium text-center ${isSaved ? 'text-green-700 dark:text-green-400' : 'text-muted-foreground'}`}>
-              {i + 1}
-            </span>
-            <Input
-              type="number"
-              min="0"
-              max={MAX_WEIGHT_KG}
-              step="0.5"
-              placeholder={isBW ? 'BW' : (ghost?.weight || defaultWeightFor(i))}
-              value={isBW ? '' : (inputs[i]?.weight || '')}
-              onChange={e => updateInput(i, 'weight', e.target.value)}
-              className={`h-7 text-sm ${isSaved ? 'border-green-300 dark:border-green-700' : ''} ${isBW ? 'bg-muted text-muted-foreground' : ''} ${rowErrors[i] ? 'border-destructive' : ''}`}
-              disabled={isBW}
-            />
-            <Button
-              variant="outline"
-              size="icon-xs"
-              className="size-7 text-muted-foreground hover:text-foreground border-dashed"
-              onClick={() => onOpenPlateCalc?.(parseFloat(inputs[i]?.weight || ghost?.weight || '0') || 0)}
-              disabled={isBW}
-              aria-label="Plate calculator"
-            >
-              <Dumbbell className="size-3.5" />
-            </Button>
-            <Button
-              variant={isBW ? 'default' : 'outline'}
-              size="sm"
-              className="h-7 w-7 text-[10px] font-bold px-0"
-              onClick={() => toggleBodyweight(i)}
-              aria-label="Toggle bodyweight"
-            >
-              BW
-            </Button>
-            <Input
-              type="number"
-              min="0"
-              max={MAX_REPS}
-              step="1"
-              placeholder={ghost?.reps || '0'}
-              value={inputs[i]?.reps || ''}
-              onChange={e => updateInput(i, 'reps', e.target.value)}
-              className={`h-7 text-sm w-14 ${isSaved ? 'border-green-300 dark:border-green-700' : ''} ${rowErrors[i] ? 'border-destructive' : ''}`}
-            />
-            <div className="flex items-center gap-1">
-              {isPRSet && prBadgeSet?.result && (
-                <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border border-amber-300 dark:border-amber-700 whitespace-nowrap ${animatingPr ? 'animate-pulse scale-110' : ''} transition-transform`}>
-                  <Trophy className="size-2.5" />
-                  PR
-                </span>
-              )}
-              <Button
-                variant={isSaved ? 'ghost' : 'outline'}
-                size="icon"
-                className={`size-7 shrink-0 ${isSaved ? 'text-green-600 dark:text-green-400' : ''}`}
-                onClick={() => handleSaveSet(i)}
-              >
-                <Check className="size-3.5" />
-              </Button>
-            </div>
-          </div>
-          {rowErrors[i] && (
-            <p className="text-[10px] text-destructive px-1 -mt-0.5">{rowErrors[i]}</p>
-          )}
-          </React.Fragment>
-        )
-      })}
-      <Button
-        variant="ghost"
-        size="sm"
-        className="w-full text-xs text-muted-foreground h-6 mt-0.5"
-        onClick={handleAddExtraSet}
-      >
-        <Plus className="size-3 mr-1" />
-        Add Set
-      </Button>
-    </div>
-  )
-}
-
-const CONDITIONING_PRESETS = [
-  { label: '15m Incline Walk', icon: '🚶', activity: 'Incline Treadmill Walk', duration: 15, rpe: 4 },
-  { label: '15m Heavy Bag', icon: '🥊', activity: 'Heavy Bag / Functional Circuit', duration: 15, rpe: 7 },
-  { label: '10m HIIT Bike', icon: '🚴', activity: 'HIIT / Assault Bike', duration: 10, rpe: 8 },
-  { label: '15m Zone 2', icon: '🫀', activity: 'Zone 2 Cardio', duration: 15, rpe: 5 },
-] as const
-
-export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, devOverrideWeek, devOverrideDay, devBypassLocks, onSwapExercise, onBanExercise }: ExercisePlanProps) {
+export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, onSwapExercise, onBanExercise }: ExercisePlanProps) {
   // generateMesocycle produces 4 weeks PER BLOCK, not 4 weeks total — a
   // hypertrophy sequence alone is 4 blocks (16 weeks). Falling back to 4 only
   // applies before the mesocycle has loaded.
   const totalWeeks = mesocycle && mesocycle.length > 0 ? mesocycle.length : 4
 
-  // Session identity (today/todayName/liveWeek) is now owned entirely by
-  // useActiveSession — stamped once there, never re-derived per render here
-  // (LAYOUT-DESIGN.md §5.2/F3). `liveWeek` is the week WRITES are stamped
-  // with and has no setter; `browseWeek` below is this component's own
-  // paging cursor for DISPLAY only (D8) — the two used to be one variable
-  // (`currentWeek`), which is exactly how browsing to a future week while
-  // training could log a set under the wrong week.
-  const {
-    date: today,
-    dayName: todayName,
-    liveWeek,
-    logs: todayLogs,
-    refresh: refreshTodayLogs,
-    startRest,
-  } = useActiveSession()
+  // The only session-identity value this browse-only surface needs: where to
+  // start paging from. No logs, no rest facade, no write path — this
+  // component never renders a set grid again (§7.3).
+  const { liveWeek } = useActiveSession()
   const [browseWeek, setBrowseWeek] = useState(liveWeek)
-  useEffect(() => {
-    setBrowseWeek(liveWeek)
-  }, [liveWeek])
 
   const [swapDialog, setSwapDialog] = useState<{ dayName: string; exIndex: number; exerciseName: string } | null>(null)
   const [pendingSwap, setPendingSwap] = useState<ExerciseEntry | null>(null)
   const [swapBusy, setSwapBusy] = useState(false)
-  // Swap-dead-end fix: "show more" past the initial handful of ranked
-  // candidates, plus a free-entry search across the full catalog for when
-  // even a raised cap still dead-ends (every ranked option unavailable).
   const [showAllReplacements, setShowAllReplacements] = useState(false)
   const [swapSearchQuery, setSwapSearchQuery] = useState('')
   const [banBusy, setBanBusy] = useState<string | null>(null)
-  const [expandedExercises, setExpandedExercises] = useState<Set<string>>(new Set())
   const [expandedWarmups, setExpandedWarmups] = useState<Set<string>>(new Set())
-  // Which exercises' load chip has its provenance explainer expanded — keyed
-  // by exerciseKey (same key as expandedExercises), independent per exercise.
   const [explainedLoadChips, setExplainedLoadChips] = useState<Set<string>>(new Set())
   const toggleLoadExplainer = useCallback((key: string) => {
     setExplainedLoadChips(prev => {
@@ -776,49 +356,8 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
       return next
     })
   }, [])
-  // One-time-per-exercise "you now have real data" celebration — session
-  // local only, no persistence, so it can only ever fire once per page load
-  // even if the same exercise's set is logged/edited multiple times today.
-  const [celebratedFirstLog, setCelebratedFirstLog] = useState<Set<string>>(new Set())
-  const [customExercises, setCustomExercises] = useState<Record<string, string[]>>({})
-  const [addingCustom, setAddingCustom] = useState<string | null>(null)
-  const [customInput, setCustomInput] = useState('')
-  const [addingCardioFinisher, setAddingCardioFinisher] = useState<string | null>(null)
-  const [cardioFinisherInput, setCardioFinisherInput] = useState({ activity: '', duration: '', rpe: 5, heartRate: '' })
-  const [cardioFinishers, setCardioFinishers] = useState<CardioLog[]>([])
-  const [savingCardio, setSavingCardio] = useState(false)
-  const [sessionLogged, setSessionLogged] = useState(false)
-  const [progressionToast, setProgressionToast] = useState<string | null>(null)
-  const progressionToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  // A new toast must never get silently wiped by an EARLIER toast's stale
-  // auto-dismiss timer — e.g. a progression toast's 5s timer firing after a
-  // bulk-log skip-warning has already replaced it. Always clear whatever
-  // timer is pending before arming a new one.
-  const showProgressionToast = useCallback((message: string, durationMs: number) => {
-    if (progressionToastTimerRef.current) clearTimeout(progressionToastTimerRef.current)
-    setProgressionToast(message)
-    progressionToastTimerRef.current = setTimeout(() => {
-      progressionToastTimerRef.current = null
-      setProgressionToast(null)
-    }, durationMs)
-  }, [])
-  useEffect(() => () => {
-    if (progressionToastTimerRef.current) clearTimeout(progressionToastTimerRef.current)
-  }, [])
-  const [setWeights, setSetWeights] = useState<Record<string, number>>({})
-  const [setReps, setSetReps] = useState<Record<string, number>>({})
-  const [completedSetsMap, setCompletedSetsMap] = useState<Record<string, boolean>>({})
-  const [loggingSession, setLoggingSession] = useState(false)
-  const [plateCalcOpen, setPlateCalcOpen] = useState(false)
-  const [plateCalcWeight, setPlateCalcWeight] = useState(0)
-  const [progressedLoads, setProgressedLoads] = useState<Record<string, number>>({})
-  const [progressionNotes, setProgressionNotes] = useState<Record<string, { note: string; didProgress: boolean }>>({})
 
   const hasMesocycle = mesocycle && mesocycle.length > 0
-  // activePlan/currentMesoWeekObj follow browseWeek deliberately — this is
-  // the PAGED view, independent from the live session's week (liveWeek,
-  // from the hook). Anything that WRITES uses liveWeek instead; see the
-  // per-call-site comments below.
   const activePlan = hasMesocycle
     ? mesocycle.find(w => w.week_number === browseWeek)?.days || plan
     : plan
@@ -827,9 +366,6 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
     : undefined
   const weekLabel = currentMesoWeekObj?.label || ''
 
-  // The mesocycle is several blocks of 4 weeks each (16 weeks for a typical
-  // 4-block sequence), not 4 weeks total — the pagination needs both a block
-  // indicator and, within that, the weeks belonging to the active block.
   const blockCount = hasMesocycle
     ? Math.max(...mesocycle.map(w => w.block_number ?? 1))
     : 1
@@ -844,115 +380,6 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
     if (firstWeekOfBlock != null) setBrowseWeek(firstWeekOfBlock)
   }
 
-  // Ramp-visibility fix: a collapsed-by-default warm-up section is exactly
-  // how a user landing straight on the exercise row saw only "S1: 90kg" with
-  // no ramp in sight. Auto-expand today's card once per day change — a
-  // ref (not a dependency-driven re-run) so a user who deliberately
-  // collapses it back mid-session isn't fought on every unrelated re-render.
-  const autoExpandedDayRef = useRef<string | null>(null)
-  useEffect(() => {
-    if (todayName && autoExpandedDayRef.current !== todayName) {
-      autoExpandedDayRef.current = todayName
-      setExpandedWarmups(prev => new Set([...prev, todayName]))
-    }
-  }, [todayName])
-
-  useEffect(() => {
-    if (profileId) {
-      getCardioLogsForDate(profileId, today).then(setCardioFinishers).catch(console.error)
-      seedPRCacheFromHistory(profileId).catch(console.error)
-    }
-  }, [profileId, today])
-
-  useEffect(() => {
-    // Compared against liveWeek (the frozen session identity), not
-    // browseWeek — cache validity is about whether this is the SAME live
-    // session, not which week the user happens to be paging through.
-    const cached = loadSessionCache(todayName)
-    if (cached && cached.weekNumber === liveWeek) {
-      setCompletedSetsMap(cached.completedSets)
-      setSetWeights(cached.setWeights)
-      setSetReps(cached.setReps)
-      setSessionLogged(cached.sessionLogged)
-    }
-  }, [todayName, liveWeek])
-
-  // Week 2+: true double progression from what the trainee actually lifted
-  // last session, not the mesocycle's flat estimate. Hit the top of the rep
-  // range on every set last time -> weight goes up one increment; anything
-  // short of that -> hold the weight, the note says to chase reps first.
-  // Week 1 never has prior data, so this is a no-op there and the static
-  // suggested_load_kg from generateMesocycle stands. Gated on liveWeek, not
-  // browseWeek — progression is about the live session regardless of which
-  // week the user is currently paging through.
-  useEffect(() => {
-    if (!profileId || liveWeek <= 1) {
-      setProgressedLoads({})
-      setProgressionNotes({})
-      return
-    }
-    const todayWorkout = activePlan.find(d => d.day === todayName)
-    if (!todayWorkout) {
-      setProgressedLoads({})
-      setProgressionNotes({})
-      return
-    }
-
-    let cancelled = false
-    Promise.all(
-      todayWorkout.exercises
-        .filter(ex => ex.suggested_load_kg != null)
-        .map(async ex => {
-          const recommendation = await getDoubleProgressionRecommendation(
-            profileId, ex.name, today, parseRepsHigh(ex.reps)
-          )
-          return [ex.name, recommendation] as const
-        })
-    ).then(results => {
-      if (cancelled) return
-      const nextLoads: Record<string, number> = {}
-      const nextNotes: Record<string, { note: string; didProgress: boolean }> = {}
-      for (const [name, recommendation] of results) {
-        if (!recommendation) continue
-        nextLoads[name] = recommendation.weightKg
-        nextNotes[name] = { note: recommendation.note, didProgress: recommendation.didProgress }
-      }
-      setProgressedLoads(nextLoads)
-      setProgressionNotes(nextNotes)
-    }).catch(() => {})
-
-    return () => { cancelled = true }
-  }, [profileId, liveWeek, todayName, activePlan, today])
-
-  const replacements = swapDialog && profile
-    ? getReplacementCandidates(swapDialog.exerciseName, profile, exclusions)
-    : []
-  const INITIAL_REPLACEMENTS_SHOWN = 4
-  const visibleReplacements = showAllReplacements ? replacements : replacements.slice(0, INITIAL_REPLACEMENTS_SHOWN)
-
-  const currentEntry = swapDialog ? getExerciseEntry(swapDialog.exerciseName) : undefined
-
-  // Swap-dead-end fix: free-entry search across the FULL catalog, unfiltered
-  // — a constraint-valid ranked list can still dead-end (every option
-  // unavailable in the gym), so this lets the user pick literally anything
-  // and see a warning instead of being blocked. Excludes the exercise being
-  // replaced and anything already in the ranked list (shown there already).
-  const swapSearchResults = swapDialog && swapSearchQuery.trim()
-    ? searchExerciseCatalog(swapSearchQuery, 20).filter(e =>
-        e.name.toLowerCase() !== swapDialog.exerciseName.toLowerCase() &&
-        !replacements.some(r => r.exercise.name === e.name)
-      )
-    : []
-
-  const toggleExercise = (key: string) => {
-    setExpandedExercises(prev => {
-      const next = new Set(prev)
-      if (next.has(key)) next.delete(key)
-      else next.add(key)
-      return next
-    })
-  }
-
   const toggleWarmup = (key: string) => {
     setExpandedWarmups(prev => {
       const next = new Set(prev)
@@ -962,235 +389,20 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
     })
   }
 
-  // todayLogs is now owned by useActiveSession — a manual per-set save
-  // already persisted local-first via SetLogger's own saveSet call, so this
-  // just tells the hook to pull the fresh merged view (fast, local-first,
-  // see set-log-store's getSetsForDate) rather than splicing state here.
-  const handleLogSaved = (_log: ExerciseSetLog) => {
-    refreshTodayLogs()
-  }
+  const replacements = swapDialog && profile
+    ? getReplacementCandidates(swapDialog.exerciseName, profile, exclusions)
+    : []
+  const INITIAL_REPLACEMENTS_SHOWN = 4
+  const visibleReplacements = showAllReplacements ? replacements : replacements.slice(0, INITIAL_REPLACEMENTS_SHOWN)
 
-  // One-time-per-exercise celebration when an exercise that previously only
-  // had estimates gets its first real logged number. celebratedFirstLog is
-  // session-local (no persistence, per the UX round's scope) — SetLogger
-  // calls this on every save while the exercise still has no prior history,
-  // so the dedupe lives entirely here.
-  const handleFirstEverLog = useCallback((exerciseName: string) => {
-    setCelebratedFirstLog(prev => {
-      if (prev.has(exerciseName)) return prev
-      showProgressionToast(`Got it — ${exerciseName} now builds from your real numbers.`, 4000)
-      const next = new Set(prev)
-      next.add(exerciseName)
-      return next
-    })
-  }, [showProgressionToast])
+  const currentEntry = swapDialog ? getExerciseEntry(swapDialog.exerciseName) : undefined
 
-  const getCompletedSetsCount = (exerciseName: string): number => {
-    return todayLogs.filter(l => l.exercise_name === exerciseName).length
-  }
-
-  function parseRestSeconds(rest: string): number {
-    const match = rest.match(/(\d+)/)
-    return match ? parseInt(match[1]) : 60
-  }
-
-  function parseRepsLow(reps: string): number {
-    const rangeMatch = reps.match(/^(\d+)\s*-\s*(\d+)$/)
-    if (rangeMatch) return parseInt(rangeMatch[1])
-    const single = parseInt(reps)
-    return isNaN(single) ? 10 : single
-  }
-
-  function parseRepsHigh(reps: string): number {
-    const rangeMatch = reps.match(/^(\d+)\s*-\s*(\d+)$/)
-    if (rangeMatch) return parseInt(rangeMatch[2])
-    const single = parseInt(reps)
-    return isNaN(single) ? 12 : single
-  }
-
-  const handleSetComplete = useCallback((
-    exerciseName: string,
-    setNumber: number,
-    weightKg: number,
-    repsCompleted: number,
-    restStr: string,
-    prescribedSets: number,
-    prescribedReps: string,
-    tier?: string
-  ) => {
-    if (!profileId) return
-    const key = `${exerciseName}-${setNumber}`
-
-    // Optimistic: update UI immediately (todayLogs itself was already updated
-    // by SetLogger's onLogSaved with the store's persisted view)
-    const newCompleted = { ...completedSetsMap, [key]: true }
-    setCompletedSetsMap(newCompleted)
-
-    const restSeconds = parseRestSeconds(restStr)
-    if (restSeconds > 0) {
-      startRest(exerciseName, restSeconds)
-    }
-
-    // Persist UI state to localStorage immediately (the set itself was already
-    // persisted local-first by SetLogger via set-log-store — no second write here).
-    // weekNumber is liveWeek, not browseWeek — this cache entry stamps the LIVE
-    // session, regardless of which week's card the user happens to be viewing.
-    saveSessionCache({
-      completedSets: newCompleted,
-      setWeights,
-      setReps,
-      sessionLogged,
-      day: todayName,
-      weekNumber: liveWeek,
-    })
-
-    // Check progression in the background (merged store reads — works offline too)
-    {
-      checkDoubleProgression(
-        profileId, exerciseName, today, prescribedSets, prescribedReps, tier as any
-      ).then(progression => {
-        if (progression) {
-          if (progression.type === 'primer_complete') {
-            showProgressionToast(`Primer complete! Great neural velocity.`, 5000)
-          } else {
-            showProgressionToast(
-              `Progressive Overload Unlocked: +${(progression.newWeight - progression.currentWeight).toFixed(1)}kg target set for next week on ${progression.exerciseName}!`,
-              5000
-            )
-          }
-        }
-      }).catch(() => {})
-    }
-  }, [profileId, liveWeek, todayName, today, completedSetsMap, setWeights, setReps, sessionLogged, showProgressionToast, startRest])
-
-  // Bulk-logs today's session with the same values a manual save would use:
-  // last-session ghosts first, then the progressed/prescribed load, prescribed
-  // reps at the low end of the range, rpe null. An externally-loaded exercise
-  // with NO known weight is skipped and named in the toast — never logged as a
-  // fabricated 0 kg set (discovery landmine L6). Bodyweight movements log 0 kg
-  // with is_bodyweight, which is real data, not fabrication.
-  const handleLogEntireSession = useCallback(async () => {
-    if (!profileId) return
-    const todayWorkout = activePlan.find(d => d.day === todayName)
-    if (!todayWorkout) return
-
-    setLoggingSession(true)
-    try {
-      const newWeights: Record<string, number> = { ...setWeights }
-      const newReps: Record<string, number> = { ...setReps }
-      const newCompleted: Record<string, boolean> = { ...completedSetsMap }
-      const savedLogs: ExerciseSetLog[] = []
-      const skipped: string[] = []
-      const raceSkipped: string[] = []
-      let loggedCount = 0
-
-      for (const ex of todayWorkout.exercises) {
-        const exerciseId = ex.id ?? getExerciseId(ex.name)
-        const entry = getExerciseEntry(ex.name)
-        const isBodyweightMovement = entry ? !isExternallyLoaded(entry) : false
-
-        // Re-checked at WRITE time, not the click-time todayLogs closure —
-        // the previous exercise's ghost lookup below awaits a network call,
-        // and a set manually saved via SetLogger during that window must
-        // never be silently overwritten by this exercise's bulk write.
-        let currentLogs: ExerciseSetLog[] = todayLogs
-        try {
-          currentLogs = await getSetsForDate(profileId, today)
-        } catch { /* offline — fall back to the click-time snapshot */ }
-        const alreadyLogged = new Set(
-          currentLogs.filter(l => l.exercise_name === ex.name).map(l => l.set_number)
-        )
-
-        let lastSets: ExerciseSetLog[] = []
-        try {
-          lastSets = await getLastSessionSets(profileId, exerciseId, today)
-        } catch { /* offline — fall back to prescription */ }
-
-        const repsLow = parseRepsLow(ex.reps)
-        let raceSkippedCount = 0
-        for (let s = 1; s <= ex.sets; s++) {
-          if (alreadyLogged.has(s)) {
-            // Keep the UI's completedSetsMap in sync with what actually got
-            // logged (by the manual save this loop deferred to) — otherwise
-            // this function's own end-of-run setCompletedSetsMap(newCompleted)
-            // would overwrite React state with a stale snapshot that never
-            // saw the manual save, and the checkmark would vanish.
-            newCompleted[`${ex.name}-${s}`] = true
-            raceSkippedCount++
-            continue
-          }
-
-          const ghostWeight = lastSets.find(ls => ls.set_number === s)?.weight_kg
-          const weight = isBodyweightMovement
-            ? 0
-            : ghostWeight
-              ?? progressedLoads[ex.name]
-              ?? ex.per_set_load?.[s - 1]?.load_kg
-              ?? ex.suggested_load_kg
-              ?? null
-
-          if (weight == null) {
-            if (!skipped.includes(ex.name)) skipped.push(ex.name)
-            continue
-          }
-
-          const log = saveSet({
-            userId: profileId,
-            date: today,
-            weekNumber: liveWeek,
-            day: todayName,
-            exerciseId,
-            exerciseName: ex.name,
-            setNumber: s,
-            weightKg: weight,
-            repsCompleted: repsLow,
-            rpe: null,
-            unit: prescriptionUnit(ex.prescription_type),
-            isBodyweight: isBodyweightMovement,
-          })
-          savedLogs.push(log)
-          loggedCount++
-          newWeights[`${ex.name}-${s}`] = weight
-          newReps[`${ex.name}-${s}`] = repsLow
-          newCompleted[`${ex.name}-${s}`] = true
-        }
-        if (raceSkippedCount > 0) raceSkipped.push(`${ex.name} (${raceSkippedCount} already logged)`)
-      }
-
-      setSetWeights(newWeights)
-      setSetReps(newReps)
-      setCompletedSetsMap(newCompleted)
-      // Only claim the session is logged if this run (or a concurrent manual
-      // save it detected) actually wrote something — an all-skipped run
-      // (every exercise lacking a known weight) must leave the "Complete &
-      // Log All Sets" button available rather than replacing it with a
-      // "Session logged!" badge that isn't true.
-      const sessionHasData = loggedCount > 0 || raceSkipped.length > 0
-      if (sessionHasData) setSessionLogged(true)
-
-      // todayLogs is hook-owned — pull the fresh merged view rather than
-      // splicing savedLogs into local state (same reasoning as handleLogSaved).
-      if (savedLogs.length > 0) refreshTodayLogs()
-
-      saveSessionCache({
-        completedSets: newCompleted,
-        setWeights: newWeights,
-        setReps: newReps,
-        sessionLogged: sessionHasData ? true : sessionLogged,
-        day: todayName,
-        weekNumber: liveWeek,
-      })
-
-      if (skipped.length > 0 || raceSkipped.length > 0) {
-        const parts = [`Logged ${loggedCount} sets.`]
-        if (raceSkipped.length > 0) parts.push(`Kept your manually-logged sets as-is: ${raceSkipped.join(', ')}.`)
-        if (skipped.length > 0) parts.push(`Skipped ${skipped.join(', ')} — no known weight yet; log those manually so progression has real numbers.`)
-        showProgressionToast(parts.join(' '), 8000)
-      }
-    } finally {
-      setLoggingSession(false)
-    }
-  }, [profileId, activePlan, todayName, today, liveWeek, setWeights, setReps, completedSetsMap, todayLogs, progressedLoads, sessionLogged, showProgressionToast, refreshTodayLogs])
+  const swapSearchResults = swapDialog && swapSearchQuery.trim()
+    ? searchExerciseCatalog(swapSearchQuery, 20).filter(e =>
+        e.name.toLowerCase() !== swapDialog.exerciseName.toLowerCase() &&
+        !replacements.some(r => r.exercise.name === e.name)
+      )
+    : []
 
   return (
     <div className="space-y-4">
@@ -1267,44 +479,12 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
           return <ActiveRecoveryCard key={dayName} workout={workout} mesoWeek={currentMesoWeekObj} />
         }
 
-        const isToday = devBypassLocks || dayName === todayName
-
-        // Unplanned-exercise fix: logged sets have always saved fine for an
-        // exercise not in today's prescribed plan (chat's log_workout_set /
-        // log_workout_session never checked plan membership) — they just had
-        // nowhere to render, so a chat-logged off-plan lift silently vanished
-        // from this screen. Cross-reference todayLogs (server-persisted,
-        // refetched on mount — survives refresh) against the plan by exercise
-        // identity (not raw name — the same slug scheme resolveWeight/
-        // progression-engine already use) to find anything logged that isn't
-        // one of today's prescribed exercises. Merged with the (session-local,
-        // not-yet-logged) "Add Extra Lift" declarations below, deduped by the
-        // same identity so a declared-then-logged lift only appears once.
-        const plannedIds = new Set(workout.exercises.map(ex => getExerciseId(ex.name)))
-        const offPlanLoggedNames = isToday
-          ? [...new Set(
-              todayLogs
-                .filter(l => !plannedIds.has(l.exercise_id || getExerciseId(l.exercise_name)))
-                .map(l => l.exercise_name)
-            )]
-          : []
-        const additionalWorkNames = isToday
-          ? [...new Map(
-              [...offPlanLoggedNames, ...(customExercises[dayName] || [])].map(n => [getExerciseId(n), n])
-            ).values()]
-          : []
-
         return (
         <React.Fragment key={dayName}>
-        <Card className={isToday ? 'ring-2 ring-primary/20' : undefined}>
+        <Card>
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <CardTitle className="text-base">{workout.day}</CardTitle>
-                {isToday && (
-                  <Badge variant="default" className="text-[10px]">Today</Badge>
-                )}
-              </div>
+              <CardTitle className="text-base">{workout.day}</CardTitle>
               <Badge variant="secondary">Primary Focus: {workout.focus}</Badge>
             </div>
             <div className="mt-2 space-y-2">
@@ -1316,24 +496,6 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
                 durationPref={profile?.session_duration_preference || '45-60'}
               />
             </div>
-            {isToday && !sessionLogged && (
-              <div className="mt-2">
-                <Button
-                  size="sm"
-                  className="w-full gap-2"
-                  disabled={loggingSession}
-                  onClick={handleLogEntireSession}
-                >
-                  <CheckCircle2 className="h-4 w-4" />
-                  {loggingSession ? 'Logging...' : 'Complete & Log All Sets'}
-                </Button>
-              </div>
-            )}
-            {isToday && sessionLogged && (
-              <Badge className="mt-2 w-full justify-center bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300 border-0">
-                Session logged!
-              </Badge>
-            )}
           </CardHeader>
           {workout.recommendedCardio && (
             <div className="px-4 pb-2 flex items-start gap-2 border-b border-border/30">
@@ -1381,24 +543,18 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
                 {workout.exercises.map((ex, exIndex) => {
                   const hasSuperset = !!ex.superset_label
                   const exerciseKey = `${dayName}-${ex.name}`
-                  const isExpanded = expandedExercises.has(exerciseKey)
-                  const completedSets = getCompletedSetsCount(ex.name)
-                  const allSetsLogged = completedSets >= ex.sets
-                  // 'logged' wins whenever the live progression engine found
-                  // real history for this exercise (week 2+ only — see the
-                  // progressedLoads effect); otherwise whatever the plan
-                  // itself recorded, defaulting to 'estimate' for legacy
-                  // plans generated before load_source existed.
+                  // Browse surfaces never see 'logged' provenance — that
+                  // requires the live progression engine, which only runs
+                  // for today's session (§2.2).
                   const loadSource: LoadSource | undefined = ex.suggested_load_kg == null
                     ? undefined
-                    : progressedLoads[ex.name] != null ? 'logged' : (ex.load_source ?? 'estimate')
+                    : (ex.load_source ?? 'estimate')
                   const loadExplained = explainedLoadChips.has(exerciseKey)
+                  const ramp = formatRampSets(ex)
 
                   return (
                   <React.Fragment key={exIndex}>
-                    <TableRow
-                      className={`${hasSuperset ? 'bg-muted/30' : ''} ${allSetsLogged && isToday ? 'bg-green-50/50 dark:bg-green-950/10' : ''}`}
-                    >
+                    <TableRow className={hasSuperset ? 'bg-muted/30' : undefined}>
                       <TableCell className="w-10 pr-0">
                         {hasSuperset && (
                           <Badge variant="outline" className="text-[10px] font-mono px-1.5 py-0.5 bg-background font-semibold">
@@ -1407,32 +563,8 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
                         )}
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-2">
-                          <span className={`font-medium ${allSetsLogged && isToday ? 'line-through text-muted-foreground' : ''}`}>{ex.name}</span>
-                          {isToday && completedSets > 0 && (
-                            <Badge variant="secondary" className="text-[10px] font-mono">
-                              {completedSets}/{ex.sets}
-                            </Badge>
-                          )}
-                        </div>
-                        {(() => {
-                          const rampSets = formatRampSets(ex)
-                          if (!rampSets) return null
-                          return (
-                            <div
-                              className="flex items-center gap-1 flex-wrap mt-0.5 rounded border border-orange-300/60 bg-orange-50 dark:bg-orange-950/20 dark:border-orange-900/50 px-1.5 py-1"
-                              title="Ramp-up sets — build to your working weight before the sets below. These don't count toward working volume."
-                            >
-                              <Thermometer className="size-2.5 text-orange-600 dark:text-orange-400 shrink-0" />
-                              <span className="text-[10px] font-medium text-orange-700 dark:text-orange-400">Ramp:</span>
-                              {rampSets.map((s, i) => (
-                                <span key={s.setNumber} className="text-[10px] text-orange-700 dark:text-orange-400">
-                                  {i > 0 && <span className="text-orange-400 dark:text-orange-600">·</span>} {s.kg}kg×{s.reps}
-                                </span>
-                              ))}
-                            </div>
-                          )
-                        })()}
+                        <span className="font-medium">{ex.name}</span>
+                        {ramp && <RampBadge ramp={ramp} />}
                         {(ex.intensity || ex.suggested_load || (ex.per_set_load && ex.per_set_load.length > 0)) && (
                           <div className="flex flex-col gap-0.5 mt-0.5">
                             {ex.intensity && (
@@ -1483,11 +615,6 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
                             {loadSource === 'estimate' && loadExplained && (
                               <p className="text-[10px] text-muted-foreground/80 italic max-w-xs">{ESTIMATE_EXPLAINER}</p>
                             )}
-                            {progressionNotes[ex.name] && (
-                              <span className={`text-[10px] italic ${progressionNotes[ex.name].didProgress ? 'text-green-700 dark:text-green-400' : 'text-muted-foreground/80'}`}>
-                                {progressionNotes[ex.name].note}
-                              </span>
-                            )}
                           </div>
                         )}
                       </TableCell>
@@ -1509,17 +636,6 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
-                          {profileId && isToday && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className={`size-7 ${isExpanded ? 'text-primary' : ''}`}
-                              onClick={() => toggleExercise(exerciseKey)}
-                              aria-label="Log sets"
-                            >
-                              <Dumbbell className="size-3.5" />
-                            </Button>
-                          )}
                           <Button
                             variant="ghost"
                             size="icon"
@@ -1553,339 +669,12 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
                         </div>
                       </TableCell>
                     </TableRow>
-                    {profileId && isToday && isExpanded && (
-                      <tr>
-                        <td colSpan={6} className="p-0 border-b border-border/50">
-                          <SetLogger
-                            exerciseName={ex.name}
-                            exerciseId={ex.id ?? getExerciseId(ex.name)}
-                            totalSets={ex.sets}
-                            profileId={profileId}
-                            sessionDate={today}
-                            dayName={todayName}
-                            todayLogs={todayLogs}
-                            onLogSaved={handleLogSaved}
-                            prescribedReps={ex.reps}
-                            prescriptionType={ex.prescription_type}
-                            restTime={ex.rest}
-                            weekNumber={liveWeek}
-                            tier={ex.tier}
-                            suggestedLoadKg={progressedLoads[ex.name] ?? ex.suggested_load_kg}
-                            perSetLoadKg={progressedLoads[ex.name] != null ? undefined : ex.per_set_load?.map(s => s.load_kg)}
-                            onSetCompleted={handleSetComplete}
-                            onOpenPlateCalc={(w) => { setPlateCalcWeight(w); setPlateCalcOpen(true) }}
-                            loadIsEstimate={loadSource === 'estimate'}
-                            onFirstEverLog={handleFirstEverLog}
-                          />
-                        </td>
-                      </tr>
-                    )}
                   </React.Fragment>
                 )})}
-                {/* Additional work: anything logged today (chat included) that
-                    isn't in the prescribed plan, plus not-yet-logged "Add
-                    Extra Lift" declarations. See additionalWorkNames above. */}
-                {profileId && isToday && additionalWorkNames.length > 0 && (
-                  <TableRow className="hover:bg-transparent">
-                    <TableCell colSpan={6} className="pt-3 pb-1">
-                      <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Additional Work</span>
-                    </TableCell>
-                  </TableRow>
-                )}
-                {profileId && isToday && additionalWorkNames.map((customName, cIdx) => {
-                  const exerciseKey = `${dayName}-custom-${customName}`
-                  const isExpanded = expandedExercises.has(exerciseKey)
-                  const completedSets = getCompletedSetsCount(customName)
-
-                  return (
-                    <React.Fragment key={`custom-${cIdx}`}>
-                      <TableRow className={completedSets > 0 ? 'bg-green-50/50 dark:bg-green-950/10' : 'bg-accent/30'}>
-                        <TableCell className="w-10 pr-0">
-                          <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 bg-background">+</Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium">{customName}</span>
-                            {completedSets > 0 && (
-                              <Badge variant="secondary" className="text-[10px] font-mono">{completedSets} sets</Badge>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-center text-muted-foreground">-</TableCell>
-                        <TableCell className="text-center text-muted-foreground">-</TableCell>
-                        <TableCell className="text-center text-muted-foreground">-</TableCell>
-                        <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className={`size-7 ${isExpanded ? 'text-primary' : ''}`}
-                            onClick={() => toggleExercise(exerciseKey)}
-                            aria-label="Log sets"
-                          >
-                            <Dumbbell className="size-3.5" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                      {isExpanded && (
-                        <tr>
-                          <td colSpan={6} className="p-0 border-b border-border/50">
-                            <SetLogger
-                              exerciseName={customName}
-                              exerciseId={getExerciseId(customName)}
-                              totalSets={3}
-                              profileId={profileId}
-                              sessionDate={today}
-                              dayName={todayName}
-                              todayLogs={todayLogs}
-                              onLogSaved={handleLogSaved}
-                              onSetCompleted={handleSetComplete}
-                              prescribedReps="8-12"
-                              restTime="60s"
-                              weekNumber={liveWeek}
-                              onOpenPlateCalc={(w) => { setPlateCalcWeight(w); setPlateCalcOpen(true) }}
-                            />
-                          </td>
-                        </tr>
-                      )}
-                    </React.Fragment>
-                  )
-                })}
               </TableBody>
             </Table>
-            {profileId && isToday && (
-              <div className="px-4 pb-3 pt-2 border-t border-border/50 space-y-3">
-
-                {/* Add Extra Lift form */}
-                {addingCustom === dayName && (
-                  <div className="flex items-center gap-2">
-                    <Input
-                      placeholder="Lift name (e.g. Shrugs, Bicep Curls)"
-                      value={customInput}
-                      onChange={e => setCustomInput(e.target.value)}
-                      className="h-8 text-sm"
-                      onKeyDown={e => {
-                        if (e.key === 'Enter' && customInput.trim()) {
-                          setCustomExercises(prev => ({
-                            ...prev,
-                            [dayName]: [...(prev[dayName] || []), customInput.trim()],
-                          }))
-                          const newKey = `${dayName}-custom-${customInput.trim()}`
-                          setExpandedExercises(prev => new Set([...prev, newKey]))
-                          setCustomInput('')
-                          setAddingCustom(null)
-                        }
-                      }}
-                      autoFocus
-                    />
-                    <Button
-                      size="sm"
-                      className="h-8 shrink-0"
-                      disabled={!customInput.trim()}
-                      onClick={() => {
-                        if (customInput.trim()) {
-                          setCustomExercises(prev => ({
-                            ...prev,
-                            [dayName]: [...(prev[dayName] || []), customInput.trim()],
-                          }))
-                          const newKey = `${dayName}-custom-${customInput.trim()}`
-                          setExpandedExercises(prev => new Set([...prev, newKey]))
-                          setCustomInput('')
-                          setAddingCustom(null)
-                        }
-                      }}
-                    >
-                      Add
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8"
-                      onClick={() => { setAddingCustom(null); setCustomInput('') }}
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                )}
-
-                {/* Inline Cardio / Conditioning form */}
-                {addingCardioFinisher === dayName && (
-                  <div className="rounded-md border p-3 space-y-3 bg-muted/20">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold flex items-center gap-1.5">
-                        <Activity className="size-3.5 text-orange-500" />
-                        Log Cardio / Conditioning
-                      </span>
-                      <Button variant="ghost" size="sm" className="h-6 text-xs px-2"
-                        onClick={() => setAddingCardioFinisher(null)}
-                      >
-                        Cancel
-                      </Button>
-                    </div>
-                    {/* Quick Presets */}
-                    <div className="grid grid-cols-2 gap-1.5">
-                      {CONDITIONING_PRESETS.map(preset => (
-                        <Button
-                          key={preset.activity}
-                          variant="outline"
-                          size="sm"
-                          className="h-7 text-[11px] justify-start gap-1 px-2"
-                          onClick={() => setCardioFinisherInput({ activity: preset.activity, duration: String(preset.duration), rpe: preset.rpe, heartRate: '' })}
-                        >
-                          <span>{preset.icon}</span>
-                          {preset.label}
-                        </Button>
-                      ))}
-                    </div>
-                    <Input
-                      placeholder="Activity Name (e.g. Muay Thai, Running, Skipping...)"
-                      value={cardioFinisherInput.activity}
-                      onChange={e => setCardioFinisherInput(prev => ({ ...prev, activity: e.target.value }))}
-                      className="h-8 text-sm"
-                      autoFocus
-                    />
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <span className="text-[10px] text-muted-foreground flex items-center gap-1 mb-1">
-                          <Clock className="size-2.5" /> Duration (mins)
-                        </span>
-                        <Input
-                          type="number"
-                          min="1"
-                          placeholder="15"
-                          value={cardioFinisherInput.duration}
-                          onChange={e => setCardioFinisherInput(prev => ({ ...prev, duration: e.target.value }))}
-                          className="h-8 text-sm"
-                        />
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-muted-foreground flex items-center gap-1 mb-1">
-                          <Heart className="size-2.5" /> Avg HR (optional)
-                        </span>
-                        <Input
-                          type="number"
-                          min="40"
-                          max="220"
-                          placeholder="145"
-                          value={cardioFinisherInput.heartRate}
-                          onChange={e => setCardioFinisherInput(prev => ({ ...prev, heartRate: e.target.value }))}
-                          className="h-8 text-sm"
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-muted-foreground flex items-center gap-1 mb-1.5">
-                        <Flame className="size-2.5" /> Intensity RPE {cardioFinisherInput.rpe} / 10
-                      </span>
-                      <div className="flex gap-0.5">
-                        {Array.from({ length: 10 }, (_, i) => i + 1).map(val => (
-                          <button
-                            key={val}
-                            type="button"
-                            className={`flex-1 h-7 rounded text-[10px] font-semibold transition-all ${
-                              val <= cardioFinisherInput.rpe
-                                ? val <= 3 ? 'bg-emerald-500 text-white'
-                                  : val <= 5 ? 'bg-yellow-500 text-white'
-                                  : val <= 7 ? 'bg-orange-500 text-white'
-                                  : 'bg-red-500 text-white'
-                                : 'bg-muted text-muted-foreground hover:bg-accent'
-                            }`}
-                            onClick={() => setCardioFinisherInput(prev => ({ ...prev, rpe: val }))}
-                          >
-                            {val}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    <Button
-                      size="sm"
-                      className="w-full h-8"
-                      disabled={!cardioFinisherInput.activity.trim() || !cardioFinisherInput.duration || savingCardio}
-                      onClick={async () => {
-                        if (!profileId || !cardioFinisherInput.activity.trim() || !cardioFinisherInput.duration) return
-                        setSavingCardio(true)
-                        try {
-                          const log = await insertCardioLog(
-                            profileId,
-                            today,
-                            cardioFinisherInput.activity.trim(),
-                            parseInt(cardioFinisherInput.duration),
-                            cardioFinisherInput.rpe,
-                            cardioFinisherInput.heartRate ? parseInt(cardioFinisherInput.heartRate) : null,
-                            null,
-                          )
-                          setCardioFinishers(prev => [log, ...prev])
-                          setCardioFinisherInput({ activity: '', duration: '', rpe: 5, heartRate: '' })
-                          setAddingCardioFinisher(null)
-                        } catch (err) {
-                          console.error('Failed to save cardio finisher:', err)
-                        } finally {
-                          setSavingCardio(false)
-                        }
-                      }}
-                    >
-                      {savingCardio ? (
-                        <div className="size-3 border-2 border-current border-t-transparent rounded-full animate-spin mr-1" />
-                      ) : (
-                        <Activity className="size-3 mr-1" />
-                      )}
-                      Save Cardio Session
-                    </Button>
-                  </div>
-                )}
-
-                {/* Action buttons (when no form is open) */}
-                {addingCustom !== dayName && addingCardioFinisher !== dayName && (
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1 text-xs h-8"
-                      onClick={() => setAddingCustom(dayName)}
-                    >
-                      <Dumbbell className="size-3 mr-1" />
-                      Add Extra Lift
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1 text-xs h-8"
-                      onClick={() => setAddingCardioFinisher(dayName)}
-                    >
-                      <Activity className="size-3 mr-1" />
-                      Log Cardio / Conditioning
-                    </Button>
-                  </div>
-                )}
-              </div>
-            )}
           </CardContent>
         </Card>
-
-        {/* Standalone Cardio Sessions for today */}
-        {profileId && isToday && cardioFinishers.length > 0 && (
-          <div className="space-y-2 mt-3">
-            {cardioFinishers.map(log => (
-              <Card key={log.id} className="border-orange-200 dark:border-orange-900/40 bg-gradient-to-r from-orange-50/50 to-background dark:from-orange-950/20 dark:to-background">
-                <CardContent className="px-4 py-3 flex items-center gap-3">
-                  <div className="size-8 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center shrink-0">
-                    <Activity className="size-4 text-orange-600 dark:text-orange-400" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold truncate">{log.activity_name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {log.duration_minutes} mins @ RPE {log.intensity_rpe}
-                      {log.avg_heart_rate ? ` \u2022 ${log.avg_heart_rate} BPM` : ''}
-                    </p>
-                  </div>
-                  <Badge className="bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300 border-0 text-xs">
-                    <Flame className="size-3 mr-0.5" />
-                    {log.intensity_rpe}/10
-                  </Badge>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
       </React.Fragment>
       )})}
 
@@ -1962,11 +751,6 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
             )
           )}
 
-          {/* Swap-dead-end fix: free-entry search across the full catalog —
-              a constraint-valid ranked list can still dead-end (every option
-              unavailable in the gym right now), so this lets the user pick
-              anything and see why it might conflict, rather than never
-              seeing it at all. */}
           {!pendingSwap && (
             <div className="space-y-2 pt-1">
               <Separator />
@@ -2078,25 +862,6 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
           )}
         </DialogContent>
       </Dialog>
-
-      {progressionToast && (
-        <div className="fixed top-4 left-4 right-4 z-50 md:left-auto md:right-4 md:w-96">
-          <Card className="border-orange-300/50 bg-orange-50/95 dark:bg-orange-950/90 dark:border-orange-700/30 backdrop-blur-sm shadow-lg">
-            <CardContent className="py-3 px-4">
-              <div className="flex items-center gap-2">
-                <Flame className="h-5 w-5 text-orange-500 shrink-0" />
-                <p className="text-sm font-medium text-orange-800 dark:text-orange-200">{progressionToast}</p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      <PlateCalculator
-        open={plateCalcOpen}
-        onOpenChange={setPlateCalcOpen}
-        initialWeight={plateCalcWeight}
-      />
     </div>
   )
 }

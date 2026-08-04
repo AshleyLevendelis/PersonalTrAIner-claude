@@ -29,6 +29,8 @@ export interface ActiveSessionRecord {
   /** Deadline-anchored rest — set by startRest, cleared by dismissRest. Absent when no rest is running. */
   restEndsAt?: string
   restLabel?: string
+  /** User-typed off-plan exercise names for today (P2) — the DETECTED half of offPlanWork is computed from logs + the day's plan, not stored here. */
+  declaredOffPlan?: string[]
 }
 
 type RecordMap = Record<string /* date */, ActiveSessionRecord>

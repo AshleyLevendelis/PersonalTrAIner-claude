@@ -2,13 +2,17 @@
 // The one state owner for "what session is live right now" (LAYOUT-DESIGN.md
 // §5.2 / D6 / F3). Nothing by this name existed before this phase.
 //
-// P1 scope only: identity (frozen once, never re-derived per render — F3),
+// P1 shipped identity (frozen once, never re-derived per render — F3),
 // `logs` + `setsFor` as the sole read model, a thin write facade
 // (`logSet`/`deleteSet`) around set-log-store, and a deadline-anchored rest
-// facade backed by the persisted session record. Ghosts, cursor, drafts,
-// order, PRs, off-plan tracking and everything else the full design's
-// schema lists arrive with the phase that actually consumes them (P2/P3) —
-// shipping them now would be unread, forkable state.
+// facade backed by the persisted session record.
+//
+// P2 adds `ghosts`/`loadGhosts` (the one getLastSessionSets fetcher now —
+// SetLogger's own per-instance effect and the bulk-log path's ad hoc call
+// both die in the same commit SetGrid ships, per F1) and the off-plan
+// declaration facade. Cursor, drafts, order, PRs and everything else the
+// full design's schema lists still arrive with P3 — shipping them now
+// would be unread, forkable state.
 //
 // `liveWeek` here has NO setter exposed to any component (D8) — it is
 // stamped once from `getSessionDateContext` + `getActiveMesocycleWeek` and
@@ -20,7 +24,8 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { getAppNow, getSessionDateContext } from '@/lib/dev-clock'
 import { getActiveMesocycleWeek } from '@/lib/calculations'
-import { saveSet, deleteSet, getSetsForDate, initSetLogStore, type SaveSetInput } from '@/lib/set-log-store'
+import { saveSet, deleteSet, getSetsForDate, getLastSessionSets, initSetLogStore, type SaveSetInput } from '@/lib/set-log-store'
+import { seedPRCacheFromHistory } from '@/lib/pr-engine'
 import { filterLoggableSets } from '@/lib/session-derive'
 import {
   getActiveSessionRecord,
@@ -54,6 +59,12 @@ export interface ActiveSessionValue extends ActiveSessionIdentity, RestState {
   startRest: (label: string, durationSeconds: number) => void
   adjustRest: (deltaSeconds: number) => void
   dismissRest: () => void
+  /** Cached previous-session sets for one exercise — call loadGhosts once (e.g. on mount) then read via ghosts(exerciseId); empty array until it resolves. The one fetcher app-wide now (was duplicated between SetLogger and the bulk-log path). */
+  ghosts: (exerciseId: string) => ExerciseSetLog[]
+  loadGhosts: (exerciseId: string) => void
+  declaredOffPlan: string[]
+  declareOffPlan: (name: string) => void
+  undeclareOffPlan: (name: string) => void
 }
 
 const ActiveSessionContext = createContext<ActiveSessionValue | null>(null)
@@ -90,6 +101,14 @@ export function ActiveSessionProvider({
   useEffect(() => {
     initSetLogStore()
   }, [])
+
+  // PR cache seeding used to run only when ExercisePlan mounted (i.e. only
+  // if the user visited the Exercise tab) — now that the program browse
+  // stand-in is the only thing ExercisePlan renders, and it may never
+  // mount in a session, seeding belongs at the root that always mounts.
+  useEffect(() => {
+    if (profileId) seedPRCacheFromHistory(profileId).catch(console.error)
+  }, [profileId])
 
   // Identity: stamped once per mount and re-stamped only when its actual
   // inputs change — never re-derived from a fresh clock read on every
@@ -144,6 +163,92 @@ export function ActiveSessionProvider({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refresh])
 
+  // --- Ghosts (F1: the one getLastSessionSets fetcher for the session view,
+  // replacing SetLogger's own per-instance effect and the bulk-log path's
+  // ad hoc call) -----------------------------------------------------------
+  const [ghostsMap, setGhostsMap] = useState<Record<string, ExerciseSetLog[]>>({})
+  const loadedGhostKeysRef = useRef<Set<string>>(new Set())
+
+  // A new session day invalidates every cached ghost — "last session before
+  // X" changes when X does.
+  useEffect(() => {
+    loadedGhostKeysRef.current = new Set()
+    setGhostsMap({})
+  }, [identity.date])
+
+  const loadGhosts = useCallback((exerciseId: string) => {
+    if (!identity.profileId || !identity.date) return
+    const key = `${identity.date}:${exerciseId}`
+    if (loadedGhostKeysRef.current.has(key)) return
+    loadedGhostKeysRef.current.add(key)
+    getLastSessionSets(identity.profileId, exerciseId, identity.date)
+      .then(rows => setGhostsMap(prev => ({ ...prev, [exerciseId]: rows })))
+      .catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [identity.profileId, identity.date])
+
+  const ghosts = useCallback((exerciseId: string) => ghostsMap[exerciseId] ?? [], [ghostsMap])
+
+  // --- Off-plan declarations (§1.7 H) — persisted so a declared-but-not-yet-
+  // logged extra lift survives a reload. Detection (chat-logged / swapped-
+  // away work) is computed by the caller from `logs` + the day's plan —
+  // this hook stays plan-agnostic (§5.5 ownership boundary).
+  const [declaredOffPlan, setDeclaredOffPlan] = useState<string[]>([])
+
+  useEffect(() => {
+    if (!identity.profileId || !identity.date) return
+    const record = getActiveSessionRecord(identity.profileId, identity.date)
+    setDeclaredOffPlan(record?.declaredOffPlan ?? [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [identity.profileId, identity.date])
+
+  // Every persist call merges onto the existing record rather than
+  // constructing a fresh one — persistRest and persistDeclaredOffPlan write
+  // different slices of the same record, and neither may clobber the
+  // other's fields (a rest started after declaring off-plan work must not
+  // wipe declaredOffPlan, and vice versa).
+  const patchRecord = useCallback((patch: Partial<ActiveSessionRecord>) => {
+    if (!identity.profileId || !identity.date) return
+    const existing = getActiveSessionRecord(identity.profileId, identity.date)
+    const now = getAppNow(identity.profileId).toISOString()
+    saveActiveSessionRecord({
+      profileId: identity.profileId,
+      date: identity.date,
+      dayName: identity.dayName,
+      liveWeek: identity.liveWeek,
+      status: existing?.status ?? 'running',
+      startedAtIso: existing?.startedAtIso ?? now,
+      finishedAtIso: existing?.finishedAtIso,
+      restEndsAt: existing?.restEndsAt,
+      restLabel: existing?.restLabel,
+      declaredOffPlan: existing?.declaredOffPlan,
+      ...patch,
+      lastActivityIso: now,
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [identity.profileId, identity.date, identity.dayName, identity.liveWeek])
+
+  const persistDeclaredOffPlan = useCallback((names: string[]) => {
+    patchRecord({ declaredOffPlan: names })
+  }, [patchRecord])
+
+  const declareOffPlan = useCallback((name: string) => {
+    setDeclaredOffPlan(prev => {
+      if (prev.includes(name)) return prev
+      const next = [...prev, name]
+      persistDeclaredOffPlan(next)
+      return next
+    })
+  }, [persistDeclaredOffPlan])
+
+  const undeclareOffPlan = useCallback((name: string) => {
+    setDeclaredOffPlan(prev => {
+      const next = prev.filter(n => n !== name)
+      persistDeclaredOffPlan(next)
+      return next
+    })
+  }, [persistDeclaredOffPlan])
+
   // --- Rest facade -----------------------------------------------------
   // Deadline-anchored (§3.8): the record stores WHEN the rest ends, never a
   // remaining-seconds counter, so it is correct after backgrounding,
@@ -172,24 +277,8 @@ export function ActiveSessionProvider({
   }, [identity.profileId, identity.date])
 
   const persistRest = useCallback((endsAt: string | null, label: string | null) => {
-    if (!identity.profileId || !identity.date) return
-    const existing = getActiveSessionRecord(identity.profileId, identity.date)
-    const now = getAppNow(identity.profileId).toISOString()
-    const record: ActiveSessionRecord = {
-      profileId: identity.profileId,
-      date: identity.date,
-      dayName: identity.dayName,
-      liveWeek: identity.liveWeek,
-      status: existing?.status ?? 'running',
-      startedAtIso: existing?.startedAtIso ?? now,
-      finishedAtIso: existing?.finishedAtIso,
-      lastActivityIso: now,
-      restEndsAt: endsAt ?? undefined,
-      restLabel: label ?? undefined,
-    }
-    saveActiveSessionRecord(record)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [identity.profileId, identity.date, identity.dayName, identity.liveWeek])
+    patchRecord({ restEndsAt: endsAt ?? undefined, restLabel: label ?? undefined })
+  }, [patchRecord])
 
   const startRest = useCallback((label: string, durationSeconds: number) => {
     if (!identity.profileId) return
@@ -262,6 +351,11 @@ export function ActiveSessionProvider({
     restEndsAt,
     restLabel,
     restRemainingMs,
+    ghosts,
+    loadGhosts,
+    declaredOffPlan,
+    declareOffPlan,
+    undeclareOffPlan,
   }
 
   return <ActiveSessionContext.Provider value={value}>{children}</ActiveSessionContext.Provider>

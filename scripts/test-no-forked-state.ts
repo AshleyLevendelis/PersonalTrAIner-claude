@@ -82,18 +82,17 @@ function main() {
     check(`${relPath} has no bare new Date()`, hits.length === 0, hits)
   }
 
-  console.log('\n[3] getLastSessionSets: at most 2 call sites in component/hook code (P1 baseline)')
-  // P1 baseline is 2 (SetLogger's ghost fetch + the bulk-log fallback,
-  // both still inside ExercisePlan.tsx — ghosts don't move into the hook
-  // until P2 deletes SetLogger in the same commit, per F1). This asserts
-  // the count doesn't grow, not that it's already down to the P2/P3 target
-  // of one.
+  console.log('\n[3] getLastSessionSets: exactly one fetcher app-wide')
+  // Reached the design's target in P2: useActiveSession.loadGhosts is now
+  // the ONLY call site — SetLogger's own per-instance effect and the
+  // bulk-log path's ad hoc call both died with ExercisePlan.tsx's
+  // conversion to a read-only program-browse stand-in (P2-4).
   const ghostCallSites = grepFiles(/getLastSessionSets\(/).filter(h =>
     /\.(tsx)$/.test(h.file) || h.file.includes('hooks/')
   )
   check(
-    `getLastSessionSets has <=2 call sites in components/hooks (found ${ghostCallSites.length})`,
-    ghostCallSites.length <= 2,
+    `getLastSessionSets has exactly 1 call site in components/hooks (found ${ghostCallSites.length})`,
+    ghostCallSites.length === 1,
     ghostCallSites,
   )
 
