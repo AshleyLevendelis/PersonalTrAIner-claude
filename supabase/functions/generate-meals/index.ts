@@ -106,6 +106,24 @@ function cookingTimeGuidance(pref: string | undefined): string {
 }
 
 // ---------------------------------------------------------------------------
+// Slot-appropriate food (meal-realism round): the prior prompt gave every
+// slot the same generic guidance, so the model was just as likely to propose
+// a Peruvian stew for breakfast as for dinner. This is prompt-level steering
+// only — meal-generation.ts's checkSlotAppropriate is the actual reject gate,
+// same nicety-vs-guard split as buildDietarySafetyBlock/diet-rules.ts above.
+// ---------------------------------------------------------------------------
+const SLOT_GUIDANCE: Record<string, string> = {
+  breakfast: "BREAKFAST FOOD ONLY: eggs, oats/porridge, yoghurt, toast, smoothies, breakfast meats (bacon, sausage), pancakes/waffles, cereal-style bowls, breakfast burritos. Never propose a curry, stew, roast dinner, casserole, or other dinner-style dish just wearing a breakfast label.",
+  lunch: "LUNCH FOOD: sandwiches, wraps, salads, grain bowls, quick hot meals, leftovers-style dishes — lighter and faster than a big dinner.",
+  dinner: "DINNER FOOD: a full cooked meal — this is where the heavier, more involved dishes belong.",
+  snack: "GENUINELY SNACK-SIZED: yoghurt, a protein shake, a handful of nuts, fruit with a protein source, a bar-style combo. 2-4 ingredients, no real 'cooking' — NOT a miniature version of a restaurant dish.",
+};
+
+function slotGuidance(slot: string): string {
+  return SLOT_GUIDANCE[slot] ?? "";
+}
+
+// ---------------------------------------------------------------------------
 // Protein-density steering: the verification pipeline (meal-generation.ts)
 // scales every proposal to the slot's CALORIE target and then requires the
 // scaled result to still meet the PROTEIN floor — uniform scaling can't fix
@@ -166,7 +184,7 @@ Deno.serve(async (req: Request) => {
     const proteinGuidance = proteinDenseGuidance(dietary_preferences || []);
 
     const slotDescriptions = typedSlots.map(
-      (s) => `- ${s.slot}: propose ${s.count} DIFFERENT dish variants, each targeting ~${s.calories} kcal — and ${s.protein}g PROTEIN is the number that must not fall short (carbs ~${s.carbs}g, fat ~${s.fat}g are secondary and can flex)`
+      (s) => `- ${s.slot} — ${slotGuidance(s.slot)}\n  Propose ${s.count} DIFFERENT dish variants, each targeting ~${s.calories} kcal — and ${s.protein}g PROTEIN is the number that must not fall short (carbs ~${s.carbs}g, fat ~${s.fat}g are secondary and can flex)`
     ).join("\n");
 
     const prompt = `You are a chef and sports nutritionist proposing meal options for an app that will independently verify every number — your job is variety and plausibility, not precision; code will re-measure and scale every ingredient you list.

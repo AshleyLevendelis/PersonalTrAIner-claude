@@ -153,6 +153,56 @@ function macrosToTargets(m: Macros100g): MacroTargets {
   return { calories: m.kcal, protein: m.protein, carbs: m.carbs, fat: m.fat }
 }
 
+// ---------------------------------------------------------------------------
+// Slot appropriateness (meal-realism round) — the generate-meals prompt now
+// steers toward slot-correct dishes (SLOT_GUIDANCE in the edge function), but
+// prompt steering is a nicety, not a guard (same split as diet-rules.ts vs
+// buildDietarySafetyBlock). This keyword heuristic is the actual reject gate.
+// No keyword list is exhaustive, so it only rejects CLEAR mismatches — a dish
+// name/prep that reads unmistakably as a heavy dinner dish landing in
+// breakfast, or a multi-component dish landing in snack. Ambiguous cases pass
+// through: a false reject just costs a generation round, a false accept is a
+// realism nit, not a safety issue, so this errs permissive.
+// ---------------------------------------------------------------------------
+const DINNER_STYLE_KEYWORDS = [
+  'curry', 'stew', 'casserole', 'roast', 'bourguignon', 'tagine', 'braised',
+  'biryani', 'paella', 'risotto', 'lasagna', 'moussaka', 'goulash',
+  'chili con carne', 'pot pie', "shepherd's pie", 'cottage pie', 'ramen',
+  'pho', 'schnitzel', 'mapo tofu', 'pad thai', 'gochujang', 'bibimbap', 'jambalaya',
+]
+
+const BREAKFAST_SIGNAL_KEYWORDS = [
+  'egg', 'oat', 'yog', 'toast', 'pancake', 'waffle', 'smoothie', 'granola',
+  'muffin', 'hash brown', 'omelette', 'omelet', 'frittata', 'shakshuka',
+  'porridge', 'cereal', 'bagel', 'crepe',
+]
+
+const MAX_SNACK_INGREDIENTS = 5
+
+/** Returns a rejection reason, or null if the proposal reads as fitting its slot. */
+export function checkSlotAppropriate(
+  name: string,
+  prep: string,
+  slot: MealSlotName,
+  ingredientCount: number,
+): string | null {
+  const lower = `${name} ${prep}`.toLowerCase()
+
+  if (slot === 'breakfast') {
+    const isDinnerStyle = DINNER_STYLE_KEYWORDS.some(kw => lower.includes(kw))
+    const hasBreakfastSignal = BREAKFAST_SIGNAL_KEYWORDS.some(kw => lower.includes(kw))
+    if (isDinnerStyle && !hasBreakfastSignal) {
+      return 'reads as a dinner-style dish, not breakfast food'
+    }
+  }
+
+  if (slot === 'snack' && ingredientCount > MAX_SNACK_INGREDIENTS) {
+    return `${ingredientCount} ingredients is too composed to be a snack (snacks should be simple — yoghurt, a shake, nuts, fruit+protein, a bar)`
+  }
+
+  return null
+}
+
 /**
  * Runs one proposal through the full verification pipeline. Returns the
  * accepted PoolOption, or null with a logged reason if it fails any stage.
@@ -168,6 +218,12 @@ export function verifyProposal(
   const parsed = parseIngredientLines(proposal.ingredients)
   if (parsed.length === 0) {
     rejectLog.push(`[${slot}] "${proposal.name}": no ingredients parsed`)
+    return null
+  }
+
+  const slotIssue = checkSlotAppropriate(proposal.name, proposal.prep, slot, parsed.length)
+  if (slotIssue) {
+    rejectLog.push(`[${slot}] "${proposal.name}": not slot-appropriate — ${slotIssue}`)
     return null
   }
 
@@ -211,7 +267,11 @@ export function verifyProposal(
     name: proposal.name,
     ingredients: scaled.ingredients,
     macros: macrosToTargets(finalComputed),
-    tags: [proposal.cuisine, prepBand, keyProtein?.name ?? ''].filter(Boolean),
+    // Fixed order: [cuisine, prepBand, proteinSourceName, ...]. slot_appropriate
+    // is appended, not inserted, so existing tags[0]/tags.find() consumers are
+    // unaffected — every option reaching here already passed checkSlotAppropriate
+    // above, so this documents the pass rather than gating anything further.
+    tags: [proposal.cuisine, prepBand, keyProtein?.name ?? '', 'slot_appropriate'].filter(Boolean),
   }
 }
 
