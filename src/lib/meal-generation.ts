@@ -179,6 +179,26 @@ const BREAKFAST_SIGNAL_KEYWORDS = [
 
 const MAX_SNACK_INGREDIENTS = 5
 
+// ---------------------------------------------------------------------------
+// Cuisine coherence (meal-realism round) — mirrors generate-meals/index.ts's
+// FAMILIAR_CUISINES/EXOTIC_CUISINES split. Kept in sync by hand: the edge
+// function is a separate Deno deploy target with no shared import surface
+// with src/lib. Used to cap POOL COMPOSITION, not to reject a proposal
+// outright — an exotic dish is a perfectly fine proposal, just not more than
+// one per slot's pool (see the exotic-cap check in generateMealPools below).
+// ---------------------------------------------------------------------------
+export const EXOTIC_CUISINES = new Set([
+  'Thai', 'Middle Eastern (Persian, Moroccan)', 'Korean', 'Indian (North Indian, South Indian)',
+  'Caribbean (Jamaican, Cuban)', 'Japanese', 'Vietnamese', 'Ethiopian',
+  'Spanish (Basque, Catalan)', 'Brazilian', 'West African (Nigerian, Ghanaian)',
+  'Peruvian', 'Filipino', 'Georgian', 'Cajun / Creole', 'Scandinavian (Nordic)',
+])
+
+/** tags[0] is always the cuisine (see verifyProposal) — undefined/'' cuisine never counts as exotic. */
+export function isExoticOption(option: PoolOption): boolean {
+  return EXOTIC_CUISINES.has(option.tags[0] ?? '')
+}
+
 /** Returns a rejection reason, or null if the proposal reads as fitting its slot. */
 export function checkSlotAppropriate(
   name: string,
@@ -334,6 +354,13 @@ export async function generateMealPools(params: {
       const budget = budgets[slot]
       if (!budget) continue
 
+      const isExoticProposal = EXOTIC_CUISINES.has(proposal.cuisine)
+      const poolAlreadyHasExotic = accepted[slot]?.some(isExoticOption) ?? false
+      if (isExoticProposal && poolAlreadyHasExotic) {
+        rejectionLog.push(`[${slot}] "${proposal.name}": pool already has an exotic-cuisine option — cuisine coherence cap (${proposal.cuisine})`)
+        continue
+      }
+
       const option = verifyProposal(proposal, slot, budget, params.dietaryPreferences, rejectionLog)
       if (option) accepted[slot]!.push(option)
     }
@@ -453,11 +480,19 @@ export function assembleDay(
       const calDiff = targets.calories > 0 ? Math.abs(totals.calories - targets.calories) / targets.calories : 0
       const proteinDeficit = Math.max(0, targets.protein - totals.protein)
       const repeatsAny = slots.some(s => recentNames[s]?.includes(combo[s]!.name))
+      // Cuisine coherence (meal-realism round): each slot's pool already
+      // caps at one exotic option, but nothing previously stopped a day from
+      // picking THAT exotic option in every slot at once. Soft tiebreak only
+      // — a day with 2+ exotic picks is a mild penalty, not excluded, since
+      // calorie/protein fit always wins first.
+      const exoticSlots = slots.filter(s => isExoticOption(combo[s]!)).length
+      const exoticPenalty = exoticSlots > 1 ? (exoticSlots - 1) * 0.005 : 0
       // Lower score wins: calorie closeness dominates, protein shortfall is a
       // smaller nudge (already gated at the pipeline level, rarely large
-      // here), and a same-as-recent combo is only a mild tiebreak penalty —
-      // variety is a preference, never worth shipping a worse-fitting day for.
-      const score = calDiff + proteinDeficit * 0.002 + (repeatsAny ? 0.01 : 0)
+      // here), and a same-as-recent combo or multi-exotic day is only a mild
+      // tiebreak penalty — variety/coherence are preferences, never worth
+      // shipping a worse-fitting day for.
+      const score = calDiff + proteinDeficit * 0.002 + (repeatsAny ? 0.01 : 0) + exoticPenalty
       if (!state.best || score < state.best.score) state.best = { combo: { ...combo }, totals, score }
       return
     }

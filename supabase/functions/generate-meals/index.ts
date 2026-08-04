@@ -39,10 +39,26 @@ interface GeneratedMeal {
   cuisine: string;
 }
 
-const GLOBAL_CUISINES = [
-  "Mediterranean (Greek, Lebanese, Turkish)",
-  "Thai",
+// ---------------------------------------------------------------------------
+// Cuisine coherence (meal-realism round): a real run produced Filipino
+// breakfast, Peruvian lunch, Filipino dinner, Turkish snack in one day —
+// macro-perfect but culturally scattershot. Split into FAMILIAR (default,
+// everyday, majority of proposals) and EXOTIC (regional, capped) — see
+// meal-generation.ts's EXOTIC_CUISINES, which must be kept in sync by hand
+// (this is a separate Deno deploy target with no shared import surface with
+// src/lib). Variety should come from ingredients/prep, not from touring a
+// different continent every meal.
+// ---------------------------------------------------------------------------
+const FAMILIAR_CUISINES = [
+  "British / Classic",
+  "Italian",
+  "American / Diner Classic",
   "Mexican",
+  "Mediterranean (Greek, Lebanese, Turkish)",
+];
+
+const EXOTIC_CUISINES = [
+  "Thai",
   "Middle Eastern (Persian, Moroccan)",
   "Korean",
   "Indian (North Indian, South Indian)",
@@ -58,8 +74,6 @@ const GLOBAL_CUISINES = [
   "Georgian",
   "Cajun / Creole",
   "Scandinavian (Nordic)",
-  "British / Classic",
-  "Italian",
 ];
 
 function pickRandom<T>(arr: T[], count: number): T[] {
@@ -177,7 +191,12 @@ Deno.serve(async (req: Request) => {
     }
 
     const typedSlots = slots as SlotRequest[];
-    const selectedCuisines = pickRandom(GLOBAL_CUISINES, Math.min(6, GLOBAL_CUISINES.length));
+    // Majority familiar, at most one exotic option offered per batch — the
+    // AI can still propose something outside this list, but the menu it's
+    // shown skews everyday. meal-generation.ts's per-slot-pool exotic cap is
+    // the actual enforcement; this just stops the prompt from suggesting six
+    // different continents in one breath.
+    const selectedCuisines = [...pickRandom(FAMILIAR_CUISINES, Math.min(4, FAMILIAR_CUISINES.length)), ...pickRandom(EXOTIC_CUISINES, 1)];
     const dietaryBlock = buildDietarySafetyBlock(dietary_preferences || []);
     const cookingGuidance = cookingTimeGuidance(cooking_time_preference);
 
@@ -189,7 +208,7 @@ Deno.serve(async (req: Request) => {
 
     const prompt = `You are a chef and sports nutritionist proposing meal options for an app that will independently verify every number — your job is variety and plausibility, not precision; code will re-measure and scale every ingredient you list.
 
-CUISINE VARIETY: draw inspiration from a mix of these cuisines across your proposals: ${selectedCuisines.join(", ")}. Vary the protein source and cooking style across variants within the same slot — do not propose near-duplicate dishes.
+CUISINE: default to familiar, everyday food — most of your proposals across a slot should be recognisably ordinary (British/Western/simple international staples), with at most ONE dish per slot drawing from something more regional. Draw from this mix: ${selectedCuisines.join(", ")}. Variety should come from ingredients, protein source, and cooking style — not from touring a different continent every dish. Do not propose near-duplicate dishes within the same slot.
 
 PREP TIME: ${cookingGuidance}
 ${dietaryBlock}
