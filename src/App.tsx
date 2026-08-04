@@ -4,12 +4,10 @@ import { Button } from '@/components/ui/button'
 import { Dumbbell, RotateCcw, Activity, UtensilsCrossed, MessageCircle, PieChart, Loader2 } from 'lucide-react'
 import { OnboardingFlow } from '@/components/onboarding/OnboardingFlow'
 import { NutritionDisplay } from '@/components/NutritionDisplay'
-import { ExercisePlan } from '@/components/ExercisePlan'
-import { CardioLogger } from '@/components/CardioLogger'
+import { ExerciseTab } from '@/components/exercise/ExerciseTab'
 import { MealPlan } from '@/components/MealPlan'
 import { ChatAssistant } from '@/components/ChatAssistant'
 import { WeeklyPlannerCard } from '@/components/WeeklyPlannerCard'
-import { DevTestPanel } from '@/components/DevTestPanel'
 import { DevTestPage } from '@/components/DevTestPage'
 import { OfflineStatusIndicator } from '@/components/OfflineStatusIndicator'
 import { BottomDock } from '@/components/BottomDock'
@@ -955,9 +953,7 @@ function App() {
           <WeeklyPlannerCard
             profileId={profile.id}
             profile={profile}
-            trainingDays={profile.training_days}
             exercisePlan={exercisePlan}
-            macros={macros}
           />
         )}
 
@@ -993,21 +989,7 @@ function App() {
           </TabsContent>
 
           <TabsContent value="exercise">
-            {isDevAccount(profile) && (
-              <DevTestPanel
-                profileId={profile?.id}
-                mesocycle={mesocycle}
-                exercisePlan={exercisePlan}
-                overrideWeek={devOverrideWeek}
-                overrideDay={devOverrideDay}
-                devBypassLocks={devBypassLocks}
-                onOverrideWeekChange={setDevOverrideWeek}
-                onOverrideDayChange={setDevOverrideDay}
-                onBypassLocksChange={setDevBypassLocks}
-                onLogsSeeded={() => setLogsVersion(v => v + 1)}
-              />
-            )}
-            <ExercisePlan
+            <ExerciseTab
               plan={exercisePlan}
               mesocycle={mesocycle}
               exclusions={exerciseExclusions}
@@ -1019,8 +1001,11 @@ function App() {
               devBypassLocks={devBypassLocks}
               onSwapExercise={handleSwapExercise}
               onBanExercise={handleBanExercise}
+              onDevOverrideWeekChange={setDevOverrideWeek}
+              onDevOverrideDayChange={setDevOverrideDay}
+              onDevBypassLocksChange={setDevBypassLocks}
+              onLogsSeeded={() => setLogsVersion(v => v + 1)}
             />
-            {profile?.id && <CardioLogger profileId={profile.id} />}
           </TabsContent>
 
           <TabsContent value="meals">

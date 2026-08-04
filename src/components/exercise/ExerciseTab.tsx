@@ -3,6 +3,8 @@ import { useAppRoute, programHash } from '@/lib/app-route'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { ExercisePlan } from '@/components/ExercisePlan'
 import { PlateCalculator } from '@/components/PlateCalculator'
+import { DevTestPanel } from '@/components/DevTestPanel'
+import { isDevAccount } from '@/lib/dev-clock'
 import { TodayPanel } from './TodayPanel'
 import { SwapDialog, type SwapTarget } from './SwapDialog'
 import type { ExerciseEntry } from '@/lib/exercise-db'
@@ -28,6 +30,10 @@ interface ExerciseTabProps {
   devBypassLocks?: boolean
   onSwapExercise: (weekNumber: number, dayName: string, exIndex: number, newExercise: ExerciseEntry, scope: SwapScope) => void | Promise<void>
   onBanExercise: (exerciseName: string) => void | Promise<void>
+  onDevOverrideWeekChange: (week: number | null) => void
+  onDevOverrideDayChange: (day: string | null) => void
+  onDevBypassLocksChange: (bypass: boolean) => void
+  onLogsSeeded: () => void
 }
 
 export function ExerciseTab({
@@ -42,6 +48,10 @@ export function ExerciseTab({
   devBypassLocks,
   onSwapExercise,
   onBanExercise,
+  onDevOverrideWeekChange,
+  onDevOverrideDayChange,
+  onDevBypassLocksChange,
+  onLogsSeeded,
 }: ExerciseTabProps) {
   const { route } = useAppRoute()
   const { liveWeek } = useActiveSession()
@@ -61,20 +71,38 @@ export function ExerciseTab({
   }
 
   if (isProgramView) {
+    // DevTestPanel mounts here — program surface, dev-gated — never above
+    // the today hero (LAYOUT-DESIGN.md §2.4).
     return (
-      <ExercisePlan
-        plan={plan}
-        mesocycle={mesocycle}
-        exclusions={exclusions}
-        profile={profile}
-        profileId={profileId}
-        planCreatedAt={planCreatedAt}
-        devOverrideWeek={devOverrideWeek}
-        devOverrideDay={devOverrideDay}
-        devBypassLocks={devBypassLocks}
-        onSwapExercise={onSwapExercise}
-        onBanExercise={onBanExercise}
-      />
+      <>
+        {isDevAccount(profile ?? null) && (
+          <DevTestPanel
+            profileId={profileId}
+            mesocycle={mesocycle ?? []}
+            exercisePlan={plan}
+            overrideWeek={devOverrideWeek ?? null}
+            overrideDay={devOverrideDay ?? null}
+            devBypassLocks={!!devBypassLocks}
+            onOverrideWeekChange={onDevOverrideWeekChange}
+            onOverrideDayChange={onDevOverrideDayChange}
+            onBypassLocksChange={onDevBypassLocksChange}
+            onLogsSeeded={onLogsSeeded}
+          />
+        )}
+        <ExercisePlan
+          plan={plan}
+          mesocycle={mesocycle}
+          exclusions={exclusions}
+          profile={profile}
+          profileId={profileId}
+          planCreatedAt={planCreatedAt}
+          devOverrideWeek={devOverrideWeek}
+          devOverrideDay={devOverrideDay}
+          devBypassLocks={devBypassLocks}
+          onSwapExercise={onSwapExercise}
+          onBanExercise={onBanExercise}
+        />
+      </>
     )
   }
 
