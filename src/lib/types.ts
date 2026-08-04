@@ -161,6 +161,19 @@ export interface Exercise {
    * movements or primers, where a single load doesn't apply.
    */
   per_set_load?: { set_number: number; load_kg: number; display: string }[] | null
+  /**
+   * Ramp-up-visibility fix: the day's warmup.ramp_ups (warmup.ts) already
+   * computed a build-up scheme for every qualifying externally-loaded
+   * compound, but it lived ONLY on WorkoutDay.warmup — a day-level block
+   * with no code path back onto the Exercise it belongs to, and the UI
+   * only ever rendered that block, collapsed by default, with no visual
+   * tie to this exercise's row. This is the same RampBlock, copied onto
+   * the specific Exercise it applies to (see exercise-plan.ts's day-build
+   * loop) so the exercise row itself can render it — undefined for
+   * anything that didn't qualify (bodyweight work, isolation, a light
+   * tier2 accessory below the ramp threshold).
+   */
+  ramp_up?: import('./warmup').RampBlock
 }
 
 export interface MesocycleWeek {

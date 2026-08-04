@@ -387,6 +387,24 @@ function runSingleAudit(
           details: `"${ex.name}" is a tier1_compound on ${day.day} with no ramp-up block in warmup.ramp_ups`,
           exercise: ex.name,
         })
+        continue
+      }
+      // Ramp-visibility fix: this guardrail used to stop at "present
+      // somewhere in warmup.ramp_ups" — which is exactly how the real bug
+      // shipped invisibly. buildWarmup's ramp is day-level and string-keyed
+      // by name only; the exercise row that actually shows the working
+      // weight had no code path back to it at all, so a user could see
+      // "S1: 90kg" with zero ramp in sight while this check stayed green.
+      // Assert the SAME data also reached the Exercise object the UI
+      // actually renders per-row (exercise-plan.ts's day-build loop) — a
+      // day-level-only ramp is now a hard failure here, not just a UI gap.
+      if (!ex.ramp_up || ex.ramp_up.exercise !== ex.name) {
+        failures.push({
+          check: 'ramp_up_missing',
+          combination: comboLabel,
+          details: `"${ex.name}" is a tier1_compound on ${day.day} with a ramp-up block in warmup.ramp_ups but NOT attached to its own Exercise.ramp_up — invisible on the exercise row`,
+          exercise: ex.name,
+        })
       }
     }
   }

@@ -10,7 +10,7 @@ import { ArrowRightLeft, Ban, Zap, ShieldAlert, Heart, Check, Dumbbell, Plus, Ac
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { getExerciseEntry, getExerciseId, searchExerciseCatalog } from '@/lib/exercise-db'
 import { getExerciseCompatibilityWarnings } from '@/lib/exercise-plan'
-import { isExternallyLoaded } from '@/lib/load-prescription'
+import { isExternallyLoaded, loadingMode, roundToPlate, getEquipmentFloorKg } from '@/lib/load-prescription'
 import { getReplacementCandidates, type SwapScope } from '@/lib/mesocycle-edit'
 import { insertCardioLog, getCardioLogsForDate } from '@/lib/daily-tracking'
 import { checkDoubleProgression, getDoubleProgressionRecommendation } from '@/lib/progression-engine'
@@ -23,7 +23,7 @@ import { RestTimer } from '@/components/RestTimer'
 import { PlateCalculator } from '@/components/PlateCalculator'
 import { OfflineStatusIndicator } from '@/components/OfflineStatusIndicator'
 import type { ExerciseEntry } from '@/lib/exercise-db'
-import type { WorkoutDay, ExerciseSetLog, CardioLog, MesocycleWeek, UserProfile, SessionDuration } from '@/lib/types'
+import type { WorkoutDay, Exercise, ExerciseSetLog, CardioLog, MesocycleWeek, UserProfile, SessionDuration } from '@/lib/types'
 import { estimateDaySeconds, getDurationBudgetSeconds } from '@/lib/session-duration'
 
 interface ExercisePlanProps {
@@ -264,6 +264,34 @@ function ActiveRecoveryCard({ workout, mesoWeek }: { workout: WorkoutDay; mesoWe
       </CardContent>
     </Card>
   )
+}
+
+/**
+ * Ramp-visibility fix: computes concrete kg targets for an exercise's
+ * ramp_up (exercise-plan.ts attaches the day's warmup ramp onto the
+ * matching Exercise — see types.ts's doc comment on ramp_up). Percent-based
+ * (RampSet.load_percent is relative to THIS week's suggested_load_kg, not a
+ * stored absolute), so this recomputes fresh every render rather than
+ * trusting a cached kg value — correct automatically as suggested_load_kg
+ * changes week to week. Guards against a stale ramp_up.exercise (a variation
+ * rotation can change ex.name without clearing the old ramp — see
+ * exercise-plan.ts's rotateVariation call sites) by refusing to render
+ * anything that doesn't name-match the exercise it's attached to. Every
+ * step is floored at the equipment's real loadable minimum (an empty bar is
+ * ~20kg, never 0) so "0% of working weight" never displays as an unsafe 0kg.
+ */
+function formatRampSets(ex: Exercise): { setNumber: number; kg: number; reps: number }[] | null {
+  if (!ex.ramp_up || ex.ramp_up.exercise !== ex.name) return null
+  if (ex.suggested_load_kg == null) return null
+  const entry = getExerciseEntry(ex.name)
+  if (!entry) return null
+  const mode = loadingMode(entry)
+  const floor = getEquipmentFloorKg(entry)
+  return ex.ramp_up.sets.map(s => ({
+    setNumber: s.set_number,
+    kg: roundToPlate(Math.max((ex.suggested_load_kg! * s.load_percent) / 100, floor), mode),
+    reps: s.reps,
+  }))
 }
 
 function WarmupSection({ warmup, open, onToggle }: { warmup: WorkoutDay['warmup']; open: boolean; onToggle: () => void }) {
@@ -818,6 +846,19 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
   }, [profileId, devOverrideWeek, devOverrideDay])
   const today = sessionDateContext.date
   const todayName = devOverrideDay ?? sessionDateContext.day
+
+  // Ramp-visibility fix: a collapsed-by-default warm-up section is exactly
+  // how a user landing straight on the exercise row saw only "S1: 90kg" with
+  // no ramp in sight. Auto-expand today's card once per day change — a
+  // ref (not a dependency-driven re-run) so a user who deliberately
+  // collapses it back mid-session isn't fought on every unrelated re-render.
+  const autoExpandedDayRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (todayName && autoExpandedDayRef.current !== todayName) {
+      autoExpandedDayRef.current = todayName
+      setExpandedWarmups(prev => new Set([...prev, todayName]))
+    }
+  }, [todayName])
 
   useEffect(() => {
     if (profileId) {
@@ -1404,6 +1445,24 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
                             </Badge>
                           )}
                         </div>
+                        {(() => {
+                          const rampSets = formatRampSets(ex)
+                          if (!rampSets) return null
+                          return (
+                            <div
+                              className="flex items-center gap-1 flex-wrap mt-0.5 rounded border border-orange-300/60 bg-orange-50 dark:bg-orange-950/20 dark:border-orange-900/50 px-1.5 py-1"
+                              title="Ramp-up sets — build to your working weight before the sets below. These don't count toward working volume."
+                            >
+                              <Thermometer className="size-2.5 text-orange-600 dark:text-orange-400 shrink-0" />
+                              <span className="text-[10px] font-medium text-orange-700 dark:text-orange-400">Ramp:</span>
+                              {rampSets.map((s, i) => (
+                                <span key={s.setNumber} className="text-[10px] text-orange-700 dark:text-orange-400">
+                                  {i > 0 && <span className="text-orange-400 dark:text-orange-600">·</span>} {s.kg}kg×{s.reps}
+                                </span>
+                              ))}
+                            </div>
+                          )
+                        })()}
                         {(ex.intensity || ex.suggested_load || (ex.per_set_load && ex.per_set_load.length > 0)) && (
                           <div className="flex flex-col gap-0.5 mt-0.5">
                             {ex.intensity && (

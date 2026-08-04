@@ -2699,10 +2699,23 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
       budgetSeconds: warmupReserve,
     })
 
+    // Ramp-up-visibility fix: buildWarmup already decided which exercises
+    // qualify for a ramp (needsRampUp in warmup.ts) — copy each RampBlock
+    // onto its Exercise (matched by name, the same key warmup.ts itself
+    // uses) so the exercise row can render its own build-up, not just the
+    // day-level warmup block. Every later pass on `exercises` (buildSuperset
+    // Pairs already ran above; enforceSetHierarchy/enforceLoadCoherence/
+    // enforceDayDurationBudget below) uses object-spread or in-place field
+    // mutation, never a from-scratch reconstruction, so this survives them.
+    const rampByName = new Map(warmup.ramp_ups.map(r => [r.exercise, r]))
+    const withRamps = rampByName.size > 0
+      ? paired.map(ex => rampByName.has(ex.name) ? { ...ex, ramp_up: rampByName.get(ex.name) } : ex)
+      : paired
+
     return {
       day: day.day,
       focus: trackFocus,
-      exercises: enforceSetHierarchy(paired),
+      exercises: enforceSetHierarchy(withRamps),
       warmup,
     }
   })
@@ -3151,6 +3164,33 @@ function applyDurationFiller(
   }
 }
 
+/**
+ * Ramp-visibility fix: a variation rotation (block-boundary main-lift swap,
+ * or a weekly accessory sub-rotation) changes Exercise.name but every one of
+ * those call sites spreads `...ex` — carrying the OLD ramp_up forward
+ * unchanged, still labeled with the exercise it no longer belongs to.
+ * formatRampSets in ExercisePlan.tsx name-guards against rendering that
+ * mismatch (so it fails safe, never wrong), but a silent hide reintroduces
+ * this exact bug for any rotated week: working weight shown, ramp gone.
+ * Re-derives instead — same experience-scaled percentage scheme (it isn't
+ * exercise-specific), just re-labeled for the new movement, so a rotated
+ * main lift still shows its build-up. Drops the ramp entirely (returns
+ * undefined) if the new exercise no longer qualifies under the same rule
+ * needsRampUp (warmup.ts) applies — e.g. rotating from a barbell press into
+ * a bodyweight variant.
+ */
+function carryRampUp(
+  previousRamp: Exercise['ramp_up'],
+  previousName: string,
+  newName: string,
+  newEntry: ExerciseEntry | undefined,
+): Exercise['ramp_up'] {
+  if (!previousRamp || previousRamp.exercise !== previousName) return undefined
+  if (newName === previousName) return previousRamp
+  if (!newEntry || newEntry.mechanics_tier !== 'tier1_compound' || !isExternallyLoaded(newEntry)) return undefined
+  return { ...previousRamp, exercise: newName }
+}
+
 export function generateMesocycle(
   profile: UserProfile,
   baseWorkout?: WorkoutDay[],
@@ -3286,7 +3326,13 @@ export function generateMesocycle(
         // The rotated slot is a different movement — its logging identity must
         // follow (a stale id would thread the old lift's history into the new
         // one's ghosts/progression).
-        return { ...ex, id: newEntry?.id ?? getExerciseId(rotated), name: rotated, reps }
+        return {
+          ...ex,
+          id: newEntry?.id ?? getExerciseId(rotated),
+          name: rotated,
+          reps,
+          ramp_up: carryRampUp(ex.ramp_up, ex.name, rotated, newEntry),
+        }
       })
       return { ...day, exercises }
     })
@@ -3666,6 +3712,7 @@ export function generateMesocycle(
             tier: dbEntry ? mapTier(dbEntry.mechanics_tier) : undefined,
             fatigue_cost: dbEntry ? deriveFatigueCost(dbEntry) : undefined,
             prescription_type: dbEntry?.prescription_type ?? ex.prescription_type,
+            ramp_up: carryRampUp(ex.ramp_up, ex.name, weeklyName, dbEntry),
           }
         })
 
