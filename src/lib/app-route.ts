@@ -17,10 +17,10 @@ const TABS: Tab[] = ['nutrition', 'exercise', 'meals', 'chat']
 export type Route =
   | { kind: 'tab'; tab: Tab }
   | { kind: 'devtest' }
-  // Reserved for P2 (`#/exercise/program[/week/{n}]`) and P3 (`#/train`) —
-  // not produced by parseRoute yet; declared here so the union is stable
-  // across phases and callers can already switch on `kind` exhaustively.
   | { kind: 'program'; week?: number }
+  // Reserved for P3 (`#/train`) — not produced by parseRoute yet; declared
+  // here so the union is stable across phases and callers can already
+  // switch on `kind` exhaustively.
   | { kind: 'train' }
 
 export function isTab(value: string): value is Tab {
@@ -31,8 +31,15 @@ export function tabHash(tab: Tab): string {
   return `#/tab/${tab}`
 }
 
+/** `#/exercise/program` (week list — no week number yet) or `#/exercise/program/{n}` (week detail). */
+export function programHash(week?: number): string {
+  return week != null ? `#/exercise/program/${week}` : '#/exercise/program'
+}
+
 export function parseRoute(hash: string): Route {
   if (hash === '#/dev-test') return { kind: 'devtest' }
+  const programMatch = /^#\/exercise\/program(?:\/(\d+))?$/.exec(hash)
+  if (programMatch) return { kind: 'program', week: programMatch[1] ? parseInt(programMatch[1], 10) : undefined }
   const tabMatch = /^#\/tab\/([a-z]+)$/.exec(hash)
   if (tabMatch && isTab(tabMatch[1])) return { kind: 'tab', tab: tabMatch[1] }
   return { kind: 'tab', tab: 'nutrition' }
