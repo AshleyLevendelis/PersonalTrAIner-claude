@@ -32,7 +32,10 @@ const LAST_TAB_KEY = 'fitplan_last_tab'
 
 function App() {
   const { hash, route } = useAppRoute()
-  const activeTab: Tab = route.kind === 'tab' ? route.tab : 'nutrition'
+  // `program`/`train` are sub-routes of the exercise tab (LAYOUT-DESIGN.md
+  // §5.3) — only an unrecognised/empty hash falls back to nutrition.
+  const activeTab: Tab =
+    route.kind === 'tab' ? route.tab : route.kind === 'program' || route.kind === 'train' ? 'exercise' : 'nutrition'
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [macros, setMacros] = useState<MacroTargets | null>(null)
   /** Latest daily_metrics weigh-in — overrides the (immutable) onboarding weight in every target computation. Null until the user first weighs in. */
