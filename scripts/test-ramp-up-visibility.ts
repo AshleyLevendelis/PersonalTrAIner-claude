@@ -22,6 +22,7 @@ import { generateMesocycle, setRandomSource, resetRandomSource } from '../src/li
 import { EXERCISE_DATABASE } from '../src/lib/exercise-db'
 import { isExternallyLoaded } from '../src/lib/load-prescription'
 import { seededRngFromKey } from '../src/lib/seeded-random'
+import { formatRampSets } from '../src/lib/session-derive'
 import type { UserProfile, WorkoutDay } from '../src/lib/types'
 
 let failures = 0
@@ -113,6 +114,67 @@ async function main() {
   for (const week of mesocycle) {
     for (const day of week.days) {
       assertDayRampsAttached(day, `Week ${week.week_number}`)
+    }
+  }
+
+  console.log('\n[3] Extended display assertions (LAYOUT-DESIGN.md §7.5, three-assertion version)')
+  for (const week of mesocycle) {
+    for (const day of week.days) {
+      // (A) every tier1 externally-loaded exercise with a matching ramp_up
+      // yields a non-empty, floored, plate-rounded kg list via the exact
+      // function the row renders from.
+      for (const ex of day.exercises) {
+        if (!ex.ramp_up || ex.ramp_up.exercise !== ex.name) continue
+        const entry = findEntry(ex.name)
+        if (!entry || entry.mechanics_tier !== 'tier1_compound' || !isExternallyLoaded(entry)) continue
+        if (ex.suggested_load_kg == null) continue // no working weight yet — covered by (B) if it qualifies there
+        const display = formatRampSets(ex)
+        check(
+          `(A) Week ${week.week_number}/${day.day}: "${ex.name}" formatRampSets yields a non-empty, floored kg list`,
+          display?.kind === 'kg' && display.sets.length > 0 && display.sets.every(s => s.kg > 0 && Number.isFinite(s.kg)),
+          display,
+        )
+      }
+
+      // (B) every warmup.ramp_ups-named exercise with suggested_load_kg ==
+      // null (a bodyweight compound) yields the rep-only variant, never the
+      // kg list (which would divide by a null working weight) and never null
+      // (which would silently drop the ramp now that the day-level
+      // percentage block is gone).
+      const rampUps = day.warmup?.ramp_ups ?? []
+      for (const rb of rampUps) {
+        const ex = day.exercises.find(e => e.name === rb.exercise)
+        if (!ex || ex.suggested_load_kg != null) continue
+        const display = ex.ramp_up ? formatRampSets(ex) : null
+        check(
+          `(B) Week ${week.week_number}/${day.day}: "${rb.exercise}" (no suggested load) yields the rep-only variant`,
+          display?.kind === 'bodyweight' && display.sets.length > 0,
+          display,
+        )
+      }
+
+      // (C) no warmup.ramp_ups entry may be orphaned by the initial attach
+      // pass (exercise-plan.ts:2710-2713, the exact seam §1.5's deletion
+      // depends on) — every RampBlock buildWarmup decided on must land on
+      // its own Exercise object at generation time. Scoped to week 1 only:
+      // day.warmup.ramp_ups is a snapshot from THIS generation pass and is
+      // never rewritten by later block-to-block rotation, while carryRampUp
+      // legitimately renames or drops an exercise's own ramp_up as it
+      // rotates — comparing a rotated week's exercises against week 1's
+      // stale name snapshot would flag that intentional drift as a false
+      // orphan, not a real attachment failure.
+      if (week.week_number === 1) {
+        const attachedNames = new Set(
+          day.exercises.filter(e => e.ramp_up && e.ramp_up.exercise === e.name).map(e => e.name),
+        )
+        for (const rb of rampUps) {
+          check(
+            `(C) Week 1/${day.day}: warmup ramp for "${rb.exercise}" is attached to its exercise, not orphaned`,
+            attachedNames.has(rb.exercise),
+            { ramp_ups: rampUps.map(r => r.exercise), attached: [...attachedNames] },
+          )
+        }
+      }
     }
   }
 

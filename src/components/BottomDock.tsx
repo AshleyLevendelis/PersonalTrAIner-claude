@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Timer } from 'lucide-react'
 import { useActiveSession } from '@/hooks/useActiveSession'
+import { useViewportInset } from '@/hooks/useViewportInset'
 
 function formatDuration(ms: number): string {
   const totalSeconds = Math.round(Math.abs(ms) / 1000)
@@ -56,6 +57,7 @@ function playChime() {
 
 export function BottomDock() {
   const { restEndsAt, restLabel, restRemainingMs, adjustRest, dismissRest } = useActiveSession()
+  const { insetPx, isKeyboardOpen } = useViewportInset()
   const chimedForRef = useRef<string | null>(null)
 
   useEffect(() => {
@@ -72,9 +74,25 @@ export function BottomDock() {
   if (!restEndsAt || restRemainingMs == null) return null
 
   const isOverrun = restRemainingMs <= 0
+  // Ride above the soft keyboard instead of sliding under it — iOS Safari
+  // doesn't resize the layout viewport this `fixed` element is anchored to.
+  const bottomStyle = insetPx > 0 ? { bottom: insetPx + 16 } : undefined
+
+  // Keyboard up (a set input is focused): collapse to one thin line — the
+  // full two-row card would occlude the very row the user is editing (§3.6).
+  if (isKeyboardOpen) {
+    return (
+      <div className="fixed left-4 right-4 z-50 md:left-auto md:right-4 md:w-96" style={bottomStyle}>
+        <div className="rounded-md border border-primary/30 bg-card/95 backdrop-blur-sm shadow-lg px-3 py-1.5 inline-flex items-center gap-1.5 text-xs font-medium tabular-nums">
+          <Timer className="h-3 w-3 text-primary shrink-0" />
+          {isOverrun ? `Rest finished ${formatDuration(restRemainingMs)} ago` : formatDuration(restRemainingMs)}
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <div className="fixed bottom-4 left-4 right-4 z-50 md:left-auto md:right-4 md:w-96">
+    <div className="fixed left-4 right-4 z-50 md:left-auto md:right-4 md:w-96" style={bottomStyle}>
       <Card className="border-primary/30 bg-card/95 backdrop-blur-sm shadow-lg">
         <div className="p-3 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 min-w-0">

@@ -27,6 +27,11 @@ import type { ExerciseSetLog } from '@/lib/types'
 const MAX_WEIGHT_KG = 9999.99
 const MAX_REPS = 999
 
+/** Keeps the row a lifter is actively editing above the soft keyboard (LAYOUT-DESIGN.md §7.6) — scrollIntoView on focus, not on every keystroke. */
+function scrollRowIntoView(e: React.FocusEvent<HTMLInputElement>) {
+  e.currentTarget.scrollIntoView({ block: 'center', behavior: 'smooth' })
+}
+
 interface SetInputState {
   weight: string
   reps: string
@@ -231,6 +236,7 @@ export function SetGrid({
               placeholder={isBW ? 'BW' : (ghost ? String(ghost.weight_kg) : defaultWeightFor(setNumber))}
               value={isBW ? '' : input.weight}
               onChange={e => updateInput(setNumber, 'weight', e.target.value)}
+              onFocus={scrollRowIntoView}
               className={`h-7 text-sm ${isSaved ? 'border-green-300 dark:border-green-700' : ''} ${isBW ? 'bg-muted text-muted-foreground' : ''} ${rowErrors[setNumber] ? 'border-destructive' : ''}`}
               disabled={isBW}
             />
@@ -261,6 +267,7 @@ export function SetGrid({
               placeholder={ghost ? String(ghost.reps_completed) : '0'}
               value={input.reps}
               onChange={e => updateInput(setNumber, 'reps', e.target.value)}
+              onFocus={scrollRowIntoView}
               className={`h-7 text-sm w-14 ${isSaved ? 'border-green-300 dark:border-green-700' : ''} ${rowErrors[setNumber] ? 'border-destructive' : ''}`}
             />
             <div className="flex items-center gap-1">
