@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { GEMINI_MODEL } from "../_shared/gemini.ts";
+import { computeMealMacros, type MealIngredientLine } from "../_shared/food-db.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -461,7 +462,7 @@ const toolDeclarations = [
   {
     name: "log_meal",
     description:
-      "Logs a meal the user has eaten. Call when the user says they ate something (e.g. 'I had a chicken salad for lunch', 'Just ate 2 eggs and toast'). Extract meal slot, food items, and estimated macros from the description.",
+      "Call whenever the user describes food they ate, OR asks a nutrition question about specific food (e.g. 'how many calories is 2 eggs and toast', 'what's the protein in this shake'). Extract ONLY the ingredients the user actually stated, with their exact quantities and units — the app computes real macros from a verified food database from what you extract, so you must never calculate or state a macro number yourself. Never add an ingredient the user didn't mention (no assumed cooking oil, seasoning, or protein powder) — if an addition seems implied, ask instead of guessing. If an ingredient has an ambiguous variant (e.g. 'greek yoghurt' could be 0% or full-fat, 'milk' could be whole or skimmed), name the SPECIFIC variant you're assuming (e.g. 'greek yoghurt 0%', not 'greek yoghurt') and record it in assumptions. If a quantity is missing, use a typical portion and record that assumption too.",
     parameters: {
       type: "object",
       properties: {
@@ -471,26 +472,31 @@ const toolDeclarations = [
         },
         food_name: {
           type: "string",
-          description: "Name/description of the food eaten",
+          description: "Short label for what was eaten, e.g. 'Post-workout shake'",
         },
-        estimated_calories: {
-          type: "number",
-          description: "Estimated calories",
+        ingredients: {
+          type: "array",
+          description: "ONLY what the user actually stated — one entry per distinct ingredient. Never invent an addition they didn't mention.",
+          items: {
+            type: "object",
+            properties: {
+              name: {
+                type: "string",
+                description: "Specific ingredient name, disambiguated where the base name is ambiguous (e.g. 'greek yoghurt 0%', not 'greek yoghurt'; 'whey protein powder' not 'protein').",
+              },
+              quantity: { type: "number", description: "Quantity in the given unit" },
+              unit: { type: "string", description: "g, ml, medium, large, scoop, tbsp, tsp, slice, whole, clove, etc." },
+            },
+            required: ["name", "quantity", "unit"],
+          },
         },
-        estimated_protein: {
-          type: "number",
-          description: "Estimated protein in grams",
-        },
-        estimated_carbs: {
-          type: "number",
-          description: "Estimated carbs in grams",
-        },
-        estimated_fat: {
-          type: "number",
-          description: "Estimated fat in grams",
+        assumptions: {
+          type: "array",
+          items: { type: "string" },
+          description: "Plain-English notes on any assumption you made — an ambiguous variant you picked, or a portion size you guessed because none was given. Empty array if you made none.",
         },
       },
-      required: ["meal_slot", "food_name", "estimated_calories", "estimated_protein", "estimated_carbs", "estimated_fat"],
+      required: ["meal_slot", "food_name", "ingredients", "assumptions"],
     },
   },
   {
@@ -839,6 +845,13 @@ PERIODIZATION COACHING RULES:
 - If the user asks about their progress, reference logged data to show improvement trends.
 ${context.exercise_exclusions && context.exercise_exclusions.length > 0 ? `\nPERMANENTLY EXCLUDED EXERCISES (never suggest these):\n${context.exercise_exclusions.join(", ")}` : ""}
 
+=== NATURAL LANGUAGE FOOD LOGGING & NUTRITION QUESTIONS (CRITICAL) ===
+- You must NEVER calculate or state a macro number (calories, protein, carbs, fat) yourself in your reply text, for ANY reason — not for logging food someone ate, not for answering "how many calories is X", not for coaching analysis. Every macro number in this app comes from a verified food database computed server-side; your job is parsing, never arithmetic.
+- Whenever the user describes food they ate, OR asks a nutrition/macro question about specific food, call log_meal with the ingredients parsed from their message. The tool's response already contains the real computed numbers (and any coverage/assumption caveats) — your reply must use ONLY those numbers, never your own math on top of them.
+- Extract ONLY what the user actually stated. Never add an ingredient they didn't mention (no assumed cooking oil, seasoning, or protein powder) — if an addition seems implied, ask the user rather than silently including it.
+- If an ingredient has an ambiguous variant (fat content, whole vs. skimmed, etc.), pick one explicit, precisely-named variant and record the assumption. If a quantity is missing, use a typical portion and record that assumption too. See log_meal's parameter descriptions for exact requirements.
+- This does NOT apply to replace_food/swap_meal's "estimated_macros" field — that is a separate, internal scaling input for building a plan swap, not a number shown to the user as verified fact.
+
 DYNAMIC QUANTITY SCALING (CRITICAL - MATHEMATICAL CONSTRAINT):
 You are strictly responsible for scaling ingredient quantities so that the physical weights add up to the requested target metrics. Do NOT use rigid, static portion templates (e.g., always defaulting to 150g chicken or 200g rice). Instead, you MUST dynamically calculate gram weights based on the specific calorie and macro budget for the meal slot you are filling.
 
@@ -857,7 +870,7 @@ The user's daily targets are ${context.macros.calories} kcal, ${context.macros.p
 - Dinner: ~30% of daily (${Math.round(context.macros.calories * 0.30)} kcal, ${Math.round(context.macros.protein * 0.30)}g P, ${Math.round(context.macros.carbs * 0.30)}g C, ${Math.round(context.macros.fat * 0.30)}g F)
 - Snack: ~10% of daily (${Math.round(context.macros.calories * 0.10)} kcal, ${Math.round(context.macros.protein * 0.10)}g P, ${Math.round(context.macros.carbs * 0.10)}g C, ${Math.round(context.macros.fat * 0.10)}g F)
 
-When replacing a food item, scale the new dish's ingredient weights to hit THAT SLOT'S specific macro budget above. The system will verify your quantities against the Edamam Nutrition API and auto-adjust if needed, but your initial estimate should be as close as possible.
+When replacing a food item, scale the new dish's ingredient weights to hit THAT SLOT'S specific macro budget above. Your "estimated_macros" here is an internal scaling input only, never shown to the user as a verified number — the meal actually applied to the plan comes from a separately verified pool, not your estimate.
 
 INGREDIENT FORMAT RULES (CRITICAL):
 - The "ingredients" array is the MOST important field. Each entry must be ONE single parseable ingredient with an exact quantity and food name.
@@ -1244,15 +1257,57 @@ Keep this context in mind to ensure your greetings and questions naturally align
         // M0 retirement: this used to insert into `daily_food_logs`, a table
         // that exists in NO migration and not on the live database — every
         // log attempt since the tool shipped has failed. Rather than keep a
-        // write path into a void, the tool now says plainly that meal
-        // logging isn't live yet. M2 wires this to the real meal_events
-        // ledger through the shared meal-store layer.
-        const confirmText =
+        // write path into a void, the tool still says plainly that meal
+        // logging isn't live yet (M2 wires this to the real meal_events
+        // ledger through the shared meal-store layer). What changed here
+        // (chat-realism round): the macro NUMBERS are no longer the model's
+        // own guess (estimated_calories/protein/carbs/fat, deleted from this
+        // tool's schema) — they're computed from the ingredients the model
+        // parsed, via the same verified food-db pipeline M1's meal
+        // generation uses, never the model's arithmetic.
+        const rawIngredients = Array.isArray(args.ingredients) ? args.ingredients : [];
+        const ingredients: MealIngredientLine[] = rawIngredients
+          .filter((i: unknown): i is { name: string; quantity: number; unit: string } =>
+            !!i && typeof (i as any).name === "string" &&
+            Number.isFinite(Number((i as any).quantity)) &&
+            typeof (i as any).unit === "string"
+          )
+          .map((i) => ({ name: i.name, quantity: Number(i.quantity), unit: i.unit }));
+
+        if (ingredients.length === 0) {
+          return new Response(
+            JSON.stringify({
+              reply: `I couldn't quite tell what you ate — could you list it out with quantities (e.g. "160g greek yoghurt, 30g whey protein, 70g raspberries")?`,
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        const computed = computeMealMacros(ingredients);
+        const assumptions: string[] = Array.isArray(args.assumptions)
+          ? args.assumptions.filter((a: unknown): a is string => typeof a === "string" && a.trim().length > 0)
+          : [];
+
+        // No unresolved lines: report the real total. Some unresolved: report
+        // a PARTIAL total (from what resolved) plus a plain caveat — never a
+        // guessed number for the ingredients the food database doesn't know.
+        const macroLine = computed.unmatched.length > 0
+          ? `roughly ${computed.kcal} kcal (P: ${computed.protein}g, C: ${computed.carbs}g, F: ${computed.fat}g) from what I could identify — that's ${Math.round(computed.coverage * 100)}% of the meal by weight`
+          : `${computed.kcal} kcal (P: ${computed.protein}g, C: ${computed.carbs}g, F: ${computed.fat}g)`;
+
+        const parts: string[] = [
           `Meal logging arrives in the next update — I can't record **${args.food_name}** yet. ` +
-          `For now, keep an eye on your ${args.meal_slot} against its budget: this looks like roughly ${args.estimated_calories} kcal (P: ${args.estimated_protein}g, C: ${args.estimated_carbs}g, F: ${args.estimated_fat}g).`;
+          `For now, keep an eye on your ${args.meal_slot} against its budget: this is ${macroLine}.`,
+        ];
+        if (computed.unmatched.length > 0) {
+          parts.push(`I couldn't find these in my food database, so they're not counted above: ${computed.unmatched.join(", ")}.`);
+        }
+        if (assumptions.length > 0) {
+          parts.push(`Assumptions: ${assumptions.join("; ")}.`);
+        }
 
         return new Response(
-          JSON.stringify({ reply: confirmText }),
+          JSON.stringify({ reply: parts.join(" ") }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
