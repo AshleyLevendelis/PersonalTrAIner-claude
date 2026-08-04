@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Dumbbell, RotateCcw, Activity, UtensilsCrossed, MessageCircle, PieChart, Loader2 } from 'lucide-react'
@@ -11,7 +11,11 @@ import { ChatAssistant } from '@/components/ChatAssistant'
 import { WeeklyPlannerCard } from '@/components/WeeklyPlannerCard'
 import { DevTestPanel } from '@/components/DevTestPanel'
 import { DevTestPage } from '@/components/DevTestPage'
-import { isDevAccount } from '@/lib/dev-clock'
+import { OfflineStatusIndicator } from '@/components/OfflineStatusIndicator'
+import { BottomDock } from '@/components/BottomDock'
+import { ActiveSessionProvider } from '@/hooks/useActiveSession'
+import { isDevAccount, getSessionDateContext } from '@/lib/dev-clock'
+import { useAppRoute, tabHash, isTab, isKnownTabHash, type Tab } from '@/lib/app-route'
 
 import { calculateCalories } from '@/lib/calculations'
 import { computeBMR, computeStaticTDEE } from '@/lib/macro-calculator'
@@ -26,19 +30,11 @@ import type { UserProfile, MacroTargets, WorkoutDay, PlanAction, SchedulePatchIt
 import type { ExerciseEntry } from '@/lib/exercise-db'
 
 const STORAGE_KEY = 'fitplan_profile_id'
-
-function useHashRoute() {
-  const [hash, setHash] = useState(window.location.hash)
-  useEffect(() => {
-    const onHashChange = () => setHash(window.location.hash)
-    window.addEventListener('hashchange', onHashChange)
-    return () => window.removeEventListener('hashchange', onHashChange)
-  }, [])
-  return hash
-}
+const LAST_TAB_KEY = 'fitplan_last_tab'
 
 function App() {
-  const hash = useHashRoute()
+  const { hash, route } = useAppRoute()
+  const activeTab: Tab = route.kind === 'tab' ? route.tab : 'nutrition'
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [macros, setMacros] = useState<MacroTargets | null>(null)
   /** Latest daily_metrics weigh-in — overrides the (immutable) onboarding weight in every target computation. Null until the user first weighs in. */
@@ -90,6 +86,40 @@ function App() {
   useEffect(() => {
     restoreSession()
   }, [])
+
+  // Initial route (LAYOUT-DESIGN.md §5.3, interim answer to vision doc Q1):
+  // land on Exercise when today is a training day, else the last tab used,
+  // defaulting to Nutrition. Runs once, only when the hash doesn't already
+  // encode a tab (a deep link or a back-navigation must never be overridden).
+  // "Training day" here checks the flat base plan (week 1), the same
+  // approximation the pre-mesocycle restore path already uses elsewhere —
+  // tightened once a real "session already finished" signal exists (P3).
+  const initialTabAppliedRef = useRef(false)
+  useEffect(() => {
+    if (initialTabAppliedRef.current || isRestoring || !profile?.id) return
+    initialTabAppliedRef.current = true
+    if (isKnownTabHash(hash)) return
+    const todayName = devOverrideDay ?? getSessionDateContext(profile.id).day
+    const isTrainingDay = exercisePlan.some(d => d.day === todayName && d.exercises.length > 0)
+    let initialTab: Tab = 'nutrition'
+    if (isTrainingDay) {
+      initialTab = 'exercise'
+    } else {
+      try {
+        const stored = localStorage.getItem(LAST_TAB_KEY)
+        if (stored && isTab(stored)) initialTab = stored
+      } catch { /* ignore */ }
+    }
+    window.location.hash = tabHash(initialTab)
+  }, [isRestoring, profile?.id, hash, exercisePlan, devOverrideDay])
+
+  // Remember the last tab a user actually landed on, for the next cold start.
+  useEffect(() => {
+    if (route.kind !== 'tab') return
+    try {
+      localStorage.setItem(LAST_TAB_KEY, route.tab)
+    } catch { /* ignore */ }
+  }, [route])
 
   const restoreSession = async () => {
     const storedId = localStorage.getItem(STORAGE_KEY)
@@ -889,7 +919,20 @@ function App() {
     return <OnboardingFlow onComplete={handleOnboardingComplete} />
   }
 
+  const totalWeeks = mesocycle.length > 0 ? mesocycle.length : 4
+  const handleTabChange = (tab: string) => {
+    if (isTab(tab)) window.location.hash = tabHash(tab)
+  }
+
   return (
+    <ActiveSessionProvider
+      profileId={profile.id}
+      planCreatedAt={mesocycleCreatedAt ?? profile.created_at}
+      totalWeeks={totalWeeks}
+      devOverrideWeek={devOverrideWeek}
+      devOverrideDay={devOverrideDay}
+      refreshToken={logsVersion}
+    >
     <div className="min-h-screen bg-background">
       <header className="border-b sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
@@ -897,15 +940,18 @@ function App() {
             <Dumbbell className="size-5 text-primary" />
             <h1 className="text-lg font-semibold tracking-tight">Personal TrAIner</h1>
           </div>
-          <Button variant="outline" size="sm" onClick={handleReset}>
-            <RotateCcw className="size-3.5" />
-            New Plan
-          </Button>
+          <div className="flex items-center gap-3">
+            <OfflineStatusIndicator />
+            <Button variant="outline" size="sm" onClick={handleReset}>
+              <RotateCcw className="size-3.5" />
+              New Plan
+            </Button>
+          </div>
         </div>
       </header>
 
       <main className="max-w-6xl mx-auto px-4 py-6 space-y-6">
-        {profile.id && (
+        {profile.id && activeTab !== 'exercise' && (
           <WeeklyPlannerCard
             profileId={profile.id}
             profile={profile}
@@ -915,7 +961,7 @@ function App() {
           />
         )}
 
-        <Tabs defaultValue="nutrition" className="space-y-6">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="nutrition">
               <PieChart className="size-4" />
@@ -1008,7 +1054,9 @@ function App() {
           </TabsContent>
         </Tabs>
       </main>
+      <BottomDock />
     </div>
+    </ActiveSessionProvider>
   )
 }
 
