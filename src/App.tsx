@@ -1014,7 +1014,6 @@ function App() {
               profile={profile ?? undefined}
               profileId={profile?.id}
               planCreatedAt={mesocycleCreatedAt ?? profile?.created_at}
-              logsVersion={logsVersion}
               devOverrideWeek={devOverrideWeek}
               devOverrideDay={devOverrideDay}
               devBypassLocks={devBypassLocks}

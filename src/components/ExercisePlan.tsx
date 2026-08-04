@@ -15,13 +15,10 @@ import { getReplacementCandidates, type SwapScope } from '@/lib/mesocycle-edit'
 import { insertCardioLog, getCardioLogsForDate } from '@/lib/daily-tracking'
 import { checkDoubleProgression, getDoubleProgressionRecommendation } from '@/lib/progression-engine'
 import { saveSessionCache, loadSessionCache } from '@/lib/offline-sync'
-import { saveSet, getSetsForDate, getLastSessionSets, initSetLogStore, prescriptionUnit } from '@/lib/set-log-store'
-import { getActiveMesocycleWeek } from '@/lib/calculations'
-import { getAppNow, getSessionDateContext } from '@/lib/dev-clock'
+import { saveSet, getSetsForDate, getLastSessionSets, prescriptionUnit } from '@/lib/set-log-store'
+import { useActiveSession } from '@/hooks/useActiveSession'
 import { checkForPR, seedPRCacheFromHistory, getTopPRSet, type PRResult, type SessionSet } from '@/lib/pr-engine'
-import { RestTimer } from '@/components/RestTimer'
 import { PlateCalculator } from '@/components/PlateCalculator'
-import { OfflineStatusIndicator } from '@/components/OfflineStatusIndicator'
 import type { ExerciseEntry } from '@/lib/exercise-db'
 import type { WorkoutDay, Exercise, ExerciseSetLog, CardioLog, MesocycleWeek, UserProfile, SessionDuration } from '@/lib/types'
 import { estimateDaySeconds, getDurationBudgetSeconds } from '@/lib/session-duration'
@@ -33,7 +30,6 @@ interface ExercisePlanProps {
   profile?: UserProfile
   profileId?: string
   planCreatedAt?: string
-  logsVersion?: number
   devOverrideWeek?: number | null
   devOverrideDay?: string | null
   devBypassLocks?: boolean
@@ -732,20 +728,32 @@ const CONDITIONING_PRESETS = [
   { label: '15m Zone 2', icon: '🫀', activity: 'Zone 2 Cardio', duration: 15, rpe: 5 },
 ] as const
 
-export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, planCreatedAt, logsVersion, devOverrideWeek, devOverrideDay, devBypassLocks, onSwapExercise, onBanExercise }: ExercisePlanProps) {
+export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, devOverrideWeek, devOverrideDay, devBypassLocks, onSwapExercise, onBanExercise }: ExercisePlanProps) {
   // generateMesocycle produces 4 weeks PER BLOCK, not 4 weeks total — a
   // hypertrophy sequence alone is 4 blocks (16 weeks). Falling back to 4 only
   // applies before the mesocycle has loaded.
   const totalWeeks = mesocycle && mesocycle.length > 0 ? mesocycle.length : 4
-  // getAppNow: the DevTestPage clock override drives the whole live path —
-  // week detection, "today" highlighting, AND the date logs are written under
-  // (C0 Part 6: this was half-wired before; time travel only affected the
-  // dev page itself, never the real plan view).
-  const [currentWeek, setCurrentWeek] = useState(() => devOverrideWeek ?? getActiveMesocycleWeek(planCreatedAt, getAppNow(profileId), totalWeeks))
+
+  // Session identity (today/todayName/liveWeek) is now owned entirely by
+  // useActiveSession — stamped once there, never re-derived per render here
+  // (LAYOUT-DESIGN.md §5.2/F3). `liveWeek` is the week WRITES are stamped
+  // with and has no setter; `browseWeek` below is this component's own
+  // paging cursor for DISPLAY only (D8) — the two used to be one variable
+  // (`currentWeek`), which is exactly how browsing to a future week while
+  // training could log a set under the wrong week.
+  const {
+    date: today,
+    dayName: todayName,
+    liveWeek,
+    logs: todayLogs,
+    refresh: refreshTodayLogs,
+    startRest,
+  } = useActiveSession()
+  const [browseWeek, setBrowseWeek] = useState(liveWeek)
   useEffect(() => {
-    if (devOverrideWeek != null) setCurrentWeek(devOverrideWeek)
-    else setCurrentWeek(getActiveMesocycleWeek(planCreatedAt, getAppNow(profileId), totalWeeks))
-  }, [devOverrideWeek, planCreatedAt, totalWeeks, profileId])
+    setBrowseWeek(liveWeek)
+  }, [liveWeek])
+
   const [swapDialog, setSwapDialog] = useState<{ dayName: string; exIndex: number; exerciseName: string } | null>(null)
   const [pendingSwap, setPendingSwap] = useState<ExerciseEntry | null>(null)
   const [swapBusy, setSwapBusy] = useState(false)
@@ -772,7 +780,6 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
   // local only, no persistence, so it can only ever fire once per page load
   // even if the same exercise's set is logged/edited multiple times today.
   const [celebratedFirstLog, setCelebratedFirstLog] = useState<Set<string>>(new Set())
-  const [todayLogs, setTodayLogs] = useState<ExerciseSetLog[]>([])
   const [customExercises, setCustomExercises] = useState<Record<string, string[]>>({})
   const [addingCustom, setAddingCustom] = useState<string | null>(null)
   const [customInput, setCustomInput] = useState('')
@@ -780,7 +787,6 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
   const [cardioFinisherInput, setCardioFinisherInput] = useState({ activity: '', duration: '', rpe: 5, heartRate: '' })
   const [cardioFinishers, setCardioFinishers] = useState<CardioLog[]>([])
   const [savingCardio, setSavingCardio] = useState(false)
-  const [restTimer, setRestTimer] = useState<{ seconds: number; exerciseName: string } | null>(null)
   const [sessionLogged, setSessionLogged] = useState(false)
   const [progressionToast, setProgressionToast] = useState<string | null>(null)
   const progressionToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -809,11 +815,15 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
   const [progressionNotes, setProgressionNotes] = useState<Record<string, { note: string; didProgress: boolean }>>({})
 
   const hasMesocycle = mesocycle && mesocycle.length > 0
+  // activePlan/currentMesoWeekObj follow browseWeek deliberately — this is
+  // the PAGED view, independent from the live session's week (liveWeek,
+  // from the hook). Anything that WRITES uses liveWeek instead; see the
+  // per-call-site comments below.
   const activePlan = hasMesocycle
-    ? mesocycle.find(w => w.week_number === currentWeek)?.days || plan
+    ? mesocycle.find(w => w.week_number === browseWeek)?.days || plan
     : plan
   const currentMesoWeekObj = hasMesocycle
-    ? mesocycle.find(w => w.week_number === currentWeek)
+    ? mesocycle.find(w => w.week_number === browseWeek)
     : undefined
   const weekLabel = currentMesoWeekObj?.label || ''
 
@@ -831,21 +841,8 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
   const jumpToBlock = (blockNumber: number) => {
     if (!hasMesocycle) return
     const firstWeekOfBlock = mesocycle.find(w => w.block_number === blockNumber)?.week_number
-    if (firstWeekOfBlock != null) setCurrentWeek(firstWeekOfBlock)
+    if (firstWeekOfBlock != null) setBrowseWeek(firstWeekOfBlock)
   }
-
-  // Computed ONCE per active session (mount, or when the dev-clock override
-  // actually changes) rather than re-derived from a fresh clock read on
-  // every render — the latter is what let an evening session silently
-  // straddle a day boundary (UTC before this fix; local midnight in the rare
-  // case someone keeps the tab open past it) mid-workout. See
-  // getSessionDateContext's doc comment.
-  const [sessionDateContext, setSessionDateContext] = useState(() => getSessionDateContext(profileId))
-  useEffect(() => {
-    setSessionDateContext(getSessionDateContext(profileId))
-  }, [profileId, devOverrideWeek, devOverrideDay])
-  const today = sessionDateContext.date
-  const todayName = devOverrideDay ?? sessionDateContext.day
 
   // Ramp-visibility fix: a collapsed-by-default warm-up section is exactly
   // how a user landing straight on the exercise row saw only "S1: 90kg" with
@@ -862,35 +859,34 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
 
   useEffect(() => {
     if (profileId) {
-      getSetsForDate(profileId, today).then(setTodayLogs).catch(console.error)
       getCardioLogsForDate(profileId, today).then(setCardioFinishers).catch(console.error)
       seedPRCacheFromHistory(profileId).catch(console.error)
     }
   }, [profileId, today])
 
   useEffect(() => {
-    initSetLogStore()
-    // Compared against todayName — the SAME dev-clock-aware value
-    // saveSessionCache below stores the cache under — never the real
-    // wall-clock weekday, which would disagree during dev-clock time travel
-    // and drop the cache (checkmarks, "Session logged!" badge) every time.
+    // Compared against liveWeek (the frozen session identity), not
+    // browseWeek — cache validity is about whether this is the SAME live
+    // session, not which week the user happens to be paging through.
     const cached = loadSessionCache(todayName)
-    if (cached && cached.weekNumber === currentWeek) {
+    if (cached && cached.weekNumber === liveWeek) {
       setCompletedSetsMap(cached.completedSets)
       setSetWeights(cached.setWeights)
       setSetReps(cached.setReps)
       setSessionLogged(cached.sessionLogged)
     }
-  }, [todayName])
+  }, [todayName, liveWeek])
 
   // Week 2+: true double progression from what the trainee actually lifted
   // last session, not the mesocycle's flat estimate. Hit the top of the rep
   // range on every set last time -> weight goes up one increment; anything
   // short of that -> hold the weight, the note says to chase reps first.
   // Week 1 never has prior data, so this is a no-op there and the static
-  // suggested_load_kg from generateMesocycle stands.
+  // suggested_load_kg from generateMesocycle stands. Gated on liveWeek, not
+  // browseWeek — progression is about the live session regardless of which
+  // week the user is currently paging through.
   useEffect(() => {
-    if (!profileId || currentWeek <= 1) {
+    if (!profileId || liveWeek <= 1) {
       setProgressedLoads({})
       setProgressionNotes({})
       return
@@ -926,28 +922,7 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
     }).catch(() => {})
 
     return () => { cancelled = true }
-  }, [profileId, currentWeek, todayName, activePlan, today])
-
-  useEffect(() => {
-    if (profileId && logsVersion && logsVersion > 0) {
-      getSetsForDate(profileId, today).then(logs => {
-        setTodayLogs(logs)
-        // Sync input fields from fetched logs so UI reflects chat-logged sets
-        const newReps: Record<string, number> = { ...setReps }
-        const newWeights: Record<string, number> = { ...setWeights }
-        const newCompleted: Record<string, boolean> = { ...completedSetsMap }
-        for (const log of logs) {
-          const key = `${log.exercise_name}-${log.set_number}`
-          newReps[key] = log.reps_completed
-          newWeights[key] = log.weight_kg
-          newCompleted[key] = true
-        }
-        setSetReps(newReps)
-        setSetWeights(newWeights)
-        setCompletedSetsMap(newCompleted)
-      }).catch(console.error)
-    }
-  }, [logsVersion])
+  }, [profileId, liveWeek, todayName, activePlan, today])
 
   const replacements = swapDialog && profile
     ? getReplacementCandidates(swapDialog.exerciseName, profile, exclusions)
@@ -987,14 +962,12 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
     })
   }
 
-  const handleLogSaved = (log: ExerciseSetLog) => {
-    setTodayLogs(prev => {
-      const idx = prev.findIndex(l =>
-        l.exercise_name === log.exercise_name && l.set_number === log.set_number && l.date === log.date
-      )
-      if (idx >= 0) return prev.map((l, i) => i === idx ? log : l)
-      return [...prev, log]
-    })
+  // todayLogs is now owned by useActiveSession — a manual per-set save
+  // already persisted local-first via SetLogger's own saveSet call, so this
+  // just tells the hook to pull the fresh merged view (fast, local-first,
+  // see set-log-store's getSetsForDate) rather than splicing state here.
+  const handleLogSaved = (_log: ExerciseSetLog) => {
+    refreshTodayLogs()
   }
 
   // One-time-per-exercise celebration when an exercise that previously only
@@ -1055,18 +1028,20 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
 
     const restSeconds = parseRestSeconds(restStr)
     if (restSeconds > 0) {
-      setRestTimer({ seconds: restSeconds, exerciseName })
+      startRest(exerciseName, restSeconds)
     }
 
     // Persist UI state to localStorage immediately (the set itself was already
-    // persisted local-first by SetLogger via set-log-store — no second write here)
+    // persisted local-first by SetLogger via set-log-store — no second write here).
+    // weekNumber is liveWeek, not browseWeek — this cache entry stamps the LIVE
+    // session, regardless of which week's card the user happens to be viewing.
     saveSessionCache({
       completedSets: newCompleted,
       setWeights,
       setReps,
       sessionLogged,
       day: todayName,
-      weekNumber: currentWeek,
+      weekNumber: liveWeek,
     })
 
     // Check progression in the background (merged store reads — works offline too)
@@ -1086,7 +1061,7 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
         }
       }).catch(() => {})
     }
-  }, [profileId, currentWeek, todayName, today, completedSetsMap, setWeights, setReps, sessionLogged, showProgressionToast])
+  }, [profileId, liveWeek, todayName, today, completedSetsMap, setWeights, setReps, sessionLogged, showProgressionToast, startRest])
 
   // Bulk-logs today's session with the same values a manual save would use:
   // last-session ghosts first, then the progressed/prescribed load, prescribed
@@ -1162,7 +1137,7 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
           const log = saveSet({
             userId: profileId,
             date: today,
-            weekNumber: currentWeek,
+            weekNumber: liveWeek,
             day: todayName,
             exerciseId,
             exerciseName: ex.name,
@@ -1193,11 +1168,9 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
       const sessionHasData = loggedCount > 0 || raceSkipped.length > 0
       if (sessionHasData) setSessionLogged(true)
 
-      setTodayLogs(prev => {
-        const existing = new Set(prev.map(l => `${l.exercise_name}-${l.set_number}`))
-        const toAdd = savedLogs.filter(l => !existing.has(`${l.exercise_name}-${l.set_number}`))
-        return [...prev, ...toAdd]
-      })
+      // todayLogs is hook-owned — pull the fresh merged view rather than
+      // splicing savedLogs into local state (same reasoning as handleLogSaved).
+      if (savedLogs.length > 0) refreshTodayLogs()
 
       saveSessionCache({
         completedSets: newCompleted,
@@ -1205,7 +1178,7 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
         setReps: newReps,
         sessionLogged: sessionHasData ? true : sessionLogged,
         day: todayName,
-        weekNumber: currentWeek,
+        weekNumber: liveWeek,
       })
 
       if (skipped.length > 0 || raceSkipped.length > 0) {
@@ -1217,13 +1190,10 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
     } finally {
       setLoggingSession(false)
     }
-  }, [profileId, activePlan, todayName, today, currentWeek, setWeights, setReps, completedSetsMap, todayLogs, progressedLoads, sessionLogged, showProgressionToast])
+  }, [profileId, activePlan, todayName, today, liveWeek, setWeights, setReps, completedSetsMap, todayLogs, progressedLoads, sessionLogged, showProgressionToast, refreshTodayLogs])
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-end min-h-[24px]">
-        <OfflineStatusIndicator />
-      </div>
       {hasMesocycle && (
         <Card className="bg-gradient-to-r from-primary/5 to-primary/10 border-primary/20">
           <CardContent className="py-3 px-4">
@@ -1231,8 +1201,8 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
               <Button
                 variant="ghost"
                 size="sm"
-                disabled={currentWeek <= 1}
-                onClick={() => setCurrentWeek(w => Math.max(1, w - 1))}
+                disabled={browseWeek <= 1}
+                onClick={() => setBrowseWeek(w => Math.max(1, w - 1))}
                 className="h-8 w-8 p-0"
               >
                 <ChevronLeft className="h-4 w-4" />
@@ -1263,9 +1233,9 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
                   {currentBlockWeeks.map(w => (
                     <button
                       key={w}
-                      onClick={() => setCurrentWeek(w)}
+                      onClick={() => setBrowseWeek(w)}
                       className={`h-2 w-6 rounded-full transition-colors ${
-                        w === currentWeek
+                        w === browseWeek
                           ? 'bg-primary'
                           : 'bg-primary/20 hover:bg-primary/40'
                       }`}
@@ -1276,8 +1246,8 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
               <Button
                 variant="ghost"
                 size="sm"
-                disabled={currentWeek >= totalWeeks}
-                onClick={() => setCurrentWeek(w => Math.min(totalWeeks, w + 1))}
+                disabled={browseWeek >= totalWeeks}
+                onClick={() => setBrowseWeek(w => Math.min(totalWeeks, w + 1))}
                 className="h-8 w-8 p-0"
               >
                 <ChevronRight className="h-4 w-4" />
@@ -1598,7 +1568,7 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
                             prescribedReps={ex.reps}
                             prescriptionType={ex.prescription_type}
                             restTime={ex.rest}
-                            weekNumber={currentWeek}
+                            weekNumber={liveWeek}
                             tier={ex.tier}
                             suggestedLoadKg={progressedLoads[ex.name] ?? ex.suggested_load_kg}
                             perSetLoadKg={progressedLoads[ex.name] != null ? undefined : ex.per_set_load?.map(s => s.load_kg)}
@@ -1671,7 +1641,7 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
                               onSetCompleted={handleSetComplete}
                               prescribedReps="8-12"
                               restTime="60s"
-                              weekNumber={currentWeek}
+                              weekNumber={liveWeek}
                               onOpenPlateCalc={(w) => { setPlateCalcWeight(w); setPlateCalcOpen(true) }}
                             />
                           </td>
@@ -2060,7 +2030,7 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
                   if (!swapDialog) return
                   setSwapBusy(true)
                   try {
-                    await onSwapExercise(currentWeek, swapDialog.dayName, swapDialog.exIndex, pendingSwap, 'today')
+                    await onSwapExercise(browseWeek, swapDialog.dayName, swapDialog.exIndex, pendingSwap, 'today')
                   } finally {
                     setSwapBusy(false)
                     setSwapDialog(null)
@@ -2080,7 +2050,7 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
                   if (!swapDialog) return
                   setSwapBusy(true)
                   try {
-                    await onSwapExercise(currentWeek, swapDialog.dayName, swapDialog.exIndex, pendingSwap, 'permanent')
+                    await onSwapExercise(browseWeek, swapDialog.dayName, swapDialog.exIndex, pendingSwap, 'permanent')
                   } finally {
                     setSwapBusy(false)
                     setSwapDialog(null)
@@ -2108,15 +2078,6 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
           )}
         </DialogContent>
       </Dialog>
-
-      {restTimer && (
-        <RestTimer
-          durationSeconds={restTimer.seconds}
-          exerciseName={restTimer.exerciseName}
-          onDismiss={() => setRestTimer(null)}
-          onComplete={() => setRestTimer(null)}
-        />
-      )}
 
       {progressionToast && (
         <div className="fixed top-4 left-4 right-4 z-50 md:left-auto md:right-4 md:w-96">
