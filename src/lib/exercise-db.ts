@@ -1963,13 +1963,44 @@ export function getSmartReplacements(
   })
 
   scored.sort((a, b) => b.score - a.score)
-  return scored.slice(0, 5).map(({ exercise, note }) => ({ exercise, note }))
+  // Swap-dead-end fix: was a hard 5, which is exactly why a real user's swap
+  // dialog dead-ended (flat bench busy -> only incline offered, also busy —
+  // decline bench, which conflicts with nothing, simply never made the cut).
+  // Raised to 8; ExercisePlan.tsx's dialog shows the top few and offers
+  // "show more" for the rest rather than dumping all 8 at once.
+  return scored.slice(0, MAX_SMART_REPLACEMENTS).map(({ exercise, note }) => ({ exercise, note }))
 }
+
+/** Cap for getSmartReplacements — see its call site's comment for why this changed from 5. */
+export const MAX_SMART_REPLACEMENTS = 8
 
 export function getExerciseEntry(name: string): ExerciseEntry | undefined {
   return EXERCISE_DATABASE.find(
     e => e.name.toLowerCase() === name.toLowerCase()
   )
+}
+
+/**
+ * Free-entry search across the FULL catalog (unfiltered by equipment,
+ * injury, style, or skill) — swap-dead-end fix: the ranked list is
+ * constraint-checked and capped, so a valid-but-unranked or even
+ * constraint-violating exercise the user specifically wants (and is warned
+ * about, not blocked from) needs a separate, unfiltered lookup. Prefix
+ * matches rank before other substring matches; alphabetical within each
+ * group. Capped so the results list stays scrollable, not a full-DB dump.
+ */
+export function searchExerciseCatalog(query: string, limit = 20): ExerciseEntry[] {
+  const q = query.trim().toLowerCase()
+  if (!q) return []
+  const startsWith: ExerciseEntry[] = []
+  const contains: ExerciseEntry[] = []
+  for (const ex of EXERCISE_DATABASE) {
+    const name = ex.name.toLowerCase()
+    if (name.startsWith(q)) startsWith.push(ex)
+    else if (name.includes(q)) contains.push(ex)
+  }
+  const byName = (a: ExerciseEntry, b: ExerciseEntry) => a.name.localeCompare(b.name)
+  return [...startsWith.sort(byName), ...contains.sort(byName)].slice(0, limit)
 }
 
 /**

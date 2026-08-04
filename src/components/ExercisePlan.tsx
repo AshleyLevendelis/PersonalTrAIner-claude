@@ -8,7 +8,8 @@ import { Input } from '@/components/ui/input'
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible'
 import { ArrowRightLeft, Ban, Zap, ShieldAlert, Heart, Check, Dumbbell, Plus, Activity, Clock, Flame, ChevronLeft, ChevronRight, ChevronDown, Calendar, CheckCircle2, Trophy, Sparkles, Thermometer } from 'lucide-react'
 import React, { useState, useEffect, useCallback, useRef } from 'react'
-import { getExerciseEntry, getExerciseId } from '@/lib/exercise-db'
+import { getExerciseEntry, getExerciseId, searchExerciseCatalog } from '@/lib/exercise-db'
+import { getExerciseCompatibilityWarnings } from '@/lib/exercise-plan'
 import { isExternallyLoaded } from '@/lib/load-prescription'
 import { getReplacementCandidates, type SwapScope } from '@/lib/mesocycle-edit'
 import { insertCardioLog, getCardioLogsForDate } from '@/lib/daily-tracking'
@@ -720,6 +721,11 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
   const [swapDialog, setSwapDialog] = useState<{ dayName: string; exIndex: number; exerciseName: string } | null>(null)
   const [pendingSwap, setPendingSwap] = useState<ExerciseEntry | null>(null)
   const [swapBusy, setSwapBusy] = useState(false)
+  // Swap-dead-end fix: "show more" past the initial handful of ranked
+  // candidates, plus a free-entry search across the full catalog for when
+  // even a raised cap still dead-ends (every ranked option unavailable).
+  const [showAllReplacements, setShowAllReplacements] = useState(false)
+  const [swapSearchQuery, setSwapSearchQuery] = useState('')
   const [banBusy, setBanBusy] = useState<string | null>(null)
   const [expandedExercises, setExpandedExercises] = useState<Set<string>>(new Set())
   const [expandedWarmups, setExpandedWarmups] = useState<Set<string>>(new Set())
@@ -905,8 +911,22 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
   const replacements = swapDialog && profile
     ? getReplacementCandidates(swapDialog.exerciseName, profile, exclusions)
     : []
+  const INITIAL_REPLACEMENTS_SHOWN = 4
+  const visibleReplacements = showAllReplacements ? replacements : replacements.slice(0, INITIAL_REPLACEMENTS_SHOWN)
 
   const currentEntry = swapDialog ? getExerciseEntry(swapDialog.exerciseName) : undefined
+
+  // Swap-dead-end fix: free-entry search across the FULL catalog, unfiltered
+  // — a constraint-valid ranked list can still dead-end (every option
+  // unavailable in the gym), so this lets the user pick literally anything
+  // and see a warning instead of being blocked. Excludes the exercise being
+  // replaced and anything already in the ranked list (shown there already).
+  const swapSearchResults = swapDialog && swapSearchQuery.trim()
+    ? searchExerciseCatalog(swapSearchQuery, 20).filter(e =>
+        e.name.toLowerCase() !== swapDialog.exerciseName.toLowerCase() &&
+        !replacements.some(r => r.exercise.name === e.name)
+      )
+    : []
 
   const toggleExercise = (key: string) => {
     setExpandedExercises(prev => {
@@ -1238,6 +1258,31 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
 
         const isToday = devBypassLocks || dayName === todayName
 
+        // Unplanned-exercise fix: logged sets have always saved fine for an
+        // exercise not in today's prescribed plan (chat's log_workout_set /
+        // log_workout_session never checked plan membership) — they just had
+        // nowhere to render, so a chat-logged off-plan lift silently vanished
+        // from this screen. Cross-reference todayLogs (server-persisted,
+        // refetched on mount — survives refresh) against the plan by exercise
+        // identity (not raw name — the same slug scheme resolveWeight/
+        // progression-engine already use) to find anything logged that isn't
+        // one of today's prescribed exercises. Merged with the (session-local,
+        // not-yet-logged) "Add Extra Lift" declarations below, deduped by the
+        // same identity so a declared-then-logged lift only appears once.
+        const plannedIds = new Set(workout.exercises.map(ex => getExerciseId(ex.name)))
+        const offPlanLoggedNames = isToday
+          ? [...new Set(
+              todayLogs
+                .filter(l => !plannedIds.has(l.exercise_id || getExerciseId(l.exercise_name)))
+                .map(l => l.exercise_name)
+            )]
+          : []
+        const additionalWorkNames = isToday
+          ? [...new Map(
+              [...offPlanLoggedNames, ...(customExercises[dayName] || [])].map(n => [getExerciseId(n), n])
+            ).values()]
+          : []
+
         return (
         <React.Fragment key={dayName}>
         <Card className={isToday ? 'ring-2 ring-primary/20' : undefined}>
@@ -1450,7 +1495,7 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
                             variant="ghost"
                             size="icon"
                             className="size-7"
-                            onClick={() => { setPendingSwap(null); setSwapDialog({ dayName, exIndex, exerciseName: ex.name }) }}
+                            onClick={() => { setPendingSwap(null); setShowAllReplacements(false); setSwapSearchQuery(''); setSwapDialog({ dayName, exIndex, exerciseName: ex.name }) }}
                             aria-label="Swap exercise"
                           >
                             <ArrowRightLeft className="size-3.5" />
@@ -1508,8 +1553,17 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
                     )}
                   </React.Fragment>
                 )})}
-                {/* Custom exercises for today */}
-                {profileId && isToday && (customExercises[dayName] || []).map((customName, cIdx) => {
+                {/* Additional work: anything logged today (chat included) that
+                    isn't in the prescribed plan, plus not-yet-logged "Add
+                    Extra Lift" declarations. See additionalWorkNames above. */}
+                {profileId && isToday && additionalWorkNames.length > 0 && (
+                  <TableRow className="hover:bg-transparent">
+                    <TableCell colSpan={6} className="pt-3 pb-1">
+                      <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Additional Work</span>
+                    </TableCell>
+                  </TableRow>
+                )}
+                {profileId && isToday && additionalWorkNames.map((customName, cIdx) => {
                   const exerciseKey = `${dayName}-custom-${customName}`
                   const isExpanded = expandedExercises.has(exerciseKey)
                   const completedSets = getCompletedSetsCount(customName)
@@ -1838,11 +1892,11 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
           {!pendingSwap && (
             replacements.length === 0 ? (
               <p className="text-sm text-muted-foreground py-4 text-center">
-                No alternative exercises fit your equipment, injuries, style, and skill level for this movement pattern.
+                No alternative exercises fit your equipment, injuries, style, and skill level for this movement pattern. Search below to pick anything from the full catalog instead.
               </p>
             ) : (
               <div className="space-y-2 max-h-80 overflow-y-auto">
-                {replacements.map(({ exercise, note }) => (
+                {visibleReplacements.map(({ exercise, note }) => (
                   <button
                     key={exercise.name}
                     className="w-full text-left rounded-md border p-3 hover:bg-accent hover:border-primary/30 transition-colors"
@@ -1870,12 +1924,76 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
                     </div>
                   </button>
                 ))}
+                {!showAllReplacements && replacements.length > INITIAL_REPLACEMENTS_SHOWN && (
+                  <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => setShowAllReplacements(true)}>
+                    Show {replacements.length - INITIAL_REPLACEMENTS_SHOWN} more
+                  </Button>
+                )}
               </div>
             )
           )}
 
+          {/* Swap-dead-end fix: free-entry search across the full catalog —
+              a constraint-valid ranked list can still dead-end (every option
+              unavailable in the gym right now), so this lets the user pick
+              anything and see why it might conflict, rather than never
+              seeing it at all. */}
+          {!pendingSwap && (
+            <div className="space-y-2 pt-1">
+              <Separator />
+              <p className="text-xs font-medium text-muted-foreground pt-1">Or search any exercise</p>
+              <Input
+                placeholder="e.g. Decline Bench Press"
+                value={swapSearchQuery}
+                onChange={e => setSwapSearchQuery(e.target.value)}
+                className="h-8 text-sm"
+              />
+              {swapSearchQuery.trim() && (
+                swapSearchResults.length === 0 ? (
+                  <p className="text-xs text-muted-foreground py-2 text-center">No matching exercise found.</p>
+                ) : (
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {swapSearchResults.map(exercise => {
+                      const warnings = profile ? getExerciseCompatibilityWarnings(exercise, profile, exclusions) : []
+                      return (
+                        <button
+                          key={exercise.name}
+                          className="w-full text-left rounded-md border p-3 hover:bg-accent hover:border-primary/30 transition-colors"
+                          onClick={() => setPendingSwap(exercise)}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="space-y-1">
+                              <p className="font-medium text-sm">{exercise.name}</p>
+                              <div className="flex flex-wrap gap-1">
+                                <Badge variant="secondary" className="text-xs">{exercise.movement_pattern.replace(/_/g, ' ')}</Badge>
+                                <Badge variant="secondary" className="text-xs">{exercise.mechanics_tier.replace(/_/g, ' ')}</Badge>
+                              </div>
+                              {warnings.map((w, i) => (
+                                <p key={i} className="text-xs text-amber-700 dark:text-amber-400 mt-1 flex items-start gap-1">
+                                  <ShieldAlert className="size-3 mt-0.5 shrink-0" />
+                                  <span>{w}</span>
+                                </p>
+                              ))}
+                            </div>
+                            <ArrowRightLeft className="size-4 shrink-0 text-muted-foreground mt-1" />
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                )
+              )}
+            </div>
+          )}
+
           {pendingSwap && (
             <div className="space-y-2 py-1">
+              {profile && getExerciseCompatibilityWarnings(pendingSwap, profile, exclusions).map((w, i) => (
+                <p key={i} className="text-xs text-amber-700 dark:text-amber-400 flex items-start gap-1.5 rounded-md border border-amber-300/50 bg-amber-50 dark:bg-amber-950/20 p-2">
+                  <ShieldAlert className="size-3.5 mt-0.5 shrink-0" />
+                  <span>{w}</span>
+                </p>
+              ))}
               <button
                 className="w-full text-left rounded-md border p-3 hover:bg-accent hover:border-primary/30 transition-colors disabled:opacity-50"
                 disabled={swapBusy}

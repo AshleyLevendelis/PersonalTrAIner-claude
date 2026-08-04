@@ -2489,6 +2489,50 @@ export function getConstrainedPool(profile: UserProfile, exclusions: string[] = 
   return pool
 }
 
+/**
+ * Swap-dead-end fix: the free-entry search in ExercisePlan.tsx's swap dialog
+ * deliberately searches the FULL catalog, not getConstrainedPool's filtered
+ * output — a constraint-valid alternative can dead-end (every ranked option
+ * also unavailable in the gym right now), and the fix is to let the user
+ * pick anything and see why it might not fit, not to keep hiding options.
+ * Reuses the exact equipment/injury logic stageEquipmentFilter/
+ * stageInjuryFilter apply during generation, just reporting instead of
+ * dropping. Style and skill are deliberately not checked here — those are
+ * softer fit signals the ranked list already optimizes for, not hard
+ * physical constraints worth blocking a user's own explicit pick over.
+ */
+export function getExerciseCompatibilityWarnings(
+  exercise: ExerciseEntry,
+  profile: UserProfile,
+  exclusions: string[] = [],
+): string[] {
+  const warnings: string[] = []
+
+  const allowedEquipment = EQUIPMENT_SETS[profile.equipment_access || 'full_gym']
+  if (allowedEquipment) {
+    const missing = exercise.equipment.filter(eq => !allowedEquipment.has(eq))
+    if (missing.length > 0) {
+      warnings.push(`Needs ${missing.join(', ')} — outside your ${(profile.equipment_access || 'full_gym').replace(/_/g, ' ')} equipment.`)
+    }
+  }
+
+  const flaggedJoints = new Set<string>()
+  for (const injury of profile.injuries || []) {
+    const joints = INJURED_JOINTS[injury]
+    if (joints) joints.forEach(j => flaggedJoints.add(j))
+  }
+  const conflictingJoints = exercise.loads_joints.filter(j => flaggedJoints.has(j))
+  if (conflictingJoints.length > 0) {
+    warnings.push(`Loads your ${conflictingJoints.join(', ').replace(/_/g, ' ')} — you've flagged an injury there.`)
+  }
+
+  if (exclusions.some(ex => ex.toLowerCase() === exercise.name.toLowerCase())) {
+    warnings.push(`You've previously banned this exercise.`)
+  }
+
+  return warnings
+}
+
 export function generateExercisePlan(profile: UserProfile, exclusions: string[] = []): PlanResult {
   const trace: ConstraintTrace = {
     equipment_filtered: [],
