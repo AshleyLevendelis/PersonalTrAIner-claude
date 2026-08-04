@@ -133,6 +133,11 @@ function App() {
       meals_per_day: profileRow.meals_per_day ?? 3,
       include_snacks: profileRow.include_snacks ?? true,
       cooking_time_preference: profileRow.cooking_time_preference || 'moderate',
+      // Meal-realism round, part 3: onboarding's optional food-preference
+      // answers — see the field docs on UserProfile in types.ts.
+      favorite_cuisines: profileRow.favorite_cuisines || [],
+      disliked_foods: profileRow.disliked_foods || [],
+      breakfast_style: profileRow.breakfast_style || undefined,
       // Vision-architecture patch round, fix 2: injuries (onboarding's
       // body-part codes: 'lower_back'/'knees'/...) and exercise_exclusions
       // (ban_exercise's exact exercise names) used to share this one
@@ -353,6 +358,11 @@ function App() {
         known_squat_kg: enrichedProfile.known_squat_kg ?? null,
         known_bench_kg: enrichedProfile.known_bench_kg ?? null,
         known_deadlift_kg: enrichedProfile.known_deadlift_kg ?? null,
+        // Meal-realism round, part 3: onboarding's optional food-preference
+        // answers — see the field docs on UserProfile in types.ts.
+        favorite_cuisines: enrichedProfile.favorite_cuisines || [],
+        disliked_foods: enrichedProfile.disliked_foods || [],
+        breakfast_style: enrichedProfile.breakfast_style || null,
         display_name: enrichedProfile.display_name || null,
         bmr: enrichedProfile.bmr,
         tdee: enrichedProfile.tdee,
@@ -402,6 +412,9 @@ function App() {
           mealsPerDay: enrichedProfile.meals_per_day,
           includeSnacks: enrichedProfile.include_snacks,
           cookingTimePreference: enrichedProfile.cooking_time_preference,
+          favoriteCuisines: enrichedProfile.favorite_cuisines,
+          dislikedFoods: enrichedProfile.disliked_foods,
+          breakfastStyle: enrichedProfile.breakfast_style,
         })
         generatedPools = result.accepted
       } catch (err) {
@@ -647,6 +660,9 @@ function App() {
         mealsPerDay: profile.meals_per_day,
         includeSnacks: profile.include_snacks,
         cookingTimePreference: profile.cooking_time_preference,
+        favoriteCuisines: profile.favorite_cuisines,
+        dislikedFoods: profile.disliked_foods,
+        breakfastStyle: profile.breakfast_style,
         onlySlots: [slot],
       })
       setMealPools(prev => ({ ...prev, ...result.accepted }))
@@ -667,6 +683,9 @@ function App() {
         mealsPerDay: profile.meals_per_day,
         includeSnacks: profile.include_snacks,
         cookingTimePreference: profile.cooking_time_preference,
+        favoriteCuisines: profile.favorite_cuisines,
+        dislikedFoods: profile.disliked_foods,
+        breakfastStyle: profile.breakfast_style,
       })
       setMealPools(result.accepted)
       setManualMealPicks({})

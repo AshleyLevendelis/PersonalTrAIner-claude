@@ -7,7 +7,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Card, CardContent } from '@/components/ui/card'
 import { ChevronLeft, Dumbbell } from 'lucide-react'
 import { OptionCard } from './OptionCard'
-import type { UserProfile, FitnessGoal, SessionDuration, TrainingTime, WorkoutSplit, EquipmentAccess, TrainingStyle, TrainingExperience, CoachingPersona, MacroCalculationMode, RecoveryCapacity, ConditioningPreference, ActivityLevel, CookingTimePreference } from '@/lib/types'
+import type { UserProfile, FitnessGoal, SessionDuration, TrainingTime, WorkoutSplit, EquipmentAccess, TrainingStyle, TrainingExperience, CoachingPersona, MacroCalculationMode, RecoveryCapacity, ConditioningPreference, ActivityLevel, CookingTimePreference, BreakfastStyle } from '@/lib/types'
 
 type WeightUnit = 'kg' | 'lbs'
 type HeightUnit = 'cm' | 'ftin'
@@ -39,9 +39,12 @@ interface OnboardingData {
   mealsPerDay: 2 | 3 | 4 | null
   includeSnacks: boolean
   cookingTime: CookingTimePreference | null
+  favoriteCuisines: string[]
+  dislikedFoods: string
+  breakfastStyle: BreakfastStyle | null
 }
 
-const TOTAL_STEPS = 19
+const TOTAL_STEPS = 20
 
 const EXPERIENCE_OPTIONS: { value: TrainingExperience; icon: string; label: string; description: string }[] = [
   { value: 'beginner', icon: '🌱', label: 'Beginner', description: 'New to this, or coming back after a long break' },
@@ -154,6 +157,28 @@ const COOKING_TIME_OPTIONS: { value: CookingTimePreference; icon: string; label:
   { value: 'loves_cooking', icon: '👨‍🍳', label: 'Happy to Cook', description: 'Real recipes, real prep — I enjoy it' },
 ]
 
+// Short labels chosen to substring-match generate-meals's FAMILIAR_CUISINES/
+// EXOTIC_CUISINES entries (e.g. "Indian" matches "Indian (North Indian,
+// South Indian)") — see selectCuisines in supabase/functions/generate-meals.
+const FAVORITE_CUISINE_OPTIONS: { value: string; icon: string; label: string }[] = [
+  { value: 'Italian', icon: '🍝', label: 'Italian' },
+  { value: 'Mexican', icon: '🌮', label: 'Mexican' },
+  { value: 'Indian', icon: '🍛', label: 'Indian' },
+  { value: 'Thai', icon: '🍜', label: 'Thai' },
+  { value: 'Mediterranean', icon: '🫒', label: 'Mediterranean' },
+  { value: 'Japanese', icon: '🍱', label: 'Japanese' },
+  { value: 'Korean', icon: '🥢', label: 'Korean' },
+  { value: 'British / Classic', icon: '🇬🇧', label: 'British / Classic' },
+  { value: 'American / Diner Classic', icon: '🍔', label: 'American' },
+  { value: 'Caribbean', icon: '🌴', label: 'Caribbean' },
+]
+
+const BREAKFAST_STYLE_OPTIONS: { value: BreakfastStyle; icon: string; label: string; description: string }[] = [
+  { value: 'quick_cold', icon: '🥣', label: 'Quick & Cold', description: 'Cereal, yoghurt, smoothies — no cooking' },
+  { value: 'cooked', icon: '🍳', label: 'Cooked', description: 'Eggs, pancakes, hot oats — happy to cook' },
+  { value: 'skip', icon: '⏭️', label: 'Usually Skip', description: 'Keep it minimal if I eat anything at all' },
+]
+
 const PERSONA_OPTIONS: { value: CoachingPersona; icon: string; label: string; description: string }[] = [
   { value: 'drill_sergeant', icon: '🎖️', label: 'Drill Sergeant', description: 'No excuses, push harder' },
   { value: 'analytical', icon: '🧠', label: 'Analytical', description: 'Data-driven, precise' },
@@ -212,6 +237,9 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
     mealsPerDay: null,
     includeSnacks: true,
     cookingTime: null,
+    favoriteCuisines: [],
+    dislikedFoods: '',
+    breakfastStyle: null,
   })
 
   const [weightUnit, setWeightUnit] = useState<WeightUnit>('kg')
@@ -325,10 +353,11 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
       case 12: return true
       case 13: return data.mealsPerDay !== null
       case 14: return !!data.cookingTime
-      case 15: return !!data.age && !!data.heightCm && !!data.weightKg && Number(data.age) > 0 && Number(data.heightCm) > 0 && Number(data.weightKg) > 0
-      case 16: return !!data.activityLevel
-      case 17: return !!data.coachingPersona
-      case 18: return true
+      case 15: return true
+      case 16: return !!data.age && !!data.heightCm && !!data.weightKg && Number(data.age) > 0 && Number(data.heightCm) > 0 && Number(data.weightKg) > 0
+      case 17: return !!data.activityLevel
+      case 18: return !!data.coachingPersona
+      case 19: return true
       default: return false
     }
   }
@@ -351,6 +380,9 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
       meals_per_day: data.mealsPerDay ?? 3,
       include_snacks: data.includeSnacks,
       cooking_time_preference: data.cookingTime ?? 'moderate',
+      favorite_cuisines: data.favoriteCuisines,
+      disliked_foods: data.dislikedFoods.split(',').map(f => f.trim()).filter(Boolean),
+      breakfast_style: data.breakfastStyle ?? undefined,
       fitness_goal: data.fitnessGoal!,
       training_days: trainingDaysFull,
       preferred_time: mappedTime,
@@ -746,6 +778,60 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
 
       case 15:
         return (
+          <StepWrapper title="Food preferences?" subtitle="Optional — helps your meal plan feel less random">
+            <div className="space-y-5">
+              <div>
+                <Label className="text-xs font-medium mb-2 block">Favourite cuisines (pick any)</Label>
+                <div className="grid grid-cols-3 gap-2">
+                  {FAVORITE_CUISINE_OPTIONS.map(opt => (
+                    <OptionCard
+                      key={opt.value}
+                      icon={opt.icon}
+                      label={opt.label}
+                      selected={data.favoriteCuisines.includes(opt.value)}
+                      compact
+                      onClick={() => setData(d => ({
+                        ...d,
+                        favoriteCuisines: d.favoriteCuisines.includes(opt.value)
+                          ? d.favoriteCuisines.filter(x => x !== opt.value)
+                          : [...d.favoriteCuisines, opt.value],
+                      }))}
+                    />
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="ob-disliked" className="text-xs font-medium">Foods you dislike (comma-separated)</Label>
+                <Input
+                  id="ob-disliked"
+                  placeholder="e.g. mushrooms, olives, blue cheese"
+                  value={data.dislikedFoods}
+                  onChange={e => setData(d => ({ ...d, dislikedFoods: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label className="text-xs font-medium mb-2 block">Breakfast style</Label>
+                <div className="grid grid-cols-1 gap-2">
+                  {BREAKFAST_STYLE_OPTIONS.map(opt => (
+                    <OptionCard
+                      key={opt.value}
+                      icon={opt.icon}
+                      label={opt.label}
+                      description={opt.description}
+                      selected={data.breakfastStyle === opt.value}
+                      compact
+                      onClick={() => setData(d => ({ ...d, breakfastStyle: d.breakfastStyle === opt.value ? null : opt.value }))}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+            <ContinueButton onClick={goNext} label={data.favoriteCuisines.length === 0 && !data.dislikedFoods && !data.breakfastStyle ? 'No preference — Skip' : 'Continue'} />
+          </StepWrapper>
+        )
+
+      case 16:
+        return (
           <StepWrapper title="Your body metrics" subtitle="Used to calculate your targets">
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
@@ -799,7 +885,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
           </StepWrapper>
         )
 
-      case 16:
+      case 17:
         return (
           <StepWrapper title="How active is your day-to-day?" subtitle="Outside of training — this sets your calorie burn baseline">
             <div className="grid grid-cols-2 gap-3">
@@ -817,7 +903,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
           </StepWrapper>
         )
 
-      case 17:
+      case 18:
         return (
           <StepWrapper title="How should your AI coach talk?" subtitle="Sets the tone for chat & advice">
             <div className="grid grid-cols-2 gap-3">
@@ -835,7 +921,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
           </StepWrapper>
         )
 
-      case 18:
+      case 19:
         return (
           <StepWrapper title={`Ready to go, ${data.displayName}!`} subtitle="Review your selections">
             <Card className="bg-muted/50 border-dashed">
@@ -857,6 +943,9 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
                 <ReviewRow label="Daily Activity" value={ACTIVITY_OPTIONS.find(o => o.value === data.activityLevel)?.label} />
                 <ReviewRow label="Meals" value={`${data.mealsPerDay ?? 3} per day${data.includeSnacks ? ' + snacks' : ', no snacks'}`} />
                 <ReviewRow label="Cooking Time" value={COOKING_TIME_OPTIONS.find(o => o.value === data.cookingTime)?.label} />
+                <ReviewRow label="Favourite Cuisines" value={data.favoriteCuisines.length > 0 ? data.favoriteCuisines.join(', ') : 'No preference'} />
+                <ReviewRow label="Disliked Foods" value={data.dislikedFoods || 'None'} />
+                <ReviewRow label="Breakfast Style" value={BREAKFAST_STYLE_OPTIONS.find(o => o.value === data.breakfastStyle)?.label ?? 'No preference'} />
                 <ReviewRow label="Coach Persona" value={PERSONA_OPTIONS.find(o => o.value === data.coachingPersona)?.label} />
               </CardContent>
             </Card>

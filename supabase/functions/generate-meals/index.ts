@@ -133,8 +133,54 @@ const SLOT_GUIDANCE: Record<string, string> = {
   snack: "GENUINELY SNACK-SIZED: yoghurt, a protein shake, a handful of nuts, fruit with a protein source, a bar-style combo. 2-4 ingredients, no real 'cooking' — NOT a miniature version of a restaurant dish.",
 };
 
-function slotGuidance(slot: string): string {
-  return SLOT_GUIDANCE[slot] ?? "";
+function slotGuidance(slot: string, breakfastStyle: string | undefined): string {
+  const base = SLOT_GUIDANCE[slot] ?? "";
+  return slot === "breakfast" ? base + breakfastStyleGuidance(breakfastStyle) : base;
+}
+
+// ---------------------------------------------------------------------------
+// Onboarding food preferences (meal-realism round, part 3) — favorite
+// cuisines and breakfast style are steering only, same nicety-vs-guard split
+// as everything else here; disliked_foods is enforced in code
+// (meal-generation.ts's verifyProposal), this AVOID block is just a
+// good-faith first attempt to not waste a generation round on it.
+// ---------------------------------------------------------------------------
+function breakfastStyleGuidance(style: string | undefined): string {
+  if (style === "quick_cold") return " This user's breakfast style is quick and cold — favour no-cook or minimal-cook options (yoghurt bowls, overnight oats, smoothies, cold cereal) over anything needing a pan.";
+  if (style === "cooked") return " This user likes a cooked breakfast — eggs, pancakes, hot oats, and similar stovetop dishes are all welcome here.";
+  if (style === "skip") return " This user doesn't usually eat much at breakfast — keep it extremely light and fast: a shake, yoghurt, or a piece of fruit with protein, nothing that reads as a full sit-down meal.";
+  return "";
+}
+
+function dislikedFoodsBlock(disliked: string[]): string {
+  if (!disliked || disliked.length === 0) return "";
+  return `\n\nAVOID (this user dislikes these — never include them): ${disliked.join(", ")}.`;
+}
+
+/**
+ * Favorite cuisines lead the selection when the user named any (matched
+ * case-insensitively / by substring against the two lists, since onboarding's
+ * option labels are short — "Indian" — and the internal list entries carry
+ * parenthetical detail — "Indian (North Indian, South Indian)"). Falls back
+ * to the plain familiar-majority-plus-one-exotic pick from part 2 when the
+ * user has no preference.
+ */
+function selectCuisines(favoriteCuisines: string[]): string[] {
+  const matches = (list: string[]) => list.filter(entry =>
+    favoriteCuisines.some(fav => {
+      const a = entry.toLowerCase();
+      const b = fav.toLowerCase().trim();
+      return b.length > 0 && (a.includes(b) || b.includes(a));
+    })
+  );
+  const favorites = [...matches(FAMILIAR_CUISINES), ...matches(EXOTIC_CUISINES)];
+  if (favorites.length === 0) {
+    return [...pickRandom(FAMILIAR_CUISINES, Math.min(4, FAMILIAR_CUISINES.length)), ...pickRandom(EXOTIC_CUISINES, 1)];
+  }
+  const remainingFamiliar = FAMILIAR_CUISINES.filter(c => !favorites.includes(c));
+  const familiarFill = pickRandom(remainingFamiliar, Math.max(0, Math.min(4, FAMILIAR_CUISINES.length) - favorites.length));
+  const remainingExotic = EXOTIC_CUISINES.filter(c => !favorites.includes(c));
+  return [...favorites, ...familiarFill, ...pickRandom(remainingExotic, 1)];
 }
 
 // ---------------------------------------------------------------------------
@@ -173,7 +219,7 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const { slots, dietary_preferences, cooking_time_preference } = await req.json();
+    const { slots, dietary_preferences, cooking_time_preference, favorite_cuisines, disliked_foods, breakfast_style } = await req.json();
 
     if (!Array.isArray(slots) || slots.length === 0) {
       return new Response(
@@ -191,24 +237,29 @@ Deno.serve(async (req: Request) => {
     }
 
     const typedSlots = slots as SlotRequest[];
+    const favoriteCuisines: string[] = Array.isArray(favorite_cuisines) ? favorite_cuisines : [];
+    const dislikedFoods: string[] = Array.isArray(disliked_foods) ? disliked_foods : [];
     // Majority familiar, at most one exotic option offered per batch — the
     // AI can still propose something outside this list, but the menu it's
-    // shown skews everyday. meal-generation.ts's per-slot-pool exotic cap is
-    // the actual enforcement; this just stops the prompt from suggesting six
-    // different continents in one breath.
-    const selectedCuisines = [...pickRandom(FAMILIAR_CUISINES, Math.min(4, FAMILIAR_CUISINES.length)), ...pickRandom(EXOTIC_CUISINES, 1)];
+    // shown skews everyday (or, when the user named favorites, skews toward
+    // those). meal-generation.ts's per-slot-pool exotic cap is the actual
+    // enforcement; this just stops the prompt from suggesting six different
+    // continents in one breath.
+    const selectedCuisines = selectCuisines(favoriteCuisines);
     const dietaryBlock = buildDietarySafetyBlock(dietary_preferences || []);
     const cookingGuidance = cookingTimeGuidance(cooking_time_preference);
 
     const proteinGuidance = proteinDenseGuidance(dietary_preferences || []);
+    const avoidBlock = dislikedFoodsBlock(dislikedFoods);
 
     const slotDescriptions = typedSlots.map(
-      (s) => `- ${s.slot} — ${slotGuidance(s.slot)}\n  Propose ${s.count} DIFFERENT dish variants, each targeting ~${s.calories} kcal — and ${s.protein}g PROTEIN is the number that must not fall short (carbs ~${s.carbs}g, fat ~${s.fat}g are secondary and can flex)`
+      (s) => `- ${s.slot} — ${slotGuidance(s.slot, breakfast_style)}\n  Propose ${s.count} DIFFERENT dish variants, each targeting ~${s.calories} kcal — and ${s.protein}g PROTEIN is the number that must not fall short (carbs ~${s.carbs}g, fat ~${s.fat}g are secondary and can flex)`
     ).join("\n");
 
     const prompt = `You are a chef and sports nutritionist proposing meal options for an app that will independently verify every number — your job is variety and plausibility, not precision; code will re-measure and scale every ingredient you list.
 
 CUISINE: default to familiar, everyday food — most of your proposals across a slot should be recognisably ordinary (British/Western/simple international staples), with at most ONE dish per slot drawing from something more regional. Draw from this mix: ${selectedCuisines.join(", ")}. Variety should come from ingredients, protein source, and cooking style — not from touring a different continent every dish. Do not propose near-duplicate dishes within the same slot.
+${avoidBlock}
 
 PREP TIME: ${cookingGuidance}
 ${dietaryBlock}

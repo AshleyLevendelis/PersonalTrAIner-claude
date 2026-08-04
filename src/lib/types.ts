@@ -73,9 +73,23 @@ export interface UserProfile {
   meals_per_day?: number
   include_snacks?: boolean
   cooking_time_preference?: CookingTimePreference
+  /**
+   * Meal-realism round: onboarding's optional (skippable) food-preference
+   * questions. favorite_cuisines steers generate-meals's cuisine selection
+   * toward these; disliked_foods is a hard filter — meal-generation.ts
+   * rejects any proposal whose ingredient list matches one; breakfast_style
+   * steers the breakfast slot's prompt guidance only (does not change
+   * whether a breakfast slot exists — meals_per_day/include_snacks own
+   * that). All default to empty/undefined ("no preference") for pre-round
+   * profiles.
+   */
+  favorite_cuisines?: string[]
+  disliked_foods?: string[]
+  breakfast_style?: BreakfastStyle
 }
 
 export type CookingTimePreference = 'quick' | 'moderate' | 'loves_cooking'
+export type BreakfastStyle = 'quick_cold' | 'cooked' | 'skip'
 
 export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'active' | 'very_active'
 export type FitnessGoal = 'fat_loss' | 'hypertrophy' | 'functional' | 'conditioning'

@@ -32,7 +32,7 @@ import { supabase, resolveEnv } from './supabase'
 import { computeMealMacros, type Macros100g } from './food-db'
 import { validateMealAgainstDiet } from './diet-rules'
 import { parseIngredientLines, scaleToTarget, isWithinCalorieTolerance, meetsProteinFloor } from './portion-scaler'
-import type { MacroTargets, CookingTimePreference } from './types'
+import type { MacroTargets, CookingTimePreference, BreakfastStyle } from './types'
 import type { MealSlotName } from './meal-store'
 
 export const MIN_COVERAGE = 0.8
@@ -112,6 +112,9 @@ async function requestProposals(
   budgets: Partial<Record<MealSlotName, MacroTargets>>,
   dietaryPreferences: string[],
   cookingTimePreference: CookingTimePreference | undefined,
+  favoriteCuisines: string[],
+  dislikedFoods: string[],
+  breakfastStyle: BreakfastStyle | undefined,
 ): Promise<RawProposal[]> {
   const slots = (Object.entries(slotCounts) as [MealSlotName, number][])
     .filter(([, count]) => count > 0)
@@ -136,7 +139,14 @@ async function requestProposals(
         Authorization: `Bearer ${env.VITE_SUPABASE_ANON_KEY}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ slots, dietary_preferences: dietaryPreferences, cooking_time_preference: cookingTimePreference }),
+      body: JSON.stringify({
+        slots,
+        dietary_preferences: dietaryPreferences,
+        cooking_time_preference: cookingTimePreference,
+        favorite_cuisines: favoriteCuisines,
+        disliked_foods: dislikedFoods,
+        breakfast_style: breakfastStyle,
+      }),
       signal: controller.signal,
     })
     if (!response.ok) return []
@@ -234,6 +244,7 @@ export function verifyProposal(
   budget: MacroTargets,
   dietaryPreferences: string[],
   rejectLog: string[],
+  dislikedFoods: string[] = [],
 ): PoolOption | null {
   const parsed = parseIngredientLines(proposal.ingredients)
   if (parsed.length === 0) {
@@ -245,6 +256,21 @@ export function verifyProposal(
   if (slotIssue) {
     rejectLog.push(`[${slot}] "${proposal.name}": not slot-appropriate — ${slotIssue}`)
     return null
+  }
+
+  // Onboarding's disliked_foods is a hard filter, not steering (favorite
+  // cuisines/breakfast_style only nudge the prompt) — substring match
+  // against the parsed ingredient names, same fail-permissive spirit as
+  // checkSlotAppropriate: a food the user didn't actually use isn't matched
+  // just because it shares a common word, but we don't try to be clever
+  // about it either (e.g. "mushroom" disliked also rejects "mushroom soup").
+  if (dislikedFoods.length > 0) {
+    const lowerNames = parsed.map(l => l.name.toLowerCase())
+    const hit = dislikedFoods.find(food => food.trim() && lowerNames.some(n => n.includes(food.trim().toLowerCase())))
+    if (hit) {
+      rejectLog.push(`[${slot}] "${proposal.name}": contains disliked food "${hit}"`)
+      return null
+    }
   }
 
   const computed = computeMealMacros(parsed)
@@ -319,6 +345,12 @@ export async function generateMealPools(params: {
   poolSize?: number
   /** Restrict generation to these slots only (per-slot regenerate). Omit to fill every active slot. */
   onlySlots?: MealSlotName[]
+  /** Steering only — nudges generate-meals's cuisine selection, never enforced in code. */
+  favoriteCuisines?: string[]
+  /** Hard filter — see the dislikedFoods check in verifyProposal. */
+  dislikedFoods?: string[]
+  /** Steering only — nudges the breakfast slot's prompt guidance. */
+  breakfastStyle?: BreakfastStyle
 }): Promise<GenerateMealPoolsResult> {
   const poolSize = params.poolSize ?? DEFAULT_POOL_SIZE
   const budgets = computeSlotBudgets(params.targets, params.mealsPerDay, params.includeSnacks)
@@ -345,7 +377,15 @@ export async function generateMealPools(params: {
       requestCounts[slot] = need + 2
     }
 
-    const proposals = await requestProposals(requestCounts, budgets, params.dietaryPreferences, params.cookingTimePreference)
+    const proposals = await requestProposals(
+      requestCounts,
+      budgets,
+      params.dietaryPreferences,
+      params.cookingTimePreference,
+      params.favoriteCuisines ?? [],
+      params.dislikedFoods ?? [],
+      params.breakfastStyle,
+    )
     for (const proposal of proposals) {
       const slot = proposal.slot as MealSlotName
       if (!activeSlots.includes(slot)) continue
@@ -361,7 +401,7 @@ export async function generateMealPools(params: {
         continue
       }
 
-      const option = verifyProposal(proposal, slot, budget, params.dietaryPreferences, rejectionLog)
+      const option = verifyProposal(proposal, slot, budget, params.dietaryPreferences, rejectionLog, params.dislikedFoods ?? [])
       if (option) accepted[slot]!.push(option)
     }
   }
