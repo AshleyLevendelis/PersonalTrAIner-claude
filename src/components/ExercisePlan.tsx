@@ -23,13 +23,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Separator } from '@/components/ui/separator'
 import { Input } from '@/components/ui/input'
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible'
-import { ArrowRightLeft, Ban, Zap, ShieldAlert, Heart, Dumbbell, Activity, Clock, Flame, ChevronLeft, ChevronRight, ChevronDown, Calendar, Sparkles, Thermometer } from 'lucide-react'
+import { ArrowRightLeft, Ban, Zap, ShieldAlert, Heart, Activity, Clock, Flame, ChevronLeft, ChevronRight, ChevronDown, Calendar, Sparkles, Thermometer } from 'lucide-react'
 import React, { useState, useCallback } from 'react'
 import { getExerciseEntry, searchExerciseCatalog } from '@/lib/exercise-db'
 import { getExerciseCompatibilityWarnings } from '@/lib/exercise-plan'
 import { getReplacementCandidates, type SwapScope } from '@/lib/mesocycle-edit'
 import { useActiveSession } from '@/hooks/useActiveSession'
-import { formatRampSets, type RampDisplay } from '@/lib/session-derive'
+import { formatRampSets } from '@/lib/session-derive'
+import { RampStrip } from '@/components/exercise/RampStrip'
+import { LoadChip } from '@/components/exercise/LoadChip'
 import type { ExerciseEntry } from '@/lib/exercise-db'
 import type { WorkoutDay, MesocycleWeek, UserProfile, SessionDuration } from '@/lib/types'
 import { estimateDaySeconds, getDurationBudgetSeconds } from '@/lib/session-duration'
@@ -55,27 +57,12 @@ function isTimeBased(reps: string, prescriptionType?: string): boolean {
   return reps.includes('s') || reps.includes('min') || reps.includes('m')
 }
 
-// ---------------------------------------------------------------------------
-// Load provenance — browse surfaces show plan-derived loads and honest
-// provenance only (§2.2): 'estimate' or 'known_weight', never 'logged'
-// (that requires the live progression engine, which only runs for today's
-// session in TodayPanel).
-// ---------------------------------------------------------------------------
+// Browse surfaces show plan-derived loads and honest provenance only
+// (§2.2): 'estimate' or 'known_weight', never 'logged' (that requires the
+// live progression engine, which only runs for today's session in
+// TodayPanel). LoadChip's type is the full 3-state union; this component
+// simply never passes 'logged'.
 type LoadSource = 'estimate' | 'known_weight'
-
-const ESTIMATE_CHIP_CLASS = 'border-dashed border-muted-foreground/40 text-muted-foreground/70'
-const CONFIDENT_CHIP_CLASS = 'border-foreground/25 bg-foreground/5 text-foreground/90 font-medium'
-
-function loadChipClass(source: LoadSource | undefined): string {
-  return source === 'estimate' ? ESTIMATE_CHIP_CLASS : CONFIDENT_CHIP_CLASS
-}
-
-const ESTIMATE_EXPLAINER = "A starting suggestion — we haven't seen you lift yet. Find your real weight and log it; the plan rebuilds from your numbers."
-
-function LoadSourceLabel({ source }: { source: LoadSource | undefined }) {
-  if (source === 'estimate') return <span className="text-[9px] italic text-muted-foreground/60">suggested</span>
-  return null
-}
 
 function getRepsLabel(reps: string, prescriptionType?: string): string {
   switch (prescriptionType) {
@@ -245,41 +232,6 @@ function ActiveRecoveryCard({ workout, mesoWeek }: { workout: WorkoutDay; mesoWe
         )}
       </CardContent>
     </Card>
-  )
-}
-
-/** Renders session-derive's RampDisplay — the same three-shape kg/bodyweight/stale variant the session view's RampStrip uses (§7.5), so a browsed ramp block never silently drops relative to what today's view shows. */
-function RampBadge({ ramp }: { ramp: RampDisplay }) {
-  if (ramp.kind === 'stale') {
-    return (
-      <div className="flex items-center gap-1 mt-0.5 rounded border border-muted-foreground/30 bg-muted/30 px-1.5 py-1">
-        <Thermometer className="size-2.5 text-muted-foreground shrink-0" />
-        <span className="text-[10px] text-muted-foreground">Build up in 3-4 lighter sets before set 1</span>
-      </div>
-    )
-  }
-  return (
-    <div
-      className="flex items-center gap-1 flex-wrap mt-0.5 rounded border border-orange-300/60 bg-orange-50 dark:bg-orange-950/20 dark:border-orange-900/50 px-1.5 py-1"
-      title="Ramp-up sets — build to your working weight before the sets below. These don't count toward working volume."
-    >
-      <Thermometer className="size-2.5 text-orange-600 dark:text-orange-400 shrink-0" />
-      <span className="text-[10px] font-medium text-orange-700 dark:text-orange-400">Ramp:</span>
-      {ramp.kind === 'kg'
-        ? ramp.sets.map((s, i) => (
-            <span key={s.setNumber} className="text-[10px] text-orange-700 dark:text-orange-400">
-              {i > 0 && <span className="text-orange-400 dark:text-orange-600">·</span>} {s.kg}kg×{s.reps}
-            </span>
-          ))
-        : ramp.sets.map((s, i) => (
-            <span key={s.setNumber} className="text-[10px] text-orange-700 dark:text-orange-400">
-              {i > 0 && <span className="text-orange-400 dark:text-orange-600">·</span>} ×{s.reps}
-            </span>
-          ))}
-      {ramp.kind === 'bodyweight' && (
-        <span className="text-[9px] italic text-muted-foreground/60">→ bodyweight</span>
-      )}
-    </div>
   )
 }
 
@@ -564,59 +516,13 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
                       </TableCell>
                       <TableCell>
                         <span className="font-medium">{ex.name}</span>
-                        {ramp && <RampBadge ramp={ramp} />}
-                        {(ex.intensity || ex.suggested_load || (ex.per_set_load && ex.per_set_load.length > 0)) && (
-                          <div className="flex flex-col gap-0.5 mt-0.5">
-                            {ex.intensity && (
-                              <span className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground">
-                                <Flame className="size-2.5" />{ex.intensity}
-                              </span>
-                            )}
-                            {ex.per_set_load && ex.per_set_load.length > 0 ? (
-                              <div
-                                className={`flex items-center gap-1 flex-wrap ${loadSource === 'estimate' ? 'cursor-pointer' : ''}`}
-                                role={loadSource === 'estimate' ? 'button' : undefined}
-                                tabIndex={loadSource === 'estimate' ? 0 : undefined}
-                                onClick={loadSource === 'estimate' ? () => toggleLoadExplainer(exerciseKey) : undefined}
-                                onKeyDown={loadSource === 'estimate' ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleLoadExplainer(exerciseKey) } } : undefined}
-                              >
-                                <Dumbbell className="size-2.5 text-muted-foreground shrink-0" />
-                                {ex.per_set_load.map(s => (
-                                  <span
-                                    key={s.set_number}
-                                    className={`inline-flex items-center rounded border px-1 py-0 text-[10px] leading-4 ${loadChipClass(loadSource)}`}
-                                    title={s.display}
-                                  >
-                                    S{s.set_number}: {s.load_kg}kg
-                                  </span>
-                                ))}
-                                {ex.per_set_load[0].display.includes('per hand') && (
-                                  <span className="text-[10px] text-muted-foreground/70">per hand</span>
-                                )}
-                                {ex.per_set_load[0].display.includes('single side') && (
-                                  <span className="text-[10px] text-muted-foreground/70">single side</span>
-                                )}
-                                <LoadSourceLabel source={loadSource} />
-                              </div>
-                            ) : ex.suggested_load && (
-                              <div
-                                className={`inline-flex items-center gap-1 w-fit ${loadSource === 'estimate' ? 'cursor-pointer' : ''}`}
-                                role={loadSource === 'estimate' ? 'button' : undefined}
-                                tabIndex={loadSource === 'estimate' ? 0 : undefined}
-                                onClick={loadSource === 'estimate' ? () => toggleLoadExplainer(exerciseKey) : undefined}
-                                onKeyDown={loadSource === 'estimate' ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleLoadExplainer(exerciseKey) } } : undefined}
-                              >
-                                <span className={`inline-flex items-center gap-0.5 rounded border px-1 py-0 text-[10px] leading-4 ${ex.suggested_load_kg != null ? loadChipClass(loadSource) : 'text-muted-foreground border-transparent px-0'}`}>
-                                  <Dumbbell className="size-2.5" />{ex.suggested_load}
-                                </span>
-                                <LoadSourceLabel source={loadSource} />
-                              </div>
-                            )}
-                            {loadSource === 'estimate' && loadExplained && (
-                              <p className="text-[10px] text-muted-foreground/80 italic max-w-xs">{ESTIMATE_EXPLAINER}</p>
-                            )}
-                          </div>
-                        )}
+                        {ramp && <RampStrip ramp={ramp} />}
+                        <LoadChip
+                          ex={ex}
+                          source={loadSource}
+                          explained={loadExplained}
+                          onToggleExplain={() => toggleLoadExplainer(exerciseKey)}
+                        />
                       </TableCell>
                       <TableCell className="text-center">{ex.sets}</TableCell>
                       <TableCell className="text-center">
