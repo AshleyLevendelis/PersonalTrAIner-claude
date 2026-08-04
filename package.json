@@ -15,6 +15,8 @@
     "test:meal-quality": "tsx scripts/run-meal-quality.ts",
     "test:injury-separation": "tsx scripts/test-injury-exclusion-separation.ts",
     "test:ramp-visibility": "tsx scripts/test-ramp-up-visibility.ts",
+    "test:session-derive": "tsx scripts/test-session-derive.ts",
+    "test:no-forked-state": "tsx scripts/test-no-forked-state.ts",
     "test:quality": "tsx scripts/run-quality-score.ts",
     "test:llm-review": "tsx scripts/run-llm-review.ts"
   },
