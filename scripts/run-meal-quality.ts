@@ -17,7 +17,7 @@ if (fs.existsSync(envPath)) {
 }
 
 import { setSupabaseClient } from '../src/lib/supabase'
-import { generateMealPools, assembleDay, computeSlotBudgets, DAY_CALORIE_TOLERANCE, DAY_PROTEIN_FLOOR_RATIO, type PoolOption } from '../src/lib/meal-generation'
+import { generateMealPools, assembleDay, computeSlotBudgets, checkSlotAppropriate, isExoticOption, DAY_CALORIE_TOLERANCE, DAY_PROTEIN_FLOOR_RATIO, type PoolOption } from '../src/lib/meal-generation'
 import { computeMealMacros } from '../src/lib/food-db'
 import { validateMealAgainstDiet, type DietaryPreference } from '../src/lib/diet-rules'
 import { getStaticDailyMacros } from '../src/lib/macro-calculator'
@@ -88,7 +88,7 @@ function buildGrid(): GridProfile[] {
 
 interface HardFailure {
   profileLabel: string
-  check: 'dietary_violation' | 'day_tolerance' | 'macro_drift' | 'pool_size' | 'unresolvable_ingredient'
+  check: 'dietary_violation' | 'day_tolerance' | 'macro_drift' | 'pool_size' | 'unresolvable_ingredient' | 'slot_appropriateness' | 'exotic_cuisine_cap'
   detail: string
 }
 
@@ -101,6 +101,9 @@ interface ProfileResult {
   cuisines: Set<string>
   prepMatch: number
   prepTotal: number
+  /** Meal-realism round, part 4: exotic-vs-familiar split of the day assembleDay actually chose. */
+  dayExoticCount: number
+  daySlotCount: number
 }
 
 const MIN_POOL_SIZE = 3
@@ -148,7 +151,7 @@ async function gradeProfile(g: GridProfile, profileId: string): Promise<ProfileR
   const targets = getStaticDailyMacros(g.profile)
   const result: ProfileResult = {
     label: g.label, poolCounts: {}, hardFailures: [], variety: 0, totalOptions: 0,
-    cuisines: new Set(), prepMatch: 0, prepTotal: 0,
+    cuisines: new Set(), prepMatch: 0, prepTotal: 0, dayExoticCount: 0, daySlotCount: 0,
   }
 
   const { accepted, shortfalls } = await generateMealPools({
@@ -172,14 +175,40 @@ async function gradeProfile(g: GridProfile, profileId: string): Promise<ProfileR
       })
     }
 
+    // (f) exotic-cuisine cap — meal-generation.ts's generateMealPools already
+    // enforces this at accept-time; re-checking the persisted pool here is
+    // the same belt-and-suspenders pattern as (a)/(c)/(e) below (a regression
+    // in the accept-time logic would otherwise ship silently).
+    const exoticCount = options.filter(isExoticOption).length
+    if (exoticCount > 1) {
+      result.hardFailures.push({
+        profileLabel: g.label, check: 'exotic_cuisine_cap',
+        detail: `${slot} pool has ${exoticCount} exotic-cuisine options (cap is 1): ${options.filter(isExoticOption).map(o => `"${o.name}" (${o.tags[0]})`).join(', ')}`,
+      })
+    }
+
     for (const opt of options) {
       allNames.add(opt.name)
-      // opt.tags is [cuisine, prepBand, proteinSourceName] in that fixed
-      // order (see verifyProposal in meal-generation.ts) — only index 0 is
-      // an actual cuisine. Iterating every tag here previously polluted this
-      // soft metric with prep-band values and, worse, protein-source names
-      // like "chicken breast"/"lean ground lamb" reported as "cuisines".
+      // opt.tags is [cuisine, prepBand, proteinSourceName, 'slot_appropriate']
+      // in that fixed order (see verifyProposal in meal-generation.ts) — only
+      // index 0 is an actual cuisine. Iterating every tag here previously
+      // polluted this soft metric with prep-band values and, worse,
+      // protein-source names like "chicken breast" reported as "cuisines".
       if (opt.tags[0]) result.cuisines.add(opt.tags[0])
+
+      // (g) no dinner-style dish in a breakfast slot (and the snack
+      // composition check) — re-runs the same heuristic verifyProposal
+      // already gated on, against the persisted option. prep text isn't
+      // stored on PoolOption, so this checks the name alone; still catches
+      // the failure mode a real run exhibited (a dinner-style dish NAME
+      // landing in breakfast), same regression-check spirit as (f) above.
+      const slotIssue = checkSlotAppropriate(opt.name, '', slot, opt.ingredients.length)
+      if (slotIssue) {
+        result.hardFailures.push({
+          profileLabel: g.label, check: 'slot_appropriateness',
+          detail: `${slot} "${opt.name}": ${slotIssue}`,
+        })
+      }
 
       // (a) zero dietary violations
       const dietResult = validateMealAgainstDiet(opt.ingredients, g.profile.dietary_preferences)
@@ -236,6 +265,14 @@ async function gradeProfile(g: GridProfile, profileId: string): Promise<ProfileR
     })
   }
 
+  // Soft: cuisine distribution of the day actually assembled (not just the
+  // pools) — the exotic-per-slot cap and assembleDay's exotic tiebreak
+  // (meal-realism round, part 2) both aim at this outcome; this reports
+  // whether it's landing.
+  const dayOptions = Object.values(day.chosen) as PoolOption[]
+  result.daySlotCount += dayOptions.length
+  result.dayExoticCount += dayOptions.filter(isExoticOption).length
+
   return result
 }
 
@@ -274,7 +311,7 @@ async function main() {
     } catch (err) {
       console.log('ERROR')
       console.error(err)
-      results.push({ label: g.label, poolCounts: {}, hardFailures: [{ profileLabel: g.label, check: 'pool_size', detail: `generation threw: ${err instanceof Error ? err.message : String(err)}` }], variety: 0, totalOptions: 0, cuisines: new Set(), prepMatch: 0, prepTotal: 0 })
+      results.push({ label: g.label, poolCounts: {}, hardFailures: [{ profileLabel: g.label, check: 'pool_size', detail: `generation threw: ${err instanceof Error ? err.message : String(err)}` }], variety: 0, totalOptions: 0, cuisines: new Set(), prepMatch: 0, prepTotal: 0, dayExoticCount: 0, daySlotCount: 0 })
     } finally {
       if (profileId) await deleteThrowawayProfile(profileId)
     }
@@ -286,10 +323,14 @@ async function main() {
   const totalCuisines = new Set<string>()
   let prepMatch = 0
   let prepTotal = 0
+  let dayExoticCount = 0
+  let daySlotCount = 0
   for (const r of results) {
     for (const c of r.cuisines) totalCuisines.add(c)
     prepMatch += r.prepMatch
     prepTotal += r.prepTotal
+    dayExoticCount += r.dayExoticCount
+    daySlotCount += r.daySlotCount
   }
 
   const lines: string[] = []
@@ -322,6 +363,7 @@ async function main() {
   lines.push('-'.repeat(80))
   lines.push(`  Distinct cuisines used: ${totalCuisines.size} (${[...totalCuisines].slice(0, 15).join(', ')})`)
   lines.push(`  Prep-time-preference match rate: ${prepTotal > 0 ? Math.round((prepMatch / prepTotal) * 100) : 0}% (${prepMatch}/${prepTotal})`)
+  lines.push(`  Cuisine distribution per assembled day: ${daySlotCount > 0 ? Math.round((dayExoticCount / daySlotCount) * 100) : 0}% exotic (${dayExoticCount}/${daySlotCount} chosen slots) — meal-realism round targets a minority`)
   for (const r of results) {
     lines.push(`  ${r.label}: variety=${r.variety}, pools=${JSON.stringify(r.poolCounts)}`)
   }
