@@ -144,6 +144,10 @@ function fakeFrom(table: string) {
     update: (obj: Row) => { op = 'update'; updateObj = obj; return api },
     delete: () => { op = 'delete'; return api },
     eq: (c: string, v: unknown) => { filters.push(r => r[c] === v); return api },
+    // Postgrest's .is(col, null) — rows never insert with the column set, so
+    // undefined and null both count as "unset" (real Postgres has no such
+    // ambiguity; this fake's rows just don't always carry every column).
+    is: (c: string, v: unknown) => { filters.push(r => (v === null ? r[c] == null : r[c] === v)); return api },
     gte: (c: string, v: unknown) => { filters.push(r => cmp(r[c], v) >= 0); return api },
     lte: (c: string, v: unknown) => { filters.push(r => cmp(r[c], v) <= 0); return api },
     order: (c: string, opts?: { ascending?: boolean }) => { orders.push([c, opts?.ascending !== false]); return api },

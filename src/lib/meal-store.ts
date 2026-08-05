@@ -224,6 +224,7 @@ export async function getTodayLedger(
       .select('client_id, date, slot, event_type, meal_name, macros, source, created_at')
       .eq('profile_id', profileId)
       .eq('date', date)
+      .is('voided_at', null) // append-only ledger's undo primitive (§2.5) — a voided event never counts
       .order('created_at', { ascending: true })
     serverEvents = (data ?? []).map(row => ({
       profileId,
@@ -324,6 +325,24 @@ export async function swapPoolMeal(
   if (!chosen) return null
 
   return chosen
+}
+
+/**
+ * Undo for a meal event (VISION-ARCHITECTURE.md §2.5) — meal_events is
+ * genuinely append-only with no hard-delete path (it would destroy the
+ * audit trail the ledger exists for, and a deleted row can't be replayed
+ * idempotently by client_id). A void is a compensating flag, not a
+ * deletion: getTodayLedger's `.is('voided_at', null)` filter excludes it
+ * from the sum. Keyed on clientId (known immediately at record time), not
+ * a server-assigned id, so it also works the instant an undo is tapped —
+ * before the local-first write has even synced: if the event is still in
+ * the pending queue it's simply dropped there so it never syncs at all;
+ * the server-side UPDATE below then matches zero rows in that case, which
+ * is correct (nothing to void because nothing was ever written).
+ */
+export async function voidMealEvent(clientId: string): Promise<void> {
+  savePending(loadPending().filter(e => e.clientId !== clientId))
+  await supabase.from('meal_events').update({ voided_at: new Date().toISOString() }).eq('client_id', clientId)
 }
 
 /** Flush when connectivity returns — mirrors set-log-store's listener. */
