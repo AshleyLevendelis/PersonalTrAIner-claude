@@ -18,6 +18,7 @@
     "test:session-derive": "tsx scripts/test-session-derive.ts",
     "test:no-forked-state": "tsx scripts/test-no-forked-state.ts",
     "test:pending-actions": "tsx scripts/test-pending-actions.ts",
+    "test:memory": "tsx scripts/test-memory.ts",
     "test:quality": "tsx scripts/run-quality-score.ts",
     "test:llm-review": "tsx scripts/run-llm-review.ts"
   },

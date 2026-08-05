@@ -68,15 +68,20 @@ export function checkGoalConflict(
   knownLifts: KnownLifts,
 ): ReconciliationResult {
   // Same metric+ref already tracked with a materially different baseline —
-  // ask which is current rather than silently superseding.
-  if (newGoal.metricRef && newGoal.baselineValue != null) {
+  // ask which is current rather than silently superseding. metricRef is
+  // legitimately absent for a metric like body_weight_kg (nothing to
+  // qualify), so this compares refs when either side has one and treats
+  // "both absent" as a match too — not "only fires when a ref exists".
+  if (newGoal.baselineValue != null) {
     const existing = existingGoals.find(g =>
-      g.metric === newGoal.metric && g.metric_ref?.toLowerCase() === newGoal.metricRef!.toLowerCase() && g.baseline_value != null
+      g.metric === newGoal.metric &&
+      (g.metric_ref?.toLowerCase() ?? null) === (newGoal.metricRef?.toLowerCase() ?? null) &&
+      g.baseline_value != null
     )
     if (existing && existing.baseline_value != null && Math.abs(existing.baseline_value - newGoal.baselineValue) / existing.baseline_value > 0.1) {
       return {
         needsConfirmation: true,
-        message: `You already told me your ${newGoal.metricRef} baseline was ${existing.baseline_value}kg — now you're saying ${newGoal.baselineValue}kg. Which is right?`,
+        message: `You already told me your ${newGoal.metricRef ? newGoal.metricRef + ' ' : ''}baseline was ${existing.baseline_value} — now you're saying ${newGoal.baselineValue}. Which is right?`,
       }
     }
   }
