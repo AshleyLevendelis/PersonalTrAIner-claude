@@ -17,6 +17,7 @@
     "test:ramp-visibility": "tsx scripts/test-ramp-up-visibility.ts",
     "test:session-derive": "tsx scripts/test-session-derive.ts",
     "test:no-forked-state": "tsx scripts/test-no-forked-state.ts",
+    "test:pending-actions": "tsx scripts/test-pending-actions.ts",
     "test:quality": "tsx scripts/run-quality-score.ts",
     "test:llm-review": "tsx scripts/run-llm-review.ts"
   },
