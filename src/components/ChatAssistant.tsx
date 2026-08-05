@@ -17,10 +17,13 @@ import { swapPoolMeal, type MealSlotName } from '@/lib/meal-store'
 import { claimPendingAction, declinePendingAction, markExecuting, resolvePendingAction, type PendingActionReceipt } from '@/lib/pending-actions-store'
 import { executeExerciseSwap, executeMealSwap, type ExerciseSwapPayload, type MealSwapPayload } from '@/lib/pending-action-executor'
 import type { SwapScope } from '@/lib/mesocycle-edit'
+import { useActiveSession } from '@/hooks/useActiveSession'
+import { parseWorkoutEntries, type ParsedSetGroup, type WorkoutEntryInput } from '@/lib/set-parse'
+import { executeLogWorkout } from '@/lib/nl-logging-executor'
 import { ProposalCard } from '@/components/chat/ProposalCard'
 import { ReceiptCard } from '@/components/chat/ReceiptCard'
 import { ClarificationCard } from '@/components/chat/ClarificationCard'
-import type { ChatMessage, UserProfile, MacroTargets, WorkoutDay, MealPlanDay, MesocycleWeek, PlanAction, ChatPendingActionView, ChatReceiptView } from '@/lib/types'
+import type { ChatMessage, UserProfile, MacroTargets, WorkoutDay, MealPlanDay, MesocycleWeek, PlanAction, ChatPendingActionView, ChatReceiptView, ChatClarificationView } from '@/lib/types'
 
 const ACTION_TAG_RE = /\[ACTION:\s*.*?\]/gi
 const QUICK_REPLIES_RE = /\[QUICK_REPLIES:\s*(.*?)\]/gi
@@ -86,6 +89,18 @@ interface ChatAssistantProps {
 }
 
 export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated }: ChatAssistantProps) {
+  // NL logging (§3) writes through the SAME frozen session identity +
+  // logSet facade SetGrid.tsx uses — never saveSet directly (see
+  // nl-logging-executor.ts's own doc comment).
+  const activeSession = useActiveSession()
+
+  // Keyed by an in-memory resolverId, not persisted: holds the full
+  // entries/groups for a log_workout turn that hit a BLOCKING ambiguity, so
+  // answering one ClarificationCard can re-parse and continue rather than
+  // losing everything already resolved in that message. Ephemeral by
+  // design, same as pendingAction/receipt/clarification on ChatMessage.
+  const parseSessionsRef = useRef<Record<string, { entries: WorkoutEntryInput[]; todaysPlanExerciseNames: string[] }>>({})
+
   const buildInitialGreeting = (): string => {
     const now = new Date()
     const hour = now.getHours()
@@ -684,6 +699,11 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     pendingAction?: ChatPendingActionView
     receipt?: ChatReceiptView
     offer?: { text: string }
+    // Wire shape matches the log_workout tool schema's snake_case param
+    // names verbatim (Gemini function-call args come back exactly as
+    // declared) — mapped to WorkoutEntryInput's camelCase at the one
+    // boundary that consumes it (resolveAndMaybeLog), not here.
+    logWorkout?: { date: string | null; entries: { raw_text: string; exercise_phrase: string; sets_phrase: string }[] }
   }
 
   const callGemini = async (userMessage: string): Promise<ChatApiResponse> => {
@@ -726,10 +746,16 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     }
 
     const data = await response.json()
-    if (!data.reply || typeof data.reply !== 'string') {
+    // An EMPTY string is a legitimate reply — log_workout returns "" on
+    // purpose (D1: the client's own client-authored copy replaces it once
+    // it decides RECEIPT vs CLARIFICATION). Only a missing/non-string reply
+    // is malformed; the old `!data.reply` truthiness check rejected "" and
+    // fell back to the local canned response, silently skipping the whole
+    // logWorkout payload — caught in browser verification.
+    if (typeof data.reply !== 'string') {
       throw new Error('Invalid response from AI')
     }
-    return { reply: data.reply, action: data.action, pendingAction: data.pendingAction, receipt: data.receipt, offer: data.offer }
+    return { reply: data.reply, action: data.action, pendingAction: data.pendingAction, receipt: data.receipt, offer: data.offer, logWorkout: data.logWorkout }
   }
 
   // Helper: persist user message to Supabase (fire-and-forget)
@@ -777,6 +803,72 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
   }
 
   /**
+   * VISION-ARCHITECTURE.md §3.1/§3.4 — runs the deterministic parser over a
+   * log_workout turn's entries and decides RECEIPT vs CLARIFICATION.
+   * Nothing writes until every BLOCKING ambiguity is resolved (a partially-
+   * parsed message never silently logs half of what was said). Only one
+   * clarification is asked at a time; answering it re-parses the full
+   * entries array (session-held in parseSessionsRef), which may surface
+   * another before finally logging.
+   */
+  const resolveAndMaybeLog = (entries: WorkoutEntryInput[]): { text: string; receipt?: ChatReceiptView; clarification?: ChatClarificationView } => {
+    const todaysWorkout = exercisePlan.find(d => d.day === activeSession.dayName)
+    const todaysPlanExerciseNames = todaysWorkout?.exercises.map(e => e.name) ?? []
+    const parsed = parseWorkoutEntries({ entries, todaysPlanExerciseNames })
+
+    if (parsed.needsClarification) {
+      const idx = parsed.groups.findIndex((g: ParsedSetGroup) => g.resolution === 'ambiguous' || !!g.ambiguity)
+      const group = parsed.groups[idx]
+      const resolverId = `parse_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+      parseSessionsRef.current[resolverId] = { entries, todaysPlanExerciseNames }
+
+      const prompt = group.resolution === 'ambiguous'
+        ? `Which "${group.matchedRawPhrase}" did you mean?`
+        : group.ambiguity?.message ?? "I need one more detail before I can log this."
+      const options = group.resolution === 'ambiguous' && group.ambiguousCandidates
+        ? group.ambiguousCandidates.map(c => ({ label: c.name, value: c.name }))
+        : []
+      return { text: prompt, clarification: { prompt, options, resolverId } }
+    }
+
+    const todaysPlanSetCounts = new Map((todaysWorkout?.exercises ?? []).map(e => [e.name, e.sets] as const))
+    const { rows, totalSets } = executeLogWorkout(parsed.groups, {
+      profileId: activeSession.profileId ?? '',
+      date: activeSession.date,
+      weekNumber: activeSession.liveWeek,
+      dayName: activeSession.dayName,
+      setsFor: activeSession.setsFor,
+      logSet: activeSession.logSet,
+      declareOffPlan: activeSession.declareOffPlan,
+      todaysPlanSetCounts,
+    })
+    onLogsUpdated?.()
+    const exerciseCount = parsed.groups.filter((g: ParsedSetGroup) => !g.routesToCardio).length
+    const summary = `${exerciseCount} exercise${exerciseCount === 1 ? '' : 's'} · ${totalSets} set${totalSets === 1 ? '' : 's'}`
+    return {
+      text: `Logged · ${activeSession.dayName}`,
+      receipt: { kind: 'log_workout', title: `Logged · ${activeSession.dayName}`, rows, summary, status: 'done', resolvedAt: new Date().toISOString() },
+    }
+  }
+
+  /** Continuation of resolveAndMaybeLog after a ClarificationCard answer — see its own doc comment for why only exercise_name ambiguity round-trips through a tap choice. */
+  const handleClarificationChoice = async (msgIndex: number, value: string) => {
+    const msg = messages[msgIndex]
+    if (!msg.clarification) return
+    const session = parseSessionsRef.current[msg.clarification.resolverId]
+    if (!session) return
+    delete parseSessionsRef.current[msg.clarification.resolverId]
+
+    const priorParse = parseWorkoutEntries({ entries: session.entries, todaysPlanExerciseNames: session.todaysPlanExerciseNames })
+    const idx = priorParse.groups.findIndex((g: ParsedSetGroup) => g.resolution === 'ambiguous' || !!g.ambiguity)
+    if (idx === -1) return
+    const updatedEntries = session.entries.map((e, i) => (i === idx ? { ...e, exercisePhrase: value } : e))
+
+    const outcome = resolveAndMaybeLog(updatedEntries)
+    setMessages(prev => prev.map((m, i) => (i === msgIndex ? { ...m, clarification: outcome.clarification, receipt: outcome.receipt, content: outcome.text } : m)))
+  }
+
+  /**
    * VISION-ARCHITECTURE.md §2.6, D1 — "the client discards model prose on
    * ANY turn that produced a proposal." result.pendingAction/result.receipt
    * take priority over result.reply unconditionally: a turn carrying either
@@ -790,12 +882,21 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     action?: PlanAction
     pendingAction?: ChatPendingActionView
     receipt?: ChatReceiptView
+    clarification?: ChatClarificationView
   }> => {
     if (result.pendingAction) {
       return { text: describeProposalClientSide(result.pendingAction), pendingAction: result.pendingAction }
     }
     if (result.receipt) {
       return { text: result.receipt.title, receipt: result.receipt }
+    }
+    if (result.logWorkout) {
+      const entries: WorkoutEntryInput[] = result.logWorkout.entries.map(e => ({
+        rawText: e.raw_text,
+        exercisePhrase: e.exercise_phrase,
+        setsPhrase: e.sets_phrase,
+      }))
+      return resolveAndMaybeLog(entries)
     }
     if (result.offer) {
       // D3: a non-imperative statement downgraded to a suggestion chip —
@@ -862,6 +963,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
           action: processed.action,
           pendingAction: processed.pendingAction,
           receipt: processed.receipt,
+          clarification: processed.clarification,
           quickReplies,
         } : m
       ))
@@ -913,6 +1015,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     let action: PlanAction | undefined
     let pendingAction: ChatPendingActionView | undefined
     let receipt: ChatReceiptView | undefined
+    let clarification: ChatClarificationView | undefined
     let failed = false
 
     if (useAI) {
@@ -923,6 +1026,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         action = processed.action
         pendingAction = processed.pendingAction
         receipt = processed.receipt
+        clarification = processed.clarification
         setLastFailedInput(null)
       } catch (err: unknown) {
         failed = true
@@ -954,6 +1058,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       action,
       pendingAction,
       receipt,
+      clarification,
       quickReplies,
     }
 
@@ -1297,9 +1402,8 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
                         prompt={msg.clarification.prompt}
                         options={msg.clarification.options}
                         onChoose={async value => {
-                          // C13 wires this to the NL-logging clarification resolver.
                           if (navigator.vibrate) navigator.vibrate(10)
-                          setInput(value)
+                          await handleClarificationChoice(i, value)
                         }}
                       />
                     )}
