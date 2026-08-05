@@ -447,6 +447,43 @@ const toolDeclarations = [
     },
   },
   {
+    name: "log_workout",
+    description:
+      "Logs a natural-language description of completed exercise sets (VISION-ARCHITECTURE.md §3.1: 'the model segments, code owns every number'). Segment the user's message into one entry per exercise — identify WHICH SPAN OF TEXT is the exercise name and which is the sets/reps/weight/RPE description. Copy those spans VERBATIM from the user's message. Do NOT compute, convert, round, or reinterpret any number yourself — the app parses every quantity deterministically from the phrases you pass through. Prefer this over log_workout_session whenever the user describes more than one exercise in natural language (e.g. 'did 6x8 @100kg bench, 4x12 @20kg DB flyes, felt like RPE 7 on the last set').",
+    parameters: {
+      type: "object",
+      properties: {
+        date: {
+          type: "string",
+          description: "ISO date (YYYY-MM-DD) this session happened. Omit to default to today.",
+        },
+        entries: {
+          type: "array",
+          description: "One entry per exercise mentioned, in the order the user described them.",
+          items: {
+            type: "object",
+            properties: {
+              raw_text: {
+                type: "string",
+                description: "The full raw text span covering this exercise (name + sets/reps/weight/RPE), verbatim from the user's message.",
+              },
+              exercise_phrase: {
+                type: "string",
+                description: "Just the exercise-name portion of the text, verbatim (e.g. 'bench', 'DB flyes').",
+              },
+              sets_phrase: {
+                type: "string",
+                description: "Just the sets/reps/weight/RPE portion of the text, verbatim (e.g. '6x8 @100kg', 'RPE 7 on the last set').",
+              },
+            },
+            required: ["raw_text", "exercise_phrase", "sets_phrase"],
+          },
+        },
+      },
+      required: ["entries"],
+    },
+  },
+  {
     name: "log_weight",
     description:
       "Records the user's body-weight for today. Call whenever the user reports a weigh-in (e.g. 'I weighed 86.4 this morning', 'scale said 190 lbs today'). Convert pounds to kilograms before calling (1 lb = 0.453592 kg). One entry per day — a second weigh-in today overwrites the first.",
@@ -1333,6 +1370,22 @@ Keep this context in mind to ensure your greetings and questions naturally align
 
         return new Response(
           JSON.stringify({ reply: confirmText, action: actionPayload }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (name === "log_workout") {
+        // I1/§3.1 hard line: the server does NOT parse anything here — it
+        // forwards the model's raw text spans untouched. src/lib/set-parse.ts
+        // (client-side) is the only place a number becomes a number. `reply`
+        // is empty on purpose: D1 means the client renders its own copy
+        // (the parsed receipt or a clarification card), never this turn's
+        // model prose, once it decides RECEIPT vs CLARIFICATION locally.
+        return new Response(
+          JSON.stringify({
+            reply: "",
+            logWorkout: { date: args.date || null, entries: Array.isArray(args.entries) ? args.entries : [] },
+          }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
