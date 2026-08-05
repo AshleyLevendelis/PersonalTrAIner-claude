@@ -86,6 +86,14 @@ export interface UserProfile {
   favorite_cuisines?: string[]
   disliked_foods?: string[]
   breakfast_style?: BreakfastStyle
+  /**
+   * Dashboard round: a plain user-editable daily hydration goal in
+   * millilitres. 2000 is a neutral starting default (a round, commonly-
+   * cited baseline) — deliberately NEVER computed from weight/activity/
+   * goal, per VISION-ARCHITECTURE.md §5's "must never suggest or default
+   * to a hydration target beyond a neutral starting value" rule.
+   */
+  water_target_ml?: number
 }
 
 export type CookingTimePreference = 'quick' | 'moderate' | 'loves_cooking'
