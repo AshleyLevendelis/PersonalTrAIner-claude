@@ -15,8 +15,8 @@ import { getRecentLogs, formatLogsForAI, getRecentCardioLogs, formatCardioLogsFo
 import { saveChatCache, loadChatCache, clearChatCache } from '@/lib/chat-cache'
 import { swapPoolMeal, type MealSlotName } from '@/lib/meal-store'
 import { getExerciseEntry } from '@/lib/exercise-db'
-import { createPendingAction, claimPendingAction, declinePendingAction, markExecuting, resolvePendingAction, type PendingActionReceipt } from '@/lib/pending-actions-store'
-import { executeExerciseSwap, executeMealSwap, type ExerciseSwapPayload, type MealSwapPayload } from '@/lib/pending-action-executor'
+import { createPendingAction, claimPendingAction, declinePendingAction, markExecuting, resolvePendingAction, getPendingAction, isWithinUndoWindow, type PendingActionReceipt } from '@/lib/pending-actions-store'
+import { executeExerciseSwap, executeMealSwap, undoExerciseSwap, type ExerciseSwapPayload, type MealSwapPayload } from '@/lib/pending-action-executor'
 import type { SwapScope } from '@/lib/mesocycle-edit'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { parseWorkoutEntries, type ParsedSetGroup, type WorkoutEntryInput } from '@/lib/set-parse'
@@ -925,7 +925,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         .filter(e => e.suggested_load_kg != null)
         .map(e => [e.name, e.suggested_load_kg as number] as const)
     )
-    const { rows, totalSets } = executeLogWorkout(parsed.groups, {
+    const { rows, totalSets, loggedKeys } = executeLogWorkout(parsed.groups, {
       profileId: activeSession.profileId ?? '',
       date: activeSession.date,
       weekNumber: activeSession.liveWeek,
@@ -941,7 +941,18 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     const summary = `${exerciseCount} exercise${exerciseCount === 1 ? '' : 's'} · ${totalSets} set${totalSets === 1 ? '' : 's'}`
     return {
       text: `Logged · ${activeSession.dayName}`,
-      receipt: { kind: 'log_workout', title: `Logged · ${activeSession.dayName}`, rows, summary, status: 'done', resolvedAt: new Date().toISOString() },
+      receipt: {
+        kind: 'log_workout',
+        title: `Logged · ${activeSession.dayName}`,
+        rows,
+        summary,
+        status: 'done',
+        resolvedAt: new Date().toISOString(),
+        // Undo (C17) parses this back out to call deleteSet per natural key
+        // — loggedKeys never leaves this module otherwise, so JSON-encode
+        // it onto the one field the receipt view already carries.
+        undoToken: JSON.stringify(loggedKeys),
+      },
     }
   }
 
@@ -1382,6 +1393,48 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     ))
   }
 
+  /**
+   * VISION-ARCHITECTURE.md §2.5 — three undo shapes behind one handler:
+   * NL-logged sets reuse deleteSet directly (undoToken is a JSON-encoded
+   * natural-key list, never leaves the browser); the two swap kinds
+   * re-fetch the pending_actions row fresh (undoToken is its id — never
+   * trusts anything cached on the message) so undo always restores from
+   * the DB's own record of what happened. All three are only offered for
+   * the 10-minute post-confirm window.
+   */
+  const handleUndoReceipt = async (msgIndex: number) => {
+    const msg = messages[msgIndex]
+    const receipt = msg.receipt
+    if (!receipt?.undoToken || !profile.id) return
+
+    if (receipt.kind === 'log_workout') {
+      if (!isWithinUndoWindow(receipt.resolvedAt ?? null)) return
+      const keys: { exerciseId: string; setNumber: number }[] = JSON.parse(receipt.undoToken)
+      for (const key of keys) {
+        activeSession.deleteSet({ userId: profile.id, date: activeSession.date, exerciseId: key.exerciseId, setNumber: key.setNumber })
+      }
+    } else {
+      const row = await getPendingAction(receipt.undoToken)
+      if (!row || !isWithinUndoWindow(row.resolved_at)) return
+
+      if (row.kind === 'propose_exercise_swap') {
+        const payload = row.payload as unknown as ExerciseSwapPayload
+        const preImage = row.pre_image as MesocycleWeek[] | null
+        if (!preImage || !planCreatedAt) return
+        await undoExerciseSwap(profile.id, preImage, payload.weekNumber, payload.scope, planCreatedAt)
+        onMesocycleUpdated(preImage)
+      } else if (row.kind === 'propose_meal_swap') {
+        const payload = row.payload as unknown as MealSwapPayload
+        if (!payload.currentName) return
+        onMealSwapApplied(payload.slot, payload.currentName)
+      } else {
+        return
+      }
+    }
+
+    setMessages(prev => prev.map((m, i) => (i === msgIndex && m.receipt ? { ...m, receipt: { ...m.receipt, undoToken: undefined } } : m)))
+  }
+
   const isInterrupted = (msg: ChatMessage) =>
     msg.role === 'assistant' && (msg.status === 'pending' || msg.status === 'streaming' || msg.status === 'failed')
 
@@ -1522,6 +1575,8 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
                         summary={msg.receipt.summary}
                         status={msg.receipt.status}
                         receipt={msg.receipt.result}
+                        undoAvailable={!!msg.receipt.undoToken && isWithinUndoWindow(msg.receipt.resolvedAt ?? null)}
+                        onUndo={msg.receipt.undoToken ? () => handleUndoReceipt(i) : undefined}
                       />
                     )}
                     {msg.clarification && msg.status !== 'failed' && (

@@ -88,8 +88,14 @@ function allocateSetNumbers(count: number, prescribedSets: number, loggedSetNumb
  * ambiguity before any of this turn's sets write," so a partially-parsed
  * message never silently logs half of what was said).
  */
-export function executeLogWorkout(groups: ParsedSetGroup[], ctx: LogWorkoutContext): { rows: LogWorkoutReceiptRow[]; totalSets: number } {
+export interface LoggedSetKey {
+  exerciseId: string
+  setNumber: number
+}
+
+export function executeLogWorkout(groups: ParsedSetGroup[], ctx: LogWorkoutContext): { rows: LogWorkoutReceiptRow[]; totalSets: number; loggedKeys: LoggedSetKey[] } {
   const rows: LogWorkoutReceiptRow[] = []
+  const loggedKeys: LoggedSetKey[] = []
   let totalSets = 0
 
   for (const group of groups) {
@@ -134,6 +140,7 @@ export function executeLogWorkout(groups: ParsedSetGroup[], ctx: LogWorkoutConte
         isBodyweight: set.isBodyweight,
       })
       totalSets++
+      loggedKeys.push({ exerciseId, setNumber })
     })
 
     const weightLabel = group.sets[0]?.isBodyweight ? 'BW' : `${group.sets[0]?.weightKg}kg`
@@ -152,5 +159,5 @@ export function executeLogWorkout(groups: ParsedSetGroup[], ctx: LogWorkoutConte
     })
   }
 
-  return { rows, totalSets }
+  return { rows, totalSets, loggedKeys }
 }
