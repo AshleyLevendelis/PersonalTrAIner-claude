@@ -10,9 +10,9 @@
 
 import { useEffect, useState } from 'react'
 
-export type Tab = 'nutrition' | 'exercise' | 'meals' | 'chat'
+export type Tab = 'dashboard' | 'nutrition' | 'exercise' | 'meals' | 'chat'
 
-const TABS: Tab[] = ['nutrition', 'exercise', 'meals', 'chat']
+const TABS: Tab[] = ['dashboard', 'nutrition', 'exercise', 'meals', 'chat']
 
 export type Route =
   | { kind: 'tab'; tab: Tab }
@@ -42,7 +42,7 @@ export function parseRoute(hash: string): Route {
   if (programMatch) return { kind: 'program', week: programMatch[1] ? parseInt(programMatch[1], 10) : undefined }
   const tabMatch = /^#\/tab\/([a-z]+)$/.exec(hash)
   if (tabMatch && isTab(tabMatch[1])) return { kind: 'tab', tab: tabMatch[1] }
-  return { kind: 'tab', tab: 'nutrition' }
+  return { kind: 'tab', tab: 'dashboard' }
 }
 
 /** True only for hashes this parser actually recognises — an empty/unknown hash needs the caller's own initial-tab decision, not this fallback. */

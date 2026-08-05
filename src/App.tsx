@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
-import { Dumbbell, RotateCcw, Activity, UtensilsCrossed, MessageCircle, PieChart, Loader2, BrainCircuit } from 'lucide-react'
+import { Dumbbell, RotateCcw, Activity, UtensilsCrossed, MessageCircle, PieChart, Loader2, BrainCircuit, LayoutDashboard } from 'lucide-react'
 import { MemoryScreen } from '@/components/MemoryScreen'
 import { OnboardingFlow } from '@/components/onboarding/OnboardingFlow'
 import { NutritionDisplay } from '@/components/NutritionDisplay'
 import { ExerciseTab } from '@/components/exercise/ExerciseTab'
 import { MealPlan } from '@/components/MealPlan'
+import { Dashboard } from '@/components/Dashboard'
 import { GroceryList } from '@/components/GroceryList'
 import { ChatAssistant } from '@/components/ChatAssistant'
 import { WeeklyPlannerCard } from '@/components/WeeklyPlannerCard'
@@ -125,31 +126,21 @@ function App() {
     restoreSession()
   }, [])
 
-  // Initial route (LAYOUT-DESIGN.md §5.3, interim answer to vision doc Q1):
-  // land on Exercise when today is a training day, else the last tab used,
-  // defaulting to Nutrition. Runs once, only when the hash doesn't already
-  // encode a tab (a deep link or a back-navigation must never be overridden).
-  // "Training day" here checks the flat base plan (week 1), the same
-  // approximation the pre-mesocycle restore path already uses elsewhere —
-  // tightened once a real "session already finished" signal exists (P3).
+  // Initial route (VISION-ARCHITECTURE.md §5 — the dashboard is the settled
+  // answer to vision doc Q1, no longer the interim training-day/last-tab
+  // heuristic LAYOUT-DESIGN.md §5.3 used before the dashboard existed).
+  // Runs once, only when the hash doesn't already encode a tab (a deep link
+  // or a back-navigation must never be overridden) — lands every returning
+  // profile (restored OR freshly onboarded) on Dashboard; it owns its own
+  // honest empty states for a brand-new profile, so there's no separate
+  // "first launch" branch to encode here.
   const initialTabAppliedRef = useRef(false)
   useEffect(() => {
     if (initialTabAppliedRef.current || isRestoring || !profile?.id) return
     initialTabAppliedRef.current = true
     if (isKnownTabHash(hash)) return
-    const todayName = devOverrideDay ?? getSessionDateContext(profile.id).day
-    const isTrainingDay = exercisePlan.some(d => d.day === todayName && d.exercises.length > 0)
-    let initialTab: Tab = 'nutrition'
-    if (isTrainingDay) {
-      initialTab = 'exercise'
-    } else {
-      try {
-        const stored = localStorage.getItem(LAST_TAB_KEY)
-        if (stored && isTab(stored)) initialTab = stored
-      } catch { /* ignore */ }
-    }
-    window.location.hash = tabHash(initialTab)
-  }, [isRestoring, profile?.id, hash, exercisePlan, devOverrideDay])
+    window.location.hash = tabHash('dashboard')
+  }, [isRestoring, profile?.id, hash])
 
   // Remember the last tab a user actually landed on, for the next cold start.
   useEffect(() => {
@@ -1001,7 +992,11 @@ function App() {
         )}
 
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
+            <TabsTrigger value="dashboard">
+              <LayoutDashboard className="size-4" />
+              <span className="hidden sm:inline ml-1.5">Home</span>
+            </TabsTrigger>
             <TabsTrigger value="nutrition">
               <PieChart className="size-4" />
               <span className="hidden sm:inline ml-1.5">Nutrition</span>
@@ -1019,6 +1014,16 @@ function App() {
               <span className="hidden sm:inline ml-1.5">Chat</span>
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="dashboard">
+            <Dashboard
+              profile={profile}
+              macros={macros}
+              exercisePlan={exercisePlan}
+              mesocycle={mesocycle}
+              planCreatedAt={mesocycleCreatedAt ?? profile.created_at}
+            />
+          </TabsContent>
 
           <TabsContent value="nutrition">
             <NutritionDisplay
