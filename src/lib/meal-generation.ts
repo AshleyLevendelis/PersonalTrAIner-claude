@@ -349,6 +349,17 @@ export async function generateMealPools(params: {
   favoriteCuisines?: string[]
   /** Hard filter — see the dislikedFoods check in verifyProposal. */
   dislikedFoods?: string[]
+  /**
+   * Memory & goals (VISION-ARCHITECTURE.md §1.2) — slot-scoped timing rules
+   * only ("no eggs at breakfast"). Training-anchored rules ("no eggs before
+   * training") are NOT applied here: doing so correctly needs day-context
+   * (is today a training day?) that `assembleDay`/`generateMealPools` don't
+   * have — the vision doc's own §1.1 conflict note flags this as a future
+   * `ctx.dayContext` addition. Those rules are recorded (fact-compiler.ts
+   * still returns them) but the memory screen must show them as not yet
+   * applied rather than silently pretending they're honoured.
+   */
+  timingRules?: import('./fact-compiler').CompiledTimingRule[]
   /** Steering only — nudges the breakfast slot's prompt guidance. */
   breakfastStyle?: BreakfastStyle
 }): Promise<GenerateMealPoolsResult> {
@@ -401,7 +412,11 @@ export async function generateMealPools(params: {
         continue
       }
 
-      const option = verifyProposal(proposal, slot, budget, params.dietaryPreferences, rejectionLog, params.dislikedFoods ?? [])
+      const slotTimingDislikes = (params.timingRules ?? [])
+        .filter(r => r.anchor === 'slot' && r.slot === slot)
+        .map(r => r.subject)
+      const effectiveDislikes = [...(params.dislikedFoods ?? []), ...slotTimingDislikes]
+      const option = verifyProposal(proposal, slot, budget, params.dietaryPreferences, rejectionLog, effectiveDislikes)
       if (option) accepted[slot]!.push(option)
     }
   }

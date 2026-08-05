@@ -22,6 +22,10 @@ import { useActiveSession } from '@/hooks/useActiveSession'
 import { parseWorkoutEntries, type ParsedSetGroup, type WorkoutEntryInput } from '@/lib/set-parse'
 import { executeLogWorkout } from '@/lib/nl-logging-executor'
 import { normalizeExternalUrl } from '@/lib/chat-links'
+import { createFact, createGoal, createContextFact, retireFact, retireContextFact, abandonGoal, type UserFactRow, type UserGoalRow, type UserContextFactRow } from '@/lib/memory-store'
+import { resolveExerciseTarget, resolveFoodTarget } from '@/lib/fact-compiler'
+import { checkFactConflict, checkGoalConflict } from '@/lib/memory-reconcile'
+import { getPRCache } from '@/lib/pr-engine'
 import { ProposalCard } from '@/components/chat/ProposalCard'
 import { ReceiptCard } from '@/components/chat/ReceiptCard'
 import { ClarificationCard } from '@/components/chat/ClarificationCard'
@@ -90,9 +94,14 @@ interface ChatAssistantProps {
   onMesocycleUpdated: (mesocycle: MesocycleWeek[]) => void
   /** Fired after a confirmed propose_meal_swap executes — mirrors App.tsx's handleSwapMealSlot's setManualMealPicks, the ONLY thing that makes a swapped-in pool option actually render as today's pick. Without this the receipt would claim a swap the Meals/Nutrition tab never shows — exactly the incident this framework exists to prevent. */
   onMealSwapApplied: (slot: MealSlotName, chosenName: string) => void
+  /** Memory & goals (VISION-ARCHITECTURE.md §1) — active facts/goals/context, loaded by App.tsx alongside the profile. Read-only here: resolveAndSaveMemory writes through memory-store directly and calls onMemoryChanged so App.tsx re-fetches, the same "the client is the only writer, the caller reloads after" shape pending_actions uses. */
+  memoryFacts: UserFactRow[]
+  memoryGoals: UserGoalRow[]
+  memoryContextFacts: UserContextFactRow[]
+  onMemoryChanged: () => void | Promise<void>
 }
 
-export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onMealSwapApplied }: ChatAssistantProps) {
+export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onMealSwapApplied, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged }: ChatAssistantProps) {
   // NL logging (§3) writes through the SAME frozen session identity +
   // logSet facade SetGrid.tsx uses — never saveSet directly (see
   // nl-logging-executor.ts's own doc comment).
@@ -517,6 +526,15 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       // field the update_workout_schedule tool wrote and nothing else read,
       // which could only desync from the mesocycle the Exercise tab renders.
       exercise_exclusions: exerciseExclusions,
+      // Memory & goals (VISION-ARCHITECTURE.md §1) — display_text only
+      // (never raw_phrase/ids): this is prompt context, not a data dump.
+      // Lets the model avoid re-asking/re-recording something already
+      // known, and consumes context facts (tone) — the ONLY place they're
+      // ever read, matching the "class='context' is unreachable by
+      // anything plan-affecting" structural barrier.
+      active_facts: memoryFacts.map(f => f.display_text),
+      active_goals: memoryGoals.map(g => g.display_text),
+      context_facts: memoryContextFacts.map(c => c.display_text),
       training_days_count: profile.training_days.filter(d => d.available).length,
       exercise_summary: exerciseSummary,
       meal_summary: mealSummary,
@@ -625,6 +643,11 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     // declared) — mapped to WorkoutEntryInput's camelCase at the one
     // boundary that consumes it (resolveAndMaybeLog), not here.
     logWorkout?: { date: string | null; entries: { raw_text: string; exercise_phrase: string; sets_phrase: string }[] }
+    // Memory & goals (VISION-ARCHITECTURE.md §1 Part 2) — I1 holds: the
+    // server never writes user_facts/user_goals/user_context_facts, it
+    // forwards the validated tool args. resolveAndSaveMemory resolves
+    // targets, checks a baseline, runs reconciliation, and only then writes.
+    memoryIntent?: { tool: 'record_fact' | 'record_goal' | 'record_context_fact'; rawArgs: Record<string, unknown> }
   }
 
   const callGemini = async (userMessage: string): Promise<ChatApiResponse> => {
@@ -797,6 +820,201 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
    * entries array (session-held in parseSessionsRef), which may surface
    * another before finally logging.
    */
+  /**
+   * VISION-ARCHITECTURE.md §1 Part 2 — resolves a record_fact/record_goal/
+   * record_context_fact intent and writes it. IMMEDIATE-style (log_workout's
+   * pattern), not a pending_actions proposal: memory rows are append-only
+   * observations about the user, not plan mutations, so there's nothing to
+   * "claim" — but every write still produces a receipt with undo, never a
+   * silent save (Part 2: "no silent writes").
+   *
+   * Three ways this can end WITHOUT writing anything: an unresolved
+   * exercise target (asks which one), a measurable goal with no baseline
+   * anywhere (asks for one — the model can re-call record_goal next turn
+   * once it has the number), or a reconciliation conflict (asks instead of
+   * guessing which fact is current).
+   */
+  const resolveAndSaveMemory = async (intent: { tool: 'record_fact' | 'record_goal' | 'record_context_fact'; rawArgs: Record<string, unknown> }): Promise<{ text: string; receipt?: ChatReceiptView }> => {
+    const args = intent.rawArgs
+    const profileId = profile.id
+    if (!profileId) return { text: "I can't save that yet — your profile hasn't finished setting up." }
+
+    if (intent.tool === 'record_context_fact') {
+      const displayText = String(args.display_text || '').trim()
+      const rawPhrase = String(args.origin_verbatim_quote || '').trim()
+      if (!displayText || !rawPhrase) return { text: '' }
+      const row = await createContextFact({ profileId, source: 'chat', rawPhrase, displayText })
+      await onMemoryChanged()
+      return {
+        text: `Saved: ${displayText}`,
+        receipt: {
+          kind: 'memory_context_fact_saved',
+          title: 'Saved to memory',
+          rows: [{ label: 'Noted', detail: displayText }],
+          status: 'done',
+          undoToken: row.id,
+          resolvedAt: new Date().toISOString(),
+        },
+      }
+    }
+
+    if (intent.tool === 'record_fact') {
+      const kind = String(args.kind || '') as UserFactRow['kind']
+      const rawPhrase = String(args.origin_verbatim_quote || '').trim()
+      if (!rawPhrase) return { text: '' }
+
+      if (kind === 'food_preference' || kind === 'exercise_preference') {
+        const polarity = (args.polarity === 'like' ? 'like' : 'dislike') as 'like' | 'dislike'
+        const hardness = (args.hardness === 'hard' ? 'hard' : 'soft') as 'hard' | 'soft'
+        const targetPhrase = String(args.target_phrase || '').trim()
+        if (!targetPhrase) return { text: "What should I remember that about, specifically?" }
+
+        const resolution = kind === 'exercise_preference' ? resolveExerciseTarget(targetPhrase) : { resolution: 'resolved' as const, resolvedRefs: resolveFoodTarget(targetPhrase) }
+        if (resolution.resolution === 'unresolved') {
+          return { text: `I don't recognize "${targetPhrase}" as an exercise — could you name it the way it appears on your plan?` }
+        }
+
+        const conflict = checkFactConflict({ kind, polarity, resolvedRefs: resolution.resolvedRefs }, memoryFacts)
+        if (conflict.needsConfirmation) return { text: conflict.message }
+
+        const displayText = `${polarity === 'dislike' ? (hardness === 'hard' ? "won't eat/do" : 'not keen on') : (hardness === 'hard' ? 'always wants' : 'prefers')} ${targetPhrase}`
+        const row = await createFact({
+          profileId, kind, source: 'chat', rawPhrase, displayText,
+          polarity, hardness, resolvedRefs: resolution.resolvedRefs,
+        })
+        await onMemoryChanged()
+        const effect = kind === 'exercise_preference' && hardness === 'hard'
+          ? `excludes ${resolution.resolvedRefs.length} exercise${resolution.resolvedRefs.length === 1 ? '' : 's'} from your plan`
+          : hardness === 'hard' ? 'excluded from your meals' : 'recorded — biases suggestions, nothing removed'
+        return {
+          text: `Saved: ${displayText}`,
+          receipt: {
+            kind: 'memory_fact_saved',
+            title: 'Saved to memory',
+            rows: [{ label: displayText, detail: effect }],
+            status: 'done',
+            undoToken: row.id,
+            resolvedAt: new Date().toISOString(),
+          },
+        }
+      }
+
+      if (kind === 'timing_rule') {
+        const timingSubject = String(args.timing_subject || '').trim()
+        const timingAnchor = args.timing_anchor === 'training' ? 'training' : 'slot'
+        const timingSlot = ['breakfast', 'lunch', 'dinner', 'snack'].includes(String(args.timing_slot)) ? (args.timing_slot as UserFactRow['timing_slot']) : null
+        if (!timingSubject || (timingAnchor === 'slot' && !timingSlot)) {
+          return { text: "Which meal slot should that apply to?" }
+        }
+        const displayText = `${args.timing_relation === 'after' ? 'no' : 'no'} ${timingSubject} ${args.timing_relation || 'before'} ${timingAnchor === 'training' ? 'training' : timingSlot}`
+        const row = await createFact({
+          profileId, kind, source: 'chat', rawPhrase, displayText,
+          timingSubject, timingRelation: (args.timing_relation === 'after' ? 'after' : 'before'),
+          timingAnchor, timingSlot: timingSlot ?? undefined,
+        })
+        await onMemoryChanged()
+        return {
+          text: `Saved: ${displayText}`,
+          receipt: {
+            kind: 'memory_fact_saved',
+            title: 'Saved to memory',
+            rows: [{
+              label: displayText,
+              detail: timingAnchor === 'slot' ? `applied to your ${timingSlot} pool` : 'recorded — not yet applied (needs day-context meal generation doesn\'t have yet)',
+            }],
+            status: 'done',
+            undoToken: row.id,
+            resolvedAt: new Date().toISOString(),
+          },
+        }
+      }
+
+      if (kind === 'hard_constraint') {
+        const constraintKind = args.constraint_kind === 'equipment' ? 'equipment' : 'availability'
+        const weekday = String(args.weekday || '')
+        const description = String(args.description || '').trim()
+        if (constraintKind === 'availability' && !weekday) return { text: 'Which day?' }
+        const displayText = constraintKind === 'availability' ? `no gym ${weekday}s` : (description || 'equipment constraint')
+        const row = await createFact({
+          profileId, kind, source: 'chat', rawPhrase, displayText,
+          constraintKind, weekday: constraintKind === 'availability' ? weekday : undefined,
+        })
+        await onMemoryChanged()
+        return {
+          text: `Saved: ${displayText}`,
+          receipt: {
+            kind: 'memory_fact_saved',
+            title: 'Saved to memory',
+            rows: [{ label: displayText, detail: constraintKind === 'availability' ? 'recorded — not yet applied (takes effect on your next plan regeneration)' : 'recorded' }],
+            status: 'done',
+            undoToken: row.id,
+            resolvedAt: new Date().toISOString(),
+          },
+        }
+      }
+      return { text: '' }
+    }
+
+    // record_goal
+    const metric = String(args.metric || '') as UserGoalRow['metric']
+    const trackable = args.trackable === 'measurable' ? 'measurable' : 'directional'
+    const rawPhrase = String(args.origin_verbatim_quote || '').trim()
+    const metricRef = args.metric_ref ? String(args.metric_ref).trim() : undefined
+    const targetValue = typeof args.target_value === 'number' ? args.target_value : undefined
+    let baselineValue = typeof args.baseline_value === 'number' ? args.baseline_value : undefined
+    let baselineSource: 'logged_data' | 'user_stated' | undefined = baselineValue != null ? 'user_stated' : undefined
+
+    if (trackable === 'measurable' && baselineValue == null) {
+      // "Using logged data where it already knows" — pr-engine's cache is
+      // the one synchronous source of a lift's last-known max weight
+      // (getLastSessionSets is async and gated to the one call site
+      // useActiveSession.loadGhosts owns — F1 in test-no-forked-state.ts —
+      // so this reuses the cache rather than adding a second fetcher).
+      if ((metric === 'lift_working_kg' || metric === 'lift_1rm_kg') && metricRef && profileId) {
+        const pr = getPRCache(profileId)[metricRef]
+        if (pr) { baselineValue = pr.maxWeight; baselineSource = 'logged_data' }
+      } else if (metric === 'body_weight_kg' && latestWeightKg != null) {
+        baselineValue = latestWeightKg
+        baselineSource = 'logged_data'
+      }
+    }
+
+    if (trackable === 'measurable' && baselineValue == null) {
+      return { text: `What's your current ${metricRef ? metricRef + ' ' : ''}number? I need a starting point before I can track progress toward that.` }
+    }
+
+    const knownLifts = { known_squat_kg: profile.known_squat_kg, known_bench_kg: profile.known_bench_kg, known_deadlift_kg: profile.known_deadlift_kg }
+    const conflict = checkGoalConflict({ metric, metricRef, baselineValue }, memoryGoals, knownLifts)
+    if (conflict.needsConfirmation) return { text: conflict.message }
+
+    const displayText = trackable === 'directional'
+      ? (String(args.description || '').trim() || 'directional goal')
+      : `${metricRef ? metricRef + ' ' : ''}${metric.replace(/_/g, ' ')}: ${baselineValue} → ${targetValue}${args.target_date ? ` by ${args.target_date}` : ''}`
+
+    const row = await createGoal({
+      profileId, metric, trackable, metricRef, baselineValue, baselineSource,
+      targetValue, targetDate: typeof args.target_date === 'string' ? args.target_date : undefined,
+      source: 'chat', rawPhrase, displayText,
+    })
+    await onMemoryChanged()
+
+    const trackingNote = trackable === 'directional'
+      ? "I'll bias your plan toward this, but a directional goal like this can't be measured as a percentage — I won't report progress as a number."
+      : baselineSource === 'logged_data' ? `Starting point pulled from your logged data: ${baselineValue}.` : `Starting point: ${baselineValue}.`
+
+    return {
+      text: `Saved: ${displayText}\n\n${trackingNote}`,
+      receipt: {
+        kind: 'memory_goal_saved',
+        title: 'Goal saved',
+        rows: [{ label: displayText, detail: trackable === 'directional' ? 'tracked directionally, not as a percentage' : 'baseline captured' }],
+        status: 'done',
+        undoToken: row.id,
+        resolvedAt: new Date().toISOString(),
+      },
+    }
+  }
+
   const resolveAndMaybeLog = (entries: WorkoutEntryInput[]): { text: string; receipt?: ChatReceiptView; clarification?: ChatClarificationView } => {
     const todaysWorkout = exercisePlan.find(d => d.day === activeSession.dayName)
     const todaysPlanExerciseNames = todaysWorkout?.exercises.map(e => e.name) ?? []
@@ -929,6 +1147,9 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         setsPhrase: e.sets_phrase,
       }))
       return resolveAndMaybeLog(entries)
+    }
+    if (result.memoryIntent) {
+      return resolveAndSaveMemory(result.memoryIntent)
     }
     if (result.offer) {
       // D3: a non-imperative statement downgraded to a suggestion chip —
@@ -1265,6 +1486,17 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       for (const key of keys) {
         activeSession.deleteSet({ userId: profile.id, date: activeSession.date, exerciseId: key.exerciseId, setNumber: key.setNumber })
       }
+    } else if (receipt.kind === 'memory_fact_saved' || receipt.kind === 'memory_goal_saved' || receipt.kind === 'memory_context_fact_saved') {
+      // Memory rows are never claimed through pending_actions (§1 Part 2's
+      // rows are append-only observations, not plan mutations) — undoToken
+      // is the row's own id, and undo is a direct retire (soft delete,
+      // same append-only-with-a-reverse convention meal_events.voided_at
+      // uses), gated by the same 10-minute window every receipt honors.
+      if (!isWithinUndoWindow(receipt.resolvedAt ?? null)) return
+      if (receipt.kind === 'memory_fact_saved') await retireFact(receipt.undoToken)
+      else if (receipt.kind === 'memory_context_fact_saved') await retireContextFact(receipt.undoToken)
+      else await abandonGoal(receipt.undoToken)
+      await onMemoryChanged()
     } else {
       const row = await getPendingAction(receipt.undoToken)
       if (!row || !isWithinUndoWindow(row.resolved_at)) return

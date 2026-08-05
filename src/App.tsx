@@ -25,6 +25,8 @@ import { supabase } from '@/lib/supabase'
 import { saveMesocycle, saveMesocycleWeek, restoreMesocycle } from '@/lib/mesocycle-persistence'
 import { swapExerciseInMesocycle, banExerciseFromMesocycle, type SwapScope } from '@/lib/mesocycle-edit'
 import { sweepStaleForTarget } from '@/lib/pending-actions-store'
+import { getActiveFacts, getActiveGoals, getActiveContextFacts, type UserFactRow, type UserGoalRow, type UserContextFactRow } from '@/lib/memory-store'
+import { compileExerciseExclusions, compileFoodDislikes, compileTimingRules } from '@/lib/fact-compiler'
 import type { UserProfile, MacroTargets, WorkoutDay, PlanAction, SchedulePatchItem, MesocycleWeek } from '@/lib/types'
 import type { ExerciseEntry } from '@/lib/exercise-db'
 
@@ -80,6 +82,27 @@ function App() {
   const [setupError, setSetupError] = useState<string | null>(null)
   const [generatingStatus, setGeneratingStatus] = useState('')
   const [exerciseExclusions, setExerciseExclusions] = useState<string[]>([])
+  // Memory & goals (VISION-ARCHITECTURE.md §1) — active facts/goals for the
+  // current profile, loaded once alongside it. fact-compiler.ts's pure
+  // functions turn these into the exact arguments generateExercisePlan/
+  // generateMealPools already accept; nothing here writes plan state.
+  const [memoryFacts, setMemoryFacts] = useState<UserFactRow[]>([])
+  const [memoryGoals, setMemoryGoals] = useState<UserGoalRow[]>([])
+  const [memoryContextFacts, setMemoryContextFacts] = useState<UserContextFactRow[]>([])
+  const reloadMemory = async (profileId: string) => {
+    const [facts, goals, contextFacts] = await Promise.all([getActiveFacts(profileId), getActiveGoals(profileId), getActiveContextFacts(profileId)])
+    setMemoryFacts(facts)
+    setMemoryGoals(goals)
+    setMemoryContextFacts(contextFacts)
+  }
+  const compiledExerciseExclusions = compileExerciseExclusions(memoryFacts)
+  const compiledFoodDislikes = compileFoodDislikes(memoryFacts)
+  const compiledTimingRules = compileTimingRules(memoryFacts)
+  // Merged into every exclusions/dislikes consumer below — a fact-derived
+  // hard exclusion has exactly the same effect as a tap-driven one (§1.0:
+  // no generator learns about memory, it just receives a longer array).
+  const effectiveExclusions = [...new Set([...exerciseExclusions, ...compiledExerciseExclusions])]
+  const effectiveDislikedFoods = [...new Set([...(profile?.disliked_foods ?? []), ...compiledFoodDislikes])]
   const [devOverrideWeek, setDevOverrideWeek] = useState<number | null>(null)
   const [devOverrideDay, setDevOverrideDay] = useState<string | null>(null)
   const [devBypassLocks, setDevBypassLocks] = useState(false)
@@ -314,6 +337,7 @@ function App() {
     setExercisePlan(restoredExercises)
     setMesocycle(restoredMesocycle)
     setIsRestoring(false)
+    if (restoredProfile.id) void reloadMemory(restoredProfile.id)
 
     // Version today's targets when they differ from the last snapshot —
     // fire-and-forget; the M3 trend loop reads this history.
@@ -683,7 +707,8 @@ function App() {
         includeSnacks: profile.include_snacks,
         cookingTimePreference: profile.cooking_time_preference,
         favoriteCuisines: profile.favorite_cuisines,
-        dislikedFoods: profile.disliked_foods,
+        dislikedFoods: effectiveDislikedFoods,
+        timingRules: compiledTimingRules,
         breakfastStyle: profile.breakfast_style,
         onlySlots: [slot],
       })
@@ -706,7 +731,8 @@ function App() {
         includeSnacks: profile.include_snacks,
         cookingTimePreference: profile.cooking_time_preference,
         favoriteCuisines: profile.favorite_cuisines,
-        dislikedFoods: profile.disliked_foods,
+        dislikedFoods: effectiveDislikedFoods,
+        timingRules: compiledTimingRules,
         breakfastStyle: profile.breakfast_style,
       })
       setMealPools(result.accepted)
@@ -992,7 +1018,7 @@ function App() {
             <ExerciseTab
               plan={exercisePlan}
               mesocycle={mesocycle}
-              exclusions={exerciseExclusions}
+              exclusions={effectiveExclusions}
               profile={profile ?? undefined}
               profileId={profile?.id}
               planCreatedAt={mesocycleCreatedAt ?? profile?.created_at}
@@ -1029,13 +1055,17 @@ function App() {
               mesocycle={mesocycle}
               planCreatedAt={mesocycleCreatedAt ?? profile?.created_at}
               mealPlan={mealPlan}
-              exerciseExclusions={exerciseExclusions}
+              exerciseExclusions={effectiveExclusions}
               latestWeightKg={latestWeightKg}
               onPlanUpdate={handlePlanUpdate}
               onLogsUpdated={() => setLogsVersion(v => v + 1)}
               onWeightLogged={handleWeightLogged}
               onMesocycleUpdated={setMesocycle}
               onMealSwapApplied={(slot, chosenName) => setManualMealPicks(prev => ({ ...prev, [slot]: chosenName }))}
+              memoryFacts={memoryFacts}
+              memoryGoals={memoryGoals}
+              memoryContextFacts={memoryContextFacts}
+              onMemoryChanged={() => { if (profile?.id) return reloadMemory(profile.id) }}
             />
           </TabsContent>
         </Tabs>

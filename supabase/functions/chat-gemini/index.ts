@@ -556,6 +556,69 @@ const toolDeclarations = [
       required: ["exercise_name", "set_number", "reps"],
     },
   },
+  {
+    name: "record_fact",
+    description:
+      "Records a clearly-stated food/exercise preference, timing rule, or hard availability constraint (VISION-ARCHITECTURE.md §1 Part 2). Call ONLY when the user explicitly states the preference/constraint as a fact about themselves — NEVER infer one from incidental conversation (e.g. them mentioning they had eggs today is not 'likes eggs'). Under-capture is correct; a noisy memory list is worse than a missed one.",
+    parameters: {
+      type: "object",
+      properties: {
+        origin_verbatim_quote: {
+          type: "string",
+          description: "The exact substring of the user's current message that states this fact. Must be a literal quote, not a paraphrase.",
+        },
+        kind: { type: "string", enum: ["food_preference", "exercise_preference", "timing_rule", "hard_constraint"] },
+        domain: { type: "string", enum: ["food", "exercise"], description: "Required for kind=food_preference/exercise_preference." },
+        polarity: { type: "string", enum: ["like", "dislike"], description: "Required for kind=food_preference/exercise_preference." },
+        hardness: {
+          type: "string",
+          enum: ["hard", "soft"],
+          description: "'hard' = an absolute exclusion ('I can't eat shellfish', 'never give me lunges'). 'soft' = a lean, not a ban ('I prefer chicken to fish', 'not a fan of burpees but I'll do them'). Default to soft unless the user's wording is absolute.",
+        },
+        target_phrase: { type: "string", description: "The food or exercise name as the user said it." },
+        timing_subject: { type: "string", description: "Required for kind=timing_rule — the food/item the rule is about." },
+        timing_relation: { type: "string", enum: ["before", "after"] },
+        timing_anchor: { type: "string", enum: ["training", "slot"] },
+        timing_slot: { type: "string", enum: ["breakfast", "lunch", "dinner", "snack"], description: "Required when timing_anchor=slot." },
+        constraint_kind: { type: "string", enum: ["availability", "equipment"], description: "Required for kind=hard_constraint." },
+        weekday: { type: "string", enum: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"], description: "Required when constraint_kind=availability." },
+        description: { type: "string", description: "Plain description for equipment gaps or anything not weekday-shaped." },
+      },
+      required: ["origin_verbatim_quote", "kind"],
+    },
+  },
+  {
+    name: "record_goal",
+    description:
+      "Records a clearly-stated goal. For a MEASURABLE metric (body_weight_kg, lift_working_kg, lift_1rm_kg, sessions_per_week), you must have a baseline: state it if the user gave one, otherwise leave baseline_value unset and the app will look up logged data or ask — do not invent a number. For a DIRECTIONAL metric (trackable=directional, e.g. body fat, 'get leaner', 'look better'), no baseline is needed or possible.",
+    parameters: {
+      type: "object",
+      properties: {
+        origin_verbatim_quote: { type: "string", description: "Exact substring of the user's message stating this goal." },
+        metric: { type: "string", enum: ["body_weight_kg", "lift_working_kg", "lift_1rm_kg", "sessions_per_week", "directional"] },
+        trackable: { type: "string", enum: ["measurable", "directional"] },
+        metric_ref: { type: "string", description: "Exercise name, required for lift_working_kg/lift_1rm_kg." },
+        baseline_value: { type: "number", description: "Only if the user stated their current number. Omit otherwise — never guess." },
+        target_value: { type: "number", description: "Required for measurable metrics." },
+        target_date: { type: "string", description: "ISO date, if the user gave one." },
+        description: { type: "string", description: "Plain description for a directional goal (e.g. 'lean out', 'look better for summer')." },
+      },
+      required: ["origin_verbatim_quote", "metric", "trackable"],
+    },
+  },
+  {
+    name: "record_context_fact",
+    description:
+      "Records tone/motivation/life-context that should shape HOW the coach talks to the user — never anything that should affect the plan itself (that's record_fact/record_goal). E.g. 'I get discouraged easily, be gentle', 'training for my wedding in June', 'I respond well to being pushed hard'.",
+    parameters: {
+      type: "object",
+      properties: {
+        origin_verbatim_quote: { type: "string", description: "Exact substring of the user's message." },
+        display_text: { type: "string", description: "A short, clean restatement for the memory screen (e.g. 'Training for a wedding in June — wants extra encouragement')." },
+      },
+      required: ["origin_verbatim_quote", "display_text"],
+    },
+  },
 ];
 
 function buildDietarySafetyBlock(preferences: string[]): string {
@@ -877,6 +940,15 @@ VIDEO & DEMONSTRATION REQUESTS:
 - Instead, ALWAYS provide a clickable YouTube search link formatted as: [Watch [Exercise Name] Tutorial on YouTube](www.youtube.com/results?search_query=[Exercise+Name]+tutorial+form)
 - The URL in that link must be BARE — no "http://" or "https://" prefix, and no other protocol text. The client adds exactly one https:// when it renders the link; including your own prefix risks a doubled, broken URL.
 - You may also include brief text-based form cues alongside the link for immediate reference.
+
+MEMORY & GOALS (VISION-ARCHITECTURE.md §1 Part 2):
+- Call record_fact/record_goal/record_context_fact ONLY when the user clearly and directly states a preference, goal, or constraint about themselves. Never infer one from an incidental mention — "I had eggs today" is not a fact; "I can't stand eggs" is.
+- At most ONE record_* call per turn, same rule as plan-mutation proposals — if the user states several things at once, take the clearest one and ask about the rest, or wait for a follow-up.
+- For record_goal on a measurable metric (body_weight_kg, lift_working_kg, lift_1rm_kg, sessions_per_week): include baseline_value ONLY if the user actually stated their current number. Never estimate or invent one — the app will look up logged data or ask.
+- Never call record_fact/record_goal for something that only affects HOW you talk to the user (motivation, tone, life context like an upcoming event) — that is record_context_fact instead, and it must never be described as something that will change the plan.
+${context.active_facts && context.active_facts.length > 0 ? `\nWHAT YOU ALREADY KNOW (do not re-ask or re-record these):\n${context.active_facts.map((f: string) => `- ${f}`).join("\n")}` : ""}
+${context.active_goals && context.active_goals.length > 0 ? `\nACTIVE GOALS:\n${context.active_goals.map((g: string) => `- ${g}`).join("\n")}` : ""}
+${context.context_facts && context.context_facts.length > 0 ? `\nHOW TO TALK TO THIS USER:\n${context.context_facts.map((c: string) => `- ${c}`).join("\n")}` : ""}
 
 ${context.concurrent_activities && context.concurrent_activities.length > 0 ? `CONCURRENT ACTIVITIES (external training demands):\n${context.concurrent_activities.map((a: { name: string; intensity: number; days: string[]; movement_demands: string[] }) => `- ${a.name}: intensity ${Math.round(a.intensity * 100)}%, days: ${a.days.join(", ")}, demands: ${a.movement_demands.join(", ")}`).join("\n")}` : ""}
 
@@ -1435,6 +1507,63 @@ Keep this context in mind to ensure your greetings and questions naturally align
               kind: "propose_exercise_swap",
               rawArgs: { day: args.day, old_item: args.old_item, new_item: args.new_item, scope: args.scope, reason: args.reason },
             },
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (name === "record_fact" || name === "record_goal") {
+        // VISION-ARCHITECTURE.md §1 Part 2 — conservative capture. D2's
+        // imperative classifier gates these too: a mid-conversation mention
+        // ("I had eggs today") must never become a stored fact just because
+        // the model decided to call the tool — only a clearly-stated
+        // preference/goal, the same bar propose_* uses for plan mutations.
+        // I1 holds here as everywhere else: the server writes NOTHING to
+        // user_facts/user_goals. It forwards the validated raw args; the
+        // client resolves target names against the exercise/food catalogs,
+        // looks up a lift goal's baseline from logged data when the model
+        // didn't get one, runs reconciliation against existing facts/
+        // profile data, and only then writes via memory-store — producing
+        // the receipt-with-undo, never this turn's model prose (D1).
+        const classification = classifyImperative(args.origin_verbatim_quote || "", message);
+        if (!classification.imperative) {
+          const subject = name === "record_fact" ? (args.target_phrase || args.timing_subject || "that") : (args.description || args.metric_ref || "that goal");
+          return new Response(
+            JSON.stringify({
+              reply: "",
+              offer: { text: `Want me to remember ${subject}?` },
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        return new Response(
+          JSON.stringify({
+            reply: "",
+            memoryIntent: { tool: name, rawArgs: args },
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (name === "record_context_fact") {
+        // Tone/context is IMMEDIATE and lower-stakes than a plan-affecting
+        // fact (VISION-ARCHITECTURE.md §1.4: "soft preferences and tone —
+        // auto-activate with an undo-only receipt") — still verbatim-quote
+        // checked (a paraphrase is not a valid trigger) but not run through
+        // the full imperative classifier, since a stated context fact is
+        // usually phrased as a plain statement ("I get discouraged easily"),
+        // not a command. I1 still holds: forwarded, never written here.
+        const quote = String(args.origin_verbatim_quote || "").trim();
+        if (!quote || !message.toLowerCase().includes(quote.toLowerCase())) {
+          return new Response(
+            JSON.stringify({ reply: textPart?.text || "" }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        return new Response(
+          JSON.stringify({
+            reply: "",
+            memoryIntent: { tool: name, rawArgs: args },
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
