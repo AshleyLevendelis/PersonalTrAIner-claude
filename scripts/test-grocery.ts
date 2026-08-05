@@ -157,6 +157,29 @@ async function main() {
   check('chicken breast: 150g x 2 days = 300g', chicken?.quantity === 300, chicken)
   check('generated rows land in the fake DB via the local-first flush (not just the local merged view)', db.grocery_items.length === 3, db.grocery_items)
 
+  // Regression: a chat add with no stated unit landing on an EXISTING
+  // gram-based generated row must merge into that one row (the DB's
+  // UNIQUE(profile_id, canonical_key) forbids a second row for the same
+  // ingredient) rather than attempt a duplicate insert that gets silently
+  // dead-lettered — the exact bug caught live: "add spinach" (default unit
+  // 'whole') after generation had already produced a gram-based spinach line.
+  // Isolated to its own profile so it doesn't disturb the main flow's state
+  // (a regenerate reconciles ALL of a profile's generated rows, not just the
+  // ones in the pools passed to it).
+  const spinachProfileId = crypto.randomUUID()
+  const spinachPools = { lunch: [{ slot: 'lunch' as const, name: 'Spinach Side', macros: targets, tags: [], ingredients: [{ name: 'spinach', quantity: 100, unit: 'g' }] }] }
+  await generateGroceryList({ profileId: spinachProfileId, mealPools: spinachPools, targets, days: 1 })
+  await flushPending()
+  const beforeChatSpinach = await getAllItems(spinachProfileId)
+  const rowCountBefore = beforeChatSpinach.filter(i => i.canonical_key === 'spinach').length
+  check('exactly one spinach row exists after generation', rowCountBefore === 1, beforeChatSpinach)
+  const chatSpinach = addItemLocal({ profileId: spinachProfileId, name: 'spinach', quantity: 1, unit: 'whole', source: 'chat', currentItems: beforeChatSpinach })
+  check('the mismatched-unit chat add merges onto the existing row rather than creating a new one', !chatSpinach.created, chatSpinach)
+  await flushPending()
+  const afterChatSpinach = await getAllItems(spinachProfileId)
+  check('still exactly one spinach row — no duplicate canonical_key insert, no dead-letter silent drop', afterChatSpinach.filter(i => i.canonical_key === 'spinach').length === 1, afterChatSpinach)
+  check('merged quantity normalizes to grams (100g existing + ~1g from the 1:1 fallback for an unmapped count unit)', (afterChatSpinach.find(i => i.canonical_key === 'spinach')?.quantity ?? 0) > 100)
+
   // ---- 2. Regeneration preserves manual items + checked state --------------
   console.log('\n[2] regeneration preserves manual items and checked state; dropped meals remove their lines')
   const manualAdd = addItemLocal({ profileId, name: 'paper towels', quantity: 2, unit: 'rolls', source: 'manual', currentItems: afterGen })

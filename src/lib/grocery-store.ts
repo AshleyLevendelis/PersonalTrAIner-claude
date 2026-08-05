@@ -296,14 +296,25 @@ export function addItemLocal(input: {
   const target = resolveGroceryTarget(input.name)
   const existing = input.currentItems.find(i => i.profile_id === input.profileId && i.canonical_key === target.canonicalKey)
 
-  if (existing && existing.unit === input.unit) {
+  // DB has a hard UNIQUE(profile_id, canonical_key) — a match on canonical_key
+  // MUST merge into that row, never insert a second one (a same-canonical_key
+  // insert would violate the constraint at sync time and silently
+  // dead-letter). Same-unit merges sum directly (exact, no conversion loss —
+  // the common case for a repeated manual/chat add). A unit mismatch (e.g. a
+  // chat add with no stated unit landing on an existing gram-based generated
+  // line) normalizes BOTH sides to grams via the shared toGrams conversion
+  // and stores the merged row in grams, matching generation's own convention.
+  if (existing) {
+    const sameUnit = existing.unit === input.unit
+    const existingQuantity = sameUnit ? existing.quantity : target.toGrams(existing.quantity, existing.unit)
+    const addQuantity = sameUnit ? input.quantity : target.toGrams(input.quantity, input.unit)
     const item: PendingItem = {
       id: existing.id,
       profileId: input.profileId,
       canonicalKey: existing.canonical_key,
       displayName: existing.display_name,
-      quantity: existing.quantity + input.quantity,
-      unit: existing.unit,
+      quantity: existingQuantity + addQuantity,
+      unit: sameUnit ? existing.unit : 'g',
       category: existing.category,
       source: existing.source,
       mealRefs: existing.meal_refs,
@@ -313,7 +324,7 @@ export function addItemLocal(input: {
       attempts: 0,
     }
     enqueueUpsert(item)
-    return { row: pendingItemToRow(item), created: false, addedQuantity: input.quantity }
+    return { row: pendingItemToRow(item), created: false, addedQuantity: addQuantity }
   }
 
   const item: PendingItem = {
