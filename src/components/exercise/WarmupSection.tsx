@@ -1,6 +1,7 @@
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible'
 import { Badge } from '@/components/ui/badge'
 import { ChevronDown, Thermometer } from 'lucide-react'
+import { normalizeWarmup } from '@/lib/session-derive'
 import type { WorkoutDay } from '@/lib/types'
 
 // ---------------------------------------------------------------------------
@@ -22,9 +23,14 @@ export function WarmupSection({
   open: boolean
   onToggle: () => void
 }) {
-  if (!warmup) return null
-  const totalMinutes = Math.round(warmup.total_seconds / 60)
-  const moveCount = warmup.general.length + warmup.mobility.length
+  // Defensive against legacy/partial warmup shapes (a mesocycle_weeks row
+  // written before a WarmupBlock field existed, or hand-edited data) — see
+  // normalizeWarmup's own doc comment. Anything not cleanly renderable
+  // degrades to "render nothing" here, same as the original `!warmup` guard.
+  const normalized = normalizeWarmup(warmup)
+  if (!normalized) return null
+  const { general, mobility, totalMinutes, coachNote } = normalized
+  const moveCount = general.length + mobility.length
 
   return (
     <Collapsible open={open} onOpenChange={onToggle} className="border-b border-border/30">
@@ -37,10 +43,10 @@ export function WarmupSection({
         <ChevronDown className={`size-3.5 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
       </CollapsibleTrigger>
       <CollapsibleContent className="px-4 pb-3 space-y-3">
-        {warmup.general.length > 0 && (
+        {general.length > 0 && (
           <div className="space-y-1">
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">General</p>
-            {warmup.general.map((item, i) => (
+            {general.map((item, i) => (
               <div key={i} className="text-xs">
                 <span className="font-medium">{item.name}</span>
                 <span className="text-muted-foreground"> — {item.prescription}</span>
@@ -48,10 +54,10 @@ export function WarmupSection({
             ))}
           </div>
         )}
-        {warmup.mobility.length > 0 && (
+        {mobility.length > 0 && (
           <div className="space-y-1">
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Mobility</p>
-            {warmup.mobility.map((item, i) => (
+            {mobility.map((item, i) => (
               <div key={i} className="text-xs">
                 <span className="font-medium">{item.name}</span>
                 <span className="text-muted-foreground"> — {item.prescription}</span>
@@ -59,8 +65,8 @@ export function WarmupSection({
             ))}
           </div>
         )}
-        {warmup.coach_note && (
-          <p className="text-[11px] text-muted-foreground/80 italic">{warmup.coach_note}</p>
+        {coachNote && (
+          <p className="text-[11px] text-muted-foreground/80 italic">{coachNote}</p>
         )}
       </CollapsibleContent>
     </Collapsible>

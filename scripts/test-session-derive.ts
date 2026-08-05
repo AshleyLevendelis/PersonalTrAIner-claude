@@ -15,6 +15,7 @@ import {
   computeSetRowNumbers,
   nextExtraSetNumber,
   computeOffPlanWork,
+  normalizeWarmup,
 } from '../src/lib/session-derive'
 import { getExerciseId } from '../src/lib/exercise-db'
 import type { Exercise, ExerciseSetLog } from '../src/lib/types'
@@ -195,6 +196,56 @@ function main() {
     { ...chatLoggedLog, exercise_id: getExerciseId('Barbell Bench Press'), exercise_name: 'Barbell Bench Press' },
   ], plannedIds, getExerciseId)
   check('a planned exercise\'s log is never treated as off-plan', offPlanNoPlanted.length === 0, offPlanNoPlanted)
+
+  // ---- normalizeWarmup: legacy/partial warmup shapes never throw (cleanup round, defect 1) --
+  console.log('\n[17] normalizeWarmup degrades legacy/partial warmup shapes instead of crashing')
+  check('undefined warmup -> null', normalizeWarmup(undefined) === null)
+  check('null warmup -> null', normalizeWarmup(null) === null)
+  // The actual live-DB legacy shape (672 rows found in the cleanup-round
+  // audit): a mesocycle_weeks row written before ramp_ups existed on
+  // WarmupBlock. general/mobility/total_seconds/coach_note are all present
+  // and well-formed — this shape never crashed WarmupSection (it never reads
+  // ramp_ups), but is the concrete evidence that this JSON drifts over time.
+  const missingRampUps = {
+    general: [{ name: 'Bike', prescription: '5 min', purpose: 'raise temp', duration_seconds: 300 }],
+    mobility: [{ name: 'Cat-Cow', prescription: '10 reps', purpose: 'spine mobility', duration_seconds: 45 }],
+    total_seconds: 345,
+    coach_note: 'No loaded ramp-up needed today.',
+    // ramp_ups intentionally absent
+  } as unknown as Parameters<typeof normalizeWarmup>[0]
+  const normalizedMissingRampUps = normalizeWarmup(missingRampUps)
+  check('a warmup missing ramp_ups (the real legacy shape) still renders general/mobility',
+    normalizedMissingRampUps?.general.length === 1 && normalizedMissingRampUps?.mobility.length === 1, normalizedMissingRampUps)
+  check('total_seconds converts to minutes correctly', normalizedMissingRampUps?.totalMinutes === 6, normalizedMissingRampUps)
+
+  // A hypothetically older shape than anything currently live: general/mobility
+  // themselves missing or null (pre-dates the WarmupBlock array fields
+  // entirely, or hand-edited data). Must degrade to empty arrays, not throw.
+  const noGeneralMobility = { total_seconds: 120, coach_note: 'Ease into it.' } as unknown as Parameters<typeof normalizeWarmup>[0]
+  const normalizedNoGM = normalizeWarmup(noGeneralMobility)
+  check('warmup missing general/mobility entirely renders as empty arrays, not a throw',
+    normalizedNoGM?.general.length === 0 && normalizedNoGM?.mobility.length === 0 && normalizedNoGM?.coachNote === 'Ease into it.', normalizedNoGM)
+
+  const nullGeneralMobility = { general: null, mobility: null, total_seconds: 'not-a-number', coach_note: null } as unknown as Parameters<typeof normalizeWarmup>[0]
+  const normalizedNullGM = normalizeWarmup(nullGeneralMobility)
+  check('warmup with null general/mobility and a non-numeric total_seconds renders as empty, 0 minutes, no crash',
+    normalizedNullGM === null, normalizedNullGM) // nothing renderable (no items, no coach note) -> null, same as !warmup
+
+  // A day with genuinely nothing to show (e.g. a rest day's warmup: null) must still return null.
+  const emptyButPresent = { general: [], mobility: [], total_seconds: 0, coach_note: '' } as unknown as Parameters<typeof normalizeWarmup>[0]
+  check('an empty-but-present warmup (nothing to show) also returns null', normalizeWarmup(emptyButPresent) === null)
+
+  // ---- formatRampSets: a legacy/malformed ramp_up.sets never throw --------
+  console.log('\n[18] formatRampSets degrades a legacy/malformed ramp_up.sets instead of crashing')
+  const exWithBadRampSets: Exercise = {
+    id: getExerciseId('Barbell Bench Press'), name: 'Barbell Bench Press', sets: 3, reps: '8-10', rest: '90s',
+    substitution: '', suggested_load_kg: 60,
+    ramp_up: { exercise: 'Barbell Bench Press', sets: undefined as unknown as RampBlock['sets'], abbreviated: false },
+  }
+  check('ramp_up.sets not an array -> null, not a throw', formatRampSets(exWithBadRampSets) === null)
+
+  const exWithEmptyRampSets: Exercise = { ...exWithBadRampSets, ramp_up: { exercise: 'Barbell Bench Press', sets: [], abbreviated: false } }
+  check('ramp_up.sets an empty array -> null (nothing to show)', formatRampSets(exWithEmptyRampSets) === null)
 
   if (failures > 0) {
     console.error(`\n${failures} check(s) FAILED.`)
