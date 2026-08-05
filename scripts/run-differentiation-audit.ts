@@ -293,10 +293,26 @@ function evaluatePair(p: Pair): PairResult {
   const mesoA = generateSeeded(p.profileA, seedKey)
   const mesoB = generateSeeded(p.profileB, seedKey)
 
-  const week1A = mesoA[0]?.days ?? []
-  const week1B = mesoB[0]?.days ?? []
-  const snapA = snapshotWeek(week1A)
-  const snapB = snapshotWeek(week1B)
+  // Week 1 is deliberately a CALIBRATION week — every exercise gets a flat,
+  // goal/recovery-neutral 3 sets so a trainee's first-week performance
+  // reads cleanly, unbiased by policy.setVolumeMultiplier or
+  // RECOVERY_SET_MULTIPLIER (see exercise-plan.ts's isCalibrationWeek
+  // gating). Snapshotting week 1 as "the week" was a real audit bug, not a
+  // generation bug. Verified empirically (scratch trace, both goals, same
+  // seed): BLOCK 1 in its entirety (weeks 1-4, calibration included) also
+  // holds sets flat regardless of goal — only block 2 onward applies
+  // policy.setVolumeMultiplier. Sample the first non-calibration,
+  // non-deload week of block 2+ — a representative week a user would
+  // actually train once their program is past its "first, unverified
+  // plan" phase, not the one stretch every profile intentionally (block 1)
+  // or incidentally (block 1's apparent set-multiplier exemption) looks
+  // alike.
+  const representativeWeek = (meso: MesocycleWeek[]) =>
+    meso.find(w => !w.isCalibrationWeek && !w.is_deload && (w.block_number ?? 1) > 1) ?? meso.find(w => !w.isCalibrationWeek && !w.is_deload) ?? meso[0]
+  const weekA = representativeWeek(mesoA)?.days ?? []
+  const weekB = representativeWeek(mesoB)?.days ?? []
+  const snapA = snapshotWeek(weekA)
+  const snapB = snapshotWeek(weekB)
 
   const loadRatios: LoadRatioEntry[] = []
   for (const [name, loadA] of snapA.loadByName) {
@@ -409,7 +425,7 @@ function main() {
   for (const r of results) {
     const p = r.pair
     push(`\n[${p.dimension}] ${p.label}`)
-    push(`  exercise-name overlap: ${fmt(r.overlapPct)}%  (Jaccard over week-1's exercise set)`)
+    push(`  exercise-name overlap: ${fmt(r.overlapPct)}%  (Jaccard over the representative week's exercise set)`)
     push(`  movement-pattern TVD:  ${fmt(r.patternTVD)}%   A=${JSON.stringify(r.patternsA)}  B=${JSON.stringify(r.patternsB)}`)
     push(`  rep-range TVD:         ${fmt(r.repRangeTVD)}%   A=${JSON.stringify(r.repBucketsA)}  B=${JSON.stringify(r.repBucketsB)}`)
     push(`  weekly sets:           A=${r.setsA}  B=${r.setsB}  (delta ${fmt(r.setsDeltaPct)}%)`)
