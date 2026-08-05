@@ -1774,10 +1774,10 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
                 >
                   <div className="max-w-[80%]">
                     <div
-                      className={`rounded-lg px-4 py-2.5 text-sm ${
+                      className={`rounded-2xl px-4 py-2.5 text-sm ${
                         msg.role === 'user'
-                          ? 'bg-primary text-primary-foreground whitespace-pre-wrap'
-                          : 'bg-muted text-foreground'
+                          ? 'bg-secondary text-secondary-foreground whitespace-pre-wrap'
+                          : 'border border-[color:var(--role-ai-border)] bg-[color:var(--role-ai-bg)] text-[color:var(--role-ai-text)]'
                       }`}
                     >
                       {msg.role === 'user' ? (
@@ -1803,7 +1803,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
                             {stripStreamingTags(msg.content)}
                           </ReactMarkdown>
                           <button
-                            className="mt-2 flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400 hover:underline"
+                            className="mt-2 flex items-center gap-1.5 text-xs text-[color:var(--role-warn)] hover:underline"
                             onClick={() => retryMessage(i)}
                             disabled={isLoading}
                           >
@@ -1852,7 +1852,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
                     {/* Retry button for interrupted messages without content */}
                     {isInterrupted(msg) && !msg.content && !isLoading && (
                       <button
-                        className="mt-2 flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400 hover:underline"
+                        className="mt-2 flex items-center gap-1.5 text-xs text-[color:var(--role-warn)] hover:underline"
                         onClick={() => retryMessage(i)}
                       >
                         <RotateCcw className="size-3" />

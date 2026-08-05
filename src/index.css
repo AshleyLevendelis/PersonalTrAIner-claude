@@ -18,6 +18,7 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -26,64 +27,108 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
+  --color-role-ai: var(--role-ai);
+  --color-role-ai-bg: var(--role-ai-bg);
+  --color-role-ai-border: var(--role-ai-border);
+  --color-role-ai-text: var(--role-ai-text);
+  --color-role-warn: var(--role-warn);
+  --color-role-warn-bg: var(--role-warn-bg);
+  --color-role-warn-border: var(--role-warn-border);
+  --color-role-warn-text: var(--role-warn-text);
+  --color-text-tertiary: var(--text-tertiary);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
-  --font-sans: "Geist", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
 }
 
+/*
+ * "Nightshift" (direction 1a) — the app's one and only theme. No light/dark
+ * toggle exists in this app, so :root IS the dark palette; .dark mirrors it
+ * so nothing regresses if a toggle is ever added later. Values sourced from
+ * claude.ai/design project 199d2206-e2fd-441b-8db4-39ca3781e797,
+ * "Dashboard Directions.dc.html", option 1a.
+ */
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
+  --radius: 0.875rem;
+  --background: #0D0A1C;
+  --foreground: #F3F1FF;
+  --card: #171233;
+  --card-foreground: #F3F1FF;
+  --popover: #171233;
+  --popover-foreground: #F3F1FF;
+  --primary: #5BE9C2;
+  --primary-foreground: #08281F;
+  --secondary: #221B4A;
+  --secondary-foreground: #F3F1FF;
+  --muted: #171233;
+  --muted-foreground: #8D86BC;
+  --accent: #221B4A;
+  --accent-foreground: #F3F1FF;
+  --destructive: #FF5C7A;
+  --destructive-foreground: #F3F1FF;
+  --border: #2A2358;
+  --input: #171233;
+  --ring: #5BE9C2;
+  --chart-1: #5BE9C2;
+  --chart-2: #8B7BFF;
+  --chart-3: #6FB7FF;
+  --chart-4: #FFB454;
+  --chart-5: #6FB7FF;
+
+  /* Role tokens — not part of the shadcn set. */
+  --role-ai: #8B7BFF;
+  --role-ai-bg: rgba(139, 123, 255, .10);
+  --role-ai-border: rgba(139, 123, 255, .28);
+  --role-ai-text: #DAD5FA;
+  --role-warn: #FFB454;
+  --role-warn-bg: rgba(255, 180, 84, .09);
+  --role-warn-border: rgba(255, 180, 84, .3);
+  --role-warn-text: #FFD9A6;
+  --text-tertiary: #B9B2E4;
+
+  /* Deeper surface used for phase/collapsed rows and the emphasized session-hero border. */
+  --surface-deep: #12102A;
+  --line-emphasis: #3A317A;
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(0.269 0 0);
-  --input: oklch(0.269 0 0);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
+  --background: #0D0A1C;
+  --foreground: #F3F1FF;
+  --card: #171233;
+  --card-foreground: #F3F1FF;
+  --popover: #171233;
+  --popover-foreground: #F3F1FF;
+  --primary: #5BE9C2;
+  --primary-foreground: #08281F;
+  --secondary: #221B4A;
+  --secondary-foreground: #F3F1FF;
+  --muted: #171233;
+  --muted-foreground: #8D86BC;
+  --accent: #221B4A;
+  --accent-foreground: #F3F1FF;
+  --destructive: #FF5C7A;
+  --destructive-foreground: #F3F1FF;
+  --border: #2A2358;
+  --input: #171233;
+  --ring: #5BE9C2;
+  --chart-1: #5BE9C2;
+  --chart-2: #8B7BFF;
+  --chart-3: #6FB7FF;
+  --chart-4: #FFB454;
+  --chart-5: #6FB7FF;
+  --role-ai: #8B7BFF;
+  --role-ai-bg: rgba(139, 123, 255, .10);
+  --role-ai-border: rgba(139, 123, 255, .28);
+  --role-ai-text: #DAD5FA;
+  --role-warn: #FFB454;
+  --role-warn-bg: rgba(255, 180, 84, .09);
+  --role-warn-border: rgba(255, 180, 84, .3);
+  --role-warn-text: #FFD9A6;
+  --text-tertiary: #B9B2E4;
+  --surface-deep: #12102A;
+  --line-emphasis: #3A317A;
 }
 
 @layer base {
@@ -97,5 +142,35 @@
   button:not(:disabled),
   [role="button"]:not(:disabled) {
     cursor: pointer;
+  }
+}
+
+@layer utilities {
+  /* Headline numbers — Nightshift type scale. */
+  .ds-num-hero {
+    font-size: 34px;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 1;
+  }
+  .ds-num-lg {
+    font-size: 32px;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 1;
+  }
+  /* Section micro-labels — Nightshift type scale. */
+  .ds-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--muted-foreground);
+  }
+  /* Compact variant for the Exercise (today) screen's denser rows. */
+  .ds-label-compact {
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--muted-foreground);
   }
 }

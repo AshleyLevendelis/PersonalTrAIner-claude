@@ -111,7 +111,7 @@ export function LoadChip({
         <p className="text-[10px] text-muted-foreground/80 italic max-w-xs">{explainer}</p>
       )}
       {progressionNote && (
-        <span className={`text-[10px] italic ${progressionNote.didProgress ? 'text-green-700 dark:text-green-400' : 'text-muted-foreground/80'}`}>
+        <span className={`text-[10px] italic ${progressionNote.didProgress ? 'text-primary' : 'text-muted-foreground/80'}`}>
           {progressionNote.note}
         </span>
       )}

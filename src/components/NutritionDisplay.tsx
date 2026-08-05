@@ -102,7 +102,7 @@ function WeighInCard({ profileId, onWeightLogged }: { profileId: string; onWeigh
         {history.length > 0 && (
           <div className="space-y-1.5">
             <div className="flex items-center justify-between text-xs">
-              <span className="uppercase tracking-wider text-muted-foreground font-medium">Last {history.length} entries</span>
+              <span className="ds-label">Last {history.length} entries</span>
               {sevenDayAvg != null && (
                 <span className="text-muted-foreground">7-day avg: <span className="font-semibold text-foreground">{sevenDayAvg} kg</span></span>
               )}
@@ -220,13 +220,13 @@ export function NutritionDisplay({ profile, macros, exercisePlan = [], latestWei
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <p className="text-sm text-muted-foreground">Basal Metabolic Rate (BMR)</p>
-              <p className="text-2xl font-semibold tracking-tight">{bmr} <span className="text-sm font-normal text-muted-foreground">kcal/day</span></p>
+              <p className="ds-label">Basal Metabolic Rate (BMR)</p>
+              <p className="ds-num-hero">{bmr} <span className="text-sm font-normal text-muted-foreground">kcal/day</span></p>
             </div>
             <Separator />
             <div>
-              <p className="text-sm text-muted-foreground">Total Daily Energy Expenditure (TDEE)</p>
-              <p className="text-2xl font-semibold tracking-tight">{tdee} <span className="text-sm font-normal text-muted-foreground">kcal/day</span></p>
+              <p className="ds-label">Total Daily Energy Expenditure (TDEE)</p>
+              <p className="ds-num-hero">{tdee} <span className="text-sm font-normal text-muted-foreground">kcal/day</span></p>
             </div>
           </CardContent>
         </Card>
@@ -289,24 +289,20 @@ export function NutritionDisplay({ profile, macros, exercisePlan = [], latestWei
                   <div
                     key={day}
                     className={`flex items-center justify-between rounded-lg px-3 py-2 text-sm ${
-                      d.dayType === 'training' ? 'bg-amber-500/10' : 'bg-muted/50'
+                      d.dayType === 'training' ? 'bg-[color:var(--role-warn-bg)]' : 'bg-muted/50'
                     }`}
                   >
                     <div className="flex items-center gap-2">
                       <span className="font-medium capitalize w-20">{day.slice(0, 3)}</span>
-                      <Badge variant="outline" className={`text-[10px] ${
-                        d.dayType === 'training'
-                          ? 'bg-amber-500/10 text-amber-500 border-amber-500/20'
-                          : 'bg-muted text-muted-foreground border-border'
-                      }`}>
+                      <Badge variant={d.dayType === 'training' ? 'warning' : 'outline'} className="text-[10px]">
                         {d.dayType === 'training' ? 'Train' : 'Rest'}
                       </Badge>
                     </div>
                     <div className="flex items-center gap-4 text-xs font-mono">
                       <span>{d.calories} kcal</span>
-                      <span className="text-sky-500">P{d.protein}g</span>
-                      <span className="text-amber-500">C{d.carbs}g</span>
-                      <span className="text-rose-400">F{d.fat}g</span>
+                      <span className="text-[color:var(--chart-2)]">P{d.protein}g</span>
+                      <span className="text-[color:var(--role-warn)]">C{d.carbs}g</span>
+                      <span className="text-text-tertiary">F{d.fat}g</span>
                     </div>
                   </div>
                 )

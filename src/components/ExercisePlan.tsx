@@ -32,6 +32,7 @@ import { useActiveSession } from '@/hooks/useActiveSession'
 import { formatRampSets, normalizeWarmup } from '@/lib/session-derive'
 import { RampStrip } from '@/components/exercise/RampStrip'
 import { LoadChip } from '@/components/exercise/LoadChip'
+import { InsightBanner } from '@/components/ui/insight-banner'
 import type { ExerciseEntry } from '@/lib/exercise-db'
 import type { WorkoutDay, MesocycleWeek, UserProfile, SessionDuration } from '@/lib/types'
 import { estimateDaySeconds, getDurationBudgetSeconds } from '@/lib/session-duration'
@@ -81,27 +82,27 @@ function getRepsLabel(reps: string, prescriptionType?: string): string {
 function PhaseBanner({ mesoWeek }: { mesoWeek?: MesocycleWeek }) {
   if (!mesoWeek || (!mesoWeek.phase_label && !mesoWeek.phase_focus && !mesoWeek.coach_note)) return null
   return (
-    <div className="flex items-start gap-2 rounded-md border border-primary/15 bg-primary/5 px-3 py-2">
-      <Sparkles className="size-3.5 text-primary mt-0.5 shrink-0" />
+    <InsightBanner tone="ai">
+      <Sparkles className="size-3.5 mt-0.5 shrink-0" />
       <div className="min-w-0 space-y-0.5">
         <div className="flex items-center gap-1.5 flex-wrap">
           {mesoWeek.phase_label && (
-            <span className="text-xs font-semibold text-primary">{mesoWeek.phase_label}</span>
+            <span className="text-xs font-semibold">{mesoWeek.phase_label}</span>
           )}
           {mesoWeek.is_deload && (
-            <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-amber-300 text-amber-700 dark:border-amber-700 dark:text-amber-400">
+            <Badge variant="warning" className="text-[10px] px-1.5 py-0 h-4">
               Deload
             </Badge>
           )}
         </div>
         {mesoWeek.phase_focus && (
-          <p className="text-[11px] text-muted-foreground">{mesoWeek.phase_focus}</p>
+          <p className="text-[11px] opacity-90">{mesoWeek.phase_focus}</p>
         )}
         {mesoWeek.coach_note && (
-          <p className="text-[11px] text-muted-foreground/80 italic">{mesoWeek.coach_note}</p>
+          <p className="text-[11px] opacity-75 italic">{mesoWeek.coach_note}</p>
         )}
       </div>
-    </div>
+    </InsightBanner>
   )
 }
 
@@ -109,18 +110,18 @@ function PhaseBanner({ mesoWeek }: { mesoWeek?: MesocycleWeek }) {
 function CalibrationBanner({ mesoWeek }: { mesoWeek?: MesocycleWeek }) {
   if (!mesoWeek?.isCalibrationWeek) return null
   return (
-    <div className="flex items-start gap-2 rounded-md border border-amber-300/60 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-700/40 px-3 py-2">
-      <Thermometer className="size-3.5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+    <InsightBanner tone="warning">
+      <Thermometer className="size-3.5 mt-0.5 shrink-0" />
       <div className="min-w-0 space-y-0.5">
-        <span className="text-xs font-semibold text-amber-800 dark:text-amber-300">Week 1 — Calibration Week</span>
-        <p className="text-[11px] text-amber-800/80 dark:text-amber-400/80">
+        <span className="text-xs font-semibold">Week 1 — Calibration Week</span>
+        <p className="text-[11px] opacity-85">
           Find the weight where your last rep feels like RPE 6. Log your session so week 2 scales from your actual performance.
         </p>
-        <p className="text-[11px] text-amber-800/80 dark:text-amber-400/80">
+        <p className="text-[11px] opacity-85">
           The printed weights are conservative on purpose. If a set feels easy, keep adding weight until the last rep feels like RPE 6 — then log the weight you actually used. What you log becomes your plan.
         </p>
       </div>
-    </div>
+    </InsightBanner>
   )
 }
 
@@ -185,11 +186,11 @@ function RestDayCard({ day, mesoWeek }: { day: string; mesoWeek?: MesocycleWeek 
 function ActiveRecoveryCard({ workout, mesoWeek }: { workout: WorkoutDay; mesoWeek?: MesocycleWeek }) {
   const cardio = workout.recommendedCardio
   return (
-    <Card className="border-orange-200/60 dark:border-orange-900/30 bg-gradient-to-br from-orange-50/30 to-background dark:from-orange-950/10 dark:to-background">
+    <Card className="border-[color:var(--role-warn-border)] bg-gradient-to-br from-[color:var(--role-warn-bg)] to-background">
       <CardHeader className="pb-3 space-y-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base">{workout.day}</CardTitle>
-          <Badge className="bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300 border-0">
+          <Badge variant="warning" className="border-0">
             <Activity className="size-3 mr-1" />
             {workout.focus}
           </Badge>
@@ -200,8 +201,8 @@ function ActiveRecoveryCard({ workout, mesoWeek }: { workout: WorkoutDay; mesoWe
       <CardContent>
         {cardio && (
           <div className="flex items-start gap-3">
-            <div className="size-10 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center shrink-0 mt-0.5">
-              <Activity className="size-5 text-orange-600 dark:text-orange-400" />
+            <div className="size-10 rounded-full bg-[color:var(--role-warn-bg)] flex items-center justify-center shrink-0 mt-0.5">
+              <Activity className="size-5 text-[color:var(--role-warn)]" />
             </div>
             <div className="flex-1 min-w-0 space-y-1.5">
               <p className="text-sm font-semibold">{cardio.activity}</p>
@@ -457,7 +458,7 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
           </CardHeader>
           {workout.recommendedCardio && (
             <div className="px-4 pb-2 flex items-start gap-2 border-b border-border/30">
-              <Activity className="size-3.5 text-orange-500 mt-0.5 shrink-0" />
+              <Activity className="size-3.5 text-[color:var(--role-warn)] mt-0.5 shrink-0" />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-medium text-foreground">{workout.recommendedCardio.activity}</span>
@@ -474,7 +475,7 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
           )}
           {workout.conditioning_note && !workout.recommendedCardio && (
             <div className="px-4 pb-2 flex items-start gap-2 border-b border-border/30">
-              <Activity className="size-3.5 text-orange-500 mt-0.5 shrink-0" />
+              <Activity className="size-3.5 text-[color:var(--role-warn)] mt-0.5 shrink-0" />
               <p className="text-xs text-muted-foreground">
                 <span className="font-medium text-foreground">Conditioning:</span> {workout.conditioning_note}
               </p>
@@ -638,7 +639,7 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
                         <div className="flex flex-wrap gap-1">
                           <Badge variant="secondary" className="text-xs">{exercise.mechanics_tier.replace(/_/g, ' ')}</Badge>
                           {exercise.joint_stress === 'low' && currentEntry?.joint_stress !== 'low' && (
-                            <Badge className="text-xs bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                            <Badge variant="success" className="text-xs">
                               lower stress
                             </Badge>
                           )}
@@ -694,7 +695,7 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
                                 <Badge variant="secondary" className="text-xs">{exercise.mechanics_tier.replace(/_/g, ' ')}</Badge>
                               </div>
                               {warnings.map((w, i) => (
-                                <p key={i} className="text-xs text-amber-700 dark:text-amber-400 mt-1 flex items-start gap-1">
+                                <p key={i} className="text-xs text-[color:var(--role-warn-text)] mt-1 flex items-start gap-1">
                                   <ShieldAlert className="size-3 mt-0.5 shrink-0" />
                                   <span>{w}</span>
                                 </p>
@@ -714,7 +715,7 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
           {pendingSwap && (
             <div className="space-y-2 py-1">
               {profile && getExerciseCompatibilityWarnings(pendingSwap, profile, exclusions).map((w, i) => (
-                <p key={i} className="text-xs text-amber-700 dark:text-amber-400 flex items-start gap-1.5 rounded-md border border-amber-300/50 bg-amber-50 dark:bg-amber-950/20 p-2">
+                <p key={i} className="text-xs text-[color:var(--role-warn-text)] flex items-start gap-1.5 rounded-md border border-[color:var(--role-warn-border)] bg-[color:var(--role-warn-bg)] p-2">
                   <ShieldAlert className="size-3.5 mt-0.5 shrink-0" />
                   <span>{w}</span>
                 </p>

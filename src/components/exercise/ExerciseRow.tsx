@@ -57,7 +57,7 @@ export function ExerciseRow({
   const [explainedLoadChip, setExplainedLoadChip] = useState(false)
 
   return (
-    <div className={`rounded-md border p-3 space-y-2 ${allSetsLogged ? 'bg-green-50/40 dark:bg-green-950/10 border-green-200/60 dark:border-green-900/40' : 'bg-card'}`}>
+    <div className={`rounded-[12px] border p-3 space-y-2 ${allSetsLogged ? 'bg-primary/10 border-primary/30' : 'bg-card'}`}>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">

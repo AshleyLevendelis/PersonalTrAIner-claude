@@ -141,7 +141,7 @@ export function GroceryList({ profileId, mealPools, targets, refreshToken }: Gro
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between gap-2">
           <CardTitle className="flex items-center gap-2 text-base font-semibold">
-            <ShoppingCart className="size-4 text-emerald-500" />
+            <ShoppingCart className="size-4 text-primary" />
             Grocery List
           </CardTitle>
           {items.some(i => i.checked) && (
@@ -195,15 +195,15 @@ export function GroceryList({ profileId, mealPools, targets, refreshToken }: Gro
         {grouped.map(({ category, items: catItems }, idx) => (
           <div key={category} className="space-y-1.5">
             {idx > 0 && <Separator />}
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground pt-1">{CATEGORY_LABEL[category]}</h3>
+            <h3 className="ds-label pt-1">{CATEGORY_LABEL[category]}</h3>
             {catItems.map(item => (
               <div key={item.id} className={`rounded-md border p-2 flex items-start gap-2 ${item.checked ? 'opacity-50 border-border/30' : 'border-border/50'}`}>
                 <button
                   onClick={() => toggleChecked(item)}
-                  className={`mt-0.5 size-5 shrink-0 rounded border flex items-center justify-center transition-colors ${item.checked ? 'bg-emerald-500 border-emerald-500' : 'border-muted-foreground/40'}`}
+                  className={`mt-0.5 size-5 shrink-0 rounded border flex items-center justify-center transition-colors ${item.checked ? 'bg-primary border-primary' : 'border-muted-foreground/40'}`}
                   aria-label={item.checked ? 'Uncheck item' : 'Check off item'}
                 >
-                  {item.checked && <Check className="size-3.5 text-white" />}
+                  {item.checked && <Check className="size-3.5 text-primary-foreground" />}
                 </button>
 
                 <div className="flex-1 min-w-0">

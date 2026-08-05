@@ -22,20 +22,20 @@ export function RampStrip({ ramp }: { ramp: RampDisplay }) {
   }
   return (
     <div
-      className="flex items-center gap-1 flex-wrap mt-0.5 rounded border border-orange-300/60 bg-orange-50 dark:bg-orange-950/20 dark:border-orange-900/50 px-1.5 py-1"
+      className="flex items-center gap-1 flex-wrap mt-0.5 rounded-[10px] border border-[color:var(--role-warn-border)] bg-[color:var(--role-warn-bg)] px-1.5 py-1"
       title="Ramp-up sets — build to your working weight before the sets below. These don't count toward working volume."
     >
-      <Thermometer className="size-2.5 text-orange-600 dark:text-orange-400 shrink-0" />
-      <span className="text-[10px] font-medium text-orange-700 dark:text-orange-400">Ramp:</span>
+      <Thermometer className="size-2.5 text-[color:var(--role-warn)] shrink-0" />
+      <span className="ds-label-compact text-[color:var(--role-warn-text)]">Ramp:</span>
       {ramp.kind === 'kg'
         ? ramp.sets.map((s, i) => (
-            <span key={s.setNumber} className="text-[10px] text-orange-700 dark:text-orange-400">
-              {i > 0 && <span className="text-orange-400 dark:text-orange-600">·</span>} {s.kg}kg×{s.reps}
+            <span key={s.setNumber} className="text-[10px] text-[color:var(--role-warn-text)]">
+              {i > 0 && <span className="text-[color:var(--role-warn)]">·</span>} {s.kg}kg×{s.reps}
             </span>
           ))
         : ramp.sets.map((s, i) => (
-            <span key={s.setNumber} className="text-[10px] text-orange-700 dark:text-orange-400">
-              {i > 0 && <span className="text-orange-400 dark:text-orange-600">·</span>} ×{s.reps}
+            <span key={s.setNumber} className="text-[10px] text-[color:var(--role-warn-text)]">
+              {i > 0 && <span className="text-[color:var(--role-warn)]">·</span>} ×{s.reps}
             </span>
           ))}
       {ramp.kind === 'bodyweight' && (

@@ -21,7 +21,7 @@ export function IdentityLine({
         TODAY · {dayName} · {focus}
       </h2>
       {devDay && (
-        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
+        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-[color:var(--role-warn-border)] bg-[color:var(--role-warn-bg)] text-[color:var(--role-warn-text)]">
           DEV · {devDay}
         </span>
       )}

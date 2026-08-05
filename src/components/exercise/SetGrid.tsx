@@ -238,11 +238,11 @@ export function SetGrid({
         return (
           <React.Fragment key={setNumber}>
           <div
-            className={`grid grid-cols-[auto_minmax(4.5rem,1fr)_auto_auto_auto_1fr_auto] gap-1.5 items-center rounded-md px-1 py-0.5 transition-colors ${
-              isSaved ? 'bg-green-50 dark:bg-green-950/20' : ''
+            className={`grid grid-cols-[auto_minmax(4.5rem,1fr)_auto_auto_auto_1fr_auto] gap-1.5 items-center rounded-[8px] px-1 py-0.5 transition-colors ${
+              isSaved ? 'bg-primary/10' : ''
             }`}
           >
-            <span className={`w-5 text-xs font-medium text-center ${isSaved ? 'text-green-700 dark:text-green-400' : 'text-muted-foreground'}`}>
+            <span className={`w-5 text-xs font-medium text-center ${isSaved ? 'text-primary' : 'text-muted-foreground'}`}>
               {setNumber}
             </span>
             <Input
@@ -254,7 +254,7 @@ export function SetGrid({
               value={isBW ? '' : input.weight}
               onChange={e => updateInput(setNumber, 'weight', e.target.value)}
               onFocus={scrollRowIntoView}
-              className={`h-7 text-sm ${isSaved ? 'border-green-300 dark:border-green-700' : ''} ${isBW ? 'bg-muted text-muted-foreground' : ''} ${rowErrors[setNumber] ? 'border-destructive' : ''}`}
+              className={`h-7 text-sm ${isSaved ? 'border-primary/50' : ''} ${isBW ? 'bg-muted text-muted-foreground' : ''} ${rowErrors[setNumber] ? 'border-destructive' : ''}`}
               disabled={isBW}
             />
             <Button
@@ -287,11 +287,11 @@ export function SetGrid({
               value={input.reps}
               onChange={e => updateInput(setNumber, 'reps', e.target.value)}
               onFocus={scrollRowIntoView}
-              className={`h-7 text-sm w-14 ${isSaved ? 'border-green-300 dark:border-green-700' : ''} ${rowErrors[setNumber] ? 'border-destructive' : ''}`}
+              className={`h-7 text-sm w-14 ${isSaved ? 'border-primary/50' : ''} ${rowErrors[setNumber] ? 'border-destructive' : ''}`}
             />
             <div className="flex items-center gap-1">
               {isPRSet && prBadgeSet?.result && (
-                <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border border-amber-300 dark:border-amber-700 whitespace-nowrap ${animatingPr ? 'animate-pulse scale-110' : ''} transition-transform`}>
+                <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-primary/15 text-primary border border-primary/30 whitespace-nowrap ${animatingPr ? 'animate-pulse scale-110' : ''} transition-transform`}>
                   <Trophy className="size-2.5" />
                   PR
                 </span>
@@ -299,7 +299,7 @@ export function SetGrid({
               <Button
                 variant={isSaved ? 'ghost' : 'outline'}
                 size="icon"
-                className={`size-7 shrink-0 ${isSaved ? 'text-green-600 dark:text-green-400' : ''}`}
+                className={`size-7 shrink-0 ${isSaved ? 'text-primary' : ''}`}
                 onClick={() => handleSaveSet(setNumber)}
               >
                 <Check className="size-3.5" />

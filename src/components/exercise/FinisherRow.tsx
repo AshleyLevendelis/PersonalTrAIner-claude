@@ -37,9 +37,9 @@ export function FinisherRow({ cardio, onLogged }: { cardio: RecommendedCardio; o
   }
 
   return (
-    <div className="flex items-center justify-between gap-2 rounded-md border border-orange-200/60 dark:border-orange-900/40 bg-orange-50/50 dark:bg-orange-950/10 px-3 py-2">
+    <div className="flex items-center justify-between gap-2 rounded-[10px] border border-[color:var(--role-warn-border)] bg-[color:var(--role-warn-bg)] px-3 py-2">
       <div className="flex items-center gap-2 min-w-0">
-        <Activity className="size-3.5 text-orange-500 shrink-0" />
+        <Activity className="size-3.5 text-[color:var(--role-warn)] shrink-0" />
         <span className="text-xs text-foreground truncate">
           Finisher · {cardio.duration}m {cardio.activity} · RPE {cardio.targetRpe}
         </span>

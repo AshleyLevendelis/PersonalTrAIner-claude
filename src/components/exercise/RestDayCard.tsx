@@ -171,11 +171,11 @@ export function ActiveRecoveryCard({
 }) {
   const cardio = workout.recommendedCardio
   return (
-    <Card className="border-orange-200/60 dark:border-orange-900/30 bg-gradient-to-br from-orange-50/30 to-background dark:from-orange-950/10 dark:to-background">
+    <Card className="border-[color:var(--role-warn-border)] bg-gradient-to-br from-[color:var(--role-warn-bg)] to-background">
       <CardContent className="py-4 space-y-3">
         <div className="flex items-center gap-3">
-          <div className="size-10 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center shrink-0">
-            <Heart className="size-5 text-orange-600 dark:text-orange-400" />
+          <div className="size-10 rounded-full bg-[color:var(--role-warn-bg)] flex items-center justify-center shrink-0">
+            <Heart className="size-5 text-[color:var(--role-warn)]" />
           </div>
           <div className="space-y-0.5">
             <p className="text-sm font-medium">Active recovery · {workout.day}</p>
@@ -215,7 +215,7 @@ function RecoveryFinisher({ cardio }: { cardio: RecommendedCardio }) {
   }
 
   return (
-    <div className="flex items-center justify-between gap-2 rounded-md border border-orange-200/60 dark:border-orange-900/40 bg-background/60 px-3 py-2">
+    <div className="flex items-center justify-between gap-2 rounded-md border border-[color:var(--role-warn-border)] bg-background/60 px-3 py-2">
       <span className="text-xs text-foreground">
         {cardio.activity} · {cardio.duration}m · RPE {cardio.targetRpe}
       </span>

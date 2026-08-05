@@ -64,7 +64,7 @@ export function MealPlan({ pools, chosen, totals, targets, isGenerating, onSwapS
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2 text-base font-semibold">
-            <ChefHat className="size-4 text-emerald-500" />
+            <ChefHat className="size-4 text-primary" />
             Today's Meals
           </CardTitle>
           <Button variant="outline" size="sm" onClick={onRegenerateAll} disabled={isGenerating}>
@@ -108,21 +108,21 @@ function TotalsBar({ totals, targets }: { totals: MacroTargets; targets: MacroTa
     <div className="space-y-3">
       <div className="space-y-1.5">
         <div className="flex items-center justify-between text-sm">
-          <span className="flex items-center gap-1.5 font-medium">
-            <Flame className="size-3.5 text-orange-400" />
+          <span className="flex items-center gap-1.5 ds-label">
+            <Flame className="size-3.5 text-[color:var(--role-warn)]" />
             Calories
           </span>
-          <span className="font-mono">{Math.round(totals.calories)} / {targets.calories} kcal</span>
+          <span className="ds-num-lg">{Math.round(totals.calories)}<span className="text-sm text-muted-foreground font-medium"> / {targets.calories} kcal</span></span>
         </div>
         <Progress value={calPct} className="h-2" />
       </div>
       <div className="space-y-1.5">
         <div className="flex items-center justify-between text-sm">
-          <span className="flex items-center gap-1.5 font-medium">
-            <Beef className="size-3.5 text-sky-400" />
+          <span className="flex items-center gap-1.5 ds-label">
+            <Beef className="size-3.5 text-[color:var(--chart-2)]" />
             Protein
           </span>
-          <span className="font-mono">{Math.round(totals.protein)} / {targets.protein}g</span>
+          <span className="ds-num-lg">{Math.round(totals.protein)}<span className="text-sm text-muted-foreground font-medium"> / {targets.protein}g</span></span>
         </div>
         <Progress value={proPct} className="h-2" />
       </div>
@@ -277,7 +277,7 @@ function MealSlotCard({
                   <p className="text-xs font-medium truncate">{alt.name}</p>
                   <p className="text-[10px] text-muted-foreground">{Math.round(alt.macros.calories)} kcal · P {Math.round(alt.macros.protein)}g</p>
                 </div>
-                <span className={`text-[10px] font-mono shrink-0 ${Math.abs(calDelta) < 20 ? 'text-muted-foreground' : calDelta > 0 ? 'text-amber-500' : 'text-sky-500'}`}>
+                <span className={`text-[10px] font-mono shrink-0 ${Math.abs(calDelta) < 20 ? 'text-muted-foreground' : calDelta > 0 ? 'text-[color:var(--role-warn)]' : 'text-primary'}`}>
                   {calDelta > 0 ? '+' : ''}{calDelta} kcal, {proteinDelta > 0 ? '+' : ''}{proteinDelta}g P
                 </span>
               </button>

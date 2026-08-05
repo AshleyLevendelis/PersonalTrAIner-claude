@@ -67,9 +67,9 @@ export function ReceiptCard({
   }
 
   const icon = status === 'done'
-    ? <CheckCircle2 className="size-3.5 text-green-600 shrink-0" />
+    ? <CheckCircle2 className="size-3.5 text-primary shrink-0" />
     : status === 'partial'
-      ? <AlertTriangle className="size-3.5 text-amber-600 shrink-0" />
+      ? <AlertTriangle className="size-3.5 text-[color:var(--role-warn)] shrink-0" />
       : <XCircle className="size-3.5 text-destructive shrink-0" />
 
   return (
@@ -94,8 +94,8 @@ export function ReceiptCard({
       )}
 
       {status === 'partial' && receipt && receipt.failed.length > 0 && (
-        <div className="space-y-1 rounded-sm bg-amber-50 dark:bg-amber-950/20 p-2">
-          <p className="text-[11px] text-amber-800 dark:text-amber-400">Didn't land:</p>
+        <div className="space-y-1 rounded-sm bg-[color:var(--role-warn-bg)] p-2">
+          <p className="text-[11px] text-[color:var(--role-warn-text)]">Didn't land:</p>
           {receipt.failed.map((f, i) => (
             <div key={i} className="flex items-center justify-between gap-2 text-[11px]">
               <span>{f.op} — {f.error}</span>

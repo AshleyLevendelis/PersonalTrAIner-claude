@@ -70,7 +70,7 @@ export function ProposalCard({
       )}
 
       {diff.implications?.map((imp, i) => (
-        <p key={i} className={`flex items-start gap-1.5 text-xs ${imp.severity === 'warn' ? 'text-amber-700 dark:text-amber-400' : 'text-muted-foreground'}`}>
+        <p key={i} className={`flex items-start gap-1.5 text-xs ${imp.severity === 'warn' ? 'text-[color:var(--role-warn)]' : 'text-muted-foreground'}`}>
           {imp.severity === 'warn' ? <ShieldAlert className="size-3.5 mt-0.5 shrink-0" /> : <Info className="size-3.5 mt-0.5 shrink-0" />}
           <span>{imp.text}</span>
         </p>
@@ -96,7 +96,7 @@ export function ProposalCard({
       )}
 
       {isStale ? (
-        <p className="text-xs text-amber-700 dark:text-amber-400">This changed since I proposed it — ask me again if you still want it.</p>
+        <p className="text-xs text-[color:var(--role-warn)]">This changed since I proposed it — ask me again if you still want it.</p>
       ) : isTerminal ? null : (
         <div className="flex items-center gap-2 pt-0.5">
           <Button size="sm" className="h-7 text-xs" onClick={handleConfirm} disabled={busyOverall}>

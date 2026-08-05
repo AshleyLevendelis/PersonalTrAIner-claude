@@ -63,9 +63,9 @@ export function WeeklyPlannerCard({ profileId, profile, exercisePlan }: WeeklyPl
   }
 
   const carbColors = {
-    low: { bar: 'bg-sky-500', badge: 'bg-sky-500/10 text-sky-400 border-sky-500/20' },
-    medium: { bar: 'bg-amber-500', badge: 'bg-amber-500/10 text-amber-400 border-amber-500/20' },
-    high: { bar: 'bg-emerald-500', badge: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' },
+    low: { bar: 'bg-[color:var(--chart-5)]', badge: 'bg-[color:var(--chart-5)]/10 text-[color:var(--chart-5)] border-[color:var(--chart-5)]/25' },
+    medium: { bar: 'bg-[color:var(--role-warn)]', badge: 'bg-[color:var(--role-warn-bg)] text-[color:var(--role-warn-text)] border-[color:var(--role-warn-border)]' },
+    high: { bar: 'bg-primary', badge: 'bg-primary/10 text-primary border-primary/25' },
   }
 
   if (nutrition) {
@@ -73,20 +73,20 @@ export function WeeklyPlannerCard({ profileId, profile, exercisePlan }: WeeklyPl
     const colors = carbColors[carbType]
     const maxMacro = Math.max(nutrition.target_protein_g, nutrition.target_carbs_g, nutrition.target_fats_g, 1)
     return (
-      <Card className="border-border/50 bg-card">
+      <Card className="bg-card">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2 text-base font-semibold">
-              <Flame className="size-4 text-orange-400" />
+              <Flame className="size-4 text-[color:var(--role-warn)]" />
               {nutrition.target_calories} kcal today
             </CardTitle>
             <Badge variant="outline" className={`text-[10px] ${colors.badge}`}>{carbType.toUpperCase()} CARB</Badge>
           </div>
         </CardHeader>
         <CardContent className="space-y-2.5">
-          <MacroBar label="Protein" value={nutrition.target_protein_g} max={maxMacro} colorClass="bg-sky-500" />
+          <MacroBar label="Protein" value={nutrition.target_protein_g} max={maxMacro} colorClass="bg-[color:var(--chart-2)]" />
           <MacroBar label="Carbs" value={nutrition.target_carbs_g} max={maxMacro} colorClass={colors.bar} />
-          <MacroBar label="Fats" value={nutrition.target_fats_g} max={maxMacro} colorClass="bg-rose-400" />
+          <MacroBar label="Fats" value={nutrition.target_fats_g} max={maxMacro} colorClass="bg-[color:var(--text-tertiary)]" />
         </CardContent>
       </Card>
     )
@@ -97,20 +97,20 @@ export function WeeklyPlannerCard({ profileId, profile, exercisePlan }: WeeklyPl
     const colors = carbColors[carbType]
     const maxMacro = Math.max(computed.protein, computed.carbs, computed.fat, 1)
     return (
-      <Card className="border-border/50 bg-card">
+      <Card className="bg-card">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2 text-base font-semibold">
-              <Flame className="size-4 text-orange-400" />
+              <Flame className="size-4 text-[color:var(--role-warn)]" />
               {computed.calories} kcal today
             </CardTitle>
             <Badge variant="outline" className={`text-[10px] ${colors.badge}`}>{carbType.toUpperCase()} CARB</Badge>
           </div>
         </CardHeader>
         <CardContent className="space-y-2.5">
-          <MacroBar label="Protein" value={computed.protein} max={maxMacro} colorClass="bg-sky-500" />
+          <MacroBar label="Protein" value={computed.protein} max={maxMacro} colorClass="bg-[color:var(--chart-2)]" />
           <MacroBar label="Carbs" value={computed.carbs} max={maxMacro} colorClass={colors.bar} />
-          <MacroBar label="Fats" value={computed.fat} max={maxMacro} colorClass="bg-rose-400" />
+          <MacroBar label="Fats" value={computed.fat} max={maxMacro} colorClass="bg-[color:var(--text-tertiary)]" />
         </CardContent>
       </Card>
     )
