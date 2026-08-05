@@ -7,6 +7,7 @@ import { OnboardingFlow } from '@/components/onboarding/OnboardingFlow'
 import { NutritionDisplay } from '@/components/NutritionDisplay'
 import { ExerciseTab } from '@/components/exercise/ExerciseTab'
 import { MealPlan } from '@/components/MealPlan'
+import { GroceryList } from '@/components/GroceryList'
 import { ChatAssistant } from '@/components/ChatAssistant'
 import { WeeklyPlannerCard } from '@/components/WeeklyPlannerCard'
 import { DevTestPage } from '@/components/DevTestPage'
@@ -1051,6 +1052,9 @@ function App() {
               onRegenerateSlot={handleRegenerateMealSlot}
               onRegenerateAll={handleRegenerateAllMeals}
             />
+            <div className="mt-4">
+              <GroceryList profileId={profile.id} mealPools={mealPools} targets={macros} />
+            </div>
           </TabsContent>
 
           <TabsContent value="chat" forceMount className="data-[state=inactive]:hidden">
