@@ -953,16 +953,63 @@ function adjustCountsForExperience(
 // Raises at 26 sets/week. Capped at 2 appearances/week; see below.
 const WEEKLY_APPEARANCE_CAP = 2
 
+/**
+ * Redistributes accessory slots between isolation (tier3) and compound-
+ * accessory (tier2) without changing the total accessory count — a goal's
+ * isolationSlotShift moves slot BUDGET (what kind of accessory work fills
+ * the session), not overall volume (policy.setVolumeMultiplier already owns
+ * volume). Positive = more isolation/variety (hypertrophy); negative =
+ * fewer isolation slots in favor of compound/multi-joint accessories
+ * (fat_loss, functional, conditioning). Tier1 (main lift) is never touched
+ * — that's the count the "fat_loss never has fewer main-compound slots
+ * than hypertrophy" audit guards. Floored at 1 each so a goal can never
+ * zero out an entire tier's presence.
+ */
+function applyIsolationSlotShift(
+  counts: { tier1: number; tier2: number; tier3: number },
+  shift: number,
+): { tier1: number; tier2: number; tier3: number } {
+  if (shift === 0) return counts
+  const tier3 = Math.max(1, counts.tier3 + shift)
+  const actualShift = tier3 - counts.tier3
+  const tier2 = Math.max(1, counts.tier2 - actualShift)
+  return { tier1: counts.tier1, tier2, tier3 }
+}
+
+/** True for exercises functional's preferUnilateralCarry policy should surface first: unilateral movements, carry-pattern work, and rotational/anti-rotation core/accessory work — the "unilateral, carry, rotational and multi-planar" emphasis from the differentiation round. */
+function isUnilateralCarryOrRotational(e: ExerciseEntry): boolean {
+  return e.unilateral || e.movement_pattern === 'carry' || e.angle_vector === 'rotational' || e.angle_vector === 'anti_rotation'
+}
+
+/**
+ * Goal-aware candidate ordering: when a policy prefers unilateral/carry/
+ * rotational work, those candidates are shuffled and tried FIRST, with the
+ * rest of the eligible pool shuffled and appended after as a fallback —
+ * never excluded, just deprioritized. Every existing eligibility filter
+ * (equipment/injury/style/skill/pattern/family/weekly-used) runs unchanged
+ * before this is ever called, so pattern-coverage and required-slot
+ * guarantees are untouched; this only changes which of several ALREADY-
+ * eligible candidates gets tried first.
+ */
+function orderCandidates(candidates: ExerciseEntry[], policy: GoalPolicy): ExerciseEntry[] {
+  if (!policy.preferUnilateralCarry) return shuffle(candidates)
+  const preferred = candidates.filter(isUnilateralCarryOrRotational)
+  const rest = candidates.filter(e => !isUnilateralCarryOrRotational(e))
+  return [...shuffle(preferred), ...shuffle(rest)]
+}
+
 function selectExercisesForTrack(
   track: TrackDefinition,
   pool: ExerciseEntry[],
-  counts: { tier1: number; tier2: number; tier3: number },
+  countsIn: { tier1: number; tier2: number; tier3: number },
   weeklyUsed: Set<string>,
   styleConfig: StyleConfig,
   trace: ConstraintTrace,
+  policy: GoalPolicy,
   feasibleRequiredPatterns?: MovementPattern[],
   weeklyAppearanceCount?: Map<string, number>,
 ): { primer: ExerciseEntry | null; main: ExerciseEntry[]; requiredNames: Set<string> } {
+  const counts = applyIsolationSlotShift(countsIn, policy.isolationSlotShift)
   const allPatterns = new Set([...track.primary_patterns, ...track.secondary_patterns])
   const forbidden = new Set(track.forbidden_patterns)
 
@@ -1052,14 +1099,15 @@ function selectExercisesForTrack(
   for (const slot of track.slots) fillSlot(slot)
 
   function pickFromTier(tier: string, count: number, patterns: MovementPattern[]) {
-    const candidates = shuffle(
+    const candidates = orderCandidates(
       trackPool.filter(e =>
         e.mechanics_tier === tier &&
         patterns.includes(e.movement_pattern) &&
         !weeklyUsed.has(e.name) &&
         !selected.some(s => s.name === e.name) &&
         !usedGroups.has(getMovementFamily(e))
-      )
+      ),
+      policy,
     )
     for (const c of candidates) {
       if (selected.length >= counts.tier1 + counts.tier2 + counts.tier3) break
@@ -1232,10 +1280,33 @@ function selectExercisesForTrack(
 // Assign sets/reps/rest using the style config
 // ---------------------------------------------------------------------------
 
+/**
+ * Shifts a rep-range string by a signed rep delta ("6-8" at -2 -> "4-6"),
+ * flooring the low bound at 1 and keeping the high bound at least one above
+ * it. Non-range strings (single numbers, "AMRAP", time/distance text) pass
+ * through untouched — a goal's rep bias only makes sense for an actual
+ * low-high rep range, and applyRepFloor (the experience floor) runs AFTER
+ * this shift, so the two never fight over which one wins the bottom bound.
+ */
+function shiftRepRange(reps: string, delta: number): string {
+  if (delta === 0) return reps
+  const range = reps.match(/^(\d+)\s*-\s*(\d+)$/)
+  if (!range) return reps
+  const low = Math.max(1, Number(range[1]) + delta)
+  const high = Math.max(low + 1, Number(range[2]) + delta)
+  return `${low}-${high}`
+}
+
+/** Multiplies a base rest-seconds value by a goal's per-tier bias, floored at 20s — even the densest circuit-adjacent goal needs SOME recovery between working sets. */
+function shiftRestSeconds(seconds: number, multiplier: number): number {
+  return Math.max(20, Math.round(seconds * multiplier))
+}
+
 function assignSetsRepsFromConfig(
   entry: ExerciseEntry,
   config: StyleConfig,
   experience: ExperienceConfig,
+  policy: GoalPolicy,
 ): { sets: number; reps: string; rest: string; restSeconds: number } {
   // Primers are not scaled — a 5-rep activation drill is a 5-rep activation
   // drill regardless of how long you have been training.
@@ -1261,30 +1332,23 @@ function assignSetsRepsFromConfig(
       // set is not "15-18 reps."
       return { sets: scaleSets(6), reps: '30s', rest: '30s', restSeconds: 30 }
     case 'reps':
-    default:
-      switch (entry.mechanics_tier) {
-        case 'tier1_compound':
-          return {
-            sets: scaleSets(config.setRange.tier1),
-            reps: applyRepFloor(config.repRange.tier1, experience.min_reps),
-            rest: `${config.restSeconds.tier1}s`,
-            restSeconds: config.restSeconds.tier1,
-          }
-        case 'tier2_compound':
-          return {
-            sets: scaleSets(config.setRange.tier2),
-            reps: applyRepFloor(config.repRange.tier2, experience.min_reps),
-            rest: `${config.restSeconds.tier2}s`,
-            restSeconds: config.restSeconds.tier2,
-          }
-        default:
-          return {
-            sets: scaleSets(config.setRange.tier3),
-            reps: applyRepFloor(config.repRange.tier3, experience.min_reps),
-            rest: `${config.restSeconds.tier3}s`,
-            restSeconds: config.restSeconds.tier3,
-          }
+    default: {
+      // Goal differentiation round: the goal's repRangeShift/
+      // restSecondsMultiplier apply on TOP of training_style's own base
+      // numbers, per tier — the two axes stay independent (a goal never
+      // overrides a style's numbers, it biases them) and this is the one
+      // choke point every tier's reps/rest passes through, so the bias
+      // reaches every call site (initial build, block rotation, weekly
+      // accessory sub-rotation, swap/gap-fill repair) for free.
+      const tierKey = entry.mechanics_tier === 'tier1_compound' ? 'tier1' : entry.mechanics_tier === 'tier2_compound' ? 'tier2' : 'tier3'
+      const restSeconds = shiftRestSeconds(config.restSeconds[tierKey], policy.restSecondsMultiplier[tierKey])
+      return {
+        sets: scaleSets(config.setRange[tierKey]),
+        reps: applyRepFloor(shiftRepRange(config.repRange[tierKey], policy.repRangeShift[tierKey]), experience.min_reps),
+        rest: `${restSeconds}s`,
+        restSeconds,
       }
+    }
   }
 }
 
@@ -1626,7 +1690,7 @@ function rebuildExerciseForSwap(
   // Reps are always re-derived from the NEW exercise; only sets/rest are
   // carried over, since those genuinely share the same base value across
   // every STYLE_CONFIGS style (see the doc comment above).
-  const reps = isPrimer ? oldExercise.reps : assignSetsRepsFromConfig(newEntry, styleConfig, experience).reps
+  const reps = isPrimer ? oldExercise.reps : assignSetsRepsFromConfig(newEntry, styleConfig, experience, getGoalPolicy(profile.fitness_goal || 'hypertrophy')).reps
   return {
     ...oldExercise,
     id: newEntry.id,
@@ -1764,7 +1828,7 @@ function balanceWeeklyStructure(
     allSelectedNames.add(entry.name)
     const isPrimer = entry.mechanics_tier === 'primer'
     const intensity = isPrimer ? 'Light — movement prep' : experience.target_rpe
-    const sr = assignSetsRepsFromConfig(entry, styleConfig, experience)
+    const sr = assignSetsRepsFromConfig(entry, styleConfig, experience, getGoalPolicy(profile.fitness_goal || 'hypertrophy'))
     const load = prescribeLoad(entry, profile, { targetRpeLabel: intensity, isFirstBlock: true, sets: sr.sets })
     days[dayIdx].exercises.push({
       id: entry.id,
@@ -2621,7 +2685,7 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
     const trackFocus = getViableTrack(rawTrack, pool)
     const track = TRACKS[trackFocus]
 
-    const { primer, main, requiredNames } = selectExercisesForTrack(track, pool, counts, weeklyUsed, styleConfig, trace, feasiblePatterns, weeklyAppearanceCount)
+    const { primer, main, requiredNames } = selectExercisesForTrack(track, pool, counts, weeklyUsed, styleConfig, trace, policy, feasiblePatterns, weeklyAppearanceCount)
     for (const name of requiredNames) weeklyRequiredNames.add(name)
 
     // Build exercise list with sets/reps from style config
@@ -2629,7 +2693,7 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
 
     if (primer) {
       weeklyUsed.add(primer.name)
-      const sr = assignSetsRepsFromConfig(primer, styleConfig, experience)
+      const sr = assignSetsRepsFromConfig(primer, styleConfig, experience, policy)
       daySlots.push({ entry: primer, ...sr })
     }
 
@@ -2637,7 +2701,7 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
       weeklyUsed.add(entry.name)
       allSelectedNames.add(entry.name)
       weeklyAppearanceCount.set(entry.name, (weeklyAppearanceCount.get(entry.name) ?? 0) + 1)
-      const sr = assignSetsRepsFromConfig(entry, styleConfig, experience)
+      const sr = assignSetsRepsFromConfig(entry, styleConfig, experience, policy)
       daySlots.push({ entry, ...sr })
     }
 
@@ -3322,7 +3386,7 @@ export function generateMesocycle(
         // rather than carrying over the old exercise's format, which is
         // exactly how an isometric hold ended up prescribed in meters.
         const newEntry = findEntry(rotated)
-        const reps = newEntry ? assignSetsRepsFromConfig(newEntry, styleConfig, expConfig).reps : ex.reps
+        const reps = newEntry ? assignSetsRepsFromConfig(newEntry, styleConfig, expConfig, policy).reps : ex.reps
         // The rotated slot is a different movement — its logging identity must
         // follow (a stale id would thread the old lift's history into the new
         // one's ghosts/progression).
@@ -3442,7 +3506,7 @@ export function generateMesocycle(
           // units), so the base reps text is recomputed from the new
           // exercise rather than inherited from the old one.
           const baseReps = weeklyName !== ex.name && dbEntry && !isPrimer
-            ? assignSetsRepsFromConfig(dbEntry, styleConfig, expConfig).reps
+            ? assignSetsRepsFromConfig(dbEntry, styleConfig, expConfig, policy).reps
             : ex.reps
 
           // A deload normally backs off by dropping the WEIGHT (70% of week
