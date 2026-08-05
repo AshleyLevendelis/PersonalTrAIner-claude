@@ -1,7 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { GEMINI_MODEL } from "../_shared/gemini.ts";
 import { computeMealMacros, type MealIngredientLine } from "../_shared/food-db.ts";
-// deno-lint-ignore no-unused-vars -- wired into propose_exercise_swap/propose_meal_swap's D2 gate in a later commit; imported now so the Deno import path is proven before those tools exist.
 import { classifyImperative } from "../_shared/imperative-classifier.ts";
 
 const corsHeaders = {
@@ -282,9 +281,9 @@ const toolDeclarations = [
     },
   },
   {
-    name: "replace_exercise",
+    name: "propose_exercise_swap",
     description:
-      "Replace an exercise in the user's workout plan with a biomechanically similar alternative. ONLY call this when the user gives an explicit command to modify their plan (e.g. 'swap bench press for push-ups', 'replace squats with leg press') OR when you have proposed a swap due to pain/fatigue and the user has confirmed. Before executing, briefly explain WHY this swap preserves muscle stimulus and ask for confirmation. Filter for exercises matching the same movement pattern. NOTE: permanent swaps (permanent: true) are not safely wired up yet and will be declined — session-only swaps (the default) still work.",
+      "PROPOSES swapping an exercise in the user's workout plan for a biomechanically similar alternative — this does NOT apply the change. Call this when the user gives an explicit command to modify their plan (e.g. 'swap bench press for push-ups', 'replace squats with leg press') OR proposes a swap due to pain/fatigue that the user has confirmed. The app shows the user a card with the exact before/after and they tap Confirm themselves — do not describe the swap as already done, and do not ask for a SEPARATE confirmation in your own text (the card IS the confirmation step). origin_verbatim_quote must be the exact substring of the user's message that makes this an imperative request, not a paraphrase.",
     parameters: {
       type: "object",
       properties: {
@@ -300,24 +299,21 @@ const toolDeclarations = [
           type: "string",
           description: "The name of the new exercise (must be biomechanically similar — same movement pattern)",
         },
-        sets: {
-          type: "integer",
-          description: "Number of sets for the new exercise",
-        },
-        reps: {
+        scope: {
           type: "string",
-          description: "Rep range or duration for the new exercise (e.g. '8-10', '12-15', '30s')",
+          enum: ["today", "permanent"],
+          description: "'today' (default) only swaps this session; 'permanent' swaps for the rest of the current training block. Use 'permanent' ONLY when the user explicitly asks for a lasting change (e.g. 'for the rest of the plan', 'I never want to do X again').",
         },
-        rest: {
+        reason: {
           type: "string",
-          description: "Rest period between sets (e.g. '60s', '90s')",
+          description: "One short sentence on why this swap makes sense — shown on the card as the rationale.",
         },
-        permanent: {
-          type: "boolean",
-          description: "If true, replaces the exercise in all remaining mesocycle weeks. If false (default), only swaps for today's session. Set to true ONLY when the user explicitly asks for a permanent change (e.g. 'replace for the rest of the plan', 'swap permanently', 'I never want to do X again').",
+        origin_verbatim_quote: {
+          type: "string",
+          description: "The exact substring of the user's CURRENT message that is the imperative command for this swap (e.g. 'swap bench for push-ups'). Must be copied verbatim, not paraphrased.",
         },
       },
-      required: ["day", "old_item", "new_item", "sets", "reps", "rest"],
+      required: ["day", "old_item", "new_item", "origin_verbatim_quote"],
     },
   },
   {
@@ -839,7 +835,7 @@ ${todaysLoggedSets}${todaysLoggedSets ? `You have full visibility of the user's 
 - You understand mechanics tiers: Tier 1 Compound (heavy multi-joint), Tier 2 Compound (moderate multi-joint), Tier 3 Isolation (single-joint).
 - You understand exercise taxonomy: movement_pattern (push/pull/hinge/squat/carry/rotation/isolation), tier (tier_0_primer through tier_4_finisher), fatigue_cost (low/moderate/high).
 - When replacing exercises, ALWAYS select from the SAME movement pattern and similar mechanics tier unless the user's condition demands otherwise (e.g., pain = lower joint stress).
-- Before executing replace_exercise, explain: (1) what movement pattern it targets, (2) why the swap preserves stimulus, (3) any trade-offs. Then ask "Shall I make this change?"
+- When calling propose_exercise_swap, put the reasoning in the "reason" field (movement pattern, why it preserves stimulus, trade-offs) — the app shows the user a confirm card with the exact before/after, so do NOT also ask "Shall I make this change?" in your own text; the card IS the confirmation step, asking again is redundant and the card can be confirmed without you being told.
 - For ban_exercise: Acknowledge the user's preference, confirm you've permanently removed it, and offer what you'll use instead in future cycles.
 - For adjust_volume: Briefly explain the reasoning behind the adjustment.
 - For ban_exercise: Provide confirmation and note the reason.
@@ -935,9 +931,9 @@ ${favoritesSection}
 
 FUNCTION CALL RULES (CRITICAL):
 - NEVER write tool names, parameter names, or enum values (like "reduce_half", "adjust_volume", "update_workout_schedule", "schedule_patch", "MOVE") in your visible text response. These exist only for native tool invocations. Your text must read like a human personal trainer — no code, no parameter labels, no function syntax.
-- Trigger replace_food or replace_exercise when the user gives a DIRECT COMMAND to modify their plan. Command verbs include: "replace", "swap", "change", "switch", "use X instead".
-- For replace_exercise: ALWAYS discuss the biomechanical reasoning first, then ask for confirmation. Only call the tool AFTER the user confirms (or if they gave a direct, unambiguous command like "swap X for Y").
-- Exercise swaps default to SESSION-ONLY (permanent: false). This means the swap only applies to today's workout and the original exercise returns next time that day comes up. Only set permanent: true when the user explicitly says they want a permanent change (e.g. "for the rest of the plan", "permanently", "I never want to do X", "always use Y instead") — be aware permanent swaps currently decline (see tool description) and the user will be redirected to the in-app swap button instead.
+- Trigger replace_food or propose_exercise_swap when the user gives a DIRECT COMMAND to modify their plan. Command verbs include: "replace", "swap", "change", "switch", "use X instead". propose_exercise_swap ALWAYS requires origin_verbatim_quote — the exact substring of the CURRENT message that is the command; if the request is a question, a hypothetical, or a statement with no imperative verb (e.g. "I didn't train today", "should I switch to dumbbells?"), do NOT call the tool — answer in text instead.
+- propose_exercise_swap does not apply anything itself — it shows the user a confirm card. Put your reasoning in the "reason" field, not in a preceding question; do not say "Shall I make this change?" or claim the swap happened.
+- Exercise swaps default to scope: "today" (only applies to today's workout; the original exercise returns next time that day comes up). Only set scope: "permanent" when the user explicitly says they want a lasting change (e.g. "for the rest of the plan", "permanently", "I never want to do X", "always use Y instead").
 - PLAN CHANGES NOT YET SAFE TO EXECUTE: update_workout_schedule (adding/moving/removing training days) and adjust_volume (adjusting sets for a session) are not safely wired up yet — calling either will always decline. For any request along these lines (rescheduling, clearing a day, adding a skill session, cutting volume, extra sets, fatigue/time-constraint adjustments), do NOT call the tool. Instead, briefly describe what you'd suggest and why, then tell the user to make it themselves via the in-app controls (the schedule editor for schedule changes, the swap (⇄) button or set-count controls on the exercise for volume changes).
 - Answer exercise form/technique questions ("How do I do X?", "What muscles does X work?") directly in your text response. Provide step-by-step form cues, target muscles, common mistakes, and coaching tips.
 - Trigger ban_exercise when the user says "I hate X", "never give me X", "remove X permanently", or explicitly flags an exercise to blacklist.
@@ -1473,16 +1469,35 @@ Keep this context in mind to ensure your greetings and questions naturally align
         );
       }
 
-      if (name === "replace_exercise" && args.permanent === true) {
-        // Trace-report fix: the permanent path mutated client mesocycle
-        // state directly (bypassing mesocycle-edit.ts) and never called
-        // saveMesocycle — the swap looked applied until the next refresh,
-        // then silently reverted. Session-only swaps (the default,
-        // permanent false/omitted) are unaffected and still fall through
-        // to the normal action below — they never claimed persistence.
+      if (name === "propose_exercise_swap") {
+        // VISION-ARCHITECTURE.md §2/Part 3 — replaces the old
+        // replace_exercise tool entirely (both its permanent-decline
+        // branch and its session-only immediate-write branch). I1: no
+        // write happens here, not even for the "safe" session-only case
+        // that used to fall through to the generic action-return below.
+        // D2: the tool call must be triggered by an imperative quote, not
+        // a question or a statement the model merely inferred a swap from.
+        const classification = classifyImperative(args.origin_verbatim_quote || "", message);
+        if (!classification.imperative) {
+          return new Response(
+            JSON.stringify({
+              reply: "",
+              offer: { text: `Want me to swap **${args.old_item}** for **${args.new_item}**?` },
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        // No server-side diff building (I1 + the client-only load-recompute
+        // reasoning documented in ChatAssistant.tsx's buildExerciseSwapProposal)
+        // — just the validated raw args for the client to resolve against
+        // the live plan.
         return new Response(
           JSON.stringify({
-            reply: "I can't safely make permanent plan changes yet — that's coming in an update soon. For now, use the swap (⇄) button on the exercise itself for a lasting change, or just tell me to swap it for today.",
+            reply: "",
+            proposal: {
+              kind: "propose_exercise_swap",
+              rawArgs: { day: args.day, old_item: args.old_item, new_item: args.new_item, scope: args.scope, reason: args.reason },
+            },
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
@@ -1540,11 +1555,6 @@ Keep this context in mind to ensure your greetings and questions naturally align
 });
 
 function generateConfirmation(name: string, args: Record<string, unknown>): string {
-  if (name === "replace_exercise") {
-    // Only reached for session-only swaps (permanent !== true) — the
-    // permanent path declines earlier and never gets here.
-    return `Done! I've swapped **${args.old_item}** for **${args.new_item}** on ${args.day} for today's session. You'll do ${args.sets} sets of ${args.reps} with ${args.rest} rest.`;
-  }
   if (name === "ban_exercise") {
     return `Got it — I've permanently removed **${args.exercise_name}** from your plan. It will never appear in future workout cycles. ${args.reason ? `Reason noted: ${args.reason}` : ""}`;
   }

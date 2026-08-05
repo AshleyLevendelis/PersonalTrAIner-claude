@@ -14,7 +14,8 @@ import { supabase } from '@/lib/supabase'
 import { getRecentLogs, formatLogsForAI, getRecentCardioLogs, formatCardioLogsForAI } from '@/lib/daily-tracking'
 import { saveChatCache, loadChatCache, clearChatCache } from '@/lib/chat-cache'
 import { swapPoolMeal, type MealSlotName } from '@/lib/meal-store'
-import { claimPendingAction, declinePendingAction, markExecuting, resolvePendingAction, type PendingActionReceipt } from '@/lib/pending-actions-store'
+import { getExerciseEntry } from '@/lib/exercise-db'
+import { createPendingAction, claimPendingAction, declinePendingAction, markExecuting, resolvePendingAction, type PendingActionReceipt } from '@/lib/pending-actions-store'
 import { executeExerciseSwap, executeMealSwap, type ExerciseSwapPayload, type MealSwapPayload } from '@/lib/pending-action-executor'
 import type { SwapScope } from '@/lib/mesocycle-edit'
 import { useActiveSession } from '@/hooks/useActiveSession'
@@ -696,7 +697,27 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
   interface ChatApiResponse {
     reply: string
     action?: PlanAction
-    pendingAction?: ChatPendingActionView
+    // I1: the edge function returns INTENT only, never a pending_actions
+    // row — that table has exactly one writer (the client). `proposal` is
+    // the raw material for createPendingAction, not an already-created
+    // row; processResponse is what actually inserts it and only then has
+    // a real id to render a ProposalCard against.
+    proposal?: {
+      kind: string
+      // propose_meal_swap: server can cheaply build the full shape (pool
+      // data is a simple REST fetch, no client-only TS modules needed).
+      scopeKey?: string
+      preconditions?: Record<string, unknown>
+      payload?: Record<string, unknown>
+      preImage?: unknown
+      diff?: import('@/lib/pending-actions-store').ProposalDiff
+      // propose_exercise_swap: recomputing a load preview needs
+      // mesocycle-edit.ts/load-prescription.ts, which only exist in the
+      // client's module graph — the server sends raw validated args only,
+      // and the client builds scopeKey/preconditions/payload/diff itself
+      // (buildExerciseSwapProposal) before ever calling createPendingAction.
+      rawArgs?: Record<string, unknown>
+    }
     receipt?: ChatReceiptView
     offer?: { text: string }
     // Wire shape matches the log_workout tool schema's snake_case param
@@ -755,7 +776,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     if (typeof data.reply !== 'string') {
       throw new Error('Invalid response from AI')
     }
-    return { reply: data.reply, action: data.action, pendingAction: data.pendingAction, receipt: data.receipt, offer: data.offer, logWorkout: data.logWorkout }
+    return { reply: data.reply, action: data.action, proposal: data.proposal, receipt: data.receipt, offer: data.offer, logWorkout: data.logWorkout }
   }
 
   // Helper: persist user message to Supabase (fire-and-forget)
@@ -800,6 +821,71 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     const headline = pendingAction.diff.rows[0]
     if (!headline) return "Here's a change I can make:"
     return `I can swap **${headline.before}** for **${headline.after}**:`
+  }
+
+  /**
+   * VISION-ARCHITECTURE.md §2.4 — builds propose_exercise_swap's diff
+   * CLIENT-side (the server only validated + classified via D2 and sent
+   * raw args back; recomputing a load preview needs mesocycle-edit.ts,
+   * which doesn't exist in the edge function's module graph). Returns null
+   * on anything that doesn't resolve against the LIVE plan — that's an
+   * honest "I can't propose this" rather than a card with fabricated
+   * before/after values.
+   *
+   * The load preview is deliberately a note, not a number: precisely
+   * mirroring recomputeLoad's logged-history-then-prescribeLoad
+   * composition here would duplicate real logic (progression-engine
+   * lookups, isMainLiftSlot's private heuristic) for a value that gets
+   * superseded the instant the swap actually executes anyway (C8's
+   * executeExerciseSwap already calls the real recomputeLoad at confirm
+   * time) — showing an approximate number pre-confirm risks being wrong
+   * in a way "recomputed when applied" never is.
+   */
+  const buildExerciseSwapProposal = (rawArgs: Record<string, unknown>): {
+    scopeKey: string
+    preconditions: Record<string, unknown>
+    payload: ExerciseSwapPayload
+    preImage: MesocycleWeek[]
+    diff: import('@/lib/pending-actions-store').ProposalDiff
+  } | null => {
+    const dayArg = String(rawArgs.day ?? '')
+    const oldItem = String(rawArgs.old_item ?? '')
+    const newItem = String(rawArgs.new_item ?? '')
+    if (!dayArg || !oldItem || !newItem || mesocycle.length === 0) return null
+
+    const week = mesocycle.find(w => w.week_number === activeSession.liveWeek)
+    const day = week?.days.find(d => d.day.toLowerCase() === dayArg.toLowerCase())
+    if (!day) return null
+    const exIndex = day.exercises.findIndex(e => e.name.toLowerCase() === oldItem.toLowerCase())
+    if (exIndex === -1) return null
+    const oldEx = day.exercises[exIndex]
+    const newEntry = getExerciseEntry(newItem)
+    if (!newEntry) return null
+
+    const scope: SwapScope = rawArgs.scope === 'permanent' ? 'permanent' : 'today'
+    const payload: ExerciseSwapPayload = {
+      weekNumber: activeSession.liveWeek,
+      dayName: day.day,
+      exIndex,
+      oldExerciseName: oldEx.name,
+      newExerciseName: newEntry.name,
+      scope,
+    }
+
+    return {
+      scopeKey: `${profile.id}:propose_exercise_swap:${day.day}:${exIndex}`,
+      preconditions: { day: day.day, exIndex, currentExerciseName: oldEx.name },
+      payload,
+      preImage: mesocycle,
+      diff: {
+        rows: [{ field: 'Exercise', before: oldEx.name, after: newEntry.name }],
+        unchanged: [`${day.day}'s other ${day.exercises.length - 1} exercise${day.exercises.length - 1 === 1 ? '' : 's'}`, `Sets × reps: ${oldEx.sets}×${oldEx.reps}`],
+        implications: [{ severity: 'info', text: 'Load recomputed for the new movement once you confirm.' }],
+        rationale: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined,
+        editable: [{ field: 'scope', options: ['today', 'permanent'] }],
+        reversible: true,
+      },
+    }
   }
 
   /**
@@ -890,8 +976,37 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     receipt?: ChatReceiptView
     clarification?: ChatClarificationView
   }> => {
-    if (result.pendingAction) {
-      return { text: describeProposalClientSide(result.pendingAction), pendingAction: result.pendingAction }
+    if (result.proposal && profile.id) {
+      // I1: the client is the ONLY writer of pending_actions — this INSERT
+      // is what actually creates the row the edge function only described.
+      let built: { scopeKey: string; preconditions: Record<string, unknown>; payload: Record<string, unknown>; preImage?: unknown; diff: import('@/lib/pending-actions-store').ProposalDiff } | null = null
+
+      if (result.proposal.kind === 'propose_exercise_swap' && result.proposal.rawArgs) {
+        const swap = buildExerciseSwapProposal(result.proposal.rawArgs)
+        if (swap) built = { scopeKey: swap.scopeKey, preconditions: swap.preconditions, payload: swap.payload as unknown as Record<string, unknown>, preImage: swap.preImage, diff: swap.diff }
+      } else if (result.proposal.diff && result.proposal.payload && result.proposal.scopeKey) {
+        built = { scopeKey: result.proposal.scopeKey, preconditions: result.proposal.preconditions ?? {}, payload: result.proposal.payload, preImage: result.proposal.preImage, diff: result.proposal.diff }
+      }
+
+      if (!built) {
+        return { text: "I couldn't find that on your current plan — it may have changed since you last looked." }
+      }
+
+      // action_class is hardcoded 'plan_mutation' here since both current
+      // propose_* kinds (exercise swap, meal swap) are plan mutations;
+      // revisit if a non-mutation propose_* kind is ever added.
+      const row = await createPendingAction({
+        profileId: profile.id,
+        actionClass: 'plan_mutation',
+        kind: result.proposal.kind,
+        scopeKey: built.scopeKey,
+        preconditions: built.preconditions,
+        payload: built.payload,
+        preImage: built.preImage,
+        diff: built.diff,
+      })
+      const pendingAction: ChatPendingActionView = { id: row.id, kind: row.kind, status: row.status, diff: row.diff }
+      return { text: describeProposalClientSide(pendingAction), pendingAction }
     }
     if (result.receipt) {
       return { text: result.receipt.title, receipt: result.receipt }
