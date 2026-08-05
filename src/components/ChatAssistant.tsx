@@ -525,7 +525,18 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     }
   }
 
-  /** Returns true on a clean success, false on failure, or a correction-note string when the action succeeded but not exactly as the model's own reply text described (see the replace_food branch). */
+  /**
+   * Returns true on a clean success, false on failure. replace_food,
+   * replace_exercise, adjust_volume, and update_workout_schedule are gone
+   * from this switch entirely — replace_food/replace_exercise are
+   * categorically superseded by propose_meal_swap/propose_exercise_swap
+   * (Part 3), and adjust_volume/update_workout_schedule's server-side
+   * tools were already unconditionally declined before this round, making
+   * their client branches dead weight rather than reachable-but-disabled
+   * code. Neither the log_weight action's own doc note nor a correction-
+   * string return path is needed anymore now that replace_food's mismatch-
+   * surfacing logic left with it.
+   */
   const applyPlanAction = async (action: PlanAction): Promise<boolean | string> => {
     if (!profile.id) return false
 
@@ -533,113 +544,6 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       // The edge function already wrote daily_metrics; the app just needs
       // to recompute living targets from the new latest weigh-in.
       await onWeightLogged?.()
-      return true
-    }
-
-    if (action.type === 'replace_food') {
-      // ONE meal-mutation layer (M0 Part 6): this is the same
-      // meal-store.swapPoolMeal call the Meals tab's swap button makes. The
-      // old body here wrote the deprecated meal_plans table directly (rows
-      // that never matched on live) and then mutated the dead legacy
-      // mealPlan state via onPlanUpdate — the exact disjoint chat write
-      // path the discovery round flagged. swapPoolMeal is an honest M0
-      // stub (always null until M1 fills the pools), so the chat appends
-      // its standard "change was not applied" note instead of claiming a
-      // swap happened.
-      // Try the model's suggested new_item as an exact pool-option match
-      // first (chooseName); meal-store falls back to nothing if it doesn't
-      // match rather than silently picking something else — a mismatch
-      // means the user asked for a specific dish outside the verified pool,
-      // and the standard "action failed" text below is the honest response
-      // (no unverified AI-invented meal is ever accepted into the plan).
-      const applied = await swapPoolMeal(
-        profile.id,
-        action.meal_slot.toLowerCase() as MealSlotName,
-        action.old_item,
-        action.new_item,
-      )
-      if (!applied) return false
-
-      await upsertFavorite({
-        new_item: applied.name,
-        meal_slot: action.meal_slot,
-        protein: applied.macros.protein,
-        carbs: applied.macros.carbs,
-        fat: applied.macros.fat,
-        portion_size: action.portion_size,
-        prep: action.prep,
-      })
-
-      // The model's own reply text was generated before this ran and may
-      // name a dish that isn't what the verified pool actually returned
-      // (chooseName only matches when the model happened to guess an exact
-      // pool option name — it has no visibility into the pool). Surface the
-      // real result as a correction note rather than let an inaccurate
-      // AI-written sentence stand as if it were true.
-      return applied.name === action.new_item
-        ? true
-        : `Swapped to **${applied.name}** (${Math.round(applied.macros.calories)} kcal, ${Math.round(applied.macros.protein)}g protein) — the closest verified match in your meal pool for that slot.`
-    }
-
-    if (action.type === 'replace_exercise') {
-      // Fail-closed on anything permanent (vision-architecture patch round,
-      // fix 1). The old guard was `permanent !== false` — true, an OMITTED
-      // permanent, and any other value all took the write branch, while the
-      // server only declines the explicit `permanent === true` case
-      // (chat-gemini/index.ts). An omitted `permanent` therefore slipped
-      // past BOTH guards and reached this UPDATE. It also wrote to
-      // `exercise_plans`, a table the Exercise tab doesn't render from once
-      // a mesocycle exists — the same class of dishonest write the trace
-      // report found elsewhere. Only the explicit session-only case
-      // (`permanent === false`) is allowed through; a real permanent swap
-      // waits for Phase B's confirm-gated rebuild through mesocycle-edit.
-      if (action.permanent === false) {
-        onPlanUpdate(action)
-        return true
-      }
-      return false
-    }
-
-    if (action.type === 'adjust_volume') {
-      const multipliers: Record<string, { sets: number; removeCount: number; halve?: boolean }> = {
-        reduce_light: { sets: -1, removeCount: 0 },
-        reduce_half: { sets: 0, removeCount: 0, halve: true },
-        reduce_heavy: { sets: -2, removeCount: 1 },
-        increase_moderate: { sets: 1, removeCount: 0 },
-        increase_heavy: { sets: 2, removeCount: 0 },
-      }
-      const modifier = multipliers[action.adjustment] || { sets: 0, removeCount: 0 }
-
-      const { data: exercises, error: fetchErr } = await supabase
-        .from('exercise_plans')
-        .select('id, sets, sort_order')
-        .eq('profile_id', profile.id)
-        .ilike('day', action.day)
-        .order('sort_order', { ascending: true })
-
-      if (fetchErr || !exercises || exercises.length === 0) {
-        console.error('Failed to fetch exercises for volume adjustment:', fetchErr)
-        return false
-      }
-
-      let toUpdate = exercises
-      if (modifier.removeCount > 0 && exercises.length > modifier.removeCount) {
-        const toRemove = exercises.slice(-modifier.removeCount)
-        for (const ex of toRemove) {
-          await supabase.from('exercise_plans').delete().eq('id', ex.id)
-        }
-        toUpdate = exercises.slice(0, -modifier.removeCount)
-      }
-
-      for (const ex of toUpdate) {
-        const currentSets = ex.sets || 3
-        const newSets = modifier.halve
-          ? Math.max(1, Math.round(currentSets / 2))
-          : Math.max(1, currentSets + modifier.sets)
-        await supabase.from('exercise_plans').update({ sets: newSets }).eq('id', ex.id)
-      }
-
-      onPlanUpdate(action)
       return true
     }
 
@@ -651,13 +555,6 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       // the first. Single write path now: this branch only forwards the
       // action; handleBanExercise does the one fresh-read-then-write.
       onPlanUpdate(action)
-      return true
-    }
-
-    if (action.type === 'update_workout_schedule') {
-      setIsRecalibrating(true)
-      await onPlanUpdate(action)
-      setIsRecalibrating(false)
       return true
     }
 
@@ -1254,52 +1151,6 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     return lastMsg.quickReplies || []
   }
 
-  const renderActionBadge = (action: PlanAction) => {
-    if (action.type === 'replace_food') {
-      return (
-        <div className="flex items-center gap-2 mt-2 rounded-md border border-border bg-accent/50 px-3 py-2 text-xs">
-          <CheckCircle2 className="size-3.5 text-green-600 shrink-0" />
-          <span className="text-accent-foreground">
-            Plan updated: <strong>{action.old_item}</strong> replaced with <strong>{action.new_item}</strong> in {action.meal_slot}
-            {action.is_verified && <span className="ml-1 text-green-600">(Verified)</span>}
-          </span>
-        </div>
-      )
-    }
-    if (action.type === 'replace_exercise') {
-      return (
-        <div className="flex items-center gap-2 mt-2 rounded-md border border-border bg-accent/50 px-3 py-2 text-xs">
-          <CheckCircle2 className="size-3.5 text-green-600 shrink-0" />
-          <span className="text-accent-foreground">
-            Plan updated: <strong>{action.old_item}</strong> replaced with <strong>{action.new_item}</strong> on {action.day}
-          </span>
-        </div>
-      )
-    }
-    if (action.type === 'update_workout_schedule') {
-      const patchItems = Array.isArray(action.schedule_patch) ? action.schedule_patch : []
-      const patchedDays = patchItems
-        .map((item: { day: string; action: string; block_name: string }) => {
-          if (item.action === 'REMOVE') return `${item.day}: Rest`
-          if (item.action === 'ADD') return `${item.day}: +${item.block_name}`
-          return `${item.day}: ${item.block_name}`
-        })
-        .join(', ')
-      return (
-        <div className="flex items-center gap-2 mt-2 rounded-md border border-border bg-accent/50 px-3 py-2 text-xs">
-          <CheckCircle2 className="size-3.5 text-green-600 shrink-0" />
-          <span className="text-accent-foreground">
-            Schedule updated: {patchedDays}
-            {action.recalibrated_days && action.recalibrated_days.length > 0 && (
-              <span className="ml-1 text-amber-600">({action.recalibrated_days.length} day{action.recalibrated_days.length > 1 ? 's' : ''} fatigue-adapted)</span>
-            )}
-          </span>
-        </div>
-      )
-    }
-    return null
-  }
-
   /**
    * Confirm-exactly-once gate (§2.5): claimPendingAction's conditional
    * UPDATE is the real correctness mechanism — this handler can be invoked
@@ -1560,7 +1411,6 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
                         </ReactMarkdown>
                       )}
                     </div>
-                    {msg.action && msg.status !== 'failed' && renderActionBadge(msg.action)}
                     {msg.pendingAction && msg.status !== 'failed' && (
                       <ProposalCard
                         pendingAction={msg.pendingAction}

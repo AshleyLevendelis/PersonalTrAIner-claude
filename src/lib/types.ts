@@ -320,31 +320,9 @@ export interface ChatMessage {
   created_at?: string
 }
 
-export interface ReplaceFoodAction {
-  type: 'replace_food'
-  meal_slot: string
-  old_item: string
-  new_item: string
-  calories?: number
-  protein: number
-  carbs: number
-  fat: number
-  portion_size?: string
-  prep?: string
-  ingredients?: string[]
-  is_verified?: boolean
-}
-
-export interface ReplaceExerciseAction {
-  type: 'replace_exercise'
-  day: string
-  old_item: string
-  new_item: string
-  sets: number
-  reps: string
-  rest: string
-  permanent?: boolean
-}
+// ReplaceFoodAction/ReplaceExerciseAction are gone — categorically
+// superseded by propose_meal_swap/propose_exercise_swap's pending-action
+// rail (ChatPendingActionView/ChatReceiptView above), not merely disabled.
 
 export interface AdjustVolumeAction {
   type: 'adjust_volume'
@@ -394,7 +372,7 @@ export interface LogWorkoutSetAction {
   rpe?: number
 }
 
-export type PlanAction = ReplaceFoodAction | ReplaceExerciseAction | AdjustVolumeAction | BanExerciseAction | UpdateScheduleAction | LogWorkoutSessionAction | LogWeightAction | LogWorkoutSetAction
+export type PlanAction = AdjustVolumeAction | BanExerciseAction | UpdateScheduleAction | LogWorkoutSessionAction | LogWeightAction | LogWorkoutSetAction
 
 // ============================================================================
 // Daily Tracking Types (connects workout engine to nutrition/carb-cycling)

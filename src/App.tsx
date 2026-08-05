@@ -515,23 +515,11 @@ function App() {
   }
 
   const handlePlanUpdate = async (action: PlanAction) => {
-    // The old replace_food branch is gone (M0 Part 6): it mutated the dead
-    // standalone mealPlan state that nothing rendered — the exact disjoint
-    // write path the discovery round flagged. Chat meal swaps now route
-    // through meal-store.swapPoolMeal inside ChatAssistant's action handler
-    // (an honest no-op until M1 fills the pools), same layer as the UI.
-    if (action.type === 'replace_exercise') {
-      // Session-only swap: nothing to persist — the swap only affects what
-      // the user does today, and actual performance gets logged through
-      // set-log-store when they log sets. ChatAssistant now only forwards
-      // this action when permanent === false (vision-architecture patch
-      // round, fix 1) — the permanent branch that used to live here mutated
-      // exercisePlan/mesocycle client state directly, with no saveMesocycle
-      // call, so a "permanent" swap looked applied until the next refresh
-      // and then silently reverted. Removed rather than left unreachable;
-      // a real permanent swap arrives with Phase B's confirm-gated rebuild
-      // through mesocycle-edit.
-    } else if (action.type === 'adjust_volume') {
+    // replace_food/replace_exercise are gone from PlanAction entirely —
+    // categorically superseded by propose_meal_swap/propose_exercise_swap's
+    // pending-action rail, which writes through meal-store/mesocycle-edit
+    // directly rather than forwarding through this handler.
+    if (action.type === 'adjust_volume') {
       setExercisePlan(prev =>
         prev.map(day => {
           if (day.day.toLowerCase() !== action.day.toLowerCase()) return day
