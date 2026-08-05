@@ -55,7 +55,7 @@ function parseRepsHigh(reps: string): number | null {
  *   getDoubleProgressionRecommendation, falling back to the normal
  *   bodyweight/known-weight estimate when no history exists.
  */
-async function recomputeLoad(
+export async function recomputeLoad(
   entry: ExerciseEntry,
   profile: UserProfile,
   intensity: string,
