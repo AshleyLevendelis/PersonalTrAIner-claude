@@ -14,7 +14,9 @@ import { supabase } from '@/lib/supabase'
 import { getRecentLogs, formatLogsForAI, getRecentCardioLogs, formatCardioLogsForAI } from '@/lib/daily-tracking'
 import { saveChatCache, loadChatCache, clearChatCache } from '@/lib/chat-cache'
 import { swapPoolMeal, type MealSlotName } from '@/lib/meal-store'
-import { claimPendingAction, declinePendingAction } from '@/lib/pending-actions-store'
+import { claimPendingAction, declinePendingAction, markExecuting, resolvePendingAction, type PendingActionReceipt } from '@/lib/pending-actions-store'
+import { executeExerciseSwap, executeMealSwap, type ExerciseSwapPayload, type MealSwapPayload } from '@/lib/pending-action-executor'
+import type { SwapScope } from '@/lib/mesocycle-edit'
 import { ProposalCard } from '@/components/chat/ProposalCard'
 import { ReceiptCard } from '@/components/chat/ReceiptCard'
 import { ClarificationCard } from '@/components/chat/ClarificationCard'
@@ -79,9 +81,11 @@ interface ChatAssistantProps {
   onLogsUpdated?: () => void
   /** Fired when a chat log_weight action lands so the app recomputes living targets. */
   onWeightLogged?: () => void | Promise<void>
+  /** Fired after a confirmed propose_exercise_swap executes — App.tsx's setMesocycle, since the executor is pure and returns the new array rather than mutating App.tsx's state directly. */
+  onMesocycleUpdated: (mesocycle: MesocycleWeek[]) => void
 }
 
-export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged }: ChatAssistantProps) {
+export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated }: ChatAssistantProps) {
   const buildInitialGreeting = (): string => {
     const now = new Date()
     const hour = now.getHours()
@@ -1062,25 +1066,78 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
    * UPDATE is the real correctness mechanism — this handler can be invoked
    * by a double-tap and only one call will see `outcome: 'claimed'`.
    *
-   * The preconditions check is `async () => true` here — always-pass — as
-   * an interim placeholder: propose_exercise_swap/propose_meal_swap (C15/
-   * C16) are what will supply the real content-fingerprint check against
-   * the live plan, and until those tools exist nothing can produce a
-   * pendingAction message to click Confirm on in the first place. Likewise
-   * the actual mutation (swap/meal-swap through the edit layers) isn't
-   * executed yet — that lands in pending-action-executor.ts (C8) — this
-   * commit only wires the claim/decline half of the lifecycle.
+   * The preconditions check is `async () => true` here — always-pass — an
+   * interim placeholder until propose_exercise_swap/propose_meal_swap
+   * (C15/C16) supply a real content-fingerprint check against the live
+   * plan/pool. Nothing can produce a pendingAction message to click
+   * Confirm on until those tools exist, so this is forward-built plumbing
+   * like C2/C3 before it.
+   *
+   * On a successful claim, dispatches by kind to the matching executor and
+   * replaces the card with a terminal ReceiptCard — never a blanket
+   * "Done!" when the receipt shows a partial/failed op.
    */
-  const handleConfirmProposal = async (msgIndex: number, _editedScope?: string) => {
+  const handleConfirmProposal = async (msgIndex: number, editedScope?: string) => {
     const msg = messages[msgIndex]
-    if (!msg.pendingAction) return
-    const result = await claimPendingAction(msg.pendingAction.id, async () => true)
-    setMessages(prev => prev.map((m, i) => {
-      if (i !== msgIndex || !m.pendingAction) return m
-      if (result.outcome === 'claimed') return { ...m, pendingAction: { ...m.pendingAction, status: 'claimed' } }
-      if (result.outcome === 'stale') return { ...m, pendingAction: { ...m.pendingAction, status: 'stale' } }
-      return m
-    }))
+    if (!msg.pendingAction || !profile.id) return
+    const claimResult = await claimPendingAction(msg.pendingAction.id, async () => true)
+
+    if (claimResult.outcome !== 'claimed') {
+      setMessages(prev => prev.map((m, i) => {
+        if (i !== msgIndex || !m.pendingAction) return m
+        if (claimResult.outcome === 'stale') return { ...m, pendingAction: { ...m.pendingAction, status: 'stale' } }
+        return m
+      }))
+      return
+    }
+
+    const row = claimResult.row
+    await markExecuting(row.id)
+
+    let title: string
+    let rows: { label: string; detail: string }[] = []
+    let receipt: PendingActionReceipt
+    let undoToken: string | undefined
+
+    if (row.kind === 'propose_exercise_swap') {
+      const payload = row.payload as unknown as ExerciseSwapPayload
+      const scope: SwapScope = editedScope === 'permanent' ? 'permanent' : payload.scope
+      const result = await executeExerciseSwap(profile, mesocycle, { ...payload, scope })
+      onMesocycleUpdated(result.mesocycle)
+      receipt = result.receipt
+      const ok = receipt.failed.length === 0
+      title = ok ? 'Swapped' : "Couldn't apply the swap"
+      rows = ok ? [{ label: payload.oldExerciseName, detail: `→ ${payload.newExerciseName}` }] : []
+      undoToken = ok ? row.id : undefined // undo (C17) re-fetches row.pre_image by this id — no need to re-capture it here
+    } else if (row.kind === 'propose_meal_swap') {
+      const payload = row.payload as unknown as MealSwapPayload
+      const result = await executeMealSwap(profile.id, payload)
+      receipt = result.receipt
+      const ok = receipt.failed.length === 0 && result.appliedName
+      title = ok ? 'Swapped' : "Couldn't apply the swap"
+      rows = ok ? [{ label: payload.slot, detail: `→ ${result.appliedName}` }] : []
+      if (ok && result.appliedMacros) {
+        await upsertFavorite({
+          new_item: result.appliedName!,
+          meal_slot: payload.slot,
+          protein: result.appliedMacros.protein,
+          carbs: result.appliedMacros.carbs,
+          fat: result.appliedMacros.fat,
+        })
+      }
+      undoToken = ok ? row.id : undefined
+    } else {
+      receipt = { landed: [], failed: [{ op: row.kind, error: 'Not available yet' }] }
+      title = "Couldn't apply that"
+    }
+
+    const status: 'done' | 'partial' | 'failed' = receipt.failed.length === 0 ? 'done' : (receipt.landed.length > 0 ? 'partial' : 'failed')
+    await resolvePendingAction(row.id, status, receipt)
+
+    setMessages(prev => prev.map((m, i) => i === msgIndex
+      ? { ...m, pendingAction: undefined, receipt: { kind: row.kind as ChatReceiptView['kind'], title, rows, status, result: receipt, undoToken, resolvedAt: new Date().toISOString() } }
+      : m
+    ))
   }
 
   const handleRejectProposal = async (msgIndex: number) => {

@@ -1037,6 +1037,7 @@ function App() {
               onPlanUpdate={handlePlanUpdate}
               onLogsUpdated={() => setLogsVersion(v => v + 1)}
               onWeightLogged={handleWeightLogged}
+              onMesocycleUpdated={setMesocycle}
             />
           </TabsContent>
         </Tabs>
