@@ -24,6 +24,7 @@ import { generateMealPools, assembleDay, chosenToMealPlanDays, type PoolOption }
 import { supabase } from '@/lib/supabase'
 import { saveMesocycle, saveMesocycleWeek, restoreMesocycle } from '@/lib/mesocycle-persistence'
 import { swapExerciseInMesocycle, banExerciseFromMesocycle, type SwapScope } from '@/lib/mesocycle-edit'
+import { sweepStaleForTarget } from '@/lib/pending-actions-store'
 import type { UserProfile, MacroTargets, WorkoutDay, PlanAction, SchedulePatchItem, MesocycleWeek } from '@/lib/types'
 import type { ExerciseEntry } from '@/lib/exercise-db'
 
@@ -678,6 +679,8 @@ function App() {
     const applied = await swapPoolMeal(profile.id, slot, chosenMeals[slot]?.name, chooseName)
     if (!applied) return
     setManualMealPicks(prev => ({ ...prev, [slot]: applied.name }))
+    // §2.3 — same sweep as the exercise swap path, same scope_key prefix propose_meal_swap uses.
+    await sweepStaleForTarget(profile.id, `${profile.id}:propose_meal_swap:${slot}`)
   }
 
   const handleRegenerateMealSlot = async (slot: MealSlotName) => {
@@ -812,6 +815,12 @@ function App() {
         )
         await Promise.all(touchedWeeks.map(w => saveMesocycleWeek(profile.id!, w)))
       }
+      // VISION-ARCHITECTURE.md §2.3 — "after any tap mutation, sweep pending
+      // proposals on the same target and mark them stale immediately, so
+      // the user never taps Confirm on a card invalidated by their own tap
+      // a second earlier." Same scope_key prefix the chat swap proposal
+      // uses (buildExerciseSwapProposal, ChatAssistant.tsx).
+      await sweepStaleForTarget(profile.id, `${profile.id}:propose_exercise_swap:${dayName}:${exIndex}`)
     } catch (err) {
       console.error('Persisting swap failed:', err)
     }
