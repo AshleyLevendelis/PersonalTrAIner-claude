@@ -17,6 +17,7 @@ import { Card } from '@/components/ui/card'
 import { Timer } from 'lucide-react'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { useViewportInset } from '@/hooks/useViewportInset'
+import { TAB_BAR_HEIGHT_PX } from '@/components/BottomTabBar'
 
 function formatDuration(ms: number): string {
   const totalSeconds = Math.round(Math.abs(ms) / 1000)
@@ -74,9 +75,13 @@ export function BottomDock() {
   if (!restEndsAt || restRemainingMs == null) return null
 
   const isOverrun = restRemainingMs <= 0
-  // Ride above the soft keyboard instead of sliding under it — iOS Safari
+  // Keyboard open: ride above it instead of sliding under it — iOS Safari
   // doesn't resize the layout viewport this `fixed` element is anchored to.
-  const bottomStyle = insetPx > 0 ? { bottom: insetPx + 16 } : undefined
+  // Keyboard closed: sit directly above the bottom tab bar (which hides
+  // itself while the keyboard is open, so these two cases never overlap).
+  const bottomStyle = insetPx > 0
+    ? { bottom: insetPx + 16 }
+    : { bottom: `calc(${TAB_BAR_HEIGHT_PX}px + env(safe-area-inset-bottom) + 12px)` }
 
   // Keyboard up (a set input is focused): collapse to one thin line — the
   // full two-row card would occlude the very row the user is editing (§3.6).

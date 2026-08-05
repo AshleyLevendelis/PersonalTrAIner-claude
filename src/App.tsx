@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Tabs, TabsContent } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
-import { Dumbbell, RotateCcw, Activity, UtensilsCrossed, MessageCircle, PieChart, Loader2, BrainCircuit, LayoutDashboard } from 'lucide-react'
+import { Dumbbell, Loader2 } from 'lucide-react'
 import { MemoryScreen } from '@/components/MemoryScreen'
+import { ProfileMenu } from '@/components/ProfileMenu'
+import { BottomTabBar } from '@/components/BottomTabBar'
 import { OnboardingFlow } from '@/components/onboarding/OnboardingFlow'
 import { NutritionDisplay } from '@/components/NutritionDisplay'
 import { ExerciseTab } from '@/components/exercise/ExerciseTab'
@@ -36,6 +38,15 @@ import type { ExerciseEntry } from '@/lib/exercise-db'
 
 const STORAGE_KEY = 'fitplan_profile_id'
 const LAST_TAB_KEY = 'fitplan_last_tab'
+
+/** Header title per tab — same labels the old top TabsList used, now the header's only content besides brand/status/profile menu. */
+const TAB_LABEL: Record<Tab, string> = {
+  dashboard: 'Home',
+  nutrition: 'Nutrition',
+  exercise: 'Exercise',
+  meals: 'Meals',
+  chat: 'Chat',
+}
 
 function App() {
   const { hash, route } = useAppRoute()
@@ -963,58 +974,20 @@ function App() {
     >
     <div className="min-h-screen bg-background">
       <header className="border-b sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Dumbbell className="size-5 text-primary" />
-            <h1 className="text-lg font-semibold tracking-tight">Personal TrAIner</h1>
+        <div className="max-w-6xl mx-auto px-4 py-2.5 flex items-center justify-between">
+          <div className="flex items-center gap-2 min-w-0">
+            <Dumbbell className="size-4 text-primary shrink-0" />
+            <h1 className="text-sm font-semibold truncate">{TAB_LABEL[activeTab]}</h1>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 shrink-0">
             <OfflineStatusIndicator />
-            <Button variant="outline" size="sm" onClick={() => setMemoryScreenOpen(true)}>
-              <BrainCircuit className="size-3.5" />
-              Memory
-            </Button>
-            <Button variant="outline" size="sm" onClick={handleReset}>
-              <RotateCcw className="size-3.5" />
-              New Plan
-            </Button>
+            <ProfileMenu onOpenMemory={() => setMemoryScreenOpen(true)} onNewPlan={handleReset} />
           </div>
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 py-6 space-y-6">
-        {profile.id && activeTab !== 'exercise' && (
-          <WeeklyPlannerCard
-            profileId={profile.id}
-            profile={profile}
-            exercisePlan={exercisePlan}
-          />
-        )}
-
+      <main className="max-w-6xl mx-auto px-4 py-6 space-y-6 pb-28">
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="dashboard">
-              <LayoutDashboard className="size-4" />
-              <span className="hidden sm:inline ml-1.5">Home</span>
-            </TabsTrigger>
-            <TabsTrigger value="nutrition">
-              <PieChart className="size-4" />
-              <span className="hidden sm:inline ml-1.5">Nutrition</span>
-            </TabsTrigger>
-            <TabsTrigger value="exercise">
-              <Activity className="size-4" />
-              <span className="hidden sm:inline ml-1.5">Exercise</span>
-            </TabsTrigger>
-            <TabsTrigger value="meals">
-              <UtensilsCrossed className="size-4" />
-              <span className="hidden sm:inline ml-1.5">Meals</span>
-            </TabsTrigger>
-            <TabsTrigger value="chat">
-              <MessageCircle className="size-4" />
-              <span className="hidden sm:inline ml-1.5">Chat</span>
-            </TabsTrigger>
-          </TabsList>
-
           <TabsContent value="dashboard">
             <Dashboard
               profile={profile}
@@ -1025,7 +998,14 @@ function App() {
             />
           </TabsContent>
 
-          <TabsContent value="nutrition">
+          <TabsContent value="nutrition" className="space-y-6">
+            {profile.id && (
+              <WeeklyPlannerCard
+                profileId={profile.id}
+                profile={profile}
+                exercisePlan={exercisePlan}
+              />
+            )}
             <NutritionDisplay
               profile={profile}
               macros={macros}
@@ -1101,6 +1081,7 @@ function App() {
         </Tabs>
       </main>
       <BottomDock />
+      <BottomTabBar activeTab={activeTab} onTabChange={handleTabChange} />
       <MemoryScreen
         open={memoryScreenOpen}
         onOpenChange={setMemoryScreenOpen}
