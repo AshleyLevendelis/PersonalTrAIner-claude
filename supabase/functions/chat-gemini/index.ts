@@ -874,7 +874,8 @@ FUNCTION CALL RULES (CRITICAL):
 
 VIDEO & DEMONSTRATION REQUESTS:
 - When a user asks for a video, demonstration, or visual guide for any exercise, NEVER respond with "I can't send videos" or similar disclaimers.
-- Instead, ALWAYS provide a clickable YouTube search link formatted as: [Watch [Exercise Name] Tutorial on YouTube](https://www.youtube.com/results?search_query=[Exercise+Name]+tutorial+form)
+- Instead, ALWAYS provide a clickable YouTube search link formatted as: [Watch [Exercise Name] Tutorial on YouTube](www.youtube.com/results?search_query=[Exercise+Name]+tutorial+form)
+- The URL in that link must be BARE — no "http://" or "https://" prefix, and no other protocol text. The client adds exactly one https:// when it renders the link; including your own prefix risks a doubled, broken URL.
 - You may also include brief text-based form cues alongside the link for immediate reference.
 
 ${context.concurrent_activities && context.concurrent_activities.length > 0 ? `CONCURRENT ACTIVITIES (external training demands):\n${context.concurrent_activities.map((a: { name: string; intensity: number; days: string[]; movement_demands: string[] }) => `- ${a.name}: intensity ${Math.round(a.intensity * 100)}%, days: ${a.days.join(", ")}, demands: ${a.movement_demands.join(", ")}`).join("\n")}` : ""}

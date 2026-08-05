@@ -21,6 +21,7 @@ import type { SwapScope } from '@/lib/mesocycle-edit'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { parseWorkoutEntries, type ParsedSetGroup, type WorkoutEntryInput } from '@/lib/set-parse'
 import { executeLogWorkout } from '@/lib/nl-logging-executor'
+import { normalizeExternalUrl } from '@/lib/chat-links'
 import { ProposalCard } from '@/components/chat/ProposalCard'
 import { ReceiptCard } from '@/components/chat/ReceiptCard'
 import { ClarificationCard } from '@/components/chat/ClarificationCard'
@@ -1299,9 +1300,18 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     h1: ({ children }: { children?: React.ReactNode }) => <p className="font-semibold mb-1">{children}</p>,
     h2: ({ children }: { children?: React.ReactNode }) => <p className="font-semibold mb-1">{children}</p>,
     h3: ({ children }: { children?: React.ReactNode }) => <p className="font-semibold mb-1">{children}</p>,
-    a: ({ href, children }: { href?: string; children?: React.ReactNode }) => (
-      <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary underline hover:opacity-80">{children}</a>
-    ),
+    a: ({ href, children }: { href?: string; children?: React.ReactNode }) => {
+      // Defect 2 (cleanup round): a malformed or double-protocol href (e.g.
+      // the model emitting a URL that already carries a protocol-shaped
+      // fragment) must never reach the DOM as an unopenable link — normalize
+      // to exactly one https://, or drop the anchor entirely and render the
+      // link text plainly if it still doesn't parse as a URL.
+      const normalized = normalizeExternalUrl(href)
+      if (!normalized) return <>{children}</>
+      return (
+        <a href={normalized} target="_blank" rel="noopener noreferrer" className="text-primary underline hover:opacity-80">{children}</a>
+      )
+    },
   }
 
   return (
