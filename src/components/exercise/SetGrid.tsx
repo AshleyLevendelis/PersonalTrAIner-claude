@@ -22,6 +22,8 @@ import { useActiveSession } from '@/hooks/useActiveSession'
 import { prescriptionUnit } from '@/lib/set-log-store'
 import { computeSetRowNumbers, nextExtraSetNumber } from '@/lib/session-derive'
 import { checkForPR, getTopPRSet, type PRResult } from '@/lib/pr-engine'
+import { getExerciseEntry } from '@/lib/exercise-db'
+import { isExternallyLoaded } from '@/lib/load-prescription'
 import type { ExerciseSetLog } from '@/lib/types'
 
 const MAX_WEIGHT_KG = 9999.99
@@ -85,6 +87,21 @@ export function SetGrid({
   useEffect(() => {
     loadGhosts(exerciseId)
   }, [loadGhosts, exerciseId])
+
+  // Cleanup round, defect 4: the BW toggle only makes sense on a movement
+  // that's actually plausible bodyweight — a loaded barbell/dumbbell
+  // compound with a prescribed working weight has nowhere for "bodyweight"
+  // to mean anything. Keyed off !isExternallyLoaded (the same function
+  // load-prescription.ts and warmup.ts use for this exact distinction),
+  // NOT a raw `equipment.includes('bodyweight')` check — an apparatus-using
+  // bodyweight movement like Pull-Ups (equipment: ['pull-up bar']) has no
+  // literal 'bodyweight' tag but is still bodyweight-or-weighted in
+  // practice, and hiding the toggle there would be wrong in the other
+  // direction. Unresolved/custom exercises (off-plan chat logs) fall back
+  // to showing the toggle — better an occasional unnecessary button than
+  // hiding it for a movement we simply don't have catalog data for.
+  const catalogEntry = getExerciseEntry(exerciseName)
+  const isBodyweightCapable = catalogEntry ? !isExternallyLoaded(catalogEntry) : true
 
   const existingLogs = setsFor(exerciseId, exerciseName)
   const ghostValues = ghosts(exerciseId)
@@ -250,15 +267,17 @@ export function SetGrid({
             >
               <Dumbbell className="size-3.5" />
             </Button>
-            <Button
-              variant={isBW ? 'default' : 'outline'}
-              size="sm"
-              className="h-7 w-7 text-[10px] font-bold px-0"
-              onClick={() => toggleBodyweight(setNumber)}
-              aria-label="Toggle bodyweight"
-            >
-              BW
-            </Button>
+            {isBodyweightCapable && (
+              <Button
+                variant={isBW ? 'default' : 'outline'}
+                size="sm"
+                className="h-7 w-7 text-[10px] font-bold px-0"
+                onClick={() => toggleBodyweight(setNumber)}
+                aria-label="Toggle bodyweight"
+              >
+                BW
+              </Button>
+            )}
             <Input
               type="number"
               min="0"
