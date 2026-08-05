@@ -99,9 +99,11 @@ interface ChatAssistantProps {
   memoryGoals: UserGoalRow[]
   memoryContextFacts: UserContextFactRow[]
   onMemoryChanged: () => void | Promise<void>
+  /** Deep-link target for a memory receipt's "View in memory" button. */
+  onOpenMemory?: () => void
 }
 
-export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onMealSwapApplied, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged }: ChatAssistantProps) {
+export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onMealSwapApplied, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenMemory }: ChatAssistantProps) {
   // NL logging (§3) writes through the SAME frozen session identity +
   // logSet facade SetGrid.tsx uses — never saveSet directly (see
   // nl-logging-executor.ts's own doc comment).
@@ -1669,6 +1671,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
                         receipt={msg.receipt.result}
                         undoAvailable={!!msg.receipt.undoToken && isWithinUndoWindow(msg.receipt.resolvedAt ?? null)}
                         onUndo={msg.receipt.undoToken ? () => handleUndoReceipt(i) : undefined}
+                        onViewMemory={msg.receipt.kind.startsWith('memory_') ? onOpenMemory : undefined}
                       />
                     )}
                     {msg.clarification && msg.status !== 'failed' && (

@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
-import { Dumbbell, RotateCcw, Activity, UtensilsCrossed, MessageCircle, PieChart, Loader2 } from 'lucide-react'
+import { Dumbbell, RotateCcw, Activity, UtensilsCrossed, MessageCircle, PieChart, Loader2, BrainCircuit } from 'lucide-react'
+import { MemoryScreen } from '@/components/MemoryScreen'
 import { OnboardingFlow } from '@/components/onboarding/OnboardingFlow'
 import { NutritionDisplay } from '@/components/NutritionDisplay'
 import { ExerciseTab } from '@/components/exercise/ExerciseTab'
@@ -89,6 +90,7 @@ function App() {
   const [memoryFacts, setMemoryFacts] = useState<UserFactRow[]>([])
   const [memoryGoals, setMemoryGoals] = useState<UserGoalRow[]>([])
   const [memoryContextFacts, setMemoryContextFacts] = useState<UserContextFactRow[]>([])
+  const [memoryScreenOpen, setMemoryScreenOpen] = useState(false)
   const reloadMemory = async (profileId: string) => {
     const [facts, goals, contextFacts] = await Promise.all([getActiveFacts(profileId), getActiveGoals(profileId), getActiveContextFacts(profileId)])
     setMemoryFacts(facts)
@@ -966,6 +968,10 @@ function App() {
           </div>
           <div className="flex items-center gap-3">
             <OfflineStatusIndicator />
+            <Button variant="outline" size="sm" onClick={() => setMemoryScreenOpen(true)}>
+              <BrainCircuit className="size-3.5" />
+              Memory
+            </Button>
             <Button variant="outline" size="sm" onClick={handleReset}>
               <RotateCcw className="size-3.5" />
               New Plan
@@ -1066,11 +1072,19 @@ function App() {
               memoryGoals={memoryGoals}
               memoryContextFacts={memoryContextFacts}
               onMemoryChanged={() => { if (profile?.id) return reloadMemory(profile.id) }}
+              onOpenMemory={() => setMemoryScreenOpen(true)}
             />
           </TabsContent>
         </Tabs>
       </main>
       <BottomDock />
+      <MemoryScreen
+        open={memoryScreenOpen}
+        onOpenChange={setMemoryScreenOpen}
+        profileId={profile.id}
+        latestWeightKg={latestWeightKg}
+        onMemoryChanged={() => { if (profile.id) return reloadMemory(profile.id) }}
+      />
     </div>
     </ActiveSessionProvider>
   )
