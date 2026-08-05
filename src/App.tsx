@@ -1095,6 +1095,7 @@ function App() {
               groceryItems={groceryItems}
               onGroceryChanged={() => { if (profile?.id) return reloadGrocery(profile.id) }}
               onOpenGrocery={() => { window.location.hash = tabHash('meals') }}
+              onOpenDashboard={() => { window.location.hash = tabHash('dashboard') }}
             />
           </TabsContent>
         </Tabs>

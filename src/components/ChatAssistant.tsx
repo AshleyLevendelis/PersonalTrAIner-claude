@@ -27,6 +27,7 @@ import { resolveExerciseTarget, resolveFoodTarget } from '@/lib/fact-compiler'
 import { checkFactConflict, checkGoalConflict } from '@/lib/memory-reconcile'
 import { getPRCache } from '@/lib/pr-engine'
 import { getAllItems as getAllGroceryItems, addItemLocal, setCheckedLocal, undoAddLocal, type GroceryItemRow, type GroceryCategory } from '@/lib/grocery-store'
+import { logWater, undoLog as undoWaterLog } from '@/lib/water-store'
 import { ProposalCard } from '@/components/chat/ProposalCard'
 import { ReceiptCard } from '@/components/chat/ReceiptCard'
 import { ClarificationCard } from '@/components/chat/ClarificationCard'
@@ -111,9 +112,13 @@ interface ChatAssistantProps {
   onGroceryChanged?: () => void | Promise<void>
   /** Deep-link target for a grocery receipt's "View list" button — navigates to the Meals tab. */
   onOpenGrocery?: () => void
+  /** Fired after a chat water log so App.tsx/Dashboard can refresh their own local water state (same "caller reloads after" shape, though water-store's own local-first merge already reflects the write immediately for anything reading it fresh). */
+  onWaterChanged?: () => void | Promise<void>
+  /** Deep-link target for a water receipt's "View" button — navigates to the Dashboard tab. */
+  onOpenDashboard?: () => void
 }
 
-export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onMealSwapApplied, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenMemory, groceryItems, onGroceryChanged, onOpenGrocery }: ChatAssistantProps) {
+export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onMealSwapApplied, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenMemory, groceryItems, onGroceryChanged, onOpenGrocery, onWaterChanged, onOpenDashboard }: ChatAssistantProps) {
   // NL logging (§3) writes through the SAME frozen session identity +
   // logSet facade SetGrid.tsx uses — never saveSet directly (see
   // nl-logging-executor.ts's own doc comment).
@@ -671,6 +676,8 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     // with no confirmation card (append-only ⇒ execute + receipt + undo).
     // Same I1 shape as memoryIntent: the server never writes grocery_items.
     groceryIntent?: { tool: 'add_to_grocery_list' | 'check_off_grocery_item'; rawArgs: Record<string, unknown> }
+    // Same I1/IMMEDIATE shape again, for water_logs.
+    waterIntent?: { tool: 'log_water'; rawArgs: Record<string, unknown> }
   }
 
   const callGemini = async (userMessage: string): Promise<ChatApiResponse> => {
@@ -728,7 +735,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       // processResponse below, but never actually threaded through here —
       // every memory save silently fell through to the offer/action path
       // instead. groceryIntent follows the identical shape.
-      memoryIntent: data.memoryIntent, groceryIntent: data.groceryIntent,
+      memoryIntent: data.memoryIntent, groceryIntent: data.groceryIntent, waterIntent: data.waterIntent,
     }
   }
 
@@ -1115,6 +1122,37 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     }
   }
 
+  /**
+   * VISION-ARCHITECTURE.md §5.4 — the water-log chat door, same shape as
+   * resolveAndSaveGrocery: IMMEDIATE, no ProposalCard, ever. amount_ml
+   * defaults to 250 (one glass) when the model gave none, matching the
+   * dashboard's own quick-add buttons rather than inventing a second
+   * default. undoToken is just the row id — a fresh log has nothing to
+   * merge onto (water-store doesn't coalesce logs by day the way grocery
+   * coalesces by canonical_key), so undo is always a straight delete.
+   */
+  const resolveAndSaveWater = async (intent: { tool: 'log_water'; rawArgs: Record<string, unknown> }): Promise<{ text: string; receipt?: ChatReceiptView }> => {
+    const args = intent.rawArgs
+    const profileId = profile.id
+    if (!profileId) return { text: "I can't log that yet — your profile hasn't finished setting up." }
+
+    const amountMl = typeof args.amount_ml === 'number' && args.amount_ml > 0 ? Math.round(args.amount_ml) : 250
+    const row = logWater({ profileId, date: activeSession.date, amountMl, source: 'chat' })
+    await onWaterChanged?.()
+
+    return {
+      text: `Logged ${amountMl}ml of water.`,
+      receipt: {
+        kind: 'water_logged',
+        title: 'Water logged',
+        rows: [{ label: `${amountMl}ml`, detail: 'added to today' }],
+        status: 'done',
+        undoToken: row.id,
+        resolvedAt: new Date().toISOString(),
+      },
+    }
+  }
+
   const resolveAndMaybeLog = (entries: WorkoutEntryInput[]): { text: string; receipt?: ChatReceiptView; clarification?: ChatClarificationView } => {
     const todaysWorkout = exercisePlan.find(d => d.day === activeSession.dayName)
     const todaysPlanExerciseNames = todaysWorkout?.exercises.map(e => e.name) ?? []
@@ -1253,6 +1291,9 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     }
     if (result.groceryIntent) {
       return resolveAndSaveGrocery(result.groceryIntent)
+    }
+    if (result.waterIntent) {
+      return resolveAndSaveWater(result.waterIntent)
     }
     if (result.offer) {
       // D3: a non-imperative statement downgraded to a suggestion chip —
@@ -1612,6 +1653,14 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         if (row) undoAddLocal(row, entry.addedQuantity, entry.created)
       }
       await onGroceryChanged?.()
+    } else if (receipt.kind === 'water_logged') {
+      // undoToken is just the row id — a fresh log has nothing to merge
+      // onto (unlike grocery's canonical_key coalescing), so undo is
+      // always a straight delete. undoLog only reads id/profile_id off
+      // its argument, so a minimal object is safe here.
+      if (!isWithinUndoWindow(receipt.resolvedAt ?? null)) return
+      undoWaterLog({ id: receipt.undoToken, profile_id: profile.id } as Parameters<typeof undoWaterLog>[0])
+      await onWaterChanged?.()
     } else {
       const row = await getPendingAction(receipt.undoToken)
       if (!row || !isWithinUndoWindow(row.resolved_at)) return
@@ -1786,6 +1835,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
                         onUndo={msg.receipt.undoToken ? () => handleUndoReceipt(i) : undefined}
                         onViewMemory={msg.receipt.kind.startsWith('memory_') ? onOpenMemory : undefined}
                         onViewGrocery={msg.receipt.kind === 'grocery_item_added' ? onOpenGrocery : undefined}
+                        onViewDashboard={msg.receipt.kind === 'water_logged' ? onOpenDashboard : undefined}
                       />
                     )}
                     {msg.clarification && msg.status !== 'failed' && (

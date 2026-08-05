@@ -660,6 +660,25 @@ const toolDeclarations = [
       required: ["origin_verbatim_quote", "item_phrase"],
     },
   },
+  {
+    name: "log_water",
+    description:
+      "Logs water intake (VISION-ARCHITECTURE.md §5.3/§5.4). IMMEDIATE, append-only — call the moment the user instructs a log ('log a glass of water', 'add 500ml of water', 'I just drank a bottle'). A mere statement about thirst or intent ('I should drink more water') without an instruction to log something now should get an offer instead, same as add_to_grocery_list.",
+    parameters: {
+      type: "object",
+      properties: {
+        origin_verbatim_quote: {
+          type: "string",
+          description: "The exact substring of the user's current message that instructs the log. Must be a literal quote, not a paraphrase.",
+        },
+        amount_ml: {
+          type: "number",
+          description: "Amount in millilitres. Convert from other units the user gives (a glass ~250ml, a bottle ~500ml, 1 litre = 1000ml, 1 US cup = 240ml, 1 fl oz = 30ml). Omit if the user names no amount or unit at all — the app defaults to 250ml (one glass).",
+        },
+      },
+      required: ["origin_verbatim_quote"],
+    },
+  },
 ];
 
 function buildDietarySafetyBlock(preferences: string[]): string {
@@ -996,6 +1015,10 @@ GROCERY LIST (VISION-ARCHITECTURE.md §5.4):
 - Call check_off_grocery_item when the user instructs a check-off.
 - If the user asks what's on their list, answer directly from the snapshot below — do not call a tool for a read.
 ${context.grocery_list_summary ? `\nCURRENT GROCERY LIST:\n${context.grocery_list_summary}` : "\nCURRENT GROCERY LIST: empty."}
+
+WATER (VISION-ARCHITECTURE.md §5.3/§5.4):
+- Call log_water the moment the user instructs a log. A mere statement about intent or thirst without an instruction to log something now should get an offer instead, never a silent call.
+- Convert any unit the user gives to millilitres yourself before calling; omit amount_ml entirely only when the user names no amount or unit at all.
 
 ${context.concurrent_activities && context.concurrent_activities.length > 0 ? `CONCURRENT ACTIVITIES (external training demands):\n${context.concurrent_activities.map((a: { name: string; intensity: number; days: string[]; movement_demands: string[] }) => `- ${a.name}: intensity ${Math.round(a.intensity * 100)}%, days: ${a.days.join(", ")}, demands: ${a.movement_demands.join(", ")}`).join("\n")}` : ""}
 
@@ -1641,6 +1664,31 @@ Keep this context in mind to ensure your greetings and questions naturally align
           JSON.stringify({
             reply: "",
             groceryIntent: { tool: name, rawArgs: args },
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (name === "log_water") {
+        // VISION-ARCHITECTURE.md §5.4 — same IMMEDIATE/D2/I1 shape as
+        // add_to_grocery_list: no confirmation card, gated by the same
+        // imperative classifier, nothing written here — the client's
+        // water-store resolves the amount (defaulting to 250ml when the
+        // model gave none) and writes.
+        const classification = classifyImperative(args.origin_verbatim_quote || "", message);
+        if (!classification.imperative) {
+          return new Response(
+            JSON.stringify({
+              reply: "",
+              offer: { text: "Want me to log that water intake?" },
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        return new Response(
+          JSON.stringify({
+            reply: "",
+            waterIntent: { tool: name, rawArgs: args },
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );

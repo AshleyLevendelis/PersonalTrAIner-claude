@@ -27,6 +27,7 @@ export function ReceiptCard({
   onRetryFailed,
   onViewMemory,
   onViewGrocery,
+  onViewDashboard,
 }: {
   title: string
   rows: ReceiptRow[]
@@ -40,6 +41,8 @@ export function ReceiptCard({
   onViewMemory?: () => void
   /** VISION-ARCHITECTURE.md §5.4 — present only for grocery_item_added receipts, deep-links to the Meals tab's grocery section. */
   onViewGrocery?: () => void
+  /** VISION-ARCHITECTURE.md §5.4 — present only for water_logged receipts, deep-links to the Dashboard tab. */
+  onViewDashboard?: () => void
 }) {
   const [busy, setBusy] = useState<'undo' | string | null>(null)
 
@@ -121,6 +124,11 @@ export function ReceiptCard({
           {onViewGrocery && (
             <Button size="sm" variant="ghost" className="h-6 text-[11px]" onClick={onViewGrocery}>
               View list
+            </Button>
+          )}
+          {onViewDashboard && (
+            <Button size="sm" variant="ghost" className="h-6 text-[11px]" onClick={onViewDashboard}>
+              View
             </Button>
           )}
           {undoAvailable && onUndo && (
