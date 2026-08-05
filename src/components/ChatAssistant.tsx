@@ -14,7 +14,11 @@ import { supabase } from '@/lib/supabase'
 import { getRecentLogs, formatLogsForAI, getRecentCardioLogs, formatCardioLogsForAI } from '@/lib/daily-tracking'
 import { saveChatCache, loadChatCache, clearChatCache } from '@/lib/chat-cache'
 import { swapPoolMeal, type MealSlotName } from '@/lib/meal-store'
-import type { ChatMessage, UserProfile, MacroTargets, WorkoutDay, MealPlanDay, MesocycleWeek, PlanAction } from '@/lib/types'
+import { claimPendingAction, declinePendingAction } from '@/lib/pending-actions-store'
+import { ProposalCard } from '@/components/chat/ProposalCard'
+import { ReceiptCard } from '@/components/chat/ReceiptCard'
+import { ClarificationCard } from '@/components/chat/ClarificationCard'
+import type { ChatMessage, UserProfile, MacroTargets, WorkoutDay, MealPlanDay, MesocycleWeek, PlanAction, ChatPendingActionView, ChatReceiptView } from '@/lib/types'
 
 const ACTION_TAG_RE = /\[ACTION:\s*.*?\]/gi
 const QUICK_REPLIES_RE = /\[QUICK_REPLIES:\s*(.*?)\]/gi
@@ -658,7 +662,27 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     return false
   }
 
-  const callGemini = async (userMessage: string): Promise<{ reply: string; action?: PlanAction }> => {
+  /**
+   * VISION-ARCHITECTURE.md §2 — the edge function response shape is
+   * extending across commits C9-C16 to also carry `pendingAction` (a
+   * plan-mutation proposal, action_class='plan_mutation'), `receipt` (an
+   * immediate append-only write already applied, e.g. natural-language
+   * logging), or `offer` (D3: a non-imperative statement downgraded from a
+   * proposal — a suggestion chip, no pending row, no Confirm button). None
+   * of the new tools exist yet as of this commit, so these fields are
+   * always undefined in practice until then — the type is ready ahead of
+   * the server emitting it, same as imperative-classifier.ts/set-parse.ts
+   * being built before anything calls them.
+   */
+  interface ChatApiResponse {
+    reply: string
+    action?: PlanAction
+    pendingAction?: ChatPendingActionView
+    receipt?: ChatReceiptView
+    offer?: { text: string }
+  }
+
+  const callGemini = async (userMessage: string): Promise<ChatApiResponse> => {
     // Fix #4: Only send conversation turns (last 20), context goes separately as system prompt
     const history = messages
       .filter(m => m.status === 'complete' || m.status === undefined)
@@ -701,7 +725,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     if (!data.reply || typeof data.reply !== 'string') {
       throw new Error('Invalid response from AI')
     }
-    return { reply: data.reply, action: data.action }
+    return { reply: data.reply, action: data.action, pendingAction: data.pendingAction, receipt: data.receipt, offer: data.offer }
   }
 
   // Helper: persist user message to Supabase (fire-and-forget)
@@ -741,12 +765,48 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     }).eq('id', placeholderId).then()
   }
 
-  // Helper: process an AI response and apply actions
-  const processResponse = async (result: { reply: string; action?: PlanAction }): Promise<{ text: string; action?: PlanAction }> => {
+  /** Client-authored copy for a proposal turn — D1 means the model's own text for this turn is never rendered, only this. Generic across every propose_* kind: the headline row is always diff.rows[0]. */
+  const describeProposalClientSide = (pendingAction: ChatPendingActionView): string => {
+    const headline = pendingAction.diff.rows[0]
+    if (!headline) return "Here's a change I can make:"
+    return `I can swap **${headline.before}** for **${headline.after}**:`
+  }
+
+  /**
+   * VISION-ARCHITECTURE.md §2.6, D1 — "the client discards model prose on
+   * ANY turn that produced a proposal." result.pendingAction/result.receipt
+   * take priority over result.reply unconditionally: a turn carrying either
+   * renders ONLY client-authored copy + the corresponding card. This is the
+   * exact fix for the incident (the model's own "Schedule updated" text
+   * rendered as if the write had already happened) — enforced here, not by
+   * asking the model to behave, so no prompt-text discipline can regress it.
+   */
+  const processResponse = async (result: ChatApiResponse): Promise<{
+    text: string
+    action?: PlanAction
+    pendingAction?: ChatPendingActionView
+    receipt?: ChatReceiptView
+  }> => {
+    if (result.pendingAction) {
+      return { text: describeProposalClientSide(result.pendingAction), pendingAction: result.pendingAction }
+    }
+    if (result.receipt) {
+      return { text: result.receipt.title, receipt: result.receipt }
+    }
+    if (result.offer) {
+      // D3: a non-imperative statement downgraded to a suggestion chip —
+      // no pendingAction, no Confirm button, nothing written. The offer's
+      // text IS safe client-owned copy (built server-side from the
+      // classifier's decision, not model free-text describing a change).
+      return { text: result.offer.text }
+    }
+
+    // No proposal, no receipt, no offer: the existing immediate-action path
+    // (log_weight, log_workout_session, etc. — writes the server already
+    // made) is unchanged, and rendering the model's own reply is still safe
+    // here because this turn made no plan-mutation claim.
     let responseText = result.reply
     let action = result.action
-
-    // Fix #5: Only confirm action if mutation actually succeeds
     if (action) {
       try {
         const success = await applyPlanAction(action)
@@ -796,6 +856,8 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
           content: cleanedText,
           status: 'complete' as const,
           action: processed.action,
+          pendingAction: processed.pendingAction,
+          receipt: processed.receipt,
           quickReplies,
         } : m
       ))
@@ -845,6 +907,8 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
 
     let responseText: string | undefined
     let action: PlanAction | undefined
+    let pendingAction: ChatPendingActionView | undefined
+    let receipt: ChatReceiptView | undefined
     let failed = false
 
     if (useAI) {
@@ -853,6 +917,8 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         const processed = await processResponse(result)
         responseText = processed.text
         action = processed.action
+        pendingAction = processed.pendingAction
+        receipt = processed.receipt
         setLastFailedInput(null)
       } catch (err: unknown) {
         failed = true
@@ -882,6 +948,8 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       content: cleanedText,
       status: finalStatus,
       action,
+      pendingAction,
+      receipt,
       quickReplies,
     }
 
@@ -987,6 +1055,41 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       )
     }
     return null
+  }
+
+  /**
+   * Confirm-exactly-once gate (§2.5): claimPendingAction's conditional
+   * UPDATE is the real correctness mechanism — this handler can be invoked
+   * by a double-tap and only one call will see `outcome: 'claimed'`.
+   *
+   * The preconditions check is `async () => true` here — always-pass — as
+   * an interim placeholder: propose_exercise_swap/propose_meal_swap (C15/
+   * C16) are what will supply the real content-fingerprint check against
+   * the live plan, and until those tools exist nothing can produce a
+   * pendingAction message to click Confirm on in the first place. Likewise
+   * the actual mutation (swap/meal-swap through the edit layers) isn't
+   * executed yet — that lands in pending-action-executor.ts (C8) — this
+   * commit only wires the claim/decline half of the lifecycle.
+   */
+  const handleConfirmProposal = async (msgIndex: number, _editedScope?: string) => {
+    const msg = messages[msgIndex]
+    if (!msg.pendingAction) return
+    const result = await claimPendingAction(msg.pendingAction.id, async () => true)
+    setMessages(prev => prev.map((m, i) => {
+      if (i !== msgIndex || !m.pendingAction) return m
+      if (result.outcome === 'claimed') return { ...m, pendingAction: { ...m.pendingAction, status: 'claimed' } }
+      if (result.outcome === 'stale') return { ...m, pendingAction: { ...m.pendingAction, status: 'stale' } }
+      return m
+    }))
+  }
+
+  const handleRejectProposal = async (msgIndex: number) => {
+    const msg = messages[msgIndex]
+    if (!msg.pendingAction) return
+    await declinePendingAction(msg.pendingAction.id)
+    setMessages(prev => prev.map((m, i) =>
+      i === msgIndex && m.pendingAction ? { ...m, pendingAction: { ...m.pendingAction, status: 'declined' } } : m
+    ))
   }
 
   const isInterrupted = (msg: ChatMessage) =>
@@ -1115,6 +1218,34 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
                       )}
                     </div>
                     {msg.action && msg.status !== 'failed' && renderActionBadge(msg.action)}
+                    {msg.pendingAction && msg.status !== 'failed' && (
+                      <ProposalCard
+                        pendingAction={msg.pendingAction}
+                        onConfirm={scope => handleConfirmProposal(i, scope)}
+                        onReject={() => handleRejectProposal(i)}
+                      />
+                    )}
+                    {msg.receipt && msg.status !== 'failed' && (
+                      <ReceiptCard
+                        title={msg.receipt.title}
+                        rows={msg.receipt.rows}
+                        summary={msg.receipt.summary}
+                        status={msg.receipt.status}
+                        receipt={msg.receipt.result}
+                      />
+                    )}
+                    {msg.clarification && msg.status !== 'failed' && (
+                      <ClarificationCard
+                        contextLines={msg.clarification.contextLines}
+                        prompt={msg.clarification.prompt}
+                        options={msg.clarification.options}
+                        onChoose={async value => {
+                          // C13 wires this to the NL-logging clarification resolver.
+                          if (navigator.vibrate) navigator.vibrate(10)
+                          setInput(value)
+                        }}
+                      />
+                    )}
                     {/* Retry button for interrupted messages without content */}
                     {isInterrupted(msg) && !msg.content && !isLoading && (
                       <button

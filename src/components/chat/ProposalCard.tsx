@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { ArrowRightLeft, ShieldAlert, Info } from 'lucide-react'
-import type { PendingActionRow } from '@/lib/pending-actions-store'
+import type { ChatPendingActionView } from '@/lib/types'
 
 // ---------------------------------------------------------------------------
 // VISION-ARCHITECTURE.md §2.4 — "rendering the effect, not prose." ONE
@@ -17,7 +17,7 @@ export function ProposalCard({
   onConfirm,
   onReject,
 }: {
-  pendingAction: PendingActionRow
+  pendingAction: ChatPendingActionView
   onConfirm: (editedScope?: string) => Promise<void>
   onReject: () => Promise<void>
 }) {

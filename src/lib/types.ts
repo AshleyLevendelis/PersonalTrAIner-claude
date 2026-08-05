@@ -271,6 +271,41 @@ export type DayName = typeof DAY_NAMES[number]
 
 export type MessageStatus = 'pending' | 'streaming' | 'complete' | 'failed'
 
+/**
+ * VISION-ARCHITECTURE.md §2/§3 — a turn that produced a plan-mutation
+ * proposal, an append-only receipt, or a natural-language-logging
+ * clarification renders ONE of these (D1: never the model's own prose on
+ * that turn). Ephemeral/client-side only — not persisted to
+ * chat_messages.action_data or restored across a reload; the underlying
+ * pending_actions row is the durable record.
+ */
+export interface ChatPendingActionView {
+  id: string
+  kind: string
+  status: import('./pending-actions-store').PendingActionStatus
+  diff: import('./pending-actions-store').ProposalDiff
+}
+
+export interface ChatReceiptView {
+  kind: 'log_workout' | 'propose_exercise_swap' | 'propose_meal_swap'
+  title: string
+  rows: { label: string; detail: string; note?: string }[]
+  summary?: string
+  status: 'done' | 'partial' | 'failed'
+  result?: import('./pending-actions-store').PendingActionReceipt
+  /** Opaque undo handle: a set's natural-key tuple (JSON), a meal event's clientId, or a pending_actions id for a swap's pre_image restore. */
+  undoToken?: string
+  resolvedAt?: string
+}
+
+export interface ChatClarificationView {
+  contextLines?: string[]
+  prompt: string
+  options: { label: string; value: string }[]
+  /** Correlates the chosen answer back to the parse session awaiting it. */
+  resolverId: string
+}
+
 export interface ChatMessage {
   id?: string
   profile_id?: string
@@ -278,6 +313,9 @@ export interface ChatMessage {
   content: string
   status?: MessageStatus
   action?: PlanAction
+  pendingAction?: ChatPendingActionView
+  receipt?: ChatReceiptView
+  clarification?: ChatClarificationView
   quickReplies?: string[]
   created_at?: string
 }
