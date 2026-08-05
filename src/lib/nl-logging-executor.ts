@@ -25,6 +25,31 @@ export interface LogWorkoutContext {
   declareOffPlan: (name: string) => void
   /** name -> prescribed set count, for exercises that ARE in today's plan (off-plan exercises pass 0). */
   todaysPlanSetCounts: Map<string, number>
+  /** name -> today's suggested_load_kg, for exercises that ARE in today's plan and are externally loaded. Used only for the §3.5 progression-moment receipt note — never a write. */
+  todaysPlanLoads: Map<string, number>
+}
+
+/**
+ * VISION-ARCHITECTURE.md §3.5 — "the moment prescriptions stop being
+ * guesses." Scoped down from the full detector (2-consecutive-sessions,
+ * propose_load_recalibration) to just the receipt-level language: a
+ * single logged weight >15% off the plan's suggested load gets one line
+ * saying what changes. No plan write here — the existing progression
+ * engine (getDoubleProgressionRecommendation, already reading
+ * exercise_set_logs the same way for tap-logged sets) is what actually
+ * derives next session's number from this row; NL-logged sets already go
+ * through the identical store, so the "flip to logged provenance" §3.5
+ * describes happens for free once this row exists — no separate write.
+ */
+const MATERIAL_DIVERGENCE_FRACTION = 0.15
+
+function progressionNote(loggedWeightKg: number, prescribedLoadKg: number | undefined): string | undefined {
+  if (prescribedLoadKg == null || prescribedLoadKg <= 0) return undefined
+  const divergence = (loggedWeightKg - prescribedLoadKg) / prescribedLoadKg
+  if (Math.abs(divergence) < MATERIAL_DIVERGENCE_FRACTION) return undefined
+  return divergence > 0
+    ? 'Heavier than the estimate — next session builds from your numbers.'
+    : 'Lighter than the estimate — next session builds from your numbers.'
 }
 
 export interface LogWorkoutReceiptRow {
@@ -113,14 +138,17 @@ export function executeLogWorkout(groups: ParsedSetGroup[], ctx: LogWorkoutConte
 
     const weightLabel = group.sets[0]?.isBodyweight ? 'BW' : `${group.sets[0]?.weightKg}kg`
     const repsLabel = group.sets[0]?.repsRangeLabel ?? String(group.sets[0]?.reps)
+    const note = group.resolution === 'unknown'
+      ? 'Logged as a custom exercise — counts toward volume/history, excluded from progression'
+      : isOffPlan
+        ? "Not in today's plan — added to Additional Work"
+        : !group.sets[0]?.isBodyweight
+          ? progressionNote(group.sets[0]?.weightKg ?? 0, ctx.todaysPlanLoads.get(exerciseName))
+          : undefined
     rows.push({
       label: exerciseName,
       detail: `${group.sets.length} × ${repsLabel} @ ${weightLabel}`,
-      note: group.resolution === 'unknown'
-        ? 'Logged as a custom exercise — counts toward volume/history, excluded from progression'
-        : isOffPlan
-          ? "Not in today's plan — added to Additional Work"
-          : undefined,
+      note,
     })
   }
 

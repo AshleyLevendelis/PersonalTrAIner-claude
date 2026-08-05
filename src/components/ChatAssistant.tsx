@@ -832,6 +832,11 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     }
 
     const todaysPlanSetCounts = new Map((todaysWorkout?.exercises ?? []).map(e => [e.name, e.sets] as const))
+    const todaysPlanLoads = new Map(
+      (todaysWorkout?.exercises ?? [])
+        .filter(e => e.suggested_load_kg != null)
+        .map(e => [e.name, e.suggested_load_kg as number] as const)
+    )
     const { rows, totalSets } = executeLogWorkout(parsed.groups, {
       profileId: activeSession.profileId ?? '',
       date: activeSession.date,
@@ -841,6 +846,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       logSet: activeSession.logSet,
       declareOffPlan: activeSession.declareOffPlan,
       todaysPlanSetCounts,
+      todaysPlanLoads,
     })
     onLogsUpdated?.()
     const exerciseCount = parsed.groups.filter((g: ParsedSetGroup) => !g.routesToCardio).length
