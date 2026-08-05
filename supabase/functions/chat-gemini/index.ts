@@ -1,6 +1,8 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { GEMINI_MODEL } from "../_shared/gemini.ts";
 import { computeMealMacros, type MealIngredientLine } from "../_shared/food-db.ts";
+// deno-lint-ignore no-unused-vars -- wired into propose_exercise_swap/propose_meal_swap's D2 gate in a later commit; imported now so the Deno import path is proven before those tools exist.
+import { classifyImperative } from "../_shared/imperative-classifier.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -1394,6 +1396,25 @@ Keep this context in mind to ensure your greetings and questions naturally align
         return new Response(
           JSON.stringify({
             reply: "I can't safely make plan changes yet — that's coming in an update soon. For now, use the swap (⇄) button on the exercise itself.",
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (name === "ban_exercise") {
+        // VISION-ARCHITECTURE.md §7.2 phase A0/§2.1: ban_exercise touches
+        // every week of every block and can drop a slot entirely when no
+        // substitute exists — the highest-blast-radius mutation in the
+        // app. It used to fall through to the generic catch-all below with
+        // no real server-side handling at all (whatever the model sent
+        // just got echoed back as an action). Explicit decline now, same
+        // as adjust_volume/update_workout_schedule — this is a one-line
+        // safety fix, not a re-enable; §2.1 demotes ban to PROPOSING and
+        // it stays disabled via chat this round (Part 3 only re-enables
+        // exercise swap and meal swap).
+        return new Response(
+          JSON.stringify({
+            reply: "I can't ban exercises through chat yet — that's coming in an update soon. For now, use the ban button on the exercise itself.",
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
