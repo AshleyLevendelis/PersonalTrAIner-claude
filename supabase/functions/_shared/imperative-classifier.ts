@@ -11,9 +11,13 @@ export type ClassificationResult =
   | { imperative: true }
   | { imperative: false; reason: 'not_verbatim' | 'interrogative' | 'negation' | 'no_imperative_verb' };
 
+// Memory & goals (VISION-ARCHITECTURE.md §1) widened this list beyond the
+// original plan-mutation verbs — see src/lib/imperative-classifier.ts's
+// matching comment (keep the two files in lockstep).
 export const IMPERATIVE_VERBS = [
   'swap', 'replace', 'change', 'switch', 'move', 'cut', 'remove', 'add',
   'ban', 'avoid', 'set', 'adjust', 'reduce', 'increase', 'log', 'record',
+  'hate', 'dislike', 'love', 'prefer', 'want', 'need', 'exclude',
 ];
 
 const INTERROGATIVE_LEAD_RE = /^\s*(what|why|how|when|where|which|who|can|could|should|would|is|are|do|does|did)\b/i;

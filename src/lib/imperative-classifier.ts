@@ -17,10 +17,21 @@ export type ClassificationResult =
   | { imperative: true }
   | { imperative: false; reason: 'not_verbatim' | 'interrogative' | 'negation' | 'no_imperative_verb' }
 
-/** Closed list — the tool call must be triggered by one of these, spoken as the quote's main verb. */
+/**
+ * Closed list — the tool call must be triggered by one of these, spoken as
+ * the quote's main verb. Memory & goals (VISION-ARCHITECTURE.md §1)
+ * extended this list beyond the original plan-mutation verbs: a stated
+ * preference is naturally phrased as "I hate X" / "I dislike Y" / "I
+ * prefer Z", not as a command verb like swap/ban — reusing this same
+ * classifier for record_fact/record_goal (deliberately, per §1 Part 2's
+ * "conservative capture, same bar as plan mutations") needed the verb list
+ * widened to actually recognize that phrasing, or every naturally-worded
+ * preference statement would silently downgrade to an offer forever.
+ */
 export const IMPERATIVE_VERBS = [
   'swap', 'replace', 'change', 'switch', 'move', 'cut', 'remove', 'add',
   'ban', 'avoid', 'set', 'adjust', 'reduce', 'increase', 'log', 'record',
+  'hate', 'dislike', 'love', 'prefer', 'want', 'need', 'exclude',
 ] as const
 
 const INTERROGATIVE_LEAD_RE = /^\s*(what|why|how|when|where|which|who|can|could|should|would|is|are|do|does|did)\b/i
