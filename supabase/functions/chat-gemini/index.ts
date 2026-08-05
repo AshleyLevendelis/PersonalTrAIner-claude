@@ -619,6 +619,47 @@ const toolDeclarations = [
       required: ["origin_verbatim_quote", "display_text"],
     },
   },
+  {
+    name: "add_to_grocery_list",
+    description:
+      "Adds one or more items to the user's grocery list (VISION-ARCHITECTURE.md §5.4). IMMEDIATE, append-only — call this the moment the user instructs an add ('add eggs to my list', 'add milk and bread'). Do NOT call this for a mere statement that something is running low ('we're out of eggs') without an instruction to add it — that gets an offer instead, gated the same way record_fact is.",
+    parameters: {
+      type: "object",
+      properties: {
+        origin_verbatim_quote: {
+          type: "string",
+          description: "The exact substring of the user's current message that instructs the add. Must be a literal quote, not a paraphrase.",
+        },
+        items: {
+          type: "array",
+          description: "One entry per distinct item the user named.",
+          items: {
+            type: "object",
+            properties: {
+              name: { type: "string", description: "The item name, as the user said it." },
+              quantity: { type: "number", description: "Omit if the user didn't give one — defaults to 1." },
+              unit: { type: "string", description: "Omit if the user didn't give one — defaults to a sensible count unit." },
+            },
+            required: ["name"],
+          },
+        },
+      },
+      required: ["origin_verbatim_quote", "items"],
+    },
+  },
+  {
+    name: "check_off_grocery_item",
+    description:
+      "Checks one item off the user's grocery list. Call when the user instructs a check-off ('check off eggs', 'I already got the milk'). IMMEDIATE.",
+    parameters: {
+      type: "object",
+      properties: {
+        origin_verbatim_quote: { type: "string", description: "Exact substring of the user's message instructing the check-off." },
+        item_phrase: { type: "string", description: "The item name, as the user said it." },
+      },
+      required: ["origin_verbatim_quote", "item_phrase"],
+    },
+  },
 ];
 
 function buildDietarySafetyBlock(preferences: string[]): string {
@@ -949,6 +990,12 @@ MEMORY & GOALS (VISION-ARCHITECTURE.md §1 Part 2):
 ${context.active_facts && context.active_facts.length > 0 ? `\nWHAT YOU ALREADY KNOW (do not re-ask or re-record these):\n${context.active_facts.map((f: string) => `- ${f}`).join("\n")}` : ""}
 ${context.active_goals && context.active_goals.length > 0 ? `\nACTIVE GOALS:\n${context.active_goals.map((g: string) => `- ${g}`).join("\n")}` : ""}
 ${context.context_facts && context.context_facts.length > 0 ? `\nHOW TO TALK TO THIS USER:\n${context.context_facts.map((c: string) => `- ${c}`).join("\n")}` : ""}
+
+GROCERY LIST (VISION-ARCHITECTURE.md §5.4):
+- Call add_to_grocery_list the moment the user instructs an add. A mere statement ("we're out of eggs") without an instruction should get a plain-text offer instead ("Want me to add eggs to your list?"), never a silent call.
+- Call check_off_grocery_item when the user instructs a check-off.
+- If the user asks what's on their list, answer directly from the snapshot below — do not call a tool for a read.
+${context.grocery_list_summary ? `\nCURRENT GROCERY LIST:\n${context.grocery_list_summary}` : "\nCURRENT GROCERY LIST: empty."}
 
 ${context.concurrent_activities && context.concurrent_activities.length > 0 ? `CONCURRENT ACTIVITIES (external training demands):\n${context.concurrent_activities.map((a: { name: string; intensity: number; days: string[]; movement_demands: string[] }) => `- ${a.name}: intensity ${Math.round(a.intensity * 100)}%, days: ${a.days.join(", ")}, demands: ${a.movement_demands.join(", ")}`).join("\n")}` : ""}
 
@@ -1564,6 +1611,36 @@ Keep this context in mind to ensure your greetings and questions naturally align
           JSON.stringify({
             reply: "",
             memoryIntent: { tool: name, rawArgs: args },
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (name === "add_to_grocery_list" || name === "check_off_grocery_item") {
+        // VISION-ARCHITECTURE.md §5.4 — the first IMMEDIATE-action chat
+        // door with no confirmation card at all (append-only ⇒ Decision #1:
+        // execute + receipt + undo). D2 gates it the same as record_fact:
+        // a statement ("we're out of eggs") without an instruction must not
+        // silently write. I1 holds: nothing is written here — the client's
+        // grocery-store resolves item names against food-db and writes.
+        const classification = classifyImperative(args.origin_verbatim_quote || "", message);
+        if (!classification.imperative) {
+          const subject = name === "add_to_grocery_list"
+            ? (Array.isArray(args.items) ? args.items.map((i: { name?: string }) => i.name).filter(Boolean).join(", ") : "that")
+            : (args.item_phrase || "that");
+          const verb = name === "add_to_grocery_list" ? "add" : "check off";
+          return new Response(
+            JSON.stringify({
+              reply: "",
+              offer: { text: `Want me to ${verb} ${subject}${name === "add_to_grocery_list" ? " on your list" : ""}?` },
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        return new Response(
+          JSON.stringify({
+            reply: "",
+            groceryIntent: { tool: name, rawArgs: args },
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
