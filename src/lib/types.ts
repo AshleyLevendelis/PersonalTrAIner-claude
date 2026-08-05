@@ -92,8 +92,24 @@ export type CookingTimePreference = 'quick' | 'moderate' | 'loves_cooking'
 export type BreakfastStyle = 'quick_cold' | 'cooked' | 'skip'
 
 export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'active' | 'very_active'
+/** No separate 'endurance' or 'maintain' value (differentiation-audit schema note) — see goal-policies.ts's file-level "Mapping note" for why: 'conditioning' already covers the endurance outcome, and 'functional' covers general-health/maintenance. */
 export type FitnessGoal = 'fat_loss' | 'hypertrophy' | 'functional' | 'conditioning'
 export type EquipmentAccess = 'full_gym' | 'home_gym' | 'minimalist' | 'bodyweight'
+/**
+ * Deliberately has no 'conditioning' value, even though FitnessGoal does
+ * (differentiation-audit schema note): training_style answers "what kind of
+ * exercise selection/session structure do you want" (bodybuilding-style
+ * isolation work vs. functional/athletic movement vs. combat-sport prep vs.
+ * a hybrid), while fitness_goal answers "what outcome are you training
+ * for" (including endurance/conditioning as an outcome) — see
+ * goal-policies.ts's GOAL_POLICIES for how a conditioning GOAL already
+ * reshapes rep ranges, rest, and accessory selection regardless of which
+ * style is picked. Adding a redundant 'conditioning' style would let the
+ * two axes fight over the same territory (a conditioning-style bodybuilder
+ * vs. a conditioning-goal bodybuilder would mean two different things with
+ * no clear precedence rule) rather than compose cleanly, so this is a
+ * deliberate 3-real-values-plus-hybrid set, not an oversight.
+ */
 export type TrainingStyle = 'functional' | 'bodybuilding' | 'combat' | 'hybrid'
 export type TrainingExperience = 'beginner' | 'novice' | 'intermediate' | 'advanced'
 export type CoachingPersona = 'drill_sergeant' | 'analytical' | 'supportive' | 'hype'

@@ -58,6 +58,48 @@ export interface GoalPolicy {
    */
   progressionEmphasis: ProgressionEmphasis
   coachNote: string
+  /**
+   * Differentiation round (VISION-ARCHITECTURE differentiation audit):
+   * signed rep-count shift applied to STYLE_CONFIGS' base rep range for
+   * each tier, before the experience floor. This is what makes fat_loss's
+   * main lifts read as "lower reps, quality over accumulation" and
+   * conditioning's read as "strength-endurance ranges" without touching
+   * training_style's own numbers — the two axes stay independent and
+   * multiply together instead of one silently overriding the other.
+   */
+  repRangeShift: { tier1: number; tier2: number; tier3: number }
+  /**
+   * Multiplies STYLE_CONFIGS' base rest-seconds per tier. Below 1.0 = denser
+   * (shorter rest); above 1.0 = fuller recovery. fat_loss/conditioning use
+   * this on accessories for density; functional lengthens tier1 rest
+   * slightly (fuller recovery between main lifts supports power/strength
+   * work); hypertrophy leaves rest untouched (rep-range/isolation-count are
+   * hypertrophy's differentiators, not rest).
+   */
+  restSecondsMultiplier: { tier1: number; tier2: number; tier3: number }
+  /**
+   * Signed shift in isolation (tier3) slot count; the same magnitude moves
+   * the OPPOSITE way for tier2 (compound-accessory) slots, so total
+   * accessory count is unchanged — only the isolation:compound-accessory
+   * ratio shifts. Never touches tier1 (main-lift) count, which is what the
+   * "fat_loss never has fewer main-compound slots than hypertrophy" audit
+   * guards. Positive = more isolation/variety (hypertrophy); negative =
+   * fewer isolation slots in favor of compound/multi-joint accessories
+   * (fat_loss's "accessory selection favouring compound over isolation",
+   * functional's "fewer machine-based isolations", conditioning's
+   * full-body/circuit-adjacent structure).
+   */
+  isolationSlotShift: number
+  /**
+   * When true, accessory/isolation candidate selection prefers exercises
+   * tagged unilateral, carry, or rotational (angle_vector) before falling
+   * back to the full eligible pool — functional's "more unilateral, carry,
+   * rotational and multi-planar work." No goal turns this off entirely for
+   * OTHER movement types; it only reorders which candidates are tried
+   * first within an already-eligible pool, so pattern-coverage/required-
+   * slot guarantees are untouched.
+   */
+  preferUnilateralCarry: boolean
 }
 
 const HYPERTROPHY_POLICY: GoalPolicy = {
@@ -70,6 +112,13 @@ const HYPERTROPHY_POLICY: GoalPolicy = {
   allowedPhases: ['anatomical_adaptation', 'hypertrophy', 'strength', 'power'],
   progressionEmphasis: 'load',
   coachNote: 'Volume drives growth here — the program is built around moderate-rep working sets taken close to failure, with load climbing week to week within each block.',
+  // Higher accessory/isolation reps (more time under tension), untouched
+  // rest (rep-range and isolation count are the differentiators, not
+  // density), and more isolation slots for wider per-muscle-group variety.
+  repRangeShift: { tier1: 0, tier2: 1, tier3: 2 },
+  restSecondsMultiplier: { tier1: 1.0, tier2: 1.0, tier3: 1.0 },
+  isolationSlotShift: 1,
+  preferUnilateralCarry: false,
 }
 
 const FAT_LOSS_POLICY: GoalPolicy = {
@@ -88,6 +137,16 @@ const FAT_LOSS_POLICY: GoalPolicy = {
   progressionEmphasis: 'load',
   coachNote:
     "Diet drives the fat loss here, not the workout — this program is built to protect the muscle you already have while you're in a deficit. Weights stay real weights and progression keeps climbing; conditioning is appended on top, never substituted for lifting.",
+  // Lower main-lift reps (quality over accumulation — deliberately NOT
+  // lighter/higher-rep, which would be the circuit-conversion myth this
+  // goal exists to avoid), shorter accessory rest for density, fewer
+  // isolation slots in favor of compound/multi-joint accessories. Tier1
+  // rest and tier1 slot count are untouched — the main lifts stay exactly
+  // as heavy and as present as hypertrophy's.
+  repRangeShift: { tier1: -2, tier2: -1, tier3: 0 },
+  restSecondsMultiplier: { tier1: 1.0, tier2: 0.75, tier3: 0.7 },
+  isolationSlotShift: -1,
+  preferUnilateralCarry: false,
 }
 
 const CONDITIONING_POLICY: GoalPolicy = {
@@ -101,6 +160,14 @@ const CONDITIONING_POLICY: GoalPolicy = {
   allowedPhases: ['anatomical_adaptation', 'hypertrophy', 'metabolic'],
   progressionEmphasis: 'reps',
   coachNote: 'Lifting supports the engine work here, not the other way around — two to three full-body sessions keep you strong enough to train hard, while dedicated conditioning is the main driver of this goal.',
+  // Strength-endurance rep ranges across every tier (including main lifts —
+  // this goal's lifting is real support work, not a heavy-strength focus),
+  // circuit-adjacent density via shortened rest everywhere, fewer isolation
+  // slots in favor of full-body/compound accessories.
+  repRangeShift: { tier1: 2, tier2: 3, tier3: 4 },
+  restSecondsMultiplier: { tier1: 0.8, tier2: 0.7, tier3: 0.65 },
+  isolationSlotShift: -1,
+  preferUnilateralCarry: false,
 }
 
 const FUNCTIONAL_POLICY: GoalPolicy = {
@@ -115,6 +182,14 @@ const FUNCTIONAL_POLICY: GoalPolicy = {
   allowedPhases: ['anatomical_adaptation', 'hypertrophy', 'strength', 'power'],
   progressionEmphasis: 'maintain',
   coachNote: 'This program favors variety and movement quality over chasing a number on the bar — exercises rotate faster, and the aim is consistent, sustainable training rather than maximal overload.',
+  // Standard rep ranges (variety is the differentiator here, not rep
+  // scheme), slightly fuller tier1 recovery (supports power/explosive work
+  // where experience allows), fewer isolation slots in favor of unilateral/
+  // carry/rotational multi-planar accessories — this goal's whole point.
+  repRangeShift: { tier1: 0, tier2: 0, tier3: 0 },
+  restSecondsMultiplier: { tier1: 1.05, tier2: 1.0, tier3: 1.0 },
+  isolationSlotShift: -1,
+  preferUnilateralCarry: true,
 }
 
 export const GOAL_POLICIES: Record<FitnessGoal, GoalPolicy> = {
