@@ -1038,6 +1038,7 @@ function App() {
               onLogsUpdated={() => setLogsVersion(v => v + 1)}
               onWeightLogged={handleWeightLogged}
               onMesocycleUpdated={setMesocycle}
+              onMealSwapApplied={(slot, chosenName) => setManualMealPicks(prev => ({ ...prev, [slot]: chosenName }))}
             />
           </TabsContent>
         </Tabs>

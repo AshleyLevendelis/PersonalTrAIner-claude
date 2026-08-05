@@ -91,8 +91,15 @@ export interface CreatePendingActionInput {
  * never produces a duplicate card.
  */
 export async function createPendingAction(input: CreatePendingActionInput): Promise<PendingActionRow> {
-  if (input.actionClass === 'plan_mutation' && input.preImage === undefined) {
-    throw new Error(`createPendingAction: pre_image is required for plan_mutation (kind=${input.kind})`)
+  // pre_image is mandatory only for kinds whose undo actually restores a
+  // snapshot (propose_exercise_swap restores the mesocycle via
+  // saveMesocycle/saveMesocycleWeek). propose_meal_swap's "undo" is just
+  // flipping manualMealPicks back client-side — no DB write to reverse, so
+  // no snapshot to capture. Keying this off `kind` rather than the whole
+  // 'plan_mutation' class avoids the earlier version wrongly demanding a
+  // mesocycle-shaped pre_image from every propose_* kind.
+  if (input.kind === 'propose_exercise_swap' && input.preImage === undefined) {
+    throw new Error(`createPendingAction: pre_image is required for ${input.kind}`)
   }
 
   const expiresAt = new Date(Date.now() + PENDING_WINDOW_MINUTES * 60_000).toISOString()

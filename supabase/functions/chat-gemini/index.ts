@@ -237,16 +237,15 @@ async function resolveWeight(
 
 const toolDeclarations = [
   {
-    name: "replace_food",
+    name: "propose_meal_swap",
     description:
-      "Replace a food item in the user's meal plan with a new one. ONLY call this when the user gives an explicit command to modify their plan (e.g. 'replace X with Y', 'swap my lunch to Z', 'change breakfast to...'). Do NOT call this for hypothetical questions, comparisons, or educational discussions about food.",
+      "PROPOSES swapping which verified pool option is assigned to a meal slot — this does NOT apply the change. Call this when the user gives an explicit command to change a meal (e.g. 'swap my lunch', 'change breakfast to something else'). Do NOT invent a new dish or ingredients — new_item, if given, must be the exact name of an existing alternative already in that slot's pool (mention one from the meal summary below if you know it; otherwise omit new_item and the app will pick the best available alternative). The app shows the user a card with the exact before/after macros and they tap Confirm themselves — do not describe the swap as already done.",
     parameters: {
       type: "object",
       properties: {
         meal_slot: {
           type: "string",
-          description:
-            "The meal slot to modify (Breakfast, Lunch, Dinner, Snack, or Post-Workout)",
+          description: "The meal slot to modify (breakfast, lunch, dinner, or snack)",
         },
         old_item: {
           type: "string",
@@ -254,30 +253,18 @@ const toolDeclarations = [
         },
         new_item: {
           type: "string",
-          description: "The name of the new food item",
+          description: "The exact name of an existing pool option to switch to. Omit if you don't know a specific alternative — the app picks one from the verified pool.",
         },
-        ingredients: {
-          type: "array",
-          items: { type: "string" },
-          description: "Array of individual ingredient lines, ONE ingredient per string, with exact gram weights (e.g. ['200g plain Greek yogurt', '100g mixed berries', '15g sliced almonds', '1 tsp honey']). Each string must be a single parseable ingredient with a quantity and a food name. Never combine multiple ingredients in one string.",
-        },
-        estimated_macros: {
-          type: "object",
-          description: "Your calculated macro estimates for this meal based on the ingredient quantities and the meal slot budget. These are used as a fallback if external verification is unavailable.",
-          properties: {
-            calories: { type: "integer", description: "Estimated total calories" },
-            protein: { type: "integer", description: "Estimated grams of protein" },
-            carbs: { type: "integer", description: "Estimated grams of carbohydrates" },
-            fat: { type: "integer", description: "Estimated grams of fat" },
-          },
-          required: ["calories", "protein", "carbs", "fat"],
-        },
-        prep: {
+        reason: {
           type: "string",
-          description: "Brief cooking instructions for the new item",
+          description: "One short sentence on why this swap makes sense — shown on the card as the rationale.",
+        },
+        origin_verbatim_quote: {
+          type: "string",
+          description: "The exact substring of the user's CURRENT message that is the imperative command for this swap. Must be copied verbatim, not paraphrased.",
         },
       },
-      required: ["meal_slot", "old_item", "new_item", "ingredients", "estimated_macros", "prep"],
+      required: ["meal_slot", "old_item", "origin_verbatim_quote"],
     },
   },
   {
@@ -535,44 +522,6 @@ const toolDeclarations = [
     },
   },
   {
-    name: "swap_meal",
-    description:
-      "Swaps one meal in the user's plan for a different one. Call when the user asks to change a specific meal (e.g. 'swap my lunch for a burrito bowl', 'change breakfast to oatmeal'). This triggers the calibration pipeline to find macro-matched alternatives.",
-    parameters: {
-      type: "object",
-      properties: {
-        meal_slot: {
-          type: "string",
-          description: "The meal slot to change (breakfast, lunch, dinner, snack_1, snack_2)",
-        },
-        old_item: {
-          type: "string",
-          description: "Current meal name being replaced",
-        },
-        new_item: {
-          type: "string",
-          description: "The new meal the user wants instead",
-        },
-        ingredients: {
-          type: "array",
-          items: { type: "string" },
-          description: "Ingredient list for the new meal with quantities",
-        },
-        estimated_macros: {
-          type: "object",
-          properties: {
-            calories: { type: "number" },
-            protein: { type: "number" },
-            carbs: { type: "number" },
-            fat: { type: "number" },
-          },
-          description: "Your estimated macros for the new meal",
-        },
-      },
-      required: ["meal_slot", "old_item", "new_item"],
-    },
-  },
-  {
     name: "log_workout_set",
     description:
       "Logs a single set of an exercise. Call when the user reports one set at a time (e.g. 'just did 8 reps of bench at 80kg'). For multiple sets, prefer log_workout_session instead.",
@@ -608,26 +557,6 @@ const toolDeclarations = [
     },
   },
 ];
-
-function getMealSlotBudget(
-  macros: { calories: number; protein: number; carbs: number; fat: number },
-  mealSlot: string
-): { calories: number; protein: number; carbs: number; fat: number } {
-  const slotRatios: Record<string, number> = {
-    breakfast: 0.25,
-    lunch: 0.35,
-    dinner: 0.30,
-    snack: 0.10,
-    "post-workout": 0.10,
-  };
-  const ratio = slotRatios[mealSlot.toLowerCase()] || 0.25;
-  return {
-    calories: Math.round(macros.calories * ratio),
-    protein: Math.round(macros.protein * ratio),
-    carbs: Math.round(macros.carbs * ratio),
-    fat: Math.round(macros.fat * ratio),
-  };
-}
 
 function buildDietarySafetyBlock(preferences: string[]): string {
   if (!preferences || preferences.length === 0) return "";
@@ -885,7 +814,7 @@ ${context.exercise_exclusions && context.exercise_exclusions.length > 0 ? `\nPER
 - Whenever the user describes food they ate, OR asks a nutrition/macro question about specific food, call log_meal with the ingredients parsed from their message. The tool's response already contains the real computed numbers (and any coverage/assumption caveats) — your reply must use ONLY those numbers, never your own math on top of them.
 - Extract ONLY what the user actually stated. Never add an ingredient they didn't mention (no assumed cooking oil, seasoning, or protein powder) — if an addition seems implied, ask the user rather than silently including it.
 - If an ingredient has an ambiguous variant (fat content, whole vs. skimmed, etc.), pick one explicit, precisely-named variant and record the assumption. If a quantity is missing, use a typical portion and record that assumption too. See log_meal's parameter descriptions for exact requirements.
-- This does NOT apply to replace_food/swap_meal's "estimated_macros" field — that is a separate, internal scaling input for building a plan swap, not a number shown to the user as verified fact.
+- propose_meal_swap does not take a macro field at all — the app computes the swap's macros itself from the verified pool, shown on the confirm card.
 
 DYNAMIC QUANTITY SCALING (CRITICAL - MATHEMATICAL CONSTRAINT):
 You are strictly responsible for scaling ingredient quantities so that the physical weights add up to the requested target metrics. Do NOT use rigid, static portion templates (e.g., always defaulting to 150g chicken or 200g rice). Instead, you MUST dynamically calculate gram weights based on the specific calorie and macro budget for the meal slot you are filling.
@@ -931,18 +860,17 @@ ${favoritesSection}
 
 FUNCTION CALL RULES (CRITICAL):
 - NEVER write tool names, parameter names, or enum values (like "reduce_half", "adjust_volume", "update_workout_schedule", "schedule_patch", "MOVE") in your visible text response. These exist only for native tool invocations. Your text must read like a human personal trainer — no code, no parameter labels, no function syntax.
-- Trigger replace_food or propose_exercise_swap when the user gives a DIRECT COMMAND to modify their plan. Command verbs include: "replace", "swap", "change", "switch", "use X instead". propose_exercise_swap ALWAYS requires origin_verbatim_quote — the exact substring of the CURRENT message that is the command; if the request is a question, a hypothetical, or a statement with no imperative verb (e.g. "I didn't train today", "should I switch to dumbbells?"), do NOT call the tool — answer in text instead.
-- propose_exercise_swap does not apply anything itself — it shows the user a confirm card. Put your reasoning in the "reason" field, not in a preceding question; do not say "Shall I make this change?" or claim the swap happened.
+- Trigger propose_meal_swap or propose_exercise_swap when the user gives a DIRECT COMMAND to modify their plan. Command verbs include: "replace", "swap", "change", "switch", "use X instead". Both ALWAYS require origin_verbatim_quote — the exact substring of the CURRENT message that is the command; if the request is a question, a hypothetical, or a statement with no imperative verb (e.g. "I didn't train today", "should I switch to dumbbells?"), do NOT call the tool — answer in text instead.
+- Neither propose_meal_swap nor propose_exercise_swap applies anything itself — both show the user a confirm card. Put your reasoning in the "reason" field, not in a preceding question; do not say "Shall I make this change?" or claim the swap happened.
 - Exercise swaps default to scope: "today" (only applies to today's workout; the original exercise returns next time that day comes up). Only set scope: "permanent" when the user explicitly says they want a lasting change (e.g. "for the rest of the plan", "permanently", "I never want to do X", "always use Y instead").
 - PLAN CHANGES NOT YET SAFE TO EXECUTE: update_workout_schedule (adding/moving/removing training days) and adjust_volume (adjusting sets for a session) are not safely wired up yet — calling either will always decline. For any request along these lines (rescheduling, clearing a day, adding a skill session, cutting volume, extra sets, fatigue/time-constraint adjustments), do NOT call the tool. Instead, briefly describe what you'd suggest and why, then tell the user to make it themselves via the in-app controls (the schedule editor for schedule changes, the swap (⇄) button or set-count controls on the exercise for volume changes).
 - Answer exercise form/technique questions ("How do I do X?", "What muscles does X work?") directly in your text response. Provide step-by-step form cues, target muscles, common mistakes, and coaching tips.
 - Trigger ban_exercise when the user says "I hate X", "never give me X", "remove X permanently", or explicitly flags an exercise to blacklist.
-- When a food command is given, execute it immediately. Scale portions to the meal slot budget above. Do NOT ask for macro details.
-- If the user does not specify which meal slot, infer it from the current meal plan.
-- When executing a food replacement, call the function FIRST. Do NOT write a long preamble.
+- When a food LOGGING command is given (log_meal), execute it immediately. Scale portions to the meal slot budget above. Do NOT ask for macro details.
+- If the user does not specify which meal slot for a swap, infer it from the current meal plan.
+- When calling propose_meal_swap, call the function FIRST. Do NOT write a long preamble — put reasoning in the "reason" field.
 - Do NOT trigger function calls for hypothetical questions, comparisons, or educational questions about exercise technique (answer those directly as text).
-- When genuinely unsure if the user wants a change applied, ask "Would you like me to make this change to your plan?"
-- ESTIMATED_MACROS REQUIREMENT: When calling replace_food, you MUST include the "estimated_macros" field with your own calculated calorie, protein, carbs, and fat totals derived from the ingredient quantities you provided.
+- When genuinely unsure if the user wants a change applied, don't call a propose_* tool at all — ask in plain text first, and only call the tool on their next, unambiguous reply.
 
 VIDEO & DEMONSTRATION REQUESTS:
 - When a user asks for a video, demonstration, or visual guide for any exercise, NEVER respond with "I can't send videos" or similar disclaimers.
@@ -1084,41 +1012,72 @@ Keep this context in mind to ensure your greetings and questions naturally align
       const { name, args } = functionCallPart.functionCall;
       const textPart = parts.find((p: { text?: string }) => p.text);
 
-      if (name === "replace_food" && Array.isArray(args.ingredients) && args.ingredients.length > 0) {
-        // M0 retirement: this used to run a 3-iteration calibrateMeal loop
-        // against the macro-calibration function, whose Edamam-backed
-        // verification step (nutrition-analysis) was never deployed and had
-        // no credentials — so calibration failed on step 1 of every single
-        // call and this path ALWAYS fell through to the estimated-macros
-        // fallback below, after burning latency for nothing. The loop call
-        // is gone; the macro-calibration function itself (and its
-        // proportional scaler, which M1 reuses) is untouched. Macros here
-        // are the model's own estimates and are labeled accordingly —
-        // is_verified is never claimed true.
-        const slotBudget = getMealSlotBudget(context.macros, args.meal_slot);
-        const estimated = args.estimated_macros;
-        const protein = estimated?.protein || slotBudget.protein;
-        const carbs = estimated?.carbs || slotBudget.carbs;
-        const fat = estimated?.fat || slotBudget.fat;
-        const calories = estimated?.calories || ((protein * 4) + (carbs * 4) + (fat * 9));
+      if (name === "propose_meal_swap") {
+        // VISION-ARCHITECTURE.md §2/Part 3 — replaces replace_food and
+        // swap_meal entirely. Unlike propose_exercise_swap, the server CAN
+        // cheaply build the full diff here: pool data is a plain REST
+        // fetch (meal_plan_slots), no client-only TS modules needed. I1
+        // still holds — this only READS meal_plan_slots, it never writes.
+        const classification = classifyImperative(args.origin_verbatim_quote || "", message);
+        if (!classification.imperative) {
+          return new Response(
+            JSON.stringify({
+              reply: "",
+              offer: { text: `Want me to swap **${args.old_item}** for something else in your ${args.meal_slot}?` },
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
 
-        const actionPayload = {
-          type: name,
-          meal_slot: args.meal_slot,
-          old_item: args.old_item,
-          new_item: args.new_item,
-          protein,
-          carbs,
-          fat,
-          portion_size: args.ingredients.join(", "),
-          prep: args.prep,
-          ingredients: args.ingredients,
-          is_verified: false,
-        };
-        const confirmationText = textPart?.text || `Done! I've replaced **${args.old_item}** with **${args.new_item}** in your ${args.meal_slot} (${args.ingredients.join(", ")}). Estimated: ${calories} kcal, ${protein}g protein, ${carbs}g carbs, ${fat}g fat.`;
+        const profileId = context.profile_id;
+        const slot = String(args.meal_slot || "").toLowerCase();
+        let proposalResult = null;
+        if (profileId && slot) {
+          try {
+            const poolResp = await fetch(
+              `${supabaseUrl}/rest/v1/meal_plan_slots?profile_id=eq.${profileId}&slot=eq.${slot}&select=name,macros&order=pool_index.asc`,
+              { headers: { Authorization: `Bearer ${serviceKey}`, Apikey: serviceKey } }
+            );
+            const options: { name: string; macros?: { kcal?: number; protein?: number; carbs?: number; fat?: number } }[] = poolResp.ok ? await poolResp.json() : [];
+            const oldOption = options.find((o) => o.name.toLowerCase() === String(args.old_item || "").toLowerCase());
+            const requestedNew = args.new_item ? options.find((o) => o.name.toLowerCase() === String(args.new_item).toLowerCase()) : undefined;
+            const alternatives = options.filter((o) => o.name.toLowerCase() !== String(args.old_item || "").toLowerCase());
+            const newOption = requestedNew ?? alternatives[0];
+
+            if (newOption) {
+              const oldMacros = oldOption?.macros ?? {};
+              const newMacros = newOption.macros ?? {};
+              proposalResult = {
+                kind: "propose_meal_swap",
+                scopeKey: `${profileId}:propose_meal_swap:${slot}`,
+                preconditions: { slot, currentItemName: args.old_item },
+                payload: { slot, currentName: args.old_item, chooseName: newOption.name },
+                diff: {
+                  rows: [
+                    { field: "Meal", before: args.old_item, after: newOption.name },
+                    { field: "Calories", before: `${Math.round(oldMacros.kcal ?? 0)} kcal`, after: `${Math.round(newMacros.kcal ?? 0)} kcal` },
+                    { field: "Protein", before: `${Math.round(oldMacros.protein ?? 0)}g`, after: `${Math.round(newMacros.protein ?? 0)}g` },
+                  ],
+                  implications: [],
+                  rationale: typeof args.reason === "string" ? args.reason : undefined,
+                  reversible: true,
+                },
+              };
+            }
+          } catch (err) {
+            console.error("propose_meal_swap: pool lookup failed", err);
+          }
+        }
+
+        if (!proposalResult) {
+          return new Response(
+            JSON.stringify({ reply: `I couldn't find another option for your ${args.meal_slot} right now.` }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
 
         return new Response(
-          JSON.stringify({ reply: confirmationText, action: actionPayload }),
+          JSON.stringify({ reply: "", proposal: proposalResult }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
@@ -1343,29 +1302,6 @@ Keep this context in mind to ensure your greetings and questions naturally align
 
         return new Response(
           JSON.stringify({ reply: parts.join(" ") }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
-      if (name === "swap_meal") {
-        const actionPayload = {
-          type: "replace_food",
-          meal_slot: args.meal_slot,
-          old_item: args.old_item,
-          new_item: args.new_item,
-          ingredients: args.ingredients || [],
-          protein: args.estimated_macros?.protein || 0,
-          carbs: args.estimated_macros?.carbs || 0,
-          fat: args.estimated_macros?.fat || 0,
-          portion_size: null,
-          prep: null,
-          is_verified: false,
-        };
-
-        const confirmText = textPart?.text || `I'll swap **${args.old_item}** for **${args.new_item}** in your ${args.meal_slot}. The meal plan will be updated once calibration completes.`;
-
-        return new Response(
-          JSON.stringify({ reply: confirmText, action: actionPayload }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }

@@ -87,9 +87,11 @@ interface ChatAssistantProps {
   onWeightLogged?: () => void | Promise<void>
   /** Fired after a confirmed propose_exercise_swap executes — App.tsx's setMesocycle, since the executor is pure and returns the new array rather than mutating App.tsx's state directly. */
   onMesocycleUpdated: (mesocycle: MesocycleWeek[]) => void
+  /** Fired after a confirmed propose_meal_swap executes — mirrors App.tsx's handleSwapMealSlot's setManualMealPicks, the ONLY thing that makes a swapped-in pool option actually render as today's pick. Without this the receipt would claim a swap the Meals/Nutrition tab never shows — exactly the incident this framework exists to prevent. */
+  onMealSwapApplied: (slot: MealSlotName, chosenName: string) => void
 }
 
-export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated }: ChatAssistantProps) {
+export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onMealSwapApplied }: ChatAssistantProps) {
   // NL logging (§3) writes through the SAME frozen session identity +
   // logSet facade SetGrid.tsx uses — never saveSet directly (see
   // nl-logging-executor.ts's own doc comment).
@@ -1342,6 +1344,11 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       const ok = receipt.failed.length === 0 && result.appliedName
       title = ok ? 'Swapped' : "Couldn't apply the swap"
       rows = ok ? [{ label: payload.slot, detail: `→ ${result.appliedName}` }] : []
+      if (ok && result.appliedName) {
+        // The step that actually makes the swap visible — without this the
+        // receipt would claim a swap the Meals/Nutrition tab never shows.
+        onMealSwapApplied(payload.slot, result.appliedName)
+      }
       if (ok && result.appliedMacros) {
         await upsertFavorite({
           new_item: result.appliedName!,
