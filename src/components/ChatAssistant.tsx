@@ -26,6 +26,7 @@ import { createFact, createGoal, createContextFact, retireFact, retireContextFac
 import { resolveExerciseTarget, resolveFoodTarget } from '@/lib/fact-compiler'
 import { checkFactConflict, checkGoalConflict } from '@/lib/memory-reconcile'
 import { getPRCache } from '@/lib/pr-engine'
+import { getAllItems as getAllGroceryItems, addItemLocal, setCheckedLocal, undoAddLocal, type GroceryItemRow, type GroceryCategory } from '@/lib/grocery-store'
 import { ProposalCard } from '@/components/chat/ProposalCard'
 import { ReceiptCard } from '@/components/chat/ReceiptCard'
 import { ClarificationCard } from '@/components/chat/ClarificationCard'
@@ -68,6 +69,10 @@ function extractQuickReplies(text: string): string[] {
     .filter(Boolean)
 }
 
+const CATEGORY_LABEL_FOR_RECEIPT: Record<GroceryCategory, string> = {
+  produce: 'Produce', meat_fish: 'Meat & Fish', dairy: 'Dairy', dry_goods: 'Dry Goods', frozen: 'Frozen', other: 'Other',
+}
+
 interface FavoriteMeal {
   name: string
   meal_slot: string
@@ -101,9 +106,14 @@ interface ChatAssistantProps {
   onMemoryChanged: () => void | Promise<void>
   /** Deep-link target for a memory receipt's "View in memory" button. */
   onOpenMemory?: () => void
+  /** Grocery list (VISION-ARCHITECTURE.md §5.4) — current items, for the "what's on my list" context snapshot and duplicate-merge decisions. Same "client is the only writer, caller reloads after" shape as memory. */
+  groceryItems: GroceryItemRow[]
+  onGroceryChanged?: () => void | Promise<void>
+  /** Deep-link target for a grocery receipt's "View list" button — navigates to the Meals tab. */
+  onOpenGrocery?: () => void
 }
 
-export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onMealSwapApplied, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenMemory }: ChatAssistantProps) {
+export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onMealSwapApplied, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenMemory, groceryItems, onGroceryChanged, onOpenGrocery }: ChatAssistantProps) {
   // NL logging (§3) writes through the SAME frozen session identity +
   // logSet facade SetGrid.tsx uses — never saveSet directly (see
   // nl-logging-executor.ts's own doc comment).
@@ -537,6 +547,13 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       active_facts: memoryFacts.map(f => f.display_text),
       active_goals: memoryGoals.map(g => g.display_text),
       context_facts: memoryContextFacts.map(c => c.display_text),
+      // Grocery list (VISION-ARCHITECTURE.md §5.4) — a snapshot for "what's
+      // on my list" Q&A, not live-synced to Meals-tab edits mid-conversation
+      // (same snapshot-per-mount shape as mealPlan/meal_summary above).
+      grocery_list_summary: groceryItems
+        .filter(i => !i.checked)
+        .map(i => `${i.quantity}${i.unit === 'g' || i.unit === 'ml' ? i.unit : ` ${i.unit}`} ${i.display_name}`)
+        .join('\n'),
       training_days_count: profile.training_days.filter(d => d.available).length,
       exercise_summary: exerciseSummary,
       meal_summary: mealSummary,
@@ -650,6 +667,10 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     // forwards the validated tool args. resolveAndSaveMemory resolves
     // targets, checks a baseline, runs reconciliation, and only then writes.
     memoryIntent?: { tool: 'record_fact' | 'record_goal' | 'record_context_fact'; rawArgs: Record<string, unknown> }
+    // VISION-ARCHITECTURE.md §5.4 — the first IMMEDIATE-action chat door
+    // with no confirmation card (append-only ⇒ execute + receipt + undo).
+    // Same I1 shape as memoryIntent: the server never writes grocery_items.
+    groceryIntent?: { tool: 'add_to_grocery_list' | 'check_off_grocery_item'; rawArgs: Record<string, unknown> }
   }
 
   const callGemini = async (userMessage: string): Promise<ChatApiResponse> => {
@@ -701,7 +722,14 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     if (typeof data.reply !== 'string') {
       throw new Error('Invalid response from AI')
     }
-    return { reply: data.reply, action: data.action, proposal: data.proposal, receipt: data.receipt, offer: data.offer, logWorkout: data.logWorkout }
+    return {
+      reply: data.reply, action: data.action, proposal: data.proposal, receipt: data.receipt, offer: data.offer, logWorkout: data.logWorkout,
+      // Bug fix: memoryIntent was validated server-side (M1-M5) and read by
+      // processResponse below, but never actually threaded through here —
+      // every memory save silently fell through to the offer/action path
+      // instead. groceryIntent follows the identical shape.
+      memoryIntent: data.memoryIntent, groceryIntent: data.groceryIntent,
+    }
   }
 
   // Helper: persist user message to Supabase (fire-and-forget)
@@ -1017,6 +1045,76 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     }
   }
 
+  /**
+   * VISION-ARCHITECTURE.md §5.4 — the append-only IMMEDIATE chat door: no
+   * ProposalCard, no pending_actions row, ever (Decision #1: append-only
+   * writes execute + receipt + undo, never a confirm gate). I1 holds: this
+   * is the ONE place the client writes grocery_items, mirroring
+   * resolveAndSaveMemory exactly. `undoToken` packs `id`, `addedQuantity`
+   * and `created` (JSON-encoded) since undo needs all three to reverse a
+   * merge-onto-an-existing-line correctly, not just delete a row.
+   */
+  const resolveAndSaveGrocery = async (intent: { tool: 'add_to_grocery_list' | 'check_off_grocery_item'; rawArgs: Record<string, unknown> }): Promise<{ text: string; receipt?: ChatReceiptView }> => {
+    const args = intent.rawArgs
+    const profileId = profile.id
+    if (!profileId) return { text: "I can't update that yet — your profile hasn't finished setting up." }
+
+    if (intent.tool === 'check_off_grocery_item') {
+      const phrase = String(args.item_phrase || '').trim().toLowerCase()
+      if (!phrase) return { text: '' }
+      const current = await getAllGroceryItems(profileId)
+      const matches = current.filter(i => !i.checked && (i.display_name.toLowerCase().includes(phrase) || phrase.includes(i.display_name.toLowerCase())))
+      if (matches.length === 0) return { text: `I don't see "${args.item_phrase}" on your list.` }
+      if (matches.length > 1) return { text: `A few items match "${args.item_phrase}" — which one: ${matches.map(m => m.display_name).join(', ')}?` }
+      const row = setCheckedLocal(matches[0], true)
+      return {
+        text: `Checked off ${row.display_name}.`,
+        receipt: {
+          kind: 'grocery_item_added',
+          title: 'Checked off',
+          rows: [{ label: row.display_name, detail: 'checked off your list' }],
+          status: 'done',
+          resolvedAt: new Date().toISOString(),
+        },
+      }
+    }
+
+    const items = Array.isArray(args.items) ? args.items as { name?: string; quantity?: number; unit?: string }[] : []
+    const named = items.filter(i => i.name && String(i.name).trim())
+    if (named.length === 0) return { text: '' }
+
+    const currentItems = await getAllGroceryItems(profileId)
+    const added: { name: string; row: GroceryItemRow; addedQuantity: number; created: boolean }[] = []
+    let workingItems = currentItems
+    for (const item of named) {
+      const result = addItemLocal({
+        profileId, name: String(item.name).trim(),
+        quantity: typeof item.quantity === 'number' ? item.quantity : 1,
+        unit: typeof item.unit === 'string' && item.unit.trim() ? item.unit.trim() : 'whole',
+        source: 'chat', currentItems: workingItems,
+      })
+      added.push({ name: String(item.name).trim(), row: result.row, addedQuantity: result.addedQuantity, created: result.created })
+      workingItems = workingItems.some(i => i.id === result.row.id) ? workingItems.map(i => (i.id === result.row.id ? result.row : i)) : [...workingItems, result.row]
+    }
+    await onGroceryChanged?.()
+
+    // Undo needs (id, addedQuantity, created) per row to reverse either a
+    // fresh insert or a merge-onto-existing-line correctly — packed as JSON
+    // since ChatReceiptView.undoToken is a single opaque string.
+    const undoToken = JSON.stringify(added.map(a => ({ id: a.row.id, addedQuantity: a.addedQuantity, created: a.created })))
+    return {
+      text: `Added to your list: ${added.map(a => a.row.display_name).join(', ')}.`,
+      receipt: {
+        kind: 'grocery_item_added',
+        title: 'Added to your list',
+        rows: added.map(a => ({ label: a.row.display_name, detail: CATEGORY_LABEL_FOR_RECEIPT[a.row.category] })),
+        status: 'done',
+        undoToken,
+        resolvedAt: new Date().toISOString(),
+      },
+    }
+  }
+
   const resolveAndMaybeLog = (entries: WorkoutEntryInput[]): { text: string; receipt?: ChatReceiptView; clarification?: ChatClarificationView } => {
     const todaysWorkout = exercisePlan.find(d => d.day === activeSession.dayName)
     const todaysPlanExerciseNames = todaysWorkout?.exercises.map(e => e.name) ?? []
@@ -1152,6 +1250,9 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     }
     if (result.memoryIntent) {
       return resolveAndSaveMemory(result.memoryIntent)
+    }
+    if (result.groceryIntent) {
+      return resolveAndSaveGrocery(result.groceryIntent)
     }
     if (result.offer) {
       // D3: a non-imperative statement downgraded to a suggestion chip —
@@ -1499,6 +1600,18 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       else if (receipt.kind === 'memory_context_fact_saved') await retireContextFact(receipt.undoToken)
       else await abandonGoal(receipt.undoToken)
       await onMemoryChanged()
+    } else if (receipt.kind === 'grocery_item_added') {
+      // §5.4/§2.5 — undoToken is a JSON-encoded list of {id, addedQuantity,
+      // created} (one per item added this turn), since undoing a merge onto
+      // an existing line means subtracting back out, not deleting the row.
+      if (!isWithinUndoWindow(receipt.resolvedAt ?? null)) return
+      const entries: { id: string; addedQuantity: number; created: boolean }[] = JSON.parse(receipt.undoToken)
+      const current = await getAllGroceryItems(profile.id)
+      for (const entry of entries) {
+        const row = current.find(i => i.id === entry.id)
+        if (row) undoAddLocal(row, entry.addedQuantity, entry.created)
+      }
+      await onGroceryChanged?.()
     } else {
       const row = await getPendingAction(receipt.undoToken)
       if (!row || !isWithinUndoWindow(row.resolved_at)) return
@@ -1672,6 +1785,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
                         undoAvailable={!!msg.receipt.undoToken && isWithinUndoWindow(msg.receipt.resolvedAt ?? null)}
                         onUndo={msg.receipt.undoToken ? () => handleUndoReceipt(i) : undefined}
                         onViewMemory={msg.receipt.kind.startsWith('memory_') ? onOpenMemory : undefined}
+                        onViewGrocery={msg.receipt.kind === 'grocery_item_added' ? onOpenGrocery : undefined}
                       />
                     )}
                     {msg.clarification && msg.status !== 'failed' && (

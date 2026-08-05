@@ -26,6 +26,7 @@ export function ReceiptCard({
   onUndo,
   onRetryFailed,
   onViewMemory,
+  onViewGrocery,
 }: {
   title: string
   rows: ReceiptRow[]
@@ -37,6 +38,8 @@ export function ReceiptCard({
   onRetryFailed?: (op: string) => Promise<void>
   /** VISION-ARCHITECTURE.md §1 Part 4 — "linkable from chat receipts": present only for memory_*_saved receipts, deep-links to the memory screen. */
   onViewMemory?: () => void
+  /** VISION-ARCHITECTURE.md §5.4 — present only for grocery_item_added receipts, deep-links to the Meals tab's grocery section. */
+  onViewGrocery?: () => void
 }) {
   const [busy, setBusy] = useState<'undo' | string | null>(null)
 
@@ -113,6 +116,11 @@ export function ReceiptCard({
           {onViewMemory && (
             <Button size="sm" variant="ghost" className="h-6 text-[11px]" onClick={onViewMemory}>
               View in memory
+            </Button>
+          )}
+          {onViewGrocery && (
+            <Button size="sm" variant="ghost" className="h-6 text-[11px]" onClick={onViewGrocery}>
+              View list
             </Button>
           )}
           {undoAvailable && onUndo && (

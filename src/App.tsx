@@ -29,6 +29,7 @@ import { swapExerciseInMesocycle, banExerciseFromMesocycle, type SwapScope } fro
 import { sweepStaleForTarget } from '@/lib/pending-actions-store'
 import { getActiveFacts, getActiveGoals, getActiveContextFacts, type UserFactRow, type UserGoalRow, type UserContextFactRow } from '@/lib/memory-store'
 import { compileExerciseExclusions, compileFoodDislikes, compileTimingRules } from '@/lib/fact-compiler'
+import { getAllItems as getAllGroceryItems, type GroceryItemRow } from '@/lib/grocery-store'
 import type { UserProfile, MacroTargets, WorkoutDay, PlanAction, SchedulePatchItem, MesocycleWeek } from '@/lib/types'
 import type { ExerciseEntry } from '@/lib/exercise-db'
 
@@ -97,6 +98,15 @@ function App() {
     setMemoryFacts(facts)
     setMemoryGoals(goals)
     setMemoryContextFacts(contextFacts)
+  }
+  // Grocery list (VISION-ARCHITECTURE.md §5.4) — a snapshot for the chat's
+  // "what's on my list" context and chat-add merge decisions. Not the Meals
+  // tab's source of truth (GroceryList.tsx owns its own live state) — this
+  // is reloaded after any chat write, same "caller reloads after" shape as
+  // memory.
+  const [groceryItems, setGroceryItems] = useState<GroceryItemRow[]>([])
+  const reloadGrocery = async (profileId: string) => {
+    setGroceryItems(await getAllGroceryItems(profileId))
   }
   const compiledExerciseExclusions = compileExerciseExclusions(memoryFacts)
   const compiledFoodDislikes = compileFoodDislikes(memoryFacts)
@@ -340,7 +350,7 @@ function App() {
     setExercisePlan(restoredExercises)
     setMesocycle(restoredMesocycle)
     setIsRestoring(false)
-    if (restoredProfile.id) void reloadMemory(restoredProfile.id)
+    if (restoredProfile.id) { void reloadMemory(restoredProfile.id); void reloadGrocery(restoredProfile.id) }
 
     // Version today's targets when they differ from the last snapshot —
     // fire-and-forget; the M3 trend loop reads this history.
@@ -1077,6 +1087,9 @@ function App() {
               memoryContextFacts={memoryContextFacts}
               onMemoryChanged={() => { if (profile?.id) return reloadMemory(profile.id) }}
               onOpenMemory={() => setMemoryScreenOpen(true)}
+              groceryItems={groceryItems}
+              onGroceryChanged={() => { if (profile?.id) return reloadGrocery(profile.id) }}
+              onOpenGrocery={() => { window.location.hash = tabHash('meals') }}
             />
           </TabsContent>
         </Tabs>

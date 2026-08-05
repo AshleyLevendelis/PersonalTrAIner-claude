@@ -287,7 +287,7 @@ export interface ChatPendingActionView {
 }
 
 export interface ChatReceiptView {
-  kind: 'log_workout' | 'propose_exercise_swap' | 'propose_meal_swap' | 'memory_fact_saved' | 'memory_goal_saved' | 'memory_context_fact_saved'
+  kind: 'log_workout' | 'propose_exercise_swap' | 'propose_meal_swap' | 'memory_fact_saved' | 'memory_goal_saved' | 'memory_context_fact_saved' | 'grocery_item_added'
   title: string
   rows: { label: string; detail: string; note?: string }[]
   summary?: string
