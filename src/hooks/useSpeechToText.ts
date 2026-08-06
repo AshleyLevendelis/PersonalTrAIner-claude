@@ -77,14 +77,32 @@ export function useSpeechToText({ onTranscript }: { onTranscript: (text: string,
     recognition.interimResults = true
     recognition.lang = navigator.language || 'en-US'
 
+    // Fix — voice input compounding instead of replacing. `event.results`
+    // keeps every already-final result around on every subsequent event, so
+    // naively re-summing the whole array on each onresult (as this used to)
+    // re-appends already-locked-in segments every time they're still
+    // present — and the still-open (non-final) segment is a REVISION of the
+    // recognizer's guess, not new text, so it must replace the previous
+    // interim rather than concatenate onto it. `finalizedCount` tracks how
+    // many leading results have already been folded into `finalizedText` so
+    // each final segment is counted exactly once; the current interim is
+    // always just the single most-recent non-final result, never a running
+    // concatenation of its own revisions.
+    let finalizedText = ''
+    let finalizedCount = 0
     recognition.onresult = event => {
-      let text = ''
-      let lastIsFinal = false
-      for (let i = 0; i < event.results.length; i++) {
-        text += event.results[i][0].transcript
-        lastIsFinal = event.results[i].isFinal
+      let interimText = ''
+      for (let i = finalizedCount; i < event.results.length; i++) {
+        const result = event.results[i]
+        if (result.isFinal) {
+          finalizedText += (finalizedText ? ' ' : '') + result[0].transcript
+          finalizedCount = i + 1
+        } else {
+          interimText = result[0].transcript
+        }
       }
-      onTranscriptRef.current(text, lastIsFinal)
+      const combined = finalizedText + (finalizedText && interimText ? ' ' : '') + interimText
+      onTranscriptRef.current(combined, interimText === '')
     }
     recognition.onerror = event => {
       if ((event.error === 'not-allowed' || event.error === 'service-not-allowed') && !deniedRef.current) {
