@@ -219,9 +219,9 @@ export function SetGrid({
 
   return (
     <div className="px-4 pb-3 pt-1 space-y-1">
-      <div className="grid grid-cols-[auto_minmax(4.5rem,1fr)_auto_auto_auto_1fr_auto] gap-1.5 items-center text-xs text-muted-foreground font-medium px-1">
+      <div className="grid grid-cols-[auto_minmax(6rem,1fr)_auto_auto_auto_1fr_auto] gap-1.5 items-center text-xs text-muted-foreground font-medium px-1">
         <span className="w-5">#</span>
-        <span>{loadIsEstimate ? 'Weight — log actual' : 'Weight'}</span>
+        <span>{loadIsEstimate ? 'Log weight' : 'Weight'}</span>
         <span className="w-7"></span>
         <span className="w-7"></span>
         <span className="w-8"></span>
@@ -238,7 +238,7 @@ export function SetGrid({
         return (
           <React.Fragment key={setNumber}>
           <div
-            className={`grid grid-cols-[auto_minmax(4.5rem,1fr)_auto_auto_auto_1fr_auto] gap-1.5 items-center rounded-[8px] px-1 py-0.5 transition-colors ${
+            className={`grid grid-cols-[auto_minmax(6rem,1fr)_auto_auto_auto_1fr_auto] gap-1.5 items-center rounded-[8px] px-1 py-0.5 transition-colors ${
               isSaved ? 'bg-primary/10' : ''
             }`}
           >

@@ -46,7 +46,7 @@ interface OnboardingData {
 
 const TOTAL_STEPS = 20
 
-const EXPERIENCE_OPTIONS: { value: TrainingExperience; icon: string; label: string; description: string }[] = [
+export const EXPERIENCE_OPTIONS: { value: TrainingExperience; icon: string; label: string; description: string }[] = [
   { value: 'beginner', icon: '🌱', label: 'Beginner', description: 'New to this, or coming back after a long break' },
   { value: 'novice', icon: '📈', label: 'Novice', description: '6+ months training fairly consistently' },
   { value: 'intermediate', icon: '🎯', label: 'Intermediate', description: '2+ years, comfortable with the main lifts' },
@@ -63,19 +63,19 @@ const GOAL_OPTIONS: { value: FitnessGoal; icon: string; label: string; descripti
 const DAYS_OF_WEEK = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const DAYS_FULL = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
-const RECOVERY_OPTIONS: { value: RecoveryCapacity; icon: string; label: string; description: string }[] = [
+export const RECOVERY_OPTIONS: { value: RecoveryCapacity; icon: string; label: string; description: string }[] = [
   { value: 'low', icon: '🪫', label: 'Stretched Thin', description: 'Poor sleep, high stress, or a physically demanding job' },
   { value: 'moderate', icon: '🔋', label: 'Getting By', description: 'Decent sleep most nights, manageable stress' },
   { value: 'high', icon: '🔌', label: 'Well Rested', description: 'Good sleep, low stress, recovery is not a limiter' },
 ]
 
-const CONDITIONING_PREF_OPTIONS: { value: ConditioningPreference; icon: string; label: string; description: string }[] = [
+export const CONDITIONING_PREF_OPTIONS: { value: ConditioningPreference; icon: string; label: string; description: string }[] = [
   { value: 'love', icon: '🏃‍♂️', label: 'Love It', description: 'Give me plenty of cardio/conditioning' },
   { value: 'tolerate', icon: '🙂', label: "It's Fine", description: "I'll do what the program calls for" },
   { value: 'avoid', icon: '🙅', label: 'Not For Me', description: 'Keep it to the minimum the goal actually needs' },
 ]
 
-const DURATION_OPTIONS: { value: SessionDuration; icon: string; label: string; description: string }[] = [
+export const DURATION_OPTIONS: { value: SessionDuration; icon: string; label: string; description: string }[] = [
   { value: '30-45', icon: '⚡', label: '30-45 min', description: 'Quick & efficient' },
   { value: '45-60', icon: '⏱️', label: '45-60 min', description: 'Standard session' },
   { value: '60-90', icon: '🏋️', label: '60-90 min', description: 'Extended volume' },
@@ -90,21 +90,21 @@ const TIME_OPTIONS: { value: TrainingTime; icon: string; label: string; descript
   { value: 'varies', icon: '🔄', label: 'It Varies', description: 'No fixed time' },
 ]
 
-const EQUIPMENT_OPTIONS: { value: EquipmentAccess; icon: string; label: string; description: string }[] = [
+export const EQUIPMENT_OPTIONS: { value: EquipmentAccess; icon: string; label: string; description: string }[] = [
   { value: 'full_gym', icon: '🏢', label: 'Full Gym', description: 'All machines & free weights' },
   { value: 'home_gym', icon: '🏠', label: 'Home Gym', description: 'Barbell, dumbbells, bench' },
   { value: 'minimalist', icon: '🎒', label: 'Minimalist', description: 'Bands & kettlebells' },
   { value: 'bodyweight', icon: '🤸', label: 'Bodyweight Only', description: 'No equipment needed' },
 ]
 
-const STYLE_OPTIONS: { value: TrainingStyle; icon: string; label: string; description: string }[] = [
+export const STYLE_OPTIONS: { value: TrainingStyle; icon: string; label: string; description: string }[] = [
   { value: 'functional', icon: '🏃', label: 'Functional / Athletic', description: 'Explosive & dynamic' },
   { value: 'bodybuilding', icon: '🏆', label: 'Bodybuilding', description: 'Aesthetics & symmetry' },
   { value: 'combat', icon: '🥊', label: 'Combat / Conditioning', description: 'Fight-ready fitness' },
   { value: 'hybrid', icon: '⚙️', label: 'Hybrid', description: 'Best of everything' },
 ]
 
-const INJURY_OPTIONS: { value: string; icon: string; label: string }[] = [
+export const INJURY_OPTIONS: { value: string; icon: string; label: string }[] = [
   { value: 'lower_back', icon: '🔙', label: 'Lower Back' },
   { value: 'knees', icon: '🦵', label: 'Knees' },
   { value: 'shoulders', icon: '💪', label: 'Shoulders' },
@@ -115,7 +115,7 @@ const INJURY_OPTIONS: { value: string; icon: string; label: string }[] = [
   { value: 'elbows', icon: '💪', label: 'Elbows' },
 ]
 
-const DIETARY_OPTIONS: { value: string; icon: string; label: string }[] = [
+export const DIETARY_OPTIONS: { value: string; icon: string; label: string }[] = [
   { value: 'vegetarian', icon: '🥬', label: 'Vegetarian' },
   { value: 'vegan', icon: '🌱', label: 'Vegan' },
   { value: 'pescatarian', icon: '🐟', label: 'Pescatarian' },
@@ -138,20 +138,20 @@ const DIETARY_OPTIONS: { value: string; icon: string; label: string }[] = [
 // 1.55 / 1.725). Four options rather than five: 'very_active' (1.9,
 // athlete-tier) stays reachable via the type but isn't offered — day-to-day
 // self-reports at that level are nearly always overestimates.
-const ACTIVITY_OPTIONS: { value: ActivityLevel; icon: string; label: string; description: string }[] = [
+export const ACTIVITY_OPTIONS: { value: ActivityLevel; icon: string; label: string; description: string }[] = [
   { value: 'sedentary', icon: '🪑', label: 'Sedentary', description: 'Desk job, little movement outside training' },
   { value: 'light', icon: '🚶', label: 'Lightly Active', description: 'On my feet some of the day, short walks' },
   { value: 'moderate', icon: '🏃', label: 'Moderately Active', description: 'Regular movement most days' },
   { value: 'active', icon: '⚡', label: 'Very Active', description: 'Physical job or on the move all day' },
 ]
 
-const MEALS_PER_DAY_OPTIONS: { value: 2 | 3 | 4; icon: string; label: string; description: string }[] = [
+export const MEALS_PER_DAY_OPTIONS: { value: 2 | 3 | 4; icon: string; label: string; description: string }[] = [
   { value: 2, icon: '🍽️', label: '2 meals', description: 'Bigger plates, longer gaps' },
   { value: 3, icon: '🍽️', label: '3 meals', description: 'Classic breakfast / lunch / dinner' },
   { value: 4, icon: '🍽️', label: '4 meals', description: 'Smaller, more frequent plates' },
 ]
 
-const COOKING_TIME_OPTIONS: { value: CookingTimePreference; icon: string; label: string; description: string }[] = [
+export const COOKING_TIME_OPTIONS: { value: CookingTimePreference; icon: string; label: string; description: string }[] = [
   { value: 'quick', icon: '⏱️', label: 'Quick', description: 'Under 15 minutes — keep it simple' },
   { value: 'moderate', icon: '🍳', label: 'Moderate', description: 'Happy to spend up to ~30 minutes' },
   { value: 'loves_cooking', icon: '👨‍🍳', label: 'Happy to Cook', description: 'Real recipes, real prep — I enjoy it' },
@@ -160,7 +160,7 @@ const COOKING_TIME_OPTIONS: { value: CookingTimePreference; icon: string; label:
 // Short labels chosen to substring-match generate-meals's FAMILIAR_CUISINES/
 // EXOTIC_CUISINES entries (e.g. "Indian" matches "Indian (North Indian,
 // South Indian)") — see selectCuisines in supabase/functions/generate-meals.
-const FAVORITE_CUISINE_OPTIONS: { value: string; icon: string; label: string }[] = [
+export const FAVORITE_CUISINE_OPTIONS: { value: string; icon: string; label: string }[] = [
   { value: 'Italian', icon: '🍝', label: 'Italian' },
   { value: 'Mexican', icon: '🌮', label: 'Mexican' },
   { value: 'Indian', icon: '🍛', label: 'Indian' },
@@ -173,7 +173,7 @@ const FAVORITE_CUISINE_OPTIONS: { value: string; icon: string; label: string }[]
   { value: 'Caribbean', icon: '🌴', label: 'Caribbean' },
 ]
 
-const BREAKFAST_STYLE_OPTIONS: { value: BreakfastStyle; icon: string; label: string; description: string }[] = [
+export const BREAKFAST_STYLE_OPTIONS: { value: BreakfastStyle; icon: string; label: string; description: string }[] = [
   { value: 'quick_cold', icon: '🥣', label: 'Quick & Cold', description: 'Cereal, yoghurt, smoothies — no cooking' },
   { value: 'cooked', icon: '🍳', label: 'Cooked', description: 'Eggs, pancakes, hot oats — happy to cook' },
   { value: 'skip', icon: '⏭️', label: 'Usually Skip', description: 'Keep it minimal if I eat anything at all' },

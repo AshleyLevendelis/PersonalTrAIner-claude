@@ -5,26 +5,23 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Settings, BrainCircuit, RotateCcw, UserCircle } from 'lucide-react'
+import { Settings, RotateCcw, UserCircle } from 'lucide-react'
 
 // ---------------------------------------------------------------------------
-// Houses the housekeeping actions ("Memory", "New Plan", "Profile") the
-// header used to carry as always-visible buttons (or, for Profile, that
-// NutritionDisplay used to render inline). Now that navigation lives in the
-// bottom tab bar, the header is a thin per-screen strip — these move behind
-// one icon so they don't compete with it. Same handlers as before
-// (setMemoryScreenOpen/handleReset/setProfileInfoOpen in App.tsx), only the
-// entry point moved.
+// Houses the housekeeping actions ("Profile", "New Plan") the header used to
+// carry as always-visible buttons. Now that navigation lives in the bottom
+// tab bar, the header is a thin per-screen strip — these move behind one
+// icon so they don't compete with it. Profile is the single "what this app
+// knows about me" surface (Memory merged in) — same handlers as before
+// (setProfileInfoOpen/handleReset in App.tsx), only the entry point moved.
 // ---------------------------------------------------------------------------
 
 export function ProfileMenu({
-  onOpenMemory,
-  onNewPlan,
   onOpenProfile,
+  onNewPlan,
 }: {
-  onOpenMemory: () => void
-  onNewPlan: () => void
   onOpenProfile: () => void
+  onNewPlan: () => void
 }) {
   return (
     <DropdownMenu>
@@ -37,10 +34,6 @@ export function ProfileMenu({
         <DropdownMenuItem onClick={onOpenProfile}>
           <UserCircle className="size-3.5" />
           Profile
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={onOpenMemory}>
-          <BrainCircuit className="size-3.5" />
-          Memory
         </DropdownMenuItem>
         <DropdownMenuItem onClick={onNewPlan}>
           <RotateCcw className="size-3.5" />

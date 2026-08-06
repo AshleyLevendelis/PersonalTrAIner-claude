@@ -2,9 +2,8 @@ import { useState, useEffect, useRef } from 'react'
 import { Tabs, TabsContent } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Dumbbell, Loader2 } from 'lucide-react'
-import { MemoryScreen } from '@/components/MemoryScreen'
 import { ProfileMenu } from '@/components/ProfileMenu'
-import { ProfileInfoDialog } from '@/components/ProfileInfoDialog'
+import { ProfileScreen } from '@/components/ProfileScreen'
 import { BottomTabBar } from '@/components/BottomTabBar'
 import { OnboardingFlow } from '@/components/onboarding/OnboardingFlow'
 import { NutritionDisplay } from '@/components/NutritionDisplay'
@@ -104,8 +103,8 @@ function App() {
   const [memoryFacts, setMemoryFacts] = useState<UserFactRow[]>([])
   const [memoryGoals, setMemoryGoals] = useState<UserGoalRow[]>([])
   const [memoryContextFacts, setMemoryContextFacts] = useState<UserContextFactRow[]>([])
-  const [memoryScreenOpen, setMemoryScreenOpen] = useState(false)
   const [profileInfoOpen, setProfileInfoOpen] = useState(false)
+  const [profileInfoSection, setProfileInfoSection] = useState<'goals' | 'facts' | 'context' | undefined>(undefined)
   const reloadMemory = async (profileId: string) => {
     const [facts, goals, contextFacts] = await Promise.all([getActiveFacts(profileId), getActiveGoals(profileId), getActiveContextFacts(profileId)])
     setMemoryFacts(facts)
@@ -983,9 +982,8 @@ function App() {
           <div className="flex items-center gap-2 shrink-0">
             <OfflineStatusIndicator />
             <ProfileMenu
-              onOpenMemory={() => setMemoryScreenOpen(true)}
+              onOpenProfile={() => { setProfileInfoSection(undefined); setProfileInfoOpen(true) }}
               onNewPlan={handleReset}
-              onOpenProfile={() => setProfileInfoOpen(true)}
             />
           </div>
         </div>
@@ -1069,7 +1067,7 @@ function App() {
               memoryGoals={memoryGoals}
               memoryContextFacts={memoryContextFacts}
               onMemoryChanged={() => { if (profile?.id) return reloadMemory(profile.id) }}
-              onOpenMemory={() => setMemoryScreenOpen(true)}
+              onOpenProfile={section => { setProfileInfoSection(section); setProfileInfoOpen(true) }}
               groceryItems={groceryItems}
               onGroceryChanged={() => { if (profile?.id) return reloadGrocery(profile.id) }}
               onOpenGrocery={() => { window.location.hash = tabHash('meals') }}
@@ -1080,18 +1078,14 @@ function App() {
       </main>
       <BottomDock />
       <BottomTabBar activeTab={activeTab} onTabChange={handleTabChange} />
-      <MemoryScreen
-        open={memoryScreenOpen}
-        onOpenChange={setMemoryScreenOpen}
-        profileId={profile.id}
-        latestWeightKg={latestWeightKg}
-        onMemoryChanged={() => { if (profile.id) return reloadMemory(profile.id) }}
-      />
-      <ProfileInfoDialog
+      <ProfileScreen
         open={profileInfoOpen}
         onOpenChange={setProfileInfoOpen}
         profile={profile}
         latestWeightKg={latestWeightKg}
+        onProfileChanged={patch => setProfile(prev => prev ? { ...prev, ...patch } : prev)}
+        onMemoryChanged={() => { if (profile.id) return reloadMemory(profile.id) }}
+        initialSection={profileInfoSection}
       />
     </div>
     </ActiveSessionProvider>

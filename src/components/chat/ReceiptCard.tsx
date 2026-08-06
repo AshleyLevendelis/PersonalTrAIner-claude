@@ -25,7 +25,7 @@ export function ReceiptCard({
   undoAvailable,
   onUndo,
   onRetryFailed,
-  onViewMemory,
+  onViewProfile,
   onViewGrocery,
   onViewDashboard,
 }: {
@@ -37,8 +37,8 @@ export function ReceiptCard({
   undoAvailable?: boolean
   onUndo?: () => Promise<void>
   onRetryFailed?: (op: string) => Promise<void>
-  /** VISION-ARCHITECTURE.md §1 Part 4 — "linkable from chat receipts": present only for memory_*_saved receipts, deep-links to the memory screen. */
-  onViewMemory?: () => void
+  /** VISION-ARCHITECTURE.md §1 Part 4 — "linkable from chat receipts": present only for memory_*_saved receipts, deep-links to the Profile screen (Memory merged in) scrolled to the relevant section. */
+  onViewProfile?: () => void
   /** VISION-ARCHITECTURE.md §5.4 — present only for grocery_item_added receipts, deep-links to the Meals tab's grocery section. */
   onViewGrocery?: () => void
   /** VISION-ARCHITECTURE.md §5.4 — present only for water_logged receipts, deep-links to the Dashboard tab. */
@@ -116,9 +116,9 @@ export function ReceiptCard({
       <div className="flex items-center justify-between pt-0.5">
         {summary && <p className="text-[10px] text-muted-foreground">{summary}</p>}
         <div className="flex items-center gap-1 ml-auto">
-          {onViewMemory && (
-            <Button size="sm" variant="ghost" className="h-6 text-[11px]" onClick={onViewMemory}>
-              View in memory
+          {onViewProfile && (
+            <Button size="sm" variant="ghost" className="h-6 text-[11px]" onClick={onViewProfile}>
+              View in profile
             </Button>
           )}
           {onViewGrocery && (

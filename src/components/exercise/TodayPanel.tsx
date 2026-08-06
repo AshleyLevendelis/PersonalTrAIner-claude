@@ -3,6 +3,7 @@ import { useActiveSession } from '@/hooks/useActiveSession'
 import { useTrainingWeek } from '@/hooks/useTrainingWeek'
 import { getDoubleProgressionRecommendation } from '@/lib/progression-engine'
 import { groupExercises, resolveCalibrationAnchorIndex } from '@/lib/session-derive'
+import { getExerciseId } from '@/lib/exercise-db'
 import { ContextLine } from './ContextLine'
 import { WeekStrip } from './WeekStrip'
 import { PeekPanel } from './PeekPanel'
@@ -240,6 +241,13 @@ function ExerciseList({
   onBan: (name: string) => void
   onSetCompleted: (exerciseName: string, setNumber: number, weight: number, reps: number, rest: string, sets: number, prescribedReps: string, tier?: string) => void
 }) {
+  const { setsFor } = useActiveSession()
+  // User overrides only — the default expanded state (which exercise is
+  // "current") is recomputed fresh every render from live logs below, so a
+  // completed exercise's row auto-advances to the next incomplete one
+  // without any explicit "mark done, move on" step.
+  const [expandOverrides, setExpandOverrides] = useState<Record<number, boolean>>({})
+
   const groups = groupExercises(workout.exercises)
   const calibrationAnchorIndex = currentMesoWeekObj?.isCalibrationWeek
     ? resolveCalibrationAnchorIndex(workout.exercises)
@@ -251,18 +259,39 @@ function ExerciseList({
     return ex.load_source ?? 'estimate'
   }
 
-  const rowProps = (ex: WorkoutDay['exercises'][number], exIndex: number) => ({
-    ex,
-    dayName,
-    loadSource: loadSourceFor(ex),
-    progressionNote: progressionNotes[ex.name],
-    showCalibrationCue: calibrationAnchorIndex === exIndex,
-    onOpenPlateCalc,
-    onSwap: () => onOpenSwap(dayName, exIndex, ex.name),
-    onBan: () => onBan(ex.name),
-    banBusy: banBusy === ex.name,
-    onSetCompleted,
-  })
+  const isExerciseComplete = (ex: WorkoutDay['exercises'][number]) => {
+    const exerciseId = ex.id ?? getExerciseId(ex.name)
+    return setsFor(exerciseId, ex.name).length >= ex.sets
+  }
+
+  // Flat, in-order list across singles and superset members — "first
+  // incomplete" spans the whole day, not just one group.
+  const flatExIndexes: number[] = []
+  for (const g of groups) {
+    if (g.kind === 'single') flatExIndexes.push(g.exIndex)
+    else for (const m of g.members) flatExIndexes.push(m.exIndex)
+  }
+  const flatComplete = new Map(groups.flatMap(g => g.kind === 'single' ? [[g.exIndex, isExerciseComplete(g.ex)] as const] : g.members.map(m => [m.exIndex, isExerciseComplete(m.ex)] as const)))
+  const firstIncompleteExIndex = flatExIndexes.find(i => !flatComplete.get(i))
+
+  const rowProps = (ex: WorkoutDay['exercises'][number], exIndex: number) => {
+    const defaultExpanded = exIndex === firstIncompleteExIndex
+    const expanded = exIndex in expandOverrides ? expandOverrides[exIndex] : defaultExpanded
+    return {
+      ex,
+      dayName,
+      loadSource: loadSourceFor(ex),
+      progressionNote: progressionNotes[ex.name],
+      showCalibrationCue: calibrationAnchorIndex === exIndex,
+      onOpenPlateCalc,
+      onSwap: () => onOpenSwap(dayName, exIndex, ex.name),
+      onBan: () => onBan(ex.name),
+      banBusy: banBusy === ex.name,
+      onSetCompleted,
+      expanded,
+      onToggleExpanded: () => setExpandOverrides(prev => ({ ...prev, [exIndex]: !expanded })),
+    }
+  }
 
   return (
     <div className="space-y-2">

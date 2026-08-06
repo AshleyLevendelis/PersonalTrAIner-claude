@@ -14,13 +14,14 @@ export function SupersetGroup({
   label: string
   members: { props: Omit<ExerciseRowProps, 'supersetLabel'> }[]
 }) {
+  // Flattened (LAYOUT-DESIGN.md §1.6, "never nested cards") — no outer card
+  // here; each member is already its own bordered row (ExerciseRow.tsx). The
+  // left accent border is the only grouping cue, plus the shared caption.
   return (
-    <div className="rounded-lg border border-muted-foreground/20 bg-muted/10 p-2 space-y-2">
-      <div className="space-y-2">
-        {members.map((m, i) => (
-          <ExerciseRow key={i} {...m.props} supersetLabel={`${label}${i + 1}`} />
-        ))}
-      </div>
+    <div className="space-y-2 border-l-2 border-muted-foreground/20 pl-2">
+      {members.map((m, i) => (
+        <ExerciseRow key={i} {...m.props} supersetLabel={`${label}${i + 1}`} />
+      ))}
       <p className="text-[10px] text-muted-foreground italic px-1">alternate — no rest between</p>
     </div>
   )

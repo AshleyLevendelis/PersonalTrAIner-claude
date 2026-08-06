@@ -105,8 +105,8 @@ interface ChatAssistantProps {
   memoryGoals: UserGoalRow[]
   memoryContextFacts: UserContextFactRow[]
   onMemoryChanged: () => void | Promise<void>
-  /** Deep-link target for a memory receipt's "View in memory" button. */
-  onOpenMemory?: () => void
+  /** Deep-link target for a memory receipt's "View in profile" button — Memory merged into Profile, so this opens Profile scrolled to the relevant section. */
+  onOpenProfile?: (section?: 'goals' | 'facts' | 'context') => void
   /** Grocery list (VISION-ARCHITECTURE.md §5.4) — current items, for the "what's on my list" context snapshot and duplicate-merge decisions. Same "client is the only writer, caller reloads after" shape as memory. */
   groceryItems: GroceryItemRow[]
   onGroceryChanged?: () => void | Promise<void>
@@ -118,7 +118,7 @@ interface ChatAssistantProps {
   onOpenDashboard?: () => void
 }
 
-export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onMealSwapApplied, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenMemory, groceryItems, onGroceryChanged, onOpenGrocery, onWaterChanged, onOpenDashboard }: ChatAssistantProps) {
+export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onMealSwapApplied, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenProfile, groceryItems, onGroceryChanged, onOpenGrocery, onWaterChanged, onOpenDashboard }: ChatAssistantProps) {
   // NL logging (§3) writes through the SAME frozen session identity +
   // logSet facade SetGrid.tsx uses — never saveSet directly (see
   // nl-logging-executor.ts's own doc comment).
@@ -1833,7 +1833,12 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
                         receipt={msg.receipt.result}
                         undoAvailable={!!msg.receipt.undoToken && isWithinUndoWindow(msg.receipt.resolvedAt ?? null)}
                         onUndo={msg.receipt.undoToken ? () => handleUndoReceipt(i) : undefined}
-                        onViewMemory={msg.receipt.kind.startsWith('memory_') ? onOpenMemory : undefined}
+                        onViewProfile={
+                          msg.receipt.kind === 'memory_goal_saved' ? () => onOpenProfile?.('goals')
+                          : msg.receipt.kind === 'memory_fact_saved' ? () => onOpenProfile?.('facts')
+                          : msg.receipt.kind === 'memory_context_fact_saved' ? () => onOpenProfile?.('context')
+                          : undefined
+                        }
                         onViewGrocery={msg.receipt.kind === 'grocery_item_added' ? onOpenGrocery : undefined}
                         onViewDashboard={msg.receipt.kind === 'water_logged' ? onOpenDashboard : undefined}
                       />
