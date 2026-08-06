@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { useTrainingWeek } from '@/hooks/useTrainingWeek'
+import { useTimers } from '@/hooks/useTimers'
 import { getDoubleProgressionRecommendation } from '@/lib/progression-engine'
 import { groupExercises, resolveCalibrationAnchorIndex } from '@/lib/session-derive'
 import { getExerciseId } from '@/lib/exercise-db'
@@ -15,6 +16,7 @@ import { FinisherRow } from './FinisherRow'
 import { AdditionalWorkSection } from './AdditionalWorkSection'
 import { AddUnplannedWork } from './AddUnplannedWork'
 import { RestDayCard, ActiveRecoveryCard } from './RestDayCard'
+import { TimersScreen } from '@/components/timers/TimersScreen'
 import type { WorkoutDay, MesocycleWeek, UserProfile } from '@/lib/types'
 import type { LoadSource } from './LoadChip'
 
@@ -52,6 +54,7 @@ export function TodayPanel({
   onOpenPlateCalc: (weightKg: number) => void
 }) {
   const { date: today, dayName: todayName, liveWeek, startRest } = useActiveSession()
+  const timers = useTimers()
 
   const totalWeeks = mesocycle && mesocycle.length > 0 ? mesocycle.length : 4
   const hasMesocycle = mesocycle && mesocycle.length > 0
@@ -64,6 +67,17 @@ export function TodayPanel({
   const [borrowedDayName, setBorrowedDayName] = useState<string | null>(null)
   const [expandedWarmup, setExpandedWarmup] = useState(false)
   const [banBusy, setBanBusy] = useState<string | null>(null)
+  const [timersOpen, setTimersOpen] = useState(false)
+
+  // BottomDock's standalone-timer chip lives in a different subtree — same
+  // cross-tree request pattern as useActiveSession's requestedSetFocus.
+  useEffect(() => {
+    if (timers.screenOpenRequested) {
+      setTimersOpen(true)
+      timers.clearScreenOpenRequest()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timers.screenOpenRequested])
 
   // Reset the warm-up collapse and any borrowed prescription whenever the
   // live day itself changes (a real day boundary, not a re-render).
@@ -189,8 +203,10 @@ export function TodayPanel({
               focus={workout!.focus}
               devDay={devOverrideDay}
               borrowedFrom={borrowedDayName ? todayName : undefined}
+              onOpenTimers={() => setTimersOpen(true)}
             />
           </div>
+          <TimersScreen open={timersOpen} onOpenChange={setTimersOpen} todaysConditioning={workout!.recommendedCardio} />
           <WarmupSection warmup={workout!.warmup} open={expandedWarmup} onToggle={() => setExpandedWarmup(v => !v)} />
           <div className="p-3 space-y-2">
             <ExerciseList

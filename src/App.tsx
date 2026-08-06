@@ -16,6 +16,7 @@ import { DevTestPage } from '@/components/DevTestPage'
 import { OfflineStatusIndicator } from '@/components/OfflineStatusIndicator'
 import { BottomDock } from '@/components/BottomDock'
 import { ActiveSessionProvider } from '@/hooks/useActiveSession'
+import { TimersProvider } from '@/hooks/useTimers'
 import { isDevAccount, getSessionDateContext } from '@/lib/dev-clock'
 import { useAppRoute, tabHash, isTab, isKnownTabHash, type Tab } from '@/lib/app-route'
 
@@ -972,6 +973,7 @@ function App() {
       devOverrideDay={devOverrideDay}
       refreshToken={logsVersion}
     >
+    <TimersProvider profileId={profile.id}>
     <div className="min-h-screen bg-background">
       <header className="border-b sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="max-w-6xl mx-auto px-4 py-2.5 flex items-center justify-between">
@@ -1088,6 +1090,7 @@ function App() {
         initialSection={profileInfoSection}
       />
     </div>
+    </TimersProvider>
     </ActiveSessionProvider>
   )
 }

@@ -21,6 +21,7 @@
     "test:memory": "tsx scripts/test-memory.ts",
     "test:grocery": "tsx scripts/test-grocery.ts",
     "test:dashboard": "tsx scripts/test-dashboard.ts",
+    "test:timers": "tsx scripts/test-timers.ts",
     "test:quality": "tsx scripts/run-quality-score.ts",
     "test:differentiation": "tsx scripts/run-differentiation-audit.ts",
     "test:llm-review": "tsx scripts/run-llm-review.ts"
