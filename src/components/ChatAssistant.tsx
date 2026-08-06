@@ -3,7 +3,7 @@ import ReactMarkdown from 'react-markdown'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import { Send, CheckCircle2, ArrowDown, RotateCcw, AlertCircle, Trash2 } from 'lucide-react'
+import { Send, CheckCircle2, ArrowDown, RotateCcw, AlertCircle, Trash2, Mic } from 'lucide-react'
 import { generateChatResponse } from '@/lib/chat-assistant'
 import { calculateCalories, getActiveMesocycleWeek } from '@/lib/calculations'
 import { computeBMR, computeStaticTDEE } from '@/lib/macro-calculator'
@@ -17,6 +17,8 @@ import { createPendingAction, claimPendingAction, declinePendingAction, markExec
 import { executeExerciseSwap, executeMealSwap, undoExerciseSwap, type ExerciseSwapPayload, type MealSwapPayload } from '@/lib/pending-action-executor'
 import type { SwapScope } from '@/lib/mesocycle-edit'
 import { useActiveSession } from '@/hooks/useActiveSession'
+import { useSpeechToText } from '@/hooks/useSpeechToText'
+import { cn } from '@/lib/utils'
 import { parseWorkoutEntries, type ParsedSetGroup, type WorkoutEntryInput } from '@/lib/set-parse'
 import { executeLogWorkout } from '@/lib/nl-logging-executor'
 import { normalizeExternalUrl } from '@/lib/chat-links'
@@ -187,6 +189,22 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     ]
   })
   const [input, setInput] = useState('')
+  // Voice input — captures the input text at the moment listening starts so
+  // a live transcript appends after whatever the user already typed, rather
+  // than each recognition event (which reports the FULL transcript so far,
+  // not a delta) overwriting it.
+  const voiceBaseRef = useRef('')
+  const speech = useSpeechToText({
+    onTranscript: text => setInput(voiceBaseRef.current + (voiceBaseRef.current && text ? ' ' : '') + text),
+  })
+  const handleMicClick = () => {
+    if (speech.isListening) {
+      speech.stop()
+      return
+    }
+    voiceBaseRef.current = input.trim()
+    speech.start()
+  }
   const [isLoading, setIsLoading] = useState(false)
   const [isRecalibrating, setIsRecalibrating] = useState(false)
   const [lastFailedInput, setLastFailedInput] = useState<string | null>(null)
@@ -1946,14 +1964,30 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Ask about your plan or request changes..."
+              placeholder={speech.isListening ? 'Listening…' : 'Ask about your plan or request changes...'}
               className="min-h-[40px] max-h-[100px] resize-none"
               rows={1}
             />
+            {speech.isSupported && (
+              <Button
+                type="button"
+                variant={speech.isListening ? 'destructive' : 'ghost'}
+                size="icon"
+                onClick={handleMicClick}
+                aria-label={speech.isListening ? 'Stop voice input' : 'Start voice input'}
+                title={speech.isListening ? 'Stop voice input' : 'Start voice input'}
+                className={cn('shrink-0 self-end', speech.isListening && 'animate-pulse')}
+              >
+                <Mic className="size-4" />
+              </Button>
+            )}
             <Button data-chat-send onClick={sendMessage} disabled={!input.trim() || isLoading} size="icon" className="shrink-0 self-end">
               <Send className="size-4" />
             </Button>
           </div>
+          {speech.permissionError && (
+            <p className="mt-1.5 text-[11px] text-muted-foreground">{speech.permissionError}</p>
+          )}
         </div>
       </CardContent>
     </Card>
