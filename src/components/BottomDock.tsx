@@ -79,7 +79,11 @@ export function BottomDock() {
   // doesn't resize the layout viewport this `fixed` element is anchored to.
   // Keyboard closed: sit directly above the bottom tab bar (which hides
   // itself while the keyboard is open, so these two cases never overlap).
-  const bottomStyle = insetPx > 0
+  // Gated on isKeyboardOpen, not a raw `insetPx > 0` check — a few stray
+  // pixels of viewport delta (scroll-induced browser-chrome collapse, or
+  // similar noise with nothing actually focused) must not float the dock
+  // up off its tab-bar baseline; see useViewportInset's own doc comment.
+  const bottomStyle = isKeyboardOpen
     ? { bottom: insetPx + 16 }
     : { bottom: `calc(${TAB_BAR_HEIGHT_PX}px + env(safe-area-inset-bottom) + 12px)` }
 
