@@ -30,8 +30,8 @@ import { supabase } from '@/lib/supabase'
 import { saveMesocycle, saveMesocycleWeek, restoreMesocycle } from '@/lib/mesocycle-persistence'
 import { swapExerciseInMesocycle, banExerciseFromMesocycle, type SwapScope } from '@/lib/mesocycle-edit'
 import { sweepStaleForTarget } from '@/lib/pending-actions-store'
-import { getActiveFacts, getActiveGoals, getActiveContextFacts, type UserFactRow, type UserGoalRow, type UserContextFactRow } from '@/lib/memory-store'
-import { compileExerciseExclusions, compileFoodDislikes, compileTimingRules } from '@/lib/fact-compiler'
+import { getActiveFacts, getActiveGoals, getActiveContextFacts, createFact, type UserFactRow, type UserGoalRow, type UserContextFactRow } from '@/lib/memory-store'
+import { compileExerciseExclusions, compileFoodDislikes, compileTimingRules, resolveFoodTarget } from '@/lib/fact-compiler'
 import { getAllItems as getAllGroceryItems, type GroceryItemRow } from '@/lib/grocery-store'
 import type { UserProfile, MacroTargets, WorkoutDay, PlanAction, SchedulePatchItem, MesocycleWeek } from '@/lib/types'
 import type { ExerciseEntry } from '@/lib/exercise-db'
@@ -115,11 +115,16 @@ function App() {
   const compiledExerciseExclusions = compileExerciseExclusions(memoryFacts)
   const compiledFoodDislikes = compileFoodDislikes(memoryFacts)
   const compiledTimingRules = compileTimingRules(memoryFacts)
-  // Merged into every exclusions/dislikes consumer below — a fact-derived
-  // hard exclusion has exactly the same effect as a tap-driven one (§1.0:
-  // no generator learns about memory, it just receives a longer array).
-  const effectiveExclusions = [...new Set([...exerciseExclusions, ...compiledExerciseExclusions])]
-  const effectiveDislikedFoods = [...new Set([...(profile?.disliked_foods ?? []), ...compiledFoodDislikes])]
+  // user_facts is now the ONLY source for hard exercise/food dislikes —
+  // `fitness_profiles.exercise_exclusions`/`.disliked_foods` are frozen,
+  // deprecated columns (kept for history, migrated into user_facts once by
+  // 20260807100000_backfill_profile_preferences_to_facts.sql, no longer
+  // written or read). See "Fix — food/exercise preferences have two
+  // competing stores": these two were the only genuinely duplicated pair;
+  // favorite_cuisines/dietary_preferences/injuries were never duplicated
+  // and still read straight off the profile.
+  const effectiveExclusions = compiledExerciseExclusions
+  const effectiveDislikedFoods = compiledFoodDislikes
   const [devOverrideWeek, setDevOverrideWeek] = useState<number | null>(null)
   const [devOverrideDay, setDevOverrideDay] = useState<string | null>(null)
   const [devBypassLocks, setDevBypassLocks] = useState(false)
@@ -424,7 +429,11 @@ function App() {
         // Meal-realism round, part 3: onboarding's optional food-preference
         // answers — see the field docs on UserProfile in types.ts.
         favorite_cuisines: enrichedProfile.favorite_cuisines || [],
-        disliked_foods: enrichedProfile.disliked_foods || [],
+        // Fix — food/exercise preferences have two competing stores:
+        // disliked_foods is now written to user_facts only (below, once
+        // data.id exists), never this column — see the deprecation note on
+        // UserProfile.disliked_foods in types.ts.
+        disliked_foods: [],
         breakfast_style: enrichedProfile.breakfast_style || null,
         display_name: enrichedProfile.display_name || null,
         bmr: enrichedProfile.bmr,
@@ -452,6 +461,31 @@ function App() {
     if (data) {
       enrichedProfile.id = data.id
       localStorage.setItem(STORAGE_KEY, data.id)
+      // Fix — food/exercise preferences have two competing stores:
+      // onboarding's disliked-foods answer is no longer written to the
+      // `disliked_foods` column (see the insert above) — it's recorded as
+      // user_facts rows instead, the same shape a later "I hate marmite"
+      // chat turn would produce, so both paths land in exactly one place.
+      // Meal-pool generation just below still reads enrichedProfile.disliked_foods
+      // directly (the in-memory onboarding answer) since memoryFacts hasn't
+      // been fetched yet at this point in a brand-new signup.
+      if (enrichedProfile.disliked_foods && enrichedProfile.disliked_foods.length > 0) {
+        try {
+          await Promise.all(enrichedProfile.disliked_foods.map(food => createFact({
+            profileId: data.id,
+            kind: 'food_preference',
+            source: 'onboarding',
+            rawPhrase: food,
+            displayText: `won't eat/do ${food}`,
+            polarity: 'dislike',
+            hardness: 'hard',
+            resolvedRefs: resolveFoodTarget(food),
+          })))
+          await reloadMemory(data.id)
+        } catch (err) {
+          console.error('Recording onboarding food dislikes failed:', err)
+        }
+      }
       try {
         await persistLegacyExercisePlan(data.id, workout)
       } catch (err) {
@@ -750,33 +784,28 @@ function App() {
   }
 
   const handleBanExercise = async (exerciseName: string) => {
-    if (!profile) return
-    // Vision-architecture patch round, fix 4: this used to build `updated`
-    // from exerciseExclusions React state, which could be stale relative to
-    // a write ChatAssistant.tsx had just made moments earlier — the second
-    // (this) write would then clobber the first with a list missing the
-    // exercise the chat action just added. Single write path: read fresh
-    // from the DB right before appending, so this is the only writer and it
-    // always starts from the current row.
-    let current = exerciseExclusions
-    if (profile.id) {
-      const { data: profileRow } = await supabase
-        .from('fitness_profiles')
-        .select('exercise_exclusions')
-        .eq('id', profile.id)
-        .maybeSingle()
-      current = profileRow?.exercise_exclusions || []
-    }
-    if (current.includes(exerciseName)) return
-    const updated = [...current, exerciseName]
-    setExerciseExclusions(updated)
-
-    if (profile.id) {
-      await supabase
-        .from('fitness_profiles')
-        .update({ exercise_exclusions: updated })
-        .eq('id', profile.id)
-    }
+    if (!profile?.id) return
+    // Fix — food/exercise preferences have two competing stores: this used
+    // to read-modify-write `fitness_profiles.exercise_exclusions` (with a
+    // fresh-read-before-append dance specifically to avoid clobbering a
+    // concurrent chat-side write to the SAME column, per fix 4's original
+    // comment). Writing a user_facts row instead makes that whole race
+    // structurally impossible — each ban is an independent INSERT, not a
+    // read-modify-write of a shared array cell, so there's nothing left to
+    // clobber and nothing to read fresh before appending to.
+    if (compiledExerciseExclusions.includes(exerciseName)) return
+    await createFact({
+      profileId: profile.id,
+      kind: 'exercise_preference',
+      source: 'manual',
+      rawPhrase: exerciseName,
+      displayText: `won't eat/do ${exerciseName}`,
+      polarity: 'dislike',
+      hardness: 'hard',
+      resolvedRefs: [exerciseName],
+    })
+    await reloadMemory(profile.id)
+    const updated = [...new Set([...compiledExerciseExclusions, exerciseName])]
 
     // Single source of truth is the mesocycle — exercisePlan (the flat,
     // non-periodized base plan) is display-only fallback for when no

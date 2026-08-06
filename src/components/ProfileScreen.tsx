@@ -20,10 +20,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Pencil, Trash2, Check, X, Plus } from 'lucide-react'
 import {
-  getAllFacts, getAllGoals, getAllContextFacts,
+  getAllFacts, getAllGoals, getAllContextFacts, createFact,
   deleteFactPermanently, deleteGoalPermanently, deleteContextFactPermanently,
   type UserFactRow, type UserGoalRow, type UserContextFactRow,
 } from '@/lib/memory-store'
+import { resolveFoodTarget } from '@/lib/fact-compiler'
 import { supabase } from '@/lib/supabase'
 import { computeGoalProgress } from '@/lib/goal-progress'
 import { updateProfileField } from '@/lib/profile-store'
@@ -249,8 +250,35 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
   const deleteGoal = async (id: string) => { await deleteGoalPermanently(id); await reload(); await onMemoryChanged() }
   const deleteContext = async (id: string) => { await deleteContextFactPermanently(id); await reload(); await onMemoryChanged() }
 
+  // Fix — food/exercise preferences have two competing stores: this is now
+  // the ONE editable list for hard food dislikes, whether created here or
+  // by "I hate marmite" in chat — both call the same createFact shape, so
+  // both land as one row here. Excluded from the generic FOOD PREFERENCES
+  // card group below (via `grouped`) so nothing renders twice.
+  const hardFoodDislikes = facts.filter(f => f.kind === 'food_preference' && f.polarity === 'dislike' && f.hardness === 'hard')
+  const hardFoodDislikeValues = hardFoodDislikes.map(f => f.resolved_refs?.[0] ?? f.display_text)
+
+  const saveDislikedFoods = async (next: string[]) => {
+    if (!profileId) return
+    const added = next.filter(v => !hardFoodDislikeValues.includes(v))
+    const removed = hardFoodDislikes.filter(f => !next.includes(f.resolved_refs?.[0] ?? f.display_text))
+    await Promise.all([
+      ...added.map(v => createFact({
+        profileId, kind: 'food_preference', source: 'manual',
+        rawPhrase: v, displayText: `won't eat/do ${v}`,
+        polarity: 'dislike', hardness: 'hard', resolvedRefs: resolveFoodTarget(v),
+      })),
+      ...removed.map(f => deleteFactPermanently(f.id)),
+    ])
+    await reload()
+    await onMemoryChanged()
+  }
+
   const grouped = (['food_preference', 'exercise_preference', 'timing_rule', 'hard_constraint'] as const)
-    .map(kind => ({ kind, items: facts.filter(f => f.kind === kind) }))
+    .map(kind => ({
+      kind,
+      items: facts.filter(f => f.kind === kind && !(kind === 'food_preference' && f.polarity === 'dislike' && f.hardness === 'hard')),
+    }))
     .filter(g => g.items.length > 0)
 
   // Editing a field here does NOT recompute macros/targets (no computeTargets/
@@ -329,7 +357,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
             </div>
             <div className="space-y-1">
               <span className="text-muted-foreground">Disliked foods</span>
-              <EditableTagList values={profile.disliked_foods ?? []} onSave={v => savePatch({ disliked_foods: v })} placeholder="e.g. mushrooms" />
+              <EditableTagList values={hardFoodDislikeValues} onSave={saveDislikedFoods} placeholder="e.g. mushrooms" />
             </div>
             <Row label="Cooking time"><EditableSelectField value={profile.cooking_time_preference ?? 'moderate'} options={COOKING_TIME_OPTIONS} onSave={v => savePatch({ cooking_time_preference: v })} /></Row>
             <Row label="Meals per day"><EditableSelectField value={profile.meals_per_day ?? 3} options={MEALS_PER_DAY_OPTIONS} onSave={v => savePatch({ meals_per_day: v })} /></Row>

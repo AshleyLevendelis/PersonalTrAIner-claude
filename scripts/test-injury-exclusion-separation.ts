@@ -1,26 +1,35 @@
 /**
  * Vision-architecture patch round, fix 2 — regression test.
+ * Updated by "Fix — food/exercise preferences have two competing stores".
  *
- * `fitness_profiles.injuries` (body-part codes) and `.exercise_exclusions`
- * (exact banned exercise names) used to be the SAME column: App.tsx read
- * exercise_exclusions back as `profile.injuries`, and wrote injuries INTO
- * exercise_exclusions at onboarding, so every ban_exercise call (which only
- * ever wrote exercise names into exercise_exclusions) silently polluted the
- * injury list.
+ * `fitness_profiles.injuries` (body-part codes) and exercise exclusions
+ * used to be the SAME column: App.tsx read exercise_exclusions back as
+ * `profile.injuries`, and wrote injuries INTO exercise_exclusions at
+ * onboarding, so every ban_exercise call (which only ever wrote exercise
+ * names into exercise_exclusions) silently polluted the injury list.
+ *
+ * The preferences-unification round moved exercise exclusions out of
+ * `fitness_profiles.exercise_exclusions` entirely — handleBanExercise now
+ * writes a `user_facts` row (kind='exercise_preference', polarity='dislike',
+ * hardness='hard') instead of updating that column, which the docs on
+ * UserProfile.disliked_foods (types.ts) explain was needed to fix a
+ * SEPARATE two-stores bug (a profile-column preference was invisible to
+ * chat). Cross-contaminating with `injuries` is now structurally
+ * impossible rather than merely avoided by convention: the two live in
+ * different tables, not different columns of the same row, so there is no
+ * shared cell left for a bad write to land on.
  *
  * App.tsx's restore/onboarding/ban logic lives inside closures in a React
  * component and isn't independently invocable from a script, so this tests
- * the boundary that IS testable: the two columns are genuinely separate in
- * the schema, and a write shaped exactly like ban_exercise's real write
- * (`.update({ exercise_exclusions: [...current, name] })`, see
- * ChatAssistant.tsx and App.tsx's handleBanExercise) cannot alter
- * `injuries`, and vice versa. This is the data-model invariant the fix
- * depends on; a future accidental re-merge of the two columns' read/write
+ * the boundary that IS testable: a write shaped exactly like
+ * handleBanExercise's real write (an INSERT into user_facts) cannot alter
+ * `fitness_profiles.injuries`, and vice versa. This is the data-model
+ * invariant the fix depends on; a future accidental re-merge of the two
  * paths would still need to be caught by code review, not this test.
  */
 
 type Row = Record<string, unknown>
-const db: Record<string, Row[]> = { fitness_profiles: [] }
+const db: Record<string, Row[]> = { fitness_profiles: [], user_facts: [] }
 
 function fakeFrom(table: string) {
   const filters: ((r: Row) => boolean)[] = []
@@ -55,6 +64,21 @@ function fakeFrom(table: string) {
   return api
 }
 
+/** Mirrors handleBanExercise's real createFact call shape (App.tsx). */
+async function banExercise(client: { from: typeof fakeFrom }, profileId: string, exerciseName: string) {
+  await (client.from('user_facts') as any).insert({
+    profile_id: profileId,
+    kind: 'exercise_preference',
+    status: 'active',
+    source: 'manual',
+    raw_phrase: exerciseName,
+    display_text: `won't eat/do ${exerciseName}`,
+    polarity: 'dislike',
+    hardness: 'hard',
+    resolved_refs: [exerciseName],
+  })
+}
+
 let failures = 0
 function check(label: string, condition: boolean, extra?: unknown) {
   if (condition) {
@@ -68,49 +92,42 @@ function check(label: string, condition: boolean, extra?: unknown) {
 async function main() {
   const client = { from: fakeFrom }
 
-  // Seed a profile exactly as onboarding now writes it (fix 2): injuries
-  // and exercise_exclusions are separate fields from the first insert.
+  // Seed a profile exactly as onboarding now writes it: injuries on the
+  // profile row, exercise exclusions nowhere on it at all (they live in
+  // user_facts, a different table entirely).
   const { data: inserted } = await (client.from('fitness_profiles') as any)
-    .insert({ injuries: ['knees', 'lower_back'], exercise_exclusions: [] })
+    .insert({ injuries: ['knees', 'lower_back'] })
     .select('id')
     .single()
   const profileId = inserted.id
 
   console.log('\n[1] A ban_exercise-shaped write never reaches injuries')
-  // Mirrors the exact write shape in ChatAssistant.tsx / App.tsx's
-  // handleBanExercise: read exercise_exclusions fresh, append, write back.
-  const { data: before } = await (client.from('fitness_profiles') as any)
-    .select('exercise_exclusions').eq('id', profileId).maybeSingle()
-  const current: string[] = (before as any)?.exercise_exclusions || []
-  await (client.from('fitness_profiles') as any)
-    .update({ exercise_exclusions: [...current, 'Barbell Bench Press'] })
-    .eq('id', profileId)
+  await banExercise(client, profileId, 'Barbell Bench Press')
 
-  const { data: afterBan } = await (client.from('fitness_profiles') as any)
-    .select('injuries, exercise_exclusions').eq('id', profileId).maybeSingle()
-  check('injuries unchanged after a ban', JSON.stringify((afterBan as any).injuries) === JSON.stringify(['knees', 'lower_back']), (afterBan as any).injuries)
-  check('the ban landed in exercise_exclusions', (afterBan as any).exercise_exclusions.includes('Barbell Bench Press'), (afterBan as any).exercise_exclusions)
-  check('no exercise name ever appears in injuries', !(afterBan as any).injuries.some((v: string) => v === 'Barbell Bench Press'))
+  const { data: profileAfterBan } = await (client.from('fitness_profiles') as any)
+    .select('injuries').eq('id', profileId).maybeSingle()
+  const factsAfterBan = db.user_facts.filter(f => f.profile_id === profileId && f.kind === 'exercise_preference')
+  check('injuries unchanged after a ban', JSON.stringify((profileAfterBan as any).injuries) === JSON.stringify(['knees', 'lower_back']), (profileAfterBan as any).injuries)
+  check('the ban landed in user_facts', factsAfterBan.some(f => f.raw_phrase === 'Barbell Bench Press'), factsAfterBan)
+  check('no exercise name ever appears in injuries', !(profileAfterBan as any).injuries.some((v: string) => v === 'Barbell Bench Press'))
 
-  console.log('\n[2] A second ban does not touch injuries either')
-  const { data: mid } = await (client.from('fitness_profiles') as any)
-    .select('exercise_exclusions').eq('id', profileId).maybeSingle()
-  await (client.from('fitness_profiles') as any)
-    .update({ exercise_exclusions: [...(mid as any).exercise_exclusions, 'Overhead Press'] })
-    .eq('id', profileId)
-  const { data: afterSecondBan } = await (client.from('fitness_profiles') as any)
-    .select('injuries, exercise_exclusions').eq('id', profileId).maybeSingle()
-  check('injuries still exactly the original two codes', JSON.stringify((afterSecondBan as any).injuries) === JSON.stringify(['knees', 'lower_back']), (afterSecondBan as any).injuries)
-  check('exercise_exclusions has both banned names', (afterSecondBan as any).exercise_exclusions.length === 2, (afterSecondBan as any).exercise_exclusions)
+  console.log('\n[2] A second ban does not touch injuries either, and both bans coexist')
+  await banExercise(client, profileId, 'Overhead Press')
+  const { data: profileAfterSecondBan } = await (client.from('fitness_profiles') as any)
+    .select('injuries').eq('id', profileId).maybeSingle()
+  const factsAfterSecondBan = db.user_facts.filter(f => f.profile_id === profileId && f.kind === 'exercise_preference')
+  check('injuries still exactly the original two codes', JSON.stringify((profileAfterSecondBan as any).injuries) === JSON.stringify(['knees', 'lower_back']), (profileAfterSecondBan as any).injuries)
+  check('user_facts has both banned exercises', factsAfterSecondBan.length === 2, factsAfterSecondBan)
 
-  console.log('\n[3] Writing to injuries does not touch exercise_exclusions')
+  console.log('\n[3] Writing to injuries does not touch user_facts')
   await (client.from('fitness_profiles') as any)
     .update({ injuries: ['knees', 'lower_back', 'shoulders'] })
     .eq('id', profileId)
-  const { data: final } = await (client.from('fitness_profiles') as any)
-    .select('injuries, exercise_exclusions').eq('id', profileId).maybeSingle()
-  check('exercise_exclusions still has exactly the two banned names', (final as any).exercise_exclusions.length === 2, (final as any).exercise_exclusions)
-  check('injuries reflects the new code', (final as any).injuries.includes('shoulders'), (final as any).injuries)
+  const { data: finalProfile } = await (client.from('fitness_profiles') as any)
+    .select('injuries').eq('id', profileId).maybeSingle()
+  const finalFacts = db.user_facts.filter(f => f.profile_id === profileId && f.kind === 'exercise_preference')
+  check('user_facts still has exactly the two banned exercises', finalFacts.length === 2, finalFacts)
+  check('injuries reflects the new code', (finalProfile as any).injuries.includes('shoulders'), (finalProfile as any).injuries)
 
   if (failures > 0) {
     console.error(`\n${failures} check(s) FAILED.`)

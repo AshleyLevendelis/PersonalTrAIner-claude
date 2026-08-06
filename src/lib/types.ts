@@ -76,14 +76,23 @@ export interface UserProfile {
   /**
    * Meal-realism round: onboarding's optional (skippable) food-preference
    * questions. favorite_cuisines steers generate-meals's cuisine selection
-   * toward these; disliked_foods is a hard filter — meal-generation.ts
-   * rejects any proposal whose ingredient list matches one; breakfast_style
-   * steers the breakfast slot's prompt guidance only (does not change
-   * whether a breakfast slot exists — meals_per_day/include_snacks own
-   * that). All default to empty/undefined ("no preference") for pre-round
-   * profiles.
+   * toward these; breakfast_style steers the breakfast slot's prompt
+   * guidance only (does not change whether a breakfast slot exists —
+   * meals_per_day/include_snacks own that). Both default to empty/undefined
+   * ("no preference") for pre-round profiles.
    */
   favorite_cuisines?: string[]
+  /**
+   * @deprecated Fix — food/exercise preferences have two competing stores:
+   * this column duplicated user_facts (kind='food_preference',
+   * polarity='dislike', hardness='hard'), which alone now backs the hard
+   * food-dislike filter (fact-compiler.ts's compileFoodDislikes) — the
+   * chat never saw this column, only user_facts, so a dislike entered here
+   * was invisible to it. Existing values were migrated into user_facts by
+   * 20260807100000_backfill_profile_preferences_to_facts.sql. No code
+   * reads or writes this column anymore; kept only so the column itself
+   * (and any value still sitting in it) isn't silently lost.
+   */
   disliked_foods?: string[]
   breakfast_style?: BreakfastStyle
   /**
