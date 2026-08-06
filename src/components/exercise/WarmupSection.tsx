@@ -33,8 +33,8 @@ export function WarmupSection({
   const moveCount = general.length + mobility.length
 
   return (
-    <Collapsible open={open} onOpenChange={onToggle} className="border-b border-border/30">
-      <CollapsibleTrigger className="w-full flex items-center justify-between px-4 py-2 text-left hover:bg-accent/30 transition-colors">
+    <Collapsible open={open} onOpenChange={onToggle} className="rounded-[10px] border bg-card">
+      <CollapsibleTrigger className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-accent/30 transition-colors">
         <span className="flex items-center gap-2 text-xs font-medium text-foreground">
           <Thermometer className="size-3.5 text-primary" />
           Warm-up
@@ -42,7 +42,7 @@ export function WarmupSection({
         </span>
         <ChevronDown className={`size-3.5 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
       </CollapsibleTrigger>
-      <CollapsibleContent className="px-4 pb-3 space-y-3">
+      <CollapsibleContent className="px-3 pb-3 space-y-3">
         {general.length > 0 && (
           <div className="space-y-1">
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">General</p>

@@ -111,7 +111,7 @@ export function ExerciseRow({
   )
 
   return (
-    <div className={`rounded-[12px] border p-3 space-y-2 ${allSetsLogged ? 'bg-primary/10 border-primary/30' : 'bg-card'}`}>
+    <div className={`rounded-[12px] border px-2 py-3 space-y-2 ${allSetsLogged ? 'bg-primary/10 border-primary/30' : 'bg-card'}`}>
       {/* A plain div, not a <button> — LoadChip renders its own interactive
           "why this weight" button below, and a button can't legally contain
           another button (the browser silently splits/corrupts the DOM when
@@ -128,13 +128,15 @@ export function ExerciseRow({
           {nameLine}
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs text-muted-foreground">{ex.sets}×{ex.reps}</span>
-            <LoadChip
-              ex={ex}
-              source={loadSource}
-              explained={false}
-              onToggleExplain={() => {}}
-              progressionNote={undefined}
-            />
+            {!expanded && (
+              <LoadChip
+                ex={ex}
+                source={loadSource}
+                explained={false}
+                onToggleExplain={() => {}}
+                progressionNote={undefined}
+              />
+            )}
             {allSetsLogged ? (
               <span className="text-xs text-primary">{formatCompletedSummary(loggedSets)}</span>
             ) : completedSets > 0 ? (
@@ -149,7 +151,6 @@ export function ExerciseRow({
         <>
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0 flex-1">
-              {ramp && <RampStrip ramp={ramp} />}
               <LoadChip
                 ex={ex}
                 source={loadSource}
@@ -157,6 +158,7 @@ export function ExerciseRow({
                 onToggleExplain={() => setExplainedLoadChip(v => !v)}
                 progressionNote={progressionNote}
               />
+              {ramp && <RampStrip ramp={ramp} />}
               {showCalibrationCue && <CalibrationCue hasLoad={ex.suggested_load_kg != null} />}
             </div>
             <DropdownMenu>

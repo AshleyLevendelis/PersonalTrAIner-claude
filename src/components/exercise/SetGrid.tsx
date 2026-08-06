@@ -218,7 +218,7 @@ export function SetGrid({
     : 'Reps'
 
   return (
-    <div className="px-4 pb-3 pt-1 space-y-1">
+    <div className="pb-3 pt-1 space-y-1">
       <div className="grid grid-cols-[auto_minmax(6rem,1fr)_auto_auto_auto_1fr_auto] gap-1.5 items-center text-xs text-muted-foreground font-medium px-1">
         <span className="w-5">#</span>
         <span>{loadIsEstimate ? 'Log weight' : 'Weight'}</span>
@@ -288,7 +288,7 @@ export function SetGrid({
               value={input.reps}
               onChange={e => updateInput(setNumber, 'reps', e.target.value)}
               onFocus={scrollRowIntoView}
-              className={`h-7 text-sm w-14 ${isSaved ? 'border-primary/50' : ''} ${rowErrors[setNumber] ? 'border-destructive' : ''}`}
+              className={`h-7 text-sm ${isSaved ? 'border-primary/50' : ''} ${rowErrors[setNumber] ? 'border-destructive' : ''}`}
             />
             <div className="flex items-center gap-1">
               {isPRSet && prBadgeSet?.result && (

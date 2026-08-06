@@ -196,41 +196,37 @@ export function TodayPanel({
           onPeek={d => setPeekDay(d)}
         />
       ) : (
-        <div className="rounded-lg border bg-card">
-          <div className="p-3 border-b">
-            <IdentityLine
-              dayName={effectiveDayName}
-              focus={workout!.focus}
-              devDay={devOverrideDay}
-              borrowedFrom={borrowedDayName ? todayName : undefined}
-              onOpenTimers={() => setTimersOpen(true)}
-            />
-          </div>
+        <div className="space-y-3">
+          <IdentityLine
+            dayName={effectiveDayName}
+            focus={workout!.focus}
+            devDay={devOverrideDay}
+            borrowedFrom={borrowedDayName ? todayName : undefined}
+            onOpenTimers={() => setTimersOpen(true)}
+          />
           <TimersScreen open={timersOpen} onOpenChange={setTimersOpen} todaysConditioning={workout!.recommendedCardio} />
           <WarmupSection warmup={workout!.warmup} open={expandedWarmup} onToggle={() => setExpandedWarmup(v => !v)} />
-          <div className="p-3 space-y-2">
-            <ExerciseList
-              workout={workout!}
-              dayName={effectiveDayName}
-              currentMesoWeekObj={currentMesoWeekObj}
-              progressedLoads={progressedLoads}
-              progressionNotes={progressionNotes}
-              onOpenSwap={onOpenSwap}
-              onOpenPlateCalc={onOpenPlateCalc}
-              banBusy={banBusy}
-              onBan={handleBan}
-              onSetCompleted={(exerciseName, setNumber, _weight, _reps, restStr, sets) => {
-                const restSeconds = parseRestSeconds(restStr)
-                if (restSeconds > 0) {
-                  const targetSetNumber = setNumber < sets ? setNumber + 1 : undefined
-                  startRest(exerciseName, restSeconds, targetSetNumber)
-                }
-              }}
-            />
-            {workout!.recommendedCardio && <FinisherRow cardio={workout!.recommendedCardio} />}
-            <AdditionalWorkSection plannedExercises={workout!.exercises} />
-            <AddUnplannedWork />
-          </div>
+          <ExerciseList
+            workout={workout!}
+            dayName={effectiveDayName}
+            currentMesoWeekObj={currentMesoWeekObj}
+            progressedLoads={progressedLoads}
+            progressionNotes={progressionNotes}
+            onOpenSwap={onOpenSwap}
+            onOpenPlateCalc={onOpenPlateCalc}
+            banBusy={banBusy}
+            onBan={handleBan}
+            onSetCompleted={(exerciseName, setNumber, _weight, _reps, restStr, sets) => {
+              const restSeconds = parseRestSeconds(restStr)
+              if (restSeconds > 0) {
+                const targetSetNumber = setNumber < sets ? setNumber + 1 : undefined
+                startRest(exerciseName, restSeconds, targetSetNumber)
+              }
+            }}
+          />
+          {workout!.recommendedCardio && <FinisherRow cardio={workout!.recommendedCardio} />}
+          <AdditionalWorkSection plannedExercises={workout!.exercises} />
+          <AddUnplannedWork />
         </div>
       )}
     </div>
