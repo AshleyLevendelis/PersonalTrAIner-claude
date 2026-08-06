@@ -130,7 +130,7 @@ export function SwapDialog({
                       <div className="flex flex-wrap gap-1">
                         <Badge variant="secondary" className="text-xs">{exercise.mechanics_tier.replace(/_/g, ' ')}</Badge>
                         {exercise.joint_stress === 'low' && currentEntry?.joint_stress !== 'low' && (
-                          <Badge className="text-xs bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                          <Badge className="text-xs bg-primary/15 text-primary">
                             lower stress
                           </Badge>
                         )}
@@ -186,7 +186,7 @@ export function SwapDialog({
                               <Badge variant="secondary" className="text-xs">{exercise.mechanics_tier.replace(/_/g, ' ')}</Badge>
                             </div>
                             {warnings.map((w, i) => (
-                              <p key={i} className="text-xs text-amber-700 dark:text-amber-400 mt-1 flex items-start gap-1">
+                              <p key={i} className="text-xs text-[color:var(--role-warn-text)] mt-1 flex items-start gap-1">
                                 <ShieldAlert className="size-3 mt-0.5 shrink-0" />
                                 <span>{w}</span>
                               </p>
@@ -206,7 +206,7 @@ export function SwapDialog({
         {pendingSwap && (
           <div className="space-y-2 py-1">
             {profile && getExerciseCompatibilityWarnings(pendingSwap, profile, exclusions).map((w, i) => (
-              <p key={i} className="text-xs text-amber-700 dark:text-amber-400 flex items-start gap-1.5 rounded-md border border-amber-300/50 bg-amber-50 dark:bg-amber-950/20 p-2">
+              <p key={i} className="text-xs text-[color:var(--role-warn-text)] flex items-start gap-1.5 rounded-lg bg-[color:var(--role-warn-bg)] p-2">
                 <ShieldAlert className="size-3.5 mt-0.5 shrink-0" />
                 <span>{w}</span>
               </p>

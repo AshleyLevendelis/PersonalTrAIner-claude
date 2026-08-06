@@ -40,9 +40,14 @@ export function BottomTabBar({
   const [leftTabs, rightTabs] = [SIDE_TABS.slice(0, 2), SIDE_TABS.slice(2)]
 
   return (
+    // Borderless: the top hairline is replaced by a fade from transparent into
+    // --surface-deep, so the bar separates from the canvas by fill alone (3a/3b).
     <nav
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card"
-      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      className="fixed inset-x-0 bottom-0 z-40 bg-[color:var(--surface-deep)]"
+      style={{
+        paddingBottom: 'env(safe-area-inset-bottom)',
+        backgroundImage: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, var(--surface-deep) 45%)',
+      }}
       aria-label="Primary"
     >
       <div className="mx-auto flex max-w-6xl items-stretch" style={{ height: TAB_BAR_HEIGHT_PX }}>
@@ -56,9 +61,10 @@ export function BottomTabBar({
             onClick={() => onTabChange('chat')}
             aria-label="Chat"
             aria-current={activeTab === 'chat' ? 'page' : undefined}
-            className={`-mt-6 flex size-14 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-shadow ${
-              activeTab === 'chat' ? 'ring-2 ring-primary/40 ring-offset-2 ring-offset-card' : ''
+            className={`-mt-6 flex size-14 shrink-0 items-center justify-center rounded-full text-primary-foreground transition-shadow glow-mint-box ${
+              activeTab === 'chat' ? 'ring-2 ring-primary/40 ring-offset-2 ring-offset-[color:var(--surface-deep)]' : ''
             }`}
+            style={{ background: 'linear-gradient(180deg, #7CF3D4, #3ED3AA)' }}
           >
             <MessageCircle className="size-6" />
           </button>
@@ -90,10 +96,10 @@ function SideTabButton({
       onClick={onClick}
       aria-current={active ? 'page' : undefined}
       className={`flex flex-1 flex-col items-center justify-center gap-0.5 ${
-        active ? 'text-primary' : 'text-muted-foreground'
+        active ? 'text-primary glow-mint' : 'text-muted-foreground'
       }`}
     >
-      <Icon className="size-5" />
+      <Icon className={`size-5 ${active ? 'glow-icon' : ''}`} />
       <span className="text-[10px] font-medium">{label}</span>
     </button>
   )

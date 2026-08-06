@@ -38,7 +38,7 @@ export function ContextLine({
   const phaseToken = isCalibrationWeek ? 'Calibration' : isDeload ? 'Deload week' : phaseLabel
 
   return (
-    <div className="rounded-md border bg-muted/20">
+    <div className="rounded-xl bg-[color:var(--surface-deep)]">
       <div className="flex items-center justify-between px-3 py-2 gap-2">
         <button
           type="button"
@@ -62,7 +62,7 @@ export function ContextLine({
         )}
       </div>
       {expanded && (phaseFocus || coachNote) && (
-        <div className="px-3 pb-2 space-y-1 border-t border-border/40 pt-2">
+        <div className="px-3 pb-2 space-y-1 pt-2">
           {phaseFocus && <p className="text-[11px] text-muted-foreground">{phaseFocus}</p>}
           {coachNote && <p className="text-[11px] text-muted-foreground/80 italic">{coachNote}</p>}
         </div>

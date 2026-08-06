@@ -1798,7 +1798,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
                   type="button"
                   onClick={loadOlderMessages}
                   disabled={isLoadingOlder}
-                  className="rounded-full border border-border bg-background px-4 py-2 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors min-h-[44px]"
+                  className="rounded-full bg-[color:var(--surface-raised)] px-4 py-2 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors min-h-[44px]"
                 >
                   {isLoadingOlder ? 'Loading...' : 'Load Previous Messages'}
                 </button>
@@ -1914,7 +1914,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
                             key={option}
                             type="button"
                             onClick={() => handleQuickReply(option)}
-                            className="rounded-full border border-border bg-background px-3 py-2.5 text-xs font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground active:bg-accent/80 min-h-[44px]"
+                            className="rounded-full bg-[color:var(--surface-raised)] px-3 py-2.5 text-xs font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground active:bg-accent/80 min-h-[44px]"
                           >
                             {option}
                           </button>
@@ -1958,7 +1958,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
             </button>
           </div>
         )}
-        <div className="p-4 border-t pb-[max(1rem,env(safe-area-inset-bottom))]">
+        <div className="p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
           <div className="flex gap-2">
             <Textarea
               value={input}

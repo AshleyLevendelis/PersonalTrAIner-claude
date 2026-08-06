@@ -255,13 +255,13 @@ export function SetGrid({
               value={isBW ? '' : input.weight}
               onChange={e => updateInput(setNumber, 'weight', e.target.value)}
               onFocus={scrollRowIntoView}
-              className={`h-7 text-sm ${isSaved ? 'border-primary/50' : ''} ${isBW ? 'bg-muted text-muted-foreground' : ''} ${rowErrors[setNumber] ? 'border-destructive' : ''}`}
+              className={`h-7 border-0 bg-[color:var(--surface-raised)] text-sm shadow-none ${isSaved ? 'text-primary' : ''} ${isBW ? 'text-muted-foreground' : ''} ${rowErrors[setNumber] ? 'ring-1 ring-destructive' : ''}`}
               disabled={isBW}
             />
             <Button
-              variant="outline"
+              variant="ghost"
               size="icon-xs"
-              className="size-7 text-muted-foreground hover:text-foreground border-dashed"
+              className="size-7 text-muted-foreground hover:text-foreground"
               onClick={() => onOpenPlateCalc?.(parseFloat(input.weight || (ghost ? String(ghost.weight_kg) : '0')) || 0)}
               disabled={isBW}
               aria-label="Plate calculator"
@@ -288,19 +288,23 @@ export function SetGrid({
               value={input.reps}
               onChange={e => updateInput(setNumber, 'reps', e.target.value)}
               onFocus={scrollRowIntoView}
-              className={`h-7 text-sm ${isSaved ? 'border-primary/50' : ''} ${rowErrors[setNumber] ? 'border-destructive' : ''}`}
+              className={`h-7 border-0 bg-[color:var(--surface-raised)] text-sm shadow-none ${isSaved ? 'text-primary' : ''} ${rowErrors[setNumber] ? 'ring-1 ring-destructive' : ''}`}
             />
             <div className="flex items-center gap-1">
               {isPRSet && prBadgeSet?.result && (
-                <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-primary/15 text-primary border border-primary/30 whitespace-nowrap ${animatingPr ? 'animate-pulse scale-110' : ''} transition-transform`}>
+                <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-primary/15 text-primary glow-mint whitespace-nowrap ${animatingPr ? 'animate-pulse scale-110' : ''} transition-transform`}>
                   <Trophy className="size-2.5" />
                   PR
                 </span>
               )}
+              {/* 3b: the outstanding set's save control is the lit mint square —
+                  the one thing on the row asking to be tapped. Once saved it
+                  recedes to a quiet mint tick. */}
               <Button
-                variant={isSaved ? 'ghost' : 'outline'}
+                variant="ghost"
                 size="icon"
-                className={`size-7 shrink-0 ${isSaved ? 'text-primary' : ''}`}
+                className={`size-7 shrink-0 ${isSaved ? 'text-primary' : 'text-[color:var(--primary-foreground)] glow-pulse'}`}
+                style={isSaved ? undefined : { background: 'linear-gradient(180deg, #7CF3D4, #3ED3AA)' }}
                 onClick={() => handleSaveSet(setNumber)}
               >
                 <Check className="size-3.5" />

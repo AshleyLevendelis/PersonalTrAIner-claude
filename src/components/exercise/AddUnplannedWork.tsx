@@ -72,7 +72,7 @@ export function AddUnplannedWork({ onLiftAdded, onCardioLogged }: { onLiftAdded?
   }
 
   return (
-    <div className="rounded-md border p-3 space-y-3 bg-muted/20">
+    <div className="rounded-xl p-3 space-y-3 bg-[color:var(--surface-deep)]">
       <div className="flex items-center justify-between">
         <div className="flex gap-1">
           <Button

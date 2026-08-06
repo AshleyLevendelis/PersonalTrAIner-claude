@@ -1,11 +1,19 @@
 import * as React from "react"
 import { cn } from "@/lib/utils"
 
+// ---------------------------------------------------------------------------
+// Density pass, turn 3 "Borderless": a Card no longer draws a border or a
+// drop shadow — it separates from the canvas by its raised fill alone. This
+// one line is what propagates the borderless treatment to every screen that
+// wasn't individually redesigned. Call sites that want a hairline back must
+// now ask for it explicitly.
+// ---------------------------------------------------------------------------
+
 function Card({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="card"
-      className={cn("bg-card text-card-foreground rounded-xl border shadow-sm", className)}
+      className={cn("bg-card text-card-foreground rounded-xl", className)}
       {...props}
     />
   )

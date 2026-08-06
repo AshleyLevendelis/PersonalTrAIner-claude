@@ -157,7 +157,7 @@ function SessionDurationNote({
 
 function RestDayCard({ day, mesoWeek }: { day: string; mesoWeek?: MesocycleWeek }) {
   return (
-    <Card className="border-dashed bg-muted/20">
+    <Card className="bg-[color:var(--surface-deep)]">
       <CardHeader className="pb-3 space-y-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base text-muted-foreground">{day}</CardTitle>

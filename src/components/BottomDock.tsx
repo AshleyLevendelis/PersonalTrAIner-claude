@@ -97,7 +97,7 @@ export function BottomDock() {
         <button
           type="button"
           onClick={timers.requestScreenOpen}
-          className="w-full rounded-md border border-primary/30 bg-card/95 backdrop-blur-sm shadow-lg px-3 py-1.5 flex items-center gap-1.5 text-xs font-medium tabular-nums text-left"
+          className="w-full rounded-xl bg-card/95 glow-mint-box backdrop-blur-sm shadow-lg px-3 py-1.5 flex items-center gap-1.5 text-xs font-medium tabular-nums text-left"
         >
           <Timer className="h-3 w-3 text-primary shrink-0" />
           {chipLabel}
@@ -111,7 +111,7 @@ export function BottomDock() {
   if (isKeyboardOpen) {
     return (
       <div className="fixed left-4 right-4 z-50 md:left-auto md:right-4 md:w-96" style={bottomStyle}>
-        <div className="rounded-md border border-primary/30 bg-card/95 backdrop-blur-sm shadow-lg px-3 py-1.5 inline-flex items-center gap-1.5 text-xs font-medium tabular-nums">
+        <div className="rounded-xl bg-card/95 glow-mint-box backdrop-blur-sm shadow-lg px-3 py-1.5 inline-flex items-center gap-1.5 text-xs font-medium tabular-nums">
           <Timer className="h-3 w-3 text-primary shrink-0" />
           {isOverrun
             ? (restTargetSetNumber != null ? `Rest complete — set ${restTargetSetNumber}` : 'Rest complete')

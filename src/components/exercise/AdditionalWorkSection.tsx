@@ -27,7 +27,7 @@ export function AdditionalWorkSection({ plannedExercises }: { plannedExercises: 
       {items.map(item => {
         const completedSets = setsFor(item.exerciseId, item.name).length
         return (
-          <div key={item.exerciseId} className="rounded-md border p-3 space-y-2 bg-accent/20">
+          <div key={item.exerciseId} className="rounded-xl p-3 space-y-2 bg-[color:var(--surface-raised)]">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 min-w-0">
                 <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 bg-background">+</Badge>

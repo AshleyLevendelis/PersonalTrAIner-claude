@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
+
+
 import { Input } from '@/components/ui/input'
 import { Scale } from 'lucide-react'
 import { getRecentWeighIns } from '@/lib/nutrition-targets'
@@ -57,55 +57,47 @@ export function WeighInCard({ profileId, onWeightLogged }: { profileId: string; 
     ? Math.round((history.reduce((sum, h) => sum + h.weight_kg, 0) / history.length) * 10) / 10
     : null
 
+  // Density pass 3a: a single raised row rather than a titled card — the
+  // placeholder carries the label, so the heading is redundant chrome.
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <div className="flex items-center gap-2">
-          <Scale className="size-4 text-primary" />
-          <CardTitle className="text-base">Today's Weigh-In</CardTitle>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="flex items-center gap-2">
-          <Input
-            type="number"
-            inputMode="decimal"
-            step="0.1"
-            min={25}
-            max={350}
-            placeholder="Weight in kg"
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') handleSave() }}
-            className="flex-1 min-w-0"
-          />
-          <Button onClick={handleSave} disabled={saving || !input} className="shrink-0">
-            {saving ? 'Saving…' : 'Save'}
-          </Button>
-        </div>
-        {error && <p className="text-xs text-destructive">{error}</p>}
-        <p className="text-[11px] text-muted-foreground">
-          Your targets recalculate from your latest weigh-in — log it and the numbers above update.
-        </p>
-        {history.length > 0 && (
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between text-xs">
-              <span className="ds-label">Last {history.length} entries</span>
-              {sevenDayAvg != null && (
-                <span className="text-muted-foreground">7-day avg: <span className="font-semibold text-foreground">{sevenDayAvg} kg</span></span>
-              )}
+    <div className="space-y-2">
+      <div className="flex items-center gap-2.5 rounded-xl bg-[color:var(--surface-raised)] px-3.5 py-2.5">
+        <Scale className="size-4 shrink-0 text-muted-foreground" />
+        <Input
+          type="number"
+          inputMode="decimal"
+          step="0.1"
+          min={25}
+          max={350}
+          placeholder="Log today's weigh-in — kg"
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') handleSave() }}
+          className="h-7 min-w-0 flex-1 border-0 bg-transparent px-0 text-[13px] shadow-none focus-visible:ring-0"
+        />
+        <button
+          onClick={handleSave}
+          disabled={saving || !input}
+          className="shrink-0 text-[13px] font-semibold text-primary glow-mint disabled:opacity-40 disabled:[text-shadow:none]"
+        >
+          {saving ? 'Saving…' : 'Save'}
+        </button>
+      </div>
+      {error && <p className="text-xs text-destructive">{error}</p>}
+      <p className="text-[11px] text-muted-foreground/85">
+        Targets recalculate from your latest weigh-in
+        {sevenDayAvg != null ? ` · 7-day avg ${sevenDayAvg} kg` : ''}
+      </p>
+      {history.length > 0 && (
+        <div className="space-y-1">
+          {history.map(h => (
+            <div key={h.date} className="flex justify-between rounded-md px-0.5 text-[13px]">
+              <span className="text-muted-foreground">{h.date}</span>
+              <span className="font-medium">{h.weight_kg} kg</span>
             </div>
-            <div className="space-y-1">
-              {history.map(h => (
-                <div key={h.date} className="flex justify-between text-sm rounded-md bg-muted/50 px-2.5 py-1">
-                  <span className="text-muted-foreground">{h.date}</span>
-                  <span className="font-medium">{h.weight_kg} kg</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }

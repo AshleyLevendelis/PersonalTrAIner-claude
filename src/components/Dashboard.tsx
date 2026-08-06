@@ -6,11 +6,8 @@
 // ---------------------------------------------------------------------------
 
 import { useEffect, useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
-import { InsightBanner } from '@/components/ui/insight-banner'
 import { WeighInCard } from '@/components/WeighInCard'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { getAppNow } from '@/lib/dev-clock'
@@ -72,9 +69,7 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
 
   if (!activeSession.ready || loading || !data) {
     return (
-      <Card className="border-border/50 bg-card">
-        <CardContent className="py-12 text-center text-sm text-muted-foreground">Loading your day…</CardContent>
-      </Card>
+      <div className="rounded-xl bg-card py-12 text-center text-sm text-muted-foreground">Loading your day…</div>
     )
   }
 
@@ -111,199 +106,221 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
   }
 
   return (
-    <div className="space-y-4">
-      {/* 1. Today's session — the emphasized "hero" card, per Nightshift's brighter #3A317A border. */}
-      <Card
-        className="bg-card rounded-[20px]"
-        style={{ borderColor: 'var(--line-emphasis)' }}
-      >
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-lg font-semibold">{data.dayName}</CardTitle>
-            <span className={`text-xs ${data.streak > 0 ? 'text-primary' : 'text-muted-foreground'}`}>🔥 {data.streak} day{data.streak === 1 ? '' : 's'}</span>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-2">
+    // Density pass 3a "Borderless": no cards. Sections separate by the
+    // uppercase micro-label + generous whitespace; the hero and the numbers
+    // read as distinct units through fill, type scale and halo alone. The two
+    // ambient radial washes sit behind everything (pointer-events-none) and
+    // are what stop a fully borderless surface reading as flat.
+    <div className="relative -mx-1 px-1">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 -top-12 h-[420px]"
+        style={{
+          background:
+            'radial-gradient(120% 60% at 50% 0%, rgba(156,141,255,.20) 0%, rgba(26,22,54,0) 60%), radial-gradient(90% 40% at 20% 42%, rgba(91,233,194,.10) 0%, rgba(26,22,54,0) 70%)',
+        }}
+      />
+
+      <div className="relative">
+        {/* 1. Day + streak */}
+        <div className="flex items-baseline justify-between">
+          <span className="ds-label">
+            {data.dayName}
+            {data.phase ? ` · Week ${data.phase.weekNumber} of ${data.phase.totalWeeks}` : ''}
+          </span>
+          <span className={`text-xs font-semibold ${data.streak > 0 ? 'text-primary glow-mint' : 'text-muted-foreground'}`}>
+            🔥 {data.streak} day{data.streak === 1 ? '' : 's'}
+          </span>
+        </div>
+
+        {/* 2. Today's session — the hero. Borderless: it's the type scale, the
+            local glow blooms and the lit CTA that make this the focal unit. */}
+        <div className="relative mt-4 pt-1">
+          <div
+            aria-hidden
+            className="pointer-events-none absolute -left-8 -top-10 size-[200px] rounded-full"
+            style={{ background: 'radial-gradient(circle, rgba(156,141,255,.30) 0%, rgba(156,141,255,0) 70%)' }}
+          />
           {data.session.status === 'rest' ? (
-            <div className="space-y-1">
-              <p className="text-sm font-medium">Rest day</p>
-              <p className="text-xs text-muted-foreground">Nothing planned today — recovery is part of the program.</p>
+            <div className="relative space-y-1">
+              <p className="text-[25px] font-bold tracking-[-.02em] glow-text">Rest day</p>
+              <p className="text-[12.5px] text-muted-foreground">Nothing planned today — recovery is part of the program.</p>
             </div>
           ) : (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-medium">{data.session.focus}</p>
-                <Badge variant={data.session.status === 'done' ? 'success' : 'outline'} className="text-[10px]">
-                  {data.session.status === 'not_started' ? 'Not started' : data.session.status === 'in_progress' ? `${data.session.setsLogged}/${data.session.setsPlanned} sets` : 'Done'}
-                </Badge>
+            <div className="relative space-y-4">
+              <div>
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="text-[25px] font-bold tracking-[-.02em] glow-text min-w-0 truncate">{data.session.focus}</span>
+                  <span className="shrink-0 text-[11px] text-muted-foreground">
+                    {data.session.status === 'not_started' ? 'Not started' : data.session.status === 'in_progress' ? `${data.session.setsLogged}/${data.session.setsPlanned} sets` : 'Done'}
+                  </span>
+                </div>
+                <p className="mt-1.5 text-[12.5px] text-muted-foreground truncate">
+                  {data.session.exerciseNames.slice(0, 3).join(' · ')}{data.session.exerciseNames.length > 3 ? ` · +${data.session.exerciseNames.length - 3} more` : ''}
+                </p>
               </div>
-              <p className="text-xs text-muted-foreground truncate">
-                {data.session.exerciseNames.slice(0, 3).join(' · ')}{data.session.exerciseNames.length > 3 ? ` · +${data.session.exerciseNames.length - 3}` : ''}
-              </p>
               {data.session.status !== 'done' && (
-                <Button size="cta" className="w-full" onClick={() => { window.location.hash = tabHash('exercise') }}>
+                <Button
+                  size="cta"
+                  className="w-full glow-pulse"
+                  style={{ background: 'linear-gradient(180deg, #7CF3D4 0%, #5BE9C2 55%, #3ED3AA 100%)' }}
+                  onClick={() => { window.location.hash = tabHash('exercise') }}
+                >
                   {data.session.status === 'not_started' ? 'Start session' : 'Continue session'}
                 </Button>
               )}
             </div>
           )}
-          <p className="text-xs text-muted-foreground pt-1">{data.tomorrowLabel}</p>
-        </CardContent>
-      </Card>
-
-      {/* 2. Coach tip — the AI-voice banner tone, per the extension rule. */}
-      {data.coachTip && (
-        <InsightBanner tone="ai">
-          <p>⚡ {data.coachTip}</p>
-        </InsightBanner>
-      )}
-
-      {/* 3. Today's numbers */}
-      <div className="space-y-2">
-        <p className="ds-label px-1">Today</p>
-        <div className="grid grid-cols-2 gap-2.5">
-          <Card className="bg-card">
-            <CardContent className="p-4 space-y-1.5">
-              <p className="text-xs text-muted-foreground">Calories</p>
-              <p className="ds-num-hero">{Math.round(data.caloriesEaten)}</p>
-              <p className="text-xs text-muted-foreground">of {Math.round(data.caloriesTarget)}</p>
-              <Progress value={data.caloriesTarget > 0 ? Math.min(150, (data.caloriesEaten / data.caloriesTarget) * 100) : 0} className="h-1" />
-              {data.caloriesEaten === 0 && (
-                <Button size="sm" variant="outline" className="mt-1 w-full" onClick={() => { window.location.hash = tabHash('meals') }}>Log a meal</Button>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="bg-card">
-            <CardContent className="p-4 space-y-1.5">
-              <p className="text-xs text-muted-foreground">Protein</p>
-              <p className="ds-num-hero">{Math.round(data.proteinEaten)}<span className="text-base text-text-tertiary font-medium">g</span></p>
-              <p className="text-xs text-muted-foreground">of {Math.round(data.proteinTarget)}g</p>
-              <Progress value={data.proteinTarget > 0 ? Math.min(150, (data.proteinEaten / data.proteinTarget) * 100) : 0} className="h-1" />
-            </CardContent>
-          </Card>
-
-          <Card className="bg-card">
-            <CardContent className="p-4 space-y-1.5">
-              <div className="flex items-center justify-between">
-                <p className="text-xs text-muted-foreground">Water</p>
-                {!editingTarget && (
-                  <button className="text-[11px] text-primary" onClick={() => { setTargetInput(String(waterTarget)); setEditingTarget(true) }}>edit</button>
-                )}
-              </div>
-              {editingTarget ? (
-                <div className="flex items-center gap-1">
-                  <input
-                    type="number"
-                    value={targetInput}
-                    onChange={e => setTargetInput(e.target.value)}
-                    className="w-16 min-w-0 h-7 text-xs border border-border rounded-md px-1.5 bg-background"
-                  />
-                  <Button size="sm" variant="ghost" className="h-7 text-[10px] px-1.5 shrink-0" onClick={handleSaveTarget}>Save</Button>
-                </div>
-              ) : (
-                <p className="ds-num-lg">{todayWaterMl}<span className="text-sm text-muted-foreground font-medium">/{waterTarget}ml</span></p>
-              )}
-              <Progress value={waterTarget > 0 ? Math.min(150, (todayWaterMl / waterTarget) * 100) : 0} className="h-1" />
-              <div className="flex items-center gap-1.5 pt-0.5 flex-wrap">
-                {WATER_QUICK_ADD_ML.map(ml => (
-                  <Button key={ml} size="sm" variant="outline" className="h-7 text-xs shrink-0" onClick={() => handleAddWater(ml)}>+{ml}ml</Button>
-                ))}
-                {lastWaterLog && (
-                  <Button size="sm" variant="ghost" className="h-7 text-xs ml-auto shrink-0" onClick={handleUndoWater}>Undo</Button>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-card/45" style={{ borderStyle: 'dashed' }}>
-            <CardContent className="p-4 space-y-1.5">
-              <p className="text-xs text-muted-foreground">Steps</p>
-              {steps ? (
-                <p className="ds-num-lg">{steps.steps.toLocaleString()}</p>
-              ) : (
-                <p className="text-sm text-muted-foreground">Not tracked yet</p>
-              )}
-              {!steps && (
-                <div className="flex items-center gap-1.5">
-                  <input
-                    type="number"
-                    placeholder="Steps"
-                    value={stepsInput}
-                    onChange={e => setStepsInput(e.target.value)}
-                    className="flex-1 min-w-0 h-7 text-xs border border-border rounded-md px-2 bg-background"
-                  />
-                  <Button size="sm" variant="outline" className="h-7 text-xs shrink-0" onClick={handleLogSteps}>Log</Button>
-                </div>
-              )}
-              <p className="text-[10px] text-muted-foreground/70">
-                No automatic step tracking yet — enter manually, or nothing to show.
-              </p>
-            </CardContent>
-          </Card>
+          <p className="relative mt-2.5 text-xs text-muted-foreground">{data.tomorrowLabel}</p>
         </div>
-      </div>
 
-      {/* 4. Progress */}
-      <div className="space-y-2">
-        <p className="ds-label px-1">Progress</p>
-        <Card className="bg-card">
-          <CardContent className="p-4 space-y-3">
-            {data.weightTrend ? (
-              <div className="text-sm">
-                <span className="ds-num-lg">{data.weightTrend.rollingAvgKg.toFixed(1)}</span>
-                <span className="text-sm text-muted-foreground">kg</span>
-                {data.weightTrend.ratePerWeekKg != null && (
-                  <span className={data.weightTrend.ratePerWeekKg < 0 ? 'text-primary' : 'text-muted-foreground'}> · {data.weightTrend.ratePerWeekKg > 0 ? '+' : ''}{data.weightTrend.ratePerWeekKg.toFixed(1)}kg/week</span>
-                )}
-                {data.weightTrend.onTrackForGoal === true && <span className="text-xs text-muted-foreground"> · on track for your target</span>}
-                {data.weightTrend.onTrackForGoal === false && <span className="text-xs text-muted-foreground"> · slower than your target pace</span>}
-                {data.weightTrend.sampleCount === 1 && <span className="text-[10px] text-muted-foreground/70"> (1 weigh-in — trend firms up with more)</span>}
+        {/* 3. Coach tip — AI voice. Borderless, the violet halo carries the tone. */}
+        {data.coachTip && (
+          <div className="mt-5 flex items-start gap-2.5">
+            <span className="text-sm leading-[1.4] text-[color:var(--role-ai)] glow-violet">⚡</span>
+            <span className="text-[13px] leading-[1.5] text-[color:var(--role-ai-text)]">{data.coachTip}</span>
+          </div>
+        )}
+
+        {/* 4. Today's numbers — hairlines between tiles replaced by wide gutters. */}
+        <p className="ds-label mt-8 glow-violet">Today</p>
+        <div className="mt-3.5 grid grid-cols-2 gap-x-[26px] gap-y-[26px]">
+          <div className="flex min-w-0 flex-col gap-1.5">
+            <span className="text-[11px] text-muted-foreground">Calories</span>
+            <span className="ds-num-tile text-[#E4FCF4] glow-mint-lg">{Math.round(data.caloriesEaten)}</span>
+            <span className="text-[11px] text-muted-foreground">of {Math.round(data.caloriesTarget)}</span>
+            <Progress glow value={data.caloriesTarget > 0 ? Math.min(150, (data.caloriesEaten / data.caloriesTarget) * 100) : 0} className="mt-0.5 h-[3px]" />
+            {data.caloriesEaten === 0 && (
+              <button className="mt-1 text-left text-xs text-primary glow-mint" onClick={() => { window.location.hash = tabHash('meals') }}>Log a meal</button>
+            )}
+          </div>
+
+          <div className="flex min-w-0 flex-col gap-1.5">
+            <span className="text-[11px] text-muted-foreground">Protein</span>
+            <span className="ds-num-tile text-[#E4FCF4] glow-mint-lg">
+              {Math.round(data.proteinEaten)}<span className="text-[15px] font-medium text-text-tertiary [text-shadow:none]">g</span>
+            </span>
+            <span className="text-[11px] text-muted-foreground">of {Math.round(data.proteinTarget)}g</span>
+            <Progress glow value={data.proteinTarget > 0 ? Math.min(150, (data.proteinEaten / data.proteinTarget) * 100) : 0} className="mt-0.5 h-[3px]" />
+          </div>
+
+          <div className="flex min-w-0 flex-col gap-1.5">
+            <span className="text-[11px] text-muted-foreground">Water</span>
+            {editingTarget ? (
+              <div className="flex items-center gap-1">
+                <input
+                  type="number"
+                  value={targetInput}
+                  onChange={e => setTargetInput(e.target.value)}
+                  className="h-7 w-16 min-w-0 rounded-md bg-[color:var(--surface-raised)] px-1.5 text-xs"
+                />
+                <Button size="sm" variant="ghost" className="h-7 shrink-0 px-1.5 text-[10px]" onClick={handleSaveTarget}>Save</Button>
               </div>
             ) : (
-              <p className="text-xs text-muted-foreground">Log a weigh-in to see your trend here.</p>
+              <span className="ds-num-tile text-[#E4FCF4] glow-mint">
+                {todayWaterMl}<span className="text-[15px] font-medium text-muted-foreground [text-shadow:none]"> / {waterTarget}</span>
+              </span>
             )}
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+              {WATER_QUICK_ADD_ML.map(ml => (
+                <button key={ml} className="text-primary glow-mint" onClick={() => handleAddWater(ml)}>+{ml}</button>
+              ))}
+              {!editingTarget && (
+                <button className="text-muted-foreground" onClick={() => { setTargetInput(String(waterTarget)); setEditingTarget(true) }}>edit</button>
+              )}
+              {lastWaterLog && (
+                <button className="text-muted-foreground" onClick={handleUndoWater}>undo</button>
+              )}
+            </div>
+          </div>
 
-            {data.recentPRs.length > 0 ? (
-              <div className="space-y-1 pt-2 border-t border-border">
-                <p className="ds-label">Recent PRs</p>
-                {data.recentPRs.map(pr => (
-                  <p key={pr.exerciseName} className="text-sm">{pr.exerciseName}: <span className="text-primary font-medium">{pr.weightKg}kg</span></p>
-                ))}
+          <div className="flex min-w-0 flex-col gap-1.5">
+            <span className="text-[11px] text-muted-foreground">Steps</span>
+            {steps ? (
+              <span className="ds-num-tile text-[#E4FCF4] glow-mint">{steps.steps.toLocaleString()}</span>
+            ) : (
+              <span className="ds-num-tile text-[color:var(--text-dim)]">—</span>
+            )}
+            {!steps && (
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="number"
+                  placeholder="Steps"
+                  value={stepsInput}
+                  onChange={e => setStepsInput(e.target.value)}
+                  className="h-7 min-w-0 flex-1 rounded-md bg-[color:var(--surface-raised)] px-2 text-xs"
+                />
+                <button className="shrink-0 text-xs text-primary glow-mint" onClick={handleLogSteps}>Log</button>
               </div>
-            ) : null}
-
-            <p className="text-xs text-muted-foreground">Streak: {data.streak} day{data.streak === 1 ? '' : 's'} on plan</p>
-          </CardContent>
-        </Card>
-        {profile.id && <WeighInCard profileId={profile.id} onWeightLogged={onWeightLogged} />}
-      </div>
-
-      {/* 5. What's left today */}
-      {data.whatsLeftLine && (
-        <InsightBanner tone="warning">
-          <p>{data.whatsLeftLine}</p>
-        </InsightBanner>
-      )}
-
-      {/* 6. Phase context */}
-      {data.phase && (
-        <Card className="bg-card" style={{ backgroundColor: 'var(--surface-deep)' }}>
-          <CardContent className="py-3">
-            <button className="w-full text-left" onClick={() => setPhaseExpanded(e => !e)}>
-              <p className="text-sm text-muted-foreground">
-                Week {data.phase.weekNumber} / {data.phase.totalWeeks}
-                {data.phase.phaseLabel ? ` · ${data.phase.phaseLabel}` : ''}
-                {data.phase.isDeload ? ' (deload)' : ''}
-                {data.phase.isCalibrationWeek ? ' (calibration)' : ''}
-              </p>
-            </button>
-            {phaseExpanded && data.phase.phaseFocus && (
-              <p className="text-xs text-muted-foreground mt-1.5">{data.phase.phaseFocus}</p>
             )}
-          </CardContent>
-        </Card>
-      )}
+          </div>
+        </div>
+
+        {/* 5. Progress — the section rule is gone; the label does that work. */}
+        <p className="ds-label mt-9 glow-violet">Progress</p>
+        {data.weightTrend ? (
+          <div className="mt-3.5 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+            <span className="ds-num-tile text-[#E4FCF4] glow-mint-lg">
+              {data.weightTrend.rollingAvgKg.toFixed(1)}<span className="text-[15px] font-medium text-muted-foreground [text-shadow:none]"> kg</span>
+            </span>
+            {data.weightTrend.ratePerWeekKg != null && (
+              <span className={`text-[13px] ${data.weightTrend.ratePerWeekKg < 0 ? 'text-primary glow-mint' : 'text-muted-foreground'}`}>
+                {data.weightTrend.ratePerWeekKg > 0 ? '+' : ''}{data.weightTrend.ratePerWeekKg.toFixed(1)} kg/wk
+                {data.weightTrend.onTrackForGoal === true ? ' · on track' : data.weightTrend.onTrackForGoal === false ? ' · slower than target' : ''}
+              </span>
+            )}
+            {data.weightTrend.sampleCount === 1 && (
+              <span className="text-[10px] text-muted-foreground/70">(1 weigh-in — trend firms up with more)</span>
+            )}
+          </div>
+        ) : (
+          <p className="mt-3.5 text-xs text-muted-foreground">Log a weigh-in to see your trend here.</p>
+        )}
+
+        {data.recentPRs.length > 0 && (
+          <div className="mt-3 space-y-1">
+            {data.recentPRs.map(pr => (
+              <p key={pr.exerciseName} className="text-[13px]">
+                {pr.exerciseName} <span className="font-semibold text-primary glow-mint">{pr.weightKg} kg</span>
+                <span className="text-[11px] text-muted-foreground"> — new PR</span>
+              </p>
+            ))}
+          </div>
+        )}
+
+        {profile.id && (
+          <div className="mt-4">
+            <WeighInCard profileId={profile.id} onWeightLogged={onWeightLogged} />
+          </div>
+        )}
+
+        <p className="mt-3 text-xs text-muted-foreground">Streak: {data.streak} day{data.streak === 1 ? '' : 's'} on plan</p>
+
+        {/* 6. What's left today — needs-you amber, marked by a pulsing dot
+            rather than a bordered banner. */}
+        {data.whatsLeftLine && (
+          <div className="mt-6 flex items-baseline gap-2">
+            <span aria-hidden className="size-1.5 shrink-0 self-center rounded-full bg-[color:var(--role-warn)] glow-warn-dot" />
+            <span className="text-[12.5px] text-[color:var(--role-warn-text)] glow-warn">{data.whatsLeftLine}</span>
+          </div>
+        )}
+
+        {/* 7. Phase context */}
+        {data.phase && (
+          <button className="mt-6 block w-full text-left" onClick={() => setPhaseExpanded(e => !e)}>
+            <p className="text-xs text-muted-foreground">
+              Week {data.phase.weekNumber} of {data.phase.totalWeeks}
+              {data.phase.phaseLabel ? ` · ${data.phase.phaseLabel}` : ''}
+              {data.phase.isDeload ? ' (deload)' : ''}
+              {data.phase.isCalibrationWeek ? ' (calibration)' : ''}
+              <span className="ml-1 text-primary glow-mint">›</span>
+            </p>
+            {phaseExpanded && data.phase.phaseFocus && (
+              <p className="mt-1.5 text-xs text-muted-foreground">{data.phase.phaseFocus}</p>
+            )}
+          </button>
+        )}
+      </div>
     </div>
   )
 }

@@ -87,7 +87,7 @@ function TomorrowPreview({
   return (
     <button
       type="button"
-      className="w-full flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-left hover:bg-accent/40 transition-colors disabled:opacity-50"
+      className="w-full flex items-center justify-between gap-2 rounded-lg bg-[color:var(--surface-raised)] px-3 py-2 text-left hover:bg-accent/40 transition-colors disabled:opacity-50"
       onClick={() => onPeek?.(tomorrow.dayName)}
       disabled={!onPeek}
     >
@@ -117,7 +117,7 @@ export function RestDayCard({
   const [pickerOpen, setPickerOpen] = useState(false)
 
   return (
-    <Card className="border-dashed bg-muted/20">
+    <Card className="bg-[color:var(--surface-deep)]">
       <CardContent className="py-4 space-y-3">
         <div className="flex items-center gap-3">
           <div className="flex items-center justify-center size-10 rounded-full bg-muted shrink-0">
@@ -215,7 +215,7 @@ function RecoveryFinisher({ cardio }: { cardio: RecommendedCardio }) {
   }
 
   return (
-    <div className="flex items-center justify-between gap-2 rounded-md border border-[color:var(--role-warn-border)] bg-background/60 px-3 py-2">
+    <div className="flex items-center justify-between gap-2 rounded-lg bg-[color:var(--role-warn-bg)] px-3 py-2">
       <span className="text-xs text-foreground">
         {cardio.activity} · {cardio.duration}m · RPE {cardio.targetRpe}
       </span>

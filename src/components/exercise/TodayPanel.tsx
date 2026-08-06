@@ -166,7 +166,7 @@ export function TodayPanel({
 
       {peekWorkout ? (
         peekWorkout.exercises.length === 0 ? (
-          <div className="rounded-md border p-4 text-center text-sm text-muted-foreground">
+          <div className="rounded-xl bg-[color:var(--surface-deep)] p-4 text-center text-sm text-muted-foreground">
             {peekDay} is a rest or recovery day.
             <button className="block mx-auto mt-2 text-xs underline" onClick={() => setPeekDay(null)}>Back to today</button>
           </div>
@@ -308,8 +308,10 @@ function ExerciseList({
     }
   }
 
+  // 3b: 20px between rows. With no borders or card padding left, this gap IS
+  // the separation — tighter and the list reads as one run-on block.
   return (
-    <div className="space-y-2">
+    <div className="flex flex-col gap-5">
       {groups.map((g, i) =>
         g.kind === 'single' ? (
           <ExerciseRow key={i} {...rowProps(g.ex, g.exIndex)} />

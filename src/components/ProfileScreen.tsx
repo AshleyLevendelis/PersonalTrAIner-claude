@@ -28,6 +28,7 @@ import { resolveFoodTarget } from '@/lib/fact-compiler'
 import { supabase } from '@/lib/supabase'
 import { computeGoalProgress } from '@/lib/goal-progress'
 import { updateProfileField } from '@/lib/profile-store'
+import { useAppearance } from '@/hooks/useAppearance'
 import {
   EXPERIENCE_OPTIONS, EQUIPMENT_OPTIONS, STYLE_OPTIONS, RECOVERY_OPTIONS,
   CONDITIONING_PREF_OPTIONS, ACTIVITY_OPTIONS, DIETARY_OPTIONS, FAVORITE_CUISINE_OPTIONS,
@@ -201,6 +202,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
   const [editValue, setEditValue] = useState('')
   const [loading, setLoading] = useState(false)
 
+  const appearance = useAppearance()
   const goalsRef = useRef<HTMLDivElement>(null)
   const factsRef = useRef<HTMLDivElement>(null)
   const contextRef = useRef<HTMLDivElement>(null)
@@ -298,6 +300,74 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
           <DialogTitle>Profile</DialogTitle>
           <DialogDescription>Everything the app knows about you — correct or remove anything here.</DialogDescription>
         </DialogHeader>
+
+        {/* Appearance — design doc option 1f. Both axes apply instantly and
+            everywhere: glow is one intensity variable, canvas swaps the
+            surface ramp. No separate themes, nothing to reload. */}
+        <div className="space-y-2">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Appearance</h3>
+          <div className="space-y-4 rounded-md bg-[color:var(--surface-deep)] p-3">
+            <div>
+              <p className="text-sm font-medium">Glow effects</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">Halos on the action button, active states and key numbers</p>
+              <div className="mt-3 flex gap-[3px] rounded-xl bg-background p-[3px]">
+                {(['off', 'subtle', 'full'] as const).map(level => (
+                  <button
+                    key={level}
+                    type="button"
+                    aria-pressed={appearance.glow === level}
+                    onClick={() => appearance.setGlow(level)}
+                    className={`h-[38px] flex-1 rounded-[9px] text-[13px] capitalize transition-colors ${
+                      appearance.glow === level
+                        ? 'font-semibold text-[color:var(--primary-foreground)] glow-mint-box'
+                        : 'text-muted-foreground'
+                    }`}
+                    style={appearance.glow === level ? { background: 'linear-gradient(180deg, #7CF3D4, #3ED3AA)' } : undefined}
+                  >
+                    {level}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="text-sm font-medium">Canvas</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">Base background depth — mood stays dark either way</p>
+              <div className="mt-3 flex gap-3">
+                {([
+                  { value: 'lifted', label: 'Lifted', bg: '#1A1636', chip: '#241E4E' },
+                  { value: 'deep', label: 'Deep', bg: '#0D0A1C', chip: '#171233' },
+                ] as const).map(opt => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    aria-pressed={appearance.canvas === opt.value}
+                    onClick={() => appearance.setCanvas(opt.value)}
+                    className="flex flex-1 flex-col gap-2"
+                  >
+                    <span
+                      className={`flex h-16 items-end rounded-xl p-2 ring-2 ${
+                        appearance.canvas === opt.value ? 'ring-primary glow-mint-box' : 'ring-transparent'
+                      }`}
+                      style={{ background: opt.bg }}
+                    >
+                      <span className="h-2 w-3/5 rounded" style={{ background: opt.chip }} />
+                    </span>
+                    <span className={`text-center text-xs ${appearance.canvas === opt.value ? 'font-medium text-primary' : 'text-muted-foreground'}`}>
+                      {opt.label}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <p className="text-[11.5px] leading-[1.5] text-muted-foreground/80">
+              Both apply instantly, everywhere. Glow maps to one intensity variable; canvas swaps two surface values — no separate themes.
+            </p>
+          </div>
+        </div>
+
+        <Separator />
 
         {/* Identity & metrics */}
         <div className="space-y-2">

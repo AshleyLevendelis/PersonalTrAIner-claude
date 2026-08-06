@@ -40,13 +40,23 @@ export function WeekStrip({
             key={d.date}
             type="button"
             onClick={() => { if (!isToday) onSelectDay(d.dayName) }}
-            className={`flex flex-col items-center gap-0.5 rounded-md py-1.5 text-xs transition-colors ${
-              isToday ? 'bg-primary/10 border border-primary/40 font-semibold' : 'hover:bg-accent/40'
+            // Density pass 3b: today is marked by a lit label and (when the
+            // session is still outstanding) a pulsing mint dot — no fill, no
+            // border. The state glyph is kept for every other case so a
+            // done/missed/rest day still reads at a glance.
+            className={`flex flex-col items-center gap-1 rounded-md py-1.5 text-xs transition-colors ${
+              isToday ? 'font-semibold' : 'hover:bg-accent/40'
             }`}
             aria-label={`${d.dayName}: ${d.state}`}
           >
-            <span className="text-[10px] text-muted-foreground">{SHORT_DAY[d.dayName] ?? d.dayName.slice(0, 3)}</span>
-            <span className="text-sm leading-none">{GLYPH[d.state]}</span>
+            <span className={`text-[10px] ${isToday ? 'text-primary glow-mint' : 'text-muted-foreground'}`}>
+              {SHORT_DAY[d.dayName] ?? d.dayName.slice(0, 3)}
+            </span>
+            {isToday && d.state === 'due' ? (
+              <span aria-hidden className="my-[3px] size-[7px] rounded-full bg-primary glow-dot" />
+            ) : (
+              <span className={`text-sm leading-none ${isToday ? 'text-primary glow-mint' : ''}`}>{GLYPH[d.state]}</span>
+            )}
           </button>
         )
       })}

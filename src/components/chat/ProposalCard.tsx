@@ -50,7 +50,7 @@ export function ProposalCard({
   const scopeField = diff.editable?.find(e => e.field === 'scope')
 
   return (
-    <div className="mt-2 rounded-md border border-border bg-card p-3 text-sm space-y-2.5">
+    <div className="mt-2 rounded-xl bg-card p-3 text-sm space-y-2.5">
       <div className="space-y-1.5">
         {diff.rows.map((row, i) => (
           <div key={i} className="flex items-start justify-between gap-2 text-xs">
@@ -83,8 +83,8 @@ export function ProposalCard({
           {scopeField.options.map(opt => (
             <button
               key={opt}
-              className={`min-h-[44px] rounded-full border px-3.5 text-xs font-medium transition-colors ${
-                scope === opt ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:bg-accent'
+              className={`min-h-[44px] rounded-full px-3.5 text-xs font-medium transition-colors ${
+                scope === opt ? 'bg-primary/15 text-primary glow-mint' : 'bg-[color:var(--surface-raised)] text-muted-foreground hover:bg-accent'
               }`}
               onClick={() => setScope(opt)}
               disabled={busyOverall}

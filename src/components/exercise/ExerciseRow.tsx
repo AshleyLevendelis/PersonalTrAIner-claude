@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { ArrowRightLeft, Ban, MoreVertical, ChevronDown, ChevronRight } from 'lucide-react'
+import { ArrowRightLeft, Ban, MoreVertical, ChevronDown } from 'lucide-react'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { getExerciseId } from '@/lib/exercise-db'
 import { formatRampSets } from '@/lib/session-derive'
@@ -102,16 +101,38 @@ export function ExerciseRow({
   const nameLine = (
     <div className="flex items-center gap-2 flex-wrap min-w-0">
       {supersetLabel && (
-        <Badge variant="outline" className="text-[10px] font-mono px-1.5 py-0.5 bg-background font-semibold shrink-0">
-          {supersetLabel}
-        </Badge>
+        <span className="shrink-0 font-mono text-[10px] font-semibold text-primary glow-mint">{supersetLabel}</span>
       )}
-      <span className={`font-medium truncate ${allSetsLogged ? 'line-through text-muted-foreground' : ''}`}>{ex.name}</span>
+      <span
+        className={`truncate ${expanded ? 'text-[17px] font-semibold' : 'text-[14.5px] font-medium'} ${
+          allSetsLogged ? 'line-through text-muted-foreground' : ''
+        }`}
+      >
+        {ex.name}
+      </span>
     </div>
   )
 
+  // Density pass 3b "Borderless": the active (expanded) exercise is no longer
+  // a bordered card — it separates by a swept mint hairline along its top edge
+  // plus its own type scale. Collapsed rows are bare lines on the canvas, so
+  // the list reads as a rhythm of names rather than a stack of boxes. That is
+  // where the ~10% row-width gain comes from: no border, no card padding.
   return (
-    <div className={`rounded-[12px] border px-2 py-3 space-y-2 ${allSetsLogged ? 'bg-primary/10 border-primary/30' : 'bg-card'}`}>
+    <div
+      className={
+        expanded
+          ? 'relative overflow-hidden rounded-[18px] pt-4 space-y-2.5'
+          : `rounded-[10px] space-y-2 ${allSetsLogged ? 'opacity-70' : ''}`
+      }
+    >
+      {expanded && (
+        <span
+          aria-hidden
+          className="absolute inset-x-0 top-0 h-px glow-sweep"
+          style={{ background: 'linear-gradient(90deg, rgba(91,233,194,0), rgba(91,233,194,.9), rgba(91,233,194,0))' }}
+        />
+      )}
       {/* A plain div, not a <button> — LoadChip renders its own interactive
           "why this weight" button below, and a button can't legally contain
           another button (the browser silently splits/corrupts the DOM when
@@ -122,29 +143,36 @@ export function ExerciseRow({
         tabIndex={0}
         onClick={onToggleExpanded}
         onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggleExpanded() } }}
-        className="w-full text-left flex items-start justify-between gap-2 cursor-pointer"
+        className="w-full text-left flex items-baseline justify-between gap-2.5 cursor-pointer"
       >
         <div className="min-w-0 flex-1 space-y-1">
           {nameLine}
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs text-muted-foreground">{ex.sets}×{ex.reps}</span>
-            {!expanded && (
-              <LoadChip
-                ex={ex}
-                source={loadSource}
-                explained={false}
-                onToggleExplain={() => {}}
-                progressionNote={undefined}
-              />
-            )}
-            {allSetsLogged ? (
-              <span className="text-xs text-primary">{formatCompletedSummary(loggedSets)}</span>
-            ) : completedSets > 0 ? (
-              <Badge variant="secondary" className="text-[10px] font-mono">{completedSets}/{ex.sets} sets</Badge>
-            ) : null}
-          </div>
+          {(expanded || allSetsLogged || completedSets > 0) && (
+            <div className="flex items-center gap-2 flex-wrap">
+              {expanded && <span className="text-xs text-text-tertiary">{ex.sets}×{ex.reps}</span>}
+              {allSetsLogged ? (
+                <span className="text-xs text-primary glow-mint">{formatCompletedSummary(loggedSets)}</span>
+              ) : completedSets > 0 ? (
+                <span className="font-mono text-[10px] text-muted-foreground">{completedSets}/{ex.sets} sets</span>
+              ) : null}
+            </div>
+          )}
         </div>
-        {expanded ? <ChevronDown className="size-4 text-muted-foreground shrink-0 mt-1" /> : <ChevronRight className="size-4 text-muted-foreground shrink-0 mt-1" />}
+        {/* Collapsed: prescription + load ride on the right as one muted line
+            (3b), replacing the chevron — the row itself is the affordance. */}
+        {!expanded && (
+          <div className="flex shrink-0 items-baseline gap-2 text-xs text-muted-foreground">
+            <span className="whitespace-nowrap">{ex.sets}×{ex.reps}</span>
+            <LoadChip
+              ex={ex}
+              source={loadSource}
+              explained={false}
+              onToggleExplain={() => {}}
+              progressionNote={undefined}
+            />
+          </div>
+        )}
+        {expanded && <ChevronDown className="size-4 text-muted-foreground shrink-0" />}
       </div>
 
       {expanded && (
