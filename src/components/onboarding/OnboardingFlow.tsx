@@ -29,7 +29,6 @@ interface OnboardingData {
   gender: 'male' | 'female'
   heightCm: string
   weightKg: string
-  coachingPersona: CoachingPersona | null
   /** null = unanswered; false = "I'm new / not sure" (calibration week); true = "I know my numbers" (known lifts below). */
   knowsWorkingLifts: boolean | null
   knownSquatKg: string
@@ -44,7 +43,7 @@ interface OnboardingData {
   breakfastStyle: BreakfastStyle | null
 }
 
-const TOTAL_STEPS = 20
+const TOTAL_STEPS = 19
 
 export const EXPERIENCE_OPTIONS: { value: TrainingExperience; icon: string; label: string; description: string }[] = [
   { value: 'beginner', icon: '🌱', label: 'Beginner', description: 'New to this, or coming back after a long break' },
@@ -179,13 +178,6 @@ export const BREAKFAST_STYLE_OPTIONS: { value: BreakfastStyle; icon: string; lab
   { value: 'skip', icon: '⏭️', label: 'Usually Skip', description: 'Keep it minimal if I eat anything at all' },
 ]
 
-const PERSONA_OPTIONS: { value: CoachingPersona; icon: string; label: string; description: string }[] = [
-  { value: 'drill_sergeant', icon: '🎖️', label: 'Drill Sergeant', description: 'No excuses, push harder' },
-  { value: 'analytical', icon: '🧠', label: 'Analytical', description: 'Data-driven, precise' },
-  { value: 'supportive', icon: '🤝', label: 'Supportive', description: 'Encouraging & patient' },
-  { value: 'hype', icon: '🔥', label: 'Hype Coach', description: 'Maximum energy & motivation' },
-]
-
 function roundTo(value: number, decimals: number): number {
   return Math.round(value * Math.pow(10, decimals)) / Math.pow(10, decimals)
 }
@@ -228,7 +220,6 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
     gender: 'male',
     heightCm: '',
     weightKg: '',
-    coachingPersona: null,
     knowsWorkingLifts: null,
     knownSquatKg: '',
     knownBenchKg: '',
@@ -356,8 +347,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
       case 15: return true
       case 16: return !!data.age && !!data.heightCm && !!data.weightKg && Number(data.age) > 0 && Number(data.heightCm) > 0 && Number(data.weightKg) > 0
       case 17: return !!data.activityLevel
-      case 18: return !!data.coachingPersona
-      case 19: return true
+      case 18: return true
       default: return false
     }
   }
@@ -393,7 +383,11 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
       equipment_access: data.equipment!,
       training_style: data.trainingStyle!,
       training_experience: data.trainingExperience!,
-      coaching_persona: data.coachingPersona!,
+      // The coach-persona onboarding step is retired (a single unnamed
+      // voice now, defined in the chat system prompt) — this column and
+      // its values are kept as the seed for a later multi-coach system,
+      // so every profile still gets a value, just never asked for.
+      coaching_persona: 'supportive' as CoachingPersona,
       recovery_capacity: data.recoveryCapacity!,
       conditioning_preference: data.conditioningPreference!,
       injuries: data.injuries,
@@ -905,24 +899,6 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
 
       case 18:
         return (
-          <StepWrapper title="How should your AI coach talk?" subtitle="Sets the tone for chat & advice">
-            <div className="grid grid-cols-2 gap-3">
-              {PERSONA_OPTIONS.map(opt => (
-                <OptionCard
-                  key={opt.value}
-                  icon={opt.icon}
-                  label={opt.label}
-                  description={opt.description}
-                  selected={data.coachingPersona === opt.value}
-                  onClick={() => autoAdvance(() => setData(d => ({ ...d, coachingPersona: opt.value })))}
-                />
-              ))}
-            </div>
-          </StepWrapper>
-        )
-
-      case 19:
-        return (
           <StepWrapper title={`Ready to go, ${data.displayName}!`} subtitle="Review your selections">
             <Card className="bg-muted/50 border-dashed">
               <CardContent className="pt-4 text-sm space-y-2">
@@ -946,7 +922,6 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
                 <ReviewRow label="Favourite Cuisines" value={data.favoriteCuisines.length > 0 ? data.favoriteCuisines.join(', ') : 'No preference'} />
                 <ReviewRow label="Disliked Foods" value={data.dislikedFoods || 'None'} />
                 <ReviewRow label="Breakfast Style" value={BREAKFAST_STYLE_OPTIONS.find(o => o.value === data.breakfastStyle)?.label ?? 'No preference'} />
-                <ReviewRow label="Coach Persona" value={PERSONA_OPTIONS.find(o => o.value === data.coachingPersona)?.label} />
               </CardContent>
             </Card>
             <Button onClick={handleSubmit} className="w-full mt-4 h-12 text-base font-semibold">

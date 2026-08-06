@@ -24,6 +24,7 @@ import { createFact, createGoal, createContextFact, retireFact, retireContextFac
 import { resolveExerciseTarget, resolveFoodTarget } from '@/lib/fact-compiler'
 import { checkFactConflict, checkGoalConflict } from '@/lib/memory-reconcile'
 import { getPRCache } from '@/lib/pr-engine'
+import { loadDashboardData, type DashboardData } from '@/lib/dashboard-data'
 import { getAllItems as getAllGroceryItems, addItemLocal, setCheckedLocal, undoAddLocal, type GroceryItemRow, type GroceryCategory } from '@/lib/grocery-store'
 import { logWater, undoLog as undoWaterLog } from '@/lib/water-store'
 import { ProposalCard } from '@/components/chat/ProposalCard'
@@ -129,14 +130,23 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
   // design, same as pendingAction/receipt/clarification on ChatMessage.
   const parseSessionsRef = useRef<Record<string, { entries: WorkoutEntryInput[]; todaysPlanExerciseNames: string[] }>>({})
 
-  const buildInitialGreeting = (): string => {
+  // Synchronous fallback opener — used as the initial message before any
+  // data has loaded, and upgraded in place once real PR/trend data resolves
+  // (see the greeting-upgrade effect below). Still concrete (today's actual
+  // session, not a canned "Hi") rather than generic — the coach-persona
+  // branching is gone; there's one voice now. `greetName` and `detail` are
+  // exposed separately so the upgrade path can prepend a PR line without
+  // string-surgery on the composed sentence.
+  const greetName = (): string => {
+    const name = profile.display_name || ''
+    return name ? `Hey ${name}` : `Hey`
+  }
+
+  const initialGreetingDetail = (): string => {
     const now = new Date()
     const hour = now.getHours()
     const dayName = now.toLocaleDateString('en-US', { weekday: 'long' })
     const todaySession = exercisePlan.find(d => d.day === dayName)
-    const name = profile.display_name || ''
-    const persona = profile.coaching_persona || 'supportive'
-
     const trainingTime = profile.preferred_time || 'morning'
     const sessionPassedCutoff: Record<string, number> = {
       morning: 13,
@@ -147,93 +157,17 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     }
     const cutoff = sessionPassedCutoff[trainingTime] || 22
 
-    const getNextSession = () => {
-      const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-      for (let i = 1; i <= 7; i++) {
-        const nextDay = days[(now.getDay() + i) % 7]
-        const session = exercisePlan.find(d => d.day === nextDay)
-        if (session) return { day: nextDay, session, daysAway: i }
-      }
-      return null
-    }
-
-    const greetByPersona = (): string => {
-      switch (persona) {
-        case 'drill_sergeant':
-          return name ? `Listen up, ${name}.` : `Listen up.`
-        case 'analytical':
-          return name ? `Good to see you, ${name}.` : `Good to see you.`
-        case 'hype':
-          return name ? `LET'S GO ${name}! 🔥` : `LET'S GO! 🔥`
-        case 'supportive':
-        default:
-          return name ? `Hey ${name}!` : `Hey there!`
-      }
-    }
-
-    const signOff = (): string => {
-      switch (persona) {
-        case 'drill_sergeant':
-          return `\n\nNo excuses. Ask me about your meals, macros, or plan changes — I'm watching.`
-        case 'analytical':
-          return `\n\nI can assist with meal plans, macro analysis, recovery optimization, or plan adjustments.`
-        case 'hype':
-          return `\n\nYou can ask me ANYTHING — meals, macros, recovery, plan changes. WE'RE IN THIS TOGETHER! 💪`
-        case 'supportive':
-        default:
-          return `\n\nYou can also ask me about your meals, macros, recovery, or request plan changes anytime.`
-      }
-    }
-
     if (todaySession) {
       const movements = todaySession.exercises.map(e => e.name).slice(0, 3).join(', ')
-      const exerciseList = `**${todaySession.focus}** (${movements}${todaySession.exercises.length > 3 ? '...' : ''})`
-
       if (hour >= cutoff) {
-        const next = getNextSession()
-        const nextLine = next
-          ? `\n\nLooking ahead, your next session is **${next.session.focus}** on ${next.day}.`
-          : ''
-        switch (persona) {
-          case 'drill_sergeant':
-            return `${greetByPersona()} Your ${trainingTime} ${exerciseList} session was today. Did you execute, or do I need to hear your excuse?${nextLine}${signOff()}`
-          case 'analytical':
-            return `${greetByPersona()} Today's ${trainingTime} ${exerciseList} session window has closed. I'd like to log your completion data — did you train as prescribed?${nextLine}${signOff()}`
-          case 'hype':
-            return `${greetByPersona()} You had a ${trainingTime} ${exerciseList} session today! Tell me you CRUSHED IT! 🏆${nextLine}${signOff()}`
-          default:
-            return `${greetByPersona()} You had a ${trainingTime} ${exerciseList} session on the cards today.\n\nHow did it go? Let me know if you crushed it, skipped it, or need to reschedule.${nextLine}${signOff()}`
-        }
+        return `today was ${todaySession.focus} (${movements}). How'd it go?`
       }
-
-      switch (persona) {
-        case 'drill_sergeant':
-          return `${greetByPersona()} It's ${dayName}. You have a ${trainingTime} session: ${exerciseList}. No negotiation — get it done. Need adjustments? Speak now.${signOff()}`
-        case 'analytical':
-          return `${greetByPersona()} Today (${dayName}) your program prescribes a ${trainingTime} session: ${exerciseList}. Are all parameters nominal, or do we need to adjust variables based on recovery status?${signOff()}`
-        case 'hype':
-          return `${greetByPersona()} Happy ${dayName}! You've got a FIRE session coming up: ${exerciseList} (${trainingTime}). This is YOUR day to dominate! Ready to GO?! 💥${signOff()}`
-        default:
-          return `${greetByPersona()} Happy ${dayName}! Looking at your profile, you have a ${trainingTime} session scheduled today: ${exerciseList}.\n\nAre you ready to get after it, or do we need to make any adjustments based on how your body is feeling?${signOff()}`
-      }
+      return `today's ${todaySession.focus}: ${movements}${todaySession.exercises.length > 3 ? '...' : ''}. Feeling good for it?`
     }
-
-    const next = getNextSession()
-    const nextLine = next
-      ? ` Your next session is **${next.session.focus}** on ${next.day}.`
-      : ''
-
-    switch (persona) {
-      case 'drill_sergeant':
-        return `${greetByPersona()} It's ${dayName} — rest day. Use it wisely: hydrate, stretch, sleep.${nextLine} Don't get comfortable.${signOff()}`
-      case 'analytical':
-        return `${greetByPersona()} ${dayName} is programmed as a recovery day — optimal for parasympathetic restoration.${nextLine} Active recovery (walking, mobility) is recommended.${signOff()}`
-      case 'hype':
-        return `${greetByPersona()} Happy ${dayName}! Rest day — your muscles are GROWING right now! 📈${nextLine} Fuel up, hydrate, and get ready for what's next!${signOff()}`
-      default:
-        return `${greetByPersona()} Happy ${dayName}! Today is a rest day on your schedule — perfect for recovery and mobility work.${nextLine}${signOff()}`
-    }
+    return `it's a rest day on your plan. How's the recovery going?`
   }
+
+  const buildInitialGreeting = (): string => `${greetName()} — ${initialGreetingDetail()}`
 
   // Lazy init: restore the last-seen conversation from the synchronous
   // localStorage mirror instantly, before the (async, fire-and-forget-backed)
@@ -321,6 +255,45 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       loadChatHistory()
     }
   }, [profile.id])
+
+  // Proactive material for the coach — the same aggregator the Dashboard
+  // tab uses (weight trend, recent PRs, streak, "what's left" adherence
+  // note), reused rather than re-derived so the numbers the coach mentions
+  // always match what the user sees on Dashboard. Feeds both buildContext
+  // (so the model can volunteer the one relevant unasked thing) and the
+  // one-time initial-greeting upgrade below.
+  const [proactiveData, setProactiveData] = useState<DashboardData | null>(null)
+  useEffect(() => {
+    if (!activeSession.ready || !profile.id || !macros) return
+    let cancelled = false
+    loadDashboardData({
+      profile, macros, exercisePlan, mesocycle, planCreatedAt,
+      todayLogs: activeSession.logs, liveWeek: activeSession.liveWeek,
+      dayName: activeSession.dayName, todayStr: activeSession.date,
+      now: getAppNow(profile.id),
+    }).then(d => { if (!cancelled) setProactiveData(d) }).catch(() => {})
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSession.ready, activeSession.date, activeSession.logs.length, profile.id])
+
+  // One-shot upgrade of the synchronous fallback greeting once real data
+  // lands — only when the conversation is still exactly the untouched
+  // opener (a fresh chat, nothing sent yet) so this never clobbers restored
+  // history or a reply already in flight. Specific-or-silent: only swaps
+  // in a recent PR when one genuinely exists within the last 7 days;
+  // otherwise the schedule-based opener already built stands as-is.
+  const greetingUpgradedRef = useRef(false)
+  useEffect(() => {
+    if (greetingUpgradedRef.current || !proactiveData || messages.length !== 1) return
+    if (messages[0].role !== 'assistant' || messages[0].content !== buildInitialGreeting()) return
+    const recentPR = proactiveData.recentPRs[0]
+    if (!recentPR) return
+    greetingUpgradedRef.current = true
+    const detail = initialGreetingDetail()
+    const upgraded = `${greetName()} — nice PR on ${recentPR.exerciseName} at ${recentPR.weightKg}kg. ${detail.charAt(0).toUpperCase()}${detail.slice(1)}`
+    setMessages([{ role: 'assistant', content: upgraded, status: 'complete' }])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [proactiveData, messages])
 
   // Synchronous write-through mirror (see chat-cache.ts) — fires on every
   // messages change, so the cache is never behind what's rendered on screen
@@ -530,7 +503,6 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       },
       session_duration_preference: profile.session_duration_preference,
       workout_split_preference: profile.workout_split_preference,
-      coaching_persona: profile.coaching_persona || 'supportive',
       display_name: profile.display_name || '',
       macros,
       dietary_preferences: profile.dietary_preferences || [],
@@ -562,6 +534,18 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       favorites_summary: favoritesSummary,
       workout_log_history: workoutLogHistory,
       cardio_log_history: cardioLogHistory,
+      // Proactive material (same Dashboard aggregator, see the
+      // `proactiveData` effect above) — specific-or-silent by construction:
+      // each field is only ever set when there's something real to report,
+      // never a placeholder the model would have to paper over.
+      streak_days: proactiveData?.streak ?? null,
+      weight_trend_summary: proactiveData?.weightTrend && proactiveData.weightTrend.ratePerWeekKg != null
+        ? `rolling average ${proactiveData.weightTrend.rollingAvgKg.toFixed(1)}kg, trending ${proactiveData.weightTrend.ratePerWeekKg >= 0 ? '+' : ''}${proactiveData.weightTrend.ratePerWeekKg.toFixed(2)}kg/week (${proactiveData.weightTrend.sampleCount} weigh-ins)${proactiveData.weightTrend.onTrackForGoal === false ? ', off track for their stated goal' : ''}`
+        : null,
+      recent_prs_summary: proactiveData && proactiveData.recentPRs.length > 0
+        ? proactiveData.recentPRs.slice(0, 3).map(pr => `${pr.exerciseName} ${pr.weightKg}kg (${pr.date})`).join('; ')
+        : null,
+      adherence_note: proactiveData?.whatsLeftLine ?? null,
     }
   }
 
