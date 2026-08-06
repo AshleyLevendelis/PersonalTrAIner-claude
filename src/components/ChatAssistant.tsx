@@ -1,11 +1,9 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import ReactMarkdown from 'react-markdown'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import { Separator } from '@/components/ui/separator'
-import { Badge } from '@/components/ui/badge'
-import { Send, MessageCircle, Sparkles, CheckCircle2, ArrowDown, RotateCcw, AlertCircle, Trash2 } from 'lucide-react'
+import { Send, CheckCircle2, ArrowDown, RotateCcw, AlertCircle, Trash2 } from 'lucide-react'
 import { generateChatResponse } from '@/lib/chat-assistant'
 import { calculateCalories, getActiveMesocycleWeek } from '@/lib/calculations'
 import { computeBMR, computeStaticTDEE } from '@/lib/macro-calculator'
@@ -255,7 +253,6 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [isRecalibrating, setIsRecalibrating] = useState(false)
-  const [useAI, setUseAI] = useState(true)
   const [lastFailedInput, setLastFailedInput] = useState<string | null>(null)
   const [favorites, setFavorites] = useState<FavoriteMeal[]>([])
   const [workoutLogHistory, setWorkoutLogHistory] = useState('')
@@ -1415,33 +1412,29 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     let clarification: ChatClarificationView | undefined
     let failed = false
 
-    if (useAI) {
-      try {
-        const result = await callGemini(userText)
-        const processed = await processResponse(result)
-        responseText = processed.text
-        action = processed.action
-        pendingAction = processed.pendingAction
-        receipt = processed.receipt
-        clarification = processed.clarification
-        setLastFailedInput(null)
-      } catch (err: unknown) {
-        failed = true
-        const error = err as { message?: string; retryable?: boolean }
-        if (error.retryable || (err instanceof DOMException && err.name === 'AbortError')) {
-          const isTimeout = err instanceof DOMException && err.name === 'AbortError'
-          responseText = isTimeout
-            ? '_That request took too long to process. Tap "Retry" to try again._'
-            : `_${error.message || 'Something went wrong with the AI service. Tap "Retry" to try again.'}_`
-          setLastFailedInput(userText)
-        } else {
-          console.error('Gemini API error, falling back to local:', err)
-          failed = false
-          responseText = generateChatResponse(userText, { profile, macros, exercisePlan, mealPlan })
-        }
+    try {
+      const result = await callGemini(userText)
+      const processed = await processResponse(result)
+      responseText = processed.text
+      action = processed.action
+      pendingAction = processed.pendingAction
+      receipt = processed.receipt
+      clarification = processed.clarification
+      setLastFailedInput(null)
+    } catch (err: unknown) {
+      failed = true
+      const error = err as { message?: string; retryable?: boolean }
+      if (error.retryable || (err instanceof DOMException && err.name === 'AbortError')) {
+        const isTimeout = err instanceof DOMException && err.name === 'AbortError'
+        responseText = isTimeout
+          ? '_That request took too long to process. Tap "Retry" to try again._'
+          : `_${error.message || 'Something went wrong with the AI service. Tap "Retry" to try again.'}_`
+        setLastFailedInput(userText)
+      } else {
+        console.error('Gemini API error, falling back to local:', err)
+        failed = false
+        responseText = generateChatResponse(userText, { profile, macros, exercisePlan, mealPlan })
       }
-    } else {
-      responseText = generateChatResponse(userText, { profile, macros, exercisePlan, mealPlan })
     }
 
     const quickReplies = extractQuickReplies(responseText!)
@@ -1712,40 +1705,17 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
 
   return (
     <Card className="flex flex-col h-[600px] max-h-[80dvh]">
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <MessageCircle className="size-5 text-primary" />
-            <CardTitle className="text-base">Fitness Assistant</CardTitle>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleClearChat}
-              aria-label="Clear chat"
-              title="Clear chat"
-            >
-              <Trash2 className="size-3.5" />
-            </Button>
-            <Button
-              variant={useAI ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setUseAI(prev => !prev)}
-            >
-              <Sparkles className="size-3" />
-              {useAI ? 'AI On' : 'AI Off'}
-            </Button>
-          </div>
-        </div>
-        {useAI && (
-          <Badge variant="secondary" className="w-fit text-xs mt-1">
-            Powered by Gemini 3.5 Flash
-          </Badge>
-        )}
-      </CardHeader>
-      <Separator />
       <CardContent className="relative flex-1 flex flex-col p-0 overflow-hidden">
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          onClick={handleClearChat}
+          aria-label="Clear chat"
+          title="Clear chat"
+          className="absolute top-2 right-2 z-10 bg-background/80 backdrop-blur-sm"
+        >
+          <Trash2 className="size-3.5" />
+        </Button>
         <div
           className="flex-1 overflow-y-auto p-4 overscroll-contain"
           ref={scrollRef}

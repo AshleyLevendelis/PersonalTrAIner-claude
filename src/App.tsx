@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Tabs, TabsContent } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
-import { Dumbbell, Loader2 } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { ProfileMenu } from '@/components/ProfileMenu'
 import { ProfileScreen } from '@/components/ProfileScreen'
 import { BottomTabBar } from '@/components/BottomTabBar'
@@ -38,15 +38,6 @@ import type { ExerciseEntry } from '@/lib/exercise-db'
 
 const STORAGE_KEY = 'fitplan_profile_id'
 const LAST_TAB_KEY = 'fitplan_last_tab'
-
-/** Header title per tab — same labels the old top TabsList used, now the header's only content besides brand/status/profile menu. */
-const TAB_LABEL: Record<Tab, string> = {
-  dashboard: 'Home',
-  nutrition: 'Nutrition',
-  exercise: 'Exercise',
-  meals: 'Meals',
-  chat: 'Chat',
-}
 
 function App() {
   const { hash, route } = useAppRoute()
@@ -975,23 +966,28 @@ function App() {
     >
     <TimersProvider profileId={profile.id}>
     <div className="min-h-screen bg-background">
-      <header className="border-b sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="max-w-6xl mx-auto px-4 py-2.5 flex items-center justify-between">
-          <div className="flex items-center gap-2 min-w-0">
-            <Dumbbell className="size-4 text-primary shrink-0" />
-            <h1 className="text-sm font-semibold truncate">{TAB_LABEL[activeTab]}</h1>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <OfflineStatusIndicator />
-            <ProfileMenu
-              onOpenProfile={() => { setProfileInfoSection(undefined); setProfileInfoOpen(true) }}
-              onNewPlan={handleReset}
-            />
-          </div>
-        </div>
-      </header>
+      {/* The old full-width header duplicated what the bottom tab bar
+          already communicates (which screen you're on). These two floating
+          icons replace it — no shared bar, no vertical strip, each reachable
+          in one tap. Positioned above <main> so they never depend on which
+          tab is mounted. */}
+      <div
+        className="fixed right-3 z-40"
+        style={{ top: 'calc(0.625rem + env(safe-area-inset-top))' }}
+      >
+        <ProfileMenu
+          onOpenProfile={() => { setProfileInfoSection(undefined); setProfileInfoOpen(true) }}
+          onNewPlan={handleReset}
+        />
+      </div>
+      <div
+        className="fixed left-3 right-14 z-40 flex justify-start"
+        style={{ top: 'calc(0.625rem + env(safe-area-inset-top))' }}
+      >
+        <OfflineStatusIndicator />
+      </div>
 
-      <main className="max-w-6xl mx-auto px-4 py-6 space-y-6 pb-28">
+      <main className="max-w-6xl mx-auto px-4 pt-12 pb-28 space-y-6">
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
           <TabsContent value="dashboard">
             <Dashboard
