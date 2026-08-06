@@ -203,9 +203,12 @@ export function TodayPanel({
               onOpenPlateCalc={onOpenPlateCalc}
               banBusy={banBusy}
               onBan={handleBan}
-              onSetCompleted={(exerciseName, _setNumber, _weight, _reps, restStr) => {
+              onSetCompleted={(exerciseName, setNumber, _weight, _reps, restStr, sets) => {
                 const restSeconds = parseRestSeconds(restStr)
-                if (restSeconds > 0) startRest(exerciseName, restSeconds)
+                if (restSeconds > 0) {
+                  const targetSetNumber = setNumber < sets ? setNumber + 1 : undefined
+                  startRest(exerciseName, restSeconds, targetSetNumber)
+                }
               }}
             />
             {workout!.recommendedCardio && <FinisherRow cardio={workout!.recommendedCardio} />}

@@ -246,6 +246,7 @@ export function SetGrid({
               {setNumber}
             </span>
             <Input
+              id={`setgrid-weight-${exerciseId}-${setNumber}`}
               type="number"
               min="0"
               max={MAX_WEIGHT_KG}
@@ -306,6 +307,17 @@ export function SetGrid({
               </Button>
             </div>
           </div>
+          {isSaved && (() => {
+            const logged = existingLogs.find(l => l.set_number === setNumber)
+            if (!logged) return null
+            return (
+              <p className="text-[10px] text-primary px-1 -mt-0.5">
+                Set {setNumber}: {logged.is_bodyweight
+                  ? `${logged.reps_completed} reps · Bodyweight`
+                  : `${logged.reps_completed} reps @ ${logged.weight_kg}kg`} ✓
+              </p>
+            )
+          })()}
           {rowErrors[setNumber] && (
             <p className="text-[10px] text-destructive px-1 -mt-0.5">{rowErrors[setNumber]}</p>
           )}

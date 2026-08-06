@@ -18,6 +18,7 @@ import { Timer } from 'lucide-react'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { useViewportInset } from '@/hooks/useViewportInset'
 import { TAB_BAR_HEIGHT_PX } from '@/components/BottomTabBar'
+import { tabHash } from '@/lib/app-route'
 
 function formatDuration(ms: number): string {
   const totalSeconds = Math.round(Math.abs(ms) / 1000)
@@ -57,9 +58,24 @@ function playChime() {
 }
 
 export function BottomDock() {
-  const { restEndsAt, restLabel, restRemainingMs, adjustRest, dismissRest } = useActiveSession()
+  const { restEndsAt, restLabel, restRemainingMs, restTargetSetNumber, adjustRest, dismissRest, requestSetFocus } = useActiveSession()
   const { insetPx, isKeyboardOpen } = useViewportInset()
   const chimedForRef = useRef<string | null>(null)
+
+  // "Start next set" — the dock is mounted outside the exercise list's
+  // subtree, so this routes the request through the shared session context
+  // rather than a prop; ExerciseRow picks it up, force-expands, and focuses
+  // the target set's input once it has painted. Navigates to the Exercise
+  // tab first if the user is elsewhere.
+  const handleStartNextSet = () => {
+    if (restTargetSetNumber != null && restLabel) {
+      requestSetFocus({ exerciseName: restLabel, setNumber: restTargetSetNumber })
+    }
+    dismissRest()
+    if (!window.location.hash.startsWith('#/tab/exercise')) {
+      window.location.hash = tabHash('exercise')
+    }
+  }
 
   useEffect(() => {
     if (!restEndsAt) {
@@ -94,7 +110,9 @@ export function BottomDock() {
       <div className="fixed left-4 right-4 z-50 md:left-auto md:right-4 md:w-96" style={bottomStyle}>
         <div className="rounded-md border border-primary/30 bg-card/95 backdrop-blur-sm shadow-lg px-3 py-1.5 inline-flex items-center gap-1.5 text-xs font-medium tabular-nums">
           <Timer className="h-3 w-3 text-primary shrink-0" />
-          {isOverrun ? `Rest finished ${formatDuration(restRemainingMs)} ago` : formatDuration(restRemainingMs)}
+          {isOverrun
+            ? (restTargetSetNumber != null ? `Rest complete — set ${restTargetSetNumber}` : 'Rest complete')
+            : formatDuration(restRemainingMs)}
         </div>
       </div>
     )
@@ -109,7 +127,9 @@ export function BottomDock() {
             <div className="min-w-0">
               {isOverrun ? (
                 <p className="text-sm font-medium truncate">
-                  Rest finished {formatDuration(restRemainingMs)} ago
+                  {restTargetSetNumber != null
+                    ? `Rest complete — ready for set ${restTargetSetNumber}?`
+                    : 'Rest complete'}
                 </p>
               ) : (
                 <p className="text-sm font-medium tabular-nums">
@@ -130,9 +150,20 @@ export function BottomDock() {
                 </Button>
               </>
             )}
-            <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={dismissRest}>
-              {isOverrun ? 'Dismiss' : 'Skip ▸'}
-            </Button>
+            {isOverrun && restTargetSetNumber != null ? (
+              <>
+                <Button size="sm" className="h-7 px-2.5 text-xs" onClick={handleStartNextSet}>
+                  Start next set ▸
+                </Button>
+                <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={dismissRest}>
+                  Dismiss
+                </Button>
+              </>
+            ) : (
+              <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={dismissRest}>
+                {isOverrun ? 'Dismiss' : 'Skip ▸'}
+              </Button>
+            )}
           </div>
         </div>
       </Card>

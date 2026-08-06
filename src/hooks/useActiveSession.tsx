@@ -22,6 +22,7 @@
 // ---------------------------------------------------------------------------
 
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { useDeadlineTick } from './useDeadlineTick'
 import { getAppNow, getSessionDateContext } from '@/lib/dev-clock'
 import { getActiveMesocycleWeek } from '@/lib/calculations'
 import { saveSet, deleteSet, getSetsForDate, getLastSessionSets, initSetLogStore, type SaveSetInput } from '@/lib/set-log-store'
@@ -47,6 +48,17 @@ export interface RestState {
   restLabel: string | null
   /** Milliseconds remaining, recomputed on every tick/visibilitychange/focus — negative once the rest has overrun. Null when no rest is running. */
   restRemainingMs: number | null
+  /** The set number to jump to once this rest completes (setNumber + 1 of the exercise it was started for), or null when the completed set was that exercise's last — nothing on this exercise to jump to. */
+  restTargetSetNumber: number | null
+}
+
+/** A pending "focus this specific set's input" request — set by BottomDock's
+ * "Start next set" action, consumed by the matching ExerciseRow once it
+ * expands and its SetGrid has painted. Transient (not persisted): a stale
+ * focus request surviving a reload has no meaning. */
+export interface SetFocusRequest {
+  exerciseName: string
+  setNumber: number
 }
 
 export interface ActiveSessionValue extends ActiveSessionIdentity, RestState {
@@ -56,9 +68,12 @@ export interface ActiveSessionValue extends ActiveSessionIdentity, RestState {
   refresh: () => void
   logSet: (input: SaveSetInput) => ExerciseSetLog
   deleteSet: typeof deleteSet
-  startRest: (label: string, durationSeconds: number) => void
+  startRest: (label: string, durationSeconds: number, targetSetNumber?: number) => void
   adjustRest: (deltaSeconds: number) => void
   dismissRest: () => void
+  requestedSetFocus: SetFocusRequest | null
+  requestSetFocus: (request: SetFocusRequest) => void
+  clearSetFocusRequest: () => void
   /** Cached previous-session sets for one exercise — call loadGhosts once (e.g. on mount) then read via ghosts(exerciseId); empty array until it resolves. The one fetcher app-wide now (was duplicated between SetLogger and the bulk-log path). */
   ghosts: (exerciseId: string) => ExerciseSetLog[]
   loadGhosts: (exerciseId: string) => void
@@ -221,6 +236,7 @@ export function ActiveSessionProvider({
       finishedAtIso: existing?.finishedAtIso,
       restEndsAt: existing?.restEndsAt,
       restLabel: existing?.restLabel,
+      restTargetSetNumber: existing?.restTargetSetNumber,
       declaredOffPlan: existing?.declaredOffPlan,
       ...patch,
       lastActivityIso: now,
@@ -259,8 +275,7 @@ export function ActiveSessionProvider({
   // and resynced on visibilitychange/pageshow/focus.
   const [restEndsAt, setRestEndsAt] = useState<string | null>(null)
   const [restLabel, setRestLabel] = useState<string | null>(null)
-  const [restTick, setRestTick] = useState(0)
-  const tickRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const [restTargetSetNumber, setRestTargetSetNumber] = useState<number | null>(null)
 
   // Hydrate rest state from the persisted record when identity resolves —
   // this is what makes the timer survive a reload or a tab switch (the app
@@ -272,20 +287,22 @@ export function ActiveSessionProvider({
     if (record?.restEndsAt) {
       setRestEndsAt(record.restEndsAt)
       setRestLabel(record.restLabel ?? null)
+      setRestTargetSetNumber(record.restTargetSetNumber ?? null)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [identity.profileId, identity.date])
 
-  const persistRest = useCallback((endsAt: string | null, label: string | null) => {
-    patchRecord({ restEndsAt: endsAt ?? undefined, restLabel: label ?? undefined })
+  const persistRest = useCallback((endsAt: string | null, label: string | null, targetSetNumber: number | null) => {
+    patchRecord({ restEndsAt: endsAt ?? undefined, restLabel: label ?? undefined, restTargetSetNumber: targetSetNumber ?? undefined })
   }, [patchRecord])
 
-  const startRest = useCallback((label: string, durationSeconds: number) => {
+  const startRest = useCallback((label: string, durationSeconds: number, targetSetNumber?: number) => {
     if (!identity.profileId) return
     const endsAt = new Date(getAppNow(identity.profileId).getTime() + durationSeconds * 1000).toISOString()
     setRestEndsAt(endsAt)
     setRestLabel(label)
-    persistRest(endsAt, label)
+    setRestTargetSetNumber(targetSetNumber ?? null)
+    persistRest(endsAt, label, targetSetNumber ?? null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [identity.profileId, persistRest])
 
@@ -293,49 +310,37 @@ export function ActiveSessionProvider({
     setRestEndsAt(prev => {
       if (!prev || !identity.profileId) return prev
       const next = new Date(new Date(prev).getTime() + deltaSeconds * 1000).toISOString()
-      persistRest(next, restLabel)
+      persistRest(next, restLabel, restTargetSetNumber)
       return next
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [identity.profileId, persistRest, restLabel])
+  }, [identity.profileId, persistRest, restLabel, restTargetSetNumber])
 
   const dismissRest = useCallback(() => {
     setRestEndsAt(null)
     setRestLabel(null)
-    persistRest(null, null)
+    setRestTargetSetNumber(null)
+    persistRest(null, null, null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [persistRest])
 
-  // Tick + resync. A plain setInterval is fine here because the DISPLAYED
-  // value is always `restEndsAt - now`, recomputed fresh each tick — unlike
-  // the old RestTimer, a throttled/missed tick cannot make the number wrong,
-  // only late by a frame. visibilitychange/pageshow/focus force an
-  // immediate resync so returning from background never shows a stale
-  // number even for that one frame.
-  useEffect(() => {
-    if (!restEndsAt) return
-    tickRef.current = setInterval(() => setRestTick(t => t + 1), 1000)
-    const resync = () => setRestTick(t => t + 1)
-    document.addEventListener('visibilitychange', resync)
-    window.addEventListener('pageshow', resync)
-    window.addEventListener('focus', resync)
-    return () => {
-      if (tickRef.current) clearInterval(tickRef.current)
-      document.removeEventListener('visibilitychange', resync)
-      window.removeEventListener('pageshow', resync)
-      window.removeEventListener('focus', resync)
-    }
-  }, [restEndsAt])
+  // Tick + resync, extracted to useDeadlineTick (shared with the standalone
+  // stopwatch/lap/round timers) — the DISPLAYED value is always
+  // `restEndsAt - now`, recomputed fresh each tick, never from the tick
+  // counter itself, so a throttled/missed tick only delays the redraw.
+  const restTick = useDeadlineTick(!!restEndsAt)
 
   const restRemainingMs = useMemo(() => {
     if (!restEndsAt || !identity.profileId) return null
-    // restTick is read only to force this memo to recompute on each tick —
-    // the actual value always comes fresh from getAppNow, never from a
-    // counter, so a missed/throttled tick only delays the redraw, never
-    // corrupts the number.
     void restTick
     return new Date(restEndsAt).getTime() - getAppNow(identity.profileId).getTime()
   }, [restEndsAt, restTick, identity.profileId])
+
+  // --- Cross-tree set-focus request (BottomDock -> the matching ExerciseRow,
+  // different subtrees) — transient, never persisted.
+  const [requestedSetFocus, setRequestedSetFocus] = useState<SetFocusRequest | null>(null)
+  const requestSetFocus = useCallback((request: SetFocusRequest) => setRequestedSetFocus(request), [])
+  const clearSetFocusRequest = useCallback(() => setRequestedSetFocus(null), [])
 
   const value: ActiveSessionValue = {
     ...identity,
@@ -351,6 +356,10 @@ export function ActiveSessionProvider({
     restEndsAt,
     restLabel,
     restRemainingMs,
+    restTargetSetNumber,
+    requestedSetFocus,
+    requestSetFocus,
+    clearSetFocusRequest,
     ghosts,
     loadGhosts,
     declaredOffPlan,

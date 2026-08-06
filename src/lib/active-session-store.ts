@@ -29,6 +29,8 @@ export interface ActiveSessionRecord {
   /** Deadline-anchored rest — set by startRest, cleared by dismissRest. Absent when no rest is running. */
   restEndsAt?: string
   restLabel?: string
+  /** The set number to jump to once this rest completes — see useActiveSession.tsx's RestState doc comment. */
+  restTargetSetNumber?: number
   /** User-typed off-plan exercise names for today (P2) — the DETECTED half of offPlanWork is computed from logs + the day's plan, not stored here. */
   declaredOffPlan?: string[]
 }

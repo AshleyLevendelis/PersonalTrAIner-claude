@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -73,13 +73,31 @@ export function ExerciseRow({
   expanded,
   onToggleExpanded,
 }: ExerciseRowProps) {
-  const { setsFor } = useActiveSession()
+  const { setsFor, requestedSetFocus, clearSetFocusRequest } = useActiveSession()
   const exerciseId = ex.id ?? getExerciseId(ex.name)
   const loggedSets = setsFor(exerciseId, ex.name)
   const completedSets = loggedSets.length
   const allSetsLogged = completedSets >= ex.sets
   const ramp = formatRampSets(ex)
   const [explainedLoadChip, setExplainedLoadChip] = useState(false)
+
+  // BottomDock's "Start next set" action, from a different subtree, routes
+  // through this shared request rather than a prop — force-expand (the same
+  // way a manual toggle would) then focus the target set's weight input
+  // once it has painted.
+  useEffect(() => {
+    if (!requestedSetFocus || requestedSetFocus.exerciseName !== ex.name) return
+    if (!expanded) {
+      onToggleExpanded()
+      return
+    }
+    const id = `setgrid-weight-${exerciseId}-${requestedSetFocus.setNumber}`
+    const raf = requestAnimationFrame(() => {
+      document.getElementById(id)?.focus()
+      clearSetFocusRequest()
+    })
+    return () => cancelAnimationFrame(raf)
+  }, [requestedSetFocus, expanded, ex.name, exerciseId, onToggleExpanded, clearSetFocusRequest])
 
   const nameLine = (
     <div className="flex items-center gap-2 flex-wrap min-w-0">
