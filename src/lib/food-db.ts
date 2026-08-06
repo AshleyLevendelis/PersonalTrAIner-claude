@@ -53,6 +53,13 @@ export interface Macros100g {
   fat: number
 }
 
+export interface PurchaseUnit {
+  /** Average grams for one purchase unit — one whole item, one head, one egg, etc. */
+  avgGrams: number
+  /** Singular label, e.g. 'egg', 'head', 'bagel' — pluralized with a trailing 's' at display time. */
+  label: string
+}
+
 export interface FoodEntry {
   name: string
   aliases: string[]
@@ -61,6 +68,14 @@ export interface FoodEntry {
   tags: FoodTags
   /** Named-unit -> gram weight, for quantities like "1 medium egg" or "2 tbsp". Water-density defaults (tbsp/tsp/cup) are applied automatically when not overridden here. */
   units?: Record<string, number>
+  /**
+   * Shopping-list purchase unit — GroceryList.tsx's display layer converts
+   * stored grams into a rounded count of these when present (e.g. "2 heads"
+   * broccoli, "12 eggs"). Independent of `units` above (cooking portions);
+   * only set where a whole/discrete purchase form is unambiguous. Stored
+   * quantities/aggregation are unaffected — this is display-only.
+   */
+  purchaseUnit?: PurchaseUnit
 }
 
 function f(
@@ -70,8 +85,9 @@ function f(
   category: FoodCategory,
   tags: FoodTags = {},
   units?: Record<string, number>,
+  purchaseUnit?: PurchaseUnit,
 ): FoodEntry {
-  return { name, aliases, per100g, category, tags, units }
+  return { name, aliases, per100g, category, tags, units, purchaseUnit }
 }
 
 export const FOOD_DB: FoodEntry[] = [
@@ -114,7 +130,7 @@ export const FOOD_DB: FoodEntry[] = [
   f('squid', ['calamari'], { kcal: 92, protein: 15.6, carbs: 3.1, fat: 1.4 }, 'protein', { contains_shellfish: true }),
 
   // ===== PROTEIN: eggs & dairy protein ================================
-  f('egg', ['eggs', 'whole egg', 'boiled egg', 'fried egg', 'scrambled egg'], { kcal: 155, protein: 13, carbs: 1.1, fat: 11 }, 'protein', { contains_egg: true }, { medium: 50, large: 58, small: 44 }),
+  f('egg', ['eggs', 'whole egg', 'boiled egg', 'fried egg', 'scrambled egg'], { kcal: 155, protein: 13, carbs: 1.1, fat: 11 }, 'protein', { contains_egg: true }, { medium: 50, large: 58, small: 44 }, { avgGrams: 58, label: 'egg' }),
   f('egg white', ['egg whites'], { kcal: 52, protein: 11, carbs: 0.7, fat: 0.2 }, 'protein', { contains_egg: true }, { medium: 33, large: 38 }),
   f('egg yolk', ['egg yolks'], { kcal: 322, protein: 16, carbs: 3.6, fat: 27 }, 'protein', { contains_egg: true }, { medium: 17, large: 20 }),
   f('greek yoghurt 0%', ['fat free greek yogurt', 'greek yoghurt fat free', '0% greek yogurt'], { kcal: 57, protein: 10, carbs: 3.6, fat: 0.2 }, 'dairy', { contains_dairy: true }),
@@ -164,7 +180,7 @@ export const FOOD_DB: FoodEntry[] = [
   f('wholewheat pasta cooked', ['wholewheat pasta', 'whole wheat pasta', 'wholemeal pasta'], { kcal: 149, protein: 6.3, carbs: 30, fat: 1.1 }, 'carb', { contains_gluten: true, is_high_carb: true }),
   f('white bread', ['bread', 'white bread slice', 'sliced white bread'], { kcal: 265, protein: 9, carbs: 49, fat: 3.2 }, 'carb', { contains_gluten: true, is_high_carb: true }, { slice: 36 }),
   f('wholemeal bread', ['whole wheat bread', 'brown bread'], { kcal: 247, protein: 13, carbs: 41, fat: 3.4 }, 'carb', { contains_gluten: true, is_high_carb: true }, { slice: 38 }),
-  f('bagel', ['plain bagel'], { kcal: 257, protein: 10, carbs: 50, fat: 1.5 }, 'carb', { contains_gluten: true, is_high_carb: true }, { whole: 95 }),
+  f('bagel', ['plain bagel'], { kcal: 257, protein: 10, carbs: 50, fat: 1.5 }, 'carb', { contains_gluten: true, is_high_carb: true }, { whole: 95 }, { avgGrams: 95, label: 'bagel' }),
   f('tortilla wrap', ['flour tortilla', 'wrap', 'tortilla'], { kcal: 310, protein: 8.4, carbs: 50, fat: 8 }, 'carb', { contains_gluten: true, is_high_carb: true }, { whole: 60 }),
   f('corn tortilla', [], { kcal: 218, protein: 5.7, carbs: 44, fat: 2.8 }, 'carb', { is_high_carb: true }, { whole: 26 }),
   f('pitta bread', ['pita bread', 'pitta'], { kcal: 275, protein: 9.1, carbs: 56, fat: 1.2 }, 'carb', { contains_gluten: true, is_high_carb: true }, { whole: 60 }),
@@ -190,7 +206,7 @@ export const FOOD_DB: FoodEntry[] = [
   f('olive oil', ['extra virgin olive oil'], { kcal: 884, protein: 0, carbs: 0, fat: 100 }, 'fat', {}, { tbsp: 14, tsp: 4.5 }),
   f('vegetable oil', ['sunflower oil', 'cooking oil', 'rapeseed oil', 'canola oil'], { kcal: 884, protein: 0, carbs: 0, fat: 100 }, 'fat', {}, { tbsp: 14, tsp: 4.5 }),
   f('coconut oil', [], { kcal: 862, protein: 0, carbs: 0, fat: 100 }, 'fat', {}, { tbsp: 13, tsp: 4.5 }),
-  f('avocado', [], { kcal: 160, protein: 2, carbs: 8.5, fat: 14.7 }, 'fruit', {}, { whole: 150, half: 75 }),
+  f('avocado', [], { kcal: 160, protein: 2, carbs: 8.5, fat: 14.7 }, 'fruit', {}, { whole: 150, half: 75 }, { avgGrams: 150, label: 'avocado' }),
   f('almonds', ['almond'], { kcal: 579, protein: 21.2, carbs: 22, fat: 49.9 }, 'fat', { contains_nuts: true }),
   f('walnuts', [], { kcal: 654, protein: 15.2, carbs: 13.7, fat: 65.2 }, 'fat', { contains_nuts: true }),
   f('cashews', ['cashew nuts'], { kcal: 553, protein: 18.2, carbs: 30.2, fat: 43.9 }, 'fat', { contains_nuts: true }),
@@ -205,7 +221,7 @@ export const FOOD_DB: FoodEntry[] = [
   f('tahini', [], { kcal: 595, protein: 17, carbs: 21, fat: 54 }, 'fat', {}, { tbsp: 15 }),
 
   // ===== VEG ===========================================================
-  f('broccoli', ['steamed broccoli', 'broccoli florets'], { kcal: 34, protein: 2.8, carbs: 6.6, fat: 0.4 }, 'veg', {}),
+  f('broccoli', ['steamed broccoli', 'broccoli florets'], { kcal: 34, protein: 2.8, carbs: 6.6, fat: 0.4 }, 'veg', {}, undefined, { avgGrams: 300, label: 'head' }), // avgGrams is a standard-head estimate, not a curated unit value like the others
   f('spinach', ['baby spinach', 'fresh spinach'], { kcal: 23, protein: 2.9, carbs: 3.6, fat: 0.4 }, 'veg', {}),
   f('kale', [], { kcal: 49, protein: 4.3, carbs: 8.8, fat: 0.9 }, 'veg', {}),
   f('mixed salad leaves', ['salad leaves', 'lettuce', 'mixed greens'], { kcal: 15, protein: 1.4, carbs: 2.9, fat: 0.2 }, 'veg', {}),
@@ -234,9 +250,9 @@ export const FOOD_DB: FoodEntry[] = [
   f('rocket', ['arugula'], { kcal: 25, protein: 2.6, carbs: 3.7, fat: 0.7 }, 'veg', {}),
 
   // ===== FRUIT ==========================================================
-  f('banana', ['bananas'], { kcal: 89, protein: 1.1, carbs: 23, fat: 0.3 }, 'fruit', {}, { medium: 118 }),
-  f('apple', ['apples'], { kcal: 52, protein: 0.3, carbs: 14, fat: 0.2 }, 'fruit', {}, { medium: 182 }),
-  f('orange', ['oranges'], { kcal: 47, protein: 0.9, carbs: 12, fat: 0.1 }, 'fruit', {}, { medium: 131 }),
+  f('banana', ['bananas'], { kcal: 89, protein: 1.1, carbs: 23, fat: 0.3 }, 'fruit', {}, { medium: 118 }, { avgGrams: 118, label: 'banana' }),
+  f('apple', ['apples'], { kcal: 52, protein: 0.3, carbs: 14, fat: 0.2 }, 'fruit', {}, { medium: 182 }, { avgGrams: 182, label: 'apple' }),
+  f('orange', ['oranges'], { kcal: 47, protein: 0.9, carbs: 12, fat: 0.1 }, 'fruit', {}, { medium: 131 }, { avgGrams: 131, label: 'orange' }),
   f('strawberries', ['strawberry'], { kcal: 32, protein: 0.7, carbs: 7.7, fat: 0.3 }, 'fruit', {}),
   f('blueberries', ['blueberry'], { kcal: 57, protein: 0.7, carbs: 14, fat: 0.3 }, 'fruit', {}),
   f('raspberries', ['raspberry'], { kcal: 52, protein: 1.2, carbs: 12, fat: 0.7 }, 'fruit', { is_high_fodmap: true }),
@@ -248,7 +264,7 @@ export const FOOD_DB: FoodEntry[] = [
   f('dried apricots', [], { kcal: 241, protein: 3.4, carbs: 63, fat: 0.5 }, 'fruit', { is_high_carb: true, is_high_fodmap: true }),
   f('kiwi', ['kiwi fruit'], { kcal: 61, protein: 1.1, carbs: 15, fat: 0.5 }, 'fruit', {}),
   f('watermelon', [], { kcal: 30, protein: 0.6, carbs: 7.6, fat: 0.2 }, 'fruit', { is_high_fodmap: true }),
-  f('pear', ['pears'], { kcal: 57, protein: 0.4, carbs: 15, fat: 0.1 }, 'fruit', { is_high_fodmap: true }, { medium: 178 }),
+  f('pear', ['pears'], { kcal: 57, protein: 0.4, carbs: 15, fat: 0.1 }, 'fruit', { is_high_fodmap: true }, { medium: 178 }, { avgGrams: 178, label: 'pear' }),
   f('lemon', ['lemon juice'], { kcal: 29, protein: 1.1, carbs: 9.3, fat: 0.3 }, 'fruit', {}),
   f('lime', ['lime juice'], { kcal: 30, protein: 0.7, carbs: 10.5, fat: 0.2 }, 'fruit', {}),
 

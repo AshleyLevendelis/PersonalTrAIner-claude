@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { InsightBanner } from '@/components/ui/insight-banner'
+import { WeighInCard } from '@/components/WeighInCard'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { getAppNow } from '@/lib/dev-clock'
 import { tabHash } from '@/lib/app-route'
@@ -26,11 +27,13 @@ interface DashboardProps {
   mesocycle: MesocycleWeek[]
   planCreatedAt?: string
   onWaterChanged?: () => void
+  /** Fired after a weigh-in saves so the app can recompute targets + snapshot — forwarded straight to WeighInCard. */
+  onWeightLogged?: () => void | Promise<void>
 }
 
 const WATER_QUICK_ADD_ML = [250, 500]
 
-export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreatedAt, onWaterChanged }: DashboardProps) {
+export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreatedAt, onWaterChanged, onWeightLogged }: DashboardProps) {
   const activeSession = useActiveSession()
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -194,20 +197,20 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
                     type="number"
                     value={targetInput}
                     onChange={e => setTargetInput(e.target.value)}
-                    className="w-16 h-7 text-xs border border-border rounded-md px-1.5 bg-background"
+                    className="w-16 min-w-0 h-7 text-xs border border-border rounded-md px-1.5 bg-background"
                   />
-                  <Button size="sm" variant="ghost" className="h-7 text-[10px] px-1.5" onClick={handleSaveTarget}>Save</Button>
+                  <Button size="sm" variant="ghost" className="h-7 text-[10px] px-1.5 shrink-0" onClick={handleSaveTarget}>Save</Button>
                 </div>
               ) : (
                 <p className="ds-num-lg">{todayWaterMl}<span className="text-sm text-muted-foreground font-medium">/{waterTarget}ml</span></p>
               )}
               <Progress value={waterTarget > 0 ? Math.min(150, (todayWaterMl / waterTarget) * 100) : 0} className="h-1" />
-              <div className="flex items-center gap-1.5 pt-0.5">
+              <div className="flex items-center gap-1.5 pt-0.5 flex-wrap">
                 {WATER_QUICK_ADD_ML.map(ml => (
-                  <Button key={ml} size="sm" variant="outline" className="h-7 text-xs" onClick={() => handleAddWater(ml)}>+{ml}ml</Button>
+                  <Button key={ml} size="sm" variant="outline" className="h-7 text-xs shrink-0" onClick={() => handleAddWater(ml)}>+{ml}ml</Button>
                 ))}
                 {lastWaterLog && (
-                  <Button size="sm" variant="ghost" className="h-7 text-xs ml-auto" onClick={handleUndoWater}>Undo</Button>
+                  <Button size="sm" variant="ghost" className="h-7 text-xs ml-auto shrink-0" onClick={handleUndoWater}>Undo</Button>
                 )}
               </div>
             </CardContent>
@@ -225,12 +228,12 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
                 <div className="flex items-center gap-1.5">
                   <input
                     type="number"
-                    placeholder="Enter today's steps"
+                    placeholder="Steps"
                     value={stepsInput}
                     onChange={e => setStepsInput(e.target.value)}
-                    className="flex-1 h-7 text-xs border border-border rounded-md px-2 bg-background"
+                    className="flex-1 min-w-0 h-7 text-xs border border-border rounded-md px-2 bg-background"
                   />
-                  <Button size="sm" variant="outline" className="h-7 text-xs" onClick={handleLogSteps}>Log</Button>
+                  <Button size="sm" variant="outline" className="h-7 text-xs shrink-0" onClick={handleLogSteps}>Log</Button>
                 </div>
               )}
               <p className="text-[10px] text-muted-foreground/70">
@@ -273,6 +276,7 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
             <p className="text-xs text-muted-foreground">Streak: {data.streak} day{data.streak === 1 ? '' : 's'} on plan</p>
           </CardContent>
         </Card>
+        {profile.id && <WeighInCard profileId={profile.id} onWeightLogged={onWeightLogged} />}
       </div>
 
       {/* 5. What's left today */}

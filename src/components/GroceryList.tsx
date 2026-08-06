@@ -20,6 +20,7 @@ import {
   DEFAULT_HORIZON_DAYS, type GroceryItemRow, type GroceryCategory,
 } from '@/lib/grocery-store'
 import { parseIngredientLine } from '@/lib/portion-scaler'
+import { lookupIngredient } from '@/lib/food-db'
 import type { MealSlotName } from '@/lib/meal-store'
 import type { PoolOption } from '@/lib/meal-generation'
 import type { MacroTargets } from '@/lib/types'
@@ -46,6 +47,33 @@ const DAY_PRESETS = [3, 7, 14]
 function formatQuantity(item: GroceryItemRow): string {
   const qty = Number.isInteger(item.quantity) ? item.quantity : Math.round(item.quantity * 10) / 10
   return item.unit === 'g' || item.unit === 'ml' ? `${qty}${item.unit}` : `${qty} ${item.unit}`
+}
+
+/**
+ * Shopping-friendly display over the stored gram figure — "378g broccoli"
+ * isn't how anyone shops. Read-only: never touches item.quantity/.unit
+ * (the raw grams stay the source of truth for edit/merge/aggregation), just
+ * how it's shown. `exact` is the unrounded figure, surfaced in the "from N
+ * meals" expander so it isn't lost.
+ */
+function formatShoppingQuantity(item: GroceryItemRow): { primary: string; exact: string } {
+  const exact = formatQuantity(item)
+  if (item.unit !== 'g') return { primary: exact, exact } // non-gram manual units (e.g. 'rolls') pass through unchanged
+
+  const entry = lookupIngredient(item.display_name)
+  if (entry?.purchaseUnit) {
+    const count = Math.max(1, Math.round(item.quantity / entry.purchaseUnit.avgGrams))
+    return { primary: `${count} ${entry.purchaseUnit.label}${count === 1 ? '' : 's'}`, exact }
+  }
+
+  const grams = item.quantity
+  const step = grams >= 1000 ? 100 : grams >= 200 ? 50 : grams >= 20 ? 10 : 5
+  const rounded = Math.round(grams / step) * step
+  const approx = rounded !== grams ? '~' : ''
+  const primary = rounded >= 1000
+    ? `${approx}${(rounded / 1000).toFixed(rounded % 1000 === 0 ? 0 : 1)}kg`
+    : `${approx}${rounded}g`
+  return { primary, exact }
 }
 
 export function GroceryList({ profileId, mealPools, targets, refreshToken }: GroceryListProps) {
@@ -217,7 +245,7 @@ export function GroceryList({ profileId, mealPools, targets, refreshToken }: Gro
                   ) : (
                     <div className={`flex items-center justify-between gap-2 ${item.checked ? 'line-through' : ''}`}>
                       <span className="text-sm truncate">
-                        <span className="font-mono text-xs text-muted-foreground mr-1.5">{formatQuantity(item)}</span>
+                        <span className="font-mono text-xs text-muted-foreground mr-1.5">{formatShoppingQuantity(item).primary}</span>
                         {item.display_name}
                       </span>
                       {item.needs_review && <Badge variant="outline" className="text-[9px] px-1 py-0 shrink-0">check</Badge>}
@@ -232,6 +260,7 @@ export function GroceryList({ profileId, mealPools, targets, refreshToken }: Gro
                   )}
                   {expandedRefs.has(item.id) && (
                     <ul className="text-[10px] text-muted-foreground pl-3 border-l-2 border-border/50 mt-1 space-y-0.5">
+                      <li>Exact: {formatShoppingQuantity(item).exact}</li>
                       {item.meal_refs.map((r, i) => <li key={i}>Day {r.day + 1} · {r.slot} · {r.mealName}</li>)}
                     </ul>
                   )}

@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Dumbbell, Loader2 } from 'lucide-react'
 import { MemoryScreen } from '@/components/MemoryScreen'
 import { ProfileMenu } from '@/components/ProfileMenu'
+import { ProfileInfoDialog } from '@/components/ProfileInfoDialog'
 import { BottomTabBar } from '@/components/BottomTabBar'
 import { OnboardingFlow } from '@/components/onboarding/OnboardingFlow'
 import { NutritionDisplay } from '@/components/NutritionDisplay'
@@ -12,7 +13,6 @@ import { MealPlan } from '@/components/MealPlan'
 import { Dashboard } from '@/components/Dashboard'
 import { GroceryList } from '@/components/GroceryList'
 import { ChatAssistant } from '@/components/ChatAssistant'
-import { WeeklyPlannerCard } from '@/components/WeeklyPlannerCard'
 import { DevTestPage } from '@/components/DevTestPage'
 import { OfflineStatusIndicator } from '@/components/OfflineStatusIndicator'
 import { BottomDock } from '@/components/BottomDock'
@@ -105,6 +105,7 @@ function App() {
   const [memoryGoals, setMemoryGoals] = useState<UserGoalRow[]>([])
   const [memoryContextFacts, setMemoryContextFacts] = useState<UserContextFactRow[]>([])
   const [memoryScreenOpen, setMemoryScreenOpen] = useState(false)
+  const [profileInfoOpen, setProfileInfoOpen] = useState(false)
   const reloadMemory = async (profileId: string) => {
     const [facts, goals, contextFacts] = await Promise.all([getActiveFacts(profileId), getActiveGoals(profileId), getActiveContextFacts(profileId)])
     setMemoryFacts(facts)
@@ -981,7 +982,11 @@ function App() {
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <OfflineStatusIndicator />
-            <ProfileMenu onOpenMemory={() => setMemoryScreenOpen(true)} onNewPlan={handleReset} />
+            <ProfileMenu
+              onOpenMemory={() => setMemoryScreenOpen(true)}
+              onNewPlan={handleReset}
+              onOpenProfile={() => setProfileInfoOpen(true)}
+            />
           </div>
         </div>
       </header>
@@ -995,24 +1000,17 @@ function App() {
               exercisePlan={exercisePlan}
               mesocycle={mesocycle}
               planCreatedAt={mesocycleCreatedAt ?? profile.created_at}
+              onWeightLogged={handleWeightLogged}
             />
           </TabsContent>
 
           <TabsContent value="nutrition" className="space-y-6">
-            {profile.id && (
-              <WeeklyPlannerCard
-                profileId={profile.id}
-                profile={profile}
-                exercisePlan={exercisePlan}
-              />
-            )}
             <NutritionDisplay
               profile={profile}
               macros={macros}
               exercisePlan={exercisePlan}
               latestWeightKg={latestWeightKg}
               onMacroModeChange={handleMacroModeChange}
-              onWeightLogged={handleWeightLogged}
             />
           </TabsContent>
 
@@ -1088,6 +1086,12 @@ function App() {
         profileId={profile.id}
         latestWeightKg={latestWeightKg}
         onMemoryChanged={() => { if (profile.id) return reloadMemory(profile.id) }}
+      />
+      <ProfileInfoDialog
+        open={profileInfoOpen}
+        onOpenChange={setProfileInfoOpen}
+        profile={profile}
+        latestWeightKg={latestWeightKg}
       />
     </div>
     </ActiveSessionProvider>

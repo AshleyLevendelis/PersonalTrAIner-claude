@@ -1,15 +1,9 @@
-import { useState, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
-import { Flame, Beef, Wheat, Droplets, Calculator, Layers, Scale } from 'lucide-react'
+import { Flame, Beef, Wheat, Droplets, Calculator, Layers } from 'lucide-react'
 import type { MacroTargets, UserProfile, WorkoutDay, MacroCalculationMode } from '@/lib/types'
-import { getActivityLabel, getGoalLabel } from '@/lib/calculations'
 import { calculateWeeklySchedule, computeBMR, computeStaticTDEE } from '@/lib/macro-calculator'
-import { getRecentWeighIns } from '@/lib/nutrition-targets'
-import { upsertDailyMetric } from '@/lib/daily-tracking'
 
 export interface NutritionDisplayProps {
   profile: UserProfile
@@ -18,111 +12,9 @@ export interface NutritionDisplayProps {
   /** Latest daily_metrics weigh-in — overrides the immutable onboarding weight in every displayed number (living targets, M0). */
   latestWeightKg?: number | null
   onMacroModeChange?: (mode: MacroCalculationMode) => void
-  /** Fired after a weigh-in saves so the app can recompute targets + snapshot. */
-  onWeightLogged?: () => void | Promise<void>
 }
 
-/**
- * Minimal weigh-in capture (M0 Part 5): one field, one save, last-7 history
- * with a 7-day average. Writes through the existing upsertDailyMetric helper
- * ((profile_id, date) unique — a second save today overwrites today's
- * entry). Trend LOGIC (target adjustment from the series) is M3; this only
- * captures and displays.
- */
-function WeighInCard({ profileId, onWeightLogged }: { profileId: string; onWeightLogged?: () => void | Promise<void> }) {
-  const [input, setInput] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [history, setHistory] = useState<{ date: string; weight_kg: number }[]>([])
-
-  const refreshHistory = useCallback(async () => {
-    setHistory(await getRecentWeighIns(profileId, 7))
-  }, [profileId])
-
-  useEffect(() => { refreshHistory() }, [refreshHistory])
-
-  const handleSave = async () => {
-    const kg = parseFloat(input)
-    if (!Number.isFinite(kg) || kg < 25 || kg > 350) {
-      setError('Enter a weight between 25 and 350 kg')
-      return
-    }
-    setError(null)
-    setSaving(true)
-    try {
-      await upsertDailyMetric({
-        profile_id: profileId,
-        date: new Date().toISOString().split('T')[0],
-        weight_kg: kg,
-      })
-      setInput('')
-      await refreshHistory()
-      await onWeightLogged?.()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Save failed — try again')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const sevenDayAvg = history.length > 0
-    ? Math.round((history.reduce((sum, h) => sum + h.weight_kg, 0) / history.length) * 10) / 10
-    : null
-
-  return (
-    <Card>
-      <CardHeader className="pb-3">
-        <div className="flex items-center gap-2">
-          <Scale className="size-4 text-primary" />
-          <CardTitle className="text-base">Today's Weigh-In</CardTitle>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="flex items-center gap-2">
-          <Input
-            type="number"
-            inputMode="decimal"
-            step="0.1"
-            min={25}
-            max={350}
-            placeholder="Weight in kg"
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') handleSave() }}
-            className="flex-1"
-          />
-          <Button onClick={handleSave} disabled={saving || !input}>
-            {saving ? 'Saving…' : 'Save'}
-          </Button>
-        </div>
-        {error && <p className="text-xs text-destructive">{error}</p>}
-        <p className="text-[11px] text-muted-foreground">
-          Your targets recalculate from your latest weigh-in — log it and the numbers above update.
-        </p>
-        {history.length > 0 && (
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between text-xs">
-              <span className="ds-label">Last {history.length} entries</span>
-              {sevenDayAvg != null && (
-                <span className="text-muted-foreground">7-day avg: <span className="font-semibold text-foreground">{sevenDayAvg} kg</span></span>
-              )}
-            </div>
-            <div className="space-y-1">
-              {history.map(h => (
-                <div key={h.date} className="flex justify-between text-sm rounded-md bg-muted/50 px-2.5 py-1">
-                  <span className="text-muted-foreground">{h.date}</span>
-                  <span className="font-medium">{h.weight_kg} kg</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  )
-}
-
-export function NutritionDisplay({ profile, macros, exercisePlan = [], latestWeightKg, onMacroModeChange, onWeightLogged }: NutritionDisplayProps) {
+export function NutritionDisplay({ profile, macros, exercisePlan = [], latestWeightKg, onMacroModeChange }: NutritionDisplayProps) {
   // Living targets (M0): BMR/TDEE were previously read from the frozen
   // fitness_profiles columns (computed once at onboarding); they're now
   // derived live from the same effective-weight profile the macros use, so
@@ -140,98 +32,6 @@ export function NutritionDisplay({ profile, macros, exercisePlan = [], latestWei
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-base">Nutrition Method</CardTitle>
-            <Badge variant="secondary" className="text-xs">
-              {mode === 'STANDARD_STATIC' ? 'Standard' : 'Dynamic CSCS'}
-            </Badge>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <button
-              type="button"
-              onClick={() => onMacroModeChange?.('STANDARD_STATIC')}
-              className={`w-full rounded-lg border p-3 text-left transition-all cursor-pointer ${
-                mode === 'STANDARD_STATIC'
-                  ? 'border-primary bg-primary/5 ring-1 ring-primary'
-                  : 'border-border hover:border-muted-foreground/30 hover:bg-muted/30'
-              }`}
-            >
-              <div className="flex items-center gap-2.5">
-                <div className={`flex size-7 shrink-0 items-center justify-center rounded-full ${
-                  mode === 'STANDARD_STATIC' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
-                }`}>
-                  <Calculator className="size-3.5" />
-                </div>
-                <div>
-                  <p className="font-medium text-xs text-foreground">Standard Static</p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">Same macros every day</p>
-                </div>
-              </div>
-            </button>
-            <button
-              type="button"
-              onClick={() => onMacroModeChange?.('DYNAMIC_CSCS')}
-              className={`w-full rounded-lg border p-3 text-left transition-all cursor-pointer ${
-                mode === 'DYNAMIC_CSCS'
-                  ? 'border-primary bg-primary/5 ring-1 ring-primary'
-                  : 'border-border hover:border-muted-foreground/30 hover:bg-muted/30'
-              }`}
-            >
-              <div className="flex items-center gap-2.5">
-                <div className={`flex size-7 shrink-0 items-center justify-center rounded-full ${
-                  mode === 'DYNAMIC_CSCS' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
-                }`}>
-                  <Layers className="size-3.5" />
-                </div>
-                <div>
-                  <p className="font-medium text-xs text-foreground">Dynamic CSCS</p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">Carb-cycles by training day</p>
-                </div>
-              </div>
-            </button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {profile.id && <WeighInCard profileId={profile.id} onWeightLogged={onWeightLogged} />}
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Your Profile</CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm space-y-2">
-            <div className="flex justify-between"><span className="text-muted-foreground">Age</span><span>{profile.age} years</span></div>
-            <div className="flex justify-between"><span className="text-muted-foreground">Gender</span><span className="capitalize">{profile.gender}</span></div>
-            <div className="flex justify-between"><span className="text-muted-foreground">Height</span><span>{profile.height_cm} cm</span></div>
-            <div className="flex justify-between"><span className="text-muted-foreground">Weight</span><span>{effectiveProfile.weight_kg} kg{latestWeightKg != null && latestWeightKg > 0 ? '' : ' (onboarding)'}</span></div>
-            <div className="flex justify-between items-center"><span className="text-muted-foreground">Activity</span><span className="text-right text-xs max-w-[180px]">{getActivityLabel(profile.activity_level)}</span></div>
-            <div className="flex justify-between items-center"><span className="text-muted-foreground">Goal</span><Badge variant="secondary">{getGoalLabel(profile.fitness_goal)}</Badge></div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Energy Expenditure</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <p className="ds-label">Basal Metabolic Rate (BMR)</p>
-              <p className="ds-num-hero">{bmr} <span className="text-sm font-normal text-muted-foreground">kcal/day</span></p>
-            </div>
-            <Separator />
-            <div>
-              <p className="ds-label">Total Daily Energy Expenditure (TDEE)</p>
-              <p className="ds-num-hero">{tdee} <span className="text-sm font-normal text-muted-foreground">kcal/day</span></p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
       {mode === 'STANDARD_STATIC' && (
         <Card>
           <CardHeader className="pb-3">
@@ -311,6 +111,80 @@ export function NutritionDisplay({ profile, macros, exercisePlan = [], latestWei
           </CardContent>
         </Card>
       )}
+
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base">Nutrition Method</CardTitle>
+            <Badge variant="secondary" className="text-xs">
+              {mode === 'STANDARD_STATIC' ? 'Standard' : 'Dynamic CSCS'}
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => onMacroModeChange?.('STANDARD_STATIC')}
+              className={`w-full rounded-lg border p-3 text-left transition-all cursor-pointer ${
+                mode === 'STANDARD_STATIC'
+                  ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                  : 'border-border hover:border-muted-foreground/30 hover:bg-muted/30'
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <div className={`flex size-7 shrink-0 items-center justify-center rounded-full ${
+                  mode === 'STANDARD_STATIC' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
+                }`}>
+                  <Calculator className="size-3.5" />
+                </div>
+                <div>
+                  <p className="font-medium text-xs text-foreground">Standard Static</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">Same macros every day</p>
+                </div>
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={() => onMacroModeChange?.('DYNAMIC_CSCS')}
+              className={`w-full rounded-lg border p-3 text-left transition-all cursor-pointer ${
+                mode === 'DYNAMIC_CSCS'
+                  ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                  : 'border-border hover:border-muted-foreground/30 hover:bg-muted/30'
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <div className={`flex size-7 shrink-0 items-center justify-center rounded-full ${
+                  mode === 'DYNAMIC_CSCS' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
+                }`}>
+                  <Layers className="size-3.5" />
+                </div>
+                <div>
+                  <p className="font-medium text-xs text-foreground">Dynamic CSCS</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">Carb-cycles by training day</p>
+                </div>
+              </div>
+            </button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Energy Expenditure</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <p className="ds-label">Basal Metabolic Rate (BMR)</p>
+            <p className="ds-num-hero">{bmr} <span className="text-sm font-normal text-muted-foreground">kcal/day</span></p>
+          </div>
+          <Separator />
+          <div>
+            <p className="ds-label">Total Daily Energy Expenditure (TDEE)</p>
+            <p className="ds-num-hero">{tdee} <span className="text-sm font-normal text-muted-foreground">kcal/day</span></p>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }
