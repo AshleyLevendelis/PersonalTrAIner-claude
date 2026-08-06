@@ -182,7 +182,8 @@ async function main() {
   setSupabaseClient(fakeClient as any)
 
   const { classifyImperative } = await import('../src/lib/imperative-classifier')
-  const { createPendingAction, claimPendingAction, resolvePendingAction, isWithinUndoWindow } = await import('../src/lib/pending-actions-store')
+  const { classifyConfirmationReply } = await import('../src/lib/confirmation-reply')
+  const { createPendingAction, claimPendingAction, declinePendingAction, resolvePendingAction, isWithinUndoWindow } = await import('../src/lib/pending-actions-store')
   const { parseSetsPhrase, resolveExerciseName, parseWorkoutEntries } = await import('../src/lib/set-parse')
   const { executeLogWorkout } = await import('../src/lib/nl-logging-executor')
   const { saveSet, deleteSet, getSetsForDate, flushPending } = await import('../src/lib/set-log-store')
@@ -442,6 +443,108 @@ async function main() {
   await resolvePendingAction(retryRow.id, 'done', { landed: ['test landed'], failed: [] })
   const { data: resolvedRow } = await fakeClient.from('pending_actions').select('*').eq('id', retryRow.id).maybeSingle() as { data: Row | null }
   check('resolvePendingAction stamps status/result/resolved_at', resolvedRow?.status === 'done' && !!resolvedRow?.resolved_at, resolvedRow)
+
+  // ---- 8. Regression: the confirmation-card stuck-loop bug ----------------
+  // Reproduced by real usage: chat proposes an exercise swap, user replies
+  // "Yes" in free text — the card re-asked the identical question, up to 4
+  // times; only "No" broke the loop. Root cause (traced): a free-text
+  // affirmative went back through the SAME imperative-classification
+  // pipeline as any other message, and "yes" can never contain an
+  // IMPERATIVE_VERBS match, so the model's re-proposal was always
+  // downgraded to a repeated plain-text offer with no new pending action.
+  // The fix (confirmation-reply.ts + ChatAssistant.tsx's sendMessage)
+  // intercepts a clear free-text yes/no BEFORE the model ever sees it,
+  // resolving the SAME still-open row the Confirm/Not-now buttons would.
+  console.log('\n[8] Regression: confirmation-card stuck loop (propose -> "Yes" -> must execute, never re-propose)')
+
+  // First, document the exact failure mode this bypasses: "Yes" alone can
+  // never pass classifyImperative, which is WHY the old (model-routed) path
+  // looped forever — this is the bug's mechanism, not a fixed thing.
+  const yesAsImperative = classifyImperative('Yes', 'Yes')
+  check('"Yes" alone can never pass classifyImperative (this is WHY the old model-routed path looped)',
+    yesAsImperative.imperative === false, yesAsImperative)
+
+  check('classifyConfirmationReply recognizes common affirmatives',
+    ['Yes', 'yes', 'yeah', 'yep', 'sure', 'confirm', 'do it', 'ok.', 'okay!'].every(t => classifyConfirmationReply(t) === 'confirm'))
+  check('classifyConfirmationReply recognizes common negatives',
+    ['No', 'no', 'nah', 'nope', 'not now', 'cancel', "don't"].every(t => classifyConfirmationReply(t) === 'decline'))
+  check('classifyConfirmationReply leaves a longer/ambiguous reply for the model',
+    classifyConfirmationReply('actually can we do the whole block instead') === 'ambiguous')
+
+  const swapProfileId = crypto.randomUUID()
+  const swapScopeKey = `${swapProfileId}:propose_exercise_swap:Thursday:0`
+  const swapRow = await createPendingAction({
+    profileId: swapProfileId,
+    actionClass: 'plan_mutation',
+    kind: 'propose_exercise_swap',
+    scopeKey: swapScopeKey,
+    preconditions: {},
+    payload: { oldExerciseName: 'Deadlifts', newExerciseName: 'Trap Bar Deadlift', scope: 'today' },
+    preImage: { snapshot: true },
+    diff: { rows: [{ field: 'exercise', before: 'Deadlifts', after: 'Trap Bar Deadlift' }] },
+  })
+  check('the swap card starts pending', swapRow.status === 'pending', swapRow)
+
+  // Exactly the sendMessage interception's own logic: classify, then drive
+  // the SAME claim -> executing -> resolve pipeline handleConfirmProposal
+  // uses — proving a bare "Yes" now executes on the FIRST reply.
+  const yesVerdict = classifyConfirmationReply('Yes')
+  check('"Yes" classifies as a confirmation (not sent to the model at all)', yesVerdict === 'confirm')
+  const swapClaim = await claimPendingAction(swapRow.id, async () => true)
+  check('the claim succeeds on the first "Yes"', swapClaim.outcome === 'claimed', swapClaim)
+  if (swapClaim.outcome === 'claimed') {
+    await resolvePendingAction(swapClaim.row.id, 'done', { landed: ['Deadlifts -> Trap Bar Deadlift'], failed: [] })
+  }
+  const { data: swapAfterYes } = await fakeClient.from('pending_actions').select('*').eq('id', swapRow.id).maybeSingle() as { data: Row | null }
+  check('after one "Yes" the row is done, never still pending (the loop is broken)', swapAfterYes?.status === 'done', swapAfterYes)
+
+  // A second identical "Yes" (double-tap / accidental resend) must not
+  // re-execute or error — claimPendingAction's exactly-once guarantee
+  // (already proven in [2]) applies identically via this path.
+  const secondYesClaim = await claimPendingAction(swapRow.id, async () => true)
+  check('a repeated "Yes" after resolution is a safe no-op, not a second execution', secondYesClaim.outcome === 'already_resolved', secondYesClaim)
+
+  // "No" cancels with NO side effects: declined status, resolved_at set,
+  // and (structurally, since decline never calls executeExerciseSwap/
+  // swapExerciseInMesocycle at all) nothing plan-mutating ever ran.
+  const declineProfileId = crypto.randomUUID()
+  const declineRow = await createPendingAction({
+    profileId: declineProfileId,
+    actionClass: 'plan_mutation',
+    kind: 'propose_exercise_swap',
+    scopeKey: `${declineProfileId}:propose_exercise_swap:Thursday:0`,
+    preconditions: {},
+    payload: { oldExerciseName: 'Deadlifts', newExerciseName: 'Trap Bar Deadlift', scope: 'today' },
+    preImage: { snapshot: true },
+    diff: { rows: [{ field: 'exercise', before: 'Deadlifts', after: 'Trap Bar Deadlift' }] },
+  })
+  const noVerdict = classifyConfirmationReply('No')
+  check('"No" classifies as a decline', noVerdict === 'decline')
+  await declinePendingAction(declineRow.id)
+  const { data: declineAfter } = await fakeClient.from('pending_actions').select('*').eq('id', declineRow.id).maybeSingle() as { data: Row | null }
+  check('"No" leaves the row declined with resolved_at set, no side effects', declineAfter?.status === 'declined' && !!declineAfter?.resolved_at, declineAfter)
+  check('a declined row was never claimed/executed', declineAfter?.claimed_at == null, declineAfter)
+
+  // The model's later idea ("log that as a conventional Deadlift instead")
+  // said yes to: since the FIRST proposal is already resolved (done, not
+  // pending/claimed/executing), the scope_key's partial-unique index no
+  // longer blocks a fresh proposal for the same slot — it's a clean new
+  // row, not a collision with the stale first one, so confirming it can't
+  // hit the same loop.
+  const secondIdeaRow = await createPendingAction({
+    profileId: swapProfileId,
+    actionClass: 'plan_mutation',
+    kind: 'propose_exercise_swap',
+    scopeKey: swapScopeKey, // SAME slot as the already-resolved first swap
+    preconditions: {},
+    payload: { oldExerciseName: 'Trap Bar Deadlift', newExerciseName: 'Deadlifts', scope: 'today' },
+    preImage: { snapshot: true },
+    diff: { rows: [{ field: 'exercise', before: 'Trap Bar Deadlift', after: 'Deadlifts' }] },
+  })
+  check('a later proposal for the same slot, after the first resolved, gets its OWN fresh row (not the stale one)',
+    secondIdeaRow.id !== swapRow.id && secondIdeaRow.status === 'pending', { firstId: swapRow.id, secondIdeaRow })
+  const secondIdeaClaim = await claimPendingAction(secondIdeaRow.id, async () => true)
+  check('confirming the later idea also claims on the first reply', secondIdeaClaim.outcome === 'claimed', secondIdeaClaim)
 
   // ---- Summary -------------------------------------------------------------
   if (failures > 0) {

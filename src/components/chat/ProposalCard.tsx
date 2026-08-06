@@ -83,7 +83,7 @@ export function ProposalCard({
           {scopeField.options.map(opt => (
             <button
               key={opt}
-              className={`rounded-full border px-2.5 py-1 text-[11px] transition-colors ${
+              className={`min-h-[44px] rounded-full border px-3.5 text-xs font-medium transition-colors ${
                 scope === opt ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:bg-accent'
               }`}
               onClick={() => setScope(opt)}
@@ -98,12 +98,19 @@ export function ProposalCard({
       {isStale ? (
         <p className="text-xs text-[color:var(--role-warn)]">This changed since I proposed it — ask me again if you still want it.</p>
       ) : isTerminal ? null : (
+        // Fix — confirmation-card stuck loop, Part 3: these are the primary,
+        // unambiguous way to answer — sized to the same min-h-[44px] touch
+        // target as the model's own [QUICK_REPLIES] chips and onboarding's
+        // OptionCard, not the compact h-7 buttons used elsewhere in chat, so
+        // tapping reads as obviously the intended action rather than typing
+        // "yes" (which free text still handles correctly — see
+        // confirmation-reply.ts — but shouldn't be the first thing reached for).
         <div className="flex items-center gap-2 pt-0.5">
-          <Button size="sm" className="h-7 text-xs" onClick={handleConfirm} disabled={busyOverall}>
-            <ArrowRightLeft className="size-3 mr-1" />
+          <Button className="min-h-[44px] text-sm px-4" onClick={handleConfirm} disabled={busyOverall}>
+            <ArrowRightLeft className="size-3.5 mr-1.5" />
             {busy === 'confirm' ? 'Applying…' : 'Confirm'}
           </Button>
-          <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={handleReject} disabled={busyOverall}>
+          <Button variant="ghost" className="min-h-[44px] text-sm px-4" onClick={handleReject} disabled={busyOverall}>
             {busy === 'reject' ? 'Declining…' : 'Not now'}
           </Button>
         </div>

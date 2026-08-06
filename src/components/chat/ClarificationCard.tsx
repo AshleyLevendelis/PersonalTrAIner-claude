@@ -60,9 +60,8 @@ export function ClarificationCard({
           {options.map(opt => (
             <Button
               key={opt.value}
-              size="sm"
               variant="outline"
-              className="h-7 text-xs"
+              className="min-h-[44px] text-xs px-3.5"
               disabled={busyValue != null}
               onClick={() => handleChoose(opt.value)}
             >

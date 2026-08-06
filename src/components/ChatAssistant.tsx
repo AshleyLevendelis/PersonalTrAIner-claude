@@ -23,11 +23,13 @@ import { normalizeExternalUrl } from '@/lib/chat-links'
 import { createFact, createGoal, createContextFact, retireFact, retireContextFact, abandonGoal, type UserFactRow, type UserGoalRow, type UserContextFactRow } from '@/lib/memory-store'
 import { resolveExerciseTarget, resolveFoodTarget } from '@/lib/fact-compiler'
 import { checkFactConflict, checkGoalConflict } from '@/lib/memory-reconcile'
+import { classifyConfirmationReply } from '@/lib/confirmation-reply'
 import { getPRCache } from '@/lib/pr-engine'
 import { loadDashboardData, type DashboardData } from '@/lib/dashboard-data'
 import { getAllItems as getAllGroceryItems, addItemLocal, setCheckedLocal, undoAddLocal, type GroceryItemRow, type GroceryCategory } from '@/lib/grocery-store'
 import { logWater, undoLog as undoWaterLog } from '@/lib/water-store'
 import { ProposalCard } from '@/components/chat/ProposalCard'
+import { TypewriterMarkdown } from '@/components/chat/TypewriterMarkdown'
 import { ReceiptCard } from '@/components/chat/ReceiptCard'
 import { ClarificationCard } from '@/components/chat/ClarificationCard'
 import type { ChatMessage, UserProfile, MacroTargets, WorkoutDay, MealPlanDay, MesocycleWeek, PlanAction, ChatPendingActionView, ChatReceiptView, ChatClarificationView } from '@/lib/types'
@@ -263,6 +265,10 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
   // (so the model can volunteer the one relevant unasked thing) and the
   // one-time initial-greeting upgrade below.
   const [proactiveData, setProactiveData] = useState<DashboardData | null>(null)
+  /** null = not yet known; set by loadChatHistory once the chat_messages count for this profile is confirmed. */
+  const [isFirstEverChat, setIsFirstEverChat] = useState<boolean | null>(null)
+  /** The one message currently mid-typewriter-reveal — set only for a reply that JUST arrived from sendMessage, never for restored history/cache (see TypewriterMarkdown.tsx). */
+  const [animatingMessageId, setAnimatingMessageId] = useState<string | null>(null)
   useEffect(() => {
     if (!activeSession.ready || !profile.id || !macros) return
     let cancelled = false
@@ -276,24 +282,49 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSession.ready, activeSession.date, activeSession.logs.length, profile.id])
 
-  // One-shot upgrade of the synchronous fallback greeting once real data
-  // lands — only when the conversation is still exactly the untouched
-  // opener (a fresh chat, nothing sent yet) so this never clobbers restored
-  // history or a reply already in flight. Specific-or-silent: only swaps
-  // in a recent PR when one genuinely exists within the last 7 days;
-  // otherwise the schedule-based opener already built stands as-is.
-  const greetingUpgradedRef = useRef(false)
+  // One-shot finalization of the synchronous fallback greeting once we know
+  // (a) whether this is a genuinely first-ever conversation (no prior
+  // chat_messages rows — see isFirstEverChat, set by loadChatHistory) and,
+  // opportunistically, (b) any recent-PR data. Only fires when the
+  // conversation is still exactly the untouched opener (a fresh chat,
+  // nothing sent yet) so this never clobbers restored history or a reply
+  // already in flight. historyLoaded typically resolves faster than
+  // proactiveData (a single chat_messages fetch vs. loadDashboardData's
+  // several), so finalizing the instant historyLoaded flips true would
+  // usually miss the PR line entirely — wait a short beat for proactiveData
+  // too, but don't hang forever if it's slow or fails (a missed bonus line
+  // is fine; a stuck opener is not).
+  const openerFinalizedRef = useRef(false)
   useEffect(() => {
-    if (greetingUpgradedRef.current || !proactiveData || messages.length !== 1) return
+    if (openerFinalizedRef.current || !historyLoaded || isFirstEverChat == null || messages.length !== 1) return
     if (messages[0].role !== 'assistant' || messages[0].content !== buildInitialGreeting()) return
-    const recentPR = proactiveData.recentPRs[0]
-    if (!recentPR) return
-    greetingUpgradedRef.current = true
-    const detail = initialGreetingDetail()
-    const upgraded = `${greetName()} — nice PR on ${recentPR.exerciseName} at ${recentPR.weightKg}kg. ${detail.charAt(0).toUpperCase()}${detail.slice(1)}`
-    setMessages([{ role: 'assistant', content: upgraded, status: 'complete' }])
+
+    const finalize = () => {
+      if (openerFinalizedRef.current) return
+      openerFinalizedRef.current = true
+
+      const recentPR = proactiveData?.recentPRs[0]
+      const detail = initialGreetingDetail()
+      const scheduleLine = recentPR
+        ? `${greetName()} — nice PR on ${recentPR.exerciseName} at ${recentPR.weightKg}kg. ${detail.charAt(0).toUpperCase()}${detail.slice(1)}`
+        : buildInitialGreeting()
+      // Brief, one voice, no bullet list — who it is and what it can do,
+      // before the specific-today opener. Returning users (isFirstEverChat
+      // false) skip this entirely.
+      const finalText = isFirstEverChat
+        ? `I'm your training coach — I can log workouts from what you tell me, adjust your plan, answer training and nutrition questions, and remember your goals and preferences as we go.\n\n${scheduleLine}`
+        : scheduleLine
+
+      if (finalText !== buildInitialGreeting()) {
+        setMessages([{ role: 'assistant', content: finalText, status: 'complete' }])
+      }
+    }
+
+    if (proactiveData) { finalize(); return }
+    const t = setTimeout(finalize, 2500)
+    return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [proactiveData, messages])
+  }, [historyLoaded, isFirstEverChat, proactiveData, messages])
 
   // Synchronous write-through mirror (see chat-cache.ts) — fires on every
   // messages change, so the cache is never behind what's rendered on screen
@@ -330,6 +361,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         setMessages(prev => (loaded.length >= prev.length ? loaded : prev))
         setHasMoreMessages((count ?? 0) > PAGE_SIZE)
       }
+      setIsFirstEverChat((count ?? 0) === 0)
       setHistoryLoaded(true)
     } catch (err) {
       console.error('Failed to load chat history:', err)
@@ -1363,6 +1395,14 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
   }
 
   // Fix #1: Full message lifecycle with placeholder
+  /** Most recent message still awaiting a yes/no on its ProposalCard, or -1. */
+  const findOpenPendingActionIndex = (): number => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].pendingAction?.status === 'pending') return i
+    }
+    return -1
+  }
+
   const sendMessage = async () => {
     if (!input.trim() || isLoading) return
     if (navigator.vibrate) navigator.vibrate(10)
@@ -1372,6 +1412,30 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     const userMessage: ChatMessage = { role: 'user', content: userText, status: 'complete', created_at: now }
     setMessages(prev => [...prev, userMessage])
     setInput('')
+
+    // Fix — confirmation-card stuck loop: a clear free-text yes/no to a
+    // still-open proposal resolves it directly through the SAME path
+    // ProposalCard's own Confirm/Not now buttons use, never sent to the
+    // model — the model has no tool that means "the user just confirmed,"
+    // so a bare "Yes" would otherwise get re-classified as a failed
+    // imperative and re-propose the identical question forever (only "No"
+    // could escape by accident, since declining needs no tool call at all).
+    const openPendingIdx = findOpenPendingActionIndex()
+    if (openPendingIdx !== -1) {
+      const verdict = classifyConfirmationReply(userText)
+      if (verdict !== 'ambiguous') {
+        persistUserMessage(userText)
+        setIsLoading(true)
+        try {
+          if (verdict === 'confirm') await handleConfirmProposal(openPendingIdx)
+          else await handleRejectProposal(openPendingIdx)
+        } finally {
+          setIsLoading(false)
+        }
+        return
+      }
+    }
+
     setIsLoading(true)
 
     // Save user message immediately (fire-and-forget, 0ms latency)
@@ -1446,6 +1510,10 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       }
       return [...prev.filter(m => !(m.role === 'assistant' && m.status === 'pending' && !m.content)), assistantMessage]
     })
+    // A just-arrived reply gets the typewriter reveal; restored history
+    // never does (see TypewriterMarkdown.tsx / findOpenPendingActionIndex's
+    // sibling render check below).
+    if (placeholderId && cleanedText) setAnimatingMessageId(placeholderId)
     setIsLoading(false)
     setQuickRepliesDismissed(false)
 
@@ -1766,9 +1834,12 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
                           </button>
                         </div>
                       ) : (
-                        <ReactMarkdown components={markdownComponents}>
-                          {stripStreamingTags(msg.content)}
-                        </ReactMarkdown>
+                        <TypewriterMarkdown
+                          text={stripStreamingTags(msg.content)}
+                          active={msg.id != null && msg.id === animatingMessageId}
+                          components={markdownComponents}
+                          onDone={() => setAnimatingMessageId(prev => (prev === msg.id ? null : prev))}
+                        />
                       )}
                     </div>
                     {msg.pendingAction && msg.status !== 'failed' && (
