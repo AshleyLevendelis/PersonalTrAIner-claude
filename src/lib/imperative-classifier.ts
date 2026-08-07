@@ -27,11 +27,17 @@ export type ClassificationResult =
  * "conservative capture, same bar as plan mutations") needed the verb list
  * widened to actually recognize that phrasing, or every naturally-worded
  * preference statement would silently downgrade to an offer forever.
+ * Same reasoning added 'ease'/'rest' for propose_injury_adaptation /
+ * propose_equipment_adaptation — those flows are deliberately conversational
+ * ("let's ease off it for a week"), not command syntax. This still never
+ * accepts a bare "yes" (no real verb in the quote) — that invariant is
+ * intentional, see test-pending-actions.ts's regression test for why.
  */
 export const IMPERATIVE_VERBS = [
   'swap', 'replace', 'change', 'switch', 'move', 'cut', 'remove', 'add',
   'ban', 'avoid', 'set', 'adjust', 'reduce', 'increase', 'log', 'record',
   'hate', 'dislike', 'love', 'prefer', 'want', 'need', 'exclude',
+  'ease', 'rest',
 ] as const
 
 const INTERROGATIVE_LEAD_RE = /^\s*(what|why|how|when|where|which|who|can|could|should|would|is|are|do|does|did)\b/i

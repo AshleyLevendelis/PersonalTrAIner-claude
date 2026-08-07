@@ -1,4 +1,4 @@
-import { generateExercisePlan, generateMesocycle, getConstrainedPool } from './exercise-plan'
+import { generateExercisePlan, generateMesocycle, getConstrainedPool, getFlaggedJoints } from './exercise-plan'
 import { EXERCISE_DATABASE, meetsCapabilityRequirement } from './exercise-db'
 import type {
   UserProfile, EquipmentAccess, TrainingStyle, SessionDuration,
@@ -41,15 +41,6 @@ export function getInjuryCombinations(): string[][] {
     ['shoulders', 'wrists'],
     ['knees', 'shoulders', 'lower_back'],
   ]
-}
-
-// Injury -> joints that should NOT appear in final exercises
-const INJURED_JOINTS_MAP: Record<string, string[]> = {
-  lower_back: ['lower_back_axial'],
-  knees: ['knee'],
-  shoulders: ['shoulder'],
-  neck: ['neck'],
-  wrists: ['wrist'],
 }
 
 // Equipment access -> what IS allowed (null = everything)
@@ -225,11 +216,7 @@ function runSingleAudit(
   }
 
   // CHECK 2: No flagged joint's movement pattern in output
-  const flaggedJoints = new Set<string>()
-  for (const injury of injuries) {
-    const joints = INJURED_JOINTS_MAP[injury]
-    if (joints) joints.forEach(j => flaggedJoints.add(j))
-  }
+  const flaggedJoints = getFlaggedJoints(injuries)
   if (flaggedJoints.size > 0) {
     for (const ex of allExercises) {
       const entry = EXERCISE_DATABASE.find(e => e.name === ex.name)

@@ -14,8 +14,10 @@ import { saveChatCache, loadChatCache, clearChatCache } from '@/lib/chat-cache'
 import { swapPoolMeal, type MealSlotName } from '@/lib/meal-store'
 import { getExerciseEntry } from '@/lib/exercise-db'
 import { createPendingAction, claimPendingAction, declinePendingAction, markExecuting, resolvePendingAction, getPendingAction, isWithinUndoWindow, type PendingActionReceipt } from '@/lib/pending-actions-store'
-import { executeExerciseSwap, executeMealSwap, undoExerciseSwap, type ExerciseSwapPayload, type MealSwapPayload } from '@/lib/pending-action-executor'
+import { executeExerciseSwap, executeMealSwap, undoExerciseSwap, executeInjuryAdaptation, executeEquipmentAdaptation, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type EquipmentAdaptationPayload } from '@/lib/pending-action-executor'
 import type { SwapScope } from '@/lib/mesocycle-edit'
+import { createPlanAdaptation } from '@/lib/plan-adaptations-store'
+import { substituteForInjury, substituteForEquipment } from '@/lib/plan-adaptations'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { useSpeechToText } from '@/hooks/useSpeechToText'
 import { cn } from '@/lib/utils'
@@ -829,10 +831,15 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     }).eq('id', placeholderId).then()
   }
 
-  /** Client-authored copy for a proposal turn — D1 means the model's own text for this turn is never rendered, only this. Generic across every propose_* kind: the headline row is always diff.rows[0]. */
+  /** Client-authored copy for a proposal turn — D1 means the model's own text for this turn is never rendered, only this. */
   const describeProposalClientSide = (pendingAction: ChatPendingActionView): string => {
-    const headline = pendingAction.diff.rows[0]
-    if (!headline) return "Here's a change I can make:"
+    const rows = pendingAction.diff.rows
+    if (rows.length === 0) return "Here's a change I can make:"
+    if (pendingAction.kind === 'propose_injury_adaptation' || pendingAction.kind === 'propose_equipment_adaptation') {
+      const count = rows.length
+      return `I can adjust ${count} exercise${count === 1 ? '' : 's'} across your plan:`
+    }
+    const headline = rows[0]
     return `I can swap **${headline.before}** for **${headline.after}**:`
   }
 
@@ -896,6 +903,113 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         implications: [{ severity: 'info', text: 'Load recomputed for the new movement once you confirm.' }],
         rationale: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined,
         editable: [{ field: 'scope', options: ['today', 'permanent'] }],
+        reversible: true,
+      },
+    }
+  }
+
+  /**
+   * Mirrors buildExerciseSwapProposal's shape exactly, for the injury
+   * adaptation middle tier (§3a). Converts duration_days into a week-number
+   * range starting at the live week (mesocycle weeks are the only
+   * granularity slots actually have) and runs substituteForInjury client-
+   * side to build the real diff — same I1 reasoning as the swap proposal:
+   * the server never touches the plan.
+   */
+  const buildInjuryAdaptationProposal = async (rawArgs: Record<string, unknown>): Promise<{
+    scopeKey: string
+    preconditions: Record<string, unknown>
+    payload: InjuryAdaptationPayload
+    preImage: MesocycleWeek[]
+    diff: import('@/lib/pending-actions-store').ProposalDiff
+  } | null> => {
+    const injuryCode = String(rawArgs.affected_area ?? '')
+    const durationDays = Number(rawArgs.duration_days)
+    if (!injuryCode || !durationDays || durationDays <= 0 || mesocycle.length === 0) return null
+
+    const startWeek = activeSession.liveWeek
+    const weekSpan = Math.max(1, Math.ceil(durationDays / 7))
+    const weekNumbers = mesocycle
+      .map(w => w.week_number)
+      .filter(n => n >= startWeek && n < startWeek + weekSpan)
+    if (weekNumbers.length === 0) return null
+
+    const result = await substituteForInjury({
+      mesocycle, profile, injuryCode, weekNumbers, exclusions: exerciseExclusions,
+    })
+    if (result.touchedSlots.length === 0) return null
+
+    const rows = result.touchedSlots.map(slot => ({
+      field: `${slot.dayName} (Week ${slot.weekNumber})`,
+      before: slot.before,
+      after: slot.after ?? '— removed (no safe alternative)',
+    }))
+    const implications: { severity: 'info' | 'warn'; text: string }[] = [
+      { severity: 'info', text: `Applies for ${durationDays} day${durationDays === 1 ? '' : 's'}, then eases back in automatically.` },
+    ]
+    if (result.droppedPatterns.length > 0) {
+      implications.push({ severity: 'warn', text: `Some movements had no safe alternative this round and were dropped rather than faked.` })
+    }
+
+    return {
+      scopeKey: `${profile.id}:propose_injury_adaptation:${injuryCode}:${startWeek}`,
+      preconditions: { injuryCode, startWeek, weekNumbers },
+      payload: { injuryCode, durationDays, weekNumbers, exclusions: exerciseExclusions, reason: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined },
+      preImage: mesocycle,
+      diff: {
+        rows,
+        implications,
+        rationale: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined,
+        reversible: true,
+      },
+    }
+  }
+
+  /** Mirrors buildInjuryAdaptationProposal exactly, for the equipment/travel adaptation (§3b). */
+  const buildEquipmentAdaptationProposal = async (rawArgs: Record<string, unknown>): Promise<{
+    scopeKey: string
+    preconditions: Record<string, unknown>
+    payload: EquipmentAdaptationPayload
+    preImage: MesocycleWeek[]
+    diff: import('@/lib/pending-actions-store').ProposalDiff
+  } | null> => {
+    const equipmentTier = String(rawArgs.equipment_tier ?? '') as UserProfile['equipment_access']
+    const durationDays = Number(rawArgs.duration_days)
+    if (!equipmentTier || !durationDays || durationDays <= 0 || mesocycle.length === 0) return null
+
+    const startWeek = activeSession.liveWeek
+    const weekSpan = Math.max(1, Math.ceil(durationDays / 7))
+    const weekNumbers = mesocycle
+      .map(w => w.week_number)
+      .filter(n => n >= startWeek && n < startWeek + weekSpan)
+    if (weekNumbers.length === 0) return null
+
+    const result = await substituteForEquipment({
+      mesocycle, profile, equipmentTier, weekNumbers, exclusions: exerciseExclusions,
+    })
+    if (result.touchedSlots.length === 0) return null
+
+    const rows = result.touchedSlots.map(slot => ({
+      field: `${slot.dayName} (Week ${slot.weekNumber})`,
+      before: slot.before,
+      after: slot.after ?? '— removed (not trainable with this equipment)',
+    }))
+    const implications: { severity: 'info' | 'warn'; text: string }[] = [
+      { severity: 'info', text: `Applies for ${durationDays} day${durationDays === 1 ? '' : 's'}, then reverts to your normal plan automatically.` },
+    ]
+    if (result.droppedPatterns.length > 0) {
+      implications.push({ severity: 'warn', text: `A pattern genuinely can't be trained with this equipment this round — skipped, not faked.` })
+    }
+
+    return {
+      scopeKey: `${profile.id}:propose_equipment_adaptation:${equipmentTier}:${startWeek}`,
+      preconditions: { equipmentTier, startWeek, weekNumbers },
+      payload: { equipmentTier, durationDays, weekNumbers, exclusions: exerciseExclusions, reason: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined },
+      preImage: mesocycle,
+      diff: {
+        rows,
+        implications,
+        rationale: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined,
         reversible: true,
       },
     }
@@ -1304,6 +1418,12 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       if (result.proposal.kind === 'propose_exercise_swap' && result.proposal.rawArgs) {
         const swap = buildExerciseSwapProposal(result.proposal.rawArgs)
         if (swap) built = { scopeKey: swap.scopeKey, preconditions: swap.preconditions, payload: swap.payload as unknown as Record<string, unknown>, preImage: swap.preImage, diff: swap.diff }
+      } else if (result.proposal.kind === 'propose_injury_adaptation' && result.proposal.rawArgs) {
+        const adaptation = await buildInjuryAdaptationProposal(result.proposal.rawArgs)
+        if (adaptation) built = { scopeKey: adaptation.scopeKey, preconditions: adaptation.preconditions, payload: adaptation.payload as unknown as Record<string, unknown>, preImage: adaptation.preImage, diff: adaptation.diff }
+      } else if (result.proposal.kind === 'propose_equipment_adaptation' && result.proposal.rawArgs) {
+        const adaptation = await buildEquipmentAdaptationProposal(result.proposal.rawArgs)
+        if (adaptation) built = { scopeKey: adaptation.scopeKey, preconditions: adaptation.preconditions, payload: adaptation.payload as unknown as Record<string, unknown>, preImage: adaptation.preImage, diff: adaptation.diff }
       } else if (result.proposal.diff && result.proposal.payload && result.proposal.scopeKey) {
         built = { scopeKey: result.proposal.scopeKey, preconditions: result.proposal.preconditions ?? {}, payload: result.proposal.payload, preImage: result.proposal.preImage, diff: result.proposal.diff }
       }
@@ -1672,6 +1792,49 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         })
       }
       undoToken = ok ? row.id : undefined
+    } else if (row.kind === 'propose_injury_adaptation') {
+      const payload = row.payload as unknown as InjuryAdaptationPayload
+      const result = await executeInjuryAdaptation(profile, mesocycle, payload)
+      onMesocycleUpdated(result.mesocycle)
+      receipt = result.receipt
+      const ok = receipt.failed.length === 0
+      title = ok ? 'Adjusted' : "Couldn't apply the adaptation"
+      rows = ok ? receipt.landed.map(line => { const [label, detail] = line.split(': '); return { label, detail } }) : []
+      if (ok && profile.id) {
+        // No standard 10-minute Undo here — ending early is a separate,
+        // longer-lived action (plan_adaptations.status='ended_early'), not
+        // the receipt's own undo button.
+        await createPlanAdaptation({
+          profileId: profile.id,
+          kind: 'injury',
+          injuryCode: payload.injuryCode,
+          reason: payload.reason,
+          affectedWeekNumbers: payload.weekNumbers,
+          preImage: result.preImage,
+          pendingActionId: row.id,
+          durationDays: payload.durationDays,
+        })
+      }
+    } else if (row.kind === 'propose_equipment_adaptation') {
+      const payload = row.payload as unknown as EquipmentAdaptationPayload
+      const result = await executeEquipmentAdaptation(profile, mesocycle, payload)
+      onMesocycleUpdated(result.mesocycle)
+      receipt = result.receipt
+      const ok = receipt.failed.length === 0
+      title = ok ? 'Adjusted' : "Couldn't apply the adaptation"
+      rows = ok ? receipt.landed.map(line => { const [label, detail] = line.split(': '); return { label, detail } }) : []
+      if (ok && profile.id) {
+        await createPlanAdaptation({
+          profileId: profile.id,
+          kind: 'equipment',
+          equipmentOverride: payload.equipmentTier,
+          reason: payload.reason,
+          affectedWeekNumbers: payload.weekNumbers,
+          preImage: result.preImage,
+          pendingActionId: row.id,
+          durationDays: payload.durationDays,
+        })
+      }
     } else {
       receipt = { landed: [], failed: [{ op: row.kind, error: 'Not available yet' }] }
       title = "Couldn't apply that"

@@ -304,6 +304,62 @@ const toolDeclarations = [
     },
   },
   {
+    name: "propose_injury_adaptation",
+    description:
+      "PROPOSES a time-bounded plan adaptation for a MANAGEABLE, PLAN-RELEVANT injury (soreness/pain the user wants to ease off, not ordinary soreness and not something needing a professional — see the SCOPE section for that line). This does NOT apply anything — the app shows a card with every touched exercise's before/after and the user taps Confirm. Only call this once you know BOTH the affected area (one of the 5 mapped codes) AND how long to ease off for. Never call this for sharp/joint/one-sided/worsening pain — redirect to a professional instead, no tool call.",
+    parameters: {
+      type: "object",
+      properties: {
+        affected_area: {
+          type: "string",
+          enum: ["lower_back", "knees", "shoulders", "neck", "wrists"],
+          description: "The body part to ease off — only these 5 have joint-conflict data; if the user describes pain elsewhere, do not call this tool, say plainly you can't auto-adjust for that area yet and offer a manual propose_exercise_swap instead.",
+        },
+        duration_days: {
+          type: "number",
+          description: "How many days to ease off for, from today (e.g. a 'week' = 7, 'two weeks' = 14, 'a few days' = 3).",
+        },
+        reason: {
+          type: "string",
+          description: "One short sentence on what the user described — shown on the card as the rationale.",
+        },
+        origin_verbatim_quote: {
+          type: "string",
+          description: "The exact substring of the user's CURRENT message describing the injury/pain. Must be copied verbatim, not paraphrased.",
+        },
+      },
+      required: ["affected_area", "duration_days", "origin_verbatim_quote"],
+    },
+  },
+  {
+    name: "propose_equipment_adaptation",
+    description:
+      "PROPOSES regenerating the affected days' exercises against a different equipment tier for a stated period (travel, a different gym, limited kit) — this does NOT apply anything, the app shows a before/after card and the user taps Confirm. Only call this once you know BOTH the equipment tier AND how many days it applies for. It automatically reverts to the normal plan once the period ends.",
+    parameters: {
+      type: "object",
+      properties: {
+        equipment_tier: {
+          type: "string",
+          enum: ["full_gym", "home_gym", "minimalist", "bodyweight"],
+          description: "The nearest fit to what's actually available. Hotel gym -> minimalist. Bodyweight only -> bodyweight. Dumbbells only -> minimalist (closest fit; say so honestly on the card, it's slightly over-inclusive). Full commercial gym -> full_gym.",
+        },
+        duration_days: {
+          type: "number",
+          description: "How many days this applies for, from today.",
+        },
+        reason: {
+          type: "string",
+          description: "One short sentence on what the user described (e.g. 'hotel gym for a week') — shown on the card as the rationale.",
+        },
+        origin_verbatim_quote: {
+          type: "string",
+          description: "The exact substring of the user's CURRENT message describing the equipment change. Must be copied verbatim, not paraphrased.",
+        },
+      },
+      required: ["equipment_tier", "duration_days", "origin_verbatim_quote"],
+    },
+  },
+  {
     name: "adjust_volume",
     description:
       "Adjust the total training volume (sets/reps) for a specific day's session. NOT SAFELY WIRED UP YET — calling this will decline with a message pointing the user at the in-app controls. Prefer discussing volume changes conversationally (what to do, why) and let the user apply it in the app, rather than calling this tool.",
@@ -857,6 +913,21 @@ You're genuinely useful on training and nutrition: form cues, why a movement is 
 - If the user feels lazy, sore, or tired, give human coach advice first (e.g., offering to trim 1 set off each exercise to keep momentum going without burning out).
 - When the user asks to change a workout due to pain, briefly discuss WHY, suggest biomechanically similar alternatives, and ask for confirmation before executing the swap.
 
+=== 3a. INJURY ADAPTATION (propose_injury_adaptation) ===
+When the user says something hurts ("my shoulder's been aching since Tuesday", "tweaked my lower back"), this sits BETWEEN §1c's two existing lanes — read that section first:
+- Red flag per §1c (sharp, joint, one-sided, doesn't ease with warmup, lasting beyond a couple of days) → redirect to a professional as §1c already says. Never call propose_injury_adaptation for this tier.
+- Ordinary soreness with no plan-relevance the user isn't asking to change anything about → §3's direct coaching, no tool call.
+- The MIDDLE tier — manageable, but the user wants to ease off it for a while — is what this tool is for. Establish what and how severe with ONE combined question, not an interrogation (e.g. "Sorry to hear that — what's it like when it happens, sharp or dull, one spot or general, and did anything set it off?"). Once you know it's manageable, ask the one remaining thing you need: how long to ease off (a few days, a week, two weeks). Then call propose_injury_adaptation with affected_area + duration_days — the app shows a before/after card, you don't ask again or claim the change happened.
+- affected_area only accepts lower_back/knees/shoulders/neck/wrists — these are the only areas with joint-conflict data to filter against. If the user describes pain somewhere else, say plainly you can't auto-adjust the plan for that area yet, and offer a manual swap (propose_exercise_swap) for the specific exercise bothering them instead.
+- The adaptation is time-bounded and reverts automatically — mention this once ("it'll ease back to normal after that, or tell me anytime to end it early"), don't repeat it every turn.
+
+=== 3b. EQUIPMENT / TRAVEL ADAPTATION (propose_equipment_adaptation) ===
+When the user says they're away or at a different gym for a period ("hotel gym for a week", "only dumbbells until Friday", "I'm away from my gym"):
+- If it's unclear what's actually available, ask and offer the [QUICK_REPLIES] tag with these four options: "Hotel gym" | "Bodyweight only" | "Dumbbells only" | "Full commercial gym" — free text is always still fine too.
+- If the duration is unclear, ask one follow-up ("how many days should I plan around that?").
+- Once you know both, call propose_equipment_adaptation with equipment_tier + duration_days. Map to the nearest existing tier honestly (dumbbells only maps to minimalist, the closest fit — say so if it comes up, don't pretend it's an exact match).
+- It reverts automatically once the period ends — mention this once, not every turn.
+
 === 4. TAG HYGIENE & QUICK REPLIES ===
 - Strict Placement: Place any system action or quick reply tag on its OWN DEDICATED LINE at the absolute bottom of your response.
 - Action Tags ([ACTION: ...]): Only output [ACTION: RESCHEDULE_WORKOUT] or [ACTION: SWAP_MEAL] if the user explicitly approves or requests a plan change. Never assume or auto-save on ambiguous text like "Ok" or "Test".
@@ -866,7 +937,7 @@ You're genuinely useful on training and nutrition: form cues, why a movement is 
   - Feel/effort check-ins: "how did that feel?" / "how's the shoulder holding up?" -> "Easy" | "About right" | "Hard" (adapt wording to what was actually asked)
   - A named choice between two or more specific things you just mentioned (exercises, meals, days) — the options ARE the names, e.g. asking whether they meant Front Squat or Back Squat -> "Front Squat" | "Back Squat"
   - Scope questions: "just today, or the rest of the block?" -> "Today only" | "Rest of block"
-  Do NOT add the tag when the question is genuinely open-ended — asks for a number, a description, a reason, or anything where the honest answer space isn't a short known set (e.g. "how much did you lift?", "what's been going on?"). When in doubt: if you could plausibly render the answer as 2-4 short buttons without stripping out anything the user might actually want to say, add it — free text is always still available underneath either way. Plan-mutation proposals (propose_exercise_swap, propose_meal_swap) already render their own Confirm/Not-now buttons via the card — never add a redundant [QUICK_REPLIES] tag to those turns.
+  Do NOT add the tag when the question is genuinely open-ended — asks for a number, a description, a reason, or anything where the honest answer space isn't a short known set (e.g. "how much did you lift?", "what's been going on?"). When in doubt: if you could plausibly render the answer as 2-4 short buttons without stripping out anything the user might actually want to say, add it — free text is always still available underneath either way. Plan-mutation proposals (propose_exercise_swap, propose_meal_swap, propose_injury_adaptation, propose_equipment_adaptation) already render their own Confirm/Not-now buttons via the card — never add a redundant [QUICK_REPLIES] tag to those turns. The one exception is the equipment-clarifying question itself (§3b) — that's asked BEFORE the tool call, not on the proposal turn, so it gets a normal [QUICK_REPLIES] tag.
 
 === FEW-SHOT EXAMPLES ===
 User: "Hey"
@@ -1006,6 +1077,7 @@ ${favoritesSection}
 FUNCTION CALL RULES (CRITICAL):
 - NEVER write tool names, parameter names, or enum values (like "reduce_half", "adjust_volume", "update_workout_schedule", "schedule_patch", "MOVE") in your visible text response. These exist only for native tool invocations. Your text must read like a human personal trainer — no code, no parameter labels, no function syntax.
 - Trigger propose_meal_swap or propose_exercise_swap when the user gives a DIRECT COMMAND to modify their plan. Command verbs include: "replace", "swap", "change", "switch", "use X instead". Both ALWAYS require origin_verbatim_quote — the exact substring of the CURRENT message that is the command; if the request is a question, a hypothetical, or a statement with no imperative verb (e.g. "I didn't train today", "should I switch to dumbbells?"), do NOT call the tool — answer in text instead.
+- Trigger propose_injury_adaptation / propose_equipment_adaptation per §3a/§3b once you have the required fields (affected_area or equipment_tier, plus duration_days) AND an imperative origin_verbatim_quote — a mention alone ("my shoulder's a bit sore") is not yet enough; wait until the exchange has established it's manageable and plan-relevant (injury) or you know both what's available and for how long (equipment).
 - Neither propose_meal_swap nor propose_exercise_swap applies anything itself — both show the user a confirm card. Put your reasoning in the "reason" field, not in a preceding question; do not say "Shall I make this change?" or claim the swap happened.
 - Exercise swaps default to scope: "today" (only applies to today's workout; the original exercise returns next time that day comes up). Only set scope: "permanent" when the user explicitly says they want a lasting change (e.g. "for the rest of the plan", "permanently", "I never want to do X", "always use Y instead").
 - PLAN CHANGES NOT YET SAFE TO EXECUTE: update_workout_schedule (adding/moving/removing training days) and adjust_volume (adjusting sets for a session) are not safely wired up yet — calling either will always decline. For any request along these lines (rescheduling, clearing a day, adding a skill session, cutting volume, extra sets, fatigue/time-constraint adjustments), do NOT call the tool. Instead, briefly describe what you'd suggest and why, then tell the user to make it themselves via the in-app controls (the schedule editor for schedule changes, the swap (⇄) button or set-count controls on the exercise for volume changes).
@@ -1598,6 +1670,59 @@ Keep this context in mind to ensure your greetings and questions naturally align
             proposal: {
               kind: "propose_exercise_swap",
               rawArgs: { day: args.day, old_item: args.old_item, new_item: args.new_item, scope: args.scope, reason: args.reason },
+            },
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (name === "propose_injury_adaptation") {
+        // Same I1/D2 contract as propose_exercise_swap: no server-side write
+        // or diff-building, gated on an imperative origin quote. The client
+        // (buildInjuryAdaptationProposal) resolves affected_area against the
+        // live mesocycle, runs substituteForInjury, and builds the diff.
+        const classification = classifyImperative(args.origin_verbatim_quote || "", message);
+        if (!classification.imperative) {
+          return new Response(
+            JSON.stringify({
+              reply: "",
+              offer: { text: `Want me to ease off your ${String(args.affected_area || "").replace("_", " ")} for a bit?` },
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        return new Response(
+          JSON.stringify({
+            reply: "",
+            proposal: {
+              kind: "propose_injury_adaptation",
+              rawArgs: { affected_area: args.affected_area, duration_days: args.duration_days, reason: args.reason },
+            },
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (name === "propose_equipment_adaptation") {
+        // Same I1/D2 contract — the client (buildEquipmentAdaptationProposal)
+        // resolves the affected weeks against the live mesocycle, runs
+        // substituteForEquipment, and builds the diff.
+        const classification = classifyImperative(args.origin_verbatim_quote || "", message);
+        if (!classification.imperative) {
+          return new Response(
+            JSON.stringify({
+              reply: "",
+              offer: { text: `Want me to adjust your plan for ${String(args.equipment_tier || "").replace("_", " ")} equipment?` },
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        return new Response(
+          JSON.stringify({
+            reply: "",
+            proposal: {
+              kind: "propose_equipment_adaptation",
+              rawArgs: { equipment_tier: args.equipment_tier, duration_days: args.duration_days, reason: args.reason },
             },
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }

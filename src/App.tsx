@@ -30,6 +30,8 @@ import { supabase } from '@/lib/supabase'
 import { saveMesocycle, saveMesocycleWeek, restoreMesocycle } from '@/lib/mesocycle-persistence'
 import { swapExerciseInMesocycle, banExerciseFromMesocycle, type SwapScope } from '@/lib/mesocycle-edit'
 import { sweepStaleForTarget } from '@/lib/pending-actions-store'
+import { checkAndRevertExpiredAdaptations } from '@/lib/plan-adaptations-store'
+import { InsightBanner } from '@/components/ui/insight-banner'
 import { getActiveFacts, getActiveGoals, getActiveContextFacts, createFact, type UserFactRow, type UserGoalRow, type UserContextFactRow } from '@/lib/memory-store'
 import { compileExerciseExclusions, compileFoodDislikes, compileTimingRules, resolveFoodTarget } from '@/lib/fact-compiler'
 import { getAllItems as getAllGroceryItems, type GroceryItemRow } from '@/lib/grocery-store'
@@ -51,6 +53,10 @@ function App() {
   const [latestWeightKg, setLatestWeightKg] = useState<number | null>(null)
   const [exercisePlan, setExercisePlan] = useState<WorkoutDay[]>([])
   const [mesocycle, setMesocycle] = useState<MesocycleWeek[]>([])
+  // Client-authored messages from an auto-reverted injury/equipment
+  // adaptation (checkAndRevertExpiredAdaptations) — never model prose,
+  // same convention as every other receipt in this app. Dismissible.
+  const [adaptationMessages, setAdaptationMessages] = useState<string[]>([])
   /** When the CURRENT mesocycle was generated — anchors live-week detection (falls back to profile.created_at for legacy profiles without persisted weeks). */
   const [mesocycleCreatedAt, setMesocycleCreatedAt] = useState<string | null>(null)
   // Meal pools (M1): every generated option per slot, keyed by slot — the
@@ -349,6 +355,23 @@ function App() {
     setExercisePlan(restoredExercises)
     setMesocycle(restoredMesocycle)
     setIsRestoring(false)
+
+    // Lazy check-on-load sweep (no scheduled-job infra exists in this
+    // codebase) — silently restores any injury/equipment adaptation whose
+    // stated period has passed, surfacing only a client-authored message,
+    // never a model-narrated one.
+    if (restoredProfile.id) {
+      checkAndRevertExpiredAdaptations(restoredProfile.id).then(result => {
+        if (result.mesocycle) {
+          setMesocycle(prev => {
+            const byWeek = new Map(prev.map(w => [w.week_number, w]))
+            for (const w of result.mesocycle!) byWeek.set(w.week_number, w)
+            return [...byWeek.values()].sort((a, b) => a.week_number - b.week_number)
+          })
+        }
+        if (result.messages.length > 0) setAdaptationMessages(prev => [...prev, ...result.messages])
+      }).catch(console.error)
+    }
     if (restoredProfile.id) { void reloadMemory(restoredProfile.id); void reloadGrocery(restoredProfile.id) }
 
     // Version today's targets when they differ from the last snapshot —
@@ -1017,6 +1040,23 @@ function App() {
       </div>
 
       <main className="max-w-6xl mx-auto px-4 pt-12 pb-28 space-y-6">
+        {adaptationMessages.length > 0 && (
+          <div className="space-y-2">
+            {adaptationMessages.map((msg, i) => (
+              <InsightBanner key={i} tone="ai" className="items-start justify-between">
+                <span>{msg}</span>
+                <button
+                  type="button"
+                  onClick={() => setAdaptationMessages(prev => prev.filter((_, idx) => idx !== i))}
+                  className="shrink-0 text-xs underline opacity-70 hover:opacity-100"
+                  aria-label="Dismiss"
+                >
+                  Dismiss
+                </button>
+              </InsightBanner>
+            ))}
+          </div>
+        )}
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
           <TabsContent value="dashboard">
             <Dashboard

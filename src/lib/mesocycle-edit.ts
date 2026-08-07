@@ -87,7 +87,7 @@ export async function recomputeLoad(
 }
 
 /** Rebuilds an Exercise slot around a NEW movement — every load/tier/pattern field recomputed, programming (sets/reps/rest) carried over from the slot being replaced. */
-function applyReplacement(slot: Exercise, entry: ExerciseEntry, load: LoadPrescription): Exercise {
+export function applyReplacement(slot: Exercise, entry: ExerciseEntry, load: LoadPrescription): Exercise {
   return {
     ...slot,
     id: entry.id,
@@ -105,7 +105,7 @@ function applyReplacement(slot: Exercise, entry: ExerciseEntry, load: LoadPrescr
 }
 
 /** A superset pair with one side removed/changed is no longer a pair — clears the label on whichever side is now alone rather than leaving it pointing at a partner that no longer matches. */
-function clearOrphanedSupersetLabels(exercises: Exercise[]): Exercise[] {
+export function clearOrphanedSupersetLabels(exercises: Exercise[]): Exercise[] {
   const letterCounts = new Map<string, number>()
   for (const ex of exercises) {
     if (!ex.superset_label) continue
@@ -120,7 +120,7 @@ function clearOrphanedSupersetLabels(exercises: Exercise[]): Exercise[] {
   })
 }
 
-function isMainLiftSlot(ex: Exercise | undefined): boolean {
+export function isMainLiftSlot(ex: Exercise | undefined): boolean {
   return ex?.tier === 'tier_1_primary'
 }
 

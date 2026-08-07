@@ -12,11 +12,12 @@
 // guard against double-execution, that's the claim's job.
 // ---------------------------------------------------------------------------
 
-import type { MesocycleWeek, UserProfile } from './types'
+import type { MesocycleWeek, UserProfile, EquipmentAccess } from './types'
 import { swapExerciseInMesocycle, type SwapScope } from './mesocycle-edit'
 import { saveMesocycle, saveMesocycleWeek } from './mesocycle-persistence'
 import { getExerciseEntry } from './exercise-db'
 import { swapPoolMeal, type MealSlotName } from './meal-store'
+import { substituteForInjury, substituteForEquipment } from './plan-adaptations'
 import type { PendingActionReceipt } from './pending-actions-store'
 
 export interface ExerciseSwapPayload {
@@ -139,5 +140,94 @@ export async function executeMealSwap(profileId: string, payload: MealSwapPayloa
     appliedName: applied.name,
     appliedMacros: applied.macros,
     receipt: { landed: [`${payload.slot}: → ${applied.name}`], failed: [] },
+  }
+}
+
+export interface InjuryAdaptationPayload {
+  injuryCode: string
+  durationDays: number
+  weekNumbers: number[]
+  exclusions: string[]
+  reason?: string
+}
+
+export interface EquipmentAdaptationPayload {
+  equipmentTier: EquipmentAccess
+  durationDays: number
+  weekNumbers: number[]
+  exclusions: string[]
+  reason?: string
+}
+
+export interface AdaptationResult {
+  mesocycle: MesocycleWeek[]
+  preImage: MesocycleWeek[]
+  receipt: PendingActionReceipt
+}
+
+/**
+ * Re-runs substituteForInjury at confirm time (the diff shown pre-confirm
+ * could be stale if the plan changed between propose and confirm — same
+ * "recomputed when applied" reasoning executeExerciseSwap already follows)
+ * and persists every touched week via saveMesocycleWeek. Does NOT create
+ * the plan_adaptations row itself — that's the caller's job (ChatAssistant),
+ * since it needs the pending_actions row id this function has no access to.
+ */
+export async function executeInjuryAdaptation(
+  profile: UserProfile,
+  mesocycle: MesocycleWeek[],
+  payload: InjuryAdaptationPayload,
+): Promise<AdaptationResult> {
+  const preImage = mesocycle
+  const result = await substituteForInjury({
+    mesocycle, profile, injuryCode: payload.injuryCode, weekNumbers: payload.weekNumbers, exclusions: payload.exclusions,
+  })
+
+  if (!profile.id) {
+    return { mesocycle: result.mesocycle, preImage, receipt: { landed: [], failed: [{ op: 'save', error: 'No profile to save against' }] } }
+  }
+
+  try {
+    const touchedWeeks = result.mesocycle.filter(w => payload.weekNumbers.includes(w.week_number))
+    await Promise.all(touchedWeeks.map(w => saveMesocycleWeek(profile.id!, w)))
+  } catch (err) {
+    console.error('executeInjuryAdaptation: persisting failed', err)
+    return { mesocycle: result.mesocycle, preImage, receipt: { landed: [], failed: [{ op: 'save', error: 'The adaptation could not be saved — try again' }] } }
+  }
+
+  return {
+    mesocycle: result.mesocycle,
+    preImage,
+    receipt: { landed: result.touchedSlots.map(s => `${s.dayName}: ${s.before} → ${s.after ?? '(removed)'}`), failed: [] },
+  }
+}
+
+/** Mirrors executeInjuryAdaptation exactly, for the equipment/travel adaptation. */
+export async function executeEquipmentAdaptation(
+  profile: UserProfile,
+  mesocycle: MesocycleWeek[],
+  payload: EquipmentAdaptationPayload,
+): Promise<AdaptationResult> {
+  const preImage = mesocycle
+  const result = await substituteForEquipment({
+    mesocycle, profile, equipmentTier: payload.equipmentTier, weekNumbers: payload.weekNumbers, exclusions: payload.exclusions,
+  })
+
+  if (!profile.id) {
+    return { mesocycle: result.mesocycle, preImage, receipt: { landed: [], failed: [{ op: 'save', error: 'No profile to save against' }] } }
+  }
+
+  try {
+    const touchedWeeks = result.mesocycle.filter(w => payload.weekNumbers.includes(w.week_number))
+    await Promise.all(touchedWeeks.map(w => saveMesocycleWeek(profile.id!, w)))
+  } catch (err) {
+    console.error('executeEquipmentAdaptation: persisting failed', err)
+    return { mesocycle: result.mesocycle, preImage, receipt: { landed: [], failed: [{ op: 'save', error: 'The adaptation could not be saved — try again' }] } }
+  }
+
+  return {
+    mesocycle: result.mesocycle,
+    preImage,
+    receipt: { landed: result.touchedSlots.map(s => `${s.dayName}: ${s.before} → ${s.after ?? '(removed)'}`), failed: [] },
   }
 }

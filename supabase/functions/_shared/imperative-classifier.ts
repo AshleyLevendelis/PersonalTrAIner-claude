@@ -18,6 +18,7 @@ export const IMPERATIVE_VERBS = [
   'swap', 'replace', 'change', 'switch', 'move', 'cut', 'remove', 'add',
   'ban', 'avoid', 'set', 'adjust', 'reduce', 'increase', 'log', 'record',
   'hate', 'dislike', 'love', 'prefer', 'want', 'need', 'exclude',
+  'ease', 'rest',
 ];
 
 const INTERROGATIVE_LEAD_RE = /^\s*(what|why|how|when|where|which|who|can|could|should|would|is|are|do|does|did)\b/i;

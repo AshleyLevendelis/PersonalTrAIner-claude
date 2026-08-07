@@ -361,6 +361,28 @@ const INJURED_JOINTS: Record<string, string[]> = {
   wrists: ['wrist'],
 }
 
+/**
+ * Single source of truth for injury-code -> flagged-joint mapping, exported
+ * so callers outside this module (the injury-adaptation feature,
+ * dev-constraint-audit.ts) read the real map instead of hand-duplicating it.
+ * Only 5 of the 8 INJURY_OPTIONS codes are mapped — hips/ankles/elbows are
+ * collected at onboarding but currently have no joint tag to filter on.
+ */
+export function getFlaggedJoints(injuries: string[]): Set<string> {
+  const joints = new Set<string>()
+  for (const injury of injuries) {
+    for (const joint of INJURED_JOINTS[injury] ?? []) joints.add(joint)
+  }
+  return joints
+}
+
+/** True when an exercise's declared equipment is fully covered by the given tier's allowed set (full_gym = everything allowed). */
+export function isEquipmentAllowed(entry: ExerciseEntry, tier: EquipmentAccess): boolean {
+  const allowed = EQUIPMENT_SETS[tier]
+  if (!allowed) return true
+  return entry.equipment.every(eq => allowed.has(eq))
+}
+
 // ---------------------------------------------------------------------------
 // Utility functions
 // ---------------------------------------------------------------------------
