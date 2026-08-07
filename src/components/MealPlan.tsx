@@ -1,18 +1,9 @@
 import { useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Progress } from '@/components/ui/progress'
-import { Separator } from '@/components/ui/separator'
 import {
   UtensilsCrossed,
   RefreshCw,
   Loader2,
-  Flame,
-  Beef,
-  Wheat,
-  Droplets,
-  ChefHat,
 } from 'lucide-react'
 import type { MacroTargets } from '@/lib/types'
 import type { MealSlotName } from '@/lib/meal-store'
@@ -40,101 +31,94 @@ interface MealPlanProps {
   onRegenerateAll: () => Promise<void>
 }
 
+/**
+ * Turn 7 ("Meals — same structure as the workout day", Density Pass) —
+ * applies turn 5's exercise-day system here: no per-meal cards, slot names
+ * as section labels, one hero number (today's planned calories), macros as
+ * a quiet tabular-mono row, and the per-meal chrome (badges, macro grids,
+ * "view ingredients" toggle) cut. Swap and ingredients only render on the
+ * one meal the user has open — everything else is a single collapsed line,
+ * mirroring ExerciseRow's collapsed/expanded contract.
+ */
 export function MealPlan({ pools, chosen, totals, targets, isGenerating, onSwapSlot, onRegenerateSlot, onRegenerateAll }: MealPlanProps) {
   const activeSlots = SLOT_ORDER.filter(s => (pools[s]?.length ?? 0) > 0)
+  const [expandedSlot, setExpandedSlot] = useState<MealSlotName | null>(null)
 
   if (activeSlots.length === 0) {
     return (
-      <Card className="border-border/50 bg-card">
-        <CardContent className="flex flex-col items-center justify-center py-16 gap-3">
-          <UtensilsCrossed className="size-8 text-muted-foreground/50" />
-          <p className="text-sm text-muted-foreground">No meal plan generated yet.</p>
-          <p className="text-xs text-muted-foreground/70">Complete onboarding to generate your meal pools, or regenerate below.</p>
-          <Button size="sm" onClick={onRegenerateAll} disabled={isGenerating} className="mt-2">
-            {isGenerating ? <Loader2 className="size-3.5 animate-spin mr-1.5" /> : <RefreshCw className="size-3.5 mr-1.5" />}
-            Generate meals
-          </Button>
-        </CardContent>
-      </Card>
+      <div className="flex flex-col items-center justify-center gap-3 py-16">
+        <UtensilsCrossed className="size-8 text-muted-foreground/50" />
+        <p className="text-sm text-muted-foreground">No meal plan generated yet.</p>
+        <p className="text-xs text-muted-foreground/70">Complete onboarding to generate your meal pools, or regenerate below.</p>
+        <Button size="sm" onClick={onRegenerateAll} disabled={isGenerating} className="mt-2">
+          {isGenerating ? <Loader2 className="size-3.5 animate-spin mr-1.5" /> : <RefreshCw className="size-3.5 mr-1.5" />}
+          Generate meals
+        </Button>
+      </div>
     )
   }
 
   return (
-    <Card className="border-border/50 bg-card overflow-hidden">
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-base font-semibold">
-            <ChefHat className="size-4 text-primary" />
-            Today's Meals
-          </CardTitle>
-          <Button variant="outline" size="sm" onClick={onRegenerateAll} disabled={isGenerating}>
-            {isGenerating ? <Loader2 className="size-3.5 animate-spin mr-1.5" /> : <RefreshCw className="size-3.5 mr-1.5" />}
-            Regenerate all
-          </Button>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {targets && <TotalsBar totals={totals} targets={targets} />}
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <span className="ds-label">Today's meals</span>
+        <button
+          type="button"
+          onClick={onRegenerateAll}
+          disabled={isGenerating}
+          className="flex items-center gap-1.5 text-xs font-semibold text-primary disabled:opacity-50"
+        >
+          {isGenerating ? <Loader2 className="size-3 animate-spin" /> : <RefreshCw className="size-3" />}
+          Regenerate all
+        </button>
+      </div>
 
-        <Separator />
+      {targets && <TotalsHero totals={totals} targets={targets} />}
 
-        <div className="space-y-2">
-          {activeSlots.map(slot => (
-            <MealSlotCard
-              key={slot}
-              slot={slot}
-              option={chosen[slot] ?? null}
-              alternatives={pools[slot] ?? []}
-              onSwap={onSwapSlot}
-              onRegenerate={onRegenerateSlot}
-            />
-          ))}
-        </div>
-      </CardContent>
-    </Card>
+      <div>
+        {activeSlots.map((slot, idx) => (
+          <MealSlotRow
+            key={slot}
+            slot={slot}
+            isFirst={idx === 0}
+            option={chosen[slot] ?? null}
+            alternatives={pools[slot] ?? []}
+            expanded={expandedSlot === slot}
+            onToggle={() => setExpandedSlot(prev => (prev === slot ? null : slot))}
+            onSwap={onSwapSlot}
+            onRegenerate={onRegenerateSlot}
+          />
+        ))}
+      </div>
+    </div>
   )
 }
 
-/**
- * Running totals vs targets. Calories and protein are the non-negotiables —
- * given the large bar and the top row; carbs/fat are secondary, smaller text
- * underneath.
- */
-function TotalsBar({ totals, targets }: { totals: MacroTargets; targets: MacroTargets }) {
-  const calPct = targets.calories > 0 ? Math.min(150, (totals.calories / targets.calories) * 100) : 0
-  const proPct = targets.protein > 0 ? Math.min(150, (totals.protein / targets.protein) * 100) : 0
+/** One hero number (today's planned calories) + a 2px progress line + a quiet tabular-mono macro row — replaces the old dual progress-bar TotalsBar. */
+function TotalsHero({ totals, targets }: { totals: MacroTargets; targets: MacroTargets }) {
+  const calPct = targets.calories > 0 ? Math.min(100, (totals.calories / targets.calories) * 100) : 0
+  const calDelta = Math.round(totals.calories - targets.calories)
+  const deltaLabel = Math.abs(calDelta) < 30 ? 'on the number' : calDelta > 0 ? `${calDelta} over` : `${Math.abs(calDelta)} under`
+  const proteinAchieved = targets.protein > 0 && totals.protein >= targets.protein
 
   return (
-    <div className="space-y-3">
-      <div className="space-y-1.5">
-        <div className="flex items-center justify-between text-sm">
-          <span className="flex items-center gap-1.5 ds-label">
-            <Flame className="size-3.5 text-[color:var(--role-warn)]" />
-            Calories
-          </span>
-          <span className="ds-num-lg">{Math.round(totals.calories)}<span className="text-sm text-muted-foreground font-medium"> / {targets.calories} kcal</span></span>
+    <div>
+      <div className="flex items-end gap-3">
+        <span className="tabular-mono ds-num-mega glow-mint-lg">{Math.round(totals.calories)}</span>
+        <div className="flex flex-col gap-0.5 pb-1.5">
+          <span className="text-sm text-foreground">kcal planned</span>
+          <span className="ds-label-compact">target {targets.calories} · {deltaLabel}</span>
         </div>
-        <Progress value={calPct} className="h-2" />
       </div>
-      <div className="space-y-1.5">
-        <div className="flex items-center justify-between text-sm">
-          <span className="flex items-center gap-1.5 ds-label">
-            <Beef className="size-3.5 text-[color:var(--chart-2)]" />
-            Protein
-          </span>
-          <span className="ds-num-lg">{Math.round(totals.protein)}<span className="text-sm text-muted-foreground font-medium"> / {targets.protein}g</span></span>
-        </div>
-        <Progress value={proPct} className="h-2" />
+      <div className="mt-3 h-[2px] rounded-full" style={{ background: 'var(--hairline)' }}>
+        <div className="h-[2px] rounded-full bg-primary glow-mint-box" style={{ width: `${calPct}%` }} />
       </div>
-      <div className="flex items-center gap-4 text-xs text-muted-foreground">
-        <span className="flex items-center gap-1">
-          <Wheat className="size-3" />
-          {Math.round(totals.carbs)}g / {targets.carbs}g carbs
+      <div className="mt-3 flex items-baseline gap-4 tabular-mono text-xs">
+        <span className={proteinAchieved ? 'text-primary glow-mint' : 'text-muted-foreground'}>
+          {Math.round(totals.protein)} / {targets.protein} P
         </span>
-        <span className="flex items-center gap-1">
-          <Droplets className="size-3" />
-          {Math.round(totals.fat)}g / {targets.fat}g fat
-        </span>
+        <span className="text-muted-foreground">{Math.round(totals.carbs)} / {targets.carbs} C</span>
+        <span className="text-muted-foreground">{Math.round(totals.fat)} / {targets.fat} F</span>
       </div>
     </div>
   )
@@ -145,30 +129,32 @@ function formatIngredient(ing: { name: string; quantity: number; unit: string })
   return `${qty}${ing.unit === 'g' || ing.unit === 'ml' ? ing.unit : ` ${ing.unit}`} ${ing.name}`
 }
 
-function MealSlotCard({
+function MealSlotRow({
   slot,
+  isFirst,
   option,
   alternatives,
+  expanded,
+  onToggle,
   onSwap,
   onRegenerate,
 }: {
   slot: MealSlotName
+  isFirst: boolean
   option: PoolOption | null
   alternatives: PoolOption[]
+  expanded: boolean
+  onToggle: () => void
   onSwap: (slot: MealSlotName, chooseName: string) => Promise<void>
   onRegenerate: (slot: MealSlotName) => Promise<void>
 }) {
-  const [expanded, setExpanded] = useState(false)
-  const [swapOpen, setSwapOpen] = useState(false)
   const [busy, setBusy] = useState(false)
-
   const otherOptions = alternatives.filter(o => o.name !== option?.name)
 
   const handleChoose = async (name: string) => {
     setBusy(true)
     try {
       await onSwap(slot, name)
-      setSwapOpen(false)
     } finally {
       setBusy(false)
     }
@@ -183,106 +169,99 @@ function MealSlotCard({
     }
   }
 
-  if (!option) {
-    return (
-      <div className="rounded-lg border border-dashed border-border/50 p-3 flex items-center justify-between">
-        <span className="text-sm text-muted-foreground">{SLOT_LABEL[slot]} — no option generated</span>
-        <Button variant="ghost" size="sm" onClick={handleRegenerate} disabled={busy}>
+  return (
+    <div className="py-4" style={!isFirst ? { borderTop: '1px solid var(--hairline)' } : undefined}>
+      <button type="button" onClick={onToggle} disabled={!option} className="flex w-full flex-col gap-1.5 text-left disabled:cursor-default">
+        <span className={expanded ? 'ds-label-compact text-primary glow-mint' : 'ds-label-compact'}>
+          {SLOT_LABEL[slot]}{expanded ? ' · open' : ''}
+        </span>
+        <div className="flex items-baseline justify-between gap-3">
+          {option ? (
+            <>
+              <span className={expanded ? 'min-w-0 truncate text-[19px] font-semibold tracking-[-.02em]' : 'min-w-0 truncate text-[16.5px] font-medium'}>
+                {option.name}
+              </span>
+              {!expanded && (
+                <span className="tabular-mono shrink-0 text-xs text-muted-foreground">{Math.round(option.macros.calories)} kcal</span>
+              )}
+            </>
+          ) : (
+            <span className="text-sm text-muted-foreground">No option generated</span>
+          )}
+        </div>
+      </button>
+
+      {!option && (
+        <Button variant="ghost" size="sm" onClick={handleRegenerate} disabled={busy} className="mt-2 h-7 px-2 text-xs">
           {busy ? <Loader2 className="size-3.5 animate-spin" /> : 'Generate'}
         </Button>
-      </div>
-    )
-  }
+      )}
 
-  return (
-    <div className="rounded-lg border border-border/50 bg-muted/20 p-3 space-y-2">
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <Badge variant="outline" className="text-[10px] shrink-0 bg-accent/50">
-              {SLOT_LABEL[slot]}
-            </Badge>
-            <span className="text-sm font-medium truncate">{option.name}</span>
+      {expanded && option && (
+        <div className="mt-4 flex flex-col gap-4">
+          <div className="flex items-end gap-3">
+            <span className="tabular-mono ds-num-lg">{Math.round(option.macros.calories)}</span>
+            <div className="flex flex-col gap-0.5 pb-0.5">
+              <span className="text-xs text-foreground">kcal</span>
+              <span className="tabular-mono ds-label-compact">
+                {Math.round(option.macros.protein)} P · {Math.round(option.macros.carbs)} C · {Math.round(option.macros.fat)} F
+              </span>
+            </div>
           </div>
-          <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
-            <span>{Math.round(option.macros.calories)} kcal</span>
-            <span>P: {Math.round(option.macros.protein)}g</span>
-            <span>C: {Math.round(option.macros.carbs)}g</span>
-            <span>F: {Math.round(option.macros.fat)}g</span>
-          </div>
-        </div>
-        <div className="flex items-center gap-1 shrink-0">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-7"
-            onClick={handleRegenerate}
-            disabled={busy}
-            title="Regenerate this slot's pool"
-          >
-            {busy ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 text-xs px-2"
-            onClick={() => setSwapOpen(s => !s)}
-            disabled={busy || otherOptions.length === 0}
-            title={otherOptions.length === 0 ? 'No other options in this pool yet' : 'Swap for another pool option'}
-          >
-            Swap ({otherOptions.length})
-          </Button>
-        </div>
-      </div>
 
-      {option.ingredients.length > 0 && (
-        <>
-          <button
-            onClick={() => setExpanded(!expanded)}
-            className="text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-          >
-            {expanded ? 'Hide ingredients' : `View ${option.ingredients.length} ingredients`}
-          </button>
-          {expanded && (
-            <ul className="text-xs text-muted-foreground space-y-0.5 pl-3 border-l-2 border-border/50">
-              {option.ingredients.map((ing, i) => (
-                <li key={i}>{formatIngredient(ing)}</li>
-              ))}
-            </ul>
+          {option.ingredients.length > 0 && (
+            <div className="flex flex-col gap-2">
+              <span className="ds-label-compact">{option.ingredients.length} ingredients</span>
+              <div className="flex flex-col gap-1.5">
+                {option.ingredients.map((ing, i) => (
+                  <span key={i} className="tabular-mono text-xs text-[color:var(--text-tertiary)]">{formatIngredient(ing)}</span>
+                ))}
+              </div>
+            </div>
           )}
-        </>
-      )}
 
-      {option.tags.length > 0 && (
-        <div className="flex flex-wrap gap-1">
-          {option.tags.map(t => (
-            <Badge key={t} variant="secondary" className="text-[9px] px-1.5 py-0">{t}</Badge>
-          ))}
-        </div>
-      )}
+          {option.tags.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {option.tags.map(t => (
+                <span key={t} className="rounded-full bg-[color:var(--surface-raised)] px-2 py-0.5 text-[10px] text-muted-foreground">{t}</span>
+              ))}
+            </div>
+          )}
 
-      {swapOpen && otherOptions.length > 0 && (
-        <div className="rounded-md border border-border/50 divide-y divide-border/50 mt-1">
-          {otherOptions.map(alt => {
-            const calDelta = Math.round(alt.macros.calories - option.macros.calories)
-            const proteinDelta = Math.round(alt.macros.protein - option.macros.protein)
-            return (
-              <button
-                key={alt.name}
-                onClick={() => handleChoose(alt.name)}
-                disabled={busy}
-                className="w-full text-left px-2.5 py-2 hover:bg-muted/50 transition-colors flex items-center justify-between gap-2"
-              >
-                <div className="min-w-0">
-                  <p className="text-xs font-medium truncate">{alt.name}</p>
-                  <p className="text-[10px] text-muted-foreground">{Math.round(alt.macros.calories)} kcal · P {Math.round(alt.macros.protein)}g</p>
-                </div>
-                <span className={`text-[10px] font-mono shrink-0 ${Math.abs(calDelta) < 20 ? 'text-muted-foreground' : calDelta > 0 ? 'text-[color:var(--role-warn)]' : 'text-primary'}`}>
-                  {calDelta > 0 ? '+' : ''}{calDelta} kcal, {proteinDelta > 0 ? '+' : ''}{proteinDelta}g P
-                </span>
-              </button>
-            )
-          })}
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" onClick={handleRegenerate} disabled={busy} className="h-8 px-2.5 text-xs" title="Regenerate this slot's pool">
+              {busy ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
+            </Button>
+            {otherOptions.length > 0 && (
+              <span className="text-xs text-muted-foreground">Swap · {otherOptions.length} option{otherOptions.length === 1 ? '' : 's'}</span>
+            )}
+          </div>
+
+          {otherOptions.length > 0 && (
+            <div className="flex flex-col gap-1">
+              {otherOptions.map(alt => {
+                const calDelta = Math.round(alt.macros.calories - option.macros.calories)
+                const proteinDelta = Math.round(alt.macros.protein - option.macros.protein)
+                return (
+                  <button
+                    key={alt.name}
+                    type="button"
+                    onClick={() => handleChoose(alt.name)}
+                    disabled={busy}
+                    className="flex items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-[color:var(--surface-raised)]"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-xs font-medium">{alt.name}</p>
+                      <p className="tabular-mono text-[10.5px] text-muted-foreground">{Math.round(alt.macros.calories)} kcal · P {Math.round(alt.macros.protein)}g</p>
+                    </div>
+                    <span className={`tabular-mono shrink-0 text-[10.5px] ${Math.abs(calDelta) < 20 ? 'text-muted-foreground' : calDelta > 0 ? 'text-[color:var(--role-warn)]' : 'text-primary'}`}>
+                      {calDelta > 0 ? '+' : ''}{calDelta} kcal, {proteinDelta > 0 ? '+' : ''}{proteinDelta}g P
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          )}
         </div>
       )}
     </div>

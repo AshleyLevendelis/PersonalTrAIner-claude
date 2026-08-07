@@ -3,7 +3,7 @@ import ReactMarkdown from 'react-markdown'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import { Send, CheckCircle2, ArrowDown, RotateCcw, AlertCircle, Trash2, Mic } from 'lucide-react'
+import { Send, CheckCircle2, ArrowDown, RotateCcw, AlertCircle, Trash2, Mic, MessageCircle } from 'lucide-react'
 import { generateChatResponse } from '@/lib/chat-assistant'
 import { calculateCalories, getActiveMesocycleWeek } from '@/lib/calculations'
 import { computeBMR, computeStaticTDEE } from '@/lib/macro-calculator'
@@ -1998,59 +1998,76 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
               // that id in the first place, so they're never held back.
               const stillRevealing = isLastAssistant && msg.id != null && msg.id === animatingMessageId
               const quickReplies = isLastAssistant && !stillRevealing ? getQuickRepliesForLastMessage() : []
+              // Turn 6 ("Coach chat — borders out, input fixed"): the
+              // assistant no longer speaks from a bordered/tinted bubble —
+              // it's plain text on the canvas, identified by a small mint
+              // avatar mark instead. Only the user's own messages get a
+              // fill now (a tinted pill with a tail corner), matching the
+              // design doc's own bubble shape. Everything below the bubble
+              // (proposal/receipt/clarification/quick-replies) still
+              // belongs to this turn, so it gets the same left offset as
+              // the avatar column for assistant turns, keeping it aligned
+              // under the text rather than the avatar.
+              const bodyContent = msg.role === 'user' ? (
+                stripStreamingTags(msg.content)
+              ) : isInterrupted(msg) && !msg.content ? (
+                /* Pending placeholder — show loading dots */
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <div className="flex gap-1">
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce" />
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:150ms]" />
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:300ms]" />
+                  </div>
+                  {isRecalibrating ? (
+                    <span className="text-xs">Recalibrating your schedule...</span>
+                  ) : (
+                    <span className="text-xs">Thinking...</span>
+                  )}
+                </div>
+              ) : isInterrupted(msg) && msg.content ? (
+                /* Interrupted/failed with content — show content + retry */
+                <div>
+                  <ReactMarkdown components={markdownComponents}>
+                    {stripStreamingTags(msg.content)}
+                  </ReactMarkdown>
+                  <button
+                    className="mt-2 flex items-center gap-1.5 text-xs text-[color:var(--role-warn)] hover:underline"
+                    onClick={() => retryMessage(i)}
+                    disabled={isLoading}
+                  >
+                    {msg.status === 'failed' ? <AlertCircle className="size-3" /> : <RotateCcw className="size-3" />}
+                    {msg.status === 'failed' ? 'Response failed — tap to retry' : 'Response interrupted — tap to retry'}
+                  </button>
+                </div>
+              ) : (
+                <TypewriterMarkdown
+                  text={stripStreamingTags(msg.content)}
+                  active={msg.id != null && msg.id === animatingMessageId}
+                  components={markdownComponents}
+                  onDone={() => setAnimatingMessageId(prev => (prev === msg.id ? null : prev))}
+                />
+              )
               return (
                 <div
                   key={msg.id || `msg-${i}`}
                   className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
                   <div className="max-w-[80%]">
-                    <div
-                      className={`rounded-2xl px-4 py-2.5 text-sm ${
-                        msg.role === 'user'
-                          ? 'bg-secondary text-secondary-foreground whitespace-pre-wrap'
-                          : 'border border-[color:var(--role-ai-border)] bg-[color:var(--role-ai-bg)] text-[color:var(--role-ai-text)]'
-                      }`}
-                    >
-                      {msg.role === 'user' ? (
-                        stripStreamingTags(msg.content)
-                      ) : isInterrupted(msg) && !msg.content ? (
-                        /* Pending placeholder — show loading dots */
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                          <div className="flex gap-1">
-                            <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce" />
-                            <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:150ms]" />
-                            <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:300ms]" />
-                          </div>
-                          {isRecalibrating ? (
-                            <span className="text-xs">Recalibrating your schedule...</span>
-                          ) : (
-                            <span className="text-xs">Thinking...</span>
-                          )}
+                    {msg.role === 'user' ? (
+                      <div className="rounded-2xl rounded-br-md bg-[rgba(91,233,194,.14)] px-4 py-2.5 text-sm whitespace-pre-wrap text-foreground">
+                        {bodyContent}
+                      </div>
+                    ) : (
+                      <div className="flex items-start gap-2.5">
+                        <span className="flex size-[26px] shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-[#7CF3D4] to-[#3ED3AA] shadow-[0_0_18px_rgba(91,233,194,.45)]">
+                          <MessageCircle className="size-3.5 text-[#08281F]" strokeWidth={2.4} />
+                        </span>
+                        <div className="min-w-0 flex-1 pt-0.5 text-sm leading-relaxed text-foreground">
+                          {bodyContent}
                         </div>
-                      ) : isInterrupted(msg) && msg.content ? (
-                        /* Interrupted/failed with content — show content + retry */
-                        <div>
-                          <ReactMarkdown components={markdownComponents}>
-                            {stripStreamingTags(msg.content)}
-                          </ReactMarkdown>
-                          <button
-                            className="mt-2 flex items-center gap-1.5 text-xs text-[color:var(--role-warn)] hover:underline"
-                            onClick={() => retryMessage(i)}
-                            disabled={isLoading}
-                          >
-                            {msg.status === 'failed' ? <AlertCircle className="size-3" /> : <RotateCcw className="size-3" />}
-                            {msg.status === 'failed' ? 'Response failed — tap to retry' : 'Response interrupted — tap to retry'}
-                          </button>
-                        </div>
-                      ) : (
-                        <TypewriterMarkdown
-                          text={stripStreamingTags(msg.content)}
-                          active={msg.id != null && msg.id === animatingMessageId}
-                          components={markdownComponents}
-                          onDone={() => setAnimatingMessageId(prev => (prev === msg.id ? null : prev))}
-                        />
-                      )}
-                    </div>
+                      </div>
+                    )}
+                    <div className={msg.role === 'assistant' ? 'pl-9' : undefined}>
                     {msg.pendingAction && msg.status !== 'failed' && (
                       <ProposalCard
                         pendingAction={msg.pendingAction}
@@ -2112,6 +2129,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
                         ))}
                       </div>
                     )}
+                    </div>
                   </div>
                 </div>
               )
@@ -2149,14 +2167,17 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
             </button>
           </div>
         )}
-        <div className="p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-          <div className="flex gap-2">
+        {/* Turn 6: composer as a fixed-height pill (not three separate
+            bordered controls) — room for two lines before it grows past
+            that, a visible mint send target, sticky above the safe area. */}
+        <div className="sticky bottom-0 bg-gradient-to-t from-[color:var(--background)] from-60% to-transparent p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          <div className="flex items-end gap-2.5 rounded-[20px] bg-[color:var(--surface-raised)] py-1.5 pl-4 pr-1.5">
             <Textarea
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder={speech.isListening ? 'Listening…' : 'Ask about your plan or request changes...'}
-              className="min-h-[40px] max-h-[100px] resize-none"
+              className="min-h-[40px] max-h-[88px] flex-1 resize-none border-0 bg-transparent px-0 py-2 shadow-none focus-visible:ring-0"
               rows={1}
             />
             {speech.isSupported && (
@@ -2184,12 +2205,12 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
                 onPointerLeave={() => { if (micLongPressTimerRef.current) window.clearTimeout(micLongPressTimerRef.current) }}
                 aria-label={speech.isListening ? 'Stop voice input' : 'Start voice input'}
                 title={speech.isListening ? 'Stop voice input' : 'Start voice input (hold to toggle debug trace)'}
-                className={cn('shrink-0 self-end', speech.isListening && 'animate-pulse')}
+                className={cn('shrink-0 rounded-full', speech.isListening && 'animate-pulse')}
               >
                 <Mic className="size-4" />
               </Button>
             )}
-            <Button data-chat-send onClick={sendMessage} disabled={!input.trim() || isLoading} size="icon" className="shrink-0 self-end">
+            <Button data-chat-send onClick={sendMessage} disabled={!input.trim() || isLoading} size="icon" className="shrink-0 rounded-full glow-mint-box">
               <Send className="size-4" />
             </Button>
           </div>
