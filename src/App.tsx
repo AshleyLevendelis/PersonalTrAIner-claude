@@ -31,6 +31,7 @@ import { saveMesocycle, saveMesocycleWeek, restoreMesocycle } from '@/lib/mesocy
 import { swapExerciseInMesocycle, banExerciseFromMesocycle, type SwapScope } from '@/lib/mesocycle-edit'
 import { sweepStaleForTarget } from '@/lib/pending-actions-store'
 import { checkAndRevertExpiredAdaptations } from '@/lib/plan-adaptations-store'
+import { getRevealSpeed, saveRevealSpeed, DEFAULT_REVEAL_SPEED, type RevealSpeed } from '@/lib/reveal-speed-store'
 import { InsightBanner } from '@/components/ui/insight-banner'
 import { getActiveFacts, getActiveGoals, getActiveContextFacts, createFact, type UserFactRow, type UserGoalRow, type UserContextFactRow } from '@/lib/memory-store'
 import { compileExerciseExclusions, compileFoodDislikes, compileTimingRules, resolveFoodTarget } from '@/lib/fact-compiler'
@@ -103,6 +104,15 @@ function App() {
   const [memoryContextFacts, setMemoryContextFacts] = useState<UserContextFactRow[]>([])
   const [profileInfoOpen, setProfileInfoOpen] = useState(false)
   const [profileInfoSection, setProfileInfoSection] = useState<'goals' | 'facts' | 'context' | undefined>(undefined)
+  // Chat typewriter reveal-speed preference — per-profile (reveal-speed-store.ts),
+  // read once the profile resolves and written back on every change from Settings.
+  const [revealSpeed, setRevealSpeedState] = useState<RevealSpeed>(DEFAULT_REVEAL_SPEED)
+  useEffect(() => { setRevealSpeedState(getRevealSpeed(profile?.id)) }, [profile?.id])
+  const handleRevealSpeedChange = (speed: RevealSpeed) => {
+    if (!profile?.id) return
+    setRevealSpeedState(speed)
+    saveRevealSpeed(profile.id, speed)
+  }
   const reloadMemory = async (profileId: string) => {
     const [facts, goals, contextFacts] = await Promise.all([getActiveFacts(profileId), getActiveGoals(profileId), getActiveContextFacts(profileId)])
     setMemoryFacts(facts)
@@ -1139,6 +1149,7 @@ function App() {
               onGroceryChanged={() => { if (profile?.id) return reloadGrocery(profile.id) }}
               onOpenGrocery={() => { window.location.hash = tabHash('meals') }}
               onOpenDashboard={() => { window.location.hash = tabHash('dashboard') }}
+              revealSpeed={revealSpeed}
             />
           </TabsContent>
         </Tabs>
@@ -1153,6 +1164,8 @@ function App() {
         onProfileChanged={patch => setProfile(prev => prev ? { ...prev, ...patch } : prev)}
         onMemoryChanged={() => { if (profile.id) return reloadMemory(profile.id) }}
         initialSection={profileInfoSection}
+        revealSpeed={revealSpeed}
+        onRevealSpeedChange={handleRevealSpeedChange}
       />
     </div>
     </TimersProvider>

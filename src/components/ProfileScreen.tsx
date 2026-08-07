@@ -29,6 +29,7 @@ import { supabase } from '@/lib/supabase'
 import { computeGoalProgress } from '@/lib/goal-progress'
 import { updateProfileField } from '@/lib/profile-store'
 import { useAppearance } from '@/hooks/useAppearance'
+import type { RevealSpeed } from '@/lib/reveal-speed-store'
 import {
   EXPERIENCE_OPTIONS, EQUIPMENT_OPTIONS, STYLE_OPTIONS, RECOVERY_OPTIONS,
   CONDITIONING_PREF_OPTIONS, ACTIVITY_OPTIONS, DIETARY_OPTIONS, FAVORITE_CUISINE_OPTIONS,
@@ -50,6 +51,9 @@ interface ProfileScreenProps {
   onMemoryChanged: () => void | Promise<void>
   /** Chat receipt deep-links land here, scrolled to the relevant memory section. */
   initialSection?: 'goals' | 'facts' | 'context'
+  /** Chat typewriter reveal-speed preference — see reveal-speed-store.ts. */
+  revealSpeed: RevealSpeed
+  onRevealSpeedChange: (speed: RevealSpeed) => void
 }
 
 // ---- Shared small field-row components (scoped to this screen) -----------
@@ -194,7 +198,7 @@ function factEffect(fact: UserFactRow): string {
   return 'recorded — not yet applied (takes effect on your next plan regeneration)'
 }
 
-export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onProfileChanged, onMemoryChanged, initialSection }: ProfileScreenProps) {
+export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onProfileChanged, onMemoryChanged, initialSection, revealSpeed, onRevealSpeedChange }: ProfileScreenProps) {
   const [facts, setFacts] = useState<UserFactRow[]>([])
   const [goals, setGoals] = useState<UserGoalRow[]>([])
   const [contextFacts, setContextFacts] = useState<UserContextFactRow[]>([])
@@ -364,6 +368,32 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
             <p className="text-[11.5px] leading-[1.5] text-muted-foreground/80">
               Both apply instantly, everywhere. Glow maps to one intensity variable; canvas swaps two surface values — no separate themes.
             </p>
+
+            <div>
+              <p className="text-sm font-medium">Chat reveal speed</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">How fast the coach's replies type out — Off shows them instantly</p>
+              <div className="mt-3 flex gap-[3px] rounded-xl bg-background p-[3px]">
+                {(['off', 'slow', 'normal', 'fast'] as const).map(level => (
+                  <button
+                    key={level}
+                    type="button"
+                    aria-pressed={revealSpeed === level}
+                    onClick={() => onRevealSpeedChange(level)}
+                    className={`h-[38px] flex-1 rounded-[9px] text-[13px] capitalize transition-colors ${
+                      revealSpeed === level
+                        ? 'font-semibold text-[color:var(--primary-foreground)] glow-mint-box'
+                        : 'text-muted-foreground'
+                    }`}
+                    style={revealSpeed === level ? { background: 'linear-gradient(180deg, #7CF3D4, #3ED3AA)' } : undefined}
+                  >
+                    {level}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-2 text-[11.5px] leading-[1.5] text-muted-foreground/80">
+                Reduced-motion system settings always show replies instantly, regardless of this choice.
+              </p>
+            </div>
           </div>
         </div>
 

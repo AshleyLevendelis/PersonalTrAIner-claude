@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import type { Components } from 'react-markdown'
+import type { RevealSpeed } from '@/lib/reveal-speed-store'
 
 // ---------------------------------------------------------------------------
 // Progressive word-by-word reveal for a just-arrived assistant reply.
@@ -27,11 +28,20 @@ import type { Components } from 'react-markdown'
 // ---------------------------------------------------------------------------
 
 const WORD_RE = /\S+\s*/g
-/** Base delay between words, in ms. One named constant — tune pace here. */
-const WORD_TICK_MS = 55
-/** Extra pause added after a token that ends a sentence, for a natural
- * "thoughtful typing" cadence rather than a flat machine-gun rate. */
-const SENTENCE_PAUSE_MS = 190
+/**
+ * Per-speed {tick, pause} pairs, in ms — the pause is always ~3.45x the
+ * tick (the original 190/55 ratio), so slowing/speeding up the base rate
+ * keeps the same "thoughtful typing" rhythm rather than flattening it out
+ * at one end. `fast` is the app's original (pre-user-request) default;
+ * `normal`, the new default, is materially slower per the user's explicit
+ * "roughly double it" request. `off` has no entry — it's handled as an
+ * instant-reveal bypass, same code path as prefers-reduced-motion.
+ */
+const SPEED_TIMING: Record<Exclude<RevealSpeed, 'off'>, { tick: number; pause: number }> = {
+  fast: { tick: 55, pause: 190 },
+  normal: { tick: 110, pause: 380 },
+  slow: { tick: 165, pause: 570 },
+}
 const SENTENCE_END_RE = /[.!?]["')\]]?\s*$/
 
 function prefersReducedMotion(): boolean {
@@ -43,23 +53,27 @@ export function TypewriterMarkdown({
   active,
   components,
   onDone,
+  speed = 'normal',
 }: {
   text: string
   /** Only true for the single message that just arrived — false renders the full text with no animation. */
   active: boolean
   components?: Components
   onDone?: () => void
+  /** User's reveal-speed preference (Settings → Profile). 'off' reveals instantly, same as prefers-reduced-motion. */
+  speed?: RevealSpeed
 }) {
   const [revealed, setRevealed] = useState(active ? '' : text)
   const doneRef = useRef(onDone)
   doneRef.current = onDone
 
   useEffect(() => {
-    if (!active || !text || prefersReducedMotion()) {
+    if (!active || !text || speed === 'off' || prefersReducedMotion()) {
       setRevealed(text)
       if (active) doneRef.current?.()
       return
     }
+    const timing = SPEED_TIMING[speed]
     const tokens = text.match(WORD_RE) ?? [text]
     let i = 0
     let cancelled = false
@@ -74,14 +88,14 @@ export function TypewriterMarkdown({
         doneRef.current?.()
         return
       }
-      const delay = SENTENCE_END_RE.test(tokens[i - 1]) ? WORD_TICK_MS + SENTENCE_PAUSE_MS : WORD_TICK_MS
+      const delay = SENTENCE_END_RE.test(tokens[i - 1]) ? timing.tick + timing.pause : timing.tick
       timer = setTimeout(step, delay)
     }
-    timer = setTimeout(step, WORD_TICK_MS)
+    timer = setTimeout(step, timing.tick)
 
     return () => { cancelled = true; clearTimeout(timer) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [text, active])
+  }, [text, active, speed])
 
   return <ReactMarkdown components={components}>{revealed}</ReactMarkdown>
 }
