@@ -16,10 +16,12 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Timer } from 'lucide-react'
 import { useActiveSession } from '@/hooks/useActiveSession'
+import { useDeadlineTick } from '@/hooks/useDeadlineTick'
 import { useTimers } from '@/hooks/useTimers'
 import { useViewportInset } from '@/hooks/useViewportInset'
 import { TAB_BAR_HEIGHT_PX } from '@/components/BottomTabBar'
 import { tabHash } from '@/lib/app-route'
+import { getAppNow } from '@/lib/dev-clock'
 import { playTimerCue } from '@/lib/timer-cues'
 
 function formatDuration(ms: number): string {
@@ -31,10 +33,17 @@ function formatDuration(ms: number): string {
 
 
 export function BottomDock() {
-  const { restEndsAt, restLabel, restRemainingMs, restTargetSetNumber, adjustRest, dismissRest, requestSetFocus } = useActiveSession()
+  const { restEndsAt, restLabel, restRemainingMs, restTargetSetNumber, restTotalMs, adjustRest, dismissRest, requestSetFocus, profileId, status: sessionStatus, startedAtIso } = useActiveSession()
   const timers = useTimers()
   const { insetPx, isKeyboardOpen } = useViewportInset()
   const chimedForRef = useRef<string | null>(null)
+
+  const hasRestForTick = !!restEndsAt && restRemainingMs != null
+  const hasSessionIndicator = !hasRestForTick && !timers.isActive && sessionStatus === 'running'
+  // Deadline-anchored count-UP, same tick source as the rest facade — must
+  // be called unconditionally (Rules of Hooks), gated by the flag rather
+  // than skipped when the session branch isn't reached.
+  useDeadlineTick(hasSessionIndicator)
 
   // "Start next set" — the dock is mounted outside the exercise list's
   // subtree, so this routes the request through the shared session context
@@ -62,10 +71,10 @@ export function BottomDock() {
     }
   }, [restEndsAt, restRemainingMs])
 
-  const hasRest = !!restEndsAt && restRemainingMs != null
+  const hasRest = hasRestForTick
   const hasStandaloneTimer = !hasRest && timers.isActive
 
-  if (!hasRest && !hasStandaloneTimer) return null
+  if (!hasRest && !hasStandaloneTimer && !hasSessionIndicator) return null
 
   const restMs = restRemainingMs ?? 0
   const isOverrun = hasRest && restMs <= 0
@@ -106,6 +115,28 @@ export function BottomDock() {
     )
   }
 
+  // Row B, at last — a running session with neither rest nor a standalone
+  // timer active. Lowest priority of the three (rest > standalone timer >
+  // this), so it never disrupts either of the dock's proven states; it's
+  // what's left showing once both fall away while a session is still open.
+  // Tap navigates only (mirrors the standalone-timer chip) — Finish stays
+  // singly-owned in TodayPanel's hero, no second entry point for it here.
+  if (hasSessionIndicator) {
+    const elapsedMs = startedAtIso ? getAppNow(profileId).getTime() - new Date(startedAtIso).getTime() : 0
+    return (
+      <div className="fixed left-4 right-4 z-50 md:left-auto md:right-4 md:w-96" style={bottomStyle}>
+        <button
+          type="button"
+          onClick={() => { if (!window.location.hash.startsWith('#/tab/exercise')) window.location.hash = tabHash('exercise') }}
+          className="w-full rounded-xl bg-card/95 glow-mint-box backdrop-blur-sm shadow-lg px-3 py-1.5 flex items-center gap-1.5 text-xs font-medium tabular-nums text-left"
+        >
+          <Timer className="h-3 w-3 text-primary shrink-0" />
+          Session running · {formatDuration(elapsedMs)}
+        </button>
+      </div>
+    )
+  }
+
   // Keyboard up (a set input is focused): collapse to one thin line — the
   // full two-row card would occlude the very row the user is editing (§3.6).
   if (isKeyboardOpen) {
@@ -121,55 +152,73 @@ export function BottomDock() {
     )
   }
 
-  return (
-    <div className="fixed left-4 right-4 z-50 md:left-auto md:right-4 md:w-96" style={bottomStyle}>
-      <Card className="border-primary/30 bg-card/95 backdrop-blur-sm shadow-lg">
-        <div className="p-3 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2 min-w-0">
-            <Timer className="h-4 w-4 text-primary shrink-0" />
-            <div className="min-w-0">
-              {isOverrun ? (
-                <p className="text-sm font-medium truncate">
-                  {restTargetSetNumber != null
-                    ? `Rest complete — ready for set ${restTargetSetNumber}?`
-                    : 'Rest complete'}
-                </p>
+  if (isOverrun) {
+    return (
+      <div className="fixed left-4 right-4 z-50 md:left-auto md:right-4 md:w-96" style={bottomStyle}>
+        <Card className="bg-card/95 backdrop-blur-sm shadow-lg">
+          <div className="p-3 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <Timer className="h-4 w-4 text-primary shrink-0" />
+              <p className="text-sm font-medium truncate">
+                {restTargetSetNumber != null
+                  ? `Rest complete — ready for set ${restTargetSetNumber}?`
+                  : 'Rest complete'}
+              </p>
+            </div>
+            <div className="flex items-center gap-1 shrink-0">
+              {restTargetSetNumber != null ? (
+                <>
+                  <Button size="sm" className="h-7 px-2.5 text-xs" onClick={handleStartNextSet}>
+                    Start next set ▸
+                  </Button>
+                  <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={dismissRest}>
+                    Dismiss
+                  </Button>
+                </>
               ) : (
-                <p className="text-sm font-medium tabular-nums">
-                  {formatDuration(restMs)}
-                  {restLabel && <span className="text-muted-foreground font-normal"> · Rest · {restLabel}</span>}
-                </p>
+                <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={dismissRest}>
+                  Dismiss
+                </Button>
               )}
             </div>
           </div>
+        </Card>
+      </div>
+    )
+  }
+
+  // Turn 5: the rest timer takes over the dock while it runs — an inline
+  // mint-gradient fill-bar (width = elapsed fraction) replaces the plain
+  // text+button row, its own fill supplying the visual weight the
+  // `border-primary/30` override used to (now redundant with the app-wide
+  // borderless base).
+  const fillFraction = restTotalMs ? Math.min(1, Math.max(0, 1 - restMs / restTotalMs)) : 0
+
+  return (
+    <div className="fixed left-4 right-4 z-50 md:left-auto md:right-4 md:w-96" style={bottomStyle}>
+      <div className="relative overflow-hidden rounded-[14px] bg-card/95 backdrop-blur-sm shadow-lg">
+        <div
+          aria-hidden
+          className="absolute inset-y-0 left-0 transition-[width] duration-1000 ease-linear"
+          style={{ width: `${fillFraction * 100}%`, background: 'linear-gradient(90deg, rgba(91,233,194,.22), rgba(91,233,194,.32))' }}
+        />
+        <div className="relative p-3 flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-sm font-medium tabular-mono">
+              {formatDuration(restMs)}
+              {restLabel && <span className="text-muted-foreground font-normal not-italic font-sans"> · rest · {restLabel}</span>}
+            </p>
+          </div>
           <div className="flex items-center gap-1 shrink-0">
-            {!isOverrun && (
-              <>
-                <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => adjustRest(-30)}>
-                  −30s
-                </Button>
-                <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => adjustRest(30)}>
-                  +30s
-                </Button>
-              </>
-            )}
-            {isOverrun && restTargetSetNumber != null ? (
-              <>
-                <Button size="sm" className="h-7 px-2.5 text-xs" onClick={handleStartNextSet}>
-                  Start next set ▸
-                </Button>
-                <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={dismissRest}>
-                  Dismiss
-                </Button>
-              </>
-            ) : (
-              <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={dismissRest}>
-                {isOverrun ? 'Dismiss' : 'Skip ▸'}
-              </Button>
-            )}
+            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => adjustRest(30)}>
+              +30s
+            </Button>
+            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={dismissRest}>
+              Skip ▸
+            </Button>
           </div>
         </div>
-      </Card>
+      </div>
     </div>
   )
 }

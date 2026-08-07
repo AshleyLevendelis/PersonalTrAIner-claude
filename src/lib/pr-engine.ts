@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import type { ExerciseSetLog } from './types'
 
 export interface PRRecord {
   maxWeight: number
@@ -124,6 +125,59 @@ export function getTopPRSet(
 
   if (!bestSetNumber || !bestResult) return null
   return { setNumber: bestSetNumber, result: bestResult }
+}
+
+export interface SessionPRHit {
+  exerciseName: string
+  result: PRResult
+}
+
+/**
+ * "PRs hit this session" — diffs each exercise's best set TODAY against a
+ * snapshot of the PR cache captured at startSession() (not the live cache,
+ * which checkForPR has already mutated set-by-set during the session — by
+ * finish time the live cache no longer has an honest "before" baseline).
+ * Read-only: never touches the live cache. Same weight-OR-e1rm comparison
+ * rule as checkForPR/getTopPRSet, generalized to an explicit baseline.
+ */
+export function computeSessionPRs(
+  preSessionSnapshot: Record<string, PRRecord>,
+  todayLogs: ExerciseSetLog[],
+): SessionPRHit[] {
+  const byExercise = new Map<string, ExerciseSetLog[]>()
+  for (const log of todayLogs) {
+    if (log.is_warmup) continue
+    if (log.weight_kg <= 0 && !log.is_bodyweight) continue
+    if (log.reps_completed <= 0) continue
+    if (log.is_bodyweight) continue // bodyweight sets have no comparable load PR
+    const list = byExercise.get(log.exercise_name) ?? []
+    list.push(log)
+    byExercise.set(log.exercise_name, list)
+  }
+
+  const hits: SessionPRHit[] = []
+  for (const [exerciseName, sets] of byExercise) {
+    const existing = preSessionSnapshot[exerciseName] ?? { maxWeight: 0, maxE1RM: 0, date: '' }
+    let best: PRResult | null = null
+    let bestE1RM = 0
+    for (const s of sets) {
+      const e1rm = calculateE1RM(s.weight_kg, s.reps_completed)
+      const isWeightPR = s.weight_kg > existing.maxWeight
+      const isE1RMPR = e1rm > existing.maxE1RM
+      if ((isWeightPR || isE1RMPR) && e1rm > bestE1RM) {
+        bestE1RM = e1rm
+        best = {
+          type: isWeightPR && isE1RMPR ? 'both' : isWeightPR ? 'weight' : 'e1rm',
+          newE1RM: e1rm,
+          newWeight: s.weight_kg,
+          previousE1RM: existing.maxE1RM,
+          previousWeight: existing.maxWeight,
+        }
+      }
+    }
+    if (best) hits.push({ exerciseName, result: best })
+  }
+  return hits
 }
 
 /** Seeds the localStorage PR cache from unified-store history (working sets only). PR storage itself stays localStorage this round — DB-backed PRs land in C2. */

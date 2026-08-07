@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Plus, X, Dumbbell, Activity, Clock, Flame, Loader2 } from 'lucide-react'
@@ -23,7 +23,24 @@ const CONDITIONING_PRESETS = [
 
 const RPE_CHOICES = [5, 6, 7, 8, 9, 10]
 
-export function AddUnplannedWork({ onLiftAdded, onCardioLogged }: { onLiftAdded?: () => void; onCardioLogged?: () => void }) {
+export function AddUnplannedWork({
+  onLiftAdded,
+  onCardioLogged,
+  open,
+  onOpenChange,
+  hideTrigger,
+}: {
+  onLiftAdded?: () => void
+  onCardioLogged?: () => void
+  /** Turn 5: unplanned work moved behind the day-level "⋮" menu (see
+   * WeekContextRow) — controlled-open mode for that call site. Omit both
+   * `open`/`hideTrigger` for the previous always-visible-button behavior. */
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+  /** Suppresses the standalone "Add unplanned work" trigger button — the
+   * caller owns opening this via `open` instead (their own menu item). */
+  hideTrigger?: boolean
+}) {
   const { profileId, date, declareOffPlan } = useActiveSession()
   const [mode, setMode] = useState<null | 'lift' | 'cardio'>(null)
   const [liftName, setLiftName] = useState('')
@@ -32,13 +49,22 @@ export function AddUnplannedWork({ onLiftAdded, onCardioLogged }: { onLiftAdded?
   const [rpe, setRpe] = useState(6)
   const [saving, setSaving] = useState(false)
 
+  // Controlled mode: opening from outside (the day-level menu) needs a
+  // default sub-tab, since nothing here set `mode` yet.
+  useEffect(() => {
+    if (hideTrigger && open && mode === null) setMode('lift')
+  }, [hideTrigger, open, mode])
+
   const reset = () => {
     setMode(null)
     setLiftName('')
     setActivity('')
     setDuration('')
     setRpe(6)
+    onOpenChange?.(false)
   }
+
+  const visible = hideTrigger ? !!open : mode !== null
 
   const handleAddLift = () => {
     if (!liftName.trim()) return
@@ -62,7 +88,8 @@ export function AddUnplannedWork({ onLiftAdded, onCardioLogged }: { onLiftAdded?
     reset()
   }
 
-  if (mode === null) {
+  if (!visible) {
+    if (hideTrigger) return null
     return (
       <Button variant="outline" size="sm" className="w-full text-xs h-8" onClick={() => setMode('lift')}>
         <Plus className="size-3 mr-1" />

@@ -122,6 +122,17 @@ function main() {
   const restTimerUsage = grepFiles(/(from\s+['"].*RestTimer['"]|<RestTimer\b)/)
   check('no import or JSX usage of RestTimer', restTimerUsage.length === 0, restTimerUsage)
 
+  console.log('\n[8] saveSet: exactly one call site outside set-log-store.ts itself (useActiveSession.logSet) — the single write path Part 1\'s silent-open behavior depends on')
+  // set-log-store.ts owns saveSet and has its own internal callers
+  // (updateSet's alias, the legacy-queue migration) — those are fine; the
+  // invariant is that no COMPONENT/HOOK bypasses the facade.
+  const saveSetCalls = grepFiles(/\bsaveSet\(/)
+    .filter(h => !/export (async )?function saveSet\b/.test(h.text))
+    .filter(h => !h.file.replace(/\\/g, '/').endsWith('lib/set-log-store.ts'))
+  const saveSetOutsideHook = saveSetCalls.filter(h => !h.file.replace(/\\/g, '/').endsWith('hooks/useActiveSession.tsx'))
+  check('no saveSet call site outside useActiveSession.tsx (excluding set-log-store.ts\'s own internals)', saveSetOutsideHook.length === 0, saveSetOutsideHook)
+  check('useActiveSession.tsx does call saveSet', saveSetCalls.length > saveSetOutsideHook.length)
+
   if (failures > 0) {
     console.error(`\n${failures} check(s) FAILED.`)
     process.exit(1)

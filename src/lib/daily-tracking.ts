@@ -143,8 +143,7 @@ export async function getWeeklyTracking(profileId: string, startDate: string, en
  * when it started (set-log-store stamps started_at on the first set of the
  * day) — records the real elapsed duration instead of the default estimate.
  */
-export async function markSessionCompleted(sessionId: string) {
-  const finishedAt = new Date()
+export async function markSessionCompleted(sessionId: string, finishedAt: Date = new Date()) {
   const { data: session } = await supabase
     .from('workout_sessions')
     .select('started_at')

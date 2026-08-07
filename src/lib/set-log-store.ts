@@ -406,7 +406,7 @@ export function deleteSet(params: {
 // Session resolution (Part 5 — auto-create today's workout_sessions row)
 // ---------------------------------------------------------------------------
 
-async function ensureSessionSynced(userId: string, date: string, splitType: string = 'training'): Promise<string> {
+export async function ensureSessionSynced(userId: string, date: string, splitType: string = 'training'): Promise<string> {
   const regKey = `${userId}|${date}`
   const registry = loadRegistry()
   const entry = registry[regKey]

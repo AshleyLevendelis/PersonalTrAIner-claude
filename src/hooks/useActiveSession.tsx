@@ -25,12 +25,15 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import { useDeadlineTick } from './useDeadlineTick'
 import { getAppNow, getSessionDateContext } from '@/lib/dev-clock'
 import { getActiveMesocycleWeek } from '@/lib/calculations'
-import { saveSet, deleteSet, getSetsForDate, getLastSessionSets, initSetLogStore, type SaveSetInput } from '@/lib/set-log-store'
-import { seedPRCacheFromHistory } from '@/lib/pr-engine'
+import { saveSet, deleteSet, getSetsForDate, getLastSessionSets, initSetLogStore, ensureSessionSynced, type SaveSetInput } from '@/lib/set-log-store'
+import { seedPRCacheFromHistory, getPRCache, type PRRecord } from '@/lib/pr-engine'
+import { markSessionCompleted } from '@/lib/daily-tracking'
 import { filterLoggableSets } from '@/lib/session-derive'
 import {
   getActiveSessionRecord,
   saveActiveSessionRecord,
+  getMostRecentActiveSessionRecord,
+  isSessionStale,
   type ActiveSessionRecord,
 } from '@/lib/active-session-store'
 import type { ExerciseSetLog } from '@/lib/types'
@@ -50,6 +53,8 @@ export interface RestState {
   restRemainingMs: number | null
   /** The set number to jump to once this rest completes (setNumber + 1 of the exercise it was started for), or null when the completed set was that exercise's last — nothing on this exercise to jump to. */
   restTargetSetNumber: number | null
+  /** The rest's original/total duration in ms — a fill-bar's denominator. Null when no rest is running. */
+  restTotalMs: number | null
 }
 
 /** A pending "focus this specific set's input" request — set by BottomDock's
@@ -61,6 +66,15 @@ export interface SetFocusRequest {
   setNumber: number
 }
 
+/** The result of finishSession — the raw materials TodayPanel composes into
+ * a SessionSummary/PR list/progression preview. useActiveSession stays
+ * plan-agnostic (§5.5) — it does not build the summary itself. */
+export interface FinishSessionResult {
+  startedAtIso: string
+  finishedAtIso: string
+  prSnapshotAtStart: Record<string, PRRecord>
+}
+
 export interface ActiveSessionValue extends ActiveSessionIdentity, RestState {
   ready: boolean
   logs: ExerciseSetLog[]
@@ -68,6 +82,13 @@ export interface ActiveSessionValue extends ActiveSessionIdentity, RestState {
   refresh: () => void
   logSet: (input: SaveSetInput) => ExerciseSetLog
   deleteSet: typeof deleteSet
+  /** 'idle' before any session activity today; 'running' from an explicit
+   * Start tap OR the first logged set (forgiving-by-design); 'finished'
+   * after an explicit Finish tap or a silent stale auto-close. */
+  status: 'idle' | 'running' | 'finished'
+  startedAtIso: string | null
+  startSession: () => void
+  finishSession: () => Promise<FinishSessionResult | null>
   startRest: (label: string, durationSeconds: number, targetSetNumber?: number) => void
   adjustRest: (deltaSeconds: number) => void
   dismissRest: () => void
@@ -143,6 +164,22 @@ export function ActiveSessionProvider({
 
   const [logs, setLogs] = useState<ExerciseSetLog[]>([])
   const [ready, setReady] = useState(false)
+  const [status, setStatus] = useState<'idle' | 'running' | 'finished'>('idle')
+  const [startedAtIso, setStartedAtIso] = useState<string | null>(null)
+
+  // Hydrate status/startedAtIso from the persisted record on identity
+  // change — same pattern restEndsAt already uses below.
+  useEffect(() => {
+    if (!identity.profileId || !identity.date) {
+      setStatus('idle')
+      setStartedAtIso(null)
+      return
+    }
+    const record = getActiveSessionRecord(identity.profileId, identity.date)
+    setStatus(record?.status ?? 'idle')
+    setStartedAtIso(record?.startedAtIso ?? null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [identity.profileId, identity.date])
 
   const refresh = useCallback(() => {
     if (!identity.profileId || !identity.date) return
@@ -170,13 +207,6 @@ export function ActiveSessionProvider({
     (exerciseId: string, exerciseName?: string) => filterLoggableSets(logs, exerciseId, exerciseName),
     [logs],
   )
-
-  const logSet = useCallback((input: SaveSetInput): ExerciseSetLog => {
-    const result = saveSet(input)
-    refresh()
-    return result
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [refresh])
 
   // --- Ghosts (F1: the one getLastSessionSets fetcher for the session view,
   // replacing SetLogger's own per-instance effect and the bulk-log path's
@@ -237,12 +267,103 @@ export function ActiveSessionProvider({
       restEndsAt: existing?.restEndsAt,
       restLabel: existing?.restLabel,
       restTargetSetNumber: existing?.restTargetSetNumber,
+      restTotalMs: existing?.restTotalMs,
       declaredOffPlan: existing?.declaredOffPlan,
       ...patch,
       lastActivityIso: now,
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [identity.profileId, identity.date, identity.dayName, identity.liveWeek])
+
+  const logSet = useCallback((input: SaveSetInput): ExerciseSetLog => {
+    const result = saveSet(input)
+    // Forgiving by design: a logged set with no session open silently opens
+    // one, backdated to "now" — patchRecord's own `existing?.startedAtIso ??
+    // now` default IS that backdating (there's no earlier timestamp to
+    // recover). Also transparently reopens a session the user had already
+    // explicitly finished, if they keep logging afterward.
+    patchRecord({ status: 'running', finishedAtIso: undefined })
+    setStatus('running')
+    refresh()
+    return result
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refresh, patchRecord])
+
+  // --- Explicit start/finish (Part 1) -----------------------------------
+  const startSession = useCallback(() => {
+    if (!identity.profileId || !identity.date) return
+    const now = getAppNow(identity.profileId).toISOString()
+    patchRecord({
+      status: 'running',
+      startedAtIso: now,
+      finishedAtIso: undefined,
+      prSnapshotAtStart: getPRCache(identity.profileId),
+    })
+    setStatus('running')
+    setStartedAtIso(now)
+    // Stamps the DB row's started_at immediately, even before the first set
+    // — same resolver the first-set sync path already uses, no parallel
+    // writer.
+    void ensureSessionSynced(identity.profileId, identity.date, 'training').catch(console.error)
+  }, [identity.profileId, identity.date, patchRecord])
+
+  const finishSession = useCallback(async (): Promise<FinishSessionResult | null> => {
+    if (!identity.profileId || !identity.date) return null
+    const record = getActiveSessionRecord(identity.profileId, identity.date)
+    const finishedAtIso = getAppNow(identity.profileId).toISOString()
+    const startedAt = record?.startedAtIso ?? finishedAtIso
+    try {
+      const sessionId = await ensureSessionSynced(identity.profileId, identity.date, 'training')
+      await markSessionCompleted(sessionId) // real "now" — the explicit tap IS the finish moment
+    } catch (e) {
+      console.error(e)
+    }
+    patchRecord({ status: 'finished', finishedAtIso })
+    setStatus('finished')
+    return { startedAtIso: startedAt, finishedAtIso, prSnapshotAtStart: record?.prSnapshotAtStart ?? {} }
+  }, [identity.profileId, identity.date, patchRecord])
+
+  // Auto-close a stale "running" session left open past D7's 6h grace
+  // window (or one whose date has rolled past "today") — forgiving by
+  // design: never left as a zombie, but silently, with no UI shown for a
+  // prior run's cleanup. Checked on mount/identity-change and again on
+  // foreground-return (the realistic mobile trigger for "backgrounded past
+  // the window"), mirroring the rest facade's own resync listener set.
+  const resolveStaleSession = useCallback(async (profileId: string, todayDate: string) => {
+    const record = getMostRecentActiveSessionRecord(profileId)
+    const nowIso = getAppNow(profileId).toISOString()
+    if (!record || !isSessionStale(record, nowIso, todayDate)) return
+    try {
+      const sessionId = await ensureSessionSynced(profileId, record.date, 'training')
+      // NOT "now" — now could be hours later than when the user actually
+      // stopped; lastActivityIso is the best-known real finish moment.
+      await markSessionCompleted(sessionId, new Date(record.lastActivityIso))
+    } catch (e) {
+      console.error(e)
+    }
+    saveActiveSessionRecord({ ...record, status: 'finished', finishedAtIso: record.lastActivityIso })
+    if (record.date === todayDate) setStatus('finished')
+  }, [])
+
+  useEffect(() => {
+    if (!identity.profileId || !identity.date) return
+    void resolveStaleSession(identity.profileId, identity.date)
+  }, [identity.profileId, identity.date, resolveStaleSession])
+
+  useEffect(() => {
+    if (!identity.profileId || !identity.date) return
+    const profileId = identity.profileId
+    const todayDate = identity.date
+    const handler = () => { void resolveStaleSession(profileId, todayDate) }
+    document.addEventListener('visibilitychange', handler)
+    window.addEventListener('focus', handler)
+    window.addEventListener('pageshow', handler)
+    return () => {
+      document.removeEventListener('visibilitychange', handler)
+      window.removeEventListener('focus', handler)
+      window.removeEventListener('pageshow', handler)
+    }
+  }, [identity.profileId, identity.date, resolveStaleSession])
 
   const persistDeclaredOffPlan = useCallback((names: string[]) => {
     patchRecord({ declaredOffPlan: names })
@@ -276,6 +397,7 @@ export function ActiveSessionProvider({
   const [restEndsAt, setRestEndsAt] = useState<string | null>(null)
   const [restLabel, setRestLabel] = useState<string | null>(null)
   const [restTargetSetNumber, setRestTargetSetNumber] = useState<number | null>(null)
+  const [restTotalMs, setRestTotalMs] = useState<number | null>(null)
 
   // Hydrate rest state from the persisted record when identity resolves —
   // this is what makes the timer survive a reload or a tab switch (the app
@@ -288,21 +410,24 @@ export function ActiveSessionProvider({
       setRestEndsAt(record.restEndsAt)
       setRestLabel(record.restLabel ?? null)
       setRestTargetSetNumber(record.restTargetSetNumber ?? null)
+      setRestTotalMs(record.restTotalMs ?? null)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [identity.profileId, identity.date])
 
-  const persistRest = useCallback((endsAt: string | null, label: string | null, targetSetNumber: number | null) => {
-    patchRecord({ restEndsAt: endsAt ?? undefined, restLabel: label ?? undefined, restTargetSetNumber: targetSetNumber ?? undefined })
+  const persistRest = useCallback((endsAt: string | null, label: string | null, targetSetNumber: number | null, totalMs: number | null) => {
+    patchRecord({ restEndsAt: endsAt ?? undefined, restLabel: label ?? undefined, restTargetSetNumber: targetSetNumber ?? undefined, restTotalMs: totalMs ?? undefined })
   }, [patchRecord])
 
   const startRest = useCallback((label: string, durationSeconds: number, targetSetNumber?: number) => {
     if (!identity.profileId) return
-    const endsAt = new Date(getAppNow(identity.profileId).getTime() + durationSeconds * 1000).toISOString()
+    const totalMs = durationSeconds * 1000
+    const endsAt = new Date(getAppNow(identity.profileId).getTime() + totalMs).toISOString()
     setRestEndsAt(endsAt)
     setRestLabel(label)
     setRestTargetSetNumber(targetSetNumber ?? null)
-    persistRest(endsAt, label, targetSetNumber ?? null)
+    setRestTotalMs(totalMs)
+    persistRest(endsAt, label, targetSetNumber ?? null, totalMs)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [identity.profileId, persistRest])
 
@@ -310,17 +435,20 @@ export function ActiveSessionProvider({
     setRestEndsAt(prev => {
       if (!prev || !identity.profileId) return prev
       const next = new Date(new Date(prev).getTime() + deltaSeconds * 1000).toISOString()
-      persistRest(next, restLabel, restTargetSetNumber)
+      const nextTotalMs = (restTotalMs ?? 0) + deltaSeconds * 1000
+      setRestTotalMs(nextTotalMs)
+      persistRest(next, restLabel, restTargetSetNumber, nextTotalMs)
       return next
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [identity.profileId, persistRest, restLabel, restTargetSetNumber])
+  }, [identity.profileId, persistRest, restLabel, restTargetSetNumber, restTotalMs])
 
   const dismissRest = useCallback(() => {
     setRestEndsAt(null)
     setRestLabel(null)
     setRestTargetSetNumber(null)
-    persistRest(null, null, null)
+    setRestTotalMs(null)
+    persistRest(null, null, null, null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [persistRest])
 
@@ -350,6 +478,10 @@ export function ActiveSessionProvider({
     refresh,
     logSet,
     deleteSet,
+    status,
+    startedAtIso,
+    startSession,
+    finishSession,
     startRest,
     adjustRest,
     dismissRest,
@@ -357,6 +489,7 @@ export function ActiveSessionProvider({
     restLabel,
     restRemainingMs,
     restTargetSetNumber,
+    restTotalMs,
     requestedSetFocus,
     requestSetFocus,
     clearSetFocusRequest,

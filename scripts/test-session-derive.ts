@@ -10,13 +10,17 @@
 import {
   filterLoggableSets,
   formatRampSets,
+  formatCompletedSummary,
   groupExercises,
   resolveCalibrationAnchorIndex,
   computeSetRowNumbers,
   nextExtraSetNumber,
   computeOffPlanWork,
   normalizeWarmup,
+  computeSessionSummary,
 } from '../src/lib/session-derive'
+import { computeSessionPRs, type PRRecord } from '../src/lib/pr-engine'
+import { isSessionStale, SESSION_STALE_INACTIVITY_MS, type ActiveSessionRecord } from '../src/lib/active-session-store'
 import { getExerciseId } from '../src/lib/exercise-db'
 import type { Exercise, ExerciseSetLog } from '../src/lib/types'
 import type { RampBlock } from '../src/lib/warmup'
@@ -246,6 +250,80 @@ function main() {
 
   const exWithEmptyRampSets: Exercise = { ...exWithBadRampSets, ramp_up: { exercise: 'Barbell Bench Press', sets: [], abbreviated: false } }
   check('ramp_up.sets an empty array -> null (nothing to show)', formatRampSets(exWithEmptyRampSets) === null)
+
+  // ---- formatCompletedSummary (moved from ExerciseRow.tsx) — regression guard for the move --
+  console.log('\n[19] formatCompletedSummary (moved into session-derive.ts) still formats correctly')
+  const rampSets = [
+    makeLog({ set_number: 1, weight_kg: 25, reps_completed: 12 }),
+    makeLog({ set_number: 2, weight_kg: 30, reps_completed: 8 }),
+  ]
+  check('ramped weights collapse into segments', formatCompletedSummary(rampSets) === '25kg × 12 · 30kg × 8', formatCompletedSummary(rampSets))
+  const bwSets = [
+    makeLog({ set_number: 1, weight_kg: 0, reps_completed: 10, is_bodyweight: true }),
+    makeLog({ set_number: 2, weight_kg: 0, reps_completed: 9, is_bodyweight: true }),
+  ]
+  check('all-bodyweight renders "Bodyweight × ..."', formatCompletedSummary(bwSets) === 'Bodyweight × 10, 9', formatCompletedSummary(bwSets))
+
+  // ---- computeSessionSummary — duration/volume/sets-vs-prescribed --------
+  console.log('\n[20] computeSessionSummary: duration, volume, prescribed-vs-completed, off-plan folding')
+  const summaryLogs: ExerciseSetLog[] = [
+    makeLog({ exercise_name: 'Barbell Bench Press', exercise_id: 'barbell-bench-press', set_number: 1, weight_kg: 60, reps_completed: 8 }),
+    makeLog({ exercise_name: 'Barbell Bench Press', exercise_id: 'barbell-bench-press', set_number: 2, weight_kg: 60, reps_completed: 8 }),
+    makeLog({ exercise_name: 'Push-Ups', exercise_id: 'push-ups', set_number: 1, weight_kg: 0, reps_completed: 15, is_bodyweight: true }),
+    makeLog({ exercise_name: 'Cable Flyes', exercise_id: 'cable-flyes', set_number: 1, weight_kg: 20, reps_completed: 12 }),
+  ]
+  const plannedForSummary = [
+    { id: 'barbell-bench-press', name: 'Barbell Bench Press', sets: 3 },
+    { id: 'push-ups', name: 'Push-Ups', sets: 1 },
+  ]
+  const summary = computeSessionSummary(summaryLogs, plannedForSummary, '2026-01-05T10:00:00.000Z', '2026-01-05T10:42:00.000Z')
+  check('durationMinutes computed correctly', summary.durationMinutes === 42, summary.durationMinutes)
+  check('setsCompleted counts every logged set incl. off-plan', summary.setsCompleted === 4, summary.setsCompleted)
+  check('setsPrescribed counts only the planned baseline', summary.setsPrescribed === 4, summary.setsPrescribed)
+  check('bodyweight set contributes 0 volume', summary.exercises.find(e => e.exerciseId === 'push-ups')?.volumeKg === 0)
+  check('volume is sets × reps × load, summed', summary.totalVolumeKg === 60 * 8 * 2 + 0 + 20 * 12, summary.totalVolumeKg)
+  const offPlanEntry = summary.exercises.find(e => e.exerciseId === 'cable-flyes')
+  check('an off-plan exercise is folded in with setsPrescribed: 0', offPlanEntry?.setsPrescribed === 0, offPlanEntry)
+  const malformedOrderSummary = computeSessionSummary([], [], '2026-01-05T10:42:00.000Z', '2026-01-05T10:00:00.000Z')
+  check('a finishedAtIso before startedAtIso clamps duration at 0, never negative', malformedOrderSummary.durationMinutes === 0, malformedOrderSummary.durationMinutes)
+
+  // ---- computeSessionPRs — session-scoped PR diff against a snapshot -----
+  console.log('\n[21] computeSessionPRs: classifies weight/e1rm/both/non-PR against a start-of-session snapshot')
+  const prSnapshot: Record<string, PRRecord> = {
+    'Barbell Bench Press': { maxWeight: 60, maxE1RM: 76, date: '2026-01-01' },
+    'Barbell Squats': { maxWeight: 100, maxE1RM: 126, date: '2026-01-01' },
+    'Deadlifts': { maxWeight: 140, maxE1RM: 163, date: '2026-01-01' },
+  }
+  const prLogs: ExerciseSetLog[] = [
+    // Weight PR only: heavier weight, but e1rm doesn't clear the old e1rm at this rep count... use reps=1 so e1rm==weight.
+    makeLog({ exercise_name: 'Barbell Bench Press', set_number: 1, weight_kg: 65, reps_completed: 1 }),
+    // Non-PR: below the snapshot on both counts.
+    makeLog({ exercise_name: 'Barbell Squats', set_number: 1, weight_kg: 90, reps_completed: 5 }),
+    // Both: a heavier weight AND a higher e1rm than the snapshot.
+    makeLog({ exercise_name: 'Deadlifts', set_number: 1, weight_kg: 150, reps_completed: 3 }),
+  ]
+  const prHits = computeSessionPRs(prSnapshot, prLogs)
+  const benchHit = prHits.find(h => h.exerciseName === 'Barbell Bench Press')
+  check('a weight PR that does not clear the snapshot e1rm classifies as weight-only', benchHit?.result.type === 'weight', benchHit)
+  check('a set below the snapshot on both counts produces no PR', !prHits.some(h => h.exerciseName === 'Barbell Squats'), prHits)
+  const deadliftHit = prHits.find(h => h.exerciseName === 'Deadlifts')
+  check('a set beating both weight and e1rm classifies as both', deadliftHit?.result.type === 'both', deadliftHit)
+  const e1rmOnlyLogs: ExerciseSetLog[] = [makeLog({ exercise_name: 'Barbell Bench Press', set_number: 1, weight_kg: 55, reps_completed: 12 })]
+  const e1rmOnlyHits = computeSessionPRs(prSnapshot, e1rmOnlyLogs)
+  check('a higher-e1rm-but-lower-weight set classifies as e1rm-only', e1rmOnlyHits[0]?.result.type === 'e1rm', e1rmOnlyHits)
+
+  // ---- isSessionStale — the auto-close predicate --------------------------
+  console.log('\n[22] isSessionStale: 6h inactivity boundary and date-rollover')
+  const baseRecord: ActiveSessionRecord = {
+    profileId: 'u1', date: '2026-01-05', dayName: 'Monday', liveWeek: 1,
+    status: 'running', startedAtIso: '2026-01-05T10:00:00.000Z', lastActivityIso: '2026-01-05T10:00:00.000Z',
+  }
+  const justUnder = new Date(new Date(baseRecord.lastActivityIso).getTime() + SESSION_STALE_INACTIVITY_MS - 1000).toISOString()
+  const justOver = new Date(new Date(baseRecord.lastActivityIso).getTime() + SESSION_STALE_INACTIVITY_MS + 1000).toISOString()
+  check('false just under the 6h boundary', isSessionStale(baseRecord, justUnder, '2026-01-05') === false)
+  check('true just past the 6h boundary', isSessionStale(baseRecord, justOver, '2026-01-05') === true)
+  check('true when the record\'s date is no longer "today", regardless of recency', isSessionStale(baseRecord, baseRecord.lastActivityIso, '2026-01-06') === true)
+  check('false for a non-running record', isSessionStale({ ...baseRecord, status: 'finished' }, justOver, '2026-01-05') === false)
 
   if (failures > 0) {
     console.error(`\n${failures} check(s) FAILED.`)

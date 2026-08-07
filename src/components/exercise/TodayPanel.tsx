@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react'
+import { Button } from '@/components/ui/button'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { useTrainingWeek } from '@/hooks/useTrainingWeek'
 import { useTimers } from '@/hooks/useTimers'
-import { getDoubleProgressionRecommendation } from '@/lib/progression-engine'
-import { groupExercises, resolveCalibrationAnchorIndex } from '@/lib/session-derive'
+import { getDoubleProgressionRecommendation, type DoubleProgressionRecommendation } from '@/lib/progression-engine'
+import { groupExercises, resolveCalibrationAnchorIndex, computeSessionSummary, type ExerciseGroup } from '@/lib/session-derive'
+import { computeSessionPRs } from '@/lib/pr-engine'
 import { getExerciseId } from '@/lib/exercise-db'
-import { ContextLine } from './ContextLine'
-import { WeekStrip } from './WeekStrip'
+import { getLocalDateString } from '@/lib/dev-clock'
+import { WeekContextRow } from './WeekContextRow'
 import { PeekPanel } from './PeekPanel'
-import { IdentityLine } from './IdentityLine'
 import { WarmupSection } from './WarmupSection'
 import { ExerciseRow } from './ExerciseRow'
 import { SupersetGroup } from './SupersetGroup'
@@ -16,6 +17,7 @@ import { FinisherRow } from './FinisherRow'
 import { AdditionalWorkSection } from './AdditionalWorkSection'
 import { AddUnplannedWork } from './AddUnplannedWork'
 import { RestDayCard, ActiveRecoveryCard } from './RestDayCard'
+import { SessionSummaryDialog, type SessionSummaryData } from './SessionSummaryDialog'
 import { TimersScreen } from '@/components/timers/TimersScreen'
 import type { WorkoutDay, MesocycleWeek, UserProfile } from '@/lib/types'
 import type { LoadSource } from './LoadChip'
@@ -41,6 +43,8 @@ export function TodayPanel({
   onOpenSwap,
   onBanExercise,
   onOpenPlateCalc,
+  onOpenHistory,
+  onOpenSessionHistory,
 }: {
   plan: WorkoutDay[]
   mesocycle?: MesocycleWeek[]
@@ -52,8 +56,10 @@ export function TodayPanel({
   onOpenSwap: (dayName: string, exIndex: number, exerciseName: string) => void
   onBanExercise: (exerciseName: string) => void | Promise<void>
   onOpenPlateCalc: (weightKg: number) => void
+  onOpenHistory?: (exerciseId: string, exerciseName: string) => void
+  onOpenSessionHistory?: () => void
 }) {
-  const { date: today, dayName: todayName, liveWeek, startRest } = useActiveSession()
+  const { date: today, dayName: todayName, liveWeek, startRest, setsFor, logs, status, startSession, finishSession } = useActiveSession()
   const timers = useTimers()
 
   const totalWeeks = mesocycle && mesocycle.length > 0 ? mesocycle.length : 4
@@ -68,6 +74,35 @@ export function TodayPanel({
   const [expandedWarmup, setExpandedWarmup] = useState(false)
   const [banBusy, setBanBusy] = useState<string | null>(null)
   const [timersOpen, setTimersOpen] = useState(false)
+  // Turn 5: "Add unplanned work" moved from an always-visible bottom button
+  // to the day-level "⋮" menu (WeekContextRow) — this is that controlled
+  // open state.
+  const [unplannedWorkOpen, setUnplannedWorkOpen] = useState(false)
+  const [summaryOpen, setSummaryOpen] = useState(false)
+  const [summaryData, setSummaryData] = useState<SessionSummaryData | null>(null)
+
+  const handleFinish = async () => {
+    const result = await finishSession()
+    if (!result || !workout) return
+    const plannedExercises = workout.exercises.map(ex => ({ id: ex.id, name: ex.name, sets: ex.sets }))
+    const summary = computeSessionSummary(logs, plannedExercises, result.startedAtIso, result.finishedAtIso)
+    const prs = computeSessionPRs(result.prSnapshotAtStart, logs)
+    // "What next session prescribes" reuses the same function already called
+    // above for the live progressedLoads badges — scoped to a date AFTER
+    // today so today's own just-logged sets resolve as "last session" from
+    // the function's point of view, per its documented `sessionDate`
+    // contract (strictly-before lookup).
+    const dayAfter = new Date(today)
+    dayAfter.setDate(dayAfter.getDate() + 1)
+    const dayAfterStr = getLocalDateString(dayAfter)
+    const progressions = await Promise.all(
+      workout.exercises
+        .filter(ex => ex.suggested_load_kg != null)
+        .map(async ex => [ex.name, await getDoubleProgressionRecommendation(profileId!, ex.name, dayAfterStr, parseRepsHigh(ex.reps))] as const)
+    )
+    setSummaryData({ summary, prs, progressions })
+    setSummaryOpen(true)
+  }
 
   // BottomDock's standalone-timer chip lives in a different subtree — same
   // cross-tree request pattern as useActiveSession's requestedSetFocus.
@@ -149,9 +184,21 @@ export function TodayPanel({
 
   const peekWorkout = peekDay ? liveWeekPlan.find(d => d.day === peekDay) : null
 
+  // Turn 5: session-progress 2px line — total sets logged today across every
+  // exercise on the live day, over total sets planned. Only meaningful (and
+  // only rendered) for the live-session branch below; rest/recovery/peek
+  // don't have a "sets" concept.
+  const totalSetsPlanned = workout && !isRestDay && !isActiveRecovery ? workout.exercises.reduce((s, ex) => s + ex.sets, 0) : 0
+  const totalSetsLogged = workout && !isRestDay && !isActiveRecovery
+    ? workout.exercises.reduce((s, ex) => s + setsFor(ex.id ?? getExerciseId(ex.name), ex.name).length, 0)
+    : 0
+
   return (
     <div className="space-y-3">
-      <ContextLine
+      <WeekContextRow
+        days={weekTrain.days}
+        todayName={todayName}
+        onSelectDay={d => setPeekDay(d)}
         weekNumber={liveWeek}
         totalWeeks={totalWeeks}
         blockNumber={currentMesoWeekObj?.block_number}
@@ -161,8 +208,10 @@ export function TodayPanel({
         phaseFocus={currentMesoWeekObj?.phase_focus}
         coachNote={currentMesoWeekObj?.coach_note}
         onOpenProgram={onOpenProgram}
+        onOpenTimers={!isRestDay && !isActiveRecovery && !peekWorkout ? () => setTimersOpen(true) : undefined}
+        onAddUnplannedWork={!isRestDay && !isActiveRecovery && !peekWorkout ? () => setUnplannedWorkOpen(true) : undefined}
+        onOpenSessionHistory={onOpenSessionHistory}
       />
-      <WeekStrip days={weekTrain.days} todayName={todayName} onSelectDay={d => setPeekDay(d)} />
 
       {peekWorkout ? (
         peekWorkout.exercises.length === 0 ? (
@@ -197,13 +246,38 @@ export function TodayPanel({
         />
       ) : (
         <div className="space-y-3">
-          <IdentityLine
-            dayName={effectiveDayName}
-            focus={workout!.focus}
-            devDay={devOverrideDay}
-            borrowedFrom={borrowedDayName ? todayName : undefined}
-            onOpenTimers={() => setTimersOpen(true)}
-          />
+          {/* Turn 5 hero block — supersedes IdentityLine's old day/focus text
+              (now deleted; its timers entry point moved into WeekContextRow's
+              "⋮" menu above). New: a 2px session-progress line under the
+              title. */}
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[10.5px] uppercase tracking-[.2em] text-primary glow-mint">
+                Today · {effectiveDayName}
+              </span>
+              {devOverrideDay && (
+                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-[color:var(--role-warn-border)] bg-[color:var(--role-warn-bg)] text-[color:var(--role-warn-text)]">
+                  DEV · {devOverrideDay}
+                </span>
+              )}
+              {borrowedDayName && (
+                <span className="text-[10px] text-muted-foreground italic">borrowed from {todayName}</span>
+              )}
+            </div>
+            <p className="mt-1.5 text-[36px] font-bold leading-[1.02] tracking-[-.035em] glow-text">{workout!.focus}</p>
+            <div className="mt-3.5 h-[2px] rounded-full" style={{ background: 'var(--hairline)' }}>
+              <div
+                className="h-[2px] rounded-full bg-primary glow-mint-box"
+                style={{ width: `${totalSetsPlanned > 0 ? Math.min(100, (totalSetsLogged / totalSetsPlanned) * 100) : 0}%` }}
+              />
+            </div>
+            {status !== 'running' ? (
+              <Button size="sm" className="mt-3" onClick={startSession}>Start session</Button>
+            ) : (
+              <Button size="sm" className="mt-3" onClick={handleFinish}>Finish session</Button>
+            )}
+          </div>
+          <SessionSummaryDialog open={summaryOpen} onOpenChange={setSummaryOpen} data={summaryData} />
           <TimersScreen open={timersOpen} onOpenChange={setTimersOpen} todaysConditioning={workout!.recommendedCardio} />
           <WarmupSection warmup={workout!.warmup} open={expandedWarmup} onToggle={() => setExpandedWarmup(v => !v)} />
           <ExerciseList
@@ -214,6 +288,7 @@ export function TodayPanel({
             progressionNotes={progressionNotes}
             onOpenSwap={onOpenSwap}
             onOpenPlateCalc={onOpenPlateCalc}
+            onOpenHistory={onOpenHistory}
             banBusy={banBusy}
             onBan={handleBan}
             onSetCompleted={(exerciseName, setNumber, _weight, _reps, restStr, sets) => {
@@ -224,9 +299,18 @@ export function TodayPanel({
               }
             }}
           />
-          {workout!.recommendedCardio && <FinisherRow cardio={workout!.recommendedCardio} />}
+          {workout!.recommendedCardio && (
+            <>
+              <p className="ds-label-compact">Finish</p>
+              <FinisherRow cardio={workout!.recommendedCardio} />
+            </>
+          )}
           <AdditionalWorkSection plannedExercises={workout!.exercises} />
-          <AddUnplannedWork />
+          <AddUnplannedWork
+            open={unplannedWorkOpen}
+            onOpenChange={setUnplannedWorkOpen}
+            hideTrigger
+          />
         </div>
       )}
     </div>
@@ -241,6 +325,7 @@ function ExerciseList({
   progressionNotes,
   onOpenSwap,
   onOpenPlateCalc,
+  onOpenHistory,
   banBusy,
   onBan,
   onSetCompleted,
@@ -252,6 +337,7 @@ function ExerciseList({
   progressionNotes: Record<string, { note: string; didProgress: boolean }>
   onOpenSwap: (dayName: string, exIndex: number, exerciseName: string) => void
   onOpenPlateCalc: (weightKg: number) => void
+  onOpenHistory?: (exerciseId: string, exerciseName: string) => void
   banBusy: string | null
   onBan: (name: string) => void
   onSetCompleted: (exerciseName: string, setNumber: number, weight: number, reps: number, rest: string, sets: number, prescribedReps: string, tier?: string) => void
@@ -299,6 +385,7 @@ function ExerciseList({
       progressionNote: progressionNotes[ex.name],
       showCalibrationCue: calibrationAnchorIndex === exIndex,
       onOpenPlateCalc,
+      onOpenHistory,
       onSwap: () => onOpenSwap(dayName, exIndex, ex.name),
       onBan: () => onBan(ex.name),
       banBusy: banBusy === ex.name,
@@ -308,23 +395,35 @@ function ExerciseList({
     }
   }
 
+  const firstMainLiftGroupIndex = groups.findIndex(
+    g => g.kind === 'single' && g.ex.tier === 'tier_1_primary'
+  )
+
   // 3b: 20px between rows. With no borders or card padding left, this gap IS
   // the separation — tighter and the list reads as one run-on block.
   return (
     <div className="flex flex-col gap-5">
-      {groups.map((g, i) =>
-        g.kind === 'single' ? (
-          <ExerciseRow key={i} {...rowProps(g.ex, g.exIndex)} />
-        ) : (
-          <SupersetGroup
-            key={i}
-            label={g.label}
-            members={g.members.map(m => ({ props: rowProps(m.ex, m.exIndex) }))}
-          />
-        )
-      )}
+      {groups.map((g, i) => (
+        <div key={i} className="flex flex-col gap-2.5">
+          <span className="ds-label-compact">{sectionLabelFor(g, i === firstMainLiftGroupIndex)}</span>
+          {g.kind === 'single' ? (
+            <ExerciseRow {...rowProps(g.ex, g.exIndex)} />
+          ) : (
+            <SupersetGroup
+              label={g.label}
+              members={g.members.map(m => ({ props: rowProps(m.ex, m.exIndex) }))}
+            />
+          )}
+        </div>
+      ))}
     </div>
   )
+}
+
+function sectionLabelFor(group: ExerciseGroup, isFirstMainLift: boolean): string {
+  if (group.kind === 'superset') return `Superset ${group.label}`
+  if (isFirstMainLift) return 'Main lift'
+  return 'Accessory'
 }
 
 function parseRepsHigh(reps: string): number {

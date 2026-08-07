@@ -7,7 +7,6 @@
 
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { Progress } from '@/components/ui/progress'
 import { WeighInCard } from '@/components/WeighInCard'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { getAppNow } from '@/lib/dev-clock'
@@ -29,6 +28,15 @@ interface DashboardProps {
 }
 
 const WATER_QUICK_ADD_ML = [250, 500]
+
+// Turn 4 ring meter — classic radial-progress technique (stroke-dasharray of
+// a fraction of the circle's circumference, rotated -90deg to start at 12
+// o'clock). Two concentric rings share one <svg>: calories outer, protein
+// inner. r/stroke-width match the design doc's literal values exactly.
+const RING_OUTER_R = 34
+const RING_INNER_R = 26
+const RING_OUTER_CIRC = 2 * Math.PI * RING_OUTER_R
+const RING_INNER_CIRC = 2 * Math.PI * RING_INNER_R
 
 export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreatedAt, onWaterChanged, onWeightLogged }: DashboardProps) {
   const activeSession = useActiveSession()
@@ -120,16 +128,24 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
             'radial-gradient(120% 60% at 50% 0%, rgba(156,141,255,.20) 0%, rgba(26,22,54,0) 60%), radial-gradient(90% 40% at 20% 42%, rgba(91,233,194,.10) 0%, rgba(26,22,54,0) 70%)',
         }}
       />
+      {/* Turn 4: a near-invisible grain texture over the whole hero surface. */}
+      <div className="grain-overlay" aria-hidden />
 
       <div className="relative">
-        {/* 1. Day + streak */}
-        <div className="flex items-baseline justify-between">
-          <span className="ds-label">
+        {/* 1. Day + streak — turn 4: streak is a number+label pair, not a
+            fire-emoji inline string. */}
+        <div className="flex items-start justify-between">
+          <span className="pt-1 ds-label">
             {data.dayName}
             {data.phase ? ` · Week ${data.phase.weekNumber} of ${data.phase.totalWeeks}` : ''}
           </span>
-          <span className={`text-xs font-semibold ${data.streak > 0 ? 'text-primary glow-mint' : 'text-muted-foreground'}`}>
-            🔥 {data.streak} day{data.streak === 1 ? '' : 's'}
+          <span className="flex flex-col items-end leading-none">
+            <span className={`text-[26px] font-bold tracking-[-.03em] ${data.streak > 0 ? 'text-primary glow-mint' : 'text-muted-foreground'}`}>
+              {data.streak}
+            </span>
+            <span className="mt-1 text-[9px] uppercase tracking-[.18em] text-muted-foreground">
+              day{data.streak === 1 ? '' : 's'} streak
+            </span>
           </span>
         </div>
 
@@ -162,7 +178,7 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
               {data.session.status !== 'done' && (
                 <Button
                   size="cta"
-                  className="w-full glow-pulse"
+                  className="w-full glow-bloom-once"
                   style={{ background: 'linear-gradient(180deg, #7CF3D4 0%, #5BE9C2 55%, #3ED3AA 100%)' }}
                   onClick={() => { window.location.hash = tabHash('exercise') }}
                 >
@@ -182,30 +198,53 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
           </div>
         )}
 
-        {/* 4. Today's numbers — hairlines between tiles replaced by wide gutters. */}
-        <p className="ds-label mt-8 glow-violet">Today</p>
-        <div className="mt-3.5 grid grid-cols-2 gap-x-[26px] gap-y-[26px]">
-          <div className="flex min-w-0 flex-col gap-1.5">
-            <span className="text-[11px] text-muted-foreground">Calories</span>
-            <span className="ds-num-tile text-[#E4FCF4] glow-mint-lg">{Math.round(data.caloriesEaten)}</span>
-            <span className="text-[11px] text-muted-foreground">of {Math.round(data.caloriesTarget)}</span>
-            <Progress glow value={data.caloriesTarget > 0 ? Math.min(150, (data.caloriesEaten / data.caloriesTarget) * 100) : 0} className="mt-0.5 h-[3px]" />
-            {data.caloriesEaten === 0 && (
-              <button className="mt-1 text-left text-xs text-primary glow-mint" onClick={() => { window.location.hash = tabHash('meals') }}>Log a meal</button>
-            )}
+        {/* 4. Today's numbers — turn 4: a glowing ring meter (calories outer,
+            protein inner) replaces the flat progress-line tiles; violet is
+            ambience-only now, so the label loses its glow. Water/Steps drop
+            out of the tile grid into plain hairline-divided rows. */}
+        <p className="ds-label mt-8">Today</p>
+        <div className="mt-[18px] flex items-center gap-5">
+          <svg width="104" height="104" viewBox="0 0 104 104" className="shrink-0">
+            <circle cx="52" cy="52" r={RING_OUTER_R} fill="none" stroke="var(--surface-raised)" strokeWidth="7" />
+            <circle cx="52" cy="52" r={RING_INNER_R} fill="none" stroke="var(--surface-raised)" strokeWidth="4" />
+            <circle
+              cx="52" cy="52" r={RING_OUTER_R} fill="none" stroke="var(--primary)" strokeWidth="7" strokeLinecap="round"
+              strokeDasharray={`${RING_OUTER_CIRC * Math.min(1, data.caloriesTarget > 0 ? data.caloriesEaten / data.caloriesTarget : 0)} ${RING_OUTER_CIRC}`}
+              transform="rotate(-90 52 52)"
+              className="glow-icon"
+              style={{ transition: 'stroke-dasharray 400ms ease' }}
+            />
+            <circle
+              cx="52" cy="52" r={RING_INNER_R} fill="none" stroke="var(--primary)" strokeOpacity="0.55" strokeWidth="4" strokeLinecap="round"
+              strokeDasharray={`${RING_INNER_CIRC * Math.min(1, data.proteinTarget > 0 ? data.proteinEaten / data.proteinTarget : 0)} ${RING_INNER_CIRC}`}
+              transform="rotate(-90 52 52)"
+              style={{ transition: 'stroke-dasharray 400ms ease' }}
+            />
+          </svg>
+          <div className="flex min-w-0 flex-1 flex-col gap-3.5">
+            <div>
+              <p className="ds-num-mega tabular-mono text-[#E4FCF4] glow-mint-lg">{Math.round(data.caloriesEaten)}</p>
+              <p className="mt-1 text-[10.5px] uppercase tracking-[.16em] text-muted-foreground">
+                kcal · of <span className="tabular-mono">{Math.round(data.caloriesTarget)}</span>
+              </p>
+              {data.caloriesEaten === 0 && (
+                <button className="mt-1 text-left text-xs text-primary glow-mint" onClick={() => { window.location.hash = tabHash('meals') }}>Log a meal</button>
+              )}
+            </div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-[22px] font-bold tracking-[-.03em] tabular-mono text-[#E4FCF4]">
+                {Math.round(data.proteinEaten)}<span className="text-xs font-medium text-text-tertiary">g</span>
+              </span>
+              <span className="text-[10.5px] uppercase tracking-[.16em] text-muted-foreground">
+                protein · of <span className="tabular-mono">{Math.round(data.proteinTarget)}g</span>
+              </span>
+            </div>
           </div>
+        </div>
 
-          <div className="flex min-w-0 flex-col gap-1.5">
-            <span className="text-[11px] text-muted-foreground">Protein</span>
-            <span className="ds-num-tile text-[#E4FCF4] glow-mint-lg">
-              {Math.round(data.proteinEaten)}<span className="text-[15px] font-medium text-text-tertiary [text-shadow:none]">g</span>
-            </span>
-            <span className="text-[11px] text-muted-foreground">of {Math.round(data.proteinTarget)}g</span>
-            <Progress glow value={data.proteinTarget > 0 ? Math.min(150, (data.proteinEaten / data.proteinTarget) * 100) : 0} className="mt-0.5 h-[3px]" />
-          </div>
-
-          <div className="flex min-w-0 flex-col gap-1.5">
-            <span className="text-[11px] text-muted-foreground">Water</span>
+        <div className="mt-5 flex flex-col">
+          <div className="flex items-baseline justify-between py-3" style={{ borderTop: '1px solid var(--hairline)' }}>
+            <span className="text-[13px] text-text-tertiary">Water</span>
             {editingTarget ? (
               <div className="flex items-center gap-1">
                 <input
@@ -217,50 +256,42 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
                 <Button size="sm" variant="ghost" className="h-7 shrink-0 px-1.5 text-[10px]" onClick={handleSaveTarget}>Save</Button>
               </div>
             ) : (
-              <span className="ds-num-tile text-[#E4FCF4] glow-mint">
-                {todayWaterMl}<span className="text-[15px] font-medium text-muted-foreground [text-shadow:none]"> / {waterTarget}</span>
+              <span className="flex flex-wrap items-baseline justify-end gap-x-3 gap-y-1">
+                <span className="tabular-mono text-[13px]">{todayWaterMl} / {waterTarget} ml</span>
+                {WATER_QUICK_ADD_ML.map(ml => (
+                  <button key={ml} className="text-xs font-semibold text-primary glow-mint" onClick={() => handleAddWater(ml)}>+{ml}</button>
+                ))}
+                <button className="text-xs text-muted-foreground" onClick={() => { setTargetInput(String(waterTarget)); setEditingTarget(true) }}>edit</button>
+                {lastWaterLog && (
+                  <button className="text-xs text-muted-foreground" onClick={handleUndoWater}>undo</button>
+                )}
               </span>
             )}
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
-              {WATER_QUICK_ADD_ML.map(ml => (
-                <button key={ml} className="text-primary glow-mint" onClick={() => handleAddWater(ml)}>+{ml}</button>
-              ))}
-              {!editingTarget && (
-                <button className="text-muted-foreground" onClick={() => { setTargetInput(String(waterTarget)); setEditingTarget(true) }}>edit</button>
-              )}
-              {lastWaterLog && (
-                <button className="text-muted-foreground" onClick={handleUndoWater}>undo</button>
-              )}
-            </div>
           </div>
-
-          <div className="flex min-w-0 flex-col gap-1.5">
-            <span className="text-[11px] text-muted-foreground">Steps</span>
+          <div className="flex items-baseline justify-between py-3" style={{ borderTop: '1px solid var(--hairline)' }}>
+            <span className="text-[13px] text-text-tertiary">Steps</span>
             {steps ? (
-              <span className="ds-num-tile text-[#E4FCF4] glow-mint">{steps.steps.toLocaleString()}</span>
+              <span className="tabular-mono text-[13px]">{steps.steps.toLocaleString()}</span>
             ) : (
-              <span className="ds-num-tile text-[color:var(--text-dim)]">—</span>
-            )}
-            {!steps && (
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-2">
                 <input
                   type="number"
                   placeholder="Steps"
                   value={stepsInput}
                   onChange={e => setStepsInput(e.target.value)}
-                  className="h-7 min-w-0 flex-1 rounded-md bg-[color:var(--surface-raised)] px-2 text-xs"
+                  className="h-7 w-24 min-w-0 rounded-md bg-[color:var(--surface-raised)] px-2 text-xs"
                 />
-                <button className="shrink-0 text-xs text-primary glow-mint" onClick={handleLogSteps}>Log</button>
+                <button className="shrink-0 text-xs font-semibold text-primary glow-mint" onClick={handleLogSteps}>Log</button>
               </div>
             )}
           </div>
         </div>
 
         {/* 5. Progress — the section rule is gone; the label does that work. */}
-        <p className="ds-label mt-9 glow-violet">Progress</p>
+        <p className="ds-label mt-9">Progress</p>
         {data.weightTrend ? (
           <div className="mt-3.5 flex flex-wrap items-baseline gap-x-2 gap-y-1">
-            <span className="ds-num-tile text-[#E4FCF4] glow-mint-lg">
+            <span className="ds-num-tile tabular-mono text-[#E4FCF4] glow-mint-lg">
               {data.weightTrend.rollingAvgKg.toFixed(1)}<span className="text-[15px] font-medium text-muted-foreground [text-shadow:none]"> kg</span>
             </span>
             {data.weightTrend.ratePerWeekKg != null && (
@@ -281,7 +312,7 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
           <div className="mt-3 space-y-1">
             {data.recentPRs.map(pr => (
               <p key={pr.exerciseName} className="text-[13px]">
-                {pr.exerciseName} <span className="font-semibold text-primary glow-mint">{pr.weightKg} kg</span>
+                {pr.exerciseName} <span className="font-semibold tabular-mono text-primary glow-mint">{pr.weightKg} kg</span>
                 <span className="text-[11px] text-muted-foreground"> — new PR</span>
               </p>
             ))}

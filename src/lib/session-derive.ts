@@ -261,3 +261,117 @@ export function computeOffPlanWork(
   }
   return Array.from(byId.values())
 }
+
+// ---------------------------------------------------------------------------
+// Completed-set summary text (moved from ExerciseRow.tsx, unchanged) — Part
+// 3's exercise-history view needs the identical "30kg × 11, 11, 10"
+// formatting for a past session's sets; duplicating it there would be
+// exactly the forked-logic pattern this file exists to prevent.
+// ---------------------------------------------------------------------------
+
+/** "30kg × 11, 11, 10" for a flat-weight exercise; groups consecutive
+ * same-weight sets (ramps) into "25kg × 12 · 30kg × 8"-style segments;
+ * "Bodyweight × 11, 11, 10" when nothing was loaded. Accepts anything
+ * structurally shaped like the fields it reads, so a history-view row that
+ * isn't a full ExerciseSetLog can still be formatted without a cast. */
+export function formatCompletedSummary(
+  sets: { set_number: number; weight_kg: number; reps_completed: number; is_bodyweight: boolean }[],
+): string {
+  const ordered = [...sets].sort((a, b) => a.set_number - b.set_number)
+  if (ordered.every(s => s.is_bodyweight)) {
+    return `Bodyweight × ${ordered.map(s => s.reps_completed).join(', ')}`
+  }
+  const groups: { weight: number; reps: number[] }[] = []
+  for (const s of ordered) {
+    const last = groups[groups.length - 1]
+    if (last && last.weight === s.weight_kg) last.reps.push(s.reps_completed)
+    else groups.push({ weight: s.weight_kg, reps: [s.reps_completed] })
+  }
+  return groups.map(g => `${g.weight}kg × ${g.reps.join(', ')}`).join(' · ')
+}
+
+// ---------------------------------------------------------------------------
+// Session summary (Part 1: explicit start/finish) — duration/volume/
+// sets-vs-prescribed for one finished session. Pure: takes the day's planned
+// exercises and the raw logs, no store/Supabase reads.
+// ---------------------------------------------------------------------------
+
+export interface SessionExerciseSummary {
+  exerciseId: string
+  exerciseName: string
+  setsCompleted: number
+  setsPrescribed: number
+  volumeKg: number
+}
+
+export interface SessionSummary {
+  durationMinutes: number
+  totalVolumeKg: number
+  setsCompleted: number
+  setsPrescribed: number
+  exercises: SessionExerciseSummary[]
+}
+
+/**
+ * Volume is literally sets × reps × load (weight_kg × reps_completed,
+ * summed) — a bodyweight set (weight_kg 0, by SetGrid's own convention)
+ * contributes 0, matching how the rest of the app treats bodyweight load.
+ * Any logged exercise NOT in `plannedExercises` (off-plan/extra work, same
+ * population `computeOffPlanWork` detects) is folded in with
+ * setsPrescribed: 0 so the totals still count it honestly.
+ */
+export function computeSessionSummary(
+  logs: ExerciseSetLog[],
+  plannedExercises: { id?: string; name: string; sets: number }[],
+  startedAtIso: string,
+  finishedAtIso: string,
+): SessionSummary {
+  const exercises: SessionExerciseSummary[] = []
+  const accountedIds = new Set<string>()
+
+  for (const planned of plannedExercises) {
+    const exerciseId = planned.id ?? planned.name
+    const loggedSets = filterLoggableSets(logs, exerciseId, planned.name)
+    accountedIds.add(exerciseId)
+    if (loggedSets.length === 0 && planned.sets === 0) continue
+    exercises.push({
+      exerciseId,
+      exerciseName: planned.name,
+      setsCompleted: loggedSets.length,
+      setsPrescribed: planned.sets,
+      volumeKg: loggedSets.reduce((sum, s) => sum + s.weight_kg * s.reps_completed, 0),
+    })
+  }
+
+  const extraByExercise = new Map<string, ExerciseSetLog[]>()
+  for (const log of logs) {
+    if (log.is_warmup) continue
+    const id = log.exercise_id ?? log.exercise_name
+    if (accountedIds.has(id)) continue
+    const list = extraByExercise.get(id) ?? []
+    list.push(log)
+    extraByExercise.set(id, list)
+  }
+  for (const [exerciseId, extraLogs] of extraByExercise) {
+    exercises.push({
+      exerciseId,
+      exerciseName: extraLogs[0].exercise_name,
+      setsCompleted: extraLogs.length,
+      setsPrescribed: 0,
+      volumeKg: extraLogs.reduce((sum, s) => sum + s.weight_kg * s.reps_completed, 0),
+    })
+  }
+
+  const durationMinutes = Math.max(
+    0,
+    Math.round((new Date(finishedAtIso).getTime() - new Date(startedAtIso).getTime()) / 60000),
+  )
+
+  return {
+    durationMinutes,
+    totalVolumeKg: exercises.reduce((sum, e) => sum + e.volumeKg, 0),
+    setsCompleted: exercises.reduce((sum, e) => sum + e.setsCompleted, 0),
+    setsPrescribed: exercises.reduce((sum, e) => sum + e.setsPrescribed, 0),
+    exercises,
+  }
+}

@@ -13,6 +13,8 @@
 // draft produced.
 // ---------------------------------------------------------------------------
 
+import type { PRRecord } from './pr-engine'
+
 const KEY_PREFIX = 'fitplan_active_session_v1:'
 const MAX_ENTRIES = 2
 
@@ -31,8 +33,16 @@ export interface ActiveSessionRecord {
   restLabel?: string
   /** The set number to jump to once this rest completes — see useActiveSession.tsx's RestState doc comment. */
   restTargetSetNumber?: number
+  /** The rest's original/total duration in ms — a fill-bar's denominator. Captured by startRest, kept in sync by adjustRest's ±30s taps. Absent when no rest is running. */
+  restTotalMs?: number
   /** User-typed off-plan exercise names for today (P2) — the DETECTED half of offPlanWork is computed from logs + the day's plan, not stored here. */
   declaredOffPlan?: string[]
+  /** Snapshot of pr-engine's PR cache taken at startSession() — the finish
+   * summary diffs today's logged maxes against THIS, not the live cache
+   * (which checkForPR has already mutated mid-session). Absent for a
+   * session that was silently opened by logSet rather than an explicit
+   * Start tap. */
+  prSnapshotAtStart?: Record<string, PRRecord>
 }
 
 type RecordMap = Record<string /* date */, ActiveSessionRecord>
@@ -97,4 +107,19 @@ export function saveActiveSessionRecord(record: ActiveSessionRecord): void {
 
 export function clearActiveSessionRecords(profileId: string): void {
   localStorage.removeItem(storageKey(profileId))
+}
+
+/** D7's "6h of inactivity" grace window — the one place this number lives. */
+export const SESSION_STALE_INACTIVITY_MS = 6 * 60 * 60 * 1000
+
+/**
+ * True when a still-"running" record should be auto-closed: either 6h+ of
+ * inactivity, or its date is no longer "today" (end-of-day rollover — a
+ * prior day's still-running record is stale by definition regardless of how
+ * recently it was touched).
+ */
+export function isSessionStale(record: ActiveSessionRecord, nowIso: string, todayDate: string): boolean {
+  if (record.status !== 'running') return false
+  if (record.date !== todayDate) return true
+  return new Date(nowIso).getTime() - new Date(record.lastActivityIso).getTime() > SESSION_STALE_INACTIVITY_MS
 }

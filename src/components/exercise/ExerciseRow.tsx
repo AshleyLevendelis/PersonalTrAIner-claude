@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { ArrowRightLeft, Ban, MoreVertical, ChevronDown } from 'lucide-react'
+import { ArrowRightLeft, Ban, History, MoreVertical, ChevronDown } from 'lucide-react'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { getExerciseId } from '@/lib/exercise-db'
-import { formatRampSets } from '@/lib/session-derive'
+import { formatRampSets, formatCompletedSummary } from '@/lib/session-derive'
 import { RampStrip } from './RampStrip'
 import { LoadChip, type LoadSource } from './LoadChip'
 import { CalibrationCue } from './CalibrationCue'
@@ -22,23 +22,6 @@ import type { Exercise, ExerciseSetLog } from '@/lib/types'
 // (LAYOUT-DESIGN.md §4.1) instead of two always-visible icons.
 // ---------------------------------------------------------------------------
 
-/** "30kg × 11, 11, 10" for a flat-weight exercise; groups consecutive
- * same-weight sets (ramps) into "25kg × 12 · 30kg × 8"-style segments;
- * "Bodyweight × 11, 11, 10" when nothing was loaded. */
-function formatCompletedSummary(sets: ExerciseSetLog[]): string {
-  const ordered = [...sets].sort((a, b) => a.set_number - b.set_number)
-  if (ordered.every(s => s.is_bodyweight)) {
-    return `Bodyweight × ${ordered.map(s => s.reps_completed).join(', ')}`
-  }
-  const groups: { weight: number; reps: number[] }[] = []
-  for (const s of ordered) {
-    const last = groups[groups.length - 1]
-    if (last && last.weight === s.weight_kg) last.reps.push(s.reps_completed)
-    else groups.push({ weight: s.weight_kg, reps: [s.reps_completed] })
-  }
-  return groups.map(g => `${g.weight}kg × ${g.reps.join(', ')}`).join(' · ')
-}
-
 export interface ExerciseRowProps {
   ex: Exercise
   dayName: string
@@ -54,6 +37,7 @@ export interface ExerciseRowProps {
   onFirstEverLog?: SetGridProps['onFirstEverLog']
   expanded: boolean
   onToggleExpanded: () => void
+  onOpenHistory?: (exerciseId: string, exerciseName: string) => void
 }
 
 export function ExerciseRow({
@@ -71,6 +55,7 @@ export function ExerciseRow({
   onFirstEverLog,
   expanded,
   onToggleExpanded,
+  onOpenHistory,
 }: ExerciseRowProps) {
   const { setsFor, requestedSetFocus, clearSetFocusRequest } = useActiveSession()
   const exerciseId = ex.id ?? getExerciseId(ex.name)
@@ -104,12 +89,30 @@ export function ExerciseRow({
         <span className="shrink-0 font-mono text-[10px] font-semibold text-primary glow-mint">{supersetLabel}</span>
       )}
       <span
-        className={`truncate ${expanded ? 'text-[17px] font-semibold' : 'text-[14.5px] font-medium'} ${
+        className={`truncate ${expanded ? 'text-[19px] font-semibold' : 'text-[15.5px] font-medium'} ${
           allSetsLogged ? 'line-through text-muted-foreground' : ''
-        }`}
+        } ${!expanded && loadSource === 'estimate' ? 'border-b border-dotted border-muted-foreground/50' : ''}`}
       >
         {ex.name}
       </span>
+    </div>
+  )
+
+  // Collapsed rows hide loads entirely (turn 5) — a per-set dot ladder
+  // stands in for "{sets}×{reps} + LoadChip", mint-filled+glowing for each
+  // logged set index, muted otherwise.
+  const dotLadder = (
+    <div className="flex items-center gap-1 shrink-0">
+      {Array.from({ length: ex.sets }, (_, i) => {
+        const done = loggedSets.some(s => s.set_number === i + 1)
+        return (
+          <span
+            key={i}
+            aria-hidden
+            className={`size-[6px] rounded-full ${done ? 'bg-primary glow-dot' : 'bg-muted-foreground/30'}`}
+          />
+        )
+      })}
     </div>
   )
 
@@ -158,20 +161,9 @@ export function ExerciseRow({
             </div>
           )}
         </div>
-        {/* Collapsed: prescription + load ride on the right as one muted line
-            (3b), replacing the chevron — the row itself is the affordance. */}
-        {!expanded && (
-          <div className="flex shrink-0 items-baseline gap-2 text-xs text-muted-foreground">
-            <span className="whitespace-nowrap">{ex.sets}×{ex.reps}</span>
-            <LoadChip
-              ex={ex}
-              source={loadSource}
-              explained={false}
-              onToggleExplain={() => {}}
-              progressionNote={undefined}
-            />
-          </div>
-        )}
+        {/* Collapsed: turn 5 hides loads on collapsed rows in favor of a
+            set-completion dot ladder — the row itself is the affordance. */}
+        {!expanded && dotLadder}
         {expanded && <ChevronDown className="size-4 text-muted-foreground shrink-0" />}
       </div>
 
@@ -179,6 +171,14 @@ export function ExerciseRow({
         <>
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0 flex-1">
+              {ex.suggested_load_kg != null && (
+                <div className="flex items-end gap-2 mb-1">
+                  <span className="tabular-mono text-[54px] font-bold leading-none -tracking-[0.02em]">
+                    {ex.suggested_load_kg}
+                  </span>
+                  <span className="text-xs text-text-tertiary pb-1.5">kg × {ex.reps}</span>
+                </div>
+              )}
               <LoadChip
                 ex={ex}
                 source={loadSource}
@@ -186,7 +186,7 @@ export function ExerciseRow({
                 onToggleExplain={() => setExplainedLoadChip(v => !v)}
                 progressionNote={progressionNote}
               />
-              {ramp && <RampStrip ramp={ramp} />}
+              {completedSets === 0 && ramp && <RampStrip ramp={ramp} />}
               {showCalibrationCue && <CalibrationCue hasLoad={ex.suggested_load_kg != null} />}
             </div>
             <DropdownMenu>
@@ -196,6 +196,12 @@ export function ExerciseRow({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                {onOpenHistory && (
+                  <DropdownMenuItem onClick={() => onOpenHistory(exerciseId, ex.name)}>
+                    <History className="size-3.5" />
+                    History
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem onClick={onSwap}>
                   <ArrowRightLeft className="size-3.5" />
                   Swap exercise
