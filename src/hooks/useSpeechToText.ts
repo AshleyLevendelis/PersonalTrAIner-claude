@@ -24,6 +24,10 @@ interface SpeechRecognitionResultLike {
 }
 interface SpeechRecognitionEventLike extends Event {
   results: ArrayLike<SpeechRecognitionResultLike>
+  /** Per spec, the lowest index in `results` that changed in this event. Not
+   * guaranteed present/correct on every engine — treated as a hint, not the
+   * sole source of truth (see accumulation comment in `start()` below). */
+  resultIndex?: number
 }
 interface SpeechRecognitionErrorEventLike extends Event {
   error: string
@@ -46,7 +50,18 @@ function getSpeechRecognitionCtor(): SpeechRecognitionCtor | null {
   return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null
 }
 
-export function useSpeechToText({ onTranscript }: { onTranscript: (text: string, isFinal: boolean) => void }) {
+export function useSpeechToText({
+  onTranscript,
+  onDebugLine,
+}: {
+  onTranscript: (text: string, isFinal: boolean) => void
+  /** Temporary diagnostic hook (see ChatAssistant.tsx's voice-debug overlay,
+   * gated behind localStorage `fitplan_voice_debug=1`) — fires one line per
+   * onresult event so a real-device trace can be captured without a tethered
+   * devtools session. Safe to leave wired in production: it's a no-op unless
+   * a caller passes it, and ChatAssistant only does that behind the flag. */
+  onDebugLine?: (line: string) => void
+}) {
   const ctorRef = useRef(getSpeechRecognitionCtor())
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null)
   const [isListening, setIsListening] = useState(false)
@@ -58,6 +73,20 @@ export function useSpeechToText({ onTranscript }: { onTranscript: (text: string,
   const deniedRef = useRef(false)
   const onTranscriptRef = useRef(onTranscript)
   onTranscriptRef.current = onTranscript
+  const onDebugLineRef = useRef(onDebugLine)
+  onDebugLineRef.current = onDebugLine
+  // Bumped on every start() — each recognition instance's callbacks capture
+  // the generation they were created with and refuse to act once a newer
+  // generation exists. This is the fix for a duplication path the previous
+  // round's fake-harness test couldn't reach: calling recognition.stop()
+  // does NOT synchronously detach its listeners or guarantee no further
+  // events — on a real device a late onresult from the instance being
+  // replaced can still fire after start() has already handed out a new one
+  // (e.g. a fast double-tap, or React not having flushed isListening yet).
+  // Two live sessions transcribing the same speech and both writing to the
+  // input independently reproduces exactly the "each event's text repeats"
+  // symptom, with no bug in the accumulation math itself.
+  const generationRef = useRef(0)
 
   const isSupported = ctorRef.current != null
 
@@ -67,58 +96,86 @@ export function useSpeechToText({ onTranscript }: { onTranscript: (text: string,
 
   const start = useCallback(() => {
     if (!ctorRef.current || deniedRef.current) return
-    // Requesting a second concurrent session throws in most engines — stop
-    // any stale instance first rather than guard on `isListening`, which
-    // can lag one render behind a fast double-tap.
-    recognitionRef.current?.stop()
+    const myGeneration = ++generationRef.current
+
+    const stale = recognitionRef.current
+    if (stale) {
+      // Detach immediately rather than relying on stop() to do it — stop()
+      // is async and, per the comment above, may not prevent one more
+      // onresult/onend from an instance we've already superseded.
+      stale.onresult = null
+      stale.onerror = null
+      stale.onend = null
+      stale.stop()
+    }
 
     const recognition = new ctorRef.current()
     recognition.continuous = true
     recognition.interimResults = true
     recognition.lang = navigator.language || 'en-US'
 
-    // Fix — voice input compounding instead of replacing. `event.results`
-    // keeps every already-final result around on every subsequent event, so
-    // naively re-summing the whole array on each onresult (as this used to)
-    // re-appends already-locked-in segments every time they're still
-    // present — and the still-open (non-final) segment is a REVISION of the
-    // recognizer's guess, not new text, so it must replace the previous
-    // interim rather than concatenate onto it. `finalizedCount` tracks how
-    // many leading results have already been folded into `finalizedText` so
-    // each final segment is counted exactly once; the current interim is
-    // always just the single most-recent non-final result, never a running
-    // concatenation of its own revisions.
-    let finalizedText = ''
-    let finalizedCount = 0
+    // Accumulation is keyed by result INDEX, not by a running counter/string
+    // concatenation. This is deliberately idempotent: whatever the real
+    // engine's replay behavior turns out to be (resending the full results
+    // array from 0 every event, re-marking an already-final index as final
+    // again with a revised transcript, an unreliable/absent resultIndex —
+    // any of which could explain the on-device "whatwhatwhat workout..."
+    // symptom that the fake single-shot test harness never exercised),
+    // writing finalsByIndex[i] = transcript OVERWRITES rather than appends.
+    // Reprocessing the same index any number of times converges to the same
+    // string instead of compounding it. event.resultIndex is used as a hint
+    // to start the scan late when the engine provides it; correctness does
+    // not depend on it being accurate, since a full 0-rescan is equally safe.
+    const finalsByIndex: string[] = []
     recognition.onresult = event => {
-      let interimText = ''
-      for (let i = finalizedCount; i < event.results.length; i++) {
+      if (generationRef.current !== myGeneration) return // stray event from a superseded session
+      const startIdx = typeof event.resultIndex === 'number' && event.resultIndex >= 0 && event.resultIndex <= event.results.length
+        ? event.resultIndex
+        : 0
+      for (let i = startIdx; i < event.results.length; i++) {
         const result = event.results[i]
-        if (result.isFinal) {
-          finalizedText += (finalizedText ? ' ' : '') + result[0].transcript
-          finalizedCount = i + 1
-        } else {
-          interimText = result[0].transcript
-        }
+        if (result.isFinal) finalsByIndex[i] = result[0].transcript
       }
-      const combined = finalizedText + (finalizedText && interimText ? ' ' : '') + interimText
+      const last = event.results.length > 0 ? event.results[event.results.length - 1] : undefined
+      const interimText = last && !last.isFinal ? last[0].transcript : ''
+      const finalText = finalsByIndex.filter(Boolean).join(' ')
+      const combined = finalText + (finalText && interimText ? ' ' : '') + interimText
+
+      if (onDebugLineRef.current) {
+        const perResult = Array.from({ length: event.results.length }, (_, i) => {
+          const r = event.results[i]
+          return `${i}:${r.isFinal ? 'F' : 'i'}"${r[0].transcript}"`
+        }).join(' ')
+        onDebugLineRef.current(
+          `gen=${myGeneration} resultIndex=${event.resultIndex ?? 'undef'} len=${event.results.length} [${perResult}] -> combined="${combined}"`
+        )
+      }
+
       onTranscriptRef.current(combined, interimText === '')
     }
     recognition.onerror = event => {
+      if (generationRef.current !== myGeneration) return
       if ((event.error === 'not-allowed' || event.error === 'service-not-allowed') && !deniedRef.current) {
         deniedRef.current = true
         setPermissionError("Microphone access was denied — allow it in your browser's site settings, then reload to use voice input.")
       }
+      onDebugLineRef.current?.(`gen=${myGeneration} onerror: ${event.error}`)
       setIsListening(false)
     }
-    recognition.onend = () => setIsListening(false)
+    recognition.onend = () => {
+      if (generationRef.current !== myGeneration) return
+      onDebugLineRef.current?.(`gen=${myGeneration} onend`)
+      setIsListening(false)
+    }
 
     recognitionRef.current = recognition
     try {
       recognition.start()
       setIsListening(true)
-    } catch {
+      onDebugLineRef.current?.(`gen=${myGeneration} start()`)
+    } catch (e) {
       setIsListening(false)
+      onDebugLineRef.current?.(`gen=${myGeneration} start() threw: ${e instanceof Error ? e.message : String(e)}`)
     }
   }, [])
 

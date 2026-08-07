@@ -194,10 +194,32 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
   // than each recognition event (which reports the FULL transcript so far,
   // not a delta) overwriting it.
   const voiceBaseRef = useRef('')
+  // TEMPORARY diagnostic — the previous fix for voice-input duplication
+  // verified clean against a synthetic SpeechRecognition but the same
+  // duplication still reproduces on a real Android device, meaning the
+  // synthetic event sequence doesn't match reality. Opt in via
+  // `localStorage.setItem('fitplan_voice_debug', '1')` (or the on-screen
+  // toggle below) to see the ACTUAL per-event trace from the real engine
+  // directly on the phone, no tethered devtools required. Remove once the
+  // real failure mode is confirmed fixed.
+  const [voiceDebugOn, setVoiceDebugOn] = useState(() => typeof localStorage !== 'undefined' && localStorage.getItem('fitplan_voice_debug') === '1')
+  const [voiceDebugLines, setVoiceDebugLines] = useState<string[]>([])
   const speech = useSpeechToText({
     onTranscript: text => setInput(voiceBaseRef.current + (voiceBaseRef.current && text ? ' ' : '') + text),
+    onDebugLine: voiceDebugOn
+      ? (line: string) => setVoiceDebugLines(prev => [...prev.slice(-24), `${new Date().toLocaleTimeString()} ${line}`])
+      : undefined,
   })
+  const micLongPressTimerRef = useRef<number | null>(null)
+  const micLongPressFiredRef = useRef(false)
   const handleMicClick = () => {
+    // A completed long-press already toggled the debug overlay (see
+    // onPointerDown above) — the click that follows pointerup must not ALSO
+    // start/stop listening.
+    if (micLongPressFiredRef.current) {
+      micLongPressFiredRef.current = false
+      return
+    }
     if (speech.isListening) {
       speech.stop()
       return
@@ -1974,8 +1996,25 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
                 variant={speech.isListening ? 'destructive' : 'ghost'}
                 size="icon"
                 onClick={handleMicClick}
+                onPointerDown={() => {
+                  // Long-press (700ms) toggles the on-screen voice-debug trace —
+                  // see the TEMPORARY diagnostic comment above voiceDebugOn.
+                  // A press-and-hold that doesn't need devtools is the whole
+                  // point: this has to be reachable on a phone in the field.
+                  micLongPressTimerRef.current = window.setTimeout(() => {
+                    micLongPressFiredRef.current = true
+                    setVoiceDebugOn(prev => {
+                      const next = !prev
+                      localStorage.setItem('fitplan_voice_debug', next ? '1' : '0')
+                      if (!next) setVoiceDebugLines([])
+                      return next
+                    })
+                  }, 700)
+                }}
+                onPointerUp={() => { if (micLongPressTimerRef.current) window.clearTimeout(micLongPressTimerRef.current) }}
+                onPointerLeave={() => { if (micLongPressTimerRef.current) window.clearTimeout(micLongPressTimerRef.current) }}
                 aria-label={speech.isListening ? 'Stop voice input' : 'Start voice input'}
-                title={speech.isListening ? 'Stop voice input' : 'Start voice input'}
+                title={speech.isListening ? 'Stop voice input' : 'Start voice input (hold to toggle debug trace)'}
                 className={cn('shrink-0 self-end', speech.isListening && 'animate-pulse')}
               >
                 <Mic className="size-4" />
@@ -1987,6 +2026,32 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
           </div>
           {speech.permissionError && (
             <p className="mt-1.5 text-[11px] text-muted-foreground">{speech.permissionError}</p>
+          )}
+          {voiceDebugOn && (
+            <div className="mt-2 rounded-xl bg-[color:var(--surface-deep)] p-2.5 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Voice debug trace — hold mic to turn off
+                </span>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    className="text-[10px] text-primary glow-mint"
+                    onClick={async () => {
+                      try { await navigator.clipboard.writeText(voiceDebugLines.join('\n')) } catch { /* clipboard unavailable — lines are still on screen to copy manually */ }
+                    }}
+                  >
+                    Copy
+                  </button>
+                  <button type="button" className="text-[10px] text-muted-foreground" onClick={() => setVoiceDebugLines([])}>Clear</button>
+                </div>
+              </div>
+              <div className="max-h-40 overflow-y-auto font-mono text-[10px] leading-[1.4] text-muted-foreground">
+                {voiceDebugLines.length === 0
+                  ? <p className="italic">No events yet — tap the mic and speak.</p>
+                  : voiceDebugLines.map((l, i) => <p key={i} className="break-all">{l}</p>)}
+              </div>
+            </div>
           )}
         </div>
       </CardContent>
