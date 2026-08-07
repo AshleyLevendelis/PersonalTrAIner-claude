@@ -23,9 +23,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Separator } from '@/components/ui/separator'
 import { Input } from '@/components/ui/input'
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible'
-import { ArrowRightLeft, Ban, Zap, ShieldAlert, Heart, Activity, Clock, Flame, ChevronLeft, ChevronRight, ChevronDown, Calendar, Sparkles, Thermometer } from 'lucide-react'
+import { ArrowRightLeft, Ban, History, Zap, ShieldAlert, Heart, Activity, Clock, Flame, ChevronLeft, ChevronRight, ChevronDown, Calendar, Sparkles, Thermometer } from 'lucide-react'
 import React, { useState, useCallback } from 'react'
-import { getExerciseEntry, searchExerciseCatalog } from '@/lib/exercise-db'
+import { getExerciseEntry, getExerciseId, searchExerciseCatalog } from '@/lib/exercise-db'
 import { getExerciseCompatibilityWarnings } from '@/lib/exercise-plan'
 import { getReplacementCandidates, type SwapScope } from '@/lib/mesocycle-edit'
 import { useActiveSession } from '@/hooks/useActiveSession'
@@ -49,6 +49,7 @@ interface ExercisePlanProps {
   devBypassLocks?: boolean
   onSwapExercise: (weekNumber: number, dayName: string, exIndex: number, newExercise: ExerciseEntry, scope: SwapScope) => void | Promise<void>
   onBanExercise: (exerciseName: string) => void | Promise<void>
+  onOpenHistory?: (exerciseId: string, exerciseName: string) => void
 }
 
 const DAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
@@ -287,7 +288,7 @@ function WarmupSection({ warmup, open, onToggle }: { warmup: WorkoutDay['warmup'
   )
 }
 
-export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, onSwapExercise, onBanExercise }: ExercisePlanProps) {
+export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, onSwapExercise, onBanExercise, onOpenHistory }: ExercisePlanProps) {
   // generateMesocycle produces 4 weeks PER BLOCK, not 4 weeks total — a
   // hypertrophy sequence alone is 4 blocks (16 weeks). Falling back to 4 only
   // applies before the mesocycle has loaded.
@@ -549,6 +550,17 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
+                          {onOpenHistory && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="size-7"
+                              onClick={() => onOpenHistory(ex.id ?? getExerciseId(ex.name), ex.name)}
+                              aria-label="Exercise history"
+                            >
+                              <History className="size-3.5" />
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
                             size="icon"

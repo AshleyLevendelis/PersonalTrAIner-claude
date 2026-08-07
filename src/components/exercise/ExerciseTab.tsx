@@ -7,6 +7,8 @@ import { DevTestPanel } from '@/components/DevTestPanel'
 import { isDevAccount } from '@/lib/dev-clock'
 import { TodayPanel } from './TodayPanel'
 import { SwapDialog, type SwapTarget } from './SwapDialog'
+import { ExerciseHistoryDialog } from './ExerciseHistoryDialog'
+import { SessionHistoryDialog } from './SessionHistoryDialog'
 import type { ExerciseEntry } from '@/lib/exercise-db'
 import type { SwapScope } from '@/lib/mesocycle-edit'
 import type { WorkoutDay, MesocycleWeek, UserProfile } from '@/lib/types'
@@ -60,6 +62,8 @@ export function ExerciseTab({
   const [swapTarget, setSwapTarget] = useState<SwapTarget | null>(null)
   const [plateCalcOpen, setPlateCalcOpen] = useState(false)
   const [plateCalcWeight, setPlateCalcWeight] = useState(0)
+  const [historyTarget, setHistoryTarget] = useState<{ exerciseId: string; exerciseName: string } | null>(null)
+  const [sessionHistoryOpen, setSessionHistoryOpen] = useState(false)
 
   const handleOpenPlateCalc = (weightKg: number) => {
     setPlateCalcWeight(weightKg)
@@ -101,6 +105,14 @@ export function ExerciseTab({
           devBypassLocks={devBypassLocks}
           onSwapExercise={onSwapExercise}
           onBanExercise={onBanExercise}
+          onOpenHistory={(id, name) => setHistoryTarget({ exerciseId: id, exerciseName: name })}
+        />
+        <ExerciseHistoryDialog
+          open={!!historyTarget}
+          onOpenChange={open => { if (!open) setHistoryTarget(null) }}
+          exerciseId={historyTarget?.exerciseId ?? null}
+          exerciseName={historyTarget?.exerciseName ?? null}
+          profileId={profileId}
         />
       </>
     )
@@ -119,6 +131,8 @@ export function ExerciseTab({
         onOpenSwap={(dayName, exIndex, exerciseName) => setSwapTarget({ dayName, exIndex, exerciseName })}
         onBanExercise={onBanExercise}
         onOpenPlateCalc={handleOpenPlateCalc}
+        onOpenHistory={(id, name) => setHistoryTarget({ exerciseId: id, exerciseName: name })}
+        onOpenSessionHistory={() => setSessionHistoryOpen(true)}
       />
       <SwapDialog
         target={swapTarget}
@@ -131,6 +145,18 @@ export function ExerciseTab({
         open={plateCalcOpen}
         onOpenChange={setPlateCalcOpen}
         initialWeight={plateCalcWeight}
+      />
+      <ExerciseHistoryDialog
+        open={!!historyTarget}
+        onOpenChange={open => { if (!open) setHistoryTarget(null) }}
+        exerciseId={historyTarget?.exerciseId ?? null}
+        exerciseName={historyTarget?.exerciseName ?? null}
+        profileId={profileId}
+      />
+      <SessionHistoryDialog
+        open={sessionHistoryOpen}
+        onOpenChange={setSessionHistoryOpen}
+        profileId={profileId}
       />
     </>
   )

@@ -460,6 +460,13 @@ export interface WorkoutSession {
   nutrition_target_id?: string
   created_at?: string
   updated_at?: string
+  /** Stamped by ensureSessionSynced on the first set saved that day. */
+  started_at?: string
+  /** Stamped by markSessionCompleted (explicit Finish, or the stale auto-close). */
+  finished_at?: string
+  week_number?: number | null
+  day?: string | null
+  notes?: string | null
 }
 
 export interface WorkoutExerciseRow {
