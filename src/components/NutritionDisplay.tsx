@@ -114,6 +114,35 @@ export function NutritionDisplay({ profile, macros, exercisePlan = [], latestWei
 
       <Card>
         <CardHeader className="pb-3">
+          <CardTitle className="text-base">Energy Expenditure</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <p className="ds-label">Basal Metabolic Rate (BMR)</p>
+            <p className="ds-num-hero">{bmr} <span className="text-sm font-normal text-muted-foreground">kcal/day</span></p>
+          </div>
+          <Separator />
+          <div>
+            <p className="ds-label">Total Daily Energy Expenditure (TDEE)</p>
+            <p className="ds-num-hero">{tdee} <span className="text-sm font-normal text-muted-foreground">kcal/day</span></p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/*
+        Fix — Nutrition Method demoted to the bottom of the tab. It's a
+        set-once decision (how the numbers above get computed), not daily
+        reading, so it was competing for prime position with numbers the
+        user actually checks every day. Kept IN this tab rather than moved
+        into ProfileScreen/Settings: it's the toggle that directly controls
+        the two target cards immediately above it on this same screen —
+        burying it in a separate settings surface would put the control and
+        the numbers it governs in two different places for what is a
+        genuinely rare edit, with no offsetting benefit (there's no daily-use
+        cost to it sitting at the bottom of an already-short tab).
+      */}
+      <Card>
+        <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base">Nutrition Method</CardTitle>
             <Badge variant="secondary" className="text-xs">
@@ -165,23 +194,6 @@ export function NutritionDisplay({ profile, macros, exercisePlan = [], latestWei
                 </div>
               </div>
             </button>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Energy Expenditure</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <p className="ds-label">Basal Metabolic Rate (BMR)</p>
-            <p className="ds-num-hero">{bmr} <span className="text-sm font-normal text-muted-foreground">kcal/day</span></p>
-          </div>
-          <Separator />
-          <div>
-            <p className="ds-label">Total Daily Energy Expenditure (TDEE)</p>
-            <p className="ds-num-hero">{tdee} <span className="text-sm font-normal text-muted-foreground">kcal/day</span></p>
           </div>
         </CardContent>
       </Card>

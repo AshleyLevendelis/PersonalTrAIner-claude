@@ -1828,7 +1828,13 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
             )}
             {messages.map((msg, i) => {
               const isLastAssistant = msg.role === 'assistant' && i === messages.length - 1
-              const quickReplies = isLastAssistant ? getQuickRepliesForLastMessage() : []
+              // Fix — quick-reply buttons must wait for the typewriter reveal
+              // to finish (buttons popping in mid-sentence read as broken).
+              // A message is still revealing exactly when its id equals
+              // animatingMessageId; restored/cached messages never carry
+              // that id in the first place, so they're never held back.
+              const stillRevealing = isLastAssistant && msg.id != null && msg.id === animatingMessageId
+              const quickReplies = isLastAssistant && !stillRevealing ? getQuickRepliesForLastMessage() : []
               return (
                 <div
                   key={msg.id || `msg-${i}`}
