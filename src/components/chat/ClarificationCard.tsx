@@ -43,7 +43,7 @@ export function ClarificationCard({
   }
 
   return (
-    <div className="mt-2 rounded-xl bg-card p-3 text-sm space-y-2">
+    <div className="mt-2 pl-3.5 border-l-2 border-[color:var(--hairline)] text-sm space-y-2">
       {contextLines && contextLines.length > 0 && (
         <div className="space-y-0.5">
           {contextLines.map((line, i) => (

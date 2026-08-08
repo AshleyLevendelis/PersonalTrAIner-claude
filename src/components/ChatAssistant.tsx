@@ -20,6 +20,8 @@ import { createPlanAdaptation } from '@/lib/plan-adaptations-store'
 import { substituteForInjury, substituteForEquipment } from '@/lib/plan-adaptations'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { useSpeechToText } from '@/hooks/useSpeechToText'
+import { useViewportInset } from '@/hooks/useViewportInset'
+import { TAB_BAR_HEIGHT_PX } from '@/components/BottomTabBar'
 import { cn } from '@/lib/utils'
 import { parseWorkoutEntries, type ParsedSetGroup, type WorkoutEntryInput } from '@/lib/set-parse'
 import { executeLogWorkout } from '@/lib/nl-logging-executor'
@@ -132,6 +134,13 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
   // logSet facade SetGrid.tsx uses — never saveSet directly (see
   // nl-logging-executor.ts's own doc comment).
   const activeSession = useActiveSession()
+  // Turn 6 composer fix: `sticky bottom-0` was inert inside CardContent's
+  // `overflow-hidden` (overflow:hidden ancestors don't give sticky anything
+  // to stick within — only overflow:auto/scroll do), and the Card's own
+  // fixed height never accounted for the independently-`fixed` tab bar. The
+  // composer now rides above the tab bar via the exact same fixed-position
+  // + keyboard-inset pattern BottomDock already uses.
+  const { insetPx: composerInsetPx, isKeyboardOpen: composerKeyboardOpen } = useViewportInset()
 
   // Keyed by an in-memory resolverId, not persisted: holds the full
   // entries/groups for a log_workout turn that hit a BLOCKING ambiguity, so
@@ -1977,7 +1986,12 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     },
   }
 
+  const composerBottomStyle = composerKeyboardOpen
+    ? { bottom: composerInsetPx + 16 }
+    : { bottom: `calc(${TAB_BAR_HEIGHT_PX}px + env(safe-area-inset-bottom))` }
+
   return (
+    <>
     <Card className="flex flex-col h-[600px] max-h-[80dvh]">
       <CardContent className="relative flex-1 flex flex-col p-0 overflow-hidden">
         <Button
@@ -1991,7 +2005,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
           <Trash2 className="size-3.5" />
         </Button>
         <div
-          className="flex-1 overflow-y-auto p-4 overscroll-contain"
+          className="flex-1 overflow-y-auto p-4 pb-24 overscroll-contain"
           ref={scrollRef}
           onScroll={handleScroll}
         >
@@ -2074,13 +2088,16 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
                 >
                   <div className="max-w-[80%]">
                     {msg.role === 'user' ? (
-                      <div className="rounded-2xl rounded-br-md bg-[rgba(91,233,194,.14)] px-4 py-2.5 text-sm whitespace-pre-wrap text-foreground">
+                      <div className="rounded-2xl rounded-br-md bg-[rgba(var(--glow-rgb),.14)] px-4 py-2.5 text-sm whitespace-pre-wrap text-foreground">
                         {bodyContent}
                       </div>
                     ) : (
                       <div className="flex items-start gap-2.5">
-                        <span className="flex size-[26px] shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-[#7CF3D4] to-[#3ED3AA] shadow-[0_0_18px_rgba(91,233,194,.45)]">
-                          <MessageCircle className="size-3.5 text-[#08281F]" strokeWidth={2.4} />
+                        <span
+                          className="flex size-[26px] shrink-0 items-center justify-center rounded-full text-[#08281F]"
+                          style={{ background: 'linear-gradient(180deg, color-mix(in oklab, var(--primary) 84%, white), var(--primary-2))', boxShadow: '0 0 18px rgba(var(--glow-rgb),.45)' }}
+                        >
+                          <MessageCircle className="size-3.5" strokeWidth={2.4} />
                         </span>
                         <div className="min-w-0 flex-1 pt-0.5 text-sm leading-relaxed text-foreground">
                           {bodyContent}
@@ -2187,84 +2204,90 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
             </button>
           </div>
         )}
-        {/* Turn 6: composer as a fixed-height pill (not three separate
-            bordered controls) — room for two lines before it grows past
-            that, a visible mint send target, sticky above the safe area. */}
-        <div className="sticky bottom-0 bg-gradient-to-t from-[color:var(--background)] from-60% to-transparent p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-          <div className="flex items-end gap-2.5 rounded-[20px] bg-[color:var(--surface-raised)] py-1.5 pl-4 pr-1.5">
-            <Textarea
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder={speech.isListening ? 'Listening…' : 'Ask about your plan or request changes...'}
-              className="min-h-[40px] max-h-[88px] flex-1 resize-none border-0 bg-transparent px-0 py-2 shadow-none focus-visible:ring-0"
-              rows={1}
-            />
-            {speech.isSupported && (
-              <Button
-                type="button"
-                variant={speech.isListening ? 'destructive' : 'ghost'}
-                size="icon"
-                onClick={handleMicClick}
-                onPointerDown={() => {
-                  // Long-press (700ms) toggles the on-screen voice-debug trace —
-                  // see the TEMPORARY diagnostic comment above voiceDebugOn.
-                  // A press-and-hold that doesn't need devtools is the whole
-                  // point: this has to be reachable on a phone in the field.
-                  micLongPressTimerRef.current = window.setTimeout(() => {
-                    micLongPressFiredRef.current = true
-                    setVoiceDebugOn(prev => {
-                      const next = !prev
-                      localStorage.setItem('fitplan_voice_debug', next ? '1' : '0')
-                      if (!next) setVoiceDebugLines([])
-                      return next
-                    })
-                  }, 700)
-                }}
-                onPointerUp={() => { if (micLongPressTimerRef.current) window.clearTimeout(micLongPressTimerRef.current) }}
-                onPointerLeave={() => { if (micLongPressTimerRef.current) window.clearTimeout(micLongPressTimerRef.current) }}
-                aria-label={speech.isListening ? 'Stop voice input' : 'Start voice input'}
-                title={speech.isListening ? 'Stop voice input' : 'Start voice input (hold to toggle debug trace)'}
-                className={cn('shrink-0 rounded-full', speech.isListening && 'animate-pulse')}
-              >
-                <Mic className="size-4" />
-              </Button>
-            )}
-            <Button data-chat-send onClick={sendMessage} disabled={!input.trim() || isLoading} size="icon" className="shrink-0 rounded-full glow-mint-box">
-              <Send className="size-4" />
-            </Button>
-          </div>
-          {speech.permissionError && (
-            <p className="mt-1.5 text-[11px] text-muted-foreground">{speech.permissionError}</p>
-          )}
-          {voiceDebugOn && (
-            <div className="mt-2 rounded-xl bg-[color:var(--surface-deep)] p-2.5 space-y-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  Voice debug trace — hold mic to turn off
-                </span>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    className="text-[10px] text-primary glow-mint"
-                    onClick={async () => {
-                      try { await navigator.clipboard.writeText(voiceDebugLines.join('\n')) } catch { /* clipboard unavailable — lines are still on screen to copy manually */ }
-                    }}
-                  >
-                    Copy
-                  </button>
-                  <button type="button" className="text-[10px] text-muted-foreground" onClick={() => setVoiceDebugLines([])}>Clear</button>
-                </div>
-              </div>
-              <div className="max-h-40 overflow-y-auto font-mono text-[10px] leading-[1.4] text-muted-foreground">
-                {voiceDebugLines.length === 0
-                  ? <p className="italic">No events yet — tap the mic and speak.</p>
-                  : voiceDebugLines.map((l, i) => <p key={i} className="break-all">{l}</p>)}
-              </div>
-            </div>
-          )}
-        </div>
       </CardContent>
     </Card>
+    {/* Turn 6: composer as a fixed-height pill (not three separate bordered
+        controls) — room for two lines before it grows past that, a visible
+        mint send target. Fixed (not sticky) and positioned exactly like
+        BottomDock rides above the tab bar / keyboard — see the comment by
+        useViewportInset's call above for why sticky never worked here. */}
+    <div
+      className="fixed left-0 right-0 z-40 mx-auto max-w-6xl px-4 bg-gradient-to-t from-[color:var(--background)] from-60% to-transparent pt-3 pb-3"
+      style={composerBottomStyle}
+    >
+      <div className="flex items-end gap-2.5 rounded-[20px] bg-[color:var(--surface-raised)] py-1.5 pl-4 pr-1.5">
+        <Textarea
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder={speech.isListening ? 'Listening…' : 'Ask about your plan or request changes...'}
+          className="min-h-[40px] max-h-[88px] flex-1 resize-none border-0 bg-transparent px-0 py-2 shadow-none focus-visible:ring-0"
+          rows={1}
+        />
+        {speech.isSupported && (
+          <Button
+            type="button"
+            variant={speech.isListening ? 'destructive' : 'ghost'}
+            size="icon"
+            onClick={handleMicClick}
+            onPointerDown={() => {
+              // Long-press (700ms) toggles the on-screen voice-debug trace —
+              // see the TEMPORARY diagnostic comment above voiceDebugOn.
+              // A press-and-hold that doesn't need devtools is the whole
+              // point: this has to be reachable on a phone in the field.
+              micLongPressTimerRef.current = window.setTimeout(() => {
+                micLongPressFiredRef.current = true
+                setVoiceDebugOn(prev => {
+                  const next = !prev
+                  localStorage.setItem('fitplan_voice_debug', next ? '1' : '0')
+                  if (!next) setVoiceDebugLines([])
+                  return next
+                })
+              }, 700)
+            }}
+            onPointerUp={() => { if (micLongPressTimerRef.current) window.clearTimeout(micLongPressTimerRef.current) }}
+            onPointerLeave={() => { if (micLongPressTimerRef.current) window.clearTimeout(micLongPressTimerRef.current) }}
+            aria-label={speech.isListening ? 'Stop voice input' : 'Start voice input'}
+            title={speech.isListening ? 'Stop voice input' : 'Start voice input (hold to toggle debug trace)'}
+            className={cn('shrink-0 rounded-full', speech.isListening && 'animate-pulse')}
+          >
+            <Mic className="size-4" />
+          </Button>
+        )}
+        <Button data-chat-send onClick={sendMessage} disabled={!input.trim() || isLoading} size="icon" className="shrink-0 rounded-full glow-mint-box">
+          <Send className="size-4" />
+        </Button>
+      </div>
+      {speech.permissionError && (
+        <p className="mt-1.5 text-[11px] text-muted-foreground">{speech.permissionError}</p>
+      )}
+      {voiceDebugOn && (
+        <div className="mt-2 rounded-xl bg-[color:var(--surface-deep)] p-2.5 space-y-1.5">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Voice debug trace — hold mic to turn off
+            </span>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                className="text-[10px] text-primary glow-mint"
+                onClick={async () => {
+                  try { await navigator.clipboard.writeText(voiceDebugLines.join('\n')) } catch { /* clipboard unavailable — lines are still on screen to copy manually */ }
+                }}
+              >
+                Copy
+              </button>
+              <button type="button" className="text-[10px] text-muted-foreground" onClick={() => setVoiceDebugLines([])}>Clear</button>
+            </div>
+          </div>
+          <div className="max-h-40 overflow-y-auto font-mono text-[10px] leading-[1.4] text-muted-foreground">
+            {voiceDebugLines.length === 0
+              ? <p className="italic">No events yet — tap the mic and speak.</p>
+              : voiceDebugLines.map((l, i) => <p key={i} className="break-all">{l}</p>)}
+          </div>
+        </div>
+      )}
+    </div>
+    </>
   )
 }

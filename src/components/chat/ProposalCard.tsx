@@ -1,6 +1,5 @@
 import { useState } from 'react'
-import { Button } from '@/components/ui/button'
-import { ArrowRightLeft, ShieldAlert, Info } from 'lucide-react'
+import { ShieldAlert, Info } from 'lucide-react'
 import type { ChatPendingActionView } from '@/lib/types'
 
 // ---------------------------------------------------------------------------
@@ -29,10 +28,12 @@ export function ProposalCard({
   const isStale = status === 'stale'
   const isTerminal = status === 'done' || status === 'partial' || status === 'failed' || status === 'declined' || status === 'expired'
 
-  const handleConfirm = async () => {
+  const handleConfirm = async (explicitScope?: string) => {
+    const useScope = explicitScope ?? scope
+    setScope(useScope)
     setBusy('confirm')
     try {
-      await onConfirm(scope)
+      await onConfirm(useScope)
     } finally {
       setBusy(null)
     }
@@ -49,18 +50,21 @@ export function ProposalCard({
 
   const scopeField = diff.editable?.find(e => e.field === 'scope')
 
+  // Turn 6: no card shell — this renders inline in the assistant's plain-text
+  // flow (ChatAssistant.tsx already applies the pl-9 avatar-offset to its
+  // parent), a left rule standing in for the removed border/background.
   return (
-    <div className="mt-2 rounded-xl bg-card p-3 text-sm space-y-2.5">
-      <div className="space-y-1.5">
+    <div className="mt-2 pl-3.5 border-l-2 border-[color:var(--role-ai-border)] text-sm space-y-2.5">
+      <div className="space-y-2">
+        <span className="block text-[9.5px] font-semibold uppercase tracking-[0.18em] text-[color:var(--role-ai)]">
+          Proposed change
+        </span>
         {diff.rows.map((row, i) => (
-          <div key={i} className="flex items-start justify-between gap-2 text-xs">
-            <span className="text-muted-foreground shrink-0">{row.field}</span>
-            <span className="text-right">
-              <span className="line-through text-muted-foreground/70">{row.before}</span>
-              {' → '}
-              <span className="font-medium">{row.after}</span>
-              {row.note && <span className="block text-[10px] text-muted-foreground/80">{row.note}</span>}
-            </span>
+          <div key={i} className="flex flex-col gap-0.5">
+            <span className="text-[10px] text-muted-foreground">{row.field}</span>
+            <span className="text-[13.5px] line-through text-muted-foreground/70">{row.before}</span>
+            <span className="text-[14.5px] font-semibold">{row.after}</span>
+            {row.note && <span className="text-[10px] text-muted-foreground/80">{row.note}</span>}
           </div>
         ))}
       </div>
@@ -78,41 +82,51 @@ export function ProposalCard({
 
       {diff.rationale && <p className="text-xs italic text-muted-foreground">"{diff.rationale}"</p>}
 
-      {scopeField && !isTerminal && (
-        <div className="flex gap-1.5">
-          {scopeField.options.map(opt => (
-            <button
-              key={opt}
-              className={`min-h-[44px] rounded-full px-3.5 text-xs font-medium transition-colors ${
-                scope === opt ? 'bg-primary/15 text-primary glow-mint' : 'bg-[color:var(--surface-raised)] text-muted-foreground hover:bg-accent'
-              }`}
-              onClick={() => setScope(opt)}
-              disabled={busyOverall}
-            >
-              {opt === 'today' ? 'Today only' : 'Rest of block'}
-            </button>
-          ))}
-        </div>
-      )}
-
       {isStale ? (
         <p className="text-xs text-[color:var(--role-warn)]">This changed since I proposed it — ask me again if you still want it.</p>
       ) : isTerminal ? null : (
-        // Fix — confirmation-card stuck loop, Part 3: these are the primary,
-        // unambiguous way to answer — sized to the same min-h-[44px] touch
-        // target as the model's own [QUICK_REPLIES] chips and onboarding's
-        // OptionCard, not the compact h-7 buttons used elsewhere in chat, so
-        // tapping reads as obviously the intended action rather than typing
-        // "yes" (which free text still handles correctly — see
-        // confirmation-reply.ts — but shouldn't be the first thing reached for).
+        // Fix — confirmation-card stuck loop, Part 3: these stay the primary,
+        // unambiguous way to answer, sized to the same min-h-[44px] touch
+        // target as the model's own [QUICK_REPLIES] chips — tapping reads as
+        // obviously the intended action rather than typing "yes" (which free
+        // text still handles correctly, see confirmation-reply.ts, but
+        // shouldn't be the first thing reached for). Turn 6 collapses the old
+        // separate scope-toggle + confirm/reject groups into one pill row:
+        // each scope option becomes its own "apply with this scope" pill.
         <div className="flex items-center gap-2 pt-0.5">
-          <Button className="min-h-[44px] text-sm px-4" onClick={handleConfirm} disabled={busyOverall}>
-            <ArrowRightLeft className="size-3.5 mr-1.5" />
-            {busy === 'confirm' ? 'Applying…' : 'Confirm'}
-          </Button>
-          <Button variant="ghost" className="min-h-[44px] text-sm px-4" onClick={handleReject} disabled={busyOverall}>
-            {busy === 'reject' ? 'Declining…' : 'Not now'}
-          </Button>
+          {scopeField ? (
+            scopeField.options.map((opt, i) => (
+              <button
+                key={opt}
+                className={
+                  i === 0
+                    ? 'min-h-[44px] rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground glow-mint-box disabled:opacity-60'
+                    : 'min-h-[44px] rounded-xl bg-[color:var(--surface-raised)] px-4 text-sm text-foreground disabled:opacity-60'
+                }
+                onClick={() => void handleConfirm(opt)}
+                disabled={busyOverall}
+              >
+                {busy === 'confirm' && scope === opt
+                  ? 'Applying…'
+                  : opt === 'today' ? 'Apply today' : opt === 'block' ? 'Whole block' : opt}
+              </button>
+            ))
+          ) : (
+            <button
+              className="min-h-[44px] rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground glow-mint-box disabled:opacity-60"
+              onClick={() => void handleConfirm()}
+              disabled={busyOverall}
+            >
+              {busy === 'confirm' ? 'Applying…' : 'Apply'}
+            </button>
+          )}
+          <button
+            className="min-h-[44px] px-3 text-sm text-muted-foreground disabled:opacity-60"
+            onClick={handleReject}
+            disabled={busyOverall}
+          >
+            {busy === 'reject' ? 'Declining…' : 'Keep'}
+          </button>
         </div>
       )}
     </div>

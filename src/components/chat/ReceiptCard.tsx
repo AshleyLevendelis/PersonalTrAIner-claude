@@ -73,7 +73,7 @@ export function ReceiptCard({
       : <XCircle className="size-3.5 text-destructive shrink-0" />
 
   return (
-    <div className="mt-2 rounded-xl bg-card p-3 text-sm space-y-2">
+    <div className="mt-2 pl-3.5 border-l-2 border-[color:var(--hairline)] text-sm space-y-2">
       <p className="flex items-center gap-1.5 text-xs font-medium">
         {icon}
         {title}
