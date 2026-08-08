@@ -10,9 +10,9 @@
 
 import { useEffect, useState } from 'react'
 
-export type Tab = 'dashboard' | 'nutrition' | 'exercise' | 'meals' | 'chat'
+export type Tab = 'dashboard' | 'nutrition' | 'exercise' | 'tools' | 'chat'
 
-const TABS: Tab[] = ['dashboard', 'nutrition', 'exercise', 'meals', 'chat']
+const TABS: Tab[] = ['dashboard', 'nutrition', 'exercise', 'tools', 'chat']
 
 export type Route =
   | { kind: 'tab'; tab: Tab }

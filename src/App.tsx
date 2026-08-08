@@ -8,9 +8,9 @@ import { BottomTabBar } from '@/components/BottomTabBar'
 import { OnboardingFlow } from '@/components/onboarding/OnboardingFlow'
 import { NutritionDisplay } from '@/components/NutritionDisplay'
 import { ExerciseTab } from '@/components/exercise/ExerciseTab'
-import { MealPlan, SLOT_LABEL as MEAL_SLOT_LABEL } from '@/components/MealPlan'
+import { SLOT_LABEL as MEAL_SLOT_LABEL } from '@/components/MealPlan'
 import { Dashboard } from '@/components/Dashboard'
-import { GroceryListSummary } from '@/components/GroceryListSummary'
+import { ToolsTab } from '@/components/ToolsTab'
 import { ChatAssistant } from '@/components/ChatAssistant'
 import { DevTestPage } from '@/components/DevTestPage'
 import { OfflineStatusIndicator } from '@/components/OfflineStatusIndicator'
@@ -1204,7 +1204,6 @@ function App() {
               exercisePlan={exercisePlan}
               mesocycle={mesocycle}
               planCreatedAt={mesocycleCreatedAt ?? profile.created_at}
-              onWeightLogged={handleWeightLogged}
             />
           </TabsContent>
 
@@ -1215,6 +1214,18 @@ function App() {
               exercisePlan={exercisePlan}
               latestWeightKg={latestWeightKg}
               onMacroModeChange={handleMacroModeChange}
+              onWeightLogged={handleWeightLogged}
+              profileId={profile.id}
+              date={getSessionDateContext(profile.id).date}
+              pools={mealPools}
+              chosen={chosenMeals}
+              mealTotals={mealTotals}
+              isGeneratingMeals={isGeneratingMeals}
+              mealRegenerateError={mealRegenerateError}
+              onDismissRegenerateError={() => setMealRegenerateError(null)}
+              onSwapMealSlot={handleSwapMealSlot}
+              onRegenerateMealSlot={handleRegenerateMealSlot}
+              onRegenerateAllMeals={handleRegenerateAllMeals}
             />
           </TabsContent>
 
@@ -1238,22 +1249,8 @@ function App() {
             />
           </TabsContent>
 
-          <TabsContent value="meals">
-            <MealPlan
-              profileId={profile.id}
-              date={getSessionDateContext(profile.id).date}
-              pools={mealPools}
-              chosen={chosenMeals}
-              totals={mealTotals}
-              targets={macros}
-              isGenerating={isGeneratingMeals}
-              regenerateError={mealRegenerateError}
-              onDismissRegenerateError={() => setMealRegenerateError(null)}
-              onSwapSlot={handleSwapMealSlot}
-              onRegenerateSlot={handleRegenerateMealSlot}
-              onRegenerateAll={handleRegenerateAllMeals}
-            />
-            <GroceryListSummary profileId={profile.id} mealPools={mealPools} targets={macros} />
+          <TabsContent value="tools">
+            <ToolsTab profileId={profile.id} mealPools={mealPools} targets={macros} />
           </TabsContent>
 
           <TabsContent value="chat" forceMount className="data-[state=inactive]:hidden">
@@ -1294,7 +1291,7 @@ function App() {
               onOpenProfile={section => { setProfileInfoSection(section); setProfileInfoOpen(true) }}
               groceryItems={groceryItems}
               onGroceryChanged={() => { if (profile?.id) return reloadGrocery(profile.id) }}
-              onOpenGrocery={() => { window.location.hash = tabHash('meals') }}
+              onOpenGrocery={() => { window.location.hash = tabHash('tools') }}
               onOpenDashboard={() => { window.location.hash = tabHash('dashboard') }}
               revealSpeed={revealSpeed}
             />

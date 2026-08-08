@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronDown, MoreVertical, Timer, ListPlus, History } from 'lucide-react'
+import { ChevronDown, MoreVertical, ListPlus, History } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import type { TrainingWeekDay } from '@/hooks/useTrainingWeek'
@@ -46,7 +46,6 @@ export function WeekContextRow({
   coachNote,
   estimatedMinutes,
   onOpenProgram,
-  onOpenTimers,
   onAddUnplannedWork,
   onOpenSessionHistory,
 }: {
@@ -63,7 +62,6 @@ export function WeekContextRow({
   coachNote?: string
   estimatedMinutes?: number
   onOpenProgram?: () => void
-  onOpenTimers?: () => void
   onAddUnplannedWork?: () => void
   onOpenSessionHistory?: () => void
 }) {
@@ -118,7 +116,7 @@ export function WeekContextRow({
               <ChevronDown className={`size-3.5 transition-transform ${expanded ? 'rotate-180' : ''}`} />
             </button>
           )}
-          {(onOpenTimers || onAddUnplannedWork || onOpenSessionHistory) && (
+          {(onAddUnplannedWork || onOpenSessionHistory) && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="size-7 shrink-0 text-muted-foreground" aria-label="More options">
@@ -126,12 +124,6 @@ export function WeekContextRow({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                {onOpenTimers && (
-                  <DropdownMenuItem onClick={onOpenTimers}>
-                    <Timer className="size-3.5" />
-                    Open timers
-                  </DropdownMenuItem>
-                )}
                 {onAddUnplannedWork && (
                   <DropdownMenuItem onClick={onAddUnplannedWork}>
                     <ListPlus className="size-3.5" />

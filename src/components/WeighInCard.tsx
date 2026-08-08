@@ -13,9 +13,9 @@ import { upsertDailyMetric } from '@/lib/daily-tracking'
  * entry). Trend LOGIC (target adjustment from the series) is M3; this only
  * captures and displays.
  *
- * Lives on the Dashboard, next to the weight-trend line it feeds — extracted
- * from NutritionDisplay.tsx (where it originally lived) since it's a daily
- * action, not a nutrition number.
+ * Lives on the Nutrition tab (turn 12: "one owner per fact") — Nutrition owns
+ * the plan, the derivation, and the weigh-in; Dashboard keeps only a
+ * read-only display of weight/trend, fed independently by data.weightTrend.
  */
 export function WeighInCard({ profileId, onWeightLogged }: { profileId: string; onWeightLogged?: () => void | Promise<void> }) {
   const [input, setInput] = useState('')

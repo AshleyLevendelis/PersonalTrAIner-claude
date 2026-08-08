@@ -106,7 +106,7 @@ interface ChatAssistantProps {
   onWeightLogged?: () => void | Promise<void>
   /** Fired after a confirmed propose_exercise_swap executes — App.tsx's setMesocycle, since the executor is pure and returns the new array rather than mutating App.tsx's state directly. */
   onMesocycleUpdated: (mesocycle: MesocycleWeek[]) => void
-  /** Fired after a confirmed propose_meal_swap executes — mirrors App.tsx's handleSwapMealSlot's setManualMealPicks, the ONLY thing that makes a swapped-in pool option actually render as today's pick. Without this the receipt would claim a swap the Meals/Nutrition tab never shows — exactly the incident this framework exists to prevent. */
+  /** Fired after a confirmed propose_meal_swap executes — mirrors App.tsx's handleSwapMealSlot's setManualMealPicks, the ONLY thing that makes a swapped-in pool option actually render as today's pick. Without this the receipt would claim a swap the Nutrition tab never shows — exactly the incident this framework exists to prevent. */
   /** Returns whether the pick actually persisted — a receipt must never say "Swapped" for a write that didn't land. */
   onMealSwapApplied: (slot: MealSlotName, chosenName: string) => Promise<boolean>
   /** Memory & goals (VISION-ARCHITECTURE.md §1) — active facts/goals/context, loaded by App.tsx alongside the profile. Read-only here: resolveAndSaveMemory writes through memory-store directly and calls onMemoryChanged so App.tsx re-fetches, the same "the client is the only writer, the caller reloads after" shape pending_actions uses. */
@@ -119,7 +119,7 @@ interface ChatAssistantProps {
   /** Grocery list (VISION-ARCHITECTURE.md §5.4) — current items, for the "what's on my list" context snapshot and duplicate-merge decisions. Same "client is the only writer, caller reloads after" shape as memory. */
   groceryItems: GroceryItemRow[]
   onGroceryChanged?: () => void | Promise<void>
-  /** Deep-link target for a grocery receipt's "View list" button — navigates to the Meals tab. */
+  /** Deep-link target for a grocery receipt's "View list" button — navigates to the Tools tab. */
   onOpenGrocery?: () => void
   /** Fired after a chat water log so App.tsx/Dashboard can refresh their own local water state (same "caller reloads after" shape, though water-store's own local-first merge already reflects the write immediately for anything reading it fresh). */
   onWaterChanged?: () => void | Promise<void>
@@ -609,7 +609,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       active_goals: memoryGoals.map(g => g.display_text),
       context_facts: memoryContextFacts.map(c => c.display_text),
       // Grocery list (VISION-ARCHITECTURE.md §5.4) — a snapshot for "what's
-      // on my list" Q&A, not live-synced to Meals-tab edits mid-conversation
+      // on my list" Q&A, not live-synced to Tools-tab edits mid-conversation
       // (same snapshot-per-mount shape as mealPlan/meal_summary above).
       grocery_list_summary: groceryItems
         .filter(i => !i.checked)
@@ -1125,7 +1125,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
           if (needle && stillPresent.length > 0) {
             rows.push({
               label: `Today's ${stillPresent.map(m => m.meal).join(', ')}`,
-              detail: 'still has it — swap from the Meals tab if you don\'t want it today',
+              detail: 'still has it — swap from the Nutrition tab if you don\'t want it today',
             })
           }
         }
@@ -1841,7 +1841,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       let ok = receipt.failed.length === 0 && !!result.appliedName
       if (ok && result.appliedName) {
         // The step that actually makes the swap visible — without this the
-        // receipt would claim a swap the Meals/Nutrition tab never shows.
+        // receipt would claim a swap the Nutrition tab never shows.
         // Awaited and checked: a receipt must never say "Swapped" for a
         // pick that didn't actually persist (fire-and-forget here would
         // reintroduce the exact bug the pool-level swap fix just closed).

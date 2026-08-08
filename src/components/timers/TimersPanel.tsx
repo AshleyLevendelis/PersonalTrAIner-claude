@@ -1,13 +1,13 @@
 // ---------------------------------------------------------------------------
-// Standalone timers surface — stopwatch, lap, and round modes — reachable
-// from the Exercise tab's IdentityLine. A Dialog (not a route) so it
-// trivially sits above BottomDock and BottomTabBar. All state lives in
-// useTimers (deadline-anchored, persisted, ticked by the same useDeadlineTick
-// hook the rest timer uses) — this component is presentation only.
+// Standalone timers surface — stopwatch, lap, and round modes. Turn 12 ("one
+// owner per fact") moved this from an Exercise-tab dialog into the Tools
+// tab as an inline panel — TimersPanel is the content, no Dialog wrapper;
+// ToolsTab.tsx mounts it directly. All state lives in useTimers
+// (deadline-anchored, persisted, ticked by the same useDeadlineTick hook the
+// rest timer uses) — this component is presentation only.
 // ---------------------------------------------------------------------------
 
 import { useState } from 'react'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
@@ -25,13 +25,9 @@ function formatMs(ms: number, withTenths = false): string {
   return `${minutes}:${seconds.toString().padStart(2, '0')}.${tenths}`
 }
 
-export function TimersScreen({
-  open,
-  onOpenChange,
+export function TimersPanel({
   todaysConditioning,
 }: {
-  open: boolean
-  onOpenChange: (open: boolean) => void
   /** Today's conditioning prescription, if any — offers a one-tap prefill for the round timer when it parses as a structured interval. */
   todaysConditioning?: WorkoutDay['recommendedCardio']
 }) {
@@ -39,29 +35,22 @@ export function TimersScreen({
   const prefill = parseConditioningInterval(todaysConditioning?.activity)
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm">
-        <DialogHeader>
-          <DialogTitle>Timers</DialogTitle>
-        </DialogHeader>
-        <Tabs value={timers.mode} onValueChange={v => timers.setMode(v as typeof timers.mode)}>
-          <TabsList className="grid grid-cols-3 w-full">
-            <TabsTrigger value="stopwatch">Stopwatch</TabsTrigger>
-            <TabsTrigger value="lap">Lap</TabsTrigger>
-            <TabsTrigger value="round">Round</TabsTrigger>
-          </TabsList>
-          <TabsContent value="stopwatch">
-            <StopwatchPanel />
-          </TabsContent>
-          <TabsContent value="lap">
-            <LapPanel />
-          </TabsContent>
-          <TabsContent value="round">
-            <RoundPanel prefill={prefill} />
-          </TabsContent>
-        </Tabs>
-      </DialogContent>
-    </Dialog>
+    <Tabs value={timers.mode} onValueChange={v => timers.setMode(v as typeof timers.mode)}>
+      <TabsList className="grid grid-cols-3 w-full">
+        <TabsTrigger value="stopwatch">Stopwatch</TabsTrigger>
+        <TabsTrigger value="lap">Lap</TabsTrigger>
+        <TabsTrigger value="round">Round</TabsTrigger>
+      </TabsList>
+      <TabsContent value="stopwatch">
+        <StopwatchPanel />
+      </TabsContent>
+      <TabsContent value="lap">
+        <LapPanel />
+      </TabsContent>
+      <TabsContent value="round">
+        <RoundPanel prefill={prefill} />
+      </TabsContent>
+    </Tabs>
   )
 }
 

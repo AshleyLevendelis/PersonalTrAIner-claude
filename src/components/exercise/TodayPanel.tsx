@@ -8,6 +8,7 @@ import { groupExercises, resolveCalibrationAnchorIndex, computeSessionSummary, t
 import { computeSessionPRs } from '@/lib/pr-engine'
 import { getExerciseId } from '@/lib/exercise-db'
 import { getLocalDateString } from '@/lib/dev-clock'
+import { tabHash } from '@/lib/app-route'
 import { WeekContextRow } from './WeekContextRow'
 import { PeekPanel } from './PeekPanel'
 import { WarmupSection } from './WarmupSection'
@@ -18,7 +19,6 @@ import { AdditionalWorkSection } from './AdditionalWorkSection'
 import { AddUnplannedWork } from './AddUnplannedWork'
 import { RestDayCard, ActiveRecoveryCard } from './RestDayCard'
 import { SessionSummaryDialog, type SessionSummaryData } from './SessionSummaryDialog'
-import { TimersScreen } from '@/components/timers/TimersScreen'
 import type { WorkoutDay, MesocycleWeek, UserProfile } from '@/lib/types'
 import type { LoadSource } from './LoadChip'
 
@@ -73,7 +73,6 @@ export function TodayPanel({
   const [borrowedDayName, setBorrowedDayName] = useState<string | null>(null)
   const [expandedWarmup, setExpandedWarmup] = useState(false)
   const [banBusy, setBanBusy] = useState<string | null>(null)
-  const [timersOpen, setTimersOpen] = useState(false)
   // Turn 5: "Add unplanned work" moved from an always-visible bottom button
   // to the day-level "⋮" menu (WeekContextRow) — this is that controlled
   // open state.
@@ -105,10 +104,13 @@ export function TodayPanel({
   }
 
   // BottomDock's standalone-timer chip lives in a different subtree — same
-  // cross-tree request pattern as useActiveSession's requestedSetFocus.
+  // cross-tree request pattern as useActiveSession's requestedSetFocus. Turn
+  // 12 moved the Timers surface out of an Exercise-tab dialog and into the
+  // Tools tab, so "reopen" now means navigating there instead of opening a
+  // local dialog.
   useEffect(() => {
     if (timers.screenOpenRequested) {
-      setTimersOpen(true)
+      window.location.hash = tabHash('tools')
       timers.clearScreenOpenRequest()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -208,7 +210,6 @@ export function TodayPanel({
         phaseFocus={currentMesoWeekObj?.phase_focus}
         coachNote={currentMesoWeekObj?.coach_note}
         onOpenProgram={onOpenProgram}
-        onOpenTimers={!isRestDay && !isActiveRecovery && !peekWorkout ? () => setTimersOpen(true) : undefined}
         onAddUnplannedWork={!isRestDay && !isActiveRecovery && !peekWorkout ? () => setUnplannedWorkOpen(true) : undefined}
         onOpenSessionHistory={onOpenSessionHistory}
       />
@@ -278,7 +279,6 @@ export function TodayPanel({
             )}
           </div>
           <SessionSummaryDialog open={summaryOpen} onOpenChange={setSummaryOpen} data={summaryData} />
-          <TimersScreen open={timersOpen} onOpenChange={setTimersOpen} todaysConditioning={workout!.recommendedCardio} />
           <WarmupSection warmup={workout!.warmup} open={expandedWarmup} onToggle={() => setExpandedWarmup(v => !v)} />
           <ExerciseList
             workout={workout!}

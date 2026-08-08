@@ -1,7 +1,11 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Calculator, Layers } from 'lucide-react'
+import { MealPlan } from '@/components/MealPlan'
+import { WeighInCard } from '@/components/WeighInCard'
 import type { MacroTargets, UserProfile, WorkoutDay, MacroCalculationMode } from '@/lib/types'
+import type { MealSlotName } from '@/lib/meal-store'
+import type { PoolOption } from '@/lib/meal-generation'
 import { calculateWeeklySchedule, getMacroDerivation } from '@/lib/macro-calculator'
 
 export interface NutritionDisplayProps {
@@ -11,9 +15,31 @@ export interface NutritionDisplayProps {
   /** Latest daily_metrics weigh-in — overrides the immutable onboarding weight in every displayed number (living targets, M0). */
   latestWeightKg?: number | null
   onMacroModeChange?: (mode: MacroCalculationMode) => void
+  /** Fired after WeighInCard saves so App.tsx can recompute targets + latestWeightKg. */
+  onWeightLogged?: () => void | Promise<void>
+  // Turn 12 ("one owner per fact") — meals moved here from the retired
+  // Meals tab: Nutrition answers "what am I eating and where do my numbers
+  // come from", so the meal list belongs beside its own targets, not on a
+  // separate tab. Props below are MealPlan's own, threaded through
+  // unchanged from App.tsx (same values it passed to <MealPlan> before).
+  profileId: string | undefined
+  date: string
+  pools: Partial<Record<MealSlotName, PoolOption[]>>
+  chosen: Partial<Record<MealSlotName, PoolOption>>
+  mealTotals: MacroTargets
+  isGeneratingMeals: boolean
+  mealRegenerateError?: string | null
+  onDismissRegenerateError?: () => void
+  onSwapMealSlot: (slot: MealSlotName, chooseName: string) => Promise<void>
+  onRegenerateMealSlot: (slot: MealSlotName) => Promise<void>
+  onRegenerateAllMeals: () => Promise<void>
 }
 
-export function NutritionDisplay({ profile, exercisePlan = [], latestWeightKg, onMacroModeChange }: NutritionDisplayProps) {
+export function NutritionDisplay({
+  profile, macros, exercisePlan = [], latestWeightKg, onMacroModeChange, onWeightLogged,
+  profileId, date, pools, chosen, mealTotals, isGeneratingMeals, mealRegenerateError, onDismissRegenerateError,
+  onSwapMealSlot, onRegenerateMealSlot, onRegenerateAllMeals,
+}: NutritionDisplayProps) {
   // Living targets (M0): BMR/TDEE were previously read from the frozen
   // fitness_profiles columns (computed once at onboarding); they're now
   // derived live from the same effective-weight profile the macros use, so
@@ -32,42 +58,63 @@ export function NutritionDisplay({ profile, exercisePlan = [], latestWeightKg, o
     ? calculateWeeklySchedule(effectiveProfile, exercisePlan)
     : null
 
-  const derivationRows = [
-    { label: 'Basal metabolic rate', sub: `From ${effectiveProfile.weight_kg} kg, ${effectiveProfile.height_cm} cm, ${effectiveProfile.age} y`, value: `${derivation.bmr}` },
-    { label: 'Daily expenditure', sub: `BMR × activity level`, value: `${derivation.tdee}` },
-    { label: derivation.surplusLabel, sub: derivation.surplusKcal === 0 ? 'No adjustment at maintenance' : 'Applied for your current goal', value: `${derivation.surplusKcal > 0 ? '+' : ''}${derivation.surplusKcal}` },
-  ]
-
   return (
     <div className="space-y-6">
+      <MealPlan
+        profileId={profileId}
+        date={date}
+        pools={pools}
+        chosen={chosen}
+        totals={mealTotals}
+        targets={macros}
+        isGenerating={isGeneratingMeals}
+        regenerateError={mealRegenerateError}
+        onDismissRegenerateError={onDismissRegenerateError}
+        onSwapSlot={onSwapMealSlot}
+        onRegenerateSlot={onRegenerateMealSlot}
+        onRegenerateAll={onRegenerateAllMeals}
+      />
+
+      {/* Turn 12: the stacked rows-with-sub-explanation layout (turn 10)
+          compresses into a single always-visible 4-column strip — BMR/TDEE/
+          adjustment/target, no expand needed. The "how it's derived" prose
+          moves to the caption below; the numbers themselves are the whole
+          point of this card now that meals sit above it. */}
       <Card>
         <CardHeader className="pb-1">
           <CardTitle className="text-base">How your targets are set</CardTitle>
         </CardHeader>
         <CardContent className="pt-0">
-          <div className="flex flex-col">
-            {derivationRows.map(row => (
-              <div key={row.label} className="flex items-baseline justify-between gap-3 py-3.5" style={{ borderTop: '1px solid var(--hairline, var(--border))' }}>
-                <div className="min-w-0">
-                  <p className="text-sm text-foreground">{row.label}</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">{row.sub}</p>
-                </div>
-                <span className="tabular-mono shrink-0 text-sm">{row.value}</span>
-              </div>
-            ))}
-            <div className="flex items-baseline justify-between gap-3 py-3.5" style={{ borderTop: '1px solid var(--hairline, var(--border))' }}>
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-foreground">Daily target</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">Protein 2 g/kg · fat 25% · carbs the remainder</p>
-              </div>
-              <span className="ds-num-tile tabular-mono glow-mint-lg shrink-0 text-[18px]">{derivation.target.calories}</span>
+          <div className="flex gap-3">
+            <div className="flex-1 min-w-0">
+              <p className="tabular-mono text-[17px] font-bold tracking-[-.03em]">{derivation.bmr}</p>
+              <p className="mt-0.5 text-[8.5px] uppercase tracking-[.14em] text-muted-foreground">BMR</p>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="tabular-mono text-[17px] font-bold tracking-[-.03em]">{derivation.tdee}</p>
+              <p className="mt-0.5 text-[8.5px] uppercase tracking-[.14em] text-muted-foreground">TDEE</p>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="tabular-mono text-[17px] font-bold tracking-[-.03em]">{derivation.surplusKcal > 0 ? '+' : ''}{derivation.surplusKcal}</p>
+              <p className="mt-0.5 text-[8.5px] uppercase tracking-[.14em] text-muted-foreground">{derivation.surplusLabel.split(' ')[0]}</p>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="tabular-mono text-[17px] font-bold tracking-[-.03em] text-primary glow-mint">{derivation.target.calories}</p>
+              <p className="mt-0.5 text-[8.5px] uppercase tracking-[.14em] text-muted-foreground">Target</p>
             </div>
           </div>
-          <p className="mt-4 text-xs text-muted-foreground">
-            Every figure here recomputes from your latest weigh-in. Today's progress against this target is the ring on Home.
+          <p className="mt-2.5 text-[11px] leading-normal text-muted-foreground">
+            From {effectiveProfile.weight_kg} kg, {effectiveProfile.height_cm} cm, {effectiveProfile.age} y · protein 2 g/kg · fat 25% · carbs the remainder.
           </p>
         </CardContent>
       </Card>
+
+      <div>
+        <p className="ds-label">Weigh-in</p>
+        <div className="mt-2.5">
+          {profile.id && <WeighInCard profileId={profile.id} onWeightLogged={onWeightLogged} />}
+        </div>
+      </div>
 
       {mode === 'DYNAMIC_CSCS' && weeklySchedule && (
         <Card>

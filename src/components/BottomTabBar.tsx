@@ -1,4 +1,4 @@
-import { LayoutDashboard, PieChart, Activity, UtensilsCrossed, MessageCircle } from 'lucide-react'
+import { LayoutDashboard, PieChart, Activity, Wrench, MessageCircle } from 'lucide-react'
 import { useViewportInset } from '@/hooks/useViewportInset'
 import type { Tab } from '@/lib/app-route'
 
@@ -22,7 +22,7 @@ const SIDE_TABS: { tab: Tab; label: string; icon: typeof LayoutDashboard }[] = [
   { tab: 'dashboard', label: 'Home', icon: LayoutDashboard },
   { tab: 'nutrition', label: 'Nutrition', icon: PieChart },
   { tab: 'exercise', label: 'Exercise', icon: Activity },
-  { tab: 'meals', label: 'Meals', icon: UtensilsCrossed },
+  { tab: 'tools', label: 'Tools', icon: Wrench },
 ]
 
 export function BottomTabBar({

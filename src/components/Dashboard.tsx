@@ -7,7 +7,6 @@
 
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { WeighInCard } from '@/components/WeighInCard'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { getAppNow } from '@/lib/dev-clock'
 import { tabHash } from '@/lib/app-route'
@@ -23,8 +22,6 @@ interface DashboardProps {
   mesocycle: MesocycleWeek[]
   planCreatedAt?: string
   onWaterChanged?: () => void
-  /** Fired after a weigh-in saves so the app can recompute targets + snapshot — forwarded straight to WeighInCard. */
-  onWeightLogged?: () => void | Promise<void>
 }
 
 const WATER_QUICK_ADD_ML = [250, 500]
@@ -42,7 +39,7 @@ const RINGS = [
 ] as const
 const RING_CIRC: Record<string, number> = Object.fromEntries(RINGS.map(r => [r.key, 2 * Math.PI * r.r]))
 
-export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreatedAt, onWaterChanged, onWeightLogged }: DashboardProps) {
+export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreatedAt, onWaterChanged }: DashboardProps) {
   const activeSession = useActiveSession()
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -237,7 +234,7 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
                 kcal · of <span className="tabular-mono">{Math.round(data.caloriesTarget)}</span>
               </p>
               {data.caloriesEaten === 0 && (
-                <button className="mt-1 text-left text-xs text-primary glow-mint" onClick={() => { window.location.hash = tabHash('meals') }}>Log a meal</button>
+                <button className="mt-1 text-left text-xs text-primary glow-mint" onClick={() => { window.location.hash = tabHash('nutrition') }}>Log a meal</button>
               )}
             </div>
             <div className="flex flex-col gap-[7px]">
@@ -332,12 +329,6 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
                 <span className="text-[11px] text-muted-foreground"> — new PR</span>
               </p>
             ))}
-          </div>
-        )}
-
-        {profile.id && (
-          <div className="mt-4">
-            <WeighInCard profileId={profile.id} onWeightLogged={onWeightLogged} />
           </div>
         )}
 
