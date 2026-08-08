@@ -121,7 +121,7 @@ export function AddUnplannedWork({
             Cardio
           </Button>
         </div>
-        <Button variant="ghost" size="icon" className="size-6" onClick={reset} aria-label="Cancel">
+        <Button variant="ghost" size="icon" className="hit-slop-44 size-6" onClick={reset} aria-label="Cancel">
           <X className="size-3.5" />
         </Button>
       </div>

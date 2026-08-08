@@ -52,7 +52,7 @@ export function OfflineStatusIndicator() {
               <AlertTriangle className="size-3.5 text-red-500" />
               Sets that failed to sync
             </span>
-            <Button variant="ghost" size="icon" className="size-6" onClick={() => setReviewOpen(false)}>
+            <Button variant="ghost" size="icon" className="hit-slop-44 size-6" onClick={() => setReviewOpen(false)}>
               <X className="size-3.5" />
             </Button>
           </div>
@@ -74,12 +74,12 @@ export function OfflineStatusIndicator() {
                     </p>
                   )}
                   <p className="text-[10px] text-red-700 dark:text-red-400">{item.errorMessage}</p>
-                  <div className="flex gap-1.5 pt-0.5">
-                    <Button variant="outline" size="sm" className="h-6 text-[10px] px-2 gap-1" onClick={() => handleRetry(item.clientId)}>
+                  <div className="flex gap-3 pt-0.5">
+                    <Button variant="outline" size="sm" className="hit-slop-44 h-6 text-[10px] px-2 gap-1" onClick={() => handleRetry(item.clientId)}>
                       <RotateCcw className="size-2.5" />
                       Retry
                     </Button>
-                    <Button variant="outline" size="sm" className="h-6 text-[10px] px-2 gap-1 text-destructive hover:text-destructive" onClick={() => handleDiscard(item.clientId)}>
+                    <Button variant="outline" size="sm" className="hit-slop-44 h-6 text-[10px] px-2 gap-1 text-destructive hover:text-destructive" onClick={() => handleDiscard(item.clientId)}>
                       <Trash2 className="size-2.5" />
                       Discard
                     </Button>

@@ -377,6 +377,38 @@
       rgba(var(--grain-rgb), 0) 1px 5px
     );
   }
+
+  /* Audit fix: expand a small tappable control's HIT AREA to the ~44x44px
+   * minimum without growing its visual size — an invisible ::after covering
+   * the element plus enough margin on each side to reach 44px total, laid
+   * over the element (not the page) so it never blocks a sibling's own
+   * click. Apply to any button/icon whose visual footprint must stay small
+   * (chip removes, dense list icons, narrow day-strip cells). */
+  .hit-slop-44 {
+    position: relative;
+  }
+  .hit-slop-44::after {
+    content: '';
+    position: absolute;
+    inset: 50% auto auto 50%;
+    width: max(44px, 100%);
+    height: max(44px, 100%);
+    transform: translate(-50%, -50%);
+  }
+
+  /* Asymmetric variant for controls packed tightly side-by-side (e.g. the
+   * 7-wide week-day strip) where a full 44px-square slop would overlap
+   * neighbours: only expand height to 44px (vertical room is available)
+   * and expand width by half the row's own gap on each side, so adjacent
+   * hit zones meet at the midpoint rather than overlapping. */
+  .hit-slop-day {
+    position: relative;
+  }
+  .hit-slop-day::after {
+    content: '';
+    position: absolute;
+    inset: -10px -5px;
+  }
 }
 
 @keyframes dsGlowPulse {

@@ -228,7 +228,7 @@ export function GroceryList({ profileId, mealPools, targets, refreshToken }: Gro
               <div key={item.id} className={`rounded-md border p-2 flex items-start gap-2 ${item.checked ? 'opacity-50 border-border/30' : 'border-border/50'}`}>
                 <button
                   onClick={() => toggleChecked(item)}
-                  className={`mt-0.5 size-5 shrink-0 rounded border flex items-center justify-center transition-colors ${item.checked ? 'bg-primary border-primary' : 'border-muted-foreground/40'}`}
+                  className={`hit-slop-44 mt-0.5 size-5 shrink-0 rounded border flex items-center justify-center transition-colors ${item.checked ? 'bg-primary border-primary' : 'border-muted-foreground/40'}`}
                   aria-label={item.checked ? 'Uncheck item' : 'Check off item'}
                 >
                   {item.checked && <Check className="size-3.5 text-primary-foreground" />}
@@ -239,8 +239,8 @@ export function GroceryList({ profileId, mealPools, targets, refreshToken }: Gro
                     <div className="flex items-center gap-1.5">
                       <Input value={editName} onChange={e => setEditName(e.target.value)} className="h-7 text-sm flex-1" />
                       <Input value={editQty} onChange={e => setEditQty(e.target.value)} className="h-7 text-sm w-16" inputMode="decimal" />
-                      <Button size="icon" variant="ghost" className="size-7" onClick={() => saveEdit(item.id)}><Check className="size-3.5" /></Button>
-                      <Button size="icon" variant="ghost" className="size-7" onClick={cancelEdit}><X className="size-3.5" /></Button>
+                      <Button size="icon" variant="ghost" className="hit-slop-44 size-7" onClick={() => saveEdit(item.id)}><Check className="size-3.5" /></Button>
+                      <Button size="icon" variant="ghost" className="hit-slop-44 size-7" onClick={cancelEdit}><X className="size-3.5" /></Button>
                     </div>
                   ) : (
                     <div className={`flex items-center justify-between gap-2 ${item.checked ? 'line-through' : ''}`}>
@@ -268,9 +268,9 @@ export function GroceryList({ profileId, mealPools, targets, refreshToken }: Gro
                 </div>
 
                 {editingId !== item.id && (
-                  <div className="flex items-center gap-0.5 shrink-0">
-                    <Button size="icon" variant="ghost" className="size-6" onClick={() => startEdit(item)}><Pencil className="size-3" /></Button>
-                    <Button size="icon" variant="ghost" className="size-6 text-destructive" onClick={() => remove(item)}><Trash2 className="size-3" /></Button>
+                  <div className="flex items-center gap-2.5 shrink-0">
+                    <Button size="icon" variant="ghost" className="hit-slop-44 size-6" onClick={() => startEdit(item)}><Pencil className="size-3" /></Button>
+                    <Button size="icon" variant="ghost" className="hit-slop-44 size-6 text-destructive" onClick={() => remove(item)}><Trash2 className="size-3" /></Button>
                   </div>
                 )}
               </div>

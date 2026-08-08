@@ -81,7 +81,7 @@ export function WeekContextRow({
                 key={d.date}
                 type="button"
                 onClick={() => { if (!isToday) onSelectDay(d.dayName) }}
-                className="flex flex-col items-center gap-0.5"
+                className="hit-slop-day flex flex-col items-center gap-0.5"
                 aria-label={`${d.dayName}: ${d.state}`}
               >
                 <span className={`text-[9.5px] tracking-[.08em] ${isToday ? 'font-semibold text-primary' : 'text-muted-foreground'}`}>
@@ -111,7 +111,7 @@ export function WeekContextRow({
           {(phaseFocus || coachNote) && (
             <button
               type="button"
-              className="shrink-0 text-muted-foreground hover:text-foreground"
+              className="hit-slop-44 shrink-0 text-muted-foreground hover:text-foreground"
               onClick={() => setExpanded(v => !v)}
               aria-label="Expand phase context"
             >

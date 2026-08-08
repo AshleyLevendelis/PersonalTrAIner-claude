@@ -142,11 +142,11 @@ function EditableTagList({
   const remove = (v: string) => onSave(values.filter(x => x !== v))
   return (
     <div className="space-y-1.5">
-      <div className="flex flex-wrap gap-1">
+      <div className="flex flex-wrap gap-x-2.5 gap-y-2.5">
         {values.map(v => (
           <Badge key={v} variant="secondary" className="text-[10px] gap-1 pr-1">
             {v}
-            <button type="button" onClick={() => remove(v)} aria-label={`Remove ${v}`}><X className="size-2.5" /></button>
+            <button type="button" onClick={() => remove(v)} aria-label={`Remove ${v}`} className="hit-slop-44"><X className="size-2.5" /></button>
           </Badge>
         ))}
         {values.length === 0 && <span className="text-xs text-muted-foreground/70">None yet</span>}
@@ -567,19 +567,19 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
               return (
                 <div key={g.id} className="rounded-md border p-2.5 space-y-1">
                   {editingId === g.id ? (
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-2.5">
                       <Input value={editValue} onChange={e => setEditValue(e.target.value)} className="h-7 text-sm" />
-                      <Button size="icon" variant="ghost" className="size-7" onClick={() => saveGoalEdit(g.id)}><Check className="size-3.5" /></Button>
-                      <Button size="icon" variant="ghost" className="size-7" onClick={cancelEdit}><X className="size-3.5" /></Button>
+                      <Button size="icon" variant="ghost" className="hit-slop-44 size-7" onClick={() => saveGoalEdit(g.id)}><Check className="size-3.5" /></Button>
+                      <Button size="icon" variant="ghost" className="hit-slop-44 size-7" onClick={cancelEdit}><X className="size-3.5" /></Button>
                     </div>
                   ) : (
                     <div className="flex items-start justify-between gap-2">
                       <span className="text-sm font-medium">{g.display_text}</span>
-                      <div className="flex items-center gap-1 shrink-0">
-                        <Button size="icon" variant="ghost" className="size-6" onClick={() => startEdit(g.id, g.display_text)}><Pencil className="size-3" /></Button>
+                      <div className="flex items-center gap-2.5 shrink-0">
+                        <Button size="icon" variant="ghost" className="hit-slop-44 size-6" onClick={() => startEdit(g.id, g.display_text)}><Pencil className="size-3" /></Button>
                         <Button
                           size="icon" variant="ghost"
-                          className={armedDeleteKey === `goal:${g.id}` ? 'size-6 bg-destructive text-destructive-foreground' : 'size-6 text-destructive'}
+                          className={armedDeleteKey === `goal:${g.id}` ? 'hit-slop-44 size-6 bg-destructive text-destructive-foreground' : 'hit-slop-44 size-6 text-destructive'}
                           onClick={() => requestDelete(`goal:${g.id}`, () => deleteGoal(g.id))}
                           aria-label={armedDeleteKey === `goal:${g.id}` ? 'Tap again to permanently delete this goal' : 'Delete goal'}
                         ><Trash2 className="size-3" /></Button>
@@ -611,20 +611,20 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                 {items.map(f => (
                   <div key={f.id} className="rounded-md border p-2.5 space-y-1">
                     {editingId === f.id ? (
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-2.5">
                         <Input value={editValue} onChange={e => setEditValue(e.target.value)} className="h-7 text-sm" />
-                        <Button size="icon" variant="ghost" className="size-7" onClick={() => saveFactEdit(f.id)}><Check className="size-3.5" /></Button>
-                        <Button size="icon" variant="ghost" className="size-7" onClick={cancelEdit}><X className="size-3.5" /></Button>
+                        <Button size="icon" variant="ghost" className="hit-slop-44 size-7" onClick={() => saveFactEdit(f.id)}><Check className="size-3.5" /></Button>
+                        <Button size="icon" variant="ghost" className="hit-slop-44 size-7" onClick={cancelEdit}><X className="size-3.5" /></Button>
                       </div>
                     ) : (
                       <div className="flex items-start justify-between gap-2">
                         <span className="text-sm font-medium">{f.display_text}</span>
-                        <div className="flex items-center gap-1 shrink-0">
+                        <div className="flex items-center gap-2.5 shrink-0">
                           {f.hardness && <Badge variant="outline" className="text-[9px] px-1 py-0">{f.hardness}</Badge>}
-                          <Button size="icon" variant="ghost" className="size-6" onClick={() => startEdit(f.id, f.display_text)}><Pencil className="size-3" /></Button>
+                          <Button size="icon" variant="ghost" className="hit-slop-44 size-6" onClick={() => startEdit(f.id, f.display_text)}><Pencil className="size-3" /></Button>
                           <Button
                             size="icon" variant="ghost"
-                            className={armedDeleteKey === `fact:${f.id}` ? 'size-6 bg-destructive text-destructive-foreground' : 'size-6 text-destructive'}
+                            className={armedDeleteKey === `fact:${f.id}` ? 'hit-slop-44 size-6 bg-destructive text-destructive-foreground' : 'hit-slop-44 size-6 text-destructive'}
                             onClick={() => requestDelete(`fact:${f.id}`, () => deleteFact(f.id))}
                             aria-label={armedDeleteKey === `fact:${f.id}` ? 'Tap again to permanently delete this fact' : 'Delete fact'}
                           ><Trash2 className="size-3" /></Button>
@@ -647,19 +647,19 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
             {contextFacts.map(c => (
               <div key={c.id} className="rounded-md border p-2.5 space-y-1">
                 {editingId === c.id ? (
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-2.5">
                     <Input value={editValue} onChange={e => setEditValue(e.target.value)} className="h-7 text-sm" />
-                    <Button size="icon" variant="ghost" className="size-7" onClick={() => saveContextEdit(c.id)}><Check className="size-3.5" /></Button>
-                    <Button size="icon" variant="ghost" className="size-7" onClick={cancelEdit}><X className="size-3.5" /></Button>
+                    <Button size="icon" variant="ghost" className="hit-slop-44 size-7" onClick={() => saveContextEdit(c.id)}><Check className="size-3.5" /></Button>
+                    <Button size="icon" variant="ghost" className="hit-slop-44 size-7" onClick={cancelEdit}><X className="size-3.5" /></Button>
                   </div>
                 ) : (
                   <div className="flex items-start justify-between gap-2">
                     <span className="text-sm font-medium">{c.display_text}</span>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <Button size="icon" variant="ghost" className="size-6" onClick={() => startEdit(c.id, c.display_text)}><Pencil className="size-3" /></Button>
+                    <div className="flex items-center gap-2.5 shrink-0">
+                      <Button size="icon" variant="ghost" className="hit-slop-44 size-6" onClick={() => startEdit(c.id, c.display_text)}><Pencil className="size-3" /></Button>
                       <Button
                         size="icon" variant="ghost"
-                        className={armedDeleteKey === `context:${c.id}` ? 'size-6 bg-destructive text-destructive-foreground' : 'size-6 text-destructive'}
+                        className={armedDeleteKey === `context:${c.id}` ? 'hit-slop-44 size-6 bg-destructive text-destructive-foreground' : 'hit-slop-44 size-6 text-destructive'}
                         onClick={() => requestDelete(`context:${c.id}`, () => deleteContext(c.id))}
                         aria-label={armedDeleteKey === `context:${c.id}` ? 'Tap again to permanently delete this' : 'Delete'}
                       ><Trash2 className="size-3" /></Button>

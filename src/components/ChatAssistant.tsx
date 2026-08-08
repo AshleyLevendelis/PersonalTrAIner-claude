@@ -2287,12 +2287,12 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
             onPointerLeave={() => { if (micLongPressTimerRef.current) window.clearTimeout(micLongPressTimerRef.current) }}
             aria-label={speech.isListening ? 'Stop voice input' : 'Start voice input'}
             title={speech.isListening ? 'Stop voice input' : 'Start voice input (hold to toggle debug trace)'}
-            className={cn('shrink-0 rounded-full', speech.isListening && 'animate-pulse')}
+            className={cn('hit-slop-44 shrink-0 rounded-full', speech.isListening && 'animate-pulse')}
           >
             <Mic className="size-4" />
           </Button>
         )}
-        <Button data-chat-send onClick={sendMessage} disabled={!input.trim() || isLoading} size="icon" className="shrink-0 rounded-full glow-mint-box">
+        <Button data-chat-send onClick={sendMessage} disabled={!input.trim() || isLoading} size="icon" className="hit-slop-44 shrink-0 rounded-full glow-mint-box">
           <Send className="size-4" />
         </Button>
       </div>
