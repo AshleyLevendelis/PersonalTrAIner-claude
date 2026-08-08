@@ -349,3 +349,39 @@ export async function voidMealEvent(clientId: string): Promise<void> {
 if (typeof window !== 'undefined') {
   window.addEventListener('online', () => { flushPending() })
 }
+
+// ---------------------------------------------------------------------------
+// Picks (UX-sweep fix) — the persisted per-date override on top of the
+// dateless pool. `meal_plan_slots` has no date column by design (any pool
+// option is valid for its slot on any day); a "swap to this" or a confirmed
+// chat meal-swap is a per-DATE decision — "for today specifically, lunch is
+// X" — layered on top. Without this, App.tsx's `manualMealPicks` React
+// state was the ONLY record of a swap, and reloading silently reverted it
+// while the chat/UI receipt kept claiming "Swapped".
+// ---------------------------------------------------------------------------
+
+export async function getMealPicksForDate(profileId: string, date: string): Promise<Partial<Record<MealSlotName, string>>> {
+  const { data, error } = await supabase
+    .from('meal_plan_picks')
+    .select('slot, meal_name')
+    .eq('profile_id', profileId)
+    .eq('date', date)
+  if (error || !data) return {}
+  const picks: Partial<Record<MealSlotName, string>> = {}
+  for (const row of data) picks[row.slot as MealSlotName] = row.meal_name
+  return picks
+}
+
+export async function setMealPick(profileId: string, date: string, slot: MealSlotName, mealName: string): Promise<void> {
+  await supabase
+    .from('meal_plan_picks')
+    .upsert({ profile_id: profileId, date, slot, meal_name: mealName }, { onConflict: 'profile_id,date,slot' })
+}
+
+export async function clearMealPick(profileId: string, date: string, slot: MealSlotName): Promise<void> {
+  await supabase.from('meal_plan_picks').delete().eq('profile_id', profileId).eq('date', date).eq('slot', slot)
+}
+
+export async function clearAllMealPicksForDate(profileId: string, date: string): Promise<void> {
+  await supabase.from('meal_plan_picks').delete().eq('profile_id', profileId).eq('date', date)
+}

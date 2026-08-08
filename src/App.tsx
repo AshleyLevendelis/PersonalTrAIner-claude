@@ -24,7 +24,7 @@ import { calculateCalories } from '@/lib/calculations'
 import { computeBMR, computeStaticTDEE } from '@/lib/macro-calculator'
 import { computeTargets, getLatestWeightKg, snapshotTargetsIfChanged } from '@/lib/nutrition-targets'
 import { generateExercisePlan, generateMesocycle } from '@/lib/exercise-plan'
-import { getPools, swapPoolMeal, type MealSlotName } from '@/lib/meal-store'
+import { getPools, swapPoolMeal, getMealPicksForDate, setMealPick, clearMealPick, clearAllMealPicksForDate, type MealSlotName } from '@/lib/meal-store'
 import { generateMealPools, assembleDay, chosenToMealPlanDays, type PoolOption } from '@/lib/meal-generation'
 import { supabase } from '@/lib/supabase'
 import { saveMesocycle, saveMesocycleWeek, restoreMesocycle } from '@/lib/mesocycle-persistence'
@@ -365,6 +365,13 @@ function App() {
     setExercisePlan(restoredExercises)
     setMesocycle(restoredMesocycle)
     setIsRestoring(false)
+
+    // Persisted per-date meal picks (UX-sweep fix) — a confirmed swap must
+    // survive reload, not just live in manualMealPicks React state.
+    if (restoredProfile.id) {
+      const todayDate = getSessionDateContext(restoredProfile.id).date
+      getMealPicksForDate(restoredProfile.id, todayDate).then(setManualMealPicks).catch(console.error)
+    }
 
     // Lazy check-on-load sweep (no scheduled-job infra exists in this
     // codebase) — silently restores any injury/equipment adaptation whose
@@ -764,6 +771,16 @@ function App() {
     if (!profile?.id) return
     const applied = await swapPoolMeal(profile.id, slot, chosenMeals[slot]?.name, chooseName)
     if (!applied) return
+    // Persist BEFORE updating the on-screen pick (UX-sweep fix) — this used
+    // to update React state first, so a confirmed swap could look applied
+    // on screen even when the write below never landed.
+    const todayDate = getSessionDateContext(profile.id).date
+    try {
+      await setMealPick(profile.id, todayDate, slot, applied.name)
+    } catch (err) {
+      console.error('handleSwapMealSlot: setMealPick failed — not applying the swap on screen', err)
+      return
+    }
     setManualMealPicks(prev => ({ ...prev, [slot]: applied.name }))
     // §2.3 — same sweep as the exercise swap path, same scope_key prefix propose_meal_swap uses.
     await sweepStaleForTarget(profile.id, `${profile.id}:propose_meal_swap:${slot}`)
@@ -788,6 +805,8 @@ function App() {
       })
       setMealPools(prev => ({ ...prev, ...result.accepted }))
       setManualMealPicks(prev => { const next = { ...prev }; delete next[slot]; return next })
+      const todayDate = getSessionDateContext(profile.id).date
+      await clearMealPick(profile.id, todayDate, slot)
     } finally {
       setIsGeneratingMeals(false)
     }
@@ -811,6 +830,8 @@ function App() {
       })
       setMealPools(result.accepted)
       setManualMealPicks({})
+      const todayDate = getSessionDateContext(profile.id).date
+      await clearAllMealPicksForDate(profile.id, todayDate)
     } finally {
       setIsGeneratingMeals(false)
     }
@@ -1139,7 +1160,23 @@ function App() {
               onLogsUpdated={() => setLogsVersion(v => v + 1)}
               onWeightLogged={handleWeightLogged}
               onMesocycleUpdated={setMesocycle}
-              onMealSwapApplied={(slot, chosenName) => setManualMealPicks(prev => ({ ...prev, [slot]: chosenName }))}
+              onMealSwapApplied={async (slot, chosenName) => {
+                // Persist chat-confirmed swaps (and their undo, which calls
+                // this with the restored previous name) BEFORE updating the
+                // on-screen pick — awaited and checked by the caller, which
+                // downgrades the receipt to "Couldn't apply" on failure
+                // instead of claiming a swap that didn't actually land.
+                if (!profile?.id) return true
+                const todayDate = getSessionDateContext(profile.id).date
+                try {
+                  await setMealPick(profile.id, todayDate, slot, chosenName)
+                } catch (err) {
+                  console.error('onMealSwapApplied: setMealPick failed', err)
+                  return false
+                }
+                setManualMealPicks(prev => ({ ...prev, [slot]: chosenName }))
+                return true
+              }}
               memoryFacts={memoryFacts}
               memoryGoals={memoryGoals}
               memoryContextFacts={memoryContextFacts}

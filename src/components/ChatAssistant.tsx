@@ -105,7 +105,8 @@ interface ChatAssistantProps {
   /** Fired after a confirmed propose_exercise_swap executes — App.tsx's setMesocycle, since the executor is pure and returns the new array rather than mutating App.tsx's state directly. */
   onMesocycleUpdated: (mesocycle: MesocycleWeek[]) => void
   /** Fired after a confirmed propose_meal_swap executes — mirrors App.tsx's handleSwapMealSlot's setManualMealPicks, the ONLY thing that makes a swapped-in pool option actually render as today's pick. Without this the receipt would claim a swap the Meals/Nutrition tab never shows — exactly the incident this framework exists to prevent. */
-  onMealSwapApplied: (slot: MealSlotName, chosenName: string) => void
+  /** Returns whether the pick actually persisted — a receipt must never say "Swapped" for a write that didn't land. */
+  onMealSwapApplied: (slot: MealSlotName, chosenName: string) => Promise<boolean>
   /** Memory & goals (VISION-ARCHITECTURE.md §1) — active facts/goals/context, loaded by App.tsx alongside the profile. Read-only here: resolveAndSaveMemory writes through memory-store directly and calls onMemoryChanged so App.tsx re-fetches, the same "the client is the only writer, the caller reloads after" shape pending_actions uses. */
   memoryFacts: UserFactRow[]
   memoryGoals: UserGoalRow[]
@@ -1777,14 +1778,21 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       const payload = row.payload as unknown as MealSwapPayload
       const result = await executeMealSwap(profile.id, payload)
       receipt = result.receipt
-      const ok = receipt.failed.length === 0 && result.appliedName
-      title = ok ? 'Swapped' : "Couldn't apply the swap"
-      rows = ok ? [{ label: payload.slot, detail: `→ ${result.appliedName}` }] : []
+      let ok = receipt.failed.length === 0 && !!result.appliedName
       if (ok && result.appliedName) {
         // The step that actually makes the swap visible — without this the
         // receipt would claim a swap the Meals/Nutrition tab never shows.
-        onMealSwapApplied(payload.slot, result.appliedName)
+        // Awaited and checked: a receipt must never say "Swapped" for a
+        // pick that didn't actually persist (fire-and-forget here would
+        // reintroduce the exact bug the pool-level swap fix just closed).
+        const persisted = await onMealSwapApplied(payload.slot, result.appliedName)
+        if (!persisted) {
+          receipt = { ...receipt, failed: [...receipt.failed, { op: 'save', error: "The swap didn't save — try again" }] }
+          ok = false
+        }
       }
+      title = ok ? 'Swapped' : "Couldn't apply the swap"
+      rows = ok ? [{ label: payload.slot, detail: `→ ${result.appliedName}` }] : []
       if (ok && result.appliedMacros) {
         await upsertFavorite({
           new_item: result.appliedName!,
@@ -1925,7 +1933,8 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       } else if (row.kind === 'propose_meal_swap') {
         const payload = row.payload as unknown as MealSwapPayload
         if (!payload.currentName) return
-        onMealSwapApplied(payload.slot, payload.currentName)
+        const persisted = await onMealSwapApplied(payload.slot, payload.currentName)
+        if (!persisted) return // leave the Undo button in place so the user can retry
       } else {
         return
       }
