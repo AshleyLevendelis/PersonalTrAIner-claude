@@ -916,12 +916,20 @@ export async function clearAllSetLogs(userId: string): Promise<void> {
 
 /** All working+warmup sets attached to a synced session id (Part 4 dashboard read). */
 export async function getSetsForSession(sessionId: string): Promise<ExerciseSetLog[]> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('exercise_set_logs')
     .select('*')
     .eq('session_id', sessionId)
     .order('exercise_name')
     .order('set_number')
+  // A query error must never look like "genuinely zero sets" — that
+  // ambiguity is exactly what made an earlier Session History bug
+  // undiagnosable (see exercise-history.ts's getSessionHistory, which
+  // surfaces this same distinction to its callers).
+  if (error) {
+    console.error(`getSetsForSession(${sessionId}) failed:`, error)
+    throw error
+  }
   return ((data || []) as ServerSetRow[]).map(r => serverRowToView(r, r.completed_at.slice(0, 10)))
 }
 

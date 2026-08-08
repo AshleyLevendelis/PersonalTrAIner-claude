@@ -178,6 +178,8 @@ export interface SessionHistoryEntry {
   isCompleted: boolean
   totalVolumeKg: number
   totalSets: number
+  /** True when the sets query for this session failed — totalVolumeKg/totalSets are 0 as a placeholder, NOT a real "nothing logged" result. Callers must render this distinctly (e.g. "Couldn't load"), never as a genuine zero. */
+  loadError?: boolean
 }
 
 /** Pure — sets × reps summed, and a raw count. Bodyweight sets (weight 0) contribute 0 volume, matching computeSessionSummary's convention. */
@@ -196,23 +198,35 @@ export async function getSessionHistory(userId: string, limit = 30): Promise<Ses
     .eq('profile_id', userId)
     .order('date', { ascending: false })
     .limit(limit)
-  if (error || !data) return []
+  if (error) {
+    console.error(`getSessionHistory(${userId}) failed to load workout_sessions:`, error)
+    throw error
+  }
+  if (!data) return []
 
   const entries = await Promise.all(
     data.map(async (row: { id: string; date: string; split_type: string; day: string | null; duration_minutes: number | null; is_completed: boolean }) => {
-      const sets = await getSetsForSession(row.id)
-      const { totalVolumeKg, totalSets } = sumVolumeAndSets(
-        sets.filter(s => !s.is_warmup).map(s => ({ weightKg: s.weight_kg, repsCompleted: s.reps_completed }))
-      )
-      return {
+      const base = {
         sessionId: row.id,
         date: row.date,
         splitType: row.split_type,
         day: row.day,
         durationMinutes: row.duration_minutes,
         isCompleted: row.is_completed,
-        totalVolumeKg,
-        totalSets,
+      }
+      // A failed sets query must render as "couldn't load", never as a
+      // silent 0kg/0sets indistinguishable from a genuinely empty session —
+      // that ambiguity was itself the bug (see set-log-store.ts's
+      // getSetsForSession, which now throws instead of swallowing the error).
+      try {
+        const sets = await getSetsForSession(row.id)
+        const { totalVolumeKg, totalSets } = sumVolumeAndSets(
+          sets.filter(s => !s.is_warmup).map(s => ({ weightKg: s.weight_kg, repsCompleted: s.reps_completed }))
+        )
+        return { ...base, totalVolumeKg, totalSets }
+      } catch (setsError) {
+        console.error(`getSessionHistory: sets query failed for session ${row.id}:`, setsError)
+        return { ...base, totalVolumeKg: 0, totalSets: 0, loadError: true }
       }
     })
   )

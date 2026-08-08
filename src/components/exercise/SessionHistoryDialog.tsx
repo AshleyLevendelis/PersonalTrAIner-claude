@@ -22,6 +22,7 @@ export function SessionHistoryDialog({
 }) {
   const [entries, setEntries] = useState<SessionHistoryEntry[]>([])
   const [loading, setLoading] = useState(false)
+  const [loadFailed, setLoadFailed] = useState(false)
   const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null)
   const [expandedSets, setExpandedSets] = useState<ExerciseSetLog[]>([])
 
@@ -29,8 +30,13 @@ export function SessionHistoryDialog({
     if (!open || !profileId) return
     let cancelled = false
     setLoading(true)
+    setLoadFailed(false)
     getSessionHistory(profileId)
       .then(result => { if (!cancelled) setEntries(result) })
+      .catch(err => {
+        console.error('SessionHistoryDialog: getSessionHistory failed', err)
+        if (!cancelled) { setEntries([]); setLoadFailed(true) }
+      })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [open, profileId])
@@ -46,7 +52,10 @@ export function SessionHistoryDialog({
       return
     }
     setExpandedSessionId(sessionId)
-    getSetsForSession(sessionId).then(setExpandedSets)
+    getSetsForSession(sessionId).then(setExpandedSets).catch(err => {
+      console.error(`SessionHistoryDialog: couldn't load sets for session ${sessionId}`, err)
+      setExpandedSets([])
+    })
   }
 
   const byExercise = new Map<string, ExerciseSetLog[]>()
@@ -65,6 +74,8 @@ export function SessionHistoryDialog({
         </DialogHeader>
         {loading ? (
           <p className="text-sm text-muted-foreground">Loading…</p>
+        ) : loadFailed ? (
+          <p className="text-sm text-destructive">Couldn't load session history — try again.</p>
         ) : entries.length === 0 ? (
           <p className="text-sm text-muted-foreground">No completed sessions yet.</p>
         ) : (
@@ -79,7 +90,9 @@ export function SessionHistoryDialog({
                   <div className="min-w-0">
                     <p className="text-sm font-medium truncate">{entry.day ?? entry.splitType} · {entry.date}</p>
                     <p className="text-xs text-muted-foreground tabular-mono">
-                      {entry.durationMinutes != null ? `${entry.durationMinutes}m` : '—'} · {Math.round(entry.totalVolumeKg).toLocaleString()}kg · {entry.totalSets} sets
+                      {entry.loadError
+                        ? <span className="text-destructive">Couldn't load this session's sets</span>
+                        : <>{entry.durationMinutes != null ? `${entry.durationMinutes}m` : '—'} · {Math.round(entry.totalVolumeKg).toLocaleString()}kg · {entry.totalSets} sets</>}
                     </p>
                   </div>
                   <ChevronDown className={`size-4 shrink-0 text-muted-foreground transition-transform ${expandedSessionId === entry.sessionId ? 'rotate-180' : ''}`} />
