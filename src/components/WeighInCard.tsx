@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Scale } from 'lucide-react'
 import { getRecentWeighIns } from '@/lib/nutrition-targets'
 import { upsertDailyMetric } from '@/lib/daily-tracking'
+import { getAppNow, getLocalDateString } from '@/lib/dev-clock'
 
 /**
  * Minimal weigh-in capture (M0 Part 5): one field, one save, last-7 history
@@ -38,9 +39,12 @@ export function WeighInCard({ profileId, onWeightLogged }: { profileId: string; 
     setError(null)
     setSaving(true)
     try {
+      // Local calendar date, not UTC — before this, an evening weigh-in in a
+      // UTC+ timezone landed on yesterday's row while the onboarding weigh-in
+      // (already on getLocalDateString) landed on today's, splitting the pair.
       await upsertDailyMetric({
         profile_id: profileId,
-        date: new Date().toISOString().split('T')[0],
+        date: getLocalDateString(getAppNow(profileId)),
         weight_kg: kg,
       })
       setInput('')
