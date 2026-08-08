@@ -21,11 +21,14 @@ export interface SessionSet {
   reps: number
 }
 
-const CACHE_KEY_PREFIX = 'pr_records_'
-
-function getCacheKey(userId: string): string {
-  return `${CACHE_KEY_PREFIX}${userId}`
-}
+// In-memory only, keyed by userId — DB (exercise_set_logs) is the sole
+// source of truth. Re-derived wholesale by refreshPRCacheFromDB, which
+// useActiveSession's refresh() calls after every mutation surface this app
+// has (logSet, deleteSet, chat-logged sets via refreshToken). This is what
+// makes a deleted/undone set evict and a chat-logged set ingest — the old
+// localStorage cache only ever grew via checkForPR's own local writes and
+// was never reconciled against reality.
+const memCache = new Map<string, Record<string, PRRecord>>()
 
 export function calculateE1RM(weight: number, reps: number): number {
   if (reps <= 0 || weight <= 0) return 0
@@ -33,19 +36,53 @@ export function calculateE1RM(weight: number, reps: number): number {
   return Math.round(weight * (1 + reps / 30) * 10) / 10
 }
 
+/** Synchronous read of the in-memory cache — empty until the first
+ * refreshPRCacheFromDB resolves (seeded at app root, see useActiveSession). */
 export function getPRCache(userId: string): Record<string, PRRecord> {
-  try {
-    const raw = localStorage.getItem(getCacheKey(userId))
-    return raw ? JSON.parse(raw) : {}
-  } catch {
-    return {}
+  return memCache.get(userId) ?? {}
+}
+
+/** Re-derives the full PR cache from exercise_set_logs (working sets only —
+ * matches derivePRHistory's filters in exercise-history.ts, the same source
+ * Part 3's history view reads). Replaces the cache wholesale rather than
+ * merging, so a deleted set's contribution disappears on the next call. */
+export async function refreshPRCacheFromDB(userId: string): Promise<void> {
+  const { data, error } = await supabase
+    .from('exercise_set_logs')
+    .select('exercise_name, weight_kg, reps_completed, completed_at')
+    .eq('user_id', userId)
+    .eq('is_warmup', false)
+    .gt('weight_kg', 0)
+    .gt('reps_completed', 0)
+
+  if (error || !data) return
+
+  const cache: Record<string, PRRecord> = {}
+  for (const row of data) {
+    const e1rm = calculateE1RM(Number(row.weight_kg), row.reps_completed)
+    const date = String(row.completed_at).split('T')[0] ?? ''
+    const current = cache[row.exercise_name]
+    if (!current) {
+      cache[row.exercise_name] = { maxWeight: Number(row.weight_kg), maxE1RM: e1rm, date }
+    } else {
+      // date tracks whichever set most recently pushed either max forward —
+      // dashboard-data.ts's "recent PRs" line filters on it, so it must be
+      // the date the record was actually set, not just the last row scanned.
+      if (Number(row.weight_kg) > current.maxWeight) { current.maxWeight = Number(row.weight_kg); current.date = date }
+      if (e1rm > current.maxE1RM) { current.maxE1RM = e1rm; current.date = date }
+    }
   }
+  memCache.set(userId, cache)
 }
 
-function savePRCache(userId: string, cache: Record<string, PRRecord>): void {
-  localStorage.setItem(getCacheKey(userId), JSON.stringify(cache))
-}
-
+/**
+ * Optimistic "did this set just PR" check against the current in-memory
+ * cache, for immediate UI feedback (the badge animation) before the
+ * follow-up refreshPRCacheFromDB (triggered by the caller's own refresh()
+ * after saveSet) confirms it. Read-only — never mutates the cache itself,
+ * since a local write here is exactly the divergence bug this replaces:
+ * the DB refresh is the only writer now.
+ */
 export function checkForPR(
   userId: string,
   exerciseName: string,
@@ -55,12 +92,9 @@ export function checkForPR(
   if (weight <= 0 || reps <= 0) return null
 
   const newE1RM = calculateE1RM(weight, reps)
-  const cache = getPRCache(userId)
-  const existing = cache[exerciseName]
+  const existing = getPRCache(userId)[exerciseName]
 
   if (!existing) {
-    cache[exerciseName] = { maxWeight: weight, maxE1RM: newE1RM, date: new Date().toISOString().split('T')[0] }
-    savePRCache(userId, cache)
     return { type: 'both', newE1RM, newWeight: weight, previousE1RM: 0, previousWeight: 0 }
   }
 
@@ -69,21 +103,13 @@ export function checkForPR(
 
   if (!isWeightPR && !isE1RMPR) return null
 
-  const result: PRResult = {
+  return {
     type: isWeightPR && isE1RMPR ? 'both' : isWeightPR ? 'weight' : 'e1rm',
     newE1RM,
     newWeight: weight,
     previousE1RM: existing.maxE1RM,
     previousWeight: existing.maxWeight,
   }
-
-  cache[exerciseName] = {
-    maxWeight: Math.max(existing.maxWeight, weight),
-    maxE1RM: Math.max(existing.maxE1RM, newE1RM),
-    date: new Date().toISOString().split('T')[0],
-  }
-  savePRCache(userId, cache)
-  return result
 }
 
 /**
@@ -178,33 +204,4 @@ export function computeSessionPRs(
     if (best) hits.push({ exerciseName, result: best })
   }
   return hits
-}
-
-/** Seeds the localStorage PR cache from unified-store history (working sets only). PR storage itself stays localStorage this round — DB-backed PRs land in C2. */
-export async function seedPRCacheFromHistory(userId: string): Promise<void> {
-  const existing = getPRCache(userId)
-  if (Object.keys(existing).length > 0) return
-
-  const { data, error } = await supabase
-    .from('exercise_set_logs')
-    .select('exercise_name, weight_kg, reps_completed')
-    .eq('user_id', userId)
-    .eq('is_warmup', false)
-    .gt('weight_kg', 0)
-    .gt('reps_completed', 0)
-
-  if (error || !data || data.length === 0) return
-
-  const cache: Record<string, PRRecord> = {}
-  for (const row of data) {
-    const e1rm = calculateE1RM(Number(row.weight_kg), row.reps_completed)
-    const current = cache[row.exercise_name]
-    if (!current) {
-      cache[row.exercise_name] = { maxWeight: Number(row.weight_kg), maxE1RM: e1rm, date: '' }
-    } else {
-      if (Number(row.weight_kg) > current.maxWeight) current.maxWeight = Number(row.weight_kg)
-      if (e1rm > current.maxE1RM) current.maxE1RM = e1rm
-    }
-  }
-  savePRCache(userId, cache)
 }

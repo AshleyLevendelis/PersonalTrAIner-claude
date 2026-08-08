@@ -26,7 +26,7 @@ import { useDeadlineTick } from './useDeadlineTick'
 import { getAppNow, getSessionDateContext } from '@/lib/dev-clock'
 import { getActiveMesocycleWeek } from '@/lib/calculations'
 import { saveSet, deleteSet, getSetsForDate, getLastSessionSets, initSetLogStore, ensureSessionSynced, type SaveSetInput } from '@/lib/set-log-store'
-import { seedPRCacheFromHistory, getPRCache, type PRRecord } from '@/lib/pr-engine'
+import { refreshPRCacheFromDB, getPRCache, type PRRecord } from '@/lib/pr-engine'
 import { markSessionCompleted } from '@/lib/daily-tracking'
 import { filterLoggableSets } from '@/lib/session-derive'
 import {
@@ -138,12 +138,12 @@ export function ActiveSessionProvider({
     initSetLogStore()
   }, [])
 
-  // PR cache seeding used to run only when ExercisePlan mounted (i.e. only
-  // if the user visited the Exercise tab) — now that the program browse
-  // stand-in is the only thing ExercisePlan renders, and it may never
-  // mount in a session, seeding belongs at the root that always mounts.
+  // Initial PR cache load — the in-memory cache is empty until this
+  // resolves. Kept alongside identity change so switching profiles doesn't
+  // read a stale userId's records; refresh() below keeps it current after
+  // every mutation surface (log, delete, chat-logged sets).
   useEffect(() => {
-    if (profileId) seedPRCacheFromHistory(profileId).catch(console.error)
+    if (profileId) refreshPRCacheFromDB(profileId).catch(console.error)
   }, [profileId])
 
   // Identity: stamped once per mount and re-stamped only when its actual
@@ -189,6 +189,12 @@ export function ActiveSessionProvider({
         setReady(true)
       })
       .catch(console.error)
+    // refresh() is the one place every mutation surface (logSet, a manual
+    // deleteSet+refresh pairing, chat-logged sets via refreshToken) already
+    // converges on — piggybacking the PR cache's DB refresh here means a
+    // deleted/undone set evicts and a chat-logged set ingests, without a
+    // second signal to wire up per call site.
+    refreshPRCacheFromDB(identity.profileId).catch(console.error)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [identity.profileId, identity.date])
 

@@ -213,7 +213,7 @@ async function main() {
     saveSet, deleteSet, flushPending, getSetsForDate, getLastSessionSets, getSyncState,
   } = await import('../src/lib/set-log-store')
   const { getDoubleProgressionRecommendation, checkDoubleProgression } = await import('../src/lib/progression-engine')
-  const { seedPRCacheFromHistory, getPRCache } = await import('../src/lib/pr-engine')
+  const { refreshPRCacheFromDB, getPRCache } = await import('../src/lib/pr-engine')
   const { getExerciseEntry, getExerciseId, slugifyExerciseName } = await import('../src/lib/exercise-db')
   const { getLoadIncrementKg, categorize, isExternallyLoaded } = await import('../src/lib/load-prescription')
 
@@ -312,13 +312,21 @@ async function main() {
     ghosts.length === 3 && ghosts.map(g => g.set_number).join(',') === '1,2,3' && ghosts[1].weight_kg === 62.5,
     ghosts.map(g => [g.set_number, g.weight_kg]))
 
-  // ---- 5. PR cache seeds from the unified store ----------------------------
-  console.log('\n[5] PR seeding')
-  localStorageShim.removeItem(`pr_records_${userId}`)
-  await seedPRCacheFromHistory(userId)
+  // ---- 5. PR cache derives fresh from the unified store ---------------------
+  console.log('\n[5] PR cache derivation from exercise_set_logs')
+  await refreshPRCacheFromDB(userId)
   const prCache = getPRCache(userId)
-  check('PR cache seeded with bench max weight', prCache[bench]?.maxWeight === 62.5, prCache[bench])
-  check('PR cache seeded deadlift max', prCache[dead]?.maxWeight === 100, prCache[dead])
+  check('PR cache derived with bench max weight', prCache[bench]?.maxWeight === 62.5, prCache[bench])
+  check('PR cache derived deadlift max', prCache[dead]?.maxWeight === 100, prCache[dead])
+
+  // A deleted set's contribution must disappear on the next derivation —
+  // the whole point of deriving fresh from the DB instead of a
+  // locally-mutated cache that only ever grew.
+  deleteSet({ userId, date: W1, exerciseId: deadId, setNumber: 3 }) // was 100kg, the max
+  await flushPending()
+  await refreshPRCacheFromDB(userId)
+  const prCacheAfterDelete = getPRCache(userId)
+  check('deleted set evicts from the PR cache on the next derivation', prCacheAfterDelete[dead]?.maxWeight === 80, prCacheAfterDelete[dead])
 
   // ---- 6. Chat edge function write shape lands in the same store -----------
   console.log('\n[6] chat write path (edge-function payload shape)')
