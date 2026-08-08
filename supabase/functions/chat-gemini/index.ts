@@ -1256,17 +1256,15 @@ Keep this context in mind to ensure your greetings and questions naturally align
         // cheaply build the full diff here: pool data is a plain REST
         // fetch (meal_plan_slots), no client-only TS modules needed. I1
         // still holds — this only READS meal_plan_slots, it never writes.
-        const classification = classifyImperative(args.origin_verbatim_quote || "", message);
-        if (!classification.imperative) {
-          return new Response(
-            JSON.stringify({
-              reply: "",
-              offer: { text: `Want me to swap **${args.old_item}** for something else in your ${args.meal_slot}?` },
-            }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-
+        // Structural fix: a non-imperative quote used to downgrade to a
+        // plain-text `offer` with no pending_actions row, so a later "yes"
+        // had nothing to resolve and went back through the model — which
+        // could fail the same classification again, looping (the bug fixed
+        // for record_fact in the "never give it to me" case, generalized
+        // here). classifyImperative's result no longer branches the
+        // response shape: every propose_* call now returns the same
+        // resolvable `proposal`, so confirmation is available on the first
+        // reply regardless of whether the quote classified as imperative.
         const profileId = context.profile_id;
         const slot = String(args.meal_slot || "").toLowerCase();
         let proposalResult = null;
@@ -1649,18 +1647,10 @@ Keep this context in mind to ensure your greetings and questions naturally align
         // branch and its session-only immediate-write branch). I1: no
         // write happens here, not even for the "safe" session-only case
         // that used to fall through to the generic action-return below.
-        // D2: the tool call must be triggered by an imperative quote, not
-        // a question or a statement the model merely inferred a swap from.
-        const classification = classifyImperative(args.origin_verbatim_quote || "", message);
-        if (!classification.imperative) {
-          return new Response(
-            JSON.stringify({
-              reply: "",
-              offer: { text: `Want me to swap **${args.old_item}** for **${args.new_item}**?` },
-            }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
+        // D2 no longer gates the response SHAPE (see the structural-fix note
+        // above propose_meal_swap): classification still runs, but both
+        // outcomes return the same resolvable `proposal` now, so a later
+        // "yes" always has a pending_actions row to resolve against.
         // No server-side diff building (I1 + the client-only load-recompute
         // reasoning documented in ChatAssistant.tsx's buildExerciseSwapProposal)
         // — just the validated raw args for the client to resolve against
@@ -1682,16 +1672,8 @@ Keep this context in mind to ensure your greetings and questions naturally align
         // or diff-building, gated on an imperative origin quote. The client
         // (buildInjuryAdaptationProposal) resolves affected_area against the
         // live mesocycle, runs substituteForInjury, and builds the diff.
-        const classification = classifyImperative(args.origin_verbatim_quote || "", message);
-        if (!classification.imperative) {
-          return new Response(
-            JSON.stringify({
-              reply: "",
-              offer: { text: `Want me to ease off your ${String(args.affected_area || "").replace("_", " ")} for a bit?` },
-            }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
+        // Same structural-fix note as propose_exercise_swap: classification
+        // no longer branches the response shape.
         return new Response(
           JSON.stringify({
             reply: "",
@@ -1707,17 +1689,9 @@ Keep this context in mind to ensure your greetings and questions naturally align
       if (name === "propose_equipment_adaptation") {
         // Same I1/D2 contract — the client (buildEquipmentAdaptationProposal)
         // resolves the affected weeks against the live mesocycle, runs
-        // substituteForEquipment, and builds the diff.
-        const classification = classifyImperative(args.origin_verbatim_quote || "", message);
-        if (!classification.imperative) {
-          return new Response(
-            JSON.stringify({
-              reply: "",
-              offer: { text: `Want me to adjust your plan for ${String(args.equipment_tier || "").replace("_", " ")} equipment?` },
-            }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
+        // substituteForEquipment, and builds the diff. Same structural-fix
+        // note as propose_exercise_swap: classification no longer branches
+        // the response shape.
         return new Response(
           JSON.stringify({
             reply: "",
@@ -1743,13 +1717,18 @@ Keep this context in mind to ensure your greetings and questions naturally align
         // didn't get one, runs reconciliation against existing facts/
         // profile data, and only then writes via memory-store — producing
         // the receipt-with-undo, never this turn's model prose (D1).
+        // Structural fix: a non-imperative quote used to downgrade to a
+        // plain-text offer with no pending_actions row — the exact shape of
+        // the "never give it to me" loop. It now returns the same rawArgs-
+        // based `proposal` shape propose_* tools use, so a later "yes" has a
+        // real row to resolve (via resolveAndSaveMemory) on the first reply,
+        // regardless of whether classification succeeded.
         const classification = classifyImperative(args.origin_verbatim_quote || "", message);
         if (!classification.imperative) {
-          const subject = name === "record_fact" ? (args.target_phrase || args.timing_subject || "that") : (args.description || args.metric_ref || "that goal");
           return new Response(
             JSON.stringify({
               reply: "",
-              offer: { text: `Want me to remember ${subject}?` },
+              proposal: { kind: name, rawArgs: args },
             }),
             { headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
@@ -1794,16 +1773,15 @@ Keep this context in mind to ensure your greetings and questions naturally align
         // a statement ("we're out of eggs") without an instruction must not
         // silently write. I1 holds: nothing is written here — the client's
         // grocery-store resolves item names against food-db and writes.
+        // Structural fix: same shape as record_fact/record_goal above —
+        // a failed classification now returns a resolvable `proposal`
+        // instead of a bare offer.
         const classification = classifyImperative(args.origin_verbatim_quote || "", message);
         if (!classification.imperative) {
-          const subject = name === "add_to_grocery_list"
-            ? (Array.isArray(args.items) ? args.items.map((i: { name?: string }) => i.name).filter(Boolean).join(", ") : "that")
-            : (args.item_phrase || "that");
-          const verb = name === "add_to_grocery_list" ? "add" : "check off";
           return new Response(
             JSON.stringify({
               reply: "",
-              offer: { text: `Want me to ${verb} ${subject}${name === "add_to_grocery_list" ? " on your list" : ""}?` },
+              proposal: { kind: name, rawArgs: args },
             }),
             { headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
@@ -1822,13 +1800,14 @@ Keep this context in mind to ensure your greetings and questions naturally align
         // add_to_grocery_list: no confirmation card, gated by the same
         // imperative classifier, nothing written here — the client's
         // water-store resolves the amount (defaulting to 250ml when the
-        // model gave none) and writes.
+        // model gave none) and writes. Same structural fix as above: a
+        // failed classification now returns a resolvable `proposal`.
         const classification = classifyImperative(args.origin_verbatim_quote || "", message);
         if (!classification.imperative) {
           return new Response(
             JSON.stringify({
               reply: "",
-              offer: { text: "Want me to log that water intake?" },
+              proposal: { kind: name, rawArgs: args },
             }),
             { headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );

@@ -13,6 +13,7 @@ import { saveChatCache, loadChatCache, clearChatCache } from '@/lib/chat-cache'
 import { swapPoolMeal, type MealSlotName } from '@/lib/meal-store'
 import { getExerciseEntry } from '@/lib/exercise-db'
 import { createPendingAction, claimPendingAction, declinePendingAction, markExecuting, resolvePendingAction, getPendingAction, isWithinUndoWindow, type PendingActionReceipt } from '@/lib/pending-actions-store'
+import { APPEND_PROPOSAL_KINDS, INTENT_PROPOSAL_VERB, buildIntentProposal } from '@/lib/intent-proposal'
 import { executeExerciseSwap, executeMealSwap, undoExerciseSwap, executeInjuryAdaptation, executeEquipmentAdaptation, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type EquipmentAdaptationPayload } from '@/lib/pending-action-executor'
 import type { SwapScope } from '@/lib/mesocycle-edit'
 import { createPlanAdaptation } from '@/lib/plan-adaptations-store'
@@ -851,9 +852,12 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       const count = rows.length
       return `I can adjust ${count} exercise${count === 1 ? '' : 's'} across your plan:`
     }
+    const intentVerb = INTENT_PROPOSAL_VERB[pendingAction.kind]
+    if (intentVerb) return `Want me to ${intentVerb} **${rows[0].after}**?`
     const headline = rows[0]
     return `I can swap **${headline.before}** for **${headline.after}**:`
   }
+
 
   /**
    * VISION-ARCHITECTURE.md §2.4 — builds propose_exercise_swap's diff
@@ -1459,6 +1463,12 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       } else if (result.proposal.kind === 'propose_equipment_adaptation' && result.proposal.rawArgs) {
         const adaptation = await buildEquipmentAdaptationProposal(result.proposal.rawArgs)
         if (adaptation) built = { scopeKey: adaptation.scopeKey, preconditions: adaptation.preconditions, payload: adaptation.payload as unknown as Record<string, unknown>, preImage: adaptation.preImage, diff: adaptation.diff }
+      } else if (APPEND_PROPOSAL_KINDS.has(result.proposal.kind) && result.proposal.rawArgs) {
+        // Structural fix: record_fact/record_goal/add_to_grocery_list/
+        // check_off_grocery_item/log_water now arrive here too whenever
+        // classifyImperative didn't confidently classify the request —
+        // previously a bare offer with nothing to resolve on a later "yes".
+        built = buildIntentProposal(result.proposal.kind, result.proposal.rawArgs, profile.id)
       } else if (result.proposal.diff && result.proposal.payload && result.proposal.scopeKey) {
         built = { scopeKey: result.proposal.scopeKey, preconditions: result.proposal.preconditions ?? {}, payload: result.proposal.payload, preImage: result.proposal.preImage, diff: result.proposal.diff }
       }
@@ -1467,12 +1477,9 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         return { text: "I couldn't find that on your current plan — it may have changed since you last looked." }
       }
 
-      // action_class is hardcoded 'plan_mutation' here since both current
-      // propose_* kinds (exercise swap, meal swap) are plan mutations;
-      // revisit if a non-mutation propose_* kind is ever added.
       const row = await createPendingAction({
         profileId: profile.id,
-        actionClass: 'plan_mutation',
+        actionClass: APPEND_PROPOSAL_KINDS.has(result.proposal.kind) ? 'append' : 'plan_mutation',
         kind: result.proposal.kind,
         scopeKey: built.scopeKey,
         preconditions: built.preconditions,
@@ -1810,6 +1817,12 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     let rows: { label: string; detail: string }[] = []
     let receipt: PendingActionReceipt
     let undoToken: string | undefined
+    // Set only by the append-kinds branch below — resolveAndSaveMemory/
+    // Grocery/Water already build a complete, ready-to-render ChatReceiptView
+    // (title/rows/status/undoToken/resolvedAt), richer than the generic
+    // title/rows reconstruction every other branch does. When present, the
+    // tail below uses this verbatim instead of rebuilding it.
+    let richReceipt: ChatReceiptView | undefined
 
     if (row.kind === 'propose_exercise_swap') {
       const payload = row.payload as unknown as ExerciseSwapPayload
@@ -1893,6 +1906,34 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
           durationDays: payload.durationDays,
         })
       }
+    } else if (APPEND_PROPOSAL_KINDS.has(row.kind)) {
+      // Structural fix: the confirm side of buildIntentProposal — reuses
+      // the SAME resolveAndSaveMemory/Grocery/Water functions the direct
+      // (successfully-classified) path already calls, so this is not a
+      // second write path, just a deferred call to the existing one.
+      const payload = row.payload as unknown as { tool: string; rawArgs: Record<string, unknown> }
+      const intent = { tool: payload.tool, rawArgs: payload.rawArgs }
+      const saveResult = row.kind === 'record_fact' || row.kind === 'record_goal'
+        ? await resolveAndSaveMemory(intent as Parameters<typeof resolveAndSaveMemory>[0])
+        : row.kind === 'add_to_grocery_list' || row.kind === 'check_off_grocery_item'
+        ? await resolveAndSaveGrocery(intent as Parameters<typeof resolveAndSaveGrocery>[0])
+        : await resolveAndSaveWater(intent as Parameters<typeof resolveAndSaveWater>[0])
+
+      if (saveResult.receipt) {
+        richReceipt = saveResult.receipt
+        title = saveResult.receipt.title
+        rows = saveResult.receipt.rows.map(r => ({ label: r.label, detail: r.detail }))
+        undoToken = saveResult.receipt.undoToken
+        receipt = { landed: [saveResult.receipt.title], failed: [] }
+      } else {
+        // resolveAndSaveMemory/Grocery/Water can still ask a clarifying
+        // question (e.g. an unresolved exercise target) instead of writing
+        // — the row is already claimed, so it resolves as a soft failure
+        // with that question surfaced, rather than silently vanishing.
+        receipt = { landed: [], failed: [{ op: row.kind, error: saveResult.text || 'Needs more detail' }] }
+        title = 'Need more detail'
+        rows = saveResult.text ? [{ label: 'Note', detail: saveResult.text }] : []
+      }
     } else {
       receipt = { landed: [], failed: [{ op: row.kind, error: 'Not available yet' }] }
       title = "Couldn't apply that"
@@ -1902,7 +1943,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     await resolvePendingAction(row.id, status, receipt)
 
     setMessages(prev => prev.map((m, i) => i === msgIndex
-      ? { ...m, pendingAction: undefined, receipt: { kind: row.kind as ChatReceiptView['kind'], title, rows, status, result: receipt, undoToken, resolvedAt: new Date().toISOString() } }
+      ? { ...m, pendingAction: undefined, receipt: richReceipt ?? { kind: row.kind as ChatReceiptView['kind'], title, rows, status, result: receipt, undoToken, resolvedAt: new Date().toISOString() } }
       : m
     ))
   }

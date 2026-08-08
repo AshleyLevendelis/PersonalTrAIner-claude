@@ -184,6 +184,7 @@ async function main() {
   const { classifyImperative } = await import('../src/lib/imperative-classifier')
   const { classifyConfirmationReply } = await import('../src/lib/confirmation-reply')
   const { createPendingAction, claimPendingAction, declinePendingAction, resolvePendingAction, isWithinUndoWindow } = await import('../src/lib/pending-actions-store')
+  const { buildIntentProposal, APPEND_PROPOSAL_KINDS } = await import('../src/lib/intent-proposal')
   const { parseSetsPhrase, resolveExerciseName, parseWorkoutEntries } = await import('../src/lib/set-parse')
   const { executeLogWorkout } = await import('../src/lib/nl-logging-executor')
   const { saveSet, deleteSet, getSetsForDate, flushPending } = await import('../src/lib/set-log-store')
@@ -581,6 +582,66 @@ async function main() {
     secondIdeaRow.id !== swapRow.id && secondIdeaRow.status === 'pending', { firstId: swapRow.id, secondIdeaRow })
   const secondIdeaClaim = await claimPendingAction(secondIdeaRow.id, async () => true)
   check('confirming the later idea also claims on the first reply', secondIdeaClaim.outcome === 'claimed', secondIdeaClaim)
+
+  // ---- 9. Structural fix: the offer-fallback gap, closed for every tool ----
+  // The mozzarella loop's real cause (per [8b]) was one level up from the
+  // classifier: when classifyImperative rejects a quote, record_fact/
+  // record_goal/add_to_grocery_list/check_off_grocery_item/log_water used to
+  // fall back to a plain-text `offer` with NO pending_actions row — so a
+  // later "yes" had nothing to resolve and went back through the model,
+  // which could fail the same classification again. The fix: the edge
+  // function's fallback for these tools (and propose_exercise_swap/
+  // propose_meal_swap/propose_injury_adaptation/propose_equipment_adaptation,
+  // whose fallback was identical) now returns the SAME resolvable `proposal`
+  // shape regardless of classification outcome. This block proves the fix
+  // holds structurally across three DIFFERENT tool types — not just memory —
+  // by building a real pending_actions row from buildIntentProposal for
+  // each and confirming claimPendingAction resolves it on the first try,
+  // exactly like block [8] proved for propose_exercise_swap.
+  console.log('\n[9] Regression: offer-fallback gap closed for record_fact / add_to_grocery_list / log_water (3+ tool types, not just memory)')
+
+  const intentTestProfileId = crypto.randomUUID()
+  const intentCases: { kind: string; rawArgs: Record<string, unknown> }[] = [
+    { kind: 'record_fact', rawArgs: { origin_verbatim_quote: 'never give me durian', kind: 'food_preference', polarity: 'dislike', hardness: 'hard', target_phrase: 'durian' } },
+    { kind: 'add_to_grocery_list', rawArgs: { origin_verbatim_quote: 'we might need eggs and milk', items: [{ name: 'eggs' }, { name: 'milk' }] } },
+    { kind: 'log_water', rawArgs: { origin_verbatim_quote: 'had some water I guess', amount_ml: 300 } },
+  ]
+
+  for (const { kind, rawArgs } of intentCases) {
+    check(`${kind} is a recognized append-proposal kind`, APPEND_PROPOSAL_KINDS.has(kind))
+
+    // This is exactly what ChatAssistant.tsx's processResponse now does for
+    // a proposal whose kind is in APPEND_PROPOSAL_KINDS — build then insert.
+    const built = buildIntentProposal(kind, rawArgs, intentTestProfileId)
+    check(`${kind}: buildIntentProposal produces a non-empty diff row (never a bare offer)`,
+      built.diff.rows.length === 1 && built.diff.rows[0].after !== '', built)
+    check(`${kind}: payload carries {tool, rawArgs} — the exact shape resolveAndSave* already accepts`,
+      (built.payload as { tool?: string }).tool === kind && !!(built.payload as { rawArgs?: unknown }).rawArgs, built.payload)
+
+    const row = await createPendingAction({
+      profileId: intentTestProfileId,
+      actionClass: 'append',
+      kind,
+      scopeKey: built.scopeKey,
+      preconditions: built.preconditions,
+      payload: built.payload,
+      diff: built.diff,
+    })
+    check(`${kind}: pending row created with status=pending (a real row, not free text)`, row.status === 'pending', row)
+
+    const claim = await claimPendingAction(row.id, async () => true)
+    check(`${kind}: "yes" claims on the first reply, no model round-trip needed`, claim.outcome === 'claimed', claim)
+
+    // Retry-safety (double-tap) must hold for these kinds exactly as it does
+    // for plan-mutation kinds — proven generically in [2], reconfirmed here
+    // per-kind since this is the exact mechanism the "yes always resolves"
+    // guarantee depends on.
+    const retryClaim = await claimPendingAction(row.id, async () => true)
+    check(`${kind}: a repeated claim is a safe no-op (already_resolved), not a second write`,
+      retryClaim.outcome === 'already_resolved', retryClaim)
+
+    await resolvePendingAction(row.id, 'done', { landed: [kind], failed: [] })
+  }
 
   // ---- Summary -------------------------------------------------------------
   if (failures > 0) {
