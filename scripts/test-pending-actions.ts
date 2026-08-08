@@ -553,6 +553,14 @@ async function main() {
   check('"I\'ve never done X" (subject-led, contracted) still classifies as negation',
     pastActionNeverHave.imperative === false && pastActionNeverHave.reason === 'negation', pastActionNeverHave)
 
+  // The model may quote just the exclusion clause, without the earlier
+  // "I hate X" — "give"/"feed"/"serve"/"include" were added to
+  // IMPERATIVE_VERBS so a bare "never give it to me" (no other verb in the
+  // quote) still passes once the negation false-positive above is fixed.
+  const exclusionClauseOnly = classifyImperative('never give it to me', 'I hate mozzarella, never give it to me')
+  check('"never give it to me" alone (no other imperative verb in the quote) still classifies as imperative',
+    exclusionClauseOnly.imperative === true, exclusionClauseOnly)
+
   // The model's later idea ("log that as a conventional Deadlift instead")
   // said yes to: since the FIRST proposal is already resolved (done, not
   // pending/claimed/executing), the scope_key's partial-unique index no
