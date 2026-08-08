@@ -4,7 +4,6 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Send, CheckCircle2, ArrowDown, RotateCcw, AlertCircle, Trash2, Mic, MessageCircle } from 'lucide-react'
-import { generateChatResponse } from '@/lib/chat-assistant'
 import { calculateCalories, getActiveMesocycleWeek } from '@/lib/calculations'
 import { computeBMR, computeStaticTDEE } from '@/lib/macro-calculator'
 import { getAppNow } from '@/lib/dev-clock'
@@ -1643,19 +1642,35 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       clarification = processed.clarification
       setLastFailedInput(null)
     } catch (err: unknown) {
+      // Fix 0.13 (ux-sweep) — every failure path used to funnel through
+      // here into one of two states, and only ONE of them was honest: a
+      // server-classified error (`retryable`, set explicitly by callGemini
+      // on a non-ok response) got the real "something went wrong, tap
+      // Retry" treatment, but anything else — critically, a raw network
+      // failure (offline, DNS, CORS — `fetch` itself rejecting with no
+      // `.retryable` field) — fell into an `else` branch that silently
+      // faked success: a local keyword-matched canned reply, persisted
+      // with status 'complete', identical in every visible way to a real
+      // answer. Offline is the single most common way this branch was hit,
+      // and it was the one case where the user's message provably never
+      // reached the coach at all. Every failure now gets the same honest
+      // "didn't go through, tap Retry" treatment — there is no longer a
+      // silent-success path.
       failed = true
       const error = err as { message?: string; retryable?: boolean }
-      if (error.retryable || (err instanceof DOMException && err.name === 'AbortError')) {
-        const isTimeout = err instanceof DOMException && err.name === 'AbortError'
-        responseText = isTimeout
-          ? '_That request took too long to process. Tap "Retry" to try again._'
-          : `_${error.message || 'Something went wrong with the AI service. Tap "Retry" to try again.'}_`
-        setLastFailedInput(userText)
-      } else {
-        console.error('Gemini API error, falling back to local:', err)
-        failed = false
-        responseText = generateChatResponse(userText, { profile, macros, exercisePlan, mealPlan })
-      }
+      const isTimeout = err instanceof DOMException && err.name === 'AbortError'
+      // error.retryable is only ever set by callGemini's own deliberate
+      // throws, whose .message is written for display. Anything else (a
+      // raw fetch rejection — offline, DNS, CORS) carries a message meant
+      // for a console, not a user, so it's replaced with the same honest
+      // copy rather than surfacing "Failed to fetch" verbatim.
+      const displayMessage = error.retryable
+        ? (error.message || 'Something went wrong with the AI service. Tap "Retry" to try again.')
+        : 'Couldn\'t reach the coach — check your connection and tap "Retry".'
+      responseText = isTimeout
+        ? '_That request took too long to process. Tap "Retry" to try again._'
+        : `_${displayMessage}_`
+      setLastFailedInput(userText)
     }
 
     const quickReplies = extractQuickReplies(responseText!)
