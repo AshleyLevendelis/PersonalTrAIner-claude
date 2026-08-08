@@ -525,6 +525,34 @@ async function main() {
   check('"No" leaves the row declined with resolved_at set, no side effects', declineAfter?.status === 'declined' && !!declineAfter?.resolved_at, declineAfter)
   check('a declined row was never claimed/executed', declineAfter?.claimed_at == null, declineAfter)
 
+  // ---- 8b. Regression: memory-save loop ("never give it to me") -----------
+  // Reproduced by real usage: "I hate mozzarella, never give it to me" made
+  // the coach ask "Want me to remember mozzarella?" forever, no matter the
+  // reply. Root cause (traced): NEGATION_RE's bare "never" term rejected the
+  // quote as non-imperative BEFORE the 'hate' verb match ever ran, so
+  // record_fact always downgraded to a plain-text offer with no
+  // pending_actions row — a DIFFERENT failure mode from [8]'s stuck loop,
+  // because there was never a card for the confirmation-reply interceptor to
+  // attach to in the first place. The fix distinguishes "I never trained"
+  // (a negated past action) from "never give it to me" (the imperative
+  // itself, an exclusion command) by requiring a subject immediately before
+  // "never" in the same clause.
+  console.log('\n[8b] Regression: memory-save loop ("never give it to me" must classify as imperative, not negation)')
+  const exclusionNever = classifyImperative(
+    'I hate mozzarella, never give it to me',
+    "I hate mozzarella, never give it to me, I can't stand it",
+  )
+  check('"never give it to me" (exclusion command) classifies as imperative, not negation',
+    exclusionNever.imperative === true, exclusionNever)
+
+  const pastActionNever = classifyImperative('I never trained legs today', 'I never trained legs today, ran out of time')
+  check('"I never trained" (negated past action, subject-led) still classifies as negation',
+    pastActionNever.imperative === false && pastActionNever.reason === 'negation', pastActionNever)
+
+  const pastActionNeverHave = classifyImperative("I've never done that exercise", "I've never done that exercise before")
+  check('"I\'ve never done X" (subject-led, contracted) still classifies as negation',
+    pastActionNeverHave.imperative === false && pastActionNeverHave.reason === 'negation', pastActionNeverHave)
+
   // The model's later idea ("log that as a conventional Deadlift instead")
   // said yes to: since the FIRST proposal is already resolved (done, not
   // pending/claimed/executing), the scope_key's partial-unique index no

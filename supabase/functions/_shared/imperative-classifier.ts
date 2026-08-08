@@ -22,7 +22,12 @@ export const IMPERATIVE_VERBS = [
 ];
 
 const INTERROGATIVE_LEAD_RE = /^\s*(what|why|how|when|where|which|who|can|could|should|would|is|are|do|does|did)\b/i;
-const NEGATION_RE = /\b(didn'?t|did not|couldn'?t|could not|won'?t|will not|not able|skipped|missed|forgot|never)\b/i;
+const NEGATION_RE = /\b(didn'?t|did not|couldn'?t|could not|won'?t|will not|not able|skipped|missed|forgot)\b/i;
+// "never" is ambiguous — "I never trained legs" negates a past action, but
+// "never give it to me" IS the imperative (an exclusion command). Only treat
+// it as negation when a subject sits immediately before it in the same
+// clause — keep in lockstep with src/lib/imperative-classifier.ts.
+const SUBJECT_LED_NEVER_RE = /\b(i|we|you|he|she|they)(?:'ve|'d)?\s+(?:have\s+|had\s+)?never\b/i;
 const IMPERATIVE_VERB_RE = new RegExp(`\\b(${IMPERATIVE_VERBS.join('|')})\\b`, 'i');
 
 export function classifyImperative(verbatimQuote: string, fullUserMessage: string): ClassificationResult {
@@ -35,7 +40,7 @@ export function classifyImperative(verbatimQuote: string, fullUserMessage: strin
   if (quote.endsWith('?') || INTERROGATIVE_LEAD_RE.test(quote)) {
     return { imperative: false, reason: 'interrogative' };
   }
-  if (NEGATION_RE.test(quote)) {
+  if (NEGATION_RE.test(quote) || SUBJECT_LED_NEVER_RE.test(quote)) {
     return { imperative: false, reason: 'negation' };
   }
   if (!IMPERATIVE_VERB_RE.test(quote)) {

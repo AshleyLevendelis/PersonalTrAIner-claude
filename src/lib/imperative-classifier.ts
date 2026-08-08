@@ -42,7 +42,18 @@ export const IMPERATIVE_VERBS = [
 
 const INTERROGATIVE_LEAD_RE = /^\s*(what|why|how|when|where|which|who|can|could|should|would|is|are|do|does|did)\b/i
 
-const NEGATION_RE = /\b(didn'?t|did not|couldn'?t|could not|won'?t|will not|not able|skipped|missed|forgot|never)\b/i
+const NEGATION_RE = /\b(didn'?t|did not|couldn'?t|could not|won'?t|will not|not able|skipped|missed|forgot)\b/i
+
+/**
+ * "never" is ambiguous: "I never trained legs" negates a past action (no
+ * imperative here), but "never give it to me" / "never feed me that" IS the
+ * imperative — an exclusion command, not a negated statement. Distinguish by
+ * whether a first/second/third-person subject sits immediately before
+ * "never" in the same clause (comma/period breaks the clause, so the
+ * subject of an earlier clause — "I hate mozzarella, never give it to me" —
+ * doesn't count). Only the subject-led form is treated as negation.
+ */
+const SUBJECT_LED_NEVER_RE = /\b(i|we|you|he|she|they)(?:'ve|'d)?\s+(?:have\s+|had\s+)?never\b/i
 
 const IMPERATIVE_VERB_RE = new RegExp(`\\b(${IMPERATIVE_VERBS.join('|')})\\b`, 'i')
 
@@ -63,7 +74,7 @@ export function classifyImperative(verbatimQuote: string, fullUserMessage: strin
     return { imperative: false, reason: 'interrogative' }
   }
 
-  if (NEGATION_RE.test(quote)) {
+  if (NEGATION_RE.test(quote) || SUBJECT_LED_NEVER_RE.test(quote)) {
     return { imperative: false, reason: 'negation' }
   }
 
