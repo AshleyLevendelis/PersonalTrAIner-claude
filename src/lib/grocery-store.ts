@@ -48,6 +48,10 @@ export interface GroceryItemRow {
   needs_review: boolean
   client_id: string | null
   created_at: string
+  /** Soft-delete for a 'generated' row: set by deleteItemLocal instead of removing the row, so a later regenerate doesn't resurrect an ingredient the user deliberately removed. Always hidden from getAllItems. */
+  dismissed: boolean
+  /** Set by editItemLocal when the user hand-corrects a 'generated' row's name/quantity/unit — a later regenerate refreshes meal_refs only and leaves the user's values alone. */
+  user_edited: boolean
 }
 
 const PENDING_KEY = 'fitplan_grocery_pending_v1'
@@ -68,6 +72,8 @@ interface PendingItem {
   needsReview: boolean
   createdAt: string
   attempts: number
+  dismissed: boolean
+  userEdited: boolean
 }
 
 interface PendingDelete {
@@ -219,6 +225,8 @@ function pendingItemToRow(item: PendingItem): GroceryItemRow {
     needs_review: item.needsReview,
     client_id: item.id,
     created_at: item.createdAt,
+    dismissed: item.dismissed,
+    user_edited: item.userEdited,
   }
 }
 
@@ -236,8 +244,8 @@ function mergePendingForProfile(profileId: string, serverRows: GroceryItemRow[])
   return [...byId.values()].sort((a, b) => a.created_at.localeCompare(b.created_at))
 }
 
-/** All grocery items for a profile — server + pending merged. Never throws offline: falls back to the pending-only view. */
-export async function getAllItems(profileId: string): Promise<GroceryItemRow[]> {
+/** Server + pending merged, including dismissed rows — only the regenerate reconciliation needs to see a dismissed row (to avoid resurrecting it), so this stays module-private rather than a second public read API. */
+async function getAllItemsIncludingDismissed(profileId: string): Promise<GroceryItemRow[]> {
   try {
     const { data, error } = await supabase
       .from('grocery_items')
@@ -249,6 +257,12 @@ export async function getAllItems(profileId: string): Promise<GroceryItemRow[]> 
   } catch {
     return mergePendingForProfile(profileId, [])
   }
+}
+
+/** All grocery items for a profile — server + pending merged, dismissed rows hidden. Never throws offline: falls back to the pending-only view. */
+export async function getAllItems(profileId: string): Promise<GroceryItemRow[]> {
+  const items = await getAllItemsIncludingDismissed(profileId)
+  return items.filter(i => !i.dismissed)
 }
 
 // ---------------------------------------------------------------------------
@@ -322,6 +336,8 @@ export function addItemLocal(input: {
       needsReview: existing.needs_review,
       createdAt: existing.created_at,
       attempts: 0,
+      dismissed: existing.dismissed,
+      userEdited: existing.user_edited,
     }
     enqueueUpsert(item)
     return { row: pendingItemToRow(item), created: false, addedQuantity: addQuantity }
@@ -341,11 +357,14 @@ export function addItemLocal(input: {
     needsReview: target.needsReview,
     createdAt: new Date().toISOString(),
     attempts: 0,
+    dismissed: false,
+    userEdited: false,
   }
   enqueueUpsert(item)
   return { row: pendingItemToRow(item), created: true, addedQuantity: input.quantity }
 }
 
+/** A direct hand-edit of name/quantity/unit/category. On a 'generated' row this marks user_edited so a later regenerate refreshes meal_refs only and leaves the user's own values in place, instead of overwriting them with the freshly-aggregated amount. */
 export function editItemLocal(current: GroceryItemRow, patch: { displayName?: string; quantity?: number; unit?: string; category?: GroceryCategory }): GroceryItemRow {
   const item: PendingItem = {
     id: current.id,
@@ -361,6 +380,8 @@ export function editItemLocal(current: GroceryItemRow, patch: { displayName?: st
     needsReview: current.needs_review,
     createdAt: current.created_at,
     attempts: 0,
+    dismissed: current.dismissed,
+    userEdited: current.source === 'generated' ? true : current.user_edited,
   }
   enqueueUpsert(item)
   return pendingItemToRow(item)
@@ -371,13 +392,25 @@ export function setCheckedLocal(current: GroceryItemRow, checked: boolean): Groc
     id: current.id, profileId: current.profile_id, canonicalKey: current.canonical_key, displayName: current.display_name,
     quantity: current.quantity, unit: current.unit, category: current.category, source: current.source,
     mealRefs: current.meal_refs, checked, needsReview: current.needs_review, createdAt: current.created_at, attempts: 0,
+    dismissed: current.dismissed, userEdited: current.user_edited,
   }
   enqueueUpsert(item)
   return pendingItemToRow(item)
 }
 
+/** 'generated' rows are soft-deleted (dismissed=true, row survives hidden) so a later regenerate doesn't re-aggregate the same ingredient from the meal plan and resurrect it. 'manual'/'chat' rows are hard-deleted as before — regeneration never reads those sources, so there is nothing to remember. */
 export function deleteItemLocal(current: GroceryItemRow): void {
-  enqueueDelete(current.id, current.profile_id)
+  if (current.source !== 'generated') {
+    enqueueDelete(current.id, current.profile_id)
+    return
+  }
+  const item: PendingItem = {
+    id: current.id, profileId: current.profile_id, canonicalKey: current.canonical_key, displayName: current.display_name,
+    quantity: current.quantity, unit: current.unit, category: current.category, source: current.source,
+    mealRefs: current.meal_refs, checked: current.checked, needsReview: current.needs_review, createdAt: current.created_at,
+    attempts: 0, dismissed: true, userEdited: current.user_edited,
+  }
+  enqueueUpsert(item)
 }
 
 export function clearCheckedLocal(currentItems: GroceryItemRow[]): void {
@@ -396,6 +429,7 @@ export function undoAddLocal(row: GroceryItemRow, addedQuantity: number, wasCrea
     id: row.id, profileId: row.profile_id, canonicalKey: row.canonical_key, displayName: row.display_name,
     quantity: Math.max(0, row.quantity - addedQuantity), unit: row.unit, category: row.category, source: row.source,
     mealRefs: row.meal_refs, checked: row.checked, needsReview: row.needs_review, createdAt: row.created_at, attempts: 0,
+    dismissed: row.dismissed, userEdited: row.user_edited,
   }
   enqueueUpsert(item)
 }
@@ -444,6 +478,8 @@ async function syncUpsert(item: PendingItem): Promise<void> {
       checked: item.checked,
       needs_review: item.needsReview,
       client_id: item.id,
+      dismissed: item.dismissed,
+      user_edited: item.userEdited,
     }, { onConflict: 'id' })
   if (error) throw error
 }
@@ -606,7 +642,11 @@ export async function generateGroceryList(input: GenerateGroceryListInput): Prom
     }
   }
 
-  const currentItems = await getAllItems(input.profileId)
+  // Must see dismissed rows too (getAllItems hides them) — a dismissed
+  // canonical_key that's still in the aggregate is exactly the "user
+  // deleted this, don't bring it back" case this reconciliation has to
+  // respect rather than silently re-adding.
+  const currentItems = await getAllItemsIncludingDismissed(input.profileId)
   const existingGenerated = new Map(currentItems.filter(r => r.source === 'generated').map(r => [r.canonical_key, r]))
 
   let added = 0
@@ -616,12 +656,31 @@ export async function generateGroceryList(input: GenerateGroceryListInput): Prom
   for (const agg of aggregate.values()) {
     const existing = existingGenerated.get(agg.canonicalKey)
     const roundedGrams = Math.round(agg.grams)
+    if (existing?.dismissed) {
+      // Deliberately removed by the user — leave it dismissed, don't resurrect it.
+      existingGenerated.delete(agg.canonicalKey)
+      continue
+    }
+    if (existing?.user_edited) {
+      // Hand-corrected by the user — refresh only which meals reference it,
+      // keep their name/quantity/unit exactly as they set them.
+      existingGenerated.delete(agg.canonicalKey)
+      enqueueUpsert({
+        id: existing.id, profileId: input.profileId, canonicalKey: existing.canonical_key, displayName: existing.display_name,
+        quantity: existing.quantity, unit: existing.unit, category: existing.category, source: 'generated', mealRefs: agg.mealRefs,
+        checked: existing.checked, needsReview: existing.needs_review, createdAt: existing.created_at, attempts: 0,
+        dismissed: false, userEdited: true,
+      })
+      updated++
+      continue
+    }
     if (existing) {
       existingGenerated.delete(agg.canonicalKey)
       enqueueUpsert({
         id: existing.id, profileId: input.profileId, canonicalKey: agg.canonicalKey, displayName: agg.displayName,
         quantity: roundedGrams, unit: 'g', category: agg.category, source: 'generated', mealRefs: agg.mealRefs,
         checked: existing.checked, needsReview: agg.needsReview, createdAt: existing.created_at, attempts: 0,
+        dismissed: false, userEdited: false,
       })
       updated++
     } else {
@@ -629,14 +688,17 @@ export async function generateGroceryList(input: GenerateGroceryListInput): Prom
         id: generateId(), profileId: input.profileId, canonicalKey: agg.canonicalKey, displayName: agg.displayName,
         quantity: roundedGrams, unit: 'g', category: agg.category, source: 'generated', mealRefs: agg.mealRefs,
         checked: false, needsReview: agg.needsReview, createdAt: new Date().toISOString(), attempts: 0,
+        dismissed: false, userEdited: false,
       })
       added++
     }
   }
 
   // Whatever's left in existingGenerated was a 'generated' row this
-  // aggregation run didn't produce — the meal it came from is no longer
-  // in the selected pools/horizon, so it's dropped (never a manual/chat row).
+  // aggregation run didn't produce — the meal it came from is no longer in
+  // the selected pools/horizon. A dismissed leftover here was already
+  // unwanted, so this is just cleanup; a live (non-dismissed) leftover is
+  // the same "no longer needed" case the original behavior handled.
   for (const stale of existingGenerated.values()) {
     enqueueDelete(stale.id, stale.profile_id)
     removed++

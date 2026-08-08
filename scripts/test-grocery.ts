@@ -8,6 +8,8 @@
  *   3. Removed meals drop their generated lines
  *   4. Chat-added items land identically to manually-added ones
  *   5. Undo removes exactly what was added (fresh insert vs. a merge)
+ *   6. A deleted generated row stays deleted across a regenerate, and a
+ *      hand-edited generated row's values survive a regenerate (fix 0.10)
  */
 
 // --- Environment shims --------------------------------------------------
@@ -265,6 +267,36 @@ async function main() {
   check('an explicit instruction to add passes the gate', instructed.imperative === true, instructed)
   const merelyStated = classifyImperative("we're out of eggs", "we're out of eggs, remind me later maybe")
   check('a mere low-stock statement with no instruction does NOT pass the gate (offer, not an action)', merelyStated.imperative === false, merelyStated)
+
+  // ---- 6. UX-sweep fix 0.10: regenerate must not resurrect a dismissed item
+  //         or clobber a hand-edited one ------------------------------------
+  console.log('\n[6] regenerate respects a deleted generated row and a hand-edited generated row')
+  const dismissProfileId = crypto.randomUUID()
+  const oatsPools = { breakfast: [{ slot: 'breakfast' as const, name: 'Oats Bowl', macros: targets, tags: [], ingredients: [{ name: 'oats', quantity: 80, unit: 'g' }] }] }
+  await generateGroceryList({ profileId: dismissProfileId, mealPools: oatsPools, targets, days: 1 })
+  await flushPending()
+  const oatsRow = (await getAllItems(dismissProfileId)).find(i => i.canonical_key === 'oats')!
+  check('oats was generated', !!oatsRow, oatsRow)
+  deleteItemLocal(oatsRow)
+  await flushPending()
+  check('deleting a generated row hides it from getAllItems', !(await getAllItems(dismissProfileId)).some(i => i.canonical_key === 'oats'))
+  check('but the row still exists in the DB, soft-deleted rather than removed', db.grocery_items.some(r => r.canonical_key === 'oats' && r.dismissed === true))
+  const rerunSamePools = await generateGroceryList({ profileId: dismissProfileId, mealPools: oatsPools, targets, days: 1 })
+  check('regenerating with oats still in the plan does NOT resurrect the dismissed row', rerunSamePools.added === 0 && rerunSamePools.updated === 0, rerunSamePools)
+  check('oats is still absent after the regenerate', !(await getAllItems(dismissProfileId)).some(i => i.canonical_key === 'oats'))
+
+  const editProfileId = crypto.randomUUID()
+  const chickenPools = { lunch: [{ slot: 'lunch' as const, name: 'Chicken Bowl', macros: targets, tags: [], ingredients: [{ name: 'chicken breast', quantity: 150, unit: 'g' }] }] }
+  await generateGroceryList({ profileId: editProfileId, mealPools: chickenPools, targets, days: 1 })
+  await flushPending()
+  const chickenRow = (await getAllItems(editProfileId)).find(i => i.canonical_key === 'chicken breast')!
+  const editedChicken = editItemLocal(chickenRow, { displayName: 'Chicken breast (family pack)', quantity: 1000 })
+  check('editItemLocal marks a generated row user_edited', editedChicken.user_edited === true, editedChicken)
+  await flushPending()
+  const regenAfterEdit = await generateGroceryList({ profileId: editProfileId, mealPools: chickenPools, targets, days: 1 })
+  check('regenerate still reports the row touched (meal_refs refresh)', regenAfterEdit.updated === 1 && regenAfterEdit.added === 0, regenAfterEdit)
+  const editedChickenAfterRegen = (await getAllItems(editProfileId)).find(i => i.id === chickenRow.id)
+  check("the user's hand-edited name and quantity survive the regenerate untouched", editedChickenAfterRegen?.display_name === 'Chicken breast (family pack)' && editedChickenAfterRegen?.quantity === 1000, editedChickenAfterRegen)
 
   // ---- Summary -------------------------------------------------------------
   if (failures > 0) {
