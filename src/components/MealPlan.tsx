@@ -209,7 +209,20 @@ function MealSlotRow({
 }) {
   const [busy, setBusy] = useState(false)
   const [swapOpen, setSwapOpen] = useState(false)
-  const otherOptions = alternatives.filter(o => o.name !== option?.name)
+  // Fix 4.3 (ux-sweep) — generateMealPools now rejects a same-named
+  // proposal at the source, but a pool persisted before that fix can still
+  // carry duplicate names; deduping here too means an already-onboarded
+  // profile's swap list can't show the chosen meal a second time under a
+  // near-identical macro reading, or a count that doesn't match what's
+  // actually listed, until their next regenerate flushes the old pool.
+  const seenNames = new Set<string>()
+  const otherOptions = alternatives.filter(o => {
+    const key = o.name.trim().toLowerCase()
+    if (key === option?.name.trim().toLowerCase()) return false
+    if (seenNames.has(key)) return false
+    seenNames.add(key)
+    return true
+  })
 
   const handleChoose = async (name: string) => {
     setBusy(true)

@@ -412,6 +412,23 @@ export async function generateMealPools(params: {
         continue
       }
 
+      // Fix 4.3 (ux-sweep) — nothing here checked for a same-named proposal
+      // already in the pool, so a proposal round could (and did, live) add
+      // "Greek Yoghurt Pancakes" twice at slightly different kcal, which
+      // then broke the swap UI downstream: its by-name filter for "options
+      // other than the chosen one" only strips ONE reading of a duplicate
+      // name, so the other duplicate survived as an "option" that was
+      // actually just the meal already showing, with a stale delta against
+      // itself, and the "N options" count coming out of the same list —
+      // wrong in lockstep with it. Rejecting the duplicate at its actual
+      // source keeps that whole downstream chain honest without needing to
+      // special-case it again at render time.
+      const normalizedName = proposal.name.trim().toLowerCase()
+      if (accepted[slot]?.some(o => o.name.trim().toLowerCase() === normalizedName)) {
+        rejectionLog.push(`[${slot}] "${proposal.name}": duplicate name already in this slot's pool`)
+        continue
+      }
+
       const slotTimingDislikes = (params.timingRules ?? [])
         .filter(r => r.anchor === 'slot' && r.slot === slot)
         .map(r => r.subject)
