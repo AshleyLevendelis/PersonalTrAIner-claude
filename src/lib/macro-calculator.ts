@@ -236,3 +236,35 @@ export function calculateWeeklySchedule(
 export function getStaticDailyMacros(profile: UserProfile): MacroTargets {
   return computeStaticMacros(profile)
 }
+
+export interface MacroDerivation {
+  bmr: number
+  tdee: number
+  /** tdee → target delta from the goal adjustment — negative for a deficit, positive for a surplus, 0 at maintenance. */
+  surplusKcal: number
+  /** Label for the surplus/deficit row — matches applyGoalAdjustment's own goal handling. */
+  surplusLabel: string
+  target: MacroTargets
+}
+
+/**
+ * The BMR → TDEE → surplus/deficit → target chain, as one caller-friendly
+ * shape — for the Nutrition tab's derivation display (turn 10). Always
+ * computed from the STATIC baseline (the same numbers `applyGoalAdjustment`
+ * and `computeStaticMacros` already produce internally) regardless of the
+ * active macro_calculation_mode, since the derivation explains "where the
+ * numbers come from" independent of which method's weekly schedule is
+ * currently selected below it.
+ */
+export function getMacroDerivation(profile: UserProfile): MacroDerivation {
+  const bmr = computeBMR(profile)
+  const tdee = computeStaticTDEE(bmr, profile.activity_level)
+  const target = computeStaticMacros(profile)
+  const surplusKcal = target.calories - tdee
+  const surplusLabel =
+    profile.fitness_goal === 'fat_loss' ? 'Fat-loss deficit'
+    : profile.fitness_goal === 'hypertrophy' ? 'Hypertrophy surplus'
+    : profile.fitness_goal === 'conditioning' ? 'Conditioning adjustment'
+    : 'Maintenance adjustment'
+  return { bmr, tdee, surplusKcal, surplusLabel, target }
+}

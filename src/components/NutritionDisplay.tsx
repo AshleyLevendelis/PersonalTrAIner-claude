@@ -1,9 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Separator } from '@/components/ui/separator'
-import { Flame, Beef, Wheat, Droplets, Calculator, Layers } from 'lucide-react'
+import { Calculator, Layers } from 'lucide-react'
 import type { MacroTargets, UserProfile, WorkoutDay, MacroCalculationMode } from '@/lib/types'
-import { calculateWeeklySchedule, computeBMR, computeStaticTDEE } from '@/lib/macro-calculator'
+import { calculateWeeklySchedule, getMacroDerivation } from '@/lib/macro-calculator'
 
 export interface NutritionDisplayProps {
   profile: UserProfile
@@ -14,7 +13,7 @@ export interface NutritionDisplayProps {
   onMacroModeChange?: (mode: MacroCalculationMode) => void
 }
 
-export function NutritionDisplay({ profile, macros, exercisePlan = [], latestWeightKg, onMacroModeChange }: NutritionDisplayProps) {
+export function NutritionDisplay({ profile, exercisePlan = [], latestWeightKg, onMacroModeChange }: NutritionDisplayProps) {
   // Living targets (M0): BMR/TDEE were previously read from the frozen
   // fitness_profiles columns (computed once at onboarding); they're now
   // derived live from the same effective-weight profile the macros use, so
@@ -22,59 +21,53 @@ export function NutritionDisplay({ profile, macros, exercisePlan = [], latestWei
   const effectiveProfile = latestWeightKg != null && latestWeightKg > 0
     ? { ...profile, weight_kg: latestWeightKg }
     : profile
-  const bmr = computeBMR(effectiveProfile)
-  const tdee = computeStaticTDEE(bmr, effectiveProfile.activity_level)
   const mode = profile.macro_calculation_mode || 'STANDARD_STATIC'
+  // Turn 10: the derivation always explains the STATIC baseline (BMR → TDEE
+  // → goal adjustment → target) regardless of which method is active below —
+  // "where your numbers come from" is a fixed chain of math, not a
+  // restatement of whichever schedule happens to be selected.
+  const derivation = getMacroDerivation(effectiveProfile)
 
   const weeklySchedule = mode === 'DYNAMIC_CSCS'
     ? calculateWeeklySchedule(effectiveProfile, exercisePlan)
     : null
 
+  const derivationRows = [
+    { label: 'Basal metabolic rate', sub: `From ${effectiveProfile.weight_kg} kg, ${effectiveProfile.height_cm} cm, ${effectiveProfile.age} y`, value: `${derivation.bmr}` },
+    { label: 'Daily expenditure', sub: `BMR × activity level`, value: `${derivation.tdee}` },
+    { label: derivation.surplusLabel, sub: derivation.surplusKcal === 0 ? 'No adjustment at maintenance' : 'Applied for your current goal', value: `${derivation.surplusKcal > 0 ? '+' : ''}${derivation.surplusKcal}` },
+  ]
+
   return (
     <div className="space-y-6">
-      {mode === 'STANDARD_STATIC' && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Daily Macronutrient Targets</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
-                <Flame className="size-5 text-chart-1 mt-0.5 shrink-0" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Calories</p>
-                  <p className="text-xl font-semibold">{macros.calories}</p>
-                  <p className="text-xs text-muted-foreground">kcal/day</p>
+      <Card>
+        <CardHeader className="pb-1">
+          <CardTitle className="text-base">How your targets are set</CardTitle>
+        </CardHeader>
+        <CardContent className="pt-0">
+          <div className="flex flex-col">
+            {derivationRows.map(row => (
+              <div key={row.label} className="flex items-baseline justify-between gap-3 py-3.5" style={{ borderTop: '1px solid var(--hairline, var(--border))' }}>
+                <div className="min-w-0">
+                  <p className="text-sm text-foreground">{row.label}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{row.sub}</p>
                 </div>
+                <span className="tabular-mono shrink-0 text-sm">{row.value}</span>
               </div>
-              <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
-                <Beef className="size-5 text-chart-2 mt-0.5 shrink-0" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Protein</p>
-                  <p className="text-xl font-semibold">{macros.protein}g</p>
-                  <p className="text-xs text-muted-foreground">{Math.round(macros.protein * 4 / macros.calories * 100)}%</p>
-                </div>
+            ))}
+            <div className="flex items-baseline justify-between gap-3 py-3.5" style={{ borderTop: '1px solid var(--hairline, var(--border))' }}>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-foreground">Daily target</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">Protein 2 g/kg · fat 25% · carbs the remainder</p>
               </div>
-              <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
-                <Wheat className="size-5 text-chart-4 mt-0.5 shrink-0" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Carbs</p>
-                  <p className="text-xl font-semibold">{macros.carbs}g</p>
-                  <p className="text-xs text-muted-foreground">{Math.round(macros.carbs * 4 / macros.calories * 100)}%</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
-                <Droplets className="size-5 text-chart-5 mt-0.5 shrink-0" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Fat</p>
-                  <p className="text-xl font-semibold">{macros.fat}g</p>
-                  <p className="text-xs text-muted-foreground">{Math.round(macros.fat * 9 / macros.calories * 100)}%</p>
-                </div>
-              </div>
+              <span className="ds-num-tile tabular-mono glow-mint-lg shrink-0 text-[18px]">{derivation.target.calories}</span>
             </div>
-          </CardContent>
-        </Card>
-      )}
+          </div>
+          <p className="mt-4 text-xs text-muted-foreground">
+            Every figure here recomputes from your latest weigh-in. Today's progress against this target is the ring on Home.
+          </p>
+        </CardContent>
+      </Card>
 
       {mode === 'DYNAMIC_CSCS' && weeklySchedule && (
         <Card>
@@ -111,23 +104,6 @@ export function NutritionDisplay({ profile, macros, exercisePlan = [], latestWei
           </CardContent>
         </Card>
       )}
-
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Energy Expenditure</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <p className="ds-label">Basal Metabolic Rate (BMR)</p>
-            <p className="ds-num-hero">{bmr} <span className="text-sm font-normal text-muted-foreground">kcal/day</span></p>
-          </div>
-          <Separator />
-          <div>
-            <p className="ds-label">Total Daily Energy Expenditure (TDEE)</p>
-            <p className="ds-num-hero">{tdee} <span className="text-sm font-normal text-muted-foreground">kcal/day</span></p>
-          </div>
-        </CardContent>
-      </Card>
 
       {/*
         Fix — Nutrition Method demoted to the bottom of the tab. It's a

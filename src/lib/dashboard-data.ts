@@ -57,6 +57,10 @@ export interface DashboardData {
   caloriesTarget: number
   proteinEaten: number
   proteinTarget: number
+  carbsEaten: number
+  carbsTarget: number
+  fatEaten: number
+  fatTarget: number
   weightTrend: WeightTrendResult | null
   recentPRs: RecentPR[]
   streak: number
@@ -267,6 +271,10 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
     caloriesTarget: ledger.targets.calories,
     proteinEaten: ledger.eaten.protein,
     proteinTarget: ledger.targets.protein,
+    carbsEaten: ledger.eaten.carbs,
+    carbsTarget: ledger.targets.carbs,
+    fatEaten: ledger.eaten.fat,
+    fatTarget: ledger.targets.fat,
     weightTrend,
     recentPRs,
     streak: streakResult.currentStreak,

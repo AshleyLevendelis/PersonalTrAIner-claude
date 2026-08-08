@@ -29,14 +29,18 @@ interface DashboardProps {
 
 const WATER_QUICK_ADD_ML = [250, 500]
 
-// Turn 4 ring meter — classic radial-progress technique (stroke-dasharray of
+// Turn 10 ring meter — classic radial-progress technique (stroke-dasharray of
 // a fraction of the circle's circumference, rotated -90deg to start at 12
-// o'clock). Two concentric rings share one <svg>: calories outer, protein
-// inner. r/stroke-width match the design doc's literal values exactly.
-const RING_OUTER_R = 34
-const RING_INNER_R = 26
-const RING_OUTER_CIRC = 2 * Math.PI * RING_OUTER_R
-const RING_INNER_CIRC = 2 * Math.PI * RING_INNER_R
+// o'clock). Four concentric rings share one <svg>: calories (outermost) then
+// protein/carbs/fat nested inside, each fading in text-color opacity to match
+// the legend rows below. r/stroke-width match the design doc's literal values.
+const RINGS = [
+  { key: 'calories', r: 40, strokeWidth: 8 },
+  { key: 'protein', r: 30, strokeWidth: 5 },
+  { key: 'carbs', r: 22, strokeWidth: 5 },
+  { key: 'fat', r: 14, strokeWidth: 5 },
+] as const
+const RING_CIRC: Record<string, number> = Object.fromEntries(RINGS.map(r => [r.key, 2 * Math.PI * r.r]))
 
 export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreatedAt, onWaterChanged, onWeightLogged }: DashboardProps) {
   const activeSession = useActiveSession()
@@ -203,23 +207,28 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
             ambience-only now, so the label loses its glow. Water/Steps drop
             out of the tile grid into plain hairline-divided rows. */}
         <p className="ds-label mt-8">Today</p>
-        <div className="mt-[18px] flex items-center gap-5">
-          <svg width="104" height="104" viewBox="0 0 104 104" className="shrink-0">
-            <circle cx="52" cy="52" r={RING_OUTER_R} fill="none" stroke="var(--surface-raised)" strokeWidth="7" />
-            <circle cx="52" cy="52" r={RING_INNER_R} fill="none" stroke="var(--surface-raised)" strokeWidth="4" />
-            <circle
-              cx="52" cy="52" r={RING_OUTER_R} fill="none" stroke="var(--primary)" strokeWidth="7" strokeLinecap="round"
-              strokeDasharray={`${RING_OUTER_CIRC * Math.min(1, data.caloriesTarget > 0 ? data.caloriesEaten / data.caloriesTarget : 0)} ${RING_OUTER_CIRC}`}
-              transform="rotate(-90 52 52)"
-              className="glow-icon"
-              style={{ transition: 'stroke-dasharray 400ms ease' }}
-            />
-            <circle
-              cx="52" cy="52" r={RING_INNER_R} fill="none" stroke="var(--primary)" strokeOpacity="0.55" strokeWidth="4" strokeLinecap="round"
-              strokeDasharray={`${RING_INNER_CIRC * Math.min(1, data.proteinTarget > 0 ? data.proteinEaten / data.proteinTarget : 0)} ${RING_INNER_CIRC}`}
-              transform="rotate(-90 52 52)"
-              style={{ transition: 'stroke-dasharray 400ms ease' }}
-            />
+        <div className="mt-[18px] flex items-center gap-[18px]">
+          <svg width="112" height="112" viewBox="0 0 112 112" className="shrink-0">
+            {RINGS.map(r => (
+              <circle key={`track-${r.key}`} cx="56" cy="56" r={r.r} fill="none" stroke="var(--surface-raised)" strokeWidth={r.strokeWidth} />
+            ))}
+            {RINGS.map((r, i) => {
+              const eaten = r.key === 'calories' ? data.caloriesEaten : r.key === 'protein' ? data.proteinEaten : r.key === 'carbs' ? data.carbsEaten : data.fatEaten
+              const target = r.key === 'calories' ? data.caloriesTarget : r.key === 'protein' ? data.proteinTarget : r.key === 'carbs' ? data.carbsTarget : data.fatTarget
+              const circ = RING_CIRC[r.key]
+              return (
+                <circle
+                  key={`fill-${r.key}`}
+                  cx="56" cy="56" r={r.r} fill="none" strokeWidth={r.strokeWidth} strokeLinecap="round"
+                  stroke={i === 0 ? 'var(--primary)' : 'currentColor'}
+                  strokeOpacity={i === 0 ? undefined : 0.88 - i * 0.2}
+                  strokeDasharray={`${circ * Math.min(1, target > 0 ? eaten / target : 0)} ${circ}`}
+                  transform="rotate(-90 56 56)"
+                  className={i === 0 ? 'glow-icon' : undefined}
+                  style={{ transition: 'stroke-dasharray 400ms ease' }}
+                />
+              )
+            })}
           </svg>
           <div className="flex min-w-0 flex-1 flex-col gap-3.5">
             <div>
@@ -231,13 +240,20 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
                 <button className="mt-1 text-left text-xs text-primary glow-mint" onClick={() => { window.location.hash = tabHash('meals') }}>Log a meal</button>
               )}
             </div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-[22px] font-bold tracking-[-.03em] tabular-mono text-[#E4FCF4]">
-                {Math.round(data.proteinEaten)}<span className="text-xs font-medium text-text-tertiary">g</span>
-              </span>
-              <span className="text-[10.5px] uppercase tracking-[.16em] text-muted-foreground">
-                protein · of <span className="tabular-mono">{Math.round(data.proteinTarget)}g</span>
-              </span>
+            <div className="flex flex-col gap-[7px]">
+              {([
+                { label: 'Protein', eaten: data.proteinEaten, target: data.proteinTarget, opacity: 0.88 },
+                { label: 'Carbs', eaten: data.carbsEaten, target: data.carbsTarget, opacity: 0.66 },
+                { label: 'Fat', eaten: data.fatEaten, target: data.fatTarget, opacity: 0.48 },
+              ] as const).map(row => (
+                <div key={row.label} className="flex items-baseline gap-[9px]">
+                  <span className="h-[9px] w-[9px] shrink-0 rounded-[3px]" style={{ background: `color-mix(in oklab, var(--text-tertiary) ${Math.round(row.opacity * 100)}%, transparent)` }} />
+                  <span className="flex-1 text-[10px] uppercase tracking-[.16em] text-muted-foreground">{row.label}</span>
+                  <span className="tabular-mono text-[12.5px]">
+                    {Math.round(row.eaten)}<span className="text-muted-foreground"> / {Math.round(row.target)}g</span>
+                  </span>
+                </div>
+              ))}
             </div>
           </div>
         </div>
