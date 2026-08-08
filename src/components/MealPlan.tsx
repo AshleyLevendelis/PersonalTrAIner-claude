@@ -6,12 +6,13 @@ import {
   Loader2,
   Check,
 } from 'lucide-react'
+import { InsightBanner } from '@/components/ui/insight-banner'
 import type { MacroTargets } from '@/lib/types'
 import { getTodayLedger, logMealEaten, voidMealEvent, type MealSlotName, type MealEventRecord } from '@/lib/meal-store'
 import type { PoolOption } from '@/lib/meal-generation'
 
 const SLOT_ORDER: MealSlotName[] = ['breakfast', 'lunch', 'dinner', 'snack']
-const SLOT_LABEL: Record<MealSlotName, string> = {
+export const SLOT_LABEL: Record<MealSlotName, string> = {
   breakfast: 'Breakfast',
   lunch: 'Lunch',
   dinner: 'Dinner',
@@ -30,6 +31,9 @@ interface MealPlanProps {
   totals: MacroTargets
   targets: MacroTargets | null
   isGenerating: boolean
+  /** Set when a (re)generate call failed or came back empty for one or more slots — the existing plan is always left in place when this fires. */
+  regenerateError?: string | null
+  onDismissRegenerateError?: () => void
   onSwapSlot: (slot: MealSlotName, chooseName: string) => Promise<void>
   onRegenerateSlot: (slot: MealSlotName) => Promise<void>
   onRegenerateAll: () => Promise<void>
@@ -44,7 +48,7 @@ interface MealPlanProps {
  * one meal the user has open — everything else is a single collapsed line,
  * mirroring ExerciseRow's collapsed/expanded contract.
  */
-export function MealPlan({ profileId, date, pools, chosen, totals, targets, isGenerating, onSwapSlot, onRegenerateSlot, onRegenerateAll }: MealPlanProps) {
+export function MealPlan({ profileId, date, pools, chosen, totals, targets, isGenerating, regenerateError, onDismissRegenerateError, onSwapSlot, onRegenerateSlot, onRegenerateAll }: MealPlanProps) {
   const activeSlots = SLOT_ORDER.filter(s => (pools[s]?.length ?? 0) > 0)
   const [expandedSlot, setExpandedSlot] = useState<MealSlotName | null>(null)
 
@@ -68,9 +72,21 @@ export function MealPlan({ profileId, date, pools, chosen, totals, targets, isGe
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(reloadLogged, [profileId, date])
 
+  const errorBanner = regenerateError && (
+    <InsightBanner tone="warning" className="items-start justify-between">
+      <span>{regenerateError}</span>
+      {onDismissRegenerateError && (
+        <button type="button" onClick={onDismissRegenerateError} className="shrink-0 text-xs font-semibold underline">
+          Dismiss
+        </button>
+      )}
+    </InsightBanner>
+  )
+
   if (activeSlots.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center gap-3 py-16">
+        {errorBanner}
         <UtensilsCrossed className="size-8 text-muted-foreground/50" />
         <p className="text-sm text-muted-foreground">No meal plan generated yet.</p>
         <p className="text-xs text-muted-foreground/70">Complete onboarding to generate your meal pools, or regenerate below.</p>
@@ -84,6 +100,7 @@ export function MealPlan({ profileId, date, pools, chosen, totals, targets, isGe
 
   return (
     <div className="space-y-4">
+      {errorBanner}
       <div className="flex items-center justify-between">
         <span className="ds-label">Today's meals</span>
         <button

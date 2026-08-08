@@ -8,7 +8,7 @@ import { BottomTabBar } from '@/components/BottomTabBar'
 import { OnboardingFlow } from '@/components/onboarding/OnboardingFlow'
 import { NutritionDisplay } from '@/components/NutritionDisplay'
 import { ExerciseTab } from '@/components/exercise/ExerciseTab'
-import { MealPlan } from '@/components/MealPlan'
+import { MealPlan, SLOT_LABEL as MEAL_SLOT_LABEL } from '@/components/MealPlan'
 import { Dashboard } from '@/components/Dashboard'
 import { GroceryListSummary } from '@/components/GroceryListSummary'
 import { ChatAssistant } from '@/components/ChatAssistant'
@@ -70,6 +70,8 @@ function App() {
   // valid for its slot any day, per the M0 architecture decision).
   const [mealPools, setMealPools] = useState<Partial<Record<MealSlotName, PoolOption[]>>>({})
   const [isGeneratingMeals, setIsGeneratingMeals] = useState(false)
+  /** Set when a (re)generate call reaches the server but comes back with nothing for one or more slots — surfaced so a failed regenerate reads as a failure, not as "your plan is gone." */
+  const [mealRegenerateError, setMealRegenerateError] = useState<string | null>(null)
   /** Slot -> pool-option name the user explicitly picked this session, overriding assembleDay's automatic choice for that slot until the next regenerate. */
   const [manualMealPicks, setManualMealPicks] = useState<Partial<Record<MealSlotName, string>>>({})
   // assembleDay is pure — deriving today's picks from pools+targets on every
@@ -795,6 +797,7 @@ function App() {
   const handleRegenerateMealSlot = async (slot: MealSlotName) => {
     if (!profile?.id || !macros) return
     setIsGeneratingMeals(true)
+    setMealRegenerateError(null)
     try {
       const result = await generateMealPools({
         profileId: profile.id,
@@ -809,10 +812,22 @@ function App() {
         breakfastStyle: profile.breakfast_style,
         onlySlots: [slot],
       })
+      // A total failure comes back as an empty array for the slot (the fetch
+      // layer swallows network/HTTP failures into []) — persistPools already
+      // leaves that slot's DB rows untouched in that case, so mirror that
+      // here: don't overwrite the on-screen pool or clear the manual pick
+      // with nothing. Only apply/clear when generation actually produced
+      // options for this slot.
+      if ((result.accepted[slot]?.length ?? 0) === 0) {
+        setMealRegenerateError(`Couldn't refresh ${MEAL_SLOT_LABEL[slot]} — kept your existing options.`)
+        return
+      }
       setMealPools(prev => ({ ...prev, ...result.accepted }))
       setManualMealPicks(prev => { const next = { ...prev }; delete next[slot]; return next })
       const todayDate = getSessionDateContext(profile.id).date
       await clearMealPick(profile.id, todayDate, slot)
+    } catch {
+      setMealRegenerateError(`Couldn't refresh ${MEAL_SLOT_LABEL[slot]} — kept your existing options.`)
     } finally {
       setIsGeneratingMeals(false)
     }
@@ -821,6 +836,7 @@ function App() {
   const handleRegenerateAllMeals = async () => {
     if (!profile?.id || !macros) return
     setIsGeneratingMeals(true)
+    setMealRegenerateError(null)
     try {
       const result = await generateMealPools({
         profileId: profile.id,
@@ -834,10 +850,37 @@ function App() {
         timingRules: compiledTimingRules,
         breakfastStyle: profile.breakfast_style,
       })
-      setMealPools(result.accepted)
+      const requestedSlots = Object.keys(result.accepted) as MealSlotName[]
+      const failedSlots = requestedSlots.filter(s => (result.accepted[s]?.length ?? 0) === 0)
+
+      if (failedSlots.length === requestedSlots.length && requestedSlots.length > 0) {
+        // Total failure — every requested slot came back empty. Leave the
+        // existing plan and manual picks untouched entirely (persistPools
+        // already left the DB untouched too) rather than replacing a real
+        // plan with the cold-start empty state.
+        setMealRegenerateError("Couldn't reach the meal generator — your existing plan is unchanged. Try again in a moment.")
+        return
+      }
+
+      // Partial failure: keep the prior pool for any slot that came back
+      // empty instead of blanking it, matching persistPools' own per-slot
+      // skip-on-empty behavior at the DB layer.
+      setMealPools(prev => {
+        const next = { ...prev }
+        for (const [s, options] of Object.entries(result.accepted) as [MealSlotName, PoolOption[]][]) {
+          if (options.length > 0) next[s] = options
+        }
+        return next
+      })
       setManualMealPicks({})
       const todayDate = getSessionDateContext(profile.id).date
       await clearAllMealPicksForDate(profile.id, todayDate)
+
+      if (failedSlots.length > 0) {
+        setMealRegenerateError(`Couldn't refresh ${failedSlots.map(s => MEAL_SLOT_LABEL[s]).join(', ')} — kept the existing options there.`)
+      }
+    } catch {
+      setMealRegenerateError("Couldn't reach the meal generator — your existing plan is unchanged. Try again in a moment.")
     } finally {
       setIsGeneratingMeals(false)
     }
@@ -1164,6 +1207,8 @@ function App() {
               totals={mealTotals}
               targets={macros}
               isGenerating={isGeneratingMeals}
+              regenerateError={mealRegenerateError}
+              onDismissRegenerateError={() => setMealRegenerateError(null)}
               onSwapSlot={handleSwapMealSlot}
               onRegenerateSlot={handleRegenerateMealSlot}
               onRegenerateAll={handleRegenerateAllMeals}
