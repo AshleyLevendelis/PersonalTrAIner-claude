@@ -443,7 +443,7 @@ const toolDeclarations = [
   {
     name: "log_workout_session",
     description:
-      "Logs completed sets, reps, and weights from natural language input. Call this whenever the user describes exercises they just completed, performance metrics, or workout results (e.g. 'Just finished bench press 100kg for 3 sets of 8', 'Did 4x10 squats at 80kg', 'Completed my push day — hit 3x8 on bench at 90'). Parse the exercise names, sets, reps, and weights from the user's message and log them.",
+      "DEPRECATED for natural-language logging — prefer log_workout instead, which is the same natural-language path but with a clarification round-trip when the exercise name is ambiguous or unstated; this tool writes immediately with no chance to ask first. Only call this for the narrow case log_workout doesn't cover: explicit structured per-exercise data the user is reading off (sets_completed/reps_completed/weight_kg as separate numbers, not a natural-language description). If the message gives sets/reps/weight but names no exercise (e.g. 'I did 5x5 at 80kg'), do NOT call this tool with a guessed exercise_name — ask which exercise instead and wait for the answer.",
     parameters: {
       type: "object",
       properties: {
@@ -459,7 +459,7 @@ const toolDeclarations = [
             properties: {
               exercise_name: {
                 type: "string",
-                description: "Name of the exercise performed",
+                description: "Name of the exercise performed — must be a name the user actually stated or clearly implied (e.g. matches today's plan by name). Never invent/guess one from context or history.",
               },
               sets_completed: {
                 type: "integer",
@@ -508,7 +508,7 @@ const toolDeclarations = [
               },
               exercise_phrase: {
                 type: "string",
-                description: "Just the exercise-name portion of the text, verbatim (e.g. 'bench', 'DB flyes').",
+                description: "Just the exercise-name portion of the text, verbatim (e.g. 'bench', 'DB flyes'). Never invent one — if this entry's raw_text names no exercise, don't include it as an entry; ask which exercise instead.",
               },
               sets_phrase: {
                 type: "string",
@@ -580,13 +580,13 @@ const toolDeclarations = [
   {
     name: "log_workout_set",
     description:
-      "Logs a single set of an exercise. Call when the user reports one set at a time (e.g. 'just did 8 reps of bench at 80kg'). For multiple sets, prefer log_workout_session instead.",
+      "Logs a single set of an exercise. Call when the user reports one set at a time (e.g. 'just did 8 reps of bench at 80kg'). For multiple sets, prefer log_workout_session instead. If the user states reps/weight but names no exercise, do NOT call this with a guessed name — ask which exercise instead.",
     parameters: {
       type: "object",
       properties: {
         exercise_name: {
           type: "string",
-          description: "Name of the exercise",
+          description: "Name of the exercise — must be a name the user actually stated or clearly implied. Never invent/guess one from context or history.",
         },
         set_number: {
           type: "integer",
@@ -1018,7 +1018,8 @@ PERIODIZATION COACHING RULES:
 - High fatigue_cost exercises (deadlifts, squats, heavy rows) should be programmed early in the session and limited to 1-2 per day.
 
 === NATURAL LANGUAGE WORKOUT LOGGING ===
-- When the user describes exercises they completed (e.g. "Just did bench 3x8 at 90kg", "Finished my push day", "Hit squats for 4 sets of 6 at 100"), ALWAYS invoke the log_workout_session tool to record their performance.
+- When the user describes exercises they completed (e.g. "Just did bench 3x8 at 90kg", "Finished my push day", "Hit squats for 4 sets of 6 at 100"), ALWAYS invoke the log_workout tool to record their performance — including for a single exercise. log_workout is preferred over log_workout_session/log_workout_set for every natural-language description because it's the one tool with a clarification round-trip when the exercise name is ambiguous or missing; the others write immediately with no chance to ask first.
+- CRITICAL — never invent an exercise name. exercise_phrase/exercise_name must be a span of text the user actually wrote. If the message states sets/reps/weight but names no exercise at all (e.g. "I did 5x5 at 80kg", "just hit 3x10 at 60"), do NOT guess one from today's plan, their history, or the conversation so far — however confident the guess feels, a wrong guess silently writes sets against the wrong exercise with no easy way to notice. Ask a single short question instead ("Which exercise was that?") and wait for their answer before calling any log tool.
 - Parse exercise names, sets, reps, and weights from the user's message. If a weight isn't mentioned, do NOT guess or default to 0 — omit weight_kg from that log entry entirely and let the app resolve it from their history or plan. Only set is_bodyweight (and weight_kg: 0) when the movement is genuinely bodyweight-only (push-ups, pull-ups, dips, planks, etc.) or the user explicitly says "bodyweight"/"no weight".
 - If the day isn't mentioned, default to today.
 - After logging, congratulate them and note if they hit the top of their rep range (which triggers progressive overload).

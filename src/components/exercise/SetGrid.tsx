@@ -17,7 +17,7 @@ import { useEffect, useState } from 'react'
 import React from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Check, Dumbbell, Plus, Trophy } from 'lucide-react'
+import { Check, Dumbbell, Plus, Trophy, Trash2 } from 'lucide-react'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { prescriptionUnit } from '@/lib/set-log-store'
 import { computeSetRowNumbers, nextExtraSetNumber } from '@/lib/session-derive'
@@ -82,7 +82,7 @@ export function SetGrid({
   onOpenPlateCalc,
   onFirstEverLog,
 }: SetGridProps) {
-  const { profileId, date: today, dayName, liveWeek, setsFor, ghosts, loadGhosts, logSet } = useActiveSession()
+  const { profileId, date: today, dayName, liveWeek, setsFor, ghosts, loadGhosts, logSet, deleteSet, refresh } = useActiveSession()
 
   useEffect(() => {
     loadGhosts(exerciseId)
@@ -114,6 +114,8 @@ export function SetGrid({
   const [rowErrors, setRowErrors] = useState<Record<number, string>>({})
   const [prBadgeSet, setPrBadgeSet] = useState<{ setNumber: number; result: PRResult } | null>(null)
   const [animatingPr, setAnimatingPr] = useState(false)
+  /** Armed-then-confirm delete, tap-tap within 3s — no window.confirm (themed-app clash, PWA-suppressible per the UX sweep's Clear-chat finding), but a saved set is still a real row to lose, so a bare single tap doesn't do it. */
+  const [confirmDeleteSet, setConfirmDeleteSet] = useState<number | null>(null)
 
   const inputFor = (setNumber: number): SetInputState => {
     if (inputs[setNumber]) return inputs[setNumber]
@@ -146,20 +148,36 @@ export function SetGrid({
     const input = inputFor(setNumber)
     const ghost = ghostFor(setNumber)
 
-    const weightStr = input.weight || (input.isBodyweight ? '0' : String(ghost?.weight_kg ?? ''))
-    const repsStr = input.reps || String(ghost?.reps_completed ?? '')
-    const weight = input.isBodyweight ? 0 : (parseFloat(weightStr) || 0)
-    const reps = parseInt(repsStr) || 0
-
-    if (!input.isBodyweight && weight === 0 && reps === 0) return
-    if (input.isBodyweight && reps === 0) return
-
-    if (!input.isBodyweight && (!Number.isFinite(weight) || weight < 0 || weight > MAX_WEIGHT_KG)) {
-      setRowErrors(prev => ({ ...prev, [setNumber]: `Weight must be between 0 and ${MAX_WEIGHT_KG}kg` }))
+    // Reps: typed -> ghost (repeat-last-week's tap-the-check convenience) ->
+    // reject with a visible row error. Reps of 0 (or nothing to fall back
+    // on) is never a valid "completed" signal, no matter what weight is
+    // present — closes the gap where a weight-only tap silently committed
+    // "0 reps" as a done set (it fed the dot ladder, progress bar, and
+    // progression engine a set that never happened), and the gap where an
+    // empty-reps tap did nothing with zero feedback.
+    const repsStr = input.reps || (ghost ? String(ghost.reps_completed) : '')
+    const reps = repsStr ? parseInt(repsStr, 10) : NaN
+    if (!Number.isFinite(reps) || reps <= 0) {
+      setRowErrors(prev => ({ ...prev, [setNumber]: 'Enter reps to log this set' }))
       return
     }
-    if (!Number.isInteger(reps) || reps < 0 || reps > MAX_REPS) {
-      setRowErrors(prev => ({ ...prev, [setNumber]: `Reps must be a whole number from 0 to ${MAX_REPS}` }))
+    if (reps > MAX_REPS) {
+      setRowErrors(prev => ({ ...prev, [setNumber]: `Reps must be a whole number from 1 to ${MAX_REPS}` }))
+      return
+    }
+
+    // Weight: bodyweight is always 0. Otherwise typed -> ghost (repeat last
+    // week) -> this row's own prescribed default (the exact number already
+    // shown as the input's placeholder — leaving it blank must log what the
+    // placeholder promised, never silently 0). A blank weight with no ghost
+    // used to fall through to weight_kg=0, which downstream code flags as
+    // malformed and drops from every summary/history view without telling
+    // the user their tap didn't actually count.
+    const weight = input.isBodyweight
+      ? 0
+      : parseFloat(input.weight || (ghost ? String(ghost.weight_kg) : defaultWeightFor(setNumber))) || 0
+    if (!input.isBodyweight && (!Number.isFinite(weight) || weight < 0 || weight > MAX_WEIGHT_KG)) {
+      setRowErrors(prev => ({ ...prev, [setNumber]: `Weight must be between 0 and ${MAX_WEIGHT_KG}kg` }))
       return
     }
     if (rowErrors[setNumber]) {
@@ -206,6 +224,22 @@ export function SetGrid({
     if (onSetCompleted && prescribedReps) {
       onSetCompleted(exerciseName, setNumber, weight, reps, restTime || '60s', totalSets, prescribedReps, tier)
     }
+  }
+
+  const handleDeleteSet = (setNumber: number) => {
+    if (!profileId) return
+    if (confirmDeleteSet !== setNumber) {
+      setConfirmDeleteSet(setNumber)
+      setTimeout(() => setConfirmDeleteSet(prev => (prev === setNumber ? null : prev)), 3000)
+      return
+    }
+    setConfirmDeleteSet(null)
+    deleteSet({ userId: profileId, date: today, exerciseId, setNumber })
+    // deleteSet is the raw store function — refresh() is what makes the row
+    // (and every other surface reading activeSession.logs) actually update.
+    refresh()
+    setInputs(prev => { const next = { ...prev }; delete next[setNumber]; return next })
+    if (prBadgeSet?.setNumber === setNumber) setPrBadgeSet(null)
   }
 
   const handleAddExtraSet = () => {
@@ -314,12 +348,24 @@ export function SetGrid({
           {isSaved && (() => {
             const logged = existingLogs.find(l => l.set_number === setNumber)
             if (!logged) return null
+            const armed = confirmDeleteSet === setNumber
             return (
-              <p className="text-[10px] text-primary px-1 -mt-0.5">
-                Set {setNumber}: {logged.is_bodyweight
-                  ? `${logged.reps_completed} reps · Bodyweight`
-                  : `${logged.reps_completed} reps @ ${logged.weight_kg}kg`} ✓
-              </p>
+              <div className="flex items-center justify-between gap-2 px-1 -mt-0.5">
+                <p className="text-[10px] text-primary">
+                  Set {setNumber}: {logged.is_bodyweight
+                    ? `${logged.reps_completed} reps · Bodyweight`
+                    : `${logged.reps_completed} reps @ ${logged.weight_kg}kg`} ✓
+                </p>
+                <button
+                  type="button"
+                  onClick={() => handleDeleteSet(setNumber)}
+                  className={`flex shrink-0 items-center gap-1 text-[10px] ${armed ? 'font-medium text-destructive' : 'text-muted-foreground'}`}
+                  aria-label={armed ? `Confirm delete set ${setNumber}` : `Delete set ${setNumber}`}
+                >
+                  <Trash2 className="size-2.5" />
+                  {armed ? 'Tap to confirm' : 'Delete'}
+                </button>
+              </div>
             )
           })()}
           {rowErrors[setNumber] && (

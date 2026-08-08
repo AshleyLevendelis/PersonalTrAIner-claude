@@ -1889,6 +1889,13 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       for (const key of keys) {
         activeSession.deleteSet({ userId: profile.id, date: activeSession.date, exerciseId: key.exerciseId, setNumber: key.setNumber })
       }
+      // deleteSet is the raw store function (unlike logSet, which already
+      // calls refresh() after writing) — without this, the Exercise tab's
+      // dot ladder, TodayPanel progress, dock chip, and dashboard aggregate
+      // (all read from activeSession.logs) keep showing the "undone" sets
+      // until an unrelated reload, even though the DB row is really gone.
+      activeSession.refresh()
+      onLogsUpdated?.()
     } else if (receipt.kind === 'memory_fact_saved' || receipt.kind === 'memory_goal_saved' || receipt.kind === 'memory_context_fact_saved') {
       // Memory rows are never claimed through pending_actions (§1 Part 2's
       // rows are append-only observations, not plan mutations) — undoToken
