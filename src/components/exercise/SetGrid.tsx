@@ -180,11 +180,22 @@ export function SetGrid({
       setRowErrors(prev => ({ ...prev, [setNumber]: `Weight must be between 0 and ${MAX_WEIGHT_KG}kg` }))
       return
     }
+    // A 0kg save without the BW flag produces exactly the "malformed
+    // zero-weight" row every summary/history reader silently filters out —
+    // the tap would look successful (rest timer starts) but the set vanishes.
+    // On a bodyweight-capable movement (whose default load IS '0'), 0kg can
+    // only mean bodyweight, so save it as one; on an externally-loaded lift,
+    // refuse with a visible error instead of losing the set.
+    const isBodyweight = input.isBodyweight || (weight === 0 && isBodyweightCapable)
+    if (weight === 0 && !isBodyweight) {
+      setRowErrors(prev => ({ ...prev, [setNumber]: 'Enter the weight you lifted' }))
+      return
+    }
     if (rowErrors[setNumber]) {
       setRowErrors(prev => { const next = { ...prev }; delete next[setNumber]; return next })
     }
 
-    setInputs(prev => ({ ...prev, [setNumber]: { weight: input.isBodyweight ? '' : String(weight), reps: String(reps), isBodyweight: input.isBodyweight } }))
+    setInputs(prev => ({ ...prev, [setNumber]: { weight: isBodyweight ? '' : String(weight), reps: String(reps), isBodyweight } }))
 
     const wasFirstEverLog = ghostValues.length === 0
 
@@ -201,7 +212,7 @@ export function SetGrid({
       weightKg: weight,
       repsCompleted: reps,
       unit: prescriptionUnit(prescriptionType),
-      isBodyweight: input.isBodyweight,
+      isBodyweight,
     })
 
     if (wasFirstEverLog) onFirstEverLog?.(exerciseName)
@@ -216,7 +227,7 @@ export function SetGrid({
     // for this row so the PR badge doesn't lag a render).
     const projectedLogs = [
       ...existingLogs.filter(l => l.set_number !== setNumber),
-      { user_id: profileId, date: today, exercise_name: exerciseName, exercise_id: exerciseId, set_number: setNumber, weight_kg: weight, reps_completed: reps, is_bodyweight: input.isBodyweight },
+      { user_id: profileId, date: today, exercise_name: exerciseName, exercise_id: exerciseId, set_number: setNumber, weight_kg: weight, reps_completed: reps, is_bodyweight: isBodyweight },
     ]
     const topPR = getTopPRSet(profileId, exerciseName, toSessionSets(projectedLogs))
     setPrBadgeSet(topPR)
