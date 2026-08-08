@@ -205,6 +205,8 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editValue, setEditValue] = useState('')
   const [loading, setLoading] = useState(false)
+  const [armedDeleteKey, setArmedDeleteKey] = useState<string | null>(null)
+  const armedDeleteTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const appearance = useAppearance()
   const goalsRef = useRef<HTMLDivElement>(null)
@@ -255,6 +257,20 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
   const deleteFact = async (id: string) => { await deleteFactPermanently(id); await reload(); await onMemoryChanged() }
   const deleteGoal = async (id: string) => { await deleteGoalPermanently(id); await reload(); await onMemoryChanged() }
   const deleteContext = async (id: string) => { await deleteContextFactPermanently(id); await reload(); await onMemoryChanged() }
+
+  /** Armed-then-confirm delete (no window.confirm — clashes with the app's
+   * themed UI and is silently suppressible in PWA contexts). First tap arms
+   * a 3s window; a second tap on the same row within it actually deletes. */
+  const requestDelete = (key: string, action: () => Promise<void>) => {
+    if (armedDeleteTimer.current) clearTimeout(armedDeleteTimer.current)
+    if (armedDeleteKey !== key) {
+      setArmedDeleteKey(key)
+      armedDeleteTimer.current = setTimeout(() => setArmedDeleteKey(prev => (prev === key ? null : prev)), 3000)
+      return
+    }
+    setArmedDeleteKey(null)
+    void action()
+  }
 
   // Fix — food/exercise preferences have two competing stores: this is now
   // the ONE editable list for hard food dislikes, whether created here or
@@ -492,7 +508,12 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                       <span className="text-sm font-medium">{g.display_text}</span>
                       <div className="flex items-center gap-1 shrink-0">
                         <Button size="icon" variant="ghost" className="size-6" onClick={() => startEdit(g.id, g.display_text)}><Pencil className="size-3" /></Button>
-                        <Button size="icon" variant="ghost" className="size-6 text-destructive" onClick={() => deleteGoal(g.id)}><Trash2 className="size-3" /></Button>
+                        <Button
+                          size="icon" variant="ghost"
+                          className={armedDeleteKey === `goal:${g.id}` ? 'size-6 bg-destructive text-destructive-foreground' : 'size-6 text-destructive'}
+                          onClick={() => requestDelete(`goal:${g.id}`, () => deleteGoal(g.id))}
+                          aria-label={armedDeleteKey === `goal:${g.id}` ? 'Tap again to permanently delete this goal' : 'Delete goal'}
+                        ><Trash2 className="size-3" /></Button>
                       </div>
                     </div>
                   )}
@@ -532,7 +553,12 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                         <div className="flex items-center gap-1 shrink-0">
                           {f.hardness && <Badge variant="outline" className="text-[9px] px-1 py-0">{f.hardness}</Badge>}
                           <Button size="icon" variant="ghost" className="size-6" onClick={() => startEdit(f.id, f.display_text)}><Pencil className="size-3" /></Button>
-                          <Button size="icon" variant="ghost" className="size-6 text-destructive" onClick={() => deleteFact(f.id)}><Trash2 className="size-3" /></Button>
+                          <Button
+                            size="icon" variant="ghost"
+                            className={armedDeleteKey === `fact:${f.id}` ? 'size-6 bg-destructive text-destructive-foreground' : 'size-6 text-destructive'}
+                            onClick={() => requestDelete(`fact:${f.id}`, () => deleteFact(f.id))}
+                            aria-label={armedDeleteKey === `fact:${f.id}` ? 'Tap again to permanently delete this fact' : 'Delete fact'}
+                          ><Trash2 className="size-3" /></Button>
                         </div>
                       </div>
                     )}
@@ -562,7 +588,12 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                     <span className="text-sm font-medium">{c.display_text}</span>
                     <div className="flex items-center gap-1 shrink-0">
                       <Button size="icon" variant="ghost" className="size-6" onClick={() => startEdit(c.id, c.display_text)}><Pencil className="size-3" /></Button>
-                      <Button size="icon" variant="ghost" className="size-6 text-destructive" onClick={() => deleteContext(c.id)}><Trash2 className="size-3" /></Button>
+                      <Button
+                        size="icon" variant="ghost"
+                        className={armedDeleteKey === `context:${c.id}` ? 'size-6 bg-destructive text-destructive-foreground' : 'size-6 text-destructive'}
+                        onClick={() => requestDelete(`context:${c.id}`, () => deleteContext(c.id))}
+                        aria-label={armedDeleteKey === `context:${c.id}` ? 'Tap again to permanently delete this' : 'Delete'}
+                      ><Trash2 className="size-3" /></Button>
                     </div>
                   </div>
                 )}

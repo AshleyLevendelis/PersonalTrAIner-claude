@@ -33,9 +33,13 @@ import { sweepStaleForTarget } from '@/lib/pending-actions-store'
 import { checkAndRevertExpiredAdaptations } from '@/lib/plan-adaptations-store'
 import { getRevealSpeed, saveRevealSpeed, DEFAULT_REVEAL_SPEED, type RevealSpeed } from '@/lib/reveal-speed-store'
 import { InsightBanner } from '@/components/ui/insight-banner'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { getActiveFacts, getActiveGoals, getActiveContextFacts, createFact, type UserFactRow, type UserGoalRow, type UserContextFactRow } from '@/lib/memory-store'
 import { compileExerciseExclusions, compileFoodDislikes, compileTimingRules, resolveFoodTarget } from '@/lib/fact-compiler'
-import { getAllItems as getAllGroceryItems, type GroceryItemRow } from '@/lib/grocery-store'
+import { getAllItems as getAllGroceryItems, flushPending as flushGroceryPending, type GroceryItemRow } from '@/lib/grocery-store'
+import { flushPending as flushSetLogPending } from '@/lib/set-log-store'
+import { flushPending as flushWaterPending } from '@/lib/water-store'
+import { flushPending as flushCardioPending } from '@/lib/cardio-log-store'
 import type { UserProfile, MacroTargets, WorkoutDay, PlanAction, SchedulePatchItem, MesocycleWeek } from '@/lib/types'
 import type { ExerciseEntry } from '@/lib/exercise-db'
 
@@ -104,6 +108,8 @@ function App() {
   const [memoryContextFacts, setMemoryContextFacts] = useState<UserContextFactRow[]>([])
   const [profileInfoOpen, setProfileInfoOpen] = useState(false)
   const [profileInfoSection, setProfileInfoSection] = useState<'goals' | 'facts' | 'context' | undefined>(undefined)
+  const [newPlanConfirmOpen, setNewPlanConfirmOpen] = useState(false)
+  const [newPlanResetting, setNewPlanResetting] = useState(false)
   // Chat typewriter reveal-speed preference — per-profile (reveal-speed-store.ts),
   // read once the profile resolves and written back on every change from Settings.
   const [revealSpeed, setRevealSpeedState] = useState<RevealSpeed>(DEFAULT_REVEAL_SPEED)
@@ -930,21 +936,40 @@ function App() {
     }
   }
 
-  const handleReset = () => {
-    localStorage.removeItem(STORAGE_KEY)
-    localStorage.removeItem('active_session_cache')
-    localStorage.removeItem('offline_log_queue')
-    localStorage.removeItem('exercise_plan_cache')
-    localStorage.removeItem('user_profile_cache')
-    localStorage.removeItem('mesocycle_cache')
-    setProfile(null)
-    setMacros(null)
-    setExercisePlan([])
-    setMesocycle([])
-    setMealPools({})
-    setManualMealPicks({})
-    setExerciseExclusions([])
-    setLogsVersion(0)
+  const handleReset = async () => {
+    setNewPlanResetting(true)
+    try {
+      // "New Plan" abandons the current profile — after this, its pending
+      // local-first writes (logged sets/water/grocery/cardio) can never be
+      // reached from the UI again to retry a failed sync. Give them one
+      // last best-effort chance to land in the DB against the OLD profile
+      // before it becomes unreachable, rather than leaving them stranded
+      // in localStorage forever. Each queued item carries its own userId,
+      // so this is safe to call regardless of which profile is "current."
+      // Best-effort: a slow/offline flush must never block starting the
+      // new plan (flushPending() itself already no-ops while offline).
+      await Promise.race([
+        Promise.allSettled([flushSetLogPending(), flushWaterPending(), flushGroceryPending(), flushCardioPending()]),
+        new Promise(resolve => setTimeout(resolve, 4000)),
+      ])
+    } finally {
+      localStorage.removeItem(STORAGE_KEY)
+      localStorage.removeItem('active_session_cache')
+      localStorage.removeItem('offline_log_queue')
+      localStorage.removeItem('exercise_plan_cache')
+      localStorage.removeItem('user_profile_cache')
+      localStorage.removeItem('mesocycle_cache')
+      setProfile(null)
+      setMacros(null)
+      setExercisePlan([])
+      setMesocycle([])
+      setMealPools({})
+      setManualMealPicks({})
+      setExerciseExclusions([])
+      setLogsVersion(0)
+      setNewPlanResetting(false)
+      setNewPlanConfirmOpen(false)
+    }
   }
 
   const handleMacroModeChange = async (mode: import('@/lib/types').MacroCalculationMode) => {
@@ -1060,7 +1085,7 @@ function App() {
       >
         <ProfileMenu
           onOpenProfile={() => { setProfileInfoSection(undefined); setProfileInfoOpen(true) }}
-          onNewPlan={handleReset}
+          onNewPlan={() => setNewPlanConfirmOpen(true)}
         />
       </div>
       <div
@@ -1204,6 +1229,27 @@ function App() {
         revealSpeed={revealSpeed}
         onRevealSpeedChange={handleRevealSpeedChange}
       />
+      <Dialog open={newPlanConfirmOpen} onOpenChange={open => { if (!newPlanResetting) setNewPlanConfirmOpen(open) }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Start a new plan?</DialogTitle>
+            <DialogDescription>
+              This creates a brand-new profile and plan. Your current training plan, logged
+              workout history, weigh-ins, PRs, goals, and saved facts will no longer be
+              reachable in the app — they aren't deleted, but there's no way back to them
+              from here.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button variant="outline" onClick={() => setNewPlanConfirmOpen(false)} disabled={newPlanResetting}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={() => void handleReset()} disabled={newPlanResetting}>
+              {newPlanResetting ? 'Starting…' : 'Start new plan'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
     </TimersProvider>
     </ActiveSessionProvider>
