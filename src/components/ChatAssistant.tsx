@@ -1099,15 +1099,38 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
           polarity, hardness, resolvedRefs: resolution.resolvedRefs,
         })
         await onMemoryChanged()
+        // Fix 1b — a hard food dislike used to claim "excluded from your
+        // meals" immediately, which was false: exclusion only takes effect
+        // on the next manual regenerate (dislikedFoods only reaches
+        // verifyProposal's filter at generation time), so a meal containing
+        // the disliked food already on today's plan stays there untouched.
+        // Now: honest not-yet-applied wording, matching the hard_constraint/
+        // timing_rule branches' own convention — and if today's plan
+        // actually still has it, that's surfaced as its own row instead of
+        // silently leaving the user to find out by eating it, mirroring the
+        // same plain-substring match verifyProposal itself uses.
         const effect = kind === 'exercise_preference' && hardness === 'hard'
           ? `excludes ${resolution.resolvedRefs.length} exercise${resolution.resolvedRefs.length === 1 ? '' : 's'} from your plan`
-          : hardness === 'hard' ? 'excluded from your meals' : 'recorded — biases suggestions, nothing removed'
+          : hardness === 'hard' ? "recorded — excluded starting your next meal regenerate, doesn't touch today's plan" : 'recorded — biases suggestions, nothing removed'
+        const rows: ChatReceiptView['rows'] = [{ label: displayText, detail: effect }]
+        if (kind === 'food_preference' && hardness === 'hard' && polarity === 'dislike') {
+          const needle = targetPhrase.trim().toLowerCase()
+          const stillPresent = mealPlan.filter(m =>
+            m.items.some(i => i.name.toLowerCase().includes(needle) || (i.ingredients ?? []).some(ing => ing.toLowerCase().includes(needle)))
+          )
+          if (needle && stillPresent.length > 0) {
+            rows.push({
+              label: `Today's ${stillPresent.map(m => m.meal).join(', ')}`,
+              detail: 'still has it — swap from the Meals tab if you don\'t want it today',
+            })
+          }
+        }
         return {
           text: `Saved: ${displayText}`,
           receipt: {
             kind: 'memory_fact_saved',
             title: 'Saved to memory',
-            rows: [{ label: displayText, detail: effect }],
+            rows,
             status: 'done',
             undoToken: row.id,
             resolvedAt: new Date().toISOString(),
