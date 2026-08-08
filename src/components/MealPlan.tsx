@@ -1,12 +1,13 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   UtensilsCrossed,
   RefreshCw,
   Loader2,
+  Check,
 } from 'lucide-react'
 import type { MacroTargets } from '@/lib/types'
-import type { MealSlotName } from '@/lib/meal-store'
+import { getTodayLedger, logMealEaten, voidMealEvent, type MealSlotName, type MealEventRecord } from '@/lib/meal-store'
 import type { PoolOption } from '@/lib/meal-generation'
 
 const SLOT_ORDER: MealSlotName[] = ['breakfast', 'lunch', 'dinner', 'snack']
@@ -18,6 +19,9 @@ const SLOT_LABEL: Record<MealSlotName, string> = {
 }
 
 interface MealPlanProps {
+  profileId: string | undefined
+  /** Local-calendar YYYY-MM-DD, dev-clock-aware — same "today" set-log-store/getSessionDateContext use. */
+  date: string
   /** Every generated option per slot — what the swap panel offers. */
   pools: Partial<Record<MealSlotName, PoolOption[]>>
   /** Today's assembled pick, one per active slot. */
@@ -40,9 +44,29 @@ interface MealPlanProps {
  * one meal the user has open — everything else is a single collapsed line,
  * mirroring ExerciseRow's collapsed/expanded contract.
  */
-export function MealPlan({ pools, chosen, totals, targets, isGenerating, onSwapSlot, onRegenerateSlot, onRegenerateAll }: MealPlanProps) {
+export function MealPlan({ profileId, date, pools, chosen, totals, targets, isGenerating, onSwapSlot, onRegenerateSlot, onRegenerateAll }: MealPlanProps) {
   const activeSlots = SLOT_ORDER.filter(s => (pools[s]?.length ?? 0) > 0)
   const [expandedSlot, setExpandedSlot] = useState<MealSlotName | null>(null)
+
+  // Which meals are already logged eaten today, keyed by slot — reuses
+  // getTodayLedger's own local-first merge (server rows + pending queue) so
+  // a just-tapped "Log this meal" reflects instantly, matching every other
+  // confirm-action in this app. targets is only needed for getTodayLedger's
+  // remaining-calc, which this screen doesn't use — totals (always present)
+  // is a safe stand-in when targets hasn't loaded yet.
+  const [loggedBySlot, setLoggedBySlot] = useState<Partial<Record<MealSlotName, MealEventRecord>>>({})
+  const reloadLogged = () => {
+    if (!profileId || !date) return
+    getTodayLedger(profileId, date, targets ?? totals).then(ledger => {
+      const next: Partial<Record<MealSlotName, MealEventRecord>> = {}
+      for (const e of ledger.events) {
+        if (e.slot && (e.eventType === 'confirmed' || e.eventType === 'extra')) next[e.slot] = e
+      }
+      setLoggedBySlot(next)
+    }).catch(console.error)
+  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(reloadLogged, [profileId, date])
 
   if (activeSlots.length === 0) {
     return (
@@ -87,6 +111,18 @@ export function MealPlan({ pools, chosen, totals, targets, isGenerating, onSwapS
             onToggle={() => setExpandedSlot(prev => (prev === slot ? null : slot))}
             onSwap={onSwapSlot}
             onRegenerate={onRegenerateSlot}
+            loggedEvent={loggedBySlot[slot]}
+            onLog={async option => {
+              if (!profileId) return
+              logMealEaten(profileId, date, slot, option.name, {
+                kcal: option.macros.calories, protein: option.macros.protein, carbs: option.macros.carbs, fat: option.macros.fat,
+              })
+              reloadLogged()
+            }}
+            onUnlog={async clientId => {
+              await voidMealEvent(clientId)
+              reloadLogged()
+            }}
           />
         ))}
       </div>
@@ -138,6 +174,9 @@ function MealSlotRow({
   onToggle,
   onSwap,
   onRegenerate,
+  loggedEvent,
+  onLog,
+  onUnlog,
 }: {
   slot: MealSlotName
   isFirst: boolean
@@ -147,14 +186,19 @@ function MealSlotRow({
   onToggle: () => void
   onSwap: (slot: MealSlotName, chooseName: string) => Promise<void>
   onRegenerate: (slot: MealSlotName) => Promise<void>
+  loggedEvent: MealEventRecord | undefined
+  onLog: (option: PoolOption) => Promise<void>
+  onUnlog: (clientId: string) => Promise<void>
 }) {
   const [busy, setBusy] = useState(false)
+  const [swapOpen, setSwapOpen] = useState(false)
   const otherOptions = alternatives.filter(o => o.name !== option?.name)
 
   const handleChoose = async (name: string) => {
     setBusy(true)
     try {
       await onSwap(slot, name)
+      setSwapOpen(false)
     } finally {
       setBusy(false)
     }
@@ -164,6 +208,17 @@ function MealSlotRow({
     setBusy(true)
     try {
       await onRegenerate(slot)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleLogToggle = async () => {
+    if (!option) return
+    setBusy(true)
+    try {
+      if (loggedEvent) await onUnlog(loggedEvent.clientId)
+      else await onLog(option)
     } finally {
       setBusy(false)
     }
@@ -229,15 +284,33 @@ function MealSlotRow({
           )}
 
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleLogToggle}
+              disabled={busy}
+              className={
+                loggedEvent
+                  ? 'flex min-h-[44px] items-center gap-1.5 rounded-xl bg-primary/15 px-3.5 text-xs font-semibold text-primary'
+                  : 'flex min-h-[44px] items-center gap-1.5 rounded-xl bg-primary px-3.5 text-xs font-semibold text-primary-foreground glow-mint-box'
+              }
+            >
+              {loggedEvent ? <><Check className="size-3.5" /> Logged</> : 'Log this meal'}
+            </button>
             <Button variant="ghost" size="sm" onClick={handleRegenerate} disabled={busy} className="h-8 px-2.5 text-xs" title="Regenerate this slot's pool">
               {busy ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
             </Button>
             {otherOptions.length > 0 && (
-              <span className="text-xs text-muted-foreground">Swap · {otherOptions.length} option{otherOptions.length === 1 ? '' : 's'}</span>
+              <button
+                type="button"
+                onClick={() => setSwapOpen(prev => !prev)}
+                className="text-xs text-muted-foreground"
+              >
+                Swap · {otherOptions.length} option{otherOptions.length === 1 ? '' : 's'}
+              </button>
             )}
           </div>
 
-          {otherOptions.length > 0 && (
+          {swapOpen && otherOptions.length > 0 && (
             <div className="flex flex-col gap-1">
               {otherOptions.map(alt => {
                 const calDelta = Math.round(alt.macros.calories - option.macros.calories)

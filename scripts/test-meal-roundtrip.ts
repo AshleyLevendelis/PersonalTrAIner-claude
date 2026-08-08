@@ -401,6 +401,28 @@ async function main() {
   }
 
   // -------------------------------------------------------------------------
+  console.log('\n[10] logMealEaten (turn 7 "Log this meal") + its undo')
+  {
+    const { logMealEaten, voidMealEvent } = await import('../src/lib/meal-store')
+    const day = '2026-08-09' // isolated date so this block's totals don't mix with [4]/[5]'s TODAY-scoped events
+    const preTargets = computeTargets(baseProfile, { latestWeightKg: latest2 })
+
+    const beforeLedger = await getTodayLedger(PROFILE_ID, day, preTargets)
+    check('no events logged yet for this isolated date', beforeLedger.events.length === 0, beforeLedger.events)
+
+    const logged = logMealEaten(PROFILE_ID, day, 'breakfast', 'Oat Bowl', { kcal: 420, protein: 28, carbs: 55, fat: 10 })
+    await flushPending()
+    const afterLog = await getTodayLedger(PROFILE_ID, day, preTargets)
+    check('logMealEaten lands as a confirmed event the ledger counts', afterLog.eaten.kcal === 420 && afterLog.eaten.protein === 28, afterLog.eaten)
+    check('the logged event carries the slot/name it was given', afterLog.events.some(e => e.slot === 'breakfast' && e.mealName === 'Oat Bowl' && e.eventType === 'confirmed'), afterLog.events)
+
+    await voidMealEvent(logged.clientId)
+    const afterUndo = await getTodayLedger(PROFILE_ID, day, preTargets)
+    check('undo (voidMealEvent) removes it from the ledger sum', afterUndo.eaten.kcal === 0 && afterUndo.eaten.protein === 0, afterUndo.eaten)
+    check('the voided row is excluded, not counted twice', afterUndo.events.every(e => e.eventType !== 'confirmed' || e.mealName !== 'Oat Bowl'), afterUndo.events)
+  }
+
+  // -------------------------------------------------------------------------
   if (failures > 0) {
     console.error(`\n${failures} meal round-trip check(s) FAILED.`)
     process.exit(1)

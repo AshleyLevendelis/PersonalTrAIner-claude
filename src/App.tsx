@@ -10,7 +10,7 @@ import { NutritionDisplay } from '@/components/NutritionDisplay'
 import { ExerciseTab } from '@/components/exercise/ExerciseTab'
 import { MealPlan } from '@/components/MealPlan'
 import { Dashboard } from '@/components/Dashboard'
-import { GroceryList } from '@/components/GroceryList'
+import { GroceryListSummary } from '@/components/GroceryListSummary'
 import { ChatAssistant } from '@/components/ChatAssistant'
 import { DevTestPage } from '@/components/DevTestPage'
 import { OfflineStatusIndicator } from '@/components/OfflineStatusIndicator'
@@ -1157,6 +1157,8 @@ function App() {
 
           <TabsContent value="meals">
             <MealPlan
+              profileId={profile.id}
+              date={getSessionDateContext(profile.id).date}
               pools={mealPools}
               chosen={chosenMeals}
               totals={mealTotals}
@@ -1166,9 +1168,7 @@ function App() {
               onRegenerateSlot={handleRegenerateMealSlot}
               onRegenerateAll={handleRegenerateAllMeals}
             />
-            <div className="mt-4">
-              <GroceryList profileId={profile.id} mealPools={mealPools} targets={macros} />
-            </div>
+            <GroceryListSummary profileId={profile.id} mealPools={mealPools} targets={macros} />
           </TabsContent>
 
           <TabsContent value="chat" forceMount className="data-[state=inactive]:hidden">

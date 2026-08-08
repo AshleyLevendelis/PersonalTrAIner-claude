@@ -345,6 +345,17 @@ export async function voidMealEvent(clientId: string): Promise<void> {
   await supabase.from('meal_events').update({ voided_at: new Date().toISOString() }).eq('client_id', clientId)
 }
 
+/**
+ * Turn 7 gap: nothing ever called recordMealEvent — meal_events had a full
+ * local-first writer (above) and an undo primitive (voidMealEvent) but no
+ * UI/chat call site, so "log this meal" had no effect anywhere in the app.
+ * This is that call site's entry point: a plain "confirmed, logged from the
+ * Meals tab" event. voidMealEvent (unchanged) is its undo.
+ */
+export function logMealEaten(profileId: string, date: string, slot: MealSlotName, mealName: string, macros: MealMacros): MealEventRecord {
+  return recordMealEvent({ profileId, date, slot, eventType: 'confirmed', mealName, macros, source: 'manual' })
+}
+
 /** Flush when connectivity returns — mirrors set-log-store's listener. */
 if (typeof window !== 'undefined') {
   window.addEventListener('online', () => { flushPending() })
