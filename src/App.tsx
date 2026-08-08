@@ -23,6 +23,7 @@ import { useAppRoute, tabHash, isTab, isKnownTabHash, type Tab } from '@/lib/app
 import { calculateCalories } from '@/lib/calculations'
 import { computeBMR, computeStaticTDEE } from '@/lib/macro-calculator'
 import { computeTargets, getLatestWeightKg, snapshotTargetsIfChanged } from '@/lib/nutrition-targets'
+import { upsertDailyMetric } from '@/lib/daily-tracking'
 import { generateExercisePlan, generateMesocycle } from '@/lib/exercise-plan'
 import { getPools, swapPoolMeal, getMealPicksForDate, setMealPick, clearMealPick, clearAllMealPicksForDate, type MealSlotName } from '@/lib/meal-store'
 import { generateMealPools, assembleDay, chosenToMealPlanDays, type PoolOption } from '@/lib/meal-generation'
@@ -360,7 +361,24 @@ function App() {
     // Living targets (M0): computed on read from the profile + the latest
     // weigh-in, never from the frozen fitness_profiles macro columns (still
     // written at onboarding for back-compat; nothing reads them anymore).
-    const restoredWeight = await getLatestWeightKg(restoredProfile.id!).catch(() => null)
+    let restoredWeight = await getLatestWeightKg(restoredProfile.id!).catch(() => null)
+    // Fix 1c (ux-sweep), existing-profile half: a profile from before the
+    // onboarding-seed fix above still has zero daily_metrics rows. Lazy
+    // check-on-load backfill (matches this app's existing convention, e.g.
+    // checkAndRevertExpiredAdaptations) — one dated seed row, same pipeline,
+    // so it never needs a standalone migration to reach in-flight accounts.
+    if (restoredWeight == null && restoredProfile.weight_kg) {
+      try {
+        await upsertDailyMetric({
+          profile_id: restoredProfile.id!,
+          date: (restoredProfile.created_at ?? new Date().toISOString()).slice(0, 10),
+          weight_kg: restoredProfile.weight_kg,
+        })
+        restoredWeight = restoredProfile.weight_kg
+      } catch (err) {
+        console.error('Backfilling onboarding weigh-in failed:', err)
+      }
+    }
     const liveTargets = computeTargets(restoredProfile, {
       latestWeightKg: restoredWeight,
       exercisePlan: restoredExercises,
@@ -517,6 +535,28 @@ function App() {
       // Meal-pool generation just below still reads enrichedProfile.disliked_foods
       // directly (the in-memory onboarding answer) since memoryFacts hasn't
       // been fetched yet at this point in a brand-new signup.
+      // Fix 1c (ux-sweep) — onboarding weight only ever wrote to
+      // fitness_profiles.weight_kg, which nothing outside computeTargets'
+      // fallback reads. Dashboard's trend, ProfileScreen's "current weight",
+      // goal progress and chat's own context payload all read exclusively
+      // from daily_metrics, seeing zero rows and reporting the honest-but-
+      // unhelpful "no weigh-ins yet" — while chat, holding the onboarding
+      // weight in the very same context payload, contradicted itself by
+      // asking the user for a number it already had. One dated seed row
+      // (today, via the same upsertDailyMetric path a manual weigh-in
+      // uses) fixes every one of those reads through the single existing
+      // pipeline, and — since weight-trend.ts already has a tested
+      // single-sample path (sampleCount===1: shows a level, no rate) —
+      // this reports honestly rather than fabricating a trend from one point.
+      try {
+        await upsertDailyMetric({
+          profile_id: data.id,
+          date: getSessionDateContext(data.id).date,
+          weight_kg: enrichedProfile.weight_kg,
+        })
+      } catch (err) {
+        console.error('Seeding onboarding weigh-in failed:', err)
+      }
       if (enrichedProfile.disliked_foods && enrichedProfile.disliked_foods.length > 0) {
         try {
           await Promise.all(enrichedProfile.disliked_foods.map(food => createFact({
