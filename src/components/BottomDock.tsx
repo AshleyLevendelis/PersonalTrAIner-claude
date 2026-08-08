@@ -200,7 +200,7 @@ export function BottomDock() {
         <div
           aria-hidden
           className="absolute inset-y-0 left-0 transition-[width] duration-1000 ease-linear"
-          style={{ width: `${fillFraction * 100}%`, background: 'linear-gradient(90deg, rgba(91,233,194,.22), rgba(91,233,194,.32))' }}
+          style={{ width: `${fillFraction * 100}%`, background: 'linear-gradient(90deg, rgba(var(--glow-rgb),.22), rgba(var(--glow-rgb),.32))' }}
         />
         <div className="relative p-3 flex items-center justify-between gap-3">
           <div className="min-w-0">

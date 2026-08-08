@@ -133,7 +133,7 @@ export function ExerciseRow({
         <span
           aria-hidden
           className="absolute inset-x-0 top-0 h-px glow-sweep"
-          style={{ background: 'linear-gradient(90deg, rgba(91,233,194,0), rgba(91,233,194,.9), rgba(91,233,194,0))' }}
+          style={{ background: 'linear-gradient(90deg, rgba(var(--glow-rgb),0), rgba(var(--glow-rgb),.9), rgba(var(--glow-rgb),0))' }}
         />
       )}
       {/* A plain div, not a <button> — LoadChip renders its own interactive

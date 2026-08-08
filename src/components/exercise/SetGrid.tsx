@@ -338,7 +338,7 @@ export function SetGrid({
                 variant="ghost"
                 size="icon"
                 className={`size-7 shrink-0 ${isSaved ? 'text-primary' : 'text-[color:var(--primary-foreground)] glow-pulse'}`}
-                style={isSaved ? undefined : { background: 'linear-gradient(180deg, #7CF3D4, #3ED3AA)' }}
+                style={isSaved ? undefined : { background: 'linear-gradient(180deg, color-mix(in oklab, var(--primary) 84%, white), var(--primary-2))' }}
                 onClick={() => handleSaveSet(setNumber)}
               >
                 <Check className="size-3.5" />

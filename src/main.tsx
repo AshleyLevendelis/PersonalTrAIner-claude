@@ -6,7 +6,7 @@ import { getAppearance, applyAppearance } from '@/lib/appearance-store'
 import { AppearanceProvider } from '@/hooks/useAppearance'
 
 // Stamp the appearance attributes onto <html> BEFORE the first render, so a
-// non-default canvas never flashes the default one on a cold load.
+// non-default theme/accent never flashes the default one on a cold load.
 applyAppearance(getAppearance())
 
 // AppearanceProvider wraps <App/> rather than living inside it, so it sits

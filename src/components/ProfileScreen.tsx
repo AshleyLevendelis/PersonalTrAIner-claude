@@ -29,6 +29,7 @@ import { supabase } from '@/lib/supabase'
 import { computeGoalProgress } from '@/lib/goal-progress'
 import { updateProfileField } from '@/lib/profile-store'
 import { useAppearance } from '@/hooks/useAppearance'
+import type { ThemeName, AccentOverride } from '@/lib/appearance-store'
 import type { RevealSpeed } from '@/lib/reveal-speed-store'
 import {
   EXPERIENCE_OPTIONS, EQUIPMENT_OPTIONS, STYLE_OPTIONS, RECOVERY_OPTIONS,
@@ -38,6 +39,23 @@ import {
 import type { UserProfile, TrainingDay } from '@/lib/types'
 
 const GENDER_OPTIONS = [{ value: 'male', label: 'Male' }, { value: 'female', label: 'Female' }]
+
+// Turn 9 — swatch/gradient values lifted verbatim from the design doc's own
+// 9c Settings preview and 9d theme-comparison cards (project
+// 46c718f3-7619-4f0f-9016-7b75f2df1a78, "Density Pass.dc.html").
+const THEME_OPTIONS: { value: ThemeName; label: string; subtitle: string; swatches: [string, string, string, string] }[] = [
+  { value: 'nightshift', label: 'Nightshift', subtitle: 'deep violet · mint', swatches: ['#1A1636', '#241E4E', '#5BE9C2', '#9C8DFF'] },
+  { value: 'ember', label: 'Ember', subtitle: 'brown · orange', swatches: ['#15100C', '#241812', '#FF7A2F', '#D9A066'] },
+  { value: 'field', label: 'Field', subtitle: 'khaki · military', swatches: ['#14170F', '#212617', '#C7D14A', '#7FA98F'] },
+  { value: 'graphite', label: 'Graphite', subtitle: 'purple · grey', swatches: ['#121216', '#1D1D24', '#9B7DF5', '#C4B5FD'] },
+]
+const ACCENT_OPTIONS: { value: AccentOverride; label: string; from: string; to: string; glowRgb: string }[] = [
+  { value: 'mint', label: 'Mint', from: '#7CF3D4', to: '#3ED3AA', glowRgb: '91,233,194' },
+  { value: 'orange', label: 'Orange', from: '#FF9A54', to: '#E8601A', glowRgb: '255,122,47' },
+  { value: 'yellowgreen', label: 'Yellow-green', from: '#D6DF6B', to: '#A8B434', glowRgb: '199,209,74' },
+  { value: 'purple', label: 'Purple', from: '#B49BFF', to: '#7C5AE0', glowRgb: '155,125,245' },
+  { value: 'blue', label: 'Blue', from: '#8FC7FF', to: '#3B82F6', glowRgb: '59,130,246' },
+]
 const DAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
 interface ProfileScreenProps {
@@ -342,7 +360,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                         ? 'font-semibold text-[color:var(--primary-foreground)] glow-mint-box'
                         : 'text-muted-foreground'
                     }`}
-                    style={appearance.glow === level ? { background: 'linear-gradient(180deg, #7CF3D4, #3ED3AA)' } : undefined}
+                    style={appearance.glow === level ? { background: 'linear-gradient(180deg, color-mix(in oklab, var(--primary) 84%, white), var(--primary-2))' } : undefined}
                   >
                     {level}
                   </button>
@@ -351,38 +369,62 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
             </div>
 
             <div>
-              <p className="text-sm font-medium">Canvas</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">Base background depth — mood stays dark either way</p>
-              <div className="mt-3 flex gap-3">
-                {([
-                  { value: 'lifted', label: 'Lifted', bg: '#1A1636', chip: '#241E4E' },
-                  { value: 'deep', label: 'Deep', bg: '#0D0A1C', chip: '#171233' },
-                ] as const).map(opt => (
+              <p className="text-sm font-medium">Theme</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Sets canvas, surfaces and text. Complete stays green and attention stays amber in every theme, so status never depends on your pick.
+              </p>
+              <div className="mt-3 flex flex-col">
+                {THEME_OPTIONS.map(opt => (
                   <button
                     key={opt.value}
                     type="button"
-                    aria-pressed={appearance.canvas === opt.value}
-                    onClick={() => appearance.setCanvas(opt.value)}
-                    className="flex flex-1 flex-col gap-2"
+                    aria-pressed={appearance.theme === opt.value}
+                    onClick={() => appearance.setTheme(opt.value)}
+                    className="flex items-center gap-3.5 py-3.5"
+                    style={{ borderTop: '1px solid var(--hairline)' }}
                   >
-                    <span
-                      className={`flex h-16 items-end rounded-xl p-2 ring-2 ${
-                        appearance.canvas === opt.value ? 'ring-primary glow-mint-box' : 'ring-transparent'
-                      }`}
-                      style={{ background: opt.bg }}
-                    >
-                      <span className="h-2 w-3/5 rounded" style={{ background: opt.chip }} />
+                    <span className="flex shrink-0 gap-[5px]">
+                      {opt.swatches.map((c, i) => (
+                        <span key={i} className="size-[22px] rounded-[7px]" style={{ background: c }} />
+                      ))}
                     </span>
-                    <span className={`text-center text-xs ${appearance.canvas === opt.value ? 'font-medium text-primary' : 'text-muted-foreground'}`}>
-                      {opt.label}
+                    <span className="min-w-0 flex-1 text-left">
+                      <span className="block text-[15px] font-semibold">{opt.label}</span>
+                      <span className="block text-[11.5px] text-muted-foreground">{opt.subtitle}</span>
                     </span>
+                    {appearance.theme === opt.value && (
+                      <span className="flex size-[22px] shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground glow-mint-box">
+                        <Check className="size-3" />
+                      </span>
+                    )}
                   </button>
                 ))}
               </div>
             </div>
 
+            <div>
+              <p className="text-sm font-medium">Action colour</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">Buttons, links and the chat key. Defaults to your theme — override it here.</p>
+              <div className="mt-3 flex items-center gap-2.5">
+                {ACCENT_OPTIONS.map(opt => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    aria-pressed={appearance.accent === opt.value}
+                    aria-label={`${opt.label} accent`}
+                    onClick={() => appearance.setAccent(opt.value)}
+                    className="size-[38px] shrink-0 rounded-xl"
+                    style={{
+                      background: `linear-gradient(180deg, ${opt.from}, ${opt.to})`,
+                      boxShadow: appearance.accent === opt.value ? `0 0 16px rgba(${opt.glowRgb},.6), inset 0 0 0 2px rgba(255,255,255,.85)` : undefined,
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+
             <p className="text-[11.5px] leading-[1.5] text-muted-foreground/80">
-              Both apply instantly, everywhere. Glow maps to one intensity variable; canvas swaps two surface values — no separate themes.
+              Both apply instantly, everywhere. Theme sets canvas and surfaces; action colour is an independent override — no separate light/dark modes to manage.
             </p>
 
             <div>
@@ -400,7 +442,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                         ? 'font-semibold text-[color:var(--primary-foreground)] glow-mint-box'
                         : 'text-muted-foreground'
                     }`}
-                    style={revealSpeed === level ? { background: 'linear-gradient(180deg, #7CF3D4, #3ED3AA)' } : undefined}
+                    style={revealSpeed === level ? { background: 'linear-gradient(180deg, color-mix(in oklab, var(--primary) 84%, white), var(--primary-2))' } : undefined}
                   >
                     {level}
                   </button>

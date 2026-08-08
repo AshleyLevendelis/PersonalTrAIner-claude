@@ -49,35 +49,35 @@
 }
 
 /*
- * "Nightshift" — the app's one and only theme, now varying along the two axes
- * the density-pass exploration itself varied along (claude.ai/design project
- * 46c718f3-7619-4f0f-9016-7b75f2df1a78, "Density Pass.dc.html"). Per that
- * doc's option 1f: "Glow maps to one intensity variable; canvas swaps two
- * surface values — no separate themes." So there is exactly ONE palette here,
- * with a surface ramp selected by [data-canvas] and a halo intensity
- * multiplier selected by [data-glow]. Both attributes live on <html> and are
- * written by useAppearance.tsx (pre-applied in main.tsx to avoid a flash).
+ * Turn 9 ("Rounded again — colour system kept, themes moved into Settings")
+ * replaces the old 2-option canvas (Lifted/Deep) with 4 full themes —
+ * Nightshift/Ember/Field/Graphite — each its own canvas/surface/text ramp
+ * PLUS its own default accent (--primary/--primary2/--glow-rgb). An
+ * independent [data-accent] override can replace just the accent hue
+ * without changing the theme, via the same --glow-rgb mechanism. Role
+ * colors (--role-ai violet, --role-warn amber, --destructive) and the halo
+ * intensity axis ([data-glow]) are unchanged from the prior round and stay
+ * fixed across every theme/accent combination — per the design doc's own
+ * rule, status never depends on cosmetic choice.
  *
- * Default is turn 3 "Borderless": canvas Lifted + glow Full.
- *
- * Hue-bearing tokens (primary, role-*, chart-*) are canvas-INDEPENDENT and
- * live here; only the surface ramp and the text that must lift with it are
- * swapped per canvas below.
+ * Nightshift's values are pulled verbatim from the mockup (identical to the
+ * old Lifted canvas). Ember/Field/Graphite's canvas/surface/accent swatches
+ * are also lifted straight from the doc's own 9c theme-picker preview; their
+ * remaining tokens (text/muted/border/surface-deep/hairline/etc., which the
+ * doc doesn't spell out per-theme) are derived using Nightshift's exact
+ * lightness/alpha relationships, just recolored to each theme's hue family —
+ * flagged here since it's an interpretation, not a literal doc value.
  */
 :root {
   --radius: 0.875rem;
-  --primary: #5BE9C2;
-  --primary-foreground: #08281F;
   --destructive: #FF5C7A;
   --destructive-foreground: #F3F1FF;
-  --ring: #5BE9C2;
-  --chart-1: #5BE9C2;
   --chart-2: #8B7BFF;
   --chart-3: #6FB7FF;
   --chart-4: #FFB454;
   --chart-5: #6FB7FF;
 
-  /* Role tokens — not part of the shadcn set. */
+  /* Role tokens — not part of the shadcn set. Theme/accent-independent. */
   --role-ai: #8B7BFF;
   --role-ai-bg: rgba(139, 123, 255, .10);
   --role-ai-border: rgba(139, 123, 255, .28);
@@ -98,9 +98,9 @@
 [data-glow="off"] { --glow-strength: 0; }
 [data-glow="subtle"] { --glow-strength: .5; }
 
-/* Canvas: Lifted (turn 3 default) — #1A1636 base, #241E4E surfaces. */
+/* Theme: Nightshift (default) — deep violet · mint. Identical to the old Lifted canvas. */
 :root,
-[data-canvas="lifted"] {
+[data-theme="nightshift"] {
   --background: #1A1636;
   --foreground: #F5F3FF;
   --card: #241E4E;
@@ -116,50 +116,127 @@
   --border: #453C8E;
   --input: #241E4E;
   --text-tertiary: #C2BCE8;
-  /* Dimmest readable step — placeholder glyphs, "—" empty states. */
   --text-dim: #453C8E;
-  /* Chrome that sits behind/below content: tab bar, dock, phase rows. */
   --surface-deep: #221C48;
-  /* Raised fill that separates an interactive unit now that borders are gone. */
   --surface-raised: rgba(69, 60, 142, .28);
   --line-emphasis: #4B3FA8;
-  /* Turns 4-5: a deliberate, scoped reintroduction of a hairline — for
-   * row-to-row list dividers only, never card/hero borders (that rule from
-   * turn 3 "Borderless" stands). --grain-rgb is the same foreground colour
-   * as an RGB triplet, since rgba() can't take a hex var as its color arg. */
   --hairline: rgba(245, 243, 255, .11);
   --grain-rgb: 245, 243, 255;
+  --theme-primary: #5BE9C2;
+  --theme-primary-2: #3ED3AA;
+  --theme-glow-rgb: 91, 233, 194;
 }
 
-/* Canvas: Deep (turn 1 / the previous shipped look) — #0D0A1C base. */
-[data-canvas="deep"] {
-  --background: #0D0A1C;
-  --foreground: #F3F1FF;
-  --card: #171233;
-  --card-foreground: #F3F1FF;
-  --popover: #171233;
-  --popover-foreground: #F3F1FF;
-  --secondary: #221B4A;
-  --secondary-foreground: #F3F1FF;
-  --muted: #171233;
-  --muted-foreground: #8D86BC;
-  --accent: #221B4A;
-  --accent-foreground: #F3F1FF;
-  --border: #2A2358;
-  --input: #171233;
-  --text-tertiary: #B9B2E4;
-  --text-dim: #2A2358;
-  --surface-deep: #12102A;
-  --surface-raised: rgba(34, 27, 74, .55);
-  --line-emphasis: #3A317A;
-  --hairline: rgba(243, 241, 255, .11);
-  --grain-rgb: 243, 241, 255;
+/* Theme: Ember — dark brown · orange. */
+[data-theme="ember"] {
+  --background: #15100C;
+  --foreground: #F5EFE9;
+  --card: #241812;
+  --card-foreground: #F5EFE9;
+  --popover: #241812;
+  --popover-foreground: #F5EFE9;
+  --secondary: #382415;
+  --secondary-foreground: #F5EFE9;
+  --muted: #241812;
+  --muted-foreground: #B3A08F;
+  --accent: #382415;
+  --accent-foreground: #F5EFE9;
+  --border: #4A3826;
+  --input: #241812;
+  --text-tertiary: #D9C9B8;
+  --text-dim: #4A3826;
+  --surface-deep: #1C130D;
+  --surface-raised: rgba(74, 56, 38, .28);
+  --line-emphasis: #5C4830;
+  --hairline: rgba(245, 239, 233, .11);
+  --grain-rgb: 245, 239, 233;
+  --theme-primary: #FF9A54;
+  --theme-primary-2: #E8601A;
+  --theme-glow-rgb: 255, 122, 47;
+}
+
+/* Theme: Field — khaki · military green. */
+[data-theme="field"] {
+  --background: #14170F;
+  --foreground: #F0F3E8;
+  --card: #212617;
+  --card-foreground: #F0F3E8;
+  --popover: #212617;
+  --popover-foreground: #F0F3E8;
+  --secondary: #2E3520;
+  --secondary-foreground: #F0F3E8;
+  --muted: #212617;
+  --muted-foreground: #A3AC8F;
+  --accent: #2E3520;
+  --accent-foreground: #F0F3E8;
+  --border: #3E4530;
+  --input: #212617;
+  --text-tertiary: #C9D1B5;
+  --text-dim: #3E4530;
+  --surface-deep: #191C12;
+  --surface-raised: rgba(62, 69, 48, .28);
+  --line-emphasis: #4E5738;
+  --hairline: rgba(240, 243, 232, .11);
+  --grain-rgb: 240, 243, 232;
+  --theme-primary: #D6DF6B;
+  --theme-primary-2: #A8B434;
+  --theme-glow-rgb: 199, 209, 74;
+}
+
+/* Theme: Graphite — near-black · purple. */
+[data-theme="graphite"] {
+  --background: #121216;
+  --foreground: #F1F0F5;
+  --card: #1D1D24;
+  --card-foreground: #F1F0F5;
+  --popover: #1D1D24;
+  --popover-foreground: #F1F0F5;
+  --secondary: #2A2A34;
+  --secondary-foreground: #F1F0F5;
+  --muted: #1D1D24;
+  --muted-foreground: #9B9AA8;
+  --accent: #2A2A34;
+  --accent-foreground: #F1F0F5;
+  --border: #35333F;
+  --input: #1D1D24;
+  --text-tertiary: #C4C1D2;
+  --text-dim: #35333F;
+  --surface-deep: #17171C;
+  --surface-raised: rgba(53, 51, 63, .28);
+  --line-emphasis: #444154;
+  --hairline: rgba(241, 240, 245, .11);
+  --grain-rgb: 241, 240, 245;
+  --theme-primary: #B49BFF;
+  --theme-primary-2: #7C5AE0;
+  --theme-glow-rgb: 155, 125, 245;
+}
+
+/* Accent override — replaces just the accent hue regardless of theme.
+ * "theme" (the default) intentionally defines nothing here, so the
+ * per-theme --theme-primary/-2/-glow-rgb set above simply shows through. */
+[data-accent="mint"] { --theme-primary: #7CF3D4; --theme-primary-2: #3ED3AA; --theme-glow-rgb: 91, 233, 194; }
+[data-accent="orange"] { --theme-primary: #FF9A54; --theme-primary-2: #E8601A; --theme-glow-rgb: 255, 122, 47; }
+[data-accent="yellowgreen"] { --theme-primary: #D6DF6B; --theme-primary-2: #A8B434; --theme-glow-rgb: 199, 209, 74; }
+[data-accent="purple"] { --theme-primary: #B49BFF; --theme-primary-2: #7C5AE0; --theme-glow-rgb: 155, 125, 245; }
+[data-accent="blue"] { --theme-primary: #8FC7FF; --theme-primary-2: #3B82F6; --theme-glow-rgb: 59, 130, 246; }
+
+/* Resolves the accent axis (theme default or override) into the tokens the
+ * rest of the app actually reads — kept as a separate step from the
+ * per-theme/per-accent blocks above so both can layer via plain attribute
+ * selectors instead of one combinatorial ruleset per theme×accent pair. */
+:root {
+  --primary: var(--theme-primary);
+  --primary-2: var(--theme-primary-2);
+  --primary-foreground: #08281F;
+  --ring: var(--theme-primary);
+  --chart-1: var(--theme-primary);
+  --glow-rgb: var(--theme-glow-rgb);
 }
 
 /*
  * .dark is retained purely so the ~40 inert `dark:*` utilities still present
  * in dev-only screens (DevTestPage, ProfileSimulator, …) keep compiling.
- * Nothing in the app ever adds this class — [data-canvas] is the real axis.
+ * Nothing in the app ever adds this class — [data-theme] is the real axis.
  */
 .dark {
   --background: #1A1636;
@@ -235,12 +312,12 @@
    * no layout shift. "Subtle" (.5) is a true half-step, not a second
    * hand-tuned palette. */
   .glow-mint {
-    text-shadow: 0 0 calc(16px * var(--glow-strength)) rgba(91, 233, 194, calc(.85 * var(--glow-strength)));
+    text-shadow: 0 0 calc(16px * var(--glow-strength)) rgba(var(--glow-rgb), calc(.85 * var(--glow-strength)));
   }
   .glow-mint-lg {
     text-shadow:
-      0 0 calc(28px * var(--glow-strength)) rgba(91, 233, 194, calc(.65 * var(--glow-strength))),
-      0 0 calc(56px * var(--glow-strength)) rgba(91, 233, 194, calc(.30 * var(--glow-strength)));
+      0 0 calc(28px * var(--glow-strength)) rgba(var(--glow-rgb), calc(.65 * var(--glow-strength))),
+      0 0 calc(56px * var(--glow-strength)) rgba(var(--glow-rgb), calc(.30 * var(--glow-strength)));
   }
   .glow-violet {
     text-shadow:
@@ -255,14 +332,14 @@
   }
   .glow-mint-box {
     box-shadow:
-      0 0 calc(12px * var(--glow-strength)) rgba(91, 233, 194, calc(.90 * var(--glow-strength))),
-      0 0 calc(24px * var(--glow-strength)) rgba(91, 233, 194, calc(.45 * var(--glow-strength)));
+      0 0 calc(12px * var(--glow-strength)) rgba(var(--glow-rgb), calc(.90 * var(--glow-strength))),
+      0 0 calc(24px * var(--glow-strength)) rgba(var(--glow-rgb), calc(.45 * var(--glow-strength)));
   }
   .glow-violet-box {
     box-shadow: 0 0 calc(22px * var(--glow-strength)) rgba(156, 141, 255, calc(.45 * var(--glow-strength)));
   }
   .glow-icon {
-    filter: drop-shadow(0 0 calc(8px * var(--glow-strength)) rgba(91, 233, 194, calc(.90 * var(--glow-strength))));
+    filter: drop-shadow(0 0 calc(8px * var(--glow-strength)) rgba(var(--glow-rgb), calc(.90 * var(--glow-strength))));
   }
 
   /* Motion — the four keyframes from the design doc. All animate only
@@ -305,18 +382,18 @@
 @keyframes dsGlowPulse {
   0%, 100% {
     box-shadow:
-      0 0 calc(34px * var(--glow-strength)) rgba(91, 233, 194, calc(.50 * var(--glow-strength))),
-      0 0 calc(8px * var(--glow-strength)) rgba(91, 233, 194, calc(.75 * var(--glow-strength)));
+      0 0 calc(34px * var(--glow-strength)) rgba(var(--glow-rgb), calc(.50 * var(--glow-strength))),
+      0 0 calc(8px * var(--glow-strength)) rgba(var(--glow-rgb), calc(.75 * var(--glow-strength)));
   }
   50% {
     box-shadow:
-      0 0 calc(54px * var(--glow-strength)) rgba(91, 233, 194, calc(.75 * var(--glow-strength))),
-      0 0 calc(12px * var(--glow-strength)) rgba(91, 233, 194, calc(.95 * var(--glow-strength)));
+      0 0 calc(54px * var(--glow-strength)) rgba(var(--glow-rgb), calc(.75 * var(--glow-strength))),
+      0 0 calc(12px * var(--glow-strength)) rgba(var(--glow-rgb), calc(.95 * var(--glow-strength)));
   }
 }
 @keyframes dsDotPulse {
-  0%, 100% { box-shadow: 0 0 calc(10px * var(--glow-strength)) rgba(91, 233, 194, calc(.8 * var(--glow-strength))); transform: scale(1); }
-  50% { box-shadow: 0 0 calc(22px * var(--glow-strength)) rgba(91, 233, 194, var(--glow-strength)); transform: scale(1.18); }
+  0%, 100% { box-shadow: 0 0 calc(10px * var(--glow-strength)) rgba(var(--glow-rgb), calc(.8 * var(--glow-strength))); transform: scale(1); }
+  50% { box-shadow: 0 0 calc(22px * var(--glow-strength)) rgba(var(--glow-rgb), var(--glow-strength)); transform: scale(1.18); }
 }
 @keyframes dsWarnPulse {
   0%, 100% { box-shadow: 0 0 calc(8px * var(--glow-strength)) rgba(255, 180, 84, calc(.7 * var(--glow-strength))); }
@@ -328,8 +405,8 @@
   100% { opacity: .35; }
 }
 @keyframes dsBloomIn {
-  0% { opacity: 0; transform: scale(.96); box-shadow: 0 0 0 rgba(91, 233, 194, 0); }
-  100% { opacity: 1; transform: scale(1); box-shadow: 0 0 calc(34px * var(--glow-strength)) rgba(91, 233, 194, calc(.5 * var(--glow-strength))); }
+  0% { opacity: 0; transform: scale(.96); box-shadow: 0 0 0 rgba(var(--glow-rgb), 0); }
+  100% { opacity: 1; transform: scale(1); box-shadow: 0 0 calc(34px * var(--glow-strength)) rgba(var(--glow-rgb), calc(.5 * var(--glow-strength))); }
 }
 
 /*

@@ -5,7 +5,8 @@ import {
   applyAppearance,
   type AppearanceRecord,
   type GlowLevel,
-  type CanvasLevel,
+  type ThemeName,
+  type AccentOverride,
 } from '@/lib/appearance-store'
 
 // ---------------------------------------------------------------------------
@@ -21,7 +22,8 @@ import {
 
 interface AppearanceContextValue extends AppearanceRecord {
   setGlow: (glow: GlowLevel) => void
-  setCanvas: (canvas: CanvasLevel) => void
+  setTheme: (theme: ThemeName) => void
+  setAccent: (accent: AccentOverride) => void
 }
 
 const AppearanceContext = createContext<AppearanceContextValue | null>(null)
@@ -40,7 +42,8 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AppearanceContextValue>(() => ({
     ...record,
     setGlow: (glow: GlowLevel) => commit({ ...record, glow }),
-    setCanvas: (canvas: CanvasLevel) => commit({ ...record, canvas }),
+    setTheme: (theme: ThemeName) => commit({ ...record, theme }),
+    setAccent: (accent: AccentOverride) => commit({ ...record, accent }),
   }), [record, commit])
 
   return <AppearanceContext.Provider value={value}>{children}</AppearanceContext.Provider>

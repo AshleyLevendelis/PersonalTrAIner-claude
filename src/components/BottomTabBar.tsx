@@ -64,7 +64,7 @@ export function BottomTabBar({
             className={`-mt-6 flex size-14 shrink-0 items-center justify-center rounded-full text-primary-foreground transition-shadow glow-mint-box ${
               activeTab === 'chat' ? 'ring-2 ring-primary/40 ring-offset-2 ring-offset-[color:var(--surface-deep)]' : ''
             }`}
-            style={{ background: 'linear-gradient(180deg, #7CF3D4, #3ED3AA)' }}
+            style={{ background: 'linear-gradient(180deg, color-mix(in oklab, var(--primary) 84%, white), var(--primary-2))' }}
           >
             <MessageCircle className="size-6" />
           </button>
