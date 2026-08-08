@@ -611,6 +611,10 @@ function App() {
 
     setProfile(enrichedProfile)
     setMacros(calculatedMacros)
+    // The onboarding weight IS the first weigh-in (it's written to
+    // daily_metrics above) — seed the shared latestWeightKg from it so the
+    // derivation/targets never render a previous profile's stale weight.
+    setLatestWeightKg(enrichedProfile.weight_kg ?? null)
     setExercisePlan(workout)
     setMesocycle(mesocycleData)
     setMesocycleCreatedAt(new Date().toISOString())
@@ -1044,6 +1048,9 @@ function App() {
       localStorage.removeItem('mesocycle_cache')
       setProfile(null)
       setMacros(null)
+      // Per-profile derived state — leaving this set leaked the previous
+      // profile's last weigh-in into the NEXT profile's target derivation.
+      setLatestWeightKg(null)
       setExercisePlan([])
       setMesocycle([])
       setMealPools({})
