@@ -189,11 +189,12 @@ async function gradeProfile(g: GridProfile, profileId: string): Promise<ProfileR
 
     for (const opt of options) {
       allNames.add(opt.name)
-      // opt.tags is [cuisine, prepBand, proteinSourceName, 'slot_appropriate']
-      // in that fixed order (see verifyProposal in meal-generation.ts) — only
-      // index 0 is an actual cuisine. Iterating every tag here previously
-      // polluted this soft metric with prep-band values and, worse,
-      // protein-source names like "chicken breast" reported as "cuisines".
+      // opt.tags is [cuisine, prepBand] in that fixed order (see
+      // verifyProposal in meal-generation.ts) — only index 0 is an actual
+      // cuisine. Iterating every tag here previously polluted this soft
+      // metric with prep-band values and, worse (before fix 4.5 dropped
+      // them from the array entirely), protein-source names like "chicken
+      // breast" reported as "cuisines".
       if (opt.tags[0]) result.cuisines.add(opt.tags[0])
 
       // (g) no dinner-style dish in a breakfast slot (and the snack

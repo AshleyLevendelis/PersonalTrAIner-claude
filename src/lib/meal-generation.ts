@@ -303,21 +303,20 @@ export function verifyProposal(
   }
 
   const prepBand = /\b(1[0-5]|[1-9])\s*(min|minute)/i.test(proposal.prep) ? 'quick' : proposal.prep.length > 0 ? 'standard' : 'unspecified'
-  const keyProtein = parsed.find(l => {
-    const entry = computed.lines.find(ln => ln.input === l)?.entry
-    return entry?.category === 'protein'
-  })
 
   return {
     slot,
     name: proposal.name,
     ingredients: scaled.ingredients,
     macros: macrosToTargets(finalComputed),
-    // Fixed order: [cuisine, prepBand, proteinSourceName, ...]. slot_appropriate
-    // is appended, not inserted, so existing tags[0]/tags.find() consumers are
-    // unaffected — every option reaching here already passed checkSlotAppropriate
-    // above, so this documents the pass rather than gating anything further.
-    tags: [proposal.cuisine, prepBand, keyProtein?.name ?? '', 'slot_appropriate'].filter(Boolean),
+    // Fixed order: [cuisine, prepBand]. This array is rendered directly as
+    // chips in MealPlan.tsx (fix 4.5, ux-sweep) — keyProtein's raw
+    // ingredient name and a literal 'slot_appropriate' marker used to be
+    // appended here too, with nothing anywhere actually reading either one
+    // back out (confirmed: no tags[2]/tags[3] consumer exists), so they
+    // existed purely to leak into the UI as meaningless chips. Every option
+    // reaching here already passed checkSlotAppropriate above regardless.
+    tags: [proposal.cuisine, prepBand].filter(Boolean),
   }
 }
 

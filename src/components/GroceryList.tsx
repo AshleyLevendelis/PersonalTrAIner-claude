@@ -248,7 +248,8 @@ export function GroceryList({ profileId, mealPools, targets, refreshToken }: Gro
                         <span className="font-mono text-xs text-muted-foreground mr-1.5">{formatShoppingQuantity(item).primary}</span>
                         {item.display_name}
                       </span>
-                      {item.needs_review && <Badge variant="outline" className="text-[9px] px-1 py-0 shrink-0">check</Badge>}
+                      {/* Fix 4.5 (ux-sweep): bare "check" told a shopper nothing about what to check or why. needs_review means the ingredient name didn't match anything in food-db, so its quantity/unit is a rough guess rather than a real lookup. */}
+                      {item.needs_review && <Badge variant="outline" className="text-[9px] px-1 py-0 shrink-0" title="Not matched to a known ingredient — quantity is a rough estimate">unmatched</Badge>}
                     </div>
                   )}
 

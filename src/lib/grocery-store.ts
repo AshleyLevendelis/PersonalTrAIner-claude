@@ -178,6 +178,21 @@ const CATEGORY_MAP: Record<FoodCategory, GroceryCategory> = {
   other: 'other',
 }
 
+/**
+ * Fix 4.8 (ux-sweep) — CATEGORY_MAP alone routed every food-db 'protein'
+ * entry to meat_fish, which is right for chicken/beef/fish but put
+ * kidney beans, black beans, lentils, and whey protein powder in the
+ * same aisle as raw meat — a shopper trips on that immediately. Both
+ * already carry the tag that says why they don't belong there
+ * (is_legume, or contains_dairy on a non-dairy-category entry i.e. the
+ * powder), so this reads those tags rather than adding new ones.
+ */
+function categoryForEntry(entry: { category: FoodCategory; tags: { is_legume?: boolean; contains_dairy?: boolean } }): GroceryCategory {
+  if (entry.category === 'protein' && entry.tags.is_legume) return 'dry_goods'
+  if (entry.category === 'protein' && entry.tags.contains_dairy) return 'dry_goods'
+  return CATEGORY_MAP[entry.category]
+}
+
 export function resolveGroceryTarget(name: string): {
   canonicalKey: string
   displayName: string
@@ -191,7 +206,7 @@ export function resolveGroceryTarget(name: string): {
     return {
       canonicalKey: entry.name.toLowerCase(),
       displayName: entry.name,
-      category: CATEGORY_MAP[entry.category],
+      category: categoryForEntry(entry),
       needsReview: false,
       toGrams: (quantity, unit) => unitToGrams(entry, unit, quantity),
     }
@@ -623,6 +638,12 @@ export async function generateGroceryList(input: GenerateGroceryListInput): Prom
   for (const { day, chosen } of horizon) {
     for (const option of Object.values(chosen) as PoolOption[]) {
       for (const ing of option.ingredients) {
+        // Fix 4.8 (ux-sweep): plain tap water used to cook/blend a meal
+        // isn't something anyone shops for — it was aggregating into rows
+        // like "~500g water". Nothing else in food-db is a zero-cost
+        // kitchen-tap ingredient like this, so a name check is enough
+        // without needing a broader "non-purchasable" flag on FoodEntry.
+        if (ing.name.trim().toLowerCase() === 'water') continue
         const target = resolveGroceryTarget(ing.name)
         const grams = target.toGrams(ing.quantity, ing.unit)
         const ref: MealRef = { day, slot: option.slot, mealName: option.name }

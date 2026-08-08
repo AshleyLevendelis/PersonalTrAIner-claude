@@ -151,8 +151,24 @@ export function MealPlan({ profileId, date, pools, chosen, totals, targets, isGe
 function TotalsHero({ totals, targets }: { totals: MacroTargets; targets: MacroTargets }) {
   const calPct = targets.calories > 0 ? Math.min(100, (totals.calories / targets.calories) * 100) : 0
   const calDelta = Math.round(totals.calories - targets.calories)
-  const deltaLabel = Math.abs(calDelta) < 30 ? 'on the number' : calDelta > 0 ? `${calDelta} over` : `${Math.abs(calDelta)} under`
   const proteinAchieved = targets.protein > 0 && totals.protein >= targets.protein
+  // Fix 4.6 (ux-sweep) — this used to say "on the number" purely off the
+  // calorie delta, so a day 32% over on protein and 27% under on carbs
+  // still read as "on the number" because calories alone happened to land
+  // close — an "at or above target" check on protein isn't enough either,
+  // since that's true at 32% over too. Now requires calories AND protein
+  // AND carbs to each be within a real tolerance of target before making
+  // that claim; otherwise it states the actual calorie delta (unchanged,
+  // and was always honest on its own — the "on the number" case was the
+  // only one overclaiming).
+  const withinTolerance = (actual: number, target: number, pct: number) =>
+    target <= 0 || Math.abs(actual - target) <= target * pct
+  const macrosOnTarget = Math.abs(calDelta) < 30
+    && withinTolerance(totals.protein, targets.protein, 0.1)
+    && withinTolerance(totals.carbs, targets.carbs, 0.1)
+  const deltaLabel = Math.abs(calDelta) < 30
+    ? (macrosOnTarget ? 'on the number' : 'kcal on target, macros off')
+    : calDelta > 0 ? `${calDelta} over` : `${Math.abs(calDelta)} under`
 
   return (
     <div>
@@ -305,9 +321,16 @@ function MealSlotRow({
             </div>
           )}
 
-          {option.tags.length > 0 && (
+          {/* Fix 4.5 (ux-sweep) — generateMealPools now only ever writes
+              [cuisine, prepBand] going forward, but a pool persisted before
+              that fix can still carry the old internal 'slot_appropriate'
+              marker and a raw ingredient name as if they were display tags.
+              Defensive filter here too, so an already-onboarded profile
+              stops seeing the leak immediately rather than waiting on its
+              next regenerate. */}
+          {option.tags.filter(t => t !== 'slot_appropriate').slice(0, 2).length > 0 && (
             <div className="flex flex-wrap gap-1.5">
-              {option.tags.map(t => (
+              {option.tags.filter(t => t !== 'slot_appropriate').slice(0, 2).map(t => (
                 <span key={t} className="rounded-full bg-[color:var(--surface-raised)] px-2 py-0.5 text-[10px] text-muted-foreground">{t}</span>
               ))}
             </div>
