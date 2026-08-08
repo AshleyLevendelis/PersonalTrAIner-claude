@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
+import { InsightBanner } from '@/components/ui/insight-banner'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Pencil, Trash2, Check, X, Plus } from 'lucide-react'
@@ -325,10 +326,27 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
   // setMacros call) — matches Memory's own edits, which never recomputed
   // anything either. This screen corrects/maintains profile data; live
   // target recalculation off an arbitrary field edit is a separate feature.
+  //
+  // Fix 0.11 — this used to be pure fire-and-forget: the optimistic
+  // onProfileChanged() applied unconditionally and the write's outcome was
+  // never observed, so an offline/failed save looked identical to a
+  // successful one for the rest of the session and only reverted silently
+  // on the next launch. Now the write's rejection reverts the optimistic
+  // patch back to the pre-edit values (read from `profile`, captured before
+  // the optimistic apply) and surfaces a dismissible error, matching every
+  // other confirm-action in this app.
+  const [saveError, setSaveError] = useState<string | null>(null)
   const savePatch = (patch: Partial<UserProfile>) => {
     if (!profileId) return
-    void updateProfileField(profileId, patch)
+    const revertPatch = Object.fromEntries(
+      Object.keys(patch).map(k => [k, profile[k as keyof UserProfile]])
+    ) as Partial<UserProfile>
     onProfileChanged(patch)
+    updateProfileField(profileId, patch).catch(err => {
+      console.error('Profile field save failed — reverting', err)
+      onProfileChanged(revertPatch)
+      setSaveError("Couldn't save that change — it's been reverted. Check your connection and try again.")
+    })
   }
 
   return (
@@ -338,6 +356,15 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
           <DialogTitle>Profile</DialogTitle>
           <DialogDescription>Everything the app knows about you — correct or remove anything here.</DialogDescription>
         </DialogHeader>
+
+        {saveError && (
+          <InsightBanner tone="warning" className="items-start justify-between">
+            <span>{saveError}</span>
+            <button type="button" onClick={() => setSaveError(null)} className="shrink-0 text-xs font-semibold underline">
+              Dismiss
+            </button>
+          </InsightBanner>
+        )}
 
         {/* Appearance — design doc option 1f. Both axes apply instantly and
             everywhere: glow is one intensity variable, canvas swaps the
