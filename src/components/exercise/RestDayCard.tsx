@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Heart, ChevronRight, Loader2 } from 'lucide-react'
 import { useActiveSession } from '@/hooks/useActiveSession'
-import { saveCardioLog } from '@/lib/cardio-log-store'
+import { saveCardioLog, deleteCardioLog } from '@/lib/cardio-log-store'
 import type { WorkoutDay, RecommendedCardio } from '@/lib/types'
 
 // ---------------------------------------------------------------------------
@@ -21,10 +21,31 @@ function ActivityLogEntry() {
   const [activity, setActivity] = useState('')
   const [duration, setDuration] = useState('')
   const [saving, setSaving] = useState(false)
-  const [logged, setLogged] = useState(false)
+  const [loggedClientId, setLoggedClientId] = useState<string | null>(null)
+  const [undoing, setUndoing] = useState(false)
 
-  if (logged) {
-    return <p className="text-xs text-muted-foreground">Activity logged for today.</p>
+  const handleUndo = async () => {
+    if (!loggedClientId) return
+    setUndoing(true)
+    try {
+      await deleteCardioLog(loggedClientId)
+      setLoggedClientId(null)
+      setActivity('')
+      setDuration('')
+    } finally {
+      setUndoing(false)
+    }
+  }
+
+  if (loggedClientId) {
+    return (
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <span>Activity logged for today.</span>
+        <button type="button" className="font-semibold text-primary disabled:opacity-50" disabled={undoing} onClick={handleUndo}>
+          {undoing ? 'Undoing…' : 'Undo'}
+        </button>
+      </div>
+    )
   }
 
   if (!open) {
@@ -42,7 +63,7 @@ function ActivityLogEntry() {
   const handleSave = () => {
     if (!profileId || !activity.trim() || !duration) return
     setSaving(true)
-    saveCardioLog({
+    const view = saveCardioLog({
       userId: profileId,
       date,
       activityName: activity.trim(),
@@ -50,7 +71,7 @@ function ActivityLogEntry() {
       intensityRpe: 4,
     })
     setSaving(false)
-    setLogged(true)
+    setLoggedClientId(view.clientId ?? null)
   }
 
   return (
@@ -198,12 +219,13 @@ export function ActiveRecoveryCard({
 function RecoveryFinisher({ cardio }: { cardio: RecommendedCardio }) {
   const { profileId, date } = useActiveSession()
   const [saving, setSaving] = useState(false)
-  const [logged, setLogged] = useState(false)
+  const [loggedClientId, setLoggedClientId] = useState<string | null>(null)
+  const [undoing, setUndoing] = useState(false)
 
   const handleLog = () => {
-    if (!profileId || logged) return
+    if (!profileId || loggedClientId) return
     setSaving(true)
-    saveCardioLog({
+    const view = saveCardioLog({
       userId: profileId,
       date,
       activityName: cardio.activity,
@@ -211,7 +233,18 @@ function RecoveryFinisher({ cardio }: { cardio: RecommendedCardio }) {
       intensityRpe: cardio.targetRpe,
     })
     setSaving(false)
-    setLogged(true)
+    setLoggedClientId(view.clientId ?? null)
+  }
+
+  const handleUndo = async () => {
+    if (!loggedClientId) return
+    setUndoing(true)
+    try {
+      await deleteCardioLog(loggedClientId)
+      setLoggedClientId(null)
+    } finally {
+      setUndoing(false)
+    }
   }
 
   return (
@@ -219,9 +252,18 @@ function RecoveryFinisher({ cardio }: { cardio: RecommendedCardio }) {
       <span className="text-xs text-foreground">
         {cardio.activity} · {cardio.duration}m · RPE {cardio.targetRpe}
       </span>
-      <Button variant={logged ? 'ghost' : 'outline'} size="sm" className="h-7 text-xs shrink-0" disabled={saving || logged} onClick={handleLog}>
-        {saving ? <Loader2 className="size-3 animate-spin" /> : logged ? 'Logged' : 'Log'}
-      </Button>
+      {loggedClientId ? (
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-xs text-muted-foreground">Logged</span>
+          <button type="button" className="text-xs font-semibold text-primary disabled:opacity-50" disabled={undoing} onClick={handleUndo}>
+            {undoing ? 'Undoing…' : 'Undo'}
+          </button>
+        </div>
+      ) : (
+        <Button variant="outline" size="sm" className="h-7 text-xs shrink-0" disabled={saving} onClick={handleLog}>
+          {saving ? <Loader2 className="size-3 animate-spin" /> : 'Log'}
+        </Button>
+      )}
     </div>
   )
 }

@@ -22,6 +22,7 @@
     "test:grocery": "tsx scripts/test-grocery.ts",
     "test:dashboard": "tsx scripts/test-dashboard.ts",
     "test:timers": "tsx scripts/test-timers.ts",
+    "test:cardio-log": "tsx scripts/test-cardio-log.ts",
     "test:exercise-history": "tsx scripts/test-exercise-history.ts",
     "test:plan-adaptations-separation": "tsx scripts/test-plan-adaptations-separation.ts",
     "test:injury-adaptation-safety": "tsx scripts/test-injury-adaptation-safety.ts",

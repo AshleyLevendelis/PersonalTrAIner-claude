@@ -7,10 +7,13 @@
 // much smaller scale: one pending queue, a natural-key coalesce, background
 // flush with backoff, and a visible failed state instead of a swallowed one.
 //
-// Not a general-purpose sync layer — cardio logs have no local edit/delete
-// UI yet (nothing today lets you correct a logged activity), so this only
-// covers save + read-merge, not the update/delete machinery set-log-store
-// needs for its heavier write surface.
+// Fix 0.12 (ux-sweep) — a synced entry is no longer dropped from the local
+// queue on flush; it's kept (status: 'synced', tagged with the server id)
+// for a short UNDO_WINDOW_MS so a mis-tap "Log" has a real undo, matching
+// every other confirm-action in this app. getCardioLogsForDateMerged only
+// surfaces 'pending'/'failed' local rows (a 'synced' row is already present
+// in the server fetch — keeping both would double-render it); synced rows
+// are pruned once they age out of the undo window.
 // ---------------------------------------------------------------------------
 
 import { supabase } from './supabase'
@@ -19,6 +22,8 @@ import type { CardioLog } from './types'
 
 const PENDING_KEY = 'fitplan_cardio_pending_v1'
 const MAX_ATTEMPTS = 5
+/** How long a synced entry stays undoable before it's pruned from the local queue. */
+export const CARDIO_UNDO_WINDOW_MS = 10 * 60 * 1000
 
 export interface CardioLogInput {
   userId: string
@@ -34,8 +39,12 @@ interface PendingCardioLog extends CardioLogInput {
   clientId: string
   completedAt: string
   attempts: number
-  status: 'pending' | 'failed'
+  status: 'pending' | 'failed' | 'synced'
   errorMessage?: string
+  /** Server-assigned id, set once status flips to 'synced' — what an undo deletes by. */
+  id?: string
+  /** Set by deleteCardioLog when undo races an in-flight sync (item was still 'pending' at the time) — flushPending's success path checks this and deletes the just-inserted row immediately instead of marking 'synced'. */
+  pendingDelete?: boolean
 }
 
 export interface CardioLogView extends CardioLog {
@@ -74,6 +83,7 @@ function savePending(items: PendingCardioLog[]): void {
 
 function pendingToView(p: PendingCardioLog): CardioLogView {
   return {
+    id: p.id,
     clientId: p.clientId,
     user_id: p.userId,
     date: p.date,
@@ -83,7 +93,7 @@ function pendingToView(p: PendingCardioLog): CardioLogView {
     avg_heart_rate: p.avgHeartRate ?? null,
     notes: p.notes ?? null,
     completed_at: p.completedAt,
-    syncStatus: p.status === 'failed' ? 'failed' : 'pending',
+    syncStatus: p.status,
   }
 }
 
@@ -127,44 +137,102 @@ export function discardFailedCardioLog(clientId: string): void {
   notify()
 }
 
-let flushing = false
-export async function flushPending(): Promise<void> {
-  if (flushing) return
-  flushing = true
-  try {
-    const items = loadPending()
-    for (const item of items.filter(i => i.status === 'pending')) {
-      try {
-        const { error } = await supabase.from('cardio_logs').insert({
-          user_id: item.userId,
-          date: item.date,
-          activity_name: item.activityName,
-          duration_minutes: item.durationMinutes,
-          intensity_rpe: item.intensityRpe,
-          avg_heart_rate: item.avgHeartRate || null,
-          notes: item.notes || null,
-          completed_at: item.completedAt,
-        })
-        if (error) throw error
-        // Synced — drop from the pending queue entirely (unlike set-log-store,
-        // there's no local edit surface that needs the row to stick around).
-        const remaining = loadPending().filter(i => i.clientId !== item.clientId)
-        savePending(remaining)
+/**
+ * Undo for a just-logged cardio entry (fix 0.12 — the "Log" button had no
+ * confirm and no way back). Works regardless of sync timing: if the entry
+ * hasn't flushed yet, it's just dropped from the local queue before it ever
+ * reaches the server; if it already synced, its server row (id captured at
+ * sync time) is deleted. Silently no-ops past CARDIO_UNDO_WINDOW_MS, once
+ * the entry has been pruned — matches this app's other undo windows.
+ */
+export async function deleteCardioLog(clientId: string): Promise<void> {
+  // Wait out any sync already in flight for this entry first — otherwise a
+  // fast undo could read 'pending' right before the flush marks it 'synced'
+  // moments later, leaving a server row neither branch below accounts for.
+  if (flushPromise) await flushPromise
+  const items = loadPending()
+  const item = items.find(i => i.clientId === clientId)
+  if (!item) return
+  if (item.status === 'pending') {
+    // A sync for this exact entry may already be in flight (saveCardioLog
+    // fires flushPending in the background) — tombstone it rather than
+    // just dropping it locally, so if that in-flight insert lands *after*
+    // this call, flushPending's success path deletes the row it just
+    // created instead of leaving an orphaned, no-longer-undoable row.
+    item.pendingDelete = true
+    savePending(items)
+    notify()
+    return
+  }
+  if (item.status === 'failed') {
+    savePending(items.filter(i => i.clientId !== clientId))
+    notify()
+    return
+  }
+  if (item.id) {
+    const { error } = await supabase.from('cardio_logs').delete().eq('id', item.id)
+    if (error) throw error
+  }
+  savePending(loadPending().filter(i => i.clientId !== clientId))
+  notify()
+}
+
+function pruneAgedSynced(items: PendingCardioLog[]): PendingCardioLog[] {
+  const cutoff = Date.now() - CARDIO_UNDO_WINDOW_MS
+  return items.filter(i => i.status !== 'synced' || new Date(i.completedAt).getTime() > cutoff)
+}
+
+let flushPromise: Promise<void> | null = null
+export function flushPending(): Promise<void> {
+  if (flushPromise) return flushPromise
+  flushPromise = doFlush().finally(() => { flushPromise = null })
+  return flushPromise
+}
+
+async function doFlush(): Promise<void> {
+  savePending(pruneAgedSynced(loadPending()))
+  const items = loadPending()
+  for (const item of items.filter(i => i.status === 'pending')) {
+    try {
+      const { data, error } = await supabase.from('cardio_logs').insert({
+        user_id: item.userId,
+        date: item.date,
+        activity_name: item.activityName,
+        duration_minutes: item.durationMinutes,
+        intensity_rpe: item.intensityRpe,
+        avg_heart_rate: item.avgHeartRate || null,
+        notes: item.notes || null,
+        completed_at: item.completedAt,
+      }).select('id').single()
+      if (error) throw error
+      const insertedId = (data as { id: string } | null)?.id
+      const current = loadPending()
+      const target = current.find(i => i.clientId === item.clientId)
+      if (target?.pendingDelete) {
+        // Undo raced this insert and lost — honor the undo now that we
+        // finally have the row's id to delete it by.
+        if (insertedId) await supabase.from('cardio_logs').delete().eq('id', insertedId)
+        savePending(current.filter(i => i.clientId !== item.clientId))
+      } else if (target) {
+        // Kept (not dropped) so a still-fresh entry stays undoable by id —
+        // getCardioLogsForDateMerged excludes 'synced' rows from its local
+        // side since the server fetch already carries them.
+        target.status = 'synced'
+        target.id = insertedId
+        savePending(current)
+      }
+      notify()
+    } catch (err) {
+      const current = loadPending()
+      const target = current.find(i => i.clientId === item.clientId)
+      if (target) {
+        target.attempts += 1
+        target.errorMessage = err instanceof Error ? err.message : 'Sync failed'
+        if (target.attempts >= MAX_ATTEMPTS) target.status = 'failed'
+        savePending(current)
         notify()
-      } catch (err) {
-        const current = loadPending()
-        const target = current.find(i => i.clientId === item.clientId)
-        if (target) {
-          target.attempts += 1
-          target.errorMessage = err instanceof Error ? err.message : 'Sync failed'
-          if (target.attempts >= MAX_ATTEMPTS) target.status = 'failed'
-          savePending(current)
-          notify()
-        }
       }
     }
-  } finally {
-    flushing = false
   }
 }
 
@@ -183,8 +251,11 @@ export async function getCardioLogsForDateMerged(userId: string, date: string): 
   } catch {
     // Offline or transient failure — pending-only view, never throws.
   }
+  // 'synced' local rows are excluded here — they're already represented by
+  // serverRows below (kept locally only so deleteCardioLog can undo them by
+  // id within CARDIO_UNDO_WINDOW_MS, not for display).
   const pendingRows = loadPending()
-    .filter(i => i.userId === userId && i.date === date)
+    .filter(i => i.userId === userId && i.date === date && i.status !== 'synced')
     .map(pendingToView)
   return [...pendingRows, ...serverRows.map(r => ({ ...r, syncStatus: 'synced' as const }))]
 }
