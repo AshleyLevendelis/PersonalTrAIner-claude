@@ -3,6 +3,7 @@ import { Badge } from '@/components/ui/badge'
 import { Calculator, Layers } from 'lucide-react'
 import { MealPlan } from '@/components/MealPlan'
 import { WeighInCard } from '@/components/WeighInCard'
+import { MacroSplitCard } from '@/components/MacroSplitCard'
 import type { MacroTargets, UserProfile, WorkoutDay, MacroCalculationMode } from '@/lib/types'
 import type { MealSlotName } from '@/lib/meal-store'
 import type { PoolOption } from '@/lib/meal-generation'
@@ -17,6 +18,8 @@ export interface NutritionDisplayProps {
   onMacroModeChange?: (mode: MacroCalculationMode) => void
   /** Fired after WeighInCard saves so App.tsx can recompute targets + latestWeightKg. */
   onWeightLogged?: () => void | Promise<void>
+  /** Macro-accuracy round, Part 2 — fired on any macro-split edit (preset tap or a Custom-mode slider). */
+  onMacroSplitChange?: (patch: Partial<UserProfile>) => void
   // Turn 12 ("one owner per fact") — meals moved here from the retired
   // Meals tab: Nutrition answers "what am I eating and where do my numbers
   // come from", so the meal list belongs beside its own targets, not on a
@@ -36,7 +39,7 @@ export interface NutritionDisplayProps {
 }
 
 export function NutritionDisplay({
-  profile, macros, exercisePlan = [], latestWeightKg, onMacroModeChange, onWeightLogged,
+  profile, macros, exercisePlan = [], latestWeightKg, onMacroModeChange, onWeightLogged, onMacroSplitChange,
   profileId, date, pools, chosen, mealTotals, isGeneratingMeals, mealRegenerateError, onDismissRegenerateError,
   onSwapMealSlot, onRegenerateMealSlot, onRegenerateAllMeals,
 }: NutritionDisplayProps) {
@@ -104,7 +107,9 @@ export function NutritionDisplay({
             </div>
           </div>
           <p className="mt-2.5 text-[11px] leading-normal text-muted-foreground">
-            From {effectiveProfile.weight_kg} kg, {effectiveProfile.height_cm} cm, {effectiveProfile.age} y · protein 2 g/kg · fat 25% · carbs the remainder.
+            {derivation.splitApplies
+              ? `From ${effectiveProfile.weight_kg} kg, ${effectiveProfile.height_cm} cm, ${effectiveProfile.age} y · protein ${derivation.split.proteinPerKg.toFixed(1)} g/kg · fat ${Math.round(derivation.split.fatPercent * 100)}% · carbs the remainder.`
+              : `From ${effectiveProfile.weight_kg} kg, ${effectiveProfile.height_cm} cm, ${effectiveProfile.age} y · a fixed 20% protein / 25% fat / 55% carb split for conditioning goals.`}
           </p>
         </CardContent>
       </Card>
@@ -115,6 +120,21 @@ export function NutritionDisplay({
           {profile.id && <WeighInCard profileId={profile.id} onWeightLogged={onWeightLogged} />}
         </div>
       </div>
+
+      <MacroSplitCard
+        profile={profile}
+        effectiveWeightKg={effectiveProfile.weight_kg}
+        calorieTarget={macros.calories}
+        applies={mode === 'STANDARD_STATIC' && profile.fitness_goal !== 'conditioning'}
+        disabledReason={
+          profile.fitness_goal === 'conditioning'
+            ? 'Not available for the conditioning goal, which uses its own fixed 20% protein / 25% fat / 55% carb split rather than a bodyweight-anchored one.'
+            : 'Not available in Dynamic CSCS mode, which varies protein and carbs by training day using its own periodization — switch to Standard Static (below) to use this control.'
+        }
+        onChange={patch => onMacroSplitChange?.(patch)}
+        isGeneratingMeals={isGeneratingMeals}
+        onRegenerateAllMeals={onRegenerateAllMeals}
+      />
 
       {mode === 'DYNAMIC_CSCS' && weeklySchedule && (
         <Card>

@@ -1101,6 +1101,27 @@ function App() {
     }
   }
 
+  /** Macro-accuracy round, Part 2 — same optimistic-apply + revert-on-failure shape as ProfileScreen's savePatch, plus the living-targets recompute handleMacroModeChange already does (the split is one of computeTargets' inputs too). */
+  const handleMacroSplitChange = (patch: Partial<UserProfile>) => {
+    if (!profile?.id) return
+    const revertPatch = Object.fromEntries(
+      Object.keys(patch).map(k => [k, profile[k as keyof UserProfile]])
+    ) as Partial<UserProfile>
+    const updated = { ...profile, ...patch }
+    setProfile(updated)
+    const targets = computeTargets(updated, { latestWeightKg, exercisePlan })
+    setMacros(targets)
+    snapshotTargetsIfChanged(profile.id, updated, targets, latestWeightKg)
+    supabase.from('fitness_profiles').update(patch).eq('id', profile.id).then(({ error }) => {
+      if (error) {
+        console.error('Macro split save failed — reverting', error)
+        setProfile(prev => (prev ? { ...prev, ...revertPatch } : prev))
+        const revertedTargets = computeTargets({ ...updated, ...revertPatch }, { latestWeightKg, exercisePlan })
+        setMacros(revertedTargets)
+      }
+    })
+  }
+
   /** Re-derives targets after a new weigh-in lands (Part 5's capture calls this). */
   const handleWeightLogged = async () => {
     if (!profile?.id) return
@@ -1242,6 +1263,7 @@ function App() {
               exercisePlan={exercisePlan}
               latestWeightKg={latestWeightKg}
               onMacroModeChange={handleMacroModeChange}
+              onMacroSplitChange={handleMacroSplitChange}
               onWeightLogged={handleWeightLogged}
               profileId={profile.id}
               date={getSessionDateContext(profile.id).date}

@@ -121,6 +121,100 @@ function getCarbsPerKg(intensity: 'rest' | 'moderate' | 'high', goal: FitnessGoa
   }
 }
 
+// ---------------------------------------------------------------------------
+// USER-ADJUSTABLE MACRO SPLIT (macro-accuracy round, Part 2)
+// ---------------------------------------------------------------------------
+// The static (non-conditioning) formula below was always protein-per-kg +
+// fat-percentage + carbs-as-remainder — this section makes those two numbers
+// user-tunable instead of hardcoded, with the same two rails the hardcoded
+// version silently already had one of (the 50g carb floor) plus a new
+// matching fat floor. calorieTarget itself is NEVER touched by the split —
+// it's derived from TDEE + goal alone; the split only reallocates within it.
+// ---------------------------------------------------------------------------
+
+export type MacroSplitPreset = 'balanced' | 'higher_protein' | 'lower_carb' | 'higher_carb' | 'custom'
+
+export interface MacroSplitInput {
+  proteinPerKg: number
+  fatPercent: number
+}
+
+export interface MacroSplit extends MacroSplitInput {
+  preset: MacroSplitPreset
+}
+
+export const MACRO_SPLIT_PRESET_VALUES: Record<Exclude<MacroSplitPreset, 'custom'>, MacroSplitInput & { label: string; description: string }> = {
+  balanced:       { proteinPerKg: 2.0, fatPercent: 0.25, label: 'Balanced',       description: 'The default — even protein and fat, carbs fill the rest.' },
+  higher_protein: { proteinPerKg: 2.4, fatPercent: 0.25, label: 'Higher protein', description: 'More protein at the same fat share, less room for carbs.' },
+  lower_carb:     { proteinPerKg: 2.0, fatPercent: 0.35, label: 'Lower carb',     description: 'More calories from fat, fewer left for carbs.' },
+  higher_carb:    { proteinPerKg: 1.8, fatPercent: 0.20, label: 'Higher carb',    description: 'Less protein and fat, more calories left for carbs.' },
+}
+
+export const DEFAULT_MACRO_SPLIT: MacroSplit = {
+  preset: 'balanced',
+  proteinPerKg: MACRO_SPLIT_PRESET_VALUES.balanced.proteinPerKg,
+  fatPercent: MACRO_SPLIT_PRESET_VALUES.balanced.fatPercent,
+}
+
+/** Slider bounds for Custom mode — the range a "standard" split can express. Below/above this needs an inverted derivation (see the keto note on computeMacroSplitTargets). */
+export const PROTEIN_PER_KG_RANGE = { min: 1.6, max: 2.4, step: 0.1 }
+export const FAT_PERCENT_RANGE = { min: 0.20, max: 0.35, step: 0.01 }
+
+export const CARB_FLOOR_G = 50
+export const FAT_FLOOR_PER_KG = 0.6
+
+/** Reads the profile's stored split, resolving a named preset to its values or falling back to the stored custom numbers. Profiles that predate this feature (all three fields undefined) resolve to DEFAULT_MACRO_SPLIT — bit-identical to the old hardcoded 2.0g/kg-protein/25%-fat formula, so nothing changes for anyone who hasn't touched the control. */
+export function getProfileMacroSplit(profile: UserProfile): MacroSplit {
+  const preset = (profile.macro_split_preset as MacroSplitPreset | undefined) ?? 'balanced'
+  if (preset !== 'custom' && preset in MACRO_SPLIT_PRESET_VALUES) {
+    const { proteinPerKg, fatPercent } = MACRO_SPLIT_PRESET_VALUES[preset as Exclude<MacroSplitPreset, 'custom'>]
+    return { preset, proteinPerKg, fatPercent }
+  }
+  return {
+    preset: 'custom',
+    proteinPerKg: profile.macro_protein_per_kg ?? DEFAULT_MACRO_SPLIT.proteinPerKg,
+    fatPercent: profile.macro_fat_percent ?? DEFAULT_MACRO_SPLIT.fatPercent,
+  }
+}
+
+export interface MacroSplitResult extends MacroTargets {
+  /** True when the fat floor (0.6g/kg) had to override the requested fat%. */
+  clampedFatFloor: boolean
+  /** True when the carb floor (50g) had to override what the split would otherwise leave for carbs. */
+  clampedCarbFloor: boolean
+}
+
+/**
+ * Applies protein-per-kg + fat% to a FIXED calorie target, carbs taking the
+ * remainder, with two hard rails: fat never drops below FAT_FLOOR_PER_KG
+ * g/kg, carbs never drop below CARB_FLOOR_G. calorieTarget itself never
+ * moves — a rail engaging reallocates grams within it, it doesn't change it
+ * (rounding can still shift the final summed calories by a few kcal either
+ * way, same as the pre-split formula always did).
+ *
+ * NOT a keto/low-carb implementation: a real low-carb split needs the
+ * opposite derivation order (carbs as a hard CAP, fat as the remainder, plus
+ * a protein ceiling) and food-db coverage this app doesn't have yet. Forcing
+ * that shape through this protein-first/fat-second/carbs-remainder pipeline
+ * by cranking fatPercent to its max would clamp into something that reads as
+ * "low carb" but isn't a genuine ketogenic ratio — the UI deliberately caps
+ * FAT_PERCENT_RANGE below where that would happen and says so explicitly
+ * rather than offering a mislabelled keto preset.
+ */
+export function computeMacroSplitTargets(weightKg: number, calorieTarget: number, split: MacroSplitInput): MacroSplitResult {
+  const protein = Math.max(0, Math.round(split.proteinPerKg * weightKg))
+  let fat = Math.round((calorieTarget * split.fatPercent) / 9)
+  const fatFloor = Math.round(FAT_FLOOR_PER_KG * weightKg)
+  let clampedFatFloor = false
+  if (fat < fatFloor) { fat = fatFloor; clampedFatFloor = true }
+
+  let carbs = Math.round((calorieTarget - protein * 4 - fat * 9) / 4)
+  let clampedCarbFloor = false
+  if (carbs < CARB_FLOOR_G) { carbs = CARB_FLOOR_G; clampedCarbFloor = true }
+
+  return { calories: protein * 4 + carbs * 4 + fat * 9, protein, carbs, fat, clampedFatFloor, clampedCarbFloor }
+}
+
 function computeStaticMacros(profile: UserProfile): MacroTargets {
   const bmr = computeBMR(profile)
   const tdee = computeStaticTDEE(bmr, profile.activity_level)
@@ -131,6 +225,11 @@ function computeStaticMacros(profile: UserProfile): MacroTargets {
   // pre-allocation target, which silently disagreed with the macro sum by
   // a couple of kcal from rounding, and by 100+ kcal whenever the 50g carb
   // floor or the calorie rail engaged.
+  //
+  // Conditioning goal keeps its own fixed 20%-protein/25%-fat/55%-carb split
+  // (an endurance-oriented ratio, not bodyweight-anchored) — the macro-split
+  // control below doesn't apply to it; the UI disables the control and says
+  // why rather than silently having no effect.
   if (profile.fitness_goal === 'conditioning') {
     const protein = Math.round((calorieTarget * 0.20) / 4)
     const fat = Math.round((calorieTarget * 0.25) / 9)
@@ -138,13 +237,20 @@ function computeStaticMacros(profile: UserProfile): MacroTargets {
     return { calories: protein * 4 + carbs * 4 + fat * 9, protein, carbs, fat }
   }
 
-  const protein = Math.round(2.0 * profile.weight_kg)
-  const fat = Math.round((calorieTarget * 0.25) / 9)
-  const carbs = Math.max(50, Math.round((calorieTarget - protein * 4 - fat * 9) / 4))
-
-  return { calories: protein * 4 + carbs * 4 + fat * 9, protein, carbs, fat }
+  const split = getProfileMacroSplit(profile)
+  const result = computeMacroSplitTargets(profile.weight_kg, calorieTarget, split)
+  return { calories: result.calories, protein: result.protein, carbs: result.carbs, fat: result.fat }
 }
 
+// Deliberately does NOT read the user-adjustable macro split (see
+// getProfileMacroSplit above) — this day-varying carb-cycling formula is its
+// own periodization scheme (protein fixed at 2.2g/kg, carbs swinging by
+// training intensity, fat as the remainder above a floor), not the flat
+// "protein g/kg + fat%, carbs remainder" shape the split control edits.
+// Retrofitting the split onto this chain would either do nothing useful
+// (fat% has no lever here — fat is already remainder-with-floor) or fight
+// the carb-cycling table. The Nutrition tab disables the split control while
+// Dynamic CSCS is selected and says why, rather than silently ignoring it.
 function computeDynamicDay(
   profile: UserProfile,
   isTraining: boolean,
@@ -245,6 +351,10 @@ export interface MacroDerivation {
   /** Label for the surplus/deficit row — matches applyGoalAdjustment's own goal handling. */
   surplusLabel: string
   target: MacroTargets
+  /** The split actually driving `target` — DEFAULT_MACRO_SPLIT when the goal is conditioning (split doesn't apply there). */
+  split: MacroSplit
+  /** False for the conditioning goal, whose fixed percentage split ignores the macro-split control entirely. */
+  splitApplies: boolean
 }
 
 /**
@@ -266,5 +376,7 @@ export function getMacroDerivation(profile: UserProfile): MacroDerivation {
     : profile.fitness_goal === 'hypertrophy' ? 'Hypertrophy surplus'
     : profile.fitness_goal === 'conditioning' ? 'Conditioning adjustment'
     : 'Maintenance adjustment'
-  return { bmr, tdee, surplusKcal, surplusLabel, target }
+  const splitApplies = profile.fitness_goal !== 'conditioning'
+  const split = splitApplies ? getProfileMacroSplit(profile) : DEFAULT_MACRO_SPLIT
+  return { bmr, tdee, surplusKcal, surplusLabel, target, split, splitApplies }
 }

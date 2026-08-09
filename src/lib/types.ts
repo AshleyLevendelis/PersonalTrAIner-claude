@@ -103,6 +103,20 @@ export interface UserProfile {
    * to a hydration target beyond a neutral starting value" rule.
    */
   water_target_ml?: number
+  /**
+   * Macro-accuracy round, Part 2: user-adjustable macro split. Governs the
+   * STANDARD_STATIC, non-conditioning-goal target formula only (see
+   * getProfileMacroSplit/computeMacroSplitTargets in macro-calculator.ts) —
+   * DYNAMIC_CSCS and the conditioning goal keep their own established
+   * formulas and ignore these fields. All three optional; undefined resolves
+   * to the 'balanced' preset (2.0 g/kg protein, 25% fat), bit-identical to
+   * the app's pre-existing hardcoded default.
+   */
+  macro_split_preset?: 'balanced' | 'higher_protein' | 'lower_carb' | 'higher_carb' | 'custom'
+  /** Only meaningful when macro_split_preset is 'custom' — a named preset always resolves from its own fixed values. */
+  macro_protein_per_kg?: number
+  /** Only meaningful when macro_split_preset is 'custom'. Fraction (0.25 = 25%), not a percentage integer. */
+  macro_fat_percent?: number
 }
 
 export type CookingTimePreference = 'quick' | 'moderate' | 'loves_cooking'

@@ -13,6 +13,7 @@
     "test:logging-roundtrip": "tsx scripts/test-logging-roundtrip.ts",
     "test:meal-roundtrip": "tsx scripts/test-meal-roundtrip.ts",
     "test:meal-quality": "tsx scripts/run-meal-quality.ts",
+    "test:macro-split": "tsx scripts/test-macro-split.ts",
     "test:injury-separation": "tsx scripts/test-injury-exclusion-separation.ts",
     "test:ramp-visibility": "tsx scripts/test-ramp-up-visibility.ts",
     "test:session-derive": "tsx scripts/test-session-derive.ts",
