@@ -68,48 +68,28 @@ export function WeekContextRow({
   const [expanded, setExpanded] = useState(false)
   const phaseToken = isCalibrationWeek ? 'Calibration' : isDeload ? 'Deload week' : phaseLabel
 
-  return (
-    <div>
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-start gap-2.5">
-          {days.map(d => {
-            const isToday = d.dayName === todayName
-            return (
-              <button
-                key={d.date}
-                type="button"
-                onClick={() => { if (!isToday) onSelectDay(d.dayName) }}
-                className="hit-slop-day flex flex-col items-center gap-0.5"
-                aria-label={`${d.dayName}: ${d.state}`}
-              >
-                <span className={`text-[9.5px] tracking-[.08em] ${isToday ? 'font-semibold text-primary' : 'text-muted-foreground'}`}>
-                  {SHORT_DAY[d.dayName] ?? d.dayName.slice(0, 1)}
-                </span>
-                {isToday && d.state === 'due' ? (
-                  <span aria-hidden className="mt-[2px] size-[7px] rounded-full bg-primary glow-dot" />
-                ) : (
-                  <span className={`text-[11px] leading-none ${isToday ? 'text-primary glow-mint' : 'text-muted-foreground'}`}>
-                    {GLYPH[d.state]}
-                  </span>
-                )}
-              </button>
-            )
-          })}
-        </div>
+  // Tab-restructure handoff — "Wk 3/16 · B1 Hypertrophy · ~52 min" as one
+  // line, block number included (blockNumber was accepted as a prop before
+  // this round but never actually rendered).
+  const headerParts = [`Wk ${weekNumber}/${totalWeeks}`]
+  if (phaseToken) headerParts.push(blockNumber != null ? `B${blockNumber} ${phaseToken}` : phaseToken)
+  if (estimatedMinutes != null) headerParts.push(`~${estimatedMinutes} min`)
 
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            className="text-right text-[9.5px] uppercase leading-[1.3] tracking-[.16em] text-muted-foreground hover:text-foreground"
-            onClick={onOpenProgram}
-          >
-            Wk {weekNumber} · {phaseToken ?? `of ${totalWeeks}`}
-            {estimatedMinutes != null && <><br />~{estimatedMinutes} min</>}
-          </button>
+  return (
+    <div className="rounded-2xl p-3.5" style={{ background: 'var(--surface-raised)' }}>
+      <div className="flex items-center justify-between gap-3">
+        <button
+          type="button"
+          className="min-w-0 flex-1 text-left text-[12.5px] text-foreground"
+          onClick={onOpenProgram}
+        >
+          {headerParts.join(' · ')}
+        </button>
+        <div className="flex shrink-0 items-center gap-1">
           {(phaseFocus || coachNote) && (
             <button
               type="button"
-              className="hit-slop-44 shrink-0 text-muted-foreground hover:text-foreground"
+              className="hit-slop-44 text-primary"
               onClick={() => setExpanded(v => !v)}
               aria-label="Expand phase context"
             >
@@ -141,11 +121,45 @@ export function WeekContextRow({
           )}
         </div>
       </div>
+
       {expanded && (phaseFocus || coachNote) && (
-        <div className="mt-2 space-y-1">
-          {phaseFocus && <p className="text-[11px] text-muted-foreground">{phaseFocus}</p>}
-          {coachNote && <p className="text-[11px] text-muted-foreground/80 italic">{coachNote}</p>}
+        <div className="mt-2.5 space-y-1.5">
+          {phaseFocus && <p className="text-xs leading-[1.5] text-text-tertiary">{phaseFocus}</p>}
+          {coachNote && <p className="text-xs leading-[1.5]" style={{ color: 'var(--role-ai-text)' }}>Coach: {coachNote}</p>}
         </div>
+      )}
+
+      <div className="mt-3.5 flex items-start justify-between">
+        {days.map(d => {
+          const isToday = d.dayName === todayName
+          return (
+            <button
+              key={d.date}
+              type="button"
+              onClick={() => { if (!isToday) onSelectDay(d.dayName) }}
+              className="hit-slop-day flex flex-col items-center gap-1 rounded-[9px] px-1.5 py-1"
+              style={isToday ? { background: 'rgba(var(--glow-rgb),.14)', border: '1px solid rgba(var(--glow-rgb),.4)' } : undefined}
+              aria-label={`${d.dayName}: ${d.state}`}
+            >
+              <span className={`text-[9px] uppercase tracking-[.08em] ${isToday ? 'font-semibold text-primary' : 'text-muted-foreground'}`}>
+                {SHORT_DAY[d.dayName] ?? d.dayName.slice(0, 1)}
+              </span>
+              {isToday && d.state === 'due' ? (
+                <span aria-hidden className="size-[7px] rounded-full bg-primary glow-dot" />
+              ) : (
+                <span className={`text-[12px] leading-none ${isToday ? 'text-primary glow-mint' : 'text-muted-foreground'}`}>
+                  {GLYPH[d.state]}
+                </span>
+              )}
+            </button>
+          )
+        })}
+      </div>
+
+      {onOpenProgram && (
+        <button type="button" className="mt-3 text-[11.5px] font-semibold text-primary" onClick={onOpenProgram}>
+          See the whole program ›
+        </button>
       )}
     </div>
   )

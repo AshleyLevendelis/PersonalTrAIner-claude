@@ -399,23 +399,39 @@ function ExerciseList({
     g => g.kind === 'single' && g.ex.tier === 'tier_1_primary'
   )
 
-  // 3b: 20px between rows. With no borders or card padding left, this gap IS
-  // the separation — tighter and the list reads as one run-on block.
+  const isGroupExpanded = (g: ExerciseGroup) =>
+    g.kind === 'single'
+      ? rowProps(g.ex, g.exIndex).expanded
+      : g.members.some(m => rowProps(m.ex, m.exIndex).expanded)
+
+  // Tab-restructure handoff — meal-slot idiom: hairline-separated rows in
+  // one column, not gap-separated cards. The section label picks up "· open"
+  // + primary colour whenever a row inside its group is expanded, matching
+  // MealPlan's slot-label treatment.
   return (
-    <div className="flex flex-col gap-5">
-      {groups.map((g, i) => (
-        <div key={i} className="flex flex-col gap-2.5">
-          <span className="ds-label-compact">{sectionLabelFor(g, i === firstMainLiftGroupIndex)}</span>
-          {g.kind === 'single' ? (
-            <ExerciseRow {...rowProps(g.ex, g.exIndex)} />
-          ) : (
-            <SupersetGroup
-              label={g.label}
-              members={g.members.map(m => ({ props: rowProps(m.ex, m.exIndex) }))}
-            />
-          )}
-        </div>
-      ))}
+    <div className="flex flex-col">
+      {groups.map((g, i) => {
+        const expanded = isGroupExpanded(g)
+        return (
+          <div
+            key={i}
+            className={`flex flex-col gap-2.5 py-3 ${i > 0 ? '' : 'pb-3'}`}
+            style={i > 0 ? { borderTop: '1px solid var(--hairline)' } : undefined}
+          >
+            <span className={expanded ? 'ds-label-compact text-primary glow-mint' : 'ds-label-compact'}>
+              {sectionLabelFor(g, i === firstMainLiftGroupIndex)}{expanded ? ' · open' : ''}
+            </span>
+            {g.kind === 'single' ? (
+              <ExerciseRow {...rowProps(g.ex, g.exIndex)} />
+            ) : (
+              <SupersetGroup
+                label={g.label}
+                members={g.members.map(m => ({ props: rowProps(m.ex, m.exIndex) }))}
+              />
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }

@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { ArrowRightLeft, Ban, History, MoreVertical, ChevronDown } from 'lucide-react'
+import { Ban, History, MoreVertical, ChevronDown } from 'lucide-react'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { getExerciseId } from '@/lib/exercise-db'
 import { formatRampSets, formatCompletedSummary } from '@/lib/session-derive'
 import { RampStrip } from './RampStrip'
-import { LoadChip, type LoadSource } from './LoadChip'
+import { LoadChip, loadSourceLabel, type LoadSource } from './LoadChip'
 import { CalibrationCue } from './CalibrationCue'
 import { SetGrid, type SetGridProps } from './SetGrid'
 import type { Exercise, ExerciseSetLog } from '@/lib/types'
@@ -98,22 +98,16 @@ export function ExerciseRow({
     </div>
   )
 
-  // Collapsed rows hide loads entirely (turn 5) — a per-set dot ladder
-  // stands in for "{sets}×{reps} + LoadChip", mint-filled+glowing for each
-  // logged set index, muted otherwise.
-  const dotLadder = (
-    <div className="flex items-center gap-1 shrink-0">
-      {Array.from({ length: ex.sets }, (_, i) => {
-        const done = loggedSets.some(s => s.set_number === i + 1)
-        return (
-          <span
-            key={i}
-            aria-hidden
-            className={`size-[6px] rounded-full ${done ? 'bg-primary glow-dot' : 'bg-muted-foreground/30'}`}
-          />
-        )
-      })}
-    </div>
+  // Tab-restructure handoff — collapsed rows go back to a mono
+  // "{sets}×{reps} · {load}kg" summary + chevron, matching the meal-slot
+  // idiom (MealPlan's collapsed row: kcal text + chevron) instead of turn
+  // 5's dot ladder.
+  const collapsedSummary = allSetsLogged ? (
+    <span className="tabular-mono text-xs text-primary glow-mint">✓ {formatCompletedSummary(loggedSets)}</span>
+  ) : (
+    <span className="tabular-mono text-xs text-muted-foreground">
+      {ex.sets}×{ex.reps}{ex.suggested_load_kg != null ? ` · ${ex.suggested_load_kg}kg` : ''}
+    </span>
   )
 
   // Density pass 3b "Borderless": the active (expanded) exercise is no longer
@@ -150,21 +144,16 @@ export function ExerciseRow({
       >
         <div className="min-w-0 flex-1 space-y-1">
           {nameLine}
-          {(expanded || allSetsLogged || completedSets > 0) && (
-            <div className="flex items-center gap-2 flex-wrap">
-              {expanded && <span className="text-xs text-text-tertiary">{ex.sets}×{ex.reps}</span>}
-              {allSetsLogged ? (
-                <span className="text-xs text-primary glow-mint">{formatCompletedSummary(loggedSets)}</span>
-              ) : completedSets > 0 ? (
-                <span className="font-mono text-[10px] text-muted-foreground">{completedSets}/{ex.sets} sets</span>
-              ) : null}
-            </div>
+          {expanded && completedSets > 0 && !allSetsLogged && (
+            <span className="font-mono text-[10px] text-muted-foreground">{completedSets}/{ex.sets} sets</span>
           )}
         </div>
-        {/* Collapsed: turn 5 hides loads on collapsed rows in favor of a
-            set-completion dot ladder — the row itself is the affordance. */}
-        {!expanded && dotLadder}
-        {expanded && <ChevronDown className="size-4 text-muted-foreground shrink-0" />}
+        {!expanded && (
+          <span className="flex shrink-0 items-center gap-1">
+            {collapsedSummary}
+            <ChevronDown className="size-3.5 text-muted-foreground" />
+          </span>
+        )}
       </div>
 
       {expanded && (
@@ -172,22 +161,40 @@ export function ExerciseRow({
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0 flex-1">
               {ex.suggested_load_kg != null && (
-                <div className="flex items-end gap-2 mb-1">
-                  <span className="tabular-mono text-[54px] font-bold leading-none -tracking-[0.02em]">
-                    {ex.suggested_load_kg}
-                  </span>
-                  <span className="text-xs text-text-tertiary pb-1.5">kg × {ex.reps}</span>
+                <div className="flex items-end gap-2">
+                  <span className="tabular-mono ds-num-lg leading-none">{ex.suggested_load_kg}</span>
+                  <span className="text-xs text-text-tertiary pb-0.5">kg</span>
                 </div>
               )}
-              <LoadChip
-                ex={ex}
-                source={loadSource}
-                explained={explainedLoadChip}
-                onToggleExplain={() => setExplainedLoadChip(v => !v)}
-                progressionNote={progressionNote}
-              />
+              {loadSourceLabel(loadSource) && (
+                <p className="text-[10px] uppercase tracking-[.1em] text-muted-foreground">{loadSourceLabel(loadSource)}</p>
+              )}
+              <div className="mt-1.5">
+                <LoadChip
+                  ex={ex}
+                  source={loadSource}
+                  explained={explainedLoadChip}
+                  onToggleExplain={() => setExplainedLoadChip(v => !v)}
+                  progressionNote={progressionNote}
+                />
+              </div>
               {completedSets === 0 && ramp && <RampStrip ramp={ramp} />}
               {showCalibrationCue && <CalibrationCue hasLoad={ex.suggested_load_kg != null} />}
+              <p className="mt-2 text-xs text-text-tertiary">
+                {ex.sets} working sets · {completedSets} logged
+              </p>
+              <div className="mt-1.5 flex items-center gap-3.5">
+                <button type="button" className="text-xs font-semibold text-primary" onClick={onSwap}>
+                  Swap exercise
+                </button>
+                <button
+                  type="button"
+                  className="text-xs text-muted-foreground"
+                  onClick={() => onOpenPlateCalc(ex.suggested_load_kg ?? 0)}
+                >
+                  Plate calculator
+                </button>
+              </div>
             </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -202,10 +209,6 @@ export function ExerciseRow({
                     History
                   </DropdownMenuItem>
                 )}
-                <DropdownMenuItem onClick={onSwap}>
-                  <ArrowRightLeft className="size-3.5" />
-                  Swap exercise
-                </DropdownMenuItem>
                 <DropdownMenuItem variant="destructive" disabled={banBusy} onClick={onBan}>
                   <Ban className="size-3.5" />
                   {banBusy ? 'Banning…' : 'Ban exercise'}
