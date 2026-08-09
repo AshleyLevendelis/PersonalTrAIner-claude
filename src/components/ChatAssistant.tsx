@@ -14,6 +14,7 @@ import { swapPoolMeal, type MealSlotName } from '@/lib/meal-store'
 import { getExerciseEntry } from '@/lib/exercise-db'
 import { createPendingAction, claimPendingAction, declinePendingAction, markExecuting, resolvePendingAction, getPendingAction, isWithinUndoWindow, type PendingActionReceipt } from '@/lib/pending-actions-store'
 import { APPEND_PROPOSAL_KINDS, INTENT_PROPOSAL_VERB, buildIntentProposal } from '@/lib/intent-proposal'
+import { pickAccountabilityCheckIn } from '@/lib/accountability'
 import { executeExerciseSwap, executeMealSwap, undoExerciseSwap, executeInjuryAdaptation, executeEquipmentAdaptation, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type EquipmentAdaptationPayload } from '@/lib/pending-action-executor'
 import type { SwapScope } from '@/lib/mesocycle-edit'
 import { createPlanAdaptation } from '@/lib/plan-adaptations-store'
@@ -43,15 +44,26 @@ import { DEFAULT_REVEAL_SPEED, type RevealSpeed } from '@/lib/reveal-speed-store
 
 const ACTION_TAG_RE = /\[ACTION:\s*.*?\]/gi
 const QUICK_REPLIES_RE = /\[QUICK_REPLIES:\s*(.*?)\]/gi
-const TRAILING_BRACKET_RE = /\[(?:ACTION|QUICK_REPLIES)[^\]]*$/i
+const TRAILING_BRACKET_RE = /\[(?:ACTION|QUICK_REPLIES|BREAK)[^\]]*$/i
 const PAGE_SIZE = 20
 
+// Chat round 2, item 2 — the model splits a reply into consecutive sent
+// messages with a [BREAK] line. Collapsed here into a blank-line paragraph
+// break so each beat renders as its own visually separated block. NOTE this
+// is a paragraph split, not yet a genuinely separate chat bubble per part —
+// see the round-2 report for the remaining piece.
+const BREAK_TAG_RE = /^[ \t]*\[BREAK\][ \t]*$/gim
+
+function applyMessageBreaks(text: string): string {
+  return text.replace(BREAK_TAG_RE, '\n')
+}
+
 function stripTags(text: string): string {
-  return text.replace(ACTION_TAG_RE, '').replace(QUICK_REPLIES_RE, '').trim()
+  return applyMessageBreaks(text).replace(ACTION_TAG_RE, '').replace(QUICK_REPLIES_RE, '').trim()
 }
 
 function stripStreamingTags(text: string): string {
-  let cleaned = text.replace(ACTION_TAG_RE, '').replace(QUICK_REPLIES_RE, '')
+  let cleaned = applyMessageBreaks(text).replace(ACTION_TAG_RE, '').replace(QUICK_REPLIES_RE, '')
   cleaned = cleaned.replace(TRAILING_BRACKET_RE, '')
   cleaned = cleaned
     .split('\n')
@@ -148,6 +160,16 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
   // losing everything already resolved in that message. Ephemeral by
   // design, same as pendingAction/receipt/clarification on ChatMessage.
   const parseSessionsRef = useRef<Record<string, { entries: WorkoutEntryInput[]; todaysPlanExerciseNames: string[] }>>({})
+
+  // Chat round 2, item 4 — "at most one check-in per conversation" is
+  // enforced HERE, not by asking the model to remember it said something.
+  // The system prompt is rebuilt every turn, so a check-in left in context
+  // would be repeated every turn; once a turn has carried it, this flips and
+  // the field is omitted from every subsequent turn of this conversation.
+  // Ref (not state) deliberately: flipping it must not re-render, and it
+  // resets naturally on remount, which is the conversation boundary the
+  // brief means.
+  const checkInUsedRef = useRef(false)
 
   // Synchronous fallback opener — used as the initial message before any
   // data has loaded, and upgraded in place once real PR/trend data resolves
@@ -363,15 +385,28 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       const scheduleLine = recentPR
         ? `${greetName()} — nice PR on ${recentPR.exerciseName} at ${recentPR.weightKg}kg. ${detail.charAt(0).toUpperCase()}${detail.slice(1)}`
         : buildInitialGreeting()
-      // Brief, one voice, no bullet list — who it is and what it can do,
-      // before the specific-today opener. Returning users (isFirstEverChat
-      // false) skip this entirely.
-      const finalText = isFirstEverChat
-        ? `I'm your training coach — I can log workouts from what you tell me, adjust your plan, answer training and nutrition questions, and remember your goals and preferences as we go.\n\n${scheduleLine}`
-        : scheduleLine
+      // Chat round 2, item 1 — a brand-new user meets someone, rather than
+      // opening a tool. Three short messages instead of one block: who this
+      // is, what it'll do for them (in plain language, NOT a feature list),
+      // then one real opening question. Returning users (isFirstEverChat
+      // false) skip the introduction entirely and get the specific-today
+      // line on its own, exactly as before.
+      if (isFirstEverChat) {
+        const detailSentence = `${detail.charAt(0).toUpperCase()}${detail.slice(1)}`
+        setMessages([
+          { role: 'assistant', content: `${greetName()} — I'm your coach. Good to meet you.`, status: 'complete' },
+          {
+            role: 'assistant',
+            content: "Your plan's built and ready. From here I'll keep it moving with you — tell me how a session went, what you'd rather not eat, anything that's nagging, and I'll adjust things and remember them.",
+            status: 'complete',
+          },
+          { role: 'assistant', content: detailSentence, status: 'complete' },
+        ])
+        return
+      }
 
-      if (finalText !== buildInitialGreeting()) {
-        setMessages([{ role: 'assistant', content: finalText, status: 'complete' }])
+      if (scheduleLine !== buildInitialGreeting()) {
+        setMessages([{ role: 'assistant', content: scheduleLine, status: 'complete' }])
       }
     }
 
@@ -633,7 +668,45 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         ? proactiveData.recentPRs.slice(0, 3).map(pr => `${pr.exerciseName} ${pr.weightKg}kg (${pr.date})`).join('; ')
         : null,
       adherence_note: proactiveData?.whatsLeftLine ?? null,
+      // Chat round 2, item 4 — at most one, computed in code (never by the
+      // model, which would invent one), and only on the first turn that can
+      // carry it. accountability.ts returns null whenever the data doesn't
+      // support something specific, which is what makes "specific-or-silent"
+      // structural rather than an instruction.
+      accountability_check_in: accountabilityCheckIn(),
     }
+  }
+
+  /**
+   * Chat round 2, item 4. Returns the one check-in for this conversation, or
+   * null. Marks it used the moment it's handed out, so the next turn of the
+   * same conversation gets null and the coach doesn't repeat itself.
+   */
+  const accountabilityCheckIn = (): string | null => {
+    if (checkInUsedRef.current || !proactiveData) return null
+    const lastWeighIn = proactiveData.weightSeries.length > 0
+      ? proactiveData.weightSeries[proactiveData.weightSeries.length - 1]
+      : null
+    const daysSinceWeighIn = lastWeighIn
+      ? Math.floor((Date.now() - new Date(lastWeighIn.date).getTime()) / 86400000)
+      : null
+    const line = pickAccountabilityCheckIn({
+      hour: new Date().getHours(),
+      proteinEaten: proactiveData.proteinEaten,
+      proteinTarget: proactiveData.proteinTarget,
+      caloriesEaten: proactiveData.caloriesEaten,
+      caloriesTarget: proactiveData.caloriesTarget,
+      waterMl: proactiveData.waterMl,
+      waterTargetMl: proactiveData.waterTargetMl,
+      streak: proactiveData.streak,
+      daysSinceWeighIn,
+      sessionDueUnlogged: proactiveData.session.setsPlanned > 0 && proactiveData.session.setsLogged === 0,
+      setsLoggedToday: proactiveData.session.setsLogged,
+      setsPlannedToday: proactiveData.session.setsPlanned,
+      onTrackForGoal: proactiveData.weightTrend?.onTrackForGoal ?? null,
+    })
+    if (line) checkInUsedRef.current = true
+    return line
   }
 
   /**
