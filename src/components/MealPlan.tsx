@@ -50,6 +50,11 @@ interface MealPlanProps {
  */
 export function MealPlan({ profileId, date, pools, chosen, totals, targets, isGenerating, regenerateError, onDismissRegenerateError, onSwapSlot, onRegenerateSlot, onRegenerateAll }: MealPlanProps) {
   const activeSlots = SLOT_ORDER.filter(s => (pools[s]?.length ?? 0) > 0)
+  // A slot generation requested and asked for (present as a key in `pools`,
+  // per generateMealPools always seeding every active slot to []) but came
+  // back with zero options must render honestly, never disappear — silently
+  // dropping it lets the day's totals quietly absorb its calories elsewhere.
+  const emptySlots = SLOT_ORDER.filter(s => s in pools && (pools[s]?.length ?? 0) === 0)
   const [expandedSlot, setExpandedSlot] = useState<MealSlotName | null>(null)
 
   // Which meals are already logged eaten today, keyed by slot — reuses
@@ -83,7 +88,7 @@ export function MealPlan({ profileId, date, pools, chosen, totals, targets, isGe
     </InsightBanner>
   )
 
-  if (activeSlots.length === 0) {
+  if (activeSlots.length === 0 && emptySlots.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center gap-3 py-16">
         {errorBanner}
@@ -142,7 +147,35 @@ export function MealPlan({ profileId, date, pools, chosen, totals, targets, isGe
             }}
           />
         ))}
+        {emptySlots.map(slot => (
+          <EmptySlotRow key={slot} slot={slot} isGenerating={isGenerating} onRegenerate={onRegenerateSlot} />
+        ))}
       </div>
+    </div>
+  )
+}
+
+/** A slot generation asked for but couldn't fill — rendered honestly instead
+ * of vanishing (its calories/protein must never get silently folded into
+ * another slot's portions, which is what assembleDay's repair scale used to
+ * do). Per-slot retry, matching every other slot row's own regenerate action. */
+function EmptySlotRow({ slot, isGenerating, onRegenerate }: { slot: MealSlotName; isGenerating: boolean; onRegenerate: (slot: MealSlotName) => Promise<void> }) {
+  const [busy, setBusy] = useState(false)
+  return (
+    <div className="flex items-center justify-between gap-3 border-t py-3" style={{ borderColor: 'var(--hairline)' }}>
+      <div>
+        <p className="ds-label-compact">{SLOT_LABEL[slot]}</p>
+        <p className="text-sm text-muted-foreground">Couldn't generate this meal.</p>
+      </div>
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={isGenerating || busy}
+        onClick={async () => { setBusy(true); try { await onRegenerate(slot) } finally { setBusy(false) } }}
+      >
+        {busy ? <Loader2 className="size-3.5 animate-spin mr-1.5" /> : <RefreshCw className="size-3.5 mr-1.5" />}
+        Retry
+      </Button>
     </div>
   )
 }

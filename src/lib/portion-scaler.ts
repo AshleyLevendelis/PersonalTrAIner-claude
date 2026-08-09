@@ -69,6 +69,18 @@ export function meetsProteinFloor(actualProtein: number, targetProtein: number):
   return actualProtein >= targetProtein
 }
 
+// QA sweep finding: protein was enforced as a floor ONLY everywhere in this
+// pipeline. A symmetric per-meal ceiling was tried and reverted — this app's
+// generate-meals prompt deliberately steers every proposal toward protein
+// density, so most proposals sit well above a 1.3x-of-slot-target ceiling by
+// design; gating on it collapsed pool sizes app-wide (confirmed live: 86 ->
+// 52 accepted options). The day-level ceiling in meal-generation.ts
+// (DAY_PROTEIN_CEILING_RATIO) reuses this same number without that cost —
+// it only stops assembleDay's calorie-only repair scale from being accepted
+// when the result would land too far over, rather than rejecting individual
+// proposals outright.
+export const PROTEIN_CEILING_RATIO = 1.3
+
 export interface ScaleToTargetResult {
   ingredients: MealIngredientLine[]
   macros: Macros100g

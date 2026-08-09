@@ -404,7 +404,7 @@ async function main() {
   console.log('\n[10] logMealEaten (turn 7 "Log this meal") + its undo')
   {
     const { logMealEaten, voidMealEvent } = await import('../src/lib/meal-store')
-    const day = '2026-08-09' // isolated date so this block's totals don't mix with [4]/[5]'s TODAY-scoped events
+    const day = '2099-01-01' // isolated date, deliberately far from any real "today" so this block's totals don't mix with [4]/[5]'s TODAY-scoped events
     const preTargets = computeTargets(baseProfile, { latestWeightKg: latest2 })
 
     const beforeLedger = await getTodayLedger(PROFILE_ID, day, preTargets)

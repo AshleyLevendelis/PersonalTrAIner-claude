@@ -137,6 +137,7 @@ export const FOOD_DB: FoodEntry[] = [
   f('greek yoghurt full fat', ['greek yogurt', 'full fat greek yoghurt', 'greek style yoghurt'], { kcal: 97, protein: 9, carbs: 4, fat: 5 }, 'dairy', { contains_dairy: true }),
   f('natural yoghurt', ['plain yoghurt', 'natural yogurt', 'low fat yogurt', 'low fat yoghurt'], { kcal: 61, protein: 4.3, carbs: 4.7, fat: 3.3 }, 'dairy', { contains_dairy: true }),
   f('cottage cheese', [], { kcal: 98, protein: 11, carbs: 3.4, fat: 4.3 }, 'dairy', { contains_dairy: true }),
+  f('ricotta cheese', ['ricotta', 'light ricotta cheese', 'light ricotta'], { kcal: 174, protein: 11, carbs: 3, fat: 13 }, 'dairy', { contains_dairy: true }),
   f('whey protein powder', ['protein powder', 'whey protein', 'whey isolate'], { kcal: 380, protein: 80, carbs: 8, fat: 5 }, 'protein', { contains_dairy: true }, { scoop: 30 }),
   f('milk whole', ['whole milk', 'full fat milk'], { kcal: 61, protein: 3.2, carbs: 4.8, fat: 3.3 }, 'dairy', { contains_dairy: true }),
   f('milk skimmed', ['skimmed milk', 'skim milk', 'fat free milk'], { kcal: 34, protein: 3.4, carbs: 5, fat: 0.1 }, 'dairy', { contains_dairy: true }),
@@ -165,6 +166,8 @@ export const FOOD_DB: FoodEntry[] = [
   f('kidney beans', ['red kidney beans', 'cooked kidney beans', 'canned kidney beans'], { kcal: 127, protein: 8.7, carbs: 23, fat: 0.5 }, 'protein', { is_legume: true, is_high_carb: true }),
   f('pinto beans', ['cooked pinto beans'], { kcal: 143, protein: 9, carbs: 26, fat: 0.7 }, 'protein', { is_legume: true, is_high_carb: true }),
   f('butter beans', ['lima beans', 'cooked butter beans'], { kcal: 113, protein: 7.6, carbs: 20, fat: 0.4 }, 'protein', { is_legume: true, is_high_carb: true }),
+  f('cannellini beans', ['canned cannellini beans', 'cooked cannellini beans', 'white kidney beans'], { kcal: 118, protein: 8.1, carbs: 20, fat: 0.5 }, 'protein', { is_legume: true, is_high_carb: true }),
+  f('brown lentils', ['canned brown lentils', 'cooked brown lentils'], { kcal: 116, protein: 9, carbs: 20, fat: 0.4 }, 'protein', { is_legume: true, is_high_carb: true }),
   f('soy mince', ['tvp', 'textured vegetable protein', 'soy protein mince'], { kcal: 285, protein: 50, carbs: 30, fat: 1 }, 'protein', { contains_soy: true }),
   f('quorn mince', ['quorn'], { kcal: 92, protein: 12, carbs: 4.4, fat: 2.7 }, 'protein', { contains_egg: true }),
   f('quorn fillet', ['quorn fillets', 'quorn chicken pieces'], { kcal: 106, protein: 13, carbs: 6.7, fat: 2.9 }, 'protein', { contains_egg: true }),
@@ -189,7 +192,7 @@ export const FOOD_DB: FoodEntry[] = [
   f('oats', ['rolled oats', 'porridge oats', 'oatmeal'], { kcal: 379, protein: 13.5, carbs: 67.7, fat: 6.9 }, 'carb', { is_high_carb: true }),
   f('potato boiled', ['potato', 'boiled potato', 'new potatoes'], { kcal: 87, protein: 1.9, carbs: 20, fat: 0.1 }, 'carb', { is_high_carb: true }),
   f('potato baked', ['baked potato', 'jacket potato'], { kcal: 93, protein: 2.5, carbs: 21, fat: 0.1 }, 'carb', { is_high_carb: true }),
-  f('mashed potato', [], { kcal: 105, protein: 1.9, carbs: 16, fat: 4 }, 'carb', { contains_dairy: true, is_high_carb: true }),
+  f('mashed potato', ['instant mashed potato', 'instant mashed potatoes', 'prepared instant mashed potatoes'], { kcal: 105, protein: 1.9, carbs: 16, fat: 4 }, 'carb', { contains_dairy: true, is_high_carb: true }),
   f('sweet potato baked', ['sweet potato', 'baked sweet potato'], { kcal: 90, protein: 2, carbs: 21, fat: 0.2 }, 'carb', { is_high_carb: true }),
   f('egg noodles cooked', ['egg noodles', 'noodles'], { kcal: 138, protein: 4.5, carbs: 25, fat: 2.1 }, 'carb', { contains_egg: true, contains_gluten: true, is_high_carb: true }),
   f('rice noodles cooked', ['rice noodles'], { kcal: 109, protein: 1.8, carbs: 25, fat: 0.2 }, 'carb', { is_high_carb: true }),
@@ -285,6 +288,7 @@ export const FOOD_DB: FoodEntry[] = [
   f('pesto', ['basil pesto'], { kcal: 303, protein: 4, carbs: 4, fat: 30 }, 'condiment', { contains_dairy: true, contains_nuts: true }, { tbsp: 16 }),
   f('tomato passata', ['passata'], { kcal: 32, protein: 1.6, carbs: 5.5, fat: 0.3 }, 'condiment', {}),
   f('chopped tomatoes canned', ['tinned tomatoes', 'canned tomatoes'], { kcal: 32, protein: 1.6, carbs: 5.5, fat: 0.3 }, 'condiment', {}),
+  f('marinara sauce', ['marinara'], { kcal: 42, protein: 1.5, carbs: 7, fat: 1 }, 'condiment', {}),
   f('curry paste', ['thai curry paste', 'tikka paste'], { kcal: 168, protein: 3, carbs: 12, fat: 12 }, 'condiment', { is_high_fodmap: true }, { tbsp: 20 }),
   f('coconut cream', [], { kcal: 330, protein: 3.6, carbs: 6.7, fat: 34 }, 'fat', {}),
   f('gravy granules made', ['gravy'], { kcal: 65, protein: 1.2, carbs: 9, fat: 2.6 }, 'condiment', { contains_gluten: true }),
@@ -459,6 +463,7 @@ export const FOOD_DB: FoodEntry[] = [
   f('injera flatbread', ['injera'], { kcal: 220, protein: 7, carbs: 45, fat: 1.5 }, 'carb', { is_high_carb: true }),
   f('calamansi juice', ['calamansi'], { kcal: 29, protein: 0.5, carbs: 9.5, fat: 0.2 }, 'fruit', {}),
   f('water', ['warm water', 'cold water', 'boiling water'], { kcal: 0, protein: 0, carbs: 0, fat: 0 }, 'other', {}),
+  f('black coffee', ['coffee', 'cold brew coffee', 'brewed coffee', 'filter coffee'], { kcal: 1, protein: 0.1, carbs: 0, fat: 0 }, 'other', {}),
 ]
 
 // ---------------------------------------------------------------------------
@@ -466,7 +471,11 @@ export const FOOD_DB: FoodEntry[] = [
 // ---------------------------------------------------------------------------
 
 function normalize(s: string): string {
-  return s.toLowerCase().trim().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ')
+  // Replace (not strip) punctuation with a space — stripping it fused
+  // adjacent words into unmatchable tokens ("seitan-based" -> "seitanbased",
+  // "boiled/instant" -> "boiledinstant"), which made every hyphenated or
+  // slash-separated ingredient name an automatic lookup miss.
+  return s.toLowerCase().trim().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
 const LOOKUP = new Map<string, FoodEntry>()
@@ -497,8 +506,10 @@ function containsWordSequence(haystack: string[], needle: string[]): boolean {
   return false
 }
 
-/** Strips a trailing 's' from tokens long enough that it's almost certainly a plural, not part of the word itself (avoids "hummus" -> "hummu", "asparagus" -> "asparagu"). Deliberately conservative: only used as a last-resort fallback below, never in the primary matching passes. */
+/** Strips a trailing plural suffix from tokens long enough that it's almost certainly a plural, not part of the word itself (avoids "hummus" -> "hummu", "asparagus" -> "asparagu"). Handles "-oes"/"-ies" specially ("potatoes" -> "potato", not the naive slice(-1) result "potatoe"; "berries" -> "berry") since a naive trailing-'s' strip never converges on the singular DB entry for these. Deliberately conservative: only used as a last-resort fallback below, never in the primary matching passes. */
 function depluralizeToken(token: string): string {
+  if (token.length > 5 && token.endsWith('ies')) return token.slice(0, -3) + 'y'
+  if (token.length > 5 && token.endsWith('oes')) return token.slice(0, -2)
   return token.length > 4 && token.endsWith('s') && !token.endsWith('ss') ? token.slice(0, -1) : token
 }
 

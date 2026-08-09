@@ -31,7 +31,7 @@
 import { supabase, resolveEnv } from './supabase'
 import { computeMealMacros, type Macros100g } from './food-db'
 import { validateMealAgainstDiet } from './diet-rules'
-import { parseIngredientLines, scaleToTarget, isWithinCalorieTolerance, meetsProteinFloor } from './portion-scaler'
+import { parseIngredientLines, scaleToTarget, isWithinCalorieTolerance, meetsProteinFloor, PROTEIN_CEILING_RATIO } from './portion-scaler'
 import type { MacroTargets, CookingTimePreference, BreakfastStyle } from './types'
 import type { MealSlotName } from './meal-store'
 
@@ -301,6 +301,16 @@ export function verifyProposal(
     rejectLog.push(`[${slot}] "${proposal.name}": post-scale result (${finalComputed.kcal} kcal, ${finalComputed.protein}g protein) missed target (${budget.calories} kcal, ${budget.protein}g protein) even at a sane scale factor (${scaled.scaleFactor.toFixed(2)}x) — likely a macro-ratio mismatch scaling alone can't fix`)
     return null
   }
+  // A per-meal protein ceiling was tried here and reverted: this app's own
+  // generate-meals prompt deliberately steers every proposal toward protein
+  // density (see the "Steer generate-meals prompt toward protein density"
+  // work), so a same-ratio ceiling rejected the large majority of
+  // proposals and collapsed pool sizes app-wide (confirmed live: 86 -> 52
+  // accepted options, pool_size failures 2 -> 23). The day-level ceiling in
+  // assembleDay (DAY_PROTEIN_CEILING_RATIO) still catches and reports real
+  // overshoot without that collateral cost — capping at the individual-meal
+  // layer needs the generation prompt's protein steering revisited first,
+  // not a symmetric per-meal gate bolted on here.
 
   const prepBand = /\b(1[0-5]|[1-9])\s*(min|minute)/i.test(proposal.prep) ? 'quick' : proposal.prep.length > 0 ? 'standard' : 'unspecified'
 
@@ -482,6 +492,14 @@ async function persistPools(profileId: string, accepted: Partial<Record<MealSlot
 
 export const DAY_CALORIE_TOLERANCE = 0.05
 export const DAY_PROTEIN_FLOOR_RATIO = 0.95
+// QA sweep finding: the day-repair scale below is calorie-only (it has no
+// way to bound protein), so folding a missing slot's whole calorie budget
+// into one dish could inflate protein ~1.5-1.9x target with no ceiling
+// anywhere in the pipeline. This caps how far the repaired day is allowed to
+// land above target protein before it's rejected as an honest miss instead.
+// Same ratio as portion-scaler.ts's per-meal PROTEIN_CEILING_RATIO — one
+// threshold, checked at both layers, not two independently-tuned numbers.
+export const DAY_PROTEIN_CEILING_RATIO = PROTEIN_CEILING_RATIO
 
 export interface AssembledDay {
   /** One chosen option per active slot. */
@@ -490,6 +508,12 @@ export interface AssembledDay {
   withinTolerance: boolean
   /** The full pools passed in, so the UI can offer swaps against every alternative, not just the chosen option. */
   alternatives: Partial<Record<MealSlotName, PoolOption[]>>
+  /** Requested slots (a key in `pools`) whose pool came back empty — generation
+   * produced zero valid options. These are NEVER silently folded into another
+   * slot's portions; the UI must render an honest "couldn't generate this
+   * meal" state with a retry, not a plausible-looking day quietly missing a
+   * meal's worth of food. */
+  missingSlots: MealSlotName[]
 }
 
 function sumOptionMacros(options: PoolOption[]): MacroTargets {
@@ -533,10 +557,12 @@ export function assembleDay(
   targets: MacroTargets,
   recentNames: Partial<Record<MealSlotName, string[]>> = {},
 ): AssembledDay {
-  const slots = (Object.keys(pools) as MealSlotName[]).filter(s => (pools[s]?.length ?? 0) > 0)
+  const requestedSlots = Object.keys(pools) as MealSlotName[]
+  const slots = requestedSlots.filter(s => (pools[s]?.length ?? 0) > 0)
+  const missingSlots = requestedSlots.filter(s => (pools[s]?.length ?? 0) === 0)
 
   if (slots.length === 0) {
-    return { chosen: {}, totals: { calories: 0, protein: 0, carbs: 0, fat: 0 }, withinTolerance: false, alternatives: pools }
+    return { chosen: {}, totals: { calories: 0, protein: 0, carbs: 0, fat: 0 }, withinTolerance: false, alternatives: pools, missingSlots }
   }
 
   type BestCombo = { combo: Partial<Record<MealSlotName, PoolOption>>; totals: MacroTargets; score: number }
@@ -575,14 +601,21 @@ export function assembleDay(
   search(0, {})
 
   if (!state.best) {
-    return { chosen: {}, totals: { calories: 0, protein: 0, carbs: 0, fat: 0 }, withinTolerance: false, alternatives: pools }
+    return { chosen: {}, totals: { calories: 0, protein: 0, carbs: 0, fat: 0 }, withinTolerance: false, alternatives: pools, missingSlots }
   }
 
   let chosen = state.best.combo
   let totals = state.best.totals
   let withinTolerance = dayWithinTolerance(totals, targets)
 
-  if (!withinTolerance) {
+  // The repair scale below only ever redistributes calories AMONG slots that
+  // actually have real options — it must never run when a slot is missing
+  // entirely, or it silently folds that slot's whole calorie (and implicitly
+  // protein) budget into whatever dish happens to be largest, which is
+  // exactly the "day quietly short a meal but reads as fine" bug this
+  // function must not produce. A missing slot always ships as an honest
+  // out-of-tolerance day instead.
+  if (!withinTolerance && missingSlots.length === 0) {
     const entries = Object.entries(chosen) as [MealSlotName, PoolOption][]
     const [largestSlot, largestOption] = entries.reduce((a, b) => (b[1].macros.calories > a[1].macros.calories ? b : a))
 
@@ -603,13 +636,23 @@ export function assembleDay(
     if (!scaleResult.rejectedReason) {
       const recomputed = computeMealMacros(scaleResult.ingredients)
       const adjustedOption: PoolOption = { ...largestOption, ingredients: scaleResult.ingredients, macros: macrosToTargets(recomputed) }
-      chosen = { ...chosen, [largestSlot]: adjustedOption }
-      totals = sumOptionMacros(Object.values(chosen) as PoolOption[])
-      withinTolerance = dayWithinTolerance(totals, targets)
+      const candidateChosen = { ...chosen, [largestSlot]: adjustedOption }
+      const candidateTotals = sumOptionMacros(Object.values(candidateChosen) as PoolOption[])
+      // scaleToTarget is calorie-only — it has no way to bound protein, so a
+      // protein-dense dish scaled up to also cover a shortfall elsewhere can
+      // land well past target. Only accept the repair if it doesn't blow
+      // past the ceiling; otherwise ship the closest unscaled combo as an
+      // honest miss rather than a day that "fits" calories by tripling protein.
+      const proteinRatio = targets.protein > 0 ? candidateTotals.protein / targets.protein : 1
+      if (proteinRatio <= DAY_PROTEIN_CEILING_RATIO) {
+        chosen = candidateChosen
+        totals = candidateTotals
+        withinTolerance = dayWithinTolerance(totals, targets)
+      }
     }
   }
 
-  return { chosen, totals, withinTolerance, alternatives: pools }
+  return { chosen, totals, withinTolerance, alternatives: pools, missingSlots }
 }
 
 /**

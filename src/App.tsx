@@ -842,6 +842,7 @@ function App() {
     if (!profile?.id || !macros) return
     setIsGeneratingMeals(true)
     setMealRegenerateError(null)
+    const hadExistingOptions = (mealPools[slot]?.length ?? 0) > 0
     try {
       const result = await generateMealPools({
         profileId: profile.id,
@@ -863,7 +864,14 @@ function App() {
       // with nothing. Only apply/clear when generation actually produced
       // options for this slot.
       if ((result.accepted[slot]?.length ?? 0) === 0) {
-        setMealRegenerateError(`Couldn't refresh ${MEAL_SLOT_LABEL[slot]} — kept your existing options.`)
+        // Don't claim options were "kept" when this slot never had any —
+        // that reads as a lie the first time generation fails on a fresh
+        // plan, when the pool was already empty going in.
+        setMealRegenerateError(
+          hadExistingOptions
+            ? `Couldn't refresh ${MEAL_SLOT_LABEL[slot]} — kept your existing options.`
+            : `Couldn't generate ${MEAL_SLOT_LABEL[slot]} — try again in a moment.`
+        )
         return
       }
       setMealPools(prev => ({ ...prev, ...result.accepted }))
@@ -871,7 +879,11 @@ function App() {
       const todayDate = getSessionDateContext(profile.id).date
       await clearMealPick(profile.id, todayDate, slot)
     } catch {
-      setMealRegenerateError(`Couldn't refresh ${MEAL_SLOT_LABEL[slot]} — kept your existing options.`)
+      setMealRegenerateError(
+        hadExistingOptions
+          ? `Couldn't refresh ${MEAL_SLOT_LABEL[slot]} — kept your existing options.`
+          : `Couldn't generate ${MEAL_SLOT_LABEL[slot]} — try again in a moment.`
+      )
     } finally {
       setIsGeneratingMeals(false)
     }
@@ -881,6 +893,7 @@ function App() {
     if (!profile?.id || !macros) return
     setIsGeneratingMeals(true)
     setMealRegenerateError(null)
+    const priorPools = mealPools
     try {
       const result = await generateMealPools({
         profileId: profile.id,
@@ -921,7 +934,15 @@ function App() {
       await clearAllMealPicksForDate(profile.id, todayDate)
 
       if (failedSlots.length > 0) {
-        setMealRegenerateError(`Couldn't refresh ${failedSlots.map(s => MEAL_SLOT_LABEL[s]).join(', ')} — kept the existing options there.`)
+        // Split by whether each failed slot actually had prior options to
+        // "keep" — a fresh plan whose lunch pool has always been empty gets
+        // an honest "couldn't generate" message, not a false "kept" claim.
+        const keptSlots = failedSlots.filter(s => (priorPools[s]?.length ?? 0) > 0)
+        const neverFilledSlots = failedSlots.filter(s => (priorPools[s]?.length ?? 0) === 0)
+        const parts: string[] = []
+        if (keptSlots.length > 0) parts.push(`Couldn't refresh ${keptSlots.map(s => MEAL_SLOT_LABEL[s]).join(', ')} — kept the existing options there.`)
+        if (neverFilledSlots.length > 0) parts.push(`Couldn't generate ${neverFilledSlots.map(s => MEAL_SLOT_LABEL[s]).join(', ')} — try again in a moment.`)
+        setMealRegenerateError(parts.join(' '))
       }
     } catch {
       setMealRegenerateError("Couldn't reach the meal generator — your existing plan is unchanged. Try again in a moment.")

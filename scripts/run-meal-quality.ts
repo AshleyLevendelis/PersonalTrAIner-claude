@@ -17,7 +17,7 @@ if (fs.existsSync(envPath)) {
 }
 
 import { setSupabaseClient } from '../src/lib/supabase'
-import { generateMealPools, assembleDay, computeSlotBudgets, checkSlotAppropriate, isExoticOption, DAY_CALORIE_TOLERANCE, DAY_PROTEIN_FLOOR_RATIO, type PoolOption } from '../src/lib/meal-generation'
+import { generateMealPools, assembleDay, computeSlotBudgets, checkSlotAppropriate, isExoticOption, DAY_CALORIE_TOLERANCE, DAY_PROTEIN_FLOOR_RATIO, DAY_PROTEIN_CEILING_RATIO, type PoolOption } from '../src/lib/meal-generation'
 import { computeMealMacros } from '../src/lib/food-db'
 import { validateMealAgainstDiet, type DietaryPreference } from '../src/lib/diet-rules'
 import { getStaticDailyMacros } from '../src/lib/macro-calculator'
@@ -263,6 +263,29 @@ async function gradeProfile(g: GridProfile, profileId: string): Promise<ProfileR
     result.hardFailures.push({
       profileLabel: g.label, check: 'day_tolerance',
       detail: `assembled day ${Math.round(day.totals.calories)}kcal/${Math.round(day.totals.protein)}g vs target ${targets.calories}kcal/${targets.protein}g (need within ${DAY_CALORIE_TOLERANCE * 100}% cal, >=${DAY_PROTEIN_FLOOR_RATIO * 100}% protein)`,
+    })
+  }
+
+  // (h) a slot the day assembly explicitly couldn't fill — this must be a
+  // hard failure, not folded silently into pool_size's own count-based
+  // check: assembleDay itself is what a real session actually renders from,
+  // so this asserts the SAME structure the app renders, not just that
+  // generateMealPools produced enough raw options somewhere upstream.
+  if (day.missingSlots.length > 0) {
+    result.hardFailures.push({
+      profileLabel: g.label, check: 'missing_slot',
+      detail: `assembleDay could not fill: ${day.missingSlots.join(', ')} — the app would render this slot as empty (never silently folded into another slot's portions)`,
+    })
+  }
+
+  // (i) protein ceiling — the day-repair scale that closes a calorie gap is
+  // calorie-only and has no way to bound protein; assert the day never lands
+  // meaningfully above target protein (the QA-sweep-reported ~1.5x overshoot
+  // this class of check exists to catch).
+  if (targets.protein > 0 && day.totals.protein > targets.protein * DAY_PROTEIN_CEILING_RATIO) {
+    result.hardFailures.push({
+      profileLabel: g.label, check: 'protein_ceiling',
+      detail: `assembled day protein ${Math.round(day.totals.protein)}g is ${(day.totals.protein / targets.protein).toFixed(2)}x target ${targets.protein}g (ceiling ${DAY_PROTEIN_CEILING_RATIO}x)`,
     })
   }
 
