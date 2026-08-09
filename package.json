@@ -20,6 +20,7 @@
     "test:no-forked-state": "tsx scripts/test-no-forked-state.ts",
     "test:pending-actions": "tsx scripts/test-pending-actions.ts",
     "test:memory": "tsx scripts/test-memory.ts",
+    "test:diet-tag-sync": "tsx scripts/test-diet-tag-sync.ts",
     "test:grocery": "tsx scripts/test-grocery.ts",
     "test:dashboard": "tsx scripts/test-dashboard.ts",
     "test:timers": "tsx scripts/test-timers.ts",

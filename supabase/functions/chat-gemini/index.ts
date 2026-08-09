@@ -737,6 +737,18 @@ const toolDeclarations = [
   },
 ];
 
+// Dietary-safety audit fix — this tag list must match diet-rules.ts's
+// DIETARY_PREFERENCES exactly (that file is the canonical source; this
+// function can't import it directly, Deno edge functions can't reach across
+// the src/lib boundary — see imperative-classifier.ts's header comment for
+// why). Previously checked "pork-free"/"seafood-free", neither of which is
+// a real onboarding value, while never checking "shellfish-free" (the real
+// one) at all — a shellfish-allergic user got zero enforcement text here.
+// scripts/test-diet-tag-sync.ts statically asserts every DIETARY_PREFERENCES
+// tag (except 'mediterranean', a documented no-op per diet-rules.ts) appears
+// in this function, and that "pork-free"/"seafood-free" don't reappear —
+// keep both files' tag sets in lockstep by re-running that gate after any
+// edit here.
 function buildDietarySafetyBlock(preferences: string[]): string {
   if (!preferences || preferences.length === 0) return "";
 
@@ -757,6 +769,9 @@ function buildDietarySafetyBlock(preferences: string[]): string {
   if (preferences.includes("kosher")) {
     rules.push("KOSHER: No pork, no shellfish, no mixing of meat and dairy in the same meal. Meat must be from kosher animals.");
   }
+  if (preferences.includes("paleo")) {
+    rules.push("PALEO: No grains, legumes, dairy, or refined sugar. Prioritize meat, fish, eggs, vegetables, fruit, nuts, and seeds.");
+  }
   if (preferences.includes("dairy-free")) {
     rules.push("DAIRY-FREE: No milk, cheese, yogurt, butter, cream, whey protein, or any dairy derivative. Use plant-based alternatives.");
   }
@@ -772,17 +787,17 @@ function buildDietarySafetyBlock(preferences: string[]): string {
   if (preferences.includes("keto")) {
     rules.push("KETO: When suggesting individual foods, prioritize fatty proteins (salmon, ribeye, thighs), healthy oils (olive, avocado, coconut), nuts, seeds, and above-ground vegetables over grains, tubers, legumes, or high-sugar fruits (banana, mango, grapes). HONESTY NOTE (macro-accuracy round): the app does NOT actually derive a genuine keto daily target — it has no sub-50g carb cap anywhere in its calorie/macro calculation, so the numbers on the Nutrition tab are not keto-accurate even though this preference is recorded. A real keto mode needs an inverted derivation (carbs as a hard cap, fat as the remainder, protein moderated) that this app doesn't have yet. If the user asks whether their plan is keto, or asks you to build them a keto plan, say this plainly rather than claiming support — don't produce a plan and call it keto.");
   }
-  if (preferences.includes("pork-free")) {
-    rules.push("PORK-FREE: Exclude ALL pork products entirely — no bacon, ham, prosciutto, pancetta, pork tenderloin, pork loin, chorizo, or any pork-derived ingredient.");
-  }
   if (preferences.includes("egg-free")) {
     rules.push("EGG-FREE: No whole eggs, egg whites, egg yolks, or any egg-derived ingredients (mayonnaise, meringue, egg wash). Zero matching allergens may pass into the ingredients array.");
   }
   if (preferences.includes("soy-free")) {
     rules.push("SOY-FREE: No tofu, tempeh, TVP (textured vegetable protein), soy sauce, tamari, edamame, miso, soy milk, or soy lecithin. Zero matching allergens may pass into the ingredients array.");
   }
-  if (preferences.includes("seafood-free")) {
-    rules.push("SEAFOOD-FREE: No fish of any kind (salmon, tuna, cod, halibut, sardines, mackerel, swordfish, sea bass, barramundi) and no shellfish (shrimp, prawns, crab, lobster, scallops, mussels). Zero matching allergens may pass into the ingredients array.");
+  if (preferences.includes("shellfish-free")) {
+    rules.push("SHELLFISH-FREE: No shellfish of any kind (shrimp, prawns, crab, lobster, scallops, mussels, oysters, clams). Zero matching allergens may pass into the ingredients array.");
+  }
+  if (preferences.includes("low-fodmap")) {
+    rules.push("LOW-FODMAP: Avoid garlic, onion, wheat, and high-fructose fruit where possible.");
   }
 
   return `\n\nCRITICAL DIETARY SAFETY RULES (HIGHEST PRIORITY - VIOLATION IS UNACCEPTABLE):
@@ -791,7 +806,7 @@ You MUST strictly adhere to ALL of the following constraints. Breaking any of th
 
 ${rules.join("\n")}
 
-Strictly enforce all allergy guardrails (Egg-Free, Soy-Free, Seafood-Free, Pork-Free). If any of these boundaries are active, zero matching allergens may pass into the ingredients array.
+Strictly enforce all allergy guardrails (Egg-Free, Soy-Free, Nut-Free, Shellfish-Free). If any of these boundaries are active, zero matching allergens may pass into the ingredients array.
 When suggesting replacements or alternatives, EVERY suggestion MUST comply with these restrictions. NEVER suggest a food that violates these constraints.`;
 }
 
@@ -907,7 +922,7 @@ You're genuinely useful on training and nutrition: form cues, why a movement is 
 - Workout Schedule ("What are we doing Friday?"): Inspect the schedule context. Give a 1-2 sentence summary of the session focus first. Only list full exercise sets/reps if explicitly requested.
 - Meal Lookups ("What should I eat tonight?"): Check today_meal_plan first. If a meal is scheduled, reference it directly.
 - Empty Meal Plan Fallback: If today_meal_plan is null/empty, suggest 1 quick meal idea based on remaining_macros_today. Never throw an error or force a save.
-- Dietary Restrictions: Strictly enforce restrictions in user_profile.dietary_preferences (e.g., Halal, Pork-Free, Dairy-Free, Vegetarian).
+- Dietary Restrictions: Strictly enforce restrictions in user_profile.dietary_preferences (e.g., Halal, Shellfish-Free, Dairy-Free, Vegetarian).
 
 === 3. SORENESS & FATIGUE COACHING ===
 - If the user feels lazy, sore, or tired, give human coach advice first (e.g., offering to trim 1 set off each exercise to keep momentum going without burning out).

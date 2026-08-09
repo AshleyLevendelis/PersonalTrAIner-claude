@@ -85,7 +85,10 @@ function pickRandom<T>(arr: T[], count: number): T[] {
  * Prompt-level dietary guidance. This is explicitly a NICETY — a good-faith
  * attempt to get the first proposal right and reduce wasted regeneration
  * rounds — not the guard. diet-rules.ts's validateMealAgainstDiet is the
- * guard, applied to every proposal after this function returns.
+ * guard, applied to every proposal after this function returns. Already
+ * correct/complete against diet-rules.ts's DIETARY_PREFERENCES (confirmed
+ * during the dietary-safety audit — this file has no drift, chat-gemini's
+ * copy did) — kept that way by scripts/test-diet-tag-sync.ts.
  */
 function buildDietarySafetyBlock(preferences: string[]): string {
   if (!preferences || preferences.length === 0) return "";

@@ -7,6 +7,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Card, CardContent } from '@/components/ui/card'
 import { ChevronLeft, Dumbbell } from 'lucide-react'
 import { OptionCard } from './OptionCard'
+import { DIETARY_PREFERENCES, type DietaryPreference } from '@/lib/diet-rules'
 import type { UserProfile, FitnessGoal, SessionDuration, TrainingTime, WorkoutSplit, EquipmentAccess, TrainingStyle, TrainingExperience, CoachingPersona, MacroCalculationMode, RecoveryCapacity, ConditioningPreference, ActivityLevel, CookingTimePreference, BreakfastStyle } from '@/lib/types'
 
 type WeightUnit = 'kg' | 'lbs'
@@ -114,24 +115,34 @@ export const INJURY_OPTIONS: { value: string; icon: string; label: string }[] = 
   { value: 'elbows', icon: '💪', label: 'Elbows' },
 ]
 
-export const DIETARY_OPTIONS: { value: string; icon: string; label: string }[] = [
-  { value: 'vegetarian', icon: '🥬', label: 'Vegetarian' },
-  { value: 'vegan', icon: '🌱', label: 'Vegan' },
-  { value: 'pescatarian', icon: '🐟', label: 'Pescatarian' },
-  { value: 'keto', icon: '🥑', label: 'Keto' },
-  { value: 'low-carb', icon: '🥩', label: 'Low-Carb' },
-  { value: 'halal', icon: '☪️', label: 'Halal' },
-  { value: 'kosher', icon: '✡️', label: 'Kosher' },
-  { value: 'paleo', icon: '🦴', label: 'Paleo' },
-  { value: 'mediterranean', icon: '🫒', label: 'Mediterranean' },
-  { value: 'dairy-free', icon: '🥛', label: 'Dairy-Free' },
-  { value: 'gluten-free', icon: '🌾', label: 'Gluten-Free' },
-  { value: 'nut-free', icon: '🥜', label: 'Nut-Free' },
-  { value: 'egg-free', icon: '🥚', label: 'Egg-Free' },
-  { value: 'soy-free', icon: '🫘', label: 'Soy-Free' },
-  { value: 'shellfish-free', icon: '🦐', label: 'Shellfish-Free' },
-  { value: 'low-fodmap', icon: '🧬', label: 'Low-FODMAP' },
-]
+// Dietary-safety audit fix — values come from diet-rules.ts's
+// DIETARY_PREFERENCES (itself derived from FORBIDDEN_TAGS's keys), not
+// hand-typed here. This is what makes it structurally impossible for the
+// onboarding picker to offer a tag the enforcement code doesn't recognize,
+// or vice versa: TypeScript's excess/missing-property checks on the
+// Record<DietaryPreference, ...> below fail to compile if the two ever
+// disagree. Only icon/label (presentation, not enforcement) stay hand-authored.
+const DIETARY_META: Record<DietaryPreference, { icon: string; label: string }> = {
+  vegetarian: { icon: '🥬', label: 'Vegetarian' },
+  vegan: { icon: '🌱', label: 'Vegan' },
+  pescatarian: { icon: '🐟', label: 'Pescatarian' },
+  keto: { icon: '🥑', label: 'Keto' },
+  'low-carb': { icon: '🥩', label: 'Low-Carb' },
+  halal: { icon: '☪️', label: 'Halal' },
+  kosher: { icon: '✡️', label: 'Kosher' },
+  paleo: { icon: '🦴', label: 'Paleo' },
+  mediterranean: { icon: '🫒', label: 'Mediterranean' },
+  'dairy-free': { icon: '🥛', label: 'Dairy-Free' },
+  'gluten-free': { icon: '🌾', label: 'Gluten-Free' },
+  'nut-free': { icon: '🥜', label: 'Nut-Free' },
+  'egg-free': { icon: '🥚', label: 'Egg-Free' },
+  'soy-free': { icon: '🫘', label: 'Soy-Free' },
+  'shellfish-free': { icon: '🦐', label: 'Shellfish-Free' },
+  'low-fodmap': { icon: '🧬', label: 'Low-FODMAP' },
+}
+
+export const DIETARY_OPTIONS: { value: DietaryPreference; icon: string; label: string }[] =
+  DIETARY_PREFERENCES.map(value => ({ value, ...DIETARY_META[value] }))
 
 // Maps to the STATIC_PAL multipliers in macro-calculator.ts (1.2 / 1.375 /
 // 1.55 / 1.725). Four options rather than five: 'very_active' (1.9,

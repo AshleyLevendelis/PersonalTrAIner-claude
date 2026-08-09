@@ -77,6 +77,21 @@ const FORBIDDEN_TAGS: Record<DietaryPreference, TagKey[]> = {
   'low-fodmap': ['is_high_fodmap'],
 }
 
+/**
+ * Dietary-safety audit fix — the canonical list of valid preference values,
+ * derived from FORBIDDEN_TAGS's own keys rather than hand-typed, so it's
+ * structurally impossible for "the list of preferences that exist" and "the
+ * list of preferences this module enforces" to diverge from each other.
+ * OnboardingFlow.tsx's DIETARY_OPTIONS is built FROM this array (single
+ * source of truth on the src/lib side). The two Deno-side edge functions
+ * (generate-meals, chat-gemini) can't import across the src/lib boundary —
+ * see imperative-classifier.ts's header comment for why — so their own
+ * hand-duplicated tag lists are instead guarded by
+ * scripts/test-diet-tag-sync.ts, which fails if either drifts from this
+ * export.
+ */
+export const DIETARY_PREFERENCES: DietaryPreference[] = Object.keys(FORBIDDEN_TAGS) as DietaryPreference[]
+
 export interface DietViolation {
   ingredient: string
   preference: DietaryPreference | 'kosher-meat-dairy-mix'
