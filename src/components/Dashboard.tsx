@@ -11,7 +11,6 @@ import { useActiveSession } from '@/hooks/useActiveSession'
 import { getAppNow } from '@/lib/dev-clock'
 import { tabHash } from '@/lib/app-route'
 import { loadDashboardData, type DashboardData } from '@/lib/dashboard-data'
-import { getAllLogs as getAllWaterLogs, logWater, undoLog as undoWaterLog, setWaterTargetMl, type WaterLogRow } from '@/lib/water-store'
 import { getStepsForDate, logStepsManual, type DailyStepsRow } from '@/lib/steps-store'
 import type { UserProfile, MacroTargets, WorkoutDay, MesocycleWeek } from '@/lib/types'
 
@@ -21,34 +20,62 @@ interface DashboardProps {
   exercisePlan: WorkoutDay[]
   mesocycle: MesocycleWeek[]
   planCreatedAt?: string
-  onWaterChanged?: () => void
 }
 
-const WATER_QUICK_ADD_ML = [250, 500]
+// Tab-restructure handoff — Dashboard.tsx no longer owns the macro ring
+// meter or water logging (both moved to NutritionDisplay.tsx). Its "Today"
+// section is now two read-only tiles that deep-link into Nutrition; the
+// small calorie-tile ring below is a single indicator ring, not the
+// multi-macro meter that used to live here.
+const CALORIE_TILE_RING_R = 14
+const CALORIE_TILE_RING_CIRC = 2 * Math.PI * CALORIE_TILE_RING_R
 
-// Turn 10 ring meter — classic radial-progress technique (stroke-dasharray of
-// a fraction of the circle's circumference, rotated -90deg to start at 12
-// o'clock). Four concentric rings share one <svg>: calories (outermost) then
-// protein/carbs/fat nested inside, each fading in text-color opacity to match
-// the legend rows below. r/stroke-width match the design doc's literal values.
-const RINGS = [
-  { key: 'calories', r: 40, strokeWidth: 8 },
-  { key: 'protein', r: 30, strokeWidth: 5 },
-  { key: 'carbs', r: 22, strokeWidth: 5 },
-  { key: 'fat', r: 14, strokeWidth: 5 },
-] as const
-const RING_CIRC: Record<string, number> = Object.fromEntries(RINGS.map(r => [r.key, 2 * Math.PI * r.r]))
+/** Weigh-in trend — hand-authored SVG, no charting library (matches this
+ * app's existing convention for the ring meters). x is spread evenly across
+ * the series (not date-proportional — a gap in logging doesn't visually
+ * compress); y maps min/max weight to an 8-48 band inside the 60-tall
+ * viewBox, leaving 8px headroom top and 12px bottom, per the design
+ * reference. A flat (single-value or all-equal) series renders as a
+ * straight line at the vertical midpoint rather than dividing by zero. */
+function WeighInTrendChart({ series }: { series: { date: string; kg: number }[] }) {
+  const width = 320
+  const height = 60
+  const topY = 8
+  const bottomY = 48
+  const kgs = series.map(p => p.kg)
+  const min = Math.min(...kgs)
+  const max = Math.max(...kgs)
+  const range = max - min
+  const points = series.map((p, i) => {
+    const x = series.length > 1 ? (i / (series.length - 1)) * width : width / 2
+    const y = range > 0 ? bottomY - ((p.kg - min) / range) * (bottomY - topY) : (topY + bottomY) / 2
+    return { x, y }
+  })
+  const lineStr = points.map(p => `${p.x},${p.y}`).join(' ')
+  const areaStr = `${points[0].x},${height} ${lineStr} ${points[points.length - 1].x},${height}`
+  const last = points[points.length - 1]
+  return (
+    <svg viewBox={`0 0 ${width} ${height}`} width="100%" height={height} preserveAspectRatio="none" className="mt-2.5 block">
+      <polygon points={areaStr} fill="rgba(var(--glow-rgb),.10)" />
+      <polyline
+        points={lineStr}
+        fill="none"
+        stroke="var(--primary)"
+        strokeWidth="2"
+        vectorEffect="non-scaling-stroke"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="glow-icon"
+      />
+      <circle cx={last.x} cy={last.y} r="3.5" fill="var(--primary)" />
+    </svg>
+  )
+}
 
-export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreatedAt, onWaterChanged }: DashboardProps) {
+export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreatedAt }: DashboardProps) {
   const activeSession = useActiveSession()
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
-
-  const [waterLogs, setWaterLogs] = useState<WaterLogRow[]>([])
-  const [waterTarget, setWaterTarget] = useState(profile.water_target_ml ?? 2000)
-  const [editingTarget, setEditingTarget] = useState(false)
-  const [targetInput, setTargetInput] = useState(String(profile.water_target_ml ?? 2000))
-  const [lastWaterLog, setLastWaterLog] = useState<WaterLogRow | null>(null)
 
   const [steps, setSteps] = useState<DailyStepsRow | null>(null)
   const [stepsInput, setStepsInput] = useState('')
@@ -71,7 +98,6 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
 
   useEffect(() => {
     if (!profile.id) return
-    void getAllWaterLogs(profile.id).then(setWaterLogs)
     void getStepsForDate(profile.id, activeSession.date || '').then(setSteps).catch(() => setSteps(null))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile.id, activeSession.date])
@@ -80,30 +106,6 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
     return (
       <div className="rounded-xl bg-card py-12 text-center text-sm text-muted-foreground">Loading your day…</div>
     )
-  }
-
-  const todayWaterMl = waterLogs.filter(l => l.date === activeSession.date).reduce((s, l) => s + l.amount_ml, 0)
-
-  const handleAddWater = (amountMl: number) => {
-    if (!profile.id) return
-    const row = logWater({ profileId: profile.id, date: activeSession.date, amountMl, source: 'manual' })
-    setWaterLogs(prev => [...prev, row])
-    setLastWaterLog(row)
-    void onWaterChanged?.()
-  }
-  const handleUndoWater = () => {
-    if (!lastWaterLog) return
-    undoWaterLog(lastWaterLog)
-    setWaterLogs(prev => prev.filter(l => l.id !== lastWaterLog.id))
-    setLastWaterLog(null)
-    void onWaterChanged?.()
-  }
-  const handleSaveTarget = async () => {
-    const n = Number(targetInput)
-    if (!profile.id || !Number.isFinite(n) || n <= 0) { setEditingTarget(false); return }
-    setWaterTarget(n)
-    setEditingTarget(false)
-    await setWaterTargetMl(profile.id, n)
   }
 
   const handleLogSteps = async () => {
@@ -199,88 +201,51 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
           </div>
         )}
 
-        {/* 4. Today's numbers — turn 4: a glowing ring meter (calories outer,
-            protein inner) replaces the flat progress-line tiles; violet is
-            ambience-only now, so the label loses its glow. Water/Steps drop
-            out of the tile grid into plain hairline-divided rows. */}
+        {/* 4. Today — tab restructure: the ring meter and water logging move
+            to Nutrition (one owner per fact). What's left here is two
+            read-only tiles that deep-link into Nutrition — Home never
+            mutates nutrition state, it only shows where things stand and
+            hands off. */}
         <p className="ds-label mt-8">Today</p>
-        <div className="mt-[18px] flex items-center gap-[18px]">
-          <svg width="112" height="112" viewBox="0 0 112 112" className="shrink-0">
-            {RINGS.map(r => (
-              <circle key={`track-${r.key}`} cx="56" cy="56" r={r.r} fill="none" stroke="var(--surface-raised)" strokeWidth={r.strokeWidth} />
-            ))}
-            {RINGS.map((r, i) => {
-              const eaten = r.key === 'calories' ? data.caloriesEaten : r.key === 'protein' ? data.proteinEaten : r.key === 'carbs' ? data.carbsEaten : data.fatEaten
-              const target = r.key === 'calories' ? data.caloriesTarget : r.key === 'protein' ? data.proteinTarget : r.key === 'carbs' ? data.carbsTarget : data.fatTarget
-              const circ = RING_CIRC[r.key]
-              return (
-                <circle
-                  key={`fill-${r.key}`}
-                  cx="56" cy="56" r={r.r} fill="none" strokeWidth={r.strokeWidth} strokeLinecap="round"
-                  stroke={i === 0 ? 'var(--primary)' : 'currentColor'}
-                  strokeOpacity={i === 0 ? undefined : 0.88 - i * 0.2}
-                  strokeDasharray={`${circ * Math.min(1, target > 0 ? eaten / target : 0)} ${circ}`}
-                  transform="rotate(-90 56 56)"
-                  className={i === 0 ? 'glow-icon' : undefined}
-                  style={{ transition: 'stroke-dasharray 400ms ease' }}
-                />
-              )
-            })}
-          </svg>
-          <div className="flex min-w-0 flex-1 flex-col gap-3.5">
+        <div className="mt-3.5 grid grid-cols-2 gap-2.5">
+          <button
+            type="button"
+            onClick={() => { window.location.hash = tabHash('nutrition') }}
+            className="flex flex-col items-start gap-2.5 rounded-2xl p-3.5 text-left"
+            style={{ background: 'var(--surface-raised)' }}
+          >
+            <svg width="34" height="34" viewBox="0 0 34 34" className="shrink-0">
+              <circle cx="17" cy="17" r={CALORIE_TILE_RING_R} fill="none" stroke="rgba(69,60,142,.9)" strokeWidth="4" />
+              <circle
+                cx="17" cy="17" r={CALORIE_TILE_RING_R} fill="none" stroke="var(--primary)" strokeWidth="4" strokeLinecap="round"
+                strokeDasharray={`${CALORIE_TILE_RING_CIRC * Math.min(1, data.caloriesTarget > 0 ? data.caloriesEaten / data.caloriesTarget : 0)} ${CALORIE_TILE_RING_CIRC}`}
+                transform="rotate(-90 17 17)"
+              />
+            </svg>
             <div>
-              <p className="ds-num-mega tabular-mono text-[#E4FCF4] glow-mint-lg">{Math.round(data.caloriesEaten)}</p>
-              <p className="mt-1 text-[10.5px] uppercase tracking-[.16em] text-muted-foreground">
-                kcal · of <span className="tabular-mono">{Math.round(data.caloriesTarget)}</span>
-              </p>
-              {data.caloriesEaten === 0 && (
-                <button className="mt-1 text-left text-xs text-primary glow-mint" onClick={() => { window.location.hash = tabHash('nutrition') }}>Log a meal</button>
-              )}
+              <p className="tabular-mono text-[19px] font-bold">{Math.round(data.caloriesEaten)}</p>
+              <p className="text-[9px] uppercase tracking-[.14em] text-muted-foreground">of {Math.round(data.caloriesTarget)} kcal</p>
             </div>
-            <div className="flex flex-col gap-[7px]">
-              {([
-                { label: 'Protein', eaten: data.proteinEaten, target: data.proteinTarget, opacity: 0.88 },
-                { label: 'Carbs', eaten: data.carbsEaten, target: data.carbsTarget, opacity: 0.66 },
-                { label: 'Fat', eaten: data.fatEaten, target: data.fatTarget, opacity: 0.48 },
-              ] as const).map(row => (
-                <div key={row.label} className="flex items-baseline gap-[9px]">
-                  <span className="h-[9px] w-[9px] shrink-0 rounded-[3px]" style={{ background: `color-mix(in oklab, var(--text-tertiary) ${Math.round(row.opacity * 100)}%, transparent)` }} />
-                  <span className="flex-1 text-[10px] uppercase tracking-[.16em] text-muted-foreground">{row.label}</span>
-                  <span className="tabular-mono text-[12.5px]">
-                    {Math.round(row.eaten)}<span className="text-muted-foreground"> / {Math.round(row.target)}g</span>
-                  </span>
-                </div>
-              ))}
+            <span className="text-[11px] font-semibold text-primary">Nutrition ›</span>
+          </button>
+
+          <div
+            className="flex flex-col items-start gap-2.5 rounded-2xl p-3.5 text-left"
+            style={{ background: 'var(--surface-raised)' }}
+          >
+            <div>
+              <p className="tabular-mono text-[19px] font-bold">{data.waterMl} <span className="text-[13px] font-medium text-muted-foreground">ml</span></p>
+              <p className="text-[9px] uppercase tracking-[.14em] text-muted-foreground">of {data.waterTargetMl} water</p>
             </div>
+            <div className="h-[2px] w-full rounded-full" style={{ background: 'var(--hairline)' }}>
+              <div className="h-[2px] rounded-full bg-primary glow-mint-box" style={{ width: `${data.waterTargetMl > 0 ? Math.min(100, (data.waterMl / data.waterTargetMl) * 100) : 0}%` }} />
+            </div>
+            <button type="button" onClick={() => { window.location.hash = tabHash('nutrition') }} className="text-[11px] font-semibold text-primary">Nutrition ›</button>
           </div>
         </div>
 
+        {/* Steps — unchanged; still logged here. */}
         <div className="mt-5 flex flex-col">
-          <div className="flex items-baseline justify-between py-3" style={{ borderTop: '1px solid var(--hairline)' }}>
-            <span className="text-[13px] text-text-tertiary">Water</span>
-            {editingTarget ? (
-              <div className="flex items-center gap-1">
-                <input
-                  type="number"
-                  value={targetInput}
-                  onChange={e => setTargetInput(e.target.value)}
-                  className="h-7 w-16 min-w-0 rounded-md bg-[color:var(--surface-raised)] px-1.5 text-xs"
-                />
-                <Button size="sm" variant="ghost" className="h-7 shrink-0 px-1.5 text-[10px]" onClick={handleSaveTarget}>Save</Button>
-              </div>
-            ) : (
-              <span className="flex flex-wrap items-baseline justify-end gap-x-3 gap-y-1">
-                <span className="tabular-mono text-[13px]">{todayWaterMl} / {waterTarget} ml</span>
-                {WATER_QUICK_ADD_ML.map(ml => (
-                  <button key={ml} className="text-xs font-semibold text-primary glow-mint" onClick={() => handleAddWater(ml)}>+{ml}</button>
-                ))}
-                <button className="text-xs text-muted-foreground" onClick={() => { setTargetInput(String(waterTarget)); setEditingTarget(true) }}>edit</button>
-                {lastWaterLog && (
-                  <button className="text-xs text-muted-foreground" onClick={handleUndoWater}>undo</button>
-                )}
-              </span>
-            )}
-          </div>
           <div className="flex items-baseline justify-between py-3" style={{ borderTop: '1px solid var(--hairline)' }}>
             <span className="text-[13px] text-text-tertiary">Steps</span>
             {steps ? (
@@ -298,6 +263,42 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
               </div>
             )}
           </div>
+        </div>
+
+        {/* Weigh-in — NEW trend chart (tab restructure). Read-only summary +
+            graph; logging a new weigh-in stays exclusively on Nutrition's
+            WeighInCard (per the handoff's ownership table: "weigh-in →
+            Nutrition, unchanged") — this block never writes. */}
+        <div className="mt-5 pt-4" style={{ borderTop: '1px solid var(--hairline)' }}>
+          <div className="flex items-baseline justify-between">
+            <span className="text-[13px] text-text-tertiary">Weigh-in</span>
+            {data.weightSeries.length > 0 && (
+              <span className="text-[13px]">
+                <span className="tabular-mono font-semibold">{data.weightSeries[data.weightSeries.length - 1].kg.toFixed(1)} kg</span>
+                <span className="ml-1.5 text-muted-foreground">
+                  {data.weightSeries[data.weightSeries.length - 1].date === data.today ? 'today ✓' : data.weightSeries[data.weightSeries.length - 1].date}
+                </span>
+              </span>
+            )}
+          </div>
+          {data.weightSeries.length === 0 ? (
+            <p className="mt-3 text-xs text-muted-foreground">Log a weigh-in to see your trend here.</p>
+          ) : (
+            <>
+              <WeighInTrendChart series={data.weightSeries} />
+              <div className="mt-1.5 flex items-baseline justify-between">
+                <span className="text-[10px] uppercase tracking-[.12em] text-muted-foreground">{data.weightSeries.length} weigh-in{data.weightSeries.length === 1 ? '' : 's'}</span>
+                {data.weightSeries.length > 1 && (
+                  <span className="text-[11px] font-semibold text-primary">
+                    {(() => {
+                      const delta = data.weightSeries[data.weightSeries.length - 1].kg - data.weightSeries[0].kg
+                      return `${delta > 0 ? '+' : ''}${delta.toFixed(1)} kg since week 1`
+                    })()}
+                  </span>
+                )}
+              </div>
+            </>
+          )}
         </div>
 
         {/* 5. Progress — the section rule is gone; the label does that work. */}

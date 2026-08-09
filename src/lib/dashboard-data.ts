@@ -13,6 +13,7 @@
 import { getTodayLedger, type MealMacros } from './meal-store'
 import { getRecentLogs, getRecentCardioLogs } from './daily-tracking'
 import { getRecentWeighIns } from './nutrition-targets'
+import { getTotalForDate as getWaterTotalForDate } from './water-store'
 import { getPRCache } from './pr-engine'
 import { getActiveGoals } from './memory-store'
 import { computeStreak, type StreakDayInput } from './streak'
@@ -47,6 +48,11 @@ export interface RecentPR {
   date: string
 }
 
+export interface WeightSeriesPoint {
+  date: string
+  kg: number
+}
+
 export interface DashboardData {
   today: string
   dayName: string
@@ -62,10 +68,15 @@ export interface DashboardData {
   fatEaten: number
   fatTarget: number
   weightTrend: WeightTrendResult | null
+  /** Oldest-first — for the Home trend chart (tab-restructure). Same source as weightTrend (getRecentWeighIns), just re-mapped/re-ordered for charting rather than averaging. */
+  weightSeries: WeightSeriesPoint[]
   recentPRs: RecentPR[]
   streak: number
   whatsLeftLine: string | null
   phase: PhaseContext | null
+  /** Tab restructure — Home's calorie/water tiles are read-only nav tiles into Nutrition; the read itself still belongs here (the one aggregator), not in Dashboard.tsx, which no longer imports water-store at all. */
+  waterMl: number
+  waterTargetMl: number
 }
 
 const KNOWN_LIFT_FIELD: Record<string, keyof Pick<UserProfile, 'known_squat_kg' | 'known_bench_kg' | 'known_deadlift_kg'>> = {
@@ -144,6 +155,8 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
 
   // ---- Nutrition ----------------------------------------------------------
   const ledger = await getTodayLedger(profileId, todayStr, macros)
+  const waterMl = await getWaterTotalForDate(profileId, todayStr)
+  const waterTargetMl = profile.water_target_ml ?? 2000
 
   // ---- Weight trend ---------------------------------------------------------
   const weighIns = await getRecentWeighIns(profileId, 14)
@@ -154,6 +167,9 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
     todayStr,
     weightGoal ? { targetKg: weightGoal.target_value!, baselineKg: weightGoal.baseline_value! } : null,
   )
+  // getRecentWeighIns returns newest-first; the Home trend chart plots
+  // left-to-right chronologically, so this is the one place that reverses it.
+  const weightSeries: WeightSeriesPoint[] = [...weighIns].reverse().map(w => ({ date: w.date, kg: w.weight_kg }))
 
   // ---- Recent PRs -----------------------------------------------------------
   const prCache = getPRCache(profileId)
@@ -276,10 +292,13 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
     fatEaten: ledger.eaten.fat,
     fatTarget: ledger.targets.fat,
     weightTrend,
+    weightSeries,
     recentPRs,
     streak: streakResult.currentStreak,
     whatsLeftLine,
     phase,
+    waterMl,
+    waterTargetMl,
   }
 }
 
