@@ -17,7 +17,7 @@ if (fs.existsSync(envPath)) {
 }
 
 import { setSupabaseClient } from '../src/lib/supabase'
-import { generateMealPools, assembleDay, computeSlotBudgets, checkSlotAppropriate, isExoticOption, DAY_CALORIE_TOLERANCE, DAY_PROTEIN_FLOOR_RATIO, DAY_PROTEIN_CEILING_RATIO, type PoolOption } from '../src/lib/meal-generation'
+import { generateMealPools, assembleDay, computeSlotBudgets, checkSlotAppropriate, isExoticOption, DAY_CALORIE_TOLERANCE, DAY_PROTEIN_LOWER_RATIO, DAY_PROTEIN_UPPER_RATIO, DAY_CARB_TOLERANCE, DAY_FAT_TOLERANCE, type PoolOption } from '../src/lib/meal-generation'
 import { computeMealMacros } from '../src/lib/food-db'
 import { validateMealAgainstDiet, type DietaryPreference } from '../src/lib/diet-rules'
 import { getStaticDailyMacros } from '../src/lib/macro-calculator'
@@ -88,7 +88,7 @@ function buildGrid(): GridProfile[] {
 
 interface HardFailure {
   profileLabel: string
-  check: 'dietary_violation' | 'day_tolerance' | 'macro_drift' | 'pool_size' | 'unresolvable_ingredient' | 'slot_appropriateness' | 'exotic_cuisine_cap'
+  check: 'dietary_violation' | 'day_tolerance' | 'macro_drift' | 'pool_size' | 'unresolvable_ingredient' | 'slot_appropriateness' | 'exotic_cuisine_cap' | 'missing_slot' | 'protein_band' | 'carb_tolerance' | 'fat_tolerance'
   detail: string
 }
 
@@ -257,12 +257,14 @@ async function gradeProfile(g: GridProfile, profileId: string): Promise<ProfileR
     }
   }
 
-  // (b) day within tolerance
+  // (b) day within tolerance — macro-accuracy round: all four macros now
+  // gate this, not just calories+protein-floor (see meal-generation.ts's
+  // dayWithinTolerance doc comment).
   const day = assembleDay(accepted, targets)
   if (!day.withinTolerance && Object.keys(day.chosen).length > 0) {
     result.hardFailures.push({
       profileLabel: g.label, check: 'day_tolerance',
-      detail: `assembled day ${Math.round(day.totals.calories)}kcal/${Math.round(day.totals.protein)}g vs target ${targets.calories}kcal/${targets.protein}g (need within ${DAY_CALORIE_TOLERANCE * 100}% cal, >=${DAY_PROTEIN_FLOOR_RATIO * 100}% protein)`,
+      detail: `assembled day ${Math.round(day.totals.calories)}kcal / ${Math.round(day.totals.protein)}g protein / ${Math.round(day.totals.carbs)}g carbs / ${Math.round(day.totals.fat)}g fat vs target ${targets.calories}kcal / ${targets.protein}g / ${targets.carbs}g / ${targets.fat}g (need within ${DAY_CALORIE_TOLERANCE * 100}% cal, ${DAY_PROTEIN_LOWER_RATIO * 100}-${DAY_PROTEIN_UPPER_RATIO * 100}% protein, within ${DAY_CARB_TOLERANCE * 100}% carbs, within ${DAY_FAT_TOLERANCE * 100}% fat)`,
     })
   }
 
@@ -278,14 +280,33 @@ async function gradeProfile(g: GridProfile, profileId: string): Promise<ProfileR
     })
   }
 
-  // (i) protein ceiling — the day-repair scale that closes a calorie gap is
-  // calorie-only and has no way to bound protein; assert the day never lands
-  // meaningfully above target protein (the QA-sweep-reported ~1.5x overshoot
-  // this class of check exists to catch).
-  if (targets.protein > 0 && day.totals.protein > targets.protein * DAY_PROTEIN_CEILING_RATIO) {
+  // (i) protein band — the day-repair scale that closes a calorie gap is
+  // calorie-only and has no way to bound protein directly; assert the day
+  // never lands meaningfully above (or below) target protein. This is
+  // reported separately from the generic day_tolerance failure above so the
+  // breakdown shows WHICH macro diverged, not just that something did.
+  if (targets.protein > 0 && (day.totals.protein > targets.protein * DAY_PROTEIN_UPPER_RATIO || day.totals.protein < targets.protein * DAY_PROTEIN_LOWER_RATIO)) {
     result.hardFailures.push({
-      profileLabel: g.label, check: 'protein_ceiling',
-      detail: `assembled day protein ${Math.round(day.totals.protein)}g is ${(day.totals.protein / targets.protein).toFixed(2)}x target ${targets.protein}g (ceiling ${DAY_PROTEIN_CEILING_RATIO}x)`,
+      profileLabel: g.label, check: 'protein_band',
+      detail: `assembled day protein ${Math.round(day.totals.protein)}g is ${(day.totals.protein / targets.protein).toFixed(2)}x target ${targets.protein}g (band ${DAY_PROTEIN_LOWER_RATIO}x-${DAY_PROTEIN_UPPER_RATIO}x)`,
+    })
+  }
+
+  // (j) / (k) carb and fat divergence — macro-accuracy round: previously only
+  // calories and protein were hard-gated at the day level; carbs and fat
+  // could drift arbitrarily far from target with nothing catching it. Same
+  // looser tolerance the assembler itself targets (DAY_CARB_TOLERANCE /
+  // DAY_FAT_TOLERANCE), not a separately-tuned number.
+  if (targets.carbs > 0 && Math.abs(day.totals.carbs - targets.carbs) / targets.carbs > DAY_CARB_TOLERANCE) {
+    result.hardFailures.push({
+      profileLabel: g.label, check: 'carb_tolerance',
+      detail: `assembled day carbs ${Math.round(day.totals.carbs)}g vs target ${targets.carbs}g — ${(Math.abs(day.totals.carbs - targets.carbs) / targets.carbs * 100).toFixed(0)}% off (tolerance ${DAY_CARB_TOLERANCE * 100}%)`,
+    })
+  }
+  if (targets.fat > 0 && Math.abs(day.totals.fat - targets.fat) / targets.fat > DAY_FAT_TOLERANCE) {
+    result.hardFailures.push({
+      profileLabel: g.label, check: 'fat_tolerance',
+      detail: `assembled day fat ${Math.round(day.totals.fat)}g vs target ${targets.fat}g — ${(Math.abs(day.totals.fat - targets.fat) / targets.fat * 100).toFixed(0)}% off (tolerance ${DAY_FAT_TOLERANCE * 100}%)`,
     })
   }
 

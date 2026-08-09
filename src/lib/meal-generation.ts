@@ -31,7 +31,7 @@
 import { supabase, resolveEnv } from './supabase'
 import { computeMealMacros, type Macros100g } from './food-db'
 import { validateMealAgainstDiet } from './diet-rules'
-import { parseIngredientLines, scaleToTarget, isWithinCalorieTolerance, meetsProteinFloor, PROTEIN_CEILING_RATIO } from './portion-scaler'
+import { parseIngredientLines, scaleToTarget, isWithinCalorieTolerance, meetsProteinFloor } from './portion-scaler'
 import type { MacroTargets, CookingTimePreference, BreakfastStyle } from './types'
 import type { MealSlotName } from './meal-store'
 
@@ -301,16 +301,16 @@ export function verifyProposal(
     rejectLog.push(`[${slot}] "${proposal.name}": post-scale result (${finalComputed.kcal} kcal, ${finalComputed.protein}g protein) missed target (${budget.calories} kcal, ${budget.protein}g protein) even at a sane scale factor (${scaled.scaleFactor.toFixed(2)}x) — likely a macro-ratio mismatch scaling alone can't fix`)
     return null
   }
-  // A per-meal protein ceiling was tried here and reverted: this app's own
-  // generate-meals prompt deliberately steers every proposal toward protein
-  // density (see the "Steer generate-meals prompt toward protein density"
-  // work), so a same-ratio ceiling rejected the large majority of
+  // A per-meal protein ceiling was tried here and reverted: an earlier round
+  // of the generate-meals prompt steered every proposal to MAXIMISE protein
+  // density, so a same-ratio ceiling rejected the large majority of
   // proposals and collapsed pool sizes app-wide (confirmed live: 86 -> 52
-  // accepted options, pool_size failures 2 -> 23). The day-level ceiling in
-  // assembleDay (DAY_PROTEIN_CEILING_RATIO) still catches and reports real
-  // overshoot without that collateral cost — capping at the individual-meal
-  // layer needs the generation prompt's protein steering revisited first,
-  // not a symmetric per-meal gate bolted on here.
+  // accepted options, pool_size failures 2 -> 23). The macro-accuracy round
+  // reframed that prompt guidance around hitting the stated target rather
+  // than maximising it (see macroTargetGuidance in generate-meals/index.ts),
+  // which reduces the root cause without needing a per-meal gate here — the
+  // day-level band in assembleDay (DAY_PROTEIN_UPPER_RATIO) is still the
+  // actual backstop against whatever overshoot gets through.
 
   const prepBand = /\b(1[0-5]|[1-9])\s*(min|minute)/i.test(proposal.prep) ? 'quick' : proposal.prep.length > 0 ? 'standard' : 'unspecified'
 
@@ -486,20 +486,28 @@ async function persistPools(profileId: string, accepted: Partial<Record<MealSlot
 // totals, not just each slot's own budget in isolation. Slot budgets are
 // derived from a fixed ratio split, so a pool option that's individually
 // within its slot's ±7% tolerance can still combine with others into a day
-// that's off — this is the actual daily-total gate, at the tighter ±5%
-// calories / >=95% protein tolerance the day as a whole must meet.
+// that's off — this is the actual daily-total gate, at the tighter per-macro
+// bands below the day as a whole must meet.
+//
+// Macro-accuracy round: assembleDay used to be calorie-aware with protein as
+// a one-sided FLOOR (never penalised for overshooting) — the QA sweep found
+// this let assembled days land up to ~1.7x over target protein while
+// calories still looked fine, because nothing in the selection score or the
+// repair-scale gate ever pushed back on going too high, only too low. It's
+// now macro-aware across all four numbers: calories keep the tightest band
+// (the headline number), protein gets a real two-sided band, carbs/fat get
+// looser bands (they're the numbers meant to flex first — see the generation
+// prompt's own "hit all three macros" framing). If no combination reaches
+// every band, the closest combination ships as an honest miss
+// (withinTolerance: false) rather than silently accepting a wild overshoot.
 // ---------------------------------------------------------------------------
-
 export const DAY_CALORIE_TOLERANCE = 0.05
-export const DAY_PROTEIN_FLOOR_RATIO = 0.95
-// QA sweep finding: the day-repair scale below is calorie-only (it has no
-// way to bound protein), so folding a missing slot's whole calorie budget
-// into one dish could inflate protein ~1.5-1.9x target with no ceiling
-// anywhere in the pipeline. This caps how far the repaired day is allowed to
-// land above target protein before it's rejected as an honest miss instead.
-// Same ratio as portion-scaler.ts's per-meal PROTEIN_CEILING_RATIO — one
-// threshold, checked at both layers, not two independently-tuned numbers.
-export const DAY_PROTEIN_CEILING_RATIO = PROTEIN_CEILING_RATIO
+export const DAY_PROTEIN_LOWER_RATIO = 0.95
+export const DAY_PROTEIN_UPPER_RATIO = 1.15
+export const DAY_CARB_TOLERANCE = 0.25
+export const DAY_FAT_TOLERANCE = 0.25
+/** @deprecated kept as an alias so any external reader of the old name still resolves — use DAY_PROTEIN_LOWER_RATIO. */
+export const DAY_PROTEIN_FLOOR_RATIO = DAY_PROTEIN_LOWER_RATIO
 
 export interface AssembledDay {
   /** One chosen option per active slot. */
@@ -528,22 +536,47 @@ function sumOptionMacros(options: PoolOption[]): MacroTargets {
   )
 }
 
+function relDiff(actual: number, target: number): number {
+  return target > 0 ? Math.abs(actual - target) / target : 0
+}
+
 function dayWithinTolerance(totals: MacroTargets, targets: MacroTargets): boolean {
   if (targets.calories <= 0) return true
-  const calOk = Math.abs(totals.calories - targets.calories) / targets.calories <= DAY_CALORIE_TOLERANCE
-  const proteinOk = targets.protein <= 0 || totals.protein >= targets.protein * DAY_PROTEIN_FLOOR_RATIO
-  return calOk && proteinOk
+  const calOk = relDiff(totals.calories, targets.calories) <= DAY_CALORIE_TOLERANCE
+  const proteinOk = targets.protein <= 0 || (totals.protein >= targets.protein * DAY_PROTEIN_LOWER_RATIO && totals.protein <= targets.protein * DAY_PROTEIN_UPPER_RATIO)
+  const carbOk = relDiff(totals.carbs, targets.carbs) <= DAY_CARB_TOLERANCE
+  const fatOk = relDiff(totals.fat, targets.fat) <= DAY_FAT_TOLERANCE
+  return calOk && proteinOk && carbOk && fatOk
 }
 
 /**
- * Picks one option per active slot from `pools` to land the day's totals
- * within ±5% calories and >=95% protein of `targets`. Pools are small (a few
- * options per slot), so this is a full cartesian search over every
- * combination rather than a heuristic — cheap and exact. Among combinations
- * that hit tolerance, and as a tiebreak among all combinations otherwise,
- * prefers ones that don't repeat a name in `recentNames` (best-effort day-to-
- * day variety; a slot whose entire pool was used recently can still repeat —
- * this is a preference, not a hard constraint the pool must satisfy).
+ * Weighted relative distance across all four macros — lower is better fit.
+ * Calories dominate (the headline number, tightest band), protein is
+ * weighted second (the macro users actually track), carbs/fat matter least
+ * (loosest bands, meant to flex). Symmetric in both directions: overshooting
+ * protein costs the same as undershooting it by the same ratio — the old
+ * scoring only penalised a shortfall (`Math.max(0, target - actual)`), which
+ * is exactly why nothing ever pushed back on the QA sweep's ~1.7x overshoot.
+ */
+function macroDistanceScore(totals: MacroTargets, targets: MacroTargets): number {
+  return relDiff(totals.calories, targets.calories) * 1.0
+    + relDiff(totals.protein, targets.protein) * 0.6
+    + relDiff(totals.carbs, targets.carbs) * 0.25
+    + relDiff(totals.fat, targets.fat) * 0.25
+}
+
+/**
+ * Picks one option per active slot from `pools` to best match the day's
+ * targets across all four macros: calories within ±5%, protein within
+ * −5%/+15% (a real two-sided band, not a one-sided floor), carbs and fat
+ * within a looser ±25% each (see dayWithinTolerance/macroDistanceScore).
+ * Pools are small (a few options per slot), so this is a full cartesian
+ * search over every combination rather than a heuristic — cheap and exact.
+ * Among combinations that hit every band, and as a tiebreak among all
+ * combinations otherwise, prefers ones that don't repeat a name in
+ * `recentNames` (best-effort day-to-day variety; a slot whose entire pool was
+ * used recently can still repeat — this is a preference, not a hard
+ * constraint the pool must satisfy).
  *
  * If NO combination reaches tolerance, applies one bounded proportional
  * scale to the day's single largest-calorie slot (closing exactly the gap
@@ -574,8 +607,6 @@ export function assembleDay(
     if (index === slots.length) {
       const chosenOptions = slots.map(s => combo[s]!)
       const totals = sumOptionMacros(chosenOptions)
-      const calDiff = targets.calories > 0 ? Math.abs(totals.calories - targets.calories) / targets.calories : 0
-      const proteinDeficit = Math.max(0, targets.protein - totals.protein)
       const repeatsAny = slots.some(s => recentNames[s]?.includes(combo[s]!.name))
       // Cuisine coherence (meal-realism round): each slot's pool already
       // caps at one exotic option, but nothing previously stopped a day from
@@ -584,12 +615,12 @@ export function assembleDay(
       // calorie/protein fit always wins first.
       const exoticSlots = slots.filter(s => isExoticOption(combo[s]!)).length
       const exoticPenalty = exoticSlots > 1 ? (exoticSlots - 1) * 0.005 : 0
-      // Lower score wins: calorie closeness dominates, protein shortfall is a
-      // smaller nudge (already gated at the pipeline level, rarely large
-      // here), and a same-as-recent combo or multi-exotic day is only a mild
-      // tiebreak penalty — variety/coherence are preferences, never worth
-      // shipping a worse-fitting day for.
-      const score = calDiff + proteinDeficit * 0.002 + (repeatsAny ? 0.01 : 0) + exoticPenalty
+      // Lower score wins: macroDistanceScore weighs all four macros
+      // (calories dominant, protein second, carbs/fat loosest), and a
+      // same-as-recent combo or multi-exotic day is only a mild tiebreak
+      // penalty — variety/coherence are preferences, never worth shipping a
+      // worse-fitting day for.
+      const score = macroDistanceScore(totals, targets) + (repeatsAny ? 0.01 : 0) + exoticPenalty
       if (!state.best || score < state.best.score) state.best = { combo: { ...combo }, totals, score }
       return
     }
@@ -638,16 +669,22 @@ export function assembleDay(
       const adjustedOption: PoolOption = { ...largestOption, ingredients: scaleResult.ingredients, macros: macrosToTargets(recomputed) }
       const candidateChosen = { ...chosen, [largestSlot]: adjustedOption }
       const candidateTotals = sumOptionMacros(Object.values(candidateChosen) as PoolOption[])
-      // scaleToTarget is calorie-only — it has no way to bound protein, so a
-      // protein-dense dish scaled up to also cover a shortfall elsewhere can
-      // land well past target. Only accept the repair if it doesn't blow
-      // past the ceiling; otherwise ship the closest unscaled combo as an
-      // honest miss rather than a day that "fits" calories by tripling protein.
+      // scaleToTarget is calorie-only — it has no way to bound protein, carbs
+      // or fat individually, so scaling one dish up to also cover a shortfall
+      // elsewhere can land well past target on any of them. Accept the
+      // repair only if it lands the day fully within every band, OR — when it
+      // doesn't quite clear every band — if it's a strictly closer fit than
+      // the unrepaired combo AND still respects the protein upper rail (never
+      // trade a calorie fix for a protein blowout, the QA sweep's original
+      // ~1.7x-overshoot failure mode). Otherwise the unrepaired combo ships
+      // as the honest miss.
+      const candidateWithinTolerance = dayWithinTolerance(candidateTotals, targets)
       const proteinRatio = targets.protein > 0 ? candidateTotals.protein / targets.protein : 1
-      if (proteinRatio <= DAY_PROTEIN_CEILING_RATIO) {
+      const isCloser = macroDistanceScore(candidateTotals, targets) < macroDistanceScore(totals, targets)
+      if (candidateWithinTolerance || (isCloser && proteinRatio <= DAY_PROTEIN_UPPER_RATIO)) {
         chosen = candidateChosen
         totals = candidateTotals
-        withinTolerance = dayWithinTolerance(totals, targets)
+        withinTolerance = candidateWithinTolerance
       }
     }
   }

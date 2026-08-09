@@ -202,6 +202,8 @@ export const FOOD_DB: FoodEntry[] = [
   f('plain flour', ['flour', 'all purpose flour'], { kcal: 364, protein: 10, carbs: 76, fat: 1 }, 'carb', { contains_gluten: true, is_high_carb: true }),
   f('rice cakes', [], { kcal: 387, protein: 8.2, carbs: 81, fat: 2.8 }, 'carb', { is_high_carb: true }, { whole: 9 }),
   f('crackers', ['water crackers', 'wheat crackers'], { kcal: 421, protein: 9, carbs: 71, fat: 11 }, 'carb', { contains_gluten: true, is_high_carb: true }),
+  f('rye crispbread', ['rye crispbreads', 'crispbread', 'crispbreads'], { kcal: 321, protein: 9.9, carbs: 71, fat: 1.5 }, 'carb', { contains_gluten: true, is_high_carb: true }),
+  f('pancake mix', ['pancake batter mix', 'dry pancake mix'], { kcal: 356, protein: 8, carbs: 76, fat: 3 }, 'carb', { contains_gluten: true, is_high_carb: true }),
   f('popcorn', ['air popped popcorn'], { kcal: 387, protein: 13, carbs: 78, fat: 4.5 }, 'carb', { is_high_carb: true }),
   f('tortilla chips', ['corn chips'], { kcal: 490, protein: 7, carbs: 63, fat: 24 }, 'carb', { is_high_carb: true }),
 
@@ -211,7 +213,7 @@ export const FOOD_DB: FoodEntry[] = [
   f('coconut oil', [], { kcal: 862, protein: 0, carbs: 0, fat: 100 }, 'fat', {}, { tbsp: 13, tsp: 4.5 }),
   f('avocado', [], { kcal: 160, protein: 2, carbs: 8.5, fat: 14.7 }, 'fruit', {}, { whole: 150, half: 75 }, { avgGrams: 150, label: 'avocado' }),
   f('almonds', ['almond'], { kcal: 579, protein: 21.2, carbs: 22, fat: 49.9 }, 'fat', { contains_nuts: true }),
-  f('walnuts', [], { kcal: 654, protein: 15.2, carbs: 13.7, fat: 65.2 }, 'fat', { contains_nuts: true }),
+  f('walnuts', ['walnut', 'walnut halves'], { kcal: 654, protein: 15.2, carbs: 13.7, fat: 65.2 }, 'fat', { contains_nuts: true }),
   f('cashews', ['cashew nuts'], { kcal: 553, protein: 18.2, carbs: 30.2, fat: 43.9 }, 'fat', { contains_nuts: true }),
   f('peanuts', [], { kcal: 567, protein: 25.8, carbs: 16.1, fat: 49.2 }, 'fat', { contains_nuts: false }),
   f('mixed nuts', [], { kcal: 607, protein: 20, carbs: 19, fat: 54 }, 'fat', { contains_nuts: true }),
@@ -259,6 +261,7 @@ export const FOOD_DB: FoodEntry[] = [
   f('strawberries', ['strawberry'], { kcal: 32, protein: 0.7, carbs: 7.7, fat: 0.3 }, 'fruit', {}),
   f('blueberries', ['blueberry'], { kcal: 57, protein: 0.7, carbs: 14, fat: 0.3 }, 'fruit', {}),
   f('raspberries', ['raspberry'], { kcal: 52, protein: 1.2, carbs: 12, fat: 0.7 }, 'fruit', { is_high_fodmap: true }),
+  f('mixed berries', ['frozen mixed berries', 'berries'], { kcal: 46, protein: 1, carbs: 11, fat: 0.5 }, 'fruit', {}),
   f('grapes', ['grape'], { kcal: 69, protein: 0.7, carbs: 18, fat: 0.2 }, 'fruit', {}),
   f('mango', [], { kcal: 60, protein: 0.8, carbs: 15, fat: 0.4 }, 'fruit', { is_high_fodmap: true }),
   f('pineapple', [], { kcal: 50, protein: 0.5, carbs: 13, fat: 0.1 }, 'fruit', {}),
@@ -385,7 +388,8 @@ export const FOOD_DB: FoodEntry[] = [
   f('harissa', [], { kcal: 111, protein: 3, carbs: 12, fat: 6 }, 'condiment', { is_high_fodmap: true }, { tbsp: 15 }),
   f('tzatziki', [], { kcal: 88, protein: 3.8, carbs: 3.6, fat: 6.8 }, 'condiment', { contains_dairy: true, is_high_fodmap: true }),
   f('guacamole', [], { kcal: 155, protein: 2, carbs: 8.5, fat: 13 }, 'condiment', { is_high_fodmap: true }),
-  f('sour cream', [], { kcal: 198, protein: 2.4, carbs: 4.6, fat: 19.7 }, 'dairy', { contains_dairy: true }),
+  f('sour cream', ['soured cream'], { kcal: 198, protein: 2.4, carbs: 4.6, fat: 19.7 }, 'dairy', { contains_dairy: true }),
+  f('creme fraiche', ['crème fraîche', 'half-fat creme fraiche', 'half-fat crème fraîche'], { kcal: 292, protein: 2.4, carbs: 3.4, fat: 30 }, 'dairy', { contains_dairy: true }),
   f('coleslaw', [], { kcal: 150, protein: 1.2, carbs: 8, fat: 13 }, 'condiment', { contains_egg: true, is_high_fodmap: true }),
   f('vinaigrette dressing', ['salad dressing', 'french dressing'], { kcal: 260, protein: 0.2, carbs: 8, fat: 25 }, 'condiment', {}, { tbsp: 15 }),
   f('ranch dressing', [], { kcal: 460, protein: 1, carbs: 6, fat: 48 }, 'condiment', { contains_dairy: true, contains_egg: true }, { tbsp: 15 }),
@@ -471,11 +475,21 @@ export const FOOD_DB: FoodEntry[] = [
 // ---------------------------------------------------------------------------
 
 function normalize(s: string): string {
+  // Decompose accented Latin characters to their base letter + a combining
+  // mark (NFD), then drop the combining marks — "crème" -> "creme", "café"
+  // -> "cafe" — BEFORE the punctuation pass below. Without this, the
+  // [^a-z0-9\s] regex treated every accented character as punctuation and
+  // replaced it with a space ("crème" -> "cr me"), silently breaking
+  // tokenization for every accented ingredient name (confirmed: "crème
+  // fraîche" was an unresolved-ingredient failure from the very first
+  // meal-quality baseline, long before this fix).
+  //
   // Replace (not strip) punctuation with a space — stripping it fused
   // adjacent words into unmatchable tokens ("seitan-based" -> "seitanbased",
   // "boiled/instant" -> "boiledinstant"), which made every hyphenated or
   // slash-separated ingredient name an automatic lookup miss.
-  return s.toLowerCase().trim().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim()
+  return s.normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .toLowerCase().trim().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
 const LOOKUP = new Map<string, FoodEntry>()

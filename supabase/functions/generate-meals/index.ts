@@ -184,23 +184,26 @@ function selectCuisines(favoriteCuisines: string[]): string[] {
 }
 
 // ---------------------------------------------------------------------------
-// Protein-density steering: the verification pipeline (meal-generation.ts)
-// scales every proposal to the slot's CALORIE target and then requires the
-// scaled result to still meet the PROTEIN floor — uniform scaling can't fix
-// a proposal whose unscaled protein:calorie ratio was already too low, so a
-// calorie-plausible but protein-thin proposal is a guaranteed rejection, not
-// a near-miss. Naming concrete protein-dense bases per diet type (rather
-// than a generic "include protein") measurably raised pool fill rates in
-// practice — this list is diet-aware because the vegan/vegetarian bases that
-// actually deliver protein density are a different set than the omnivore
-// ones, and a generic prompt kept reaching for lower-density plant staples.
+// Macro-target steering (macro-accuracy round): the verification pipeline
+// (meal-generation.ts) scales every proposal to the slot's CALORIE target and
+// then requires the scaled result to still clear the PROTEIN floor — so a
+// proposal whose unscaled protein:calorie ratio was already too low is a
+// guaranteed rejection, not a near-miss, and naming concrete protein-dense
+// bases per diet type measurably raised pool fill rates in practice. But an
+// earlier round of this guidance pushed the model to MAXIMIZE protein rather
+// than hit the stated target — that's the direct cause of the QA-sweep
+// finding that assembled days landed up to ~1.7x over target protein while
+// calories looked fine. Protein is now framed the same way calories, carbs and
+// fat are: a number to land ON. The day-assembly layer (assembleDay in
+// meal-generation.ts) is the actual backstop against overshoot — this prompt
+// change reduces how often it has to correct for one.
 // ---------------------------------------------------------------------------
-function proteinDenseGuidance(preferences: string[]): string {
+function macroTargetGuidance(preferences: string[]): string {
   const isVegan = preferences.includes("vegan");
   const isVegetarian = preferences.includes("vegetarian") || isVegan;
   const isPescatarian = preferences.includes("pescatarian");
 
-  const bases = isVegan
+  const proteinBases = isVegan
     ? "tofu, tempeh, seitan, edamame, lentils, chickpeas, black beans, soy mince/TVP, high-protein pasta, vegan protein powder"
     : isVegetarian
     ? "tofu, tempeh, seitan, lentils, chickpeas, edamame, high-protein pasta, Greek yoghurt, cottage cheese, eggs, whey protein"
@@ -208,9 +211,10 @@ function proteinDenseGuidance(preferences: string[]): string {
     ? "salmon, tuna, cod, prawns, white fish, eggs, Greek yoghurt, cottage cheese, whey protein, tofu, lentils"
     : "chicken breast, turkey, lean beef mince, pork tenderloin, salmon, tuna, cod, prawns, eggs, Greek yoghurt, cottage cheese, whey protein";
 
-  return `\n\nPROTEIN DENSITY (CRITICAL — this is the #1 cause of proposals being rejected):
-Every dish's PRIMARY protein source must be protein-dense, not just protein-present. Build around: ${bases}.
-The verification pipeline scales your ingredients to hit the CALORIE target, then checks the result still clears the PROTEIN target — a dish that reaches the right calories by leaning on carbs or fat with only a token amount of protein will scale down to a calorie-correct but protein-SHORT result and be rejected outright, even if your unscaled numbers looked close. If you need to trade off to fit the calorie budget, undershoot carbs or fat before you undershoot protein — protein is the target that must clear the floor after scaling, calories are what scaling corrects for.`;
+  return `\n\nHIT ALL THREE MACROS (CRITICAL — this is the #1 cause of proposals being rejected or, worse, quietly accepted with a skewed ratio):
+Every dish needs a clear protein source (build around: ${proteinBases}) sized to the stated protein grams — but protein is a TARGET TO LAND ON, not one to maximise. A dish that way overshoots its protein gram target at the expense of carbs/fat is just as wrong as one that falls short of it: it throws off the day's overall macro ratio even when calories look fine.
+Size your carb source (rice, potatoes, oats, bread, pasta, fruit) and fat source (oil, butter, nuts, cheese, fatty cuts) to their stated gram targets too — don't treat them as whatever calories are left over after protein. All three macros matter; get as close to all three stated numbers as you can, not just calories.
+If you must trade off to fit the calorie budget, make a small even trim across carbs/fat rather than skipping the protein source — but don't overcorrect into a protein-heavy, carb/fat-thin dish either.`;
 }
 
 Deno.serve(async (req: Request) => {
@@ -249,11 +253,11 @@ Deno.serve(async (req: Request) => {
     const dietaryBlock = buildDietarySafetyBlock(dietary_preferences || []);
     const cookingGuidance = cookingTimeGuidance(cooking_time_preference);
 
-    const proteinGuidance = proteinDenseGuidance(dietary_preferences || []);
+    const macroGuidance = macroTargetGuidance(dietary_preferences || []);
     const avoidBlock = dislikedFoodsBlock(dislikedFoods);
 
     const slotDescriptions = typedSlots.map(
-      (s) => `- ${s.slot} — ${slotGuidance(s.slot, breakfast_style)}\n  Propose ${s.count} DIFFERENT dish variants, each targeting ~${s.calories} kcal — and ${s.protein}g PROTEIN is the number that must not fall short (carbs ~${s.carbs}g, fat ~${s.fat}g are secondary and can flex)`
+      (s) => `- ${s.slot} — ${slotGuidance(s.slot, breakfast_style)}\n  Propose ${s.count} DIFFERENT dish variants, each targeting ~${s.calories} kcal, ~${s.protein}g protein, ~${s.carbs}g carbs, ~${s.fat}g fat — hit all four as closely as you can; protein must not fall meaningfully short, but don't overshoot it at the expense of carbs/fat either`
     ).join("\n");
 
     const prompt = `You are a chef and sports nutritionist proposing meal options for an app that will independently verify every number — your job is variety and plausibility, not precision; code will re-measure and scale every ingredient you list.
@@ -263,13 +267,13 @@ ${avoidBlock}
 
 PREP TIME: ${cookingGuidance}
 ${dietaryBlock}
-${proteinGuidance}
+${macroGuidance}
 
 RULES:
 1. Each dish needs a specific, appetizing name (not "Chicken and Rice" — something like "Sichuan Mapo Tofu with Charred Bok Choy").
 2. Every ingredient MUST be ONE parseable line with an exact quantity and unit: "165g chicken breast", "2 tbsp olive oil", "1 medium egg", "200g cooked basmati rice". No ranges, no "to taste", no combined items.
 3. Include all cooking fats with exact amounts.
-4. Aim your ingredient quantities roughly at the stated macro targets — exact precision isn't required (the app rescales), but stay in the right neighborhood so rescaling doesn't need to be extreme. Protein especially: undershooting it is the #1 rejection reason (see PROTEIN DENSITY above) — when in doubt, size the protein source generously.
+4. Aim your ingredient quantities at ALL FOUR stated macro targets, not just calories — exact precision isn't required (the app rescales), but stay in the right neighborhood on protein, carbs AND fat so rescaling doesn't need to be extreme in any one direction. Undershooting protein is a rejection; so is padding it out so far that carbs/fat are starved (see HIT ALL THREE MACROS above).
 5. Report which single cuisine (from the list above, or "Other") each dish draws from as the "cuisine" field.
 
 SLOTS TO GENERATE:
