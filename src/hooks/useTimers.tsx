@@ -7,13 +7,14 @@
 // timer-store.ts so a reload resumes correctly.
 // ---------------------------------------------------------------------------
 
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useDeadlineTick } from './useDeadlineTick'
 import { getAppNow } from '@/lib/dev-clock'
 import { playTimerCue } from '@/lib/timer-cues'
 import {
   computeStopwatchElapsedMs,
   computeRoundState,
+  roundPhaseIndex,
   type RoundConfig,
   type RoundPhase,
 } from '@/lib/timer-engine'
@@ -63,11 +64,19 @@ export function TimersProvider({ profileId, children }: { profileId: string | un
   const [record, setRecord] = useState<TimerRecord>(() => defaultTimerRecord('stopwatch'))
 
   // Hydrate from the persisted record when identity resolves — mirrors the
-  // rest facade's own hydration effect.
+  // rest facade's own hydration effect. A round-mode record persisted by the
+  // pre-fix version has no startedAtIso anchor (it stored a per-phase
+  // deadline the old stepping logic corrupted) — there is nothing honest to
+  // resume it from, so it hydrates stopped rather than guessing a position.
   useEffect(() => {
     if (!profileId) return
     const existing = getTimerRecord(profileId)
-    if (existing) setRecord(existing)
+    if (!existing) return
+    if (existing.mode === 'round' && existing.running && !existing.startedAtIso) {
+      setRecord({ ...existing, running: false })
+      return
+    }
+    setRecord(existing)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profileId])
 
@@ -77,7 +86,11 @@ export function TimersProvider({ profileId, children }: { profileId: string | un
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profileId])
 
-  const tick = useDeadlineTick(record.running)
+  // 100ms redraw for stopwatch/lap so the tenths digit actually moves (the
+  // 1s default left it frozen); round mode keeps 1s — it displays a whole-
+  // second countdown and derives transitions from elapsed time, so a faster
+  // tick would buy nothing but battery drain.
+  const tick = useDeadlineTick(record.running, record.mode === 'round' ? 1000 : 100)
 
   const setMode = useCallback((mode: TimerMode) => {
     persist(defaultTimerRecord(mode))
@@ -113,12 +126,15 @@ export function TimersProvider({ profileId, children }: { profileId: string | un
   const startRound = useCallback((config: RoundConfig) => {
     if (!profileId) return
     const now = getAppNow(profileId)
-    const phaseEndsAt = new Date(now.getTime() + config.workSeconds * 1000).toISOString()
+    // startedAtIso is the round timer's single source of truth: round, phase
+    // and remaining are all derived from (now - startedAt) against the
+    // schedule. phaseEndsAtIso/currentRound/currentPhase stay in the record
+    // shape for storage compat but are no longer read back for computation.
     persist({
       ...defaultTimerRecord('round'),
       running: true,
       roundConfig: config,
-      phaseEndsAtIso: phaseEndsAt,
+      startedAtIso: now.toISOString(),
       currentRound: 1,
       currentPhase: 'work',
     })
@@ -132,24 +148,39 @@ export function TimersProvider({ profileId, children }: { profileId: string | un
   }, [profileId, record.accumulatedMs, record.startedAtIso, record.running, tick])
 
   const roundState = useMemo(() => {
-    if (!profileId || record.mode !== 'round' || !record.roundConfig || !record.phaseEndsAtIso || !record.running) return null
+    if (!profileId || record.mode !== 'round' || !record.roundConfig || !record.startedAtIso || !record.running) return null
     void tick
-    return computeRoundState(record.roundConfig, record.phaseEndsAtIso, record.currentRound, record.currentPhase, getAppNow(profileId).getTime())
-  }, [profileId, record.mode, record.roundConfig, record.phaseEndsAtIso, record.running, record.currentRound, record.currentPhase, tick])
+    return computeRoundState(record.roundConfig, record.startedAtIso, getAppNow(profileId).getTime())
+  }, [profileId, record.mode, record.roundConfig, record.startedAtIso, record.running, tick])
 
-  // Persist the walked-forward round/phase once computeRoundState advances
-  // past what's stored — keeps the record's own round/phase fields in sync
-  // for the next reload instead of re-walking from round 1 every time.
+  // Cues only — round/phase are pure derivations of the start anchor, so
+  // nothing needs persisting per transition (the old per-transition persist
+  // advanced round/phase without re-anchoring the stored deadline, which is
+  // exactly the corruption computeRoundState's rewrite removed). The ref
+  // tracks the last observed schedule position; a step of exactly 1 is a
+  // live transition and plays its single cue (only while the app is
+  // foregrounded); a larger jump means phases elapsed in the background —
+  // those cues are stale, so none fire, never a queued burst. The anchor key
+  // resets the baseline on a new round start or reload without cueing.
+  const lastCueRef = useRef<{ anchor: string; index: number } | null>(null)
   useEffect(() => {
-    if (!roundState) return
-    if (roundState.currentRound === record.currentRound && roundState.currentPhase === record.currentPhase && !roundState.isComplete) return
+    if (!roundState || !record.roundConfig || !record.startedAtIso) return
+    const index = roundPhaseIndex(roundState, record.roundConfig)
+    const prev = lastCueRef.current
+    lastCueRef.current = { anchor: record.startedAtIso, index }
+    // Completion always stops the record — including when it's the very
+    // first observation after a reload (prev === null), where no cue plays.
+    const isFirstObservation = !prev || prev.anchor !== record.startedAtIso
     if (roundState.isComplete) {
-      playTimerCue('round-complete')
-      persist({ ...record, running: false, currentRound: roundState.currentRound, currentPhase: roundState.currentPhase })
+      if (!isFirstObservation && index - prev!.index === 1 && !document.hidden) playTimerCue('round-complete')
+      persist({ ...record, running: false })
       return
     }
-    playTimerCue(roundState.currentPhase === 'rest' ? 'work-to-rest' : 'rest-to-work')
-    persist({ ...record, currentRound: roundState.currentRound, currentPhase: roundState.currentPhase })
+    if (isFirstObservation) return
+    const delta = index - prev!.index
+    if (delta === 1 && !document.hidden) {
+      playTimerCue(roundState.currentPhase === 'rest' ? 'work-to-rest' : 'rest-to-work')
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roundState])
 

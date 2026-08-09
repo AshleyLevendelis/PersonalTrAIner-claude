@@ -13,17 +13,21 @@ import { useEffect, useRef, useState } from 'react'
 // stale value even for that one frame.
 // ---------------------------------------------------------------------------
 
-/** Returns a counter that increments roughly once a second while `active`,
- * plus immediately on visibilitychange/pageshow/focus. The counter's VALUE
- * is meaningless — callers read it only to force a recompute of their own
- * deadline-derived state; never treat it as an elapsed/remaining count. */
-export function useDeadlineTick(active: boolean): number {
+/** Returns a counter that increments roughly every `intervalMs` (default 1s)
+ * while `active`, plus immediately on visibilitychange/pageshow/focus. The
+ * counter's VALUE is meaningless — callers read it only to force a recompute
+ * of their own deadline-derived state; never treat it as an elapsed/remaining
+ * count. A faster cadence (e.g. 100ms for a tenths-resolution stopwatch)
+ * only changes redraw frequency — correctness still comes entirely from the
+ * caller's anchor-timestamp math, so browser throttling in background tabs
+ * remains harmless. */
+export function useDeadlineTick(active: boolean, intervalMs = 1000): number {
   const [tick, setTick] = useState(0)
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
     if (!active) return
-    tickRef.current = setInterval(() => setTick(t => t + 1), 1000)
+    tickRef.current = setInterval(() => setTick(t => t + 1), intervalMs)
     const resync = () => setTick(t => t + 1)
     document.addEventListener('visibilitychange', resync)
     window.addEventListener('pageshow', resync)
@@ -34,7 +38,7 @@ export function useDeadlineTick(active: boolean): number {
       window.removeEventListener('pageshow', resync)
       window.removeEventListener('focus', resync)
     }
-  }, [active])
+  }, [active, intervalMs])
 
   return tick
 }

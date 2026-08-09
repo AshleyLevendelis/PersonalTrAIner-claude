@@ -18,7 +18,7 @@ export type RoundPhase = 'work' | 'rest'
 export interface RoundState {
   currentRound: number
   currentPhase: RoundPhase
-  /** Ms remaining in the CURRENT phase — negative/zero handled by the caller same as rest's overrun (shouldn't occur once isComplete is walked forward correctly). */
+  /** Ms remaining in the CURRENT phase — always >= 0 (0 only when complete). */
   phaseRemainingMs: number
   isComplete: boolean
 }
@@ -39,45 +39,43 @@ export function computeStopwatchElapsedMs(
 }
 
 /**
- * Recomputes round/phase from the current phase's stored deadline. If `now`
- * has passed that deadline by more than one phase (the app was closed
- * mid-interval for a while), walks forward phase-by-phase — bounded by
- * rounds*2 — to land on the correct round/phase rather than assuming reload
- * always happens inside the same phase.
+ * Derives round/phase/remaining purely from elapsed time against the round
+ * schedule — no stored per-phase deadline, no stateful stepping. The previous
+ * implementation walked forward from a persisted phase deadline that its
+ * caller advanced WITHOUT re-anchoring, so stored round/phase and the stored
+ * deadline disagreed after the first transition and every subsequent tick
+ * compounded the error (racing through rounds / stalling). Deriving from the
+ * single immutable start anchor makes any moment — including a return from
+ * hours in the background or a reload — land on exactly the right round and
+ * phase, because there is no intermediate state to drift.
  */
-export function computeRoundState(
-  config: RoundConfig,
-  phaseEndsAtIso: string,
-  currentRound: number,
-  currentPhase: RoundPhase,
-  now: number
-): RoundState {
-  let round = currentRound
-  let phase = currentPhase
-  let phaseEndsAt = new Date(phaseEndsAtIso).getTime()
-  const maxSteps = config.rounds * 2
-  let steps = 0
+export function computeRoundState(config: RoundConfig, roundStartedAtIso: string, now: number): RoundState {
+  const start = new Date(roundStartedAtIso).getTime()
+  const workMs = config.workSeconds * 1000
+  const cycleMs = workMs + config.restSeconds * 1000
+  const elapsed = Math.max(0, now - start)
 
-  while (now >= phaseEndsAt && steps < maxSteps) {
-    if (phase === 'work') {
-      phase = 'rest'
-      phaseEndsAt += config.restSeconds * 1000
-    } else {
-      round += 1
-      if (round > config.rounds) {
-        return { currentRound: config.rounds, currentPhase: 'rest', phaseRemainingMs: 0, isComplete: true }
-      }
-      phase = 'work'
-      phaseEndsAt += config.workSeconds * 1000
-    }
-    steps += 1
-  }
-
-  if (steps >= maxSteps && now >= phaseEndsAt) {
+  if (elapsed >= config.rounds * cycleMs) {
     return { currentRound: config.rounds, currentPhase: 'rest', phaseRemainingMs: 0, isComplete: true }
   }
 
-  return { currentRound: round, currentPhase: phase, phaseRemainingMs: phaseEndsAt - now, isComplete: false }
+  const round = Math.floor(elapsed / cycleMs) + 1
+  const inCycle = elapsed % cycleMs
+  const phase: RoundPhase = inCycle < workMs ? 'work' : 'rest'
+  const phaseRemainingMs = phase === 'work' ? workMs - inCycle : cycleMs - inCycle
+  return { currentRound: round, currentPhase: phase, phaseRemainingMs, isComplete: false }
+}
+
+/**
+ * Monotonic position of a round-timer state on the schedule: work/rest of
+ * round N map to 2(N-1) / 2(N-1)+1, completion to rounds*2. The cue logic
+ * diffs consecutive indices — a difference of exactly 1 is a live transition
+ * (play its cue); a larger jump means phases were missed while backgrounded,
+ * and firing a burst of stale cues on return would be noise, not information.
+ */
+export function roundPhaseIndex(state: RoundState, config: RoundConfig): number {
+  if (state.isComplete) return config.rounds * 2
+  return (state.currentRound - 1) * 2 + (state.currentPhase === 'rest' ? 1 : 0)
 }
 
 /**

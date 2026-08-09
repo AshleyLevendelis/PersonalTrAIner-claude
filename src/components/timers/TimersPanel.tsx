@@ -58,7 +58,7 @@ function StopwatchPanel() {
   const timers = useTimers()
   return (
     <div className="flex flex-col items-center gap-4 py-4">
-      <div className="ds-num-hero tabular-nums">{formatMs(timers.elapsedMs, true)}</div>
+      <div className="ds-num-hero tabular-mono">{formatMs(timers.elapsedMs, true)}</div>
       <div className="flex gap-2">
         {timers.running ? (
           <Button onClick={timers.stop}>Stop</Button>
@@ -77,7 +77,7 @@ function LapPanel() {
   const timers = useTimers()
   return (
     <div className="flex flex-col items-center gap-4 py-4">
-      <div className="ds-num-hero tabular-nums">{formatMs(timers.elapsedMs, true)}</div>
+      <div className="ds-num-hero tabular-mono">{formatMs(timers.elapsedMs, true)}</div>
       <div className="flex gap-2">
         {timers.running ? (
           <>
@@ -96,7 +96,7 @@ function LapPanel() {
           {[...timers.laps].reverse().map(lap => (
             <div key={lap.lapNumber} className="flex justify-between text-sm px-2 py-1 rounded-md bg-muted">
               <span className="text-muted-foreground">Lap {lap.lapNumber}</span>
-              <span className="tabular-nums">{formatMs(lap.elapsedMs, true)}</span>
+              <span className="tabular-mono">{formatMs(lap.elapsedMs, true)}</span>
             </div>
           ))}
         </div>
@@ -134,7 +134,7 @@ function RoundPanel({ prefill }: { prefill: RoundConfig | null }) {
       <div className="flex flex-col items-center gap-3 py-4">
         <p className="ds-label">Round {timers.currentRound} of {timers.roundConfig!.rounds}</p>
         <div
-          className={`ds-num-hero tabular-nums ${timers.currentPhase === 'work' ? 'text-primary' : 'text-[color:var(--role-warn)]'}`}
+          className={`ds-num-hero tabular-mono ${timers.currentPhase === 'work' ? 'text-primary' : 'text-[color:var(--role-warn)]'}`}
         >
           {formatMs(timers.phaseRemainingMs ?? 0)}
         </div>
