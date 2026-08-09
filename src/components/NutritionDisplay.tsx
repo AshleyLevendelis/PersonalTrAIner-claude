@@ -1,13 +1,38 @@
+import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Calculator, Layers } from 'lucide-react'
 import { MealPlan } from '@/components/MealPlan'
 import { WeighInCard } from '@/components/WeighInCard'
 import { MacroSplitCard } from '@/components/MacroSplitCard'
+import { useActiveSession } from '@/hooks/useActiveSession'
+import { getTodayLedger } from '@/lib/meal-store'
+import { getAllLogs as getAllWaterLogs, logWater, undoLog as undoWaterLog, setWaterTargetMl, type WaterLogRow } from '@/lib/water-store'
 import type { MacroTargets, UserProfile, WorkoutDay, MacroCalculationMode } from '@/lib/types'
 import type { MealSlotName } from '@/lib/meal-store'
 import type { PoolOption } from '@/lib/meal-generation'
 import { calculateWeeklySchedule, getMacroDerivation } from '@/lib/macro-calculator'
+
+const WATER_QUICK_ADD_ML = [250, 500]
+
+// Tab-restructure handoff — the ring meter moves here from Dashboard.tsx and
+// grows a 5th (outermost) water ring, each ring now its own colour instead
+// of one hue fading in opacity: water lives on the same tab as the ring
+// meter now, so it earns its own visual identity (--chart-3, matching the
+// water row/quick-adds below) rather than borrowing the mint accent.
+// Calories keeps the hero-number treatment (not a legend row); the other
+// three rings + water get a legend row each — four rows, not five, matching
+// the design reference's own rendered screen (its prose says "five legend
+// rows" but the reference screen itself shows four: water/protein/carbs/fat).
+const NUTRITION_RINGS = [
+  { key: 'water', r: 50, strokeWidth: 3, color: 'var(--chart-3)' },
+  { key: 'calories', r: 40, strokeWidth: 8, color: 'var(--primary)' },
+  { key: 'protein', r: 30, strokeWidth: 5, color: 'var(--role-ai)' },
+  { key: 'carbs', r: 22, strokeWidth: 5, color: 'var(--role-warn)' },
+  { key: 'fat', r: 14, strokeWidth: 5, color: 'var(--text-tertiary)' },
+] as const
+const NUTRITION_RING_CIRC: Record<string, number> = Object.fromEntries(NUTRITION_RINGS.map(r => [r.key, 2 * Math.PI * r.r]))
 
 export interface NutritionDisplayProps {
   profile: UserProfile
@@ -61,8 +86,162 @@ export function NutritionDisplay({
     ? calculateWeeklySchedule(effectiveProfile, exercisePlan)
     : null
 
+  // Tab-restructure handoff — "one owner per fact": Nutrition now owns the
+  // macro ring meter and water logging (moved off Dashboard.tsx). Both are
+  // self-contained reads, mirroring how MealPlan.tsx already independently
+  // fetches getTodayLedger for its own logged-state — not threaded through
+  // App.tsx, since nothing else in the tree needs this data.
+  const { dayName } = useActiveSession()
+  const [eaten, setEaten] = useState({ kcal: 0, protein: 0, carbs: 0, fat: 0 })
+  const [waterLogs, setWaterLogs] = useState<WaterLogRow[]>([])
+  const [waterTarget, setWaterTarget] = useState(profile.water_target_ml ?? 2000)
+  const [editingWaterTarget, setEditingWaterTarget] = useState(false)
+  const [waterTargetInput, setWaterTargetInput] = useState(String(profile.water_target_ml ?? 2000))
+  const [lastWaterLog, setLastWaterLog] = useState<WaterLogRow | null>(null)
+
+  useEffect(() => {
+    if (!profileId || !date) return
+    getTodayLedger(profileId, date, macros).then(l => setEaten(l.eaten)).catch(console.error)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profileId, date, mealTotals])
+
+  useEffect(() => {
+    if (!profileId) return
+    void getAllWaterLogs(profileId).then(setWaterLogs)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profileId, date])
+
+  useEffect(() => { setWaterTarget(profile.water_target_ml ?? 2000) }, [profile.water_target_ml])
+
+  const todayWaterMl = waterLogs.filter(l => l.date === date).reduce((s, l) => s + l.amount_ml, 0)
+
+  const handleAddWater = (amountMl: number) => {
+    if (!profileId || !date) return
+    const row = logWater({ profileId, date, amountMl, source: 'manual' })
+    setWaterLogs(prev => [...prev, row])
+    setLastWaterLog(row)
+  }
+  const handleUndoWater = () => {
+    if (!lastWaterLog) return
+    undoWaterLog(lastWaterLog)
+    setWaterLogs(prev => prev.filter(l => l.id !== lastWaterLog.id))
+    setLastWaterLog(null)
+  }
+  const handleSaveWaterTarget = async () => {
+    const n = Number(waterTargetInput)
+    if (!profileId || !Number.isFinite(n) || n <= 0) { setEditingWaterTarget(false); return }
+    setWaterTarget(n)
+    setEditingWaterTarget(false)
+    await setWaterTargetMl(profileId, n)
+  }
+
+  const ringValues: Record<string, { eaten: number; target: number }> = {
+    water: { eaten: todayWaterMl, target: waterTarget },
+    calories: { eaten: eaten.kcal, target: macros.calories },
+    protein: { eaten: eaten.protein, target: macros.protein },
+    carbs: { eaten: eaten.carbs, target: macros.carbs },
+    fat: { eaten: eaten.fat, target: macros.fat },
+  }
+
   return (
     <div className="space-y-6">
+      <div>
+        <p className="ds-label">Nutrition · {dayName}</p>
+
+        <div className="mt-3.5 flex items-center gap-[18px]">
+          <svg width="112" height="112" viewBox="0 0 112 112" className="shrink-0">
+            {NUTRITION_RINGS.map(r => (
+              <circle key={`track-${r.key}`} cx="56" cy="56" r={r.r} fill="none" stroke="var(--surface-raised)" strokeWidth={r.strokeWidth} />
+            ))}
+            {NUTRITION_RINGS.map(r => {
+              const { eaten: e, target: t } = ringValues[r.key]
+              const circ = NUTRITION_RING_CIRC[r.key]
+              const frac = t > 0 ? Math.min(1, e / t) : 0
+              return (
+                <circle
+                  key={`fill-${r.key}`}
+                  cx="56" cy="56" r={r.r} fill="none" strokeWidth={r.strokeWidth} strokeLinecap="round"
+                  stroke={r.color}
+                  strokeDasharray={`${circ * frac} ${circ}`}
+                  transform="rotate(-90 56 56)"
+                  className={r.key === 'calories' ? 'glow-icon' : undefined}
+                  style={{ transition: 'stroke-dasharray 400ms ease' }}
+                />
+              )
+            })}
+          </svg>
+          <div className="flex min-w-0 flex-1 flex-col gap-3">
+            <div>
+              <p className="ds-num-mega tabular-mono text-[#E4FCF4] glow-mint-lg">{Math.round(eaten.kcal)}</p>
+              <p className="mt-1 text-[10.5px] uppercase tracking-[.16em] text-muted-foreground">
+                kcal · of <span className="tabular-mono">{Math.round(macros.calories)}</span>
+              </p>
+            </div>
+            <div className="flex flex-col gap-[6px]">
+              {([
+                { key: 'water', label: 'Water', unit: 'ml' },
+                { key: 'protein', label: 'Protein', unit: 'g' },
+                { key: 'carbs', label: 'Carbs', unit: 'g' },
+                { key: 'fat', label: 'Fat', unit: 'g' },
+              ] as const).map(row => {
+                const ring = NUTRITION_RINGS.find(r => r.key === row.key)!
+                const { eaten: e, target: t } = ringValues[row.key]
+                return (
+                  <div key={row.key} className="flex items-baseline gap-[9px]">
+                    <span className="h-[9px] w-[9px] shrink-0 rounded-[3px]" style={{ background: ring.color }} />
+                    <span className="flex-1 text-[10px] uppercase tracking-[.16em] text-muted-foreground">{row.label}</span>
+                    <span className="tabular-mono text-[12.5px]">
+                      {Math.round(e)}<span className="text-muted-foreground"> / {Math.round(t)}{row.unit}</span>
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Water logging row — moved off Dashboard.tsx. Quick-adds and the
+            progress bar use --chart-3 (blue) to match the water ring above,
+            deliberately not the mint accent — this is the one place on the
+            app where the mint "on-track" colour doesn't apply, since water
+            isn't a macro target the split card governs. */}
+        <div className="flex items-baseline justify-between pt-3.5 pb-2.5" style={{ borderTop: '1px solid var(--hairline)' }}>
+          <span className="text-[13px] text-text-tertiary">Water</span>
+          {editingWaterTarget ? (
+            <div className="flex items-center gap-1">
+              <input
+                type="number"
+                value={waterTargetInput}
+                onChange={e => setWaterTargetInput(e.target.value)}
+                className="h-7 w-16 min-w-0 rounded-md bg-[color:var(--surface-raised)] px-1.5 text-xs"
+              />
+              <Button size="sm" variant="ghost" className="h-7 shrink-0 px-1.5 text-[10px]" onClick={handleSaveWaterTarget}>Save</Button>
+            </div>
+          ) : (
+            <span className="flex flex-wrap items-baseline justify-end gap-x-3 gap-y-1">
+              <span className="tabular-mono text-[13px]">{todayWaterMl} / {waterTarget} ml</span>
+              {WATER_QUICK_ADD_ML.map(ml => (
+                <button key={ml} className="text-xs font-semibold" style={{ color: 'var(--chart-3)' }} onClick={() => handleAddWater(ml)}>+{ml}</button>
+              ))}
+              <button className="text-xs text-muted-foreground" onClick={() => { setWaterTargetInput(String(waterTarget)); setEditingWaterTarget(true) }}>edit</button>
+              {lastWaterLog && (
+                <button className="text-xs text-muted-foreground" onClick={handleUndoWater}>undo</button>
+              )}
+            </span>
+          )}
+        </div>
+        <div className="mt-0 h-[3px] rounded-full" style={{ background: 'var(--hairline)' }}>
+          <div
+            className="h-[3px] rounded-full"
+            style={{
+              width: `${waterTarget > 0 ? Math.min(100, (todayWaterMl / waterTarget) * 100) : 0}%`,
+              background: 'var(--chart-3)',
+              boxShadow: '0 0 10px rgba(111,183,255,.7)',
+            }}
+          />
+        </div>
+      </div>
+
       <MealPlan
         profileId={profileId}
         date={date}

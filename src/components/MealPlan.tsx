@@ -5,6 +5,7 @@ import {
   RefreshCw,
   Loader2,
   Check,
+  ChevronDown,
 } from 'lucide-react'
 import { InsightBanner } from '@/components/ui/insight-banner'
 import type { MacroTargets } from '@/lib/types'
@@ -316,7 +317,12 @@ function MealSlotRow({
                 {option.name}
               </span>
               {!expanded && (
-                <span className="tabular-mono shrink-0 text-xs text-muted-foreground">{Math.round(option.macros.calories)} kcal</span>
+                <span className="flex shrink-0 items-center gap-1">
+                  <span className={`tabular-mono text-xs ${loggedEvent ? 'text-primary glow-mint' : 'text-muted-foreground'}`}>
+                    {loggedEvent ? '✓ ' : ''}{Math.round(option.macros.calories)} kcal
+                  </span>
+                  <ChevronDown className="size-3.5 text-muted-foreground" />
+                </span>
               )}
             </>
           ) : (
