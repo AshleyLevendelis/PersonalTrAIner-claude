@@ -848,7 +848,16 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     movement_pattern: 'hip_hinge',
     mechanics_tier: 'tier2_compound',
     prescription_type: 'reps',
-    angle_vector: 'vertical',
+    // Was 'vertical' (matching Glute Bridge) — corrected to 'horizontal' to
+    // match Bodyweight Good Morning: both are a standing torso-hinge
+    // hip-hinge, the torso pitching toward horizontal, not a vertical hip
+    // drive off the floor like Glute Bridge. Note this now agrees with
+    // Good Morning rather than with Romanian Deadlifts (angle_vector:
+    // 'vertical', its own namesake loaded RDL) — the catalogue isn't fully
+    // consistent on whether angle_vector tracks "torso pitch" or "load
+    // path" for hip-hinge work; this fix picks the former, matching the
+    // torso-hinge description in this exercise's own coach_note_swap.
+    angle_vector: 'horizontal',
     primary_muscles: ['hamstrings', 'glutes', 'erectors'],
     equipment: ['bodyweight'],
     joint_stress: 'low',
@@ -1810,7 +1819,13 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     form_cues: ['High-knee march in place or walking', 'Controlled tempo, no jumping', 'Drive the knee to hip height', 'Land softly'],
     coach_note_swap: 'Low-impact lower-body primer — raises heart rate and preps the hip/knee patterns without the landing forces of a jump.',
     loads_joints: [],
-    style_tags: ['functional', 'combat', 'hybrid'],
+    // 'bodybuilding' added: unlike its 5 siblings excluded two rounds ago
+    // (Box Jumps, Broad Jumps, Medicine Ball Slams, Plyo Push-Ups,
+    // Kettlebell Swings), this one is explicitly low-impact and non-jumping
+    // by its own form_cues ("no jumping") — it was grouped with the
+    // ballistic set for being their common regression option, not for
+    // being ballistic itself.
+    style_tags: ['functional', 'combat', 'hybrid', 'bodybuilding'],
     substitution_group: 'low_impact_activation',
     unilateral: false,
     avg_duration_seconds: 15,
