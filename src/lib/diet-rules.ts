@@ -36,6 +36,7 @@ export type DietaryPreference =
   | 'egg-free'
   | 'soy-free'
   | 'shellfish-free'
+  | 'fish-free'
   | 'low-fodmap'
 
 type TagKey = keyof FoodTags
@@ -74,6 +75,11 @@ const FORBIDDEN_TAGS: Record<DietaryPreference, TagKey[]> = {
   'egg-free': ['contains_egg'],
   'soy-free': ['contains_soy'],
   'shellfish-free': ['contains_shellfish'],
+  // Dietary-safety round 2: contains_fish was already carried on every fish
+  // entry (and, importantly, on worcestershire sauce and fish sauce — the
+  // hidden cases a name match would sail past) but no preference consumed it
+  // on its own. vegetarian/vegan reach it too; this is the standalone lane.
+  'fish-free': ['contains_fish'],
   'low-fodmap': ['is_high_fodmap'],
 }
 
@@ -94,13 +100,22 @@ export const DIETARY_PREFERENCES: DietaryPreference[] = Object.keys(FORBIDDEN_TA
 
 export interface DietViolation {
   ingredient: string
-  preference: DietaryPreference | 'kosher-meat-dairy-mix'
+  preference: DietaryPreference | 'kosher-meat-dairy-mix' | 'unrecognised-preference'
   reason: string
 }
 
 export interface DietValidationResult {
   ok: boolean
   violations: DietViolation[]
+  /**
+   * Values in `prefs` that this module does not recognise. Previously these
+   * were silently dropped — and if EVERY value was unrecognised the function
+   * returned ok:true, passing the meal completely unchecked. That fail-open
+   * is gone: an unrecognised restriction is now a hard failure, surfaced
+   * here so the caller can say "unrecognised dietary restriction 'x'"
+   * instead of reporting a generic generation failure.
+   */
+  unrecognisedPreferences: string[]
 }
 
 /**
@@ -109,15 +124,44 @@ export interface DietValidationResult {
  * active preference's forbidden-tag check. An ingredient that fails to
  * resolve at all is recorded as a violation of EVERY active preference
  * (fail-closed) rather than silently passing.
+ *
+ * An UNRECOGNISED preference value is now also fail-closed. It used to be
+ * dropped by the filter, which meant a junk value enforced nothing — and a
+ * profile whose values were ALL junk got ok:true with the meal unchecked.
+ * The `prefs` parameter stays deliberately wide (it reads a `string[]`
+ * column, which no longer accepts free text from the UI but has no DB
+ * constraint), so junk has to be caught here rather than assumed away.
  */
 export function validateMealAgainstDiet(
   ingredients: MealIngredientLine[],
   prefs: (DietaryPreference | string)[],
 ): DietValidationResult {
-  const activePrefs = prefs.filter((p): p is DietaryPreference => p in FORBIDDEN_TAGS)
+  // Own-property check, NOT `in`: `in` also matches Object.prototype keys, so
+  // a stored value of "constructor" would pass the filter and then blow up on
+  // `for (const tag of FORBIDDEN_TAGS['constructor'])` (a function is not
+  // iterable). Now it lands in unrecognised, like any other junk value.
+  // hasOwnProperty.call rather than Object.hasOwn: identical semantics, but
+  // Object.hasOwn needs an ES2022 lib and this project targets ES2020 —
+  // not worth a project-wide compile-target bump for one predicate.
+  const isKnown = (p: string): boolean => Object.prototype.hasOwnProperty.call(FORBIDDEN_TAGS, p)
+  const activePrefs = prefs.filter((p): p is DietaryPreference => isKnown(p))
+  const unrecognisedPreferences = prefs.filter(p => !isKnown(p)).map(String)
   const violations: DietViolation[] = []
 
-  if (activePrefs.length === 0) return { ok: true, violations: [] }
+  for (const unknown of unrecognisedPreferences) {
+    violations.push({
+      ingredient: '(whole meal)',
+      preference: 'unrecognised-preference',
+      reason: `"${unknown}" is not a dietary preference this app can enforce — rejected rather than ignored, since nothing here can prove the meal complies with it.`,
+    })
+  }
+
+  // No recognised restrictions AND no junk: genuinely unrestricted, pass.
+  // Note the asymmetry with the old code — that early return used to fire
+  // whenever activePrefs was empty, INCLUDING when every value was junk.
+  if (activePrefs.length === 0) {
+    return { ok: violations.length === 0, violations, unrecognisedPreferences }
+  }
 
   let sawMeatOrPork = false
   let sawDairy = false
@@ -161,5 +205,5 @@ export function validateMealAgainstDiet(
     })
   }
 
-  return { ok: violations.length === 0, violations }
+  return { ok: violations.length === 0, violations, unrecognisedPreferences }
 }

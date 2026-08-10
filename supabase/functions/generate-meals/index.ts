@@ -109,6 +109,7 @@ function buildDietarySafetyBlock(preferences: string[]): string {
   if (has("egg-free")) rules.push("EGG-FREE: no eggs or egg-derived ingredients.");
   if (has("soy-free")) rules.push("SOY-FREE: no tofu, tempeh, soy sauce, edamame, or soy milk.");
   if (has("shellfish-free")) rules.push("SHELLFISH-FREE: no prawns, crab, lobster, mussels, or scallops.");
+  if (has("fish-free")) rules.push("FISH-FREE: no fish of any kind, and no fish sauce, worcestershire sauce, or anchovy paste.");
   if (has("low-fodmap")) rules.push("LOW-FODMAP: avoid garlic, onion, wheat, and high-fructose fruit where possible.");
 
   if (rules.length === 0) return "";

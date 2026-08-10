@@ -75,9 +75,49 @@ async function main() {
   check('generate-meals buildDietarySafetyBlock has no "pork-free" literal', !generateMealsBlock.includes('"pork-free"'))
   check('generate-meals buildDietarySafetyBlock has no "seafood-free" literal', !generateMealsBlock.includes('"seafood-free"'))
 
-  console.log(`\n[5] DIETARY_PREFERENCES itself has no duplicates and covers all 16 onboarding categories`)
-  check('exactly 16 preferences', DIETARY_PREFERENCES.length === 16, DIETARY_PREFERENCES)
+  console.log(`\n[5] DIETARY_PREFERENCES itself has no duplicates and covers all 17 onboarding categories`)
+  check('exactly 17 preferences', DIETARY_PREFERENCES.length === 17, DIETARY_PREFERENCES)
   check('no duplicate tags', new Set(DIETARY_PREFERENCES).size === DIETARY_PREFERENCES.length, DIETARY_PREFERENCES)
+  check('fish-free is present (round 2 — contains_fish had no standalone lane)', DIETARY_PREFERENCES.includes('fish-free'))
+
+  // -------------------------------------------------------------------------
+  // Round 2: the fail-open fix. An unrecognised preference used to be dropped
+  // silently, and an ALL-unrecognised set returned ok:true with the meal
+  // completely unchecked. Both are now hard failures.
+  // -------------------------------------------------------------------------
+  const { validateMealAgainstDiet } = await import('../src/lib/diet-rules')
+  const chickenMeal = [{ name: 'chicken breast', quantity: 150, unit: 'g' as const }]
+  const salmonMeal = [{ name: 'salmon', quantity: 150, unit: 'g' as const }]
+  const fishSauceMeal = [{ name: 'fish sauce', quantity: 15, unit: 'g' as const }]
+
+  console.log(`\n[6] Unrecognised preferences fail closed`)
+  const unknownOnly = validateMealAgainstDiet(chickenMeal, ['definitely-not-a-diet'])
+  check('an all-unrecognised set is NOT ok (the old ok:true fail-open is gone)', unknownOnly.ok === false, unknownOnly)
+  check('the unrecognised value is surfaced for the caller', unknownOnly.unrecognisedPreferences.includes('definitely-not-a-diet'), unknownOnly)
+
+  const mixed = validateMealAgainstDiet(salmonMeal, ['fish-free', 'not-a-real-tag'])
+  check('mixed known+unknown still enforces the known rule', mixed.ok === false && mixed.violations.some(v => v.preference === 'fish-free'), mixed)
+  check('mixed known+unknown still surfaces the unknown', mixed.unrecognisedPreferences.includes('not-a-real-tag'), mixed)
+
+  const clean = validateMealAgainstDiet(chickenMeal, ['fish-free'])
+  check('a genuinely compliant meal still passes, with nothing unrecognised', clean.ok === true && clean.unrecognisedPreferences.length === 0, clean)
+
+  const noPrefs = validateMealAgainstDiet(chickenMeal, [])
+  check('no restrictions at all still passes (unrestricted is not the same as unrecognised)', noPrefs.ok === true, noPrefs)
+
+  console.log(`\n[7] Object.prototype keys are treated as unrecognised, not as rules`)
+  for (const proto of ['constructor', 'toString', 'hasOwnProperty']) {
+    let threw = false
+    let res: ReturnType<typeof validateMealAgainstDiet> | null = null
+    try { res = validateMealAgainstDiet(chickenMeal, [proto]) } catch { threw = true }
+    check(`"${proto}" does not throw`, !threw)
+    check(`"${proto}" is classified unrecognised`, res != null && res.unrecognisedPreferences.includes(proto), res)
+  }
+
+  console.log(`\n[8] fish-free catches hidden fish, not just fillets`)
+  check('fish-free rejects salmon', validateMealAgainstDiet(salmonMeal, ['fish-free']).ok === false)
+  check('fish-free rejects fish sauce (the case a name match would miss)', validateMealAgainstDiet(fishSauceMeal, ['fish-free']).ok === false)
+  check('fish-free does not reject chicken', validateMealAgainstDiet(chickenMeal, ['fish-free']).ok === true)
 
   if (failures > 0) {
     console.error(`\n${failures} diet-tag-sync check(s) FAILED.`)

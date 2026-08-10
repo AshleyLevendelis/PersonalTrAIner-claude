@@ -796,6 +796,9 @@ function buildDietarySafetyBlock(preferences: string[]): string {
   if (preferences.includes("shellfish-free")) {
     rules.push("SHELLFISH-FREE: No shellfish of any kind (shrimp, prawns, crab, lobster, scallops, mussels, oysters, clams). Zero matching allergens may pass into the ingredients array.");
   }
+  if (preferences.includes("fish-free")) {
+    rules.push("FISH-FREE: No fish of any kind (salmon, tuna, cod, haddock, tilapia, sea bass, mackerel, sardines, anchovies, trout, red snapper) and no fish-derived condiments (fish sauce, worcestershire sauce, anchovy paste). Zero matching allergens may pass into the ingredients array.");
+  }
   if (preferences.includes("low-fodmap")) {
     rules.push("LOW-FODMAP: Avoid garlic, onion, wheat, and high-fructose fruit where possible.");
   }

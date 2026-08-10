@@ -532,17 +532,40 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
         <div className="space-y-2">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Dietary &amp; cooking</h3>
           <div className="rounded-md border p-2.5 space-y-3 text-sm">
-            <div className="space-y-1">
-              <span className="text-muted-foreground">Dietary preferences</span>
-              <EditableTagList values={profile.dietary_preferences} onSave={v => savePatch({ dietary_preferences: v })} placeholder={`e.g. ${DIETARY_OPTIONS[0]?.label ?? 'vegetarian'}`} />
+            {/* Dietary-safety round 2 — the two lanes are now visibly
+                different things, and only the canonical one is pickable.
+                This was free text before, which let a user type an
+                unenforceable value ("shellfish") that looked saved and did
+                nothing. Copy explains the difference in strength without a
+                word about tags or the food database. */}
+            <div className="space-y-1.5">
+              <span className="text-muted-foreground">Dietary restrictions</span>
+              <p className="text-[11px] leading-snug text-muted-foreground/70">Diets and allergies the app enforces when building your meals.</p>
+              <ToggleGroup
+                type="multiple"
+                value={profile.dietary_preferences}
+                onValueChange={(next: string[]) => savePatch({ dietary_preferences: next })}
+                className="flex flex-wrap justify-start gap-1.5"
+              >
+                {DIETARY_OPTIONS.map(o => (
+                  <ToggleGroupItem
+                    key={o.value}
+                    value={o.value}
+                    className="h-8 rounded-full border px-2.5 text-[11px] data-[state=on]:border-primary data-[state=on]:text-primary"
+                  >
+                    {o.icon} {o.label}
+                  </ToggleGroupItem>
+                ))}
+              </ToggleGroup>
+            </div>
+            <div className="space-y-1.5">
+              <span className="text-muted-foreground">Foods to avoid</span>
+              <p className="text-[11px] leading-snug text-muted-foreground/70">Anything else you'd rather not see. Matched by name.</p>
+              <EditableTagList values={hardFoodDislikeValues} onSave={saveDislikedFoods} placeholder="e.g. mushrooms" />
             </div>
             <div className="space-y-1">
               <span className="text-muted-foreground">Favorite cuisines</span>
               <EditableTagList values={profile.favorite_cuisines ?? []} onSave={v => savePatch({ favorite_cuisines: v })} placeholder={`e.g. ${FAVORITE_CUISINE_OPTIONS[0]?.label ?? 'Italian'}`} />
-            </div>
-            <div className="space-y-1">
-              <span className="text-muted-foreground">Disliked foods</span>
-              <EditableTagList values={hardFoodDislikeValues} onSave={saveDislikedFoods} placeholder="e.g. mushrooms" />
             </div>
             <Row label="Cooking time"><EditableSelectField value={profile.cooking_time_preference ?? 'moderate'} options={COOKING_TIME_OPTIONS} onSave={v => savePatch({ cooking_time_preference: v })} /></Row>
             <Row label="Meals per day"><EditableSelectField value={profile.meals_per_day ?? 3} options={MEALS_PER_DAY_OPTIONS} onSave={v => savePatch({ meals_per_day: v })} /></Row>

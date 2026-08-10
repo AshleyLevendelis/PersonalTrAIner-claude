@@ -138,6 +138,7 @@ const DIETARY_META: Record<DietaryPreference, { icon: string; label: string }> =
   'egg-free': { icon: '🥚', label: 'Egg-Free' },
   'soy-free': { icon: '🫘', label: 'Soy-Free' },
   'shellfish-free': { icon: '🦐', label: 'Shellfish-Free' },
+  'fish-free': { icon: '🐟', label: 'Fish-Free' },
   'low-fodmap': { icon: '🧬', label: 'Low-FODMAP' },
 }
 

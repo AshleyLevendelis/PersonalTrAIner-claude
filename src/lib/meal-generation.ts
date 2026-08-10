@@ -281,6 +281,14 @@ export function verifyProposal(
 
   const dietResult = validateMealAgainstDiet(parsed, dietaryPreferences)
   if (!dietResult.ok) {
+    // An unrecognised restriction is a DATA problem, not a bad proposal —
+    // every meal will fail identically until the value is fixed, so it gets
+    // its own message rather than being buried in a per-meal violation list
+    // that reads like generation just kept getting unlucky.
+    if (dietResult.unrecognisedPreferences.length > 0) {
+      rejectLog.push(`[${slot}] unrecognised dietary restriction(s): ${dietResult.unrecognisedPreferences.join(', ')} — nothing can be generated until these are corrected in Profile.`)
+      return null
+    }
     rejectLog.push(`[${slot}] "${proposal.name}": diet violation(s) — ${dietResult.violations.map(v => v.reason).join('; ')}`)
     return null
   }
