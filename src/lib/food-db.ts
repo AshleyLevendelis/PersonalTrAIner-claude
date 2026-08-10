@@ -171,7 +171,14 @@ export const FOOD_DB: FoodEntry[] = [
   f('soy mince', ['tvp', 'textured vegetable protein', 'soy protein mince'], { kcal: 285, protein: 50, carbs: 30, fat: 1 }, 'protein', { contains_soy: true }),
   f('quorn mince', ['quorn'], { kcal: 92, protein: 12, carbs: 4.4, fat: 2.7 }, 'protein', { contains_egg: true }),
   f('quorn fillet', ['quorn fillets', 'quorn chicken pieces'], { kcal: 106, protein: 13, carbs: 6.7, fat: 2.9 }, 'protein', { contains_egg: true }),
-  f('peanut butter', [], { kcal: 588, protein: 25, carbs: 20, fat: 50 }, 'fat', { contains_nuts: false }, { tbsp: 16 }),
+  // PEANUTS COUNT AS NUTS HERE. Botanically peanuts are legumes, and this
+  // entry (plus 'peanuts' and 'peanut oil' below) used to assert
+  // contains_nuts: false on that basis. That is the wrong frame: 'nut-free'
+  // is a user-facing safety checkbox, not a botanical classification, and
+  // peanuts are the most common severe nut allergen. Over-restricting a
+  // tree-nut-only user fails safe; under-restricting a peanut-allergic user
+  // does not. Do not "correct" these back to false.
+  f('peanut butter', [], { kcal: 588, protein: 25, carbs: 20, fat: 50 }, 'fat', { contains_nuts: true }, { tbsp: 16 }),
   f('almond butter', [], { kcal: 614, protein: 21, carbs: 19, fat: 56 }, 'fat', { contains_nuts: true }, { tbsp: 16 }),
   f('hummus', [], { kcal: 166, protein: 7.9, carbs: 11, fat: 9.6 }, 'other', { is_legume: true }),
 
@@ -215,7 +222,7 @@ export const FOOD_DB: FoodEntry[] = [
   f('almonds', ['almond'], { kcal: 579, protein: 21.2, carbs: 22, fat: 49.9 }, 'fat', { contains_nuts: true }),
   f('walnuts', ['walnut', 'walnut halves'], { kcal: 654, protein: 15.2, carbs: 13.7, fat: 65.2 }, 'fat', { contains_nuts: true }),
   f('cashews', ['cashew nuts'], { kcal: 553, protein: 18.2, carbs: 30.2, fat: 43.9 }, 'fat', { contains_nuts: true }),
-  f('peanuts', [], { kcal: 567, protein: 25.8, carbs: 16.1, fat: 49.2 }, 'fat', { contains_nuts: false }),
+  f('peanuts', [], { kcal: 567, protein: 25.8, carbs: 16.1, fat: 49.2 }, 'fat', { contains_nuts: true }), // see 'peanut butter' above for why this is true, not false
   f('mixed nuts', [], { kcal: 607, protein: 20, carbs: 19, fat: 54 }, 'fat', { contains_nuts: true }),
   f('pistachios', [], { kcal: 560, protein: 20.6, carbs: 27.2, fat: 45.3 }, 'fat', { contains_nuts: true }),
   f('chia seeds', [], { kcal: 486, protein: 17, carbs: 42, fat: 31 }, 'fat', {}, { tbsp: 12 }),
@@ -458,7 +465,11 @@ export const FOOD_DB: FoodEntry[] = [
   f('sulguni cheese', ['sulguni'], { kcal: 280, protein: 22, carbs: 2, fat: 21 }, 'dairy', { contains_dairy: true }),
   f('sesame seeds', ['roasted sesame seeds'], { kcal: 573, protein: 17.7, carbs: 23.4, fat: 49.7 }, 'fat', {}),
   f('hemp seeds', [], { kcal: 553, protein: 31.6, carbs: 8.7, fat: 48.8 }, 'fat', {}),
-  f('peanut oil', [], { kcal: 884, protein: 0, carbs: 0, fat: 100 }, 'fat', {}, { tbsp: 14, tsp: 4.5 }),
+  // Untagged before this round (absent reads as safe), so nut-free never saw
+  // it. Tagged for the same reason as 'peanut butter' above. Refined peanut
+  // oil is often tolerated clinically, but that is a per-person medical call
+  // this app cannot make from an ingredient string.
+  f('peanut oil', [], { kcal: 884, protein: 0, carbs: 0, fat: 100 }, 'fat', { contains_nuts: true }, { tbsp: 14, tsp: 4.5 }),
   f('safflower oil', [], { kcal: 884, protein: 0, carbs: 0, fat: 100 }, 'fat', {}, { tbsp: 14, tsp: 4.5 }),
   f('red snapper', ['red snapper fillet'], { kcal: 100, protein: 20.5, carbs: 0, fat: 1.3 }, 'protein', { contains_fish: true }),
   f('beef broth', ['beef bone broth', 'beef stock'], { kcal: 15, protein: 2.5, carbs: 0.5, fat: 0.3 }, 'condiment', {}),

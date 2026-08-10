@@ -86,6 +86,7 @@ async function main() {
   // completely unchecked. Both are now hard failures.
   // -------------------------------------------------------------------------
   const { validateMealAgainstDiet } = await import('../src/lib/diet-rules')
+  const { lookupIngredient } = await import('../src/lib/food-db')
   const chickenMeal = [{ name: 'chicken breast', quantity: 150, unit: 'g' as const }]
   const salmonMeal = [{ name: 'salmon', quantity: 150, unit: 'g' as const }]
   const fishSauceMeal = [{ name: 'fish sauce', quantity: 15, unit: 'g' as const }]
@@ -118,6 +119,57 @@ async function main() {
   check('fish-free rejects salmon', validateMealAgainstDiet(salmonMeal, ['fish-free']).ok === false)
   check('fish-free rejects fish sauce (the case a name match would miss)', validateMealAgainstDiet(fishSauceMeal, ['fish-free']).ok === false)
   check('fish-free does not reject chicken', validateMealAgainstDiet(chickenMeal, ['fish-free']).ok === true)
+
+  // -------------------------------------------------------------------------
+  // Allergen round: peanuts count as nuts. These three entries used to assert
+  // contains_nuts: false (peanut butter, peanuts) or carry no tags at all
+  // (peanut oil), so a nut-free profile was served peanut butter with ok:true
+  // and zero violations. Botanically peanuts are legumes; 'nut-free' is a
+  // safety checkbox, not a botanical classification. These assertions exist so
+  // nobody "corrects" the tags back on botanical grounds.
+  // -------------------------------------------------------------------------
+  console.log(`\n[9] nut-free rejects peanuts, peanut butter and peanut oil`)
+  const peanutSources: [string, number][] = [
+    ['peanut butter', 30],
+    ['peanuts', 40],
+    ['peanut oil', 15],
+  ]
+  for (const [name, grams] of peanutSources) {
+    const entry = lookupIngredient(name)
+    check(`"${name}" resolves to a food-db entry`, entry !== null, name)
+    check(`"${name}" is tagged contains_nuts`, entry?.tags.contains_nuts === true, entry?.tags)
+
+    const meal = [{ name, quantity: grams, unit: 'g' as const }]
+    const res = validateMealAgainstDiet(meal, ['nut-free'])
+    check(`nut-free REJECTS a meal containing "${name}"`, res.ok === false, res)
+    check(`the violation names nut-free and the ingredient`, res.violations.some(v => v.preference === 'nut-free' && v.ingredient.includes('peanut')), res.violations)
+  }
+
+  // Mixed meal: the peanut source is one ingredient among several compliant
+  // ones — the whole meal must still be rejected, not diluted to a pass.
+  const mixedPeanutMeal = [
+    { name: 'chicken breast', quantity: 150, unit: 'g' as const },
+    { name: 'white rice cooked', quantity: 180, unit: 'g' as const },
+    { name: 'peanut oil', quantity: 10, unit: 'g' as const },
+  ]
+  check('nut-free rejects a mixed meal where only the oil is a peanut source',
+    validateMealAgainstDiet(mixedPeanutMeal, ['nut-free']).ok === false)
+
+  // Guard the tree-nut side didn't regress while flipping the peanut side.
+  check('nut-free still rejects almonds (tree nut, unchanged)',
+    validateMealAgainstDiet([{ name: 'almonds', quantity: 30, unit: 'g' }], ['nut-free']).ok === false)
+  check('nut-free still passes a genuinely nut-free meal',
+    validateMealAgainstDiet([{ name: 'chicken breast', quantity: 150, unit: 'g' }], ['nut-free']).ok === true)
+
+  // The Deno-side table is a hand-maintained duplicate that nothing currently
+  // reads for tags — guarded here so the two cannot drift on a SAFETY fact.
+  console.log(`\n[10] the Deno-side _shared/food-db.ts agrees on the peanut tags`)
+  const sharedSrc = readFileSync(join(ROOT, 'supabase/functions/_shared/food-db.ts'), 'utf-8')
+  for (const name of ['peanut butter', 'peanuts', 'peanut oil']) {
+    const line = sharedSrc.split('\n').find(l => l.includes(`f('${name}'`))
+    check(`_shared food-db declares "${name}"`, line !== undefined)
+    check(`_shared "${name}" is contains_nuts: true`, line?.includes('contains_nuts: true') === true, line?.trim())
+  }
 
   if (failures > 0) {
     console.error(`\n${failures} diet-tag-sync check(s) FAILED.`)
