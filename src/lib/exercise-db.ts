@@ -2062,6 +2062,61 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     avg_duration_seconds: 18,
     primer_pattern_affinity: ['horizontal_push', 'vertical_push', 'horizontal_pull', 'vertical_pull'],
   },
+  // The 7 primers above cover every upper-body push/pull pattern for
+  // bodybuilding-style profiles (see the accompanying report) but nothing
+  // lower-body or cardio — Squat & Carry, Legs & Calves, and Conditioning &
+  // Core still had zero bodybuilding-tagged primer with a matching
+  // primer_pattern_affinity, so those tracks fell back to a mismatched
+  // primer for every bodybuilding-style profile. The only EXISTING primers
+  // covering knee_dominant/hip_hinge/cardio are the 6 explicitly-excluded
+  // ballistic ones (Box Jumps, Broad Jumps, Medicine Ball Slams, Plyo
+  // Push-Ups, Kettlebell Swings, Bodyweight Squat Marches) — genuinely a
+  // missing-exercise gap, not a missing-tag one, so these two are new
+  // entries rather than a re-tag.
+  {
+    name: 'Leg Swings',
+    id: 'leg-swings',
+    movement_pattern: 'activation',
+    mechanics_tier: 'primer',
+    prescription_type: 'reps',
+    angle_vector: 'diagonal',
+    primary_muscles: ['hip flexors', 'glutes', 'hamstrings'],
+    equipment: ['bodyweight'],
+    joint_stress: 'low',
+    form_cues: ['Hold a wall or rack for balance', 'Swing one leg forward and back under control', 'Full range, no momentum or kicking', 'Switch legs halfway'],
+    coach_note_swap: 'Dynamic hip-mobility warm-up — controlled range of motion before squat or hinge work, no jump and no impact.',
+    loads_joints: [],
+    style_tags: ['functional', 'hybrid', 'bodybuilding'],
+    substitution_group: 'low_impact_activation',
+    unilateral: true,
+    avg_duration_seconds: 18,
+    // Dynamic hip flexion/extension under control — suits squat and hinge
+    // days alike, the same dual-pattern shape Broad Jumps has, just without
+    // the jump.
+    primer_pattern_affinity: ['knee_dominant', 'hip_hinge'],
+  },
+  {
+    name: 'Lateral Step Touches',
+    id: 'lateral-step-touches',
+    movement_pattern: 'activation',
+    mechanics_tier: 'primer',
+    prescription_type: 'reps',
+    angle_vector: 'lateral',
+    primary_muscles: ['glutes', 'quadriceps', 'calves'],
+    equipment: ['bodyweight'],
+    joint_stress: 'low',
+    form_cues: ['Step side to side at a steady pace', 'Stay light on the feet — no jumping', 'Swing arms naturally for rhythm', 'Keep knees soft throughout'],
+    coach_note_swap: 'Zero-impact rhythmic warm-up that raises heart rate without any jumping or landing force.',
+    loads_joints: [],
+    style_tags: ['functional', 'hybrid', 'bodybuilding'],
+    substitution_group: 'low_impact_activation',
+    unilateral: false,
+    avg_duration_seconds: 20,
+    // Raises heart rate with zero impact — the conditioning-primer role
+    // Kettlebell Swings/Bodyweight Squat Marches play elsewhere, without
+    // the ballistic hip-snap or the (excluded) march.
+    primer_pattern_affinity: ['cardio'],
+  },
 ]
 
 /**
