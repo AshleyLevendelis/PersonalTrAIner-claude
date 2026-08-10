@@ -217,7 +217,7 @@ async function main() {
   lines.push('-'.repeat(80))
   for (const s of worst10) {
     lines.push('')
-    lines.push(`Score ${s.result.overall.toFixed(1)}/10 — ${s.label}`)
+    lines.push(`Score ${s.result.overall.toFixed(1)}/12 — ${s.label}`)
     for (const key of DIMENSION_KEYS) {
       const dim = s.result.dimensions[key]
       if (dim.deductions.length === 0) continue
