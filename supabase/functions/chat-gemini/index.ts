@@ -813,6 +813,26 @@ Strictly enforce all allergy guardrails (Egg-Free, Soy-Free, Nut-Free, Shellfish
 When suggesting replacements or alternatives, EVERY suggestion MUST comply with these restrictions. NEVER suggest a food that violates these constraints.`;
 }
 
+// Allergen-honesty round — the rules above tell the model to STRICTLY
+// ENFORCE and let ZERO allergens pass, which is correct instruction to the
+// generator but reads, unqualified, as a claim the model could echo back to
+// the user ("this is nut-free"). It can't back that claim: the eight
+// categories above are food-database TAG matching over a mostly-untagged
+// catalogue, and the resolver can drop a named qualifier entirely (an
+// "almond-crusted cod" suggestion can resolve to plain cod, tags and all).
+// Deliberately unconditional — interpolated at every turn regardless of
+// whether dietary_preferences is set, because the risky moment (a user
+// disclosing an allergy, or asking "can I eat X") isn't gated on a
+// restriction already being on file; the real chat message that prompted
+// this round ("I can record them to ensure they never appear in your meal
+// plans") was said to a profile with zero restrictions recorded.
+const ALLERGEN_HONESTY_BLOCK = `
+
+ALLERGEN HONESTY (applies every turn, not only when a restriction is set):
+Never state or imply that a specific food or meal "is safe," "is nut-free/gluten-free/dairy-free/[X]-free," or "won't contain" an allergen — for ANY of the eight categories above OR anything else. Both the rules above and the free-text avoid-list are real filtering, not verification: category tag-matching over a mostly-untagged catalogue, or literal word-matching with no synonym expansion — imperfect in different ways, neither one a guarantee. Say what the app actually did instead of what it verified: "your plan excludes X" or "I've filtered that out" (an action you can state), never "this is X-free" (a certainty you can't back). One clause is enough; don't repeat it more than once a conversation.
+If the user discloses celery, sesame, mustard, lupin, sulphites, or anything outside the eight categories above, still record it as a fact — that excludes the literal word they used from suggestions, the same word-matching the avoid-list already relies on. But say plainly, once, that this one works purely on the word said, not other names for the same thing — then offer, by name, to add the common hidden forms too ("want me to add tahini, hummus, and halva as well?" for sesame; stock cubes and stock for celery) so it becomes something they can act on, not just a caveat to sit with.
+For "can I eat X" questions: answer with what you actually know — the recipe, the macros, what's recorded — the same direct way you already answer nutrition questions, but never give a yes/no safety verdict on an allergy. For food outside the app's own data (a restaurant, a packaged product, someone else's cooking) you have no ingredient data at all — say that plainly and point them to the label or the people who made it, the same one-line redirect §1c already uses for genuinely out-of-scope questions.`;
+
 interface ConcurrentActivity {
   name: string;
   intensity: number;
@@ -1169,6 +1189,7 @@ MEMORY & GOALS (VISION-ARCHITECTURE.md §1 Part 2):
 - For record_goal on a measurable metric (body_weight_kg, lift_working_kg, lift_1rm_kg, sessions_per_week): include baseline_value ONLY if the user actually stated their current number. Never estimate or invent one — the app will look up logged data or ask.
 - Never call record_fact/record_goal for something that only affects HOW you talk to the user (motivation, tone, life context like an upcoming event) — that is record_context_fact instead, and it must never be described as something that will change the plan.
 - DON'T ANNOUNCE THE SAVE. A coach who remembers something doesn't tell you they're filing it. For record_fact and record_context_fact, acknowledge in at most half a sentence, folded into a normal reply — "Fair enough, I'll keep it off your plans", "Noted", "Good to know" — then carry on with the actual conversation. Never say "Saved to memory", "I've recorded that", "Added to your profile", or describe where it went. The app handles the receipt; your job is to keep talking like a person.
+- When offering to record, or acknowledging, a food dislike or allergy: state the action, not a certainty the matching can't back. Say "I can keep that off what I suggest" or "I'll exclude that going forward" — never "I'll make sure it never appears" or any other guaranteed-X-free phrasing. True regardless of how well the matching actually catches it, and it doesn't promise more than the app can stand behind.
 - record_goal is the one exception: a goal is rare and consequential, so the app shows the user a card of exactly what was captured. You still don't narrate the filing — just respond to the goal itself.
 ${context.active_facts && context.active_facts.length > 0 ? `\nWHAT YOU ALREADY KNOW (do not re-ask or re-record these):\n${context.active_facts.map((f: string) => `- ${f}`).join("\n")}` : ""}
 ${context.active_goals && context.active_goals.length > 0 ? `\nACTIVE GOALS:\n${context.active_goals.map((g: string) => `- ${g}`).join("\n")}` : ""}
@@ -1220,6 +1241,7 @@ ${context.exercise_summary}
 CURRENT MEAL PLAN:
 ${context.meal_summary}
 ${buildDietarySafetyBlock(context.dietary_preferences || [])}
+${ALLERGEN_HONESTY_BLOCK}
 
 ${context.workout_log_history ? `WORKOUT PERFORMANCE HISTORY (last 14 days):
 The following is the user's actual logged workout performance data. Each line shows a date and exercises performed with weight x reps for each set.
