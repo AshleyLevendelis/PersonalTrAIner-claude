@@ -50,6 +50,9 @@ export interface FoodTags {
   is_refined_sugar?: boolean
   is_high_carb?: boolean
   is_high_fodmap?: boolean
+  // Referenced by NO dietary preference — nothing on the Deno side reads
+  // FoodTags at all today, but kept in lockstep with src/lib/food-db.ts's
+  // copy. See that file's comment for the full rationale.
   is_processed_meat?: boolean
 }
 
@@ -293,9 +296,17 @@ export const FOOD_DB: FoodEntry[] = [
   f('worcestershire sauce', [], { kcal: 78, protein: 0, carbs: 19.5, fat: 0 }, 'condiment', { contains_fish: true }, { tbsp: 17 }),
   f('teriyaki sauce', [], { kcal: 89, protein: 5.9, carbs: 16, fat: 0 }, 'condiment', { contains_soy: true, contains_gluten: true }, { tbsp: 18 }),
   f('vegetable stock cube', ['stock cube', 'vegetable stock'], { kcal: 233, protein: 8, carbs: 40, fat: 5 }, 'condiment', { is_high_fodmap: true }),
-  f('dark chocolate', ['70% dark chocolate'], { kcal: 546, protein: 7.8, carbs: 46, fat: 31 }, 'other', { is_refined_sugar: true }),
-  f('milk chocolate', [], { kcal: 535, protein: 7.6, carbs: 59, fat: 30 }, 'other', { contains_dairy: true, is_refined_sugar: true }),
-  f('protein bar generic', ['protein bar'], { kcal: 370, protein: 30, carbs: 35, fat: 12 }, 'other', {}, { whole: 60 }),
+  // Soy lecithin is a near-ubiquitous emulsifier in commercial chocolate —
+  // brand-dependent, not knowable from the name. Absent reads as safe, so
+  // true is the only fail-safe state this schema can express. Kept in
+  // lockstep with src/lib/food-db.ts.
+  f('dark chocolate', ['70% dark chocolate'], { kcal: 546, protein: 7.8, carbs: 46, fat: 31 }, 'other', { is_refined_sugar: true, contains_soy: true }),
+  f('milk chocolate', [], { kcal: 535, protein: 7.6, carbs: 59, fat: 30 }, 'other', { contains_dairy: true, is_refined_sugar: true, contains_soy: true }),
+  // Brand-dependent, not knowable from the name — protein bars routinely
+  // carry a nut or peanut base, whey/milk chocolate coating, soy protein
+  // isolate, and an oat/wheat binder. Absent reads as safe, so true across
+  // all four is the only fail-safe state this schema can express.
+  f('protein bar generic', ['protein bar'], { kcal: 370, protein: 30, carbs: 35, fat: 12 }, 'other', { contains_nuts: true, contains_dairy: true, contains_soy: true, contains_gluten: true }, { whole: 60 }),
 
   // ===== PROTEIN: more meat & poultry ==================================
   f('duck breast', ['duck'], { kcal: 201, protein: 23.5, carbs: 0, fat: 11.2 }, 'protein', { contains_meat: true }),
@@ -329,7 +340,10 @@ export const FOOD_DB: FoodEntry[] = [
   // Nut content is brand-dependent and not knowable from the name. Kept in
   // lockstep with src/lib/food-db.ts's copy — see the fuller rationale there.
   f('granola', [], { kcal: 471, protein: 10, carbs: 64, fat: 20 }, 'carb', { is_grain: true, is_high_carb: true, contains_nuts: true }),
-  f('muesli', [], { kcal: 362, protein: 9.7, carbs: 66, fat: 6 }, 'carb', { is_grain: true, is_high_carb: true }),
+  // Same shape as granola — nut content is brand-dependent and not knowable
+  // from the name. Absent reads as safe, so true is the only fail-safe state
+  // this schema can express.
+  f('muesli', [], { kcal: 362, protein: 9.7, carbs: 66, fat: 6 }, 'carb', { is_grain: true, is_high_carb: true, contains_nuts: true }),
   f('cornflakes', ['corn flakes'], { kcal: 357, protein: 7.5, carbs: 84, fat: 0.9 }, 'carb', { is_grain: true, is_high_carb: true }),
   f('weetabix', ['bran cereal'], { kcal: 338, protein: 11, carbs: 69, fat: 2.5 }, 'carb', { is_grain: true, contains_gluten: true, is_high_carb: true }),
   f('brioche', [], { kcal: 375, protein: 8.5, carbs: 50, fat: 15 }, 'carb', { is_grain: true, contains_gluten: true, contains_egg: true, contains_dairy: true, is_high_carb: true }),
@@ -380,8 +394,15 @@ export const FOOD_DB: FoodEntry[] = [
   // ===== CONDIMENTS: more variety ==========================================
   f('rice vinegar', [], { kcal: 18, protein: 0, carbs: 0.4, fat: 0 }, 'condiment', {}, { tbsp: 15 }),
   f('fish sauce', [], { kcal: 43, protein: 6, carbs: 3.6, fat: 0 }, 'condiment', { contains_fish: true }, { tbsp: 18 }),
-  f('miso paste', ['miso'], { kcal: 199, protein: 12.8, carbs: 26, fat: 6 }, 'condiment', { contains_soy: true }, { tbsp: 17 }),
-  f('gochujang', ['korean chilli paste'], { kcal: 173, protein: 5.5, carbs: 34, fat: 2.4 }, 'condiment', { contains_soy: true, is_high_fodmap: true }, { tbsp: 20 }),
+  // Miso is often assumed gluten-free because it's "just soy" — wrong for
+  // barley/rice-koji miso, which carries gluten. Brand-dependent, not
+  // knowable from the name; absent reads as safe, so true is the only
+  // fail-safe state this schema can express.
+  f('miso paste', ['miso'], { kcal: 199, protein: 12.8, carbs: 26, fat: 6 }, 'condiment', { contains_soy: true, contains_gluten: true }, { tbsp: 17 }),
+  // Traditionally made with wheat flour alongside the soybean base.
+  // Brand-dependent, not knowable from the name; absent reads as safe, so
+  // true is the only fail-safe state this schema can express.
+  f('gochujang', ['korean chilli paste'], { kcal: 173, protein: 5.5, carbs: 34, fat: 2.4 }, 'condiment', { contains_soy: true, is_high_fodmap: true, contains_gluten: true }, { tbsp: 20 }),
   f('harissa', [], { kcal: 111, protein: 3, carbs: 12, fat: 6 }, 'condiment', { is_high_fodmap: true }, { tbsp: 15 }),
   f('tzatziki', [], { kcal: 88, protein: 3.8, carbs: 3.6, fat: 6.8 }, 'condiment', { contains_dairy: true, is_high_fodmap: true }),
   f('guacamole', [], { kcal: 155, protein: 2, carbs: 8.5, fat: 13 }, 'condiment', { is_high_fodmap: true }),
