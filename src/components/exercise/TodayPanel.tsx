@@ -439,6 +439,8 @@ function ExerciseList({
 function sectionLabelFor(group: ExerciseGroup, isFirstMainLift: boolean): string {
   if (group.kind === 'superset') return `Superset ${group.label}`
   if (isFirstMainLift) return 'Main lift'
+  if (group.ex.tier === 'tier_0_primer') return 'Primer'
+  if (group.ex.tier === 'tier_4_finisher') return 'Finisher'
   return 'Accessory'
 }
 

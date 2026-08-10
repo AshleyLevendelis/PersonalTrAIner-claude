@@ -1670,7 +1670,10 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     prescription_type: 'reps',
     angle_vector: 'anti_rotation',
     primary_muscles: ['obliques', 'transverse abdominis', 'core'],
-    equipment: ['resistance band'],
+    // Form cues describe cable-machine execution — 'resistance band' has no
+    // meaningful kg value to load-prescription.ts's LOADED_EQUIPMENT set, so
+    // this exercise was silently getting no load estimate at all.
+    equipment: ['cable machine'],
     joint_stress: 'low',
     form_cues: ['Stand perpendicular to cable', 'Press hands straight out', 'Resist rotation', 'Hold 2 seconds extended'],
     coach_note_swap: 'Gold-standard anti-rotation exercise for rotational stability.',
