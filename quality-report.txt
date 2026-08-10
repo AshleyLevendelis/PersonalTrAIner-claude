@@ -3,15 +3,15 @@ PLAN QUALITY SCORE REPORT
 ================================================================================
 
 Combinations scored: 9216
-Runtime: 602.7s
-Overall average: 10.01 / 12
+Runtime: 367.9s
+Overall average: 10.45 / 12
 
 Per-dimension averages (max 2.0 each):
-  Time fit         0.71  <-- BELOW FLOOR (1.2)
+  Time fit         1.16  <-- BELOW FLOOR (1.2)
   Structure        1.95
   Progression      1.70
   Selection        1.93
-  Goal alignment   1.87
+  Goal alignment   1.86
   Primer fit       1.85
 
 Score distribution:
@@ -22,9 +22,9 @@ Score distribution:
   [4-5)  0
   [5-6)  0
   [6-7)  0
-  [7-8)  19
-  [8-9) ##### 740
-  [9-10) ####################################################### 8457
+  [7-8)  14
+  [8-9) ### 453
+  [9-10) ######################################################### 8749
 
 Plans below the 7.2 floor: 0 / 9216
 
@@ -34,38 +34,33 @@ Plans below the 7.2 floor: 0 / 9216
 
 Score 7.8/12 — full_gym / knees / 30-45 / bodybuilding / beginner / functional / recovery=low / cardio=love
   Time fit (0.0/2):
-    [time_fit] wk9 Thursday: Worst day (week 9 Thursday) is 36% under budget (expected: 37min, actual: 24min)
+    [time_fit] wk3 Thursday: Worst day (week 3 Thursday) is 40% under budget (expected: 37min, actual: 22min)
   Progression (1.6/2):
     [frozen_week] wk6 Monday: Barbell Bench Press: load and reps both unchanged from week 6 to week 7 (8-10 @ 30) — only the RPE label differs
     [frozen_week] wk9 Monday: Barbell Bench Press: load and reps both unchanged from week 9 to week 10 (8-10 @ 30) — only the RPE label differs
     [frozen_week] wk9 Monday: Push-Ups: load and reps both unchanged from week 9 to week 10 (8-12 @ bodyweight) — only the RPE label differs
     [frozen_week] wk9 Monday: Dumbbell Shoulder Press: load and reps both unchanged from week 9 to week 10 (8-12 @ 10) — only the RPE label differs
-    [frozen_week] wk9 Tuesday: Close-Grip Lat Pulldown: load and reps both unchanged from week 9 to week 10 (8-12 @ 27.5) — only the RPE label differs
-    [frozen_week] wk9 Tuesday: Cable Rows: load and reps both unchanged from week 9 to week 10 (8-12 @ 27.5) — only the RPE label differs
-    [frozen_week] wk9 Thursday: Romanian Deadlifts: load and reps both unchanged from week 9 to week 10 (8-12 @ 28) — only the RPE label differs
-    [frozen_week] wk9 Friday: Bodyweight Good Morning: load and reps both unchanged from week 9 to week 10 (8-12 @ bodyweight) — only the RPE label differs
+    [frozen_week] wk9 Tuesday: T-Bar Rows: load and reps both unchanged from week 9 to week 10 (8-12 @ 27.5) — only the RPE label differs
+    [frozen_week] wk9 Thursday: Bodyweight Good Morning: load and reps both unchanged from week 9 to week 10 (8-12 @ bodyweight) — only the RPE label differs
+    [frozen_week] wk9 Friday: Romanian Deadlifts: load and reps both unchanged from week 9 to week 10 (8-12 @ 28) — only the RPE label differs
     [frozen_week] wk9 Friday: Lat Pulldown: load and reps both unchanged from week 9 to week 10 (8-12 @ 27.5) — only the RPE label differs
-    [frozen_week] wk9 Friday: T-Bar Rows: load and reps both unchanged from week 9 to week 10 (8-12 @ 27.5) — only the RPE label differs
+    [frozen_week] wk9 Friday: Cable Rows: load and reps both unchanged from week 9 to week 10 (8-12 @ 27.5) — only the RPE label differs
     [frozen_week] wk10 Monday: Barbell Bench Press: load and reps both unchanged from week 10 to week 11 (8-10 @ 30) — only the RPE label differs
     [frozen_week] wk10 Monday: Push-Ups: load and reps both unchanged from week 10 to week 11 (8-12 @ bodyweight) — only the RPE label differs
     [frozen_week] wk10 Monday: Dumbbell Shoulder Press: load and reps both unchanged from week 10 to week 11 (8-12 @ 10) — only the RPE label differs
-    [frozen_week] wk10 Tuesday: Close-Grip Lat Pulldown: load and reps both unchanged from week 10 to week 11 (8-12 @ 27.5) — only the RPE label differs
-    [frozen_week] wk10 Tuesday: Cable Rows: load and reps both unchanged from week 10 to week 11 (8-12 @ 27.5) — only the RPE label differs
-    [frozen_week] wk10 Thursday: Romanian Deadlifts: load and reps both unchanged from week 10 to week 11 (8-12 @ 28) — only the RPE label differs
-    [frozen_week] wk10 Friday: Bodyweight Good Morning: load and reps both unchanged from week 10 to week 11 (8-12 @ bodyweight) — only the RPE label differs
+    [frozen_week] wk10 Tuesday: T-Bar Rows: load and reps both unchanged from week 10 to week 11 (8-12 @ 27.5) — only the RPE label differs
+    [frozen_week] wk10 Thursday: Bodyweight Good Morning: load and reps both unchanged from week 10 to week 11 (8-12 @ bodyweight) — only the RPE label differs
+    [frozen_week] wk10 Friday: Romanian Deadlifts: load and reps both unchanged from week 10 to week 11 (8-12 @ 28) — only the RPE label differs
     [frozen_week] wk10 Friday: Lat Pulldown: load and reps both unchanged from week 10 to week 11 (8-12 @ 27.5) — only the RPE label differs
-    [frozen_week] wk10 Friday: T-Bar Rows: load and reps both unchanged from week 10 to week 11 (8-12 @ 27.5) — only the RPE label differs
+    [frozen_week] wk10 Friday: Cable Rows: load and reps both unchanged from week 10 to week 11 (8-12 @ 27.5) — only the RPE label differs
     [frozen_week] wk13 Monday: Barbell Bench Press: load and reps both unchanged from week 13 to week 14 (8-10 @ 30) — only the RPE label differs
     [frozen_week] wk14 Monday: Barbell Bench Press: load and reps both unchanged from week 14 to week 15 (8-10 @ 30) — only the RPE label differs
   Selection (1.6/2):
-    [load_incoherent] wk1: "bicep" load spread this week is 5kg-20kg (Cable Curls=5kg, Barbell Curls=20kg)
+    [load_incoherent] wk1: "bicep" load spread this week is 2kg-20kg (Barbell Curls=20kg, Incline Dumbbell Curls=2kg)
   Goal alignment (1.0/2):
-    [recovery_volume_not_reduced] wk1: low recovery_capacity weekly sets (31) not >=15% below high (39)
+    [recovery_volume_not_reduced] wk1: low recovery_capacity weekly sets (37) not >=15% below high (45)
   Primer fit (1.6/2):
-    [primer_absent] wk1 Monday: Monday (Chest & Triceps) has no primer exercise, though this track has a primer pool.
-    [primer_absent] wk1 Tuesday: Tuesday (Back & Biceps) has no primer exercise, though this track has a primer pool.
-    [primer_absent] wk1 Thursday: Thursday (Legs & Calves) has no primer exercise, though this track has a primer pool.
-    [primer_absent] wk1 Friday: Friday (Pull & Hinge) has no primer exercise, though this track has a primer pool.
+    [primer_pattern_mismatch] wk1 Thursday: "Scapular Push-Ups" (affinity: horizontal_push/vertical_push) doesn't fit Thursday's Legs & Calves patterns (knee_dominant/hip_hinge). Cause: the affinity-preferred primer pool was empty for this profile, so selection fell back to any eligible primer — this is a catalogue coverage gap for this profile/track combination, not a selection bug.
 
 Score 7.8/12 — full_gym / knees / 90+ / hybrid / novice / functional / recovery=low / cardio=love
   Time fit (0.0/2):
@@ -94,77 +89,6 @@ Score 7.8/12 — full_gym / knees / 90+ / hybrid / novice / functional / recover
   Goal alignment (1.0/2):
     [recovery_volume_not_reduced] wk1: low recovery_capacity weekly sets (87) not >=15% below high (112)
 
-Score 7.8/12 — full_gym / shoulders / 30-45 / hybrid / beginner / functional / recovery=low / cardio=love
-  Time fit (0.0/2):
-    [time_fit] wk9 Monday: Worst day (week 9 Monday) is 23% over budget (expected: 37min, actual: 45min)
-  Progression (1.6/2):
-    [frozen_week] wk5 Thursday: Farmer's Walk: load and reps both unchanged from week 5 to week 6 (40m @ 14) — only the RPE label differs
-    [frozen_week] wk6 Tuesday: Barbell Rows: load and reps both unchanged from week 6 to week 7 (8-12 @ 27.5) — only the RPE label differs
-    [frozen_week] wk6 Thursday: Barbell Squats: load and reps both unchanged from week 6 to week 7 (8-12 @ 42.5) — only the RPE label differs
-    [frozen_week] wk6 Thursday: Farmer's Walk: load and reps both unchanged from week 6 to week 7 (40m @ 14) — only the RPE label differs
-    [frozen_week] wk9 Monday: Deadlifts: load and reps both unchanged from week 9 to week 10 (8-12 @ 57.5) — only the RPE label differs
-    [frozen_week] wk9 Monday: Dumbbell Rows: load and reps both unchanged from week 9 to week 10 (8-12 @ 14) — only the RPE label differs
-    [frozen_week] wk9 Monday: Cable Rows: load and reps both unchanged from week 9 to week 10 (8-12 @ 27.5) — only the RPE label differs
-    [frozen_week] wk9 Tuesday: Trap Bar Deadlift: load and reps both unchanged from week 9 to week 10 (8-12 @ 57.5) — only the RPE label differs
-    [frozen_week] wk9 Tuesday: Barbell Rows: load and reps both unchanged from week 9 to week 10 (8-12 @ 27.5) — only the RPE label differs
-    [frozen_week] wk9 Tuesday: Seated Cable Row: load and reps both unchanged from week 9 to week 10 (8-12 @ 27.5) — only the RPE label differs
-    [frozen_week] wk9 Thursday: Barbell Squats: load and reps both unchanged from week 9 to week 10 (8-12 @ 42.5) — only the RPE label differs
-    [frozen_week] wk9 Thursday: Bulgarian Split Squats: load and reps both unchanged from week 9 to week 10 (8-12 @ 22) — only the RPE label differs
-    [frozen_week] wk9 Friday: Dumbbell Rows: load and reps both unchanged from week 9 to week 10 (8-12 @ 14) — only the RPE label differs
-    [frozen_week] wk9 Friday: Cable Rows: load and reps both unchanged from week 9 to week 10 (8-12 @ 27.5) — only the RPE label differs
-    [frozen_week] wk10 Monday: Deadlifts: load and reps both unchanged from week 10 to week 11 (8-12 @ 57.5) — only the RPE label differs
-    [frozen_week] wk10 Monday: Dumbbell Rows: load and reps both unchanged from week 10 to week 11 (8-12 @ 14) — only the RPE label differs
-    [frozen_week] wk10 Monday: Cable Rows: load and reps both unchanged from week 10 to week 11 (8-12 @ 27.5) — only the RPE label differs
-    [frozen_week] wk10 Tuesday: Trap Bar Deadlift: load and reps both unchanged from week 10 to week 11 (8-12 @ 57.5) — only the RPE label differs
-    [frozen_week] wk10 Tuesday: Barbell Rows: load and reps both unchanged from week 10 to week 11 (8-12 @ 27.5) — only the RPE label differs
-    [frozen_week] wk10 Tuesday: Seated Cable Row: load and reps both unchanged from week 10 to week 11 (8-12 @ 27.5) — only the RPE label differs
-    [frozen_week] wk10 Thursday: Barbell Squats: load and reps both unchanged from week 10 to week 11 (8-12 @ 42.5) — only the RPE label differs
-    [frozen_week] wk10 Thursday: Bulgarian Split Squats: load and reps both unchanged from week 10 to week 11 (8-12 @ 22) — only the RPE label differs
-    [frozen_week] wk10 Friday: Dumbbell Rows: load and reps both unchanged from week 10 to week 11 (8-12 @ 14) — only the RPE label differs
-    [frozen_week] wk10 Friday: Cable Rows: load and reps both unchanged from week 10 to week 11 (8-12 @ 27.5) — only the RPE label differs
-    [frozen_week] wk13 Monday: Trap Bar Deadlift: load and reps both unchanged from week 13 to week 14 (8-12 @ 57.5) — only the RPE label differs
-    [frozen_week] wk13 Tuesday: Deadlifts: load and reps both unchanged from week 13 to week 14 (8-12 @ 57.5) — only the RPE label differs
-    [frozen_week] wk13 Tuesday: Barbell Rows: load and reps both unchanged from week 13 to week 14 (8-12 @ 27.5) — only the RPE label differs
-    [frozen_week] wk13 Thursday: Barbell Squats: load and reps both unchanged from week 13 to week 14 (8-12 @ 42.5) — only the RPE label differs
-    [frozen_week] wk13 Thursday: Farmer's Walk: load and reps both unchanged from week 13 to week 14 (40m @ 14) — only the RPE label differs
-    [frozen_week] wk14 Monday: Trap Bar Deadlift: load and reps both unchanged from week 14 to week 15 (8-12 @ 57.5) — only the RPE label differs
-    [frozen_week] wk14 Tuesday: Deadlifts: load and reps both unchanged from week 14 to week 15 (8-12 @ 57.5) — only the RPE label differs
-    [frozen_week] wk14 Tuesday: Barbell Rows: load and reps both unchanged from week 14 to week 15 (8-12 @ 27.5) — only the RPE label differs
-    [frozen_week] wk14 Thursday: Barbell Squats: load and reps both unchanged from week 14 to week 15 (8-12 @ 42.5) — only the RPE label differs
-    [frozen_week] wk14 Thursday: Farmer's Walk: load and reps both unchanged from week 14 to week 15 (40m @ 14) — only the RPE label differs
-  Selection (1.6/2):
-    [load_incoherent] wk1: "bicep" load spread this week is 2kg-20kg (Hammer Curls=2kg, Barbell Curls=20kg, Dumbbell Curls=2kg)
-  Goal alignment (1.0/2):
-    [recovery_volume_not_reduced] wk1: low recovery_capacity weekly sets (63) not >=15% below high (79)
-  Primer fit (1.6/2):
-    [primer_pattern_mismatch] wk1 Friday: "Bodyweight Squat Marches" (affinity: knee_dominant/cardio) doesn't fit Friday's Upper Pull & Core patterns (vertical_pull/horizontal_pull). Cause: the affinity-preferred primer pool was empty for this profile, so selection fell back to any eligible primer — this is a catalogue coverage gap for this profile/track combination, not a selection bug.
-
-Score 7.8/12 — full_gym / shoulders / 30-45 / hybrid / advanced / functional / recovery=low / cardio=love
-  Time fit (0.0/2):
-    [time_fit] wk13 Monday: Worst day (week 13 Monday) is 21% over budget (expected: 37min, actual: 45min)
-  Progression (1.6/2):
-    [frozen_week] wk14 Thursday: Suitcase Carry: load and reps both unchanged from week 14 to week 15 (40m @ 36) — only the RPE label differs
-  Selection (1.6/2):
-    [load_incoherent] wk1: "bicep" load spread this week is 6kg-20kg (Incline Dumbbell Curls=6kg, Hammer Curls=6kg, Barbell Curls=20kg)
-  Goal alignment (1.0/2):
-    [recovery_volume_not_reduced] wk1: low recovery_capacity weekly sets (56) not >=15% below high (67)
-  Primer fit (1.6/2):
-    [primer_pattern_mismatch] wk1 Friday: "Bodyweight Squat Marches" (affinity: knee_dominant/cardio) doesn't fit Friday's Upper Pull & Core patterns (vertical_pull/horizontal_pull). Cause: the affinity-preferred primer pool was empty for this profile, so selection fell back to any eligible primer — this is a catalogue coverage gap for this profile/track combination, not a selection bug.
-
-Score 7.8/12 — full_gym / shoulders / 45-60 / hybrid / intermediate / functional / recovery=low / cardio=love
-  Time fit (0.0/2):
-    [time_fit] wk11 Friday: Worst day (week 11 Friday) is 22% over budget (expected: 52min, actual: 64min)
-  Progression (1.6/2):
-    [frozen_week] wk6 Thursday: Farmer's Walk: load and reps both unchanged from week 6 to week 7 (40m @ 30) — only the RPE label differs
-    [frozen_week] wk13 Thursday: Farmer's Walk: load and reps both unchanged from week 13 to week 14 (40m @ 28) — only the RPE label differs
-    [frozen_week] wk13 Friday: Barbell Rows: load and reps both unchanged from week 13 to week 14 (4-8 @ 62.5) — only the RPE label differs
-  Selection (1.6/2):
-    [load_incoherent] wk1: "bicep" load spread this week is 4kg-20kg (Incline Dumbbell Curls=4kg, Barbell Curls=20kg, Dumbbell Curls=4kg)
-  Goal alignment (1.0/2):
-    [recovery_volume_not_reduced] wk1: low recovery_capacity weekly sets (64) not >=15% below high (77)
-  Primer fit (1.6/2):
-    [primer_pattern_mismatch] wk1 Friday: "Box Jumps" (affinity: knee_dominant) doesn't fit Friday's Upper Pull & Core patterns (vertical_pull/horizontal_pull). Cause: the affinity-preferred primer pool was empty for this profile, so selection fell back to any eligible primer — this is a catalogue coverage gap for this profile/track combination, not a selection bug.
-
 Score 7.8/12 — full_gym / shoulders / 90+ / bodybuilding / intermediate / functional / recovery=low / cardio=love
   Time fit (0.0/2):
     [time_fit] wk1 Tuesday: Worst day (week 1 Tuesday) is 48% under budget (expected: 100min, actual: 52min)
@@ -181,83 +105,38 @@ Score 7.8/12 — full_gym / shoulders / 90+ / bodybuilding / intermediate / func
     [primer_absent] wk1 Thursday: Thursday (Legs & Calves) has no primer exercise, though this track has a primer pool.
     [primer_absent] wk1 Friday: Friday (Legs & Calves) has no primer exercise, though this track has a primer pool.
 
-Score 7.8/12 — full_gym / wrists / 30-45 / bodybuilding / advanced / hypertrophy / recovery=low / cardio=love
+Score 7.8/12 — home_gym / none / 90+ / bodybuilding / intermediate / functional / recovery=low / cardio=love
   Time fit (0.0/2):
-    [time_fit] wk9 Tuesday: Worst day (week 9 Tuesday) is 22% over budget (expected: 37min, actual: 45min)
+    [time_fit] wk1 Monday: Worst day (week 1 Monday) is 48% under budget (expected: 100min, actual: 52min)
   Progression (1.6/2):
-    [frozen_week] wk6 Friday: Good Mornings: load and reps both unchanged from week 6 to week 7 (9-13 @ 77.5) — only the RPE label differs
-    [frozen_week] wk9 Thursday: Good Mornings: load and reps both unchanged from week 9 to week 10 (6-10 @ 82.5) — only the RPE label differs
-    [frozen_week] wk13 Monday: Dumbbell Bench Press: load and reps both unchanged from week 13 to week 14 (9-13 @ 42) — only the RPE label differs
-    [frozen_week] wk13 Monday: Pec Deck Machine: load and reps both unchanged from week 13 to week 14 (14-17 @ 40) — only the RPE label differs
-    [frozen_week] wk13 Monday: Cable Flyes: load and reps both unchanged from week 13 to week 14 (14-17 @ 40) — only the RPE label differs
-    [frozen_week] wk13 Tuesday: Cable Rows: load and reps both unchanged from week 13 to week 14 (9-13 @ 70) — only the RPE label differs
-    [frozen_week] wk13 Tuesday: Close-Grip Lat Pulldown: load and reps both unchanged from week 13 to week 14 (9-13 @ 70) — only the RPE label differs
-    [frozen_week] wk13 Thursday: Leg Extensions: load and reps both unchanged from week 13 to week 14 (14-17 @ 55) — only the RPE label differs
-    [frozen_week] wk14 Monday: Pec Deck Machine: load and reps both unchanged from week 14 to week 15 (14-17 @ 40) — only the RPE label differs
-    [frozen_week] wk14 Monday: Cable Flyes: load and reps both unchanged from week 14 to week 15 (14-17 @ 40) — only the RPE label differs
-    [frozen_week] wk14 Tuesday: Close-Grip Lat Pulldown: load and reps both unchanged from week 14 to week 15 (9-13 @ 70) — only the RPE label differs
-    [frozen_week] wk14 Thursday: Leg Extensions: load and reps both unchanged from week 14 to week 15 (14-17 @ 55) — only the RPE label differs
+    [frozen_week] wk9 Tuesday: Pull-Ups: load and reps both unchanged from week 9 to week 10 (4-6 @ bodyweight) — only the RPE label differs
+    [frozen_week] wk13 Monday: Barbell Bench Press: load and reps both unchanged from week 13 to week 14 (4-6 @ 65) — only the RPE label differs
+    [frozen_week] wk13 Tuesday: Pull-Ups: load and reps both unchanged from week 13 to week 14 (4-6 @ bodyweight) — only the RPE label differs
+    [frozen_week] wk13 Friday: Overhead Press: load and reps both unchanged from week 13 to week 14 (4-6 @ 42.5) — only the RPE label differs
+    [frozen_week] wk14 Monday: Barbell Bench Press: load and reps both unchanged from week 14 to week 15 (4-6 @ 65) — only the RPE label differs
+    [frozen_week] wk14 Tuesday: Pull-Ups: load and reps both unchanged from week 14 to week 15 (4-6 @ bodyweight) — only the RPE label differs
+    [frozen_week] wk14 Friday: Overhead Press: load and reps both unchanged from week 14 to week 15 (4-6 @ 42.5) — only the RPE label differs
   Selection (1.6/2):
-    [duplicate_movement_family] wk1 Monday: Movement family "fly_isolation" appears twice: Pec Deck Machine, Cable Flyes
+    [duplicate_movement_family] wk1 Friday: Movement family "shrug" appears twice: Dumbbell Shrugs, Shrugs
   Goal alignment (1.0/2):
-    [recovery_volume_not_reduced] wk1: low recovery_capacity weekly sets (41) not >=15% below high (50)
+    [recovery_volume_not_reduced] wk1: low recovery_capacity weekly sets (76) not >=15% below high (95)
   Primer fit (1.6/2):
-    [primer_absent] wk1 Monday: Monday (Chest & Triceps) has no primer exercise, though this track has a primer pool.
-    [primer_absent] wk1 Tuesday: Tuesday (Back & Biceps) has no primer exercise, though this track has a primer pool.
-    [primer_absent] wk1 Thursday: Thursday (Legs & Calves) has no primer exercise, though this track has a primer pool.
-    [primer_absent] wk1 Friday: Friday (Shoulders & Abs) has no primer exercise, though this track has a primer pool.
-
-Score 7.8/12 — full_gym / wrists / 30-45 / bodybuilding / advanced / functional / recovery=low / cardio=love
-  Time fit (0.0/2):
-    [time_fit] wk7 Tuesday: Worst day (week 7 Tuesday) is 21% over budget (expected: 37min, actual: 45min)
-  Progression (1.6/2):
-    [frozen_week] wk13 Tuesday: Pull-Ups: load and reps both unchanged from week 13 to week 14 (3-5 @ bodyweight) — only the RPE label differs
-  Selection (1.6/2):
-    [duplicate_movement_family] wk1 Monday: Movement family "fly_isolation" appears twice: Pec Deck Machine, Cable Flyes
-  Goal alignment (1.0/2):
-    [recovery_volume_not_reduced] wk1: low recovery_capacity weekly sets (41) not >=15% below high (51)
-  Primer fit (1.6/2):
-    [primer_absent] wk1 Monday: Monday (Chest & Triceps) has no primer exercise, though this track has a primer pool.
-    [primer_absent] wk1 Tuesday: Tuesday (Back & Biceps) has no primer exercise, though this track has a primer pool.
-    [primer_absent] wk1 Thursday: Thursday (Legs & Calves) has no primer exercise, though this track has a primer pool.
-    [primer_absent] wk1 Friday: Friday (Shoulders & Abs) has no primer exercise, though this track has a primer pool.
-
-Score 7.8/12 — home_gym / lower_back / 90+ / bodybuilding / novice / hypertrophy / recovery=low / cardio=love
-  Time fit (0.0/2):
-    [time_fit] wk1 Tuesday: Worst day (week 1 Tuesday) is 41% under budget (expected: 100min, actual: 59min)
-  Progression (1.6/2):
-    [frozen_week] wk6 Tuesday: Dumbbell Rows: load and reps both unchanged from week 6 to week 7 (9-13 @ 22) — only the RPE label differs
-    [frozen_week] wk9 Monday: Barbell Bench Press: load and reps both unchanged from week 9 to week 10 (6-8 @ 47.5) — only the RPE label differs
-    [frozen_week] wk9 Friday: Barbell Bench Press: load and reps both unchanged from week 9 to week 10 (6-8 @ 47.5) — only the RPE label differs
-    [frozen_week] wk10 Monday: Barbell Bench Press: load and reps both unchanged from week 10 to week 11 (6-8 @ 47.5) — only the RPE label differs
-    [frozen_week] wk10 Friday: Barbell Bench Press: load and reps both unchanged from week 10 to week 11 (6-8 @ 47.5) — only the RPE label differs
-    [frozen_week] wk14 Monday: Barbell Bench Press: load and reps both unchanged from week 14 to week 15 (6-8 @ 47.5) — only the RPE label differs
-    [frozen_week] wk14 Tuesday: Dumbbell Rows: load and reps both unchanged from week 14 to week 15 (9-13 @ 22) — only the RPE label differs
-    [frozen_week] wk14 Friday: Barbell Bench Press: load and reps both unchanged from week 14 to week 15 (6-8 @ 47.5) — only the RPE label differs
-  Selection (1.6/2):
-    [push_pull_imbalance] wk1: Weekly push:pull set ratio is 1.71 (push=12, pull=7) (expected: 0.6 - 1.6, actual: 1.71)
-  Goal alignment (1.0/2):
-    [recovery_volume_not_reduced] wk1: low recovery_capacity weekly sets (47) not >=15% below high (60)
-  Primer fit (1.6/2):
-    [primer_absent] wk1 Monday: Monday (Chest & Triceps) has no primer exercise, though this track has a primer pool.
-    [primer_absent] wk1 Tuesday: Tuesday (Back & Biceps) has no primer exercise, though this track has a primer pool.
-    [primer_absent] wk1 Thursday: Thursday (Legs & Calves) has no primer exercise, though this track has a primer pool.
-    [primer_absent] wk1 Friday: Friday (Push & Press) has no primer exercise, though this track has a primer pool.
+    [primer_pattern_mismatch] wk1 Thursday: "Scapular Push-Ups" (affinity: horizontal_push/vertical_push) doesn't fit Thursday's Legs & Calves patterns (knee_dominant/hip_hinge). Cause: the affinity-preferred primer pool was empty for this profile, so selection fell back to any eligible primer — this is a catalogue coverage gap for this profile/track combination, not a selection bug.
 
 Score 7.8/12 — home_gym / lower_back / 90+ / bodybuilding / novice / functional / recovery=low / cardio=love
   Time fit (0.0/2):
-    [time_fit] wk1 Monday: Worst day (week 1 Monday) is 48% under budget (expected: 100min, actual: 52min)
+    [time_fit] wk1 Monday: Worst day (week 1 Monday) is 46% under budget (expected: 100min, actual: 54min)
   Progression (1.6/2):
     [frozen_week] wk9 Monday: Barbell Bench Press: load and reps both unchanged from week 9 to week 10 (6-8 @ 47.5) — only the RPE label differs
     [frozen_week] wk9 Monday: Tricep Dips: load and reps both unchanged from week 9 to week 10 (6-10 @ bodyweight) — only the RPE label differs
     [frozen_week] wk9 Tuesday: Inverted Row: load and reps both unchanged from week 9 to week 10 (6-10 @ bodyweight) — only the RPE label differs
-    [frozen_week] wk9 Thursday: Goblet Squats: load and reps both unchanged from week 9 to week 10 (6-10 @ 26) — only the RPE label differs
-    [frozen_week] wk9 Thursday: Glute Bridge: load and reps both unchanged from week 9 to week 10 (6-10 @ bodyweight) — only the RPE label differs
+    [frozen_week] wk9 Thursday: Air Squat: load and reps both unchanged from week 9 to week 10 (6-10 @ bodyweight) — only the RPE label differs
+    [frozen_week] wk9 Thursday: Bodyweight Good Morning: load and reps both unchanged from week 9 to week 10 (6-10 @ bodyweight) — only the RPE label differs
     [frozen_week] wk9 Thursday: Bulgarian Split Squats: load and reps both unchanged from week 9 to week 10 (6-10 @ 38) — only the RPE label differs
     [frozen_week] wk9 Friday: Barbell Bench Press: load and reps both unchanged from week 9 to week 10 (6-8 @ 47.5) — only the RPE label differs
-    [frozen_week] wk9 Friday: Dumbbell Shoulder Press: load and reps both unchanged from week 9 to week 10 (6-10 @ 16) — only the RPE label differs
+    [frozen_week] wk9 Friday: Arnold Press: load and reps both unchanged from week 9 to week 10 (6-10 @ 16) — only the RPE label differs
     [frozen_week] wk9 Friday: Tricep Dips: load and reps both unchanged from week 9 to week 10 (6-10 @ bodyweight) — only the RPE label differs
-    [frozen_week] wk9 Friday: Bodyweight Good Morning: load and reps both unchanged from week 9 to week 10 (6-10 @ bodyweight) — only the RPE label differs
+    [frozen_week] wk9 Friday: Glute Bridge: load and reps both unchanged from week 9 to week 10 (6-10 @ bodyweight) — only the RPE label differs
     [frozen_week] wk10 Monday: Barbell Bench Press: load and reps both unchanged from week 10 to week 11 (6-8 @ 47.5) — only the RPE label differs
     [frozen_week] wk10 Friday: Barbell Bench Press: load and reps both unchanged from week 10 to week 11 (6-8 @ 47.5) — only the RPE label differs
     [frozen_week] wk14 Monday: Barbell Bench Press: load and reps both unchanged from week 14 to week 15 (6-8 @ 47.5) — only the RPE label differs
@@ -265,11 +144,204 @@ Score 7.8/12 — home_gym / lower_back / 90+ / bodybuilding / novice / functiona
   Selection (1.6/2):
     [push_pull_imbalance] wk1: Weekly push:pull set ratio is 1.71 (push=12, pull=7) (expected: 0.6 - 1.6, actual: 1.71)
   Goal alignment (1.0/2):
-    [recovery_volume_not_reduced] wk1: low recovery_capacity weekly sets (47) not >=15% below high (60)
+    [recovery_volume_not_reduced] wk1: low recovery_capacity weekly sets (55) not >=15% below high (68)
   Primer fit (1.6/2):
-    [primer_absent] wk1 Monday: Monday (Chest & Triceps) has no primer exercise, though this track has a primer pool.
+    [primer_pattern_mismatch] wk1 Thursday: "Band Face Pulls" (affinity: horizontal_push/vertical_push/horizontal_pull/vertical_pull) doesn't fit Thursday's Legs & Calves patterns (knee_dominant/hip_hinge). Cause: the affinity-preferred primer pool was empty for this profile, so selection fell back to any eligible primer — this is a catalogue coverage gap for this profile/track combination, not a selection bug.
+
+Score 7.8/12 — home_gym / knees / 90+ / bodybuilding / beginner / functional / recovery=low / cardio=love
+  Time fit (0.0/2):
+    [time_fit] wk1 Monday: Worst day (week 1 Monday) is 55% under budget (expected: 100min, actual: 45min)
+  Progression (1.6/2):
+    [frozen_week] wk6 Monday: Barbell Bench Press: load and reps both unchanged from week 6 to week 7 (8-10 @ 30) — only the RPE label differs
+    [frozen_week] wk6 Friday: Barbell Bench Press: load and reps both unchanged from week 6 to week 7 (8-10 @ 30) — only the RPE label differs
+    [frozen_week] wk9 Monday: Barbell Bench Press: load and reps both unchanged from week 9 to week 10 (8-10 @ 30) — only the RPE label differs
+    [frozen_week] wk9 Tuesday: Dumbbell Rows: load and reps both unchanged from week 9 to week 10 (8-12 @ 14) — only the RPE label differs
+    [frozen_week] wk9 Thursday: Romanian Deadlifts: load and reps both unchanged from week 9 to week 10 (8-12 @ 28) — only the RPE label differs
+    [frozen_week] wk9 Friday: Barbell Bench Press: load and reps both unchanged from week 9 to week 10 (8-10 @ 30) — only the RPE label differs
+    [frozen_week] wk9 Friday: Dumbbell Shoulder Press: load and reps both unchanged from week 9 to week 10 (8-12 @ 10) — only the RPE label differs
+    [frozen_week] wk9 Friday: Bodyweight Good Morning: load and reps both unchanged from week 9 to week 10 (8-12 @ bodyweight) — only the RPE label differs
+    [frozen_week] wk10 Monday: Barbell Bench Press: load and reps both unchanged from week 10 to week 11 (8-10 @ 30) — only the RPE label differs
+    [frozen_week] wk10 Tuesday: Dumbbell Rows: load and reps both unchanged from week 10 to week 11 (8-12 @ 14) — only the RPE label differs
+    [frozen_week] wk10 Thursday: Romanian Deadlifts: load and reps both unchanged from week 10 to week 11 (8-12 @ 28) — only the RPE label differs
+    [frozen_week] wk10 Friday: Barbell Bench Press: load and reps both unchanged from week 10 to week 11 (8-10 @ 30) — only the RPE label differs
+    [frozen_week] wk10 Friday: Dumbbell Shoulder Press: load and reps both unchanged from week 10 to week 11 (8-12 @ 10) — only the RPE label differs
+    [frozen_week] wk10 Friday: Bodyweight Good Morning: load and reps both unchanged from week 10 to week 11 (8-12 @ bodyweight) — only the RPE label differs
+    [frozen_week] wk13 Monday: Barbell Bench Press: load and reps both unchanged from week 13 to week 14 (8-10 @ 30) — only the RPE label differs
+    [frozen_week] wk13 Friday: Barbell Bench Press: load and reps both unchanged from week 13 to week 14 (8-10 @ 30) — only the RPE label differs
+    [frozen_week] wk14 Monday: Barbell Bench Press: load and reps both unchanged from week 14 to week 15 (8-10 @ 30) — only the RPE label differs
+    [frozen_week] wk14 Friday: Barbell Bench Press: load and reps both unchanged from week 14 to week 15 (8-10 @ 30) — only the RPE label differs
+  Selection (1.6/2):
+    [push_pull_imbalance] wk1: Weekly push:pull set ratio is 1.71 (push=12, pull=7) (expected: 0.6 - 1.6, actual: 1.71)
+  Goal alignment (1.0/2):
+    [recovery_volume_not_reduced] wk1: low recovery_capacity weekly sets (43) not >=15% below high (52)
+  Primer fit (1.6/2):
+    [primer_pattern_mismatch] wk1 Thursday: "Band Face Pulls" (affinity: horizontal_push/vertical_push/horizontal_pull/vertical_pull) doesn't fit Thursday's Legs & Calves patterns (knee_dominant/hip_hinge). Cause: the affinity-preferred primer pool was empty for this profile, so selection fell back to any eligible primer — this is a catalogue coverage gap for this profile/track combination, not a selection bug.
+
+Score 7.8/12 — home_gym / shoulders / 60-90 / bodybuilding / beginner / functional / recovery=low / cardio=love
+  Time fit (0.0/2):
+    [time_fit] wk1 Tuesday: Worst day (week 1 Tuesday) is 51% under budget (expected: 75min, actual: 37min)
+  Progression (1.6/2):
+    [frozen_week] wk6 Monday: Barbell Squats: load and reps both unchanged from week 6 to week 7 (8-10 @ 42.5) — only the RPE label differs
+    [frozen_week] wk6 Tuesday: Barbell Rows: load and reps both unchanged from week 6 to week 7 (8-10 @ 30) — only the RPE label differs
+    [frozen_week] wk6 Thursday: Barbell Squats: load and reps both unchanged from week 6 to week 7 (8-10 @ 42.5) — only the RPE label differs
+    [frozen_week] wk6 Friday: Barbell Squats: load and reps both unchanged from week 6 to week 7 (8-10 @ 42.5) — only the RPE label differs
+    [frozen_week] wk9 Monday: Barbell Squats: load and reps both unchanged from week 9 to week 10 (8-10 @ 42.5) — only the RPE label differs
+    [frozen_week] wk9 Monday: Deadlifts: load and reps both unchanged from week 9 to week 10 (8-10 @ 57.5) — only the RPE label differs
+    [frozen_week] wk9 Monday: Romanian Deadlifts: load and reps both unchanged from week 9 to week 10 (8-12 @ 28) — only the RPE label differs
+    [frozen_week] wk9 Monday: Bulgarian Split Squats: load and reps both unchanged from week 9 to week 10 (8-12 @ 22) — only the RPE label differs
+    [frozen_week] wk9 Tuesday: Barbell Rows: load and reps both unchanged from week 9 to week 10 (8-10 @ 30) — only the RPE label differs
+    [frozen_week] wk9 Thursday: Barbell Squats: load and reps both unchanged from week 9 to week 10 (8-10 @ 42.5) — only the RPE label differs
+    [frozen_week] wk9 Thursday: Trap Bar Deadlift: load and reps both unchanged from week 9 to week 10 (8-10 @ 57.5) — only the RPE label differs
+    [frozen_week] wk9 Thursday: Bodyweight Good Morning: load and reps both unchanged from week 9 to week 10 (8-12 @ bodyweight) — only the RPE label differs
+    [frozen_week] wk9 Thursday: Bulgarian Split Squats: load and reps both unchanged from week 9 to week 10 (8-12 @ 22) — only the RPE label differs
+    [frozen_week] wk9 Friday: Barbell Squats: load and reps both unchanged from week 9 to week 10 (8-10 @ 42.5) — only the RPE label differs
+    [frozen_week] wk9 Friday: Deadlifts: load and reps both unchanged from week 9 to week 10 (8-10 @ 57.5) — only the RPE label differs
+    [frozen_week] wk9 Friday: Trap Bar Deadlift: load and reps both unchanged from week 9 to week 10 (8-10 @ 57.5) — only the RPE label differs
+    [frozen_week] wk9 Friday: Romanian Deadlifts: load and reps both unchanged from week 9 to week 10 (8-12 @ 28) — only the RPE label differs
+    [frozen_week] wk9 Friday: Walking Lunges: load and reps both unchanged from week 9 to week 10 (8-12 @ 8) — only the RPE label differs
+    [frozen_week] wk10 Monday: Barbell Squats: load and reps both unchanged from week 10 to week 11 (8-10 @ 42.5) — only the RPE label differs
+    [frozen_week] wk10 Monday: Deadlifts: load and reps both unchanged from week 10 to week 11 (8-10 @ 57.5) — only the RPE label differs
+    [frozen_week] wk10 Monday: Romanian Deadlifts: load and reps both unchanged from week 10 to week 11 (8-12 @ 28) — only the RPE label differs
+    [frozen_week] wk10 Monday: Bulgarian Split Squats: load and reps both unchanged from week 10 to week 11 (8-12 @ 22) — only the RPE label differs
+    [frozen_week] wk10 Tuesday: Barbell Rows: load and reps both unchanged from week 10 to week 11 (8-10 @ 30) — only the RPE label differs
+    [frozen_week] wk10 Thursday: Barbell Squats: load and reps both unchanged from week 10 to week 11 (8-10 @ 42.5) — only the RPE label differs
+    [frozen_week] wk10 Thursday: Trap Bar Deadlift: load and reps both unchanged from week 10 to week 11 (8-10 @ 57.5) — only the RPE label differs
+    [frozen_week] wk10 Thursday: Bodyweight Good Morning: load and reps both unchanged from week 10 to week 11 (8-12 @ bodyweight) — only the RPE label differs
+    [frozen_week] wk10 Thursday: Bulgarian Split Squats: load and reps both unchanged from week 10 to week 11 (8-12 @ 22) — only the RPE label differs
+    [frozen_week] wk10 Friday: Barbell Squats: load and reps both unchanged from week 10 to week 11 (8-10 @ 42.5) — only the RPE label differs
+    [frozen_week] wk10 Friday: Deadlifts: load and reps both unchanged from week 10 to week 11 (8-10 @ 57.5) — only the RPE label differs
+    [frozen_week] wk10 Friday: Trap Bar Deadlift: load and reps both unchanged from week 10 to week 11 (8-10 @ 57.5) — only the RPE label differs
+    [frozen_week] wk10 Friday: Romanian Deadlifts: load and reps both unchanged from week 10 to week 11 (8-12 @ 28) — only the RPE label differs
+    [frozen_week] wk10 Friday: Walking Lunges: load and reps both unchanged from week 10 to week 11 (8-12 @ 8) — only the RPE label differs
+    [frozen_week] wk13 Monday: Barbell Squats: load and reps both unchanged from week 13 to week 14 (8-10 @ 42.5) — only the RPE label differs
+    [frozen_week] wk13 Monday: Trap Bar Deadlift: load and reps both unchanged from week 13 to week 14 (8-10 @ 57.5) — only the RPE label differs
+    [frozen_week] wk13 Tuesday: Barbell Rows: load and reps both unchanged from week 13 to week 14 (8-10 @ 30) — only the RPE label differs
+    [frozen_week] wk13 Thursday: Barbell Squats: load and reps both unchanged from week 13 to week 14 (8-10 @ 42.5) — only the RPE label differs
+    [frozen_week] wk13 Thursday: Deadlifts: load and reps both unchanged from week 13 to week 14 (8-10 @ 57.5) — only the RPE label differs
+    [frozen_week] wk13 Friday: Barbell Squats: load and reps both unchanged from week 13 to week 14 (8-10 @ 42.5) — only the RPE label differs
+    [frozen_week] wk13 Friday: Deadlifts: load and reps both unchanged from week 13 to week 14 (8-10 @ 57.5) — only the RPE label differs
+    [frozen_week] wk13 Friday: Trap Bar Deadlift: load and reps both unchanged from week 13 to week 14 (8-10 @ 57.5) — only the RPE label differs
+    [frozen_week] wk14 Monday: Barbell Squats: load and reps both unchanged from week 14 to week 15 (8-10 @ 42.5) — only the RPE label differs
+    [frozen_week] wk14 Monday: Trap Bar Deadlift: load and reps both unchanged from week 14 to week 15 (8-10 @ 57.5) — only the RPE label differs
+    [frozen_week] wk14 Tuesday: Barbell Rows: load and reps both unchanged from week 14 to week 15 (8-10 @ 30) — only the RPE label differs
+    [frozen_week] wk14 Thursday: Barbell Squats: load and reps both unchanged from week 14 to week 15 (8-10 @ 42.5) — only the RPE label differs
+    [frozen_week] wk14 Thursday: Deadlifts: load and reps both unchanged from week 14 to week 15 (8-10 @ 57.5) — only the RPE label differs
+    [frozen_week] wk14 Friday: Barbell Squats: load and reps both unchanged from week 14 to week 15 (8-10 @ 42.5) — only the RPE label differs
+    [frozen_week] wk14 Friday: Deadlifts: load and reps both unchanged from week 14 to week 15 (8-10 @ 57.5) — only the RPE label differs
+    [frozen_week] wk14 Friday: Trap Bar Deadlift: load and reps both unchanged from week 14 to week 15 (8-10 @ 57.5) — only the RPE label differs
+  Selection (1.6/2):
+    [duplicate_movement_family] wk1 Friday: Movement family "deadlift" appears twice: Deadlifts, Trap Bar Deadlift
+  Goal alignment (1.0/2):
+    [recovery_volume_not_reduced] wk1: low recovery_capacity weekly sets (50) not >=15% below high (54)
+  Primer fit (1.6/2):
+    [primer_absent] wk1 Monday: Monday (Legs & Calves) has no primer exercise, though this track has a primer pool.
     [primer_absent] wk1 Tuesday: Tuesday (Back & Biceps) has no primer exercise, though this track has a primer pool.
     [primer_absent] wk1 Thursday: Thursday (Legs & Calves) has no primer exercise, though this track has a primer pool.
-    [primer_absent] wk1 Friday: Friday (Push & Press) has no primer exercise, though this track has a primer pool.
+    [primer_absent] wk1 Friday: Friday (Legs & Calves) has no primer exercise, though this track has a primer pool.
+
+Score 7.8/12 — home_gym / shoulders / 60-90 / hybrid / novice / functional / recovery=low / cardio=love
+  Time fit (0.0/2):
+    [time_fit] wk1 Friday: Worst day (week 1 Friday) is 40% under budget (expected: 75min, actual: 45min)
+  Progression (1.6/2):
+    [frozen_week] wk1 Thursday: Loaded Backpack Walk: load and reps both unchanged from week 1 to week 2 (40m @ 12) — only the RPE label differs
+    [frozen_week] wk2 Thursday: Loaded Backpack Walk: load and reps both unchanged from week 2 to week 3 (40m @ 12) — only the RPE label differs
+    [frozen_week] wk5 Thursday: Loaded Backpack Walk: load and reps both unchanged from week 5 to week 6 (40m @ 12) — only the RPE label differs
+    [frozen_week] wk6 Thursday: Loaded Backpack Walk: load and reps both unchanged from week 6 to week 7 (40m @ 12) — only the RPE label differs
+    [frozen_week] wk9 Monday: Backpack Row: load and reps both unchanged from week 9 to week 10 (6-10 @ 12) — only the RPE label differs
+    [frozen_week] wk9 Monday: Glute Bridge: load and reps both unchanged from week 9 to week 10 (6-10 @ bodyweight) — only the RPE label differs
+    [frozen_week] wk9 Tuesday: Dumbbell Rows: load and reps both unchanged from week 9 to week 10 (6-10 @ 22) — only the RPE label differs
+    [frozen_week] wk9 Tuesday: Romanian Deadlifts: load and reps both unchanged from week 9 to week 10 (6-10 @ 46) — only the RPE label differs
+    [frozen_week] wk9 Thursday: Loaded Backpack Walk: load and reps both unchanged from week 9 to week 10 (40m @ 12) — only the RPE label differs
+    [frozen_week] wk9 Thursday: Walking Lunges: load and reps both unchanged from week 9 to week 10 (6-10 @ 16) — only the RPE label differs
+    [frozen_week] wk9 Friday: Barbell Rows: load and reps both unchanged from week 9 to week 10 (6-10 @ 45) — only the RPE label differs
+    [frozen_week] wk10 Thursday: Loaded Backpack Walk: load and reps both unchanged from week 10 to week 11 (40m @ 12) — only the RPE label differs
+    [frozen_week] wk10 Friday: Barbell Rows: load and reps both unchanged from week 10 to week 11 (6-10 @ 45) — only the RPE label differs
+    [frozen_week] wk13 Monday: Trap Bar Deadlift: load and reps both unchanged from week 13 to week 14 (6-10 @ 90) — only the RPE label differs
+    [frozen_week] wk13 Tuesday: Deadlifts: load and reps both unchanged from week 13 to week 14 (6-10 @ 90) — only the RPE label differs
+    [frozen_week] wk13 Thursday: Barbell Squats: load and reps both unchanged from week 13 to week 14 (6-10 @ 75) — only the RPE label differs
+    [frozen_week] wk13 Thursday: Loaded Backpack Walk: load and reps both unchanged from week 13 to week 14 (40m @ 12) — only the RPE label differs
+    [frozen_week] wk13 Friday: Barbell Rows: load and reps both unchanged from week 13 to week 14 (6-10 @ 45) — only the RPE label differs
+    [frozen_week] wk14 Monday: Trap Bar Deadlift: load and reps both unchanged from week 14 to week 15 (6-10 @ 90) — only the RPE label differs
+    [frozen_week] wk14 Tuesday: Deadlifts: load and reps both unchanged from week 14 to week 15 (6-10 @ 90) — only the RPE label differs
+    [frozen_week] wk14 Thursday: Barbell Squats: load and reps both unchanged from week 14 to week 15 (6-10 @ 75) — only the RPE label differs
+    [frozen_week] wk14 Thursday: Loaded Backpack Walk: load and reps both unchanged from week 14 to week 15 (40m @ 12) — only the RPE label differs
+    [frozen_week] wk14 Friday: Barbell Rows: load and reps both unchanged from week 14 to week 15 (6-10 @ 45) — only the RPE label differs
+  Selection (1.6/2):
+    [load_incoherent] wk1: "bicep" load spread this week is 4kg-20kg (Dumbbell Curls=4kg, Barbell Curls=20kg, Hammer Curls=4kg)
+  Goal alignment (1.0/2):
+    [recovery_volume_not_reduced] wk1: low recovery_capacity weekly sets (59) not >=15% below high (71)
+  Primer fit (1.6/2):
+    [primer_pattern_mismatch] wk1 Friday: "Kettlebell Swings" (affinity: hip_hinge/cardio) doesn't fit Friday's Upper Pull & Core patterns (vertical_pull/horizontal_pull). Cause: the affinity-preferred primer pool was empty for this profile, so selection fell back to any eligible primer — this is a catalogue coverage gap for this profile/track combination, not a selection bug.
+
+Score 7.8/12 — home_gym / wrists / 90+ / bodybuilding / beginner / functional / recovery=low / cardio=love
+  Time fit (0.0/2):
+    [time_fit] wk1 Tuesday: Worst day (week 1 Tuesday) is 59% under budget (expected: 100min, actual: 41min)
+  Progression (1.6/2):
+    [frozen_week] wk9 Monday: Trap Bar Deadlift: load and reps both unchanged from week 9 to week 10 (8-10 @ 57.5) — only the RPE label differs
+    [frozen_week] wk9 Monday: Dumbbell Bench Press: load and reps both unchanged from week 9 to week 10 (8-12 @ 14) — only the RPE label differs
+    [frozen_week] wk9 Monday: Inverted Row: load and reps both unchanged from week 9 to week 10 (8-12 @ bodyweight) — only the RPE label differs
+    [frozen_week] wk9 Monday: Walking Lunges: load and reps both unchanged from week 9 to week 10 (8-12 @ 8) — only the RPE label differs
+    [frozen_week] wk9 Monday: Bodyweight Good Morning: load and reps both unchanged from week 9 to week 10 (8-12 @ bodyweight) — only the RPE label differs
+    [frozen_week] wk9 Monday: Air Squat: load and reps both unchanged from week 9 to week 10 (8-12 @ bodyweight) — only the RPE label differs
+    [frozen_week] wk9 Tuesday: Dumbbell Rows: load and reps both unchanged from week 9 to week 10 (8-12 @ 14) — only the RPE label differs
+    [frozen_week] wk9 Thursday: Trap Bar Deadlift: load and reps both unchanged from week 9 to week 10 (8-10 @ 57.5) — only the RPE label differs
+    [frozen_week] wk9 Thursday: Goblet Squats: load and reps both unchanged from week 9 to week 10 (8-12 @ 14) — only the RPE label differs
+    [frozen_week] wk9 Thursday: Glute Bridge: load and reps both unchanged from week 9 to week 10 (8-12 @ bodyweight) — only the RPE label differs
+    [frozen_week] wk9 Thursday: Bulgarian Split Squats: load and reps both unchanged from week 9 to week 10 (8-12 @ 22) — only the RPE label differs
+    [frozen_week] wk9 Friday: Trap Bar Deadlift: load and reps both unchanged from week 9 to week 10 (8-10 @ 57.5) — only the RPE label differs
+    [frozen_week] wk9 Friday: Incline Dumbbell Press: load and reps both unchanged from week 9 to week 10 (8-12 @ 14) — only the RPE label differs
+    [frozen_week] wk9 Friday: Inverted Row: load and reps both unchanged from week 9 to week 10 (8-12 @ bodyweight) — only the RPE label differs
+    [frozen_week] wk9 Friday: Bulgarian Split Squats: load and reps both unchanged from week 9 to week 10 (8-12 @ 22) — only the RPE label differs
+    [frozen_week] wk9 Friday: Goblet Squats: load and reps both unchanged from week 9 to week 10 (8-12 @ 14) — only the RPE label differs
+    [frozen_week] wk9 Friday: Bodyweight Good Morning: load and reps both unchanged from week 9 to week 10 (8-12 @ bodyweight) — only the RPE label differs
+    [frozen_week] wk9 Friday: Dumbbell Shoulder Press: load and reps both unchanged from week 9 to week 10 (8-12 @ 10) — only the RPE label differs
+    [frozen_week] wk9 Friday: Glute Bridge: load and reps both unchanged from week 9 to week 10 (8-12 @ bodyweight) — only the RPE label differs
+    [frozen_week] wk10 Monday: Trap Bar Deadlift: load and reps both unchanged from week 10 to week 11 (8-10 @ 57.5) — only the RPE label differs
+    [frozen_week] wk10 Monday: Dumbbell Bench Press: load and reps both unchanged from week 10 to week 11 (8-12 @ 14) — only the RPE label differs
+    [frozen_week] wk10 Monday: Inverted Row: load and reps both unchanged from week 10 to week 11 (8-12 @ bodyweight) — only the RPE label differs
+    [frozen_week] wk10 Monday: Walking Lunges: load and reps both unchanged from week 10 to week 11 (8-12 @ 8) — only the RPE label differs
+    [frozen_week] wk10 Monday: Bodyweight Good Morning: load and reps both unchanged from week 10 to week 11 (8-12 @ bodyweight) — only the RPE label differs
+    [frozen_week] wk10 Monday: Air Squat: load and reps both unchanged from week 10 to week 11 (8-12 @ bodyweight) — only the RPE label differs
+    [frozen_week] wk10 Tuesday: Dumbbell Rows: load and reps both unchanged from week 10 to week 11 (8-12 @ 14) — only the RPE label differs
+    [frozen_week] wk10 Thursday: Trap Bar Deadlift: load and reps both unchanged from week 10 to week 11 (8-10 @ 57.5) — only the RPE label differs
+    [frozen_week] wk10 Thursday: Goblet Squats: load and reps both unchanged from week 10 to week 11 (8-12 @ 14) — only the RPE label differs
+    [frozen_week] wk10 Thursday: Glute Bridge: load and reps both unchanged from week 10 to week 11 (8-12 @ bodyweight) — only the RPE label differs
+    [frozen_week] wk10 Thursday: Bulgarian Split Squats: load and reps both unchanged from week 10 to week 11 (8-12 @ 22) — only the RPE label differs
+    [frozen_week] wk10 Friday: Trap Bar Deadlift: load and reps both unchanged from week 10 to week 11 (8-10 @ 57.5) — only the RPE label differs
+    [frozen_week] wk10 Friday: Incline Dumbbell Press: load and reps both unchanged from week 10 to week 11 (8-12 @ 14) — only the RPE label differs
+    [frozen_week] wk10 Friday: Inverted Row: load and reps both unchanged from week 10 to week 11 (8-12 @ bodyweight) — only the RPE label differs
+    [frozen_week] wk10 Friday: Bulgarian Split Squats: load and reps both unchanged from week 10 to week 11 (8-12 @ 22) — only the RPE label differs
+    [frozen_week] wk10 Friday: Goblet Squats: load and reps both unchanged from week 10 to week 11 (8-12 @ 14) — only the RPE label differs
+    [frozen_week] wk10 Friday: Bodyweight Good Morning: load and reps both unchanged from week 10 to week 11 (8-12 @ bodyweight) — only the RPE label differs
+    [frozen_week] wk10 Friday: Dumbbell Shoulder Press: load and reps both unchanged from week 10 to week 11 (8-12 @ 10) — only the RPE label differs
+    [frozen_week] wk10 Friday: Glute Bridge: load and reps both unchanged from week 10 to week 11 (8-12 @ bodyweight) — only the RPE label differs
+    [frozen_week] wk13 Monday: Trap Bar Deadlift: load and reps both unchanged from week 13 to week 14 (8-10 @ 57.5) — only the RPE label differs
+    [frozen_week] wk13 Thursday: Trap Bar Deadlift: load and reps both unchanged from week 13 to week 14 (8-10 @ 57.5) — only the RPE label differs
+    [frozen_week] wk13 Friday: Trap Bar Deadlift: load and reps both unchanged from week 13 to week 14 (8-10 @ 57.5) — only the RPE label differs
+    [frozen_week] wk14 Monday: Trap Bar Deadlift: load and reps both unchanged from week 14 to week 15 (8-10 @ 57.5) — only the RPE label differs
+    [frozen_week] wk14 Thursday: Trap Bar Deadlift: load and reps both unchanged from week 14 to week 15 (8-10 @ 57.5) — only the RPE label differs
+    [frozen_week] wk14 Friday: Trap Bar Deadlift: load and reps both unchanged from week 14 to week 15 (8-10 @ 57.5) — only the RPE label differs
+  Selection (1.6/2):
+    [duplicate_movement_family] wk1 Friday: Movement family "hip_hinge" appears twice: Bodyweight Good Morning, Glute Bridge
+  Goal alignment (1.0/2):
+    [recovery_volume_not_reduced] wk1: low recovery_capacity weekly sets (76) not >=15% below high (98)
+  Primer fit (1.6/2):
+    [primer_pattern_mismatch] wk1 Thursday: "Prone Y-T Raises" (affinity: horizontal_push/vertical_push/horizontal_pull/vertical_pull) doesn't fit Thursday's Legs & Calves patterns (knee_dominant/hip_hinge). Cause: the affinity-preferred primer pool was empty for this profile, so selection fell back to any eligible primer — this is a catalogue coverage gap for this profile/track combination, not a selection bug.
+
+Score 7.8/12 — home_gym / lower_back+knees / 90+ / bodybuilding / intermediate / functional / recovery=low / cardio=love
+  Time fit (0.0/2):
+    [time_fit] wk1 Monday: Worst day (week 1 Monday) is 46% under budget (expected: 100min, actual: 54min)
+  Progression (1.6/2):
+    [frozen_week] wk9 Tuesday: Pull-Ups: load and reps both unchanged from week 9 to week 10 (4-6 @ bodyweight) — only the RPE label differs
+    [frozen_week] wk13 Monday: Barbell Bench Press: load and reps both unchanged from week 13 to week 14 (4-6 @ 65) — only the RPE label differs
+    [frozen_week] wk13 Tuesday: Pull-Ups: load and reps both unchanged from week 13 to week 14 (4-6 @ bodyweight) — only the RPE label differs
+    [frozen_week] wk14 Monday: Barbell Bench Press: load and reps both unchanged from week 14 to week 15 (4-6 @ 65) — only the RPE label differs
+    [frozen_week] wk14 Tuesday: Pull-Ups: load and reps both unchanged from week 14 to week 15 (4-6 @ bodyweight) — only the RPE label differs
+  Selection (1.6/2):
+    [duplicate_movement_family] wk1 Friday: Movement family "shrug" appears twice: Dumbbell Shrugs, Shrugs
+  Goal alignment (1.0/2):
+    [recovery_volume_not_reduced] wk1: low recovery_capacity weekly sets (50) not >=15% below high (64)
+  Primer fit (1.6/2):
+    [primer_pattern_mismatch] wk1 Thursday: "Wall Slides" (affinity: horizontal_push/vertical_push) doesn't fit Thursday's Legs & Calves patterns (knee_dominant/hip_hinge). Cause: the affinity-preferred primer pool was empty for this profile, so selection fell back to any eligible primer — this is a catalogue coverage gap for this profile/track combination, not a selection bug.
 
 ================================================================================

@@ -16,7 +16,7 @@ import {
   shiftReps, adjustRest, dedupeAdjacentPhases, type PhaseConfig, type TrainingPhase,
 } from './periodization'
 import { getGoalPolicy, restrictPhaseSequence, resolveConditioningFrequency, RECOVERY_SET_MULTIPLIER, type GoalPolicy } from './goal-policies'
-import { getDurationBudgetSeconds, estimateDaySeconds, estimateSlotsSeconds } from './session-duration'
+import { getDurationBudgetSeconds, estimateDaySeconds, estimateSlotsSeconds, parseRestSeconds } from './session-duration'
 
 // ---------------------------------------------------------------------------
 // Track definitions (unchanged — used for day-level focus selection)
@@ -3221,6 +3221,58 @@ function computeDurationTopUp(
   })
 }
 
+/**
+ * stageTimeCap's set-count/removal trimming (STAGE 5, selection time) runs
+ * ONCE, against block 1's anatomical_adaptation rest (-15s, see
+ * PHASE_CONFIGS in periodization.ts). Every later block's phase can add real
+ * rest time on top — Maximal Strength +45s, Power +60s — that the one-time
+ * trim has no visibility into, since sets/reps/rest are all recomputed per
+ * WEEK, well after selection-time trimming already ran. Measured directly
+ * against the 9216-combo harness: the large majority of over-budget
+ * worst-days land at week 9+ (block 3 onward, where 3 of 4 goal sequences
+ * hit a rest-heavy strength/power phase), not week 1.
+ *
+ * Rather than re-running the full destructive stageTimeCap cascade (which
+ * trims SETS — exactly what progression's frozen_week/sets_not_flat checks
+ * expect to stay flat across a block's three loading weeks), this only
+ * pulls the lever stageTimeCap's own Phase 2 already treats as acceptable
+ * under time pressure: rest, never sets, and never the main lift below the
+ * 60s floor structure's own main_lift_short_rest check expects. Deload
+ * weeks are never passed in here — they're deliberately light and unlikely
+ * to run over, and touching their rest would fight the same "designed to be
+ * shorter" reasoning applyDurationFiller and scoreTimeFit already carve out
+ * for them.
+ */
+function trimWeekRestForBudget(days: WorkoutDay[], budgetSeconds: number): void {
+  for (const day of days) {
+    if (day.exercises.length === 0) continue
+    let seconds = estimateDaySeconds(day)
+    if (seconds <= budgetSeconds) continue
+
+    // Accessories/isolation first, main lift last — same priority order as
+    // stageTimeCap's own Phase 5 set-trimming.
+    const order = day.exercises
+      .map((ex, i) => ({ i, isMain: ex.tier === 'tier_1_primary' }))
+      .sort((a, b) => Number(a.isMain) - Number(b.isMain))
+
+    for (let pass = 0; pass < 6 && seconds > budgetSeconds; pass++) {
+      let trimmed = false
+      for (const { i, isMain } of order) {
+        if (seconds <= budgetSeconds) break
+        const ex = day.exercises[i]
+        const restSeconds = parseRestSeconds(ex.rest)
+        const floor = isMain ? 60 : 30
+        if (restSeconds <= floor) continue
+        const newRest = Math.max(floor, restSeconds - 15)
+        day.exercises[i] = { ...ex, rest: `${newRest}s` }
+        trimmed = true
+        seconds = estimateDaySeconds(day)
+      }
+      if (!trimmed) break
+    }
+  }
+}
+
 // Below this underrun, a day is "close enough" and gets no filler — matches
 // the quality scorer's tighter (10%/20%) overrun bands staying strict while
 // underrun gets real headroom before anything is appended.
@@ -3252,13 +3304,20 @@ function applyDurationFiller(
     const underBySeconds = totalBudgetSeconds - actualSeconds
     if (underBySeconds <= FILLER_TRIGGER_SECONDS) continue
 
-    // Capped higher than the old 20min ceiling now that the honest duration
-    // model (session-duration.ts) charges real per-exercise setup overhead
-    // and rep-scaled work time — a thin equipment/experience pool (e.g.
-    // minimalist + beginner) genuinely cannot fill a 90+ min session with
-    // quality distinct lifting, and the honest move is a longer mobility/
-    // conditioning close-out, not pretending the gap doesn't exist.
-    const fillerMinutes = Math.min(30, Math.round(underBySeconds / 60))
+    // Capped higher than the old 20min (then 30min, then 60min) ceiling now
+    // that the honest duration model (session-duration.ts) charges real
+    // per-exercise setup overhead and rep-scaled work time — a thin
+    // equipment/experience pool (e.g. minimalist + beginner) genuinely
+    // cannot fill a 90+ min session with quality distinct lifting, and the
+    // honest move is a longer mobility/conditioning close-out, not
+    // pretending the gap doesn't exist. A flat 30min was sized for a ~37min
+    // (30-45min) budget but was chronically insufficient for a 100min (90+)
+    // budget with a thin pool — measured directly against the 9216-combo
+    // harness at each step. 90min is bounded by the longest budget tier
+    // itself (90+ => 100min) — someone who told onboarding they have that
+    // much time available isn't hearing an implausible number if the honest
+    // answer is "the rest of it goes to mobility, not more lifting."
+    const fillerMinutes = Math.min(90, Math.round(underBySeconds / 60))
 
     if (mobilityOnly) {
       day.conditioning_note = `Optional mobility flow (~${fillerMinutes} min) — today's session ran under your time budget; the extra time goes to mobility, not more lifting volume.`
@@ -3865,6 +3924,12 @@ export function generateMesocycle(
       // filler there would fight the whole point of the recovery week, so
       // this only applies to loading weeks.
       if (!isDeload) {
+        // Must run BEFORE the filler — a day trimmed back under budget here
+        // has nothing left for the filler to react to; a day still over
+        // after this (rest already at floor) has nothing under-budget for
+        // the filler to fill either, so the two never fight over the same
+        // day.
+        trimWeekRestForBudget(days, totalBudgetSeconds)
         applyDurationFiller(days, profile, policy, totalBudgetSeconds)
         // Runs last, after rotation, periodization and duration-budget
         // trimming have all had their say — see enforceWeeklyPatternBalance's
