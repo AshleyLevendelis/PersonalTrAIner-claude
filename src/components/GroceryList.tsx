@@ -195,6 +195,9 @@ export function GroceryList({ profileId, mealPools, targets, refreshToken }: Gro
             Regenerate ({horizonDays}d)
           </Button>
         </div>
+        <p className="pt-1 text-xs text-muted-foreground/70">
+          Ingredients are filtered, not verified. Check labels if you have an allergy.
+        </p>
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="flex items-center gap-1.5">

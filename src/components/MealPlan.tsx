@@ -157,6 +157,9 @@ export function MealPlan({
           Regenerate all
         </button>
       </div>
+      <p className="text-xs text-muted-foreground/70">
+        Ingredients are filtered, not verified. Check labels if you have an allergy.
+      </p>
 
       {targets && <TotalsHero totals={totals} targets={targets} />}
 

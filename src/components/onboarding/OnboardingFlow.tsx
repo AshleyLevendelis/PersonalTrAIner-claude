@@ -723,6 +723,11 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
                 />
               ))}
             </div>
+            <p className="text-[11px] leading-snug text-muted-foreground/70 text-center">
+              These filters check ingredients we recognise. We can't check brands,
+              preparation, or cross-contamination. If you have a food allergy,
+              always check ingredients yourself.
+            </p>
             <ContinueButton onClick={goNext} label={data.dietaryPreferences.length === 0 ? 'No restrictions — Skip' : 'Continue'} />
           </StepWrapper>
         )

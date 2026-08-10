@@ -564,6 +564,20 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
               <p className="text-[11px] leading-snug text-muted-foreground/70">Anything else you'd rather not see. Matched by name.</p>
               <EditableTagList values={hardFoodDislikeValues} onSave={saveDislikedFoods} placeholder="e.g. mushrooms" />
             </div>
+            {/* Honesty-copy round — applies to BOTH fields above (the
+                canonical picker's tag-based checks AND the free-text
+                avoid-list's literal name match, which has its own blind spot:
+                no synonym expansion, so "sesame" doesn't catch "tahini").
+                Deliberately placed after both, with a hairline rule, rather
+                than nested inside the picker's own div — nested there it read
+                as belonging only to the ToggleGroup, at the same space-y-3 gap
+                as every other unrelated field in this card, which risked
+                being misread as "the avoid-list doesn't have this limitation." */}
+            <p className="pt-2 text-[11px] leading-snug text-muted-foreground/70" style={{ borderTop: '1px solid var(--hairline)' }}>
+              These filters check ingredients we recognise. We can't check brands,
+              preparation, or cross-contamination. If you have a food allergy,
+              always check ingredients yourself.
+            </p>
             <div className="space-y-1">
               <span className="text-muted-foreground">Favorite cuisines</span>
               <EditableTagList values={profile.favorite_cuisines ?? []} onSave={v => savePatch({ favorite_cuisines: v })} placeholder={`e.g. ${FAVORITE_CUISINE_OPTIONS[0]?.label ?? 'Italian'}`} />
