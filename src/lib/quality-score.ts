@@ -79,18 +79,36 @@ function isMainCompound(ex: Exercise): boolean {
  * window that day. Underrun gets a genuinely gentler curve, not just the
  * same thresholds relabeled.
  */
-function scoreTimeRatio(seconds: number, budget: number): number {
+function scoreTimeRatio(seconds: number, budget: number, exemptUnderrun: boolean): number {
   const diff = seconds - budget
   if (diff >= 0) {
     const ratio = diff / budget
     return ratio <= 0.10 ? 2 : ratio <= 0.20 ? 1 : 0
   }
+  // LOAD-BEARING COUPLING with exercise-plan.ts's computeDurationTopUp — do
+  // not change one side without the other. `exemptUnderrun` is passed in as
+  // exactly `profile.recovery_capacity === 'low'`, which is only a safe
+  // signal because computeDurationTopUp returns ZERO top-up sets for that
+  // exact case (see its own matching comment). That makes a low-recovery
+  // under-budget day categorically different from every other under-budget
+  // day: it is NEVER "the engine couldn't fill it," always "the user
+  // recovers slowly and this is the correct amount of work" — the same
+  // reasoning already applied to deload weeks below. If computeDurationTopUp
+  // ever starts giving low recovery ANY top-up again (even partial), this
+  // exemption must be revisited too, or the scorer will silently stop
+  // catching genuine under-fill for that profile. Overrun is untouched —
+  // running long is a real cost regardless of recovery tier.
+  if (exemptUnderrun) return 2
   const ratio = -diff / budget
   return ratio <= 0.20 ? 2 : ratio <= 0.35 ? 1 : 0
 }
 
 function scoreTimeFit(profile: UserProfile, mesocycle: MesocycleWeek[]): DimensionResult {
   const budget = DURATION_BUDGET_SECONDS[profile.session_duration_preference || '45-60']
+  // See scoreTimeRatio's own comment — this is only valid while
+  // computeDurationTopUp (exercise-plan.ts) returns zero top-up for low
+  // recovery_capacity. The two must move together.
+  const exemptUnderrun = profile.recovery_capacity === 'low'
   let worstScore = 2
   let worst: { week: number; day: string; seconds: number; ratio: number; isOver: boolean } | null = null
 
@@ -104,7 +122,7 @@ function scoreTimeFit(profile: UserProfile, mesocycle: MesocycleWeek[]): Dimensi
     for (const day of week.days) {
       if (day.exercises.length === 0) continue
       const seconds = estimateDaySeconds(day)
-      const dayScore = scoreTimeRatio(seconds, budget)
+      const dayScore = scoreTimeRatio(seconds, budget, exemptUnderrun)
       if (dayScore < worstScore) {
         const diff = seconds - budget
         worstScore = dayScore

@@ -10,7 +10,7 @@ import {
   type ExperienceConfig,
 } from './experience-config'
 import { buildWarmup, getWarmupReserveSeconds } from './warmup'
-import { prescribeLoad, categorize, getLoadIncrementKg, isExternallyLoaded, getEquipmentFloorKg, loadingMode, roundToPlate, formatLoad, labelModeForEntry, hasKnownWorkingWeight, unverifiedRampStepKg, type KnownWorkingWeights } from './load-prescription'
+import { prescribeLoad, categorize, getLoadIncrementKg, isExternallyLoaded, getEquipmentFloorKg, loadingMode, roundToPlate, formatLoad, labelModeForEntry, hasKnownWorkingWeight, unverifiedRampStepKg, isolationTargetBelowFloor, type KnownWorkingWeights } from './load-prescription'
 import {
   getPhaseSequence, getPhaseConfig, rotateVariation, resolveTargetRpe,
   shiftReps, adjustRest, dedupeAdjacentPhases, type PhaseConfig, type TrainingPhase,
@@ -1624,6 +1624,66 @@ function rebuildLoadForExercise(ex: Exercise, entry: ExerciseEntry, targetKg: nu
   }
 }
 
+/**
+ * Barbell/EZ-bar isolation work (Barbell Curls, Skull Crushers) has a much
+ * higher equipment floor than its dumbbell/cable siblings in the same
+ * substitution_group (20kg/10kg vs 2-5kg) — for a lighter trainee whose
+ * true target is below that floor, roundToPlate clamps the DISPLAYED
+ * number up to the bar weight, producing a load that doesn't represent
+ * this trainee's actual strength at all. Both numbers were individually
+ * "correct" given each implement's physical floor, but pairing them in
+ * the same week reads as incoherent (quality-score.ts's load_incoherent
+ * "weekly_group_spread" check exists specifically to catch this). The
+ * honest fix is the same movement on a lower-floor implement — every
+ * affected substitution_group already carries one — not inventing a
+ * fractional barbell weight nobody can load.
+ *
+ * Runs on the BASE (un-periodized) plan, before any weekly/phase-specific
+ * load computation, so the swap is decided once and every week of the
+ * mesocycle inherits it consistently rather than drifting mid-block. Uses
+ * isolationTargetBelowFloor's REFERENCE weight (the standards-model
+ * baseline, same one prescribeLoad itself starts from) rather than
+ * inspecting the just-computed suggested_load_kg — a rounded value of
+ * exactly the floor is genuinely ambiguous (a trainee whose true target
+ * is a few kg over the floor rounds to the same displayed number as one
+ * who's meaningfully under it), while the reference weight says directly
+ * whether THIS trainee's target sits below THIS implement's floor.
+ */
+function substituteFloorClampedIsolation(
+  exercises: Exercise[],
+  pool: ExerciseEntry[],
+  profile: UserProfile,
+  experienceLoadGuidance: string,
+): void {
+  for (let i = 0; i < exercises.length; i++) {
+    const entry = findEntry(exercises[i].name)
+    if (!entry || !isolationTargetBelowFloor(entry, profile)) continue
+
+    // Lowest-floor same-substitution_group sibling available in the
+    // constrained pool — equipment/injury/experience filtering has
+    // already run by this point, so every candidate here is genuinely
+    // eligible for this trainee, not just theoretically lower-floor.
+    const sibling = pool
+      .filter(e => e.substitution_group === entry.substitution_group && e.name !== entry.name)
+      .sort((a, b) => getEquipmentFloorKg(a) - getEquipmentFloorKg(b))[0]
+    if (!sibling) continue
+
+    const ex = exercises[i]
+    const load = prescribeLoad(sibling, profile, { targetRpeLabel: ex.intensity, isFirstBlock: true, sets: ex.sets })
+    exercises[i] = {
+      ...ex,
+      id: sibling.id,
+      name: sibling.name,
+      prescription_type: sibling.prescription_type,
+      load_guidance: `${experienceLoadGuidance} ${load.basis}`,
+      suggested_load: load.display,
+      suggested_load_kg: load.starting_weight_kg,
+      load_source: load.load_source,
+      per_set_load: load.per_set,
+    }
+  }
+}
+
 function enforceLoadCoherence(days: WorkoutDay[]): void {
   for (const day of days) {
     const mainLifts = day.exercises.filter(ex => {
@@ -2795,6 +2855,8 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
       }
     })
 
+    substituteFloorClampedIsolation(exercises, pool, profile, experience.load_guidance)
+
     // Build superset pairings
     const paired = buildSupersetPairs(exercises, pool, duration, trainingStyle, trace)
 
@@ -3198,6 +3260,31 @@ function computeDurationTopUp(
     const baseSets = day.exercises.map(ex =>
       Math.max(2, Math.round(ex.sets * policy.setVolumeMultiplier * recoverySetMultiplier * phaseConfig.sets_multiplier))
     )
+
+    // Recovery constraint outranks time budget: low recovery_capacity is
+    // exempt from top-up entirely, not just capped by a recovery-scaled
+    // ceiling. The ceiling-based path below still let available session
+    // time pull sets back up toward what a high-recovery peer would get,
+    // which is exactly how a deliberate ~25% volume cut
+    // (RECOVERY_SET_MULTIPLIER.low) was quietly eroding to a much smaller
+    // real-world reduction (measured: only ~14% actual, not ~25%, in the
+    // majority of low-recovery combos before this exemption). The 2-set
+    // floor in baseSets above is untouched.
+    //
+    // LOAD-BEARING COUPLING — do not change one side without the other:
+    // quality-score.ts's scoreTimeRatio treats every low-recovery
+    // under-budget day as a full pass, on the assumption that it can ONLY
+    // be under budget because of this exact exemption — never because the
+    // engine failed to fill it. That assumption is only true as long as
+    // this function returns zero top-up for low recovery. Re-enable top-up
+    // here (even partially) without updating scoreTimeRatio's exemption to
+    // match, and the scorer will silently stop catching genuine under-fill
+    // for low-recovery profiles — a real regression that the 9216-combo
+    // harness will NOT flag, since the score would just look artificially
+    // perfect.
+    if (profile.recovery_capacity === 'low') {
+      return day.exercises.map(() => 0)
+    }
 
     if (recoveryRatio >= 1) {
       // High recovery (or nothing eligible): no recovery-driven deficit to

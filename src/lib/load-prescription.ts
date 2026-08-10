@@ -830,6 +830,31 @@ function resolveIsolationReferenceKg(category: string, profile: UserProfile): nu
   return resolveParentOneRepMaxKg(isolation.parent, profile) * isolation.fraction
 }
 
+/**
+ * Whether this isolation exercise's reference working weight — the same
+ * baseline resolveIsolationReferenceKg computes, before any per-week RPE/
+ * rep scaling — would round below the exercise's OWN equipment floor (an
+ * empty 20kg bar, a 10kg EZ bar). Only barbell/EZ-bar modes have a floor
+ * high enough for this to matter — dumbbell (2kg), single_implement (2kg)
+ * and stack (5kg) floors are low enough that a genuinely light target
+ * still displays close to its real value. Used by exercise selection to
+ * prefer a lower-floor same-substitution_group sibling instead of
+ * silently clamping a lighter trainee's true target up to a bar weight
+ * the number never actually represented — the exact "Barbell Curls=20kg,
+ * Dumbbell Curls=5kg" incoherence a real trainee would see as two
+ * unrelated numbers for the same muscle, when both are really just this
+ * one gap wearing two different implements.
+ */
+export function isolationTargetBelowFloor(entry: ExerciseEntry, profile: UserProfile): boolean {
+  const mode = loadingMode(entry)
+  if (mode !== 'barbell' && mode !== 'ez_bar') return false
+  const category = categorize(entry)
+  if (!category) return false
+  const reference = resolveIsolationReferenceKg(category, profile)
+  if (reference == null) return false
+  return reference < LOADING_FLOOR_KG[mode]
+}
+
 export function prescribeLoad(
   entry: ExerciseEntry,
   profile: UserProfile,
