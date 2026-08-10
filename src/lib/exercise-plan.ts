@@ -1049,10 +1049,24 @@ function selectExercisesForTrack(
   // the real, track-aware signal; movement_pattern stays untouched so
   // quality-score.ts's weekly pattern-coverage checks don't start counting a
   // 2x8 primer set as real pattern volume.
-  const primerPool = pool.filter(e =>
+  //
+  // The affinity filter is a PREFERENCE, not a gate — measured after landing
+  // (commit 3c2b191), it left 37% of combos with at least one session missing
+  // a primer outright (a mismatched primer beats no primer; the user still
+  // warms up). `pool` has already applied equipment/injury/experience, so
+  // falling back to it unfiltered keeps every hard constraint and only drops
+  // the soft track-fit preference. Selection within either pool is identical
+  // (uniform shuffle(), not ranked by "closeness" — there's no distance
+  // metric between patterns in the data model to rank by, and this is the
+  // same random-from-pool behavior every primer had before affinity existed,
+  // which is exactly the right fallback for the one case where affinity
+  // can't be honored).
+  const affinityPrimerPool = pool.filter(e =>
     e.mechanics_tier === 'primer' &&
     (e.primer_pattern_affinity ?? []).some(p => track.primer_patterns.includes(p))
   )
+  const anyPrimerPool = pool.filter(e => e.mechanics_tier === 'primer')
+  const primerPool = affinityPrimerPool.length > 0 ? affinityPrimerPool : anyPrimerPool
   const primer = primerPool.length > 0
     ? shuffle(primerPool.filter(p => !weeklyUsed.has(p.name)))[0] ?? shuffle(primerPool)[0]
     : null

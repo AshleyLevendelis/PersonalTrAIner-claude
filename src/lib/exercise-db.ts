@@ -1927,6 +1927,139 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     // general enough as CNS activation to also serve overhead-pressing days.
     primer_pattern_affinity: ['horizontal_push', 'vertical_push'],
   },
+  // The next four are equipment: ['bodyweight'] ONLY — verified against
+  // EQUIPMENT_SETS.bodyweight (exercise-plan.ts), which allows exactly
+  // ['bodyweight', 'pull-up bar', 'weighted backpack']. Added because the
+  // bodyweight equipment tier was the single largest driver of primer-pool
+  // exhaustion (1616 of 3408 affected combos, measured against 3c2b191) —
+  // every other existing primer needs a kettlebell, medicine ball,
+  // resistance band, or plyo box, none of which that tier allows.
+  {
+    name: 'Scapular Push-Ups',
+    id: 'scapular-push-ups',
+    movement_pattern: 'activation',
+    mechanics_tier: 'primer',
+    prescription_type: 'reps',
+    angle_vector: 'horizontal',
+    primary_muscles: ['serratus anterior', 'chest', 'shoulders'],
+    equipment: ['bodyweight'],
+    joint_stress: 'low',
+    form_cues: ['Plank or push-up position', 'Let shoulder blades sink together', 'Push the floor away to protract', 'Small range, elbows locked'],
+    coach_note_swap: 'Trains scapular control under bodyweight load — the foundational pattern under every push-up and bench press. No plyo skill required.',
+    loads_joints: ['shoulder', 'wrist'],
+    style_tags: ['functional', 'combat', 'hybrid'],
+    substitution_group: 'scapular_control',
+    unilateral: false,
+    avg_duration_seconds: 15,
+    primer_pattern_affinity: ['horizontal_push', 'vertical_push'],
+  },
+  {
+    name: 'Wall Slides',
+    id: 'wall-slides',
+    movement_pattern: 'activation',
+    mechanics_tier: 'primer',
+    prescription_type: 'reps',
+    angle_vector: 'vertical',
+    primary_muscles: ['shoulders', 'upper back', 'rotator cuff'],
+    equipment: ['bodyweight'],
+    joint_stress: 'low',
+    form_cues: ['Back flat against a wall', 'Arms in goalpost position', 'Slide arms overhead keeping contact', 'Control the return'],
+    coach_note_swap: 'Shoulder mobility and scapular control — preps the joint for overhead pressing with zero load.',
+    loads_joints: ['shoulder'],
+    style_tags: ['functional', 'hybrid'],
+    substitution_group: 'scapular_control',
+    unilateral: false,
+    avg_duration_seconds: 15,
+    primer_pattern_affinity: ['horizontal_push', 'vertical_push'],
+  },
+  {
+    name: 'Prone Y-T Raises',
+    id: 'prone-y-t-raises',
+    movement_pattern: 'activation',
+    mechanics_tier: 'primer',
+    prescription_type: 'reps',
+    angle_vector: 'diagonal',
+    primary_muscles: ['rear deltoid', 'rhomboids', 'lower trapezius'],
+    equipment: ['bodyweight'],
+    joint_stress: 'low',
+    form_cues: ['Lie face down', 'Raise arms to a Y then a T', 'Squeeze shoulder blades together', 'Keep neck neutral'],
+    // Own note deliberately parallels Band Pull-Aparts' — same posterior-
+    // shoulder role, zero equipment, so it's the fallback when a band isn't
+    // available AND the zero-equipment primer for the bodyweight tier.
+    coach_note_swap: 'Bodyweight scapular activation from the floor — the same posterior-shoulder stability as a band pull-apart, for anyone without a band handy.',
+    loads_joints: ['shoulder', 'lower_back_axial'],
+    style_tags: ['functional', 'hybrid'],
+    substitution_group: 'scapular_control',
+    unilateral: false,
+    avg_duration_seconds: 18,
+    primer_pattern_affinity: ['horizontal_push', 'vertical_push', 'horizontal_pull', 'vertical_pull'],
+  },
+  {
+    name: 'Arm Circles',
+    id: 'arm-circles',
+    movement_pattern: 'activation',
+    mechanics_tier: 'primer',
+    prescription_type: 'reps',
+    angle_vector: 'rotational',
+    primary_muscles: ['shoulders', 'rotator cuff'],
+    equipment: ['bodyweight'],
+    joint_stress: 'low',
+    form_cues: ['Arms extended out to sides', 'Small controlled circles', 'Reverse direction halfway', 'Shoulders down, not shrugged'],
+    coach_note_swap: 'General shoulder-joint warm-up before any upper-body pressing or pulling.',
+    loads_joints: ['shoulder'],
+    style_tags: ['functional', 'combat', 'hybrid'],
+    substitution_group: 'general_warmup',
+    unilateral: false,
+    avg_duration_seconds: 15,
+    // Deliberately the broadest of the six — general joint warm-up, not a
+    // specific strength pattern, so it's eligible everywhere upper-body work
+    // happens. Flagged in the accompanying report as a real design tension:
+    // this breadth also means it can crowd out more specific primers if it
+    // gets picked too often — a coaching judgment call, not a filter bug.
+    primer_pattern_affinity: ['horizontal_push', 'vertical_push', 'horizontal_pull', 'vertical_pull'],
+  },
+  {
+    name: 'Band Dislocates',
+    id: 'band-dislocates',
+    movement_pattern: 'activation',
+    mechanics_tier: 'primer',
+    prescription_type: 'reps',
+    angle_vector: 'vertical',
+    primary_muscles: ['shoulders', 'rotator cuff', 'chest'],
+    equipment: ['resistance band'],
+    joint_stress: 'low',
+    form_cues: ['Hold band wide with both hands', 'Raise arms overhead and back', 'Keep elbows locked throughout', 'Return under control'],
+    coach_note_swap: 'Opens shoulder range of motion before overhead work — especially valuable heading into a vertical press.',
+    loads_joints: ['shoulder'],
+    style_tags: ['functional', 'hybrid'],
+    substitution_group: 'scapular_control',
+    unilateral: false,
+    avg_duration_seconds: 18,
+    primer_pattern_affinity: ['horizontal_push', 'vertical_push'],
+  },
+  {
+    // Distinct name from the existing tier3 'Face Pulls' cable exercise
+    // (same movement family, different tier/equipment) — kept separate so
+    // neither exercise-name lookups nor substitution_group dedup conflate a
+    // primer with a real working-set accessory.
+    name: 'Band Face Pulls',
+    id: 'band-face-pulls',
+    movement_pattern: 'activation',
+    mechanics_tier: 'primer',
+    prescription_type: 'reps',
+    angle_vector: 'diagonal',
+    primary_muscles: ['rear deltoid', 'rotator cuff', 'rhomboids'],
+    equipment: ['resistance band'],
+    joint_stress: 'low',
+    form_cues: ['Anchor band at face height', 'Pull to the face, elbows high', 'Externally rotate at the end', 'Controlled return'],
+    coach_note_swap: 'Rotator-cuff and rear-delt prep — protects the shoulder under press load and suits pulling days too.',
+    loads_joints: ['shoulder'],
+    style_tags: ['functional', 'hybrid'],
+    substitution_group: 'scapular_control',
+    unilateral: false,
+    avg_duration_seconds: 18,
+    primer_pattern_affinity: ['horizontal_push', 'vertical_push', 'horizontal_pull', 'vertical_pull'],
+  },
 ]
 
 /**
