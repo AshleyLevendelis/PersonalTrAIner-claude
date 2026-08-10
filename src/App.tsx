@@ -73,6 +73,16 @@ function App() {
   const [isGeneratingMeals, setIsGeneratingMeals] = useState(false)
   /** Set when a (re)generate call reaches the server but comes back with nothing for one or more slots — surfaced so a failed regenerate reads as a failure, not as "your plan is gone." */
   const [mealRegenerateError, setMealRegenerateError] = useState<string | null>(null)
+  /**
+   * Surfacing round — distinct from mealRegenerateError above: this is a
+   * DATA problem (a value in dietary_preferences the app can't enforce), not
+   * a generation failure, so it needs different UI — persistent rather than
+   * dismiss-and-forget, and an action that actually fixes it (open Profile)
+   * rather than a retry that will fail identically forever. Cleared whenever
+   * a generate call comes back clean, so fixing the value in Profile and
+   * regenerating makes the banner go away on its own.
+   */
+  const [unrecognisedDietaryRestrictions, setUnrecognisedDietaryRestrictions] = useState<string[] | null>(null)
   /** Slot -> pool-option name the user explicitly picked this session, overriding assembleDay's automatic choice for that slot until the next regenerate. */
   const [manualMealPicks, setManualMealPicks] = useState<Partial<Record<MealSlotName, string>>>({})
   // assembleDay is pure — deriving today's picks from pools+targets on every
@@ -110,7 +120,7 @@ function App() {
   const [memoryGoals, setMemoryGoals] = useState<UserGoalRow[]>([])
   const [memoryContextFacts, setMemoryContextFacts] = useState<UserContextFactRow[]>([])
   const [profileInfoOpen, setProfileInfoOpen] = useState(false)
-  const [profileInfoSection, setProfileInfoSection] = useState<'goals' | 'facts' | 'context' | undefined>(undefined)
+  const [profileInfoSection, setProfileInfoSection] = useState<'goals' | 'facts' | 'context' | 'dietary' | undefined>(undefined)
   const [newPlanConfirmOpen, setNewPlanConfirmOpen] = useState(false)
   const [newPlanResetting, setNewPlanResetting] = useState(false)
   // Chat typewriter reveal-speed preference — per-profile (reveal-speed-store.ts),
@@ -602,6 +612,11 @@ function App() {
           breakfastStyle: enrichedProfile.breakfast_style,
         })
         generatedPools = result.accepted
+        // Onboarding's dietary_preferences always comes from the picker, so
+        // this branch is defensive rather than reachable today — but it
+        // costs nothing to keep the one piece of state honest from first
+        // load rather than only ever touched by the regenerate handlers.
+        if (result.unrecognisedPreferences.length > 0) setUnrecognisedDietaryRestrictions(result.unrecognisedPreferences)
       } catch (err) {
         // Meal generation failing must not block the rest of the plan —
         // the Meals tab shows its own empty state with a manual retry.
@@ -857,20 +872,35 @@ function App() {
         breakfastStyle: profile.breakfast_style,
         onlySlots: [slot],
       })
-      // A total failure comes back as an empty array for the slot (the fetch
-      // layer swallows network/HTTP failures into []) — persistPools already
-      // leaves that slot's DB rows untouched in that case, so mirror that
-      // here: don't overwrite the on-screen pool or clear the manual pick
+      // Surfacing round — a dietary_preferences value the app can't enforce
+      // fails every proposal identically, so this is checked before anything
+      // else and short-circuits: there's nothing a per-slot message or a
+      // retry can add once the actual cause is known.
+      if (result.unrecognisedPreferences.length > 0) {
+        setUnrecognisedDietaryRestrictions(result.unrecognisedPreferences)
+        return
+      }
+      setUnrecognisedDietaryRestrictions(null)
+      // A total failure comes back as an empty array for the slot — persistPools
+      // already leaves that slot's DB rows untouched in that case, so mirror
+      // that here: don't overwrite the on-screen pool or clear the manual pick
       // with nothing. Only apply/clear when generation actually produced
       // options for this slot.
       if ((result.accepted[slot]?.length ?? 0) === 0) {
         // Don't claim options were "kept" when this slot never had any —
         // that reads as a lie the first time generation fails on a fresh
-        // plan, when the pool was already empty going in.
+        // plan, when the pool was already empty going in. generatorReached
+        // distinguishes "the call worked, nothing fit" (deterministic — name
+        // what'd help) from "the call itself failed" (transient — try again
+        // is the honest advice there).
         setMealRegenerateError(
-          hadExistingOptions
-            ? `Couldn't refresh ${MEAL_SLOT_LABEL[slot]} — kept your existing options.`
-            : `Couldn't generate ${MEAL_SLOT_LABEL[slot]} — try again in a moment.`
+          result.generatorReached
+            ? (hadExistingOptions
+                ? `Couldn't fit a new ${MEAL_SLOT_LABEL[slot]} option — kept your existing one. Try loosening a restriction or widening your calorie range.`
+                : `${MEAL_SLOT_LABEL[slot]} doesn't fit your current targets. Try loosening a restriction, widening your calorie range, or turning off this slot.`)
+            : (hadExistingOptions
+                ? `Couldn't refresh ${MEAL_SLOT_LABEL[slot]} — kept your existing options.`
+                : `Couldn't generate ${MEAL_SLOT_LABEL[slot]} — try again in a moment.`)
         )
         return
       }
@@ -907,6 +937,16 @@ function App() {
         timingRules: compiledTimingRules,
         breakfastStyle: profile.breakfast_style,
       })
+      // Surfacing round — checked first and short-circuits, same reasoning
+      // as the single-slot handler above: an unrecognised restriction fails
+      // every slot identically, so there's nothing the failure-count logic
+      // below needs to run for.
+      if (result.unrecognisedPreferences.length > 0) {
+        setUnrecognisedDietaryRestrictions(result.unrecognisedPreferences)
+        return
+      }
+      setUnrecognisedDietaryRestrictions(null)
+
       const requestedSlots = Object.keys(result.accepted) as MealSlotName[]
       const failedSlots = requestedSlots.filter(s => (result.accepted[s]?.length ?? 0) === 0)
 
@@ -914,8 +954,15 @@ function App() {
         // Total failure — every requested slot came back empty. Leave the
         // existing plan and manual picks untouched entirely (persistPools
         // already left the DB untouched too) rather than replacing a real
-        // plan with the cold-start empty state.
-        setMealRegenerateError("Couldn't reach the meal generator — your existing plan is unchanged. Try again in a moment.")
+        // plan with the cold-start empty state. generatorReached splits
+        // "the call worked, nothing fit your targets" (deterministic — name
+        // what'd help) from "the call itself failed" (transient — retrying
+        // is genuinely the right advice there).
+        setMealRegenerateError(
+          result.generatorReached
+            ? "Nothing fits your current targets right now. Try loosening a dietary restriction, widening your calorie range, or turning off a meal slot — then regenerate."
+            : "Couldn't reach the meal generator — your existing plan is unchanged. Try again in a moment."
+        )
         return
       }
 
@@ -937,11 +984,15 @@ function App() {
         // Split by whether each failed slot actually had prior options to
         // "keep" — a fresh plan whose lunch pool has always been empty gets
         // an honest "couldn't generate" message, not a false "kept" claim.
+        // Reaching this branch at all means at least one other slot DID
+        // fill, which is positive proof the generator was reached this run
+        // — so a failed slot here is provably the "nothing fit" case, not
+        // "the call failed" (that's the total-failure branch above).
         const keptSlots = failedSlots.filter(s => (priorPools[s]?.length ?? 0) > 0)
         const neverFilledSlots = failedSlots.filter(s => (priorPools[s]?.length ?? 0) === 0)
         const parts: string[] = []
-        if (keptSlots.length > 0) parts.push(`Couldn't refresh ${keptSlots.map(s => MEAL_SLOT_LABEL[s]).join(', ')} — kept the existing options there.`)
-        if (neverFilledSlots.length > 0) parts.push(`Couldn't generate ${neverFilledSlots.map(s => MEAL_SLOT_LABEL[s]).join(', ')} — try again in a moment.`)
+        if (keptSlots.length > 0) parts.push(`Couldn't fit new options for ${keptSlots.map(s => MEAL_SLOT_LABEL[s]).join(', ')} — kept what you had.`)
+        if (neverFilledSlots.length > 0) parts.push(`${neverFilledSlots.map(s => MEAL_SLOT_LABEL[s]).join(', ')} don't fit your current targets. Try loosening a restriction, widening your calorie range, or turning off a slot.`)
         setMealRegenerateError(parts.join(' '))
       }
     } catch {
@@ -1273,6 +1324,8 @@ function App() {
               isGeneratingMeals={isGeneratingMeals}
               mealRegenerateError={mealRegenerateError}
               onDismissRegenerateError={() => setMealRegenerateError(null)}
+              unrecognisedDietaryRestrictions={unrecognisedDietaryRestrictions}
+              onFixDietaryRestrictions={() => { setProfileInfoSection('dietary'); setProfileInfoOpen(true) }}
               onSwapMealSlot={handleSwapMealSlot}
               onRegenerateMealSlot={handleRegenerateMealSlot}
               onRegenerateAllMeals={handleRegenerateAllMeals}

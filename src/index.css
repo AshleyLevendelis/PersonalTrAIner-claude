@@ -235,7 +235,7 @@
 
 /*
  * .dark is retained purely so the ~40 inert `dark:*` utilities still present
- * in dev-only screens (DevTestPage, ProfileSimulator, …) keep compiling.
+ * in dev-only screens (DevTestPage, …) keep compiling.
  * Nothing in the app ever adds this class — [data-theme] is the real axis.
  */
 .dark {

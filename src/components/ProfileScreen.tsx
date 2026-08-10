@@ -68,8 +68,8 @@ interface ProfileScreenProps {
   onProfileChanged: (patch: Partial<UserProfile>) => void
   /** Fired after any memory (goal/fact/context) edit/delete — same contract MemoryScreen had. */
   onMemoryChanged: () => void | Promise<void>
-  /** Chat receipt deep-links land here, scrolled to the relevant memory section. */
-  initialSection?: 'goals' | 'facts' | 'context'
+  /** Chat receipt deep-links land here, scrolled to the relevant memory section. 'dietary' — surfacing round — is where the meal-plan "unrecognised restriction" banner's "Open Profile" button lands. */
+  initialSection?: 'goals' | 'facts' | 'context' | 'dietary'
   /** Chat typewriter reveal-speed preference — see reveal-speed-store.ts. */
   revealSpeed: RevealSpeed
   onRevealSpeedChange: (speed: RevealSpeed) => void
@@ -231,6 +231,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
   const goalsRef = useRef<HTMLDivElement>(null)
   const factsRef = useRef<HTMLDivElement>(null)
   const contextRef = useRef<HTMLDivElement>(null)
+  const dietaryRef = useRef<HTMLDivElement>(null)
 
   const profileId = profile.id
 
@@ -251,7 +252,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
 
   useEffect(() => {
     if (!open || !initialSection) return
-    const ref = initialSection === 'goals' ? goalsRef : initialSection === 'facts' ? factsRef : contextRef
+    const ref = initialSection === 'goals' ? goalsRef : initialSection === 'facts' ? factsRef : initialSection === 'dietary' ? dietaryRef : contextRef
     // Content loads async (reload() above) — give it a tick before scrolling.
     const t = setTimeout(() => ref.current?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 150)
     return () => clearTimeout(t)
@@ -538,7 +539,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                 unenforceable value ("shellfish") that looked saved and did
                 nothing. Copy explains the difference in strength without a
                 word about tags or the food database. */}
-            <div className="space-y-1.5">
+            <div ref={dietaryRef} className="space-y-1.5">
               <span className="text-muted-foreground">Dietary restrictions</span>
               <p className="text-[11px] leading-snug text-muted-foreground/70">Diets and allergies the app enforces when building your meals.</p>
               <ToggleGroup

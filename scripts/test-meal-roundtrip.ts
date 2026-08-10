@@ -28,6 +28,14 @@
  *      verification pipeline before it ever reaches persistence
  *   9. (M1) Scaler convergence: scaleToTarget lands a mis-portioned proposal
  *      within tolerance, and rejects rather than forces an absurd factor
+ *  10. logMealEaten (turn 7 "Log this meal") + its undo
+ *  11. (surfacing round) generateMealPools' generatorReached split: every
+ *      round's call throwing (infra failure, unreachable) is distinguished
+ *      from every round's call succeeding with nothing usable (reached, the
+ *      pool is genuinely exhausted) — via a mocked global.fetch, no network
+ *  12. (surfacing round) unrecognisedPreferences propagates end-to-end
+ *      through generateMealPools, not just verifyProposal's own Set param —
+ *      the banner-path plumbing App.tsx/MealPlan.tsx read from
  */
 
 // --- Environment shims (before importing any lib modules) -------------------
@@ -420,6 +428,97 @@ async function main() {
     const afterUndo = await getTodayLedger(PROFILE_ID, day, preTargets)
     check('undo (voidMealEvent) removes it from the ledger sum', afterUndo.eaten.kcal === 0 && afterUndo.eaten.protein === 0, afterUndo.eaten)
     check('the voided row is excluded, not counted twice', afterUndo.events.every(e => e.eventType !== 'confirmed' || e.mealName !== 'Oat Bowl'), afterUndo.events)
+  }
+
+  // -------------------------------------------------------------------------
+  console.log('\n[11] generatorReached split: infra failure vs. reached-but-exhausted (mocked fetch, no network)')
+  {
+    const { generateMealPools, computeSlotBudgets, MAX_GENERATION_ROUNDS } = await import('../src/lib/meal-generation')
+    const targets = getStaticDailyMacros(baseProfile)
+    // Sanity-check the fixture before trusting the mocked-fetch assertions below.
+    check('lunch has a budget at mealsPerDay=3 (sanity check for onlySlots below)', computeSlotBudgets(targets, 3, false).lunch != null)
+
+    const originalFetch = globalThis.fetch
+
+    // Case A — every round's call throws (the generator was unreachable).
+    let callCount = 0
+    globalThis.fetch = (async () => { callCount++; throw new Error('simulated network failure') }) as typeof fetch
+    const unreachable = await generateMealPools({
+      profileId: PROFILE_ID, targets, dietaryPreferences: [], mealsPerDay: 3, includeSnacks: false,
+      onlySlots: ['lunch'], poolSize: 1,
+    })
+    check('every round throwing -> generatorReached stays false', unreachable.generatorReached === false, unreachable)
+    check('accepted stays empty', (unreachable.accepted.lunch?.length ?? 0) === 0, unreachable.accepted)
+    check(`exactly MAX_GENERATION_ROUNDS (${MAX_GENERATION_ROUNDS}) attempts were made, not zero and not unbounded`, callCount === MAX_GENERATION_ROUNDS, callCount)
+    check('rejectionLog records a call-failed line per round', unreachable.rejectionLog.filter(l => l.includes('call failed')).length === MAX_GENERATION_ROUNDS, unreachable.rejectionLog)
+
+    // Case B — the first round throws, a later round succeeds and fills the
+    // pool: generatorReached must flip true, and the earlier throw must not
+    // wipe out (or block) what the later round accepted.
+    let attempt = 0
+    globalThis.fetch = (async () => {
+      attempt++
+      if (attempt === 1) throw new Error('simulated transient failure')
+      return {
+        ok: true,
+        json: async () => ({
+          meals: [{
+            slot: 'lunch', name: 'Verified Chicken Rice Bowl',
+            ingredients: ['200g chicken breast', '220g cooked basmati rice', '1 tbsp olive oil', '100g broccoli'],
+            prep: '20 min', cuisine: 'Other',
+          }],
+        }),
+      } as Response
+    }) as typeof fetch
+    const recovered = await generateMealPools({
+      profileId: PROFILE_ID, targets, dietaryPreferences: [], mealsPerDay: 3, includeSnacks: false,
+      onlySlots: ['lunch'], poolSize: 1,
+    })
+    check('a later round succeeding after an earlier throw still sets generatorReached true', recovered.generatorReached === true, recovered)
+    check('the successful round\'s accepted option survives the earlier throw', recovered.accepted.lunch?.length === 1, recovered.accepted)
+    check('rejectionLog still records the earlier failed round', recovered.rejectionLog.some(l => l.includes('call failed')), recovered.rejectionLog)
+
+    // Case C — every round's call succeeds but proposes nothing usable (the
+    // AI genuinely returned no meals): reached, and honestly exhausted —
+    // must NOT be confused with case A's unreachable classification.
+    globalThis.fetch = (async () => ({ ok: true, json: async () => ({ meals: [] }) })) as typeof fetch
+    const exhausted = await generateMealPools({
+      profileId: PROFILE_ID, targets, dietaryPreferences: [], mealsPerDay: 3, includeSnacks: false,
+      onlySlots: ['lunch'], poolSize: 1,
+    })
+    check('an empty-but-successful response still sets generatorReached true', exhausted.generatorReached === true, exhausted)
+    check('accepted stays empty when nothing was proposed', (exhausted.accepted.lunch?.length ?? 0) === 0, exhausted.accepted)
+
+    globalThis.fetch = originalFetch
+  }
+
+  // -------------------------------------------------------------------------
+  console.log('\n[12] unrecognisedPreferences banner path: propagates end-to-end through generateMealPools')
+  {
+    const { generateMealPools } = await import('../src/lib/meal-generation')
+    const targets = getStaticDailyMacros(baseProfile)
+    const originalFetch = globalThis.fetch
+
+    globalThis.fetch = (async () => ({
+      ok: true,
+      json: async () => ({
+        meals: [{
+          slot: 'lunch', name: 'Herb Chicken Bowl',
+          ingredients: ['200g chicken breast', '220g cooked basmati rice', '100g broccoli'],
+          prep: '20 min', cuisine: 'Other',
+        }],
+      }),
+    })) as typeof fetch
+
+    const result = await generateMealPools({
+      profileId: PROFILE_ID, targets, dietaryPreferences: ['not-a-real-restriction'], mealsPerDay: 3, includeSnacks: false,
+      onlySlots: ['lunch'], poolSize: 1,
+    })
+    check('generatorReached is true (the call itself completed)', result.generatorReached === true, result)
+    check('unrecognisedPreferences surfaces the bad value through GenerateMealPoolsResult, not just verifyProposal\'s Set param', result.unrecognisedPreferences.includes('not-a-real-restriction'), result.unrecognisedPreferences)
+    check('nothing is accepted while a restriction is unrecognised (fails closed at the pipeline level)', (result.accepted.lunch?.length ?? 0) === 0, result.accepted)
+
+    globalThis.fetch = originalFetch
   }
 
   // -------------------------------------------------------------------------

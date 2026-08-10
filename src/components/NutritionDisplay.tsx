@@ -58,6 +58,9 @@ export interface NutritionDisplayProps {
   isGeneratingMeals: boolean
   mealRegenerateError?: string | null
   onDismissRegenerateError?: () => void
+  /** Surfacing round — a dietary_preferences value the app can't enforce. Distinct from mealRegenerateError: not dismissable, routes to Profile instead of offering a retry. */
+  unrecognisedDietaryRestrictions?: string[] | null
+  onFixDietaryRestrictions?: () => void
   onSwapMealSlot: (slot: MealSlotName, chooseName: string) => Promise<void>
   onRegenerateMealSlot: (slot: MealSlotName) => Promise<void>
   onRegenerateAllMeals: () => Promise<void>
@@ -66,6 +69,7 @@ export interface NutritionDisplayProps {
 export function NutritionDisplay({
   profile, macros, exercisePlan = [], latestWeightKg, onMacroModeChange, onWeightLogged, onMacroSplitChange,
   profileId, date, pools, chosen, mealTotals, isGeneratingMeals, mealRegenerateError, onDismissRegenerateError,
+  unrecognisedDietaryRestrictions, onFixDietaryRestrictions,
   onSwapMealSlot, onRegenerateMealSlot, onRegenerateAllMeals,
 }: NutritionDisplayProps) {
   // Living targets (M0): BMR/TDEE were previously read from the frozen
@@ -252,6 +256,8 @@ export function NutritionDisplay({
         isGenerating={isGeneratingMeals}
         regenerateError={mealRegenerateError}
         onDismissRegenerateError={onDismissRegenerateError}
+        unrecognisedDietaryRestrictions={unrecognisedDietaryRestrictions}
+        onFixDietaryRestrictions={onFixDietaryRestrictions}
         onSwapSlot={onSwapMealSlot}
         onRegenerateSlot={onRegenerateMealSlot}
         onRegenerateAll={onRegenerateAllMeals}

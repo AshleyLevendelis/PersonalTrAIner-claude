@@ -35,6 +35,15 @@ interface MealPlanProps {
   /** Set when a (re)generate call failed or came back empty for one or more slots — the existing plan is always left in place when this fires. */
   regenerateError?: string | null
   onDismissRegenerateError?: () => void
+  /**
+   * Surfacing round — a value in dietary_preferences the app can't enforce.
+   * Deliberately separate from regenerateError: not dismissable (the cause
+   * doesn't go away until it's fixed), and routes to Profile instead of
+   * offering a retry, since every retry fails identically for as long as
+   * this is set.
+   */
+  unrecognisedDietaryRestrictions?: string[] | null
+  onFixDietaryRestrictions?: () => void
   onSwapSlot: (slot: MealSlotName, chooseName: string) => Promise<void>
   onRegenerateSlot: (slot: MealSlotName) => Promise<void>
   onRegenerateAll: () => Promise<void>
@@ -49,7 +58,10 @@ interface MealPlanProps {
  * one meal the user has open — everything else is a single collapsed line,
  * mirroring ExerciseRow's collapsed/expanded contract.
  */
-export function MealPlan({ profileId, date, pools, chosen, totals, targets, isGenerating, regenerateError, onDismissRegenerateError, onSwapSlot, onRegenerateSlot, onRegenerateAll }: MealPlanProps) {
+export function MealPlan({
+  profileId, date, pools, chosen, totals, targets, isGenerating, regenerateError, onDismissRegenerateError,
+  unrecognisedDietaryRestrictions, onFixDietaryRestrictions, onSwapSlot, onRegenerateSlot, onRegenerateAll,
+}: MealPlanProps) {
   const activeSlots = SLOT_ORDER.filter(s => (pools[s]?.length ?? 0) > 0)
   // A slot generation requested and asked for (present as a key in `pools`,
   // per generateMealPools always seeding every active slot to []) but came
@@ -89,24 +101,50 @@ export function MealPlan({ profileId, date, pools, chosen, totals, targets, isGe
     </InsightBanner>
   )
 
+  // Surfacing round — takes priority over errorBanner (App.tsx's handlers
+  // return before setting regenerateError once this fires, so in practice
+  // they don't overlap). No dismiss action: the cause doesn't go away until
+  // Profile is actually fixed, so a dismiss button would just teach the user
+  // to hide a problem that's still there next time they regenerate.
+  const unrecognisedBanner = unrecognisedDietaryRestrictions && unrecognisedDietaryRestrictions.length > 0 && (
+    <InsightBanner tone="warning" className="items-start justify-between">
+      <span>
+        {unrecognisedDietaryRestrictions.map(v => `"${v}"`).join(' and ')}{' '}
+        {unrecognisedDietaryRestrictions.length === 1 ? "isn't a restriction" : "aren't restrictions"} this app can enforce, so it can't generate any meals right now.
+        {' '}Remove {unrecognisedDietaryRestrictions.length === 1 ? 'it' : 'them'}, or pick one from the list in Profile.
+      </span>
+      {onFixDietaryRestrictions && (
+        <button type="button" onClick={onFixDietaryRestrictions} className="shrink-0 text-xs font-semibold underline">
+          Open Profile
+        </button>
+      )}
+    </InsightBanner>
+  )
+
   if (activeSlots.length === 0 && emptySlots.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center gap-3 py-16">
-        {errorBanner}
+        {unrecognisedBanner || errorBanner}
         <UtensilsCrossed className="size-8 text-muted-foreground/50" />
         <p className="text-sm text-muted-foreground">No meal plan generated yet.</p>
-        <p className="text-xs text-muted-foreground/70">Complete onboarding to generate your meal pools, or regenerate below.</p>
-        <Button size="sm" onClick={onRegenerateAll} disabled={isGenerating} className="mt-2">
-          {isGenerating ? <Loader2 className="size-3.5 animate-spin mr-1.5" /> : <RefreshCw className="size-3.5 mr-1.5" />}
-          Generate meals
-        </Button>
+        {unrecognisedBanner ? (
+          <p className="text-xs text-muted-foreground/70">Fix the restriction above, then generate.</p>
+        ) : (
+          <p className="text-xs text-muted-foreground/70">Complete onboarding to generate your meal pools, or regenerate below.</p>
+        )}
+        {!unrecognisedBanner && (
+          <Button size="sm" onClick={onRegenerateAll} disabled={isGenerating} className="mt-2">
+            {isGenerating ? <Loader2 className="size-3.5 animate-spin mr-1.5" /> : <RefreshCw className="size-3.5 mr-1.5" />}
+            Generate meals
+          </Button>
+        )}
       </div>
     )
   }
 
   return (
     <div className="space-y-4">
-      {errorBanner}
+      {unrecognisedBanner || errorBanner}
       <div className="flex items-center justify-between">
         <span className="ds-label">Today's meals</span>
         <button
@@ -148,7 +186,12 @@ export function MealPlan({ profileId, date, pools, chosen, totals, targets, isGe
             }}
           />
         ))}
-        {emptySlots.map(slot => (
+        {/* Surfacing round — a per-slot Retry is a dead end while a
+            restriction is unrecognised (every retry fails identically), and
+            showing four of them would restate the false promise the top
+            banner already exists to remove. The banner is the only action
+            offered in this state. */}
+        {!unrecognisedBanner && emptySlots.map(slot => (
           <EmptySlotRow key={slot} slot={slot} isGenerating={isGenerating} onRegenerate={onRegenerateSlot} />
         ))}
       </div>

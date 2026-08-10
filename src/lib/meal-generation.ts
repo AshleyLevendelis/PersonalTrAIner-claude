@@ -133,6 +133,14 @@ async function requestProposals(
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 45000)
   try {
+    // Surfacing round — this used to swallow EVERY failure (non-ok HTTP,
+    // network exception, abort/timeout, malformed body) into a bare `[]`,
+    // which made "the AI genuinely proposed nothing" and "the call never
+    // happened" indistinguishable to every caller above this function. Now
+    // only a genuinely empty/malformed `meals` array resolves to `[]` — that
+    // IS a completed call, just one with nothing usable in it. Everything
+    // else throws, so generateMealPools' generatorReached flag means what it
+    // says: at least one round's call actually completed.
     const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
@@ -149,11 +157,9 @@ async function requestProposals(
       }),
       signal: controller.signal,
     })
-    if (!response.ok) return []
+    if (!response.ok) throw new Error(`generate-meals responded ${response.status}`)
     const data = await response.json()
     return Array.isArray(data.meals) ? data.meals : []
-  } catch {
-    return []
   } finally {
     clearTimeout(timeout)
   }
@@ -245,6 +251,14 @@ export function verifyProposal(
   dietaryPreferences: string[],
   rejectLog: string[],
   dislikedFoods: string[] = [],
+  /**
+   * Surfacing round — mirrors rejectLog's shared-mutable-array idiom rather
+   * than widening the return type, since there's a single call site. A Set
+   * because every proposal in every round hits the identical unrecognised
+   * value(s) for as long as the profile stays broken — generateMealPools
+   * dedupes for free by using one Set across the whole run.
+   */
+  unrecognisedOut?: Set<string>,
 ): PoolOption | null {
   const parsed = parseIngredientLines(proposal.ingredients)
   if (parsed.length === 0) {
@@ -287,6 +301,7 @@ export function verifyProposal(
     // that reads like generation just kept getting unlucky.
     if (dietResult.unrecognisedPreferences.length > 0) {
       rejectLog.push(`[${slot}] unrecognised dietary restriction(s): ${dietResult.unrecognisedPreferences.join(', ')} — nothing can be generated until these are corrected in Profile.`)
+      for (const p of dietResult.unrecognisedPreferences) unrecognisedOut?.add(p)
       return null
     }
     rejectLog.push(`[${slot}] "${proposal.name}": diet violation(s) — ${dietResult.violations.map(v => v.reason).join('; ')}`)
@@ -342,6 +357,18 @@ export interface GenerateMealPoolsResult {
   accepted: Partial<Record<MealSlotName, PoolOption[]>>
   rejectionLog: string[]
   shortfalls: { slot: MealSlotName; requested: number; filled: number }[]
+  /** Surfacing round — every DietValidationResult.unrecognisedPreferences value seen across the whole run, deduped, sorted. Empty when nothing was unrecognised. */
+  unrecognisedPreferences: string[]
+  /**
+   * True the moment any round's generate-meals call completes (with or
+   * without usable meals in the response) — false only if every round's call
+   * threw. This is what lets a caller tell "the generator ran, and honestly
+   * couldn't fit your targets" (deterministic — retrying won't help, loosen
+   * something) apart from "the generator was unreachable" (transient —
+   * retrying might help). Before this, both collapsed into the same silent
+   * `[]`.
+   */
+  generatorReached: boolean
 }
 
 /**
@@ -388,6 +415,8 @@ export async function generateMealPools(params: {
 
   const accepted: Partial<Record<MealSlotName, PoolOption[]>> = {}
   const rejectionLog: string[] = []
+  const unrecognisedPreferences = new Set<string>()
+  let generatorReached = false
   for (const slot of activeSlots) accepted[slot] = []
 
   for (let round = 0; round < MAX_GENERATION_ROUNDS; round++) {
@@ -405,15 +434,27 @@ export async function generateMealPools(params: {
       requestCounts[slot] = need + 2
     }
 
-    const proposals = await requestProposals(
-      requestCounts,
-      budgets,
-      params.dietaryPreferences,
-      params.cookingTimePreference,
-      params.favoriteCuisines ?? [],
-      params.dislikedFoods ?? [],
-      params.breakfastStyle,
-    )
+    // Surfacing round — requestProposals now throws on a genuine infra
+    // failure instead of silently resolving to []. Caught HERE (not left to
+    // propagate out of generateMealPools) so one bad round doesn't lose
+    // whatever earlier rounds already accepted — MAX_GENERATION_ROUNDS
+    // already exists to smooth over exactly this kind of transient blip.
+    let proposals: RawProposal[] = []
+    try {
+      proposals = await requestProposals(
+        requestCounts,
+        budgets,
+        params.dietaryPreferences,
+        params.cookingTimePreference,
+        params.favoriteCuisines ?? [],
+        params.dislikedFoods ?? [],
+        params.breakfastStyle,
+      )
+      generatorReached = true
+    } catch (err) {
+      rejectionLog.push(`[round ${round + 1}] generate-meals call failed: ${err instanceof Error ? err.message : String(err)}`)
+      continue
+    }
     for (const proposal of proposals) {
       const slot = proposal.slot as MealSlotName
       if (!activeSlots.includes(slot)) continue
@@ -450,7 +491,7 @@ export async function generateMealPools(params: {
         .filter(r => r.anchor === 'slot' && r.slot === slot)
         .map(r => r.subject)
       const effectiveDislikes = [...(params.dislikedFoods ?? []), ...slotTimingDislikes]
-      const option = verifyProposal(proposal, slot, budget, params.dietaryPreferences, rejectionLog, effectiveDislikes)
+      const option = verifyProposal(proposal, slot, budget, params.dietaryPreferences, rejectionLog, effectiveDislikes, unrecognisedPreferences)
       if (option) accepted[slot]!.push(option)
     }
   }
@@ -465,7 +506,7 @@ export async function generateMealPools(params: {
 
   await persistPools(params.profileId, accepted)
 
-  return { accepted, rejectionLog, shortfalls }
+  return { accepted, rejectionLog, shortfalls, unrecognisedPreferences: [...unrecognisedPreferences].sort(), generatorReached }
 }
 
 /** Replaces a profile's stored pool for each touched slot with the newly accepted options. */
