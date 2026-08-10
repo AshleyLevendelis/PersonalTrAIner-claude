@@ -6,7 +6,7 @@ import { EXPERIENCE_RPE_CEILING } from './periodization'
 import { setRandomSource, resetRandomSource } from './exercise-plan'
 import { seededRngFromKey } from './seeded-random'
 import { DURATION_BUDGET_SECONDS, estimateDaySeconds } from './session-duration'
-import { getEquipmentFloorKg, loadingMode } from './load-prescription'
+import { getEquipmentFloorKg } from './load-prescription'
 
 // ---------------------------------------------------------------------------
 // PLAN QUALITY SCORING
@@ -593,15 +593,28 @@ function scoreSelection(profile: UserProfile, mesocycle: MesocycleWeek[]): Dimen
     }
   }
 
-  const style = profile.training_style || 'hybrid'
-  const goal = profile.fitness_goal
-  // Bodybuilding/hypertrophy programming routinely pairs a compound (Barbell
-  // Bench Press) with an accessory on a different implement (Dumbbell Bench
-  // Press) for extra stimulus at a different angle/stability demand — that's
-  // normal programming, not the same movement written down twice. Two
-  // entries on the SAME implement (or this pairing under any other
-  // style/goal) still reads as a duplicate.
-  const crossImplementExemptionApplies = style === 'bodybuilding' || goal === 'hypertrophy'
+  // Two same-family exercises are the SAME movement wearing a grip/stance
+  // modifier (Lat Pulldown -> Close-Grip Lat Pulldown) only when they share
+  // BOTH the movement plane (angle_vector) and the implement (overlapping
+  // equipment tags) — that's the one case where pairing them in a session
+  // is redundant, not variety. A different plane (Barbell Curls, vertical ->
+  // Incline Dumbbell Curls, diagonal) or a different implement/resistance
+  // profile (Cable Flyes' constant cable tension vs Pec Deck Machine's cam
+  // curve; Deadlifts' straight bar vs Trap Bar Deadlift's altered leverage)
+  // is normal programming variety even inside the same movement family and
+  // the same substitution_group — sharing a plane or an implement alone
+  // isn't enough on its own, both have to match. Equipment comparison uses
+  // overlap rather than exact-array-equality or the coarser loadingMode()
+  // bucket: 'cable machine' and 'machine' both collapse to loadingMode's
+  // 'stack', which would wrongly treat Cable Flyes/Pec Deck as the same
+  // implement; overlap correctly still treats a dual-tagged entry (Shrugs,
+  // equipment ['barbell','dumbbells']) as the same implement as its
+  // dumbbell-specific sibling (Dumbbell Shrugs) when it's actually done that
+  // way, without conflating cable and machine resistance curves.
+  const sameImplement = (a: ExerciseEntry, b: ExerciseEntry): boolean =>
+    a.equipment.some(eq => b.equipment.includes(eq))
+  const isGenuineDuplicate = (a: ExerciseEntry, b: ExerciseEntry): boolean =>
+    a.angle_vector === b.angle_vector && sameImplement(a, b)
 
   for (const day of week1?.days ?? []) {
     const families = new Map<string, Exercise[]>()
@@ -616,19 +629,16 @@ function scoreSelection(profile: UserProfile, mesocycle: MesocycleWeek[]): Dimen
       if (exs.length <= 1) continue
 
       const entries = exs.map(e => dbEntry(e.name)!)
-      const isMainPlusAccessoryPair =
-        exs.length === 2 &&
-        entries.filter(e => e.mechanics_tier === 'tier1_compound').length === 1 &&
-        entries.filter(e => e.mechanics_tier !== 'tier1_compound').length === 1
-      const differentImplements = exs.length === 2 && loadingMode(entries[0]) !== loadingMode(entries[1])
-      const exempt = crossImplementExemptionApplies && isMainPlusAccessoryPair && differentImplements
-      if (exempt) continue
-
-      violatedRules.add('duplicate_movement_family')
-      deductions.push({
-        rule: 'duplicate_movement_family', day: day.day, weekNumber: 1,
-        detail: `Movement family "${family}" appears twice: ${exs.map(e => e.name).join(', ')}`,
-      })
+      for (let i = 0; i < exs.length; i++) {
+        for (let j = i + 1; j < exs.length; j++) {
+          if (!isGenuineDuplicate(entries[i], entries[j])) continue
+          violatedRules.add('duplicate_movement_family')
+          deductions.push({
+            rule: 'duplicate_movement_family', day: day.day, weekNumber: 1,
+            detail: `Movement family "${family}": "${exs[i].name}" and "${exs[j].name}" are the same movement (same plane, same implement) — not just variety`,
+          })
+        }
+      }
     }
   }
 
