@@ -48,8 +48,14 @@ type TagKey = keyof FoodTags
  * meal (not expressible as a single ingredient tag), and 'mediterranean' has
  * no hard exclusions — it's a style preference, not a restriction diet, so it
  * always passes (documented, not silently ignored).
+ *
+ * Exported (not just DIETARY_PREFERENCES, which is derived from its keys) so
+ * a gate can introspect which food-db attributes are actually referenced and
+ * assert none of them has zero true entries in FOOD_DB — that gap (is_grain
+ * sitting at 0 while paleo referenced it) is exactly how a rule silently
+ * enforced nothing. See test-diet-tag-sync.ts.
  */
-const FORBIDDEN_TAGS: Record<DietaryPreference, TagKey[]> = {
+export const FORBIDDEN_TAGS: Record<DietaryPreference, TagKey[]> = {
   vegetarian: ['contains_meat', 'contains_fish', 'contains_shellfish'],
   vegan: ['contains_meat', 'contains_fish', 'contains_shellfish', 'contains_dairy', 'contains_egg', 'contains_honey'],
   pescatarian: ['contains_meat'],
@@ -67,6 +73,22 @@ const FORBIDDEN_TAGS: Record<DietaryPreference, TagKey[]> = {
   // Kosher: no pork, no shellfish, plus the meat+dairy combination rule below.
   // Kosher slaughter (like halal) can't be verified from an ingredient name.
   kosher: ['contains_pork', 'contains_shellfish'],
+  // is_grain used to be true on ZERO food-db entries, so this rule enforced
+  // nothing — a paleo profile was served bread and pasta with ok:true. Now
+  // populated on every contains_gluten:true entry that IS a grain-based
+  // staple food (bread/pasta/crackers/etc, following the is_X = "this food
+  // IS X" convention is_legume/is_processed_meat already use, as opposed to
+  // contains_X = "this food CONTAINS X as a component") plus the naturally
+  // gluten-free grains contains_gluten never reached (rice, oats, corn,
+  // quinoa, buckwheat, millet, popcorn, cornflakes...). Deliberately NOT
+  // populated on foods where wheat is a minor filler/thickener rather than
+  // the food's identity — pork sausage (rusk filler), soy/teriyaki/hoisin
+  // sauce and gravy (fermentation/thickening agent), vegan sausage (protein
+  // blend) — those stay contains_gluten:true (correctly enforced by
+  // gluten-free) without also being is_grain (paleo wouldn't recognise "a
+  // splash of soy sauce" as "eating a grain"). Pseudocereals (quinoa,
+  // buckwheat) are included: strict paleo excludes them despite them not
+  // being true cereal grasses.
   paleo: ['contains_dairy', 'is_grain', 'is_legume', 'is_refined_sugar'],
   mediterranean: [],
   'dairy-free': ['contains_dairy'],

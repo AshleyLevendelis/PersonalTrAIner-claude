@@ -171,6 +171,41 @@ async function main() {
     check(`_shared "${name}" is contains_nuts: true`, line?.includes('contains_nuts: true') === true, line?.trim())
   }
 
+  // -------------------------------------------------------------------------
+  // Allergen round, part 2: is_grain was true on ZERO food-db entries, so
+  // paleo's grain rule enforced nothing — the same class of bug as the
+  // fail-open the surfacing round closed, just quieter (the code reads
+  // correct; it just never fires). This gate makes that structurally
+  // impossible to reintroduce: every attribute any preference actually
+  // references must have at least one true entry somewhere in the catalogue.
+  // -------------------------------------------------------------------------
+  console.log(`\n[11] no FORBIDDEN_TAGS attribute may silently enforce nothing (zero true entries)`)
+  const { FORBIDDEN_TAGS } = await import('../src/lib/diet-rules')
+  const { FOOD_DB } = await import('../src/lib/food-db')
+  const referencedAttrs = [...new Set(Object.values(FORBIDDEN_TAGS).flat())]
+  check('at least one attribute is referenced (sanity check on the gate itself)', referencedAttrs.length > 0, referencedAttrs)
+  for (const attr of referencedAttrs) {
+    const trueCount = FOOD_DB.filter(e => e.tags[attr] === true).length
+    check(`"${attr}" has at least one true entry in FOOD_DB (referenced by a preference)`, trueCount > 0, { trueCount })
+  }
+
+  console.log(`\n[12] paleo rejects bread, pasta and rice (is_grain now populated)`)
+  const grainMeals: [string, string][] = [
+    ['white bread', 'bread'],
+    ['pasta cooked', 'pasta'],
+    ['white rice cooked', 'rice'],
+  ]
+  for (const [ingredient, label] of grainMeals) {
+    const res = validateMealAgainstDiet([{ name: ingredient, quantity: 150, unit: 'g' }], ['paleo'])
+    check(`paleo REJECTS ${label} ("${ingredient}")`, res.ok === false, res)
+    check(`the violation names paleo and is_grain`, res.violations.some(v => v.preference === 'paleo' && v.reason.includes('is_grain')), res.violations)
+  }
+  check('paleo still passes a genuinely paleo-compliant meal (chicken + veg)',
+    validateMealAgainstDiet([
+      { name: 'chicken breast', quantity: 150, unit: 'g' },
+      { name: 'broccoli', quantity: 100, unit: 'g' },
+    ], ['paleo']).ok === true)
+
   if (failures > 0) {
     console.error(`\n${failures} diet-tag-sync check(s) FAILED.`)
     process.exit(1)
