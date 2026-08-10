@@ -1,6 +1,6 @@
 import type { UserProfile, MesocycleWeek, WorkoutDay, Exercise } from './types'
 import { EXERCISE_DATABASE, getMovementFamily, getVolumeRole, type ExerciseEntry } from './exercise-db'
-import { getConstrainedPool, generateMesocycle } from './exercise-plan'
+import { getConstrainedPool, generateMesocycle, primerPatternsForTrack } from './exercise-plan'
 import { getGoalPolicy, resolveConditioningFrequency, RECOVERY_SET_MULTIPLIER } from './goal-policies'
 import { EXPERIENCE_RPE_CEILING } from './periodization'
 import { setRandomSource, resetRandomSource } from './exercise-plan'
@@ -11,13 +11,18 @@ import { getEquipmentFloorKg, loadingMode } from './load-prescription'
 // ---------------------------------------------------------------------------
 // PLAN QUALITY SCORING
 // ---------------------------------------------------------------------------
-// Five dimensions, 2 points each, 10 total. Each dimension starts at 2 and
+// Six dimensions, 2 points each, 12 total. Each dimension starts at 2 and
 // loses a fixed 0.4 per DISTINCT rule violated (not per occurrence) — a day
 // with three separate structural problems and a day with one of the same
 // problem repeated three times both cost the dimension the same 0.4, but
 // every individual occurrence is still recorded in `deductions` for the
 // itemized report. This keeps one badly-behaved day from single-handedly
 // zeroing a whole dimension while still surfacing everything that's wrong.
+//
+// Scale note: this was five dimensions / 10 total before primerFit was
+// added. Any report or baseline number from before primerFit existed is out
+// of 10, not 12 — not directly comparable to a fresh run without rescaling
+// (multiply by 10/12) or excluding primerFit's points from the sum.
 
 export interface Deduction {
   rule: string
@@ -34,9 +39,9 @@ export interface DimensionResult {
   deductions: Deduction[]
 }
 
-export type DimensionKey = 'timeFit' | 'structure' | 'progression' | 'selection' | 'goalAlignment'
+export type DimensionKey = 'timeFit' | 'structure' | 'progression' | 'selection' | 'goalAlignment' | 'primerFit'
 
-export const DIMENSION_KEYS: DimensionKey[] = ['timeFit', 'structure', 'progression', 'selection', 'goalAlignment']
+export const DIMENSION_KEYS: DimensionKey[] = ['timeFit', 'structure', 'progression', 'selection', 'goalAlignment', 'primerFit']
 
 export interface PlanScoreResult {
   overall: number
@@ -285,6 +290,58 @@ function parseRepsHigh(reps: string): number | null {
   if (range) return parseInt(range[2], 10)
   const single = reps.match(/^(\d+)$/)
   return single ? parseInt(single[1], 10) : null
+}
+
+/**
+ * Whether each day's chosen primer actually suits that day's track, and
+ * whether a primer is present at all. Existing outside this file entirely
+ * until now — every earlier measurement in this investigation (primer-loss
+ * counts, pool sizes) came from instrumenting the harness by hand, because
+ * the scorer had no way to see it.
+ *
+ * `primer_pattern_mismatch` can ONLY fire via selectExercisesForTrack's
+ * graceful fallback: when the affinity-filtered pool is non-empty, the
+ * selected primer is drawn exclusively from it, so it always fits by
+ * construction — a mismatch is therefore proof the affinity pool was empty
+ * for this profile/track and the any-primer fallback ran (nothing
+ * downstream ever swaps a primer afterward — every trim/balance/top-up pass
+ * explicitly excludes mechanics_tier === 'primer'). The detail text says so
+ * directly so a future reader doesn't go hunting for a selection bug when
+ * what's actually being reported is a catalogue coverage gap.
+ */
+function scorePrimerFit(mesocycle: MesocycleWeek[]): DimensionResult {
+  const week1 = mesocycle.find(w => w.week_number === 1)
+  const deductions: Deduction[] = []
+  const violatedRules = new Set<string>()
+
+  for (const day of week1?.days ?? []) {
+    if (day.exercises.length === 0) continue
+    const trackPatterns = primerPatternsForTrack(day.focus)
+    if (trackPatterns.length === 0) continue // not a track this map knows (rest/off day) — nothing to check
+
+    const primerEx = day.exercises.find(ex => ex.tier === 'tier_0_primer')
+    if (!primerEx) {
+      violatedRules.add('primer_absent')
+      deductions.push({
+        rule: 'primer_absent', day: day.day, weekNumber: 1,
+        detail: `${day.day} (${day.focus}) has no primer exercise, though this track has a primer pool.`,
+      })
+      continue
+    }
+
+    const entry = dbEntry(primerEx.name)
+    const affinity = entry?.primer_pattern_affinity ?? []
+    const fits = affinity.some(p => trackPatterns.includes(p))
+    if (!fits) {
+      violatedRules.add('primer_pattern_mismatch')
+      deductions.push({
+        rule: 'primer_pattern_mismatch', day: day.day, weekNumber: 1,
+        detail: `"${primerEx.name}" (affinity: ${affinity.join('/') || 'none'}) doesn't fit ${day.day}'s ${day.focus} patterns (${trackPatterns.join('/')}). Cause: the affinity-preferred primer pool was empty for this profile, so selection fell back to any eligible primer — this is a catalogue coverage gap for this profile/track combination, not a selection bug.`,
+      })
+    }
+  }
+
+  return { label: 'Primer fit', points: scoreFromViolatedRules(violatedRules.size), deductions }
 }
 
 function scoreProgression(profile: UserProfile, mesocycle: MesocycleWeek[]): DimensionResult {
@@ -892,6 +949,7 @@ export function scorePlan(profile: UserProfile, mesocycle: MesocycleWeek[], comb
     progression: scoreProgression(profile, mesocycle),
     selection: scoreSelection(profile, mesocycle),
     goalAlignment: scoreGoalAlignment(profile, mesocycle, comboKey),
+    primerFit: scorePrimerFit(mesocycle),
   }
   const overall = DIMENSION_KEYS.reduce((sum, key) => sum + dimensions[key].points, 0)
   return { overall: Math.round(overall * 10) / 10, dimensions }

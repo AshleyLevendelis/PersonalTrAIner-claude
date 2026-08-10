@@ -184,7 +184,11 @@ async function main() {
   }
 
   const worst10 = [...scored].sort((a, b) => a.result.overall - b.result.overall).slice(0, 10)
-  const belowFloor = scored.filter(s => s.result.overall < 6.0)
+  // 60% of the 12-point total (6 dimensions x 2 each) now that primerFit
+  // exists — was 6.0/10 before primerFit; the ratio is what's held constant,
+  // not the literal number, so this floor means the same thing it always did.
+  const OVERALL_FLOOR = 7.2
+  const belowFloor = scored.filter(s => s.result.overall < OVERALL_FLOOR)
   const dimensionsBelowFloor = DIMENSION_KEYS.filter(key => dimensionAverages[key] < 1.2)
 
   const lines: string[] = []
@@ -194,7 +198,7 @@ async function main() {
   lines.push('')
   lines.push(`Combinations scored: ${scored.length}`)
   lines.push(`Runtime: ${(elapsed / 1000).toFixed(1)}s`)
-  lines.push(`Overall average: ${overallAvg.toFixed(2)} / 10`)
+  lines.push(`Overall average: ${overallAvg.toFixed(2)} / 12`)
   lines.push('')
   lines.push('Per-dimension averages (max 2.0 each):')
   for (const key of DIMENSION_KEYS) {
@@ -206,7 +210,7 @@ async function main() {
   lines.push('Score distribution:')
   lines.push(formatHistogram(overallScores))
   lines.push('')
-  lines.push(`Plans below the 6.0 floor: ${belowFloor.length} / ${scored.length}`)
+  lines.push(`Plans below the ${OVERALL_FLOOR} floor: ${belowFloor.length} / ${scored.length}`)
   lines.push('')
   lines.push('-'.repeat(80))
   lines.push('10 WORST-SCORING PLANS')
@@ -235,7 +239,7 @@ async function main() {
   const failed = belowFloor.length > 0 || dimensionsBelowFloor.length > 0
   if (failed) {
     console.log('')
-    if (belowFloor.length > 0) console.log(`FAIL: ${belowFloor.length} plan(s) scored below 6.0`)
+    if (belowFloor.length > 0) console.log(`FAIL: ${belowFloor.length} plan(s) scored below ${OVERALL_FLOOR}`)
     if (dimensionsBelowFloor.length > 0) console.log(`FAIL: dimension(s) below 1.2 average: ${dimensionsBelowFloor.join(', ')}`)
   }
   process.exit(failed ? 1 : 0)

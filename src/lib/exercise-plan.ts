@@ -258,6 +258,18 @@ const TRACKS: Record<TrackFocus, TrackDefinition> = {
   },
 }
 
+/**
+ * The same pattern set selectExercisesForTrack's primer filter matches
+ * against, exported so quality-score.ts's primerFit dimension can check a
+ * chosen primer's fit without re-deriving (and risking drift from) this
+ * track's real primer_patterns. `focus` is a WorkoutDay.focus string, which
+ * is always a TrackFocus value at runtime — returns [] for anything else
+ * (a rest/off day, or a focus this map doesn't know) rather than throwing.
+ */
+export function primerPatternsForTrack(focus: string): MovementPattern[] {
+  return TRACKS[focus as TrackFocus]?.primer_patterns ?? []
+}
+
 // ---------------------------------------------------------------------------
 // Style config (data-driven, not if/else)
 // ---------------------------------------------------------------------------
