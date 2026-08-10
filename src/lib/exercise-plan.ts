@@ -99,7 +99,7 @@ const TRACKS: Record<TrackFocus, TrackDefinition> = {
     primary_patterns: ['horizontal_push', 'vertical_push'],
     secondary_patterns: ['isolation_tricep', 'isolation_shoulder', 'core'],
     forbidden_patterns: ['isolation_bicep', 'horizontal_pull', 'vertical_pull'],
-    primer_patterns: ['activation'],
+    primer_patterns: ['horizontal_push', 'vertical_push'],
     required_patterns: [],
     slots: [
       { patterns: ['horizontal_push'], tier: 'tier1_compound', required: true },
@@ -114,7 +114,7 @@ const TRACKS: Record<TrackFocus, TrackDefinition> = {
     primary_patterns: ['horizontal_pull', 'vertical_pull', 'hip_hinge'],
     secondary_patterns: ['isolation_bicep', 'isolation_hamstring', 'core'],
     forbidden_patterns: ['isolation_tricep', 'horizontal_push', 'vertical_push'],
-    primer_patterns: ['activation'],
+    primer_patterns: ['horizontal_pull', 'vertical_pull', 'hip_hinge'],
     required_patterns: ['hip_hinge'],
     slots: [
       { patterns: ['hip_hinge'], tier: 'tier1_compound', required: true },
@@ -130,7 +130,7 @@ const TRACKS: Record<TrackFocus, TrackDefinition> = {
     primary_patterns: ['knee_dominant', 'single_leg', 'carry'],
     secondary_patterns: ['isolation_quad', 'isolation_calf', 'core'],
     forbidden_patterns: ['horizontal_push', 'horizontal_pull', 'isolation_bicep', 'isolation_tricep'],
-    primer_patterns: ['activation'],
+    primer_patterns: ['knee_dominant'],
     required_patterns: ['carry'],
     slots: [
       { patterns: ['knee_dominant'], tier: 'tier1_compound', required: true },
@@ -146,7 +146,7 @@ const TRACKS: Record<TrackFocus, TrackDefinition> = {
     primary_patterns: ['vertical_pull', 'horizontal_pull'],
     secondary_patterns: ['core', 'isolation_bicep', 'isolation_shoulder'],
     forbidden_patterns: ['isolation_tricep', 'horizontal_push'],
-    primer_patterns: ['activation'],
+    primer_patterns: ['vertical_pull', 'horizontal_pull'],
     required_patterns: ['core'],
     slots: [
       { patterns: ['vertical_pull'], tier: 'tier1_compound', required: true },
@@ -161,7 +161,7 @@ const TRACKS: Record<TrackFocus, TrackDefinition> = {
     primary_patterns: ['hip_hinge', 'knee_dominant', 'horizontal_push', 'vertical_pull'],
     secondary_patterns: ['single_leg', 'core'],
     forbidden_patterns: [],
-    primer_patterns: ['activation'],
+    primer_patterns: ['hip_hinge', 'knee_dominant', 'horizontal_push', 'vertical_pull'],
     required_patterns: [],
     slots: [
       { patterns: ['knee_dominant', 'hip_hinge'], tier: 'tier1_compound', required: true },
@@ -176,7 +176,7 @@ const TRACKS: Record<TrackFocus, TrackDefinition> = {
     primary_patterns: ['cardio'],
     secondary_patterns: ['core'],
     forbidden_patterns: [],
-    primer_patterns: ['activation'],
+    primer_patterns: ['cardio'],
     required_patterns: ['core'],
     slots: [
       { patterns: ['cardio'], tier: 'cardio', required: true },
@@ -188,7 +188,7 @@ const TRACKS: Record<TrackFocus, TrackDefinition> = {
     primary_patterns: ['horizontal_push'],
     secondary_patterns: ['isolation_tricep'],
     forbidden_patterns: ['horizontal_pull', 'vertical_pull', 'hip_hinge', 'knee_dominant', 'single_leg', 'carry', 'isolation_bicep', 'isolation_hamstring', 'isolation_quad', 'isolation_calf'],
-    primer_patterns: ['activation'],
+    primer_patterns: ['horizontal_push'],
     required_patterns: [],
     slots: [
       { patterns: ['horizontal_push'], tier: 'tier1_compound', required: true },
@@ -202,7 +202,7 @@ const TRACKS: Record<TrackFocus, TrackDefinition> = {
     primary_patterns: ['horizontal_pull', 'vertical_pull'],
     secondary_patterns: ['isolation_bicep'],
     forbidden_patterns: ['horizontal_push', 'vertical_push', 'hip_hinge', 'knee_dominant', 'single_leg', 'carry', 'isolation_tricep', 'isolation_shoulder', 'isolation_quad', 'isolation_calf'],
-    primer_patterns: ['activation'],
+    primer_patterns: ['horizontal_pull', 'vertical_pull'],
     required_patterns: [],
     slots: [
       { patterns: ['vertical_pull'], tier: 'tier1_compound', required: true },
@@ -216,7 +216,7 @@ const TRACKS: Record<TrackFocus, TrackDefinition> = {
     primary_patterns: ['knee_dominant', 'hip_hinge', 'single_leg'],
     secondary_patterns: ['isolation_quad', 'isolation_hamstring', 'isolation_calf'],
     forbidden_patterns: ['horizontal_push', 'horizontal_pull', 'vertical_push', 'vertical_pull', 'isolation_bicep', 'isolation_tricep', 'isolation_shoulder'],
-    primer_patterns: ['activation'],
+    primer_patterns: ['knee_dominant', 'hip_hinge'],
     required_patterns: [],
     slots: [
       { patterns: ['knee_dominant'], tier: 'tier1_compound', required: true },
@@ -241,7 +241,10 @@ const TRACKS: Record<TrackFocus, TrackDefinition> = {
     // and this round's own audit both converged on "legs trained once a
     // week" for exactly this split.
     forbidden_patterns: ['horizontal_push', 'horizontal_pull', 'vertical_pull', 'carry', 'isolation_bicep', 'isolation_tricep', 'isolation_quad', 'isolation_calf'],
-    primer_patterns: ['activation'],
+    // Matches this track's own primary_patterns (minus isolation_shoulder/
+    // single_leg, which no primer covers) — same "primer_patterns derived
+    // from the track's real primary emphasis" rule every track uses now.
+    primer_patterns: ['vertical_push', 'knee_dominant', 'hip_hinge'],
     required_patterns: ['core'],
     slots: [
       { patterns: ['vertical_push'], tier: 'tier1_compound', required: true },
@@ -1040,9 +1043,15 @@ function selectExercisesForTrack(
     !forbidden.has(e.movement_pattern)
   )
 
+  // Every primer's own movement_pattern is 'activation' (see exercise-db.ts's
+  // MovementPattern comment), so matching against it was a no-op — every
+  // primer was equally eligible for every track. primer_pattern_affinity is
+  // the real, track-aware signal; movement_pattern stays untouched so
+  // quality-score.ts's weekly pattern-coverage checks don't start counting a
+  // 2x8 primer set as real pattern volume.
   const primerPool = pool.filter(e =>
     e.mechanics_tier === 'primer' &&
-    track.primer_patterns.includes(e.movement_pattern)
+    (e.primer_pattern_affinity ?? []).some(p => track.primer_patterns.includes(p))
   )
   const primer = primerPool.length > 0
     ? shuffle(primerPool.filter(p => !weeklyUsed.has(p.name)))[0] ?? shuffle(primerPool)[0]

@@ -88,6 +88,18 @@ export interface ExerciseEntry {
   substitution_group: string
   unilateral: boolean
   avg_duration_seconds: number
+  /**
+   * Primer-tier only. What training pattern(s) this primer suits — read only
+   * by selectExercisesForTrack's primer filter (exercise-plan.ts), matched
+   * against a track's own primer_patterns. Deliberately NOT movement_pattern
+   * itself: every primer's movement_pattern is 'activation' (see the type
+   * comment on MovementPattern), and quality-score.ts's weekly pattern-
+   * coverage checks (pushSets/pullSets/hasSquat/hasHinge, day-label-mismatch)
+   * read movement_pattern directly — repurposing it here would make a 2x8
+   * primer set silently count as real weekly pattern volume and could mask
+   * genuine imbalance. This field is additive and has no other reader.
+   */
+  primer_pattern_affinity?: MovementPattern[]
 }
 
 export const EXERCISE_DATABASE: ExerciseEntry[] = [
@@ -1670,12 +1682,17 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     prescription_type: 'reps',
     angle_vector: 'anti_rotation',
     primary_muscles: ['obliques', 'transverse abdominis', 'core'],
-    // Form cues describe cable-machine execution — 'resistance band' has no
-    // meaningful kg value to load-prescription.ts's LOADED_EQUIPMENT set, so
-    // this exercise was silently getting no load estimate at all.
-    equipment: ['cable machine'],
+    // Band Pallof presses are the standard home-gym version — do not narrow
+    // this to 'cable machine' alone (isEquipmentAllowed requires EVERY listed
+    // equipment tag to be covered by a tier's allowed set, so adding 'cable
+    // machine' alongside 'resistance band' here would re-narrow this to
+    // full_gym only, not widen it — the array is AND, not OR). The load-chip
+    // gap this used to be tagged for is a separate, still-open defect in how
+    // a null starting_weight_kg renders (see load-prescription.ts), not an
+    // equipment-tagging problem.
+    equipment: ['resistance band'],
     joint_stress: 'low',
-    form_cues: ['Stand perpendicular to cable', 'Press hands straight out', 'Resist rotation', 'Hold 2 seconds extended'],
+    form_cues: ['Stand perpendicular to the anchor point — band or cable', 'Press hands straight out', 'Resist rotation', 'Hold 2 seconds extended'],
     coach_note_swap: 'Gold-standard anti-rotation exercise for rotational stability.',
     loads_joints: [],
     style_tags: ['functional', 'combat', 'hybrid'],
@@ -1777,6 +1794,8 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     substitution_group: 'explosive_lower',
     unilateral: false,
     avg_duration_seconds: 18,
+    // Explosive knee-dominant power — suits squat/leg days.
+    primer_pattern_affinity: ['knee_dominant'],
   },
   {
     name: 'Bodyweight Squat Marches',
@@ -1795,6 +1814,9 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     substitution_group: 'low_impact_activation',
     unilateral: false,
     avg_duration_seconds: 15,
+    // Knee-dominant, and its own note calls out raising heart rate —
+    // suits squat/leg days and doubles as a low-impact conditioning primer.
+    primer_pattern_affinity: ['knee_dominant', 'cardio'],
   },
   {
     name: 'Band Pull-Aparts',
@@ -1813,6 +1835,10 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     substitution_group: 'conditioning',
     unilateral: false,
     avg_duration_seconds: 18,
+    // Its own note says posterior-shoulder/scapular prep — genuinely helps
+    // both pressing days (shoulder stability under load) and pulling days
+    // (the movement itself is a horizontal pull).
+    primer_pattern_affinity: ['horizontal_push', 'vertical_push', 'horizontal_pull', 'vertical_pull'],
   },
   {
     name: 'Medicine Ball Slams',
@@ -1832,6 +1858,9 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     substitution_group: 'explosive_upper',
     unilateral: false,
     avg_duration_seconds: 18,
+    // Hip-hinge loaded descent into a pulling-motion ascent — suits
+    // hinge/pull days, not press days (no push component to the movement).
+    primer_pattern_affinity: ['hip_hinge', 'horizontal_pull'],
   },
   {
     name: 'Broad Jumps',
@@ -1851,6 +1880,9 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     substitution_group: 'explosive_lower',
     unilateral: false,
     avg_duration_seconds: 15,
+    // Its own note says it "primes hip extensors for hinge work" — also a
+    // real knee-dominant/squat power movement, so it fits both.
+    primer_pattern_affinity: ['hip_hinge', 'knee_dominant'],
   },
   {
     name: 'Kettlebell Swings',
@@ -1869,6 +1901,9 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     substitution_group: 'swing',
     unilateral: false,
     avg_duration_seconds: 20,
+    // Ballistic hip hinge; its own note explicitly says it elevates heart
+    // rate too, so it also fits a conditioning-flavored day.
+    primer_pattern_affinity: ['hip_hinge', 'cardio'],
   },
   {
     name: 'Plyo Push-Ups',
@@ -1888,6 +1923,9 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     substitution_group: 'explosive_upper',
     unilateral: false,
     avg_duration_seconds: 18,
+    // Its own note says "pressing days" explicitly — horizontal push, and
+    // general enough as CNS activation to also serve overhead-pressing days.
+    primer_pattern_affinity: ['horizontal_push', 'vertical_push'],
   },
 ]
 
