@@ -38,7 +38,7 @@ export function WarmupSection({
         <span className="flex items-center gap-2 text-xs font-medium text-foreground">
           <Thermometer className="size-3.5 text-primary" />
           Warm-up
-          <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">{moveCount} moves · ~{totalMinutes} min</Badge>
+          <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">{moveCount} {moveCount === 1 ? 'move' : 'moves'} · ~{totalMinutes} min</Badge>
         </span>
         <ChevronDown className={`size-3.5 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
       </CollapsibleTrigger>
