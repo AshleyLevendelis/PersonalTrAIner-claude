@@ -482,6 +482,13 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
               </p>
             </div>
           )}
+          {workout.pattern_gap_note && (
+            <div className="px-4 pb-2">
+              <InsightBanner tone="warning" className="text-xs">
+                {workout.pattern_gap_note}
+              </InsightBanner>
+            </div>
+          )}
           <WarmupSection
             warmup={workout.warmup}
             open={expandedWarmups.has(dayName)}

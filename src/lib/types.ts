@@ -273,6 +273,16 @@ export interface WorkoutDay {
   warmup?: import('./warmup').WarmupBlock
   conditioning_note?: string
   recommendedCardio?: RecommendedCardio
+  /**
+   * Plain-language note for the (rare) case a required movement pattern for
+   * this day genuinely has nothing eligible under the trainee's equipment
+   * and injury constraints, even after trying a nearest-pattern substitute
+   * (see fillSlot's "(none)" case in exercise-plan.ts). Previously this only
+   * reached an internal trace (constraint_trace.structure_adjusted) — never
+   * the trainee. Set once on the base plan and carried through periodized
+   * weeks unchanged (same convention as conditioning_note).
+   */
+  pattern_gap_note?: string
 }
 
 export interface ConstraintTraceEntry {

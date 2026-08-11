@@ -19,6 +19,7 @@ import { AdditionalWorkSection } from './AdditionalWorkSection'
 import { AddUnplannedWork } from './AddUnplannedWork'
 import { RestDayCard, ActiveRecoveryCard } from './RestDayCard'
 import { SessionSummaryDialog, type SessionSummaryData } from './SessionSummaryDialog'
+import { InsightBanner } from '@/components/ui/insight-banner'
 import type { WorkoutDay, MesocycleWeek, UserProfile } from '@/lib/types'
 import type { LoadSource } from './LoadChip'
 
@@ -279,6 +280,11 @@ export function TodayPanel({
             )}
           </div>
           <SessionSummaryDialog open={summaryOpen} onOpenChange={setSummaryOpen} data={summaryData} />
+          {workout!.pattern_gap_note && (
+            <InsightBanner tone="warning" className="text-xs">
+              {workout!.pattern_gap_note}
+            </InsightBanner>
+          )}
           <WarmupSection warmup={workout!.warmup} open={expandedWarmup} onToggle={() => setExpandedWarmup(v => !v)} />
           <ExerciseList
             workout={workout!}

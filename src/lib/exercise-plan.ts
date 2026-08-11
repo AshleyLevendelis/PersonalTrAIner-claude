@@ -1089,6 +1089,61 @@ const PATTERN_TO_RELATED_ISOLATION: Partial<Record<MovementPattern, MovementPatt
   vertical_pull: ['isolation_bicep'],
 }
 
+/**
+ * Plain-English name for a movement pattern, for the ONE place a pattern
+ * name reaches the trainee directly (pattern_gap_note below) — everywhere
+ * else this stays internal jargon (trace entries, dev tooling). Covers every
+ * MovementPattern, not just the ones that can appear as a required slot —
+ * buildPatternGapNote also uses this for the "what the rest of the session
+ * covers" half, which draws from whatever actually got selected (isolation/
+ * core/cardio work included), not just required patterns.
+ */
+function patternLabel(pattern: MovementPattern): string {
+  switch (pattern) {
+    case 'vertical_push': return 'an overhead press'
+    case 'vertical_pull': return 'a pull-up or pulldown movement'
+    case 'horizontal_push': return 'a horizontal press'
+    case 'horizontal_pull': return 'a row'
+    case 'knee_dominant': return 'a squat'
+    case 'single_leg': return 'a lunge or split squat'
+    case 'hip_hinge': return 'a hip-hinge movement (deadlift/RDL pattern)'
+    case 'carry': return 'a loaded carry'
+    case 'isolation_bicep': return 'bicep work'
+    case 'isolation_tricep': return 'tricep work'
+    case 'isolation_shoulder': return 'shoulder isolation work'
+    case 'isolation_quad': return 'quad work'
+    case 'isolation_hamstring': return 'hamstring work'
+    case 'isolation_calf': return 'calf work'
+    case 'cardio': return 'conditioning work'
+    case 'core': return 'core work'
+    case 'activation': return 'warm-up/activation work'
+  }
+}
+
+/**
+ * Item 4 (queue-clearing round 3): a required slot that hits fillSlot's
+ * "(none)" case used to be silent to the trainee — only an internal trace
+ * entry. This turns that into a plain sentence naming the gap and what the
+ * rest of the session still covers, per the explicit instruction to "tell
+ * them plainly ... and offer what it can" rather than let the plan quietly
+ * come up short. `covered` is what the day's OTHER required/primary
+ * patterns actually landed (already-selected exercises), so the note never
+ * claims coverage the day doesn't have.
+ */
+function buildPatternGapNote(uncovered: MovementPattern[], covered: ExerciseEntry[]): string {
+  const uncoveredLabels = [...new Set(uncovered)].map(patternLabel)
+  const coveredLabels = [...new Set(covered.map(e => e.movement_pattern))]
+    .filter(p => !uncovered.includes(p))
+    .map(patternLabel)
+  const gapPart = uncoveredLabels.length === 1
+    ? `nothing eligible for ${uncoveredLabels[0]} today`
+    : `nothing eligible for ${uncoveredLabels.slice(0, -1).join(', ')} or ${uncoveredLabels[uncoveredLabels.length - 1]} today`
+  const offerPart = coveredLabels.length > 0
+    ? ` The rest of this session still covers ${coveredLabels.join(', ')}.`
+    : ''
+  return `Your current equipment and injury settings leave ${gapPart} — not a bug, just a real gap in what's available.${offerPart} Update your equipment or injuries in Profile, or ask your coach in Chat, if that changes.`
+}
+
 function selectExercisesForTrack(
   track: TrackDefinition,
   pool: ExerciseEntry[],
@@ -1100,7 +1155,7 @@ function selectExercisesForTrack(
   feasibleRequiredPatterns?: MovementPattern[],
   weeklyAppearanceCount?: Map<string, number>,
   rawExperience: TrainingExperience = 'novice',
-): { primer: ExerciseEntry | null; main: ExerciseEntry[]; requiredNames: Set<string> } {
+): { primer: ExerciseEntry | null; main: ExerciseEntry[]; requiredNames: Set<string>; uncoveredPatterns: MovementPattern[] } {
   const counts = applyIsolationSlotShift(countsIn, policy.isolationSlotShift)
   const allPatterns = new Set([...track.primary_patterns, ...track.secondary_patterns])
   const forbidden = new Set(track.forbidden_patterns)
@@ -1150,6 +1205,12 @@ function selectExercisesForTrack(
   // silently drop the slot" guarantee Fix 1 exists to provide); it may
   // still trim their SETS, just not remove them outright.
   const requiredNames = new Set<string>()
+  // Required slots that hit fillSlot's final "(none)" case — equipment/
+  // injury genuinely leaves nothing eligible, even with a nearest-pattern
+  // substitute. Previously only reached trace.structure_adjusted (an
+  // internal diagnostic array, never shown to the trainee); collected here
+  // so the caller can turn it into a plain-language note on the day itself.
+  const uncoveredPatterns: MovementPattern[] = []
 
   // Pattern-guaranteed slots — filled FIRST, in order, before the legacy
   // pickFromTier/refill pass below tops up to the duration-based count. See
@@ -1206,6 +1267,7 @@ function selectExercisesForTrack(
       exercise: '(none)', stage: 'structure',
       reason: `"${track.label}" required slot for [${slot.patterns.join('/')}] could not be filled even with a nearest-pattern substitute — equipment/injury genuinely leaves nothing eligible`,
     })
+    uncoveredPatterns.push(...slot.patterns)
   }
   for (const slot of track.slots) fillSlot(slot)
 
@@ -1420,7 +1482,7 @@ function selectExercisesForTrack(
     return tierDiff !== 0 ? tierDiff : isolationPriority(a) - isolationPriority(b)
   })
 
-  return { primer, main: selected, requiredNames }
+  return { primer, main: selected, requiredNames, uncoveredPatterns }
 }
 
 // ---------------------------------------------------------------------------
@@ -2965,7 +3027,7 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
     const trackFocus = getViableTrack(rawTrack, pool)
     const track = TRACKS[trackFocus]
 
-    const { primer, main, requiredNames } = selectExercisesForTrack(track, pool, counts, weeklyUsed, styleConfig, trace, policy, feasiblePatterns, weeklyAppearanceCount, profile.training_experience || 'novice')
+    const { primer, main, requiredNames, uncoveredPatterns } = selectExercisesForTrack(track, pool, counts, weeklyUsed, styleConfig, trace, policy, feasiblePatterns, weeklyAppearanceCount, profile.training_experience || 'novice')
     for (const name of requiredNames) weeklyRequiredNames.add(name)
 
     // Build exercise list with sets/reps from style config
@@ -3066,6 +3128,7 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
       focus: trackFocus,
       exercises: enforceSetHierarchy(withRamps),
       warmup,
+      ...(uncoveredPatterns.length > 0 ? { pattern_gap_note: buildPatternGapNote(uncoveredPatterns, main) } : {}),
     }
   })
 
