@@ -53,6 +53,8 @@ export function filterLoggableSets(
 export interface NormalizedWarmup {
   general: WarmupItem[]
   mobility: WarmupItem[]
+  /** Count of ramped compounds (buildWarmup's ramp_ups, one per qualifying heavy lift) — their set time is already folded into totalMinutes via rampSeconds, so the displayed move count must include them too or the chip undercounts what it's timing. */
+  rampCount: number
   totalMinutes: number
   coachNote?: string
 }
@@ -62,10 +64,11 @@ export function normalizeWarmup(warmup: WorkoutDay['warmup'] | null | undefined)
   if (!warmup || typeof warmup !== 'object') return null
   const general = Array.isArray(warmup.general) ? warmup.general : []
   const mobility = Array.isArray(warmup.mobility) ? warmup.mobility : []
+  const rampCount = Array.isArray(warmup.ramp_ups) ? warmup.ramp_ups.length : 0
   const coachNote = typeof warmup.coach_note === 'string' && warmup.coach_note.length > 0 ? warmup.coach_note : undefined
-  if (general.length === 0 && mobility.length === 0 && !coachNote) return null
+  if (general.length === 0 && mobility.length === 0 && rampCount === 0 && !coachNote) return null
   const totalSeconds = typeof warmup.total_seconds === 'number' && Number.isFinite(warmup.total_seconds) ? warmup.total_seconds : 0
-  return { general, mobility, totalMinutes: Math.round(totalSeconds / 60), coachNote }
+  return { general, mobility, rampCount, totalMinutes: Math.round(totalSeconds / 60), coachNote }
 }
 
 // ---------------------------------------------------------------------------

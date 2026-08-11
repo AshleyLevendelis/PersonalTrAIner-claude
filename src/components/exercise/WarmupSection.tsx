@@ -29,8 +29,12 @@ export function WarmupSection({
   // degrades to "render nothing" here, same as the original `!warmup` guard.
   const normalized = normalizeWarmup(warmup)
   if (!normalized) return null
-  const { general, mobility, totalMinutes, coachNote } = normalized
-  const moveCount = general.length + mobility.length
+  const { general, mobility, rampCount, totalMinutes, coachNote } = normalized
+  // rampCount isn't rendered in this section's body (RampStrip on the
+  // focused exercise row is the sole surface for ramp data) but its set
+  // time is already folded into totalMinutes, so it must count here too —
+  // otherwise "1 move" next to "~10 min" reads as a bug, not a ramp.
+  const moveCount = general.length + mobility.length + rampCount
 
   return (
     <Collapsible open={open} onOpenChange={onToggle} className="rounded-[10px] border bg-card">
