@@ -1,4 +1,5 @@
-import { generateExercisePlan, generateMesocycle, getConstrainedPool, getFlaggedJoints } from './exercise-plan'
+import { generateExercisePlan, generateMesocycle, getConstrainedPool, getFlaggedJoints, setRandomSource, resetRandomSource } from './exercise-plan'
+import { seededRngFromKey } from './seeded-random'
 import { EXERCISE_DATABASE, meetsCapabilityRequirement } from './exercise-db'
 import type {
   UserProfile, EquipmentAccess, TrainingStyle, SessionDuration,
@@ -183,8 +184,16 @@ function runSingleAudit(
 
   let result: PlanResult
   try {
+    // Seeded the same way run-quality-score.ts's harness seeds
+    // generateMesocycle — same key -> same shuffle() outcome -> same plan,
+    // every run. Without this, the audit's own ✗-count could drift between
+    // runs purely from which candidate exercise a tie-break shuffle put
+    // first, with nothing in the codebase actually changing.
+    setRandomSource(seededRngFromKey(comboLabel))
     result = generateExercisePlan(profile)
+    resetRandomSource()
   } catch (err) {
+    resetRandomSource()
     return {
       equipment, injuries, duration, style, experience,
       passed: false,
@@ -624,7 +633,9 @@ async function runMesocycleBehaviorChecks(): Promise<AuditTestCase[]> {
     const comboLabel = `[mesocycle progression] goal=${goal}`
     const failures: AuditFailure[] = []
 
+    setRandomSource(seededRngFromKey(comboLabel))
     const meso = generateMesocycle(profile)
+    resetRandomSource()
     const block1 = meso.filter(w => w.block_number === 1).sort((a, b) => (a.week_in_block ?? 0) - (b.week_in_block ?? 0))
 
     for (const day of profile.training_days.filter(d => d.available)) {
@@ -716,8 +727,12 @@ async function runMesocycleBehaviorChecks(): Promise<AuditTestCase[]> {
   {
     const comboLabel = '[mesocycle goal structure] fat_loss vs hypertrophy'
     const failures: AuditFailure[] = []
+    setRandomSource(seededRngFromKey(comboLabel + '|hypertrophy'))
     const hypertrophyDays = generateExercisePlan(baseMesocycleProfile({ fitness_goal: 'hypertrophy' })).plan
+    resetRandomSource()
+    setRandomSource(seededRngFromKey(comboLabel + '|fat_loss'))
     const fatLossDays = generateExercisePlan(baseMesocycleProfile({ fitness_goal: 'fat_loss' })).plan
+    resetRandomSource()
     const hypertrophyMainSlots = countMainCompoundSlots(hypertrophyDays)
     const fatLossMainSlots = countMainCompoundSlots(fatLossDays)
     if (fatLossMainSlots < hypertrophyMainSlots) {
@@ -741,7 +756,9 @@ async function runMesocycleBehaviorChecks(): Promise<AuditTestCase[]> {
     const failures: AuditFailure[] = []
     const weeklySets: Record<RecoveryCapacity, number> = { low: 0, moderate: 0, high: 0 }
     for (const capacity of ['low', 'high'] as RecoveryCapacity[]) {
+      setRandomSource(seededRngFromKey(comboLabel + '|' + capacity))
       const meso = generateMesocycle(baseMesocycleProfile({ recovery_capacity: capacity }))
+      resetRandomSource()
       const week1 = meso.find(w => w.week_number === 1)!
       weeklySets[capacity] = sumWeeklySets(week1.days)
     }
@@ -770,7 +787,9 @@ async function runMesocycleBehaviorChecks(): Promise<AuditTestCase[]> {
     const profile = baseMesocycleProfile({ fitness_goal: goal, equipment_access: 'full_gym' })
     const comboLabel = `[mesocycle prescription units] goal=${goal}`
     const failures: AuditFailure[] = []
+    setRandomSource(seededRngFromKey(comboLabel))
     const meso = generateMesocycle(profile)
+    resetRandomSource()
     let totalExercises = 0
     for (const week of meso) {
       for (const day of week.days) {
@@ -804,6 +823,10 @@ async function runMesocycleBehaviorChecks(): Promise<AuditTestCase[]> {
     const comboLabel = '[mesocycle swap/ban] constraint compliance + load independence + ban purge'
     const failures: AuditFailure[] = []
     const profile = baseMesocycleProfile({ injuries: ['shoulders'] })
+    // Stays seeded through the swap/ban calls below too, not just
+    // generateMesocycle — getReplacementCandidates/rotation logic can also
+    // draw on the shared random source.
+    setRandomSource(seededRngFromKey(comboLabel))
     const mesocycle = generateMesocycle(profile)
     const week1 = mesocycle.find(w => w.week_number === 1)!
     const dayWithMain = week1.days.find(d => d.exercises.some(e => e.tier === 'tier_1_primary'))
@@ -865,6 +888,7 @@ async function runMesocycleBehaviorChecks(): Promise<AuditTestCase[]> {
       }
     }
 
+    resetRandomSource()
     cases.push({
       equipment: 'full_gym', injuries: ['shoulders'], duration: '60-90', style: 'hybrid', experience: 'intermediate',
       passed: failures.length === 0, failures,
@@ -890,7 +914,9 @@ async function runMesocycleBehaviorChecks(): Promise<AuditTestCase[]> {
         const comboLabel = `[mesocycle safety] equipment=${equipment} experience=${experience}`
         const failures: AuditFailure[] = []
         const profile = baseMesocycleProfile({ equipment_access: equipment, training_experience: experience })
+        setRandomSource(seededRngFromKey(comboLabel))
         const meso = generateMesocycle(profile)
+        resetRandomSource()
 
         const ceiling = IMPROVISED_IMPLEMENT_CEILING_KG[experience]
         for (const week of meso) {
@@ -972,7 +998,9 @@ async function runMesocycleBehaviorChecks(): Promise<AuditTestCase[]> {
           const comboLabel = `[phase sequence] goal=${goal} experience=${experience} equipment=${equipment}`
           const failures: AuditFailure[] = []
           const profile = baseMesocycleProfile({ fitness_goal: goal, training_experience: experience, equipment_access: equipment })
+          setRandomSource(seededRngFromKey(comboLabel))
           const meso = generateMesocycle(profile)
+          resetRandomSource()
           const blockLabels: string[] = []
           for (let block = 1; block <= 4; block++) {
             const week = meso.find(w => w.block_number === block)
@@ -1020,7 +1048,9 @@ async function runMesocycleBehaviorChecks(): Promise<AuditTestCase[]> {
     const comboLabel = `[calibration load ceiling] experience=${experience}`
     const failures: AuditFailure[] = []
     const profile = baseMesocycleProfile({ training_experience: experience })
+    setRandomSource(seededRngFromKey(comboLabel))
     const meso = generateMesocycle(profile)
+    resetRandomSource()
     const week1 = meso.find(w => w.week_number === 1)
 
     if (!week1?.isCalibrationWeek) {
@@ -1104,7 +1134,9 @@ async function runMesocycleBehaviorChecks(): Promise<AuditTestCase[]> {
     const comboLabel = `[block transition jump] experience=${experience}`
     const failures: AuditFailure[] = []
     const profile = baseMesocycleProfile({ training_experience: experience })
+    setRandomSource(seededRngFromKey(comboLabel))
     const meso = generateMesocycle(profile)
+    resetRandomSource()
     const sortedWeeks = [...meso].sort((a, b) => a.week_number - b.week_number)
 
     const dayCount = sortedWeeks[0]?.days.length ?? 0

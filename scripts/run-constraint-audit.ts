@@ -1,6 +1,7 @@
 import { runFullConstraintAudit } from '../src/lib/dev-constraint-audit'
 import type { AuditReport } from '../src/lib/dev-constraint-audit'
-import { generateMesocycle } from '../src/lib/exercise-plan'
+import { generateMesocycle, setRandomSource, resetRandomSource } from '../src/lib/exercise-plan'
+import { seededRngFromKey } from '../src/lib/seeded-random'
 import type { UserProfile, FitnessGoal } from '../src/lib/types'
 import * as fs from 'fs'
 import * as path from 'path'
@@ -113,7 +114,9 @@ function buildGoalSampleReport(): string {
       recovery_capacity: 'moderate', conditioning_preference: 'tolerate',
     }
 
+    setRandomSource(seededRngFromKey(`[goal sample] goal=${goal}`))
     const meso = generateMesocycle(profile)
+    resetRandomSource()
     const block1 = meso.filter(w => w.block_number === 1).sort((a, b) => (a.week_in_block ?? 0) - (b.week_in_block ?? 0))
 
     lines.push('')
