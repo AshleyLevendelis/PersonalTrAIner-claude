@@ -8,6 +8,21 @@ These apply to every session in this repo. They exist so they stop being restate
 - If a prompt's code block and its surrounding prose conflict, the code block wins. Ask rather than resolve it yourself.
 - Flag any deviation from an instruction and why, in the report, unprompted.
 
+## Asking
+
+- Work autonomously by default. When a decision genuinely is Ashley's to make, ask her directly in the conversation — don't guess and don't wait for it to arrive secondhand.
+- ASK when the decision is about how the app behaves: what a coach should do in a situation, what the app is allowed to claim, what a user should see or be told, a trade-off between two defensible behaviours, or anything safety-adjacent (allergens, injuries, medical, mental health).
+- PROCEED WITHOUT ASKING on anything mechanical: bugs, tests, refactors, measurement, data consistency, performance — anything that has a right answer.
+- How to ask, which matters as much as when:
+  - Ashley is non-technical. Never ask about a function, field, or file.
+  - Translate to the product question underneath. Not "should coherenceGroupOf key on substitution_group" but "should the app compare shrug weights against lateral raise weights, or treat them separately?"
+  - Give 2-4 concrete options and a recommendation with a one-line reason.
+  - Say what happens either way, in plain terms.
+  - One question at a time. Don't batch several and stall.
+  - If she picks something that seems wrong, say so once, then do it.
+- Keep a decision log: every judgment call, the options, what was chosen, why, and whether she answered or it was decided unprompted.
+- Still stop and wait, even with a good default in hand: anything affecting live users, anything that changes what a metric measures, anything in the allergen or safety path.
+
 ## Git and deploy
 
 - Commit, never push, unless explicitly told to push.
