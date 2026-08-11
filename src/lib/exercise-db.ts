@@ -21,6 +21,27 @@ export type MovementPattern =
   | 'core'
   | 'activation'
 
+/**
+ * DEFINITION — angle_vector tracks TORSO ORIENTATION, not the implement's
+ * literal path through the room. 'horizontal' = torso lying flat/prone
+ * (flat bench, push-ups). 'diagonal' = torso pitched ~30-60° from vertical
+ * (incline press, a standing hip-hinge with real forward lean). 'vertical'
+ * = torso upright/axial (overhead press, dips) OR, for floor-based work
+ * with no meaningful torso angle at all (Glute Bridge), the direction the
+ * load/hips travel instead — the same fallback dips/overhead-press use for
+ * axial movement.
+ *
+ * The disambiguator that settles it: a flat bench press moves the bar
+ * VERTICALLY in room coordinates, yet it's 'horizontal' — because the
+ * torso is lying flat. Load path alone doesn't explain that; torso
+ * orientation does, consistently, across every pressing entry in this
+ * file. Applied to hip-hinge: any standing hinge with real forward lean
+ * (Deadlifts, Trap Bar Deadlift, Romanian Deadlifts, Kettlebell Swing
+ * Heavy) is 'diagonal', not 'vertical' — none of them have an upright
+ * torso. Only Good Morning/Bodyweight Good Morning earn 'horizontal'
+ * (explicit "torso parallel to floor" form cue). Glute Bridge stays
+ * 'vertical' as the floor-based exception described above.
+ */
 export type AngleVector = 'horizontal' | 'vertical' | 'diagonal' | 'rotational' | 'anti_extension' | 'anti_rotation' | 'lateral' | 'none'
 
 export type MechanicsTier = 'tier1_compound' | 'tier2_compound' | 'tier3_isolation' | 'cardio' | 'primer'
@@ -100,6 +121,20 @@ export interface ExerciseEntry {
    * genuine imbalance. This field is additive and has no other reader.
    */
   primer_pattern_affinity?: MovementPattern[]
+  /**
+   * True for an entry retired from new selection. The entry (and its
+   * stable `id`) stays in the database on purpose — historical
+   * exercise_set_logs rows and already-generated future mesocycle weeks
+   * reference exercises by name/id as plain denormalized data, never a
+   * foreign key, so removing the entry outright would silently degrade
+   * metadata lookups (progression, load prescription, plate calculator)
+   * for anything still pointing at it. `getConstrainedPool` and
+   * `generateExercisePlan`'s pool-build both filter this out at the
+   * source, so it never reaches a NEW plan; `getExerciseEntry`/
+   * `getExerciseId` deliberately do NOT check it, so old references keep
+   * resolving. Absent/false means active.
+   */
+  retired?: boolean
 }
 
 export const EXERCISE_DATABASE: ExerciseEntry[] = [
@@ -342,6 +377,11 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     substitution_group: 'row',
     unilateral: false,
     avg_duration_seconds: 30,
+    // Retired — identical to Seated Cable Row on every scoring-relevant
+    // field (pattern, angle_vector, equipment, muscles); redundant with it
+    // in the catalogue. Entry/id kept in place, see `retired`'s doc
+    // comment on ExerciseEntry.
+    retired: true,
   },
   {
     name: 'Seated Cable Row',
@@ -740,7 +780,12 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     movement_pattern: 'hip_hinge',
     mechanics_tier: 'tier1_compound',
     prescription_type: 'reps',
-    angle_vector: 'vertical',
+    // Torso orientation, not bar path (see AngleVector's doc comment): a
+    // conventional deadlift has real forward lean at the bottom, not an
+    // upright torso — 'diagonal', matching every other standing hip-hinge
+    // with genuine forward lean (Trap Bar Deadlift, Romanian Deadlifts,
+    // Kettlebell Swing Heavy).
+    angle_vector: 'diagonal',
     primary_muscles: ['hamstrings', 'glutes', 'erectors', 'lats'],
     equipment: ['barbell'],
     joint_stress: 'high',
@@ -758,7 +803,11 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     movement_pattern: 'hip_hinge',
     mechanics_tier: 'tier1_compound',
     prescription_type: 'reps',
-    angle_vector: 'vertical',
+    // 'diagonal', not 'vertical' — the trap bar reduces forward lean
+    // relative to a straight-bar deadlift, but it's still a real hip-hinge
+    // with meaningful torso pitch, not an upright torso. See Deadlifts'
+    // comment and AngleVector's doc comment for the definition.
+    angle_vector: 'diagonal',
     primary_muscles: ['hamstrings', 'glutes', 'quads', 'erectors'],
     equipment: ['trap bar'],
     joint_stress: 'moderate',
@@ -776,7 +825,11 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     movement_pattern: 'hip_hinge',
     mechanics_tier: 'tier2_compound',
     prescription_type: 'reps',
-    angle_vector: 'vertical',
+    // 'diagonal', not 'vertical' — form cues describe a pronounced hinge
+    // (bar slides down the thighs to mid-shin), real forward torso lean,
+    // not an upright torso. See AngleVector's doc comment for the
+    // definition this now matches.
+    angle_vector: 'diagonal',
     primary_muscles: ['hamstrings', 'glutes', 'erectors'],
     equipment: ['barbell', 'dumbbells'],
     joint_stress: 'moderate',
@@ -851,12 +904,13 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     // Was 'vertical' (matching Glute Bridge) — corrected to 'horizontal' to
     // match Bodyweight Good Morning: both are a standing torso-hinge
     // hip-hinge, the torso pitching toward horizontal, not a vertical hip
-    // drive off the floor like Glute Bridge. Note this now agrees with
-    // Good Morning rather than with Romanian Deadlifts (angle_vector:
-    // 'vertical', its own namesake loaded RDL) — the catalogue isn't fully
-    // consistent on whether angle_vector tracks "torso pitch" or "load
-    // path" for hip-hinge work; this fix picks the former, matching the
-    // torso-hinge description in this exercise's own coach_note_swap.
+    // drive off the floor like Glute Bridge. This now diverges from
+    // Romanian Deadlifts (its loaded namesake, 'diagonal') on purpose —
+    // this variant's own coach_note_swap describes a deeper torso pitch
+    // ("genuine balance and hamstring-stretch demand") than the loaded
+    // RDL's moderate hinge. Both readings are consistent under
+    // AngleVector's torso-orientation definition; they just describe
+    // different depths of the same movement family.
     angle_vector: 'horizontal',
     primary_muscles: ['hamstrings', 'glutes', 'erectors'],
     equipment: ['bodyweight'],

@@ -2678,7 +2678,7 @@ export function getConstrainedPool(profile: UserProfile, exclusions: string[] = 
     pool_size_after_each_stage: { equipment: 0, injury: 0, style: 0, skill: 0, final: 0 },
   }
   let pool = EXERCISE_DATABASE.filter(
-    e => !exclusions.some(ex => ex.toLowerCase() === e.name.toLowerCase())
+    e => !e.retired && !exclusions.some(ex => ex.toLowerCase() === e.name.toLowerCase())
   )
   pool = stageEquipmentFilter(pool, profile.equipment_access || 'full_gym', throwaway)
   pool = stageInjuryFilter(pool, [...pool], profile.injuries || [], throwaway)
@@ -2766,8 +2766,9 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
     profile.injuries || []
   )
 
-  // Pre-filter: manual exclusions
+  // Pre-filter: retired entries, then manual exclusions
   let pool = EXERCISE_DATABASE.filter(e => {
+    if (e.retired) return false
     const excluded = exclusions.some(ex => ex.toLowerCase() === e.name.toLowerCase())
     if (excluded) {
       trace.exclusion_filtered.push({
