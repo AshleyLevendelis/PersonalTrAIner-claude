@@ -221,6 +221,17 @@ export interface Exercise {
    * tier2 accessory below the ramp threshold).
    */
   ramp_up?: import('./warmup').RampBlock
+  /**
+   * Present only for an assistance-loaded exercise (ExerciseEntry.assistance
+   * — today, only Pull-Ups (Assisted)); mutually exclusive with
+   * suggested_load_kg, never both set. Unlike load, LOWER is progress here —
+   * see load-prescription.ts's prescribeAssistance and AssistanceChip.tsx,
+   * which render this with an inverted (down = good) cue instead of
+   * LoadChip's up = good framing.
+   */
+  suggested_assistance_kg?: number | null
+  /** True once suggested_assistance_kg has reached 0 — full bodyweight range on the assisted machine, the natural cue to try the real (unassisted) exercise next. */
+  assistance_ready_to_graduate?: boolean
 }
 
 export interface MesocycleWeek {

@@ -135,6 +135,18 @@ export interface ExerciseEntry {
    * resolving. Absent/false means active.
    */
   retired?: boolean
+  /**
+   * Present only for exercises loaded by REMOVING resistance rather than
+   * adding it (an assisted pull-up machine's counterweight, a resistance
+   * band). Getting stronger means this number goes DOWN, the opposite of
+   * every other loaded exercise — see load-prescription.ts's
+   * prescribeAssistance and AssistanceChip.tsx, which both key off this
+   * field's presence to switch to the inverted-progress framing. 'kg' is
+   * the only populated unit today (Pull-Ups (Assisted)'s machine
+   * counterweight); 'band_tier' is reserved for a future band-resisted
+   * exercise, ordered easiest-to-hardest in band_tiers.
+   */
+  assistance?: { unit: 'kg' | 'band_tier'; band_tiers?: string[] }
 }
 
 export const EXERCISE_DATABASE: ExerciseEntry[] = [
@@ -607,6 +619,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     substitution_group: 'vertical_pull',
     unilateral: false,
     avg_duration_seconds: 30,
+    assistance: { unit: 'kg' },
   },
   {
     name: 'Close-Grip Lat Pulldown',

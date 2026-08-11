@@ -1070,3 +1070,81 @@ export function preservesRelativeLoad(current: ExerciseEntry, candidate: Exercis
   const ratio = candidateKg / currentKg
   return ratio >= 0.6 && ratio <= 1.4
 }
+
+// ---------------------------------------------------------------------------
+// ASSISTANCE PRESCRIPTION — the inverse of load
+// ---------------------------------------------------------------------------
+// An assistance-loaded exercise (ExerciseEntry.assistance — today, only
+// Pull-Ups (Assisted), machine counterweight) removes resistance rather than
+// adding it, so "stronger" means the number goes DOWN, floored at 0kg (full
+// bodyweight range — the trainee is doing the real movement on the assisted
+// rig, no help left to give). This deliberately does NOT reuse prescribeLoad's
+// machinery (starting-weight standards table, known-working-weight anchors,
+// unverified-ramp carry-forward, calibration-week clamps): none of that has
+// an assistance equivalent — there is no "known assisted-pull-up weight" a
+// trainee reports at onboarding, no logged history to anchor to (see this
+// function's own doc comment on why the live post-session double-progression
+// engine is intentionally NOT wired to this — that's a set-logging schema
+// question, not a load-prescription one). This is a plain, stateless,
+// experience-scaled decrement table instead — always 'estimate' class,
+// recomputed fresh from (experience, weekInBlock) every call, nothing to
+// carry forward or contaminate on a rotation.
+
+/** Starting assistance for someone who has never done an unassisted rep — deliberately generous (more help) for a beginner, less for someone who has plainly trained pulling strength before. */
+const ASSISTANCE_START_KG: Record<TrainingExperience, number> = {
+  beginner: 40,
+  novice: 35,
+  intermediate: 20,
+  advanced: 10,
+}
+
+/** Assistance removed per loading week (weeks 2 and 3 of a block) — same "two real steps per block" cadence prescribeLoad's own forceStartingWeightKg logic uses for load. */
+const ASSISTANCE_STEP_KG = 5
+
+export interface AssistancePrescription {
+  assistance_kg: number
+  display: string
+  /** True once assistance_kg has hit 0 — full bodyweight range, the cue to try the real (unassisted) exercise next. */
+  ready_to_graduate: boolean
+}
+
+/**
+ * Returns null for any exercise without an `assistance` field — the normal
+ * (non-assistance) case, so callers can unconditionally call this alongside
+ * prescribeLoad and just check for null.
+ *
+ * weekInBlock is 1-3 (loading weeks only); pass 1 for any "first build /
+ * swapped in" context that has no real week-in-block concept yet (mirrors
+ * how those same call sites already pass isFirstBlock: true to prescribeLoad).
+ * isDeload holds assistance flat at whatever week 3 resolved to — matching
+ * this codebase's established deload philosophy elsewhere ("recovery comes
+ * from doing less, not lifting lighter"): sets/reps carry the deload's
+ * recovery reduction, not a change in either direction on the assistance/load
+ * axis itself.
+ */
+export function prescribeAssistance(
+  entry: ExerciseEntry,
+  profile: UserProfile,
+  weekInBlock: number,
+  isDeload: boolean,
+): AssistancePrescription | null {
+  if (!entry.assistance) return null
+  const experience = profile.training_experience || 'novice'
+  const startKg = ASSISTANCE_START_KG[experience] ?? ASSISTANCE_START_KG.novice
+  const effectiveWeek = isDeload ? 3 : Math.min(Math.max(1, weekInBlock), 3)
+  const assistanceKg = Math.max(0, startKg - (effectiveWeek - 1) * ASSISTANCE_STEP_KG)
+  const readyToGraduate = assistanceKg === 0
+  return {
+    assistance_kg: assistanceKg,
+    display: readyToGraduate ? 'Bodyweight (no assist)' : `${assistanceKg}kg assist`,
+    ready_to_graduate: readyToGraduate,
+  }
+}
+
+/** The load_guidance-equivalent copy for an assistance exercise — parallels ExperienceConfig.load_guidance's role for prescribeLoad, but framed around removing help rather than adding weight. */
+export function assistanceGuidance(prescription: AssistancePrescription): string {
+  if (prescription.ready_to_graduate) {
+    return "You're at full bodyweight range on the assisted rig now — try the real, unassisted version next session."
+  }
+  return 'Less machine assistance each week as you get stronger — the number should go DOWN over time, not up.'
+}

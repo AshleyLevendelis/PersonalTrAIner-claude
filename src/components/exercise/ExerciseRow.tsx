@@ -7,6 +7,7 @@ import { getExerciseId } from '@/lib/exercise-db'
 import { formatRampSets, formatCompletedSummary } from '@/lib/session-derive'
 import { RampStrip } from './RampStrip'
 import { LoadChip, loadSourceLabel, type LoadSource } from './LoadChip'
+import { AssistanceChip } from './AssistanceChip'
 import { CalibrationCue } from './CalibrationCue'
 import { SetGrid, type SetGridProps } from './SetGrid'
 import type { Exercise, ExerciseSetLog } from '@/lib/types'
@@ -106,7 +107,9 @@ export function ExerciseRow({
     <span className="tabular-mono text-xs text-primary glow-mint">✓ {formatCompletedSummary(loggedSets)}</span>
   ) : (
     <span className="tabular-mono text-xs text-muted-foreground">
-      {ex.sets}×{ex.reps}{ex.suggested_load_kg != null ? ` · ${ex.suggested_load_kg}kg` : ''}
+      {ex.sets}×{ex.reps}
+      {ex.suggested_load_kg != null ? ` · ${ex.suggested_load_kg}kg` : ''}
+      {ex.suggested_assistance_kg != null ? ` · ${ex.assistance_ready_to_graduate ? 'no assist' : `${ex.suggested_assistance_kg}kg assist`}` : ''}
     </span>
   )
 
@@ -166,17 +169,27 @@ export function ExerciseRow({
                   <span className="text-xs text-text-tertiary pb-0.5">kg</span>
                 </div>
               )}
-              {loadSourceLabel(loadSource) && (
+              {ex.suggested_assistance_kg != null && (
+                <div className="flex items-end gap-2">
+                  <span className="tabular-mono ds-num-lg leading-none">{ex.suggested_assistance_kg}</span>
+                  <span className="text-xs text-text-tertiary pb-0.5">kg assist</span>
+                </div>
+              )}
+              {ex.suggested_load_kg != null && loadSourceLabel(loadSource) && (
                 <p className="text-[10px] uppercase tracking-[.1em] text-muted-foreground">{loadSourceLabel(loadSource)}</p>
               )}
               <div className="mt-1.5">
-                <LoadChip
-                  ex={ex}
-                  source={loadSource}
-                  explained={explainedLoadChip}
-                  onToggleExplain={() => setExplainedLoadChip(v => !v)}
-                  progressionNote={progressionNote}
-                />
+                {ex.suggested_assistance_kg != null ? (
+                  <AssistanceChip ex={ex} />
+                ) : (
+                  <LoadChip
+                    ex={ex}
+                    source={loadSource}
+                    explained={explainedLoadChip}
+                    onToggleExplain={() => setExplainedLoadChip(v => !v)}
+                    progressionNote={progressionNote}
+                  />
+                )}
               </div>
               {completedSets === 0 && ramp && <RampStrip ramp={ramp} />}
               {showCalibrationCue && <CalibrationCue hasLoad={ex.suggested_load_kg != null} />}

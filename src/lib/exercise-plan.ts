@@ -10,7 +10,7 @@ import {
   type ExperienceConfig,
 } from './experience-config'
 import { buildWarmup, getWarmupReserveSeconds } from './warmup'
-import { prescribeLoad, categorize, getLoadIncrementKg, isExternallyLoaded, getEquipmentFloorKg, loadingMode, roundToPlate, formatLoad, labelModeForEntry, hasKnownWorkingWeight, unverifiedRampStepKg, isolationTargetBelowFloor, type KnownWorkingWeights } from './load-prescription'
+import { prescribeLoad, categorize, getLoadIncrementKg, isExternallyLoaded, getEquipmentFloorKg, loadingMode, roundToPlate, formatLoad, labelModeForEntry, hasKnownWorkingWeight, unverifiedRampStepKg, isolationTargetBelowFloor, prescribeAssistance, assistanceGuidance, type KnownWorkingWeights } from './load-prescription'
 import {
   getPhaseSequence, getPhaseConfig, rotateVariation, resolveTargetRpe,
   shiftReps, adjustRest, dedupeAdjacentPhases, type PhaseConfig, type TrainingPhase,
@@ -1425,6 +1425,52 @@ function shiftRepRange(reps: string, delta: number): string {
   return `${low}-${high}`
 }
 
+/**
+ * Conventional coaching brackets a rep range is snapped to at BASE
+ * assignment only — see snapToRepBracket's own doc comment for why the
+ * weekly shiftReps drift is deliberately left untouched. Ordered low to
+ * high so a nearest-low-bound search is a simple linear scan.
+ */
+const REP_BRACKETS = ['1-3', '3-5', '5-6', '6-8', '8-10', '10-12', '12-15', '15-20', '20-25']
+
+/**
+ * Snaps a computed rep range (style base + goal shift + experience floor)
+ * to the nearest real coaching bracket by low-bound distance, so the BASE
+ * assignment reads like a range a coach would actually prescribe ("8-10")
+ * instead of arbitrary algebra ("7-11"). Deliberately called ONLY here, at
+ * base assignment — never inside shiftReps (periodization.ts)'s per-week
+ * call. Reps already hold flat across a block for rampLoad-only exercises
+ * (repShift carries no `w-1` term for them — see the rampLoad/rampReps
+ * split in the per-week loop below), so snapping the base alone already
+ * gives those exercises a genuinely bracket-fixed block, with load as the
+ * sole week-to-week lever, unchanged. For rampReps exercises (bodyweight /
+ * unaffordable-load / reps-emphasis accessories), the existing +1 rep/week
+ * drift is what keeps every consecutive week distinct for frozen_week — an
+ * earlier attempt to ALSO snap the weekly-shifted value collapsed distinct
+ * weeks onto the same bracket and reintroduced frozen_week failures
+ * (measured: Progression 1.70->1.60, Overall 11.10->11.01/12); leaving the
+ * per-week shift alone and only cleaning up its starting point measured as
+ * a no-op on every quality dimension (Overall 11.10/12 unchanged,
+ * Progression 1.70->1.69 — noise) while still landing week 1 on a real
+ * bracket, which is the one part of this that's safe to ship.
+ */
+function snapToRepBracket(reps: string): string {
+  const m = reps.match(/^(\d+)\s*-\s*(\d+)$/)
+  if (!m) return reps
+  const low = Number(m[1])
+  let best = REP_BRACKETS[0]
+  let bestDist = Infinity
+  for (const bracket of REP_BRACKETS) {
+    const bracketLow = Number(bracket.split('-')[0])
+    const dist = Math.abs(bracketLow - low)
+    if (dist < bestDist) {
+      bestDist = dist
+      best = bracket
+    }
+  }
+  return best
+}
+
 /** Multiplies a base rest-seconds value by a goal's per-tier bias, floored at 20s — even the densest circuit-adjacent goal needs SOME recovery between working sets. */
 function shiftRestSeconds(seconds: number, multiplier: number): number {
   return Math.max(20, Math.round(seconds * multiplier))
@@ -1472,7 +1518,7 @@ function assignSetsRepsFromConfig(
       const restSeconds = shiftRestSeconds(config.restSeconds[tierKey], policy.restSecondsMultiplier[tierKey])
       return {
         sets: scaleSets(config.setRange[tierKey]),
-        reps: applyRepFloor(shiftRepRange(config.repRange[tierKey], policy.repRangeShift[tierKey]), experience.min_reps),
+        reps: snapToRepBracket(applyRepFloor(shiftRepRange(config.repRange[tierKey], policy.repRangeShift[tierKey]), experience.min_reps)),
         rest: `${restSeconds}s`,
         restSeconds,
       }
@@ -1879,6 +1925,7 @@ function rebuildExerciseForSwap(
   // carried over, since those genuinely share the same base value across
   // every STYLE_CONFIGS style (see the doc comment above).
   const reps = isPrimer ? oldExercise.reps : assignSetsRepsFromConfig(newEntry, styleConfig, experience, getGoalPolicy(profile.fitness_goal || 'hypertrophy')).reps
+  const assistance = isPrimer ? null : prescribeAssistance(newEntry, profile, 1, false)
   return {
     ...oldExercise,
     id: newEntry.id,
@@ -1887,11 +1934,17 @@ function rebuildExerciseForSwap(
     substitution: getSubstitution(newEntry, pool, allSelectedNames),
     intensity,
     prescription_type: newEntry.prescription_type,
-    load_guidance: isPrimer ? oldExercise.load_guidance : `${experience.load_guidance} ${load.basis}`,
+    load_guidance: isPrimer ? oldExercise.load_guidance : (assistance ? assistanceGuidance(assistance) : `${experience.load_guidance} ${load.basis}`),
     suggested_load: isPrimer ? 'Light' : load.display,
     suggested_load_kg: isPrimer ? null : load.starting_weight_kg,
     load_source: isPrimer ? undefined : load.load_source,
     per_set_load: isPrimer ? null : load.per_set,
+    // Old exercise's assistance fields (spread above) must not leak through
+    // a swap into a non-assistance exercise — explicit undefined here always
+    // wins over the spread, mirroring how suggested_load_kg already
+    // self-corrects via prescribeLoad's own null-for-bodyweight return.
+    suggested_assistance_kg: assistance?.assistance_kg,
+    assistance_ready_to_graduate: assistance?.ready_to_graduate,
     superset_label: undefined,
   }
 }
@@ -2018,6 +2071,7 @@ function balanceWeeklyStructure(
     const intensity = isPrimer ? 'Light — movement prep' : experience.target_rpe
     const sr = assignSetsRepsFromConfig(entry, styleConfig, experience, getGoalPolicy(profile.fitness_goal || 'hypertrophy'))
     const load = prescribeLoad(entry, profile, { targetRpeLabel: intensity, isFirstBlock: true, sets: sr.sets })
+    const assistance = isPrimer ? null : prescribeAssistance(entry, profile, 1, false)
     days[dayIdx].exercises.push({
       id: entry.id,
       name: entry.name,
@@ -2027,11 +2081,13 @@ function balanceWeeklyStructure(
       substitution: getSubstitution(entry, pool, allSelectedNames),
       intensity,
       prescription_type: entry.prescription_type,
-      load_guidance: isPrimer ? 'Stay light and controlled. This is preparation, not a working set.' : `${experience.load_guidance} ${load.basis}`,
+      load_guidance: isPrimer ? 'Stay light and controlled. This is preparation, not a working set.' : (assistance ? assistanceGuidance(assistance) : `${experience.load_guidance} ${load.basis}`),
       suggested_load: isPrimer ? 'Light' : load.display,
       suggested_load_kg: isPrimer ? null : load.starting_weight_kg,
       load_source: isPrimer ? undefined : load.load_source,
       per_set_load: isPrimer ? null : load.per_set,
+      suggested_assistance_kg: assistance?.assistance_kg,
+      assistance_ready_to_graduate: assistance?.ready_to_graduate,
     })
   }
 
@@ -2908,6 +2964,7 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
       // No phase yet either (that's a mesocycle concept), so this always
       // comes back as a straight, flat per-set weight.
       const load = prescribeLoad(slot.entry, profile, { targetRpeLabel: intensity, isFirstBlock: true, sets: slot.sets })
+      const assistance = isPrimer ? null : prescribeAssistance(slot.entry, profile, 1, false)
       return {
         id: slot.entry.id,
         name: slot.entry.name,
@@ -2919,11 +2976,13 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
         prescription_type: slot.entry.prescription_type,
         load_guidance: isPrimer
           ? 'Stay light and controlled. This is preparation, not a working set.'
-          : `${experience.load_guidance} ${load.basis}`,
+          : (assistance ? assistanceGuidance(assistance) : `${experience.load_guidance} ${load.basis}`),
         suggested_load: isPrimer ? 'Light' : load.display,
         suggested_load_kg: isPrimer ? null : load.starting_weight_kg,
         load_source: isPrimer ? undefined : load.load_source,
         per_set_load: isPrimer ? null : load.per_set,
+        suggested_assistance_kg: assistance?.assistance_kg,
+        assistance_ready_to_graduate: assistance?.ready_to_graduate,
       }
     })
 
@@ -3919,6 +3978,14 @@ export function generateMesocycle(
           const intensity = isPrimer ? ex.intensity : resolveTargetRpe(phase, experience, w, isDeload)
 
           let load = null as ReturnType<typeof prescribeLoad> | null
+          // Independent of the load branch below — an assistance exercise
+          // (today, only Pull-Ups (Assisted)) is bodyweight-classified
+          // (isExternallyLoaded false), so it never enters the load branch
+          // at all; this is its own, much simpler decrement schedule keyed
+          // only on (experience, week-in-block, isDeload). See
+          // prescribeAssistance's own doc comment for why it doesn't reuse
+          // any of the load engine's baseline-carry/calibration machinery.
+          const assistance = dbEntry && !isPrimer ? prescribeAssistance(dbEntry, profile, w, isDeload) : null
           if (dbEntry && !isPrimer) {
             const baselineKg = blockBaselineKg[dayIdx][exIdx]
             const increment = getLoadIncrementKg(dbEntry, category, baselineKg ?? 0)
@@ -4042,11 +4109,13 @@ export function generateMesocycle(
               ? (deloadNeedsRepCut
                   ? 'Bar stays the same — reduced reps this week. Recovery comes from doing less, not lifting lighter.'
                   : 'Bar stays the same — reduced sets this week. Recovery comes from doing less, not lifting lighter.')
-              : (load ? `${expConfig.load_guidance} ${load.basis}` : ex.load_guidance),
+              : (assistance ? assistanceGuidance(assistance) : (load ? `${expConfig.load_guidance} ${load.basis}` : ex.load_guidance)),
             suggested_load: load ? load.display : ex.suggested_load,
             suggested_load_kg: load ? load.starting_weight_kg : ex.suggested_load_kg,
             load_source: load ? load.load_source : ex.load_source,
             per_set_load: load ? load.per_set : (ex.per_set_load ?? null),
+            suggested_assistance_kg: assistance ? assistance.assistance_kg : ex.suggested_assistance_kg,
+            assistance_ready_to_graduate: assistance ? assistance.ready_to_graduate : ex.assistance_ready_to_graduate,
             movement_pattern: dbEntry ? mapMovementPattern(dbEntry.movement_pattern) : undefined,
             tier: dbEntry ? mapTier(dbEntry.mechanics_tier) : undefined,
             fatigue_cost: dbEntry ? deriveFatigueCost(dbEntry) : undefined,
