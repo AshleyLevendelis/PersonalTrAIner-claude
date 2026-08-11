@@ -1035,6 +1035,26 @@ function orderCandidates(candidates: ExerciseEntry[], policy: GoalPolicy): Exerc
   return [...shuffle(preferred), ...shuffle(rest)]
 }
 
+/**
+ * The subset of an already-filtered pool that's primer-tier AND
+ * affinity-matched to a track's primer_patterns — the exact predicate
+ * selectExercisesForTrack uses to decide whether a day's primer comes
+ * from the affinity-preferred pool or falls back to any eligible primer.
+ * Exported (not just a local const inside selectExercisesForTrack) so
+ * quality-score.ts's primerFit dimension can ask "would THIS profile have
+ * had a matching primer" — e.g. against an injury-free clone of the same
+ * profile, to tell an injury-driven fallback apart from a genuine
+ * catalogue-thin one — by calling the SAME function real selection uses,
+ * not a hand-copied filter that can silently drift out of sync with it if
+ * this predicate ever changes.
+ */
+export function getAffinityPrimerPool(pool: ExerciseEntry[], trackPatterns: MovementPattern[]): ExerciseEntry[] {
+  return pool.filter(e =>
+    e.mechanics_tier === 'primer' &&
+    (e.primer_pattern_affinity ?? []).some(p => trackPatterns.includes(p))
+  )
+}
+
 function selectExercisesForTrack(
   track: TrackDefinition,
   pool: ExerciseEntry[],
@@ -1073,10 +1093,7 @@ function selectExercisesForTrack(
   // same random-from-pool behavior every primer had before affinity existed,
   // which is exactly the right fallback for the one case where affinity
   // can't be honored).
-  const affinityPrimerPool = pool.filter(e =>
-    e.mechanics_tier === 'primer' &&
-    (e.primer_pattern_affinity ?? []).some(p => track.primer_patterns.includes(p))
-  )
+  const affinityPrimerPool = getAffinityPrimerPool(pool, track.primer_patterns)
   const anyPrimerPool = pool.filter(e => e.mechanics_tier === 'primer')
   const primerPool = affinityPrimerPool.length > 0 ? affinityPrimerPool : anyPrimerPool
   const primer = primerPool.length > 0

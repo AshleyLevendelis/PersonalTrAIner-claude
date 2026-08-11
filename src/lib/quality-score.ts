@@ -1,12 +1,12 @@
 import type { UserProfile, MesocycleWeek, WorkoutDay, Exercise } from './types'
 import { EXERCISE_DATABASE, getMovementFamily, getVolumeRole, type ExerciseEntry } from './exercise-db'
-import { getConstrainedPool, generateMesocycle, primerPatternsForTrack } from './exercise-plan'
+import { getConstrainedPool, generateMesocycle, primerPatternsForTrack, getAffinityPrimerPool } from './exercise-plan'
 import { getGoalPolicy, resolveConditioningFrequency, RECOVERY_SET_MULTIPLIER } from './goal-policies'
 import { EXPERIENCE_RPE_CEILING } from './periodization'
 import { setRandomSource, resetRandomSource } from './exercise-plan'
 import { seededRngFromKey } from './seeded-random'
 import { DURATION_BUDGET_SECONDS, estimateDaySeconds } from './session-duration'
-import { getEquipmentFloorKg } from './load-prescription'
+import { getEquipmentFloorKg, labelModeForEntry } from './load-prescription'
 
 // ---------------------------------------------------------------------------
 // PLAN QUALITY SCORING
@@ -326,8 +326,20 @@ function parseRepsHigh(reps: string): number | null {
  * explicitly excludes mechanics_tier === 'primer'). The detail text says so
  * directly so a future reader doesn't go hunting for a selection bug when
  * what's actually being reported is a catalogue coverage gap.
+ *
+ * LOAD-BEARING COUPLING — do not change one side without the other: the
+ * injury-exemption below recomputes the affinity pool a SECOND time,
+ * against an injury-free clone of the same profile, via
+ * getAffinityPrimerPool (exercise-plan.ts) — the SAME function
+ * selectExercisesForTrack itself calls, not a hand-copied filter. That
+ * function's predicate is what "would this profile have had a matching
+ * primer" actually means here; if it ever changes (a new eligibility
+ * condition, a different affinity rule), this exemption changes meaning
+ * with it automatically, which is the point — a hand-duplicated filter
+ * would instead silently drift and start exempting (or failing to exempt)
+ * the wrong days.
  */
-function scorePrimerFit(mesocycle: MesocycleWeek[]): DimensionResult {
+function scorePrimerFit(profile: UserProfile, mesocycle: MesocycleWeek[]): DimensionResult {
   const week1 = mesocycle.find(w => w.week_number === 1)
   const deductions: Deduction[] = []
   const violatedRules = new Set<string>()
@@ -351,6 +363,22 @@ function scorePrimerFit(mesocycle: MesocycleWeek[]): DimensionResult {
     const affinity = entry?.primer_pattern_affinity ?? []
     const fits = affinity.some(p => trackPatterns.includes(p))
     if (!fits) {
+      // Recovery constraint outranks time budget established the pattern
+      // for this: a deliberate, correct outcome shouldn't score as a
+      // failure. Here, the deliberate outcome is injury filtering doing
+      // its job — if the SAME profile minus its own reported injuries
+      // would have had a matching primer, this mismatch is injury-driven,
+      // not a catalogue gap, and the fallback IS the correct, safe output.
+      // Only exempt when there's an injury to blame it on; a profile with
+      // no injuries at all can't have this excuse, so an empty
+      // affinity pool for one of those is still a genuine gap.
+      const injuryFree = { ...profile, injuries: [] }
+      const noInjuryPool = getConstrainedPool(injuryFree, [])
+      const noInjuryAffinityPrimers = getAffinityPrimerPool(noInjuryPool, trackPatterns)
+      const isInjuryDriven = (profile.injuries?.length ?? 0) > 0 && noInjuryAffinityPrimers.length > 0
+
+      if (isInjuryDriven) continue
+
       violatedRules.add('primer_pattern_mismatch')
       deductions.push({
         rule: 'primer_pattern_mismatch', day: day.day, weekNumber: 1,
@@ -782,7 +810,21 @@ function scoreSelection(profile: UserProfile, mesocycle: MesocycleWeek[]): Dimen
   // Same-muscle-group accessories should stay in the same ballpark across
   // the week — a 26kg curl next to a 2kg shrug in the same week was a
   // direct review finding.
-  const coherenceGroups = new Map<string, { name: string; kg: number }[]>()
+  //
+  // suggested_load_kg is not one consistent unit across exercises: a
+  // 'per_hand'/'single_side' entry (any 'dumbbells'-mode exercise, or a
+  // single-implement one carried unilaterally — see labelModeForEntry,
+  // load-prescription.ts) stores HALF of what a 'total' entry (barbell,
+  // stack) would for equivalent effort, by design — that's the correct,
+  // honest gym-floor convention ("12kg dumbbells" means 12kg per hand, not
+  // 24kg total), not an inconsistency to fix at the load-prescription
+  // layer. Comparing those raw numbers directly is comparing different
+  // units: a genuinely coherent "20kg barbell curl / 10kg-per-hand
+  // dumbbell curl" pair reads as a 2x spread before normalizing back to a
+  // common basis. normalizedKg puts every entry on the SAME 'total' basis
+  // before the spread check runs; the detail message still reports the
+  // real, un-normalized numbers a user would actually see on their plan.
+  const coherenceGroups = new Map<string, { name: string; kg: number; normalizedKg: number }[]>()
   const coherenceGroupOf = (p: string): string | null => {
     if (p === 'isolation_bicep') return 'bicep'
     if (p === 'isolation_tricep') return 'tricep'
@@ -799,18 +841,19 @@ function scoreSelection(profile: UserProfile, mesocycle: MesocycleWeek[]): Dimen
       const group = coherenceGroupOf(entry.movement_pattern)
       if (!group) continue
       if (!coherenceGroups.has(group)) coherenceGroups.set(group, [])
-      coherenceGroups.get(group)!.push({ name: ex.name, kg: ex.suggested_load_kg })
+      const normalizedKg = labelModeForEntry(entry) !== 'total' ? ex.suggested_load_kg * 2 : ex.suggested_load_kg
+      coherenceGroups.get(group)!.push({ name: ex.name, kg: ex.suggested_load_kg, normalizedKg })
     }
   }
   for (const [group, items] of coherenceGroups) {
     if (items.length < 2) continue
-    const min = Math.min(...items.map(i => i.kg))
-    const max = Math.max(...items.map(i => i.kg))
+    const min = Math.min(...items.map(i => i.normalizedKg))
+    const max = Math.max(...items.map(i => i.normalizedKg))
     if (min > 0 && max / min > 2.5) {
       violatedRules.add('load_incoherent')
       deductions.push({
         rule: 'load_incoherent', weekNumber: 1,
-        detail: `"${group}" load spread this week is ${min}kg-${max}kg (${items.map(i => `${i.name}=${i.kg}kg`).join(', ')})`,
+        detail: `"${group}" load spread this week is ${min}kg-${max}kg normalized (${items.map(i => `${i.name}=${i.kg}kg`).join(', ')})`,
       })
     }
   }
@@ -977,7 +1020,7 @@ export function scorePlan(profile: UserProfile, mesocycle: MesocycleWeek[], comb
     progression: scoreProgression(profile, mesocycle),
     selection: scoreSelection(profile, mesocycle),
     goalAlignment: scoreGoalAlignment(profile, mesocycle, comboKey),
-    primerFit: scorePrimerFit(mesocycle),
+    primerFit: scorePrimerFit(profile, mesocycle),
   }
   const overall = DIMENSION_KEYS.reduce((sum, key) => sum + dimensions[key].points, 0)
   return { overall: Math.round(overall * 10) / 10, dimensions }
