@@ -31,9 +31,12 @@ These apply to every session in this repo. They exist so they stop being restate
 
 ## Database
 
-- Local dev and production share ONE Supabase database. There is no scratch or staging instance.
-- All DB access select-only unless explicitly told otherwise.
-- Never create, modify, or delete profiles or user rows to test something. If a check requires test data, say so and stop — don't manufacture it.
+- Two Supabase projects since 11 Aug 2026: TEST (`vswuurrtbzbrgubddefv`, the CLI's default link) and PRODUCTION (`sdkhuczcfnqqimdgfiks`, live users' data). Before that date, dev and prod shared one database with no scratch instance — that constraint no longer holds; don't rely on old notes that assume it does.
+- The CLI defaults to TEST. Reaching production requires `npm run db:link-prod`, which demands typing `yes-production` — a wrong-target command should cost deliberate effort, not just a missing argument. Run `npm run db:link-test` to return to the safe default when done.
+- Migrations: never run a bare `supabase db push` by hand. Use `npm run db:push-both` — the only sanctioned path. It pushes to TEST first, then (after the same typed confirmation) to PRODUCTION, and always relinks back to TEST when it finishes, success or failure. `npm run test:schema-parity` verifies both projects have applied the identical migration set; run it if drift is ever suspected.
+- All DB access select-only on PRODUCTION unless explicitly told otherwise. The TEST project exists specifically so this restriction can be relaxed there — creating profiles, writing data, and running full end-to-end flows (including through the actual onboarding UI) is fine on TEST.
+- Never create, modify, or delete profiles or user rows on PRODUCTION to test something. If a check needs real interaction, use TEST instead of manufacturing prod data.
+- Both projects are free-tier and pause after ~7 days with no API activity. A paused project fails every request (CLI and app alike) until restored — there is no way to wake it via traffic. Restore from the Supabase dashboard: open the project, its paused banner has a "Restore project" button. Check this first if a TEST-project command fails with a connection/timeout error after a quiet stretch.
 
 ## Safety-adjacent work
 
@@ -42,6 +45,6 @@ These apply to every session in this repo. They exist so they stop being restate
 ## Reporting
 
 - Report the verified state, not that a command exited 0. Say what was proven live versus proven by construction or by test.
-- The browser harness in this project cannot register synthetic clicks. Say so plainly rather than describing an interaction as verified.
+- Browser-harness clicks: verified working 11 Aug 2026 (field focus, typing, and two state-changing clicks all registered correctly). History: this harness failed to register synthetic clicks for an extended prior period, the cause was never root-caused, and the recovery is unexplained. Treat "working" as the current observed state, not a permanent fix — if clicks stop registering again, re-test before concluding anything, rather than assuming either "still broken" or "still fixed."
 - If a metric's scale, denominator, or threshold changes, say so — prior numbers stop being comparable.
 - If you retract or correct an earlier claim, say how you reached the wrong one — which file you read, what you skimmed, what you assumed. The correction is worth more than the retraction: it tells us whether the same error shape is sitting in other conclusions.
