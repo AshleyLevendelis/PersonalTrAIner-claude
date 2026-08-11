@@ -31,7 +31,8 @@
     "test:injury-adaptation-safety": "tsx scripts/test-injury-adaptation-safety.ts",
     "test:quality": "tsx scripts/run-quality-score.ts",
     "test:differentiation": "tsx scripts/run-differentiation-audit.ts",
-    "test:llm-review": "tsx scripts/run-llm-review.ts"
+    "test:llm-review": "tsx scripts/run-llm-review.ts",
+    "benchmark": "tsx scripts/run-benchmark.ts"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.4",
