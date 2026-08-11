@@ -540,7 +540,7 @@ const toolDeclarations = [
   {
     name: "log_meal",
     description:
-      "Call whenever the user describes food they ate, OR asks a nutrition question about specific food (e.g. 'how many calories is 2 eggs and toast', 'what's the protein in this shake'). Extract ONLY the ingredients the user actually stated, with their exact quantities and units — the app computes real macros from a verified food database from what you extract, so you must never calculate or state a macro number yourself. Never add an ingredient the user didn't mention (no assumed cooking oil, seasoning, or protein powder) — if an addition seems implied, ask instead of guessing. If an ingredient has an ambiguous variant (e.g. 'greek yoghurt' could be 0% or full-fat, 'milk' could be whole or skimmed), name the SPECIFIC variant you're assuming (e.g. 'greek yoghurt 0%', not 'greek yoghurt') and record it in assumptions. If a quantity is missing, use a typical portion and record that assumption too.",
+      "Call whenever the user describes food they ate, OR asks a MACRO question about specific food (e.g. 'how many calories is 2 eggs and toast', 'what's the protein in this shake'). Do NOT call this for an allergen or food-safety question ('does this have nuts', 'is this safe for my allergy', 'is there dairy in it') — those never get a tool call, they're answered in plain reply text under ALLERGEN HONESTY. Extract ONLY the ingredients the user actually stated, with their exact quantities and units — the app computes real macros from a verified food database from what you extract, so you must never calculate or state a macro number yourself. Never add an ingredient the user didn't mention (no assumed cooking oil, seasoning, or protein powder) — if an addition seems implied, ask instead of guessing. If an ingredient has an ambiguous variant (e.g. 'greek yoghurt' could be 0% or full-fat, 'milk' could be whole or skimmed), name the SPECIFIC variant you're assuming (e.g. 'greek yoghurt 0%', not 'greek yoghurt') and record it in assumptions. If a quantity is missing, use a typical portion and record that assumption too.",
     parameters: {
       type: "object",
       properties: {
@@ -571,7 +571,7 @@ const toolDeclarations = [
         assumptions: {
           type: "array",
           items: { type: "string" },
-          description: "Plain-English notes on any assumption you made — an ambiguous variant you picked, or a portion size you guessed because none was given. Empty array if you made none.",
+          description: "Plain-English notes on any assumption you made — an ambiguous variant you picked, or a portion size you guessed because none was given. A short phrase each, e.g. 'assumed 0% fat greek yoghurt' — never your reasoning about what tool to call or why, that is not an assumption and must never appear here. Empty array if you made none.",
         },
       },
       required: ["meal_slot", "food_name", "ingredients", "assumptions"],
@@ -1163,7 +1163,8 @@ ${context.exercise_exclusions && context.exercise_exclusions.length > 0 ? `\nPER
 
 === NATURAL LANGUAGE FOOD LOGGING & NUTRITION QUESTIONS (CRITICAL) ===
 - You must NEVER calculate or state a macro number (calories, protein, carbs, fat) yourself in your reply text, for ANY reason — not for logging food someone ate, not for answering "how many calories is X", not for coaching analysis. Every macro number in this app comes from a verified food database computed server-side; your job is parsing, never arithmetic.
-- Whenever the user describes food they ate, OR asks a nutrition/macro question about specific food, call log_meal with the ingredients parsed from their message. The tool's response already contains the real computed numbers (and any coverage/assumption caveats) — your reply must use ONLY those numbers, never your own math on top of them.
+- Whenever the user describes food they ate, OR asks a nutrition/macro question about specific food (calories, protein, carbs, fat), call log_meal with the ingredients parsed from their message. The tool's response already contains the real computed numbers (and any coverage/assumption caveats) — your reply must use ONLY those numbers, never your own math on top of them.
+- NEVER call log_meal for an allergen or food-safety question ("does this contain X", "is this safe for my allergy", "is there Y in it") — those are governed entirely by ALLERGEN HONESTY below, answered in your own reply text, no tool call. A macro question and a safety question can share the same sentence shape ("what's in tonight's dinner") but are never the same question — macros go through log_meal, safety never does.
 - Extract ONLY what the user actually stated. Never add an ingredient they didn't mention (no assumed cooking oil, seasoning, or protein powder) — if an addition seems implied, ask the user rather than silently including it.
 - If an ingredient has an ambiguous variant (fat content, whole vs. skimmed, etc.), pick one explicit, precisely-named variant and record the assumption. If a quantity is missing, use a typical portion and record that assumption too. See log_meal's parameter descriptions for exact requirements.
 - propose_meal_swap does not take a macro field at all — the app computes the swap's macros itself from the verified pool, shown on the confirm card.
@@ -1653,8 +1654,23 @@ Keep this context in mind to ensure your greetings and questions naturally align
         }
 
         const computed = computeMealMacros(ingredients);
+        // Defensive cap, independent of the prompt instruction above: this
+        // field is echoed to the user VERBATIM below with no other review,
+        // so it's the one spot in this handler where model-generated text
+        // reaches the user unfiltered. A genuine assumption ("assumed 0%
+        // fat greek yoghurt") is always a short phrase; anything longer is
+        // far more likely to be reasoning narration that leaked in here
+        // instead of the reply — drop it rather than echo it, matching
+        // §1a's "never narrate internal reasoning" even where that
+        // instruction can't reach (this bypasses reply generation
+        // entirely). Caught live: a misrouted allergen question produced
+        // an "assumption" that was actually a run-on description of what
+        // the model was doing and why.
+        const ASSUMPTION_MAX_CHARS = 80;
         const assumptions: string[] = Array.isArray(args.assumptions)
-          ? args.assumptions.filter((a: unknown): a is string => typeof a === "string" && a.trim().length > 0)
+          ? args.assumptions.filter((a: unknown): a is string =>
+              typeof a === "string" && a.trim().length > 0 && a.trim().length <= ASSUMPTION_MAX_CHARS
+            )
           : [];
 
         // No unresolved lines: report the real total. Some unresolved: report
