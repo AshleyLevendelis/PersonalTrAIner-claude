@@ -526,6 +526,14 @@ export interface ExerciseSetLog {
   rpe?: number | null
   is_warmup?: boolean
   completed_at?: string
+  /**
+   * Assistance used (kg), for an assistance-loaded exercise (today, only
+   * Pull-Ups (Assisted)) — undefined/null for every ordinary set. Column
+   * exists (migration 20260811100000); the write path (SetGrid.tsx logging
+   * UI, set-log-store.ts save/sync) and the inverted progression read-back
+   * are not wired yet — see this round's decision log.
+   */
+  assistance_kg?: number | null
 }
 
 export interface CardioLog {
