@@ -1055,6 +1055,25 @@ export function getAffinityPrimerPool(pool: ExerciseEntry[], trackPatterns: Move
   )
 }
 
+/**
+ * Which isolation patterns are "the target muscle" for a given day's own
+ * compound pattern(s) — e.g. a hinge day's hamstring isolation work directly
+ * supports the hinge; its bicep/tricep isolation work does not. Drives the
+ * intra-tier3 sequencing below: pickFromTier's tier3_isolation pass
+ * (movement-variety selection) still picks WHICH isolation exercises make
+ * the day via a plain shuffle — this table only reorders the ones already
+ * chosen, so it never biases selection itself, only presentation order.
+ */
+const PATTERN_TO_RELATED_ISOLATION: Partial<Record<MovementPattern, MovementPattern[]>> = {
+  hip_hinge: ['isolation_hamstring'],
+  knee_dominant: ['isolation_quad', 'isolation_calf'],
+  single_leg: ['isolation_quad', 'isolation_hamstring'],
+  horizontal_push: ['isolation_tricep', 'isolation_shoulder'],
+  vertical_push: ['isolation_shoulder', 'isolation_tricep'],
+  horizontal_pull: ['isolation_bicep'],
+  vertical_pull: ['isolation_bicep'],
+}
+
 function selectExercisesForTrack(
   track: TrackDefinition,
   pool: ExerciseEntry[],
@@ -1343,9 +1362,44 @@ function selectExercisesForTrack(
   if (track.label === 'Squat & Carry') ensurePatternPresent(['knee_dominant', 'single_leg'])
   if (track.label === 'Push & Press') ensurePatternPresent(['vertical_push'])
 
-  // Sort: tier1 compounds first, then tier2, then tier3
+  // Sort: tier1 compounds first, then tier2, then tier3 — and WITHIN tier3,
+  // target muscle (directly related to the day's own compound pattern(s))
+  // before supporting isolation work, core/anti-extension always last. A
+  // hinge day's hamstring curl finishing before its bicep curl, and its
+  // core work finishing the session, is how a real coach orders a page —
+  // pickFromTier's shuffle decides WHICH isolation exercises make the day;
+  // this only decides the order they're written down in.
+  //
+  // Relevance alone isn't enough on a day whose primary_patterns span TWO
+  // compounds (e.g. "Pull & Hinge" — hip_hinge AND horizontal_pull/
+  // vertical_pull), since it would then rate hamstring isolation (hinge)
+  // and bicep isolation (pull) as equally "target" and fall back to
+  // whatever order the tier3 shuffle happened to produce — exactly the
+  // Incline Curls-before-Leg-Curl case this rule exists to fix. A muscle-
+  // size sub-rank breaks that tie in relevance's favor: legs first, then
+  // shoulders, then arms, matching the classic big-to-small accessory
+  // convention regardless of which compound patterns the day covers.
   const tierOrder = { tier1_compound: 0, tier2_compound: 1, tier3_isolation: 2, cardio: 3, primer: 4 }
-  selected.sort((a, b) => (tierOrder[a.mechanics_tier] ?? 3) - (tierOrder[b.mechanics_tier] ?? 3))
+  const MUSCLE_SIZE_RANK: Partial<Record<MovementPattern, number>> = {
+    isolation_hamstring: 0, isolation_quad: 0,
+    isolation_calf: 1,
+    isolation_shoulder: 2,
+    isolation_bicep: 3, isolation_tricep: 3,
+  }
+  const relatedIsolation = new Set<MovementPattern>()
+  for (const p of track.primary_patterns) {
+    for (const r of PATTERN_TO_RELATED_ISOLATION[p] ?? []) relatedIsolation.add(r)
+  }
+  const isolationPriority = (e: ExerciseEntry): number => {
+    if (e.movement_pattern === 'core') return 100
+    if (e.mechanics_tier !== 'tier3_isolation') return -1
+    const sizeRank = MUSCLE_SIZE_RANK[e.movement_pattern] ?? 2
+    return (relatedIsolation.has(e.movement_pattern) ? 0 : 10) + sizeRank
+  }
+  selected.sort((a, b) => {
+    const tierDiff = (tierOrder[a.mechanics_tier] ?? 3) - (tierOrder[b.mechanics_tier] ?? 3)
+    return tierDiff !== 0 ? tierDiff : isolationPriority(a) - isolationPriority(b)
+  })
 
   return { primer, main: selected, requiredNames }
 }
