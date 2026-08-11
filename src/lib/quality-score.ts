@@ -824,11 +824,24 @@ function scoreSelection(profile: UserProfile, mesocycle: MesocycleWeek[]): Dimen
   // common basis. normalizedKg puts every entry on the SAME 'total' basis
   // before the spread check runs; the detail message still reports the
   // real, un-normalized numbers a user would actually see on their plan.
+  // shoulder_isolation split (queue-clearing round): 'isolation_shoulder'
+  // used to collapse into ONE coherence bucket regardless of which shoulder
+  // exercise it was — but the only two movements that pattern actually
+  // covers today are Lateral/Cable Lateral Raises (substitution_group
+  // 'lateral_delt') and Shrugs/Dumbbell Shrugs ('shrug'), and a shrug is
+  // structurally loaded 5-10x heavier than a lateral raise for the same
+  // trainee — every week both appeared together was a guaranteed
+  // load_incoherent false positive, not a real coherence problem. Keying on
+  // substitution_group (already a finer distinction the data carries, just
+  // discarded by movement_pattern alone) splits them into their own
+  // buckets. Not extended to the other five isolation patterns here —
+  // scoped to the one bucket that was actually measured and proposed.
   const coherenceGroups = new Map<string, { name: string; kg: number; normalizedKg: number }[]>()
-  const coherenceGroupOf = (p: string): string | null => {
+  const coherenceGroupOf = (entry: ExerciseEntry): string | null => {
+    const p = entry.movement_pattern
     if (p === 'isolation_bicep') return 'bicep'
     if (p === 'isolation_tricep') return 'tricep'
-    if (p === 'isolation_shoulder') return 'shoulder_isolation'
+    if (p === 'isolation_shoulder') return entry.substitution_group === 'shrug' ? 'shrug' : 'lateral_delt'
     if (p === 'isolation_quad') return 'quad_isolation'
     if (p === 'isolation_hamstring') return 'hamstring_isolation'
     if (p === 'isolation_calf') return 'calf_isolation'
@@ -838,7 +851,7 @@ function scoreSelection(profile: UserProfile, mesocycle: MesocycleWeek[]): Dimen
     for (const ex of day.exercises) {
       const entry = dbEntry(ex.name)
       if (!entry || ex.suggested_load_kg == null) continue
-      const group = coherenceGroupOf(entry.movement_pattern)
+      const group = coherenceGroupOf(entry)
       if (!group) continue
       if (!coherenceGroups.has(group)) coherenceGroups.set(group, [])
       const normalizedKg = labelModeForEntry(entry) !== 'total' ? ex.suggested_load_kg * 2 : ex.suggested_load_kg

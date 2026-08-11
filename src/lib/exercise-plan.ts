@@ -13,7 +13,7 @@ import { buildWarmup, getWarmupReserveSeconds } from './warmup'
 import { prescribeLoad, categorize, getLoadIncrementKg, isExternallyLoaded, getEquipmentFloorKg, loadingMode, roundToPlate, formatLoad, labelModeForEntry, hasKnownWorkingWeight, unverifiedRampStepKg, isolationTargetBelowFloor, prescribeAssistance, assistanceGuidance, type KnownWorkingWeights } from './load-prescription'
 import {
   getPhaseSequence, getPhaseConfig, rotateVariation, resolveTargetRpe,
-  shiftReps, adjustRest, dedupeAdjacentPhases, type PhaseConfig, type TrainingPhase,
+  shiftReps, adjustRest, dedupeAdjacentPhases, isRegressionFor, type PhaseConfig, type TrainingPhase,
 } from './periodization'
 import { getGoalPolicy, restrictPhaseSequence, resolveConditioningFrequency, RECOVERY_SET_MULTIPLIER, type GoalPolicy } from './goal-policies'
 import { getDurationBudgetSeconds, estimateDaySeconds, estimateSlotsSeconds, parseRestSeconds } from './session-duration'
@@ -1019,20 +1019,35 @@ function isUnilateralCarryOrRotational(e: ExerciseEntry): boolean {
 }
 
 /**
- * Goal-aware candidate ordering: when a policy prefers unilateral/carry/
- * rotational work, those candidates are shuffled and tried FIRST, with the
- * rest of the eligible pool shuffled and appended after as a fallback —
- * never excluded, just deprioritized. Every existing eligibility filter
- * (equipment/injury/style/skill/pattern/family/weekly-used) runs unchanged
- * before this is ever called, so pattern-coverage and required-slot
- * guarantees are untouched; this only changes which of several ALREADY-
- * eligible candidates gets tried first.
+ * Goal- and capability-aware candidate ordering. Every existing eligibility
+ * filter (equipment/injury/style/skill/pattern/family/weekly-used) runs
+ * unchanged before this is ever called, so pattern-coverage and required-
+ * slot guarantees are untouched; this only changes which of several
+ * ALREADY-eligible candidates gets tried first.
+ *
+ * Capability-tier bias (primary split): meetsCapabilityRequirement is a
+ * pure floor — an on-ramp/regression variant (Pull-Ups (Assisted), Goblet
+ * Squats, ...) clearing the floor for a trainee who has already outgrown it
+ * was winning selection purely on shuffle luck, with nothing upstream ever
+ * preferring the full version once both are eligible. Regression variants
+ * (isRegressionFor, periodization.ts) are demoted below every non-regression
+ * alternative in the SAME candidate list — never excluded outright, so a
+ * slot where the regression variant is the only eligible option still fills.
+ *
+ * Goal-aware ordering (secondary, within each half): when a policy prefers
+ * unilateral/carry/rotational work, those candidates are tried first within
+ * whichever capability tier they landed in.
  */
-function orderCandidates(candidates: ExerciseEntry[], policy: GoalPolicy): ExerciseEntry[] {
-  if (!policy.preferUnilateralCarry) return shuffle(candidates)
-  const preferred = candidates.filter(isUnilateralCarryOrRotational)
-  const rest = candidates.filter(e => !isUnilateralCarryOrRotational(e))
-  return [...shuffle(preferred), ...shuffle(rest)]
+function orderCandidates(candidates: ExerciseEntry[], policy: GoalPolicy, rawExperience: TrainingExperience): ExerciseEntry[] {
+  const byGoalPref = (pool: ExerciseEntry[]): ExerciseEntry[] => {
+    if (!policy.preferUnilateralCarry) return shuffle(pool)
+    const preferred = pool.filter(isUnilateralCarryOrRotational)
+    const rest = pool.filter(e => !isUnilateralCarryOrRotational(e))
+    return [...shuffle(preferred), ...shuffle(rest)]
+  }
+  const nonRegression = candidates.filter(e => !isRegressionFor(e.name, rawExperience))
+  const regression = candidates.filter(e => isRegressionFor(e.name, rawExperience))
+  return [...byGoalPref(nonRegression), ...byGoalPref(regression)]
 }
 
 /**
@@ -1084,6 +1099,7 @@ function selectExercisesForTrack(
   policy: GoalPolicy,
   feasibleRequiredPatterns?: MovementPattern[],
   weeklyAppearanceCount?: Map<string, number>,
+  rawExperience: TrainingExperience = 'novice',
 ): { primer: ExerciseEntry | null; main: ExerciseEntry[]; requiredNames: Set<string> } {
   const counts = applyIsolationSlotShift(countsIn, policy.isolationSlotShift)
   const allPatterns = new Set([...track.primary_patterns, ...track.secondary_patterns])
@@ -1140,7 +1156,7 @@ function selectExercisesForTrack(
   // TrackSlot's doc comment for why this replaced pure filter-then-shuffle.
   const slotForbidden = new Set(track.forbidden_patterns)
   function findForSlot(patterns: MovementPattern[], tier: TrackSlot['tier'] | null, respectWeeklyUsed: boolean): ExerciseEntry | null {
-    const candidates = shuffle(
+    const candidates = orderCandidates(
       pool.filter(e =>
         patterns.includes(e.movement_pattern) &&
         !slotForbidden.has(e.movement_pattern) &&
@@ -1148,7 +1164,9 @@ function selectExercisesForTrack(
         !selected.some(s => s.name === e.name) &&
         !usedGroups.has(getMovementFamily(e)) &&
         (!respectWeeklyUsed || !weeklyUsed.has(e.name))
-      )
+      ),
+      policy,
+      rawExperience,
     )
     return candidates[0] ?? null
   }
@@ -1201,6 +1219,7 @@ function selectExercisesForTrack(
         !usedGroups.has(getMovementFamily(e))
       ),
       policy,
+      rawExperience,
     )
     for (const c of candidates) {
       if (selected.length >= counts.tier1 + counts.tier2 + counts.tier3) break
@@ -1710,12 +1729,28 @@ function broadPattern(pattern: MovementPattern): BroadPattern {
   }
 }
 
-/** Same-muscle-group coherence bucket — exercises whose absolute load should stay in the same ballpark within a week. Laterals and shrugs share a bucket deliberately: both are the same "small, high-rep shoulder-girdle isolation" complaint class in the review. */
+/**
+ * Same-muscle-group coherence bucket — exercises whose absolute load should
+ * stay in the same ballpark within a week, clamped by enforceLoadCoherence
+ * below. Laterals and shrugs USED TO share a bucket deliberately ("both are
+ * the same 'small, high-rep shoulder-girdle isolation' complaint class in
+ * the review") — that premise was wrong: a shrug is structurally loaded
+ * 2-4x heavier than a lateral raise for the same trainee (trapezius vs.
+ * lateral deltoid), so sharing a bucket didn't just fail to catch real
+ * incoherence, it actively clamped a legitimately heavy shrug DOWN toward
+ * whatever the lateral raise happened to show — manufacturing the exact
+ * "2kg shrug" complaint this pass exists to prevent, on the exercise it was
+ * supposed to protect. Split via substitution_group (already the finer
+ * distinction the data carries) — same fix as quality-score.ts's matching
+ * coherenceGroupOf, which scores the OUTPUT of this pass and was silently
+ * scoring clean because this clamp already forced every plan under its
+ * threshold before scoring ever saw it.
+ */
 function coherenceGroup(entry: ExerciseEntry): string | null {
   switch (entry.movement_pattern) {
     case 'isolation_bicep': return 'bicep'
     case 'isolation_tricep': return 'tricep'
-    case 'isolation_shoulder': return 'shoulder_isolation'
+    case 'isolation_shoulder': return entry.substitution_group === 'shrug' ? 'shrug' : 'lateral_delt'
     case 'isolation_quad': return 'quad_isolation'
     case 'isolation_hamstring': return 'hamstring_isolation'
     case 'isolation_calf': return 'calf_isolation'
@@ -2930,7 +2965,7 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
     const trackFocus = getViableTrack(rawTrack, pool)
     const track = TRACKS[trackFocus]
 
-    const { primer, main, requiredNames } = selectExercisesForTrack(track, pool, counts, weeklyUsed, styleConfig, trace, policy, feasiblePatterns, weeklyAppearanceCount)
+    const { primer, main, requiredNames } = selectExercisesForTrack(track, pool, counts, weeklyUsed, styleConfig, trace, policy, feasiblePatterns, weeklyAppearanceCount, profile.training_experience || 'novice')
     for (const name of requiredNames) weeklyRequiredNames.add(name)
 
     // Build exercise list with sets/reps from style config
