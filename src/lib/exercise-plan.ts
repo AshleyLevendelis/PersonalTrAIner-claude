@@ -2318,18 +2318,17 @@ function balanceWeeklyStructure(
         }
       }
     }
-    if (!slot) continue
 
-    const usedFamilies = dayFamilies(slot.dayIdx)
-    const forbidden = dayForbidden(slot.dayIdx)
+    const usedFamilies = slot ? dayFamilies(slot.dayIdx) : null
+    const forbidden = slot ? dayForbidden(slot.dayIdx) : null
     const eligible = (e: ExerciseEntry) =>
       classifyForCoverage(e.movement_pattern) === missing &&
       e.mechanics_tier !== 'tier1_compound' && e.mechanics_tier !== 'primer' &&
-      !usedFamilies.has(getMovementFamily(e)) &&
-      !forbidden.has(e.movement_pattern)
-    const replacement = pool.find(e => eligible(e) && !weeklyUsed.has(e.name)) ?? pool.find(eligible)
+      !usedFamilies!.has(getMovementFamily(e)) &&
+      !forbidden!.has(e.movement_pattern)
+    const replacement = slot ? (pool.find(e => eligible(e) && !weeklyUsed.has(e.name)) ?? pool.find(eligible)) : null
 
-    if (replacement) {
+    if (slot && replacement) {
       swap(slot.dayIdx, slot.exIdx, replacement, `weekly pattern coverage missing '${missing}'`)
       coveragePresent.add(missing)
       // This exercise IS the week's only source of `missing` right now —
@@ -2340,10 +2339,70 @@ function balanceWeeklyStructure(
       // because it doesn't know that's the only vertical press in the
       // week).
       protectedNames.add(replacement.name)
+      continue
+    }
+
+    // No swappable slot at all — every accessory slot on every eligible day
+    // was either protected or absent. Previously this just gave up here,
+    // silently: a profile with exactly ONE candidate for a pattern (a
+    // constrained equipment/injury pool, e.g. Dumbbell Floor Press as the
+    // only surviving horizontal_push for a shoulder injury on minimalist
+    // equipment) got no attempt at all to place it, because the code only
+    // ever tried to SWAP an existing slot, never to ADD one. Same Fix-2
+    // authority the push:pull pass below already has: add a whole new
+    // exercise instead of leaving the pattern absent. One candidate,
+    // repeated every week, is worse variety than several — but it is far
+    // better than the pattern being missing outright, which for an injured
+    // profile can mean "no pressing in this plan at all" even though a
+    // safe press exists.
+    let addTarget = days.findIndex((_, i) => dayAllowsCoveragePattern(i, missing))
+    let overriddenTrack = false
+    if (addTarget === -1) {
+      // Every day's TRACK forbids this pattern outright — observed for
+      // injured/equipment-constrained pools where day-focus selection never
+      // offered a track carrying this pattern at all (a shoulder injury
+      // thinning the push-capable exercise pool means no day got assigned
+      // "Push & Press", so EVERY day's template forbids horizontal_push,
+      // not just some of them). The swap path above already respects track
+      // identity for good reason (never plant a bench press on a day
+      // labelled "Pull & Hinge") — but that guard assumes an alternative
+      // day exists. When none does, honouring it means the pattern is
+      // absent from the whole week even though a safe candidate exists in
+      // the pool. A single candidate on an imperfectly-labelled day is
+      // still a real, safe rep for the user; total absence is not better
+      // structure, it is a worse plan wearing tidier labels. Last resort
+      // only: falls through to the least-loaded day, family/duplicate
+      // checks still apply.
+      addTarget = days.reduce((best, _, i) => (days[i].exercises.length < days[best].exercises.length ? i : best), 0)
+      overriddenTrack = true
+    }
+    const addCandidateBase = (e: ExerciseEntry) =>
+      classifyForCoverage(e.movement_pattern) === missing &&
+      !dayFamilies(addTarget).has(getMovementFamily(e)) &&
+      (overriddenTrack || !dayForbidden(addTarget).has(e.movement_pattern)) &&
+      !weeklyUsed.has(e.name)
+    const addCandidate = pool.find(e => addCandidateBase(e) && e.mechanics_tier !== 'tier1_compound' && e.mechanics_tier !== 'primer')
+    // Last resort within the last resort: some patterns (e.g. vertical_pull
+    // on bodyweight-only equipment) have exactly one real candidate and it's
+    // a tier1 compound lift (Pull-Ups) — the accessory-only exclusion above
+    // exists to stop a second heavy compound crowding an already-built day,
+    // but that reasoning doesn't apply when it's the ONLY way to place the
+    // pattern at all. Same "repeated single candidate beats total absence"
+    // call already made for the track-forbidden case above; primer is still
+    // excluded (a warm-up movement was never meant to stand in as the week's
+    // vertical_pull rep).
+    const tier1Candidate = addCandidate ? null : pool.find(e => addCandidateBase(e) && e.mechanics_tier !== 'primer')
+    const finalCandidate = addCandidate ?? tier1Candidate
+
+    if (finalCandidate) {
+      const usedTier1Fallback = !addCandidate && !!tier1Candidate
+      addExercise(addTarget, finalCandidate, `weekly pattern coverage missing '${missing}'${overriddenTrack ? ' (no day track allows it — placed anyway rather than leaving it absent)' : ''}${usedTier1Fallback ? ' (only candidate is a tier1 compound lift — added anyway rather than leaving it absent)' : ''}`)
+      coveragePresent.add(missing)
+      protectedNames.add(finalCandidate.name)
     } else {
       trace.structure_adjusted.push({
         exercise: '(weekly pattern coverage)', stage: 'structure',
-        reason: `'${missing}' pattern is available in the constrained pool but no swappable accessory slot could add it without a movement-family duplicate`,
+        reason: `'${missing}' pattern is available in the constrained pool but neither a swap nor an add could place it without a movement-family duplicate`,
       })
     }
   }
@@ -2379,6 +2438,7 @@ function balanceWeeklyStructure(
           if (findEntry(exercises[exIdx].name)?.mechanics_tier === 'tier3_isolation') { slot = { dayIdx, exIdx }; break }
         }
       }
+      let placed = false
       if (slot) {
         const usedFamilies = dayFamilies(slot.dayIdx)
         const forbidden = dayForbidden(slot.dayIdx)
@@ -2391,17 +2451,34 @@ function balanceWeeklyStructure(
         if (replacement) {
           swap(slot.dayIdx, slot.exIdx, replacement, `legs trained on only ${legDayCount} day(s), need >=2 on a ${days.length}-day split`)
           protectedNames.add(replacement.name)
+          placed = true
+        }
+      }
+      if (!placed) {
+        // Same Fix-2 fallback as the pattern-coverage loop above: no
+        // swappable slot (or nothing eligible in it) previously meant just
+        // giving up, even when a single squat/hinge candidate existed and
+        // could have been ADDED as a new exercise instead.
+        const addTarget = days.findIndex((_, i) =>
+          !isLegDay(i) && (dayAllowsCoveragePattern(i, 'squat') || dayAllowsCoveragePattern(i, 'hinge')))
+        const addCandidate = addTarget >= 0
+          ? pool.find(e =>
+              (classifyForCoverage(e.movement_pattern) === 'squat' || classifyForCoverage(e.movement_pattern) === 'hinge') &&
+              e.mechanics_tier !== 'tier1_compound' && e.mechanics_tier !== 'primer' &&
+              !dayFamilies(addTarget).has(getMovementFamily(e)) &&
+              !dayForbidden(addTarget).has(e.movement_pattern) &&
+              !weeklyUsed.has(e.name)
+            )
+          : undefined
+        if (addTarget >= 0 && addCandidate) {
+          addExercise(addTarget, addCandidate, `legs trained on only ${legDayCount} day(s), need >=2 on a ${days.length}-day split`)
+          protectedNames.add(addCandidate.name)
         } else {
           trace.structure_adjusted.push({
             exercise: '(weekly leg-day coverage)', stage: 'structure',
-            reason: `legs trained on only ${legDayCount} day(s) of ${days.length} — no swappable accessory slot could add a second leg exposure`,
+            reason: `legs trained on only ${legDayCount} day(s) of ${days.length} — neither a swap nor an add could give a second leg exposure`,
           })
         }
-      } else {
-        trace.structure_adjusted.push({
-          exercise: '(weekly leg-day coverage)', stage: 'structure',
-          reason: `legs trained on only ${legDayCount} day(s) of ${days.length} — every remaining day's track forbids squat/hinge patterns`,
-        })
       }
     }
   }
@@ -3114,7 +3191,24 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
     }
 
     // STAGE 5: Time-cap optimization per day
+    const preTimeCapNames = new Set(daySlots.map(s => s.entry.name))
     const optimized = stageTimeCap(daySlots, budgetSeconds, trainingStyle, trace, requiredNames)
+    // stageTimeCap's Phase 4 can drop an exercise outright under duration
+    // pressure — that name was already added to weeklyUsed/allSelectedNames
+    // above, on the assumption it was staying. Left uncleared, it becomes a
+    // permanent ghost: later weekly-balance passes see the name as "already
+    // used this week" and refuse to place it again, even though no day
+    // actually carries it — the exact shape that made a genuinely-available
+    // single candidate (e.g. Pull-Ups, dropped from one day for time, then
+    // unavailable to the weekly vertical_pull coverage backstop) look used
+    // up when it never really was.
+    const optimizedNames = new Set(optimized.map(s => s.entry.name))
+    for (const name of preTimeCapNames) {
+      if (!optimizedNames.has(name)) {
+        weeklyUsed.delete(name)
+        allSelectedNames.delete(name)
+      }
+    }
 
     // Convert to Exercise objects
     const exercises: Exercise[] = optimized.map(slot => {
