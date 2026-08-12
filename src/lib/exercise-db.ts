@@ -1125,6 +1125,14 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     unilateral: false,
     avg_duration_seconds: 30,
   },
+  // Sliding Leg Curl / Lying Leg Curl: same knee-tag split as the shoulder
+  // review. Both genuinely load the knee (loads_joints says so honestly),
+  // but a controlled, low-range hamstring curl is a standard knee-rehab
+  // tool, not a contraindication — unlike Nordic Hamstring Curl just below,
+  // whose large eccentric knee-flexor demand keeps it excluded. Marked
+  // indicated_joints (not just tolerated) because these are genuinely the
+  // kind of accessory a physio prescribes FOR a knee injury, the same
+  // reasoning that put Band Pull-Aparts in the shoulder-indicated set.
   {
     name: 'Sliding Leg Curl',
     id: 'sliding-leg-curl',
@@ -1138,6 +1146,8 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     form_cues: ['Lie back, heels on a towel or slider', 'Bridge the hips up', 'Curl heels toward glutes, hips staying elevated', 'Extend back out with control'],
     coach_note_swap: 'A genuine Nordic-curl regression — real hamstring loading with none of the skill demand.',
     loads_joints: ['knee'],
+    contraindicated_joints: [],
+    indicated_joints: ['knee'],
     style_tags: ['functional', 'combat', 'hybrid'],
     substitution_group: 'leg_curl',
     unilateral: false,
@@ -1156,6 +1166,8 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     form_cues: ['Pad above ankles', 'Curl heels toward glutes', 'Squeeze at top', 'Slow negative'],
     coach_note_swap: 'Isolated knee-flexion work for hamstring hypertrophy.',
     loads_joints: ['knee'],
+    contraindicated_joints: [],
+    indicated_joints: ['knee'],
     style_tags: ['bodybuilding', 'hybrid'],
     substitution_group: 'leg_curl',
     unilateral: false,
@@ -1272,6 +1284,83 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     unilateral: false,
     avg_duration_seconds: 28,
   },
+  // ---------------------------------------------------------------------
+  // Knee-friendly additions. A knee injury correctly excludes every
+  // knee_dominant/single_leg/isolation_quad movement above -- and until
+  // now that left NO direct quad-focused work at all, the same content gap
+  // the shoulder-friendly presses closed. These four are deliberately
+  // low-compressive/low-shear variants used in real knee rehab protocols:
+  // an isometric hold, a closed-chain squat with an anchor that unloads
+  // the knee, a short-range banded terminal extension, and a shallow step
+  // with reduced knee flexion. All genuinely load the knee (loads_joints
+  // says so honestly) but are indicated_joints, not merely tolerated --
+  // the whole reason they exist is to be prescribed for a knee injury.
+  // Leg Extensions above is deliberately NOT given this treatment: full
+  // open-chain knee extension is commonly contraindicated for
+  // patellofemoral pain, the most common knee complaint, so it stays a
+  // plain contraindication rather than a judgment call this app can't make
+  // without knowing the injury subtype.
+  // ---------------------------------------------------------------------
+  {
+    name: 'Wall Sit',
+    id: 'wall-sit',
+    movement_pattern: 'knee_dominant',
+    mechanics_tier: 'tier3_isolation',
+    prescription_type: 'time',
+    angle_vector: 'vertical',
+    primary_muscles: ['quadriceps', 'glutes'],
+    equipment: ['bodyweight'],
+    joint_stress: 'low',
+    form_cues: ['Back flat against a wall', 'Thighs parallel to floor, or as close as comfortable', 'Knees stacked over ankles, not past toes', 'Breathe steadily and hold'],
+    coach_note_swap: 'Isometric quad work with no eccentric or joint-shear component — a standard knee-rehab hold.',
+    loads_joints: ['knee'],
+    contraindicated_joints: [],
+    indicated_joints: ['knee'],
+    style_tags: ['functional', 'combat', 'hybrid'],
+    substitution_group: 'knee_isometric',
+    unilateral: false,
+    avg_duration_seconds: 40,
+  },
+  {
+    name: 'Spanish Squat',
+    id: 'spanish-squat',
+    movement_pattern: 'knee_dominant',
+    mechanics_tier: 'tier2_compound',
+    prescription_type: 'time',
+    angle_vector: 'vertical',
+    primary_muscles: ['quadriceps'],
+    equipment: ['resistance band'],
+    joint_stress: 'low',
+    form_cues: ['Loop a heavy band around a sturdy anchor and behind both knees', 'Sit back against the band, torso upright', 'Lower to a comfortable depth and hold', 'The band takes the shear the knee would otherwise absorb'],
+    coach_note_swap: 'The band lets the torso counterbalance the squat, which shifts load off the knee joint while still driving real quad tension — a standard patellar-tendon rehab tool.',
+    loads_joints: ['knee'],
+    contraindicated_joints: [],
+    indicated_joints: ['knee'],
+    style_tags: ['functional', 'hybrid'],
+    substitution_group: 'knee_isometric',
+    unilateral: false,
+    avg_duration_seconds: 40,
+  },
+  {
+    name: 'Banded Terminal Knee Extension',
+    id: 'banded-terminal-knee-extension',
+    movement_pattern: 'isolation_quad',
+    mechanics_tier: 'tier3_isolation',
+    prescription_type: 'reps',
+    angle_vector: 'horizontal',
+    primary_muscles: ['quadriceps'],
+    equipment: ['resistance band'],
+    joint_stress: 'low',
+    form_cues: ['Anchor a band behind the knee at knee height', 'Start with a slight bend', 'Straighten the knee fully against the band', 'Control the return, do not let the band snap it back'],
+    coach_note_swap: 'Short-range, closed-chain extension near lockout — builds the terminal quad strength a knee needs without the open-chain shear a full leg extension creates.',
+    loads_joints: ['knee'],
+    contraindicated_joints: [],
+    indicated_joints: ['knee'],
+    style_tags: ['functional', 'combat', 'hybrid'],
+    substitution_group: 'quad_isolation',
+    unilateral: true,
+    avg_duration_seconds: 28,
+  },
 
   // SINGLE LEG
   {
@@ -1382,6 +1471,26 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     substitution_group: 'single_leg',
     unilateral: true,
     avg_duration_seconds: 32,
+  },
+  {
+    name: 'Low Box Step-Up',
+    id: 'low-box-step-up',
+    movement_pattern: 'single_leg',
+    mechanics_tier: 'tier2_compound',
+    prescription_type: 'reps',
+    angle_vector: 'vertical',
+    primary_muscles: ['quadriceps', 'glutes'],
+    equipment: ['bodyweight'],
+    joint_stress: 'low',
+    form_cues: ['A curb-height step or low box — well below knee height', 'Drive through the lead heel', 'Stand fully at the top without shoving off the trailing leg', 'Lower with control'],
+    coach_note_swap: 'The same step-up pattern at a shallow height, which keeps knee flexion in a smaller, lower-stress range — a standard early-stage regression for a knee injury.',
+    loads_joints: ['knee'],
+    contraindicated_joints: [],
+    indicated_joints: ['knee'],
+    style_tags: ['functional', 'combat', 'hybrid'],
+    substitution_group: 'single_leg',
+    unilateral: true,
+    avg_duration_seconds: 30,
   },
   {
     name: 'Pistol Squat Progression',
@@ -1757,6 +1866,15 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     unilateral: false,
     avg_duration_seconds: 30,
   },
+  // Cycling Intervals genuinely loads the knee (loads_joints says so
+  // honestly) but was being excluded by the same blunt rule that dropped
+  // it alongside Treadmill Intervals/Jump Rope/Burpees — impact-loading
+  // cardio a knee injury should actually avoid. Cycling has none of that
+  // impact; it's low-range, non-weight-bearing, and the standard "switch
+  // to the bike" recommendation for a knee injury. contraindicated_joints
+  // (not indicated_joints) because it's a tolerated substitute training
+  // modality, not literally rehab — same tier as the shoulder press
+  // variants below.
   {
     name: 'Cycling Intervals',
     id: 'cycling-intervals',
@@ -1770,6 +1888,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     form_cues: ['Alternate resistance levels', 'Keep cadence above 80rpm', 'Seated and standing mix'],
     coach_note_swap: 'Low-impact cardio preserving knee and ankle joints.',
     loads_joints: ['knee'],
+    contraindicated_joints: [],
     style_tags: ['functional', 'combat', 'hybrid'],
     substitution_group: 'cardio_cycling',
     unilateral: false,

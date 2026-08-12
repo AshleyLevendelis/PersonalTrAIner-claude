@@ -75,9 +75,9 @@ console.log('\n[4] An indicated movement is never excluded even though it loads 
   check(`all ${indicated.length} reach the constrained pool`, inPool === indicated.length, { inPool })
 }
 
-console.log('\n[5] Other injuries are untouched by the shoulder review')
+console.log('\n[5] Injuries not yet reviewed are untouched (lower_back/wrists/neck — knees was reviewed below)')
 {
-  for (const inj of ['knees', 'lower_back', 'wrists', 'neck']) {
+  for (const inj of ['lower_back', 'wrists', 'neck']) {
     const j = getFlaggedJoints([inj])
     const viaNew = EXERCISE_DATABASE.filter(e => isContraindicatedFor(e, j)).length
     const viaOld = EXERCISE_DATABASE.filter(e => e.loads_joints.some(x => j.has(x))).length
@@ -102,6 +102,67 @@ console.log('\n[6] A shoulder injury still leaves real pressing and rowing avail
     check(`${name}: still honestly records that it loads the shoulder`, !!e && e.loads_joints.includes('shoulder'))
     check(`${name}: is tolerated, NOT marked as rehab`, !!e && !(e.indicated_joints ?? []).includes('shoulder'))
   }
+}
+
+console.log('\n[7] Knee-rehab movements survive a knee injury')
+{
+  const knee = getFlaggedJoints(['knees'])
+  const REHAB = ['Sliding Leg Curl', 'Lying Leg Curl', 'Wall Sit', 'Spanish Squat',
+    'Banded Terminal Knee Extension', 'Low Box Step-Up']
+  for (const name of REHAB) {
+    const e = EXERCISE_DATABASE.find(x => x.name === name)
+    if (!e) { check(`${name} exists`, false); continue }
+    check(`${name}: not excluded`, !isContraindicatedFor(e, knee))
+    check(`${name}: marked indicated`, isIndicatedFor(e, knee))
+    check(`${name}: still records that it loads the knee`, e.loads_joints.includes('knee'), e.loads_joints)
+  }
+  // Cycling Intervals is a tolerated substitute, not prescribed rehab —
+  // deliberately NOT indicated_joints (see the reasoning comment on the
+  // entry itself), so it gets its own, weaker assertion.
+  const cycling = EXERCISE_DATABASE.find(x => x.name === 'Cycling Intervals')
+  check('Cycling Intervals: not excluded', !!cycling && !isContraindicatedFor(cycling, knee))
+  check('Cycling Intervals: still records that it loads the knee', !!cycling && cycling.loads_joints.includes('knee'))
+}
+
+console.log('\n[8] Genuinely contraindicated knee work is STILL excluded (no safety relaxation)')
+{
+  const knee = getFlaggedJoints(['knees'])
+  const MUST_EXCLUDE = ['Barbell Squats', 'Leg Press', 'Goblet Squats', 'Hack Squat', 'Air Squat',
+    'Walking Lunges', 'Bulgarian Split Squats', 'Step-Ups', 'Split Squat (Bodyweight)',
+    'Step-Ups (Bodyweight)', 'Pistol Squat Progression', 'Leg Extensions', 'Nordic Hamstring Curl',
+    'Jump Rope', 'Burpees', 'Box Jumps', 'Broad Jumps', 'Deadlifts', 'Trap Bar Deadlift',
+    'Treadmill Intervals']
+  for (const name of MUST_EXCLUDE) {
+    const e = EXERCISE_DATABASE.find(x => x.name === name)
+    if (!e) { check(`${name} exists`, false); continue }
+    check(`${name}: still excluded`, isContraindicatedFor(e, knee))
+  }
+}
+
+console.log('\n[9] An indicated knee movement is never excluded even though it loads the joint')
+{
+  const knee = getFlaggedJoints(['knees'])
+  const indicated = EXERCISE_DATABASE.filter(e => isIndicatedFor(e, knee))
+  check('at least one indicated movement exists for knees', indicated.length > 0, indicated.length)
+  check('none of them are excluded', indicated.every(e => !isContraindicatedFor(e, knee)))
+  const pool = getConstrainedPool({ ...profile, injuries: ['knees'] }, [])
+  const inPool = indicated.filter(e => pool.some(p => p.name === e.name)).length
+  check(`all ${indicated.length} reach the constrained pool`, inPool === indicated.length, { inPool })
+}
+
+console.log('\n[10] A knee injury still leaves real direct leg work available')
+{
+  const pool = getConstrainedPool({ ...profile, injuries: ['knees'] }, [])
+  const byPattern = (p: string) => pool.filter(e => e.movement_pattern === p).length
+  // The content gap this review closed: a knee injury correctly excluded
+  // every knee_dominant/single_leg/isolation_quad/isolation_hamstring
+  // movement, and the database had NO safe alternative for any of those
+  // four patterns — a knee rebuild had zero direct quad or hamstring work.
+  // Guarded so a future tag edit can't silently reopen it.
+  check(`knee_dominant options survive (${byPattern('knee_dominant')})`, byPattern('knee_dominant') > 0)
+  check(`single_leg options survive (${byPattern('single_leg')})`, byPattern('single_leg') > 0)
+  check(`isolation_quad options survive (${byPattern('isolation_quad')})`, byPattern('isolation_quad') > 0)
+  check(`isolation_hamstring options survive (${byPattern('isolation_hamstring')})`, byPattern('isolation_hamstring') > 0)
 }
 
 if (failures > 0) { console.error(`\n${failures} check(s) FAILED.`); process.exit(1) }
