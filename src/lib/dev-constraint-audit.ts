@@ -1,6 +1,6 @@
 import { generateExercisePlan, generateMesocycle, getConstrainedPool, getFlaggedJoints, setRandomSource, resetRandomSource } from './exercise-plan'
 import { seededRngFromKey } from './seeded-random'
-import { EXERCISE_DATABASE, meetsCapabilityRequirement } from './exercise-db'
+import { EXERCISE_DATABASE, meetsCapabilityRequirement, isContraindicatedFor, contraindicatedJoints } from './exercise-db'
 import type {
   UserProfile, EquipmentAccess, TrainingStyle, SessionDuration,
   WorkoutDay, ConstraintTrace, PlanResult, TrainingExperience, RecoveryCapacity, FitnessGoal,
@@ -267,21 +267,29 @@ function runSingleAudit(
     }
   }
 
-  // CHECK 2: No flagged joint's movement pattern in output
+  // CHECK 2: nothing CONTRAINDICATED for a flagged joint reaches the plan.
+  //
+  // Deliberately not "nothing that loads a flagged joint": that was the old
+  // rule, and it's the same conflation the three-state tags exist to undo
+  // (see exercise-db.ts). Under it this check would fail every rotator-cuff
+  // rehab movement prescribed FOR a shoulder injury, and every
+  // shoulder-friendly press — both of which are the correct output, not a
+  // violation. The real invariant is contraindication, which
+  // isContraindicatedFor answers (and which never returns true for an
+  // INDICATED movement).
   const flaggedJoints = getFlaggedJoints(injuries)
   if (flaggedJoints.size > 0) {
     for (const ex of allExercises) {
       const entry = EXERCISE_DATABASE.find(e => e.name === ex.name)
       if (!entry) continue
-      for (const joint of entry.loads_joints) {
-        if (flaggedJoints.has(joint)) {
-          failures.push({
-            check: 'injury',
-            combination: comboLabel,
-            details: `Exercise loads joint "${joint}" which is flagged by injury [${injuries.join(', ')}]`,
-            exercise: ex.name,
-          })
-        }
+      if (isContraindicatedFor(entry, flaggedJoints)) {
+        const offending = contraindicatedJoints(entry).filter(j => flaggedJoints.has(j))
+        failures.push({
+          check: 'injury',
+          combination: comboLabel,
+          details: `Exercise is contraindicated for joint(s) [${offending.join(', ')}], flagged by injury [${injuries.join(', ')}]`,
+          exercise: ex.name,
+        })
       }
     }
   }

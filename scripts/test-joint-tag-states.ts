@@ -85,5 +85,24 @@ console.log('\n[5] Other injuries are untouched by the shoulder review')
   }
 }
 
+console.log('\n[6] A shoulder injury still leaves real pressing and rowing available')
+{
+  const shoulder = getFlaggedJoints(['shoulders'])
+  const pool = getConstrainedPool({ ...profile, injuries: ['shoulders'] }, [])
+  const byPattern = (p: string) => pool.filter(e => e.movement_pattern === p).length
+  // The content gap that made a shoulder rebuild contain no upper-body
+  // pushing at all. Guarded so a future tag edit can't silently reopen it.
+  check(`horizontal_push options survive (${byPattern('horizontal_push')})`, byPattern('horizontal_push') > 0)
+  check(`vertical_push options survive (${byPattern('vertical_push')})`, byPattern('vertical_push') > 0)
+  check(`horizontal_pull options survive (${byPattern('horizontal_pull')})`, byPattern('horizontal_pull') > 0)
+  for (const name of ['Barbell Floor Press', 'Dumbbell Floor Press', 'Neutral-Grip Dumbbell Press',
+                      'Landmine Press', 'Chest-Supported Row', 'Neutral-Grip Seated Cable Row']) {
+    const e = EXERCISE_DATABASE.find(x => x.name === name)
+    check(`${name}: exists and survives a shoulder injury`, !!e && !isContraindicatedFor(e, shoulder))
+    check(`${name}: still honestly records that it loads the shoulder`, !!e && e.loads_joints.includes('shoulder'))
+    check(`${name}: is tolerated, NOT marked as rehab`, !!e && !(e.indicated_joints ?? []).includes('shoulder'))
+  }
+}
+
 if (failures > 0) { console.error(`\n${failures} check(s) FAILED.`); process.exit(1) }
 console.log('\nAll joint-tag state checks passed.')

@@ -219,6 +219,141 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     unilateral: false,
     avg_duration_seconds: 35,
   },
+  // ---------------------------------------------------------------------
+  // Shoulder-friendly pressing and rowing variants.
+  //
+  // Added to close a real gap: the injury filter correctly rules out every
+  // standard press and vertical pull for a shoulder injury, and the database
+  // then had NO pressing variant left at all -- so a plan rebuilt around a
+  // shoulder injury contained no upper-body pushing of any kind. That was a
+  // content gap, not a filter gap.
+  //
+  // All of these LOAD the shoulder (they are pressing and rowing movements;
+  // loads_joints says so honestly) but are not CONTRAINDICATED by it: the
+  // floor limits the press before the deep-stretch position that impinges,
+  // a neutral grip keeps the humerus out of internal rotation, the landmine
+  // path stays in the scapular plane, and a chest-supported row removes the
+  // torso swing. They are TOLERATED, not prescribed -- none is marked
+  // indicated_joints, because unlike the band/scapular work these are not
+  // rehab, they are ordinary training that happens to be gentler.
+  //
+  // This does not change the red-flag path: sharp/worsening/one-sided pain
+  // still routes to a professional and never reaches exercise selection.
+  // ---------------------------------------------------------------------
+  {
+    name: 'Barbell Floor Press',
+    id: 'barbell-floor-press',
+    movement_pattern: 'horizontal_push',
+    mechanics_tier: 'tier2_compound',
+    prescription_type: 'reps',
+    angle_vector: 'horizontal',
+    primary_muscles: ['chest', 'triceps', 'anterior deltoid'],
+    equipment: ['barbell'],
+    joint_stress: 'low',
+    form_cues: ['Lie flat on the floor, knees bent', 'Lower until the upper arms touch down', 'Pause briefly, then press', 'The floor sets the depth'],
+    coach_note_swap: 'The floor stops the press before the range that irritates most shoulders.',
+    loads_joints: ['shoulder', 'wrist'],
+    contraindicated_joints: ['wrist'],
+    style_tags: ['bodybuilding', 'functional', 'hybrid'],
+    substitution_group: 'bench_press',
+    unilateral: false,
+    avg_duration_seconds: 35,
+  },
+  {
+    name: 'Dumbbell Floor Press',
+    id: 'dumbbell-floor-press',
+    movement_pattern: 'horizontal_push',
+    mechanics_tier: 'tier2_compound',
+    prescription_type: 'reps',
+    angle_vector: 'horizontal',
+    primary_muscles: ['chest', 'triceps', 'anterior deltoid'],
+    equipment: ['dumbbells'],
+    joint_stress: 'low',
+    form_cues: ['Lie flat on the floor, knees bent', 'Elbows tucked to about 45 degrees', 'Touch the upper arms down, pause, press', 'Keep the wrists stacked over the elbows'],
+    coach_note_swap: 'Floor-limited range with a dumbbell path the shoulder can choose.',
+    loads_joints: ['shoulder'],
+    contraindicated_joints: [],
+    style_tags: ['bodybuilding', 'functional', 'combat', 'hybrid'],
+    substitution_group: 'bench_press',
+    unilateral: false,
+    avg_duration_seconds: 35,
+  },
+  {
+    name: 'Neutral-Grip Dumbbell Press',
+    id: 'neutral-grip-dumbbell-press',
+    movement_pattern: 'horizontal_push',
+    mechanics_tier: 'tier2_compound',
+    prescription_type: 'reps',
+    angle_vector: 'horizontal',
+    primary_muscles: ['chest', 'triceps', 'anterior deltoid'],
+    equipment: ['dumbbells', 'bench'],
+    joint_stress: 'low',
+    form_cues: ['Palms facing each other throughout', 'Elbows travel close to the ribs', 'Lower to a comfortable stretch, not the deepest one', 'Press without letting the palms rotate'],
+    coach_note_swap: 'Palms-in keeps the shoulder out of the internally rotated position that pinches.',
+    loads_joints: ['shoulder'],
+    contraindicated_joints: [],
+    style_tags: ['bodybuilding', 'functional', 'combat', 'hybrid'],
+    substitution_group: 'bench_press',
+    unilateral: false,
+    avg_duration_seconds: 35,
+  },
+  {
+    name: 'Landmine Press',
+    id: 'landmine-press',
+    movement_pattern: 'vertical_push',
+    mechanics_tier: 'tier2_compound',
+    prescription_type: 'reps',
+    angle_vector: 'diagonal',
+    primary_muscles: ['anterior deltoid', 'chest', 'triceps'],
+    equipment: ['barbell'],
+    joint_stress: 'low',
+    form_cues: ['Press up and slightly forward, not straight overhead', 'Ribs down, do not arch to finish the rep', 'Follow the bar path the landmine gives you', 'Stop short of a hard lockout'],
+    coach_note_swap: 'Presses in the scapular plane rather than straight overhead.',
+    loads_joints: ['shoulder'],
+    contraindicated_joints: [],
+    style_tags: ['functional', 'combat', 'hybrid', 'bodybuilding'],
+    substitution_group: 'overhead_press',
+    unilateral: true,
+    avg_duration_seconds: 40,
+  },
+  {
+    name: 'Chest-Supported Row',
+    id: 'chest-supported-row',
+    movement_pattern: 'horizontal_pull',
+    mechanics_tier: 'tier2_compound',
+    prescription_type: 'reps',
+    angle_vector: 'horizontal',
+    primary_muscles: ['lats', 'rhomboids', 'mid traps', 'biceps'],
+    equipment: ['dumbbells', 'incline bench'],
+    joint_stress: 'low',
+    form_cues: ['Chest stays on the pad the whole set', 'Lead with the elbows, not the hands', 'Squeeze the shoulder blades together at the top', 'No body English, the pad is there to stop it'],
+    coach_note_swap: 'The pad removes torso swing, so the mid-back works and the shoulder is not stabilising a moving trunk.',
+    loads_joints: ['shoulder'],
+    contraindicated_joints: [],
+    style_tags: ['bodybuilding', 'functional', 'hybrid'],
+    substitution_group: 'row',
+    unilateral: false,
+    avg_duration_seconds: 35,
+  },
+  {
+    name: 'Neutral-Grip Seated Cable Row',
+    id: 'neutral-grip-seated-cable-row',
+    movement_pattern: 'horizontal_pull',
+    mechanics_tier: 'tier2_compound',
+    prescription_type: 'reps',
+    angle_vector: 'horizontal',
+    primary_muscles: ['lats', 'rhomboids', 'mid traps', 'biceps'],
+    equipment: ['cable machine'],
+    joint_stress: 'low',
+    form_cues: ['Palms facing each other on the close handle', 'Sit tall, pull to the navel', 'Let the shoulder blades travel', 'Control the return rather than letting it snap out'],
+    coach_note_swap: 'Neutral grip and a supported seated position, comfortable for most irritable shoulders.',
+    loads_joints: ['shoulder'],
+    contraindicated_joints: [],
+    style_tags: ['bodybuilding', 'functional', 'hybrid'],
+    substitution_group: 'row',
+    unilateral: false,
+    avg_duration_seconds: 35,
+  },
   {
     name: 'Incline Dumbbell Press',
     id: 'incline-dumbbell-press',
