@@ -1557,6 +1557,38 @@ function shiftRestSeconds(seconds: number, multiplier: number): number {
   return Math.max(20, Math.round(seconds * multiplier))
 }
 
+/**
+ * The prescription for every non-'reps' unit — a hold duration, a measured
+ * carry distance, a work:rest interval. These are FIXED: unlike a rep range,
+ * they don't bend to training style, experience or goal (a 40m farmer's walk
+ * is 40m for everyone; only the load moves). Returns null for 'reps', which
+ * genuinely does need the style/experience/policy chain.
+ *
+ * Exported because any path that changes WHICH exercise occupies a slot has
+ * to re-derive these when the incoming exercise's prescription_type differs
+ * from the outgoing one — inheriting the old units is how a carry ended up
+ * prescribed "8-12 reps" and a hold ended up "40m". applyReplacement
+ * (mesocycle-edit.ts) is the shared choke point for the swap/ban/injury/
+ * equipment paths and reads this rather than keeping a second copy of the
+ * same three constants.
+ */
+export function fixedUnitPrescription(
+  type: import('./exercise-db').PrescriptionType | undefined,
+): { sets: number; reps: string; rest: string; restSeconds: number } | null {
+  switch (type) {
+    case 'time':
+      return { sets: 3, reps: '30-45s', rest: '45s', restSeconds: 45 }
+    case 'distance_load':
+      return { sets: 3, reps: '40m', rest: '60s', restSeconds: 60 }
+    case 'intervals':
+      // Rounds of work:rest, never a rep count — a jump-rope or battle-rope
+      // set is not "15-18 reps."
+      return { sets: 6, reps: '30s', rest: '30s', restSeconds: 30 }
+    default:
+      return null
+  }
+}
+
 function assignSetsRepsFromConfig(
   entry: ExerciseEntry,
   config: StyleConfig,
@@ -1577,15 +1609,13 @@ function assignSetsRepsFromConfig(
   // can share a pattern ('carry') while needing entirely different units
   // (Farmer Squat Hold is a hold, Farmer's Walk is a measured distance).
   // See PrescriptionType's doc comment in exercise-db.ts.
+  const fixedUnits = fixedUnitPrescription(entry.prescription_type)
+  if (fixedUnits) {
+    return entry.prescription_type === 'intervals'
+      ? { ...fixedUnits, sets: scaleSets(fixedUnits.sets), restSeconds: fixedUnits.restSeconds }
+      : fixedUnits
+  }
   switch (entry.prescription_type) {
-    case 'time':
-      return { sets: 3, reps: '30-45s', rest: '45s', restSeconds: 45 }
-    case 'distance_load':
-      return { sets: 3, reps: '40m', rest: '60s', restSeconds: 60 }
-    case 'intervals':
-      // Rounds of work:rest, never a rep count — a jump-rope or battle-rope
-      // set is not "15-18 reps."
-      return { sets: scaleSets(6), reps: '30s', rest: '30s', restSeconds: 30 }
     case 'reps':
     default: {
       // Goal differentiation round: the goal's repRangeShift/

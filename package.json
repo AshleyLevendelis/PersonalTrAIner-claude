@@ -38,7 +38,8 @@
     "db:link-test": "bash scripts/db-link-test.sh",
     "db:link-prod": "bash scripts/db-link-prod.sh",
     "smoke:regen-week": "tsx scripts/smoke-regen-week.ts",
-    "smoke:check-week": "tsx scripts/smoke-check-week.ts"
+    "smoke:check-week": "tsx scripts/smoke-check-week.ts",
+    "test:slot-replacement": "tsx scripts/test-slot-replacement-hygiene.ts"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.4",

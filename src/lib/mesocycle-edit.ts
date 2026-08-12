@@ -1,6 +1,6 @@
 import type { MesocycleWeek, Exercise, UserProfile } from './types'
 import { getSmartReplacements, type ExerciseEntry } from './exercise-db'
-import { getConstrainedPool, mapMovementPattern, mapTier, deriveFatigueCost } from './exercise-plan'
+import { getConstrainedPool, mapMovementPattern, mapTier, deriveFatigueCost, fixedUnitPrescription } from './exercise-plan'
 import { prescribeLoad, type LoadPrescription } from './load-prescription'
 // Dynamically imported inside recomputeLoad(), not statically here — importing
 // progression-engine.ts pulls in supabase.ts, which reads import.meta.env at
@@ -107,12 +107,36 @@ export async function recomputeLoad(
  */
 export function applyReplacement(slot: Exercise, entry: ExerciseEntry, load: LoadPrescription): Exercise {
   const isPrimer = entry.mechanics_tier === 'primer'
+
+  // A slot's prescription UNITS belong to the exercise in it, not to whatever
+  // was there before. Inheriting them is the same defect class as inheriting
+  // a load: swapping Farmer's Walk (distance_load, '40m') for Dumbbell Rows
+  // left "40m" on a rep-counted lift, and the reverse left "8-12" on a
+  // measured carry. Only re-derived when the TYPE actually changes — a
+  // reps->reps swap keeps the block's own rep prescription, which is correct
+  // and is what the generator's own rotation path already does.
+  const typeChanged = (entry.prescription_type ?? 'reps') !== (slot.prescription_type ?? 'reps')
+  // Into a fixed-unit type (hold / carry / intervals): the canonical
+  // prescription for that unit, shared with the generator so the two can't
+  // drift. Into 'reps' (the one type whose range genuinely depends on
+  // style/experience/goal, none of which this pure function has): keep the
+  // slot's own range if it IS a rep count, and fall back to a conservative
+  // middle range only when the inherited string is in the wrong units
+  // entirely (e.g. '40m' left behind by a carry).
+  const REPS_FALLBACK = { sets: slot.sets, reps: '8-12', rest: slot.rest }
+  const looksLikeRepCount = /^\d+(\s*-\s*\d+)?$/.test(slot.reps)
+  const fixedUnits = !typeChanged
+    ? null
+    : fixedUnitPrescription(entry.prescription_type) ?? (looksLikeRepCount ? null : REPS_FALLBACK)
+
   return {
     ...slot,
     id: entry.id,
     name: entry.name,
     substitution: '',
     superset_label: undefined,
+    prescription_type: entry.prescription_type,
+    ...(fixedUnits ? { sets: fixedUnits.sets, reps: fixedUnits.reps, rest: fixedUnits.rest } : {}),
     intensity: isPrimer ? 'Light — movement prep' : slot.intensity,
     suggested_load: isPrimer ? 'Light' : load.display,
     suggested_load_kg: isPrimer ? null : load.starting_weight_kg,
@@ -121,6 +145,19 @@ export function applyReplacement(slot: Exercise, entry: ExerciseEntry, load: Loa
     movement_pattern: mapMovementPattern(entry.movement_pattern),
     tier: mapTier(entry.mechanics_tier),
     fatigue_cost: deriveFatigueCost(entry),
+    // A ramp block is a per-set kg ladder built for ONE specific lift (see
+    // Exercise.ramp_up / warmup.ts). Carrying it across a replacement leaves
+    // the OUTGOING exercise's warm-up weights sitting under the incoming
+    // one's name — the same wrong-exercise-load leak this function's primer
+    // guard was added for. Nothing here can rebuild it (that needs the
+    // day-level warmup pass), so it is cleared rather than left wrong; the
+    // next generation recomputes it.
+    ramp_up: undefined,
+    // Assistance is likewise exercise-specific (only an assisted machine has
+    // it) and none of this function's callers recompute it. Clearing avoids
+    // a stale "-20kg assist" chip surviving onto an unassisted movement.
+    suggested_assistance_kg: undefined,
+    assistance_ready_to_graduate: undefined,
   }
 }
 
