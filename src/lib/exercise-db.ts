@@ -102,7 +102,39 @@ export interface ExerciseEntry {
   joint_stress: 'low' | 'moderate' | 'high'
   form_cues: string[]
   coach_note_swap?: string
+  /**
+   * Which joints this movement LOADS — i.e. participates. This is an
+   * anatomical fact, not a safety verdict.
+   *
+   * It used to be both: the injury filter excluded anything whose
+   * loads_joints matched an injured joint, which conflated "this joint
+   * participates" with "this is dangerous for that injury." They are
+   * different questions, and conflating them made the filter blunt enough
+   * to remove rotator-cuff REHAB movements from a user with a rotator-cuff
+   * injury (Band Pull-Aparts, Wall Slides, Prone Y-T Raises...). See
+   * contraindicated_joints / indicated_joints below for the split.
+   */
   loads_joints: string[]
+  /**
+   * Joints for which this movement is genuinely CONTRAINDICATED when
+   * injured — the filter's real input. Absent means "same as loads_joints,"
+   * which preserves the historical behaviour for every entry that hasn't
+   * been explicitly reviewed, so this split is additive rather than a
+   * silent relaxation of every exercise at once.
+   *
+   * An explicit empty array means "participates, but safe to keep" — use it
+   * for movements where the joint is along for the ride rather than under
+   * load through range.
+   */
+  contraindicated_joints?: string[]
+  /**
+   * Joints for which this movement is actively INDICATED when injured —
+   * the prep/rehab work a physio would prescribe FOR that joint. These are
+   * not merely tolerated: the plan should deliberately include them when
+   * the matching injury is present, which is the whole reason this is a
+   * third state rather than a boolean.
+   */
+  indicated_joints?: string[]
   style_tags: TrainingStyle[]
   /** Hard experience gate + regression — see CapabilityRequirement. Absent means no gate beyond the generic SKILL_DEMAND ceiling. */
   capability_requirement?: CapabilityRequirement
@@ -522,6 +554,8 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     form_cues: ['Set cable at face height', 'Pull rope to ears', 'Externally rotate at end', 'Squeeze rear delts'],
     coach_note_swap: 'Critical for shoulder health and rear delt/rotator cuff strength.',
     loads_joints: ['shoulder'],
+    contraindicated_joints: [],
+    indicated_joints: ['shoulder'],
     style_tags: ['bodybuilding', 'functional', 'hybrid'],
     substitution_group: 'rear_delt',
     unilateral: false,
@@ -558,6 +592,8 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     form_cues: ['Bend at hips', 'Arms hang below', 'Raise to sides', 'Squeeze rear delts at top'],
     coach_note_swap: 'Free-weight rear delt isolation for posture balance.',
     loads_joints: ['shoulder'],
+    contraindicated_joints: [],
+    indicated_joints: ['shoulder'],
     style_tags: ['bodybuilding', 'hybrid'],
     substitution_group: 'rear_delt',
     unilateral: false,
@@ -1913,6 +1949,8 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     form_cues: ['Arms straight at shoulder height', 'Pull band apart to chest', 'Squeeze shoulder blades', 'Controlled return'],
     coach_note_swap: 'Warms up the posterior shoulder complex and improves scapular positioning.',
     loads_joints: ['shoulder'],
+    contraindicated_joints: [],
+    indicated_joints: ['shoulder'],
     // 'bodybuilding' added: this is mobility/activation work standard in a
     // bodybuilding warm-up (unlike the ballistic primers below, which aren't).
     style_tags: ['functional', 'hybrid', 'bodybuilding'],
@@ -2031,6 +2069,8 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     form_cues: ['Plank or push-up position', 'Let shoulder blades sink together', 'Push the floor away to protract', 'Small range, elbows locked'],
     coach_note_swap: 'Trains scapular control under bodyweight load — the foundational pattern under every push-up and bench press. No plyo skill required.',
     loads_joints: ['shoulder', 'wrist'],
+    contraindicated_joints: ['wrist'],
+    indicated_joints: ['shoulder'],
     style_tags: ['functional', 'combat', 'hybrid', 'bodybuilding'],
     substitution_group: 'scapular_control',
     unilateral: false,
@@ -2050,6 +2090,8 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     form_cues: ['Back flat against a wall', 'Arms in goalpost position', 'Slide arms overhead keeping contact', 'Control the return'],
     coach_note_swap: 'Shoulder mobility and scapular control — preps the joint for overhead pressing with zero load.',
     loads_joints: ['shoulder'],
+    contraindicated_joints: [],
+    indicated_joints: ['shoulder'],
     style_tags: ['functional', 'hybrid', 'bodybuilding'],
     substitution_group: 'scapular_control',
     unilateral: false,
@@ -2072,6 +2114,8 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     // available AND the zero-equipment primer for the bodyweight tier.
     coach_note_swap: 'Bodyweight scapular activation from the floor — the same posterior-shoulder stability as a band pull-apart, for anyone without a band handy.',
     loads_joints: ['shoulder', 'lower_back_axial'],
+    contraindicated_joints: ['lower_back_axial'],
+    indicated_joints: ['shoulder'],
     style_tags: ['functional', 'hybrid', 'bodybuilding'],
     substitution_group: 'scapular_control',
     unilateral: false,
@@ -2091,6 +2135,8 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     form_cues: ['Arms extended out to sides', 'Small controlled circles', 'Reverse direction halfway', 'Shoulders down, not shrugged'],
     coach_note_swap: 'General shoulder-joint warm-up before any upper-body pressing or pulling.',
     loads_joints: ['shoulder'],
+    contraindicated_joints: [],
+    indicated_joints: ['shoulder'],
     style_tags: ['functional', 'combat', 'hybrid', 'bodybuilding'],
     substitution_group: 'general_warmup',
     unilateral: false,
@@ -2115,6 +2161,8 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     form_cues: ['Hold band wide with both hands', 'Raise arms overhead and back', 'Keep elbows locked throughout', 'Return under control'],
     coach_note_swap: 'Opens shoulder range of motion before overhead work — especially valuable heading into a vertical press.',
     loads_joints: ['shoulder'],
+    contraindicated_joints: [],
+    indicated_joints: ['shoulder'],
     style_tags: ['functional', 'hybrid', 'bodybuilding'],
     substitution_group: 'scapular_control',
     unilateral: false,
@@ -2138,6 +2186,8 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     form_cues: ['Anchor band at face height', 'Pull to the face, elbows high', 'Externally rotate at the end', 'Controlled return'],
     coach_note_swap: 'Rotator-cuff and rear-delt prep — protects the shoulder under press load and suits pulling days too.',
     loads_joints: ['shoulder'],
+    contraindicated_joints: [],
+    indicated_joints: ['shoulder'],
     style_tags: ['functional', 'hybrid', 'bodybuilding'],
     substitution_group: 'scapular_control',
     unilateral: false,
@@ -2286,6 +2336,29 @@ export function getSmartReplacements(
 
 /** Cap for getSmartReplacements — see its call site's comment for why this changed from 5. */
 export const MAX_SMART_REPLACEMENTS = 8
+
+/**
+ * The joints that actually disqualify this movement for an injured trainee.
+ * Falls back to loads_joints when contraindicated_joints is absent, so an
+ * un-reviewed entry keeps its historical (conservative) behaviour.
+ *
+ * Every injury filter reads THIS, never loads_joints directly — that's what
+ * keeps "participates" and "is unsafe" from collapsing back into one idea.
+ */
+export function contraindicatedJoints(entry: ExerciseEntry): string[] {
+  return entry.contraindicated_joints ?? entry.loads_joints
+}
+
+/** True when this movement is prep/rehab work FOR one of the flagged joints — it should be actively included, not merely allowed. */
+export function isIndicatedFor(entry: ExerciseEntry, flaggedJoints: Set<string>): boolean {
+  return (entry.indicated_joints ?? []).some(j => flaggedJoints.has(j))
+}
+
+/** True when this movement must be excluded for a trainee with these flagged joints. An indicated movement is never excluded, even if it loads the joint. */
+export function isContraindicatedFor(entry: ExerciseEntry, flaggedJoints: Set<string>): boolean {
+  if (isIndicatedFor(entry, flaggedJoints)) return false
+  return contraindicatedJoints(entry).some(j => flaggedJoints.has(j))
+}
 
 export function getExerciseEntry(name: string): ExerciseEntry | undefined {
   return EXERCISE_DATABASE.find(

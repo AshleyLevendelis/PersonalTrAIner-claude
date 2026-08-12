@@ -4,7 +4,7 @@ import type {
   FatigueCost, MesocycleMovementPattern, EquipmentAccess, TrainingStyle,
   ConstraintTrace, ConstraintTraceEntry, PlanResult, TrainingExperience,
 } from './types'
-import { EXERCISE_DATABASE, getMovementFamily, getVolumeRole, meetsCapabilityRequirement, getExerciseId, type ExerciseEntry, type MovementPattern, type AngleVector, type VolumeRole } from './exercise-db'
+import { EXERCISE_DATABASE, getMovementFamily, getVolumeRole, meetsCapabilityRequirement, getExerciseId, contraindicatedJoints, isContraindicatedFor, isIndicatedFor, type ExerciseEntry, type MovementPattern, type AngleVector, type VolumeRole } from './exercise-db'
 import {
   getExperienceConfig, getSkillDemand, isSkillAppropriate, applyRepFloor,
   type ExperienceConfig,
@@ -485,19 +485,23 @@ function stageInjuryFilter(
   const addedReplacements = new Set<string>()
 
   for (const ex of pool) {
-    const conflict = ex.loads_joints.some(j => flaggedJoints.has(j))
+    // Reads contraindication, NOT participation — an exercise can load a
+    // flagged joint and still belong in the plan (a rotator-cuff rehab
+    // movement loads the shoulder; that's the point of it). See
+    // isContraindicatedFor / the three-state tag doc in exercise-db.ts.
+    const conflict = isContraindicatedFor(ex, flaggedJoints)
     if (!conflict) {
       result.push(ex)
     } else {
       trace.injury_filtered.push({
         exercise: ex.name,
         stage: 'injury',
-        reason: `loads joints [${ex.loads_joints.join(', ')}]; user flagged [${injuries.join(', ')}]`,
+        reason: `contraindicated for joints [${contraindicatedJoints(ex).join(', ')}]; user flagged [${injuries.join(', ')}]`,
       })
       const replacement = equipmentPool.find(r =>
         r.substitution_group === ex.substitution_group &&
         r.name !== ex.name &&
-        !r.loads_joints.some(j => flaggedJoints.has(j)) &&
+        !isContraindicatedFor(r, flaggedJoints) &&
         !poolNames.has(r.name) &&
         !addedReplacements.has(r.name)
       )
@@ -2980,9 +2984,17 @@ export function getExerciseCompatibilityWarnings(
     const joints = INJURED_JOINTS[injury]
     if (joints) joints.forEach(j => flaggedJoints.add(j))
   }
-  const conflictingJoints = exercise.loads_joints.filter(j => flaggedJoints.has(j))
-  if (conflictingJoints.length > 0) {
-    warnings.push(`Loads your ${conflictingJoints.join(', ').replace(/_/g, ' ')} — you've flagged an injury there.`)
+  // Warn on CONTRAINDICATION, not participation. A movement deliberately
+  // included as rehab for the injured joint (Band Pull-Aparts for a
+  // shoulder) does load that joint — warning "you've flagged an injury
+  // there" about it would contradict the reason it's in the plan.
+  if (isIndicatedFor(exercise, flaggedJoints)) {
+    warnings.push(`Chosen to help your ${(exercise.indicated_joints ?? []).join(', ').replace(/_/g, ' ')} — keep it light and controlled.`)
+  } else {
+    const conflictingJoints = contraindicatedJoints(exercise).filter(j => flaggedJoints.has(j))
+    if (conflictingJoints.length > 0) {
+      warnings.push(`Loads your ${conflictingJoints.join(', ').replace(/_/g, ' ')} — you've flagged an injury there.`)
+    }
   }
 
   if (exclusions.some(ex => ex.toLowerCase() === exercise.name.toLowerCase())) {

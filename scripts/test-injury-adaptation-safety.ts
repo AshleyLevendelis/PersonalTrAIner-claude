@@ -11,6 +11,7 @@
 import { generateMesocycle, getFlaggedJoints } from '../src/lib/exercise-plan'
 import { substituteForInjury } from '../src/lib/plan-adaptations'
 import { getExerciseEntry } from '../src/lib/exercise-db'
+import { isContraindicatedFor } from '../src/lib/exercise-db'
 import type { UserProfile, EquipmentAccess, TrainingStyle, TrainingExperience } from '../src/lib/types'
 
 function buildProfile(overrides: Partial<UserProfile>): UserProfile {
@@ -91,7 +92,7 @@ async function main() {
             for (const ex of day.exercises) {
               const entry = getExerciseEntry(ex.name)
               if (!entry) continue
-              const conflict = entry.loads_joints.some(j => flaggedJoints.has(j))
+              const conflict = isContraindicatedFor(entry, flaggedJoints)
               if (conflict) {
                 failures++
                 console.error(`  FAIL: [${injuryCode}/${equipment}/${style}/${experience}] "${ex.name}" on ${day.day} still loads a flagged joint after substitution`, entry.loads_joints)
@@ -120,7 +121,7 @@ async function main() {
       for (const day of week1.days) {
         for (const ex of day.exercises) {
           const entry = getExerciseEntry(ex.name)
-          if (entry && entry.loads_joints.some(j => flaggedJoints.has(j))) allClean = false
+          if (entry && isContraindicatedFor(entry, flaggedJoints)) allClean = false
         }
       }
     }

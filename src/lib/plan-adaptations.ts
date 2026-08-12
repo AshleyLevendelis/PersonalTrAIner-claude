@@ -10,7 +10,7 @@
 // ---------------------------------------------------------------------------
 
 import type { MesocycleWeek, Exercise, UserProfile, EquipmentAccess } from './types'
-import { getExerciseEntry } from './exercise-db'
+import { getExerciseEntry, isContraindicatedFor } from './exercise-db'
 import { getFlaggedJoints, isEquipmentAllowed } from './exercise-plan'
 import {
   getReplacementCandidates,
@@ -112,7 +112,9 @@ export async function substituteForInjury(params: SubstituteForInjuryParams): Pr
   const conflicts = (slot: Exercise): boolean => {
     const entry = getExerciseEntry(slot.name)
     if (!entry) return false
-    return entry.loads_joints.some(j => flaggedJoints.has(j))
+    // Contraindication, not participation — a rehab movement for the injured
+    // joint must NOT be substituted away. See exercise-db.ts's three-state tag.
+    return isContraindicatedFor(entry, flaggedJoints)
   }
 
   return substituteSlots(mesocycle, profile, weekNumbers, exclusions, conflicts, candidateProfile)
