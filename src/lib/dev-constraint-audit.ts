@@ -102,19 +102,38 @@ export interface AuditReport {
   runTimeMs: number
 }
 
+// Every load calculation in load-prescription.ts scales off profile.weight_kg
+// and profile.gender (separate male/female strength-standards tables) — the
+// base grid ran exactly one hardcoded body (80kg male) through every other
+// combo, so a load defect visible only at a different bodyweight or for a
+// female profile was structurally invisible here, the same coverage gap the
+// mesocycle-safety sweep closed for itself (see WEIGHT_GENDER_OPTIONS' other
+// call site in runMesocycleBehaviorChecks). Single source of truth so both
+// grids stay in sync rather than drifting two independently-picked lists.
+export const WEIGHT_GENDER_OPTIONS: { weightKg: number; gender: 'male' | 'female' }[] = [
+  { weightKg: 50, gender: 'female' },
+  { weightKg: 62, gender: 'female' },
+  { weightKg: 70, gender: 'male' },
+  { weightKg: 80, gender: 'male' },
+  { weightKg: 100, gender: 'male' },
+  { weightKg: 120, gender: 'male' },
+]
+
 function buildTestProfile(
   equipment: EquipmentAccess,
   injuries: string[],
   duration: SessionDuration,
   style: TrainingStyle,
-  experience: TrainingExperience
+  experience: TrainingExperience,
+  weightKg: number = 80,
+  gender: 'male' | 'female' = 'male',
 ): UserProfile {
   return {
     id: 'audit-test',
     age: 30,
-    gender: 'male',
+    gender,
     height_cm: 178,
-    weight_kg: 80,
+    weight_kg: weightKg,
     activity_level: 'moderate',
     fitness_goal: 'hypertrophy',
     preferred_time: 'morning',
@@ -176,10 +195,12 @@ function runSingleAudit(
   injuries: string[],
   duration: SessionDuration,
   style: TrainingStyle,
-  experience: TrainingExperience
+  experience: TrainingExperience,
+  weightKg: number = 80,
+  gender: 'male' | 'female' = 'male',
 ): AuditTestCase {
-  const profile = buildTestProfile(equipment, injuries, duration, style, experience)
-  const comboLabel = `${equipment} / ${injuries.length > 0 ? injuries.join('+') : 'none'} / ${duration} / ${style} / ${experience}`
+  const profile = buildTestProfile(equipment, injuries, duration, style, experience, weightKg, gender)
+  const comboLabel = `${equipment} / ${injuries.length > 0 ? injuries.join('+') : 'none'} / ${duration} / ${style} / ${experience} / ${weightKg}kg ${gender}`
   const failures: AuditFailure[] = []
 
   let result: PlanResult
@@ -943,15 +964,10 @@ async function runMesocycleBehaviorChecks(): Promise<AuditTestCase[]> {
     // Split Squats/Romanian Deadlifts falling through to the full squat/
     // deadlift standard instead of their scaled-down derived category) went
     // undetected: it manifests for ANY bodyweight, but the audit never
-    // varied bodyweight or gender to find it.
-    const weightGenderOptions: { weightKg: number; gender: 'male' | 'female' }[] = [
-      { weightKg: 50, gender: 'female' },
-      { weightKg: 62, gender: 'female' },
-      { weightKg: 70, gender: 'male' },
-      { weightKg: 80, gender: 'male' },
-      { weightKg: 100, gender: 'male' },
-      { weightKg: 120, gender: 'male' },
-    ]
+    // varied bodyweight or gender to find it. Shared with the base grid's
+    // own weight/gender sweep (WEIGHT_GENDER_OPTIONS) rather than a second,
+    // independently-driftable list.
+    const weightGenderOptions = WEIGHT_GENDER_OPTIONS
     for (const equipment of equipmentOptions) {
       for (const experience of ALL_EXPERIENCE) {
         for (const { weightKg, gender } of weightGenderOptions) {
@@ -1274,7 +1290,7 @@ export async function runFullConstraintAudit(
 
   const totalCombinations =
     ALL_EQUIPMENT.length * injuryCombinations.length * ALL_DURATIONS.length *
-    ALL_STYLES.length * ALL_EXPERIENCE.length
+    ALL_STYLES.length * ALL_EXPERIENCE.length * WEIGHT_GENDER_OPTIONS.length
   const results: AuditTestCase[] = []
   let done = 0
 
@@ -1283,10 +1299,12 @@ export async function runFullConstraintAudit(
       for (const duration of ALL_DURATIONS) {
         for (const style of ALL_STYLES) {
           for (const experience of ALL_EXPERIENCE) {
-            const testCase = runSingleAudit(equipment, injuries, duration, style, experience)
-            results.push(testCase)
-            done++
-            onProgress?.(done, totalCombinations)
+            for (const { weightKg, gender } of WEIGHT_GENDER_OPTIONS) {
+              const testCase = runSingleAudit(equipment, injuries, duration, style, experience, weightKg, gender)
+              results.push(testCase)
+              done++
+              onProgress?.(done, totalCombinations)
+            }
           }
         }
       }
