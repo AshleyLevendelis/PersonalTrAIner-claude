@@ -40,7 +40,8 @@
     "smoke:regen-week": "tsx scripts/smoke-regen-week.ts",
     "smoke:check-week": "tsx scripts/smoke-check-week.ts",
     "test:slot-replacement": "tsx scripts/test-slot-replacement-hygiene.ts",
-    "test:joint-tags": "tsx scripts/test-joint-tag-states.ts"
+    "test:joint-tags": "tsx scripts/test-joint-tag-states.ts",
+    "test:injury-rebuild": "tsx scripts/test-injury-rebuild.ts"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.4",

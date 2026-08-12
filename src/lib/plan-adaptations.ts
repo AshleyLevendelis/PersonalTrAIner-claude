@@ -120,6 +120,114 @@ export async function substituteForInjury(params: SubstituteForInjuryParams): Pr
   return substituteSlots(mesocycle, profile, weekNumbers, exclusions, conflicts, candidateProfile)
 }
 
+/**
+ * How much of the plan a pointwise substitution would destroy.
+ *
+ * Pointwise substitution assumes the injury removes SOME exercises. When it
+ * removes whole movement patterns — a shoulder injury eliminates every
+ * horizontal push, vertical push and vertical pull in the pool — there is no
+ * same-pattern candidate for any of those slots by construction, so every one
+ * of them gets dropped and the user is left with a hollow plan. Measured on a
+ * real full_gym profile: 146 of ~190 slots removed, none substituted.
+ *
+ * A coach in that situation doesn't delete two thirds of the programme and
+ * hand back the remains — they rebuild the week around what the person CAN
+ * train. This is the signal for that.
+ */
+export interface AdaptationViability {
+  /** Slots that would be changed at all. */
+  touched: number
+  /** Slots that would be dropped with no replacement. */
+  dropped: number
+  /** Movement patterns with no surviving candidate anywhere in the pool. */
+  wipedPatterns: string[]
+  /** Dropped slots as a fraction of the ENTIRE programme — what the user actually loses. */
+  planLossRatio: number
+  /** True when dropping is doing most of the work — rebuild instead. */
+  shouldRebuild: boolean
+}
+
+/**
+ * How much of the WHOLE plan the substitution would delete.
+ *
+ * Measuring against slots-touched was the obvious first cut and it's wrong:
+ * a neck injury touches 16 slots and drops all 16, scoring a perfect 1.0,
+ * but that's under 4% of a 432-slot programme — rebuilding the entire
+ * mesocycle over it would destroy the user's plan to fix a rounding error.
+ * A shoulder injury drops 96 of 432 (22%), which genuinely is the plan no
+ * longer being the plan. The denominator has to be the whole programme,
+ * because that's what the user actually loses.
+ */
+export const REBUILD_PLAN_LOSS_RATIO = 0.15
+
+export function assessAdaptation(result: SubstitutionResult, totalSlots: number): AdaptationViability {
+  const touched = result.touchedSlots.length
+  const dropped = result.touchedSlots.filter(s => s.after === null).length
+  const wipedPatterns = [...new Set(result.droppedPatterns)]
+  return {
+    touched,
+    dropped,
+    wipedPatterns,
+    planLossRatio: totalSlots > 0 ? dropped / totalSlots : 0,
+    shouldRebuild: totalSlots > 0 && dropped / totalSlots >= REBUILD_PLAN_LOSS_RATIO,
+  }
+}
+
+/** Total loaded+unloaded exercise slots in a mesocycle — the denominator for assessAdaptation. */
+export function countSlots(mesocycle: MesocycleWeek[]): number {
+  return mesocycle.reduce((n, w) => n + w.days.reduce((m, d) => m + d.exercises.length, 0), 0)
+}
+
+export interface RebuildForInjuryParams {
+  profile: UserProfile
+  injuryCode: string
+  exclusions: string[]
+  /** Preserved from the outgoing mesocycle so week numbering/labels/blocks stay stable for anything referencing them. */
+  mesocycle: MesocycleWeek[]
+}
+
+/**
+ * Regenerates the programme with the injury applied, instead of subtracting
+ * from the existing one. Reuses the normal generation pipeline against a
+ * profile clone carrying the injury, so the result is a coherent, balanced
+ * week built for someone with that injury — including any movements marked
+ * INDICATED for it (see exercise-db.ts's three-state joint tags), which is
+ * why the rebuild can produce genuinely rehabilitative work rather than just
+ * an absence of the dangerous stuff.
+ *
+ * The profile clone is local and never written back: the caller owns whether
+ * fitness_profiles.injuries changes (executeLastingInjury does; the
+ * time-bounded adaptation deliberately doesn't), and this function must not
+ * quietly make that decision for it — the same separation
+ * test:injury-separation protects.
+ */
+export async function rebuildForInjury(params: RebuildForInjuryParams): Promise<MesocycleWeek[]> {
+  const { profile, injuryCode, exclusions, mesocycle } = params
+  const injuredProfile: UserProfile = {
+    ...profile,
+    injuries: profile.injuries.includes(injuryCode) ? profile.injuries : [...profile.injuries, injuryCode],
+  }
+
+  const { generateExercisePlan, generateMesocycle } = await import('./exercise-plan')
+  const plan = generateExercisePlan(injuredProfile, exclusions)
+  const rebuilt = generateMesocycle(injuredProfile, plan.plan)
+
+  // Keep the outgoing week identity (numbers, labels, block boundaries) so
+  // anything holding a week reference — logged sets, an active session, the
+  // week strip — still resolves. Only the CONTENT is replaced.
+  return rebuilt.map((week, i) => {
+    const original = mesocycle[i]
+    if (!original) return week
+    return {
+      ...week,
+      week_number: original.week_number,
+      block_number: original.block_number,
+      label: original.label,
+      phase_label: original.phase_label,
+    }
+  })
+}
+
 export interface SubstituteForEquipmentParams {
   mesocycle: MesocycleWeek[]
   profile: UserProfile
