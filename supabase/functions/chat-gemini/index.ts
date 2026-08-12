@@ -332,6 +332,50 @@ const toolDeclarations = [
     },
   },
   {
+    name: "propose_injury_as_lasting",
+    description:
+      "PROPOSES adjusting the current plan for a LASTING/ongoing injury (chronic, an old injury, no expected end) AND adding it to the trainee's permanent injuries list so future/regenerated plans avoid it too — unlike propose_injury_adaptation, this has no duration and does not auto-revert. This does NOT apply anything — the app shows a card and the user taps Confirm. Only call this once you know the affected area AND that it's the lasting kind, not a passing niggle (see the INJURY ADAPTATION section for how to tell). Never call this for sharp/joint/one-sided/worsening pain — redirect to a professional instead, no tool call.",
+    parameters: {
+      type: "object",
+      properties: {
+        affected_area: {
+          type: "string",
+          enum: ["lower_back", "knees", "shoulders", "neck", "wrists"],
+          description: "The body part — only these 5 have joint-conflict data; if the user describes pain elsewhere, do not call this tool, say plainly you can't auto-adjust for that area yet and offer a manual propose_exercise_swap instead.",
+        },
+        reason: {
+          type: "string",
+          description: "One short sentence on what the user described — shown on the card as the rationale.",
+        },
+        origin_verbatim_quote: {
+          type: "string",
+          description: "The exact substring of the user's CURRENT message describing the injury/pain. Must be copied verbatim, not paraphrased.",
+        },
+      },
+      required: ["affected_area", "origin_verbatim_quote"],
+    },
+  },
+  {
+    name: "propose_injury_recovered",
+    description:
+      "PROPOSES removing a previously-added LASTING injury (see propose_injury_as_lasting) from the trainee's injuries, once they say it's resolved. Does NOT undo any exercise already swapped out for it — only stops FUTURE plans from avoiding that area. This does NOT apply anything — the app shows a card and the user taps Confirm. If the area isn't actually in their injuries, the app will say so rather than you needing to check first.",
+    parameters: {
+      type: "object",
+      properties: {
+        affected_area: {
+          type: "string",
+          enum: ["lower_back", "knees", "shoulders", "neck", "wrists"],
+          description: "The body part that's recovered.",
+        },
+        origin_verbatim_quote: {
+          type: "string",
+          description: "The exact substring of the user's CURRENT message saying it's recovered. Must be copied verbatim, not paraphrased.",
+        },
+      },
+      required: ["affected_area", "origin_verbatim_quote"],
+    },
+  },
+  {
     name: "propose_equipment_adaptation",
     description:
       "PROPOSES regenerating the affected days' exercises against a different equipment tier for a stated period (travel, a different gym, limited kit) — this does NOT apply anything, the app shows a before/after card and the user taps Confirm. Only call this once you know BOTH the equipment tier AND how many days it applies for. It automatically reverts to the normal plan once the period ends.",
@@ -1013,13 +1057,18 @@ Work it in ONCE, in your own words, warmly — a coach who noticed, not an app t
 - When the user asks to change a workout due to pain, briefly discuss WHY, suggest biomechanically similar alternatives, and ask for confirmation before executing the swap.
 - That's for ordinary "don't feel like training today" — coach it directly, no question needed. But when the language is about the PERSON rather than the session (self-worth, hating how they look, feeling awful about themselves), that's heavier than routine low motivation. Ask one gentle, genuine question before jumping to session logistics — don't assume it's just a flat day. If it turns out to be one, warmth plus an easy option is exactly right ("getting there is the hardest part"). If it isn't, "you'll feel better after a workout" is the wrong answer and should not appear — stay with them first.
 
-=== 3a. INJURY ADAPTATION (propose_injury_adaptation) ===
+=== 3a. INJURY ADAPTATION (propose_injury_adaptation / propose_injury_as_lasting) ===
 When the user says something hurts ("my shoulder's been aching since Tuesday", "tweaked my lower back"), this sits BETWEEN §1c's two existing lanes — read that section first:
-- Red flag per §1c (sharp, joint, one-sided, doesn't ease with warmup, lasting beyond a couple of days) → redirect to a professional as §1c already says. Never call propose_injury_adaptation for this tier.
+- Red flag per §1c (sharp, joint, one-sided, doesn't ease with warmup, lasting beyond a couple of days) → redirect to a professional as §1c already says. Never call either injury tool for this tier.
 - Ordinary soreness with no plan-relevance the user isn't asking to change anything about → §3's direct coaching, no tool call.
-- The MIDDLE tier — manageable, but the user wants to ease off it for a while — is what this tool is for. Establish what and how severe with ONE combined question, not an interrogation (e.g. "Sorry to hear that — what's it like when it happens, sharp or dull, one spot or general, and did anything set it off?"). Once you know it's manageable, ask the one remaining thing you need: how long to ease off (a few days, a week, two weeks). Then call propose_injury_adaptation with affected_area + duration_days — the app shows a before/after card, you don't ask again or claim the change happened.
-- affected_area only accepts lower_back/knees/shoulders/neck/wrists — these are the only areas with joint-conflict data to filter against. If the user describes pain somewhere else, say plainly you can't auto-adjust the plan for that area yet, and offer a manual swap (propose_exercise_swap) for the specific exercise bothering them instead.
-- The adaptation is time-bounded and reverts automatically — mention this once ("it'll ease back to normal after that, or tell me anytime to end it early"), don't repeat it every turn.
+- The MIDDLE tier — manageable, but the user wants to ease off it — is what these two tools are for. Establish what and how severe with ONE combined question, not an interrogation (e.g. "Sorry to hear that — what's it like when it happens, sharp or dull, one spot or general, and did anything set it off?").
+- Before asking how long, listen for whether this reads as a passing niggle or something lasting — words like "chronic," "old injury," "never fully healed," "flares up," "I've done my [body part]," or no expected end in sight. If it's ambiguous, fold the check into the SAME next question rather than adding a turn: "How long do you want to ease off — a few days, a week or two, or is this something ongoing you'd like the plan to just work around from now on?"
+  - Time-bounded answer (a few days, a week, two weeks) → propose_injury_adaptation with affected_area + duration_days, same as always. It's time-bounded and reverts automatically — mention this once ("it'll ease back to normal after that, or tell me anytime to end it early"), don't repeat it every turn.
+  - Lasting/ongoing answer → propose_injury_as_lasting with affected_area + reason instead. This adjusts the current plan AND adds it to their injuries so future plans avoid it too — say so once, plainly, e.g. "I'll adjust your plan for this and add it to your injuries so it's accounted for going forward." Never call both tools for the same report.
+- affected_area only accepts lower_back/knees/shoulders/neck/wrists on EITHER tool — these are the only areas with joint-conflict data to filter against. If the user describes pain somewhere else, say plainly you can't auto-adjust the plan for that area yet, and offer a manual swap (propose_exercise_swap) for the specific exercise bothering them instead.
+
+=== 3c. INJURY RECOVERY (propose_injury_recovered) ===
+When the user says a lasting injury has resolved ("my shoulder's fine now", "knee's back to normal", "I don't need to work around my back anymore"), call propose_injury_recovered with the affected_area. Say plainly what this does and doesn't do: it stops FUTURE plans from avoiding that area — it does NOT undo any exercise already swapped out for it, those stay as they are unless they ask for a manual swap back. If there's nothing currently listed for that area, the app will tell you rather than you having to check first.
 
 === 3b. EQUIPMENT / TRAVEL ADAPTATION (propose_equipment_adaptation) ===
 When the user says they're away or at a different gym for a period ("hotel gym for a week", "only dumbbells until Friday", "I'm away from my gym"):
@@ -1835,6 +1884,42 @@ Keep this context in mind to ensure your greetings and questions naturally align
             proposal: {
               kind: "propose_injury_adaptation",
               rawArgs: { affected_area: args.affected_area, duration_days: args.duration_days, reason: args.reason },
+            },
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (name === "propose_injury_as_lasting") {
+        // Same no-server-write contract as propose_injury_adaptation above.
+        // The client (buildLastingInjuryProposal) resolves affected_area
+        // against the live mesocycle, runs substituteForInjury over every
+        // remaining week (not a bounded window — see that function's own
+        // comment), and separately builds the fitness_profiles.injuries diff
+        // row. No duration_days: this tool has none.
+        return new Response(
+          JSON.stringify({
+            reply: "",
+            proposal: {
+              kind: "propose_injury_as_lasting",
+              rawArgs: { affected_area: args.affected_area, reason: args.reason },
+            },
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (name === "propose_injury_recovered") {
+        // Same no-server-write contract. The client (buildInjuryRecoveredProposal)
+        // checks the live profile's injuries for affected_area — if it isn't
+        // there, it returns null and the client shows its own generic
+        // "couldn't find that" fallback rather than this function guessing.
+        return new Response(
+          JSON.stringify({
+            reply: "",
+            proposal: {
+              kind: "propose_injury_recovered",
+              rawArgs: { affected_area: args.affected_area },
             },
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }

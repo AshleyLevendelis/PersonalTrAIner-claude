@@ -15,7 +15,7 @@ import { getExerciseEntry } from '@/lib/exercise-db'
 import { createPendingAction, claimPendingAction, declinePendingAction, markExecuting, resolvePendingAction, getPendingAction, isWithinUndoWindow, type PendingActionReceipt } from '@/lib/pending-actions-store'
 import { APPEND_PROPOSAL_KINDS, INTENT_PROPOSAL_VERB, buildIntentProposal } from '@/lib/intent-proposal'
 import { pickAccountabilityCheckIn } from '@/lib/accountability'
-import { executeExerciseSwap, executeMealSwap, undoExerciseSwap, executeInjuryAdaptation, executeEquipmentAdaptation, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type EquipmentAdaptationPayload } from '@/lib/pending-action-executor'
+import { executeExerciseSwap, executeMealSwap, undoExerciseSwap, executeInjuryAdaptation, executeLastingInjury, executeInjuryRecovered, executeEquipmentAdaptation, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type LastingInjuryPayload, type InjuryRecoveredPayload, type EquipmentAdaptationPayload } from '@/lib/pending-action-executor'
 import type { SwapScope } from '@/lib/mesocycle-edit'
 import { createPlanAdaptation } from '@/lib/plan-adaptations-store'
 import { substituteForInjury, substituteForEquipment } from '@/lib/plan-adaptations'
@@ -118,6 +118,8 @@ interface ChatAssistantProps {
   onWeightLogged?: () => void | Promise<void>
   /** Fired after a confirmed propose_exercise_swap executes — App.tsx's setMesocycle, since the executor is pure and returns the new array rather than mutating App.tsx's state directly. */
   onMesocycleUpdated: (mesocycle: MesocycleWeek[]) => void
+  /** Fired after a confirmed propose_injury_as_lasting/propose_injury_recovered writes fitness_profiles.injuries directly (executeLastingInjury/executeInjuryRecovered) — mirrors ProfileScreen's own onProfileChanged so App.tsx's profile state stays in sync with a write chat made outside its own setProfile calls. */
+  onProfileChanged: (patch: Partial<UserProfile>) => void
   /** Fired after a confirmed propose_meal_swap executes — mirrors App.tsx's handleSwapMealSlot's setManualMealPicks, the ONLY thing that makes a swapped-in pool option actually render as today's pick. Without this the receipt would claim a swap the Nutrition tab never shows — exactly the incident this framework exists to prevent. */
   /** Returns whether the pick actually persisted — a receipt must never say "Swapped" for a write that didn't land. */
   onMealSwapApplied: (slot: MealSlotName, chosenName: string) => Promise<boolean>
@@ -141,7 +143,7 @@ interface ChatAssistantProps {
   revealSpeed?: RevealSpeed
 }
 
-export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onMealSwapApplied, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenProfile, groceryItems, onGroceryChanged, onOpenGrocery, onWaterChanged, onOpenDashboard, revealSpeed = DEFAULT_REVEAL_SPEED }: ChatAssistantProps) {
+export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onProfileChanged, onMealSwapApplied, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenProfile, groceryItems, onGroceryChanged, onOpenGrocery, onWaterChanged, onOpenDashboard, revealSpeed = DEFAULT_REVEAL_SPEED }: ChatAssistantProps) {
   // NL logging (§3) writes through the SAME frozen session identity +
   // logSet facade SetGrid.tsx uses — never saveSet directly (see
   // nl-logging-executor.ts's own doc comment).
@@ -921,7 +923,8 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
   const describeProposalClientSide = (pendingAction: ChatPendingActionView): string => {
     const rows = pendingAction.diff.rows
     if (rows.length === 0) return "Here's a change I can make:"
-    if (pendingAction.kind === 'propose_injury_adaptation' || pendingAction.kind === 'propose_equipment_adaptation') {
+    if (pendingAction.kind === 'propose_injury_recovered') return "Here's the injury update:"
+    if (pendingAction.kind === 'propose_injury_adaptation' || pendingAction.kind === 'propose_injury_as_lasting' || pendingAction.kind === 'propose_equipment_adaptation') {
       const count = rows.length
       return `I can adjust ${count} exercise${count === 1 ? '' : 's'} across your plan:`
     }
@@ -1050,6 +1053,94 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         implications,
         rationale: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined,
         reversible: true,
+      },
+    }
+  }
+
+  /**
+   * A lasting injury (Part 1/2 of the injury-persistence fix) — unlike
+   * buildInjuryAdaptationProposal, weekNumbers runs from the current week
+   * to the END of the mesocycle (no span cap: there's no duration to bound
+   * it by), and the proposal still builds even when touchedSlots is empty
+   * — the injuries write is valuable on its own (protects a future
+   * regeneration) even on a week where nothing currently conflicts.
+   */
+  const buildLastingInjuryProposal = async (rawArgs: Record<string, unknown>): Promise<{
+    scopeKey: string
+    preconditions: Record<string, unknown>
+    payload: LastingInjuryPayload
+    preImage: MesocycleWeek[]
+    diff: import('@/lib/pending-actions-store').ProposalDiff
+  } | null> => {
+    const injuryCode = String(rawArgs.affected_area ?? '')
+    if (!injuryCode || mesocycle.length === 0) return null
+
+    const startWeek = activeSession.liveWeek
+    const weekNumbers = mesocycle.map(w => w.week_number).filter(n => n >= startWeek)
+    if (weekNumbers.length === 0) return null
+
+    const result = await substituteForInjury({
+      mesocycle, profile, injuryCode, weekNumbers, exclusions: exerciseExclusions,
+    })
+
+    const rows = result.touchedSlots.map(slot => ({
+      field: `${slot.dayName} (Week ${slot.weekNumber})`,
+      before: slot.before,
+      after: slot.after ?? '— removed (no safe alternative)',
+    }))
+    rows.push({
+      field: 'Injuries',
+      before: profile.injuries.includes(injuryCode) ? injuryCode.replace('_', ' ') : 'not listed',
+      after: `${injuryCode.replace('_', ' ')} — added`,
+    })
+    const implications: { severity: 'info' | 'warn'; text: string }[] = [
+      { severity: 'info', text: `Adjusts your plan for the rest of this program AND adds this to your injuries, so future plans avoid it too — this does not revert on its own.` },
+    ]
+    if (result.droppedPatterns.length > 0) {
+      implications.push({ severity: 'warn', text: `Some movements had no safe alternative this round and were dropped rather than faked.` })
+    }
+
+    return {
+      scopeKey: `${profile.id}:propose_injury_as_lasting:${injuryCode}:${startWeek}`,
+      preconditions: { injuryCode, startWeek, weekNumbers },
+      payload: { injuryCode, weekNumbers, exclusions: exerciseExclusions, reason: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined },
+      preImage: mesocycle,
+      diff: {
+        rows,
+        implications,
+        rationale: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined,
+        reversible: false,
+      },
+    }
+  }
+
+  /**
+   * The inverse of buildLastingInjuryProposal — removes a lasting injury.
+   * Returns null when the area isn't actually in profile.injuries (falls
+   * through to processResponse's generic "couldn't find that" fallback,
+   * same as every other build*Proposal's null-return convention in this
+   * file) rather than the model needing to already know the current list.
+   */
+  const buildInjuryRecoveredProposal = (rawArgs: Record<string, unknown>): {
+    scopeKey: string
+    preconditions: Record<string, unknown>
+    payload: InjuryRecoveredPayload
+    diff: import('@/lib/pending-actions-store').ProposalDiff
+  } | null => {
+    const injuryCode = String(rawArgs.affected_area ?? '')
+    if (!injuryCode || !profile.injuries.includes(injuryCode)) return null
+
+    return {
+      scopeKey: `${profile.id}:propose_injury_recovered:${injuryCode}`,
+      preconditions: { injuryCode },
+      payload: { injuryCode },
+      diff: {
+        rows: [{ field: 'Injuries', before: injuryCode.replace('_', ' '), after: 'removed' }],
+        implications: [
+          { severity: 'info', text: `Future plans stop avoiding this area.` },
+          { severity: 'warn', text: `This won't undo any exercise already swapped out for it — those stay as they are unless you swap them back yourself.` },
+        ],
+        reversible: false,
       },
     }
   }
@@ -1533,6 +1624,12 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       } else if (result.proposal.kind === 'propose_injury_adaptation' && result.proposal.rawArgs) {
         const adaptation = await buildInjuryAdaptationProposal(result.proposal.rawArgs)
         if (adaptation) built = { scopeKey: adaptation.scopeKey, preconditions: adaptation.preconditions, payload: adaptation.payload as unknown as Record<string, unknown>, preImage: adaptation.preImage, diff: adaptation.diff }
+      } else if (result.proposal.kind === 'propose_injury_as_lasting' && result.proposal.rawArgs) {
+        const lasting = await buildLastingInjuryProposal(result.proposal.rawArgs)
+        if (lasting) built = { scopeKey: lasting.scopeKey, preconditions: lasting.preconditions, payload: lasting.payload as unknown as Record<string, unknown>, preImage: lasting.preImage, diff: lasting.diff }
+      } else if (result.proposal.kind === 'propose_injury_recovered' && result.proposal.rawArgs) {
+        const recovered = buildInjuryRecoveredProposal(result.proposal.rawArgs)
+        if (recovered) built = { scopeKey: recovered.scopeKey, preconditions: recovered.preconditions, payload: recovered.payload as unknown as Record<string, unknown>, diff: recovered.diff }
       } else if (result.proposal.kind === 'propose_equipment_adaptation' && result.proposal.rawArgs) {
         const adaptation = await buildEquipmentAdaptationProposal(result.proposal.rawArgs)
         if (adaptation) built = { scopeKey: adaptation.scopeKey, preconditions: adaptation.preconditions, payload: adaptation.payload as unknown as Record<string, unknown>, preImage: adaptation.preImage, diff: adaptation.diff }
@@ -1959,6 +2056,28 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
           durationDays: payload.durationDays,
         })
       }
+    } else if (row.kind === 'propose_injury_as_lasting') {
+      const payload = row.payload as unknown as LastingInjuryPayload
+      const result = await executeLastingInjury(profile, mesocycle, payload)
+      onMesocycleUpdated(result.mesocycle)
+      // executeLastingInjury already wrote fitness_profiles.injuries — keep
+      // App.tsx's profile state in lockstep, same reasoning onMesocycleUpdated
+      // exists for: the executor is pure and returns what changed rather than
+      // mutating App.tsx's state directly.
+      onProfileChanged({ injuries: profile.injuries.includes(payload.injuryCode) ? profile.injuries : [...profile.injuries, payload.injuryCode] })
+      receipt = result.receipt
+      const ok = receipt.failed.length === 0
+      title = ok ? 'Injury saved' : "Couldn't save this"
+      rows = ok ? receipt.landed.map(line => { const [label, detail] = line.split(': '); return { label, detail } }) : []
+      // No plan_adaptations row — nothing time-bounded here to expire.
+    } else if (row.kind === 'propose_injury_recovered') {
+      const payload = row.payload as unknown as InjuryRecoveredPayload
+      const result = await executeInjuryRecovered(profile, payload)
+      onProfileChanged({ injuries: profile.injuries.filter(i => i !== payload.injuryCode) })
+      receipt = result.receipt
+      const ok = receipt.failed.length === 0
+      title = ok ? 'Injury removed' : "Couldn't save this"
+      rows = ok ? receipt.landed.map(line => { const [label, detail] = line.split(': '); return { label, detail } }) : []
     } else if (row.kind === 'propose_equipment_adaptation') {
       const payload = row.payload as unknown as EquipmentAdaptationPayload
       const result = await executeEquipmentAdaptation(profile, mesocycle, payload)

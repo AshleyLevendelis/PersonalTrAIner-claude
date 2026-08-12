@@ -18,6 +18,7 @@ import { saveMesocycle, saveMesocycleWeek } from './mesocycle-persistence'
 import { getExerciseEntry } from './exercise-db'
 import { swapPoolMeal, type MealSlotName } from './meal-store'
 import { substituteForInjury, substituteForEquipment } from './plan-adaptations'
+import { updateProfileField } from './profile-store'
 import type { PendingActionReceipt } from './pending-actions-store'
 
 export interface ExerciseSwapPayload {
@@ -200,6 +201,101 @@ export async function executeInjuryAdaptation(
     preImage,
     receipt: { landed: result.touchedSlots.map(s => `${s.dayName}: ${s.before} → ${s.after ?? '(removed)'}`), failed: [] },
   }
+}
+
+export interface LastingInjuryPayload {
+  injuryCode: string
+  weekNumbers: number[]
+  exclusions: string[]
+  reason?: string
+}
+
+/**
+ * The one legitimate chat-driven writer of fitness_profiles.injuries —
+ * everywhere else in this file (substituteForInjury included) deliberately
+ * never touches that column, see plan-adaptations.ts's own doc comment and
+ * test-injury-exclusion-separation.ts. This function is new, narrow, and
+ * additive to that set, not a change to any existing writer's contract.
+ *
+ * Two independent effects, same as the Profile screen's own manual-add path
+ * would eventually produce together: (1) substitutes every remaining week
+ * of the CURRENT mesocycle (payload.weekNumbers — the caller computes this
+ * as "from today's week to the end of the program," not a bounded window,
+ * since a lasting injury has no end date to bound it by), and (2) appends
+ * injuryCode to the real profile.injuries (deduped) so any FUTURE/
+ * regenerated plan is aware of it too — closing the exact gap that made a
+ * chat-reported lasting injury invisible to regeneration. No plan_adaptations
+ * row: there's nothing time-bounded here to expire.
+ */
+export async function executeLastingInjury(
+  profile: UserProfile,
+  mesocycle: MesocycleWeek[],
+  payload: LastingInjuryPayload,
+): Promise<AdaptationResult> {
+  const preImage = mesocycle
+  const result = await substituteForInjury({
+    mesocycle, profile, injuryCode: payload.injuryCode, weekNumbers: payload.weekNumbers, exclusions: payload.exclusions,
+  })
+
+  if (!profile.id) {
+    return { mesocycle: result.mesocycle, preImage, receipt: { landed: [], failed: [{ op: 'save', error: 'No profile to save against' }] } }
+  }
+
+  try {
+    const touchedWeeks = result.mesocycle.filter(w => payload.weekNumbers.includes(w.week_number))
+    await Promise.all(touchedWeeks.map(w => saveMesocycleWeek(profile.id!, w)))
+    if (!profile.injuries.includes(payload.injuryCode)) {
+      await updateProfileField(profile.id, { injuries: [...profile.injuries, payload.injuryCode] })
+    }
+  } catch (err) {
+    console.error('executeLastingInjury: persisting failed', err)
+    return { mesocycle: result.mesocycle, preImage, receipt: { landed: [], failed: [{ op: 'save', error: 'Could not save this — try again' }] } }
+  }
+
+  return {
+    mesocycle: result.mesocycle,
+    preImage,
+    receipt: {
+      landed: [
+        ...result.touchedSlots.map(s => `${s.dayName}: ${s.before} → ${s.after ?? '(removed)'}`),
+        `Injuries: added ${payload.injuryCode.replace('_', ' ')}`,
+      ],
+      failed: [],
+    },
+  }
+}
+
+export interface InjuryRecoveredPayload {
+  injuryCode: string
+}
+
+export interface InjuryRecoveredResult {
+  receipt: PendingActionReceipt
+}
+
+/**
+ * The inverse of executeLastingInjury — removes injuryCode from
+ * fitness_profiles.injuries. Deliberately does NOT touch the mesocycle:
+ * whatever was already substituted out stays substituted (see this
+ * feature's own chat-facing copy, propose_injury_recovered's tool
+ * description, and buildInjuryRecoveredProposal's card wording — all three
+ * say this explicitly so it's never a surprise). Only future/regenerated
+ * plans stop avoiding this area.
+ */
+export async function executeInjuryRecovered(
+  profile: UserProfile,
+  payload: InjuryRecoveredPayload,
+): Promise<InjuryRecoveredResult> {
+  if (!profile.id) {
+    return { receipt: { landed: [], failed: [{ op: 'save', error: 'No profile to save against' }] } }
+  }
+  try {
+    await updateProfileField(profile.id, { injuries: profile.injuries.filter(i => i !== payload.injuryCode) })
+  } catch (err) {
+    console.error('executeInjuryRecovered: persisting failed', err)
+    return { receipt: { landed: [], failed: [{ op: 'save', error: 'Could not save this — try again' }] } }
+  }
+  return { receipt: { landed: [`Injuries: removed ${payload.injuryCode.replace('_', ' ')}`], failed: [] } }
 }
 
 /** Mirrors executeInjuryAdaptation exactly, for the equipment/travel adaptation. */

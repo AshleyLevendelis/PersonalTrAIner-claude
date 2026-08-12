@@ -32,7 +32,7 @@ import { supabase } from '@/lib/supabase'
 import { saveMesocycle, saveMesocycleWeek, restoreMesocycle } from '@/lib/mesocycle-persistence'
 import { swapExerciseInMesocycle, banExerciseFromMesocycle, type SwapScope } from '@/lib/mesocycle-edit'
 import { sweepStaleForTarget } from '@/lib/pending-actions-store'
-import { checkAndRevertExpiredAdaptations } from '@/lib/plan-adaptations-store'
+import { checkAndRevertExpiredAdaptations, getActiveAdaptations, type PlanAdaptationRow } from '@/lib/plan-adaptations-store'
 import { getRevealSpeed, saveRevealSpeed, DEFAULT_REVEAL_SPEED, type RevealSpeed } from '@/lib/reveal-speed-store'
 import { InsightBanner } from '@/components/ui/insight-banner'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
@@ -132,6 +132,8 @@ function App() {
   const [profileInfoSection, setProfileInfoSection] = useState<'goals' | 'facts' | 'context' | 'dietary' | undefined>(undefined)
   const [newPlanConfirmOpen, setNewPlanConfirmOpen] = useState(false)
   const [newPlanResetting, setNewPlanResetting] = useState(false)
+  /** Injury/equipment plan_adaptations still active when the New Plan dialog opens — New Plan creates a brand-new profile row (see handleReset), which orphans anything tied to the old profile_id, including these. Fetched fresh on open (Part 3, injury-persistence fix) so the loss is named and consented-to rather than silent. */
+  const [activeAdaptationsForReset, setActiveAdaptationsForReset] = useState<PlanAdaptationRow[]>([])
   // Chat typewriter reveal-speed preference — per-profile (reveal-speed-store.ts),
   // read once the profile resolves and written back on every change from Settings.
   const [revealSpeed, setRevealSpeedState] = useState<RevealSpeed>(DEFAULT_REVEAL_SPEED)
@@ -1333,7 +1335,11 @@ function App() {
       >
         <ProfileMenu
           onOpenProfile={() => { setProfileInfoSection(undefined); setProfileInfoOpen(true) }}
-          onNewPlan={() => setNewPlanConfirmOpen(true)}
+          onNewPlan={() => {
+            setActiveAdaptationsForReset([])
+            if (profile?.id) getActiveAdaptations(profile.id).then(setActiveAdaptationsForReset).catch(console.error)
+            setNewPlanConfirmOpen(true)
+          }}
         />
       </div>
       <div
@@ -1438,6 +1444,7 @@ function App() {
               onLogsUpdated={() => setLogsVersion(v => v + 1)}
               onWeightLogged={handleWeightLogged}
               onMesocycleUpdated={setMesocycle}
+              onProfileChanged={patch => setProfile(prev => prev ? { ...prev, ...patch } : prev)}
               onMealSwapApplied={async (slot, chosenName) => {
                 // Persist chat-confirmed swaps (and their undo, which calls
                 // this with the restored previous name) BEFORE updating the
@@ -1493,6 +1500,16 @@ function App() {
               from here.
             </DialogDescription>
           </DialogHeader>
+          {activeAdaptationsForReset.length > 0 && (
+            <div className="space-y-1.5 rounded-lg bg-[color:var(--role-warn-bg)] px-3 py-2.5 text-[13px] text-[color:var(--role-warn-text)]">
+              {activeAdaptationsForReset.map(a => (
+                <p key={a.id}>
+                  You have an active {a.kind === 'injury' ? `${a.injury_code?.replace('_', ' ')} adaptation` : 'equipment adaptation'} running
+                  until {new Date(a.expires_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} — starting a new plan won't carry this over.
+                </p>
+              ))}
+            </div>
+          )}
           <DialogFooter className="gap-2 sm:gap-2">
             <Button variant="outline" onClick={() => setNewPlanConfirmOpen(false)} disabled={newPlanResetting}>
               Cancel
