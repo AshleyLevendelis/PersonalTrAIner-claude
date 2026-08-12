@@ -36,7 +36,9 @@
     "benchmark": "tsx scripts/run-benchmark.ts",
     "db:push-both": "bash scripts/db-push-both.sh",
     "db:link-test": "bash scripts/db-link-test.sh",
-    "db:link-prod": "bash scripts/db-link-prod.sh"
+    "db:link-prod": "bash scripts/db-link-prod.sh",
+    "smoke:regen-week": "tsx scripts/smoke-regen-week.ts",
+    "smoke:check-week": "tsx scripts/smoke-check-week.ts"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.4",
