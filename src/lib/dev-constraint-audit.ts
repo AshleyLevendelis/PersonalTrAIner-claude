@@ -14,12 +14,34 @@ import { categorize, isImprovisedLoadImplement, IMPROVISED_IMPLEMENT_CEILING_KG,
 // table that no longer needs propping up). These numbers are generous enough
 // that a correct estimate for ANY profile should never approach them; if one
 // does, that's a formula regression, not a legitimately heavy lifter.
+//
+// RECALIBRATED across the real bodyweight/gender range (50-120kg, both
+// sexes, all four experience tiers, every rep/RPE bracket a plan actually
+// prescribes) rather than against the single 80kg male this grid used to
+// run. Seven of these were breached by a legitimate estimate at the heavy
+// end — every breach traced to the same 120kg advanced male at 3-5 reps,
+// which is a real trainee, not a formula regression. Each raised ceiling
+// sits ~25% above the highest legitimate observed value, preserving the
+// "no correct estimate should ever approach this" intent while actually
+// covering the population.
+//
+// DELIBERATELY NOT RAISED — isolation_shoulder (stays 25kg, still breached
+// at 40kg by Cable Lateral Raises for a 120kg advanced male). A 40kg
+// lateral raise is not a real prescription at any bodyweight; the shoulder
+// isolation fraction (0.19 of bench, load-prescription.ts) is what's wrong,
+// not this ceiling. Raising it here would silence a genuine defect, which
+// is the one thing an outer-bound backstop must never do. The audit keeps
+// failing on it on purpose.
 const SAFETY_CEILING_KG: Partial<Record<string, number>> = {
-  squat: 260, deadlift: 320, bench: 220, overhead: 140, row: 200,
+  squat: 260, deadlift: 325, bench: 220, overhead: 140, row: 200,
   pulldown: 180, leg_press: 400, goblet_squat: 60, hinge_accessory: 180,
-  isolation_bicep: 45, isolation_tricep: 55, isolation_chest: 60,
-  isolation_shoulder: 25, shrug: 140, isolation_quad: 90,
-  isolation_hamstring: 80, isolation_calf: 140, carry: 90,
+  isolation_bicep: 70, isolation_tricep: 80, isolation_chest: 95,
+  isolation_shoulder: 25, shrug: 140, isolation_quad: 115,
+  isolation_hamstring: 115, isolation_calf: 140, carry: 130,
+  // Previously had no ceiling at all — a category with no entry here is
+  // silently exempt from the whole check, which is how these two went
+  // unbounded. Observed peaks 48kg / 42kg respectively.
+  overhead_carry: 70, single_leg_dumbbell: 60,
 }
 import { getReplacementCandidates, swapExerciseInMesocycle, banExerciseFromMesocycle, containsExerciseName } from './mesocycle-edit'
 import { estimateDaySeconds, DURATION_BUDGET_SECONDS } from './session-duration'
