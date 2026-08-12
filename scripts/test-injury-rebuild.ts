@@ -87,6 +87,35 @@ async function main() {
   check('block numbers unchanged', rebuilt.map(w => w.block_number).join() === meso.map(w => w.block_number).join())
   check('labels unchanged', rebuilt.map(w => w.label).join() === meso.map(w => w.label).join())
 
+  console.log('\n[7] The WIRED executor path rebuilds, not substitutes')
+  {
+    // executeLastingInjury with no profile.id still runs the full plan
+    // transformation before the persistence guard, so this exercises the
+    // real production branch without touching a database.
+    const { executeLastingInjury } = await import('../src/lib/pending-action-executor')
+    const viaRebuild = await executeLastingInjury(
+      { ...profile, id: undefined } as UserProfile, meso,
+      { injuryCode: 'shoulders', weekNumbers, exclusions: [], mode: 'rebuild' },
+    )
+    const rebuiltSlots = viaRebuild.mesocycle.flatMap(w => w.days.flatMap(d => d.exercises)).length
+    const unsafeWired: string[] = []
+    for (const w of viaRebuild.mesocycle) for (const d of w.days) for (const ex of d.exercises) {
+      const e = getExerciseEntry(ex.name)
+      if (e && isContraindicatedFor(e, shoulder)) unsafeWired.push(ex.name)
+    }
+    console.log(`     executor(mode=rebuild) -> ${rebuiltSlots} slots, ${unsafeWired.length} unsafe`)
+    check('executor rebuild keeps the plan whole', rebuiltSlots >= slotsBefore * 0.8, rebuiltSlots)
+    check('executor rebuild is safe for the injury', unsafeWired.length === 0, unsafeWired.slice(0, 5))
+
+    const viaSubstitute = await executeLastingInjury(
+      { ...profile, id: undefined } as UserProfile, meso,
+      { injuryCode: 'shoulders', weekNumbers, exclusions: [], mode: 'substitute' },
+    )
+    const subSlots = viaSubstitute.mesocycle.flatMap(w => w.days.flatMap(d => d.exercises)).length
+    console.log(`     executor(mode=substitute) -> ${subSlots} slots`)
+    check('the two modes genuinely differ (rebuild is not a no-op)', rebuiltSlots > subSlots, { rebuiltSlots, subSlots })
+  }
+
   if (failures > 0) { console.error(`\n${failures} check(s) FAILED.`); process.exit(1) }
   console.log('\nAll injury-rebuild checks passed.')
 }

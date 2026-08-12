@@ -17,7 +17,7 @@ import { swapExerciseInMesocycle, type SwapScope } from './mesocycle-edit'
 import { saveMesocycle, saveMesocycleWeek } from './mesocycle-persistence'
 import { getExerciseEntry } from './exercise-db'
 import { swapPoolMeal, type MealSlotName } from './meal-store'
-import { substituteForInjury, substituteForEquipment } from './plan-adaptations'
+import { substituteForInjury, substituteForEquipment, rebuildForInjury } from './plan-adaptations'
 import { updateProfileField } from './profile-store'
 import type { PendingActionReceipt } from './pending-actions-store'
 
@@ -150,6 +150,8 @@ export interface InjuryAdaptationPayload {
   weekNumbers: number[]
   exclusions: string[]
   reason?: string
+  /** See InjuryAdaptationMode. A time-bounded rebuild is exactly as temporary as the adaptation: pre_image restores the original weeks when it expires. */
+  mode?: InjuryAdaptationMode
 }
 
 export interface EquipmentAdaptationPayload {
@@ -180,9 +182,22 @@ export async function executeInjuryAdaptation(
   payload: InjuryAdaptationPayload,
 ): Promise<AdaptationResult> {
   const preImage = mesocycle
-  const result = await substituteForInjury({
+  // Same substitute-vs-rebuild choice as executeLastingInjury. A niggle in a
+  // joint that rules out whole patterns still can't be adapted slot by slot,
+  // and gutting the plan for two weeks is no better than gutting it forever.
+  const rebuilding = payload.mode === 'rebuild'
+  const substitution = rebuilding ? null : await substituteForInjury({
     mesocycle, profile, injuryCode: payload.injuryCode, weekNumbers: payload.weekNumbers, exclusions: payload.exclusions,
   })
+  const result = {
+    mesocycle: rebuilding
+      ? await rebuildForInjury({
+          profile, injuryCode: payload.injuryCode, exclusions: payload.exclusions,
+          mesocycle, weekNumbers: payload.weekNumbers,
+        })
+      : substitution!.mesocycle,
+    touchedSlots: substitution?.touchedSlots ?? [],
+  }
 
   if (!profile.id) {
     return { mesocycle: result.mesocycle, preImage, receipt: { landed: [], failed: [{ op: 'save', error: 'No profile to save against' }] } }
@@ -199,15 +214,32 @@ export async function executeInjuryAdaptation(
   return {
     mesocycle: result.mesocycle,
     preImage,
-    receipt: { landed: result.touchedSlots.map(s => `${s.dayName}: ${s.before} → ${s.after ?? '(removed)'}`), failed: [] },
+    receipt: {
+      landed: rebuilding
+        ? [`Rebuilt ${payload.weekNumbers.length} week${payload.weekNumbers.length === 1 ? '' : 's'} around your ${payload.injuryCode.replace('_', ' ')}`]
+        : result.touchedSlots.map(s => `${s.dayName}: ${s.before} → ${s.after ?? '(removed)'}`),
+      failed: [],
+    },
   }
 }
+
+/**
+ * Which strategy the confirmed action applies. 'substitute' swaps the
+ * conflicting slots one by one (correct when an injury removes SOME
+ * exercises). 'rebuild' regenerates the affected weeks around the injury
+ * (correct when it removes whole movement patterns, where pointwise
+ * substitution has no candidate for any of them and would simply delete a
+ * quarter of the programme). Chosen at propose time by assessAdaptation so
+ * the card the user confirms describes what will actually happen.
+ */
+export type InjuryAdaptationMode = 'substitute' | 'rebuild'
 
 export interface LastingInjuryPayload {
   injuryCode: string
   weekNumbers: number[]
   exclusions: string[]
   reason?: string
+  mode?: InjuryAdaptationMode
 }
 
 /**
@@ -233,31 +265,48 @@ export async function executeLastingInjury(
   payload: LastingInjuryPayload,
 ): Promise<AdaptationResult> {
   const preImage = mesocycle
-  const result = await substituteForInjury({
-    mesocycle, profile, injuryCode: payload.injuryCode, weekNumbers: payload.weekNumbers, exclusions: payload.exclusions,
-  })
+
+  // Rebuild path — the injury removes whole movement patterns, so there is
+  // nothing to substitute INTO and swapping slot by slot would just delete
+  // them. Regenerates the affected weeks around the injury instead. See
+  // assessAdaptation / rebuildForInjury.
+  const rebuilding = payload.mode === 'rebuild'
+  const substitution = rebuilding
+    ? null
+    : await substituteForInjury({
+        mesocycle, profile, injuryCode: payload.injuryCode, weekNumbers: payload.weekNumbers, exclusions: payload.exclusions,
+      })
+  const nextMesocycle = rebuilding
+    ? await rebuildForInjury({
+        profile, injuryCode: payload.injuryCode, exclusions: payload.exclusions,
+        mesocycle, weekNumbers: payload.weekNumbers,
+      })
+    : substitution!.mesocycle
+  const touchedSlots = substitution?.touchedSlots ?? []
 
   if (!profile.id) {
-    return { mesocycle: result.mesocycle, preImage, receipt: { landed: [], failed: [{ op: 'save', error: 'No profile to save against' }] } }
+    return { mesocycle: nextMesocycle, preImage, receipt: { landed: [], failed: [{ op: 'save', error: 'No profile to save against' }] } }
   }
 
   try {
-    const touchedWeeks = result.mesocycle.filter(w => payload.weekNumbers.includes(w.week_number))
+    const touchedWeeks = nextMesocycle.filter(w => payload.weekNumbers.includes(w.week_number))
     await Promise.all(touchedWeeks.map(w => saveMesocycleWeek(profile.id!, w)))
     if (!profile.injuries.includes(payload.injuryCode)) {
       await updateProfileField(profile.id, { injuries: [...profile.injuries, payload.injuryCode] })
     }
   } catch (err) {
     console.error('executeLastingInjury: persisting failed', err)
-    return { mesocycle: result.mesocycle, preImage, receipt: { landed: [], failed: [{ op: 'save', error: 'Could not save this — try again' }] } }
+    return { mesocycle: nextMesocycle, preImage, receipt: { landed: [], failed: [{ op: 'save', error: 'Could not save this — try again' }] } }
   }
 
   return {
-    mesocycle: result.mesocycle,
+    mesocycle: nextMesocycle,
     preImage,
     receipt: {
       landed: [
-        ...result.touchedSlots.map(s => `${s.dayName}: ${s.before} → ${s.after ?? '(removed)'}`),
+        ...(rebuilding
+          ? [`Rebuilt ${payload.weekNumbers.length} week${payload.weekNumbers.length === 1 ? '' : 's'} around your ${payload.injuryCode.replace('_', ' ')}`]
+          : touchedSlots.map(s => `${s.dayName}: ${s.before} → ${s.after ?? '(removed)'}`)),
         `Injuries: added ${payload.injuryCode.replace('_', ' ')}`,
       ],
       failed: [],

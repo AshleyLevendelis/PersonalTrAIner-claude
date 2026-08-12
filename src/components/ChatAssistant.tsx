@@ -18,7 +18,7 @@ import { pickAccountabilityCheckIn } from '@/lib/accountability'
 import { executeExerciseSwap, executeMealSwap, undoExerciseSwap, executeInjuryAdaptation, executeLastingInjury, executeInjuryRecovered, executeEquipmentAdaptation, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type LastingInjuryPayload, type InjuryRecoveredPayload, type EquipmentAdaptationPayload } from '@/lib/pending-action-executor'
 import type { SwapScope } from '@/lib/mesocycle-edit'
 import { createPlanAdaptation } from '@/lib/plan-adaptations-store'
-import { substituteForInjury, substituteForEquipment } from '@/lib/plan-adaptations'
+import { substituteForInjury, substituteForEquipment, assessAdaptation, countSlots } from '@/lib/plan-adaptations'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { useSpeechToText } from '@/hooks/useSpeechToText'
 import { useViewportInset } from '@/hooks/useViewportInset'
@@ -1031,22 +1031,36 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     })
     if (result.touchedSlots.length === 0) return null
 
-    const rows = result.touchedSlots.map(slot => ({
-      field: `${slot.dayName} (Week ${slot.weekNumber})`,
-      before: slot.before,
-      after: slot.after ?? '— removed (no safe alternative)',
-    }))
+    // Same substitute-vs-rebuild decision as the lasting-injury card. Being
+    // time-bounded doesn't make a gutted plan acceptable — two weeks of a
+    // hollow programme is still two weeks of not training.
+    const verdict = assessAdaptation(result, countSlots(mesocycle))
+    const mode: 'substitute' | 'rebuild' = verdict.shouldRebuild ? 'rebuild' : 'substitute'
+
+    const rows = mode === 'rebuild'
+      ? [{
+          field: `Weeks ${weekNumbers[0]}–${weekNumbers[weekNumbers.length - 1]}`,
+          before: `${verdict.dropped} exercises you can't train right now`,
+          after: 'rebuilt around it, same number of sessions',
+        }]
+      : result.touchedSlots.map(slot => ({
+          field: `${slot.dayName} (Week ${slot.weekNumber})`,
+          before: slot.before,
+          after: slot.after ?? '— removed (no safe alternative)',
+        }))
     const implications: { severity: 'info' | 'warn'; text: string }[] = [
       { severity: 'info', text: `Applies for ${durationDays} day${durationDays === 1 ? '' : 's'}, then eases back in automatically.` },
     ]
-    if (result.droppedPatterns.length > 0) {
+    if (mode === 'rebuild') {
+      implications.unshift({ severity: 'warn', text: `This rules out too much to patch exercise by exercise, so I'd rebuild these weeks around it rather than leave gaps — your original plan comes back automatically when it expires.` })
+    } else if (result.droppedPatterns.length > 0) {
       implications.push({ severity: 'warn', text: `Some movements had no safe alternative this round and were dropped rather than faked.` })
     }
 
     return {
       scopeKey: `${profile.id}:propose_injury_adaptation:${injuryCode}:${startWeek}`,
       preconditions: { injuryCode, startWeek, weekNumbers },
-      payload: { injuryCode, durationDays, weekNumbers, exclusions: exerciseExclusions, reason: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined },
+      payload: { injuryCode, durationDays, weekNumbers, exclusions: exerciseExclusions, mode, reason: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined },
       preImage: mesocycle,
       diff: {
         rows,
@@ -1082,28 +1096,45 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     const result = await substituteForInjury({
       mesocycle, profile, injuryCode, weekNumbers, exclusions: exerciseExclusions,
     })
+    // Substituting slot by slot only works when the injury removes SOME
+    // exercises. When it removes whole movement patterns there is nothing to
+    // substitute into, and the "adjustment" is really a mass deletion — so
+    // the card has to offer the rebuild, and say that's what it is.
+    const verdict = assessAdaptation(result, countSlots(mesocycle))
+    const mode: 'substitute' | 'rebuild' = verdict.shouldRebuild ? 'rebuild' : 'substitute'
 
-    const rows = result.touchedSlots.map(slot => ({
-      field: `${slot.dayName} (Week ${slot.weekNumber})`,
-      before: slot.before,
-      after: slot.after ?? '— removed (no safe alternative)',
-    }))
+    const rows = mode === 'rebuild'
+      ? [{
+          field: 'Your plan',
+          before: `${verdict.dropped} of ${countSlots(mesocycle)} exercises can't be trained with this injury`,
+          after: 'rebuilt around it, same number of sessions',
+        }]
+      : result.touchedSlots.map(slot => ({
+          field: `${slot.dayName} (Week ${slot.weekNumber})`,
+          before: slot.before,
+          after: slot.after ?? '— removed (no safe alternative)',
+        }))
     rows.push({
       field: 'Injuries',
       before: profile.injuries.includes(injuryCode) ? injuryCode.replace('_', ' ') : 'not listed',
       after: `${injuryCode.replace('_', ' ')} — added`,
     })
-    const implications: { severity: 'info' | 'warn'; text: string }[] = [
-      { severity: 'info', text: `Adjusts your plan for the rest of this program AND adds this to your injuries, so future plans avoid it too — this does not revert on its own.` },
-    ]
-    if (result.droppedPatterns.length > 0) {
+    const implications: { severity: 'info' | 'warn'; text: string }[] = mode === 'rebuild'
+      ? [
+          { severity: 'warn', text: `This injury rules out too much of your current plan to patch it exercise by exercise — I'd rebuild the whole programme around it instead, keeping the same number of sessions and adding work that helps the joint.` },
+          { severity: 'info', text: `It also goes on your injuries list, so future plans avoid it too — this does not revert on its own.` },
+        ]
+      : [
+          { severity: 'info', text: `Adjusts your plan for the rest of this program AND adds this to your injuries, so future plans avoid it too — this does not revert on its own.` },
+        ]
+    if (mode === 'substitute' && result.droppedPatterns.length > 0) {
       implications.push({ severity: 'warn', text: `Some movements had no safe alternative this round and were dropped rather than faked.` })
     }
 
     return {
       scopeKey: `${profile.id}:propose_injury_as_lasting:${injuryCode}:${startWeek}`,
       preconditions: { injuryCode, startWeek, weekNumbers },
-      payload: { injuryCode, weekNumbers, exclusions: exerciseExclusions, reason: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined },
+      payload: { injuryCode, weekNumbers, exclusions: exerciseExclusions, mode, reason: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined },
       preImage: mesocycle,
       diff: {
         rows,

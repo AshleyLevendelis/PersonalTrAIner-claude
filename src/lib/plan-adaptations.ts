@@ -184,6 +184,14 @@ export interface RebuildForInjuryParams {
   exclusions: string[]
   /** Preserved from the outgoing mesocycle so week numbering/labels/blocks stay stable for anything referencing them. */
   mesocycle: MesocycleWeek[]
+  /**
+   * Only these weeks are replaced; everything else is returned untouched.
+   * Omitted means the whole programme (a lasting injury). A time-bounded
+   * adaptation passes its window, so the rebuild is exactly as temporary as
+   * the adaptation is and the existing pre_image/revert machinery restores
+   * the original weeks unchanged when it expires.
+   */
+  weekNumbers?: number[]
 }
 
 /**
@@ -202,7 +210,8 @@ export interface RebuildForInjuryParams {
  * test:injury-separation protects.
  */
 export async function rebuildForInjury(params: RebuildForInjuryParams): Promise<MesocycleWeek[]> {
-  const { profile, injuryCode, exclusions, mesocycle } = params
+  const { profile, injuryCode, exclusions, mesocycle, weekNumbers } = params
+  const targetWeeks = weekNumbers ? new Set(weekNumbers) : null
   const injuredProfile: UserProfile = {
     ...profile,
     injuries: profile.injuries.includes(injuryCode) ? profile.injuries : [...profile.injuries, injuryCode],
@@ -215,9 +224,10 @@ export async function rebuildForInjury(params: RebuildForInjuryParams): Promise<
   // Keep the outgoing week identity (numbers, labels, block boundaries) so
   // anything holding a week reference — logged sets, an active session, the
   // week strip — still resolves. Only the CONTENT is replaced.
-  return rebuilt.map((week, i) => {
-    const original = mesocycle[i]
-    if (!original) return week
+  return mesocycle.map((original, i) => {
+    if (targetWeeks && !targetWeeks.has(original.week_number)) return original
+    const week = rebuilt[i]
+    if (!week) return original
     return {
       ...week,
       week_number: original.week_number,
