@@ -1304,6 +1304,7 @@ function App() {
               exercisePlan={exercisePlan}
               mesocycle={mesocycle}
               planCreatedAt={mesocycleCreatedAt ?? profile.created_at}
+              onWeightLogged={handleWeightLogged}
             />
           </TabsContent>
 
@@ -1315,7 +1316,6 @@ function App() {
               latestWeightKg={latestWeightKg}
               onMacroModeChange={handleMacroModeChange}
               onMacroSplitChange={handleMacroSplitChange}
-              onWeightLogged={handleWeightLogged}
               profileId={profile.id}
               date={getSessionDateContext(profile.id).date}
               pools={mealPools}

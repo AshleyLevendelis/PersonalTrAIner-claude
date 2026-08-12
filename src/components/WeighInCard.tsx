@@ -14,9 +14,11 @@ import { getAppNow, getLocalDateString } from '@/lib/dev-clock'
  * entry). Trend LOGIC (target adjustment from the series) is M3; this only
  * captures and displays.
  *
- * Lives on the Nutrition tab (turn 12: "one owner per fact") — Nutrition owns
- * the plan, the derivation, and the weigh-in; Dashboard keeps only a
- * read-only display of weight/trend, fed independently by data.weightTrend.
+ * Body-weight logging round: moved from the Nutrition tab to the Home/
+ * Dashboard tab, next to the trend chart it feeds — a Fat Loss user tracking
+ * progress looks at Dashboard first, and logging + seeing the trend in one
+ * place beats a plan-detail screen (Nutrition) owning the write while
+ * Dashboard only mirrored it read-only.
  */
 export function WeighInCard({ profileId, onWeightLogged }: { profileId: string; onWeightLogged?: () => void | Promise<void> }) {
   const [input, setInput] = useState('')

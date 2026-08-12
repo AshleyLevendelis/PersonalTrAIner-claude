@@ -4,7 +4,6 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Calculator, Layers } from 'lucide-react'
 import { MealPlan } from '@/components/MealPlan'
-import { WeighInCard } from '@/components/WeighInCard'
 import { MacroSplitCard } from '@/components/MacroSplitCard'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { getTodayLedger } from '@/lib/meal-store'
@@ -41,8 +40,6 @@ export interface NutritionDisplayProps {
   /** Latest daily_metrics weigh-in — overrides the immutable onboarding weight in every displayed number (living targets, M0). */
   latestWeightKg?: number | null
   onMacroModeChange?: (mode: MacroCalculationMode) => void
-  /** Fired after WeighInCard saves so App.tsx can recompute targets + latestWeightKg. */
-  onWeightLogged?: () => void | Promise<void>
   /** Macro-accuracy round, Part 2 — fired on any macro-split edit (preset tap or a Custom-mode slider). */
   onMacroSplitChange?: (patch: Partial<UserProfile>) => void
   // Turn 12 ("one owner per fact") — meals moved here from the retired
@@ -67,7 +64,7 @@ export interface NutritionDisplayProps {
 }
 
 export function NutritionDisplay({
-  profile, macros, exercisePlan = [], latestWeightKg, onMacroModeChange, onWeightLogged, onMacroSplitChange,
+  profile, macros, exercisePlan = [], latestWeightKg, onMacroModeChange, onMacroSplitChange,
   profileId, date, pools, chosen, mealTotals, isGeneratingMeals, mealRegenerateError, onDismissRegenerateError,
   unrecognisedDietaryRestrictions, onFixDietaryRestrictions,
   onSwapMealSlot, onRegenerateMealSlot, onRegenerateAllMeals,
@@ -298,13 +295,6 @@ export function NutritionDisplay({
           </p>
         </CardContent>
       </Card>
-
-      <div>
-        <p className="ds-label">Weigh-in</p>
-        <div className="mt-2.5">
-          {profile.id && <WeighInCard profileId={profile.id} onWeightLogged={onWeightLogged} />}
-        </div>
-      </div>
 
       <MacroSplitCard
         profile={profile}

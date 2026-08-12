@@ -12,6 +12,8 @@ import { getAppNow } from '@/lib/dev-clock'
 import { tabHash } from '@/lib/app-route'
 import { loadDashboardData, type DashboardData } from '@/lib/dashboard-data'
 import { getStepsForDate, logStepsManual, type DailyStepsRow } from '@/lib/steps-store'
+import { createGoal } from '@/lib/memory-store'
+import { WeighInCard } from '@/components/WeighInCard'
 import type { UserProfile, MacroTargets, WorkoutDay, MesocycleWeek } from '@/lib/types'
 
 interface DashboardProps {
@@ -20,6 +22,8 @@ interface DashboardProps {
   exercisePlan: WorkoutDay[]
   mesocycle: MesocycleWeek[]
   planCreatedAt?: string
+  /** Fired after a weigh-in is logged here so App.tsx recomputes living targets + latestWeightKg — same callback chat's log_weight already uses. */
+  onWeightLogged?: () => void | Promise<void>
 }
 
 // Tab-restructure handoff — Dashboard.tsx no longer owns the macro ring
@@ -36,27 +40,40 @@ const CALORIE_TILE_RING_CIRC = 2 * Math.PI * CALORIE_TILE_RING_R
  * compress); y maps min/max weight to an 8-48 band inside the 60-tall
  * viewBox, leaving 8px headroom top and 12px bottom, per the design
  * reference. A flat (single-value or all-equal) series renders as a
- * straight line at the vertical midpoint rather than dividing by zero. */
-function WeighInTrendChart({ series }: { series: { date: string; kg: number }[] }) {
+ * straight line at the vertical midpoint rather than dividing by zero.
+ *
+ * `goalKg`, when set, is folded into the min/max range BEFORE mapping so the
+ * goal line is always visible even when it sits outside the logged series —
+ * a Fat Loss user who just set a goal 8kg below today's weigh-in should see
+ * both on the same chart, not a goal line clipped off the top/bottom. */
+function WeighInTrendChart({ series, goalKg }: { series: { date: string; kg: number }[]; goalKg?: number | null }) {
   const width = 320
   const height = 60
   const topY = 8
   const bottomY = 48
   const kgs = series.map(p => p.kg)
-  const min = Math.min(...kgs)
-  const max = Math.max(...kgs)
+  const rangeValues = goalKg != null ? [...kgs, goalKg] : kgs
+  const min = Math.min(...rangeValues)
+  const max = Math.max(...rangeValues)
   const range = max - min
-  const points = series.map((p, i) => {
-    const x = series.length > 1 ? (i / (series.length - 1)) * width : width / 2
-    const y = range > 0 ? bottomY - ((p.kg - min) / range) * (bottomY - topY) : (topY + bottomY) / 2
-    return { x, y }
-  })
+  const toY = (kg: number) => (range > 0 ? bottomY - ((kg - min) / range) * (bottomY - topY) : (topY + bottomY) / 2)
+  const points = series.map((p, i) => ({
+    x: series.length > 1 ? (i / (series.length - 1)) * width : width / 2,
+    y: toY(p.kg),
+  }))
   const lineStr = points.map(p => `${p.x},${p.y}`).join(' ')
   const areaStr = `${points[0].x},${height} ${lineStr} ${points[points.length - 1].x},${height}`
   const last = points[points.length - 1]
+  const goalY = goalKg != null ? toY(goalKg) : null
   return (
     <svg viewBox={`0 0 ${width} ${height}`} width="100%" height={height} preserveAspectRatio="none" className="mt-2.5 block">
       <polygon points={areaStr} fill="rgba(var(--glow-rgb),.10)" />
+      {goalY != null && (
+        <>
+          <line x1={0} y1={goalY} x2={width} y2={goalY} stroke="var(--role-warn, #FFB454)" strokeWidth="1" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" opacity="0.7" />
+          <text x={width} y={goalY - 3} textAnchor="end" fontSize="8" fill="var(--role-warn, #FFB454)" opacity="0.85">goal</text>
+        </>
+      )}
       <polyline
         points={lineStr}
         fill="none"
@@ -72,7 +89,71 @@ function WeighInTrendChart({ series }: { series: { date: string; kg: number }[] 
   )
 }
 
-export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreatedAt }: DashboardProps) {
+/** Inline goal-weight setter — shown only when no body_weight_kg goal
+ * exists yet. Baseline is the latest logged weight (or the onboarding
+ * weight if nothing's been logged) at the moment the goal is set; matches
+ * `computeWeightTrend`'s own baseline-at-capture convention. */
+function GoalWeightSetter({ profileId, baselineKg, onSet }: { profileId: string; baselineKg: number; onSet: () => void | Promise<void> }) {
+  const [input, setInput] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const handleSave = async () => {
+    const kg = parseFloat(input)
+    if (!Number.isFinite(kg) || kg < 25 || kg > 350) {
+      setError('Enter a weight between 25 and 350 kg')
+      return
+    }
+    setError(null)
+    setSaving(true)
+    try {
+      await createGoal({
+        profileId,
+        metric: 'body_weight_kg',
+        trackable: 'measurable',
+        baselineValue: baselineKg,
+        baselineSource: 'logged_data',
+        targetValue: kg,
+        source: 'manual',
+        rawPhrase: `goal weight ${kg}kg`,
+        displayText: `Goal weight: ${kg} kg`,
+      })
+      setInput('')
+      await onSet()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Save failed — try again')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="mt-2 flex items-center gap-2">
+      <input
+        type="number"
+        inputMode="decimal"
+        step="0.1"
+        min={25}
+        max={350}
+        placeholder="Set a goal weight — kg"
+        value={input}
+        onChange={e => setInput(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter') handleSave() }}
+        className="h-7 min-w-0 flex-1 rounded-md bg-[color:var(--surface-raised)] px-2 text-[13px]"
+      />
+      <button
+        onClick={handleSave}
+        disabled={saving || !input}
+        className="shrink-0 text-[13px] font-semibold text-primary glow-mint disabled:opacity-40 disabled:[text-shadow:none]"
+      >
+        {saving ? 'Saving…' : 'Set'}
+      </button>
+      {error && <p className="text-xs text-destructive">{error}</p>}
+    </div>
+  )
+}
+
+export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreatedAt, onWeightLogged }: DashboardProps) {
   const activeSession = useActiveSession()
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -81,6 +162,13 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
   const [stepsInput, setStepsInput] = useState('')
 
   const [phaseExpanded, setPhaseExpanded] = useState(false)
+
+  // Bumped after a weigh-in save (from WeighInCard here, or a goal-weight
+  // set) so the effect below re-fetches — nothing else that changes when a
+  // weight is logged (session logs, date) already triggers this effect, and
+  // a chat-side log_weight only refreshes App.tsx's own latestWeightKg, not
+  // this component's independently-fetched weightSeries/weightTrend/goal.
+  const [weighInVersion, setWeighInVersion] = useState(0)
 
   useEffect(() => {
     if (!activeSession.ready || !profile.id || !macros) return
@@ -94,7 +182,12 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
     }).then(d => { if (!cancelled) setData(d) }).finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeSession.ready, activeSession.date, activeSession.logs.length, profile.id])
+  }, [activeSession.ready, activeSession.date, activeSession.logs.length, profile.id, weighInVersion])
+
+  const handleWeighInChanged = async () => {
+    setWeighInVersion(v => v + 1)
+    await onWeightLogged?.()
+  }
 
   useEffect(() => {
     if (!profile.id) return
@@ -265,10 +358,11 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
           </div>
         </div>
 
-        {/* Weigh-in — NEW trend chart (tab restructure). Read-only summary +
-            graph; logging a new weigh-in stays exclusively on Nutrition's
-            WeighInCard (per the handoff's ownership table: "weigh-in →
-            Nutrition, unchanged") — this block never writes. */}
+        {/* Weigh-in — logging + history + trend graph all live here now
+            (moved from Nutrition's WeighInCard): a Fat Loss user tracking
+            progress looks at Home first, and the log input sits right next
+            to the trend it feeds instead of a plan-detail tab mirroring it
+            read-only. A goal weight, when set, draws as a line on the chart. */}
         <div className="mt-5 pt-4" style={{ borderTop: '1px solid var(--hairline)' }}>
           <div className="flex items-baseline justify-between">
             <span className="text-[13px] text-text-tertiary">Weigh-in</span>
@@ -285,7 +379,7 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
             <p className="mt-3 text-xs text-muted-foreground">Log a weigh-in to see your trend here.</p>
           ) : (
             <>
-              <WeighInTrendChart series={data.weightSeries} />
+              <WeighInTrendChart series={data.weightSeries} goalKg={data.weightGoalKg} />
               <div className="mt-1.5 flex items-baseline justify-between">
                 <span className="text-[10px] uppercase tracking-[.12em] text-muted-foreground">{data.weightSeries.length} weigh-in{data.weightSeries.length === 1 ? '' : 's'}</span>
                 {data.weightSeries.length > 1 && (
@@ -298,6 +392,18 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
                 )}
               </div>
             </>
+          )}
+          {data.weightGoalKg == null && profile.id && (
+            <GoalWeightSetter
+              profileId={profile.id}
+              baselineKg={data.weightSeries[data.weightSeries.length - 1]?.kg ?? profile.weight_kg}
+              onSet={handleWeighInChanged}
+            />
+          )}
+          {profile.id && (
+            <div className="mt-3">
+              <WeighInCard profileId={profile.id} onWeightLogged={handleWeighInChanged} />
+            </div>
           )}
         </div>
 

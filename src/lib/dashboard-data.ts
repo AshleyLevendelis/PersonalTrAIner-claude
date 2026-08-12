@@ -70,6 +70,8 @@ export interface DashboardData {
   weightTrend: WeightTrendResult | null
   /** Oldest-first — for the Home trend chart (tab-restructure). Same source as weightTrend (getRecentWeighIns), just re-mapped/re-ordered for charting rather than averaging. */
   weightSeries: WeightSeriesPoint[]
+  /** The active body_weight_kg goal's target, if one exists — drawn as a reference line on the Home trend chart. Null when no goal has been set (no UI existed to set one before this; chat's record_goal was the only path). */
+  weightGoalKg: number | null
   recentPRs: RecentPR[]
   streak: number
   whatsLeftLine: string | null
@@ -293,6 +295,7 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
     fatTarget: ledger.targets.fat,
     weightTrend,
     weightSeries,
+    weightGoalKg: weightGoal?.target_value ?? null,
     recentPRs,
     streak: streakResult.currentStreak,
     whatsLeftLine,
