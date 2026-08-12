@@ -6,7 +6,7 @@ import type {
   WorkoutDay, ConstraintTrace, PlanResult, TrainingExperience, RecoveryCapacity, FitnessGoal,
 } from './types'
 import { getSkillDemand, isSkillAppropriate } from './experience-config'
-import { categorize, isImprovisedLoadImplement, IMPROVISED_IMPLEMENT_CEILING_KG, estimateEffectiveTotalKg, isExternallyLoaded, prescribeLoad, getEquipmentFloorKg, loadingMode, unverifiedRampStepKg } from './load-prescription'
+import { categorize, isImprovisedLoadImplement, IMPROVISED_IMPLEMENT_CEILING_KG, estimateEffectiveTotalKg, isExternallyLoaded, prescribeLoad, getEquipmentFloorKg, getLoadingCeilingKg, loadingMode, unverifiedRampStepKg } from './load-prescription'
 
 // A genuine outer-bound safety backstop — not a conservatism patch (the
 // capability-model round replaced the old CATEGORY_CAPS_KG, which existed to
@@ -75,7 +75,7 @@ export interface AuditFailure {
     | 'superset_pairing' | 'load_progression' | 'set_progression' | 'goal_structure' | 'recovery_volume'
     | 'swap_constraint' | 'swap_load' | 'ban_purge' | 'prescription_unit' | 'capability_gate'
     | 'improvised_carry_cap' | 'pattern_coverage' | 'rotation_relative_load' | 'phase_sequence'
-    | 'ramp_up_missing' | 'calibration_load_ceiling' | 'block_transition_jump'
+    | 'ramp_up_missing' | 'calibration_load_ceiling' | 'block_transition_jump' | 'loading_ceiling'
   combination: string
   details: string
   exercise?: string
@@ -358,6 +358,30 @@ function runSingleAudit(
         check: 'load_cap',
         combination: comboLabel,
         details: `Suggested load ${ex.suggested_load_kg}kg exceeds the ${cap}kg outer-bound safety ceiling for category "${category}"`,
+        exercise: ex.name,
+      })
+    }
+  }
+
+  // CHECK 7z: SAFETY NET, must never actually fire — no suggested load
+  // exceeds its implement's realistic physical ceiling
+  // (LOADING_CEILING_KG_PER_HAND_OR_TOTAL). prescribeLoad already clamps and
+  // warns when this happens; this check exists to FAIL THE AUDIT if it ever
+  // does, on the theory that a ceiling silently doing its job is a passing
+  // grid hiding a real defect, not a passing grid. See the "88kg Kettlebell
+  // Swings" incident (applyReplacement's missing primer guard) for exactly
+  // the kind of upstream bug this is meant to surface rather than absorb.
+  for (const ex of allExercises) {
+    if (ex.suggested_load_kg == null) continue
+    const entry = EXERCISE_DATABASE.find(e => e.name === ex.name)
+    if (!entry) continue
+    const category = categorize(entry)
+    const ceiling = getLoadingCeilingKg(entry, category)
+    if (ex.suggested_load_kg > ceiling) {
+      failures.push({
+        check: 'loading_ceiling',
+        combination: comboLabel,
+        details: `"${ex.name}" suggested load ${ex.suggested_load_kg}kg exceeds the ${ceiling}kg realistic implement ceiling — prescribeLoad's clamp caught this, which means something upstream computed a wrong number`,
         exercise: ex.name,
       })
     }
@@ -924,12 +948,27 @@ async function runMesocycleBehaviorChecks(): Promise<AuditTestCase[]> {
             for (const ex of day.exercises) {
               if (ex.suggested_load_kg == null) continue
               const entry = EXERCISE_DATABASE.find(e => e.name === ex.name)
-              if (!entry || !isImprovisedLoadImplement(entry)) continue
-              if (ex.suggested_load_kg > ceiling) {
+              if (!entry) continue
+              if (isImprovisedLoadImplement(entry) && ex.suggested_load_kg > ceiling) {
                 failures.push({
                   check: 'improvised_carry_cap',
                   combination: comboLabel,
                   details: `week ${week.week_number} ${day.day} "${ex.name}" ${ex.suggested_load_kg}kg exceeds the ${ceiling}kg improvised-implement ceiling for "${experience}"`,
+                  exercise: ex.name,
+                })
+              }
+              // SAFETY NET (see CHECK 7z above for the base-plan version) —
+              // the same implement-ceiling check, but across every week of a
+              // full periodized mesocycle, since a within-block ramp or a
+              // block-boundary rotation could theoretically push a
+              // clean-at-week-1 exercise over the ceiling in a later week.
+              const loadingCategory = categorize(entry)
+              const loadingCeiling = getLoadingCeilingKg(entry, loadingCategory)
+              if (ex.suggested_load_kg > loadingCeiling) {
+                failures.push({
+                  check: 'loading_ceiling',
+                  combination: comboLabel,
+                  details: `week ${week.week_number} ${day.day} "${ex.name}" ${ex.suggested_load_kg}kg exceeds the ${loadingCeiling}kg realistic implement ceiling`,
                   exercise: ex.name,
                 })
               }

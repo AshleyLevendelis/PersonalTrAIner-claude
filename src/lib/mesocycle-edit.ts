@@ -86,18 +86,38 @@ export async function recomputeLoad(
   })
 }
 
-/** Rebuilds an Exercise slot around a NEW movement — every load/tier/pattern field recomputed, programming (sets/reps/rest) carried over from the slot being replaced. */
+/**
+ * Rebuilds an Exercise slot around a NEW movement — every load/tier/pattern
+ * field recomputed, programming (sets/reps/rest) carried over from the slot
+ * being replaced.
+ *
+ * A primer-tier replacement (getSmartReplacements/getReplacementCandidates
+ * never exclude primers — a same-tier candidate scores highest, so a swap or
+ * ban can land one here same as any other movement) must stay submaximal and
+ * un-scaled, exactly like every generation-time construction site already
+ * enforces via an isPrimer guard. Without this, `load` (still a real
+ * prescribeLoad result computed by the caller for every replacement,
+ * regardless of tier) got written straight through — a warm-up movement
+ * ending up with a genuine working-weight number while `intensity` was left
+ * however the OUTGOING (possibly non-primer) slot had it, e.g. a live report
+ * of Kettlebell Swings prescribed 88kg under an "RPE"-less label. `intensity`
+ * is the one field this function otherwise never touches (it's carried via
+ * the `...slot` spread) — a primer needs it forced, since the outgoing slot
+ * may not have been a primer at all.
+ */
 export function applyReplacement(slot: Exercise, entry: ExerciseEntry, load: LoadPrescription): Exercise {
+  const isPrimer = entry.mechanics_tier === 'primer'
   return {
     ...slot,
     id: entry.id,
     name: entry.name,
     substitution: '',
     superset_label: undefined,
-    suggested_load: load.display,
-    suggested_load_kg: load.starting_weight_kg,
-    per_set_load: load.per_set,
-    load_guidance: load.basis,
+    intensity: isPrimer ? 'Light — movement prep' : slot.intensity,
+    suggested_load: isPrimer ? 'Light' : load.display,
+    suggested_load_kg: isPrimer ? null : load.starting_weight_kg,
+    per_set_load: isPrimer ? null : load.per_set,
+    load_guidance: isPrimer ? 'Stay light and controlled. This is preparation, not a working set.' : load.basis,
     movement_pattern: mapMovementPattern(entry.movement_pattern),
     tier: mapTier(entry.mechanics_tier),
     fatigue_cost: deriveFatigueCost(entry),

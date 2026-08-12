@@ -452,6 +452,58 @@ export function getEquipmentFloorKg(entry: ExerciseEntry): number {
   return LOADING_FLOOR_KG[loadingMode(entry)]
 }
 
+/**
+ * The highest weight a given loading mode can realistically put in
+ * someone's hands or on a machine — the ceiling counterpart to
+ * LOADING_FLOOR_KG. Same units as whatever prescribeLoad's `rounded`
+ * already holds for that mode: for 'dumbbell' that is PER HAND (after the
+ * per-side halving prescribeLoad applies, matching the "~Nkg per hand"
+ * display) — NEVER the total weight of the pair. Everything else is total.
+ *
+ * This is a safety NET, not a fix — see the console.warn at its one call
+ * site in prescribeLoad. A clamp that silently makes a wrong number look
+ * plausible is worse than no clamp: the "88kg Kettlebell Swings" bug was
+ * only found because 88kg was obviously absurd for that exercise; clipped
+ * quietly to 48kg it would have looked like a real prescription and the
+ * actual defect (a missing primer guard in the swap path) would have
+ * shipped invisibly. If this ceiling is ever actually hit in a real plan,
+ * that means something upstream is still wrong, not that the ceiling did
+ * its job — scripts/run-constraint-audit.ts's 'loading_ceiling' check
+ * fails the whole audit if it ever fires across the standard combo grid.
+ *
+ * Values are full-gym ceilings and do not scale down by equipment tier —
+ * a home_gym/minimalist trainee's actual adjustable dumbbells realistically
+ * top out well below 50kg. Tracked in BACKLOG.md as a follow-up, not
+ * addressed here.
+ *
+ * - dumbbell 50kg per hand — commercial fixed-dumbbell racks commonly top out around there
+ * - single_implement (kettlebell / single dumbbell) 48kg — top of commercial kettlebell ranges
+ * - ez_bar 60kg — a curl/skullcrusher bar, not a pressing bar; far fewer plates fit than an Olympic bar
+ * - barbell 300kg — bar + realistic plate loading, clears an advanced deadlift with room
+ * - stack 100kg — most cable/machine stacks top out there (leg press is the one exception — see LEG_PRESS_CEILING_KG)
+ */
+const LOADING_CEILING_KG_PER_HAND_OR_TOTAL: Record<LoadingMode, number> = {
+  dumbbell: 50, // PER HAND — never the total pair load
+  single_implement: 48,
+  barbell: 300,
+  ez_bar: 60,
+  stack: 100,
+}
+
+// Leg press sits on the 'stack' loading mode but is a fundamentally
+// different machine — a real leg press sled routinely loads well past a
+// cable stack's pin-selected weight (DERIVED_COMPOUND_SCALE already scales
+// it 2.2x squat 1RM for exactly this reason — see that table's doc
+// comment). Using the generic stack ceiling here would clip a genuinely
+// achievable advanced leg press number.
+const LEG_PRESS_CEILING_KG = 400
+
+/** The realistic implement ceiling for this exercise, in the same units prescribeLoad's `rounded` already uses for its loading mode (per hand for a dumbbell pair, total otherwise). */
+export function getLoadingCeilingKg(entry: ExerciseEntry, category: string | null): number {
+  if (category === 'leg_press') return LEG_PRESS_CEILING_KG
+  return LOADING_CEILING_KG_PER_HAND_OR_TOTAL[loadingMode(entry)]
+}
+
 /** Round to something actually loadable rather than a number like 43.7kg. */
 export function roundToPlate(kg: number, mode: LoadingMode): number {
   const floor = LOADING_FLOOR_KG[mode]
@@ -978,6 +1030,22 @@ export function prescribeLoad(
     }
 
     rounded = roundToPlate(estimate, mode)
+  }
+
+  // SAFETY ceiling — general per-implement cap, checked before the
+  // improvised-implement override below so a genuine implement-ceiling hit
+  // is never silently absorbed by that separate, much tighter clamp. Logs
+  // rather than clamping quietly — see LOADING_CEILING_KG_PER_HAND_OR_TOTAL's
+  // doc comment for why a clip that looks plausible afterward is worse than
+  // no clip at all.
+  const loadingCeiling = getLoadingCeilingKg(entry, category)
+  if (rounded > loadingCeiling) {
+    console.warn(
+      `[Load Prescription] "${entry.name}" computed ${rounded}kg, above the ${loadingCeiling}kg realistic ` +
+      `ceiling for its implement — clamping. This is a safety net, not a fix: something upstream produced ` +
+      `a wrong number and should be traced, not just the clamp trusted.`
+    )
+    rounded = Math.min(rounded, loadingCeiling)
   }
 
   // SAFETY ceiling — applied last, after both the estimate path and the
