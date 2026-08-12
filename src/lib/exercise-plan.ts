@@ -1873,12 +1873,36 @@ function substituteFloorClampedIsolation(
     const entry = findEntry(exercises[i].name)
     if (!entry || !isolationTargetBelowFloor(entry, profile)) continue
 
+    // Every other exercise-adding pass in this file (fillSlot, pickFromTier,
+    // refill, balanceWeeklyStructure's swap/addExercise) excludes a
+    // candidate whose movement family already appears elsewhere in the same
+    // day — this one didn't, because it only ever matched on
+    // substitution_group. That's not the same key: Close-Grip Lat Pulldown
+    // sits in substitution_group 'row' (it's a row-adjacent lat exercise)
+    // but movement family 'pulldown' (MOVEMENT_FAMILIES override, since
+    // it's genuinely the same movement as Lat Pulldown wearing a grip
+    // variant). A barbell/EZ-bar row whose target rounded below the bar
+    // floor would pick it as the lowest-floor 'row'-group sibling even when
+    // Lat Pulldown was already sitting on the same day — two pulldowns,
+    // identical prescription, on the same session.
+    const otherFamilies = new Set(
+      exercises
+        .filter((_, j) => j !== i)
+        .map(ex => findEntry(ex.name))
+        .filter((e): e is ExerciseEntry => !!e)
+        .map(e => getMovementFamily(e)),
+    )
+
     // Lowest-floor same-substitution_group sibling available in the
     // constrained pool — equipment/injury/experience filtering has
     // already run by this point, so every candidate here is genuinely
     // eligible for this trainee, not just theoretically lower-floor.
     const sibling = pool
-      .filter(e => e.substitution_group === entry.substitution_group && e.name !== entry.name)
+      .filter(e =>
+        e.substitution_group === entry.substitution_group &&
+        e.name !== entry.name &&
+        !otherFamilies.has(getMovementFamily(e)),
+      )
       .sort((a, b) => getEquipmentFloorKg(a) - getEquipmentFloorKg(b))[0]
     if (!sibling) continue
 
