@@ -23,6 +23,7 @@
 import type { UserProfile, MacroTargets, WorkoutDay } from './types'
 import { calculateDailyMacros, getStaticDailyMacros, computeBMR, computeStaticTDEE } from './macro-calculator'
 import { getDailyMetrics, upsertNutritionTarget, getNutritionTargets } from './daily-tracking'
+import { computeWeightTrend } from './weight-trend'
 import { supabase } from './supabase'
 
 export interface ComputeTargetsOptions {
@@ -92,17 +93,84 @@ export async function getRecentWeighIns(profileId: string, limit = 7): Promise<{
 }
 
 /**
+ * A rolling-average move smaller than this is treated as day-to-day water/
+ * food/sodium noise (commonly 1-2% of bodyweight), not a real enough trend
+ * shift to retune calorie/macro targets over. Flat kg rather than a percent
+ * of bodyweight — simpler to reason about and close enough across the
+ * app's realistic bodyweight range that a percent-based band wasn't worth
+ * the extra complexity.
+ */
+export const TARGET_WEIGHT_ANCHOR_THRESHOLD_KG = 1
+
+export interface EffectiveTargetWeight {
+  /** The weight to feed into computeTargets — either a fresh 7-day average (the anchor moved) or last time's anchor held flat (the move was inside the noise band). */
+  weightKg: number
+  /** True only when a PRIOR anchor existed and this call moved away from it — the signal a caller uses to decide whether a "your target changed" notice is warranted. False for a first-ever anchor (nothing to compare against) or a within-band move (nothing changed). */
+  anchorMoved: boolean
+}
+
+/**
+ * The weight figure that should drive calorie/macro TARGETS — distinct from
+ * getLatestWeightKg, which stays a single day's reading for DISPLAY purposes
+ * ("your current weight is X") and is untouched by this. Reuses weight-
+ * trend.ts's computeWeightTrend (the same 7-day rolling average already
+ * driving the Dashboard chart) rather than a second averaging
+ * implementation, and only moves the "anchor" once that average has shifted
+ * at least TARGET_WEIGHT_ANCHOR_THRESHOLD_KG from whatever average last set
+ * the standing target — see that constant's doc comment for why. The
+ * anchor is read from/written to daily_nutrition_targets.calculated_weight_kg
+ * (the same versioned snapshot table that already tracks BMR/TDEE per
+ * change) so it stays consistent across devices rather than drifting per
+ * client, the way a localStorage-only tracker would.
+ */
+export async function getEffectiveTargetWeightKg(
+  profileId: string,
+  fallbackWeightKg: number,
+): Promise<EffectiveTargetWeight> {
+  const todayStr = new Date().toISOString().split('T')[0]
+  const recentWeighIns = await getRecentWeighIns(profileId, 14)
+  const trend = computeWeightTrend(
+    recentWeighIns.map(w => ({ date: w.date, weightKg: w.weight_kg })),
+    todayStr,
+    null,
+  )
+  if (!trend) return { weightKg: fallbackWeightKg, anchorMoved: false }
+
+  const recentTargets = await getNutritionTargets(profileId, '1970-01-01', todayStr).catch(() => [])
+  const lastAnchorKg = recentTargets.length > 0
+    ? recentTargets[recentTargets.length - 1].calculated_weight_kg ?? null
+    : null
+
+  if (lastAnchorKg == null) return { weightKg: trend.rollingAvgKg, anchorMoved: false }
+  if (Math.abs(trend.rollingAvgKg - lastAnchorKg) >= TARGET_WEIGHT_ANCHOR_THRESHOLD_KG) {
+    return { weightKg: trend.rollingAvgKg, anchorMoved: true }
+  }
+  return { weightKg: lastAnchorKg, anchorMoved: false }
+}
+
+export interface SnapshotResult {
+  /** True whenever a new row was written — includes a profile's very first-ever snapshot, which is not "the target changed" (there was nothing to change FROM). */
+  snapshotted: boolean
+  /** True only when a new row was written AND a prior snapshot existed with genuinely different numbers — the one signal a caller should use to show a "your target changed" notice. */
+  changedFromPrior: boolean
+}
+
+/**
  * Version today's effective targets into daily_nutrition_targets when they
  * differ from the most recent snapshot (or none exists). Fire-and-forget
  * from the caller's perspective — a failed snapshot must never block
- * rendering targets. Returns whether a snapshot was written.
+ * rendering targets. `anchorWeightKg` should be the SAME weight that
+ * produced `targets` (getEffectiveTargetWeightKg's result for the living-
+ * targets path, or plain profile.weight_kg at onboarding) — persisted into
+ * calculated_weight_kg so the next call can read it back as "the anchor
+ * targets last moved from."
  */
 export async function snapshotTargetsIfChanged(
   profileId: string,
   profile: UserProfile,
   targets: MacroTargets,
-  latestWeightKg?: number | null,
-): Promise<boolean> {
+  anchorWeightKg?: number | null,
+): Promise<SnapshotResult> {
   try {
     const today = new Date().toISOString().split('T')[0]
     const recent = await getNutritionTargets(profileId, '1970-01-01', today)
@@ -115,9 +183,9 @@ export async function snapshotTargetsIfChanged(
       last.target_carbs_g === targets.carbs &&
       last.target_fats_g === targets.fat
 
-    if (unchanged) return false
+    if (unchanged) return { snapshotted: false, changedFromPrior: false }
 
-    const eff = effectiveProfile(profile, latestWeightKg)
+    const eff = effectiveProfile(profile, anchorWeightKg)
     const bmr = computeBMR(eff)
     await upsertNutritionTarget({
       profile_id: profileId,
@@ -129,10 +197,11 @@ export async function snapshotTargetsIfChanged(
       target_fats_g: targets.fat,
       calculated_bmr: bmr,
       calculated_tdee: computeStaticTDEE(bmr, eff.activity_level),
+      calculated_weight_kg: anchorWeightKg ?? eff.weight_kg,
     })
-    return true
+    return { snapshotted: true, changedFromPrior: last != null }
   } catch (err) {
     console.error('Target snapshot failed (non-blocking):', err)
-    return false
+    return { snapshotted: false, changedFromPrior: false }
   }
 }

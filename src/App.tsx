@@ -22,7 +22,8 @@ import { useAppRoute, tabHash, isTab, isKnownTabHash, type Tab } from '@/lib/app
 
 import { calculateCalories } from '@/lib/calculations'
 import { computeBMR, computeStaticTDEE } from '@/lib/macro-calculator'
-import { computeTargets, getLatestWeightKg, snapshotTargetsIfChanged } from '@/lib/nutrition-targets'
+import { computeTargets, getLatestWeightKg, getEffectiveTargetWeightKg, snapshotTargetsIfChanged } from '@/lib/nutrition-targets'
+import { describeGoalProximity, isGoalProximityDismissed, dismissGoalProximity } from '@/lib/goal-proximity'
 import { upsertDailyMetric } from '@/lib/daily-tracking'
 import { generateExercisePlan, generateMesocycle } from '@/lib/exercise-plan'
 import { getPools, swapPoolMeal, getMealPicksForDate, setMealPick, clearMealPick, clearAllMealPicksForDate, type MealSlotName } from '@/lib/meal-store'
@@ -55,14 +56,22 @@ function App() {
     route.kind === 'tab' ? route.tab : route.kind === 'program' || route.kind === 'train' ? 'exercise' : 'nutrition'
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [macros, setMacros] = useState<MacroTargets | null>(null)
-  /** Latest daily_metrics weigh-in — overrides the (immutable) onboarding weight in every target computation. Null until the user first weighs in. */
+  /** Latest daily_metrics weigh-in — DISPLAY only ("your current weight is X"). Null until the user first weighs in. Target computation uses targetWeightAnchorKg instead (see its own doc comment) — the two intentionally diverge: this always shows the real latest reading, the anchor only moves once that reading's 7-day average has shifted enough to matter. */
   const [latestWeightKg, setLatestWeightKg] = useState<number | null>(null)
+  /** The weight that actually drives computeTargets — a threshold-gated 7-day average (getEffectiveTargetWeightKg), not the raw latest reading. Kept separate from latestWeightKg so a noisy day-to-day swing never retunes calories on its own; only a real trend move does. Null until the first target computation resolves it. */
+  const [targetWeightAnchorKg, setTargetWeightAnchorKg] = useState<number | null>(null)
   const [exercisePlan, setExercisePlan] = useState<WorkoutDay[]>([])
   const [mesocycle, setMesocycle] = useState<MesocycleWeek[]>([])
-  // Client-authored messages from an auto-reverted injury/equipment
-  // adaptation (checkAndRevertExpiredAdaptations) — never model prose,
-  // same convention as every other receipt in this app. Dismissible.
-  const [adaptationMessages, setAdaptationMessages] = useState<string[]>([])
+  // Client-authored dismissible notices — never model prose, same
+  // convention as every other receipt in this app. Three sources feed this
+  // one list: an auto-reverted injury/equipment adaptation
+  // (checkAndRevertExpiredAdaptations), a living-target recalculation
+  // (snapshotTargetsIfChanged's changedFromPrior), and a goal-proximity ask
+  // (goal-proximity.ts). goalId is set only for the last of those — its
+  // dismiss must also persist via dismissGoalProximity so it doesn't
+  // reappear next load; the other two are naturally one-shot already (see
+  // each push site's own comment).
+  const [adaptationMessages, setAdaptationMessages] = useState<{ text: string; goalId?: string }[]>([])
   /** When the CURRENT mesocycle was generated — anchors live-week detection (falls back to profile.created_at for legacy profiles without persisted weeks). */
   const [mesocycleCreatedAt, setMesocycleCreatedAt] = useState<string | null>(null)
   // Meal pools (M1): every generated option per slot, keyed by slot — the
@@ -389,18 +398,41 @@ function App() {
         console.error('Backfilling onboarding weigh-in failed:', err)
       }
     }
+    // targetWeightAnchorKg (not restoredWeight) drives the actual target
+    // number — a threshold-gated 7-day average, so a single noisy reading
+    // doesn't retune calories on its own. See getEffectiveTargetWeightKg's
+    // doc comment.
+    const effectiveTargetWeight = await getEffectiveTargetWeightKg(
+      restoredProfile.id!,
+      restoredWeight ?? restoredProfile.weight_kg,
+    )
     const liveTargets = computeTargets(restoredProfile, {
-      latestWeightKg: restoredWeight,
+      latestWeightKg: effectiveTargetWeight.weightKg,
       exercisePlan: restoredExercises,
     })
 
     setProfile(restoredProfile)
     setLatestWeightKg(restoredWeight)
+    setTargetWeightAnchorKg(effectiveTargetWeight.weightKg)
     setMacros(liveTargets)
     setMealPools(restoredPools)
     setExercisePlan(restoredExercises)
     setMesocycle(restoredMesocycle)
     setIsRestoring(false)
+
+    // Goal-proximity nudge (ask-first, never auto-changes anything — see
+    // goal-proximity.ts's own doc comment): checked against the same
+    // threshold-gated weight the targets themselves just used.
+    if (restoredProfile.id) {
+      getActiveGoals(restoredProfile.id).then(goals => {
+        const weightGoal = goals.find(g => g.metric === 'body_weight_kg')
+        if (!weightGoal) return
+        const info = describeGoalProximity(effectiveTargetWeight.weightKg, weightGoal)
+        if (info && !isGoalProximityDismissed(info.goalId)) {
+          setAdaptationMessages(prev => prev.some(m => m.goalId === info.goalId) ? prev : [...prev, { text: info.message, goalId: info.goalId }])
+        }
+      }).catch(console.error)
+    }
 
     // Persisted per-date meal picks (UX-sweep fix) — a confirmed swap must
     // survive reload, not just live in manualMealPicks React state.
@@ -422,14 +454,21 @@ function App() {
             return [...byWeek.values()].sort((a, b) => a.week_number - b.week_number)
           })
         }
-        if (result.messages.length > 0) setAdaptationMessages(prev => [...prev, ...result.messages])
+        if (result.messages.length > 0) setAdaptationMessages(prev => [...prev, ...result.messages.map(text => ({ text }))])
       }).catch(console.error)
     }
     if (restoredProfile.id) { void reloadMemory(restoredProfile.id); void reloadGrocery(restoredProfile.id) }
 
     // Version today's targets when they differ from the last snapshot —
-    // fire-and-forget; the M3 trend loop reads this history.
-    snapshotTargetsIfChanged(restoredProfile.id!, restoredProfile, liveTargets, restoredWeight)
+    // fire-and-forget; the M3 trend loop reads this history. changedFromPrior
+    // (a real move from an EXISTING prior snapshot, not a profile's first
+    // one ever) is the one-time "your target changed" notice trigger.
+    snapshotTargetsIfChanged(restoredProfile.id!, restoredProfile, liveTargets, effectiveTargetWeight.weightKg)
+      .then(result => {
+        if (result.changedFromPrior) {
+          setAdaptationMessages(prev => [...prev, { text: `Your calorie target updated to ${liveTargets.calories} kcal, based on your recent weigh-ins.` }])
+        }
+      })
   }
 
   const handleOnboardingComplete = async (userProfile: UserProfile) => {
@@ -1140,11 +1179,15 @@ function App() {
     setProfile(updated)
     // Living targets: mode is one of computeTargets' inputs, so the shared
     // macros state must recompute the moment it changes — the chat and the
-    // Nutrition tab both read this state and must always agree.
-    const targets = computeTargets(updated, { latestWeightKg, exercisePlan })
+    // Nutrition tab both read this state and must always agree. Reuses the
+    // CURRENT targetWeightAnchorKg rather than recomputing a fresh average —
+    // nothing about weight changed here, only the calculation method, so
+    // there's nothing to re-anchor and no "your target changed" notice to
+    // show (the user just deliberately changed it themselves).
+    const targets = computeTargets(updated, { latestWeightKg: targetWeightAnchorKg, exercisePlan })
     setMacros(targets)
     if (profile.id) {
-      snapshotTargetsIfChanged(profile.id, updated, targets, latestWeightKg)
+      snapshotTargetsIfChanged(profile.id, updated, targets, targetWeightAnchorKg)
       await supabase
         .from('fitness_profiles')
         .update({ macro_calculation_mode: mode })
@@ -1160,14 +1203,16 @@ function App() {
     ) as Partial<UserProfile>
     const updated = { ...profile, ...patch }
     setProfile(updated)
-    const targets = computeTargets(updated, { latestWeightKg, exercisePlan })
+    // Same reasoning as handleMacroModeChange above — reuse the current
+    // anchor, no weight moved, no notice.
+    const targets = computeTargets(updated, { latestWeightKg: targetWeightAnchorKg, exercisePlan })
     setMacros(targets)
-    snapshotTargetsIfChanged(profile.id, updated, targets, latestWeightKg)
+    snapshotTargetsIfChanged(profile.id, updated, targets, targetWeightAnchorKg)
     supabase.from('fitness_profiles').update(patch).eq('id', profile.id).then(({ error }) => {
       if (error) {
         console.error('Macro split save failed — reverting', error)
         setProfile(prev => (prev ? { ...prev, ...revertPatch } : prev))
-        const revertedTargets = computeTargets({ ...updated, ...revertPatch }, { latestWeightKg, exercisePlan })
+        const revertedTargets = computeTargets({ ...updated, ...revertPatch }, { latestWeightKg: targetWeightAnchorKg, exercisePlan })
         setMacros(revertedTargets)
       }
     })
@@ -1178,9 +1223,29 @@ function App() {
     if (!profile?.id) return
     const weight = await getLatestWeightKg(profile.id).catch(() => null)
     setLatestWeightKg(weight)
-    const targets = computeTargets(profile, { latestWeightKg: weight, exercisePlan })
+    // A fresh weigh-in is exactly the case the anchor threshold exists for —
+    // recompute it (it may or may not actually move, see
+    // getEffectiveTargetWeightKg's doc comment) rather than assuming this
+    // new reading itself is the new anchor.
+    const effectiveTargetWeight = await getEffectiveTargetWeightKg(profile.id, weight ?? profile.weight_kg)
+    setTargetWeightAnchorKg(effectiveTargetWeight.weightKg)
+    const targets = computeTargets(profile, { latestWeightKg: effectiveTargetWeight.weightKg, exercisePlan })
     setMacros(targets)
-    snapshotTargetsIfChanged(profile.id, profile, targets, weight)
+    snapshotTargetsIfChanged(profile.id, profile, targets, effectiveTargetWeight.weightKg).then(result => {
+      if (result.changedFromPrior) {
+        setAdaptationMessages(prev => [...prev, { text: `Your calorie target updated to ${targets.calories} kcal, based on your recent weigh-ins.` }])
+      }
+    })
+
+    // Goal-proximity nudge — same ask-first check as the initial load path.
+    const goals = await getActiveGoals(profile.id).catch(() => [])
+    const weightGoal = goals.find(g => g.metric === 'body_weight_kg')
+    if (weightGoal) {
+      const info = describeGoalProximity(effectiveTargetWeight.weightKg, weightGoal)
+      if (info && !isGoalProximityDismissed(info.goalId)) {
+        setAdaptationMessages(prev => prev.some(m => m.goalId === info.goalId) ? prev : [...prev, { text: info.message, goalId: info.goalId }])
+      }
+    }
   }
 
   if (isRestoring) {
@@ -1283,10 +1348,13 @@ function App() {
           <div className="space-y-2">
             {adaptationMessages.map((msg, i) => (
               <InsightBanner key={i} tone="ai" className="items-start justify-between">
-                <span>{msg}</span>
+                <span>{msg.text}</span>
                 <button
                   type="button"
-                  onClick={() => setAdaptationMessages(prev => prev.filter((_, idx) => idx !== i))}
+                  onClick={() => {
+                    if (msg.goalId) dismissGoalProximity(msg.goalId)
+                    setAdaptationMessages(prev => prev.filter((_, idx) => idx !== i))
+                  }}
                   className="shrink-0 text-xs underline opacity-70 hover:opacity-100"
                   aria-label="Dismiss"
                 >

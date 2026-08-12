@@ -481,6 +481,8 @@ export interface DailyNutritionTarget {
   calculated_bmr?: number
   estimated_eee?: number
   calculated_tdee?: number
+  /** The weight (kg) actually used to derive this snapshot's targets — the 7-day-average anchor from getEffectiveTargetWeightKg, not necessarily the latest single weigh-in. Null on rows written before this field existed. */
+  calculated_weight_kg?: number | null
   created_at?: string
   updated_at?: string
 }
