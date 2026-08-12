@@ -933,14 +933,34 @@ async function runMesocycleBehaviorChecks(): Promise<AuditTestCase[]> {
   // Dumbbell Rows slot as "~56kg per hand."
   {
     const equipmentOptions: EquipmentAccess[] = ['full_gym', 'home_gym', 'minimalist', 'bodyweight']
+    // Every load calculation in load-prescription.ts scales off profile.weight_kg
+    // (bodyweight-relative standards tables) and profile.gender (separate
+    // male/female standards) — this sweep previously ran exactly one
+    // hardcoded body (80kg male) through every equipment x experience
+    // combo, so any load defect that only shows up at a different bodyweight
+    // or for a female profile was structurally invisible to this audit. This
+    // is exactly how the categorize() substring-ordering bug (Bulgarian
+    // Split Squats/Romanian Deadlifts falling through to the full squat/
+    // deadlift standard instead of their scaled-down derived category) went
+    // undetected: it manifests for ANY bodyweight, but the audit never
+    // varied bodyweight or gender to find it.
+    const weightGenderOptions: { weightKg: number; gender: 'male' | 'female' }[] = [
+      { weightKg: 50, gender: 'female' },
+      { weightKg: 62, gender: 'female' },
+      { weightKg: 70, gender: 'male' },
+      { weightKg: 80, gender: 'male' },
+      { weightKg: 100, gender: 'male' },
+      { weightKg: 120, gender: 'male' },
+    ]
     for (const equipment of equipmentOptions) {
       for (const experience of ALL_EXPERIENCE) {
-        const comboLabel = `[mesocycle safety] equipment=${equipment} experience=${experience}`
-        const failures: AuditFailure[] = []
-        const profile = baseMesocycleProfile({ equipment_access: equipment, training_experience: experience })
-        setRandomSource(seededRngFromKey(comboLabel))
-        const meso = generateMesocycle(profile)
-        resetRandomSource()
+        for (const { weightKg, gender } of weightGenderOptions) {
+          const comboLabel = `[mesocycle safety] equipment=${equipment} experience=${experience} weight=${weightKg} gender=${gender}`
+          const failures: AuditFailure[] = []
+          const profile = baseMesocycleProfile({ equipment_access: equipment, training_experience: experience, weight_kg: weightKg, gender })
+          setRandomSource(seededRngFromKey(comboLabel))
+          const meso = generateMesocycle(profile)
+          resetRandomSource()
 
         const ceiling = IMPROVISED_IMPLEMENT_CEILING_KG[experience]
         for (const week of meso) {
@@ -1014,11 +1034,12 @@ async function runMesocycleBehaviorChecks(): Promise<AuditTestCase[]> {
           }
         }
 
-        cases.push({
-          equipment, injuries: [], duration: '45-60', style: 'hybrid', experience,
-          passed: failures.length === 0, failures,
-          planDays: 0, totalExercises: 0, estimatedDurationSec: 0,
-        })
+          cases.push({
+            equipment, injuries: [], duration: '45-60', style: 'hybrid', experience,
+            passed: failures.length === 0, failures,
+            planDays: 0, totalExercises: 0, estimatedDurationSec: 0,
+          })
+        }
       }
     }
   }
