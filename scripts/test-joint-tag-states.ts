@@ -75,9 +75,9 @@ console.log('\n[4] An indicated movement is never excluded even though it loads 
   check(`all ${indicated.length} reach the constrained pool`, inPool === indicated.length, { inPool })
 }
 
-console.log('\n[5] Injuries not yet reviewed are untouched (lower_back/wrists/neck — knees was reviewed below)')
+console.log('\n[5] Injuries not yet reviewed are untouched (lower_back/neck — knees/wrists reviewed below)')
 {
-  for (const inj of ['lower_back', 'wrists', 'neck']) {
+  for (const inj of ['lower_back', 'neck']) {
     const j = getFlaggedJoints([inj])
     const viaNew = EXERCISE_DATABASE.filter(e => isContraindicatedFor(e, j)).length
     const viaOld = EXERCISE_DATABASE.filter(e => e.loads_joints.some(x => j.has(x))).length
@@ -163,6 +163,40 @@ console.log('\n[10] A knee injury still leaves real direct leg work available')
   check(`single_leg options survive (${byPattern('single_leg')})`, byPattern('single_leg') > 0)
   check(`isolation_quad options survive (${byPattern('isolation_quad')})`, byPattern('isolation_quad') > 0)
   check(`isolation_hamstring options survive (${byPattern('isolation_hamstring')})`, byPattern('isolation_hamstring') > 0)
+}
+
+console.log('\n[11] Over-broad wrist tags relaxed: static grip-hold movements survive a wrist injury')
+{
+  const wrist = getFlaggedJoints(['wrists'])
+  // Tolerated, not indicated -- these are ordinary training that happens to
+  // not load the wrist through active range, not literal wrist rehab.
+  const TOLERATED = ['Shrugs', 'Barbell Rows', 'T-Bar Rows']
+  for (const name of TOLERATED) {
+    const e = EXERCISE_DATABASE.find(x => x.name === name)
+    if (!e) { check(`${name} exists`, false); continue }
+    check(`${name}: not excluded for wrist`, !isContraindicatedFor(e, wrist))
+    check(`${name}: not marked indicated (tolerated, not rehab)`, !isIndicatedFor(e, wrist))
+    check(`${name}: still records that it loads the wrist`, e.loads_joints.includes('wrist'), e.loads_joints)
+  }
+  // Shrugs' neck exclusion and the rows' lower_back_axial exclusion must
+  // survive the wrist relaxation -- this was a per-joint tag split, not a
+  // blanket "these exercises are fine now."
+  const lowerBack = getFlaggedJoints(['lower_back'])
+  const neck = getFlaggedJoints(['neck'])
+  check('Barbell Rows: still excluded for lower_back', isContraindicatedFor(EXERCISE_DATABASE.find(x => x.name === 'Barbell Rows')!, lowerBack))
+  check('T-Bar Rows: still excluded for lower_back', isContraindicatedFor(EXERCISE_DATABASE.find(x => x.name === 'T-Bar Rows')!, lowerBack))
+  check('Shrugs: still excluded for neck', isContraindicatedFor(EXERCISE_DATABASE.find(x => x.name === 'Shrugs')!, neck))
+}
+
+console.log('\n[12] Grip-is-the-point carries stay excluded for wrist (no safety relaxation)')
+{
+  const wrist = getFlaggedJoints(['wrists'])
+  const MUST_EXCLUDE = ["Farmer's Walk", 'Suitcase Carry', 'Trap Bar Carry']
+  for (const name of MUST_EXCLUDE) {
+    const e = EXERCISE_DATABASE.find(x => x.name === name)
+    if (!e) { check(`${name} exists`, false); continue }
+    check(`${name}: still excluded for wrist`, isContraindicatedFor(e, wrist))
+  }
 }
 
 if (failures > 0) { console.error(`\n${failures} check(s) FAILED.`); process.exit(1) }

@@ -533,7 +533,12 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     joint_stress: 'moderate',
     form_cues: ['Hinge at hips 45 degrees', 'Pull to lower ribcage', 'Squeeze shoulder blades', 'Control the descent'],
     coach_note_swap: 'Heavy compound pulling for thick back development.',
+    // Wrist tag was over-broad: gripping a bar through a hinge is a static
+    // hold, not the active wrist-extension load a push-up or bench press
+    // creates. Relaxed for wrist only -- lower_back_axial stays excluded,
+    // the spinal-loading concern from the hinge position is real.
     loads_joints: ['lower_back_axial', 'wrist'],
+    contraindicated_joints: ['lower_back_axial'],
     style_tags: ['bodybuilding', 'functional', 'combat', 'hybrid'],
     substitution_group: 'row',
     unilateral: false,
@@ -610,7 +615,10 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     joint_stress: 'moderate',
     form_cues: ['Straddle bar or use landmine', 'Hinge forward 45 degrees', 'Pull to chest', 'Squeeze at top'],
     coach_note_swap: 'Neutral grip row that loads the mid-back heavily.',
+    // Same wrist-tag relaxation as Barbell Rows -- a static grip hold
+    // through a hinge, not active wrist extension. lower_back_axial stays.
     loads_joints: ['lower_back_axial', 'wrist'],
+    contraindicated_joints: ['lower_back_axial'],
     style_tags: ['bodybuilding', 'functional', 'combat', 'hybrid'],
     substitution_group: 'row',
     unilateral: false,
@@ -932,7 +940,11 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     joint_stress: 'low',
     form_cues: ['Elevate shoulders straight up', 'Hold at top 1 second', 'Do not roll shoulders', 'Full depression at bottom'],
     coach_note_swap: 'Direct trap work for neck and yoke thickness.',
+    // Wrist tag was over-broad: arms hang straight down in a static grip
+    // hold while the shoulders elevate -- the wrist itself does no active
+    // work through range. Relaxed for wrist only -- neck stays excluded.
     loads_joints: ['neck', 'wrist'],
+    contraindicated_joints: ['neck'],
     style_tags: ['bodybuilding', 'functional', 'hybrid'],
     substitution_group: 'shrug',
     unilateral: false,
