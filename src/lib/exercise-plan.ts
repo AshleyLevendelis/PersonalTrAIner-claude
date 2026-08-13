@@ -1050,16 +1050,102 @@ function isUnilateralCarryOrRotational(e: ExerciseEntry): boolean {
  * unilateral/carry/rotational work, those candidates are tried first within
  * whichever capability tier they landed in.
  */
-function orderCandidates(candidates: ExerciseEntry[], policy: GoalPolicy, rawExperience: TrainingExperience): ExerciseEntry[] {
-  const byGoalPref = (pool: ExerciseEntry[]): ExerciseEntry[] => {
-    if (!policy.preferUnilateralCarry) return shuffle(pool)
-    const preferred = pool.filter(isUnilateralCarryOrRotational)
-    const rest = pool.filter(e => !isUnilateralCarryOrRotational(e))
-    return [...shuffle(preferred), ...shuffle(rest)]
+interface ScoreContext {
+  /** The day's own patterns (track.primary_patterns + secondary_patterns) — what "supports today's session" is measured against. */
+  trackPatterns: MovementPattern[]
+  selectedSoFar: ExerciseEntry[]
+  weeklyAppearanceCount?: Map<string, number>
+}
+
+/**
+ * Weighs one eligible candidate the way a coach actually chooses, not just
+ * filters (VISION.md: "score eligible candidates on quality, goal fit,
+ * experience fit, what's already in the session, and variety across the
+ * block — then pick the best, not any valid one"). Every weight below reuses
+ * a signal that already existed in this file for some OTHER purpose
+ * (PATTERN_TO_RELATED_ISOLATION, GoalPolicy, isRegressionFor,
+ * WEEKLY_APPEARANCE_CAP) — this is the first place they combine into an
+ * actual ranking instead of being applied individually.
+ *
+ * Cross-week/cross-block variety is deliberately NOT part of this score —
+ * that's rotateVariation()'s job at block boundaries, with its own
+ * used-name tracking. This function only orders ONE day's candidates at the
+ * moment of the initial pick.
+ */
+function scoreCandidate(candidate: ExerciseEntry, policy: GoalPolicy, rawExperience: TrainingExperience, ctx: ScoreContext): number {
+  let score = 0
+
+  // 1. Quality for the role: an isolation exercise that directly supports
+  // today's main compound pattern (hamstring work on a hinge day) beats one
+  // that's only generically eligible for the slot.
+  if (ctx.trackPatterns.some(p => (PATTERN_TO_RELATED_ISOLATION[p] ?? []).includes(candidate.movement_pattern))) {
+    score += 2
   }
-  const nonRegression = candidates.filter(e => !isRegressionFor(e.name, rawExperience))
-  const regression = candidates.filter(e => isRegressionFor(e.name, rawExperience))
-  return [...byGoalPref(nonRegression), ...byGoalPref(regression)]
+
+  // 2. Goal fit — GoalPolicy's existing preferences, now weighted instead of
+  // an absolute float-to-top/bottom split.
+  if (policy.preferUnilateralCarry && isUnilateralCarryOrRotational(candidate)) score += 2
+  if (policy.goal === 'fat_loss' && candidate.mechanics_tier === 'tier2_compound') score += 1
+  if (policy.goal === 'conditioning' && candidate.joint_stress === 'low') score += 1
+
+  // 3. Experience fit — was an absolute "sort after every non-regression"
+  // partition; now a real penalty that composes with everything else
+  // instead of overriding it (a regression can still win if every other
+  // eligible candidate is a worse fit on every other axis).
+  if (isRegressionFor(candidate.name, rawExperience)) score -= 3
+
+  // 4. What's already in the session — penalize real muscle overlap with
+  // anything already picked today, so the session comes out balanced rather
+  // than four different exercises hammering the same muscle.
+  let overlapPenalty = 0
+  for (const already of ctx.selectedSoFar) {
+    const overlap = already.primary_muscles.filter(m => candidate.primary_muscles.includes(m)).length
+    if (overlap >= 2) overlapPenalty -= 1
+  }
+  score += Math.max(overlapPenalty, -3)
+
+  // 5. Variety across the week — graduated, on top of (not instead of)
+  // WEEKLY_APPEARANCE_CAP's hard ceiling elsewhere: each prior appearance
+  // this week costs a point, so a fresh exercise wins over a repeat before
+  // the cap ever has to step in.
+  if (ctx.weeklyAppearanceCount) {
+    score -= ctx.weeklyAppearanceCount.get(candidate.name) ?? 0
+  }
+
+  // Tier preference — deliberately UNCONDITIONAL and with a much bigger gap
+  // than every other factor combined can ever swing (roughly +/-10 at the
+  // extreme): a tier1 main lift must never lose a comparison to a tier2/3
+  // accessory, in ANY call site, not just the ones that obviously mix tiers
+  // (refill()). findForSlot's required-pattern slots can ALSO have tier set
+  // to null (any tier satisfies the slot) — that's exactly where this bit
+  // me. The goal-fit bonus two lines up (+1 for a fat_loss tier2_compound)
+  // was enough, on its own, to occasionally outrank an available tier1
+  // candidate in one of those null-tier slots: caught live by test:audit's
+  // goal_structure check, which measured a fat_loss day landing on fewer
+  // main-compound slots than hypertrophy for exactly that reason — a rowing
+  // slot resolved to Dumbbell Rows (tier2) instead of Barbell Rows (tier1)
+  // purely because of the fat_loss bonus. pickFromTier/findForSlot calls
+  // that already fixed their own tier before filtering are unaffected
+  // (every candidate in the list gets the identical bonus, so relative
+  // order — and therefore all the OTHER scoring below — is untouched); this
+  // only changes outcomes where multiple tiers were being compared side by
+  // side, which is exactly where it needs to.
+  score += ({ tier1_compound: 90, tier2_compound: 60, tier3_isolation: 30 } as Record<string, number>)[candidate.mechanics_tier] ?? 0
+
+  // Tie-break only: small enough to never overturn a genuine difference
+  // above, large enough to stop two truly equal candidates from always
+  // resolving the same way. Goes through the same seeded randomSource() as
+  // everything else, so audit/test runs stay reproducible.
+  score += (randomSource() - 0.5) * 0.6
+
+  return score
+}
+
+function orderCandidates(candidates: ExerciseEntry[], policy: GoalPolicy, rawExperience: TrainingExperience, ctx: ScoreContext): ExerciseEntry[] {
+  return candidates
+    .map(e => ({ e, score: scoreCandidate(e, policy, rawExperience, ctx) }))
+    .sort((a, b) => b.score - a.score)
+    .map(x => x.e)
 }
 
 /**
@@ -1240,6 +1326,7 @@ function selectExercisesForTrack(
       ),
       policy,
       rawExperience,
+      { trackPatterns: [...track.primary_patterns, ...track.secondary_patterns], selectedSoFar: selected, weeklyAppearanceCount },
     )
     return candidates[0] ?? null
   }
@@ -1294,6 +1381,7 @@ function selectExercisesForTrack(
       ),
       policy,
       rawExperience,
+      { trackPatterns: [...track.primary_patterns, ...track.secondary_patterns], selectedSoFar: selected, weeklyAppearanceCount },
     )
     for (const c of candidates) {
       if (selected.length >= counts.tier1 + counts.tier2 + counts.tier3) break
@@ -1338,20 +1426,25 @@ function selectExercisesForTrack(
   // allowing exercises already used earlier in the week.
   if (selected.length < counts.tier1 + counts.tier2 + counts.tier3) {
     const target = counts.tier1 + counts.tier2 + counts.tier3
-    // Prefer bigger movements first so a refilled session still opens with a
-    // compound rather than leading on isolation work.
-    const tierRank = (e: ExerciseEntry) =>
-      ({ tier1_compound: 0, tier2_compound: 1, tier3_isolation: 2 } as Record<string, number>)[e.mechanics_tier] ?? 3
 
     const refill = (respectFamilies: boolean, respectWeeklyCap: boolean) => {
-      const candidates = shuffle(
+      // Prefer bigger movements first (scoreCandidate's tier-preference
+      // component is unconditional) so a refilled session still opens with
+      // a compound rather than leading on isolation work — scored alongside
+      // quality/goal-fit/session-balance/variety instead of a separate
+      // tier-only sort, now that this fallback pools all three tiers
+      // together.
+      const candidates = orderCandidates(
         trackPool.filter(e =>
           e.mechanics_tier !== 'primer' &&
           !selected.some(s => s.name === e.name) &&
           (!respectFamilies || !usedGroups.has(getMovementFamily(e))) &&
           (!respectWeeklyCap || !weeklyAppearanceCount || (weeklyAppearanceCount.get(e.name) ?? 0) < WEEKLY_APPEARANCE_CAP)
-        )
-      ).sort((a, b) => tierRank(a) - tierRank(b))
+        ),
+        policy,
+        rawExperience,
+        { trackPatterns: [...track.primary_patterns, ...track.secondary_patterns], selectedSoFar: selected, weeklyAppearanceCount },
+      )
 
       for (const c of candidates) {
         if (selected.length >= target) break
