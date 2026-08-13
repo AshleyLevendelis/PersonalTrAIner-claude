@@ -391,11 +391,19 @@ export function getFlaggedJoints(injuries: string[]): Set<string> {
   return joints
 }
 
-/** True when an exercise's declared equipment is fully covered by the given tier's allowed set (full_gym = everything allowed). */
+/**
+ * True when an exercise's declared equipment is satisfiable at the given
+ * tier (full_gym = everything allowed). `equipment_alternatives` entries
+ * (interchangeable implements — T-Bar Rows' "straddle bar or use landmine")
+ * need only ONE listed item present; every other entry needs all of them,
+ * the historical behaviour.
+ */
 export function isEquipmentAllowed(entry: ExerciseEntry, tier: EquipmentAccess): boolean {
   const allowed = EQUIPMENT_SETS[tier]
   if (!allowed) return true
-  return entry.equipment.every(eq => allowed.has(eq))
+  return entry.equipment_alternatives
+    ? entry.equipment.some(eq => allowed.has(eq))
+    : entry.equipment.every(eq => allowed.has(eq))
 }
 
 // ---------------------------------------------------------------------------
@@ -444,7 +452,7 @@ function stageEquipmentFilter(
   }
   const result: ExerciseEntry[] = []
   for (const ex of pool) {
-    const hasAll = ex.equipment.every(eq => allowed.has(eq))
+    const hasAll = isEquipmentAllowed(ex, equipmentAccess)
     if (hasAll) {
       result.push(ex)
     } else {

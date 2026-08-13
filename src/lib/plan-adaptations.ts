@@ -169,7 +169,15 @@ export function assessAdaptation(result: SubstitutionResult, totalSlots: number)
     dropped,
     wipedPatterns,
     planLossRatio: totalSlots > 0 ? dropped / totalSlots : 0,
-    shouldRebuild: totalSlots > 0 && dropped / totalSlots >= REBUILD_PLAN_LOSS_RATIO,
+    // The ratio alone misses the exact case this function's own doc comment
+    // describes: a wiped pattern means there is no same-pattern candidate
+    // for those slots BY CONSTRUCTION, no matter how few slots that turns
+    // out to be in raw count terms. A shoulder injury that wipes 'pull'
+    // entirely, but only touches a small enough share of a large programme
+    // to stay under the ratio threshold, still leaves the user with zero
+    // pulling work — pointwise substitution can't fix that, only a rebuild
+    // (which can re-plan the week's tracks around what's actually left) can.
+    shouldRebuild: totalSlots > 0 && (dropped / totalSlots >= REBUILD_PLAN_LOSS_RATIO || wipedPatterns.length > 0),
   }
 }
 

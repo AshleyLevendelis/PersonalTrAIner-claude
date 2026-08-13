@@ -291,6 +291,17 @@ export function resolveTargetRpe(
  * someone building up to the full movement and the wrong answer for someone
  * who has already outgrown them.
  */
+// Audited against every tier2_compound bodyweight/unloaded entry whose
+// movement_pattern also has a tier1_compound or loaded-tier2 sibling (the
+// exact shape all of these share). Deliberately excludes Spanish Squat and
+// Low Box Step-Up despite matching that shape: both carry indicated_joints
+// (knee-rehab additions), and adding them here would block a knee-injured
+// advanced lifter from reaching their only safe swap, which defeats the
+// reason they exist. Also excludes Deficit Push-Ups, Archer Push-Ups,
+// Chest Dips, Pistol Squat Progression — each already carries its own
+// capability_requirement and its own `regression` field pointing at
+// something easier than itself, so they're progressions in an existing
+// chain, not undocumented easy downgrades.
 const REGRESSION_VARIATIONS = new Set([
   'Pull-Ups (Assisted)',
   'Goblet Squats',
@@ -298,6 +309,14 @@ const REGRESSION_VARIATIONS = new Set([
   'Incline Push-Ups',
   'Loaded Backpack Walk',
   'Farmer Squat Hold (Isometric Carry)',
+  'Air Squat',
+  'Inverted Row',
+  'Towel Row',
+  'Glute Bridge',
+  'Single-Leg RDL (Bodyweight)',
+  'Bodyweight Good Morning',
+  'Split Squat (Bodyweight)',
+  'Step-Ups (Bodyweight)',
 ])
 
 export function isRegressionFor(name: string, experience: TrainingExperience): boolean {

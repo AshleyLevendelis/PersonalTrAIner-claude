@@ -46,7 +46,16 @@ async function main() {
   const totalSlots = countSlots(meso)
   const verdict = assessAdaptation(sub, totalSlots)
   console.log(`     touched=${verdict.touched} dropped=${verdict.dropped} planLoss=${(verdict.planLossRatio * 100).toFixed(1)}% of ${totalSlots}`)
-  check('substitution deletes a material share of the whole plan', verdict.planLossRatio > 0.15)
+  // The swap-depth work gave shoulder-affected patterns (horizontal_pull,
+  // vertical_push) real off-machine/off-equipment candidates that didn't
+  // exist before, so pointwise substitution now finds a home for more
+  // slots and the raw drop ratio legitimately fell below the old 0.15
+  // fixture value — that's the fix working as intended, not a regression.
+  // The invariant that actually matters is wipedPatterns: a shoulder
+  // injury still wipes vertical_pull entirely (no shoulder-safe vertical
+  // pull exists in the catalogue), which is what should force a rebuild
+  // regardless of how the raw ratio happens to land.
+  check('a whole movement pattern is wiped, not just thinned', verdict.wipedPatterns.length > 0, verdict.wipedPatterns)
   check('flagged shouldRebuild', verdict.shouldRebuild, verdict)
 
   console.log('\n[2] A neck injury (thins patterns, wipes none) is NOT flagged for rebuild')

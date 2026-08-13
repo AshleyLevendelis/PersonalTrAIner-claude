@@ -249,11 +249,30 @@ function runSingleAudit(
   const allExercises = plan.flatMap(d => d.exercises)
 
   // CHECK 1: No excluded equipment in output
+  //
+  // equipment_alternatives (exercise-db.ts) entries list INTERCHANGEABLE
+  // implements (T-Bar Rows: "straddle bar or use landmine") -- having any
+  // ONE satisfies the exercise, not all of them. Every other entry keeps
+  // the historical all-required check. Read directly off the entry rather
+  // than reimplementing isEquipmentAllowed's own boolean, so this audit
+  // stays independent of a bug in that function while still respecting
+  // the field's real, documented semantics.
   const allowedSet = EQUIPMENT_SETS[equipment]
   if (allowedSet) {
     for (const ex of allExercises) {
       const entry = EXERCISE_DATABASE.find(e => e.name === ex.name)
       if (!entry) continue
+      if (entry.equipment_alternatives) {
+        if (!entry.equipment.some(eq => allowedSet.has(eq))) {
+          failures.push({
+            check: 'equipment',
+            combination: comboLabel,
+            details: `Exercise requires one of [${entry.equipment.join(', ')}] but user only has ${equipment}`,
+            exercise: ex.name,
+          })
+        }
+        continue
+      }
       for (const eq of entry.equipment) {
         if (!allowedSet.has(eq)) {
           failures.push({

@@ -1,6 +1,5 @@
-import { TrainingStyle, type TrainingExperience, type UserProfile } from './types'
+import { TrainingStyle, type TrainingExperience } from './types'
 import { isRegressionFor } from './periodization'
-import { isExternallyLoaded, preservesRelativeLoad } from './load-prescription'
 
 export type MovementPattern =
   | 'horizontal_push'
@@ -99,6 +98,20 @@ export interface ExerciseEntry {
   angle_vector: AngleVector
   primary_muscles: string[]
   equipment: string[]
+  /**
+   * When true, `equipment` lists INTERCHANGEABLE implements — having any
+   * ONE of them is enough (T-Bar Rows: "straddle bar or use landmine").
+   * Absent/false (the default, and every entry's historical behaviour)
+   * means every listed item is required together (Barbell Bench Press
+   * genuinely needs both a barbell AND a bench). Getting this wrong in
+   * either direction is real: treating an AND entry as OR would offer
+   * Barbell Bench Press to someone with a bench and no barbell; treating
+   * an OR entry as AND (the bug this field fixes) hides Goblet Squats from
+   * anyone who owns a kettlebell but not a dumbbell. Read by
+   * isEquipmentAllowed/stageEquipmentFilter (exercise-plan.ts), nowhere
+   * else — every other equipment check goes through those two.
+   */
+  equipment_alternatives?: boolean
   joint_stress: 'low' | 'moderate' | 'high'
   form_cues: string[]
   coach_note_swap?: string
@@ -426,6 +439,28 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     unilateral: false,
     avg_duration_seconds: 28,
   },
+  // Swap-depth fix: Cable Flyes and Pec Deck Machine were each other's ONLY
+  // swap option (both cable-station/machine-bound) -- a busy pec deck left
+  // a busy cable stack as the sole alternative. Dumbbell Flyes is the
+  // off-machine escape.
+  {
+    name: 'Dumbbell Flyes',
+    id: 'dumbbell-flyes',
+    movement_pattern: 'horizontal_push',
+    mechanics_tier: 'tier3_isolation',
+    prescription_type: 'reps',
+    angle_vector: 'horizontal',
+    primary_muscles: ['chest'],
+    equipment: ['dumbbells', 'bench'],
+    joint_stress: 'low',
+    form_cues: ['Lie flat, slight bend in elbows', 'Lower until stretch in chest', 'Arc dumbbells together over chest', 'Control the descent'],
+    coach_note_swap: 'Free-weight fly with a real stretch at the bottom — no machine or cable station needed.',
+    loads_joints: ['shoulder'],
+    style_tags: ['bodybuilding', 'hybrid'],
+    substitution_group: 'fly_isolation',
+    unilateral: false,
+    avg_duration_seconds: 32,
+  },
   {
     name: 'Push-Ups',
     id: 'push-ups',
@@ -612,6 +647,8 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     angle_vector: 'diagonal',
     primary_muscles: ['lats', 'rhomboids', 'rear deltoid', 'biceps'],
     equipment: ['t-bar', 'barbell'],
+    // "Straddle bar or use landmine" -- either implement does this, not both.
+    equipment_alternatives: true,
     joint_stress: 'moderate',
     form_cues: ['Straddle bar or use landmine', 'Hinge forward 45 degrees', 'Pull to chest', 'Squeeze at top'],
     coach_note_swap: 'Neutral grip row that loads the mid-back heavily.',
@@ -762,6 +799,32 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     unilateral: false,
     avg_duration_seconds: 30,
   },
+  // Swap-depth fix, and the same content gap the catalogue-thinness audit
+  // found: at home_gym/minimalist, the only vertical_pull option a
+  // beginner/novice could reach was Pull-Ups itself gated to intermediate+
+  // (no cable machine, and the assisted pull-up machine isn't available
+  // either) -- a busy pull-up bar left NOTHING. A band anchored high and
+  // pulled down mimics the lat-pulldown pattern with equipment already in
+  // both the home_gym and minimalist sets, and needs no prior pulling
+  // strength.
+  {
+    name: 'Kneeling Band Lat Pulldown',
+    id: 'kneeling-band-lat-pulldown',
+    movement_pattern: 'vertical_pull',
+    mechanics_tier: 'tier2_compound',
+    prescription_type: 'reps',
+    angle_vector: 'vertical',
+    primary_muscles: ['lats', 'rhomboids', 'biceps'],
+    equipment: ['resistance band'],
+    joint_stress: 'low',
+    form_cues: ['Anchor a band high overhead, kneel facing the anchor', 'Grip wide, arms extended', 'Pull the band down to the upper chest, leading with the elbows', 'Control the return to full stretch'],
+    coach_note_swap: 'The lat-pulldown pattern with a band and an overhead anchor — no cable machine, no pull-up strength required.',
+    loads_joints: ['shoulder'],
+    style_tags: ['bodybuilding', 'functional', 'hybrid'],
+    substitution_group: 'vertical_pull',
+    unilateral: false,
+    avg_duration_seconds: 30,
+  },
   {
     name: 'Pull-Ups',
     id: 'pull-ups',
@@ -892,6 +955,27 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     unilateral: true,
     avg_duration_seconds: 35,
   },
+  // Swap-depth fix: Dumbbell Shoulder Press and Arnold Press were each
+  // other's only swap at the minimalist tier. A band press adds a third,
+  // using equipment already in that tier.
+  {
+    name: 'Band Shoulder Press',
+    id: 'band-shoulder-press',
+    movement_pattern: 'vertical_push',
+    mechanics_tier: 'tier2_compound',
+    prescription_type: 'reps',
+    angle_vector: 'vertical',
+    primary_muscles: ['anterior deltoid', 'lateral deltoid', 'triceps'],
+    equipment: ['resistance band'],
+    joint_stress: 'low',
+    form_cues: ['Stand on the band, one handle at each shoulder', 'Press straight overhead', 'Lock out without shrugging', 'Control the descent'],
+    coach_note_swap: 'Overhead press with accommodating band resistance — heaviest at lockout, easiest at the bottom.',
+    loads_joints: ['shoulder'],
+    style_tags: ['bodybuilding', 'functional', 'hybrid'],
+    substitution_group: 'overhead_press',
+    unilateral: false,
+    avg_duration_seconds: 32,
+  },
   {
     name: 'Lateral Raises',
     id: 'lateral-raises',
@@ -937,6 +1021,8 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     angle_vector: 'vertical',
     primary_muscles: ['upper trapezius'],
     equipment: ['barbell', 'dumbbells'],
+    // Either implement shrugs the same way -- not both required.
+    equipment_alternatives: true,
     joint_stress: 'low',
     form_cues: ['Elevate shoulders straight up', 'Hold at top 1 second', 'Do not roll shoulders', 'Full depression at bottom'],
     coach_note_swap: 'Direct trap work for neck and yoke thickness.',
@@ -1028,6 +1114,8 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     angle_vector: 'diagonal',
     primary_muscles: ['hamstrings', 'glutes', 'erectors'],
     equipment: ['barbell', 'dumbbells'],
+    // Either implement hinges the same way -- not both required.
+    equipment_alternatives: true,
     joint_stress: 'moderate',
     form_cues: ['Soft knees', 'Push hips back', 'Bar slides down thighs', 'Stop at mid-shin', 'Squeeze glutes up'],
     coach_note_swap: 'Eccentric-focused hamstring builder with excellent stretch.',
@@ -1204,6 +1292,45 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     unilateral: false,
     avg_duration_seconds: 30,
   },
+  // Swap-depth fix: Lying Leg Curl (machine) had zero swap options at all --
+  // a busy leg-curl station left nothing. These two give it a loaded,
+  // off-machine alternative.
+  {
+    name: 'Seated Leg Curl',
+    id: 'seated-leg-curl',
+    movement_pattern: 'isolation_hamstring',
+    mechanics_tier: 'tier3_isolation',
+    prescription_type: 'reps',
+    angle_vector: 'horizontal',
+    primary_muscles: ['hamstrings'],
+    equipment: ['machine'],
+    joint_stress: 'low',
+    form_cues: ['Pad above ankles, seated upright', 'Curl heels down and under', 'Squeeze at bottom', 'Control the return'],
+    coach_note_swap: 'Same isolated knee-flexion work as the lying version, from a different machine.',
+    loads_joints: ['knee'],
+    style_tags: ['bodybuilding', 'hybrid'],
+    substitution_group: 'leg_curl',
+    unilateral: false,
+    avg_duration_seconds: 28,
+  },
+  {
+    name: 'Dumbbell Leg Curl',
+    id: 'dumbbell-leg-curl',
+    movement_pattern: 'isolation_hamstring',
+    mechanics_tier: 'tier3_isolation',
+    prescription_type: 'reps',
+    angle_vector: 'horizontal',
+    primary_muscles: ['hamstrings'],
+    equipment: ['dumbbells'],
+    joint_stress: 'low',
+    form_cues: ['Lie face down, dumbbell held between feet', 'Curl heels toward glutes', 'Squeeze at top', 'Lower with control'],
+    coach_note_swap: 'A real loaded leg curl with nothing but a dumbbell and a floor — no machine required.',
+    loads_joints: ['knee'],
+    style_tags: ['bodybuilding', 'functional', 'hybrid'],
+    substitution_group: 'leg_curl',
+    unilateral: false,
+    avg_duration_seconds: 30,
+  },
 
   // KNEE DOMINANT
   {
@@ -1251,6 +1378,8 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     angle_vector: 'vertical',
     primary_muscles: ['quadriceps', 'glutes', 'core'],
     equipment: ['dumbbell', 'kettlebell'],
+    // Either implement holds the same way -- not both required.
+    equipment_alternatives: true,
     joint_stress: 'low',
     form_cues: ['Hold weight at chest', 'Elbows between knees at bottom', 'Upright torso', 'Full depth'],
     coach_note_swap: 'Teaches squat mechanics with natural upright posture.',
@@ -1295,6 +1424,32 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     substitution_group: 'quad_isolation',
     unilateral: false,
     avg_duration_seconds: 28,
+  },
+  // Swap-depth fix: Leg Extensions had zero swap options. Sissy Squat is
+  // the bodyweight escape, but it's the opposite end of the knee-stress
+  // spectrum from the Wall Sit/Spanish Squat additions above -- a deep,
+  // leaned-back bodyweight knee flexion under real eccentric control, not
+  // a neutral option. Gated to advanced and marked knee-contraindicated,
+  // not offered as a general "no equipment" substitute.
+  {
+    name: 'Sissy Squat',
+    id: 'sissy-squat',
+    movement_pattern: 'isolation_quad',
+    mechanics_tier: 'tier3_isolation',
+    prescription_type: 'reps',
+    angle_vector: 'vertical',
+    primary_muscles: ['quadriceps'],
+    equipment: ['bodyweight'],
+    joint_stress: 'high',
+    form_cues: ['Rise onto toes, hold a support for balance', 'Lean back as the knees drive forward', 'Lower until a deep quad stretch', 'Drive back up through the quads'],
+    coach_note_swap: 'Deep, leaned-back knee flexion under full bodyweight — real quad demand, real knee stress. Not a substitute for someone easing back into training.',
+    loads_joints: ['knee'],
+    contraindicated_joints: ['knee'],
+    style_tags: ['bodybuilding', 'functional', 'hybrid'],
+    capability_requirement: { minExperience: 'advanced', regression: 'Leg Extensions' },
+    substitution_group: 'quad_isolation',
+    unilateral: false,
+    avg_duration_seconds: 30,
   },
   // ---------------------------------------------------------------------
   // Knee-friendly additions. A knee injury correctly excludes every
@@ -1534,6 +1689,8 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     angle_vector: 'none',
     primary_muscles: ['forearms', 'traps', 'core', 'glutes'],
     equipment: ['dumbbells', 'farmer handles'],
+    // Either implement carries the same way -- not both required.
+    equipment_alternatives: true,
     joint_stress: 'low',
     form_cues: ['Heavy weight in each hand', 'Tall posture', 'Short quick steps', 'Brace core throughout'],
     coach_note_swap: 'Total-body bracing exercise that builds grip, traps, and core stability.',
@@ -1552,6 +1709,8 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     angle_vector: 'lateral',
     primary_muscles: ['obliques', 'core', 'forearms', 'traps'],
     equipment: ['dumbbell', 'kettlebell'],
+    // Either implement carries the same way -- not both required.
+    equipment_alternatives: true,
     joint_stress: 'low',
     form_cues: ['Heavy weight in one hand only', 'Resist lateral lean', 'Walk tall and straight', 'Switch sides'],
     coach_note_swap: 'Anti-lateral flexion carry that hammers obliques and stabilizers.',
@@ -1570,6 +1729,8 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     angle_vector: 'vertical',
     primary_muscles: ['shoulders', 'core', 'traps', 'serratus anterior'],
     equipment: ['dumbbell', 'kettlebell'],
+    // Either implement carries the same way -- not both required.
+    equipment_alternatives: true,
     joint_stress: 'moderate',
     form_cues: ['Lock weight overhead', 'Ribs down, core braced', 'Walk with control', 'Maintain vertical arm'],
     coach_note_swap: 'Overhead stability carry that builds shoulder health and core anti-extension.',
@@ -1672,6 +1833,28 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     unilateral: false,
     avg_duration_seconds: 28,
   },
+  // Swap-depth fix: Calf Raises (machine) and Seated Calf Raises were each
+  // other's only swap -- both machine-bound, so a busy calf station left
+  // nothing. A single-leg dumbbell version off the edge of any step is the
+  // loaded, off-machine escape.
+  {
+    name: 'Single-Leg Dumbbell Calf Raise',
+    id: 'single-leg-dumbbell-calf-raise',
+    movement_pattern: 'isolation_calf',
+    mechanics_tier: 'tier3_isolation',
+    prescription_type: 'reps',
+    angle_vector: 'vertical',
+    primary_muscles: ['gastrocnemius', 'soleus'],
+    equipment: ['dumbbell'],
+    joint_stress: 'low',
+    form_cues: ['Stand on one foot at the edge of a step, dumbbell in the same-side hand', 'Lower heel below the step for a full stretch', 'Rise onto the toes', 'Pause at the top'],
+    coach_note_swap: 'A real loaded calf raise off a step edge — no machine needed, and unilateral catches side-to-side imbalances a machine hides.',
+    loads_joints: [],
+    style_tags: ['bodybuilding', 'functional', 'hybrid'],
+    substitution_group: 'calf',
+    unilateral: true,
+    avg_duration_seconds: 30,
+  },
 
   {
     name: 'Calf Raises (Bodyweight)',
@@ -1741,6 +1924,28 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     joint_stress: 'low',
     form_cues: ['Neutral grip (palms facing)', 'Curl to shoulder', 'No wrist rotation', 'Elbows stay put'],
     coach_note_swap: 'Targets brachioradialis and forearm thickness.',
+    loads_joints: [],
+    style_tags: ['bodybuilding', 'hybrid'],
+    substitution_group: 'bicep_curl',
+    unilateral: false,
+    avg_duration_seconds: 28,
+  },
+  // Swap-depth fix, and closes the minimalist-tier isolation_bicep content
+  // gap the thinness audit found -- Dumbbell Curls and Hammer Curls were
+  // each other's only option, and the tier had no band-based isolation
+  // pair at all despite owning bands.
+  {
+    name: 'Band Curl',
+    id: 'band-curl',
+    movement_pattern: 'isolation_bicep',
+    mechanics_tier: 'tier3_isolation',
+    prescription_type: 'reps',
+    angle_vector: 'vertical',
+    primary_muscles: ['biceps brachii'],
+    equipment: ['resistance band'],
+    joint_stress: 'low',
+    form_cues: ['Stand on the band, feet shoulder-width', 'Elbows pinned to sides', 'Curl to full contraction', 'Control the return, no slack in the band'],
+    coach_note_swap: 'Accommodating resistance curl — heaviest at the top of the contraction.',
     loads_joints: [],
     style_tags: ['bodybuilding', 'hybrid'],
     substitution_group: 'bicep_curl',
@@ -1822,6 +2027,28 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     unilateral: false,
     avg_duration_seconds: 28,
   },
+  // Swap-depth fix, and closes the minimalist-tier isolation_tricep content
+  // gap the thinness audit found -- all 4 existing tricep-isolation
+  // exercises need dip bars/cable/barbell, so minimalist (and home_gym)
+  // had zero or near-zero options regardless of injury or experience.
+  {
+    name: 'Band Tricep Pushdown',
+    id: 'band-tricep-pushdown',
+    movement_pattern: 'isolation_tricep',
+    mechanics_tier: 'tier3_isolation',
+    prescription_type: 'reps',
+    angle_vector: 'vertical',
+    primary_muscles: ['triceps'],
+    equipment: ['resistance band'],
+    joint_stress: 'low',
+    form_cues: ['Anchor a band overhead', 'Elbows pinned to sides', 'Push down to full extension', 'Control the return'],
+    coach_note_swap: 'The cable pushdown pattern with a band and any overhead anchor.',
+    loads_joints: [],
+    style_tags: ['bodybuilding', 'hybrid'],
+    substitution_group: 'tricep_extension',
+    unilateral: false,
+    avg_duration_seconds: 28,
+  },
   {
     name: 'Overhead Tricep Extension',
     id: 'overhead-tricep-extension',
@@ -1831,6 +2058,8 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     angle_vector: 'vertical',
     primary_muscles: ['triceps (long head)'],
     equipment: ['dumbbell', 'cable machine'],
+    // Either implement does this the same way -- not both required.
+    equipment_alternatives: true,
     joint_stress: 'low',
     form_cues: ['Elbows pointing up', 'Lower behind head', 'Extend fully overhead', 'Keep upper arms still'],
     coach_note_swap: 'Overhead position maximally stretches the long head.',
@@ -1849,6 +2078,8 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     angle_vector: 'horizontal',
     primary_muscles: ['triceps'],
     equipment: ['barbell', 'EZ bar'],
+    // Either bar type does this the same way -- not both required.
+    equipment_alternatives: true,
     joint_stress: 'moderate',
     form_cues: ['Lie flat on bench', 'Lower bar to forehead', 'Elbows point to ceiling', 'Extend without flaring'],
     coach_note_swap: 'Effective heavy tricep isolation with stretch component.',
@@ -2129,6 +2360,30 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     form_cues: ['High-to-low or low-to-high path', 'Rotate through hips and torso', 'Arms stay extended', 'Control the return'],
     coach_note_swap: 'Rotational power for sport-specific core development.',
     loads_joints: [],
+    style_tags: ['functional', 'combat', 'hybrid'],
+    substitution_group: 'core_rotational',
+    unilateral: false,
+    avg_duration_seconds: 28,
+  },
+  // Swap-depth fix: Cable Woodchops had zero swap options. Russian Twist is
+  // the off-cable escape, but it's loaded spinal rotation under a seated
+  // lean-back -- a real lower-back load, unlike Cable Woodchops' standing,
+  // hip-driven path. Marked lower_back-contraindicated rather than offered
+  // as a blanket substitute.
+  {
+    name: 'Russian Twist',
+    id: 'russian-twist',
+    movement_pattern: 'core',
+    mechanics_tier: 'tier3_isolation',
+    prescription_type: 'reps',
+    angle_vector: 'rotational',
+    primary_muscles: ['obliques', 'core'],
+    equipment: ['medicine ball'],
+    joint_stress: 'moderate',
+    form_cues: ['Sit with knees bent, lean back to a stable angle', 'Hold the ball at the chest', 'Rotate side to side, touching the ball down each time', 'Keep the chest up, don\'t round the spine'],
+    coach_note_swap: 'Loaded rotational core work — the seated lean-back puts real load through the lower back, unlike a standing woodchop.',
+    loads_joints: ['lower_back_axial'],
+    contraindicated_joints: ['lower_back_axial'],
     style_tags: ['functional', 'combat', 'hybrid'],
     substitution_group: 'core_rotational',
     unilateral: false,
@@ -2536,13 +2791,6 @@ export function getSmartReplacements(
   pool: ExerciseEntry[],
   experience: TrainingExperience,
   exclusions: string[] = [],
-  /**
-   * Needed for the relative-load guard below (preservesRelativeLoad) —
-   * optional and defaulted to undefined for any pre-existing caller that
-   * doesn't have a profile handy; the relative-load check is skipped
-   * (falls back to loading-class only) when omitted.
-   */
-  profile?: UserProfile,
 ): { exercise: ExerciseEntry; note: string }[] {
   const current = EXERCISE_DATABASE.find(
     e => e.name.toLowerCase() === exerciseName.toLowerCase()
@@ -2552,24 +2800,35 @@ export function getSmartReplacements(
   const excludedSet = new Set(exclusions.map(e => e.toLowerCase()))
   excludedSet.add(exerciseName.toLowerCase())
 
-  // Same loading-class guard as periodization.ts's rotateVariation, applied
-  // here too — manual swap/ban went through a completely separate candidate
-  // function with no such guard, so a user swapping out a loaded Dumbbell
-  // Row could still land on a bodyweight Inverted Row. Bodyweight -> loaded
-  // is fine (an upgrade); loaded -> bodyweight is the regression this
-  // blocks.
-  const currentIsLoaded = isExternallyLoaded(current)
-
+  // A blanket "loaded -> bodyweight is always blocked" guard used to live
+  // here (mirroring periodization.ts's rotateVariation, which keeps it —
+  // automatic week-to-week rotation must never silently delete a trainee's
+  // logged overload). A manual swap is a different situation: the user is
+  // asking for this specific substitute (their equipment is busy), and
+  // recomputeLoad (mesocycle-edit.ts) already throws away the outgoing
+  // exercise's number and prescribes fresh for whatever's chosen — there is
+  // no load to "carry over" and accidentally lose. What still needs
+  // blocking is a genuine skill downgrade, and that's already covered by
+  // two other checks: `pool` only contains exercises whose
+  // capability_requirement this profile's experience already satisfies
+  // (getConstrainedPool's skill stage), and the regression-guard line right
+  // above already excludes named easier variants (REGRESSION_VARIATIONS)
+  // for anyone past novice. Barbell Squats -> Air Squat is deliberately
+  // allowed to fail this filter at every experience level below advanced
+  // and blocked at advanced+ via that same regression-guard line, since
+  // Air Squat is on that list.
+  //
+  // The same swap ALSO used to require the replacement stay within +-40%
+  // of the outgoing exercise's estimated load (preservesRelativeLoad) —
+  // right for automatic rotation (still enforced in rotateVariation), wrong
+  // here for the identical reason: different equipment genuinely takes a
+  // different number, and a fresh prescription is computed either way, so
+  // there's no "stealth regression" to protect against on a manual pick.
   const candidates = pool.filter(e => {
     if (excludedSet.has(e.name.toLowerCase())) return false
     if (e.movement_pattern !== current.movement_pattern) return false
     if (e.name === current.name) return false
     if (isRegressionFor(e.name, experience) && !isRegressionFor(current.name, experience)) return false
-    if (currentIsLoaded && !isExternallyLoaded(e)) return false
-    // Fix 3: loaded -> loaded must also preserve roughly the same loading
-    // demand — the class guard above alone lets a 28kg dumbbell row swap
-    // to a 27.5kg backpack row (both "loaded"), a stealth ~50% regression.
-    if (profile && !preservesRelativeLoad(current, e, profile)) return false
     return true
   })
 
