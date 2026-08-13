@@ -2,6 +2,10 @@
 
 These apply to every session in this repo. They exist so they stop being restated per-prompt.
 
+## Product vision
+
+- Full product vision, standards, and shipping bar: see [VISION.md](VISION.md). Safety-adjacent and architecture-level decisions should be checked against it.
+
 ## Instruction handling
 
 - "Report only", "investigate", "propose", "don't build" mean exactly that. Wait for an explicit "build it". An acknowledgement, a thumbs-up, or encouraging prose around a prompt is NOT approval.
