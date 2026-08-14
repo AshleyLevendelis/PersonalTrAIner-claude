@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics=""><meta name="design_doc_mode" content="canvas"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin=""><link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&amp;display=swap" rel="stylesheet"><style>
+body{margin:0;background:#0E0B20;font-family:"Space Grotesk",system-ui,sans-serif}
+a{color:#5BE9C2;text-decoration:none}a:hover{color:#7CF3D4}
+.dv-turn{padding:40px 44px 32px;border-bottom:1px solid rgba(245,243,255,.08)}
+.dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 22px}
+.dv-tid{font:600 10px ui-monospace,Menlo,monospace;padding:3px 7px;background:#5BE9C2;color:#08281F;border-radius:4px}
+.dv-tname{font:600 13px/1.2 "Space Grotesk",sans-serif;color:#F5F3FF}
+.dv-opts{display:flex;flex-wrap:wrap;gap:30px;align-items:flex-start}
+.dv-opt{flex:none;display:flex;flex-direction:column;gap:9px}
+.dv-oid{font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:rgba(245,243,255,.10);color:#F5F3FF;border-radius:5px}
+.dv-olabel{display:flex;align-items:baseline;gap:8px;font:400 11px/1.3 "Space Grotesk",sans-serif;color:rgba(245,243,255,.55);max-width:390px}
+.dv-opt:target .dv-oid{background:#5BE9C2;color:#08281F}
+.dv-next{margin:24px 0 0;font:12px/1.6 "Space Grotesk",sans-serif;color:rgba(245,243,255,.5)}
+.ph{width:390px;height:844px;border-radius:34px;background:#1A1636;overflow:hidden;position:relative;border:1px solid rgba(245,243,255,.14);box-shadow:0 20px 60px rgba(0,0,0,.5)}
+.ph-scroll{height:844px;overflow:auto;scrollbar-width:none}
+.ph-scroll::-webkit-scrollbar{display:none}
+</style></helmet>
+
+<section class="dv-turn" id="t1">
+<div class="dv-thd"><span class="dv-tid">1</span><span class="dv-tname">Tab restructure — Nutrition owns macros + water, Exercise owns program context, Home gets a new job</span></div>
+
+<div class="dv-opts">
+
+<div class="dv-opt" id="1a">
+<div class="dv-olabel"><span class="dv-oid">1a</span>HOME · Command center. Session CTA leads; calories and water are read-only tiles that deep-link into Nutrition. Steps + weigh-in are the only things logged here.</div>
+<div class="ph"><div class="ph-scroll">
+
+<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 22px 0;font-size:12px;font-weight:600;color:#F5F3FF">
+<span>9:41</span><span style="display:flex;gap:5px;align-items:center"><span style="width:16px;height:9px;border:1.2px solid rgba(245,243,255,.6);border-radius:2px;display:inline-block"></span></span>
+</div>
+
+<div style="position:relative;padding:18px 22px 0">
+<div style="position:absolute;inset:-40px -20px auto;height:380px;background:radial-gradient(120% 60% at 50% 0%, rgba(156,141,255,.20) 0%, rgba(26,22,54,0) 60%), radial-gradient(90% 40% at 20% 42%, rgba(91,233,194,.10) 0%, rgba(26,22,54,0) 70%);pointer-events:none"></div>
+
+<div style="position:relative;display:flex;align-items:flex-start;justify-content:space-between">
+<span style="padding-top:4px;font-size:11px;text-transform:uppercase;letter-spacing:.14em;color:#9A93C9">Wednesday · Week 3 of 16</span>
+<span style="display:flex;flex-direction:column;align-items:flex-end;line-height:1">
+<span style="font-size:26px;font-weight:700;letter-spacing:-.03em;color:#5BE9C2;text-shadow:0 0 16px rgba(91,233,194,.85)">12</span>
+<span style="margin-top:5px;font-size:9px;text-transform:uppercase;letter-spacing:.18em;color:#9A93C9">days streak</span>
+</span>
+</div>
+
+<div style="position:relative;margin-top:20px">
+<div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px">
+<span style="font-size:25px;font-weight:700;letter-spacing:-.02em;color:#F5F3FF;text-shadow:0 0 26px rgba(245,243,255,.35)">Push &amp; Press</span>
+<span style="font-size:11px;color:#9A93C9;flex-shrink:0">Not started</span>
+</div>
+<p style="margin:6px 0 0;font-size:12.5px;color:#9A93C9">Barbell Bench Press · Incline DB Press · Chest-Supported Row · +3 more</p>
+<button style="margin-top:16px;width:100%;height:52px;border:0;border-radius:14px;font-family:inherit;font-size:15px;font-weight:600;color:#08281F;background:linear-gradient(180deg,#7DEDCD 0%,#5BE9C2 55%,#3ED3AA 100%);box-shadow:0 0 34px rgba(91,233,194,.5)">Start session</button>
+<p style="margin:10px 0 0;font-size:12px;color:#9A93C9">Tomorrow · Pull &amp; Hinge · 5 exercises</p>
+</div>
+
+<div style="position:relative;margin-top:20px;display:flex;align-items:flex-start;gap:10px">
+<span style="font-size:14px;line-height:1.4;color:#8B7BFF;text-shadow:0 0 16px rgba(156,141,255,.95)">⚡</span>
+<span style="font-size:13px;line-height:1.5;color:#DAD5FA">Bench moved to 92.5 kg this week. Keep 2 reps in reserve on set 1 and the rest will follow.</span>
+</div>
+
+<p style="margin:32px 0 0;font-size:11px;text-transform:uppercase;letter-spacing:.14em;color:#9A93C9">Today</p>
+
+<div style="margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px">
+<div style="border-radius:16px;background:rgba(69,60,142,.28);padding:14px 14px 12px">
+<div style="display:flex;align-items:center;gap:10px">
+<svg width="34" height="34" viewBox="0 0 34 34" style="flex-shrink:0"><circle cx="17" cy="17" r="14" fill="none" stroke="rgba(69,60,142,.9)" stroke-width="4"></circle><circle cx="17" cy="17" r="14" fill="none" stroke="#5BE9C2" stroke-width="4" stroke-linecap="round" stroke-dasharray="44 88" transform="rotate(-90 17 17)"></circle></svg>
+<div><p style="margin:0;font-family:ui-monospace,Menlo,monospace;font-size:19px;font-weight:700;letter-spacing:-.03em;color:#E4FCF4">1240</p><p style="margin:3px 0 0;font-size:9px;text-transform:uppercase;letter-spacing:.14em;color:#9A93C9">of 2480 kcal</p></div>
+</div>
+<p style="margin:12px 0 0;font-size:11px;color:#5BE9C2">Nutrition ›</p>
+</div>
+<div style="border-radius:16px;background:rgba(69,60,142,.28);padding:14px 14px 12px">
+<p style="margin:0;font-family:ui-monospace,Menlo,monospace;font-size:19px;font-weight:700;letter-spacing:-.03em;color:#E4FCF4">1250<span style="font-size:12px;font-weight:500;color:#9A93C9"> ml</span></p>
+<p style="margin:3px 0 0;font-size:9px;text-transform:uppercase;letter-spacing:.14em;color:#9A93C9">of 2000 water</p>
+<div style="margin-top:10px;height:2px;border-radius:2px;background:rgba(245,243,255,.11)"><div style="width:62%;height:2px;border-radius:2px;background:#5BE9C2;box-shadow:0 0 12px rgba(91,233,194,.9)"></div></div>
+<p style="margin:11px 0 0;font-size:11px;color:#5BE9C2">Nutrition ›</p>
+</div>
+</div>
+
+<div style="margin-top:6px;display:flex;align-items:baseline;justify-content:space-between;padding:14px 0;border-top:1px solid rgba(245,243,255,.11)">
+<span style="font-size:13px;color:#C2BCE8">Steps</span>
+<span style="display:flex;align-items:center;gap:8px">
+<span style="display:inline-flex;align-items:center;height:30px;padding:0 10px;border-radius:8px;background:rgba(69,60,142,.28);font-size:12px;color:#9A93C9">Steps</span>
+<span style="font-size:12px;font-weight:600;color:#5BE9C2;text-shadow:0 0 16px rgba(91,233,194,.85)">Log</span>
+</span>
+</div>
+<div style="padding:14px 0;border-top:1px solid rgba(245,243,255,.11)">
+<div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+<span style="font-size:13px;color:#C2BCE8">Weigh-in</span>
+<span style="display:flex;align-items:baseline;gap:8px;flex-shrink:0;white-space:nowrap">
+<span style="font-family:ui-monospace,Menlo,monospace;font-size:13px;color:#F5F3FF">78.4 kg</span>
+<span style="font-size:12px;color:#9A93C9">today ✓</span>
+</span>
+</div>
+<svg viewBox="0 0 320 60" width="100%" height="60" preserveAspectRatio="none" style="margin-top:10px;display:block">
+<polygon points="0,11.6 45,17.1 90,15.3 135,26.2 180,31.6 225,28 270,40.7 315,44.4 315,56 0,56" fill="rgba(91,233,194,.10)"></polygon>
+<polyline points="0,11.6 45,17.1 90,15.3 135,26.2 180,31.6 225,28 270,40.7 315,44.4" fill="none" stroke="#5BE9C2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" style="filter:drop-shadow(0 0 8px rgba(91,233,194,.6))"></polyline>
+<circle cx="315" cy="44.4" r="3.5" fill="#5BE9C2"></circle>
+</svg>
+<div style="display:flex;align-items:baseline;justify-content:space-between;margin-top:4px">
+<span style="font-size:10px;text-transform:uppercase;letter-spacing:.14em;color:#9A93C9">8 weigh-ins</span>
+<span style="font-size:11px;color:#5BE9C2">−2.0 kg since week 1</span>
+</div>
+</div>
+
+<p style="margin:26px 0 0;font-size:11px;text-transform:uppercase;letter-spacing:.14em;color:#9A93C9">Progress</p>
+<div style="margin-top:14px;display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px">
+<span style="font-family:ui-monospace,Menlo,monospace;font-size:32px;font-weight:700;letter-spacing:-.03em;color:#E4FCF4;text-shadow:0 0 28px rgba(91,233,194,.65)">78.1<span style="font-size:15px;font-weight:500;color:#9A93C9;text-shadow:none"> kg</span></span>
+<span style="font-size:13px;color:#5BE9C2;text-shadow:0 0 16px rgba(91,233,194,.85)">−0.4 kg/wk · on track</span>
+</div>
+<p style="margin:12px 0 0;font-size:13px;color:#F5F3FF">Barbell Bench Press <span style="font-family:ui-monospace,Menlo,monospace;font-weight:600;color:#5BE9C2;text-shadow:0 0 16px rgba(91,233,194,.85)">92.5 kg</span><span style="font-size:11px;color:#9A93C9"> — new PR</span></p>
+
+<div style="margin-top:24px;display:flex;align-items:baseline;gap:8px">
+<span style="width:6px;height:6px;border-radius:50%;background:#FFB454;align-self:center;flex-shrink:0;box-shadow:0 0 8px rgba(255,180,84,.7)"></span>
+<span style="font-size:12.5px;color:#FFD9A6">62 g protein and one session left today.</span>
+</div>
+<div style="height:120px"></div>
+</div>
+
+<div style="position:absolute;left:0;right:0;bottom:0;height:74px;background:linear-gradient(180deg,rgba(0,0,0,0) 0%,#221C48 45%)">
+<div style="display:flex;align-items:stretch;height:64px;margin-top:10px">
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:#5BE9C2"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" style="filter:drop-shadow(0 0 8px rgba(91,233,194,.9))"><rect x="2.5" y="2.5" width="6" height="6" rx="1.5"></rect><rect x="11.5" y="2.5" width="6" height="6" rx="1.5"></rect><rect x="2.5" y="11.5" width="6" height="6" rx="1.5"></rect><rect x="11.5" y="11.5" width="6" height="6" rx="1.5"></rect></svg><span style="font-size:10px;font-weight:500;text-shadow:0 0 16px rgba(91,233,194,.85)">Home</span></div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:#9A93C9"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path><path d="M22 12A10 10 0 0 0 12 2v10z"></path></svg><span style="font-size:10px;font-weight:500">Nutrition</span></div>
+<div style="flex:1;display:flex;align-items:center;justify-content:center"><div style="margin-top:-24px;width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:linear-gradient(180deg,#7DEDCD,#3ED3AA);box-shadow:0 0 12px rgba(91,233,194,.9),0 0 24px rgba(91,233,194,.45)"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#08281F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path></svg></div></div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:#9A93C9"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M1.5 10h3l2.5-6 3 12 2.5-6h4.5"></path></svg><span style="font-size:10px;font-weight:500">Exercise</span></div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:#9A93C9"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg><span style="font-size:10px;font-weight:500">Tools</span></div>
+</div>
+</div>
+</div></div>
+</div>
+
+
+
+
+
+<div class="dv-opt" id="1d">
+<div class="dv-olabel"><span class="dv-oid">1d</span>NUTRITION · now owns the macro ring meter and water logging (both moved off Home), above the existing meals list, targets derivation and weigh-in.</div>
+<div class="ph"><div class="ph-scroll">
+
+<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 22px 0;font-size:12px;font-weight:600;color:#F5F3FF"><span>9:41</span><span style="width:16px;height:9px;border:1.2px solid rgba(245,243,255,.6);border-radius:2px;display:inline-block"></span></div>
+
+<div style="padding:20px 22px 0">
+<p style="margin:0;font-size:11px;text-transform:uppercase;letter-spacing:.14em;color:#9A93C9">Nutrition · Wednesday</p>
+
+<div style="margin-top:20px;display:flex;align-items:center;gap:18px">
+<svg width="112" height="112" viewBox="0 0 112 112" style="flex-shrink:0">
+<circle cx="56" cy="56" r="50" fill="none" stroke="rgba(69,60,142,.45)" stroke-width="3"></circle>
+<circle cx="56" cy="56" r="40" fill="none" stroke="rgba(69,60,142,.45)" stroke-width="8"></circle>
+<circle cx="56" cy="56" r="30" fill="none" stroke="rgba(69,60,142,.45)" stroke-width="5"></circle>
+<circle cx="56" cy="56" r="22" fill="none" stroke="rgba(69,60,142,.45)" stroke-width="5"></circle>
+<circle cx="56" cy="56" r="14" fill="none" stroke="rgba(69,60,142,.45)" stroke-width="5"></circle>
+<circle cx="56" cy="56" r="50" fill="none" stroke="#6FB7FF" stroke-width="3" stroke-linecap="round" stroke-dasharray="195 314" transform="rotate(-90 56 56)"></circle>
+<circle cx="56" cy="56" r="40" fill="none" stroke="#5BE9C2" stroke-width="8" stroke-linecap="round" stroke-dasharray="126 251" transform="rotate(-90 56 56)" style="filter:drop-shadow(0 0 8px rgba(91,233,194,.9))"></circle>
+<circle cx="56" cy="56" r="30" fill="none" stroke="#8B7BFF" stroke-width="5" stroke-linecap="round" stroke-dasharray="115 188" transform="rotate(-90 56 56)"></circle>
+<circle cx="56" cy="56" r="22" fill="none" stroke="#FFB454" stroke-width="5" stroke-linecap="round" stroke-dasharray="55 138" transform="rotate(-90 56 56)"></circle>
+<circle cx="56" cy="56" r="14" fill="none" stroke="#C2BCE8" stroke-width="5" stroke-linecap="round" stroke-dasharray="52 88" transform="rotate(-90 56 56)"></circle>
+</svg>
+<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:14px">
+<div>
+<p style="margin:0;font-family:ui-monospace,Menlo,monospace;font-size:46px;font-weight:700;letter-spacing:-.04em;line-height:.92;color:#E4FCF4;text-shadow:0 0 28px rgba(91,233,194,.65),0 0 56px rgba(91,233,194,.3)">1240</p>
+<p style="margin:5px 0 0;font-size:10.5px;text-transform:uppercase;letter-spacing:.16em;color:#9A93C9">kcal · of <span style="font-family:ui-monospace,Menlo,monospace">2480</span></p>
+</div>
+<div style="display:flex;flex-direction:column;gap:7px">
+<div style="display:flex;align-items:baseline;gap:9px"><span style="width:9px;height:9px;border-radius:3px;background:#8B7BFF;flex-shrink:0"></span><span style="flex:1;font-size:10px;text-transform:uppercase;letter-spacing:.16em;color:#9A93C9">Protein</span><span style="font-family:ui-monospace,Menlo,monospace;font-size:12.5px;color:#F5F3FF">98<span style="color:#9A93C9"> / 160g</span></span></div>
+<div style="display:flex;align-items:baseline;gap:9px"><span style="width:9px;height:9px;border-radius:3px;background:#FFB454;flex-shrink:0"></span><span style="flex:1;font-size:10px;text-transform:uppercase;letter-spacing:.16em;color:#9A93C9">Carbs</span><span style="font-family:ui-monospace,Menlo,monospace;font-size:12.5px;color:#F5F3FF">112<span style="color:#9A93C9"> / 280g</span></span></div>
+<div style="display:flex;align-items:baseline;gap:9px"><span style="width:9px;height:9px;border-radius:3px;background:#C2BCE8;flex-shrink:0"></span><span style="flex:1;font-size:10px;text-transform:uppercase;letter-spacing:.16em;color:#9A93C9">Fat</span><span style="font-family:ui-monospace,Menlo,monospace;font-size:12.5px;color:#F5F3FF">41<span style="color:#9A93C9"> / 69g</span></span></div>
+<div style="display:flex;align-items:baseline;gap:9px"><span style="width:9px;height:9px;border-radius:3px;background:#6FB7FF;flex-shrink:0"></span><span style="flex:1;font-size:10px;text-transform:uppercase;letter-spacing:.16em;color:#9A93C9">Water</span><span style="font-family:ui-monospace,Menlo,monospace;font-size:12.5px;color:#F5F3FF">1250<span style="color:#9A93C9"> / 2000ml</span></span></div>
+</div>
+</div>
+</div>
+
+<div style="margin-top:20px;padding:14px 0;border-top:1px solid rgba(245,243,255,.11);border-bottom:1px solid rgba(245,243,255,.11)">
+<div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+<span style="font-size:13px;color:#C2BCE8">Water</span>
+<span style="display:flex;align-items:baseline;gap:14px;flex-shrink:0;white-space:nowrap">
+<span style="font-family:ui-monospace,Menlo,monospace;font-size:13px;color:#F5F3FF">1250 / 2000 ml</span>
+<span style="font-size:12px;font-weight:600;color:#6FB7FF">+250</span>
+<span style="font-size:12px;font-weight:600;color:#6FB7FF">+500</span>
+<span style="font-size:12px;color:#9A93C9">edit</span>
+</span>
+</div>
+
+</div>
+
+<div style="margin-top:26px;display:flex;align-items:center;justify-content:space-between">
+<span style="font-size:11px;text-transform:uppercase;letter-spacing:.14em;color:#9A93C9">Today's meals</span>
+<span style="font-size:12px;font-weight:600;color:#5BE9C2">↻ Regenerate all</span>
+</div>
+
+<div style="margin-top:14px">
+<div style="padding:16px 0">
+<p style="margin:0;font-size:9.5px;text-transform:uppercase;letter-spacing:.12em;color:#5BE9C2;text-shadow:0 0 16px rgba(91,233,194,.85)">Breakfast · open</p>
+<div style="margin-top:7px;display:flex;align-items:baseline;justify-content:space-between;gap:12px">
+<span style="font-size:19px;font-weight:600;letter-spacing:-.02em;color:#F5F3FF">Greek yogurt, berries &amp; walnuts</span>
+<span style="font-size:12px;color:#9A93C9;flex-shrink:0">⌃</span>
+</div>
+<div style="margin-top:14px;display:flex;align-items:flex-end;gap:12px">
+<span style="font-family:ui-monospace,Menlo,monospace;font-size:32px;font-weight:700;letter-spacing:-.03em;line-height:1;color:#F5F3FF">480</span>
+<div style="padding-bottom:2px"><p style="margin:0;font-size:12px;color:#F5F3FF">kcal</p><p style="margin:3px 0 0;font-family:ui-monospace,Menlo,monospace;font-size:9.5px;text-transform:uppercase;letter-spacing:.12em;color:#9A93C9">34 P · 41 C · 18 F</p></div>
+</div>
+<p style="margin:16px 0 0;font-size:9.5px;text-transform:uppercase;letter-spacing:.12em;color:#9A93C9">4 ingredients</p>
+<div style="margin-top:8px;display:flex;flex-direction:column;gap:6px;font-family:ui-monospace,Menlo,monospace;font-size:12px;color:#C2BCE8">
+<span>250g Greek yogurt 0%</span><span>120g mixed berries</span><span>20g walnuts</span><span>10g honey</span>
+</div>
+<div style="margin-top:16px;display:flex;align-items:center;gap:10px">
+<span style="display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 16px;border-radius:12px;background:rgba(91,233,194,.15);font-size:12.5px;font-weight:600;color:#5BE9C2">✓ Logged</span>
+<span style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:10px;color:#9A93C9;font-size:14px">↻</span>
+<span style="font-size:12px;color:#5BE9C2">Swap · 4 options</span>
+</div>
+</div>
+<div style="padding:15px 0;border-top:1px solid rgba(245,243,255,.11)">
+<p style="margin:0;font-size:9.5px;text-transform:uppercase;letter-spacing:.12em;color:#9A93C9">Lunch</p>
+<div style="margin-top:6px;display:flex;align-items:baseline;justify-content:space-between;gap:12px">
+<span style="min-width:0;font-size:16.5px;font-weight:500;color:#F5F3FF">Chicken &amp; rice bowl</span>
+<span style="display:flex;align-items:baseline;gap:8px;flex-shrink:0;white-space:nowrap"><span style="font-family:ui-monospace,Menlo,monospace;font-size:12px;color:#5BE9C2">✓ 760</span><span style="font-size:12px;color:#9A93C9">⌄</span></span>
+</div>
+</div>
+<div style="padding:15px 0;border-top:1px solid rgba(245,243,255,.11)">
+<p style="margin:0;font-size:9.5px;text-transform:uppercase;letter-spacing:.12em;color:#9A93C9">Dinner</p>
+<div style="margin-top:6px;display:flex;align-items:baseline;justify-content:space-between;gap:12px">
+<span style="min-width:0;font-size:16.5px;font-weight:500;color:#F5F3FF">Salmon, potatoes &amp; greens</span>
+<span style="display:flex;align-items:baseline;gap:8px;flex-shrink:0;white-space:nowrap"><span style="font-family:ui-monospace,Menlo,monospace;font-size:12px;color:#9A93C9">820 kcal</span><span style="font-size:12px;color:#9A93C9">⌄</span></span>
+</div>
+</div>
+<div style="padding:15px 0;border-top:1px solid rgba(245,243,255,.11)">
+<p style="margin:0;font-size:9.5px;text-transform:uppercase;letter-spacing:.12em;color:#9A93C9">Snack</p>
+<div style="margin-top:6px;display:flex;align-items:baseline;justify-content:space-between;gap:12px">
+<span style="min-width:0;font-size:16.5px;font-weight:500;color:#F5F3FF">Cottage cheese &amp; honey</span>
+<span style="display:flex;align-items:baseline;gap:8px;flex-shrink:0;white-space:nowrap"><span style="font-family:ui-monospace,Menlo,monospace;font-size:12px;color:#9A93C9">240 kcal</span><span style="font-size:12px;color:#9A93C9">⌄</span></span>
+</div>
+</div>
+</div>
+
+<div style="margin-top:22px;border-radius:16px;background:#241E4E;padding:16px">
+<p style="margin:0;font-size:15px;font-weight:600;color:#F5F3FF">How your targets are set</p>
+<div style="margin-top:14px;display:flex;gap:12px">
+<div style="flex:1;min-width:0"><p style="margin:0;font-family:ui-monospace,Menlo,monospace;font-size:17px;font-weight:700;letter-spacing:-.03em;color:#F5F3FF">1710</p><p style="margin:3px 0 0;font-size:8.5px;text-transform:uppercase;letter-spacing:.14em;color:#9A93C9">BMR</p></div>
+<div style="flex:1;min-width:0"><p style="margin:0;font-family:ui-monospace,Menlo,monospace;font-size:17px;font-weight:700;letter-spacing:-.03em;color:#F5F3FF">2650</p><p style="margin:3px 0 0;font-size:8.5px;text-transform:uppercase;letter-spacing:.14em;color:#9A93C9">TDEE</p></div>
+<div style="flex:1;min-width:0"><p style="margin:0;font-family:ui-monospace,Menlo,monospace;font-size:17px;font-weight:700;letter-spacing:-.03em;color:#F5F3FF">−170</p><p style="margin:3px 0 0;font-size:8.5px;text-transform:uppercase;letter-spacing:.14em;color:#9A93C9">Deficit</p></div>
+<div style="flex:1;min-width:0"><p style="margin:0;font-family:ui-monospace,Menlo,monospace;font-size:17px;font-weight:700;letter-spacing:-.03em;color:#5BE9C2;text-shadow:0 0 16px rgba(91,233,194,.85)">2480</p><p style="margin:3px 0 0;font-size:8.5px;text-transform:uppercase;letter-spacing:.14em;color:#9A93C9">Target</p></div>
+</div>
+<p style="margin:12px 0 0;font-size:11px;line-height:1.45;color:#9A93C9">From 78.4 kg, 181 cm, 31 y · protein 2 g/kg · fat 25% · carbs the remainder.</p>
+</div>
+
+<p style="margin:26px 0 0;font-size:11px;text-transform:uppercase;letter-spacing:.14em;color:#9A93C9">Weigh-in</p>
+<div style="margin-top:12px;display:flex;align-items:center;gap:10px">
+<span style="flex:1;display:inline-flex;align-items:center;height:44px;padding:0 14px;border-radius:12px;background:rgba(69,60,142,.28);font-family:ui-monospace,Menlo,monospace;font-size:14px;color:#F5F3FF">78.4 kg</span>
+<button style="height:44px;padding:0 18px;border:0;border-radius:12px;font-family:inherit;font-size:13px;font-weight:600;color:#08281F;background:#5BE9C2">Save</button>
+</div>
+<div style="height:120px"></div>
+</div>
+
+<div style="position:absolute;left:0;right:0;bottom:0;height:74px;background:linear-gradient(180deg,rgba(0,0,0,0) 0%,#221C48 45%)">
+<div style="display:flex;align-items:stretch;height:64px;margin-top:10px">
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:#9A93C9"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2.5" y="2.5" width="6" height="6" rx="1.5"></rect><rect x="11.5" y="2.5" width="6" height="6" rx="1.5"></rect><rect x="2.5" y="11.5" width="6" height="6" rx="1.5"></rect><rect x="11.5" y="11.5" width="6" height="6" rx="1.5"></rect></svg><span style="font-size:10px;font-weight:500">Home</span></div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:#5BE9C2"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="filter:drop-shadow(0 0 8px rgba(91,233,194,.9))"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path><path d="M22 12A10 10 0 0 0 12 2v10z"></path></svg><span style="font-size:10px;font-weight:500;text-shadow:0 0 16px rgba(91,233,194,.85)">Nutrition</span></div>
+<div style="flex:1;display:flex;align-items:center;justify-content:center"><div style="margin-top:-24px;width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:linear-gradient(180deg,#7DEDCD,#3ED3AA);box-shadow:0 0 12px rgba(91,233,194,.9),0 0 24px rgba(91,233,194,.45)"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#08281F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path></svg></div></div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:#9A93C9"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M1.5 10h3l2.5-6 3 12 2.5-6h4.5"></path></svg><span style="font-size:10px;font-weight:500">Exercise</span></div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:#9A93C9"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg><span style="font-size:10px;font-weight:500">Tools</span></div>
+</div>
+</div>
+</div></div>
+</div>
+
+
+
+<div class="dv-opt" id="1f">
+<div class="dv-olabel"><span class="dv-oid">1f</span>EXERCISE · today, now owning the full program/phase context (expanded here) that used to be echoed on Home. Week strip, ramp strips, load provenance and set grid unchanged.</div>
+<div class="ph"><div class="ph-scroll">
+
+<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 22px 0;font-size:12px;font-weight:600;color:#F5F3FF"><span>9:41</span><span style="width:16px;height:9px;border:1.2px solid rgba(245,243,255,.6);border-radius:2px;display:inline-block"></span></div>
+
+<div style="padding:18px 22px 0">
+
+<div style="border-radius:16px;background:rgba(69,60,142,.28);padding:14px">
+<div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+<span style="font-size:12.5px;color:#F5F3FF">Wk 3/16 · B1 Hypertrophy · ~52 min</span>
+<span style="font-size:13px;color:#5BE9C2">⌃</span>
+</div>
+<p style="margin:12px 0 0;font-size:12px;line-height:1.5;color:#C2BCE8">Accumulation block. Volume climbs each week; loads move only when you clear the top of the rep range on every set.</p>
+<p style="margin:8px 0 0;font-size:12px;line-height:1.5;color:#DAD5FA">Coach: this is the heaviest week before the deload — bank the reps, don't chase the weight.</p>
+<div style="margin-top:14px;display:flex;gap:5px">
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;padding:7px 0;border-radius:9px"><span style="font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#9A93C9">Mon</span><span style="font-size:12px;color:#5BE9C2">✓</span></div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;padding:7px 0;border-radius:9px"><span style="font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#9A93C9">Tue</span><span style="font-size:12px;color:#9A93C9">–</span></div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;padding:7px 0;border-radius:9px;background:rgba(91,233,194,.14);border:1px solid rgba(91,233,194,.4)"><span style="font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#5BE9C2">Wed</span><span style="font-size:12px;color:#5BE9C2;text-shadow:0 0 12px rgba(91,233,194,.9)">●</span></div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;padding:7px 0;border-radius:9px"><span style="font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#9A93C9">Thu</span><span style="font-size:12px;color:#C2BCE8">●</span></div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;padding:7px 0;border-radius:9px"><span style="font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#9A93C9">Fri</span><span style="font-size:12px;color:#C2BCE8">●</span></div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;padding:7px 0;border-radius:9px"><span style="font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#9A93C9">Sat</span><span style="font-size:12px;color:#9A93C9">–</span></div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;padding:7px 0;border-radius:9px"><span style="font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#9A93C9">Sun</span><span style="font-size:12px;color:#9A93C9">~</span></div>
+</div>
+<p style="margin:12px 0 0;font-size:11.5px;color:#5BE9C2">See the whole program ›</p>
+</div>
+
+<div style="margin-top:20px">
+<span style="font-size:10.5px;text-transform:uppercase;letter-spacing:.2em;color:#5BE9C2;text-shadow:0 0 16px rgba(91,233,194,.85)">Today · Wednesday</span>
+<p style="margin:8px 0 0;font-size:36px;font-weight:700;line-height:1.02;letter-spacing:-.035em;color:#F5F3FF;text-shadow:0 0 26px rgba(245,243,255,.35)">Push &amp; Press</p>
+<div style="margin-top:14px;height:2px;border-radius:2px;background:rgba(245,243,255,.11)"><div style="width:28%;height:2px;border-radius:2px;background:#5BE9C2;box-shadow:0 0 12px rgba(91,233,194,.9)"></div></div>
+<button style="margin-top:14px;height:40px;padding:0 18px;border:0;border-radius:11px;font-family:inherit;font-size:13px;font-weight:600;color:#08281F;background:#5BE9C2;box-shadow:0 0 24px rgba(91,233,194,.45)">Start session</button>
+</div>
+
+<p style="margin:20px 0 0;font-size:13px;color:#C2BCE8">▸ Warm-up · 4 moves · ~6 min</p>
+
+<div style="margin-top:22px">
+
+<div style="padding:16px 0;border-top:1px solid rgba(245,243,255,.11)">
+<p style="margin:0;font-size:9.5px;text-transform:uppercase;letter-spacing:.12em;color:#5BE9C2;text-shadow:0 0 16px rgba(91,233,194,.85)">Main lift · open</p>
+<div style="margin-top:7px;display:flex;align-items:baseline;justify-content:space-between;gap:12px">
+<span style="min-width:0;font-size:19px;font-weight:600;letter-spacing:-.02em;color:#F5F3FF">Barbell Bench Press</span>
+<span style="display:flex;align-items:baseline;gap:8px;flex-shrink:0;white-space:nowrap"><span style="font-family:ui-monospace,Menlo,monospace;font-size:12px;color:#9A93C9">3×8-11</span><span style="font-size:13px;color:#9A93C9">⋯</span></span>
+</div>
+
+<div style="margin-top:14px;display:flex;align-items:flex-end;gap:12px">
+<span style="font-family:ui-monospace,Menlo,monospace;font-size:32px;font-weight:700;letter-spacing:-.03em;line-height:1;color:#F5F3FF">92.5</span>
+<div style="padding-bottom:2px"><p style="margin:0;font-size:12px;color:#F5F3FF">kg</p><p style="margin:3px 0 0;font-family:ui-monospace,Menlo,monospace;font-size:9.5px;text-transform:uppercase;letter-spacing:.12em;color:#9A93C9">from your last session ⓘ</p></div>
+</div>
+
+<p style="margin:16px 0 0;font-size:9.5px;text-transform:uppercase;letter-spacing:.12em;color:#9A93C9">4 ramp sets</p>
+<div style="margin-top:8px;display:flex;flex-direction:column;gap:6px;font-family:ui-monospace,Menlo,monospace;font-size:12px;color:#C2BCE8">
+<span>20 kg × 10</span><span>50 kg × 5</span><span>70 kg × 3</span><span>80 kg × 1</span>
+</div>
+
+<p style="margin:16px 0 0;font-size:9.5px;text-transform:uppercase;letter-spacing:.12em;color:#9A93C9">3 working sets · 2 logged</p>
+<div style="margin-top:8px;display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:12px;background:rgba(69,60,142,.28)">
+<span style="font-family:ui-monospace,Menlo,monospace;font-size:11px;color:#9A93C9;width:20px">S1</span>
+<span style="flex:1;font-family:ui-monospace,Menlo,monospace;font-size:13px;color:#F5F3FF">92.5 kg × 9</span>
+<span style="font-size:13px;color:#5BE9C2;text-shadow:0 0 12px rgba(91,233,194,.9)">✓</span>
+</div>
+<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:12px;background:rgba(69,60,142,.28)">
+<span style="font-family:ui-monospace,Menlo,monospace;font-size:11px;color:#9A93C9;width:20px">S2</span>
+<span style="flex:1;font-family:ui-monospace,Menlo,monospace;font-size:13px;color:#F5F3FF">92.5 kg × 8</span>
+<span style="font-size:13px;color:#5BE9C2;text-shadow:0 0 12px rgba(91,233,194,.9)">✓</span>
+</div>
+<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:12px;background:rgba(69,60,142,.28);border:1px solid rgba(91,233,194,.3)">
+<span style="font-family:ui-monospace,Menlo,monospace;font-size:11px;color:#9A93C9;width:20px">S3</span>
+<span style="display:inline-flex;align-items:center;height:36px;padding:0 10px;border-radius:9px;background:#1A1636;font-family:ui-monospace,Menlo,monospace;font-size:13px;color:#F5F3FF">92.5</span>
+<span style="font-size:11px;color:#9A93C9">kg</span>
+<span style="display:inline-flex;align-items:center;height:36px;padding:0 10px;border-radius:9px;background:#1A1636;font-family:ui-monospace,Menlo,monospace;font-size:13px;color:#9A93C9">8</span>
+<span style="font-size:11px;color:#9A93C9">reps</span>
+<span style="flex:1"></span>
+<span style="display:inline-flex;align-items:center;justify-content:center;width:44px;height:36px;border-radius:9px;background:#5BE9C2;color:#08281F;font-size:14px;font-weight:700;box-shadow:0 0 12px rgba(91,233,194,.9)">✓</span>
+</div>
+</div>
+
+<div style="margin-top:16px;display:flex;align-items:center;gap:14px">
+<span style="font-size:12px;color:#5BE9C2">Swap · 6 alternatives</span>
+<span style="font-size:12px;color:#9A93C9">Plate calculator</span>
+</div>
+</div>
+
+<div style="padding:16px 0;border-top:1px solid rgba(245,243,255,.11)">
+<p style="margin:0;font-size:9.5px;text-transform:uppercase;letter-spacing:.12em;color:#9A93C9">Superset A · alternate, no rest</p>
+<div style="margin-top:7px;display:flex;align-items:baseline;justify-content:space-between;gap:12px">
+<span style="min-width:0;font-size:16.5px;font-weight:500;color:#F5F3FF">A1 · Incline DB Press</span>
+<span style="display:flex;align-items:baseline;gap:8px;flex-shrink:0;white-space:nowrap"><span style="font-family:ui-monospace,Menlo,monospace;font-size:12px;color:#9A93C9">3×10 · 30 kg</span><span style="font-size:12px;color:#9A93C9">⌄</span></span>
+</div>
+<div style="margin-top:10px;display:flex;align-items:baseline;justify-content:space-between;gap:12px">
+<span style="min-width:0;font-size:16.5px;font-weight:500;color:#F5F3FF">A2 · Chest-Supported Row</span>
+<span style="display:flex;align-items:baseline;gap:8px;flex-shrink:0;white-space:nowrap"><span style="font-family:ui-monospace,Menlo,monospace;font-size:12px;color:#9A93C9">3×10 · 55 kg</span><span style="font-size:12px;color:#9A93C9">⌄</span></span>
+</div>
+</div>
+
+<div style="padding:16px 0;border-top:1px solid rgba(245,243,255,.11)">
+<p style="margin:0;font-size:9.5px;text-transform:uppercase;letter-spacing:.12em;color:#9A93C9">Accessory</p>
+<div style="margin-top:7px;display:flex;align-items:baseline;justify-content:space-between;gap:12px">
+<span style="min-width:0;font-size:16.5px;font-weight:500;color:#F5F3FF">Seated DB Shoulder Press</span>
+<span style="display:flex;align-items:baseline;gap:8px;flex-shrink:0;white-space:nowrap"><span style="font-family:ui-monospace,Menlo,monospace;font-size:12px;color:#9A93C9">3×12 · 22.5 kg</span><span style="font-size:12px;color:#9A93C9">⌄</span></span>
+</div>
+<div style="margin-top:10px;display:flex;align-items:baseline;justify-content:space-between;gap:12px">
+<span style="min-width:0;font-size:16.5px;font-weight:500;color:#F5F3FF">Cable Lateral Raise</span>
+<span style="display:flex;align-items:baseline;gap:8px;flex-shrink:0;white-space:nowrap"><span style="font-family:ui-monospace,Menlo,monospace;font-size:12px;color:#9A93C9">3×15 · 7.5 kg</span><span style="font-size:12px;color:#9A93C9">⌄</span></span>
+</div>
+</div>
+
+<div style="padding:16px 0;border-top:1px solid rgba(245,243,255,.11);border-bottom:1px solid rgba(245,243,255,.11)">
+<p style="margin:0;font-size:9.5px;text-transform:uppercase;letter-spacing:.12em;color:#9A93C9">Finisher</p>
+<div style="margin-top:7px;display:flex;align-items:baseline;justify-content:space-between;gap:12px">
+<span style="min-width:0;font-size:16.5px;font-weight:500;color:#F5F3FF">15 min incline walk</span>
+<span style="display:flex;align-items:baseline;gap:10px;flex-shrink:0;white-space:nowrap"><span style="font-family:ui-monospace,Menlo,monospace;font-size:12px;color:#9A93C9">RPE 6</span><span style="font-size:12px;font-weight:600;color:#5BE9C2">Log</span></span>
+</div>
+</div>
+
+</div>
+<div style="height:130px"></div>
+</div>
+
+<div style="position:absolute;left:0;right:0;bottom:0;height:74px;background:linear-gradient(180deg,rgba(0,0,0,0) 0%,#221C48 45%)">
+<div style="display:flex;align-items:stretch;height:64px;margin-top:10px">
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:#9A93C9"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2.5" y="2.5" width="6" height="6" rx="1.5"></rect><rect x="11.5" y="2.5" width="6" height="6" rx="1.5"></rect><rect x="2.5" y="11.5" width="6" height="6" rx="1.5"></rect><rect x="11.5" y="11.5" width="6" height="6" rx="1.5"></rect></svg><span style="font-size:10px;font-weight:500">Home</span></div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:#9A93C9"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path><path d="M22 12A10 10 0 0 0 12 2v10z"></path></svg><span style="font-size:10px;font-weight:500">Nutrition</span></div>
+<div style="flex:1;display:flex;align-items:center;justify-content:center"><div style="margin-top:-24px;width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:linear-gradient(180deg,#7DEDCD,#3ED3AA);box-shadow:0 0 12px rgba(91,233,194,.9),0 0 24px rgba(91,233,194,.45)"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#08281F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path></svg></div></div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:#5BE9C2"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" style="filter:drop-shadow(0 0 8px rgba(91,233,194,.9))"><path d="M1.5 10h3l2.5-6 3 12 2.5-6h4.5"></path></svg><span style="font-size:10px;font-weight:500;text-shadow:0 0 16px rgba(91,233,194,.85)">Exercise</span></div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:#9A93C9"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg><span style="font-size:10px;font-weight:500">Tools</span></div>
+</div>
+</div>
+</div></div>
+</div>
+
+
+
+
+
+</div>
+
+<p class="dv-next">Try next: "take <a class="dv-oid" href="#1a">1a</a> but lead with the coach line from <a class="dv-oid" href="#1c">1c</a>" · "show the mid-session and empty-profile Home states" · "storyboard the Exercise active-session flow"</p>
+</section>
+</x-dc>
+</body>
+</html>
