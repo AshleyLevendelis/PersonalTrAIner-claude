@@ -141,9 +141,11 @@ interface ChatAssistantProps {
   onOpenDashboard?: () => void
   /** User's chat typewriter-reveal-speed preference (Settings → Profile). Defaults to 'normal' if omitted. */
   revealSpeed?: RevealSpeed
+  /** Vision Step 6 — any pending "start heavier next block?" suggestions currently showing on the dashboard banner, so the coach can discuss one if asked directly. Confirming/declining still only happens via the banner's own buttons, not from here (see load-suggestions.ts's own doc comment on why chat-driven confirm is out of scope for this pass). */
+  pendingLoadSuggestions?: string[]
 }
 
-export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onProfileChanged, onMealSwapApplied, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenProfile, groceryItems, onGroceryChanged, onOpenGrocery, onWaterChanged, onOpenDashboard, revealSpeed = DEFAULT_REVEAL_SPEED }: ChatAssistantProps) {
+export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onProfileChanged, onMealSwapApplied, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenProfile, groceryItems, onGroceryChanged, onOpenGrocery, onWaterChanged, onOpenDashboard, revealSpeed = DEFAULT_REVEAL_SPEED, pendingLoadSuggestions }: ChatAssistantProps) {
   // NL logging (§3) writes through the SAME frozen session identity +
   // logSet facade SetGrid.tsx uses — never saveSet directly (see
   // nl-logging-executor.ts's own doc comment).
@@ -592,6 +594,9 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       .map(d => `${d.day}: ${d.focus} - ${d.exercises.map(e => `${e.name} (${e.sets}x${e.reps}, rest ${e.rest})${e.selection_note ? ` [why: ${e.selection_note}]` : ''}${e.block_hold_note ? ` [note: ${e.block_hold_note}]` : ''}`).join(', ')}`)
       .join('\n')
       + (activeMesoWeek?.coach_note ? `\nThis week's coaching note: ${activeMesoWeek.coach_note}` : '')
+      + (pendingLoadSuggestions && pendingLoadSuggestions.length > 0
+        ? `\nPending suggestion(s) waiting on the dashboard, not yet answered: ${pendingLoadSuggestions.join(' | ')}`
+        : '')
 
     const mealSummary = mealPlan
       .map(m => `${m.meal}: ${m.items.map(i => `${i.name} (${i.calories} kcal, P:${i.protein}g C:${i.carbs}g F:${i.fat}g)`).join(', ')}`)

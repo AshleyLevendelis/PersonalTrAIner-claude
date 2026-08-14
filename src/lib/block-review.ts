@@ -32,9 +32,9 @@ import { saveMesocycleWeek } from './mesocycle-persistence'
  * would look identical to a real stall, exactly the case this exists to
  * exclude. This is Ashley's own correction on the approved plan.
  */
-const MIN_SESSIONS_TO_JUDGE = 3
+export const MIN_SESSIONS_TO_JUDGE = 3
 
-interface BlockProgressPoint {
+export interface BlockProgressPoint {
   date: string
   topSetWeightKg: number
   repsAtTopSet: number
@@ -46,8 +46,15 @@ interface BlockProgressPoint {
  * groupSetsBySession skips bodyweight sets when computing topSetWeightKg, so
  * for an all-bodyweight session every set matches (all at 0kg) and this
  * still captures real rep progress on bodyweight main lifts.
+ *
+ * Exported (along with `improved` and `lastLoggedWeight` below) so Vision
+ * Step 6's load-suggestions.ts can reuse the exact same per-session
+ * comparison this module's own stall detector uses, rather than
+ * re-deriving it — the "did this block genuinely improve" question and the
+ * "did this block genuinely stall" question are the same comparator, just
+ * aggregated in opposite directions.
  */
-function toProgressPoint(session: ExerciseHistorySession): BlockProgressPoint {
+export function toProgressPoint(session: ExerciseHistorySession): BlockProgressPoint {
   const repsAtWeight = session.sets.filter(s => s.weightKg === session.topSetWeightKg).map(s => s.repsCompleted)
   return {
     date: session.date,
@@ -57,7 +64,7 @@ function toProgressPoint(session: ExerciseHistorySession): BlockProgressPoint {
 }
 
 /** More weight, or the same weight with more reps — double progression's own definition of real progress. */
-function improved(prev: BlockProgressPoint, next: BlockProgressPoint): boolean {
+export function improved(prev: BlockProgressPoint, next: BlockProgressPoint): boolean {
   if (next.topSetWeightKg > prev.topSetWeightKg) return true
   return next.topSetWeightKg === prev.topSetWeightKg && next.repsAtTopSet > prev.repsAtTopSet
 }
@@ -81,7 +88,7 @@ export function didExerciseStallInBlock(sessionsInBlock: ExerciseHistorySession[
 }
 
 /** The weight actually lifted last, within the block — the hold target, not a block-wide max. */
-function lastLoggedWeight(sessionsInBlock: ExerciseHistorySession[]): number {
+export function lastLoggedWeight(sessionsInBlock: ExerciseHistorySession[]): number {
   const mostRecent = [...sessionsInBlock].sort((a, b) => b.date.localeCompare(a.date))[0]
   return mostRecent.topSetWeightKg
 }

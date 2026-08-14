@@ -35,6 +35,7 @@ import { sweepStaleForTarget } from '@/lib/pending-actions-store'
 import { checkAndRevertExpiredAdaptations, getActiveAdaptations, type PlanAdaptationRow } from '@/lib/plan-adaptations-store'
 import { checkForBlockReview } from '@/lib/block-review'
 import { checkForConsistencyHold } from '@/lib/block-consistency'
+import { checkForLoadSuggestions, confirmLoadSuggestion, declineLoadSuggestion } from '@/lib/load-suggestions'
 import { getRevealSpeed, saveRevealSpeed, DEFAULT_REVEAL_SPEED, type RevealSpeed } from '@/lib/reveal-speed-store'
 import { InsightBanner } from '@/components/ui/insight-banner'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
@@ -65,15 +66,20 @@ function App() {
   const [exercisePlan, setExercisePlan] = useState<WorkoutDay[]>([])
   const [mesocycle, setMesocycle] = useState<MesocycleWeek[]>([])
   // Client-authored dismissible notices — never model prose, same
-  // convention as every other receipt in this app. Three sources feed this
+  // convention as every other receipt in this app. Four sources feed this
   // one list: an auto-reverted injury/equipment adaptation
   // (checkAndRevertExpiredAdaptations), a living-target recalculation
-  // (snapshotTargetsIfChanged's changedFromPrior), and a goal-proximity ask
-  // (goal-proximity.ts). goalId is set only for the last of those — its
-  // dismiss must also persist via dismissGoalProximity so it doesn't
-  // reappear next load; the other two are naturally one-shot already (see
-  // each push site's own comment).
-  const [adaptationMessages, setAdaptationMessages] = useState<{ text: string; goalId?: string }[]>([])
+  // (snapshotTargetsIfChanged's changedFromPrior), a goal-proximity ask
+  // (goal-proximity.ts), and — Vision Step 6 — a pending load suggestion
+  // (checkForLoadSuggestions). goalId is set only for the goal-proximity
+  // case — its dismiss must also persist via dismissGoalProximity so it
+  // doesn't reappear next load. loadSuggestionId is set only for the
+  // Step 6 case, and changes what the banner renders: Confirm/Decline
+  // instead of a plain Dismiss, since this is the one message in this list
+  // that represents an action rather than a fact.
+  const [adaptationMessages, setAdaptationMessages] = useState<{ text: string; goalId?: string; loadSuggestionId?: string }[]>([])
+  /** Which load_suggestions row a Confirm/Decline tap is currently in flight for — disables both buttons on that one banner only. */
+  const [loadSuggestionBusy, setLoadSuggestionBusy] = useState<string | null>(null)
   /** When the CURRENT mesocycle was generated — anchors live-week detection (falls back to profile.created_at for legacy profiles without persisted weeks). */
   const [mesocycleCreatedAt, setMesocycleCreatedAt] = useState<string | null>(null)
   // Meal pools (M1): every generated option per slot, keyed by slot — the
@@ -478,9 +484,17 @@ function App() {
     if (restoredProfile.id && restoredMesocycle.length > 0) {
       const blockCheckPlanCreatedAt = fullMesocycle?.createdAt ?? restoredProfile.created_at ?? new Date().toISOString()
       const blockCheckNow = getAppNow(restoredProfile.id)
+      // Hoisted so every stage of the chain can read/update "the mesocycle
+      // as patched so far" — each `.then()` below is a separate callback,
+      // not nested, so a `const` declared inside one isn't visible to the
+      // next; this `let`, declared in the enclosing scope all three close
+      // over, is what lets Step 6 see Step 4 and 5's patches without
+      // threading them through each promise's resolved value.
+      let workingMesocycle = restoredMesocycle
       checkForBlockReview(restoredProfile.id, restoredMesocycle, restoredProfile, blockCheckPlanCreatedAt, blockCheckNow)
         .then(blockReviewResult => {
           if (blockReviewResult.mesocycle) {
+            workingMesocycle = blockReviewResult.mesocycle
             setMesocycle(prev => {
               const byWeek = new Map(prev.map(w => [w.week_number, w]))
               for (const w of blockReviewResult.mesocycle!) byWeek.set(w.week_number, w)
@@ -489,11 +503,11 @@ function App() {
           }
           if (blockReviewResult.messages.length > 0) setAdaptationMessages(prev => [...prev, ...blockReviewResult.messages.map(text => ({ text }))])
 
-          const afterBlockReview = blockReviewResult.mesocycle ?? restoredMesocycle
-          return checkForConsistencyHold(restoredProfile.id!, afterBlockReview, restoredProfile, blockCheckPlanCreatedAt, blockCheckNow)
+          return checkForConsistencyHold(restoredProfile.id!, workingMesocycle, restoredProfile, blockCheckPlanCreatedAt, blockCheckNow)
         })
         .then(consistencyResult => {
           if (consistencyResult.mesocycle) {
+            workingMesocycle = consistencyResult.mesocycle
             setMesocycle(prev => {
               const byWeek = new Map(prev.map(w => [w.week_number, w]))
               for (const w of consistencyResult.mesocycle!) byWeek.set(w.week_number, w)
@@ -501,6 +515,20 @@ function App() {
             })
           }
           if (consistencyResult.messages.length > 0) setAdaptationMessages(prev => [...prev, ...consistencyResult.messages.map(text => ({ text }))])
+
+          // Vision Step 6 — never patches the mesocycle itself (see
+          // load-suggestions.ts's own header comment for why); only ever
+          // surfaces a proposal, via the same dashboard banner, now with
+          // real Confirm/Decline buttons instead of a plain Dismiss.
+          return checkForLoadSuggestions(restoredProfile.id!, workingMesocycle, restoredProfile, blockCheckPlanCreatedAt, blockCheckNow)
+        })
+        .then(loadSuggestionResult => {
+          if (loadSuggestionResult.suggestions.length > 0) {
+            setAdaptationMessages(prev => [
+              ...prev,
+              ...loadSuggestionResult.suggestions.map(s => ({ text: s.text, loadSuggestionId: s.id })),
+            ])
+          }
         })
         .catch(console.error)
     }
@@ -1088,6 +1116,40 @@ function App() {
     }
   }
 
+  // Vision Step 6 — the one message in adaptationMessages that's an action
+  // rather than a fact, so it needs real handlers instead of a plain
+  // dismiss. Confirm patches the mesocycle (same forceStartingWeightKg
+  // mechanism the load-hold already uses, just going up); decline is
+  // permanent per exercise, enforced by checkForLoadSuggestions' own
+  // declined-row check next time this runs, not by anything client-side.
+  const handleLoadSuggestionConfirm = async (id: string) => {
+    if (!profile?.id) return
+    setLoadSuggestionBusy(id)
+    try {
+      const patched = await confirmLoadSuggestion(id, mesocycle, profile, profile.id)
+      if (patched) {
+        setMesocycle(prev => {
+          const byWeek = new Map(prev.map(w => [w.week_number, w]))
+          for (const w of patched) byWeek.set(w.week_number, w)
+          return [...byWeek.values()].sort((a, b) => a.week_number - b.week_number)
+        })
+      }
+      setAdaptationMessages(prev => prev.filter(m => m.loadSuggestionId !== id))
+    } finally {
+      setLoadSuggestionBusy(null)
+    }
+  }
+
+  const handleLoadSuggestionDecline = async (id: string) => {
+    setLoadSuggestionBusy(id)
+    try {
+      await declineLoadSuggestion(id)
+      setAdaptationMessages(prev => prev.filter(m => m.loadSuggestionId !== id))
+    } finally {
+      setLoadSuggestionBusy(null)
+    }
+  }
+
   const handleBanExercise = async (exerciseName: string) => {
     if (!profile?.id) return
     // Fix — food/exercise preferences have two competing stores: this used
@@ -1400,17 +1462,38 @@ function App() {
             {adaptationMessages.map((msg, i) => (
               <InsightBanner key={i} tone="ai" className="items-start justify-between">
                 <span>{msg.text}</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (msg.goalId) dismissGoalProximity(msg.goalId)
-                    setAdaptationMessages(prev => prev.filter((_, idx) => idx !== i))
-                  }}
-                  className="shrink-0 text-xs underline opacity-70 hover:opacity-100"
-                  aria-label="Dismiss"
-                >
-                  Dismiss
-                </button>
+                {msg.loadSuggestionId ? (
+                  <div className="flex shrink-0 items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => void handleLoadSuggestionConfirm(msg.loadSuggestionId!)}
+                      disabled={loadSuggestionBusy === msg.loadSuggestionId}
+                      className="text-xs font-semibold underline opacity-90 hover:opacity-100 disabled:opacity-50"
+                    >
+                      {loadSuggestionBusy === msg.loadSuggestionId ? 'Applying…' : 'Start heavier'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleLoadSuggestionDecline(msg.loadSuggestionId!)}
+                      disabled={loadSuggestionBusy === msg.loadSuggestionId}
+                      className="text-xs underline opacity-70 hover:opacity-100 disabled:opacity-50"
+                    >
+                      Keep as is
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (msg.goalId) dismissGoalProximity(msg.goalId)
+                      setAdaptationMessages(prev => prev.filter((_, idx) => idx !== i))
+                    }}
+                    className="shrink-0 text-xs underline opacity-70 hover:opacity-100"
+                    aria-label="Dismiss"
+                  >
+                    Dismiss
+                  </button>
+                )}
               </InsightBanner>
             ))}
           </div>
@@ -1517,6 +1600,7 @@ function App() {
               onOpenGrocery={() => { window.location.hash = tabHash('tools') }}
               onOpenDashboard={() => { window.location.hash = tabHash('dashboard') }}
               revealSpeed={revealSpeed}
+              pendingLoadSuggestions={adaptationMessages.filter(m => m.loadSuggestionId).map(m => m.text)}
             />
           </TabsContent>
         </Tabs>
