@@ -721,6 +721,29 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     unilateral: true,
     avg_duration_seconds: 32,
   },
+  // Swap-depth fix (measured, not assumed): at bodyweight-only equipment,
+  // Backpack Row had zero swap options — Inverted Row and Towel Row are
+  // both REGRESSION_VARIATIONS (periodization.ts), so an intermediate+
+  // trainee who isn't on a regression can't swap into them. This is a
+  // genuine peer, not an easier on-ramp.
+  {
+    name: 'Table Row',
+    id: 'table-row',
+    movement_pattern: 'horizontal_pull',
+    mechanics_tier: 'tier2_compound',
+    prescription_type: 'reps',
+    angle_vector: 'horizontal',
+    primary_muscles: ['lats', 'rhomboids', 'biceps'],
+    equipment: ['bodyweight'],
+    joint_stress: 'low',
+    form_cues: ['Lie under a sturdy, heavy table', 'Grip the edge, body straight, heels on the floor', 'Pull chest to the table edge', 'Lower with control'],
+    coach_note_swap: 'The same straight-body horizontal pull as an inverted row, using a table instead of a bar — no pull-up bar required.',
+    loads_joints: ['shoulder'],
+    style_tags: ['functional', 'combat', 'hybrid'],
+    substitution_group: 'row',
+    unilateral: false,
+    avg_duration_seconds: 32,
+  },
   {
     name: 'Face Pulls',
     id: 'face-pulls',
@@ -837,6 +860,32 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     joint_stress: 'moderate',
     form_cues: ['Grip shoulder-width or wider', 'Dead hang start', 'Pull chin over bar', 'Control the descent'],
     coach_note_swap: 'The gold standard for relative upper-body pulling strength.',
+    loads_joints: ['shoulder'],
+    style_tags: ['bodybuilding', 'functional', 'combat', 'hybrid'],
+    capability_requirement: { minExperience: 'intermediate', regression: 'Pull-Ups (Assisted)' },
+    substitution_group: 'vertical_pull',
+    unilateral: false,
+    avg_duration_seconds: 35,
+  },
+  // Swap-depth fix (measured): at bodyweight-only equipment, Pull-Ups had
+  // zero swap options for an intermediate+ trainee — Pull-Ups (Assisted)
+  // is its own named regression (REGRESSION_VARIATIONS, periodization.ts)
+  // and gets excluded as a candidate the same way. A genuine peer
+  // movement, not an easier variant, gated the same as Pull-Ups so it
+  // never becomes the unearned option for someone who hasn't earned
+  // Pull-Ups itself.
+  {
+    name: 'Chin-Ups',
+    id: 'chin-ups',
+    movement_pattern: 'vertical_pull',
+    mechanics_tier: 'tier1_compound',
+    prescription_type: 'reps',
+    angle_vector: 'vertical',
+    primary_muscles: ['lats', 'biceps', 'teres major', 'core'],
+    equipment: ['pull-up bar'],
+    joint_stress: 'moderate',
+    form_cues: ['Underhand, shoulder-width grip', 'Dead hang start', 'Pull chin over bar', 'Control the descent'],
+    coach_note_swap: 'Same vertical pull as a pull-up, underhand grip — more bicep involvement, same bar.',
     loads_joints: ['shoulder'],
     style_tags: ['bodybuilding', 'functional', 'combat', 'hybrid'],
     capability_requirement: { minExperience: 'intermediate', regression: 'Pull-Ups (Assisted)' },
@@ -1253,6 +1302,58 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     unilateral: false,
     avg_duration_seconds: 28,
   },
+  // Swap-depth fix (measured after the first pass, not assumed): Seated
+  // Band Leg Curl below needs a resistance band, which the bodyweight-only
+  // equipment tier doesn't have — so Sliding Leg Curl was STILL the only
+  // isolation_hamstring option there, the single worst remaining gap after
+  // this session's first round of additions. Same equipment, same
+  // mechanism, but genuinely harder (full weight on one leg) — a real
+  // progression, not a duplicate.
+  {
+    name: 'Single-Leg Sliding Leg Curl',
+    id: 'single-leg-sliding-leg-curl',
+    movement_pattern: 'isolation_hamstring',
+    mechanics_tier: 'tier3_isolation',
+    prescription_type: 'reps',
+    angle_vector: 'horizontal',
+    primary_muscles: ['hamstrings'],
+    equipment: ['bodyweight'],
+    joint_stress: 'low',
+    form_cues: ['Lie back, one heel on a towel or slider, other leg lifted', 'Bridge the hips up on the working leg', 'Curl the heel toward the glute, hips staying elevated', 'Extend back out with control'],
+    coach_note_swap: 'Same slider curl, one leg at a time — the working leg takes your full hip weight instead of sharing it.',
+    loads_joints: ['knee'],
+    contraindicated_joints: [],
+    indicated_joints: ['knee'],
+    style_tags: ['functional', 'combat', 'hybrid'],
+    substitution_group: 'leg_curl',
+    unilateral: true,
+    avg_duration_seconds: 30,
+  },
+  // Swap-depth fix (measured): Sliding Leg Curl was the ONLY knee-indicated
+  // hamstring isolation exercise at home_gym/minimalist equipment — anyone
+  // without a slider-friendly floor had exactly one option. A band gives
+  // the same short-range, low-shear knee-flexion work from different
+  // equipment.
+  {
+    name: 'Seated Band Leg Curl',
+    id: 'seated-band-leg-curl',
+    movement_pattern: 'isolation_hamstring',
+    mechanics_tier: 'tier3_isolation',
+    prescription_type: 'reps',
+    angle_vector: 'horizontal',
+    primary_muscles: ['hamstrings'],
+    equipment: ['resistance band'],
+    joint_stress: 'low',
+    form_cues: ['Sit on a chair or the floor, band anchored in front', 'Loop the band around one ankle', 'Curl the heel toward the glute', 'Control the return, no jerking'],
+    coach_note_swap: 'Short-range, controlled knee-flexion work with a band — the same low-shear hamstring loading a slider gives, for anyone without a smooth floor.',
+    loads_joints: ['knee'],
+    contraindicated_joints: [],
+    indicated_joints: ['knee'],
+    style_tags: ['functional', 'combat', 'hybrid'],
+    substitution_group: 'leg_curl',
+    unilateral: true,
+    avg_duration_seconds: 28,
+  },
   {
     name: 'Lying Leg Curl',
     id: 'lying-leg-curl',
@@ -1528,6 +1629,56 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     unilateral: true,
     avg_duration_seconds: 28,
   },
+  // Swap-depth fix (measured): isolation_quad was the single worst pattern
+  // in the whole catalogue — 11 of 59 measured zero-swap situations. Two
+  // gaps, two different fixes:
+  // 1. At home_gym/minimalist equipment, an intermediate trainee with no
+  //    injury had exactly one isolation_quad option (Banded Terminal Knee
+  //    Extension) — Leg Extensions needs a machine, Sissy Squat is gated to
+  //    advanced. A genuine bodyweight, non-gated quad isolation closes it.
+  // 2. Banded Terminal Knee Extension was ALSO the only knee-INDICATED
+  //    option at every equipment tier, including full_gym — a knee injury
+  //    left exactly one option regardless of what gym someone had. A second
+  //    knee-safe isolation with different equipment (none at all) closes
+  //    that at every tier simultaneously.
+  {
+    name: 'Chair Leg Extension',
+    id: 'chair-leg-extension',
+    movement_pattern: 'isolation_quad',
+    mechanics_tier: 'tier3_isolation',
+    prescription_type: 'reps',
+    angle_vector: 'horizontal',
+    primary_muscles: ['quadriceps'],
+    equipment: ['bodyweight'],
+    joint_stress: 'moderate',
+    form_cues: ['Sit tall on the edge of a sturdy chair', 'Extend one leg fully, foot flexed', 'Hold briefly at the top', 'Lower with control, no swinging'],
+    coach_note_swap: 'The same open-chain quad extension as a leg-extension machine, done seated with just your own bodyweight.',
+    loads_joints: ['knee'],
+    style_tags: ['bodybuilding', 'functional', 'hybrid'],
+    substitution_group: 'quad_isolation',
+    unilateral: true,
+    avg_duration_seconds: 26,
+  },
+  {
+    name: 'Seated Short-Arc Quad Set',
+    id: 'seated-short-arc-quad-set',
+    movement_pattern: 'isolation_quad',
+    mechanics_tier: 'tier3_isolation',
+    prescription_type: 'reps',
+    angle_vector: 'horizontal',
+    primary_muscles: ['quadriceps'],
+    equipment: ['bodyweight'],
+    joint_stress: 'low',
+    form_cues: ['Sit with the leg mostly straight, a small roll or towel under the knee', 'Push the back of the knee down into the roll', 'Lift the heel a few centimetres, hold', 'Lower with control — small range throughout'],
+    coach_note_swap: 'A short-arc "quad set" near full extension — standard physio-clinic knee rehab, and needs nothing but a rolled towel.',
+    loads_joints: ['knee'],
+    contraindicated_joints: [],
+    indicated_joints: ['knee'],
+    style_tags: ['functional', 'combat', 'hybrid'],
+    substitution_group: 'quad_isolation',
+    unilateral: true,
+    avg_duration_seconds: 24,
+  },
 
   // SINGLE LEG
   {
@@ -1603,6 +1754,30 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     unilateral: false,
     avg_duration_seconds: 30,
   },
+  // Swap-depth fix (measured): at bodyweight-only equipment, Air Squat had
+  // zero swap options — it's on REGRESSION_VARIATIONS itself, and Wall Sit
+  // (the other bodyweight knee_dominant entry) is a genuinely different
+  // movement quality (isometric hold vs. dynamic reps), not interchangeable
+  // as a like-for-like swap. This is a real second dynamic squat pattern,
+  // not a regression.
+  {
+    name: 'Box Squat (Bodyweight)',
+    id: 'box-squat-bodyweight',
+    movement_pattern: 'knee_dominant',
+    mechanics_tier: 'tier2_compound',
+    prescription_type: 'reps',
+    angle_vector: 'vertical',
+    primary_muscles: ['quadriceps', 'glutes', 'hamstrings'],
+    equipment: ['bodyweight'],
+    joint_stress: 'low',
+    form_cues: ['A box or sturdy chair just below knee height', 'Sit back with the hips, not straight down', 'Lightly touch the box, do not relax onto it', 'Drive back up through the heels'],
+    coach_note_swap: 'Same no-equipment squat as Air Squat, but the box teaches a hips-back pattern and gives a consistent depth target every rep.',
+    loads_joints: ['knee'],
+    style_tags: ['bodybuilding', 'functional', 'combat', 'hybrid'],
+    substitution_group: 'squat',
+    unilateral: false,
+    avg_duration_seconds: 32,
+  },
   {
     name: 'Split Squat (Bodyweight)',
     id: 'split-squat-bodyweight',
@@ -1651,6 +1826,31 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     joint_stress: 'low',
     form_cues: ['A curb-height step or low box — well below knee height', 'Drive through the lead heel', 'Stand fully at the top without shoving off the trailing leg', 'Lower with control'],
     coach_note_swap: 'The same step-up pattern at a shallow height, which keeps knee flexion in a smaller, lower-stress range — a standard early-stage regression for a knee injury.',
+    loads_joints: ['knee'],
+    contraindicated_joints: [],
+    indicated_joints: ['knee'],
+    style_tags: ['functional', 'combat', 'hybrid'],
+    substitution_group: 'single_leg',
+    unilateral: true,
+    avg_duration_seconds: 30,
+  },
+  // Swap-depth fix (measured): Low Box Step-Up was the ONLY knee-indicated
+  // single-leg exercise — a knee injury left exactly one option in this
+  // whole pattern. A controlled eccentric step-down is a distinct rehab
+  // tool (loaded control on the way down, not concentric drive up), and a
+  // genuine second one.
+  {
+    name: 'Step-Down (Eccentric)',
+    id: 'step-down-eccentric',
+    movement_pattern: 'single_leg',
+    mechanics_tier: 'tier2_compound',
+    prescription_type: 'reps',
+    angle_vector: 'vertical',
+    primary_muscles: ['quadriceps', 'glutes'],
+    equipment: ['bodyweight'],
+    joint_stress: 'low',
+    form_cues: ['Stand on a low step or curb, well below knee height', 'Lower the free leg toward the floor with control', 'Tap the heel lightly, don’t collapse into it', 'Drive back up through the standing leg'],
+    coach_note_swap: 'Slow, controlled lowering rather than a drive up — the eccentric-control side of knee rehab that a step-up alone doesn’t train.',
     loads_joints: ['knee'],
     contraindicated_joints: [],
     indicated_joints: ['knee'],
@@ -1874,6 +2074,28 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     unilateral: false,
     avg_duration_seconds: 26,
   },
+  // Swap-depth fix (measured): at bodyweight-only equipment, Calf Raises
+  // (Bodyweight) had zero swap options in EVERY injury state — it was the
+  // only calf exercise this tier could ever offer at all. Going single-leg
+  // adds real intensity without needing any load.
+  {
+    name: 'Single-Leg Calf Raise (Bodyweight)',
+    id: 'single-leg-calf-raise-bodyweight',
+    movement_pattern: 'isolation_calf',
+    mechanics_tier: 'tier3_isolation',
+    prescription_type: 'reps',
+    angle_vector: 'vertical',
+    primary_muscles: ['gastrocnemius', 'soleus'],
+    equipment: ['bodyweight'],
+    joint_stress: 'low',
+    form_cues: ['Stand on one foot, a step edge if available', 'Rise onto the ball of that foot', 'Pause at the top', 'Lower under control for a full stretch'],
+    coach_note_swap: 'Full bodyweight on one leg is real added resistance — no dumbbell needed to make this genuinely harder than the two-footed version.',
+    loads_joints: [],
+    style_tags: ['bodybuilding', 'functional', 'hybrid'],
+    substitution_group: 'calf',
+    unilateral: true,
+    avg_duration_seconds: 28,
+  },
 
   // BICEPS
   {
@@ -2048,6 +2270,29 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     substitution_group: 'tricep_extension',
     unilateral: false,
     avg_duration_seconds: 28,
+  },
+  // Swap-depth fix (measured): at home_gym/minimalist equipment, Band
+  // Tricep Pushdown was the only shoulder-safe tricep isolation on offer —
+  // a shoulder injury left exactly one option. Same band, elbow pinned to
+  // the side rather than overhead, so the shoulder stays in a neutral,
+  // low-flexion position throughout.
+  {
+    name: 'Band Tricep Kickback',
+    id: 'band-tricep-kickback',
+    movement_pattern: 'isolation_tricep',
+    mechanics_tier: 'tier3_isolation',
+    prescription_type: 'reps',
+    angle_vector: 'horizontal',
+    primary_muscles: ['triceps'],
+    equipment: ['resistance band'],
+    joint_stress: 'low',
+    form_cues: ['Anchor a band low, behind you', 'Elbow pinned to your side, upper arm still', 'Extend the forearm straight back', 'Control the return'],
+    coach_note_swap: 'Elbow stays pinned at your side the whole set — the shoulder barely moves, unlike an overhead extension.',
+    loads_joints: [],
+    style_tags: ['bodybuilding', 'functional', 'hybrid'],
+    substitution_group: 'tricep_extension',
+    unilateral: true,
+    avg_duration_seconds: 26,
   },
   {
     name: 'Overhead Tricep Extension',
