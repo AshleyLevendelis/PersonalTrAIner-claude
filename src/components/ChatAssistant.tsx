@@ -579,13 +579,19 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
   // Fix #4: System prompt context assembled once per call, separate from conversation window
   const buildContext = () => {
     const activeWeek = getActiveMesocycleWeek(planCreatedAt ?? profile.created_at, getAppNow(profile.id), mesocycle.length > 0 ? mesocycle.length : 4)
-    const activeWeekData = mesocycle.length > 0
-      ? mesocycle.find(w => w.week_number === activeWeek)?.days || exercisePlan
-      : exercisePlan
+    // Split out from `.days` (not just `?.days || exercisePlan` inline) so
+    // the week's own coach_note is still reachable below — that's where a
+    // block-boundary hold (Step 4's load-hold, Step 5's volume-hold) and a
+    // deload's own explanation already live, and until now neither ever
+    // reached the chat: it could show the note in the plan/dashboard but
+    // had no idea what to say if asked "why is my squat the same weight?"
+    const activeMesoWeek = mesocycle.length > 0 ? mesocycle.find(w => w.week_number === activeWeek) : undefined
+    const activeWeekData = activeMesoWeek?.days ?? exercisePlan
 
     const exerciseSummary = activeWeekData
-      .map(d => `${d.day}: ${d.focus} - ${d.exercises.map(e => `${e.name} (${e.sets}x${e.reps}, rest ${e.rest})${e.selection_note ? ` [why: ${e.selection_note}]` : ''}`).join(', ')}`)
+      .map(d => `${d.day}: ${d.focus} - ${d.exercises.map(e => `${e.name} (${e.sets}x${e.reps}, rest ${e.rest})${e.selection_note ? ` [why: ${e.selection_note}]` : ''}${e.block_hold_note ? ` [note: ${e.block_hold_note}]` : ''}`).join(', ')}`)
       .join('\n')
+      + (activeMesoWeek?.coach_note ? `\nThis week's coaching note: ${activeMesoWeek.coach_note}` : '')
 
     const mealSummary = mealPlan
       .map(m => `${m.meal}: ${m.items.map(i => `${i.name} (${i.calories} kcal, P:${i.protein}g C:${i.carbs}g F:${i.fat}g)`).join(', ')}`)
