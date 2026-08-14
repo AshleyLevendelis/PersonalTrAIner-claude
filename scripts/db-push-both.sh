@@ -15,12 +15,26 @@ set -euo pipefail
 PROD_REF="sdkhuczcfnqqimdgfiks"
 TEST_REF="vswuurrtbzbrgubddefv"
 
+# The CLI's `supabase link` reliably fails with
+# "AlreadyExists: FileSystem.makeDirectory (.../supabase/.temp)" if that
+# directory already exists from a PRIOR link — including one this same
+# script just did a moment ago (TEST, then PRODUCTION, both call `link`).
+# supabase/.temp is a pure, regenerable local cache (project ref, version
+# info) written fresh by every successful link, so clearing it immediately
+# before each `link` call is safe and is what makes both legs of this
+# script reliable in one run, rather than only ever the first.
+clear_link_cache() {
+  rm -rf supabase/.temp
+}
+
 relink_test() {
+  clear_link_cache
   npx supabase link --project-ref "$TEST_REF" >/dev/null 2>&1 || true
 }
 trap relink_test EXIT
 
 echo "== Pushing migrations to TEST ($TEST_REF) =="
+clear_link_cache
 npx supabase link --project-ref "$TEST_REF"
 npx supabase db push --linked --yes
 
@@ -33,6 +47,7 @@ if [ "$CONFIRM" != "yes-production" ]; then
 fi
 
 echo "== Pushing migrations to PRODUCTION ($PROD_REF) =="
+clear_link_cache
 npx supabase link --project-ref "$PROD_REF"
 npx supabase db push --linked --yes
 
