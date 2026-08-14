@@ -34,6 +34,7 @@ import { swapExerciseInMesocycle, banExerciseFromMesocycle, type SwapScope } fro
 import { sweepStaleForTarget } from '@/lib/pending-actions-store'
 import { checkAndRevertExpiredAdaptations, getActiveAdaptations, type PlanAdaptationRow } from '@/lib/plan-adaptations-store'
 import { checkForBlockReview } from '@/lib/block-review'
+import { checkForConsistencyHold } from '@/lib/block-consistency'
 import { getRevealSpeed, saveRevealSpeed, DEFAULT_REVEAL_SPEED, type RevealSpeed } from '@/lib/reveal-speed-store'
 import { InsightBanner } from '@/components/ui/insight-banner'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
@@ -461,30 +462,47 @@ function App() {
       }).catch(console.error)
     }
 
-    // VISION.md Step 4 — same lazy check-on-load sweep pattern as the
-    // adaptation-expiry check just above, run independently right after it.
-    // The moment the live week is week 1 of a new block, looks at the block
-    // that just ended for every main lift and, if one genuinely stalled (no
-    // real progress across real logged sessions — a missed week is never
-    // evidence of a stall), holds its starting weight flat into the block
-    // that's now live instead of letting the formula step it up.
+    // VISION.md Step 4 + Step 5 — same lazy check-on-load sweep pattern as
+    // the adaptation-expiry check just above, run right after it. Both fire
+    // on the exact same trigger (the live week just became week 1 of a new
+    // block) and can both touch the same weeks — Step 4 holds a stalled
+    // main lift's LOAD flat, Step 5 holds a low-attendance block's VOLUME
+    // flat. Chained with .then(), not run independently: each check's saved
+    // write (and the mesocycle array it hands to the next) already includes
+    // whatever the previous check just changed. Two independent
+    // fire-and-forget calls would each build their patch from the SAME
+    // original snapshot and could silently clobber each other's save
+    // (and the client state) if both trigger on the same visit — this
+    // sequencing is what prevents that, not just the merge-by-week-number
+    // pattern each check's own save already uses.
     if (restoredProfile.id && restoredMesocycle.length > 0) {
-      checkForBlockReview(
-        restoredProfile.id,
-        restoredMesocycle,
-        restoredProfile,
-        fullMesocycle?.createdAt ?? restoredProfile.created_at ?? new Date().toISOString(),
-        getAppNow(restoredProfile.id),
-      ).then(result => {
-        if (result.mesocycle) {
-          setMesocycle(prev => {
-            const byWeek = new Map(prev.map(w => [w.week_number, w]))
-            for (const w of result.mesocycle!) byWeek.set(w.week_number, w)
-            return [...byWeek.values()].sort((a, b) => a.week_number - b.week_number)
-          })
-        }
-        if (result.messages.length > 0) setAdaptationMessages(prev => [...prev, ...result.messages.map(text => ({ text }))])
-      }).catch(console.error)
+      const blockCheckPlanCreatedAt = fullMesocycle?.createdAt ?? restoredProfile.created_at ?? new Date().toISOString()
+      const blockCheckNow = getAppNow(restoredProfile.id)
+      checkForBlockReview(restoredProfile.id, restoredMesocycle, restoredProfile, blockCheckPlanCreatedAt, blockCheckNow)
+        .then(blockReviewResult => {
+          if (blockReviewResult.mesocycle) {
+            setMesocycle(prev => {
+              const byWeek = new Map(prev.map(w => [w.week_number, w]))
+              for (const w of blockReviewResult.mesocycle!) byWeek.set(w.week_number, w)
+              return [...byWeek.values()].sort((a, b) => a.week_number - b.week_number)
+            })
+          }
+          if (blockReviewResult.messages.length > 0) setAdaptationMessages(prev => [...prev, ...blockReviewResult.messages.map(text => ({ text }))])
+
+          const afterBlockReview = blockReviewResult.mesocycle ?? restoredMesocycle
+          return checkForConsistencyHold(restoredProfile.id!, afterBlockReview, restoredProfile, blockCheckPlanCreatedAt, blockCheckNow)
+        })
+        .then(consistencyResult => {
+          if (consistencyResult.mesocycle) {
+            setMesocycle(prev => {
+              const byWeek = new Map(prev.map(w => [w.week_number, w]))
+              for (const w of consistencyResult.mesocycle!) byWeek.set(w.week_number, w)
+              return [...byWeek.values()].sort((a, b) => a.week_number - b.week_number)
+            })
+          }
+          if (consistencyResult.messages.length > 0) setAdaptationMessages(prev => [...prev, ...consistencyResult.messages.map(text => ({ text }))])
+        })
+        .catch(console.error)
     }
     if (restoredProfile.id) { void reloadMemory(restoredProfile.id); void reloadGrocery(restoredProfile.id) }
 

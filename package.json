@@ -40,10 +40,12 @@
     "smoke:regen-week": "tsx scripts/smoke-regen-week.ts",
     "smoke:check-week": "tsx scripts/smoke-check-week.ts",
     "smoke:verify-block-review": "tsx scripts/verify-block-review-live.ts",
+    "smoke:verify-block-consistency": "tsx scripts/verify-block-consistency-live.ts",
     "test:slot-replacement": "tsx scripts/test-slot-replacement-hygiene.ts",
     "test:joint-tags": "tsx scripts/test-joint-tag-states.ts",
     "test:injury-rebuild": "tsx scripts/test-injury-rebuild.ts",
-    "test:block-review": "tsx scripts/test-block-review.ts"
+    "test:block-review": "tsx scripts/test-block-review.ts",
+    "test:block-consistency": "tsx scripts/test-block-consistency.ts"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.4",
