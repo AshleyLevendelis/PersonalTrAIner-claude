@@ -17,7 +17,7 @@ import { OfflineStatusIndicator } from '@/components/OfflineStatusIndicator'
 import { BottomDock } from '@/components/BottomDock'
 import { ActiveSessionProvider } from '@/hooks/useActiveSession'
 import { TimersProvider } from '@/hooks/useTimers'
-import { isDevAccount, getSessionDateContext } from '@/lib/dev-clock'
+import { isDevAccount, getSessionDateContext, getAppNow } from '@/lib/dev-clock'
 import { useAppRoute, tabHash, isTab, isKnownTabHash, type Tab } from '@/lib/app-route'
 
 import { calculateCalories } from '@/lib/calculations'
@@ -33,6 +33,7 @@ import { saveMesocycle, saveMesocycleWeek, restoreMesocycle } from '@/lib/mesocy
 import { swapExerciseInMesocycle, banExerciseFromMesocycle, type SwapScope } from '@/lib/mesocycle-edit'
 import { sweepStaleForTarget } from '@/lib/pending-actions-store'
 import { checkAndRevertExpiredAdaptations, getActiveAdaptations, type PlanAdaptationRow } from '@/lib/plan-adaptations-store'
+import { checkForBlockReview } from '@/lib/block-review'
 import { getRevealSpeed, saveRevealSpeed, DEFAULT_REVEAL_SPEED, type RevealSpeed } from '@/lib/reveal-speed-store'
 import { InsightBanner } from '@/components/ui/insight-banner'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
@@ -449,6 +450,32 @@ function App() {
     // never a model-narrated one.
     if (restoredProfile.id) {
       checkAndRevertExpiredAdaptations(restoredProfile.id).then(result => {
+        if (result.mesocycle) {
+          setMesocycle(prev => {
+            const byWeek = new Map(prev.map(w => [w.week_number, w]))
+            for (const w of result.mesocycle!) byWeek.set(w.week_number, w)
+            return [...byWeek.values()].sort((a, b) => a.week_number - b.week_number)
+          })
+        }
+        if (result.messages.length > 0) setAdaptationMessages(prev => [...prev, ...result.messages.map(text => ({ text }))])
+      }).catch(console.error)
+    }
+
+    // VISION.md Step 4 — same lazy check-on-load sweep pattern as the
+    // adaptation-expiry check just above, run independently right after it.
+    // The moment the live week is week 1 of a new block, looks at the block
+    // that just ended for every main lift and, if one genuinely stalled (no
+    // real progress across real logged sessions — a missed week is never
+    // evidence of a stall), holds its starting weight flat into the block
+    // that's now live instead of letting the formula step it up.
+    if (restoredProfile.id && restoredMesocycle.length > 0) {
+      checkForBlockReview(
+        restoredProfile.id,
+        restoredMesocycle,
+        restoredProfile,
+        fullMesocycle?.createdAt ?? restoredProfile.created_at ?? new Date().toISOString(),
+        getAppNow(restoredProfile.id),
+      ).then(result => {
         if (result.mesocycle) {
           setMesocycle(prev => {
             const byWeek = new Map(prev.map(w => [w.week_number, w]))

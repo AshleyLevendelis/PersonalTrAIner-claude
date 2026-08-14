@@ -241,6 +241,18 @@ export interface Exercise {
    * anything chosen outside initial generation (manual swaps, substitutions).
    */
   selection_note?: string
+  /**
+   * VISION.md Step 4 ("logged sets... should feed the next block"). Set only
+   * on week 1 of a block whose starting weight was held flat because the
+   * PREVIOUS block showed no real progress (neither more weight nor more
+   * reps) across at least two real logged-session comparisons — see
+   * block-review.ts's didExerciseStallInBlock. Read by TodayPanel in
+   * preference to the live single-session progression note for that one
+   * week, then falls back to the normal live note from week 2 onward. This
+   * is an automatic hold, not a proposal — the trainee can always log a
+   * heavier weight than it suggests, same as any other suggested load.
+   */
+  block_hold_note?: string
 }
 
 export interface MesocycleWeek {

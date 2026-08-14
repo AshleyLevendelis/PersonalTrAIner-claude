@@ -388,7 +388,11 @@ function ExerciseList({
       ex,
       dayName,
       loadSource: loadSourceFor(ex),
-      progressionNote: progressionNotes[ex.name],
+      // A persisted block-level hold (VISION.md Step 4 — see block-review.ts)
+      // takes precedence over the live single-session note: it reflects a
+      // real judgment made across the whole prior block, not just whether
+      // last session's sets hit the top of the rep range.
+      progressionNote: ex.block_hold_note ? { note: ex.block_hold_note, didProgress: false } : progressionNotes[ex.name],
       showCalibrationCue: calibrationAnchorIndex === exIndex,
       onOpenPlateCalc,
       onOpenHistory,
