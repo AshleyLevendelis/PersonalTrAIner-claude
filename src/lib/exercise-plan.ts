@@ -3672,6 +3672,17 @@ export function mapTier(mechanicsTier: string): ExerciseTier {
     // was (correctly) trying to exempt primers by tier and finding none
     // tagged 'tier_0_primer' to exempt.
     primer: 'tier_0_primer',
+    // The same shape of bug as the primer fix above, just never caught: no
+    // key here ever matched 'cardio' (MechanicsTier's real value for every
+    // conditioning entry — Burpees, Mountain Climbers, Elliptical, Cycling
+    // Intervals, etc.), so every cardio-tagged exercise silently fell
+    // through to the 'tier_3_isolation' default and rendered under
+    // "Accessory" instead of the dedicated Finisher section
+    // tier_4_finisher already exists for. Confirmed dead until this line:
+    // progression-engine.ts's NON_PROGRESSABLE_TIERS already excludes
+    // tier_4_finisher from load-progression tracking, and quality-score.ts
+    // / TodayPanel.tsx already branch on it — nothing ever produced it.
+    cardio: 'tier_4_finisher',
   }
   return mapping[mechanicsTier] || 'tier_3_isolation'
 }
