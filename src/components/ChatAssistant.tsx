@@ -584,7 +584,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       : exercisePlan
 
     const exerciseSummary = activeWeekData
-      .map(d => `${d.day}: ${d.focus} - ${d.exercises.map(e => `${e.name} (${e.sets}x${e.reps}, rest ${e.rest})`).join(', ')}`)
+      .map(d => `${d.day}: ${d.focus} - ${d.exercises.map(e => `${e.name} (${e.sets}x${e.reps}, rest ${e.rest})${e.selection_note ? ` [why: ${e.selection_note}]` : ''}`).join(', ')}`)
       .join('\n')
 
     const mealSummary = mealPlan

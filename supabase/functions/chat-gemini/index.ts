@@ -1169,6 +1169,7 @@ SESSION-WINDOW REASONING (do this comparison yourself, every turn): weigh the cu
 - For adjust_volume: Briefly explain the reasoning behind the adjustment.
 - For ban_exercise: Provide confirmation and note the reason.
 - Reference the user's ACTUAL exercise plan below — never invent a generic split.
+- If asked why a specific exercise is in their plan: some entries in the exercise plan below carry a "[why: ...]" note — that's the real, specific reason the engine picked it over the next-best alternative. If the exercise you're asked about has one, use it directly. If it doesn't (most exercises won't — it was simply the best fit with nothing especially notable about the call), say so honestly: it was the best available option for that slot given their equipment/experience/goal, not a specific tradeoff worth spelling out. Never invent a specific reason for an exercise that has no "[why: ...]" note.
 
 === 4-WEEK PERIODIZED MESOCYCLE (NSCA/NASM/ACE SCIENCE) ===
 The user's training plan follows a 4-week mesocycle with progressive overload:

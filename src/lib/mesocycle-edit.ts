@@ -158,6 +158,12 @@ export function applyReplacement(slot: Exercise, entry: ExerciseEntry, load: Loa
     // a stale "-20kg assist" chip surviving onto an unassisted movement.
     suggested_assistance_kg: undefined,
     assistance_ready_to_graduate: undefined,
+    // Same reasoning as ramp_up above: `slot.selection_note` (if any)
+    // explains why the OUTGOING exercise won its generation-time comparison
+    // — nothing true about `entry`, the incoming replacement. A manual swap
+    // is deliberately outside "why this exercise"'s scope (see
+    // Exercise.selection_note's doc comment), so this must not survive.
+    selection_note: undefined,
   }
 }
 

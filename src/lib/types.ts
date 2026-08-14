@@ -232,6 +232,15 @@ export interface Exercise {
   suggested_assistance_kg?: number | null
   /** True once suggested_assistance_kg has reached 0 — full bodyweight range on the assisted machine, the natural cue to try the real (unassisted) exercise next. */
   assistance_ready_to_graduate?: boolean
+  /**
+   * VISION.md Step 2 ("where a choice is non-obvious, say why"). Set only
+   * when this exercise's win over its runner-up at generation time was
+   * decided by one identifiable factor (see explainWinner in
+   * exercise-plan.ts) — most exercises won't have one, by design. undefined
+   * for the primer (its selection is a plain shuffle, out of scope) and for
+   * anything chosen outside initial generation (manual swaps, substitutions).
+   */
+  selection_note?: string
 }
 
 export interface MesocycleWeek {

@@ -1058,6 +1058,31 @@ interface ScoreContext {
 }
 
 /**
+ * The five VISION.md-named factors (quality/goal/experience/session/
+ * variety), each isolated to its own point value instead of folded straight
+ * into one number. Deliberately excludes the tier-preference bonus and the
+ * tie-break jitter below — those decide close ties or keep a compound ahead
+ * of an accessory, which is structural, not "a coach's reasoning" a trainee
+ * would find non-obvious (VISION.md Step 2: "where a choice is non-obvious,
+ * say why"). Kept as a Record so explainWinner (below) can diff two
+ * candidates factor-by-factor to find what actually decided a pick, instead
+ * of guessing from the final score alone.
+ */
+interface ScoreFactors {
+  role_support: number
+  goal_fit: number
+  experience_fit: number
+  session_balance: number
+  weekly_variety: number
+}
+
+interface ScoredCandidate {
+  e: ExerciseEntry
+  score: number
+  factors: ScoreFactors
+}
+
+/**
  * Weighs one eligible candidate the way a coach actually chooses, not just
  * filters (VISION.md: "score eligible candidates on quality, goal fit,
  * experience fit, what's already in the session, and variety across the
@@ -1072,27 +1097,29 @@ interface ScoreContext {
  * used-name tracking. This function only orders ONE day's candidates at the
  * moment of the initial pick.
  */
-function scoreCandidate(candidate: ExerciseEntry, policy: GoalPolicy, rawExperience: TrainingExperience, ctx: ScoreContext): number {
-  let score = 0
+function scoreCandidate(candidate: ExerciseEntry, policy: GoalPolicy, rawExperience: TrainingExperience, ctx: ScoreContext): { score: number; factors: ScoreFactors } {
+  const factors: ScoreFactors = { role_support: 0, goal_fit: 0, experience_fit: 0, session_balance: 0, weekly_variety: 0 }
 
   // 1. Quality for the role: an isolation exercise that directly supports
   // today's main compound pattern (hamstring work on a hinge day) beats one
   // that's only generically eligible for the slot.
   if (ctx.trackPatterns.some(p => (PATTERN_TO_RELATED_ISOLATION[p] ?? []).includes(candidate.movement_pattern))) {
-    score += 2
+    factors.role_support = 2
   }
 
   // 2. Goal fit — GoalPolicy's existing preferences, now weighted instead of
   // an absolute float-to-top/bottom split.
-  if (policy.preferUnilateralCarry && isUnilateralCarryOrRotational(candidate)) score += 2
-  if (policy.goal === 'fat_loss' && candidate.mechanics_tier === 'tier2_compound') score += 1
-  if (policy.goal === 'conditioning' && candidate.joint_stress === 'low') score += 1
+  let goalFit = 0
+  if (policy.preferUnilateralCarry && isUnilateralCarryOrRotational(candidate)) goalFit += 2
+  if (policy.goal === 'fat_loss' && candidate.mechanics_tier === 'tier2_compound') goalFit += 1
+  if (policy.goal === 'conditioning' && candidate.joint_stress === 'low') goalFit += 1
+  factors.goal_fit = goalFit
 
   // 3. Experience fit — was an absolute "sort after every non-regression"
   // partition; now a real penalty that composes with everything else
   // instead of overriding it (a regression can still win if every other
   // eligible candidate is a worse fit on every other axis).
-  if (isRegressionFor(candidate.name, rawExperience)) score -= 3
+  factors.experience_fit = isRegressionFor(candidate.name, rawExperience) ? -3 : 0
 
   // 4. What's already in the session — penalize real muscle overlap with
   // anything already picked today, so the session comes out balanced rather
@@ -1102,15 +1129,15 @@ function scoreCandidate(candidate: ExerciseEntry, policy: GoalPolicy, rawExperie
     const overlap = already.primary_muscles.filter(m => candidate.primary_muscles.includes(m)).length
     if (overlap >= 2) overlapPenalty -= 1
   }
-  score += Math.max(overlapPenalty, -3)
+  factors.session_balance = Math.max(overlapPenalty, -3)
 
   // 5. Variety across the week — graduated, on top of (not instead of)
   // WEEKLY_APPEARANCE_CAP's hard ceiling elsewhere: each prior appearance
   // this week costs a point, so a fresh exercise wins over a repeat before
   // the cap ever has to step in.
-  if (ctx.weeklyAppearanceCount) {
-    score -= ctx.weeklyAppearanceCount.get(candidate.name) ?? 0
-  }
+  factors.weekly_variety = ctx.weeklyAppearanceCount ? -(ctx.weeklyAppearanceCount.get(candidate.name) ?? 0) : 0
+
+  let score = factors.role_support + factors.goal_fit + factors.experience_fit + factors.session_balance + factors.weekly_variety
 
   // Tier preference — deliberately UNCONDITIONAL and with a much bigger gap
   // than every other factor combined can ever swing (roughly +/-10 at the
@@ -1129,7 +1156,10 @@ function scoreCandidate(candidate: ExerciseEntry, policy: GoalPolicy, rawExperie
   // (every candidate in the list gets the identical bonus, so relative
   // order — and therefore all the OTHER scoring below — is untouched); this
   // only changes outcomes where multiple tiers were being compared side by
-  // side, which is exactly where it needs to.
+  // side, which is exactly where it needs to. Kept OUT of `factors` on
+  // purpose — explainWinner must never cite "it's a bigger movement" as a
+  // trainee-facing reason, that's baseline session structure, not a
+  // non-obvious coaching call.
   score += ({ tier1_compound: 90, tier2_compound: 60, tier3_isolation: 30 } as Record<string, number>)[candidate.mechanics_tier] ?? 0
 
   // Tie-break only: small enough to never overturn a genuine difference
@@ -1138,14 +1168,58 @@ function scoreCandidate(candidate: ExerciseEntry, policy: GoalPolicy, rawExperie
   // everything else, so audit/test runs stay reproducible.
   score += (randomSource() - 0.5) * 0.6
 
-  return score
+  return { score, factors }
 }
 
-function orderCandidates(candidates: ExerciseEntry[], policy: GoalPolicy, rawExperience: TrainingExperience, ctx: ScoreContext): ExerciseEntry[] {
+function orderCandidates(candidates: ExerciseEntry[], policy: GoalPolicy, rawExperience: TrainingExperience, ctx: ScoreContext): ScoredCandidate[] {
   return candidates
-    .map(e => ({ e, score: scoreCandidate(e, policy, rawExperience, ctx) }))
+    .map(e => ({ e, ...scoreCandidate(e, policy, rawExperience, ctx) }))
     .sort((a, b) => b.score - a.score)
-    .map(x => x.e)
+}
+
+/**
+ * One human-readable clause per reason factor, VISION.md Step 2 style
+ * ("trap bar rather than conventional because your recovery is stretched
+ * thin"). Every branch here states something independently verifiable about
+ * `winner` — never invented, never guessed — which is why this only runs
+ * against the SPECIFIC factor explainWinner already proved was decisive,
+ * not against the winner's full trait list.
+ */
+const REASON_CLAUSES: { [K in keyof ScoreFactors]: (winner: ExerciseEntry, runnerUp: ExerciseEntry, policy: GoalPolicy) => string } = {
+  role_support: (w, r) => `${w.name} over ${r.name} because it lines up more directly with today's main movement pattern, not just generically eligible for the slot.`,
+  goal_fit: (w, r, policy) => {
+    if (policy.preferUnilateralCarry && isUnilateralCarryOrRotational(w)) return `${w.name} over ${r.name} because unilateral, single-side work fits your training goal better.`
+    if (policy.goal === 'fat_loss' && w.mechanics_tier === 'tier2_compound') return `${w.name} over ${r.name} to keep a bigger, more efficient movement in the mix for fat loss.`
+    if (policy.goal === 'conditioning' && w.joint_stress === 'low') return `${w.name} over ${r.name} because it's easier on your joints, matching your conditioning focus.`
+    return `${w.name} over ${r.name} to better fit your ${policy.label.toLowerCase()} goal.`
+  },
+  experience_fit: (w, r) => `${w.name} over ${r.name} because you're ready for the standard version, not the easier on-ramp.`,
+  session_balance: (w, r) => `${w.name} over ${r.name} to avoid repeating a muscle group you already worked earlier in this session.`,
+  weekly_variety: (w, r) => `${w.name} over ${r.name} because it's fresher — ${r.name} already showed up earlier this week.`,
+}
+
+/**
+ * The "quieter" design call (VISION.md Step 2 plan, confirmed with Ashley):
+ * only speak up when a factor genuinely decided the pick, not whenever one
+ * merely applied. Compares the winner against the very next candidate in
+ * the same ranked list (its real runner-up, not some other alternative),
+ * and only returns a note when one reason factor accounts for at least half
+ * of the total score gap between them — i.e. it's the reason they'd have
+ * tied, or the runner-up would have won, without it. A close call with no
+ * single deciding factor (or one only separated by tier/jitter) stays
+ * silent, same as an obvious pick always has.
+ */
+function explainWinner(winner: ScoredCandidate, runnerUp: ScoredCandidate | undefined, policy: GoalPolicy): string | undefined {
+  if (!runnerUp) return undefined
+  const totalGap = winner.score - runnerUp.score
+  if (totalGap <= 0) return undefined
+  const keys = Object.keys(winner.factors) as (keyof ScoreFactors)[]
+  const decisive = keys
+    .map(key => ({ key, diff: winner.factors[key] - runnerUp.factors[key] }))
+    .filter(d => d.diff > 0)
+    .sort((a, b) => b.diff - a.diff)[0]
+  if (!decisive || decisive.diff < totalGap * 0.5) return undefined
+  return REASON_CLAUSES[decisive.key](winner.e, runnerUp.e, policy)
 }
 
 /**
@@ -1253,7 +1327,7 @@ function selectExercisesForTrack(
   feasibleRequiredPatterns?: MovementPattern[],
   weeklyAppearanceCount?: Map<string, number>,
   rawExperience: TrainingExperience = 'novice',
-): { primer: ExerciseEntry | null; main: ExerciseEntry[]; requiredNames: Set<string>; uncoveredPatterns: MovementPattern[] } {
+): { primer: ExerciseEntry | null; main: ExerciseEntry[]; requiredNames: Set<string>; uncoveredPatterns: MovementPattern[]; selectionNotes: Map<string, string> } {
   const counts = applyIsolationSlotShift(countsIn, policy.isolationSlotShift)
   const allPatterns = new Set([...track.primary_patterns, ...track.secondary_patterns])
   const forbidden = new Set(track.forbidden_patterns)
@@ -1309,6 +1383,13 @@ function selectExercisesForTrack(
   // internal diagnostic array, never shown to the trainee); collected here
   // so the caller can turn it into a plain-language note on the day itself.
   const uncoveredPatterns: MovementPattern[] = []
+  // VISION.md Step 2 ("say why, where a choice is non-obvious") — keyed by
+  // exercise name because every name is unique within a single day's
+  // `selected` list (usedGroups/duplicate-name checks already guarantee
+  // that), so this survives the rest of the day-build pipeline as a plain
+  // name -> note lookup without needing to carry a reference through every
+  // downstream transform.
+  const selectionNotes = new Map<string, string>()
 
   // Pattern-guaranteed slots — filled FIRST, in order, before the legacy
   // pickFromTier/refill pass below tops up to the duration-based count. See
@@ -1328,7 +1409,12 @@ function selectExercisesForTrack(
       rawExperience,
       { trackPatterns: [...track.primary_patterns, ...track.secondary_patterns], selectedSoFar: selected, weeklyAppearanceCount },
     )
-    return candidates[0] ?? null
+    const winner = candidates[0]
+    if (winner) {
+      const note = explainWinner(winner, candidates[1], policy)
+      if (note) selectionNotes.set(winner.e.name, note)
+    }
+    return winner?.e ?? null
   }
   function fillSlot(slot: TrackSlot): void {
     // Preferred tier wins over "fresh this week" — reusing the same main
@@ -1383,16 +1469,21 @@ function selectExercisesForTrack(
       rawExperience,
       { trackPatterns: [...track.primary_patterns, ...track.secondary_patterns], selectedSoFar: selected, weeklyAppearanceCount },
     )
-    for (const c of candidates) {
+    for (let i = 0; i < candidates.length; i++) {
+      const c = candidates[i]
       if (selected.length >= counts.tier1 + counts.tier2 + counts.tier3) break
       if (count <= 0) break
       // Re-check the family here, not only in the filter above. `candidates`
       // is evaluated once, so a family claimed earlier in THIS loop would
       // otherwise slip through — which is how Chest Dips and Tricep Dips
       // (both family 'dip') ended up in the same session.
-      if (usedGroups.has(getMovementFamily(c))) continue
-      selected.push(c)
-      usedGroups.add(getMovementFamily(c))
+      if (usedGroups.has(getMovementFamily(c.e))) continue
+      selected.push(c.e)
+      usedGroups.add(getMovementFamily(c.e))
+      // Runner-up is the next entry in this same ranked list — the real
+      // alternative this pick beat, not some other candidate elsewhere.
+      const note = explainWinner(c, candidates[i + 1], policy)
+      if (note) selectionNotes.set(c.e.name, note)
       count--
     }
     return count
@@ -1446,10 +1537,13 @@ function selectExercisesForTrack(
         { trackPatterns: [...track.primary_patterns, ...track.secondary_patterns], selectedSoFar: selected, weeklyAppearanceCount },
       )
 
-      for (const c of candidates) {
+      for (let i = 0; i < candidates.length; i++) {
+        const c = candidates[i]
         if (selected.length >= target) break
-        selected.push(c)
-        usedGroups.add(getMovementFamily(c))
+        selected.push(c.e)
+        usedGroups.add(getMovementFamily(c.e))
+        const note = explainWinner(c, candidates[i + 1], policy)
+        if (note) selectionNotes.set(c.e.name, note)
       }
     }
 
@@ -1587,7 +1681,7 @@ function selectExercisesForTrack(
     return tierDiff !== 0 ? tierDiff : isolationPriority(a) - isolationPriority(b)
   })
 
-  return { primer, main: selected, requiredNames, uncoveredPatterns }
+  return { primer, main: selected, requiredNames, uncoveredPatterns, selectionNotes }
 }
 
 // ---------------------------------------------------------------------------
@@ -2053,6 +2147,14 @@ function substituteFloorClampedIsolation(
       suggested_load_kg: load.starting_weight_kg,
       load_source: load.load_source,
       per_set_load: load.per_set,
+      // The spread above carries `ex`'s selection_note forward, but that note
+      // was written to explain the OLD exercise's win over its OWN runner-up
+      // — it says nothing true about `sibling`. Left in place, a floor-clamp
+      // swap would attach one exercise's "why" to a completely different
+      // exercise's name (caught live: a Landmine Press row showing the note
+      // "Single-Leg Dumbbell Calf Raise over Calf Raises... " — true of
+      // neither exercise actually in that slot).
+      selection_note: undefined,
     }
   }
 }
@@ -2202,6 +2304,12 @@ function rebuildExerciseForSwap(
     suggested_assistance_kg: assistance?.assistance_kg,
     assistance_ready_to_graduate: assistance?.ready_to_graduate,
     superset_label: undefined,
+    // Same stale-identity risk as substituteFloorClampedIsolation: the
+    // spread above carries oldExercise.selection_note forward, but that note
+    // explained why the OLD exercise beat ITS OWN runner-up — nothing here
+    // recomputes a reason for newEntry, so it must not inherit one that
+    // isn't true of it.
+    selection_note: undefined,
   }
 }
 
@@ -3271,7 +3379,7 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
     const trackFocus = getViableTrack(rawTrack, pool)
     const track = TRACKS[trackFocus]
 
-    const { primer, main, requiredNames, uncoveredPatterns } = selectExercisesForTrack(track, pool, counts, weeklyUsed, styleConfig, trace, policy, feasiblePatterns, weeklyAppearanceCount, profile.training_experience || 'novice')
+    const { primer, main, requiredNames, uncoveredPatterns, selectionNotes } = selectExercisesForTrack(track, pool, counts, weeklyUsed, styleConfig, trace, policy, feasiblePatterns, weeklyAppearanceCount, profile.training_experience || 'novice')
     for (const name of requiredNames) weeklyRequiredNames.add(name)
 
     // Build exercise list with sets/reps from style config
@@ -3341,6 +3449,7 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
         per_set_load: isPrimer ? null : load.per_set,
         suggested_assistance_kg: assistance?.assistance_kg,
         assistance_ready_to_graduate: assistance?.ready_to_graduate,
+        selection_note: selectionNotes.get(slot.entry.name),
       }
     })
 
@@ -4089,6 +4198,12 @@ export function generateMesocycle(
           name: rotated,
           reps,
           ramp_up: carryRampUp(ex.ramp_up, ex.name, rotated, newEntry),
+          // Block-boundary rotation changes WHICH exercise this slot holds —
+          // ex.selection_note (if any) explained the ORIGINAL exercise's win
+          // at week-1 generation and says nothing true about `rotated`. Same
+          // stale-identity bug as substituteFloorClampedIsolation/
+          // rebuildExerciseForSwap.
+          selection_note: undefined,
         }
       })
       return { ...day, exercises }
@@ -4480,6 +4595,16 @@ export function generateMesocycle(
             fatigue_cost: dbEntry ? deriveFatigueCost(dbEntry) : undefined,
             prescription_type: dbEntry?.prescription_type ?? ex.prescription_type,
             ramp_up: carryRampUp(ex.ramp_up, ex.name, weeklyName, dbEntry),
+            // Weekly accessory sub-rotation (fortnightOffset) is a second
+            // identity-change point on top of the block-level rotation above
+            // — same rule: a note only stays valid if this slot is still the
+            // SAME exercise it was, name for name. Not unconditional
+            // `undefined` here (unlike the two spread-based reconstructions
+            // above) because most weeks DON'T rotate the name, and the
+            // original note is still a true statement about this slot when
+            // that's the case — only clear it the week identity actually
+            // changes.
+            selection_note: weeklyName === ex.name ? ex.selection_note : undefined,
           }
         })
 

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { Ban, History, MoreVertical, ChevronDown } from 'lucide-react'
+import { Ban, History, MoreVertical, ChevronDown, Info } from 'lucide-react'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { getExerciseId } from '@/lib/exercise-db'
 import { formatRampSets, formatCompletedSummary } from '@/lib/session-derive'
@@ -65,6 +65,7 @@ export function ExerciseRow({
   const allSetsLogged = completedSets >= ex.sets
   const ramp = formatRampSets(ex)
   const [explainedLoadChip, setExplainedLoadChip] = useState(false)
+  const [explainedPick, setExplainedPick] = useState(false)
 
   // BottomDock's "Start next set" action, from a different subtree, routes
   // through this shared request rather than a prop — force-expand (the same
@@ -196,6 +197,22 @@ export function ExerciseRow({
               <p className="mt-2 text-xs text-text-tertiary">
                 {ex.sets} working sets · {completedSets} logged
               </p>
+              {ex.selection_note && (
+                <div className="mt-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setExplainedPick(v => !v)}
+                    aria-label="Why this exercise"
+                    className="inline-flex items-center gap-1 text-muted-foreground/60 hover:text-muted-foreground"
+                  >
+                    <Info className="size-2.5" />
+                    <span className="text-[9px] italic">why this exercise</span>
+                  </button>
+                  {explainedPick && (
+                    <p className="mt-0.5 text-[10px] text-muted-foreground/80 italic max-w-xs">{ex.selection_note}</p>
+                  )}
+                </div>
+              )}
               <div className="mt-1.5 flex items-center gap-3.5">
                 <button type="button" className="text-xs font-semibold text-primary" onClick={onSwap}>
                   Swap exercise
