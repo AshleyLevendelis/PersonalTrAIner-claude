@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { useTrainingWeek } from '@/hooks/useTrainingWeek'
@@ -284,6 +285,12 @@ export function TodayPanel({
             <InsightBanner tone="warning" className="text-xs">
               {workout!.pattern_gap_note}
             </InsightBanner>
+          )}
+          {workout!.block_size_note && (
+            <div className="flex items-start gap-2">
+              <Clock className="size-3.5 text-muted-foreground mt-0.5 shrink-0" />
+              <p className="text-xs text-muted-foreground">{workout!.block_size_note}</p>
+            </div>
           )}
           <WarmupSection warmup={workout!.warmup} open={expandedWarmup} onToggle={() => setExpandedWarmup(v => !v)} />
           <ExerciseList

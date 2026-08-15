@@ -32,6 +32,7 @@ import { useActiveSession } from '@/hooks/useActiveSession'
 import { formatRampSets, normalizeWarmup } from '@/lib/session-derive'
 import { RampStrip } from '@/components/exercise/RampStrip'
 import { LoadChip } from '@/components/exercise/LoadChip'
+import { ProgramArc } from '@/components/exercise/ProgramArc'
 import { InsightBanner } from '@/components/ui/insight-banner'
 import type { ExerciseEntry } from '@/lib/exercise-db'
 import type { WorkoutDay, MesocycleWeek, UserProfile, SessionDuration } from '@/lib/types'
@@ -368,6 +369,9 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
   return (
     <div className="space-y-4">
       {hasMesocycle && (
+        <ProgramArc mesocycle={mesocycle} liveWeek={liveWeek} totalWeeks={totalWeeks} onJumpToBlock={jumpToBlock} />
+      )}
+      {hasMesocycle && (
         <Card className="bg-gradient-to-r from-primary/5 to-primary/10 border-primary/20">
           <CardContent className="py-3 px-4">
             <div className="flex items-center justify-between">
@@ -488,6 +492,12 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
               <InsightBanner tone="warning" className="text-xs">
                 {workout.pattern_gap_note}
               </InsightBanner>
+            </div>
+          )}
+          {workout.block_size_note && (
+            <div className="px-4 pb-2 flex items-start gap-2 border-b border-border/30">
+              <Clock className="size-3.5 text-muted-foreground mt-0.5 shrink-0" />
+              <p className="text-xs text-muted-foreground">{workout.block_size_note}</p>
             </div>
           )}
           <WarmupSection
