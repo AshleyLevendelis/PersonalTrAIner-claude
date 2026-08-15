@@ -73,7 +73,7 @@ const SETUP_SECONDS_PRIMER = 15
 // the mental changeover from warm-up to working sets. Charged once per
 // non-empty session, not per exercise — this is what the review's hand math
 // implicitly included and the old formula omitted entirely.
-const SESSION_OVERHEAD_SECONDS = 120
+export const SESSION_OVERHEAD_SECONDS = 120
 
 /**
  * Per-SET working time, honoring the actual prescription TYPE instead of a

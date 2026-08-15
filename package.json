@@ -50,6 +50,7 @@
     "test:load-suggestions": "tsx scripts/test-load-suggestions.ts",
     "test:interval-prescription": "tsx scripts/test-interval-prescription.ts",
     "test:cardio-share-score": "tsx scripts/test-cardio-share-score.ts",
+    "test:block-rest-sizing": "tsx scripts/test-block-rest-sizing.ts",
     "report:trim-magnitude": "tsx scripts/run-trim-magnitude-report.ts"
   },
   "dependencies": {

@@ -16,7 +16,7 @@ import {
   shiftReps, adjustRest, dedupeAdjacentPhases, isRegressionFor, stepIntervalSeconds, type PhaseConfig, type TrainingPhase,
 } from './periodization'
 import { getGoalPolicy, restrictPhaseSequence, resolveConditioningFrequency, RECOVERY_SET_MULTIPLIER, type GoalPolicy } from './goal-policies'
-import { getDurationBudgetSeconds, getSteadyStateSeconds, estimateDaySeconds, estimateSlotsSeconds, parseRestSeconds } from './session-duration'
+import { getDurationBudgetSeconds, getSteadyStateSeconds, estimateDaySeconds, estimateSlotsSeconds, parseRestSeconds, SESSION_OVERHEAD_SECONDS } from './session-duration'
 
 // ---------------------------------------------------------------------------
 // Track definitions (unchanged — used for day-level focus selection)
@@ -3671,7 +3671,7 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
   // unchanged via object spread, so fixing it once here is sufficient.
   enforceFatigueCostRestFloor(budgetedDays)
 
-  return { plan: budgetedDays, constraint_trace: trace }
+  return { plan: budgetedDays, constraint_trace: trace, requiredNames: Array.from(weeklyRequiredNames) }
 }
 
 // ---------------------------------------------------------------------------
@@ -3885,6 +3885,26 @@ type RotationTier = 'main' | 'accessory' | 'core'
  * Tags each exercise in a (block-level, pre-week-modifiers) day by rotation
  * tier. Computed once per day per block — position and tier don't change
  * week to week within a block, only an accessory's specific variation does.
+ *
+ * "main" here MUST match isMainLiftSlot's definition (mesocycle-edit.ts —
+ * ex.tier === 'tier_1_primary', i.e. mechanics_tier === 'tier1_compound',
+ * no other condition). This function used to additionally require
+ * isExternallyLoaded(dbEntry), which silently fell through to 'accessory'
+ * for the two bodyweight tier1_compound exercises (Pull-Ups, Chin-Ups —
+ * the only two tier1_compound options for the vertical_pull pattern, so
+ * any vertical-pull main-lift day was unavoidably affected). That made
+ * them eligible for the 2-week accessory sub-rotation below, so an
+ * intermediate/advanced trainee's PULLING main lift could silently become
+ * a DIFFERENT exercise mid-block — confirmed live (Pull-Ups -> Pull-Ups ->
+ * Chin-Ups across one block's 3 weeks) and confirmed as the direct cause
+ * of two downstream problems: quality-score.ts's main_lift_changed_within_block
+ * check, and progressive overload silently inheriting a position-indexed
+ * baseline (blockBaselineKg) computed for a completely different
+ * exercise. Checked: isExternallyLoaded was not load-bearing for anything
+ * else here — every OTHER tier1_compound exercise in the database (Bench
+ * Press, Barbell Rows, Overhead Press, Deadlifts, Trap Bar Deadlift,
+ * Barbell Squats) is externally loaded already, so dropping the check
+ * changes classification for exactly these two exercises and nothing else.
  */
 function classifyRotationTiers(exercises: Exercise[]): RotationTier[] {
   let mainCount = 0
@@ -3893,11 +3913,11 @@ function classifyRotationTiers(exercises: Exercise[]): RotationTier[] {
     if (!dbEntry || dbEntry.mechanics_tier === 'primer') return 'core'
     if (dbEntry.movement_pattern === 'core' || dbEntry.movement_pattern === 'carry') return 'core'
 
-    // "First 1-2 externally-loaded compounds" — in practice this is almost
-    // always exactly one exercise (getExerciseCountForDuration always asks
-    // for a single tier1 slot), but the cap stays at 2 to match the spec for
-    // any future session shape that requests more.
-    if (dbEntry.mechanics_tier === 'tier1_compound' && isExternallyLoaded(dbEntry) && mainCount < 2) {
+    // "First 1-2 compounds" — in practice this is almost always exactly one
+    // exercise (getExerciseCountForDuration always asks for a single tier1
+    // slot), but the cap stays at 2 to match the spec for any future
+    // session shape that requests more.
+    if (dbEntry.mechanics_tier === 'tier1_compound' && mainCount < 2) {
       mainCount++
       return 'main'
     }
@@ -3978,8 +3998,6 @@ function computeDurationTopUp(
   phaseConfig: PhaseConfig,
 ): number[][] {
   const totalBudgetSeconds = getDurationBudgetSeconds(profile.session_duration_preference || '45-60')
-  const dayBudgetSeconds = totalBudgetSeconds - getWarmupReserveSeconds(totalBudgetSeconds)
-  const targetSeconds = dayBudgetSeconds * 0.95
   // A real ceiling, not just a knob to raise until the numbers work out: no
   // sane program puts 15-20+ sets on one accessory. Raising this past ~6
   // (tried up to 20 while tuning) stopped fixing anything and started
@@ -4008,6 +4026,20 @@ function computeDurationTopUp(
   const isLongSession = (profile.session_duration_preference || '45-60') === '90+'
 
   return blockDays.map((day, dayIdx) => {
+    // Real per-day fixed cost (actual warmup, not the generic reserve;
+    // session overhead; any post-session cardio finisher) subtracted from
+    // the FULL budget — matching estimateDaySeconds's own accounting
+    // exactly, not a cheaper working-set-only approximation. A prior
+    // version compared bare estimateSlotsSeconds against a generic
+    // (totalBudgetSeconds - warmupReserve) figure, which was measurably
+    // more generous than the real final check trimWeekRestForBudget (and
+    // sizeBlockToRestBudget, just above this call) both use — caught live
+    // when top-up was still re-adding sets a same-block structural trim had
+    // just correctly removed, because top-up's own target didn't agree
+    // with what the day would actually be checked against later.
+    const fixedCostSeconds = (day.warmup?.total_seconds ?? 0) + SESSION_OVERHEAD_SECONDS +
+      (day.recommendedCardio?.timing === 'post_session' ? day.recommendedCardio.duration * 60 : 0)
+    const targetSeconds = (totalBudgetSeconds - fixedCostSeconds) * 0.95
     const entries = day.exercises.map(ex => EXERCISE_DATABASE.find(e => e.name.toLowerCase() === ex.name.toLowerCase()))
     const restSeconds = day.exercises.map(ex => {
       const match = ex.rest.match(/(\d+)/)
@@ -4162,6 +4194,133 @@ function trimWeekRestForBudget(days: WorkoutDay[], budgetSeconds: number, trimLo
   }
 }
 
+/**
+ * Runs once per block, inside generateMesocycle's block loop, right after
+ * that block's exercise names are rotated and before computeDurationTopUp.
+ * Sized against THAT block's own real rest_adjust_seconds — not week 1's,
+ * and not a forecast across every future block. Each block already knows
+ * its own real phase config by the time this runs, so there's nothing to
+ * guess: a day whose structure fit at generation-time's neutral rest can
+ * still not fit once a heavier-rest phase's real number is honored (traced
+ * live: the worst combo in the 9216-grid needed the identical rest-shave
+ * re-applied in 12 of 12 non-deload weeks, growing from ~105s cut in week 1
+ * to 855s cut in week 15, because nothing above trimWeekRestForBudget ever
+ * asked this question once, per block, up front).
+ *
+ * Reuses the exact set-drop / exercise-removal priority order stageTimeCap
+ * already uses at generation time (Phases 3-5) — this is the same
+ * decision, re-run here because the day's real cost has changed, not a new
+ * policy.
+ *
+ * Deliberately never writes an adjusted rest value onto a returned
+ * exercise — only structure (sets, whether an exercise survives) changes
+ * here. The per-week loop already derives real rest fresh every week via
+ * adjustRest(ex.rest, restShift) from this exercise's neutral baseline; if
+ * this function also baked the block's adjustment into the stored value,
+ * it would apply twice.
+ *
+ * Budget comparison MUST match trimWeekRestForBudget's own accounting
+ * (estimateDaySeconds — real warmup + session overhead + working sets +
+ * any post-session cardio — against the full totalBudgetSeconds), not a
+ * partial approximation. A first version of this function compared bare
+ * working-set time against totalBudgetSeconds-minus-warmup-reserve (mirroring
+ * computeDurationTopUp's own shorthand) and under-trimmed for short
+ * sessions as a result — session overhead (2min) is a much bigger fraction
+ * of a 30-45min budget than a 90+ one, and computeDurationTopUp's shorthand
+ * is safe for it (only ever ADDS, so a generous estimate just adds
+ * slightly less) in a way this function's DOWNWARD decision is not (a
+ * generous estimate here means real overage slips through untrimmed).
+ * Caught live: the bodyweight/bodybuilding/beginner/moderate-recovery
+ * combo barely improved under the shorthand version (458 of 520 original
+ * trim events still firing) because its remapped phase sequence for
+ * bodyweight equipment never carries a positive rest_adjust_seconds at
+ * all — the entire overage was this session-overhead gap, not a
+ * cross-block rest increase, and the shorthand estimate was too generous
+ * to see it.
+ */
+export function sizeBlockToRestBudget(
+  blockDays: WorkoutDay[],
+  restAdjustSeconds: number,
+  totalBudgetSeconds: number,
+  protectedNames: Set<string>,
+  trimLog?: ConstraintTraceEntry[],
+): WorkoutDay[] {
+  return blockDays.map(day => {
+    if (day.exercises.length === 0) return day
+
+    // Real, block-adjusted rest — used ONLY for this fit decision, never
+    // stored. Same floor as adjustRest so this estimate can't diverge from
+    // what the per-week loop will actually derive later. Reuses
+    // estimateDaySeconds directly (rather than re-deriving its formula)
+    // via a throwaway day object so this can never drift from the same
+    // accounting trimWeekRestForBudget checks against later.
+    const estimate = (exercises: Exercise[]) => estimateDaySeconds({
+      ...day,
+      exercises: exercises.map(ex => ({ ...ex, rest: `${Math.max(20, parseRestSeconds(ex.rest) + restAdjustSeconds)}s` })),
+    })
+
+    let exercises = day.exercises
+    if (estimate(exercises) <= totalBudgetSeconds) return day
+
+    let removedAny = false
+
+    // Phase A: drop sets toward each exercise's role floor, biggest first —
+    // same priority order as enforceDayDurationBudget's own safety net.
+    // Cardio-tier exempt, same reasoning as trimWeekRestForBudget/
+    // stageTimeCap: cutting an interval's sets changes what the exercise
+    // IS, not just its duration.
+    for (let pass = 0; pass < 10 && estimate(exercises) > totalBudgetSeconds; pass++) {
+      const trimmable = exercises
+        .map((ex, i) => {
+          const entry = findEntry(ex.name)
+          const role = entry ? getVolumeRole(entry) : null
+          const floor = role ? getRoleSetFloor(role) : 2
+          return { i, sets: ex.sets, entry, role, floor }
+        })
+        .filter(t => t.entry && t.entry.mechanics_tier !== 'primer' && t.entry.mechanics_tier !== 'cardio' && t.sets > t.floor)
+      if (trimmable.length === 0) break
+      const protectedRoles = new Set(['main', 'conditioning'])
+      const nonProtected = trimmable.filter(t => !t.role || !protectedRoles.has(t.role))
+      const candidates = nonProtected.length > 0 ? nonProtected : trimmable
+      candidates.sort((a, b) => b.sets - a.sets)
+      const target = candidates[0].i
+      const ex = exercises[target]
+      exercises = exercises.map((e, i) => (i === target ? { ...e, sets: e.sets - 1 } : e))
+      trimLog?.push({
+        exercise: ex.name, stage: 'time_cap',
+        reason: `sets trimmed ${ex.sets} -> ${ex.sets - 1} to fit this block's real rest cost on ${day.day}`,
+      })
+    }
+
+    // Phase B: still over even at every set floor — remove whole
+    // exercises, same order as stageTimeCap's own Phase 4 (lowest tier
+    // first, since selection sorts tier1->tier2->tier3->cardio so the END
+    // of the array is lowest-tier; required-slot and cardio exercises
+    // never removed; floor of 3 exercises remaining, matching
+    // stageTimeCap's own floor).
+    for (let guard = 0; guard < 10 && estimate(exercises) > totalBudgetSeconds && exercises.length > 3; guard++) {
+      let removeIdx = exercises.length - 1
+      while (removeIdx >= 0) {
+        const entry = findEntry(exercises[removeIdx].name)
+        if (entry && entry.mechanics_tier !== 'cardio' && !protectedNames.has(exercises[removeIdx].name)) break
+        removeIdx--
+      }
+      if (removeIdx < 0) break
+      const removed = exercises[removeIdx]
+      exercises = exercises.filter((_, i) => i !== removeIdx)
+      removedAny = true
+      trimLog?.push({
+        exercise: removed.name, stage: 'structure',
+        reason: `dropped entirely — ${day.day} still over budget at every set floor once this block's real rest is honored`,
+      })
+    }
+
+    return removedAny
+      ? { ...day, exercises, block_size_note: 'Fewer exercises this block — heavier lifts need longer rest between sets.' }
+      : { ...day, exercises }
+  })
+}
+
 // Below this underrun, a day is "close enough" and gets no filler — matches
 // the quality scorer's tighter (10%/20%) overrun bands staying strict while
 // underrun gets real headroom before anything is appended.
@@ -4274,7 +4433,14 @@ export function generateMesocycle(
    */
   trimLog?: ConstraintTraceEntry[],
 ): MesocycleWeek[] {
-  const baseWeek = baseWorkout ?? generateExercisePlan(profile, exclusions).plan
+  // requiredNames is only available when this function does its own base
+  // generation — a caller-supplied baseWorkout (mesocycle-edit.ts's
+  // regeneration paths) has no equivalent tracking today, so
+  // sizeBlockToRestBudget below just gets nothing to protect in that case,
+  // same as stageTimeCap's own protectedNames defaults to empty.
+  const basePlanResult = baseWorkout ? undefined : generateExercisePlan(profile, exclusions)
+  const baseWeek = baseWorkout ?? basePlanResult!.plan
+  const requiredNames = new Set(basePlanResult?.requiredNames ?? [])
   const goal = (profile.fitness_goal || 'hypertrophy') as FitnessGoal
   const experience = profile.training_experience || 'novice'
   const expConfig = getExperienceConfig(experience)
@@ -4366,7 +4532,7 @@ export function generateMesocycle(
     // Variations rotate ONCE PER BLOCK, not per week. Changing them weekly
     // would make progression impossible to read; holding them for four weeks
     // gives enough repetitions to actually improve at the movement.
-    const blockDays = baseWeek.map(day => {
+    const rotatedBlockDays = baseWeek.map(day => {
       // Per-day dedup: a block rotation is computed independently per
       // exercise, with no visibility into what its day-mates just resolved
       // to. Without this set, a rotation that falls back past a
@@ -4420,6 +4586,15 @@ export function generateMesocycle(
       })
       return { ...day, exercises }
     })
+
+    // Cross-block cause of the trim-magnitude bug: this base structure was
+    // only ever validated against neutral (unperiodized) rest at generation
+    // time. Sized here, once per block, against THIS block's own real
+    // rest_adjust_seconds — not a forecast, since this block's real number
+    // is already known — so trimWeekRestForBudget below goes back to being
+    // the rare last-resort nudge it was designed as, not the mechanism
+    // carrying the whole mesocycle every week.
+    const blockDays = sizeBlockToRestBudget(rotatedBlockDays, phaseConfig.rest_adjust_seconds, totalBudgetSeconds, requiredNames, trimLog)
 
     // Double progression's within-block memory: each exercise's week-1
     // ("baseline") load, keyed by [dayIndex][exerciseIndex] — weeks 2-3 are

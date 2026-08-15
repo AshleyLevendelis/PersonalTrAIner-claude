@@ -304,6 +304,14 @@ export interface WorkoutDay {
    * weeks unchanged (same convention as conditioning_note).
    */
   pattern_gap_note?: string
+  /**
+   * Plain-language note for the case a block's exercise structure had to
+   * lose a whole exercise (not just sets) to fit that block's own real
+   * rest cost — see sizeBlockToRestBudget in exercise-plan.ts. Set once per
+   * block, only on days it actually applies to; never implies a defect,
+   * just explains why this block looks lighter than an earlier one.
+   */
+  block_size_note?: string
 }
 
 export interface ConstraintTraceEntry {
@@ -329,6 +337,15 @@ export interface ConstraintTrace {
 export interface PlanResult {
   plan: WorkoutDay[]
   constraint_trace: ConstraintTrace
+  /**
+   * Exercise names that filled a REQUIRED track slot somewhere in the base
+   * plan (see selectExercisesForTrack's requiredNames, threaded here via
+   * balanceWeeklyStructure's weeklyRequiredNames) — carried forward so any
+   * later trimming pass (sizeBlockToRestBudget in exercise-plan.ts) can
+   * extend the same "never silently drop a required slot" protection
+   * stageTimeCap already applies at generation time.
+   */
+  requiredNames: string[]
 }
 
 export interface Meal {
