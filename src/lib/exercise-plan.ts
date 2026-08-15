@@ -785,8 +785,18 @@ function stageTimeCap(
   estimated = estimateSessionDuration(dayExercises.map(e => ({ entry: e.entry, sets: e.sets, reps: e.reps, restSeconds: e.restSeconds })))
   if (estimated <= budgetSeconds) return dayExercises
 
-  // Phase 2: Reduce rest by 15s across the board
+  // Phase 2: Reduce rest by 15s across the board — except cardio-tier,
+  // same reasoning as trimWeekRestForBudget's own exemption: cutting an
+  // interval's rest changes what the exercise IS rather than shaving
+  // time off it, and a steady-state block (rest: '0s' by design) has no
+  // rest to cut at all. Without this, this earlier, selection-time pass
+  // was the one actually responsible for a steady-state exercise showing
+  // a stray non-zero rest in the first place — caught live verifying the
+  // new cardio reservation, where Elliptical still showed "30s" instead
+  // of its real "0s" (Math.max(30, 0 - 15) = 30) despite never going
+  // through trimWeekRestForBudget at all.
   for (let i = 0; i < dayExercises.length; i++) {
+    if (dayExercises[i].entry.mechanics_tier === 'cardio') continue
     const newRest = Math.max(30, dayExercises[i].restSeconds - 15)
     dayExercises[i] = { ...dayExercises[i], restSeconds: newRest, rest: `${newRest}s` }
   }
@@ -1316,6 +1326,42 @@ function buildPatternGapNote(uncovered: MovementPattern[], covered: ExerciseEntr
   return `Your current equipment and injury settings leave ${gapPart} — not a bug, just a real gap in what's available.${offerPart} Update your equipment or injuries in Profile, or ask your coach in Chat, if that changes.`
 }
 
+/**
+ * Share of the total session budget a "Conditioning & Core" track's cardio
+ * block is allowed to reserve — a real minute cap, not a slot count. Picked
+ * from the middle of the 25-30% range this was scoped at; see
+ * selectExercisesForTrack's cardio-reservation block for why a minute share
+ * replaced the old ceil(slots/2) formula.
+ */
+const CARDIO_RESERVED_SHARE = 0.28
+
+/**
+ * What one cardio candidate would actually cost in the final rendered plan
+ * — same fixedUnitPrescription + experience-scaling + estimateSlotsSeconds
+ * chain real generation uses, not a separate guess. Using a different
+ * estimate here than what ships is exactly the mismatch class of bug that
+ * let a steady-state block get counted at ~30s instead of its real ~20min
+ * before it shipped; this reuses the real numbers so the reservation
+ * decision and the final prescription can't drift apart.
+ */
+function estimateCardioCandidateSeconds(
+  candidate: ExerciseEntry,
+  experience: ExperienceConfig,
+  sessionDurationPreference: SessionDuration | undefined,
+): number {
+  const fixedUnits = fixedUnitPrescription(candidate, sessionDurationPreference)
+  if (!fixedUnits) return 0
+  // Mirrors the real per-week sets computation exactly, including its
+  // steady-state exemption (generateMesocycle's per-week loop) — a
+  // different floor here than what actually ships is exactly the
+  // mismatch that let this reservation's own budget check pass while the
+  // rendered day still came out 2-3x over.
+  const sets = candidate.prescription_type === 'steady_state'
+    ? 1
+    : Math.max(2, Math.round(fixedUnits.sets * experience.sets_multiplier))
+  return estimateSlotsSeconds([{ entry: candidate, sets, reps: fixedUnits.reps, restSeconds: fixedUnits.restSeconds }])
+}
+
 function selectExercisesForTrack(
   track: TrackDefinition,
   pool: ExerciseEntry[],
@@ -1327,6 +1373,7 @@ function selectExercisesForTrack(
   feasibleRequiredPatterns?: MovementPattern[],
   weeklyAppearanceCount?: Map<string, number>,
   rawExperience: TrainingExperience = 'novice',
+  sessionDurationPreference?: SessionDuration,
 ): { primer: ExerciseEntry | null; main: ExerciseEntry[]; requiredNames: Set<string>; uncoveredPatterns: MovementPattern[]; selectionNotes: Map<string, string> } {
   const counts = applyIsolationSlotShift(countsIn, policy.isolationSlotShift)
   const allPatterns = new Set([...track.primary_patterns, ...track.secondary_patterns])
@@ -1498,12 +1545,64 @@ function selectExercisesForTrack(
   // Raises, Ab Wheel...) are plentiful enough to satisfy that target on
   // their own, so refill() rarely triggered — a "Conditioning & Core" day
   // ended up almost entirely core with one or two token cardio entries, a
-  // direct, repeated LLM coach review finding. Reserving real cardio slots
-  // FIRST, before core competes for the same count, fixes that at the
+  // direct, repeated LLM coach review finding. Reserving real cardio work
+  // FIRST, before core competes for the same budget, fixes that at the
   // source.
+  //
+  // Reserved as MINUTES, not a slot count. A slot-count formula
+  // (previously ceil(total/2)) has no idea what a slot actually costs in
+  // time — it can only ever be "enough cardio," never "not too much,"
+  // because it doesn't know the session's time budget exists. Measured
+  // live: at 90+ min preference, EVERY combat/conditioning combo tested
+  // filled every eligible cardio-tier exercise (up to 8) and needed
+  // computeDurationTopUp + trimWeekRestForBudget to force the day back
+  // under budget afterward — one of them by piling extra sets onto
+  // cardio specifically (now excluded, see computeDurationTopUp's
+  // eligible filter), the other by shaving interval rest toward a 30s
+  // floor regardless of category (now exempted, see
+  // trimWeekRestForBudget's order filter) — silently breaking the work:
+  // rest ratio stepIntervalSeconds is supposed to hold, on whichever
+  // exercise happened to get reached first. Reserving a minute share up
+  // front means cardio's own volume is decided once, honestly, instead
+  // of being decided by slot count and then quietly corrected downstream
+  // by two mechanisms that don't know why the day got big in the first
+  // place.
   if (track.primary_patterns.includes('cardio')) {
-    const cardioCount = Math.max(2, Math.ceil((counts.tier1 + counts.tier2 + counts.tier3) / 2))
-    pickFromTier('cardio', cardioCount, track.primary_patterns)
+    const totalBudgetSeconds = getDurationBudgetSeconds(sessionDurationPreference ?? '45-60')
+    const reservedCardioSeconds = totalBudgetSeconds * CARDIO_RESERVED_SHARE
+    const experienceConfig = getExperienceConfig(rawExperience)
+    const cardioCandidates = orderCandidates(
+      trackPool.filter(e =>
+        e.mechanics_tier === 'cardio' &&
+        !weeklyUsed.has(e.name) &&
+        !selected.some(s => s.name === e.name) &&
+        !usedGroups.has(getMovementFamily(e))
+      ),
+      policy,
+      rawExperience,
+      { trackPatterns: [...track.primary_patterns, ...track.secondary_patterns], selectedSoFar: selected, weeklyAppearanceCount },
+    )
+    let cardioSecondsUsed = 0
+    let cardioAdded = 0
+    for (let i = 0; i < cardioCandidates.length; i++) {
+      const c = cardioCandidates[i]
+      if (usedGroups.has(getMovementFamily(c.e))) continue
+      const cost = estimateCardioCandidateSeconds(c.e, experienceConfig, sessionDurationPreference)
+      // The floor: the FIRST (best-ranked) candidate is always taken,
+      // even if its own cost alone exceeds the reserved share — a session
+      // too short to "afford" one full cardio exercise by the numbers
+      // still gets one, matching the original reason this reservation
+      // existed (an all-core conditioning day). Every candidate after the
+      // first is genuinely budget-gated.
+      if (cardioAdded > 0 && cardioSecondsUsed + cost > reservedCardioSeconds) continue
+      selected.push(c.e)
+      usedGroups.add(getMovementFamily(c.e))
+      cardioSecondsUsed += cost
+      cardioAdded++
+      const note = explainWinner(c, cardioCandidates[i + 1], policy)
+      if (note) selectionNotes.set(c.e.name, note)
+      if (cardioSecondsUsed >= reservedCardioSeconds) break
+    }
   }
 
   pickFromTier('tier1_compound', counts.tier1, track.primary_patterns)
@@ -3409,7 +3508,7 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
     const trackFocus = getViableTrack(rawTrack, pool)
     const track = TRACKS[trackFocus]
 
-    const { primer, main, requiredNames, uncoveredPatterns, selectionNotes } = selectExercisesForTrack(track, pool, counts, weeklyUsed, styleConfig, trace, policy, feasiblePatterns, weeklyAppearanceCount, profile.training_experience || 'novice')
+    const { primer, main, requiredNames, uncoveredPatterns, selectionNotes } = selectExercisesForTrack(track, pool, counts, weeklyUsed, styleConfig, trace, policy, feasiblePatterns, weeklyAppearanceCount, profile.training_experience || 'novice', profile.session_duration_preference)
     for (const name of requiredNames) weeklyRequiredNames.add(name)
 
     // Build exercise list with sets/reps from style config
@@ -3889,9 +3988,18 @@ function computeDurationTopUp(
     const roles = entries.map(e => e ? getVolumeRole(e) : null)
     const roleCeilings = day.exercises.map((_, i) => roles[i] ? getRoleSetCeiling(roles[i]!, isLongSession) : EXTRA_SETS_CAP + 99)
     const reps = day.exercises.map(ex => ex.reps)
+    // Cardio-tier exercises are excluded — their volume is already decided
+    // once, honestly, by selectExercisesForTrack's minute-based reservation
+    // (CARDIO_RESERVED_SHARE). Letting this greedy fill also treat them as
+    // eligible (it used to, and a 90+ "long session" already exempts every
+    // OTHER main-classified exercise from the isLongSession guard too) is
+    // exactly how a correctly-reserved cardio block got re-inflated to
+    // 8-9 sets per exercise, blowing the reservation right back past
+    // budget through a different lever. Their volume moves only if the
+    // reservation itself changes, not via this separate top-up.
     const eligible = day.exercises
       .map((_, i) => i)
-      .filter(i => entries[i] && entries[i]!.mechanics_tier !== 'primer' && (roles[i] !== 'main' || isLongSession))
+      .filter(i => entries[i] && entries[i]!.mechanics_tier !== 'primer' && entries[i]!.mechanics_tier !== 'cardio' && (roles[i] !== 'main' || isLongSession))
       // Accessories/isolation are ordered before mains so round-robin growth
       // fills them first — mains only start climbing once every accessory
       // slot has already hit its own (lower) ceiling.
@@ -3977,9 +4085,23 @@ function trimWeekRestForBudget(days: WorkoutDay[], budgetSeconds: number): void 
     if (seconds <= budgetSeconds) continue
 
     // Accessories/isolation first, main lift last — same priority order as
-    // stageTimeCap's own Phase 5 set-trimming.
+    // stageTimeCap's own Phase 5 set-trimming. Cardio-tier exercises
+    // (tier_4_finisher — mapTier's only mapping to that tier, so this is
+    // cardio-exclusive) are excluded entirely, not just deprioritized.
+    // Cutting an interval's rest toward this 30s floor doesn't shave time
+    // off the exercise the way it does for a lift — it changes the
+    // exercise into a different, more intense modality, and which of
+    // several cardio exercises loses its ratio is purely an accident of
+    // iteration order (measured live: two of seven identically-categorized
+    // exercises got cut, the rest didn't, for no principled reason). A day
+    // over budget because of its cardio reservation should shed a whole
+    // exercise via selectExercisesForTrack's reservation, not have one
+    // arbitrary survivor's rest quietly degraded here; a day over budget
+    // for other reasons still trims normally, cardio just isn't a
+    // candidate.
     const order = day.exercises
       .map((ex, i) => ({ i, isMain: ex.tier === 'tier_1_primary' }))
+      .filter(({ i }) => day.exercises[i].tier !== 'tier_4_finisher')
       .sort((a, b) => Number(a.isMain) - Number(b.isMain))
 
     for (let pass = 0; pass < 6 && seconds > budgetSeconds; pass++) {
@@ -4397,16 +4519,28 @@ export function generateMesocycle(
           // anatomical-adaptation week can no longer crush a main lift to 2
           // sets while duration top-up inflates an accessory to 7.
           const volumeRole = dbEntry ? getVolumeRole(dbEntry) : null
-          const sets = isDeload
-            ? (deloadAtFloor ? floorDeloadSets : standardDeloadSets)
-            // + the once-per-block duration top-up (see computeDurationTopUp)
-            // — a fixed per-slot amount, so this still holds sets flat
-            // across weeks 1-3 despite being duration-driven.
-            : clampToVolumeRole(
-                Math.max(2, Math.round(goalAdjustedBaseSets * phaseConfig.sets_multiplier)) + blockExtraSets[dayIdx][exIdx],
-                volumeRole,
-                (profile.session_duration_preference || '45-60') === '90+',
-              )
+          // Steady-state cardio is exempt from every path below — one
+          // continuous block has no "rounds" for a volume-role floor to
+          // apply to. Without this, the 'conditioning' role's 4-round
+          // floor (genuinely correct for real interval work) was instead
+          // forcing Elliptical's single block up to 4 sets — caught live
+          // when the new minute-based cardio reservation (below, in
+          // selectExercisesForTrack) kept coming out 2-3x over its own
+          // budget: the estimate used at selection time correctly assumed
+          // 1 set, but the per-week sets computation was unconditionally
+          // overriding it to 4 for every exercise, cardio included.
+          const sets = dbEntry?.prescription_type === 'steady_state'
+            ? 1
+            : isDeload
+              ? (deloadAtFloor ? floorDeloadSets : standardDeloadSets)
+              // + the once-per-block duration top-up (see computeDurationTopUp)
+              // — a fixed per-slot amount, so this still holds sets flat
+              // across weeks 1-3 despite being duration-driven.
+              : clampToVolumeRole(
+                  Math.max(2, Math.round(goalAdjustedBaseSets * phaseConfig.sets_multiplier)) + blockExtraSets[dayIdx][exIdx],
+                  volumeRole,
+                  (profile.session_duration_preference || '45-60') === '90+',
+                )
 
           // No externally loaded weight to ramp (true bodyweight movement, or
           // one prescribeLoad can't categorize) — progress these via reps
