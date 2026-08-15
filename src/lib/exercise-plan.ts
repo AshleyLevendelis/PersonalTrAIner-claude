@@ -1571,6 +1571,21 @@ function selectExercisesForTrack(
     const totalBudgetSeconds = getDurationBudgetSeconds(sessionDurationPreference ?? '45-60')
     const reservedCardioSeconds = totalBudgetSeconds * CARDIO_RESERVED_SHARE
     const experienceConfig = getExperienceConfig(rawExperience)
+    // track.slots' own required cardio slot (fillSlot, run earlier in this
+    // function — see the pattern-guaranteed-slots pass above) may already
+    // have picked one cardio exercise, unconditionally, with no idea this
+    // budget exists. Seeding the running total with whatever it already
+    // spent is what makes the two mechanisms cooperate instead of
+    // stacking blind: caught live reconciling a reported number against
+    // its own math — the reservation loop's own budget math was correct
+    // in isolation, but starting it fresh at 0 every time meant a day
+    // where the slot pass had already spent, say, a 9-minute Rowing
+    // Machine pick got a FULL extra 21 minutes on top from this loop,
+    // landing the real total at 56% of budget instead of the ~28% either
+    // mechanism thought it was granting on its own.
+    const preSelectedCardio = selected.filter(e => e.mechanics_tier === 'cardio')
+    let cardioSecondsUsed = preSelectedCardio.reduce((sum, e) => sum + estimateCardioCandidateSeconds(e, experienceConfig, sessionDurationPreference), 0)
+    let cardioAdded = preSelectedCardio.length
     const cardioCandidates = orderCandidates(
       trackPool.filter(e =>
         e.mechanics_tier === 'cardio' &&
@@ -1582,18 +1597,16 @@ function selectExercisesForTrack(
       rawExperience,
       { trackPatterns: [...track.primary_patterns, ...track.secondary_patterns], selectedSoFar: selected, weeklyAppearanceCount },
     )
-    let cardioSecondsUsed = 0
-    let cardioAdded = 0
     for (let i = 0; i < cardioCandidates.length; i++) {
       const c = cardioCandidates[i]
       if (usedGroups.has(getMovementFamily(c.e))) continue
       const cost = estimateCardioCandidateSeconds(c.e, experienceConfig, sessionDurationPreference)
-      // The floor: the FIRST (best-ranked) candidate is always taken,
-      // even if its own cost alone exceeds the reserved share — a session
-      // too short to "afford" one full cardio exercise by the numbers
-      // still gets one, matching the original reason this reservation
-      // existed (an all-core conditioning day). Every candidate after the
-      // first is genuinely budget-gated.
+      // The floor: the FIRST candidate this loop itself adds is always
+      // taken, even over budget — but only when nothing (including the
+      // slot pass above) has provided a cardio exercise yet. A session
+      // too short to "afford" one by the numbers still gets one; a
+      // session that already has one from the slot pass doesn't get a
+      // second free pass just for being first through THIS loop.
       if (cardioAdded > 0 && cardioSecondsUsed + cost > reservedCardioSeconds) continue
       selected.push(c.e)
       usedGroups.add(getMovementFamily(c.e))
@@ -1624,9 +1637,25 @@ function selectExercisesForTrack(
       // quality/goal-fit/session-balance/variety instead of a separate
       // tier-only sort, now that this fallback pools all three tiers
       // together.
+      //
+      // Cardio-tier is excluded here too, not just primer — on a
+      // "Conditioning & Core" track trackPool is cardio-and-core only, so
+      // once core-isolation candidates ran thin this was the back door
+      // that let refill silently re-stuff MORE cardio back in after the
+      // reservation above had already made its own, deliberate,
+      // budget-respecting decision to stop. Caught live reconciling a
+      // reported number against its own math: the reservation loop by
+      // itself admitted 3 exercises (22min, correctly under its 28min
+      // share); this fallback alone added 4 more, un-budgeted, to chase
+      // the slot-count target — the exact "count, not minutes" anti-
+      // pattern this whole change exists to remove. A day that comes up
+      // short on core candidates now ends up with fewer total exercises,
+      // bounded by the time budget, rather than refill forcing the slot
+      // count back up with more cardio.
       const candidates = orderCandidates(
         trackPool.filter(e =>
           e.mechanics_tier !== 'primer' &&
+          e.mechanics_tier !== 'cardio' &&
           !selected.some(s => s.name === e.name) &&
           (!respectFamilies || !usedGroups.has(getMovementFamily(e))) &&
           (!respectWeeklyCap || !weeklyAppearanceCount || (weeklyAppearanceCount.get(e.name) ?? 0) < WEEKLY_APPEARANCE_CAP)
