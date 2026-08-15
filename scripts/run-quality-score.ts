@@ -25,6 +25,18 @@ import type {
 // combination gets one deterministically assigned via round-robin, so all
 // three/three values still get real coverage across the run without an
 // unreasonable runtime.
+//
+// The two round-robin values must NOT share one counter (recovery =
+// rotationIndex % 3, conditioning = rotationIndex % 3) — that makes every
+// recovery tier permanently paired with exactly one conditioning preference
+// (high always with avoid, moderate always with tolerate, low always with
+// love) across the ENTIRE grid, so anything that looks like it correlates
+// with conditioning_preference in a report is statistically indistinguishable
+// from correlating with recovery_capacity instead. Treating rotationIndex as
+// a base-3 odometer — recovery reads the 1s place, conditioning reads the 3s
+// place — makes both cycle at different rates, so all 9 (recovery,
+// conditioning) pairings actually occur, spread independently across the
+// grid, while staying a pure deterministic function of one counter.
 
 const ALL_GOALS: FitnessGoal[] = ['hypertrophy', 'fat_loss', 'conditioning', 'functional']
 const ALL_RECOVERY: RecoveryCapacity[] = ['low', 'moderate', 'high']
@@ -104,7 +116,7 @@ function generateAllCombinations(): Combination[] {
               combos.push({
                 equipment, injuries, duration, style, experience, goal,
                 recovery: ALL_RECOVERY[rotationIndex % ALL_RECOVERY.length],
-                conditioningPref: ALL_CONDITIONING_PREF[rotationIndex % ALL_CONDITIONING_PREF.length],
+                conditioningPref: ALL_CONDITIONING_PREF[Math.floor(rotationIndex / ALL_RECOVERY.length) % ALL_CONDITIONING_PREF.length],
               })
               rotationIndex++
             }

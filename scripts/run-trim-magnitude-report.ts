@@ -84,6 +84,15 @@ function comboLabel(combo: Combination): string {
   return `${combo.equipment} / ${combo.injuries.join('+') || 'none'} / ${combo.duration} / ${combo.style} / ${combo.experience} / ${combo.goal} / recovery=${combo.recovery} / cardio=${combo.conditioningPref}`
 }
 
+// recovery and conditioningPref read different "digits" of the same base-3
+// counter (recovery = 1s place, conditioning = 3s place) rather than both
+// reading rotationIndex % 3 directly — sharing one counter would permanently
+// pair every recovery tier with exactly one conditioning preference across
+// the WHOLE grid (high always with avoid, moderate with tolerate, low with
+// love), making anything that looks like it correlates with
+// conditioning_preference statistically indistinguishable from correlating
+// with recovery_capacity instead. See run-quality-score.ts's matching
+// comment — this harness duplicates that grid, so it duplicated the bug too.
 function generateAllCombinations(): Combination[] {
   const injuryCombinations = getInjuryCombinations()
   const combos: Combination[] = []
@@ -97,7 +106,7 @@ function generateAllCombinations(): Combination[] {
               combos.push({
                 equipment, injuries, duration, style, experience, goal,
                 recovery: ALL_RECOVERY[rotationIndex % ALL_RECOVERY.length],
-                conditioningPref: ALL_CONDITIONING_PREF[rotationIndex % ALL_CONDITIONING_PREF.length],
+                conditioningPref: ALL_CONDITIONING_PREF[Math.floor(rotationIndex / ALL_RECOVERY.length) % ALL_CONDITIONING_PREF.length],
               })
               rotationIndex++
             }
