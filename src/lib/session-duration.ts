@@ -34,6 +34,24 @@ export function getDurationBudgetSeconds(duration: SessionDuration): number {
   return DURATION_BUDGET_SECONDS[duration] ?? DURATION_BUDGET_SECONDS['45-60']
 }
 
+// Steady-state cardio (currently: Elliptical) is one continuous block, not a
+// fixed 20 minutes for every trainee — roughly 35-40% of the total session
+// budget, since it's normally paired with at least a warm-up and one or two
+// other exercises, not the whole session. A flat value regardless of
+// session length either eats nearly half a short session's budget or barely
+// registers in a long one; scaling it the same way DURATION_BUDGET_SECONDS
+// already scales everything else keeps it proportionate at every tier.
+export const STEADY_STATE_SECONDS: Record<SessionDuration, number> = {
+  '30-45': 15 * 60,
+  '45-60': 20 * 60,
+  '60-90': 30 * 60,
+  '90+': 35 * 60,
+}
+
+export function getSteadyStateSeconds(duration: SessionDuration): number {
+  return STEADY_STATE_SECONDS[duration] ?? STEADY_STATE_SECONDS['45-60']
+}
+
 // Rough controlled-tempo pace for a rep-based working set — covers a
 // deliberate eccentric/concentric plus the brief pause most working sets
 // have at the top or bottom. At 10 reps this lands at 35s, matching the
@@ -67,7 +85,7 @@ const SESSION_OVERHEAD_SECONDS = 120
  *    anatomical-adaptation phase and a low-rep strength phase are no longer
  *    charged the same time for a set that takes visibly different effort
  */
-function computeSetWorkSeconds(reps: string, fallbackSeconds: number): number {
+function computeSetWorkSeconds(reps: string, fallbackSeconds: number, exerciseName?: string): number {
   const timeRange = reps.match(/^(\d+)\s*-\s*(\d+)\s*s$/)
   if (timeRange) return (parseInt(timeRange[1], 10) + parseInt(timeRange[2], 10)) / 2
   const timeSingle = reps.match(/^(\d+)\s*s$/)
@@ -79,6 +97,19 @@ function computeSetWorkSeconds(reps: string, fallbackSeconds: number): number {
   const repSingle = reps.match(/^(\d+)$/)
   if (repSingle) return parseInt(repSingle[1], 10) * SECONDS_PER_REP
 
+  // A string that matches none of the above is a real prescription-format
+  // bug, not a rare edge case a silent default should absorb — this is the
+  // exact shape that let a steady-state cardio block get estimated at ~30s
+  // instead of its real ~20min before it shipped (caught in review, not by
+  // this function). A quiet fallback here can't be found; a loud one gets
+  // fixed. Mirrors the discipline of the load-ceiling warning in
+  // load-prescription.ts — log, don't just absorb.
+  console.warn(
+    `[Session Duration] "${exerciseName ?? 'unknown exercise'}" reps string "${reps}" didn't match any known ` +
+    `prescription pattern (rep count/range, "Ns"/"N-Ms" time, or "Nm" distance) — falling back to a flat ` +
+    `${fallbackSeconds}s estimate. This default looks plausible but is very likely wrong; trace why the ` +
+    `string didn't parse rather than trusting the fallback.`
+  )
   return fallbackSeconds
 }
 
@@ -119,7 +150,7 @@ export interface DurationSlot {
 export function estimateSlotsSeconds(slots: DurationSlot[]): number {
   let total = 0
   for (const slot of slots) {
-    const workPerSet = computeSetWorkSeconds(slot.reps, slot.entry?.avg_duration_seconds ?? 35)
+    const workPerSet = computeSetWorkSeconds(slot.reps, slot.entry?.avg_duration_seconds ?? 35, slot.entry?.name)
     total += getSetupSeconds(slot.entry) + slot.sets * (workPerSet + slot.restSeconds)
   }
   return total

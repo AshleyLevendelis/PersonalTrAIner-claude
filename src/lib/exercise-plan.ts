@@ -13,10 +13,10 @@ import { buildWarmup, getWarmupReserveSeconds } from './warmup'
 import { prescribeLoad, categorize, getLoadIncrementKg, isExternallyLoaded, getEquipmentFloorKg, loadingMode, roundToPlate, formatLoad, labelModeForEntry, hasKnownWorkingWeight, unverifiedRampStepKg, isolationTargetBelowFloor, prescribeAssistance, assistanceGuidance, type KnownWorkingWeights } from './load-prescription'
 import {
   getPhaseSequence, getPhaseConfig, rotateVariation, resolveTargetRpe,
-  shiftReps, adjustRest, dedupeAdjacentPhases, isRegressionFor, type PhaseConfig, type TrainingPhase,
+  shiftReps, adjustRest, dedupeAdjacentPhases, isRegressionFor, stepIntervalSeconds, type PhaseConfig, type TrainingPhase,
 } from './periodization'
 import { getGoalPolicy, restrictPhaseSequence, resolveConditioningFrequency, RECOVERY_SET_MULTIPLIER, type GoalPolicy } from './goal-policies'
-import { getDurationBudgetSeconds, estimateDaySeconds, estimateSlotsSeconds, parseRestSeconds } from './session-duration'
+import { getDurationBudgetSeconds, getSteadyStateSeconds, estimateDaySeconds, estimateSlotsSeconds, parseRestSeconds } from './session-duration'
 
 // ---------------------------------------------------------------------------
 // Track definitions (unchanged — used for day-level focus selection)
@@ -1772,17 +1772,46 @@ function shiftRestSeconds(seconds: number, multiplier: number): number {
  * same three constants.
  */
 export function fixedUnitPrescription(
-  type: import('./exercise-db').PrescriptionType | undefined,
+  entry: ExerciseEntry | undefined,
+  sessionDurationPreference?: SessionDuration,
 ): { sets: number; reps: string; rest: string; restSeconds: number } | null {
-  switch (type) {
+  switch (entry?.prescription_type) {
     case 'time':
       return { sets: 3, reps: '30-45s', rest: '45s', restSeconds: 45 }
     case 'distance_load':
       return { sets: 3, reps: '40m', rest: '60s', restSeconds: 60 }
-    case 'intervals':
+    case 'intervals': {
       // Rounds of work:rest, never a rep count — a jump-rope or battle-rope
-      // set is not "15-18 reps."
-      return { sets: 6, reps: '30s', rest: '30s', restSeconds: 30 }
+      // set is not "15-18 reps." Differentiated by category rather than one
+      // literal for every exercise sharing this type — the direct cause of
+      // Burpees, Mountain Climbers and Cycling Intervals all showing an
+      // identical "6x33s" in a live bug report. Bodyweight-HIIT (Burpees,
+      // Mountain Climbers, Jump Rope, Battle Ropes) runs shorter, rest-
+      // matched bursts; machine-interval (Treadmill/Cycling Intervals,
+      // Rowing Machine) tolerates a longer work bout with a real recovery
+      // period. Checked against the small closed set of actual cardio
+      // MACHINES rather than `equipment.includes('bodyweight')` — Jump Rope
+      // and Battle Ropes are light-prop, bodyweight-adjacent HIIT work, not
+      // literally tagged 'bodyweight', and a naive bodyweight check silently
+      // dropped both into machine-interval (caught live, before shipping,
+      // by the verification script; every one of the four bodyweight-HIIT
+      // exercises came back with the identical 45s/40s machine numbers). An
+      // unlisted future cardio machine defaults to the gentler bodyweight-
+      // HIIT numbers rather than the more demanding ones — the safer
+      // direction for a gap in this list to fail toward.
+      const CARDIO_MACHINE_EQUIPMENT = ['treadmill', 'stationary bike', 'rowing machine']
+      const isMachine = entry.equipment.some(e => CARDIO_MACHINE_EQUIPMENT.includes(e))
+      return isMachine
+        ? { sets: 6, reps: '45s', rest: '40s', restSeconds: 40 }
+        : { sets: 6, reps: '30s', rest: '30s', restSeconds: 30 }
+    }
+    case 'steady_state': {
+      // One continuous block — no rounds, no rest. Sized to the trainee's
+      // session length rather than a flat duration; see
+      // getSteadyStateSeconds' own doc comment (session-duration.ts).
+      const seconds = getSteadyStateSeconds(sessionDurationPreference ?? '45-60')
+      return { sets: 1, reps: `${seconds}s`, rest: '0s', restSeconds: 0 }
+    }
     default:
       return null
   }
@@ -1793,6 +1822,7 @@ function assignSetsRepsFromConfig(
   config: StyleConfig,
   experience: ExperienceConfig,
   policy: GoalPolicy,
+  sessionDurationPreference?: SessionDuration,
 ): { sets: number; reps: string; rest: string; restSeconds: number } {
   // Primers are not scaled — a 5-rep activation drill is a 5-rep activation
   // drill regardless of how long you have been training.
@@ -1808,7 +1838,7 @@ function assignSetsRepsFromConfig(
   // can share a pattern ('carry') while needing entirely different units
   // (Farmer Squat Hold is a hold, Farmer's Walk is a measured distance).
   // See PrescriptionType's doc comment in exercise-db.ts.
-  const fixedUnits = fixedUnitPrescription(entry.prescription_type)
+  const fixedUnits = fixedUnitPrescription(entry, sessionDurationPreference)
   if (fixedUnits) {
     return entry.prescription_type === 'intervals'
       ? { ...fixedUnits, sets: scaleSets(fixedUnits.sets), restSeconds: fixedUnits.restSeconds }
@@ -2282,7 +2312,7 @@ function rebuildExerciseForSwap(
   // Reps are always re-derived from the NEW exercise; only sets/rest are
   // carried over, since those genuinely share the same base value across
   // every STYLE_CONFIGS style (see the doc comment above).
-  const reps = isPrimer ? oldExercise.reps : assignSetsRepsFromConfig(newEntry, styleConfig, experience, getGoalPolicy(profile.fitness_goal || 'hypertrophy')).reps
+  const reps = isPrimer ? oldExercise.reps : assignSetsRepsFromConfig(newEntry, styleConfig, experience, getGoalPolicy(profile.fitness_goal || 'hypertrophy'), profile.session_duration_preference).reps
   const assistance = isPrimer ? null : prescribeAssistance(newEntry, profile, 1, false)
   return {
     ...oldExercise,
@@ -2433,7 +2463,7 @@ function balanceWeeklyStructure(
     allSelectedNames.add(entry.name)
     const isPrimer = entry.mechanics_tier === 'primer'
     const intensity = isPrimer ? 'Light — movement prep' : experience.target_rpe
-    const sr = assignSetsRepsFromConfig(entry, styleConfig, experience, getGoalPolicy(profile.fitness_goal || 'hypertrophy'))
+    const sr = assignSetsRepsFromConfig(entry, styleConfig, experience, getGoalPolicy(profile.fitness_goal || 'hypertrophy'), profile.session_duration_preference)
     const load = prescribeLoad(entry, profile, { targetRpeLabel: intensity, isFirstBlock: true, sets: sr.sets })
     const assistance = isPrimer ? null : prescribeAssistance(entry, profile, 1, false)
     days[dayIdx].exercises.push({
@@ -3387,7 +3417,7 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
 
     if (primer) {
       weeklyUsed.add(primer.name)
-      const sr = assignSetsRepsFromConfig(primer, styleConfig, experience, policy)
+      const sr = assignSetsRepsFromConfig(primer, styleConfig, experience, policy, profile.session_duration_preference)
       daySlots.push({ entry: primer, ...sr })
     }
 
@@ -3395,7 +3425,7 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
       weeklyUsed.add(entry.name)
       allSelectedNames.add(entry.name)
       weeklyAppearanceCount.set(entry.name, (weeklyAppearanceCount.get(entry.name) ?? 0) + 1)
-      const sr = assignSetsRepsFromConfig(entry, styleConfig, experience, policy)
+      const sr = assignSetsRepsFromConfig(entry, styleConfig, experience, policy, profile.session_duration_preference)
       daySlots.push({ entry, ...sr })
     }
 
@@ -4199,7 +4229,7 @@ export function generateMesocycle(
         // rather than carrying over the old exercise's format, which is
         // exactly how an isometric hold ended up prescribed in meters.
         const newEntry = findEntry(rotated)
-        const reps = newEntry ? assignSetsRepsFromConfig(newEntry, styleConfig, expConfig, policy).reps : ex.reps
+        const reps = newEntry ? assignSetsRepsFromConfig(newEntry, styleConfig, expConfig, policy, profile.session_duration_preference).reps : ex.reps
         // The rotated slot is a different movement — its logging identity must
         // follow (a stale id would thread the old lift's history into the new
         // one's ghosts/progression).
@@ -4325,7 +4355,7 @@ export function generateMesocycle(
           // units), so the base reps text is recomputed from the new
           // exercise rather than inherited from the old one.
           const baseReps = weeklyName !== ex.name && dbEntry && !isPrimer
-            ? assignSetsRepsFromConfig(dbEntry, styleConfig, expConfig, policy).reps
+            ? assignSetsRepsFromConfig(dbEntry, styleConfig, expConfig, policy, profile.session_duration_preference).reps
             : ex.reps
 
           // A deload normally backs off by dropping the WEIGHT (70% of week
@@ -4455,7 +4485,35 @@ export function generateMesocycle(
                 : phaseConfig.rep_shift + 2)
             : phaseConfig.rep_shift + (rampReps ? w - 1 : 0)
           const restShift = isDeload ? 0 : phaseConfig.rest_adjust_seconds
-          const reps = shiftReps(baseReps, repShift, expConfig.min_reps)
+
+          // Interval and steady-state cardio don't go through the reps-
+          // calibrated repShift/restShift machinery above — see
+          // stepIntervalSeconds' own doc comment (periodization.ts) for why
+          // phaseConfig.rep_shift is the wrong magnitude for a seconds
+          // delta (this is where "33s" came from). Work and rest step
+          // together by the same amount, so the ratio between them holds
+          // across the block instead of silently drifting as the bout
+          // lengthens. Steady-state (Elliptical) has nothing to step at
+          // all — a single continuous block holds its duration and its
+          // (zero) rest completely flat within a block.
+          const parseIntervalSeconds = (s: string): number | null => {
+            const m = s.match(/^(\d+)s$/)
+            return m ? Number(m[1]) : null
+          }
+          let reps: string
+          let restForWeek: string
+          if (dbEntry?.prescription_type === 'intervals') {
+            const workBase = parseIntervalSeconds(baseReps)
+            const restBase = parseIntervalSeconds(ex.rest)
+            reps = workBase != null ? `${stepIntervalSeconds(workBase, w, isDeload)}s` : shiftReps(baseReps, repShift, expConfig.min_reps)
+            restForWeek = restBase != null ? `${stepIntervalSeconds(restBase, w, isDeload)}s` : adjustRest(ex.rest, restShift)
+          } else if (dbEntry?.prescription_type === 'steady_state') {
+            reps = baseReps
+            restForWeek = ex.rest
+          } else {
+            reps = shiftReps(baseReps, repShift, expConfig.min_reps)
+            restForWeek = adjustRest(ex.rest, restShift)
+          }
 
           // Primers stay submaximal and un-scaled for the same reason as the
           // base plan — a warm-up movement should never carry a working-set
@@ -4588,7 +4646,7 @@ export function generateMesocycle(
             name: weeklyName,
             sets,
             reps,
-            rest: adjustRest(ex.rest, restShift),
+            rest: restForWeek,
             intensity,
             load_guidance: deloadAtFloor
               ? (deloadNeedsRepCut

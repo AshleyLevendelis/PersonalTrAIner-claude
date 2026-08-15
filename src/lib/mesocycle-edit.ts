@@ -105,7 +105,7 @@ export async function recomputeLoad(
  * the `...slot` spread) — a primer needs it forced, since the outgoing slot
  * may not have been a primer at all.
  */
-export function applyReplacement(slot: Exercise, entry: ExerciseEntry, load: LoadPrescription): Exercise {
+export function applyReplacement(slot: Exercise, entry: ExerciseEntry, load: LoadPrescription, sessionDurationPreference?: UserProfile['session_duration_preference']): Exercise {
   const isPrimer = entry.mechanics_tier === 'primer'
 
   // A slot's prescription UNITS belong to the exercise in it, not to whatever
@@ -127,7 +127,7 @@ export function applyReplacement(slot: Exercise, entry: ExerciseEntry, load: Loa
   const looksLikeRepCount = /^\d+(\s*-\s*\d+)?$/.test(slot.reps)
   const fixedUnits = !typeChanged
     ? null
-    : fixedUnitPrescription(entry.prescription_type) ?? (looksLikeRepCount ? null : REPS_FALLBACK)
+    : fixedUnitPrescription(entry, sessionDurationPreference) ?? (looksLikeRepCount ? null : REPS_FALLBACK)
 
   return {
     ...slot,
@@ -236,7 +236,7 @@ export async function swapExerciseInMesocycle(params: SwapExerciseParams): Promi
     if (!day || !slot) return week
 
     const load = await recomputeLoad(newExercise, profile, slot.intensity || '', slot.sets, slot.reps, isMainLift)
-    const replaced = applyReplacement(slot, newExercise, load)
+    const replaced = applyReplacement(slot, newExercise, load, profile.session_duration_preference)
     const exercises = clearOrphanedSupersetLabels(
       day.exercises.map((e, i) => (i === exIndex ? replaced : e))
     )
@@ -282,7 +282,7 @@ export async function banExerciseFromMesocycle(params: BanExerciseParams): Promi
 
       const replacement = candidates[0].exercise
       const load = await recomputeLoad(replacement, profile, oldSlot.intensity || '', oldSlot.sets, oldSlot.reps, isMainLiftSlot(oldSlot))
-      const replaced = applyReplacement(oldSlot, replacement, load)
+      const replaced = applyReplacement(oldSlot, replacement, load, profile.session_duration_preference)
       const exercises = clearOrphanedSupersetLabels(
         day.exercises.map((e, i) => (i === idx ? replaced : e))
       )

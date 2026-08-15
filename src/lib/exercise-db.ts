@@ -59,8 +59,13 @@ export type MechanicsTier = 'tier1_compound' | 'tier2_compound' | 'tier3_isolati
  *  - 'time'          isometric/controlled-continuous holds: N sets x duration
  *  - 'distance_load' loaded carries: N sets x distance, with an explicit kg load
  *  - 'intervals'     conditioning modalities: rounds x work:rest, never a rep count
+ *  - 'steady_state'  continuous machine cardio: one unbroken block, no rounds and
+ *                    no rest — added after Elliptical was found sharing 'intervals'
+ *                    despite having no interval structure at all (no rounds, no
+ *                    work:rest split); see fixedUnitPrescription's 'steady_state'
+ *                    case for how its single duration is sized.
  */
-export type PrescriptionType = 'reps' | 'time' | 'distance_load' | 'intervals'
+export type PrescriptionType = 'reps' | 'time' | 'distance_load' | 'intervals' | 'steady_state'
 
 /**
  * A hard capability gate distinct from SKILL_DEMAND's generic ceiling
@@ -2441,7 +2446,13 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     id: 'elliptical',
     movement_pattern: 'cardio',
     mechanics_tier: 'cardio',
-    prescription_type: 'intervals',
+    // Zero-impact, steady-state machine cardio — no rounds, no work:rest
+    // split (its own coach_note_swap already calls it "conditioning," not
+    // intervals). Was sharing 'intervals' with genuinely round-based
+    // exercises (Cycling Intervals, Treadmill Intervals) purely because no
+    // continuous-cardio type existed yet — confirmed a mis-typing, not a
+    // deliberate choice, during the cardio-prescription investigation.
+    prescription_type: 'steady_state',
     angle_vector: 'none',
     primary_muscles: ['cardiovascular system', 'quadriceps', 'glutes'],
     equipment: ['elliptical machine'],

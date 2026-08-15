@@ -403,6 +403,7 @@ function getRepsColumnLabel(reps: string, prescriptionType?: string): string {
     case 'time': return 'Hold'
     case 'distance_load': return 'Distance'
     case 'intervals': return 'Work'
+    case 'steady_state': return 'Duration'
     case 'reps': return 'Reps'
   }
   if (reps.includes('min')) return 'Duration'

@@ -480,6 +480,32 @@ export function shiftReps(reps: string, delta: number, minReps: number): string 
   return reps
 }
 
+/**
+ * Per-week step for an interval exercise's work bout and rest period —
+ * deliberately its own small constant rather than reusing PHASE_CONFIGS'
+ * rep_shift, which is calibrated for rep-count magnitudes (~3-4) and
+ * produces un-coached numbers ("33s") when borrowed directly as a seconds
+ * delta. Applied identically to work AND rest (see stepIntervalSeconds'
+ * call sites in exercise-plan.ts) so the work:rest ratio holds across a
+ * block instead of silently drifting as the bout lengthens.
+ */
+const INTERVAL_STEP_SECONDS = 5
+
+/**
+ * Steps an interval's work (or rest) duration for the given week-in-block:
+ * week 1 is the category base, week 2 is +5s, week 3 is +10s. Deload holds
+ * at the base — no step — matching how deload already treats every other
+ * progression lever (load holds, sets cut). Kept separate from shiftReps:
+ * that function's `w-1` term compounds through the goal's phase-level
+ * rep_shift, which is exactly the reps/seconds unit mismatch this exists
+ * to avoid.
+ */
+export function stepIntervalSeconds(baseSeconds: number, weekInBlock: number, isDeload: boolean): number {
+  if (isDeload) return baseSeconds
+  const week = Math.min(Math.max(1, weekInBlock), 3)
+  return baseSeconds + (week - 1) * INTERVAL_STEP_SECONDS
+}
+
 export function adjustRest(rest: string, deltaSeconds: number): string {
   const m = rest.match(/^(\d+)s$/)
   if (!m) return rest

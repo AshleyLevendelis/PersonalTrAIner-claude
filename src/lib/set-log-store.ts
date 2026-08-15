@@ -123,6 +123,7 @@ export function prescriptionUnit(prescriptionType?: string): SetUnit {
   switch (prescriptionType) {
     case 'time': return 'seconds'
     case 'intervals': return 'seconds'
+    case 'steady_state': return 'seconds'
     case 'distance_load': return 'meters'
     default: return 'reps'
   }

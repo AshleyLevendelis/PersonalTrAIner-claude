@@ -247,7 +247,7 @@ function scoreStructure(mesocycle: MesocycleWeek[]): DimensionResult {
       if (!entry) continue
       const matches =
         entry.prescription_type === 'reps' ? /^\d+(\s*-\s*\d+)?$/.test(ex.reps) :
-        entry.prescription_type === 'time' || entry.prescription_type === 'intervals' ? /^\d+(\s*-\s*\d+)?\s*s$/.test(ex.reps) :
+        entry.prescription_type === 'time' || entry.prescription_type === 'intervals' || entry.prescription_type === 'steady_state' ? /^\d+(\s*-\s*\d+)?\s*s$/.test(ex.reps) :
         entry.prescription_type === 'distance_load' ? /^\d+(\s*-\s*\d+)?\s*m$/.test(ex.reps) :
         true
       if (!matches) {
@@ -539,8 +539,14 @@ function scoreProgression(profile: UserProfile, mesocycle: MesocycleWeek[]): Dim
           if (!exB || exB.name !== exA.name) return
           // Primers are fixed by design (2 sets, reps '5', no load) — a
           // warm-up movement isn't a progression target, so it never
-          // ramping isn't a "nothing is progressing" failure.
-          if (exA.tier === 'tier_0_primer') return
+          // ramping isn't a "nothing is progressing" failure. Steady-state
+          // cardio (Elliptical) is the same shape for the same reason: one
+          // continuous block has nothing to ramp week-to-week within a
+          // block — its progression lever, if any, is a longer-term
+          // question (see stepIntervalSeconds' doc comment for why this is
+          // deliberately out of scope), not a per-week one this rule can
+          // meaningfully judge.
+          if (exA.tier === 'tier_0_primer' || exA.prescription_type === 'steady_state') return
           const loadFrozen = exA.suggested_load_kg == null
             ? exB.suggested_load_kg == null
             : exA.suggested_load_kg === exB.suggested_load_kg

@@ -206,7 +206,8 @@ function repsMatchesPrescriptionType(reps: string, type: string | undefined): bo
   switch (type) {
     case 'reps': return /^\d+(\s*-\s*\d+)?$/.test(reps)
     case 'time':
-    case 'intervals': return /^\d+(\s*-\s*\d+)?\s*s$/.test(reps)
+    case 'intervals':
+    case 'steady_state': return /^\d+(\s*-\s*\d+)?\s*s$/.test(reps)
     case 'distance_load': return /^\d+(\s*-\s*\d+)?\s*m$/.test(reps)
     default: return true
   }

@@ -47,7 +47,8 @@
     "test:injury-rebuild": "tsx scripts/test-injury-rebuild.ts",
     "test:block-review": "tsx scripts/test-block-review.ts",
     "test:block-consistency": "tsx scripts/test-block-consistency.ts",
-    "test:load-suggestions": "tsx scripts/test-load-suggestions.ts"
+    "test:load-suggestions": "tsx scripts/test-load-suggestions.ts",
+    "test:interval-prescription": "tsx scripts/test-interval-prescription.ts"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.4",
