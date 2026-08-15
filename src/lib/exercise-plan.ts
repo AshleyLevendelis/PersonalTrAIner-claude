@@ -1333,7 +1333,7 @@ function buildPatternGapNote(uncovered: MovementPattern[], covered: ExerciseEntr
  * selectExercisesForTrack's cardio-reservation block for why a minute share
  * replaced the old ceil(slots/2) formula.
  */
-const CARDIO_RESERVED_SHARE = 0.28
+export const CARDIO_RESERVED_SHARE = 0.28
 
 /**
  * What one cardio candidate would actually cost in the final rendered plan
@@ -4107,7 +4107,7 @@ function computeDurationTopUp(
  * shorter" reasoning applyDurationFiller and scoreTimeFit already carve out
  * for them.
  */
-function trimWeekRestForBudget(days: WorkoutDay[], budgetSeconds: number): void {
+function trimWeekRestForBudget(days: WorkoutDay[], budgetSeconds: number, trimLog?: ConstraintTraceEntry[]): void {
   for (const day of days) {
     if (day.exercises.length === 0) continue
     let seconds = estimateDaySeconds(day)
@@ -4145,6 +4145,17 @@ function trimWeekRestForBudget(days: WorkoutDay[], budgetSeconds: number): void 
         day.exercises[i] = { ...ex, rest: `${newRest}s` }
         trimmed = true
         seconds = estimateDaySeconds(day)
+        // A mechanism that silently modifies plans and leaves no trace is
+        // precisely how the cardio-reservation overrun stayed hidden for
+        // this whole investigation — worth fixing on its own merits,
+        // independent of whether a scorer ever reads it (see
+        // scoreCardioShare in quality-score.ts and
+        // run-trim-magnitude-report.ts, which does).
+        trimLog?.push({
+          exercise: ex.name, stage: 'time_cap',
+          reason: `rest trimmed ${restSeconds}s -> ${newRest}s (day was ${Math.round((seconds + (restSeconds - newRest)) / 60)}min, budget ${Math.round(budgetSeconds / 60)}min) on ${day.day}`,
+          secondsCut: restSeconds - newRest,
+        })
       }
       if (!trimmed) break
     }
@@ -4253,6 +4264,15 @@ export function generateMesocycle(
   profile: UserProfile,
   baseWorkout?: WorkoutDay[],
   exclusions: string[] = [],
+  /**
+   * Optional out-parameter, mutated in place — same idiom as the
+   * ConstraintTrace threading elsewhere in this file. Nothing inside this
+   * function reads it back; it exists purely so a caller (today: the
+   * trim-magnitude report) can inspect what trimWeekRestForBudget actually
+   * cut, without generateMesocycle's own return type (MesocycleWeek[],
+   * relied on by every existing caller) having to change to carry it.
+   */
+  trimLog?: ConstraintTraceEntry[],
 ): MesocycleWeek[] {
   const baseWeek = baseWorkout ?? generateExercisePlan(profile, exclusions).plan
   const goal = (profile.fitness_goal || 'hypertrophy') as FitnessGoal
@@ -4873,7 +4893,7 @@ export function generateMesocycle(
         // after this (rest already at floor) has nothing under-budget for
         // the filler to fill either, so the two never fight over the same
         // day.
-        trimWeekRestForBudget(days, totalBudgetSeconds)
+        trimWeekRestForBudget(days, totalBudgetSeconds, trimLog)
         applyDurationFiller(days, profile, policy, totalBudgetSeconds)
         // Runs last, after rotation, periodization and duration-budget
         // trimming have all had their say — see enforceWeeklyPatternBalance's

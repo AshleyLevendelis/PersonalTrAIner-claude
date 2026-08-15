@@ -1,11 +1,11 @@
 import type { UserProfile, MesocycleWeek, WorkoutDay, Exercise } from './types'
 import { EXERCISE_DATABASE, getMovementFamily, getVolumeRole, type ExerciseEntry } from './exercise-db'
-import { getConstrainedPool, generateMesocycle, primerPatternsForTrack, getAffinityPrimerPool } from './exercise-plan'
+import { getConstrainedPool, generateMesocycle, primerPatternsForTrack, getAffinityPrimerPool, CARDIO_RESERVED_SHARE } from './exercise-plan'
 import { getGoalPolicy, resolveConditioningFrequency, RECOVERY_SET_MULTIPLIER } from './goal-policies'
 import { EXPERIENCE_RPE_CEILING } from './periodization'
 import { setRandomSource, resetRandomSource } from './exercise-plan'
 import { seededRngFromKey } from './seeded-random'
-import { DURATION_BUDGET_SECONDS, estimateDaySeconds } from './session-duration'
+import { DURATION_BUDGET_SECONDS, estimateDaySeconds, estimateSlotsSeconds, parseRestSeconds } from './session-duration'
 import { getEquipmentFloorKg, labelModeForEntry } from './load-prescription'
 
 // ---------------------------------------------------------------------------
@@ -103,6 +103,44 @@ function scoreTimeRatio(seconds: number, budget: number, exemptUnderrun: boolean
   return ratio <= 0.20 ? 2 : ratio <= 0.35 ? 1 : 0
 }
 
+/**
+ * A day can be honestly within its overall time budget while its cardio
+ * component ALONE is still an oversized reservation — the exact blind spot
+ * that let 176-190%-of-budget cardio blocks score a passing timeFit before
+ * this check existed: downstream trimming (stageTimeCap,
+ * trimWeekRestForBudget) had already forced the DAY TOTAL back under
+ * budget by degrading what shipped (extra sets piled on, interval rest cut
+ * toward a floor), and scoreTimeRatio only ever sees that already-corrected
+ * total. This is deliberately a SEPARATE check from the day-total ratio
+ * above, not folded into it, so a correction elsewhere in the day can't
+ * mask an oversized cardio reservation specifically.
+ *
+ * Bands are wider than scoreTimeRatio's own — comfortably within the
+ * reservation's own target (CARDIO_RESERVED_SHARE, exercise-plan.ts, 28%)
+ * is a full pass; up to ~1.8x the target costs a point, since the
+ * reservation's own approved "always take the first candidate, even over
+ * budget" floor rule can legitimately land a single expensive steady-state
+ * pick there (measured live: Elliptical alone landed at 41% of a 75min
+ * budget, which is correct, not a bug) — genuinely runaway, well past what
+ * even the floor rule explains, is 0.
+ */
+export function scoreCardioShare(cardioSeconds: number, budget: number): number {
+  if (cardioSeconds <= 0) return 2
+  const ratio = cardioSeconds / budget
+  return ratio <= 0.35 ? 2 : ratio <= 0.50 ? 1 : 0
+}
+
+/** Sum of estimateSlotsSeconds over just this day's cardio-tier exercises — the same real numbers (sets/reps/rest as actually assigned) the day-total estimate already uses, isolated to the one category scoreCardioShare needs to judge. */
+export function cardioOnlySeconds(day: WorkoutDay): number {
+  const cardioSlots = day.exercises
+    .map(ex => ({ ex, entry: dbEntry(ex.name) }))
+    .filter((s): s is { ex: Exercise; entry: ExerciseEntry } => !!s.entry && s.entry.mechanics_tier === 'cardio')
+  if (cardioSlots.length === 0) return 0
+  return estimateSlotsSeconds(cardioSlots.map(({ ex, entry }) => ({
+    entry, sets: ex.sets, reps: ex.reps, restSeconds: parseRestSeconds(ex.rest),
+  })))
+}
+
 function scoreTimeFit(profile: UserProfile, mesocycle: MesocycleWeek[]): DimensionResult {
   const budget = DURATION_BUDGET_SECONDS[profile.session_duration_preference || '45-60']
   // See scoreTimeRatio's own comment — this is only valid while
@@ -111,6 +149,8 @@ function scoreTimeFit(profile: UserProfile, mesocycle: MesocycleWeek[]): Dimensi
   const exemptUnderrun = profile.recovery_capacity === 'low'
   let worstScore = 2
   let worst: { week: number; day: string; seconds: number; ratio: number; isOver: boolean } | null = null
+  let worstCardioScore = 2
+  let worstCardio: { week: number; day: string; cardioSeconds: number; ratio: number } | null = null
 
   for (const week of mesocycle) {
     // Deload weeks are DESIGNED to be lighter and shorter — half the sets,
@@ -128,6 +168,13 @@ function scoreTimeFit(profile: UserProfile, mesocycle: MesocycleWeek[]): Dimensi
         worstScore = dayScore
         worst = { week: week.week_number, day: day.day, seconds, ratio: Math.abs(diff) / budget, isOver: diff >= 0 }
       }
+
+      const cardioSeconds = cardioOnlySeconds(day)
+      const cardioScore = scoreCardioShare(cardioSeconds, budget)
+      if (cardioScore < worstCardioScore) {
+        worstCardioScore = cardioScore
+        worstCardio = { week: week.week_number, day: day.day, cardioSeconds, ratio: cardioSeconds / budget }
+      }
     }
   }
 
@@ -142,7 +189,18 @@ function scoreTimeFit(profile: UserProfile, mesocycle: MesocycleWeek[]): Dimensi
       actual: `${Math.round(worst.seconds / 60)}min`,
     })
   }
-  return { label: 'Time fit', points: worstScore, deductions }
+  if (worstCardioScore < 2 && worstCardio) {
+    deductions.push({
+      rule: 'conditioning_share_over_budget',
+      detail: `Worst day (week ${worstCardio.week} ${worstCardio.day}) has cardio-only work at ${(worstCardio.ratio * 100).toFixed(0)}% of the session budget — an oversized conditioning reservation, even though the day's own total may already be within budget`,
+      weekNumber: worstCardio.week,
+      day: worstCardio.day,
+      expected: `<=${Math.round(budget * CARDIO_RESERVED_SHARE / 60)}min cardio (${Math.round(CARDIO_RESERVED_SHARE * 100)}% target)`,
+      actual: `${Math.round(worstCardio.cardioSeconds / 60)}min cardio`,
+    })
+  }
+  const combinedScore = Math.min(worstScore, worstCardioScore)
+  return { label: 'Time fit', points: combinedScore, deductions }
 }
 
 // ---------------------------------------------------------------------------

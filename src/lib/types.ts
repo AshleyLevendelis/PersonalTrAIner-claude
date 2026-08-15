@@ -310,6 +310,8 @@ export interface ConstraintTraceEntry {
   exercise: string
   stage: 'equipment' | 'injury' | 'style' | 'skill' | 'time_cap' | 'exclusion' | 'structure'
   reason: string
+  /** Present only on time_cap rest-trim entries (trimWeekRestForBudget) — how many seconds this one cut removed, so a magnitude report can aggregate real numbers instead of parsing `reason` strings. */
+  secondsCut?: number
 }
 
 export interface ConstraintTrace {
