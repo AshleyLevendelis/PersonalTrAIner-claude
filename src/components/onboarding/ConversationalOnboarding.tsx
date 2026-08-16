@@ -166,11 +166,15 @@ function normalizeSlotKey(rawKey: string): string {
  * (returns undefined) on anything short of an exact match; ambiguous free
  * text still goes to the model, same as always.
  */
-function tryExactLabelMatch(def: SlotDef, raw: string): unknown {
+function tryExactLabelMatch(def: SlotDef, raw: string, labelOnly = false): unknown {
   const trimmed = raw.trim()
   if (!trimmed || !def.options) return undefined
   const sameText = (a: string, b: string) => a.toLowerCase() === b.toLowerCase()
-  const findOption = (text: string) => def.options!.find(o => sameText(o.label, text) || sameText(String(o.value), text))
+  // labelOnly drops the raw-value branch — used for volunteered capture
+  // below, where there's no on-screen question to make a bare internal
+  // value like "2" or "true" an obviously confident answer the way it is
+  // when a matching chip card is actually pending.
+  const findOption = (text: string) => def.options!.find(o => sameText(o.label, text) || (!labelOnly && sameText(String(o.value), text)))
 
   if (def.control === 'single') {
     const hit = findOption(trimmed)
@@ -192,6 +196,61 @@ function tryExactLabelMatch(def: SlotDef, raw: string): unknown {
   }
 
   return undefined
+}
+
+/**
+ * Ashley's ruling: if someone volunteers a value before the app has asked
+ * for it, capture it rather than dropping it and asking again later — the
+ * questionnaire behavior the conversation exists to escape.
+ *
+ * Scoped deliberately narrow: only closed-set slots (numeric/text slots
+ * have no confident deterministic mapping — that's still the model's job),
+ * only slots that are currently APPLICABLE (isSlotApplicable respects
+ * requiredIf — this never fills a slot that doesn't apply to this person's
+ * plan yet, e.g. a known-lift number before the app even knows they'll be
+ * lifting barbells) and not yet confirmed, and label-only (see
+ * tryExactLabelMatch's labelOnly param above).
+ *
+ * If more than one eligible slot's label matches the same text, that's
+ * genuinely ambiguous, not confident — bail and let the model use real
+ * conversational context instead. Two real collisions exist in this
+ * catalog today: "Mediterranean" is both a diet type and a cuisine, and
+ * "none"/"nothing" is a valid empty-answer for four different multi-selects
+ * (trainingDays, injuries, dietaryPreferences, favoriteCuisines) — both are
+ * exactly the shape of thing this must refuse to guess at.
+ *
+ * That cross-slot check alone isn't enough, though: it only catches a
+ * SHARED label, not a single slot's label coincidentally being a plausible
+ * answer to some OTHER, un-carded question. The prompt groups two asks per
+ * turn with only one getting a chip card ("at most ONE of them gets chips;
+ * ask the other in plain text" — onboarding-chat's SLOT MECHANICS) — a bare
+ * "Quick" typed in reply to an un-carded "how long are your sessions?"
+ * matches cookingTime's label uniquely in the catalog and would otherwise
+ * get silently captured there instead, with sessionDuration left unanswered.
+ * cookingTime's labels ("Quick", "Moderate") are common generic English
+ * adjectives with exactly that risk profile; excluded here for that reason
+ * — still fully capturable the safe way, once its own card is actually on
+ * screen (tier 1, above).
+ */
+const VOLUNTEERED_CAPTURE_EXCLUDED: SlotKey[] = ['cookingTime']
+
+function tryVolunteeredCapture(
+  values: OnboardingSlotValues,
+  confirmed: ReadonlySet<string>,
+  trimmed: string,
+): { def: SlotDef; value: unknown } | undefined {
+  const matches: { def: SlotDef; value: unknown }[] = []
+  for (const def of ONBOARDING_SLOTS) {
+    if (
+      !def.options ||
+      VOLUNTEERED_CAPTURE_EXCLUDED.includes(def.key) ||
+      !isSlotApplicable(def, values) ||
+      confirmed.has(def.key)
+    ) continue
+    const matched = tryExactLabelMatch(def, trimmed, true)
+    if (matched !== undefined) matches.push({ def, value: matched })
+  }
+  return matches.length === 1 ? matches[0] : undefined
 }
 
 /**
@@ -370,6 +429,16 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
           console.warn('onboarding: set_slot with unknown slot_key', action.args.slot_key)
           continue
         }
+        // A slot's requiredIf gate can close mid-conversation (equipment
+        // changed away from barbell-capable after knowsWorkingLifts was
+        // already asked, say) — never write into one that's no longer
+        // applicable, model-driven or not. Confirmed live-reachable: this
+        // exact gap let a stale exact-label match set skip_calibration_week
+        // via knowsWorkingLifts after the plan no longer called for it.
+        if (!isSlotApplicable(def, ws.values)) {
+          console.warn('onboarding: set_slot for no-longer-applicable slot', key)
+          continue
+        }
         const coerced = coerceSlotValue(def, String(action.args.value ?? ''))
         // Compare against ws.values, not the outer (pre-turn) values: a slot
         // can already be recorded THIS turn — by the exact-label backstop's
@@ -397,6 +466,7 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
           continue
         }
         if (ws.confirmed.has(key)) continue
+        if (!isSlotApplicable(def, ws.values)) continue
         // One live card per question. The model can ask for the same chips on
         // both legs of the round trip, and the second copy found the coach's
         // message already taken, so it fell through to the raw-question
@@ -485,20 +555,36 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
     let ws = preRecorded
     let immediateCommit = !!preRecorded
     if (!ws) {
-      // Try every still-unresolved card, most recent first — not just the
-      // latest one. The model can leave an older question's card pending
-      // while it asks a second one (executeActions allows at most one live
-      // card per turn, so a second present_slot either attaches to the same
-      // reply or waits for a later turn) — an exact-label answer to that
-      // OLDER question was being checked only against the NEWEST card's
-      // options here, failing every time even though it matched a card
-      // still on screen. Live re-runs caught this identical mechanism
-      // dropping three different verbatim chip-label answers ("Getting By",
-      // "Not For Me", "Full Gym") across three separate personas.
+      // Tier 1 — every still-unresolved card, most recent first. The model
+      // can leave an older question's card pending while it asks a second
+      // one (executeActions allows at most one live card per turn, so a
+      // second present_slot either attaches to the same reply or waits for a
+      // later turn) — an exact-label answer to that OLDER question was being
+      // checked only against the NEWEST card's options, failing every time
+      // even though it matched a card still on screen. Live re-runs caught
+      // this identical mechanism dropping three different verbatim
+      // chip-label answers ("Getting By", "Not For Me", "Full Gym") across
+      // three separate personas.
+      //
+      // Trust the most-recently-shown matching card rather than requiring
+      // catalog-wide uniqueness — a rendered, still-visible card IS strong
+      // context (the user is almost certainly answering what's on screen),
+      // and this exact "most-recent wins" shape was what caught all three
+      // personas above; a stricter "only if no OTHER pending card also
+      // matches" version was tried and adversarially found to regress it —
+      // three different multi-select slots (injuries, dietaryPreferences,
+      // favoriteCuisines) all accept the same "none"/"nothing" answer, so
+      // whenever two of their cards were simultaneously pending the stricter
+      // version silently captured nothing at all, reproducing the exact
+      // failure this backstop exists to close.
       const pendingCards = [...messages].reverse().filter(m => m.role === 'assistant' && m.slotCard && !m.slotCardResolved)
       for (const pendingCard of pendingCards) {
         const pendingDef = getSlotDef(pendingCard.slotCard!)
-        if (!pendingDef) continue
+        // A slot's requiredIf gate can close after its card was shown (an
+        // earlier answer changed — equipment moved away from barbell-capable
+        // after knowsWorkingLifts was already asked, say); never let a stale
+        // card still resolve a write once that's happened.
+        if (!pendingDef || !isSlotApplicable(pendingDef, values)) continue
         const matched = tryExactLabelMatch(pendingDef, trimmed)
         if (matched === undefined) continue
         const candidate = makeWorkingState()
@@ -507,6 +593,20 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
           immediateCommit = true
         }
         break
+      }
+
+      // Tier 2 — volunteered capture (Ashley's ruling): only reached when no
+      // pending card matched. See tryVolunteeredCapture's own comment for the
+      // full rationale and its deliberate scope limits.
+      if (!ws) {
+        const volunteered = tryVolunteeredCapture(values, confirmed, trimmed)
+        if (volunteered) {
+          const candidate = makeWorkingState()
+          if (applySlot(candidate, volunteered.def.key, volunteered.value, values)) {
+            ws = candidate
+            immediateCommit = true
+          }
+        }
       }
     }
     if (!ws) ws = makeWorkingState()
@@ -644,6 +744,10 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
   const handleResolveSingle = (key: SlotKey, value: string) => {
     const def = getSlotDef(key)
     if (!def) return
+    // A tap on a stale card (its gate closed after an earlier answer
+    // changed — the user scrolled back to it) must not write either; the
+    // model-driven paths above got the same guard for the same reason.
+    if (!isSlotApplicable(def, values)) return
     const ws = makeWorkingState()
     // false: a tap is not a mapping — see applySlot's note.
     if (!applySlot(ws, key, coerceSlotValue(def, value), values, false)) return
@@ -654,6 +758,7 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
   const handleResolveMulti = (key: SlotKey) => {
     const def = getSlotDef(key)
     if (!def) return
+    if (!isSlotApplicable(def, values)) return
     const selected = (values[key] as string[]) ?? []
     const ws = makeWorkingState()
     if (!applySlot(ws, key, selected, values, false)) {
