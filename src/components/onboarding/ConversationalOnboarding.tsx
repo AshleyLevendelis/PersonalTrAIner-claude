@@ -349,6 +349,17 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
   }
 
   const executeActions = (ws: WorkingState, actions: Array<{ name: string; args: Record<string, unknown> }>) => {
+    // Caught by re-running the audit's personas against the deployed fixes:
+    // the prompt says "one present_slot per turn" but the model still
+    // sometimes calls it twice. The FIRST call correctly attaches to the
+    // turn's own text; the second found no unclaimed host message and fell
+    // through to the raw-canonical-question fallback below — spawning a
+    // brand-new message in form voice, with its own duplicate chip card.
+    // That fallback exists for the genuine dead-air case (a turn with NO
+    // text at all); a second present_slot in an already-answered turn is a
+    // different situation and should just be dropped, not treated as dead
+    // air a second time.
+    let presentedThisTurn = false
     for (const action of actions) {
       if (action.name === 'set_slot') {
         const key = normalizeSlotKey(String(action.args.slot_key ?? '')) as SlotKey
@@ -383,6 +394,11 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
           m => m.slotCard === key && !m.slotCardResolved && !ws.resolveCards.has(key),
         )
         if (alreadyLive) continue
+        // A second present_slot in the same turn is a prompt-compliance miss
+        // (see the comment above the loop), not a fresh instance of dead air
+        // — drop it rather than spawning a duplicate form-voice message.
+        if (presentedThisTurn) continue
+        presentedThisTurn = true
         // Attach the chip card to the model's own turn when it produced text
         // this round; otherwise render the slot's canonical question.
         //

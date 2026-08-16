@@ -68,7 +68,13 @@ async function say(text:string){
     if(a.name!=='set_slot') continue
     const key=a.args?.slot_key; const def=ONBOARDING_SLOTS.find((s:any)=>s.key===key); if(!def) continue
     const raw=String(a.args?.value??'')
-    const c:any = def.control==='multi' ? (raw.trim()===''?[]:raw.split(',').map(s=>s.trim()).filter(Boolean))
+    // Mirrors ConversationalOnboarding.tsx's coerceSlotValue EXACTLY — this
+    // diverged once already (missing the none/no/nothing -> [] case the real
+    // client has) and produced a false "dietaryPreferences silently dropped"
+    // finding in a verification re-run: the real app handles that skip
+    // correctly, only this probe's own simplified copy didn't.
+    const trimmedRaw = raw.trim()
+    const c:any = def.control==='multi' ? (trimmedRaw===''||/^(none|no|nothing)$/i.test(trimmedRaw)?[]:trimmedRaw.split(',').map(s=>s.trim()).filter(Boolean))
           : (key==='knowsWorkingLifts'||key==='includeSnacks') ? raw.trim()==='true'
           : key==='mealsPerDay' ? Number(raw) : raw.trim()
     if(def.validate(c)){ values[key]=c; confirmed.add(key) }
