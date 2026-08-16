@@ -79,6 +79,25 @@ interface WorkingState {
 
 const RECEIPT_PREFIX = '✓ '
 
+// Shown on resume, and NEVER persisted — see toDraftMessages.
+const RESUME_BANNER = "Welcome back — picking up right where we left off. Say anything and we'll carry on."
+
+/**
+ * The transcript as it should be SAVED.
+ *
+ * The resume banner is generated fresh on every mount, so persisting it meant
+ * each refresh saved the previous one and appended a new one — five refreshes
+ * left five "Welcome back" bubbles stacked in the conversation, permanently,
+ * because the draft carried them forward. Filtering on the way out also heals
+ * drafts that already accumulated them, since a loaded transcript is written
+ * straight back on the next save.
+ */
+function toDraftMessages(messages: ChatMsg[]): DraftMessage[] {
+  return messages
+    .filter(m => m.content.trim().length > 0 && m.content !== RESUME_BANNER)
+    .map(({ role, content, slotCard, slotCardResolved }) => ({ role, content, slotCard, slotCardResolved }))
+}
+
 const COMPLETE_MESSAGE = "That's everything I need. Here's what I've got — have a look, and if it's right I'll build your plan."
 
 function displayValueFor(def: SlotDef, values: OnboardingSlotValues): string {
@@ -159,8 +178,10 @@ export function ConversationalOnboarding({
   const [messages, setMessages] = useState<ChatMsg[]>(() => {
     if (draftLoaded && draftLoaded.messages.length > 0) {
       return [
-        ...draftLoaded.messages.map(m => ({ ...m, isReceipt: m.role === 'assistant' && m.content.startsWith(RECEIPT_PREFIX) })),
-        { role: 'assistant', content: "Welcome back — picking up right where we left off. Say anything and we'll carry on." },
+        ...draftLoaded.messages
+          .filter(m => m.content !== RESUME_BANNER)
+          .map(m => ({ ...m, isReceipt: m.role === 'assistant' && m.content.startsWith(RECEIPT_PREFIX) })),
+        { role: 'assistant', content: RESUME_BANNER },
       ]
     }
     return [
@@ -190,9 +211,7 @@ export function ConversationalOnboarding({
       ...emptyDraft(),
       values,
       confirmedSlots: Array.from(confirmed),
-      messages: messages
-        .filter(m => m.content.trim().length > 0)
-        .map(({ role, content, slotCard, slotCardResolved }) => ({ role, content, slotCard, slotCardResolved })),
+      messages: toDraftMessages(messages),
       pendingContextFacts,
       pendingGoals,
     }
@@ -469,9 +488,7 @@ export function ConversationalOnboarding({
       ...emptyDraft(),
       values,
       confirmedSlots: Array.from(confirmed),
-      messages: messages
-        .filter(m => m.content.trim().length > 0)
-        .map(({ role, content, slotCard, slotCardResolved }) => ({ role, content, slotCard, slotCardResolved })),
+      messages: toDraftMessages(messages),
       pendingContextFacts,
       pendingGoals,
       completing: true,
