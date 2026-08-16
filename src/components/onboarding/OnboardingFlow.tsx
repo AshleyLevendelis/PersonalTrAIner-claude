@@ -7,188 +7,40 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Card, CardContent } from '@/components/ui/card'
 import { ChevronLeft, Dumbbell } from 'lucide-react'
 import { OptionCard } from './OptionCard'
-import { DIETARY_PREFERENCES, type DietaryPreference } from '@/lib/diet-rules'
-import type { UserProfile, FitnessGoal, SessionDuration, TrainingTime, WorkoutSplit, EquipmentAccess, TrainingStyle, TrainingExperience, CoachingPersona, MacroCalculationMode, RecoveryCapacity, ConditioningPreference, ActivityLevel, CookingTimePreference, BreakfastStyle } from '@/lib/types'
+import {
+  GOAL_OPTIONS,
+  EXPERIENCE_OPTIONS,
+  RECOVERY_OPTIONS,
+  CONDITIONING_PREF_OPTIONS,
+  DURATION_OPTIONS,
+  TIME_OPTIONS,
+  EQUIPMENT_OPTIONS,
+  STYLE_OPTIONS,
+  INJURY_OPTIONS,
+  DIETARY_OPTIONS,
+  ACTIVITY_OPTIONS,
+  MEALS_PER_DAY_OPTIONS,
+  COOKING_TIME_OPTIONS,
+  FAVORITE_CUISINE_OPTIONS,
+  BREAKFAST_STYLE_OPTIONS,
+  DAYS_OF_WEEK,
+  initialSlotValues,
+  toggleValue,
+  assembleProfile,
+  type OnboardingSlotValues,
+} from '@/lib/onboarding-slots'
+import type { UserProfile } from '@/lib/types'
 
 type WeightUnit = 'kg' | 'lbs'
 type HeightUnit = 'cm' | 'ftin'
 
-interface OnboardingData {
-  displayName: string
-  fitnessGoal: FitnessGoal | null
-  trainingDays: string[]
-  recoveryCapacity: RecoveryCapacity | null
-  conditioningPreference: ConditioningPreference | null
-  sessionDuration: SessionDuration | null
-  trainingTime: TrainingTime | null
-  equipment: EquipmentAccess | null
-  trainingStyle: TrainingStyle | null
-  trainingExperience: TrainingExperience | null
-  injuries: string[]
-  dietaryPreferences: string[]
-  age: string
-  gender: 'male' | 'female'
-  heightCm: string
-  weightKg: string
-  /** null = unanswered; false = "I'm new / not sure" (calibration week); true = "I know my numbers" (known lifts below). */
-  knowsWorkingLifts: boolean | null
-  knownSquatKg: string
-  knownBenchKg: string
-  knownDeadliftKg: string
-  activityLevel: ActivityLevel | null
-  mealsPerDay: 2 | 3 | 4 | null
-  includeSnacks: boolean
-  cookingTime: CookingTimePreference | null
-  favoriteCuisines: string[]
-  dislikedFoods: string
-  breakfastStyle: BreakfastStyle | null
-}
+// The questionnaire's working state IS the shared slot-values shape — the
+// option lists, per-slot validation, and the values→UserProfile transform all
+// live in src/lib/onboarding-slots.ts, shared with the conversational intake
+// path. This file owns only the step-by-step form presentation.
+type OnboardingData = OnboardingSlotValues
 
 const TOTAL_STEPS = 19
-
-export const EXPERIENCE_OPTIONS: { value: TrainingExperience; icon: string; label: string; description: string }[] = [
-  { value: 'beginner', icon: '🌱', label: 'Beginner', description: 'New to this, or coming back after a long break' },
-  { value: 'novice', icon: '📈', label: 'Novice', description: '6+ months training fairly consistently' },
-  { value: 'intermediate', icon: '🎯', label: 'Intermediate', description: '2+ years, comfortable with the main lifts' },
-  { value: 'advanced', icon: '🏅', label: 'Advanced', description: 'Years of training, progress comes slowly now' },
-]
-
-const GOAL_OPTIONS: { value: FitnessGoal; icon: string; label: string; description: string }[] = [
-  { value: 'fat_loss', icon: '🔥', label: 'Fat Loss', description: 'Shred body fat, get lean' },
-  { value: 'hypertrophy', icon: '💪', label: 'Muscle Growth', description: 'Build size & strength' },
-  { value: 'functional', icon: '⚡', label: 'Functional Strength', description: 'Move better, lift heavier' },
-  { value: 'conditioning', icon: '❤️', label: 'Conditioning', description: 'Cardio & endurance' },
-]
-
-const DAYS_OF_WEEK = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-const DAYS_FULL = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-
-export const RECOVERY_OPTIONS: { value: RecoveryCapacity; icon: string; label: string; description: string }[] = [
-  { value: 'low', icon: '🪫', label: 'Stretched Thin', description: 'Poor sleep, high stress, or a physically demanding job' },
-  { value: 'moderate', icon: '🔋', label: 'Getting By', description: 'Decent sleep most nights, manageable stress' },
-  { value: 'high', icon: '🔌', label: 'Well Rested', description: 'Good sleep, low stress, recovery is not a limiter' },
-]
-
-export const CONDITIONING_PREF_OPTIONS: { value: ConditioningPreference; icon: string; label: string; description: string }[] = [
-  { value: 'love', icon: '🏃‍♂️', label: 'Love It', description: 'Give me plenty of cardio/conditioning' },
-  { value: 'tolerate', icon: '🙂', label: "It's Fine", description: "I'll do what the program calls for" },
-  { value: 'avoid', icon: '🙅', label: 'Not For Me', description: 'Keep it to the minimum the goal actually needs' },
-]
-
-export const DURATION_OPTIONS: { value: SessionDuration; icon: string; label: string; description: string }[] = [
-  { value: '30-45', icon: '⚡', label: '30-45 min', description: 'Quick & efficient' },
-  { value: '45-60', icon: '⏱️', label: '45-60 min', description: 'Standard session' },
-  { value: '60-90', icon: '🏋️', label: '60-90 min', description: 'Extended volume' },
-  { value: '90+', icon: '🔥', label: '90+ min', description: 'Maximum volume' },
-]
-
-const TIME_OPTIONS: { value: TrainingTime; icon: string; label: string; description: string }[] = [
-  { value: 'morning', icon: '🌅', label: 'Morning', description: '5 AM - 10 AM' },
-  { value: 'midday', icon: '☀️', label: 'Midday', description: '10 AM - 2 PM' },
-  { value: 'evening', icon: '🌆', label: 'Evening', description: '4 PM - 8 PM' },
-  { value: 'night', icon: '🌙', label: 'Night', description: '8 PM - 12 AM' },
-  { value: 'varies', icon: '🔄', label: 'It Varies', description: 'No fixed time' },
-]
-
-export const EQUIPMENT_OPTIONS: { value: EquipmentAccess; icon: string; label: string; description: string }[] = [
-  { value: 'full_gym', icon: '🏢', label: 'Full Gym', description: 'All machines & free weights' },
-  { value: 'home_gym', icon: '🏠', label: 'Home Gym', description: 'Barbell, dumbbells, bench' },
-  { value: 'minimalist', icon: '🎒', label: 'Minimalist', description: 'Bands & kettlebells' },
-  { value: 'bodyweight', icon: '🤸', label: 'Bodyweight Only', description: 'No equipment needed' },
-]
-
-export const STYLE_OPTIONS: { value: TrainingStyle; icon: string; label: string; description: string }[] = [
-  { value: 'functional', icon: '🏃', label: 'Functional / Athletic', description: 'Explosive & dynamic' },
-  { value: 'bodybuilding', icon: '🏆', label: 'Bodybuilding', description: 'Aesthetics & symmetry' },
-  { value: 'combat', icon: '🥊', label: 'Combat / Conditioning', description: 'Fight-ready fitness' },
-  { value: 'hybrid', icon: '⚙️', label: 'Hybrid', description: 'Best of everything' },
-]
-
-export const INJURY_OPTIONS: { value: string; icon: string; label: string }[] = [
-  { value: 'lower_back', icon: '🔙', label: 'Lower Back' },
-  { value: 'knees', icon: '🦵', label: 'Knees' },
-  { value: 'shoulders', icon: '💪', label: 'Shoulders' },
-  { value: 'neck', icon: '🧣', label: 'Neck' },
-  { value: 'wrists', icon: '✋', label: 'Wrists' },
-  { value: 'hips', icon: '🦴', label: 'Hips' },
-  { value: 'ankles', icon: '🦶', label: 'Ankles' },
-  { value: 'elbows', icon: '💪', label: 'Elbows' },
-]
-
-// Dietary-safety audit fix — values come from diet-rules.ts's
-// DIETARY_PREFERENCES (itself derived from FORBIDDEN_TAGS's keys), not
-// hand-typed here. This is what makes it structurally impossible for the
-// onboarding picker to offer a tag the enforcement code doesn't recognize,
-// or vice versa: TypeScript's excess/missing-property checks on the
-// Record<DietaryPreference, ...> below fail to compile if the two ever
-// disagree. Only icon/label (presentation, not enforcement) stay hand-authored.
-const DIETARY_META: Record<DietaryPreference, { icon: string; label: string }> = {
-  vegetarian: { icon: '🥬', label: 'Vegetarian' },
-  vegan: { icon: '🌱', label: 'Vegan' },
-  pescatarian: { icon: '🐟', label: 'Pescatarian' },
-  keto: { icon: '🥑', label: 'Keto' },
-  'low-carb': { icon: '🥩', label: 'Low-Carb' },
-  halal: { icon: '☪️', label: 'Halal' },
-  kosher: { icon: '✡️', label: 'Kosher' },
-  paleo: { icon: '🦴', label: 'Paleo' },
-  mediterranean: { icon: '🫒', label: 'Mediterranean' },
-  'dairy-free': { icon: '🥛', label: 'Dairy-Free' },
-  'gluten-free': { icon: '🌾', label: 'Gluten-Free' },
-  'nut-free': { icon: '🥜', label: 'Nut-Free' },
-  'egg-free': { icon: '🥚', label: 'Egg-Free' },
-  'soy-free': { icon: '🫘', label: 'Soy-Free' },
-  'shellfish-free': { icon: '🦐', label: 'Shellfish-Free' },
-  'fish-free': { icon: '🐟', label: 'Fish-Free' },
-  'low-fodmap': { icon: '🧬', label: 'Low-FODMAP' },
-}
-
-export const DIETARY_OPTIONS: { value: DietaryPreference; icon: string; label: string }[] =
-  DIETARY_PREFERENCES.map(value => ({ value, ...DIETARY_META[value] }))
-
-// Maps to the STATIC_PAL multipliers in macro-calculator.ts (1.2 / 1.375 /
-// 1.55 / 1.725). Four options rather than five: 'very_active' (1.9,
-// athlete-tier) stays reachable via the type but isn't offered — day-to-day
-// self-reports at that level are nearly always overestimates.
-export const ACTIVITY_OPTIONS: { value: ActivityLevel; icon: string; label: string; description: string }[] = [
-  { value: 'sedentary', icon: '🪑', label: 'Sedentary', description: 'Desk job, little movement outside training' },
-  { value: 'light', icon: '🚶', label: 'Lightly Active', description: 'On my feet some of the day, short walks' },
-  { value: 'moderate', icon: '🏃', label: 'Moderately Active', description: 'Regular movement most days' },
-  { value: 'active', icon: '⚡', label: 'Very Active', description: 'Physical job or on the move all day' },
-]
-
-export const MEALS_PER_DAY_OPTIONS: { value: 2 | 3 | 4; icon: string; label: string; description: string }[] = [
-  { value: 2, icon: '🍽️', label: '2 meals', description: 'Bigger plates, longer gaps' },
-  { value: 3, icon: '🍽️', label: '3 meals', description: 'Classic breakfast / lunch / dinner' },
-  { value: 4, icon: '🍽️', label: '4 meals', description: 'Smaller, more frequent plates' },
-]
-
-export const COOKING_TIME_OPTIONS: { value: CookingTimePreference; icon: string; label: string; description: string }[] = [
-  { value: 'quick', icon: '⏱️', label: 'Quick', description: 'Under 15 minutes — keep it simple' },
-  { value: 'moderate', icon: '🍳', label: 'Moderate', description: 'Happy to spend up to ~30 minutes' },
-  { value: 'loves_cooking', icon: '👨‍🍳', label: 'Happy to Cook', description: 'Real recipes, real prep — I enjoy it' },
-]
-
-// Short labels chosen to substring-match generate-meals's FAMILIAR_CUISINES/
-// EXOTIC_CUISINES entries (e.g. "Indian" matches "Indian (North Indian,
-// South Indian)") — see selectCuisines in supabase/functions/generate-meals.
-export const FAVORITE_CUISINE_OPTIONS: { value: string; icon: string; label: string }[] = [
-  { value: 'Italian', icon: '🍝', label: 'Italian' },
-  { value: 'Mexican', icon: '🌮', label: 'Mexican' },
-  { value: 'Indian', icon: '🍛', label: 'Indian' },
-  { value: 'Thai', icon: '🍜', label: 'Thai' },
-  { value: 'Mediterranean', icon: '🫒', label: 'Mediterranean' },
-  { value: 'Japanese', icon: '🍱', label: 'Japanese' },
-  { value: 'Korean', icon: '🥢', label: 'Korean' },
-  { value: 'British / Classic', icon: '🇬🇧', label: 'British / Classic' },
-  { value: 'American / Diner Classic', icon: '🍔', label: 'American' },
-  { value: 'Caribbean', icon: '🌴', label: 'Caribbean' },
-]
-
-export const BREAKFAST_STYLE_OPTIONS: { value: BreakfastStyle; icon: string; label: string; description: string }[] = [
-  { value: 'quick_cold', icon: '🥣', label: 'Quick & Cold', description: 'Cereal, yoghurt, smoothies — no cooking' },
-  { value: 'cooked', icon: '🍳', label: 'Cooked', description: 'Eggs, pancakes, hot oats — happy to cook' },
-  { value: 'skip', icon: '⏭️', label: 'Usually Skip', description: 'Keep it minimal if I eat anything at all' },
-]
 
 function roundTo(value: number, decimals: number): number {
   return Math.round(value * Math.pow(10, decimals)) / Math.pow(10, decimals)
@@ -215,35 +67,10 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
   const [isAnimating, setIsAnimating] = useState(false)
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const [data, setData] = useState<OnboardingData>({
-    displayName: '',
-    fitnessGoal: null,
-    trainingDays: [],
-    recoveryCapacity: null,
-    conditioningPreference: null,
-    sessionDuration: null,
-    trainingTime: null,
-    equipment: null,
-    trainingStyle: null,
-    trainingExperience: null,
-    injuries: [],
-    dietaryPreferences: [],
-    age: '',
-    gender: 'male',
-    heightCm: '',
-    weightKg: '',
-    knowsWorkingLifts: null,
-    knownSquatKg: '',
-    knownBenchKg: '',
-    knownDeadliftKg: '',
-    activityLevel: null,
-    mealsPerDay: null,
-    includeSnacks: true,
-    cookingTime: null,
-    favoriteCuisines: [],
-    dislikedFoods: '',
-    breakfastStyle: null,
-  })
+  // gender: 'male' preserves the form's historical pre-selection (the shared
+  // initialSlotValues() starts it null — the conversational path requires an
+  // explicit answer instead of shipping a silent default).
+  const [data, setData] = useState<OnboardingData>({ ...initialSlotValues(), gender: 'male' })
 
   const [weightUnit, setWeightUnit] = useState<WeightUnit>('kg')
   const [weightDisplay, setWeightDisplay] = useState('')
@@ -365,51 +192,10 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
   }
 
   const handleSubmit = () => {
-    const mappedTime: 'morning' | 'evening' =
-      data.trainingTime === 'morning' || data.trainingTime === 'midday' ? 'morning' : 'evening'
-
-    const trainingDaysFull = DAYS_FULL.map(day => ({
-      day,
-      available: data.trainingDays.includes(day.slice(0, 3)),
-    }))
-
-    const profile: UserProfile = {
-      age: Number(data.age),
-      gender: data.gender,
-      height_cm: Number(data.heightCm),
-      weight_kg: Number(data.weightKg),
-      activity_level: data.activityLevel ?? 'moderate',
-      meals_per_day: data.mealsPerDay ?? 3,
-      include_snacks: data.includeSnacks,
-      cooking_time_preference: data.cookingTime ?? 'moderate',
-      favorite_cuisines: data.favoriteCuisines,
-      disliked_foods: data.dislikedFoods.split(',').map(f => f.trim()).filter(Boolean),
-      breakfast_style: data.breakfastStyle ?? undefined,
-      fitness_goal: data.fitnessGoal!,
-      training_days: trainingDaysFull,
-      preferred_time: mappedTime,
-      dietary_preferences: data.dietaryPreferences,
-      session_duration_preference: data.sessionDuration!,
-      workout_split_preference: 'ai_recommendation' as WorkoutSplit,
-      macro_calculation_mode: 'STANDARD_STATIC' as MacroCalculationMode,
-      equipment_access: data.equipment!,
-      training_style: data.trainingStyle!,
-      training_experience: data.trainingExperience!,
-      // The coach-persona onboarding step is retired (a single unnamed
-      // voice now, defined in the chat system prompt) — this column and
-      // its values are kept as the seed for a later multi-coach system,
-      // so every profile still gets a value, just never asked for.
-      coaching_persona: 'supportive' as CoachingPersona,
-      recovery_capacity: data.recoveryCapacity!,
-      conditioning_preference: data.conditioningPreference!,
-      injuries: data.injuries,
-      display_name: data.displayName.trim(),
-      skip_calibration_week: data.knowsWorkingLifts === true,
-      known_squat_kg: data.knowsWorkingLifts === true && data.knownSquatKg ? Number(data.knownSquatKg) : undefined,
-      known_bench_kg: data.knowsWorkingLifts === true && data.knownBenchKg ? Number(data.knownBenchKg) : undefined,
-      known_deadlift_kg: data.knowsWorkingLifts === true && data.knownDeadliftKg ? Number(data.knownDeadliftKg) : undefined,
-    }
-    onComplete(profile)
+    // The values→UserProfile transform (time-of-day collapse, day-name
+    // expansion, never-asked constants) lives in onboarding-slots.ts so the
+    // conversational path produces an identical profile by construction.
+    onComplete(assembleProfile(data))
   }
 
   const getSlideClass = () => {
@@ -555,12 +341,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
                   label={day}
                   selected={data.trainingDays.includes(day)}
                   compact
-                  onClick={() => setData(d => ({
-                    ...d,
-                    trainingDays: d.trainingDays.includes(day)
-                      ? d.trainingDays.filter(x => x !== day)
-                      : [...d.trainingDays, day],
-                  }))}
+                  onClick={() => setData(d => ({ ...d, trainingDays: toggleValue(d.trainingDays, day) }))}
                 />
               ))}
             </div>
@@ -690,12 +471,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
                   label={opt.label}
                   selected={data.injuries.includes(opt.value)}
                   compact
-                  onClick={() => setData(d => ({
-                    ...d,
-                    injuries: d.injuries.includes(opt.value)
-                      ? d.injuries.filter(x => x !== opt.value)
-                      : [...d.injuries, opt.value],
-                  }))}
+                  onClick={() => setData(d => ({ ...d, injuries: toggleValue(d.injuries, opt.value) }))}
                 />
               ))}
             </div>
@@ -714,12 +490,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
                   label={opt.label}
                   selected={data.dietaryPreferences.includes(opt.value)}
                   compact
-                  onClick={() => setData(d => ({
-                    ...d,
-                    dietaryPreferences: d.dietaryPreferences.includes(opt.value)
-                      ? d.dietaryPreferences.filter(x => x !== opt.value)
-                      : [...d.dietaryPreferences, opt.value],
-                  }))}
+                  onClick={() => setData(d => ({ ...d, dietaryPreferences: toggleValue(d.dietaryPreferences, opt.value) }))}
                 />
               ))}
             </div>
@@ -801,12 +572,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
                       label={opt.label}
                       selected={data.favoriteCuisines.includes(opt.value)}
                       compact
-                      onClick={() => setData(d => ({
-                        ...d,
-                        favoriteCuisines: d.favoriteCuisines.includes(opt.value)
-                          ? d.favoriteCuisines.filter(x => x !== opt.value)
-                          : [...d.favoriteCuisines, opt.value],
-                      }))}
+                      onClick={() => setData(d => ({ ...d, favoriteCuisines: toggleValue(d.favoriteCuisines, opt.value) }))}
                     />
                   ))}
                 </div>
@@ -852,7 +618,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs font-medium">Sex</Label>
-                  <ToggleGroup type="single" variant="outline" value={data.gender} onValueChange={v => { if (v) setData(d => ({ ...d, gender: v as 'male' | 'female' })) }} className="w-full">
+                  <ToggleGroup type="single" variant="outline" value={data.gender ?? 'male'} onValueChange={v => { if (v) setData(d => ({ ...d, gender: v as 'male' | 'female' })) }} className="w-full">
                     <ToggleGroupItem value="male" className="flex-1">Male</ToggleGroupItem>
                     <ToggleGroupItem value="female" className="flex-1">Female</ToggleGroupItem>
                   </ToggleGroup>

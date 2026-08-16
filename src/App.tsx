@@ -5,7 +5,8 @@ import { Loader2 } from 'lucide-react'
 import { ProfileMenu } from '@/components/ProfileMenu'
 import { ProfileScreen } from '@/components/ProfileScreen'
 import { BottomTabBar } from '@/components/BottomTabBar'
-import { OnboardingFlow } from '@/components/onboarding/OnboardingFlow'
+import { OnboardingEntry } from '@/components/onboarding/OnboardingEntry'
+import { loadOnboardingDraft, clearOnboardingDraft } from '@/lib/onboarding-draft-store'
 import { NutritionDisplay } from '@/components/NutritionDisplay'
 import { ExerciseTab } from '@/components/exercise/ExerciseTab'
 import { SLOT_LABEL as MEAL_SLOT_LABEL } from '@/components/MealPlan'
@@ -39,7 +40,7 @@ import { checkForLoadSuggestions, confirmLoadSuggestion, declineLoadSuggestion }
 import { getRevealSpeed, saveRevealSpeed, DEFAULT_REVEAL_SPEED, type RevealSpeed } from '@/lib/reveal-speed-store'
 import { InsightBanner } from '@/components/ui/insight-banner'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
-import { getActiveFacts, getActiveGoals, getActiveContextFacts, createFact, type UserFactRow, type UserGoalRow, type UserContextFactRow } from '@/lib/memory-store'
+import { getActiveFacts, getActiveGoals, getActiveContextFacts, createFact, createContextFact, createGoal, type UserFactRow, type UserGoalRow, type UserContextFactRow } from '@/lib/memory-store'
 import { compileExerciseExclusions, compileFoodDislikes, compileTimingRules, resolveFoodTarget } from '@/lib/fact-compiler'
 import { getAllItems as getAllGroceryItems, flushPending as flushGroceryPending, type GroceryItemRow } from '@/lib/grocery-store'
 import { flushPending as flushSetLogPending } from '@/lib/set-log-store'
@@ -651,6 +652,71 @@ function App() {
     if (data) {
       enrichedProfile.id = data.id
       localStorage.setItem(STORAGE_KEY, data.id)
+      // Conversational-onboarding draft: context facts / goals volunteered
+      // mid-conversation queue in the draft (user_context_facts/user_goals
+      // need a profile_id that didn't exist until this insert). Flush them
+      // ONLY for a draft the chat path stamped `completing` — a draft
+      // abandoned for the questionnaire is discarded unflushed, so a
+      // half-conversation's facts can never attach to a form-built profile.
+      // Per-item try/catch: one failed write must not lose the rest, and on
+      // any failure the draft is KEPT (it's inert once a profile exists)
+      // rather than cleared into permanent silent data loss. Clearing on
+      // success is also the no-duplicate-row guard: a cleared draft can
+      // never re-run completion.
+      try {
+        const onboardingDraft = loadOnboardingDraft()
+        if (onboardingDraft?.completing) {
+          let allFlushed = true
+          for (const fact of onboardingDraft.pendingContextFacts) {
+            try {
+              await createContextFact({
+                profileId: data.id,
+                source: 'chat',
+                rawPhrase: fact.rawPhrase,
+                displayText: fact.displayText,
+              })
+            } catch (err) {
+              allFlushed = false
+              console.error('Flushing onboarding context fact failed:', fact.displayText, err)
+            }
+          }
+          for (const goal of onboardingDraft.pendingGoals) {
+            try {
+              await createGoal({
+                profileId: data.id,
+                metric: goal.metric,
+                trackable: goal.metric === 'directional' ? 'directional' : 'measurable',
+                baselineValue: goal.baselineValue,
+                baselineSource: goal.baselineValue != null ? 'user_stated' : undefined,
+                targetValue: goal.targetValue,
+                targetDate: goal.targetDate,
+                source: 'chat',
+                rawPhrase: goal.rawPhrase,
+                displayText: goal.displayText,
+              })
+            } catch (err) {
+              allFlushed = false
+              console.error('Flushing onboarding goal failed:', goal.displayText, err)
+            }
+          }
+          if (onboardingDraft.pendingContextFacts.length > 0 || onboardingDraft.pendingGoals.length > 0) {
+            try {
+              await reloadMemory(data.id)
+            } catch (err) {
+              console.error('Reloading memory after draft flush failed:', err)
+            }
+          }
+          if (allFlushed) {
+            clearOnboardingDraft()
+          } else {
+            console.error('Onboarding draft kept: some queued facts/goals failed to save')
+          }
+        } else if (onboardingDraft) {
+          clearOnboardingDraft()
+        }
+      } catch (err) {
+        console.error('Flushing onboarding draft failed:', err)
+      }
       // Fix — food/exercise preferences have two competing stores:
       // onboarding's disliked-foods answer is no longer written to the
       // `disliked_foods` column (see the insert above) — it's recorded as
@@ -1412,7 +1478,7 @@ function App() {
         </div>
       )
     }
-    return <OnboardingFlow onComplete={handleOnboardingComplete} />
+    return <OnboardingEntry onComplete={handleOnboardingComplete} />
   }
 
   const totalWeeks = mesocycle.length > 0 ? mesocycle.length : 4

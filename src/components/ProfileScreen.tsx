@@ -36,7 +36,8 @@ import {
   EXPERIENCE_OPTIONS, EQUIPMENT_OPTIONS, STYLE_OPTIONS, RECOVERY_OPTIONS,
   CONDITIONING_PREF_OPTIONS, ACTIVITY_OPTIONS, DIETARY_OPTIONS, FAVORITE_CUISINE_OPTIONS,
   INJURY_OPTIONS, COOKING_TIME_OPTIONS, MEALS_PER_DAY_OPTIONS, DURATION_OPTIONS, BREAKFAST_STYLE_OPTIONS,
-} from '@/components/onboarding/OnboardingFlow'
+  DAYS_FULL,
+} from '@/lib/onboarding-slots'
 import type { UserProfile, TrainingDay } from '@/lib/types'
 
 const GENDER_OPTIONS = [{ value: 'male', label: 'Male' }, { value: 'female', label: 'Female' }]
@@ -57,7 +58,9 @@ const ACCENT_OPTIONS: { value: AccentOverride; label: string; from: string; to: 
   { value: 'purple', label: 'Purple', from: '#B49BFF', to: '#7C5AE0', glowRgb: '155,125,245' },
   { value: 'blue', label: 'Blue', from: '#8FC7FF', to: '#3B82F6', glowRgb: '59,130,246' },
 ]
-const DAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+// The canonical day ordering now comes from the shared slot module rather
+// than a second hand-typed copy that could drift.
+const DAY_ORDER = DAYS_FULL
 
 interface ProfileScreenProps {
   open: boolean

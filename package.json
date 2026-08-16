@@ -51,6 +51,8 @@
     "test:interval-prescription": "tsx scripts/test-interval-prescription.ts",
     "test:cardio-share-score": "tsx scripts/test-cardio-share-score.ts",
     "test:block-rest-sizing": "tsx scripts/test-block-rest-sizing.ts",
+    "test:onboarding-slots": "tsx scripts/test-onboarding-slots.ts",
+    "test:coach-rules-sync": "tsx scripts/test-coach-rules-sync.ts",
     "report:trim-magnitude": "tsx scripts/run-trim-magnitude-report.ts"
   },
   "dependencies": {
