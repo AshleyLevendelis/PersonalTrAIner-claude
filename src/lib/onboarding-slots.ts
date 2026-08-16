@@ -356,6 +356,31 @@ function knowsTheirLifts(values: OnboardingSlotValues): boolean {
   return values.knowsWorkingLifts === true
 }
 
+/**
+ * Will this person's plan actually contain barbell lifts?
+ *
+ * Asking "do you know your working weights for squat, bench and deadlift?"
+ * before knowing that is a question about equipment they may not have, for
+ * lifts they may never be prescribed — someone training bodyweight-only, or
+ * someone starting from nothing whose first block is walks, was being asked
+ * it regardless. Ashley's call: only ask people who will be lifting barbells.
+ *
+ * Two conditions, and BOTH answers must be in before the question can apply —
+ * an unanswered slot means "we don't know yet", never "assume yes":
+ *   1. They have barbell access at all.
+ *   2. They aren't starting from nothing. This mirrors isStartingOut() in
+ *      starting-out.ts, which is what actually decides whether the engine
+ *      prescribes lifting or walking. The two are kept in step by a check in
+ *      scripts/test-onboarding-slots.ts — if that definition moves, this must
+ *      move with it or the gate fails.
+ */
+function willBeLiftingBarbells(values: OnboardingSlotValues): boolean {
+  if (values.equipment !== 'full_gym' && values.equipment !== 'home_gym') return false
+  if (values.trainingExperience === null || values.activityLevel === null) return false
+  const startingFromNothing = values.trainingExperience === 'beginner' && values.activityLevel === 'sedentary'
+  return !startingFromNothing
+}
+
 const DAY_OPTIONS: SlotOption[] = DAYS_OF_WEEK.map(d => ({ value: d, icon: '📅', label: d }))
 const GENDER_OPTIONS: SlotOption[] = [
   { value: 'male', icon: '♂️', label: 'Male' },
@@ -374,7 +399,7 @@ export const ONBOARDING_SLOTS: SlotDef[] = [
   { key: 'displayName', question: 'What should I call you?', shortLabel: 'Name', control: 'text', required: true, destination: 'column', validate: v => typeof v === 'string' && v.trim().length > 0 && v.trim().length <= 30 },
   { key: 'fitnessGoal', question: "What's your main goal?", shortLabel: 'Goal', control: 'single', required: true, options: GOAL_OPTIONS, destination: 'column', validate: isOneOf(GOAL_OPTIONS) },
   { key: 'trainingExperience', question: 'How much training have you done?', shortLabel: 'Experience', control: 'single', required: true, options: EXPERIENCE_OPTIONS, destination: 'column', validate: isOneOf(EXPERIENCE_OPTIONS) },
-  { key: 'knowsWorkingLifts', question: 'Do you know your working lifts (squat, bench, deadlift)?', shortLabel: 'Working lifts', control: 'single', required: true, options: KNOWS_LIFTS_OPTIONS, destination: 'column', validate: v => v === true || v === false || v === 'true' || v === 'false' },
+  { key: 'knowsWorkingLifts', question: 'Do you know your working lifts (squat, bench, deadlift)?', shortLabel: 'Working lifts', control: 'single', required: true, requiredIf: willBeLiftingBarbells, options: KNOWS_LIFTS_OPTIONS, destination: 'column', validate: v => v === true || v === false || v === 'true' || v === 'false' },
   // Only meaningful once someone has said they DO know their numbers.
   { key: 'knownSquatKg', question: 'Squat working weight (kg)?', shortLabel: 'Squat', control: 'numeric', required: false, requiredIf: knowsTheirLifts, min: 1, max: 500, destination: 'column', validate: isNumberIn(1, 500) },
   { key: 'knownBenchKg', question: 'Bench working weight (kg)?', shortLabel: 'Bench', control: 'numeric', required: false, requiredIf: knowsTheirLifts, min: 1, max: 400, destination: 'column', validate: isNumberIn(1, 400) },

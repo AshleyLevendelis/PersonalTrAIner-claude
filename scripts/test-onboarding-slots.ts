@@ -29,6 +29,8 @@ import {
 } from '../src/lib/onboarding-slots'
 import { DIETARY_PREFERENCES } from '../src/lib/diet-rules'
 import { getFlaggedJoints } from '../src/lib/exercise-plan'
+import { isStartingOut } from '../src/lib/starting-out'
+import type { UserProfile } from '../src/lib/types'
 
 let failures = 0
 const check = (name: string, ok: boolean, detail = '') => {
@@ -133,7 +135,16 @@ check('numerics converted', p.age === 31 && p.height_cm === 168 && p.weight_kg =
 console.log('\n5. Completion gating')
 const fresh = initialSlotValues()
 const missingFresh = missingRequiredSlots(fresh)
-check('fresh values: every required slot missing', missingFresh.length === ONBOARDING_SLOTS.filter(s => s.required).length, `got ${missingFresh.length}`)
+// Counted through isSlotRequired, not the raw `required` flag: a
+// conditionally-required slot (the working-lift question, which only applies
+// once we know they'll be lifting barbells) is correctly NOT missing on fresh
+// values, because it does not yet apply to anyone.
+check(
+  'fresh values: every applicable required slot missing',
+  missingFresh.length === ONBOARDING_SLOTS.filter(s => isSlotRequired(s, fresh)).length,
+  `got ${missingFresh.length}`,
+)
+check('the working-lift question is not among them', !missingFresh.includes('knowsWorkingLifts'))
 check('full values: nothing missing', missingRequiredSlots(fullValues()).length === 0, JSON.stringify(missingRequiredSlots(fullValues())))
 const unasked = unconfirmedOptionalSlots(new Set())
 check('injuries must be explicitly asked', unasked.includes('injuries'))
@@ -182,7 +193,10 @@ console.log('\n10. Everyone answers the same questions')
 // The removed fork made six questions conditional on a category the user
 // picked. They are unconditional again: the coach decides what to prescribe
 // from the answers; the user never classifies themselves.
-for (const key of ['trainingExperience', 'knowsWorkingLifts', 'conditioningPreference', 'equipment', 'trainingStyle', 'fitnessGoal'] as SlotKey[]) {
+// knowsWorkingLifts is deliberately NOT in this list — see section 12. It is
+// the one question that depends on what the plan will contain, rather than
+// being part of finding that out.
+for (const key of ['trainingExperience', 'conditioningPreference', 'equipment', 'trainingStyle', 'fitnessGoal'] as SlotKey[]) {
   check(`${key}: required for everyone`, isSlotRequired(getSlotDef(key)!, initialSlotValues()))
 }
 check('offeredOptionsFor hides nothing today', ONBOARDING_SLOTS.every(d => !d.options || offeredOptionsFor(d)!.length === d.options.length))
@@ -195,6 +209,62 @@ check('training_experience present', gymProfile.training_experience === 'novice'
 check('known lifts flow when known', gymProfile.known_squat_kg === 80)
 check('training_days is a 7-entry array (unguarded readers depend on it)', Array.isArray(gymProfile.training_days) && gymProfile.training_days.length === 7)
 check('no plan_format field written', !('plan_format' in gymProfile))
+
+console.log('\n12. The working-lifts question only reaches people who will lift barbells')
+// Ashley: "it doesn't make sense that we ask the user their working lifts
+// before even determining if weight training is right for them."
+const liftsDef = getSlotDef('knowsWorkingLifts')!
+const gymLifter = { ...initialSlotValues(), equipment: 'full_gym', trainingExperience: 'intermediate', activityLevel: 'light' } as OnboardingSlotValues
+const homeGymLifter = { ...gymLifter, equipment: 'home_gym' } as OnboardingSlotValues
+const bodyweight = { ...gymLifter, equipment: 'bodyweight' } as OnboardingSlotValues
+const bands = { ...gymLifter, equipment: 'minimalist' } as OnboardingSlotValues
+const startingFromNothing = { ...gymLifter, trainingExperience: 'beginner', activityLevel: 'sedentary' } as OnboardingSlotValues
+const activeBeginner = { ...gymLifter, trainingExperience: 'beginner', activityLevel: 'moderate' } as OnboardingSlotValues
+
+check('full gym + real training history → asked', isSlotApplicable(liftsDef, gymLifter))
+check('home gym → asked', isSlotApplicable(liftsDef, homeGymLifter))
+check('bodyweight only → never asked (no barbell in the plan)', !isSlotApplicable(liftsDef, bodyweight))
+check('bands/kettlebells only → never asked', !isSlotApplicable(liftsDef, bands))
+check('gym but starting from nothing → never asked (plan starts with walks)', !isSlotApplicable(liftsDef, startingFromNothing))
+check('gym beginner who is already active → asked', isSlotApplicable(liftsDef, activeBeginner))
+
+// An unanswered slot means "we don't know yet", never "assume yes" — this is
+// what stops the question arriving before the coach has learned enough.
+check('not asked before equipment is known', !isSlotApplicable(liftsDef, initialSlotValues()))
+check(
+  'not asked when equipment is known but experience/activity are not',
+  !isSlotApplicable(liftsDef, { ...initialSlotValues(), equipment: 'full_gym' } as OnboardingSlotValues),
+)
+
+// Skipping it must not strand anyone at the review screen.
+const bodyweightComplete = { ...fullValues(), equipment: 'bodyweight', knowsWorkingLifts: null, knownSquatKg: '', knownBenchKg: '', knownDeadliftKg: '' } as OnboardingSlotValues
+check(
+  'a bodyweight profile completes without ever answering it',
+  missingRequiredSlots(bodyweightComplete).length === 0,
+  JSON.stringify(missingRequiredSlots(bodyweightComplete)),
+)
+check(
+  'and it is not left owing an explicit skip either',
+  !unconfirmedOptionalSlots(new Set(), bodyweightComplete).includes('knowsWorkingLifts'),
+)
+const bwProfile = assembleProfile(bodyweightComplete)
+check('unasked → calibration week, never a bogus known weight', bwProfile.skip_calibration_week === false && bwProfile.known_squat_kg === undefined)
+
+console.log('\n13. That gate stays in step with what the engine actually prescribes')
+// willBeLiftingBarbells duplicates isStartingOut's rule (different input
+// shape). If one definition moves without the other, people get asked about
+// barbell weights for a plan made of walks — so assert they agree.
+const asProfile = (v: OnboardingSlotValues): UserProfile =>
+  ({ ...assembleProfile(fullValues()), training_experience: v.trainingExperience, activity_level: v.activityLevel } as UserProfile)
+for (const [label, v] of [
+  ['starting from nothing', startingFromNothing],
+  ['active beginner', activeBeginner],
+  ['intermediate', gymLifter],
+] as const) {
+  const engineSaysWalks = isStartingOut(asProfile(v))
+  const weAsk = isSlotApplicable(liftsDef, v)
+  check(`${label}: asked about lifts ⟺ engine prescribes lifting`, weAsk === !engineSaysWalks, `ask=${weAsk} walks=${engineSaysWalks}`)
+}
 
 if (failures > 0) {
   console.error(`\n${failures} failure(s)`)
