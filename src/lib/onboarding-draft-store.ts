@@ -124,7 +124,3 @@ export function clearOnboardingDraft(): void {
   }
 }
 
-export function hasOnboardingDraft(): boolean {
-  const draft = loadOnboardingDraft()
-  return draft !== null && (draft.confirmedSlots.length > 0 || draft.messages.length > 0)
-}

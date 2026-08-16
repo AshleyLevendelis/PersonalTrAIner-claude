@@ -33,7 +33,16 @@ import {
 import type { UserProfile } from '@/lib/types'
 
 // ---------------------------------------------------------------------------
-// Conversational intake — same coverage as the questionnaire, different feel.
+// THE onboarding. Ashley's call: one way in, the conversation — the
+// step-by-step questionnaire and the chooser that offered it are gone.
+//
+// The cost of being the only door, stated plainly because it is now load-
+// bearing: if onboarding-chat or Gemini is unreachable, a NEW user cannot
+// create a profile at all. There is no second path to fall back to. The
+// composer stays live and says so on failure, but a sustained outage means
+// no new signups. Existing users are unaffected — they already have a
+// profile and never see this screen.
+//
 // The contract with onboarding-chat mirrors the app's established "the edge
 // function describes, the client executes" shape:
 //
@@ -55,7 +64,7 @@ import type { UserProfile } from '@/lib/types'
 //     and every ask-anyway slot — injuries above all — was explicitly
 //     answered or skipped. Only then does the review card render, and only
 //     its button calls onComplete → the SAME atomic generate-then-insert
-//     pipeline the questionnaire uses.
+//     generate-then-insert pipeline.
 //
 // State-threading note: slot writes and the follow-up request to the model
 // happen in the same tick (a chip tap records the value AND sends the turn),
@@ -165,13 +174,7 @@ function applySlot(
   return true
 }
 
-export function ConversationalOnboarding({
-  onComplete,
-  onSwitchToForm,
-}: {
-  onComplete: (profile: UserProfile) => void
-  onSwitchToForm: () => void
-}) {
+export function ConversationalOnboarding({ onComplete }: { onComplete: (profile: UserProfile) => void }) {
   const [draftLoaded] = useState<OnboardingDraft | null>(() => loadOnboardingDraft())
   const [values, setValues] = useState<OnboardingSlotValues>(() => draftLoaded?.values ?? initialSlotValues())
   const [confirmed, setConfirmed] = useState<Set<string>>(() => new Set(draftLoaded?.confirmedSlots ?? []))
@@ -519,8 +522,8 @@ export function ConversationalOnboarding({
     if (missing.length > 0) return
     // Stamp the draft as a chat-path completion BEFORE handing off: App.tsx
     // flushes queued context facts/goals only for a completing draft, so a
-    // draft abandoned for the questionnaire can never attach its facts to a
-    // form-built profile.
+    // draft abandoned mid-conversation can never attach its facts to a
+    // profile built by a later, separate run.
     saveOnboardingDraft({
       ...emptyDraft(),
       values,
@@ -542,9 +545,6 @@ export function ConversationalOnboarding({
           <Dumbbell className="size-5 text-primary" />
           <h1 className="text-base font-bold tracking-tight">Personal TrAIner</h1>
         </div>
-        <button onClick={onSwitchToForm} className="text-xs text-muted-foreground underline underline-offset-2">
-          Quick questionnaire instead
-        </button>
       </div>
       {/* Progress without a form's scorekeeping: a hairline that fills as
           the conversation goes. "12 of 18 answered" told the user they were

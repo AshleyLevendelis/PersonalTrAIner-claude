@@ -13,8 +13,8 @@ import {
 // ---------------------------------------------------------------------------
 // The numeric counterpart to SlotChipsCard.
 //
-// Age, height and weight are required, bounded fields — the same fields the
-// questionnaire renders as proper inputs. In chat they had NO control at all:
+// Age, height and weight are required, bounded fields. In chat they had NO
+// control at all:
 // present_slot marked a card for them, but the chips component draws only
 // closed-set options and returned null for anything numeric, so the question
 // fell through to free text. The bounds then went unchecked until the very

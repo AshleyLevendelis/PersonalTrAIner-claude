@@ -4,7 +4,7 @@ import { getSlotDef, offeredOptionsFor, type OnboardingSlotValues, type SlotKey 
 
 // ---------------------------------------------------------------------------
 // The REAL onboarding chips, rendered inside the conversational flow — same
-// OptionCard the questionnaire uses, driven by the same slot definition, so
+// OptionCard used elsewhere in the app, driven by the same slot definition, so
 // a tapped value is guaranteed to be one the engine understands. Single-select
 // resolves on tap; multi-select toggles live against the parent's values and
 // resolves via the Done button (an empty Done is an explicit "none", which is

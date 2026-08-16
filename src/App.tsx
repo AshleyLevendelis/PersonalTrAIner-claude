@@ -5,7 +5,7 @@ import { Loader2 } from 'lucide-react'
 import { ProfileMenu } from '@/components/ProfileMenu'
 import { ProfileScreen } from '@/components/ProfileScreen'
 import { BottomTabBar } from '@/components/BottomTabBar'
-import { OnboardingEntry } from '@/components/onboarding/OnboardingEntry'
+import { ConversationalOnboarding } from '@/components/onboarding/ConversationalOnboarding'
 import { loadOnboardingDraft, clearOnboardingDraft } from '@/lib/onboarding-draft-store'
 import { NutritionDisplay } from '@/components/NutritionDisplay'
 import { ExerciseTab } from '@/components/exercise/ExerciseTab'
@@ -1478,7 +1478,10 @@ function App() {
         </div>
       )
     }
-    return <OnboardingEntry onComplete={handleOnboardingComplete} />
+    // One way in: the conversation. The step-by-step questionnaire and the
+    // chooser that offered it were removed — see ConversationalOnboarding's
+    // header note for what that means when the coach is unreachable.
+    return <ConversationalOnboarding onComplete={handleOnboardingComplete} />
   }
 
   const totalWeeks = mesocycle.length > 0 ? mesocycle.length : 4

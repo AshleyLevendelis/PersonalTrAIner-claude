@@ -18,10 +18,12 @@ import type {
 } from '@/lib/types'
 
 // ---------------------------------------------------------------------------
-// THE shared definition of what an onboarding needs — read by both intake
-// surfaces (the fixed questionnaire in OnboardingFlow.tsx and the
-// conversational flow in ConversationalOnboarding.tsx) so a future field is
-// added exactly once. Three layers live here:
+// THE definition of what an onboarding needs, read by the conversational
+// flow (ConversationalOnboarding.tsx) and by ProfileScreen for later edits.
+// It was built as a shared source for two intake surfaces; the step-by-step
+// questionnaire has since been removed, and the structure was kept because
+// the value is the same either way — one place where a field's meaning,
+// allowed values and bounds are declared. Three layers live here:
 //
 //   1. The option arrays (moved out of OnboardingFlow.tsx, where they were
 //      exported ad hoc for ProfileScreen) — the closed sets themselves.
@@ -209,7 +211,7 @@ export function toggleValue<T>(arr: T[], value: T): T[] {
 }
 
 // ---------------------------------------------------------------------------
-// Slot values — the working state both intake surfaces accumulate. Identical
+// Slot values — the working state intake accumulates. Identical
 // to OnboardingFlow's historical local OnboardingData shape (numerics stay
 // strings until assembleProfile converts, matching the form's input fields).
 // ---------------------------------------------------------------------------
@@ -247,7 +249,7 @@ export interface OnboardingSlotValues {
 
 /**
  * gender starts null here — an explicit answer is required by the slot
- * definition. The questionnaire keeps its historical 'male' pre-selection in
+ * definition. The retired questionnaire kept a historical 'male' pre-selection in
  * its own local state (unchanged behavior for the form path); the
  * conversational path never defaults it.
  */
