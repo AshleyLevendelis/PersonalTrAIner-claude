@@ -49,6 +49,6 @@ async function say(text:string){
   const acts=(j.actions||[]).map((a:any)=>a.name+'('+(a.args?.slot_key??'')+(a.args?.value!==undefined?'='+a.args.value:'')+')')
   if(acts.length) console.log('       ['+acts.join(' ')+']')
 }
-const script=["Hi, I'm Ash","fat loss mainly","I've never really trained, tried a gym once years ago and hated it","Mon Wed Fri work best","sleep's alright, work's not physical","not keen on cardio to be honest","30-45 mins","mornings","just my bodyweight at home","functional I guess","my left knee clicks sometimes","no restrictions","3 meals, and yeah snacks","quick stuff, nothing fancy","marmite, can't stand it"]
+const script=["Ash — fat loss is the goal, never trained before","Full Gym","Mon, Tue, Wed, Thu, Sun","about an hour","evenings usually","sleep is fine, desk job","cardio's ok in small doses","functional stuff","knees give me trouble","no food restrictions","3 meals and snacks","quick to cook","nothing I hate except marmite","cooked breakfast","41, female, 170cm, 87kg","pretty sedentary otherwise"]
 for(const s of script) await say(s)
 console.log('\n--- answered: '+[...confirmed].join(', '))
