@@ -11,6 +11,7 @@ import {
   missingRequiredSlots,
   unconfirmedOptionalSlots,
   isSlotRequired,
+  isSlotApplicable,
   assembleProfile,
   toggleValue,
   initialSlotValues,
@@ -75,6 +76,8 @@ interface WorkingState {
 }
 
 const RECEIPT_PREFIX = '✓ '
+
+const COMPLETE_MESSAGE = "That's everything I need. Here's what I've got — have a look, and if it's right I'll build your plan."
 
 function displayValueFor(def: SlotDef, values: OnboardingSlotValues): string {
   const v = values[def.key]
@@ -178,6 +181,27 @@ export function ConversationalOnboarding({
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
   }, [messages, busy, reviewOpen])
+
+  // Completion is the CLIENT's call, never the model's. The moment every
+  // required slot validates and every ask-anyway slot has been answered, the
+  // review appears — whether or not the model ever calls complete_onboarding.
+  //
+  // This exists because it once didn't: the conversation went silent on the
+  // final answer and stayed silent, and because onboarding owns the whole
+  // screen (no tab bar until a profile exists) that was a dead end with no
+  // way out. A stall here is uniquely costly, so it gets a guard that no
+  // request path can route around.
+  useEffect(() => {
+    if (busy || reviewOpen) return
+    if (missingRequiredSlots(values).length > 0) return
+    if (unconfirmedOptionalSlots(confirmed, values).length > 0) return
+    setMessages(prev =>
+      prev.some(m => m.content === COMPLETE_MESSAGE)
+        ? prev
+        : [...prev, { role: 'assistant', content: COMPLETE_MESSAGE }],
+    )
+    setReviewOpen(true)
+  }, [values, confirmed, busy, reviewOpen])
 
   const makeWorkingState = (): WorkingState => ({
     values,
@@ -350,6 +374,15 @@ export function ConversationalOnboarding({
             content: nextDef.question,
             slotCard: nextDef.control === 'single' || nextDef.control === 'multi' ? nextDef.key : undefined,
           })
+        } else {
+          // Nothing left to ask AND the model said nothing — it simply didn't
+          // call complete_onboarding. Finish anyway: the client decides when
+          // the tracker is complete, never the model. (Without this the
+          // conversation went permanently silent on the last answer, with the
+          // tab bar hidden because onboarding owns the whole screen — a dead
+          // end with no way forward. Found by Ashley in real use.)
+          responseWs.newMessages.push({ role: 'assistant', content: COMPLETE_MESSAGE })
+          responseWs.openReview = true
         }
       }
       commitWorkingState(responseWs)
@@ -467,10 +500,27 @@ export function ConversationalOnboarding({
           )}
           {busy && <p className="text-xs text-muted-foreground pl-1">…</p>}
 
+          {/* Escape hatch: if the tracker says everything is answered, the
+              Generate button is reachable from the composer area too, not only
+              from the review card. Onboarding hides the tab bar (there's no
+              profile yet), so any state where the user can see no way forward
+              is a dead end — this makes "finish" always reachable. */}
+          {!reviewOpen && missing.length === 0 && (
+            <Button onClick={() => setReviewOpen(true)} className="w-full h-11">
+              Review and build my plan
+            </Button>
+          )}
+
           {reviewOpen && (
             <Card className="bg-muted/50 border-dashed">
               <CardContent className="pt-4 text-sm space-y-1.5">
-                {ONBOARDING_SLOTS.filter(s => s.required || confirmed.has(s.key)).map(def => (
+                {ONBOARDING_SLOTS
+                  // Only what actually applies to this person: a "don't know
+                  // my lifts" answer shouldn't leave three blank weight rows
+                  // in the summary they're being asked to confirm.
+                  .filter(s => isSlotApplicable(s, values))
+                  .filter(s => isSlotRequired(s, values) || confirmed.has(s.key))
+                  .map(def => (
                   <p key={def.key}>
                     <span className="font-medium text-foreground">{def.question.replace(/\?$/, '')}:</span>{' '}
                     <span className="text-muted-foreground">{displayValueFor(def, values)}</span>
