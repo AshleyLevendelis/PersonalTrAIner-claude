@@ -522,6 +522,50 @@ async function main() {
   }
 
   // -------------------------------------------------------------------------
+  console.log('\n[13] computeSlotBudgets: mealsPerDay=4 + includeSnacks=false actually removes the snack slot')
+  {
+    const { computeSlotBudgets } = await import('../src/lib/meal-generation')
+    // BASE_RATIOS[4] hardcodes a snack slot regardless of includeSnacks — a
+    // profile that explicitly declined snacks was still getting one, found
+    // by a live onboarding audit, not by inspecting the code. Only mpd=4 can
+    // exhibit this (2 and 3 never carry a base snack slot), so that's the
+    // one case worth locking down.
+    const targets = getStaticDailyMacros(baseProfile)
+    const withSnack = computeSlotBudgets(targets, 4, true)
+    const noSnack = computeSlotBudgets(targets, 4, false)
+    check('includeSnacks=true keeps the snack slot at mpd=4', withSnack.snack != null, withSnack)
+    check('includeSnacks=false REMOVES the snack slot at mpd=4', noSnack.snack === undefined, noSnack)
+    check('the other three slots still exist when snacks are removed', noSnack.breakfast != null && noSnack.lunch != null && noSnack.dinner != null, noSnack)
+    const sumKcal = (b: Partial<Record<string, { calories: number }>>) =>
+      Object.values(b).reduce((sum, slot) => sum + (slot?.calories ?? 0), 0)
+    // The snack's share must be REDISTRIBUTED, not dropped — the day's total
+    // has to still land on the real daily target either way.
+    check(
+      'daily calories still sum to the real target with snacks removed (redistributed, not dropped)',
+      Math.abs(sumKcal(noSnack) - targets.calories) <= 2,
+      `sum=${sumKcal(noSnack)} target=${targets.calories}`,
+    )
+    check(
+      'daily calories still sum to the real target with snacks included',
+      Math.abs(sumKcal(withSnack) - targets.calories) <= 2,
+      `sum=${sumKcal(withSnack)} target=${targets.calories}`,
+    )
+    // Removing the snack should grow the remaining slots, not shrink them.
+    check(
+      'each remaining slot is bigger without the snack than with it (share genuinely redistributed)',
+      noSnack.breakfast!.calories > withSnack.breakfast!.calories &&
+      noSnack.lunch!.calories > withSnack.lunch!.calories &&
+      noSnack.dinner!.calories > withSnack.dinner!.calories,
+      { withSnack, noSnack },
+    )
+    // mealsPerDay 2 and 3 never carried a base snack — confirm includeSnacks
+    // still behaves as designed there (this branch of the fix must not have
+    // disturbed the pre-existing add path).
+    check('mpd=3 still ADDS a snack when requested (unaffected by this fix)', computeSlotBudgets(targets, 3, true).snack != null)
+    check('mpd=3 still has no snack when not requested', computeSlotBudgets(targets, 3, false).snack === undefined)
+  }
+
+  // -------------------------------------------------------------------------
   if (failures > 0) {
     console.error(`\n${failures} meal round-trip check(s) FAILED.`)
     process.exit(1)

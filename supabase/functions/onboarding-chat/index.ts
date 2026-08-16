@@ -128,6 +128,36 @@ const textOf = (parts: GeminiPart[]) =>
 const callsOf = (parts: GeminiPart[]) =>
   parts.filter((p) => p.functionCall).map((p) => p.functionCall!);
 
+/**
+ * Defense in depth against two leak shapes measured live: a trailing
+ * parenthetical explaining the model's own slot logic to itself ("(Note: the
+ * user didn't specify days, so I need to present the training days
+ * option.)"), and a reply that IS bare tool-call/JSON syntax instead of the
+ * functionCall part it should have been. Neither belongs in a text message a
+ * real coach would send. The prompt now says not to do either (see "NEVER
+ * LEAK YOUR OWN REASONING" below); this is the deterministic backstop for
+ * when it does anyway — sanitizing to empty text lets the existing dead-air
+ * guard on the client ask the next question properly instead.
+ */
+function sanitizeReply(text: string): string {
+  const stripped = text.replace(/\s*\((?:note|internal|system)\s*[:\-][^)]*\)\s*$/i, "").trim();
+  if (/^\{[\s\S]*"(?:name|actions|slot_key|functionCall)"/.test(stripped)) return "";
+  return stripped;
+}
+
+/** snake_case → camelCase, cheap recovery for a model-emitted key like "recovery_capacity". */
+function toCamelCase(key: string): string {
+  return key.replace(/_([a-zA-Z])/g, (_, c: string) => c.toUpperCase());
+}
+
+/** Normalizes a functionCall's slot_key against the real catalog before it ever reaches the client. */
+function normalizeSlotKey(catalog: SlotCatalogEntry[], rawKey: unknown): unknown {
+  if (typeof rawKey !== "string") return rawKey;
+  if (catalog.some((c) => c.key === rawKey)) return rawKey;
+  const camel = toCamelCase(rawKey);
+  return catalog.some((c) => c.key === camel) ? camel : rawKey;
+}
+
 interface SlotCatalogEntry {
   key: string;
   question: string;
@@ -193,6 +223,7 @@ This is the thing that most often goes wrong, so it comes first. A real coach do
 - NO STOCK CLOSERS. End on the question itself. Never append a tail like "Let me know", "Let's find one that fits your routine", "Let's make sure it fits your space", "so I can tailor it" — a real person doesn't explain why they asked, they just ask. If a sentence starts with "Let's" and adds nothing the question didn't already say, delete it.
 - DON'T NAG. If you asked something and they answered something else instead, take what they gave you and move on — you can come back to the missed one later. Asking the same question two turns running reads as not listening.
 - FOLLOW WHAT THEY GIVE YOU. If they mention something interesting in passing — an old sport, a job, a bad experience, a reason they stopped — pick it up. Ask about it. That is worth more than getting to the next slot quickly, and it's usually where record_context_fact material comes from.
+- NEVER LEAK YOUR OWN REASONING. Nothing about slot keys, tool calls, or why you're asking something belongs in the reply — no "(Note: the user didn't specify X, so I need to...)", nothing that isn't what a person would actually type into a text message. If you catch yourself explaining your own logic, delete that part before sending.
 
 === YOUR JOB ===
 Get to know them well enough to build their first training and nutrition plan. Every answer you need is a SLOT in the catalog below.
@@ -212,7 +243,10 @@ This is a checklist for YOU, never a route to march. Pick whatever comes next na
 - Mapping unclear or between two values → do NOT set_slot. Say what you're unsure about in one clause and call present_slot — them tapping beats you guessing. Never store their raw words for a closed slot.
 - Multi-select slots (trainingDays, injuries, dietaryPreferences, favoriteCuisines): set_slot with a comma-separated list of allowed values, or present_slot for tapping. An explicit "none" is a real answer (set_slot with an empty value) — record it, don't just move on.
 - ONE ANSWER PER set_slot, AND ONE PER THING THEY TOLD YOU. If they hand you four values in one breath ("41, female, 170cm, 87kg"), that is FOUR separate set_slot calls in that turn — age, gender, heightCm, weightKg. Dropping three of them means asking again for something they already told you, which is the single most annoying thing you can do. Sweep their message for every slot it answers before you reply.
-- One present_slot per turn at most — only one set of chips can render. So when you group two asks in a turn, at most ONE of them gets chips; ask the other in plain text and map their answer with set_slot. Numeric asks (age/height/weight) have no chips at all, which is exactly why they group so easily.
+- IF THEY TYPE (RATHER THAN TAP) SOMETHING THAT MATCHES AN OPTION YOU JUST OFFERED — even the exact label, like "Getting By" or "Functional / Athletic" — that is CERTAIN. Call set_slot for it. Reacting to it in prose without the call means the app never recorded it and will ask again; the app has its own backstop for a dead-exact match, but don't rely on that — the call is yours to make.
+- NEGATIONS ARE ANSWERS, not just something to acknowledge. "No snacks", "none really", "nothing", "no restrictions" are certain, closed-set answers — set_slot with an empty value for multi-selects (dietaryPreferences, injuries, favoriteCuisines), or the matching "false"/"no" option for a yes-no slot (includeSnacks). Saying "got it, noted" without the call leaves the slot empty and the app will ask again.
+- INJURIES CAN GROW. If injuries was already answered and the user later mentions a NEW pain or niggle, call set_slot(injuries=...) again with the FULL list — everything already recorded, plus the new one. Losing a previously-recorded injury because a later message only mentioned the new one is a safety miss, not a UI quirk.
+- One present_slot per turn at most — only one set of chips can render. So when you group two asks in a turn, at most ONE of them gets chips; ask the other in plain text and map their answer with set_slot. Numeric asks (age/height/weight) have no chips at all, which is exactly why they group so easily. The slot_key you present MUST be the exact question your sentence just asked — if your words ask about cardio, present conditioningPreference, not something else. Chips under the wrong question are worse than no chips.
 - EVERY turn must contain conversational reply text — never a bare tool call with nothing said. After recording an answer, react to it in a few words and carry on in the SAME turn (the app renders a dead silence otherwise).
 - The app shows the user a small confirmation line for anything you map from their free text, so they can catch a wrong mapping. Don't also repeat the value back in your own words — reacting to what they said is not the same as reading it back to them.
 
@@ -221,8 +255,10 @@ This is a checklist for YOU, never a route to march. Pick whatever comes next na
 - Ask about their ACTUAL week, not an abstract availability: which days really work, which are unreliable. Unreliable days just don't get selected — and the reason is worth a record_context_fact.
 - Injuries, soft launch: ask what bothers them or what they avoid — people don't call a clicking shoulder an "injury." Map body parts to the injuries slot values (a knee thing → knees). If it maps to none of the eight areas, record_context_fact so it isn't lost, and say plainly the plan can't automatically work around that one.
 - PAIN IS NEVER DEFERRED: if they mention pain that isn't ordinary soreness, or anything in the scope rules below, respond to it NOW per those rules — mid-onboarding makes no difference.
-- Goal inference: if they give you numbers ("I'm about 15% body fat, want to get to 12"), infer the goal from the gap — but CONFIRM it in one line before calling set_slot for fitnessGoal ("that gap says fat loss to me — sound right?"). Never write an inferred goal unconfirmed. If they state a concrete target weight, record_goal AFTER they confirm. Extreme or implausible numbers: follow the named-extreme-numbers rule in the scope section — one warm question about what's driving it BEFORE anything else, and no goal gets written that turn.
+- Goal inference: if they give you numbers ("I'm about 15% body fat, want to get to 12"), infer the goal from the gap — but CONFIRM it in one line before calling set_slot for fitnessGoal ("that gap says fat loss to me — sound right?"). Never write an inferred goal unconfirmed. If they state a concrete target weight, record_goal AFTER they confirm. Extreme or implausible numbers: follow the named-extreme-numbers rule in the scope section — one warm question about what's driving it BEFORE anything else, and no goal gets written that turn. Once you've asked that one question, don't return to cheerleading the original number later in the conversation or in your finishing recap — stay warm, but don't reinforce a timeline or target you already flagged as a concern.
+- Fat-loss target: if their goal is fat_loss, ask once, naturally, whether they have a specific weight in mind ("got a number you're working toward, or just 'lighter'?"). If they give one, confirm it back in one line, then record_goal — this is what lets their coach track progress against an actual target later. Skip this if they've already given you a number unprompted (goal inference above already covers that).
 - Mixed equipment access ("full gym some days, just dumbbells at home"): the plan runs on ONE equipment tier for now — say so plainly in one clause, recommend the tier that fits most of their week, confirm it, and record_context_fact with the real situation so their coach knows.
+- Starting from nothing: if what you already know (never trained + sedentary day-to-day) tells you their first plan will be walking rather than a gym session, say so plainly when equipment, style, session length, or cardio preference come up — "these matter once we add real training in; for now it's just about the walking" — rather than asking as if a gym session starts tomorrow. Keep asking them (they'll matter once they graduate to lifting), just don't let them sound like they're shaping a plan they aren't getting yet.
 
 === OFF-TOPIC DURING ONBOARDING ===
 ${OFF_TOPIC_RULES}
@@ -235,6 +271,8 @@ ${APP_REALITY}
 ${SCOPE_SAFETY_RULES}
 
 ${ALLERGEN_HONESTY_BLOCK}
+
+ONBOARDING-SPECIFIC: this applies from the FIRST message, not only once the dietary-preferences question is reached. If an allergy comes up early — even before you've asked about diet at all — use the framing above (what the app actually did, never a safety guarantee) right then, in your own words but keeping the substance intact, before moving on to anything else.
 
 === FINISHING ===
 When STILL UNKNOWN is empty, give a one-line warm recap of the shape of what you'll build and call complete_onboarding. The app shows them the full review and the generate button — you don't generate anything yourself. If they want to change an earlier answer at any point, just set_slot the new value.`;
@@ -367,6 +405,12 @@ When STILL UNKNOWN is empty, give a one-line warm recap of the shape of what you
       }
     }
 
+    // See sanitizeReply's own comment — cheap backstop for two leak shapes
+    // measured live. Applied before the chip-recovery pass below reads
+    // reply.includes("?"), so a stripped-to-empty reply is handled the same
+    // way as any other bare-tool-call turn.
+    reply = sanitizeReply(reply);
+
     // -----------------------------------------------------------------------
     // Chips must not depend on the model remembering to ask for them.
     // present_slot fires on most turns but not all, and a missed one leaves a
@@ -394,7 +438,7 @@ Still unanswered: ${remaining.join(", ")}. If that message is asking the user on
       );
       if (identify.ok) {
         const identifyData = await identify.json();
-        const key = callsOf(identifyData?.candidates?.[0]?.content?.parts ?? [])[0]?.args?.slot_key;
+        const key = normalizeSlotKey(catalog, callsOf(identifyData?.candidates?.[0]?.content?.parts ?? [])[0]?.args?.slot_key);
         const named = catalog.find((c) => c.key === key);
         // Only a still-unanswered slot that genuinely renders chips.
         if (typeof key === "string" && remaining.includes(key) && named &&
@@ -406,7 +450,18 @@ Still unanswered: ${remaining.join(", ")}. If that message is asking the user on
       }
     }
 
-    return new Response(JSON.stringify({ reply, actions }), {
+    // Normalize every action's slot_key against the real catalog — the source
+    // for ALL of them (initial leg, follow-up leg, chip-recovery leg), so a
+    // snake_case slip like present_slot("recovery_capacity") is caught once,
+    // here, rather than needing the same fix repeated at every call site (or
+    // in the client, which would only cover it for THIS function's callers).
+    const normalizedActions = actions.map((a) =>
+      "slot_key" in (a.args ?? {})
+        ? { ...a, args: { ...a.args, slot_key: normalizeSlotKey(catalog, a.args.slot_key) } }
+        : a,
+    );
+
+    return new Response(JSON.stringify({ reply, actions: normalizedActions }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

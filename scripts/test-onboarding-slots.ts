@@ -24,6 +24,7 @@ import {
   PROFILE_CONSTANTS,
   INJURY_OPTIONS,
   DIETARY_OPTIONS,
+  isStartingFromNothing,
   type OnboardingSlotValues,
   type SlotKey,
 } from '../src/lib/onboarding-slots'
@@ -251,9 +252,11 @@ const bwProfile = assembleProfile(bodyweightComplete)
 check('unasked → calibration week, never a bogus known weight', bwProfile.skip_calibration_week === false && bwProfile.known_squat_kg === undefined)
 
 console.log('\n13. That gate stays in step with what the engine actually prescribes')
-// willBeLiftingBarbells duplicates isStartingOut's rule (different input
-// shape). If one definition moves without the other, people get asked about
-// barbell weights for a plan made of walks — so assert they agree.
+// willBeLiftingBarbells calls the shared isStartingFromNothing helper, which
+// is the values-based twin of isStartingOut's own profile-based check
+// (different input shape, same two questions, same answer). If one moves
+// without the other, people get asked about barbell weights for a plan made
+// of walks — so assert they agree.
 const asProfile = (v: OnboardingSlotValues): UserProfile =>
   ({ ...assembleProfile(fullValues()), training_experience: v.trainingExperience, activity_level: v.activityLevel } as UserProfile)
 for (const [label, v] of [
@@ -264,7 +267,54 @@ for (const [label, v] of [
   const engineSaysWalks = isStartingOut(asProfile(v))
   const weAsk = isSlotApplicable(liftsDef, v)
   check(`${label}: asked about lifts ⟺ engine prescribes lifting`, weAsk === !engineSaysWalks, `ask=${weAsk} walks=${engineSaysWalks}`)
+  check(`${label}: isStartingFromNothing matches isStartingOut`, isStartingFromNothing(v) === engineSaysWalks)
 }
+
+console.log('\n14. Order — the structural fix, not just the reading order')
+// A live audit found the old order broken, not just suboptimal: activityLevel
+// sat LAST (position 27) despite gating both willBeLiftingBarbells here and
+// the engine's own isStartingFromNothing check, so knowsWorkingLifts —
+// declared 4th — could not actually be asked until the final question
+// answered. Someone who volunteered their lift numbers early had them
+// silently discarded, then got the barbell questions sprung on them as a
+// surprise appendix. These assertions protect the fix, not just the taste.
+const indexOf = (key: SlotKey) => ONBOARDING_SLOTS.findIndex(s => s.key === key)
+check(
+  'activityLevel resolves BEFORE knowsWorkingLifts is even reachable',
+  indexOf('activityLevel') < indexOf('knowsWorkingLifts'),
+  `activityLevel=${indexOf('activityLevel')} knowsWorkingLifts=${indexOf('knowsWorkingLifts')}`,
+)
+check(
+  'equipment resolves BEFORE knowsWorkingLifts',
+  indexOf('equipment') < indexOf('knowsWorkingLifts'),
+  `equipment=${indexOf('equipment')} knowsWorkingLifts=${indexOf('knowsWorkingLifts')}`,
+)
+check(
+  'trainingExperience resolves before activityLevel needs it (both routing facts land early)',
+  indexOf('trainingExperience') < indexOf('activityLevel'),
+)
+check(
+  'safety/enforcement asks (injuries, dietaryPreferences) precede the food-taste asks (cuisines, cooking time) they used to follow',
+  indexOf('injuries') < indexOf('favoriteCuisines') && indexOf('dietaryPreferences') < indexOf('cookingTime'),
+)
+check(
+  'the three body-metric numerics are adjacent and sit near the end',
+  indexOf('heightCm') === indexOf('age') + 1 && indexOf('weightKg') === indexOf('heightCm') + 1,
+)
+check('gender — most sensitive, least gating — is declared last', indexOf('gender') === ONBOARDING_SLOTS.length - 1)
+
+console.log('\n15. trainingTime — measured to change nothing plan-side, so it must never block')
+const timeDef = getSlotDef('trainingTime')!
+check('trainingTime.required is false on the definition itself', timeDef.required === false)
+for (const [label, v] of [
+  ['fresh', initialSlotValues()],
+  ['fully answered', fullValues()],
+] as const) {
+  check(`${label}: trainingTime never counts as required`, !isSlotRequired(timeDef, v))
+}
+// Still worth asking once (small chat-greeting value) — confirm it stays in
+// the optional/ask-anyway pool rather than being silently skipped entirely.
+check('trainingTime still needs an explicit ask/skip (it is not in NEVER_BLOCKING)', unconfirmedOptionalSlots(new Set()).includes('trainingTime'))
 
 if (failures > 0) {
   console.error(`\n${failures} failure(s)`)

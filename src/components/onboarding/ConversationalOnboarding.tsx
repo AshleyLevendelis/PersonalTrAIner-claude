@@ -17,6 +17,7 @@ import {
   toggleValue,
   numericGroupFor,
   initialSlotValues,
+  isStartingFromNothing,
   type OnboardingSlotValues,
   type SlotKey,
   type SlotDef,
@@ -138,6 +139,60 @@ function coerceSlotValue(def: SlotDef, raw: string): unknown {
 }
 
 /**
+ * The app's own key vocabulary is camelCase; the model sometimes emits
+ * snake_case (present_slot('recovery_capacity') was observed live, and got
+ * silently dropped — getSlotDef found nothing, so the chips just never
+ * rendered). Cheap, safe recovery: try the camelCase conversion before giving
+ * up. Never invents a match that isn't in the catalog.
+ */
+function normalizeSlotKey(rawKey: string): string {
+  if (getSlotDef(rawKey)) return rawKey
+  const camel = rawKey.replace(/_([a-zA-Z])/g, (_, c: string) => c.toUpperCase())
+  return getSlotDef(camel) ? camel : rawKey
+}
+
+/**
+ * Live transcripts repeatedly showed the model failing to call set_slot for
+ * text that matched a just-shown chip's label character-for-character —
+ * "Functional / Athletic", "Getting By", "Not For Me" — even after reacting
+ * to it in prose. The conversation then re-asked the same question, several
+ * times in some transcripts, because nothing was ever recorded.
+ *
+ * This is the one case the app can resolve with total certainty without the
+ * model's help: if what they typed is EXACTLY one of the options already on
+ * screen, record it — same guarantee a tap gives, just typed instead. Bails
+ * (returns undefined) on anything short of an exact match; ambiguous free
+ * text still goes to the model, same as always.
+ */
+function tryExactLabelMatch(def: SlotDef, raw: string): unknown {
+  const trimmed = raw.trim()
+  if (!trimmed || !def.options) return undefined
+  const sameText = (a: string, b: string) => a.toLowerCase() === b.toLowerCase()
+  const findOption = (text: string) => def.options!.find(o => sameText(o.label, text) || sameText(String(o.value), text))
+
+  if (def.control === 'single') {
+    const hit = findOption(trimmed)
+    return hit ? coerceSlotValue(def, String(hit.value)) : undefined
+  }
+
+  if (def.control === 'multi') {
+    // An unambiguous skip is a real answer, same as the model-facing coercion.
+    if (/^(none|no|nothing|none of these|n\/a)$/i.test(trimmed)) return []
+    const parts = trimmed.split(',').map(p => p.trim()).filter(Boolean)
+    if (parts.length === 0) return undefined
+    const values: string[] = []
+    for (const part of parts) {
+      const hit = findOption(part)
+      if (!hit) return undefined // any unmatched part — don't guess, let the model interpret the whole thing
+      values.push(String(hit.value))
+    }
+    return values
+  }
+
+  return undefined
+}
+
+/**
  * Validate + record one slot into the working copy. Returns false when the
  * value is rejected.
  *
@@ -203,11 +258,21 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
   const scrollRef = useRef<HTMLDivElement>(null)
 
   const missing = useMemo(() => missingRequiredSlots(values), [values])
+  const unconfirmedOptional = useMemo(() => unconfirmedOptionalSlots(confirmed, values), [confirmed, values])
   // requiredIf-aware: the denominator shrinks the moment an activity format is
   // chosen, so the tracker never counts gym-only questions this profile will
   // never be asked.
   const requiredCount = useMemo(() => ONBOARDING_SLOTS.filter(s => isSlotRequired(s, values)).length, [values])
   const answeredCount = requiredCount - missing.length
+  // What both the manual escape hatch and Generate gate on. Required-missing
+  // alone was the wrong bar: it let "Review and build my plan" appear (and
+  // Generate succeed) before injuries or dietary restrictions had ever been
+  // asked, since neither is required — an unconfirmed injuries slot then
+  // silently assembles into an empty array, indistinguishable from "no
+  // injuries" the user actually gave. This is the same bar the auto-open
+  // effect below already uses; the escape hatch existing on a looser one was
+  // the gap.
+  const readyToGenerate = missing.length === 0 && unconfirmedOptional.length === 0
 
   // Persist the draft after every state change — this is the whole
   // "a dropped connection never loses answered slots" guarantee.
@@ -238,8 +303,7 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
   // request path can route around.
   useEffect(() => {
     if (busy || reviewOpen) return
-    if (missingRequiredSlots(values).length > 0) return
-    if (unconfirmedOptionalSlots(confirmed, values).length > 0) return
+    if (!readyToGenerate) return
     setMessages(prev =>
       prev.some(m => m.content === COMPLETE_MESSAGE)
         ? prev
@@ -287,7 +351,7 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
   const executeActions = (ws: WorkingState, actions: Array<{ name: string; args: Record<string, unknown> }>) => {
     for (const action of actions) {
       if (action.name === 'set_slot') {
-        const key = String(action.args.slot_key ?? '') as SlotKey
+        const key = normalizeSlotKey(String(action.args.slot_key ?? '')) as SlotKey
         const def = getSlotDef(key)
         if (!def) {
           console.warn('onboarding: set_slot with unknown slot_key', action.args.slot_key)
@@ -304,7 +368,7 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
           })
         }
       } else if (action.name === 'present_slot') {
-        const key = String(action.args.slot_key ?? '')
+        const key = normalizeSlotKey(String(action.args.slot_key ?? ''))
         const def = getSlotDef(key)
         if (!def) {
           console.warn('onboarding: present_slot with unknown slot_key', action.args.slot_key)
@@ -384,12 +448,36 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
     const trimmed = text.trim()
     if (!trimmed || busy) return
     setBusy(true)
-    const ws = preRecorded ?? makeWorkingState()
+
+    // Typed-exact-label backstop (see tryExactLabelMatch): if this is raw
+    // typed text — not already a chip tap — and it exactly matches an option
+    // on the card currently showing, record it before the model even sees
+    // the turn. Mirrors the tap path exactly (immediate commit, same
+    // applySlot call) so the fix doesn't depend on Gemini for the one case
+    // the app can already be certain about.
+    let ws = preRecorded
+    let immediateCommit = !!preRecorded
+    if (!ws) {
+      const pendingCard = [...messages].reverse().find(m => m.role === 'assistant' && m.slotCard && !m.slotCardResolved)
+      const pendingDef = pendingCard?.slotCard ? getSlotDef(pendingCard.slotCard) : undefined
+      if (pendingDef) {
+        const matched = tryExactLabelMatch(pendingDef, trimmed)
+        if (matched !== undefined) {
+          const candidate = makeWorkingState()
+          if (applySlot(candidate, pendingDef.key, matched, values)) {
+            ws = candidate
+            immediateCommit = true
+          }
+        }
+      }
+    }
+    if (!ws) ws = makeWorkingState()
+
     const priorMessages = messages
     // User bubble first, THEN the tap's receipt — the transcript reads in
     // the order things actually happened.
     setMessages(prev => [...prev, { role: 'user', content: trimmed }])
-    if (preRecorded) commitWorkingState(ws)
+    if (immediateCommit) commitWorkingState(ws)
     try {
       const history = priorMessages
         .filter(m => !m.isReceipt && m.content.trim())
@@ -447,6 +535,32 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
           // end with no way forward. Found by Ashley in real use.)
           responseWs.newMessages.push({ role: 'assistant', content: COMPLETE_MESSAGE })
           responseWs.openReview = true
+        }
+      }
+      // Stuck-slot breaker: several live transcripts showed the coach
+      // re-asking the SAME still-unanswered question 6-8 times, reworded
+      // each time, because a captured answer kept failing to register (the
+      // capture backstops above cut this off much earlier now, but nothing
+      // guarantees it to zero — this is the backstop for the backstops).
+      // Once the canonical next slot has been shown 3 times without landing,
+      // stop trusting the model's phrasing for it: ask it plainly, with the
+      // guaranteed-correct chip key attached directly, on top of whatever
+      // else this turn already said.
+      if (!responseWs.openReview) {
+        const canonicalNext = [...missingRequiredSlots(responseWs.values), ...unconfirmedOptionalSlots(responseWs.confirmed, responseWs.values)][0]
+        if (canonicalNext) {
+          const priorAsks = priorMessages.filter(m => m.slotCard === canonicalNext).length
+          const askedThisTurn = responseWs.newMessages.some(m => m.slotCard === canonicalNext)
+          if (priorAsks >= 3 && !askedThisTurn) {
+            const def = getSlotDef(canonicalNext)
+            if (def) {
+              responseWs.newMessages.push({
+                role: 'assistant',
+                content: `Let's lock this one in — ${def.question}`,
+                slotCard: def.control === 'text' ? undefined : canonicalNext,
+              })
+            }
+          }
         }
       }
       commitWorkingState(responseWs)
@@ -519,7 +633,7 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
   }
 
   const handleGenerate = () => {
-    if (missing.length > 0) return
+    if (!readyToGenerate) return
     // Stamp the draft as a chat-path completion BEFORE handing off: App.tsx
     // flushes queued context facts/goals only for a completing draft, so a
     // draft abandoned mid-conversation can never attach its facts to a
@@ -609,8 +723,13 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
               Generate button is reachable from the composer area too, not only
               from the review card. Onboarding hides the tab bar (there's no
               profile yet), so any state where the user can see no way forward
-              is a dead end — this makes "finish" always reachable. */}
-          {!reviewOpen && missing.length === 0 && (
+              is a dead end — this makes "finish" always reachable.
+              Gated on readyToGenerate, not just required-missing: required
+              alone let this appear (and Generate succeed) before injuries or
+              dietary restrictions had ever been asked — neither is required,
+              so an unconfirmed injuries slot silently assembles into an empty
+              array, indistinguishable from a real "no injuries" answer. */}
+          {!reviewOpen && readyToGenerate && (
             <Button onClick={() => setReviewOpen(true)} className="w-full h-11">
               Review and build my plan
             </Button>
@@ -631,7 +750,18 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
                     <span className="text-muted-foreground">{displayValueFor(def, values)}</span>
                   </p>
                 ))}
-                <Button onClick={handleGenerate} disabled={missing.length > 0} className="w-full mt-3 h-12 text-base font-semibold">
+                {/* VISION.md: "someone beginning exercise for the first time
+                    is told, once, plainly and without alarm, to check with a
+                    doctor before starting something new — at the point their
+                    plan is set up, not buried in a disclaimer." Deterministic
+                    and client-rendered rather than left to the model saying it
+                    reliably — this is exactly that point. */}
+                {isStartingFromNothing(values) && (
+                  <p className="text-xs text-muted-foreground border-t border-border/40 pt-2 mt-1">
+                    Quick note: if you have any health concerns, it's worth checking with a doctor before starting something new.
+                  </p>
+                )}
+                <Button onClick={handleGenerate} disabled={!readyToGenerate} className="w-full mt-3 h-12 text-base font-semibold">
                   Generate My Plan
                 </Button>
               </CardContent>

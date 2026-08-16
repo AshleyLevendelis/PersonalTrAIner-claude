@@ -62,7 +62,9 @@ function scaleTargets(targets: MacroTargets, ratio: number): MacroTargets {
  * include_snacks. mealsPerDay outside {2,3,4} falls back to 3 (the onboarding
  * default). include_snacks on a 2/3-meal profile carves out a flat 10% for a
  * snack slot and proportionally shrinks the others to make room for it;
- * 4-meal profiles already have a snack slot in their base ratios.
+ * 4-meal profiles already have a snack slot in their base ratios, so an
+ * explicit "no snacks" there does the symmetric thing — removes it and gives
+ * its share back to the other slots, rather than being silently ignored.
  */
 export function computeSlotBudgets(
   targets: MacroTargets,
@@ -81,6 +83,20 @@ export function computeSlotBudgets(
     }
     scaled.snack = snackShare
     ratios = scaled
+  } else if (includeSnacks === false && ratios.snack != null) {
+    // Only mealsPerDay=4 reaches here (2/3 never carry a base snack slot, so
+    // this branch is a no-op for them either way). A profile that explicitly
+    // declined snacks was still getting BASE_RATIOS[4]'s hardcoded 15% snack
+    // — measured live, not theoretical. Redistribute it proportionally
+    // across the remaining slots, the mirror image of the add path above.
+    const snackShare = ratios.snack
+    const nonSnackEntries = (Object.entries(ratios) as [MealSlotName, number][]).filter(([slot]) => slot !== 'snack')
+    const nonSnackTotal = nonSnackEntries.reduce((sum, [, r]) => sum + r, 0)
+    const redistributed: Partial<Record<MealSlotName, number>> = {}
+    for (const [slot, r] of nonSnackEntries) {
+      redistributed[slot] = r + (r / nonSnackTotal) * snackShare
+    }
+    ratios = redistributed
   }
 
   const budgets: Partial<Record<MealSlotName, MacroTargets>> = {}
