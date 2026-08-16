@@ -1,15 +1,18 @@
 PersonalTrAIner — Product Vision
 
 The problem
-Generic fitness apps hand out templated splits that ignore real
-constraints. I'm building the app I want to use: an adaptive AI personal
-trainer and nutritionist that programmes like an elite human coach.
+Generic fitness apps hand out templated plans that ignore real
+constraints — and most of them quietly assume you already train. I'm
+building an adaptive AI personal trainer and nutritionist that programmes
+like an elite human coach, for everybody: from someone who has never
+exercised in their life to someone who has been lifting for a decade.
 
 Three pillars
 1. True personalisation without compromise. Respect every individual
-constraint — equipment, injury history, exact time caps, training style
-from functional through bodybuilding. Never fall back on a generic
-split or algorithm fluff.
+constraint — starting point, equipment, injury history, exact time caps,
+preferred style of training. Meeting a user where they actually are IS
+the personalisation, not a lesser version of it. Never fall back on a
+generic plan or algorithm fluff.
 2. World-class coaching logic. Bridge rigid software rules and
 authentic strength & conditioning principles (CSCS-level programming).
 Every plan should feel hand-crafted by an elite human coach.
@@ -17,7 +20,20 @@ Every plan should feel hand-crafted by an elite human coach.
 that handles daily meal swaps, tracks real progression, and keeps users
 accountable to ambitious physical goals.
 
+What a plan can be
+A plan is whatever genuinely serves this person. For many that is
+sets-and-reps gym sessions. For others it is activity-shaped — walks,
+swims, rides — prescribed by duration and frequency, progressing on their
+own terms.
+
+These are different plan formats, not different amounts of care put into
+the same one. An activity plan is not a gym plan with the weights taken
+out; it is the right shape for that person, built to the same standard.
+
 How generation works
+Gym-style programming — the mode described below — is a core capability,
+not the definition of the product. Other plan shapes are held to the same
+coaching standard, in their own terms.
 • Hybrid: a rules-based engine generates; AI handles modification and
 conversation. Neither alone is enough.
 • Five-stage pipeline: equipment → injury → style → time cap →
@@ -87,7 +103,7 @@ hunting for a control, and never describes a screen or button that doesn't
 exist.
 
 History is permanent
-Logged sets, weigh-ins, goals and training history survive every change —
+Logged sessions, weigh-ins, goals and training history survive every change —
 a new plan, a new goal, a changed profile. Nothing the user has recorded
 is ever orphaned by an action they take inside the app.
 
@@ -102,8 +118,8 @@ redirect; open-ended tasks are acknowledged and declined. After that it
 never budges, but stays friendly.
 • House style — ask before prescribing. "How do I eat 800 calories a
 day?" → ask what's driving the number first. "My shoulder hurts on
-presses" → ask what kind of pain before adapting. "I can't face the gym"
-→ find out whether it's a flat day or something heavier before
+presses" → ask what kind of pain before adapting. "I can't face training
+today" → find out whether it's a flat day or something heavier before
 suggesting a session.
 • Never claims a capability it doesn't have. Never invents screens,
 features or safety guarantees.
@@ -143,16 +159,31 @@ single noisy weigh-in.
 • A deficit has an endpoint. As someone approaches their goal, ask what's
 next rather than cutting indefinitely.
 
-It has to work in a gym
-Bad signal, one hand free, mid-set, under time pressure. Logging a set,
-starting a rest timer, and finding a swap must all work in seconds on a
-phone held in one hand. This is where the app is actually used.
+It has to work wherever the user trains
+Bad signal, one hand free, mid-set, under time pressure — a gym floor, a
+pool deck, a park path, a pavement halfway round a walk. Logging what you
+just did, starting a timer, and finding an alternative must all work in
+seconds on a phone held in one hand. This is where the app is actually
+used, and it is never a desk.
 
 What this is not
 • Not a template app with personalisation bolted on.
 • Not a lookup table with a chat interface.
 • Not a bot with a topic filter.
 • Not an app that claims certainty it can't back.
+• Not a gym app that tolerates beginners.
+
+Only offer what's built
+The app never offers a style, a mode, or an audience it cannot genuinely
+serve yet. A picker listing an option the engine can't programme properly
+is a promise the product doesn't keep — and worse than not offering it,
+because the user only finds out after they've committed.
+
+This document states the destination. What the app actually offers —
+every option in every picker, everything the coach says it can do — is
+limited to what is built and verified. Removing an option that isn't
+ready is not a retreat; it's the same honesty the rest of this document
+demands.
 
 The bar for shipping
 "Uncompromising" describes the standard, not the schedule. A feature ships
