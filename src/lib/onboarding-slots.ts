@@ -587,6 +587,23 @@ export interface SlotCatalogEntry {
  * format is chosen (rather than being sent with a required flag the model
  * would dutifully chase).
  */
+/**
+ * Numeric answers that are naturally given in one breath, and so are asked and
+ * captured in one card rather than one at a time. "How old are you, and what
+ * are your height and weight?" is a single question to a human; splitting it
+ * into three turns is the form-feel we removed everywhere else.
+ *
+ * A key with no group answers for itself alone.
+ */
+const NUMERIC_GROUPS: SlotKey[][] = [
+  ['age', 'heightCm', 'weightKg'],
+  ['knownSquatKg', 'knownBenchKg', 'knownDeadliftKg'],
+]
+
+export function numericGroupFor(key: SlotKey): SlotKey[] {
+  return NUMERIC_GROUPS.find(g => g.includes(key)) ?? [key]
+}
+
 export function buildSlotCatalog(values: OnboardingSlotValues = initialSlotValues()): SlotCatalogEntry[] {
   return ONBOARDING_SLOTS
     .filter(s => isSlotApplicable(s, values))

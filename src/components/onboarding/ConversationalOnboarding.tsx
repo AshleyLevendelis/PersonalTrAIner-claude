@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { Dumbbell, Send, Check } from 'lucide-react'
 import { SlotChipsCard } from './SlotChipsCard'
+import { SlotNumericCard } from './SlotNumericCard'
 import {
   ONBOARDING_SLOTS,
   getSlotDef,
@@ -14,6 +15,7 @@ import {
   isSlotApplicable,
   assembleProfile,
   toggleValue,
+  numericGroupFor,
   initialSlotValues,
   type OnboardingSlotValues,
   type SlotKey,
@@ -429,7 +431,9 @@ export function ConversationalOnboarding({
           responseWs.newMessages.push({
             role: 'assistant',
             content: nextDef.question,
-            slotCard: nextDef.control === 'single' || nextDef.control === 'multi' ? nextDef.key : undefined,
+            // Numeric slots get a card as well now — they used to fall through
+            // to free text with no bounds check at the point of answering.
+            slotCard: nextDef.control === 'text' ? undefined : nextDef.key,
           })
         } else {
           // Nothing left to ask AND the model said nothing — it simply didn't
@@ -484,6 +488,31 @@ export function ConversationalOnboarding({
       ? selected.map(v => def.options?.find(o => String(o.value) === v)?.label ?? v).join(', ')
       : 'none'
     void sendMessage(labels, ws)
+  }
+
+  /**
+   * Save one card's worth of numeric answers. Mirrors the chip path: record
+   * every value first, then send ONE turn carrying all of them, so the coach
+   * never sees a half-filled state and never re-asks for a number just given.
+   */
+  const handleResolveNumeric = (entries: { key: SlotKey; raw: string }[]) => {
+    if (entries.length === 0) return
+    const ws = makeWorkingState()
+    const saved: string[] = []
+    for (const { key, raw } of entries) {
+      const def = getSlotDef(key)
+      if (!def) continue
+      // false: they typed the value into a labelled field — nothing was
+      // mapped, so no confirmation line is owed (see applySlot).
+      if (applySlot(ws, key, coerceSlotValue(def, raw), values, false)) {
+        saved.push(`${def.shortLabel.toLowerCase()} ${raw}`)
+      }
+    }
+    if (saved.length === 0) {
+      setMessages(prev => [...prev, { role: 'assistant', content: 'That didn’t look right — check the numbers and try again.' }])
+      return
+    }
+    void sendMessage(saved.join(', '), ws)
   }
 
   const handleGenerate = () => {
@@ -550,6 +579,16 @@ export function ConversationalOnboarding({
                 >
                   {msg.content}
                 </div>
+                {msg.slotCard && getSlotDef(msg.slotCard)?.control === 'numeric' && (
+                  <SlotNumericCard
+                    slotKey={msg.slotCard}
+                    values={values}
+                    confirmed={confirmed}
+                    resolved={!!msg.slotCardResolved}
+                    busy={busy}
+                    onResolve={handleResolveNumeric}
+                  />
+                )}
                 {msg.slotCard && (
                   <SlotChipsCard
                     slotKey={msg.slotCard}
