@@ -369,7 +369,16 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
           continue
         }
         const coerced = coerceSlotValue(def, String(action.args.value ?? ''))
-        if (!applySlot(ws, key, coerced, values)) {
+        // Compare against ws.values, not the outer (pre-turn) values: a slot
+        // can already be recorded THIS turn — by the exact-label backstop's
+        // immediate commit, or by an earlier action in this same list — and
+        // the outer closure won't reflect that until the next render. Diffing
+        // against the stale value made the model's own redundant set_slot
+        // for something the backstop just caught print a second, duplicate
+        // receipt (caught live: typing "Hybrid" against a pending style card
+        // committed instantly, then the model's response echoed the same
+        // set_slot and printed "✓ Style — Hybrid" a second time).
+        if (!applySlot(ws, key, coerced, ws.values)) {
           // Fail LOUD: the mapped value didn't validate — never store it,
           // re-ask with the real chips instead.
           ws.newMessages.push({
@@ -474,17 +483,28 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
     let ws = preRecorded
     let immediateCommit = !!preRecorded
     if (!ws) {
-      const pendingCard = [...messages].reverse().find(m => m.role === 'assistant' && m.slotCard && !m.slotCardResolved)
-      const pendingDef = pendingCard?.slotCard ? getSlotDef(pendingCard.slotCard) : undefined
-      if (pendingDef) {
+      // Try every still-unresolved card, most recent first — not just the
+      // latest one. The model can leave an older question's card pending
+      // while it asks a second one (executeActions allows at most one live
+      // card per turn, so a second present_slot either attaches to the same
+      // reply or waits for a later turn) — an exact-label answer to that
+      // OLDER question was being checked only against the NEWEST card's
+      // options here, failing every time even though it matched a card
+      // still on screen. Live re-runs caught this identical mechanism
+      // dropping three different verbatim chip-label answers ("Getting By",
+      // "Not For Me", "Full Gym") across three separate personas.
+      const pendingCards = [...messages].reverse().filter(m => m.role === 'assistant' && m.slotCard && !m.slotCardResolved)
+      for (const pendingCard of pendingCards) {
+        const pendingDef = getSlotDef(pendingCard.slotCard!)
+        if (!pendingDef) continue
         const matched = tryExactLabelMatch(pendingDef, trimmed)
-        if (matched !== undefined) {
-          const candidate = makeWorkingState()
-          if (applySlot(candidate, pendingDef.key, matched, values)) {
-            ws = candidate
-            immediateCommit = true
-          }
+        if (matched === undefined) continue
+        const candidate = makeWorkingState()
+        if (applySlot(candidate, pendingDef.key, matched, values)) {
+          ws = candidate
+          immediateCommit = true
         }
+        break
       }
     }
     if (!ws) ws = makeWorkingState()
