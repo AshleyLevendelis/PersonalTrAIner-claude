@@ -253,6 +253,32 @@ function tryVolunteeredCapture(
   return matches.length === 1 ? matches[0] : undefined
 }
 
+// How many turns the stuck-slot breaker below tolerates with no confirmed
+// answer anywhere before forcing the canonical-next question regardless of
+// how many times (if any) that specific slot has been asked.
+const STALL_TURN_LIMIT = 6
+
+/**
+ * Turns since ANY slot last got confirmed — not since the conversation
+ * started, and not specific to one slot. The stuck-slot breaker's own
+ * priorAsks count only starts once a slot has actually been asked; a slot
+ * the model never brings up at all keeps priorAsks at 0 forever, so nothing
+ * previously forced it in. This is the floor for that case: real standstill
+ * (nothing confirmed in a while) forces progress; steady work through a
+ * long slot list — new confirmations arriving turn after turn, even on
+ * different slots — never trips it, because the count keeps resetting.
+ */
+function turnsSinceLastConfirmation(msgs: ChatMsg[]): number {
+  let count = 0
+  for (let i = msgs.length - 1; i >= 0; i--) {
+    const m = msgs[i]
+    if (m.role !== 'assistant') continue
+    if (m.isReceipt || (m.slotCard && m.slotCardResolved)) return count
+    count++
+  }
+  return count
+}
+
 /**
  * Validate + record one slot into the working copy. Returns false when the
  * value is rejected.
@@ -707,12 +733,21 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
       // stop trusting the model's phrasing for it: ask it plainly, with the
       // guaranteed-correct chip key attached directly, on top of whatever
       // else this turn already said.
+      //
+      // priorAsks alone only catches a slot the model keeps TRYING and
+      // failing at — it never starts counting for one the model just never
+      // brings up at all, which has no guaranteed floor otherwise. Paired
+      // with stalledTurns: how many turns have passed since anything last
+      // actually got confirmed, anywhere — not specific to canonicalNext, so
+      // legitimate steady progress through a long slot list never trips it,
+      // only genuine standstill does.
       if (!responseWs.openReview) {
         const canonicalNext = [...missingRequiredSlots(responseWs.values), ...unconfirmedOptionalSlots(responseWs.confirmed, responseWs.values)][0]
         if (canonicalNext) {
           const priorAsks = priorMessages.filter(m => m.slotCard === canonicalNext).length
           const askedThisTurn = responseWs.newMessages.some(m => m.slotCard === canonicalNext)
-          if (priorAsks >= 3 && !askedThisTurn) {
+          const stalledTurns = turnsSinceLastConfirmation([...priorMessages, ...responseWs.newMessages])
+          if ((priorAsks >= 3 || stalledTurns >= STALL_TURN_LIMIT) && !askedThisTurn) {
             const def = getSlotDef(canonicalNext)
             if (def) {
               responseWs.newMessages.push({
