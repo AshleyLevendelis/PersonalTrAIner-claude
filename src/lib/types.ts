@@ -13,15 +13,42 @@ export interface UserProfile {
   weight_kg: number
   activity_level: ActivityLevel
   fitness_goal: FitnessGoal
+  /**
+   * STAYS REQUIRED and array-typed for BOTH plan formats. Several readers
+   * call .filter/.some on this without a null guard, so an activity profile
+   * must still populate it — an empty array at minimum, never undefined.
+   * (The guards were added defensively anyway; the contract is the primary
+   * protection, the guards are the backstop.)
+   */
   training_days: TrainingDay[]
   preferred_time: 'morning' | 'evening'
   dietary_preferences: string[]
   session_duration_preference: SessionDuration
   workout_split_preference: WorkoutSplit
   macro_calculation_mode: MacroCalculationMode
-  equipment_access: EquipmentAccess
-  training_style: TrainingStyle
-  training_experience: TrainingExperience
+  /**
+   * Which shape of plan this profile is on. Absent means 'gym' — every
+   * profile written before activity-shaped plans existed is a gym profile,
+   * and treating undefined as 'gym' keeps them working untouched.
+   */
+  plan_format?: PlanFormat
+  /**
+   * The three fields below are OPTIONAL because they have no honest value on
+   * an activity-format profile: someone whose plan is "walk three times a
+   * week" has no equipment tier, no lifting style, and no lifting-experience
+   * tier. They remain required in practice for gym profiles (onboarding
+   * gates them via SlotDef.requiredIf).
+   *
+   * Safe to make optional because every functional read site already carries
+   * an explicit fallback — e.g. exercise-plan.ts's
+   * `profile.equipment_access || 'full_gym'` and
+   * `profile.training_experience || 'novice'`. Note the contrast with
+   * training_days below, which is read UNGUARDED in several places and so
+   * stays required.
+   */
+  equipment_access?: EquipmentAccess
+  training_style?: TrainingStyle
+  training_experience?: TrainingExperience
   coaching_persona: CoachingPersona
   injuries: string[]
   display_name?: string
@@ -118,6 +145,19 @@ export interface UserProfile {
   /** Only meaningful when macro_split_preset is 'custom'. Fraction (0.25 = 25%), not a percentage integer. */
   macro_fat_percent?: number
 }
+
+/**
+ * Which shape of plan a profile gets. 'gym' is sets-and-reps sessions built
+ * by generateExercisePlan/generateMesocycle. 'activity' is duration-and-
+ * frequency work — walks, swims, rides — for someone whose right plan isn't
+ * a gym plan (see VISION.md's "What a plan can be").
+ *
+ * NOTE as of slice one: nothing generates an 'activity' plan yet. The option
+ * is gated behind a feature flag (see isActivityFormatEnabled in
+ * feature-flags.ts) precisely so no real user can select a plan format the
+ * engine can't build — VISION.md's "Only offer what's built".
+ */
+export type PlanFormat = 'gym' | 'activity'
 
 export type CookingTimePreference = 'quick' | 'moderate' | 'loves_cooking'
 export type BreakfastStyle = 'quick_cold' | 'cooked' | 'skip'
@@ -287,6 +327,36 @@ export interface RecommendedCardio {
   is_filler?: boolean
 }
 
+/**
+ * An activity-shaped day's ENTIRE prescription — a walk, a swim, a ride,
+ * expressed as duration and effort rather than sets and reps.
+ *
+ * Deliberately a SIBLING of recommendedCardio, not a reuse of it: that field
+ * means "an optional add-on attached to a gym day" (or a filler on a rest
+ * day), and conflating the two would make "is this the whole session or an
+ * extra?" unanswerable from the data. A WorkoutDay carrying this field has
+ * exercises: [] and is the complete plan for that day.
+ *
+ * Type and shape only as of slice one — nothing generates these yet. The
+ * generator (and its progression/ramp model) is deliberately NOT built here:
+ * duration and frequency numbers for a true beginner are a coaching
+ * decision, not something to guess at in a type definition.
+ */
+export interface PlannedActivity {
+  /** Plain activity name as the user would say it — "Walk", "Swim". */
+  activity: string
+  /** Minutes for this single session. */
+  duration: number
+  /**
+   * Perceived-effort target on the same 1-10 scale RecommendedCardio uses,
+   * so both surfaces can render effort identically. Optional: a first
+   * walking prescription may deliberately carry no effort target at all.
+   */
+  targetRpe?: number
+  /** Coach-voice reason this session is what it is, same role as Exercise.selection_note. */
+  reason?: string
+}
+
 export interface WorkoutDay {
   day: string
   focus: string
@@ -294,6 +364,23 @@ export interface WorkoutDay {
   warmup?: import('./warmup').WarmupBlock
   conditioning_note?: string
   recommendedCardio?: RecommendedCardio
+  /**
+   * Set when this day's whole prescription is an activity rather than a gym
+   * session — see PlannedActivity. Mutually exclusive with a populated
+   * exercises array in practice, though nothing enforces that structurally
+   * yet (no generator produces these as of slice one).
+   */
+  plannedActivity?: PlannedActivity
+  /**
+   * Whether this day is a SCHEDULED training day, independent of whether it
+   * carries gym exercises. Before this existed, "scheduled" was inferred
+   * downstream as `exercises.length > 0` (dashboard-data.ts's streak input),
+   * which silently means an activity day — walk, swim, no exercises array —
+   * could never count as scheduled, so logging it would never build a
+   * streak. Readers should prefer this field and fall back to the old
+   * inference only when it's absent (pre-existing stored plans).
+   */
+  is_scheduled?: boolean
   /**
    * Plain-language note for the (rare) case a required movement pattern for
    * this day genuinely has nothing eligible under the trainee's equipment

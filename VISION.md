@@ -137,6 +137,15 @@ contraindicated when injured / indicated for this injury.
 • Loads. Implement ceilings warn before clamping, never silently. A
 ceiling is a safety net, not a fix — if it catches something, something
 upstream is broken.
+• Starting out. Someone beginning exercise for the first time is told,
+once, plainly and without alarm, to check with a doctor before starting
+something new — at the point their plan is set up, not buried in a
+disclaimer. The app does not screen anyone: no health questionnaire, no
+symptom checklist, no risk score, nothing that performs clinical
+assessment it isn't qualified to make. It says the one true thing and
+gets out of the way. Anything a user raises later is handled by the same
+scope rule as any other symptom — acknowledged warmly, then pointed at a
+professional.
 
 Adaptivity
 • Nothing auto-applies. Every profile change, including a new injury,

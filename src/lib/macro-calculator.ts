@@ -307,7 +307,8 @@ export function calculateDailyMacros(
 
   if (mode === 'STANDARD_STATIC') {
     const macros = computeStaticMacros(profile)
-    const isTraining = profile.training_days.some(
+    // `|| []` backstop — see the note in exercise-plan.ts's availableDays.
+    const isTraining = (profile.training_days || []).some(
       td => td.day === dayName && td.available
     )
     return {
@@ -317,7 +318,7 @@ export function calculateDailyMacros(
     }
   }
 
-  const isTraining = profile.training_days.some(
+  const isTraining = (profile.training_days || []).some(
     td => td.day === dayName && td.available
   )
   const workoutDay = exercisePlan.find(wp => wp.day === dayName)

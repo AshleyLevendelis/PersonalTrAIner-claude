@@ -1,6 +1,6 @@
 import { OptionCard } from './OptionCard'
 import { Button } from '@/components/ui/button'
-import { getSlotDef, type OnboardingSlotValues, type SlotKey } from '@/lib/onboarding-slots'
+import { getSlotDef, offeredOptionsFor, type OnboardingSlotValues, type SlotKey } from '@/lib/onboarding-slots'
 
 // ---------------------------------------------------------------------------
 // The REAL onboarding chips, rendered inside the conversational flow — same
@@ -31,7 +31,11 @@ export function SlotChipsCard({
   onResolveMulti: (key: SlotKey) => void
 }) {
   const def = getSlotDef(slotKey)
-  if (!def || !def.options || (def.control !== 'single' && def.control !== 'multi')) return null
+  // offeredOptionsFor, not def.options: a feature-flagged-off value (today,
+  // planFormat's 'activity') must never render as a tappable chip, even
+  // though it stays valid for a flagged-on profile round-tripping through.
+  const options = def ? offeredOptionsFor(def) : undefined
+  if (!def || !options || (def.control !== 'single' && def.control !== 'multi')) return null
 
   const current = values[def.key]
   const selectedMulti: string[] = Array.isArray(current) ? (current as string[]) : []
@@ -40,14 +44,14 @@ export function SlotChipsCard({
       ? selectedMulti.includes(String(value))
       : current !== null && current !== undefined && String(current) === String(value)
 
-  const compact = def.options.length > 4 || def.options.every(o => !o.description)
+  const compact = options.length > 4 || options.every(o => !o.description)
 
   if (resolved) {
     const picked = def.control === 'multi'
       ? (selectedMulti.length > 0
-          ? def.options.filter(o => selectedMulti.includes(String(o.value))).map(o => o.label).join(', ')
+          ? options.filter(o => selectedMulti.includes(String(o.value))).map(o => o.label).join(', ')
           : 'None')
-      : def.options.find(o => isSelected(o.value))?.label ?? '—'
+      : options.find(o => isSelected(o.value))?.label ?? '—'
     return (
       <div className="mt-2 pl-3.5 border-l-2 border-[color:var(--hairline)]">
         <p className="text-xs text-muted-foreground">{picked}</p>
@@ -57,8 +61,8 @@ export function SlotChipsCard({
 
   return (
     <div className={`mt-2 space-y-2 ${busy ? 'pointer-events-none opacity-60' : ''}`}>
-      <div className={def.options.length > 6 ? 'grid grid-cols-3 gap-2' : 'grid grid-cols-2 gap-2'}>
-        {def.options.map(opt => (
+      <div className={options.length > 6 ? 'grid grid-cols-3 gap-2' : 'grid grid-cols-2 gap-2'}>
+        {options.map(opt => (
           <OptionCard
             key={String(opt.value)}
             icon={opt.icon}

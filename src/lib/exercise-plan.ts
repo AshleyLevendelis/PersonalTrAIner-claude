@@ -3511,8 +3511,13 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
 
   trace.pool_size_after_each_stage.final = pool.length
 
-  // Build the weekly plan
-  let availableDays = profile.training_days.filter(d => d.available)
+  // Build the weekly plan.
+  // `|| []` is a backstop, not the contract: training_days is required and
+  // array-typed on UserProfile for BOTH plan formats, and assembleProfile
+  // always writes all seven entries. The guard exists because an undefined
+  // here used to throw outright rather than degrade — an unhelpful failure
+  // mode for a field a malformed stored row could plausibly be missing.
+  let availableDays = (profile.training_days || []).filter(d => d.available)
   if (profile.recovery_capacity === 'low' && availableDays.length >= 5) {
     // Low recovery capacity (poor sleep, high stress, a physically demanding
     // job) can't safely absorb 5+ weekly sessions on top of everything else

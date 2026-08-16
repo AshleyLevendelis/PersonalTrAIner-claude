@@ -733,7 +733,7 @@ async function runMesocycleBehaviorChecks(): Promise<AuditTestCase[]> {
     resetRandomSource()
     const block1 = meso.filter(w => w.block_number === 1).sort((a, b) => (a.week_in_block ?? 0) - (b.week_in_block ?? 0))
 
-    for (const day of profile.training_days.filter(d => d.available)) {
+    for (const day of (profile.training_days || []).filter(d => d.available)) {
       const weekDays = block1.map(w => w.days.find(d => d.day === day.day))
       const mainLifts = weekDays.map(d => d?.exercises.find(e => e.tier === 'tier_1_primary'))
       if (mainLifts.some(e => !e)) continue
@@ -808,8 +808,8 @@ async function runMesocycleBehaviorChecks(): Promise<AuditTestCase[]> {
 
     const allExercises = block1.flatMap(w => w.days.flatMap(d => d.exercises))
     cases.push({
-      equipment: profile.equipment_access, injuries: profile.injuries, duration: profile.session_duration_preference,
-      style: profile.training_style, experience: profile.training_experience,
+      equipment: profile.equipment_access ?? 'full_gym', injuries: profile.injuries, duration: profile.session_duration_preference,
+      style: profile.training_style ?? 'hybrid', experience: profile.training_experience ?? 'novice',
       passed: failures.length === 0, failures,
       planDays: block1[0]?.days.length ?? 0, totalExercises: allExercises.length, estimatedDurationSec: 0,
     })
@@ -904,8 +904,8 @@ async function runMesocycleBehaviorChecks(): Promise<AuditTestCase[]> {
       }
     }
     cases.push({
-      equipment: profile.equipment_access, injuries: [], duration: profile.session_duration_preference,
-      style: profile.training_style, experience: profile.training_experience,
+      equipment: profile.equipment_access ?? 'full_gym', injuries: [], duration: profile.session_duration_preference,
+      style: profile.training_style ?? 'hybrid', experience: profile.training_experience ?? 'novice',
       passed: failures.length === 0, failures,
       planDays: 0, totalExercises, estimatedDurationSec: 0,
     })
@@ -1236,8 +1236,8 @@ async function runMesocycleBehaviorChecks(): Promise<AuditTestCase[]> {
     }
 
     cases.push({
-      equipment: profile.equipment_access, injuries: [], duration: profile.session_duration_preference,
-      style: profile.training_style, experience,
+      equipment: profile.equipment_access ?? 'full_gym', injuries: [], duration: profile.session_duration_preference,
+      style: profile.training_style ?? 'hybrid', experience,
       passed: failures.length === 0, failures,
       planDays: week1?.days.length ?? 0, totalExercises: week1?.days.flatMap(d => d.exercises).length ?? 0, estimatedDurationSec: 0,
     })
@@ -1321,8 +1321,8 @@ async function runMesocycleBehaviorChecks(): Promise<AuditTestCase[]> {
     }
 
     cases.push({
-      equipment: profile.equipment_access, injuries: [], duration: profile.session_duration_preference,
-      style: profile.training_style, experience,
+      equipment: profile.equipment_access ?? 'full_gym', injuries: [], duration: profile.session_duration_preference,
+      style: profile.training_style ?? 'hybrid', experience,
       passed: failures.length === 0, failures,
       planDays: sortedWeeks[0]?.days.length ?? 0, totalExercises: sortedWeeks[0]?.days.flatMap(d => d.exercises).length ?? 0, estimatedDurationSec: 0,
     })

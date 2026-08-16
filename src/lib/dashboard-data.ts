@@ -187,7 +187,15 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
   ])
   const loggedDates = new Set<string>([...workingLogs.map(l => l.date), ...cardioLogs.map(c => c.date)])
 
-  const scheduledWeekdays = new Set(exercisePlan.filter(d => d.exercises.length > 0).map(d => d.day))
+  // A day is scheduled if it SAYS it is (is_scheduled), falling back to the
+  // old "has exercises" inference only for plans stored before that field
+  // existed. Without the field, an activity-shaped day — a walk, a swim, no
+  // exercises array — would never count as scheduled, so logging it could
+  // never build a streak: streak.ts treats an unscheduled day as transparent,
+  // putting a completed walk in the same bucket as an untouched rest day.
+  const scheduledWeekdays = new Set(
+    exercisePlan.filter(d => (d.is_scheduled ?? d.exercises.length > 0)).map(d => d.day),
+  )
   const streakDays: StreakDayInput[] = []
   for (let i = 34; i >= 0; i--) {
     const d = new Date(now.getTime() - i * 86_400_000)

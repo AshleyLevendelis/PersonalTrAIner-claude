@@ -10,6 +10,7 @@ import {
   buildSlotCatalog,
   missingRequiredSlots,
   unconfirmedOptionalSlots,
+  isSlotRequired,
   assembleProfile,
   toggleValue,
   initialSlotValues,
@@ -152,7 +153,10 @@ export function ConversationalOnboarding({
   const scrollRef = useRef<HTMLDivElement>(null)
 
   const missing = useMemo(() => missingRequiredSlots(values), [values])
-  const requiredCount = useMemo(() => ONBOARDING_SLOTS.filter(s => s.required).length, [])
+  // requiredIf-aware: the denominator shrinks the moment an activity format is
+  // chosen, so the tracker never counts gym-only questions this profile will
+  // never be asked.
+  const requiredCount = useMemo(() => ONBOARDING_SLOTS.filter(s => isSlotRequired(s, values)).length, [values])
   const answeredCount = requiredCount - missing.length
 
   // Persist the draft after every state change — this is the whole
@@ -205,9 +209,9 @@ export function ConversationalOnboarding({
       if (ws.confirmed.has(def.key)) filled[def.key] = displayValueFor(def, ws.values)
     }
     return {
-      slotCatalog: buildSlotCatalog(),
+      slotCatalog: buildSlotCatalog(ws.values),
       filled,
-      remaining: [...missingRequiredSlots(ws.values), ...unconfirmedOptionalSlots(ws.confirmed)],
+      remaining: [...missingRequiredSlots(ws.values), ...unconfirmedOptionalSlots(ws.confirmed, ws.values)],
     }
   }
 
@@ -269,7 +273,7 @@ export function ConversationalOnboarding({
         }
       } else if (action.name === 'complete_onboarding') {
         const stillMissing = missingRequiredSlots(ws.values)
-        const stillUnasked = unconfirmedOptionalSlots(ws.confirmed)
+        const stillUnasked = unconfirmedOptionalSlots(ws.confirmed, ws.values)
         if (stillMissing.length > 0 || stillUnasked.length > 0) {
           // The model jumped early — refuse, visibly. Injuries especially
           // must never be skipped past into generation.
@@ -338,7 +342,7 @@ export function ConversationalOnboarding({
       // with its chips instead of leaving silence.
       const producedVisible = responseWs.newMessages.some(m => !m.isReceipt) || responseWs.openReview
       if (!producedVisible) {
-        const next = [...missingRequiredSlots(responseWs.values), ...unconfirmedOptionalSlots(responseWs.confirmed)][0]
+        const next = [...missingRequiredSlots(responseWs.values), ...unconfirmedOptionalSlots(responseWs.confirmed, responseWs.values)][0]
         const nextDef = next ? getSlotDef(next) : undefined
         if (nextDef) {
           responseWs.newMessages.push({

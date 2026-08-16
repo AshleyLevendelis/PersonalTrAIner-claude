@@ -38,7 +38,7 @@ import {
   INJURY_OPTIONS, COOKING_TIME_OPTIONS, MEALS_PER_DAY_OPTIONS, DURATION_OPTIONS, BREAKFAST_STYLE_OPTIONS,
   DAYS_FULL,
 } from '@/lib/onboarding-slots'
-import type { UserProfile, TrainingDay } from '@/lib/types'
+import type { UserProfile, TrainingDay, TrainingExperience, EquipmentAccess, TrainingStyle } from '@/lib/types'
 
 const GENDER_OPTIONS = [{ value: 'male', label: 'Male' }, { value: 'female', label: 'Female' }]
 
@@ -506,14 +506,19 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
         <div className="space-y-2">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Training setup</h3>
           <div className="rounded-md border p-2.5 space-y-2 text-sm">
-            <Row label="Experience"><EditableSelectField value={profile.training_experience} options={EXPERIENCE_OPTIONS} onSave={v => savePatch({ training_experience: v })} /></Row>
-            <Row label="Equipment"><EditableSelectField value={profile.equipment_access} options={EQUIPMENT_OPTIONS} onSave={v => savePatch({ equipment_access: v })} /></Row>
+            {/* The three gym-only fields below are optional on UserProfile (an
+                activity-format profile has no equipment tier or lifting style).
+                The `??` here is display-only — an activity profile shows the
+                same neutral placeholder any unset field would, rather than
+                these rows vanishing mid-edit. */}
+            <Row label="Experience"><EditableSelectField value={profile.training_experience ?? ''} options={EXPERIENCE_OPTIONS} onSave={v => savePatch({ training_experience: v as TrainingExperience })} /></Row>
+            <Row label="Equipment"><EditableSelectField value={profile.equipment_access ?? ''} options={EQUIPMENT_OPTIONS} onSave={v => savePatch({ equipment_access: v as EquipmentAccess })} /></Row>
             <div className="space-y-1">
               <span className="text-muted-foreground">Training days</span>
               <TrainingDaysEditor days={profile.training_days} onSave={v => savePatch({ training_days: v })} />
             </div>
             <Row label="Session length"><EditableSelectField value={profile.session_duration_preference} options={DURATION_OPTIONS} onSave={v => savePatch({ session_duration_preference: v })} /></Row>
-            <Row label="Style"><EditableSelectField value={profile.training_style} options={STYLE_OPTIONS} onSave={v => savePatch({ training_style: v })} /></Row>
+            <Row label="Style"><EditableSelectField value={profile.training_style ?? ''} options={STYLE_OPTIONS} onSave={v => savePatch({ training_style: v as TrainingStyle })} /></Row>
             <Row label="Activity level"><EditableSelectField value={profile.activity_level} options={ACTIVITY_OPTIONS} onSave={v => savePatch({ activity_level: v })} /></Row>
             <Row label="Recovery capacity"><EditableSelectField value={profile.recovery_capacity} options={RECOVERY_OPTIONS} onSave={v => savePatch({ recovery_capacity: v })} /></Row>
             <Row label="Conditioning"><EditableSelectField value={profile.conditioning_preference} options={CONDITIONING_PREF_OPTIONS} onSave={v => savePatch({ conditioning_preference: v })} /></Row>
