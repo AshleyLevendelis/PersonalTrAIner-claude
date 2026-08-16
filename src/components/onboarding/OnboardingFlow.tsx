@@ -70,14 +70,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
   // gender: 'male' preserves the form's historical pre-selection (the shared
   // initialSlotValues() starts it null — the conversational path requires an
   // explicit answer instead of shipping a silent default).
-  //
-  // planFormat: 'gym' is pinned, not asked. This 19-step form is the gym
-  // questionnaire — every one of its steps assumes sets-and-reps, so pinning
-  // the format here keeps the gym path byte-identical to before rather than
-  // half-forking it. Whether this surface ever grows an activity branch is an
-  // open product question; until it's answered, the conversational flow is
-  // the only surface that asks.
-  const [data, setData] = useState<OnboardingData>({ ...initialSlotValues(), planFormat: 'gym', gender: 'male' })
+  const [data, setData] = useState<OnboardingData>({ ...initialSlotValues(), gender: 'male' })
 
   const [weightUnit, setWeightUnit] = useState<WeightUnit>('kg')
   const [weightDisplay, setWeightDisplay] = useState('')

@@ -41,7 +41,6 @@ const check = (name: string, ok: boolean, detail = '') => {
 
 const fullValues = (): OnboardingSlotValues => ({
   ...initialSlotValues(),
-  planFormat: 'gym',
   displayName: 'Ash',
   fitnessGoal: 'fat_loss',
   trainingExperience: 'novice',
@@ -158,71 +157,44 @@ console.log('\n8. Helpers')
 check('toggleValue adds', JSON.stringify(toggleValue(['a'], 'b')) === JSON.stringify(['a', 'b']))
 check('toggleValue removes', JSON.stringify(toggleValue(['a', 'b'], 'a')) === JSON.stringify(['b']))
 const catalog = buildSlotCatalog()
-check('catalog covers every slot', catalog.length === ONBOARDING_SLOTS.length)
+check('catalog covers every applicable slot', catalog.length === ONBOARDING_SLOTS.filter(s => isSlotApplicable(s, initialSlotValues())).length)
 check('catalog serializes closed sets', catalog.find(c => c.key === 'fitnessGoal')?.values?.length === 4)
 
-console.log('\n9. planFormat gate + requiredIf (activity-format profiles)')
-const planFormatDef = getSlotDef('planFormat')!
-check('planFormat is the FIRST slot (conversational surface asks in array order)', ONBOARDING_SLOTS[0].key === 'planFormat')
-check('planFormat is required', planFormatDef.required)
-check("planFormat accepts 'gym'", planFormatDef.validate('gym'))
-check("planFormat accepts 'activity' (valid even while flag-hidden)", planFormatDef.validate('activity'))
-check('planFormat rejects nonsense', !planFormatDef.validate('yoga_retreat'))
-
-// The six gym-only slots identified in the trace.
-const GYM_ONLY: SlotKey[] = ['trainingExperience', 'knowsWorkingLifts', 'conditioningPreference', 'equipment', 'trainingStyle']
-const gymValues = { ...initialSlotValues(), planFormat: 'gym' as const }
-const activityValues = { ...initialSlotValues(), planFormat: 'activity' as const }
-for (const key of GYM_ONLY) {
+console.log('\n9. requiredIf — genuinely conditional questions')
+// A plan is a plan; there is no plan-format fork. requiredIf exists for
+// questions that only mean something given another answer: the known-lift
+// numbers matter only once someone says they know their lifts.
+check('no planFormat slot exists (the fork was removed)', !getSlotDef('planFormat'))
+const knowsLifts = { ...initialSlotValues(), knowsWorkingLifts: true }
+const doesntKnow = { ...initialSlotValues(), knowsWorkingLifts: false }
+for (const key of ['knownSquatKg', 'knownBenchKg', 'knownDeadliftKg'] as SlotKey[]) {
   const def = getSlotDef(key)!
-  check(`${key}: required for a gym profile`, isSlotRequired(def, gymValues))
-  check(`${key}: NOT required for an activity profile`, !isSlotRequired(def, activityValues))
-  check(`${key}: not applicable (never asked) for an activity profile`, !isSlotApplicable(def, activityValues))
-}
-// Format-agnostic slots must stay required for BOTH.
-for (const key of ['displayName', 'fitnessGoal', 'trainingDays', 'age', 'weightKg'] as SlotKey[]) {
-  const def = getSlotDef(key)!
-  check(`${key}: still required for an activity profile`, isSlotRequired(def, activityValues))
+  check(`${key}: applies once they say they know their numbers`, isSlotApplicable(def, knowsLifts))
+  check(`${key}: does NOT apply when they said they don't`, !isSlotApplicable(def, doesntKnow))
+  check(`${key}: never blocks completion either way`, !isSlotRequired(def, knowsLifts) && !isSlotRequired(def, doesntKnow))
 }
 check(
-  'activity profile has strictly fewer required slots than gym',
-  ONBOARDING_SLOTS.filter(s => isSlotRequired(s, activityValues)).length <
-    ONBOARDING_SLOTS.filter(s => isSlotRequired(s, gymValues)).length,
+  "a don't-know-my-lifts profile is never asked for a squat number, even as a skip",
+  !unconfirmedOptionalSlots(new Set(), doesntKnow).some(k => k.startsWith('known')),
 )
-check('gym-only slots never surface as unanswered optionals for activity', !unconfirmedOptionalSlots(new Set(), activityValues).some(k => GYM_ONLY.includes(k)))
-check('injuries STILL must be explicitly asked on an activity profile (safety)', unconfirmedOptionalSlots(new Set(), activityValues).includes('injuries'))
-check('slot catalog drops gym-only slots for an activity profile', !buildSlotCatalog(activityValues).some(c => GYM_ONLY.includes(c.key as SlotKey)))
 
-console.log('\n10. Feature flag: activity is not OFFERED unless enabled')
-// Node has no localStorage — isActivityFormatEnabled catches and fails CLOSED,
-// which is exactly the state a real user is in.
-check("offeredOptionsFor hides 'activity' when the flag is unavailable/off", !offeredOptionsFor(planFormatDef)!.some(o => o.value === 'activity'))
-check("offeredOptionsFor still offers 'gym'", offeredOptionsFor(planFormatDef)!.some(o => o.value === 'gym'))
-check('catalog sent to the model also hides it', !buildSlotCatalog(gymValues).find(c => c.key === 'planFormat')?.values?.some(v => v.value === 'activity'))
+console.log('\n10. Everyone answers the same questions')
+// The removed fork made six questions conditional on a category the user
+// picked. They are unconditional again: the coach decides what to prescribe
+// from the answers; the user never classifies themselves.
+for (const key of ['trainingExperience', 'knowsWorkingLifts', 'conditioningPreference', 'equipment', 'trainingStyle', 'fitnessGoal'] as SlotKey[]) {
+  check(`${key}: required for everyone`, isSlotRequired(getSlotDef(key)!, initialSlotValues()))
+}
+check('offeredOptionsFor hides nothing today', ONBOARDING_SLOTS.every(d => !d.options || offeredOptionsFor(d)!.length === d.options.length))
 
-console.log('\n11. assembleProfile: activity profiles omit gym-only columns, keep training_days')
-const activityProfile = assembleProfile({
-  ...fullValues(),
-  planFormat: 'activity',
-  equipment: null,
-  trainingStyle: null,
-  trainingExperience: null,
-  knowsWorkingLifts: null,
-  conditioningPreference: null,
-})
-check('plan_format written', activityProfile.plan_format === 'activity')
-check('equipment_access omitted (not defaulted to a claim the user never made)', activityProfile.equipment_access === undefined)
-check('training_style omitted', activityProfile.training_style === undefined)
-check('training_experience omitted', activityProfile.training_experience === undefined)
-check('skip_calibration_week omitted', activityProfile.skip_calibration_week === undefined)
-check('known lifts omitted', activityProfile.known_squat_kg === undefined)
-check('conditioning_preference still populated (non-optional on UserProfile)', !!activityProfile.conditioning_preference)
-check('training_days STILL a 7-entry array (unguarded readers depend on it)', Array.isArray(activityProfile.training_days) && activityProfile.training_days.length === 7)
+console.log('\n11. assembleProfile produces one shape of profile')
 const gymProfile = assembleProfile(fullValues())
-check('gym profile unchanged: equipment_access present', gymProfile.equipment_access === 'home_gym')
-check('gym profile unchanged: training_style present', gymProfile.training_style === 'hybrid')
-check('gym profile unchanged: known lifts still flow', gymProfile.known_squat_kg === 80)
-check('gym profile plan_format defaults correctly', gymProfile.plan_format === 'gym')
+check('equipment_access present', gymProfile.equipment_access === 'home_gym')
+check('training_style present', gymProfile.training_style === 'hybrid')
+check('training_experience present', gymProfile.training_experience === 'novice')
+check('known lifts flow when known', gymProfile.known_squat_kg === 80)
+check('training_days is a 7-entry array (unguarded readers depend on it)', Array.isArray(gymProfile.training_days) && gymProfile.training_days.length === 7)
+check('no plan_format field written', !('plan_format' in gymProfile))
 
 if (failures > 0) {
   console.error(`\n${failures} failure(s)`)

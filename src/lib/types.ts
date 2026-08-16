@@ -27,12 +27,6 @@ export interface UserProfile {
   workout_split_preference: WorkoutSplit
   macro_calculation_mode: MacroCalculationMode
   /**
-   * Which shape of plan this profile is on. Absent means 'gym' — every
-   * profile written before activity-shaped plans existed is a gym profile,
-   * and treating undefined as 'gym' keeps them working untouched.
-   */
-  plan_format?: PlanFormat
-  /**
    * The three fields below are OPTIONAL because they have no honest value on
    * an activity-format profile: someone whose plan is "walk three times a
    * week" has no equipment tier, no lifting style, and no lifting-experience
@@ -145,19 +139,6 @@ export interface UserProfile {
   /** Only meaningful when macro_split_preset is 'custom'. Fraction (0.25 = 25%), not a percentage integer. */
   macro_fat_percent?: number
 }
-
-/**
- * Which shape of plan a profile gets. 'gym' is sets-and-reps sessions built
- * by generateExercisePlan/generateMesocycle. 'activity' is duration-and-
- * frequency work — walks, swims, rides — for someone whose right plan isn't
- * a gym plan (see VISION.md's "What a plan can be").
- *
- * NOTE as of slice one: nothing generates an 'activity' plan yet. The option
- * is gated behind a feature flag (see isActivityFormatEnabled in
- * feature-flags.ts) precisely so no real user can select a plan format the
- * engine can't build — VISION.md's "Only offer what's built".
- */
-export type PlanFormat = 'gym' | 'activity'
 
 export type CookingTimePreference = 'quick' | 'moderate' | 'loves_cooking'
 export type BreakfastStyle = 'quick_cold' | 'cooked' | 'skip'

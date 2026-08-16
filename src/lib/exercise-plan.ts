@@ -16,6 +16,7 @@ import {
   shiftReps, adjustRest, dedupeAdjacentPhases, isRegressionFor, stepIntervalSeconds, type PhaseConfig, type TrainingPhase,
 } from './periodization'
 import { getGoalPolicy, restrictPhaseSequence, resolveConditioningFrequency, RECOVERY_SET_MULTIPLIER, type GoalPolicy } from './goal-policies'
+import { isStartingOut, applyStartingOut, startingOutMinutes } from './starting-out'
 import { getDurationBudgetSeconds, getSteadyStateSeconds, estimateDaySeconds, estimateSlotsSeconds, parseRestSeconds, SESSION_OVERHEAD_SECONDS } from './session-duration'
 
 // ---------------------------------------------------------------------------
@@ -3676,7 +3677,14 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
   // unchanged via object spread, so fixing it once here is sufficient.
   enforceFatigueCostRestFloor(budgetedDays)
 
-  return { plan: budgetedDays, constraint_trace: trace, requiredNames: Array.from(weeklyRequiredNames) }
+  // Last: if this person's own answers say they aren't exercising yet, the
+  // days they'd have trained become walks. Same plan, same days, same week —
+  // only what's prescribed inside each day changes. Deliberately AFTER the
+  // full build rather than instead of it, so the day structure (which
+  // weekdays, how many) is decided by exactly the same code for everyone.
+  const finalDays = isStartingOut(profile) ? applyStartingOut(budgetedDays, 1) : budgetedDays
+
+  return { plan: finalDays, constraint_trace: trace, requiredNames: Array.from(weeklyRequiredNames) }
 }
 
 // ---------------------------------------------------------------------------
@@ -5081,6 +5089,19 @@ export function generateMesocycle(
         // above): their volume is deliberately, uniformly cut, and nudging
         // set counts would fight that.
         enforceWeeklyPatternBalance(days)
+      }
+
+      // Starting-out weeks progress on DURATION, not load. Everything above
+      // has already run and found nothing to do (an activity day carries no
+      // exercises, so every per-exercise loop no-ops) — this re-stamps each
+      // day's walk with this week's minutes, which is the whole progression.
+      if (isStartingOut(profile)) {
+        const minutes = startingOutMinutes(blockIndex + 1)
+        for (let i = 0; i < days.length; i++) {
+          const activity = days[i].plannedActivity
+          if (!activity) continue
+          days[i] = { ...days[i], plannedActivity: { ...activity, duration: minutes } }
+        }
       }
 
       weeks.push({

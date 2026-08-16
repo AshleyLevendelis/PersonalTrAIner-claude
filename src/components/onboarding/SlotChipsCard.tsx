@@ -31,9 +31,8 @@ export function SlotChipsCard({
   onResolveMulti: (key: SlotKey) => void
 }) {
   const def = getSlotDef(slotKey)
-  // offeredOptionsFor, not def.options: a feature-flagged-off value (today,
-  // planFormat's 'activity') must never render as a tappable chip, even
-  // though it stays valid for a flagged-on profile round-tripping through.
+  // Via offeredOptionsFor so any future "hidden until the engine can honour
+  // it" filtering applies here automatically.
   const options = def ? offeredOptionsFor(def) : undefined
   if (!def || !options || (def.control !== 'single' && def.control !== 'multi')) return null
 

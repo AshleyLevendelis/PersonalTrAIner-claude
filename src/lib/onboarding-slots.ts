@@ -1,8 +1,6 @@
 import { DIETARY_PREFERENCES, type DietaryPreference } from '@/lib/diet-rules'
-import { isActivityFormatEnabled } from '@/lib/feature-flags'
 import type {
   UserProfile,
-  PlanFormat,
   FitnessGoal,
   SessionDuration,
   TrainingTime,
@@ -217,8 +215,6 @@ export function toggleValue<T>(arr: T[], value: T): T[] {
 // ---------------------------------------------------------------------------
 
 export interface OnboardingSlotValues {
-  /** Which plan shape this profile is on — gates every gym-only slot below. */
-  planFormat: PlanFormat | null
   displayName: string
   fitnessGoal: FitnessGoal | null
   trainingDays: string[]
@@ -257,7 +253,6 @@ export interface OnboardingSlotValues {
  */
 export function initialSlotValues(): OnboardingSlotValues {
   return {
-    planFormat: null,
     displayName: '',
     fitnessGoal: null,
     trainingDays: [],
@@ -312,17 +307,16 @@ export interface SlotDef {
    */
   required: boolean
   /**
-   * Conditional requiredness. When present, a slot is required only if this
-   * returns true for the current answers — that's how the gym-only questions
-   * (equipment, training style, working lifts…) stop blocking an
-   * activity-format profile, for whom they have no meaningful answer.
+   * Conditional applicability. When present, a slot applies only if this
+   * returns true for the current answers.
    *
-   * A slot whose requiredIf returns false is treated as fully NOT APPLICABLE:
-   * it neither blocks completion nor needs an explicit skip, so the coach
-   * never asks a walker which barbell they own. This is the mechanism chosen
-   * over parallel gym/activity slot arrays specifically to avoid two
-   * definitions of the same field drifting apart — the failure this module
-   * was created to prevent.
+   * A slot whose requiredIf returns false is fully NOT APPLICABLE: it neither
+   * blocks completion nor needs an explicit skip, so the coach never asks a
+   * question that has no meaning for this person — nobody who just said they
+   * don't know their working lifts is then asked for their squat number.
+   *
+   * Kept as a general mechanism rather than special-cased per slot so a new
+   * conditional question is one predicate, not a new branch in every caller.
    */
   requiredIf?: (values: OnboardingSlotValues) => boolean
   options?: readonly SlotOption[]
@@ -350,26 +344,9 @@ const isNumberIn = (min: number, max: number) => (value: unknown) => {
   return value !== '' && value !== null && !Number.isNaN(n) && n >= min && n <= max
 }
 
-/**
- * The plan-format gate. Deliberately FIRST in ONBOARDING_SLOTS: the
- * conversational surface asks in array order (missingRequiredSlots is a plain
- * filter), so placing it here is what makes it the opening question and lets
- * every gym-only slot below gate on the answer.
- *
- * The 'activity' option is filtered out of what's OFFERED unless the feature
- * flag is on (see activitySlotOptions/isActivityFormatEnabled) — the value
- * stays valid in the type and the validator so a flagged-on test profile
- * round-trips, but no real user can pick a format the engine can't build yet.
- */
-export const PLAN_FORMAT_OPTIONS: SlotOption[] = [
-  { value: 'gym', icon: '🏋️', label: 'Structured training', description: 'Gym or home sessions — sets, reps, progressive overload' },
-  { value: 'activity', icon: '🚶', label: 'Everyday movement', description: 'Walks, swims, rides — build the habit first, by time not weights' },
-]
-
-export function isGymFormat(values: OnboardingSlotValues): boolean {
-  // Absent means gym: every profile predating activity-shaped plans is a gym
-  // profile, and the questionnaire's own default is gym.
-  return (values.planFormat ?? 'gym') === 'gym'
+/** The three known-lift numbers only apply once someone says they know them. */
+function knowsTheirLifts(values: OnboardingSlotValues): boolean {
+  return values.knowsWorkingLifts === true
 }
 
 const DAY_OPTIONS: SlotOption[] = DAYS_OF_WEEK.map(d => ({ value: d, icon: '📅', label: d }))
@@ -387,26 +364,21 @@ const SNACKS_OPTIONS: SlotOption[] = [
 ]
 
 export const ONBOARDING_SLOTS: SlotDef[] = [
-  { key: 'planFormat', question: 'What kind of plan suits you right now?', control: 'single', required: true, options: PLAN_FORMAT_OPTIONS, destination: 'column', validate: isOneOf(PLAN_FORMAT_OPTIONS) },
   { key: 'displayName', question: 'What should I call you?', control: 'text', required: true, destination: 'column', validate: v => typeof v === 'string' && v.trim().length > 0 && v.trim().length <= 30 },
   { key: 'fitnessGoal', question: "What's your main goal?", control: 'single', required: true, options: GOAL_OPTIONS, destination: 'column', validate: isOneOf(GOAL_OPTIONS) },
-  // Gym-only from here — an activity-format profile has no honest answer to
-  // any of these, so they gate on the format rather than blocking completion.
-  { key: 'trainingExperience', question: 'How much training have you done?', control: 'single', required: true, requiredIf: isGymFormat, options: EXPERIENCE_OPTIONS, destination: 'column', validate: isOneOf(EXPERIENCE_OPTIONS) },
-  { key: 'knowsWorkingLifts', question: 'Do you know your working lifts (squat, bench, deadlift)?', control: 'single', required: true, requiredIf: isGymFormat, options: KNOWS_LIFTS_OPTIONS, destination: 'column', validate: v => v === true || v === false || v === 'true' || v === 'false' },
-  { key: 'knownSquatKg', question: 'Squat working weight (kg)?', control: 'numeric', required: false, min: 1, max: 500, destination: 'column', validate: isNumberIn(1, 500) },
-  { key: 'knownBenchKg', question: 'Bench working weight (kg)?', control: 'numeric', required: false, min: 1, max: 400, destination: 'column', validate: isNumberIn(1, 400) },
-  { key: 'knownDeadliftKg', question: 'Deadlift working weight (kg)?', control: 'numeric', required: false, min: 1, max: 500, destination: 'column', validate: isNumberIn(1, 500) },
+  { key: 'trainingExperience', question: 'How much training have you done?', control: 'single', required: true, options: EXPERIENCE_OPTIONS, destination: 'column', validate: isOneOf(EXPERIENCE_OPTIONS) },
+  { key: 'knowsWorkingLifts', question: 'Do you know your working lifts (squat, bench, deadlift)?', control: 'single', required: true, options: KNOWS_LIFTS_OPTIONS, destination: 'column', validate: v => v === true || v === false || v === 'true' || v === 'false' },
+  // Only meaningful once someone has said they DO know their numbers.
+  { key: 'knownSquatKg', question: 'Squat working weight (kg)?', control: 'numeric', required: false, requiredIf: knowsTheirLifts, min: 1, max: 500, destination: 'column', validate: isNumberIn(1, 500) },
+  { key: 'knownBenchKg', question: 'Bench working weight (kg)?', control: 'numeric', required: false, requiredIf: knowsTheirLifts, min: 1, max: 400, destination: 'column', validate: isNumberIn(1, 400) },
+  { key: 'knownDeadliftKg', question: 'Deadlift working weight (kg)?', control: 'numeric', required: false, requiredIf: knowsTheirLifts, min: 1, max: 500, destination: 'column', validate: isNumberIn(1, 500) },
   { key: 'trainingDays', question: 'Which days can you actually train?', control: 'multi', required: true, options: DAY_OPTIONS, destination: 'column', validate: v => isSubsetOf(DAY_OPTIONS)(v) && Array.isArray(v) && v.length > 0 },
   { key: 'recoveryCapacity', question: "How's your recovery capacity — sleep, stress, physical job?", control: 'single', required: true, options: RECOVERY_OPTIONS, destination: 'column', validate: isOneOf(RECOVERY_OPTIONS) },
-  // Gym-only: "how do you feel about cardio" is framed as a bolt-on to a
-  // primary lifting plan ("keep it to the minimum the goal needs") — for an
-  // activity profile the movement IS the plan, so the question doesn't parse.
-  { key: 'conditioningPreference', question: 'How do you feel about cardio?', control: 'single', required: true, requiredIf: isGymFormat, options: CONDITIONING_PREF_OPTIONS, destination: 'column', validate: isOneOf(CONDITIONING_PREF_OPTIONS) },
+  { key: 'conditioningPreference', question: 'How do you feel about cardio?', control: 'single', required: true, options: CONDITIONING_PREF_OPTIONS, destination: 'column', validate: isOneOf(CONDITIONING_PREF_OPTIONS) },
   { key: 'sessionDuration', question: 'How long can your sessions usually run?', control: 'single', required: true, options: DURATION_OPTIONS, destination: 'column', validate: isOneOf(DURATION_OPTIONS) },
   { key: 'trainingTime', question: 'When do you usually train?', control: 'single', required: true, options: TIME_OPTIONS, destination: 'derived', validate: isOneOf(TIME_OPTIONS) },
-  { key: 'equipment', question: 'What equipment do you have access to?', control: 'single', required: true, requiredIf: isGymFormat, options: EQUIPMENT_OPTIONS, destination: 'column', validate: isOneOf(EQUIPMENT_OPTIONS) },
-  { key: 'trainingStyle', question: "What's your training style?", control: 'single', required: true, requiredIf: isGymFormat, options: STYLE_OPTIONS, destination: 'column', validate: isOneOf(STYLE_OPTIONS) },
+  { key: 'equipment', question: 'What equipment do you have access to?', control: 'single', required: true, options: EQUIPMENT_OPTIONS, destination: 'column', validate: isOneOf(EQUIPMENT_OPTIONS) },
+  { key: 'trainingStyle', question: "What's your training style?", control: 'single', required: true, options: STYLE_OPTIONS, destination: 'column', validate: isOneOf(STYLE_OPTIONS) },
   { key: 'injuries', question: 'Anything that bothers you when you train — something you avoid or work around?', control: 'multi', required: false, options: INJURY_OPTIONS, destination: 'column', validate: isSubsetOf(INJURY_OPTIONS) },
   { key: 'dietaryPreferences', question: 'Any dietary preferences or restrictions?', control: 'multi', required: false, options: DIETARY_OPTIONS, destination: 'column', validate: isSubsetOf(DIETARY_OPTIONS) },
   { key: 'mealsPerDay', question: 'How many meals a day suits you?', control: 'single', required: true, options: MEALS_PER_DAY_OPTIONS, destination: 'column', validate: isOneOf(MEALS_PER_DAY_OPTIONS) },
@@ -448,23 +420,21 @@ export function isSlotApplicable(def: SlotDef, values: OnboardingSlotValues): bo
 }
 
 /**
- * The options a slot should OFFER right now. Currently only planFormat
- * filters: 'activity' is hidden unless its feature flag is on, so nobody can
- * choose a plan format the engine can't generate yet (VISION.md, "Only offer
- * what's built"). Validation deliberately still accepts 'activity' — a
- * flagged-on profile must round-trip through the same validators.
+ * The options a slot should OFFER right now.
+ *
+ * Nothing is filtered today. Kept as the single choke point so that if a
+ * value ever needs hiding until the engine can honour it (VISION.md's "Only
+ * offer what's built"), it happens in one place rather than at each render
+ * site.
  */
 export function offeredOptionsFor(def: SlotDef): readonly SlotOption[] | undefined {
-  if (def.key === 'planFormat' && !isActivityFormatEnabled()) {
-    return def.options?.filter(o => o.value !== 'activity')
-  }
   return def.options
 }
 
 /**
- * Slots that never gate completion, even on the "explicitly asked" bar: the
- * three known-lift numbers are optional-within-a-question (the form treats
- * them the same), and includeSnacks carries a real default.
+ * Slots that never gate completion, even on the "explicitly asked" bar:
+ * includeSnacks carries a real default, and the three known-lift numbers are
+ * optional-within-a-question (the form treats them the same).
  */
 export const NEVER_BLOCKING_SLOTS: SlotKey[] = ['knownSquatKg', 'knownBenchKg', 'knownDeadliftKg', 'includeSnacks']
 
@@ -492,9 +462,9 @@ export function unconfirmedOptionalSlots(
 ): SlotKey[] {
   return ONBOARDING_SLOTS
     .filter(s => !isSlotRequired(s, values) && !NEVER_BLOCKING_SLOTS.includes(s.key))
-    // A conditionally-required slot whose condition is false is NOT
-    // APPLICABLE, not "an optional we still owe the user" — an activity
-    // profile is never asked which barbell it owns, even as a skip.
+    // A slot whose requiredIf condition is false is NOT APPLICABLE, not "an
+    // optional we still owe the user" — nobody is asked for a squat number
+    // after saying they don't know their lifts, even as a skip.
     .filter(s => isSlotApplicable(s, values))
     .filter(s => !confirmed.has(s.key))
     .map(s => s.key)
@@ -530,32 +500,7 @@ export function assembleProfile(data: OnboardingSlotValues): UserProfile {
     available: data.trainingDays.includes(day.slice(0, 3)),
   }))
 
-  const planFormat: PlanFormat = data.planFormat ?? 'gym'
-  const isGym = planFormat === 'gym'
-
   return {
-    plan_format: planFormat,
-    // Gym-only fields are omitted entirely on an activity profile rather than
-    // filled with a misleading default — "bodyweight equipment" would be a
-    // claim the user never made. Every engine reader already falls back.
-    ...(isGym
-      ? {
-          equipment_access: data.equipment!,
-          training_style: data.trainingStyle!,
-          training_experience: data.trainingExperience!,
-          skip_calibration_week: data.knowsWorkingLifts === true,
-          known_squat_kg: data.knowsWorkingLifts === true && data.knownSquatKg ? Number(data.knownSquatKg) : undefined,
-          known_bench_kg: data.knowsWorkingLifts === true && data.knownBenchKg ? Number(data.knownBenchKg) : undefined,
-          known_deadlift_kg: data.knowsWorkingLifts === true && data.knownDeadliftKg ? Number(data.knownDeadliftKg) : undefined,
-          conditioning_preference: data.conditioningPreference!,
-        }
-      : {
-          // An activity profile still needs a conditioning_preference value —
-          // it's non-optional on UserProfile and read by nutrition//goal code
-          // — so it takes the neutral middle rather than a preference the
-          // user was never asked for.
-          conditioning_preference: 'tolerate' as const,
-        }),
     age: Number(data.age),
     gender: data.gender ?? 'male',
     height_cm: Number(data.heightCm),
@@ -572,11 +517,14 @@ export function assembleProfile(data: OnboardingSlotValues): UserProfile {
     preferred_time: mappedTime,
     dietary_preferences: data.dietaryPreferences,
     session_duration_preference: data.sessionDuration!,
-    // equipment_access / training_style / training_experience /
-    // skip_calibration_week / known_*_kg / conditioning_preference are set by
-    // the format-conditional spread ABOVE — deliberately not repeated here,
-    // where they would overwrite it and put gym values back on an activity
-    // profile.
+    equipment_access: data.equipment!,
+    training_style: data.trainingStyle!,
+    training_experience: data.trainingExperience!,
+    conditioning_preference: data.conditioningPreference!,
+    skip_calibration_week: data.knowsWorkingLifts === true,
+    known_squat_kg: data.knowsWorkingLifts === true && data.knownSquatKg ? Number(data.knownSquatKg) : undefined,
+    known_bench_kg: data.knowsWorkingLifts === true && data.knownBenchKg ? Number(data.knownBenchKg) : undefined,
+    known_deadlift_kg: data.knowsWorkingLifts === true && data.knownDeadliftKg ? Number(data.knownDeadliftKg) : undefined,
     recovery_capacity: data.recoveryCapacity!,
     injuries: data.injuries,
     display_name: data.displayName.trim(),
@@ -605,7 +553,7 @@ export interface SlotCatalogEntry {
  * Serialized for the model. Takes the current answers so the catalog reflects
  * THIS profile's reality: gym-only slots disappear entirely once an activity
  * format is chosen (rather than being sent with a required flag the model
- * would dutifully chase), and planFormat only ever offers what's built.
+ * would dutifully chase).
  */
 export function buildSlotCatalog(values: OnboardingSlotValues = initialSlotValues()): SlotCatalogEntry[] {
   return ONBOARDING_SLOTS
