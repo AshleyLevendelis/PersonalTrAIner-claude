@@ -1,1 +1,14 @@
+# Dependencies — never commit these. Committing node_modules is what broke
+# every Vercel production build from ~2026-08-14 to 2026-08-16: git stored
+# node_modules/.bin/tsc with mode 100644 (non-executable), so the Linux build
+# box hit "Permission denied" running `tsc -b` and exited 126. package-lock.json
+# is committed instead, which reproduces the exact dependency tree on install.
+node_modules/
+
+# Build output
+dist/
+*.tsbuildinfo
+
+# Local tooling state
 .vercel
+supabase/.temp/
