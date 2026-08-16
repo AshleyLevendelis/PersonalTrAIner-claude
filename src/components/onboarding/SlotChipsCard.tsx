@@ -45,18 +45,11 @@ export function SlotChipsCard({
 
   const compact = options.length > 4 || options.every(o => !o.description)
 
-  if (resolved) {
-    const picked = def.control === 'multi'
-      ? (selectedMulti.length > 0
-          ? options.filter(o => selectedMulti.includes(String(o.value))).map(o => o.label).join(', ')
-          : 'None')
-      : options.find(o => isSelected(o.value))?.label ?? '—'
-    return (
-      <div className="mt-2 pl-3.5 border-l-2 border-[color:var(--hairline)]">
-        <p className="text-xs text-muted-foreground">{picked}</p>
-      </div>
-    )
-  }
+  // Answered: the chips simply go away. They used to collapse into a small
+  // "you picked X" line, but the user's own message bubble sits directly
+  // below saying exactly that — the echo was the third copy of one answer on
+  // screen, and stacked down the transcript it read as a completed form.
+  if (resolved) return null
 
   return (
     <div className={`mt-2 space-y-2 ${busy ? 'pointer-events-none opacity-60' : ''}`}>

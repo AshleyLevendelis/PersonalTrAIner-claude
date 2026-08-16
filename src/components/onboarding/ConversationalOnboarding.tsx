@@ -40,8 +40,10 @@ import type { UserProfile } from '@/lib/types'
 //     set is never stored — the user gets the real chips instead (fail loud;
 //     the precedent is the almond-crusted-cod qualifier drop documented in
 //     chat-gemini's allergen block, where silent resolution lost meaning).
-//   - Every recorded value renders a visible receipt line — never a silent
-//     write.
+//   - Every value the model MAPS from free text renders a visible receipt
+//     line — never a silent write. A tapped chip gets no receipt: nothing was
+//     mapped, and the user's own message bubble already states the value. See
+//     applySlot.
 //   - Every slot write persists the draft, so a refresh at slot 7 of 20
 //     resumes with slots 1-6 intact. Context facts / goals volunteered
 //     mid-conversation queue in the draft; App.tsx flushes them after the
@@ -105,18 +107,37 @@ function coerceSlotValue(def: SlotDef, raw: string): unknown {
   return raw.trim()
 }
 
-/** Validate + record one slot into the working copy. Returns false when the value is rejected. */
-function applySlot(ws: WorkingState, key: SlotKey, coerced: unknown, prior: OnboardingSlotValues): boolean {
+/**
+ * Validate + record one slot into the working copy. Returns false when the
+ * value is rejected.
+ *
+ * `showReceipt` is what keeps "never a silent write" true without making the
+ * conversation read like a form. The rule it encodes: a receipt is owed when a
+ * MAPPING happened — the user said "just some dumbbells at home" and the app
+ * stored `minimalist`, which they must be able to see and correct. When they
+ * tapped a chip, no mapping happened: they picked the value, and their own
+ * message bubble already says exactly what was recorded. A tick-row echoing
+ * the question back at them there added nothing but checklist.
+ */
+function applySlot(
+  ws: WorkingState,
+  key: SlotKey,
+  coerced: unknown,
+  prior: OnboardingSlotValues,
+  showReceipt = true,
+): boolean {
   const def = getSlotDef(key)
   if (!def || !def.validate(coerced)) return false
   const alreadySame = JSON.stringify(prior[key]) === JSON.stringify(coerced) && ws.confirmed.has(key)
   ws.values = { ...ws.values, [key]: coerced } as OnboardingSlotValues
   ws.confirmed = new Set(ws.confirmed).add(key)
   ws.resolveCards.add(key)
-  if (!alreadySame) {
+  if (showReceipt && !alreadySame) {
     ws.newMessages.push({
+      // Short noun, not the question — "Equipment — Home Gym" reads as the
+      // coach noting something down; the full question read as a form field.
       role: 'assistant',
-      content: `${RECEIPT_PREFIX}${def.question.replace(/\?$/, '')} — ${displayValueFor(def, ws.values)}`,
+      content: `${RECEIPT_PREFIX}${def.shortLabel} — ${displayValueFor(def, ws.values)}`,
       isReceipt: true,
     })
   }
@@ -268,9 +289,18 @@ export function ConversationalOnboarding({
         if (ws.confirmed.has(key)) continue
         // Attach the chip card to the model's own turn when it produced text
         // this round; otherwise render the slot's canonical question.
-        const lastNew = ws.newMessages[ws.newMessages.length - 1]
-        if (lastNew && lastNew.role === 'assistant' && !lastNew.isReceipt && !lastNew.slotCard && lastNew.content.trim()) {
-          lastNew.slotCard = key
+        //
+        // Search BACKWARDS past confirmation lines rather than looking only at
+        // the last message. A turn that both records an answer and asks the
+        // next question emits [coach text, ✓ confirmation], so a last-only
+        // check found the confirmation, gave up, and printed the slot's raw
+        // form question underneath the coach's own words — the questionnaire
+        // voice reappearing directly below the conversational one.
+        const host = [...ws.newMessages]
+          .reverse()
+          .find(m => m.role === 'assistant' && !m.isReceipt && !m.slotCard && m.content.trim())
+        if (host) {
+          host.slotCard = key
         } else {
           ws.newMessages.push({ role: 'assistant', content: def.question, slotCard: key })
         }
@@ -406,7 +436,8 @@ export function ConversationalOnboarding({
     const def = getSlotDef(key)
     if (!def) return
     const ws = makeWorkingState()
-    if (!applySlot(ws, key, coerceSlotValue(def, value), values)) return
+    // false: a tap is not a mapping — see applySlot's note.
+    if (!applySlot(ws, key, coerceSlotValue(def, value), values, false)) return
     const label = def.options?.find(o => String(o.value) === value)?.label ?? value
     void sendMessage(label, ws)
   }
@@ -416,7 +447,7 @@ export function ConversationalOnboarding({
     if (!def) return
     const selected = (values[key] as string[]) ?? []
     const ws = makeWorkingState()
-    if (!applySlot(ws, key, selected, values)) {
+    if (!applySlot(ws, key, selected, values, false)) {
       // Belt-and-braces: SlotChipsCard disables Done for a required-empty
       // multi, but a validation miss must still be LOUD, never a no-op.
       setMessages(prev => [...prev, { role: 'assistant', content: 'I need at least one there — tap the ones that work for you.' }])
@@ -461,9 +492,19 @@ export function ConversationalOnboarding({
           Quick questionnaire instead
         </button>
       </div>
-      <p className="px-4 pb-2 text-xs text-muted-foreground max-w-md w-full mx-auto">
-        {answeredCount} of {requiredCount} answered
-      </p>
+      {/* Progress without a form's scorekeeping: a hairline that fills as
+          the conversation goes. "12 of 18 answered" told the user they were
+          working through a list, which is exactly the feel we're removing —
+          but dropping progress entirely leaves an open-ended chat with no
+          sense of how long it runs, so the reassurance stays, wordlessly. */}
+      <div className="px-4 pb-3 max-w-md w-full mx-auto">
+        <div className="h-0.5 w-full rounded-full bg-muted overflow-hidden">
+          <div
+            className="h-full bg-primary/60 transition-all duration-500"
+            style={{ width: `${requiredCount > 0 ? Math.round((answeredCount / requiredCount) * 100) : 0}%` }}
+          />
+        </div>
+      </div>
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 pb-4">
         <div className="max-w-md w-full mx-auto space-y-3">
@@ -522,7 +563,7 @@ export function ConversationalOnboarding({
                   .filter(s => isSlotRequired(s, values) || confirmed.has(s.key))
                   .map(def => (
                   <p key={def.key}>
-                    <span className="font-medium text-foreground">{def.question.replace(/\?$/, '')}:</span>{' '}
+                    <span className="font-medium text-foreground">{def.shortLabel}:</span>{' '}
                     <span className="text-muted-foreground">{displayValueFor(def, values)}</span>
                   </p>
                 ))}
@@ -547,7 +588,7 @@ export function ConversationalOnboarding({
                 void sendMessage(text)
               }
             }}
-            placeholder="Type your answer…"
+            placeholder="Say anything…"
             className="h-11"
             disabled={busy}
           />

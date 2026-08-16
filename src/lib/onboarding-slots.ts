@@ -293,6 +293,13 @@ export interface SlotDef {
   key: SlotKey
   /** Coach-voice question — used as the chip card title in chat and mirrors the form's step title. */
   question: string
+  /**
+   * Two-or-three-word noun for this answer, e.g. "Goal", "Training days".
+   * Used wherever a recorded value is echoed back — the confirmation line in
+   * chat, the review card — because repeating the full question there is what
+   * made the conversation read like a form being filled in.
+   */
+  shortLabel: string
   control: 'single' | 'multi' | 'text' | 'numeric' | 'boolean'
   /**
    * required=true means the value must be non-empty/valid before completion.
@@ -364,34 +371,34 @@ const SNACKS_OPTIONS: SlotOption[] = [
 ]
 
 export const ONBOARDING_SLOTS: SlotDef[] = [
-  { key: 'displayName', question: 'What should I call you?', control: 'text', required: true, destination: 'column', validate: v => typeof v === 'string' && v.trim().length > 0 && v.trim().length <= 30 },
-  { key: 'fitnessGoal', question: "What's your main goal?", control: 'single', required: true, options: GOAL_OPTIONS, destination: 'column', validate: isOneOf(GOAL_OPTIONS) },
-  { key: 'trainingExperience', question: 'How much training have you done?', control: 'single', required: true, options: EXPERIENCE_OPTIONS, destination: 'column', validate: isOneOf(EXPERIENCE_OPTIONS) },
-  { key: 'knowsWorkingLifts', question: 'Do you know your working lifts (squat, bench, deadlift)?', control: 'single', required: true, options: KNOWS_LIFTS_OPTIONS, destination: 'column', validate: v => v === true || v === false || v === 'true' || v === 'false' },
+  { key: 'displayName', question: 'What should I call you?', shortLabel: 'Name', control: 'text', required: true, destination: 'column', validate: v => typeof v === 'string' && v.trim().length > 0 && v.trim().length <= 30 },
+  { key: 'fitnessGoal', question: "What's your main goal?", shortLabel: 'Goal', control: 'single', required: true, options: GOAL_OPTIONS, destination: 'column', validate: isOneOf(GOAL_OPTIONS) },
+  { key: 'trainingExperience', question: 'How much training have you done?', shortLabel: 'Experience', control: 'single', required: true, options: EXPERIENCE_OPTIONS, destination: 'column', validate: isOneOf(EXPERIENCE_OPTIONS) },
+  { key: 'knowsWorkingLifts', question: 'Do you know your working lifts (squat, bench, deadlift)?', shortLabel: 'Working lifts', control: 'single', required: true, options: KNOWS_LIFTS_OPTIONS, destination: 'column', validate: v => v === true || v === false || v === 'true' || v === 'false' },
   // Only meaningful once someone has said they DO know their numbers.
-  { key: 'knownSquatKg', question: 'Squat working weight (kg)?', control: 'numeric', required: false, requiredIf: knowsTheirLifts, min: 1, max: 500, destination: 'column', validate: isNumberIn(1, 500) },
-  { key: 'knownBenchKg', question: 'Bench working weight (kg)?', control: 'numeric', required: false, requiredIf: knowsTheirLifts, min: 1, max: 400, destination: 'column', validate: isNumberIn(1, 400) },
-  { key: 'knownDeadliftKg', question: 'Deadlift working weight (kg)?', control: 'numeric', required: false, requiredIf: knowsTheirLifts, min: 1, max: 500, destination: 'column', validate: isNumberIn(1, 500) },
-  { key: 'trainingDays', question: 'Which days can you actually train?', control: 'multi', required: true, options: DAY_OPTIONS, destination: 'column', validate: v => isSubsetOf(DAY_OPTIONS)(v) && Array.isArray(v) && v.length > 0 },
-  { key: 'recoveryCapacity', question: "How's your recovery capacity — sleep, stress, physical job?", control: 'single', required: true, options: RECOVERY_OPTIONS, destination: 'column', validate: isOneOf(RECOVERY_OPTIONS) },
-  { key: 'conditioningPreference', question: 'How do you feel about cardio?', control: 'single', required: true, options: CONDITIONING_PREF_OPTIONS, destination: 'column', validate: isOneOf(CONDITIONING_PREF_OPTIONS) },
-  { key: 'sessionDuration', question: 'How long can your sessions usually run?', control: 'single', required: true, options: DURATION_OPTIONS, destination: 'column', validate: isOneOf(DURATION_OPTIONS) },
-  { key: 'trainingTime', question: 'When do you usually train?', control: 'single', required: true, options: TIME_OPTIONS, destination: 'derived', validate: isOneOf(TIME_OPTIONS) },
-  { key: 'equipment', question: 'What equipment do you have access to?', control: 'single', required: true, options: EQUIPMENT_OPTIONS, destination: 'column', validate: isOneOf(EQUIPMENT_OPTIONS) },
-  { key: 'trainingStyle', question: "What's your training style?", control: 'single', required: true, options: STYLE_OPTIONS, destination: 'column', validate: isOneOf(STYLE_OPTIONS) },
-  { key: 'injuries', question: 'Anything that bothers you when you train — something you avoid or work around?', control: 'multi', required: false, options: INJURY_OPTIONS, destination: 'column', validate: isSubsetOf(INJURY_OPTIONS) },
-  { key: 'dietaryPreferences', question: 'Any dietary preferences or restrictions?', control: 'multi', required: false, options: DIETARY_OPTIONS, destination: 'column', validate: isSubsetOf(DIETARY_OPTIONS) },
-  { key: 'mealsPerDay', question: 'How many meals a day suits you?', control: 'single', required: true, options: MEALS_PER_DAY_OPTIONS, destination: 'column', validate: isOneOf(MEALS_PER_DAY_OPTIONS) },
-  { key: 'includeSnacks', question: 'Snacks too, or meals only?', control: 'single', required: false, options: SNACKS_OPTIONS, destination: 'column', validate: v => v === true || v === false || v === 'true' || v === 'false' },
-  { key: 'cookingTime', question: 'How much time do you want to spend cooking?', control: 'single', required: true, options: COOKING_TIME_OPTIONS, destination: 'column', validate: isOneOf(COOKING_TIME_OPTIONS) },
-  { key: 'favoriteCuisines', question: 'Any favourite cuisines?', control: 'multi', required: false, options: FAVORITE_CUISINE_OPTIONS, destination: 'column', validate: isSubsetOf(FAVORITE_CUISINE_OPTIONS) },
-  { key: 'dislikedFoods', question: 'Any foods you just won\'t eat?', control: 'text', required: false, destination: 'user_facts', validate: v => typeof v === 'string' },
-  { key: 'breakfastStyle', question: "What's breakfast usually like for you?", control: 'single', required: false, options: BREAKFAST_STYLE_OPTIONS, destination: 'column', validate: isOneOf(BREAKFAST_STYLE_OPTIONS) },
-  { key: 'age', question: 'How old are you?', control: 'numeric', required: true, min: 13, max: 100, destination: 'column', validate: isNumberIn(13, 100) },
-  { key: 'gender', question: 'Sex (for calorie math)?', control: 'single', required: true, options: GENDER_OPTIONS, destination: 'column', validate: isOneOf(GENDER_OPTIONS) },
-  { key: 'heightCm', question: 'How tall are you (cm)?', control: 'numeric', required: true, min: 100, max: 250, destination: 'column', validate: isNumberIn(100, 250) },
-  { key: 'weightKg', question: 'What do you weigh right now (kg)?', control: 'numeric', required: true, min: 25, max: 350, destination: 'column', validate: isNumberIn(25, 350) },
-  { key: 'activityLevel', question: 'How active is your day-to-day, outside training?', control: 'single', required: true, options: ACTIVITY_OPTIONS, destination: 'column', validate: isOneOf(ACTIVITY_OPTIONS) },
+  { key: 'knownSquatKg', question: 'Squat working weight (kg)?', shortLabel: 'Squat', control: 'numeric', required: false, requiredIf: knowsTheirLifts, min: 1, max: 500, destination: 'column', validate: isNumberIn(1, 500) },
+  { key: 'knownBenchKg', question: 'Bench working weight (kg)?', shortLabel: 'Bench', control: 'numeric', required: false, requiredIf: knowsTheirLifts, min: 1, max: 400, destination: 'column', validate: isNumberIn(1, 400) },
+  { key: 'knownDeadliftKg', question: 'Deadlift working weight (kg)?', shortLabel: 'Deadlift', control: 'numeric', required: false, requiredIf: knowsTheirLifts, min: 1, max: 500, destination: 'column', validate: isNumberIn(1, 500) },
+  { key: 'trainingDays', question: 'Which days can you actually train?', shortLabel: 'Training days', control: 'multi', required: true, options: DAY_OPTIONS, destination: 'column', validate: v => isSubsetOf(DAY_OPTIONS)(v) && Array.isArray(v) && v.length > 0 },
+  { key: 'recoveryCapacity', question: "How's your recovery capacity — sleep, stress, physical job?", shortLabel: 'Recovery', control: 'single', required: true, options: RECOVERY_OPTIONS, destination: 'column', validate: isOneOf(RECOVERY_OPTIONS) },
+  { key: 'conditioningPreference', question: 'How do you feel about cardio?', shortLabel: 'Cardio', control: 'single', required: true, options: CONDITIONING_PREF_OPTIONS, destination: 'column', validate: isOneOf(CONDITIONING_PREF_OPTIONS) },
+  { key: 'sessionDuration', question: 'How long can your sessions usually run?', shortLabel: 'Session length', control: 'single', required: true, options: DURATION_OPTIONS, destination: 'column', validate: isOneOf(DURATION_OPTIONS) },
+  { key: 'trainingTime', question: 'When do you usually train?', shortLabel: 'Time of day', control: 'single', required: true, options: TIME_OPTIONS, destination: 'derived', validate: isOneOf(TIME_OPTIONS) },
+  { key: 'equipment', question: 'What equipment do you have access to?', shortLabel: 'Equipment', control: 'single', required: true, options: EQUIPMENT_OPTIONS, destination: 'column', validate: isOneOf(EQUIPMENT_OPTIONS) },
+  { key: 'trainingStyle', question: "What's your training style?", shortLabel: 'Style', control: 'single', required: true, options: STYLE_OPTIONS, destination: 'column', validate: isOneOf(STYLE_OPTIONS) },
+  { key: 'injuries', question: 'Anything that bothers you when you train — something you avoid or work around?', shortLabel: 'Niggles', control: 'multi', required: false, options: INJURY_OPTIONS, destination: 'column', validate: isSubsetOf(INJURY_OPTIONS) },
+  { key: 'dietaryPreferences', question: 'Any dietary preferences or restrictions?', shortLabel: 'Diet', control: 'multi', required: false, options: DIETARY_OPTIONS, destination: 'column', validate: isSubsetOf(DIETARY_OPTIONS) },
+  { key: 'mealsPerDay', question: 'How many meals a day suits you?', shortLabel: 'Meals a day', control: 'single', required: true, options: MEALS_PER_DAY_OPTIONS, destination: 'column', validate: isOneOf(MEALS_PER_DAY_OPTIONS) },
+  { key: 'includeSnacks', question: 'Snacks too, or meals only?', shortLabel: 'Snacks', control: 'single', required: false, options: SNACKS_OPTIONS, destination: 'column', validate: v => v === true || v === false || v === 'true' || v === 'false' },
+  { key: 'cookingTime', question: 'How much time do you want to spend cooking?', shortLabel: 'Cooking time', control: 'single', required: true, options: COOKING_TIME_OPTIONS, destination: 'column', validate: isOneOf(COOKING_TIME_OPTIONS) },
+  { key: 'favoriteCuisines', question: 'Any favourite cuisines?', shortLabel: 'Cuisines', control: 'multi', required: false, options: FAVORITE_CUISINE_OPTIONS, destination: 'column', validate: isSubsetOf(FAVORITE_CUISINE_OPTIONS) },
+  { key: 'dislikedFoods', question: 'Any foods you just won\'t eat?', shortLabel: 'Foods to avoid', control: 'text', required: false, destination: 'user_facts', validate: v => typeof v === 'string' },
+  { key: 'breakfastStyle', question: "What's breakfast usually like for you?", shortLabel: 'Breakfast', control: 'single', required: false, options: BREAKFAST_STYLE_OPTIONS, destination: 'column', validate: isOneOf(BREAKFAST_STYLE_OPTIONS) },
+  { key: 'age', question: 'How old are you?', shortLabel: 'Age', control: 'numeric', required: true, min: 13, max: 100, destination: 'column', validate: isNumberIn(13, 100) },
+  { key: 'gender', question: 'Sex (for calorie math)?', shortLabel: 'Sex', control: 'single', required: true, options: GENDER_OPTIONS, destination: 'column', validate: isOneOf(GENDER_OPTIONS) },
+  { key: 'heightCm', question: 'How tall are you (cm)?', shortLabel: 'Height', control: 'numeric', required: true, min: 100, max: 250, destination: 'column', validate: isNumberIn(100, 250) },
+  { key: 'weightKg', question: 'What do you weigh right now (kg)?', shortLabel: 'Weight', control: 'numeric', required: true, min: 25, max: 350, destination: 'column', validate: isNumberIn(25, 350) },
+  { key: 'activityLevel', question: 'How active is your day-to-day, outside training?', shortLabel: 'Daily activity', control: 'single', required: true, options: ACTIVITY_OPTIONS, destination: 'column', validate: isOneOf(ACTIVITY_OPTIONS) },
 ]
 
 export function getSlotDef(key: string): SlotDef | undefined {

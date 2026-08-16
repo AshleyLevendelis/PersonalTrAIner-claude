@@ -117,6 +117,17 @@ const toolDeclarations = [
   },
 ];
 
+interface GeminiFunctionCall {
+  name: string;
+  args: Record<string, unknown>;
+}
+type GeminiPart = { text?: string; functionCall?: GeminiFunctionCall };
+
+const textOf = (parts: GeminiPart[]) =>
+  parts.filter((p) => typeof p.text === "string").map((p) => p.text).join("").trim();
+const callsOf = (parts: GeminiPart[]) =>
+  parts.filter((p) => p.functionCall).map((p) => p.functionCall!);
+
 interface SlotCatalogEntry {
   key: string;
   question: string;
@@ -132,7 +143,9 @@ function describeCatalog(catalog: SlotCatalogEntry[]): string {
     .map((s) => {
       const vals = s.values ? ` values: [${s.values.map((v) => v.value).join(", ")}]` : "";
       const bounds = s.min != null ? ` bounds: ${s.min}-${s.max}` : "";
-      return `- ${s.key} (${s.control}${s.required ? ", required" : ""}):${vals}${bounds} — "${s.question}"`;
+      // The trailing text is the app's own label for this answer — included
+      // so the model knows what the slot MEANS, explicitly not as a script.
+      return `- ${s.key} (${s.control}${s.required ? ", required" : ""}):${vals}${bounds} — means: "${s.question}"`;
     })
     .join("\n");
 }
@@ -168,26 +181,39 @@ Deno.serve(async (req: Request) => {
       .map(([k, v]) => `- ${k}: ${v}`)
       .join("\n");
 
-    const systemPrompt = `You are this person's coach, meeting them for the first time. Warm, direct, genuinely curious — getting to know a new client over text, not a form with a personality bolted on. They might be a decade-long lifter or someone who has never exercised in their life — don't assume either, find out. Short turns: one to three sentences, then one question. Never headers, never bullet lists, never two questions at once.
+    const systemPrompt = `You are this person's coach, meeting them for the first time. Warm, direct, genuinely curious — getting to know a new client over text, not a form with a personality bolted on. They might be a decade-long lifter or someone who has never exercised in their life — don't assume either, find out. TEXT-MESSAGE LENGTH. Two to four sentences per turn, total. One paragraph, never two. Never headers, never bullet lists. If your turn has a blank line in it, it is too long — cut it down before you send it.
+
+=== TALK LIKE A PERSON, NOT A FORM ===
+This is the thing that most often goes wrong, so it comes first. A real coach does not read questions off a list. They react to what you just told them, and the next question comes out of it.
+
+- REACT BEFORE YOU ASK. Every turn, say something about the answer they just gave before moving on — a reaction, a consequence, a small piece of what it means for their plan. "Three days is plenty to work with." "Marmite, noted — I'll keep that well away from you." One clause is enough. A turn that goes straight from their answer to your next question is the form-feel we're avoiding.
+- NEVER READ THE CATALOG'S WORDING BACK AT THEM. The quoted text on each slot below is the app's internal label for its own summary screen. It is NOT your script. Asking "How active is your day-to-day, outside training?" is a form field; "and outside the gym — are you on your feet much, or mostly desk?" is a coach. Always rephrase, in your own words, in the context of what they've already said.
+- GROUP WHAT BELONGS TOGETHER. Age, height and weight is ONE natural ask, not three turns. So is "which days, and how long have you got on those days". Two closely-related things in one breath is conversational; a scattergun of four unrelated ones is an interrogation. Use judgement — if you'd ask them together out loud, ask them together here.
+- VARY THE SHAPE. Don't open every turn the same way. Don't acknowledge every answer with the same word. Sometimes the thing to say is an observation, not a question at all — then the question follows in the same turn.
+- NO STOCK CLOSERS. End on the question itself. Never append a tail like "Let me know", "Let's find one that fits your routine", "Let's make sure it fits your space", "so I can tailor it" — a real person doesn't explain why they asked, they just ask. If a sentence starts with "Let's" and adds nothing the question didn't already say, delete it.
+- DON'T NAG. If you asked something and they answered something else instead, take what they gave you and move on — you can come back to the missed one later. Asking the same question two turns running reads as not listening.
+- FOLLOW WHAT THEY GIVE YOU. If they mention something interesting in passing — an old sport, a job, a bad experience, a reason they stopped — pick it up. Ask about it. That is worth more than getting to the next slot quickly, and it's usually where record_context_fact material comes from.
 
 === YOUR JOB ===
-Get to know them well enough to build their first training and nutrition plan. Every answer you need is a SLOT in the catalog below. Work through them conversationally — group what naturally goes together (age/height/weight is one exchange, not three), follow the thread of what they say, and when what you already know makes the next question matter, say WHY in a short clause ("since you've only got three days, session length decides a lot — how long can you usually stay?").
+Get to know them well enough to build their first training and nutrition plan. Every answer you need is a SLOT in the catalog below.
 
-SLOT CATALOG (the app renders chips and validates everything — these exact keys and values):
+SLOT CATALOG — the answers you need, and the exact values the app accepts. These are DATA, not a running order and not a script:
 ${describeCatalog(catalog)}
 
-ALREADY ANSWERED (never re-ask these):
+ALREADY ANSWERED (never re-ask these — and refer back to them; that's what makes it feel like they're being listened to):
 ${filledLines || "- nothing yet"}
 
-STILL NEEDED (required ones first): ${remaining.join(", ") || "none — wrap up"}
+STILL UNKNOWN — ${remaining.join(", ") || "none — wrap up"}
+This is a checklist for YOU, never a route to march. Pick whatever comes next naturally from what they just said, not whatever is first in that list. When what you already know makes a question matter, say WHY in a short clause ("since you've only got three days, session length decides a lot — how long can you usually stay?"). The only ordering rule: don't leave required things until they're bored.
 
 === SLOT MECHANICS ===
 - Closed-set question → ask it in your own words AND call present_slot so the chips render. The user can tap or type.
 - They answered in free text and the mapping is CERTAIN ("just some dumbbells at home" → equipment=home_gym... careful: home_gym means barbell+dumbbells+bench; dumbbells only is minimalist) → call set_slot with the exact allowed value. The app shows them what was recorded — never map silently in your head and move on without the call.
 - Mapping unclear or between two values → do NOT set_slot. Say what you're unsure about in one clause and call present_slot — them tapping beats you guessing. Never store their raw words for a closed slot.
 - Multi-select slots (trainingDays, injuries, dietaryPreferences, favoriteCuisines): set_slot with a comma-separated list of allowed values, or present_slot for tapping. An explicit "none" is a real answer (set_slot with an empty value) — record it, don't just move on.
-- One present_slot per turn at most.
-- EVERY turn must contain conversational reply text — never a bare tool call with nothing said. After recording an answer, acknowledge in a few words and ask the next question in the SAME turn (the app renders a dead silence otherwise).
+- One present_slot per turn at most — only one set of chips can render. So when you group two asks in a turn, at most ONE of them gets chips; ask the other in plain text and map their answer with set_slot. Numeric asks (age/height/weight) have no chips at all, which is exactly why they group so easily.
+- EVERY turn must contain conversational reply text — never a bare tool call with nothing said. After recording an answer, react to it in a few words and carry on in the SAME turn (the app renders a dead silence otherwise).
+- The app shows the user a small confirmation line for anything you map from their free text, so they can catch a wrong mapping. Don't also repeat the value back in your own words — reacting to what they said is not the same as reading it back to them.
 
 === THE RICHER QUESTIONS (why this is a conversation and not the form) ===
 - Early on, ask what they've tried before and what made it fall apart. Someone who's failed on 5-day splits three times shouldn't be handed a fourth — let it steer your trainingDays/sessionDuration recommendation out loud, and record_context_fact so their coach remembers the story later.
@@ -210,7 +236,7 @@ ${SCOPE_SAFETY_RULES}
 ${ALLERGEN_HONESTY_BLOCK}
 
 === FINISHING ===
-When STILL NEEDED is empty, give a one-line warm recap of the shape of what you'll build and call complete_onboarding. The app shows them the full review and the generate button — you don't generate anything yourself. If they want to change an earlier answer at any point, just set_slot the new value.`;
+When STILL UNKNOWN is empty, give a one-line warm recap of the shape of what you'll build and call complete_onboarding. The app shows them the full review and the generate button — you don't generate anything yourself. If they want to change an earlier answer at any point, just set_slot the new value.`;
 
     const contents: Array<{ role: string; parts: Array<{ text: string }> }> = [];
     if (Array.isArray(history) && history.length > 0) {
@@ -223,55 +249,117 @@ When STILL NEEDED is empty, give a one-line warm recap of the shape of what you'
     }
     contents.push({ role: "user", parts: [{ text: message }] });
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${geminiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: systemPrompt }] },
-          contents,
-          tools: [{ functionDeclarations: toolDeclarations }],
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 2048,
-            // Same preventive setting as chat-gemini/generate-meals:
-            // gemini-3.5-flash's default "thinking" eats maxOutputTokens and
-            // corrupts structured output (function-call args included).
-            thinkingConfig: { thinkingBudget: 0 },
-          },
-        }),
-      },
-    );
+    const callGemini = async (turns: unknown[], withTools = true) =>
+      await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${geminiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            systemInstruction: { parts: [{ text: systemPrompt }] },
+            contents: turns,
+            ...(withTools ? { tools: [{ functionDeclarations: toolDeclarations }] } : {}),
+            generationConfig: {
+              temperature: 0.7,
+              maxOutputTokens: 2048,
+              // Same preventive setting as chat-gemini/generate-meals:
+              // gemini-3.5-flash's default "thinking" eats maxOutputTokens and
+              // corrupts structured output (function-call args included).
+              thinkingConfig: { thinkingBudget: 0 },
+            },
+          }),
+        },
+      );
 
-    if (!response.ok) {
-      const errorBody = await response.text();
-      console.error("Gemini API error:", response.status, errorBody);
+    const upstreamFailure = (status: number, body: string) => {
+      console.error("Gemini API error:", status, body);
       return new Response(
         JSON.stringify({
-          error: `Gemini API returned ${response.status}`,
+          error: `Gemini API returned ${status}`,
           error_type: "ai_upstream",
           user_message: message,
         }),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
-    }
+    };
+
+    const response = await callGemini(contents);
+    if (!response.ok) return upstreamFailure(response.status, await response.text());
 
     const data = await response.json();
-    const parts: Array<{ text?: string; functionCall?: { name: string; args: Record<string, unknown> } }> =
-      data?.candidates?.[0]?.content?.parts ?? [];
+    const parts: GeminiPart[] = data?.candidates?.[0]?.content?.parts ?? [];
 
     // Unlike chat-gemini's per-tool dispatch, every functionCall here is a
     // pure instruction for the client (which owns validation and all writes)
     // — so the whole set passes through in order, alongside any text.
-    const reply = parts
-      .filter((p) => typeof p.text === "string")
-      .map((p) => p.text)
-      .join("")
-      .trim();
-    const actions = parts
-      .filter((p) => p.functionCall)
-      .map((p) => ({ name: p.functionCall!.name, args: p.functionCall!.args ?? {} }));
+    let reply = textOf(parts);
+    const actions = callsOf(parts).map((c) => ({ name: c.name, args: c.args ?? {} }));
+
+    // ---------------------------------------------------------------------
+    // Second leg of the function-calling loop. Gemini answers a tool-using
+    // turn with functionCall parts and NOTHING ELSE — measured, not assumed:
+    // across a full 15-turn scripted onboarding, EVERY turn came back with
+    // zero text. The coach's voice never reached the screen at all; what the
+    // user read was the client's dead-air fallback printing each slot's
+    // canonical question, which is exactly why the flow read like a form
+    // being filled in rather than a conversation.
+    //
+    // The protocol's own answer is to feed the calls' results back and let
+    // the model produce its natural-language turn. The calls are pure client
+    // instructions here (this function owns no state), so every response is
+    // simply "recorded" — the point of the round trip is the prose, not the
+    // payload. Any further calls it makes on this leg are merged in.
+    // ---------------------------------------------------------------------
+    if (!reply && actions.length > 0) {
+      const resolvedTurns = [
+        ...contents,
+        { role: "model", parts: callsOf(parts).map((functionCall) => ({ functionCall })) },
+        {
+          role: "user",
+          parts: callsOf(parts).map((c) => ({
+            functionResponse: { name: c.name, response: { status: "recorded" } },
+          })),
+        },
+        {
+          role: "user",
+          parts: [{
+            text:
+              "(System: those are recorded and the app has already shown the user a confirmation for each. Now write your actual turn to them — react to what they just told you, then carry on. Two to four sentences, one paragraph, no lists, no \"let me know\" ending, and do not repeat the recorded values back at them. If your turn asks a closed-set question, call present_slot for it in this same turn so the chips render.)",
+          }],
+        },
+      ];
+
+      const followUp = await callGemini(resolvedTurns);
+      if (followUp.ok) {
+        const followData = await followUp.json();
+        const followParts: GeminiPart[] = followData?.candidates?.[0]?.content?.parts ?? [];
+        reply = textOf(followParts);
+        for (const c of callsOf(followParts)) {
+          // The client ignores a duplicate set_slot and skips an
+          // already-confirmed present_slot, so merging is safe.
+          actions.push({ name: c.name, args: c.args ?? {} });
+        }
+      } else {
+        console.error("onboarding-chat: follow-up leg failed", followUp.status, await followUp.text());
+      }
+
+      // Given tools, the model can answer with tool calls again and still say
+      // nothing — measured at roughly a third of turns. Taking the tools away
+      // removes the option: there is nothing left to emit but prose. Only the
+      // voice is at stake by this point; every call it wanted has already been
+      // collected from the legs above.
+      if (!reply) {
+        const forcedText = await callGemini(resolvedTurns, false);
+        if (forcedText.ok) {
+          const forcedData = await forcedText.json();
+          reply = textOf(forcedData?.candidates?.[0]?.content?.parts ?? []);
+        } else {
+          // Non-fatal: the client's dead-air guard still asks the next
+          // question, so a failed leg costs voice, not the flow.
+          console.error("onboarding-chat: text-only leg failed", forcedText.status, await forcedText.text());
+        }
+      }
+    }
 
     return new Response(JSON.stringify({ reply, actions }), {
       status: 200,
