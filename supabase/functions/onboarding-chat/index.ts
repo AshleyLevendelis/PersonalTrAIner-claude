@@ -337,9 +337,13 @@ When STILL UNKNOWN is empty, give a one-line warm recap of the shape of what you
         const followParts: GeminiPart[] = followData?.candidates?.[0]?.content?.parts ?? [];
         reply = textOf(followParts);
         for (const c of callsOf(followParts)) {
-          // The client ignores a duplicate set_slot and skips an
-          // already-confirmed present_slot, so merging is safe.
-          actions.push({ name: c.name, args: c.args ?? {} });
+          // Drop what the first leg already asked for. A repeated present_slot
+          // is the damaging one — it renders a second copy of the same
+          // question — so identical (tool, slot) pairs never merge twice.
+          const dup = actions.some(
+            (a) => a.name === c.name && a.args?.slot_key === (c.args ?? {}).slot_key,
+          );
+          if (!dup) actions.push({ name: c.name, args: c.args ?? {} });
         }
       } else {
         console.error("onboarding-chat: follow-up leg failed", followUp.status, await followUp.text());

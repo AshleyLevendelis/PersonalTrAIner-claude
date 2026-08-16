@@ -306,6 +306,14 @@ export function ConversationalOnboarding({
           continue
         }
         if (ws.confirmed.has(key)) continue
+        // One live card per question. The model can ask for the same chips on
+        // both legs of the round trip, and the second copy found the coach's
+        // message already taken, so it fell through to the raw-question
+        // fallback — the same question twice, the second time in form voice.
+        const alreadyLive = [...messages, ...ws.newMessages].some(
+          m => m.slotCard === key && !m.slotCardResolved && !ws.resolveCards.has(key),
+        )
+        if (alreadyLive) continue
         // Attach the chip card to the model's own turn when it produced text
         // this round; otherwise render the slot's canonical question.
         //
