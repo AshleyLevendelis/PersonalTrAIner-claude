@@ -25,6 +25,7 @@ import {
   INJURY_OPTIONS,
   DIETARY_OPTIONS,
   isStartingFromNothing,
+  detectAllergenTags,
   type OnboardingSlotValues,
   type SlotKey,
 } from '../src/lib/onboarding-slots'
@@ -315,6 +316,49 @@ for (const [label, v] of [
 // Still worth asking once (small chat-greeting value) — confirm it stays in
 // the optional/ask-anyway pool rather than being silently skipped entirely.
 check('trainingTime still needs an explicit ask/skip (it is not in NEVER_BLOCKING)', unconfirmedOptionalSlots(new Set()).includes('trainingTime'))
+
+console.log('\n16. detectAllergenTags — deterministic safety backstop, model-independent')
+// A live onboarding transcript disclosed a "severe peanut allergy" and got a
+// reassuring reply and a memory note — no set_slot, so meal generation never
+// saw it (record_context_fact writes to a table generate-meals never reads).
+// This backstop exists so a tagged allergy lands in dietaryPreferences no
+// matter what the model does with it.
+const trueCases: [string, string][] = [
+  ['I have a severe peanut allergy', 'nut-free'],
+  ['allergic to tree nuts, mostly walnuts', 'nut-free'],
+  ["I'm lactose intolerant", 'dairy-free'],
+  ['I have a dairy allergy', 'dairy-free'],
+  ['gluten allergy, celiac actually', 'gluten-free'],
+  ['allergic to eggs', 'egg-free'],
+  ['I have a soy allergy', 'soy-free'],
+  ['shellfish allergy, shrimp especially', 'shellfish-free'],
+  ['allergic to fish', 'fish-free'],
+]
+for (const [text, tag] of trueCases) {
+  check(`"${text}" detects ${tag}`, detectAllergenTags(text).includes(tag as any), JSON.stringify(detectAllergenTags(text)))
+}
+check(
+  'a combined disclosure detects multiple tags in one pass',
+  (() => {
+    const tags = detectAllergenTags('allergic to peanuts and shellfish')
+    return tags.includes('nut-free') && tags.includes('shellfish-free') && tags.length === 2
+  })(),
+)
+const falseCases = [
+  'I love fish and chips',
+  'I eat a lot of nuts and seeds',
+  'my go-to breakfast is eggs and toast',
+  'I drink milk with my shakes',
+  "let's talk about my training days",
+  'I want to build more muscle',
+]
+for (const text of falseCases) {
+  check(`"${text}" does NOT falsely detect an allergen`, detectAllergenTags(text).length === 0, JSON.stringify(detectAllergenTags(text)))
+}
+check(
+  'the five untagged allergens (no enforcement mechanism exists) are correctly never returned',
+  detectAllergenTags('allergic to celery, sesame, mustard, lupin, and sulphites').length === 0,
+)
 
 if (failures > 0) {
   console.error(`\n${failures} failure(s)`)

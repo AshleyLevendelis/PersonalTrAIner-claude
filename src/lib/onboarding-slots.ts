@@ -156,6 +156,43 @@ const DIETARY_META: Record<DietaryPreference, { icon: string; label: string }> =
 export const DIETARY_OPTIONS: { value: DietaryPreference; icon: string; label: string }[] =
   DIETARY_PREFERENCES.map(value => ({ value, ...DIETARY_META[value] }))
 
+// Only these seven "-free" tags are structurally enforced — FORBIDDEN_TAGS
+// in diet-rules.ts is what generate-meals actually filters against. A
+// disclosed allergy needs to land in dietaryPreferences to be kept out of
+// meals; being remembered as a fact (record_context_fact) is NOT enough —
+// meal generation never reads that table. Confirmed missing live: a "severe
+// peanut allergy" disclosed in an onboarding transcript got a reassuring
+// reply and a memory note, but the generated plan's filter never saw it.
+const ALLERGEN_SIGNAL = /allerg|intoleran|anaphyla|can'?t (eat|have)|cannot (eat|have)|reaction to|sensitive to|makes? me (sick|ill)|gets? me sick/i
+
+const ALLERGEN_FOOD_PATTERNS: Partial<Record<DietaryPreference, RegExp>> = {
+  'nut-free': /\b(peanuts?|tree nuts?|almonds?|cashews?|walnuts?|pistachios?|hazelnuts?|pecans?|macadamia|nuts?)\b/i,
+  'dairy-free': /\b(dairy|milk|lactose|cheese)\b/i,
+  'gluten-free': /\b(gluten|wheat|celiac|coeliac)\b/i,
+  'egg-free': /\beggs?\b/i,
+  'soy-free': /\b(soy|soya|soybeans?)\b/i,
+  'shellfish-free': /\b(shellfish|shrimp|prawns?|crab|lobster|crustaceans?|mollus[ck]s?|clams?|mussels?|oysters?|scallops?)\b/i,
+  'fish-free': /\bfish\b/i,
+}
+
+/**
+ * Deterministic safety backstop, independent of the model: free text that
+ * BOTH names one of the seven tagged allergen categories AND signals an
+ * actual allergy (not just a food mention) returns the matching "-free"
+ * tag(s). The signal requirement is what keeps this conservative — "I love
+ * shellfish" never matches, only "I'm allergic to shellfish" does — so the
+ * failure mode this leaves is a missed unusually-phrased disclosure (the
+ * model prompt is the second layer for that), never an over-eager false tag.
+ */
+export function detectAllergenTags(text: string): DietaryPreference[] {
+  if (!ALLERGEN_SIGNAL.test(text)) return []
+  const hits: DietaryPreference[] = []
+  for (const [tag, pattern] of Object.entries(ALLERGEN_FOOD_PATTERNS) as [DietaryPreference, RegExp][]) {
+    if (pattern.test(text)) hits.push(tag)
+  }
+  return hits
+}
+
 // Maps to the STATIC_PAL multipliers in macro-calculator.ts (1.2 / 1.375 /
 // 1.55 / 1.725). Four options rather than five: 'very_active' (1.9,
 // athlete-tier) stays reachable via the type but isn't offered — day-to-day

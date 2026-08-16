@@ -18,6 +18,8 @@ import {
   numericGroupFor,
   initialSlotValues,
   isStartingFromNothing,
+  detectAllergenTags,
+  DIETARY_OPTIONS,
   type OnboardingSlotValues,
   type SlotKey,
   type SlotDef,
@@ -508,6 +510,29 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
       }
     }
     if (!ws) ws = makeWorkingState()
+
+    // Deterministic allergen safety backstop — runs on every typed message,
+    // independent of whatever slot is currently pending, because a serious
+    // allergy can come up at any point in the conversation (confirmed live:
+    // a "severe peanut allergy" disclosed in the very first message got a
+    // reassuring reply and nothing else — no set_slot, so meal generation
+    // never saw it). The model is told to do this too (coach-rules.ts), but
+    // a missed allergy tag isn't something to shrug off as "the model had an
+    // off turn" the way a missed trainingStyle answer is, so it doesn't rely
+    // on the model at all.
+    const allergenTags = detectAllergenTags(trimmed).filter(t => !ws.values.dietaryPreferences.includes(t))
+    if (allergenTags.length > 0) {
+      const merged = [...ws.values.dietaryPreferences, ...allergenTags]
+      if (applySlot(ws, 'dietaryPreferences', merged, ws.values, false)) {
+        const labels = allergenTags.map(t => DIETARY_OPTIONS.find(o => o.value === t)?.label ?? t).join(', ')
+        ws.newMessages.push({
+          role: 'assistant',
+          content: `✓ Flagged as a hard restriction, not just a preference — ${labels} will be kept out of every meal.`,
+          isReceipt: true,
+        })
+        immediateCommit = true
+      }
+    }
 
     const priorMessages = messages
     // User bubble first, THEN the tap's receipt — the transcript reads in

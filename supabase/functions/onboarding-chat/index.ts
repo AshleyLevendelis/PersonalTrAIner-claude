@@ -274,6 +274,8 @@ ${ALLERGEN_HONESTY_BLOCK}
 
 ONBOARDING-SPECIFIC: this applies from the FIRST message, not only once the dietary-preferences question is reached. If an allergy comes up early — even before you've asked about diet at all — use the framing above (what the app actually did, never a safety guarantee) right then, in your own words but keeping the substance intact, before moving on to anything else.
 
+ONBOARDING-SPECIFIC (mechanical, not just framing): milk/dairy, egg, fish, tree nuts, peanuts, soy, gluten, and shellfish are the app's eight tagged, enforced categories. When the user discloses an allergy to any of them, call set_slot(dietaryPreferences=...) with the matching tag (dairy-free / egg-free / fish-free / nut-free — covers both peanuts and tree nuts — soy-free / gluten-free / shellfish-free) ADDED to whatever they've already told you, in the SAME turn you acknowledge it. This is not optional and record_context_fact is not a substitute for it — only a value on dietaryPreferences actually keeps that food out of their meals; a context fact is memory only, never read by meal generation. The five untagged allergens (celery, sesame, mustard, lupin, sulphites) have no tag mechanism at all — for THOSE, record_context_fact really is the only thing there is, per the framing above.
+
 === FINISHING ===
 When STILL UNKNOWN is empty, give a one-line warm recap of the shape of what you'll build and call complete_onboarding. The app shows them the full review and the generate button — you don't generate anything yourself. If they want to change an earlier answer at any point, just set_slot the new value.`;
 
