@@ -21,7 +21,7 @@
 // ---------------------------------------------------------------------------
 
 import type { UserProfile, MacroTargets, WorkoutDay } from './types'
-import { calculateDailyMacros, getStaticDailyMacros, computeBMR, computeStaticTDEE } from './macro-calculator'
+import { calculateDailyMacros, getStaticDailyMacros, computeBMR, computeStaticTDEE, resolveBodyMetrics } from './macro-calculator'
 import { getDailyMetrics, upsertNutritionTarget, getNutritionTargets } from './daily-tracking'
 import { computeWeightTrend } from './weight-trend'
 import { supabase } from './supabase'
@@ -52,12 +52,18 @@ function todayName(): string {
  * regardless of mode) and prefers the latest weigh-in over onboarding
  * weight.
  */
-export function computeTargets(profile: UserProfile, opts: ComputeTargetsOptions = {}): MacroTargets {
+/**
+ * Null when the profile has no weight/height/age/sex — targets are ABSENT,
+ * not estimated. Callers render the absence line and a way to add the
+ * missing value; none of them substitute a figure.
+ */
+export function computeTargets(profile: UserProfile, opts: ComputeTargetsOptions = {}): MacroTargets | null {
   const eff = effectiveProfile(profile, opts.latestWeightKg)
 
   if ((profile.macro_calculation_mode || 'STANDARD_STATIC') === 'DYNAMIC_CSCS') {
     const day = opts.dayName ?? todayName()
     const result = calculateDailyMacros(eff, day, opts.exercisePlan ?? [])
+    if (!result) return null
     return { calories: result.calories, protein: result.protein, carbs: result.carbs, fat: result.fat }
   }
 
@@ -186,7 +192,11 @@ export async function snapshotTargetsIfChanged(
     if (unchanged) return { snapshotted: false, changedFromPrior: false }
 
     const eff = effectiveProfile(profile, anchorWeightKg)
-    const bmr = computeBMR(eff)
+    // No body metrics means no target to snapshot — persisting a computed
+    // row here would recreate the fabricated number this change removes.
+    const metrics = resolveBodyMetrics(eff)
+    if (!metrics) return { snapshotted: false, changedFromPrior: false }
+    const bmr = computeBMR(metrics)
     await upsertNutritionTarget({
       profile_id: profileId,
       date: today,
