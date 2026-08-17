@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Send, CheckCircle2, ArrowDown, RotateCcw, AlertCircle, Trash2, Mic, MessageCircle } from 'lucide-react'
 import { calculateCalories, getActiveMesocycleWeek } from '@/lib/calculations'
-import { computeBMR, computeStaticTDEE } from '@/lib/macro-calculator'
+import { computeBMR, computeStaticTDEE, resolveBodyMetrics } from '@/lib/macro-calculator'
 import { getAppNow } from '@/lib/dev-clock'
 import { supabase } from '@/lib/supabase'
 import { getRecentLogs, formatLogsForAI, getRecentCardioLogs, formatCardioLogsForAI } from '@/lib/daily-tracking'
@@ -103,8 +103,8 @@ interface FavoriteMeal {
 
 interface ChatAssistantProps {
   profile: UserProfile
-  /** Living targets from computeTargets (M0) — the SAME numbers the Nutrition tab shows, respecting the user's selected macro mode. */
-  macros: MacroTargets
+  /** Living targets from computeTargets (M0) — the SAME numbers the Nutrition tab shows, respecting the user's selected macro mode. Null when a body metric is missing; already guarded internally (line ~355) before any use. */
+  macros: MacroTargets | null
   exercisePlan: WorkoutDay[]
   mesocycle: MesocycleWeek[]
   /** When the CURRENT plan was generated — the live-week anchor (C0 Part 6). Falls back to profile.created_at upstream. */
@@ -614,8 +614,13 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     const workoutLoggedToday = workoutLogHistory.includes(todayStr)
 
     const effectiveWeightKg = latestWeightKg != null && latestWeightKg > 0 ? latestWeightKg : profile.weight_kg
-    const liveBmr = computeBMR({ ...profile, weight_kg: effectiveWeightKg })
-    const liveTdee = computeStaticTDEE(liveBmr, profile.activity_level)
+    // Null when a body metric is missing. The coach is then told the numbers
+    // are unavailable rather than being handed a figure computed from a
+    // guessed weight — it must not quote a calorie target it cannot stand
+    // behind, and it must not invent one to fill the silence.
+    const liveMetrics = resolveBodyMetrics({ ...profile, weight_kg: effectiveWeightKg })
+    const liveBmr = liveMetrics ? computeBMR(liveMetrics) : null
+    const liveTdee = liveBmr != null ? computeStaticTDEE(liveBmr, profile.activity_level) : null
 
     return {
       current_date: now.toISOString(),

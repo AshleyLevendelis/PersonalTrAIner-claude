@@ -3,7 +3,7 @@ PLAN QUALITY SCORE REPORT
 ================================================================================
 
 Combinations scored: 9216
-Runtime: 1182.9s
+Runtime: 1149.8s
 Overall average: 11.04 / 12
 
 Per-dimension averages (max 2.0 each):

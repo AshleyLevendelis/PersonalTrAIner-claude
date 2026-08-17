@@ -23,7 +23,7 @@ import { isDevAccount, getSessionDateContext, getAppNow } from '@/lib/dev-clock'
 import { useAppRoute, tabHash, isTab, isKnownTabHash, type Tab } from '@/lib/app-route'
 
 import { calculateCalories } from '@/lib/calculations'
-import { computeBMR, computeStaticTDEE } from '@/lib/macro-calculator'
+import { computeBMR, computeStaticTDEE, resolveBodyMetrics } from '@/lib/macro-calculator'
 import { computeTargets, getLatestWeightKg, getEffectiveTargetWeightKg, snapshotTargetsIfChanged } from '@/lib/nutrition-targets'
 import { describeGoalProximity, isGoalProximityDismissed, dismissGoalProximity } from '@/lib/goal-proximity'
 import { upsertDailyMetric } from '@/lib/daily-tracking'
@@ -235,10 +235,15 @@ function App() {
 
     const restoredProfile: UserProfile = {
       id: profileRow.id,
-      age: profileRow.age,
-      gender: profileRow.gender,
-      height_cm: Number(profileRow.height_cm),
-      weight_kg: Number(profileRow.weight_kg),
+      // Number(null) is 0, not undefined — that silently turned "never given"
+      // back into a fabricated measurement right at the restore boundary,
+      // undoing the whole absence fix for every returning user. age/gender
+      // pass through as-is (already null | T from Postgres); height/weight
+      // need the Number() cast for real values but must skip it for null.
+      age: profileRow.age ?? undefined,
+      gender: profileRow.gender ?? undefined,
+      height_cm: profileRow.height_cm == null ? undefined : Number(profileRow.height_cm),
+      weight_kg: profileRow.weight_kg == null ? undefined : Number(profileRow.weight_kg),
       activity_level: profileRow.activity_level,
       fitness_goal: profileRow.fitness_goal,
       training_days: profileRow.training_days,
@@ -425,7 +430,7 @@ function App() {
 
     setProfile(restoredProfile)
     setLatestWeightKg(restoredWeight)
-    setTargetWeightAnchorKg(effectiveTargetWeight.weightKg)
+    setTargetWeightAnchorKg(effectiveTargetWeight.weightKg ?? null)
     setMacros(liveTargets)
     setMealPools(restoredPools)
     setExercisePlan(restoredExercises)
@@ -439,7 +444,7 @@ function App() {
       getActiveGoals(restoredProfile.id).then(goals => {
         const weightGoal = goals.find(g => g.metric === 'body_weight_kg')
         if (!weightGoal) return
-        const info = describeGoalProximity(effectiveTargetWeight.weightKg, weightGoal)
+        const info = effectiveTargetWeight.weightKg == null ? null : describeGoalProximity(effectiveTargetWeight.weightKg, weightGoal)
         if (info && !isGoalProximityDismissed(info.goalId)) {
           setAdaptationMessages(prev => prev.some(m => m.goalId === info.goalId) ? prev : [...prev, { text: info.message, goalId: info.goalId }])
         }
@@ -543,7 +548,7 @@ function App() {
     snapshotTargetsIfChanged(restoredProfile.id!, restoredProfile, liveTargets, effectiveTargetWeight.weightKg)
       .then(result => {
         if (result.changedFromPrior) {
-          setAdaptationMessages(prev => [...prev, { text: `Your calorie target updated to ${liveTargets.calories} kcal, based on your recent weigh-ins.` }])
+          setAdaptationMessages(prev => [...prev, { text: `Your calorie target updated to ${liveTargets!.calories} kcal, based on your recent weigh-ins.` }])
         }
       })
   }
@@ -558,8 +563,13 @@ function App() {
     // left the user watching a spinner with no way forward and no error shown.
     try {
 
-    const bmr = computeBMR(userProfile)
-    const tdee = computeStaticTDEE(bmr, userProfile.activity_level)
+    // Null when the user declined a body metric. bmr/tdee/targets then stay
+    // undefined on the profile rather than being computed from a guessed
+    // weight — the training plan below is generated either way, because it
+    // does not need these numbers.
+    const onboardingMetrics = resolveBodyMetrics(userProfile)
+    const bmr = onboardingMetrics ? computeBMR(onboardingMetrics) : undefined
+    const tdee = bmr != null ? computeStaticTDEE(bmr, userProfile.activity_level) : undefined
     // No weigh-ins can exist yet at onboarding, so computeTargets here is
     // equivalent to the static calculation — but going through the one
     // shared entry point keeps every consumer on identical numbers.
@@ -569,10 +579,10 @@ function App() {
       ...userProfile,
       bmr,
       tdee,
-      calorie_target: calculatedMacros.calories,
-      protein_g: calculatedMacros.protein,
-      carbs_g: calculatedMacros.carbs,
-      fat_g: calculatedMacros.fat,
+      calorie_target: calculatedMacros?.calories,
+      protein_g: calculatedMacros?.protein,
+      carbs_g: calculatedMacros?.carbs,
+      fat_g: calculatedMacros?.fat,
     }
 
     const planResult = generateExercisePlan(enrichedProfile, exerciseExclusions)
@@ -739,14 +749,20 @@ function App() {
       // pipeline, and — since weight-trend.ts already has a tested
       // single-sample path (sampleCount===1: shows a level, no rate) —
       // this reports honestly rather than fabricating a trend from one point.
-      try {
-        await upsertDailyMetric({
-          profile_id: data.id,
-          date: getSessionDateContext(data.id).date,
-          weight_kg: enrichedProfile.weight_kg,
-        })
-      } catch (err) {
-        console.error('Seeding onboarding weigh-in failed:', err)
+      // Only seed a weigh-in if there is a weight to seed. Writing one from a
+      // missing value would put a fabricated number into the weight SERIES,
+      // which then anchors every future target — the worst place for a guess
+      // to land, because it looks like something the user measured.
+      if (enrichedProfile.weight_kg != null) {
+        try {
+          await upsertDailyMetric({
+            profile_id: data.id,
+            date: getSessionDateContext(data.id).date,
+            weight_kg: enrichedProfile.weight_kg,
+          })
+        } catch (err) {
+          console.error('Seeding onboarding weigh-in failed:', err)
+        }
       }
       if (enrichedProfile.disliked_foods && enrichedProfile.disliked_foods.length > 0) {
         try {
@@ -779,7 +795,11 @@ function App() {
       } catch (err) {
         console.error('Persisting mesocycle failed:', err)
       }
-      try {
+      // No targets means no macro budget for meals to hit. Generating a pool
+      // against invented numbers would produce a plausible-looking day of
+      // food built on nothing — skip it; the nutrition surface explains why
+      // and the meals appear as soon as a weight is added.
+      if (calculatedMacros) try {
         setGeneratingStatus('Building your meal pools...')
         const result = await generateMealPools({
           profileId: data.id,
@@ -1404,12 +1424,12 @@ function App() {
     // getEffectiveTargetWeightKg's doc comment) rather than assuming this
     // new reading itself is the new anchor.
     const effectiveTargetWeight = await getEffectiveTargetWeightKg(profile.id, weight ?? profile.weight_kg)
-    setTargetWeightAnchorKg(effectiveTargetWeight.weightKg)
+    setTargetWeightAnchorKg(effectiveTargetWeight.weightKg ?? null)
     const targets = computeTargets(profile, { latestWeightKg: effectiveTargetWeight.weightKg, exercisePlan })
     setMacros(targets)
     snapshotTargetsIfChanged(profile.id, profile, targets, effectiveTargetWeight.weightKg).then(result => {
       if (result.changedFromPrior) {
-        setAdaptationMessages(prev => [...prev, { text: `Your calorie target updated to ${targets.calories} kcal, based on your recent weigh-ins.` }])
+        setAdaptationMessages(prev => [...prev, { text: `Your calorie target updated to ${targets!.calories} kcal, based on your recent weigh-ins.` }])
       }
     })
 
@@ -1417,7 +1437,7 @@ function App() {
     const goals = await getActiveGoals(profile.id).catch(() => [])
     const weightGoal = goals.find(g => g.metric === 'body_weight_kg')
     if (weightGoal) {
-      const info = describeGoalProximity(effectiveTargetWeight.weightKg, weightGoal)
+      const info = effectiveTargetWeight.weightKg == null ? null : describeGoalProximity(effectiveTargetWeight.weightKg, weightGoal)
       if (info && !isGoalProximityDismissed(info.goalId)) {
         setAdaptationMessages(prev => prev.some(m => m.goalId === info.goalId) ? prev : [...prev, { text: info.message, goalId: info.goalId }])
       }
@@ -1450,7 +1470,16 @@ function App() {
     }
   }
 
-  if (!profile || !macros) {
+  // NOT `|| !macros` — that was the refusal trap's other half. macros is
+  // null (not undefined-while-loading; isRestoring already returned above)
+  // whenever computeTargets found a missing body metric, which is a
+  // deliberate, valid state for an otherwise-complete profile. Gating whole-
+  // app entry on it meant declining a weight bounced a fully onboarded user
+  // straight back into onboarding, forever — the exact trap the absence
+  // work exists to remove. Every consumer below already accepts
+  // MacroTargets | null (macros has always been typed that way), so no
+  // downstream change was needed once this line stopped requiring it.
+  if (!profile) {
     if (isGenerating) {
       return (
         <div className="min-h-screen bg-background flex items-center justify-center">

@@ -42,11 +42,51 @@ const NEAT_MULTIPLIER: Record<ActivityLevel, number> = {
   very_active: 1.6,
 }
 
-export function computeBMR(profile: UserProfile): number {
-  if (profile.gender === 'male') {
-    return Math.round(10 * profile.weight_kg + 6.25 * profile.height_cm - 5 * profile.age + 5)
+/**
+ * The four body values every calorie/protein figure in this file depends on,
+ * proven present. Nothing here computes from a UserProfile's optional fields
+ * directly — you resolve once, at the edge, and either get all four or get
+ * null and render an absence.
+ *
+ * This shape exists so "we don't have a weight" is impossible to forget.
+ * Previously each function read profile.weight_kg on its own, and a missing
+ * one arrived as 0 (Number('') is 0, not NaN) — which produced a confident
+ * 1502 kcal target next to 0g of protein rather than declining to answer.
+ */
+export interface BodyMetrics {
+  weightKg: number
+  heightCm: number
+  age: number
+  gender: 'male' | 'female'
+}
+
+/** Which body values are still missing, in user-facing words. Empty means targets can be computed. */
+export function missingBodyMetrics(profile: UserProfile): ('weight' | 'height' | 'age' | 'sex')[] {
+  const missing: ('weight' | 'height' | 'age' | 'sex')[] = []
+  if (!profile.weight_kg) missing.push('weight')
+  if (!profile.height_cm) missing.push('height')
+  if (!profile.age) missing.push('age')
+  if (!profile.gender) missing.push('sex')
+  return missing
+}
+
+/**
+ * All four body values, or null if any is missing. Falsy checks are
+ * deliberate and cover both absence and the legacy zeros already sitting in
+ * rows written before body metrics could be null — a 0 weight is not a
+ * measurement, and treating it as one is the bug.
+ */
+export function resolveBodyMetrics(profile: UserProfile): BodyMetrics | null {
+  const { weight_kg, height_cm, age, gender } = profile
+  if (!weight_kg || !height_cm || !age || !gender) return null
+  return { weightKg: weight_kg, heightCm: height_cm, age, gender }
+}
+
+export function computeBMR(m: BodyMetrics): number {
+  if (m.gender === 'male') {
+    return Math.round(10 * m.weightKg + 6.25 * m.heightCm - 5 * m.age + 5)
   }
-  return Math.round(10 * profile.weight_kg + 6.25 * profile.height_cm - 5 * profile.age - 161)
+  return Math.round(10 * m.weightKg + 6.25 * m.heightCm - 5 * m.age - 161)
 }
 
 export function computeStaticTDEE(bmr: number, activityLevel: ActivityLevel): number {
@@ -215,10 +255,10 @@ export function computeMacroSplitTargets(weightKg: number, calorieTarget: number
   return { calories: protein * 4 + carbs * 4 + fat * 9, protein, carbs, fat, clampedFatFloor, clampedCarbFloor }
 }
 
-function computeStaticMacros(profile: UserProfile): MacroTargets {
-  const bmr = computeBMR(profile)
+function computeStaticMacros(profile: UserProfile, m: BodyMetrics): MacroTargets {
+  const bmr = computeBMR(m)
   const tdee = computeStaticTDEE(bmr, profile.activity_level)
-  const calorieTarget = applyGoalAdjustment(tdee, profile.fitness_goal, profile.gender)
+  const calorieTarget = applyGoalAdjustment(tdee, profile.fitness_goal, m.gender)
 
   // The calories field is always recomputed from the FINAL macros (M0),
   // matching what dynamic mode already did — the old code returned the
@@ -238,7 +278,7 @@ function computeStaticMacros(profile: UserProfile): MacroTargets {
   }
 
   const split = getProfileMacroSplit(profile)
-  const result = computeMacroSplitTargets(profile.weight_kg, calorieTarget, split)
+  const result = computeMacroSplitTargets(m.weightKg, calorieTarget, split)
   return { calories: result.calories, protein: result.protein, carbs: result.carbs, fat: result.fat }
 }
 
@@ -253,12 +293,13 @@ function computeStaticMacros(profile: UserProfile): MacroTargets {
 // Dynamic CSCS is selected and says why, rather than silently ignoring it.
 function computeDynamicDay(
   profile: UserProfile,
+  m: BodyMetrics,
   isTraining: boolean,
   workoutFocus: string | null,
 ): DailyMacroResult {
-  const bmr = computeBMR(profile)
+  const bmr = computeBMR(m)
   const neatTDEE = bmr * NEAT_MULTIPLIER[profile.activity_level]
-  const weight = profile.weight_kg
+  const weight = m.weightKg
 
   let eee = 0
   let intensity: 'rest' | 'moderate' | 'high' = 'rest'
@@ -271,7 +312,7 @@ function computeDynamicDay(
   }
 
   const dailyTDEE = Math.round(neatTDEE + eee)
-  const calories = applyGoalAdjustment(dailyTDEE, profile.fitness_goal, profile.gender)
+  const calories = applyGoalAdjustment(dailyTDEE, profile.fitness_goal, m.gender)
 
   const protein = Math.round(2.2 * weight)
   const carbsPerKg = getCarbsPerKg(intensity, profile.fitness_goal)
@@ -298,15 +339,22 @@ function computeDynamicDay(
   }
 }
 
+/**
+ * Null when any body metric is missing — the caller must render an absence,
+ * not a number. Every public entry point in this file returns null the same
+ * way, so there is no path that quietly computes from a guessed weight.
+ */
 export function calculateDailyMacros(
   profile: UserProfile,
   dayName: string,
   exercisePlan: WorkoutDay[],
-): DailyMacroResult {
+): DailyMacroResult | null {
+  const m = resolveBodyMetrics(profile)
+  if (!m) return null
   const mode = profile.macro_calculation_mode || 'STANDARD_STATIC'
 
   if (mode === 'STANDARD_STATIC') {
-    const macros = computeStaticMacros(profile)
+    const macros = computeStaticMacros(profile, m)
     // `|| []` backstop — see the note in exercise-plan.ts's availableDays.
     const isTraining = (profile.training_days || []).some(
       td => td.day === dayName && td.available
@@ -322,26 +370,35 @@ export function calculateDailyMacros(
     td => td.day === dayName && td.available
   )
   const workoutDay = exercisePlan.find(wp => wp.day === dayName)
-  return computeDynamicDay(profile, isTraining, workoutDay?.focus ?? null)
+  return computeDynamicDay(profile, m, isTraining, workoutDay?.focus ?? null)
 }
 
+/** Null when body metrics are missing — see calculateDailyMacros. All seven days share one resolution, so a week is never half-computed. */
 export function calculateWeeklySchedule(
   profile: UserProfile,
   exercisePlan: WorkoutDay[],
-): WeeklyMacroSchedule {
+): WeeklyMacroSchedule | null {
+  if (!resolveBodyMetrics(profile)) return null
+  // Non-null asserted deliberately: the guard above already proved the
+  // metrics resolve, and calculateDailyMacros returns null for exactly that
+  // one reason. Asserting here keeps a week all-or-nothing rather than
+  // letting individual days go null and half-populate the schedule.
+  const day = (name: string) => calculateDailyMacros(profile, name, exercisePlan)!
   return {
-    monday: calculateDailyMacros(profile, 'Monday', exercisePlan),
-    tuesday: calculateDailyMacros(profile, 'Tuesday', exercisePlan),
-    wednesday: calculateDailyMacros(profile, 'Wednesday', exercisePlan),
-    thursday: calculateDailyMacros(profile, 'Thursday', exercisePlan),
-    friday: calculateDailyMacros(profile, 'Friday', exercisePlan),
-    saturday: calculateDailyMacros(profile, 'Saturday', exercisePlan),
-    sunday: calculateDailyMacros(profile, 'Sunday', exercisePlan),
+    monday: day('Monday'),
+    tuesday: day('Tuesday'),
+    wednesday: day('Wednesday'),
+    thursday: day('Thursday'),
+    friday: day('Friday'),
+    saturday: day('Saturday'),
+    sunday: day('Sunday'),
   }
 }
 
-export function getStaticDailyMacros(profile: UserProfile): MacroTargets {
-  return computeStaticMacros(profile)
+/** Null when body metrics are missing — see calculateDailyMacros. */
+export function getStaticDailyMacros(profile: UserProfile): MacroTargets | null {
+  const m = resolveBodyMetrics(profile)
+  return m ? computeStaticMacros(profile, m) : null
 }
 
 export interface MacroDerivation {
@@ -367,10 +424,12 @@ export interface MacroDerivation {
  * numbers come from" independent of which method's weekly schedule is
  * currently selected below it.
  */
-export function getMacroDerivation(profile: UserProfile): MacroDerivation {
-  const bmr = computeBMR(profile)
+export function getMacroDerivation(profile: UserProfile): MacroDerivation | null {
+  const m = resolveBodyMetrics(profile)
+  if (!m) return null
+  const bmr = computeBMR(m)
   const tdee = computeStaticTDEE(bmr, profile.activity_level)
-  const target = computeStaticMacros(profile)
+  const target = computeStaticMacros(profile, m)
   const surplusKcal = target.calories - tdee
   const surplusLabel =
     profile.fitness_goal === 'fat_loss' ? 'Fat-loss deficit'

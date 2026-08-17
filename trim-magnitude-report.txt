@@ -1,0 +1,56 @@
+================================================================================
+TRIM-MAGNITUDE DISTRIBUTION REPORT
+(report only -- no threshold set, no score affected)
+================================================================================
+
+Combinations swept: 9216
+Runtime: 801.1s
+
+Combos with at least one rest-trim event: 4570 / 9216 (49.6%)
+Total trim events across all combos: 162212
+
+--------------------------------------------------------------------------------
+PER-COMBO TOTAL SECONDS CUT (summed across every trim event in that combo's whole mesocycle)
+--------------------------------------------------------------------------------
+  min:    0s
+  p50:    159s
+  p75:    450s
+  p90:    825s
+  p95:    1175s
+  p99:    2195s
+  max:    3887s
+
+--------------------------------------------------------------------------------
+PER-COMBO TRIM EVENT COUNT (how many individual rest-cuts in that combo's whole mesocycle)
+--------------------------------------------------------------------------------
+  min:    1
+  p50:    25
+  p75:    51
+  p90:    79
+  p95:    97
+  p99:    172
+  max:    325
+
+--------------------------------------------------------------------------------
+PER-EVENT SECONDS CUT (one exercise, one 15s-step trim pass)
+--------------------------------------------------------------------------------
+  min:    0s
+  p50:    12s
+  p90:    15s
+  max:    15s
+
+--------------------------------------------------------------------------------
+10 WORST COMBOS BY TOTAL SECONDS CUT
+--------------------------------------------------------------------------------
+  64.8min cut across 325 events — full_gym / none / 60-90 / bodybuilding / intermediate / conditioning / recovery=moderate / cardio=love
+  61.2min cut across 284 events — bodyweight / shoulders+wrists / 30-45 / bodybuilding / beginner / conditioning / recovery=moderate / cardio=love
+  60.1min cut across 279 events — full_gym / lower_back / 60-90 / bodybuilding / novice / conditioning / recovery=moderate / cardio=love
+  58.5min cut across 265 events — bodyweight / wrists / 30-45 / bodybuilding / beginner / conditioning / recovery=high / cardio=love
+  57.6min cut across 264 events — bodyweight / lower_back / 30-45 / bodybuilding / beginner / conditioning / recovery=moderate / cardio=tolerate
+  55.4min cut across 234 events — bodyweight / neck / 30-45 / bodybuilding / beginner / conditioning / recovery=moderate / cardio=avoid
+  53.7min cut across 234 events — bodyweight / wrists / 30-45 / bodybuilding / beginner / fat_loss / recovery=moderate / cardio=love
+  51.4min cut across 234 events — bodyweight / none / 45-60 / bodybuilding / beginner / conditioning / recovery=moderate / cardio=love
+  49.6min cut across 231 events — bodyweight / shoulders+wrists / 45-60 / bodybuilding / intermediate / conditioning / recovery=moderate / cardio=love
+  49.6min cut across 218 events — bodyweight / none / 30-45 / bodybuilding / beginner / functional / recovery=moderate / cardio=love
+
+================================================================================

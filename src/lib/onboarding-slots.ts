@@ -503,10 +503,10 @@ export const ONBOARDING_SLOTS: SlotDef[] = [
   { key: 'breakfastStyle', question: "What's breakfast usually like for you?", shortLabel: 'Breakfast', control: 'single', required: false, options: BREAKFAST_STYLE_OPTIONS, destination: 'column', validate: isOneOf(BREAKFAST_STYLE_OPTIONS) },
   { key: 'cookingTime', question: 'How much time do you want to spend cooking?', shortLabel: 'Cooking time', control: 'single', required: true, options: COOKING_TIME_OPTIONS, destination: 'column', validate: isOneOf(COOKING_TIME_OPTIONS) },
   { key: 'includeSnacks', question: 'Snacks too, or meals only?', shortLabel: 'Snacks', control: 'single', required: false, options: SNACKS_OPTIONS, destination: 'column', validate: v => v === true || v === false || v === 'true' || v === 'false' },
-  { key: 'age', question: 'How old are you?', shortLabel: 'Age', control: 'numeric', required: true, min: 13, max: 100, destination: 'column', validate: isNumberIn(13, 100) },
-  { key: 'heightCm', question: 'How tall are you (cm)?', shortLabel: 'Height', control: 'numeric', required: true, min: 100, max: 250, destination: 'column', validate: isNumberIn(100, 250) },
-  { key: 'weightKg', question: 'What do you weigh right now (kg)?', shortLabel: 'Weight', control: 'numeric', required: true, min: 25, max: 350, destination: 'column', validate: isNumberIn(25, 350) },
-  { key: 'gender', question: 'Sex (for calorie math)?', shortLabel: 'Sex', control: 'single', required: true, options: GENDER_OPTIONS, destination: 'column', validate: isOneOf(GENDER_OPTIONS) },
+  { key: 'age', question: 'How old are you?', shortLabel: 'Age', control: 'numeric', required: false, min: 13, max: 100, destination: 'column', validate: isNumberIn(13, 100) },
+  { key: 'heightCm', question: 'How tall are you (cm)?', shortLabel: 'Height', control: 'numeric', required: false, min: 100, max: 250, destination: 'column', validate: isNumberIn(100, 250) },
+  { key: 'weightKg', question: 'What do you weigh right now (kg)?', shortLabel: 'Weight', control: 'numeric', required: false, min: 25, max: 350, destination: 'column', validate: isNumberIn(25, 350) },
+  { key: 'gender', question: 'Which should I use for your calorie maths?', shortLabel: 'Sex', control: 'single', required: false, options: GENDER_OPTIONS, destination: 'column', validate: isOneOf(GENDER_OPTIONS) },
 ]
 
 export function getSlotDef(key: string): SlotDef | undefined {
@@ -602,6 +602,20 @@ export const PROFILE_CONSTANTS = {
   coaching_persona: 'supportive' as CoachingPersona,
 } as const
 
+/**
+ * A body metric the user actually gave, or undefined. Deliberately strict:
+ * empty string, whitespace, null, and anything non-finite all mean "not
+ * given". Zero is rejected too — no real age, height or bodyweight is 0, so
+ * a 0 arriving here is a bug or a coerced blank, and passing it through is
+ * exactly the failure this whole change exists to remove.
+ */
+function numericOrUndefined(raw: unknown): number | undefined {
+  if (raw === null || raw === undefined) return undefined
+  if (typeof raw === 'string' && raw.trim() === '') return undefined
+  const n = Number(raw)
+  return Number.isFinite(n) && n > 0 ? n : undefined
+}
+
 export function assembleProfile(data: OnboardingSlotValues): UserProfile {
   const mappedTime: 'morning' | 'evening' =
     data.trainingTime === 'morning' || data.trainingTime === 'midday' ? 'morning' : 'evening'
@@ -616,10 +630,17 @@ export function assembleProfile(data: OnboardingSlotValues): UserProfile {
   }))
 
   return {
-    age: Number(data.age),
-    gender: data.gender ?? 'male',
-    height_cm: Number(data.heightCm),
-    weight_kg: Number(data.weightKg),
+    // Body metrics: absent stays ABSENT. `Number('')` is 0, not NaN, so the
+    // old `Number(data.age)` turned "declined to say" into a confident zero
+    // that every downstream reader treated as a real measurement — a zero
+    // bodyweight is what produced the 1502 kcal / 0g protein target. And
+    // `gender ?? 'male'` was worse than a computed default: it wrote a
+    // fabricated ANSWER into the profile, indistinguishable downstream from
+    // one the user actually gave, which also defeated "the slot stays open".
+    age: numericOrUndefined(data.age),
+    gender: data.gender ?? undefined,
+    height_cm: numericOrUndefined(data.heightCm),
+    weight_kg: numericOrUndefined(data.weightKg),
     activity_level: data.activityLevel ?? 'moderate',
     meals_per_day: data.mealsPerDay ?? 3,
     include_snacks: data.includeSnacks,

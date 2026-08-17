@@ -12,6 +12,7 @@ import type { MacroTargets, UserProfile, WorkoutDay, MacroCalculationMode } from
 import type { MealSlotName } from '@/lib/meal-store'
 import type { PoolOption } from '@/lib/meal-generation'
 import { calculateWeeklySchedule, getMacroDerivation } from '@/lib/macro-calculator'
+import { MissingBodyMetricsNotice } from '@/components/MissingBodyMetricsNotice'
 
 const WATER_QUICK_ADD_ML = [250, 500]
 
@@ -35,7 +36,8 @@ const NUTRITION_RING_CIRC: Record<string, number> = Object.fromEntries(NUTRITION
 
 export interface NutritionDisplayProps {
   profile: UserProfile
-  macros: MacroTargets
+  /** Null when a body metric is missing — see MissingBodyMetricsNotice, which this component renders in that case instead of a ring meter reading 0/0. */
+  macros: MacroTargets | null
   exercisePlan?: WorkoutDay[]
   /** Latest daily_metrics weigh-in — overrides the immutable onboarding weight in every displayed number (living targets, M0). */
   latestWeightKg?: number | null
@@ -101,10 +103,10 @@ export function NutritionDisplay({
   const [lastWaterLog, setLastWaterLog] = useState<WaterLogRow | null>(null)
 
   useEffect(() => {
-    if (!profileId || !date) return
+    if (!profileId || !date || !macros) return
     getTodayLedger(profileId, date, macros).then(l => setEaten(l.eaten)).catch(console.error)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profileId, date, mealTotals])
+  }, [profileId, date, macros, mealTotals])
 
   useEffect(() => {
     if (!profileId) return
@@ -138,10 +140,10 @@ export function NutritionDisplay({
 
   const ringValues: Record<string, { eaten: number; target: number }> = {
     water: { eaten: todayWaterMl, target: waterTarget },
-    calories: { eaten: eaten.kcal, target: macros.calories },
-    protein: { eaten: eaten.protein, target: macros.protein },
-    carbs: { eaten: eaten.carbs, target: macros.carbs },
-    fat: { eaten: eaten.fat, target: macros.fat },
+    calories: { eaten: eaten.kcal, target: macros?.calories ?? 0 },
+    protein: { eaten: eaten.protein, target: macros?.protein ?? 0 },
+    carbs: { eaten: eaten.carbs, target: macros?.carbs ?? 0 },
+    fat: { eaten: eaten.fat, target: macros?.fat ?? 0 },
   }
 
   return (
@@ -173,9 +175,11 @@ export function NutritionDisplay({
           </svg>
           <div className="flex min-w-0 flex-1 flex-col gap-3">
             <div>
-              <p className="ds-num-mega tabular-mono text-[#E4FCF4] glow-mint-lg">{Math.round(eaten.kcal)}</p>
+              <p className="ds-num-mega tabular-mono text-[#E4FCF4] glow-mint-lg">{macros ? Math.round(eaten.kcal) : '—'}</p>
               <p className="mt-1 text-[10.5px] uppercase tracking-[.16em] text-muted-foreground">
-                kcal · of <span className="tabular-mono">{Math.round(macros.calories)}</span>
+                {macros
+                  ? <>kcal · of <span className="tabular-mono">{Math.round(macros.calories)}</span></>
+                  : 'kcal · add your weight for a target'}
               </p>
             </div>
             <div className="flex flex-col gap-[6px]">
@@ -265,6 +269,11 @@ export function NutritionDisplay({
           adjustment/target, no expand needed. The "how it's derived" prose
           moves to the caption below; the numbers themselves are the whole
           point of this card now that meals sit above it. */}
+      {/* No body metrics means no target to explain. The notice replaces the
+          whole derivation card rather than showing it with holes in it — a
+          BMR row with a blank number reads as a loading bug, not as a
+          deliberate absence. */}
+      {derivation ? (
       <Card>
         <CardHeader className="pb-1">
           <CardTitle className="text-base">How your targets are set</CardTitle>
@@ -295,11 +304,20 @@ export function NutritionDisplay({
           </p>
         </CardContent>
       </Card>
+      ) : (
+        <MissingBodyMetricsNotice profile={profile} />
+      )}
 
+      {/* The split control edits protein-per-KG and shows the resulting
+          grams — both meaningless without a bodyweight, and a 0 here
+          would render "0 g protein" all over again. Hidden entirely
+          rather than shown with a stand-in; derivation is non-null
+          exactly when the weight exists, so the assertion is safe. */}
+      {derivation && (
       <MacroSplitCard
         profile={profile}
-        effectiveWeightKg={effectiveProfile.weight_kg}
-        calorieTarget={macros.calories}
+        effectiveWeightKg={effectiveProfile.weight_kg!}
+        calorieTarget={derivation.target.calories}
         applies={mode === 'STANDARD_STATIC' && profile.fitness_goal !== 'conditioning'}
         disabledReason={
           profile.fitness_goal === 'conditioning'
@@ -310,6 +328,7 @@ export function NutritionDisplay({
         isGeneratingMeals={isGeneratingMeals}
         onRegenerateAllMeals={onRegenerateAllMeals}
       />
+      )}
 
       {mode === 'DYNAMIC_CSCS' && weeklySchedule && (
         <Card>
