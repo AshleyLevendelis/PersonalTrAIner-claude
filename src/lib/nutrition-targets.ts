@@ -109,8 +109,8 @@ export async function getRecentWeighIns(profileId: string, limit = 7): Promise<{
 export const TARGET_WEIGHT_ANCHOR_THRESHOLD_KG = 1
 
 export interface EffectiveTargetWeight {
-  /** The weight to feed into computeTargets — either a fresh 7-day average (the anchor moved) or last time's anchor held flat (the move was inside the noise band). */
-  weightKg: number
+  /** The weight to feed into computeTargets — either a fresh 7-day average (the anchor moved) or last time's anchor held flat (the move was inside the noise band). Undefined when the user never gave a weight and has no weigh-ins: there is no anchor, and callers must not invent one. */
+  weightKg: number | undefined
   /** True only when a PRIOR anchor existed and this call moved away from it — the signal a caller uses to decide whether a "your target changed" notice is warranted. False for a first-ever anchor (nothing to compare against) or a within-band move (nothing changed). */
   anchorMoved: boolean
 }
@@ -129,9 +129,10 @@ export interface EffectiveTargetWeight {
  * change) so it stays consistent across devices rather than drifting per
  * client, the way a localStorage-only tracker would.
  */
+/** fallbackWeightKg may be undefined when the user never gave a weight; callers then get whatever the weigh-in series holds, or nothing. */
 export async function getEffectiveTargetWeightKg(
   profileId: string,
-  fallbackWeightKg: number,
+  fallbackWeightKg?: number,
 ): Promise<EffectiveTargetWeight> {
   const todayStr = new Date().toISOString().split('T')[0]
   const recentWeighIns = await getRecentWeighIns(profileId, 14)
@@ -171,12 +172,19 @@ export interface SnapshotResult {
  * calculated_weight_kg so the next call can read it back as "the anchor
  * targets last moved from."
  */
+/**
+ * targets may be null — no body metrics means there is no target to record.
+ * Accepting null here rather than at each of the four call sites keeps the
+ * rule in ONE place: a fabricated figure must never reach the database,
+ * where nothing downstream could tell it from a measured one.
+ */
 export async function snapshotTargetsIfChanged(
   profileId: string,
   profile: UserProfile,
-  targets: MacroTargets,
+  targets: MacroTargets | null,
   anchorWeightKg?: number | null,
 ): Promise<SnapshotResult> {
+  if (!targets) return { snapshotted: false, changedFromPrior: false }
   try {
     const today = new Date().toISOString().split('T')[0]
     const recent = await getNutritionTargets(profileId, '1970-01-01', today)

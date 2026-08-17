@@ -305,9 +305,15 @@ export function NutritionDisplay({
         <MissingBodyMetricsNotice profile={profile} />
       )}
 
+      {/* The split control edits protein-per-KG and shows the resulting
+          grams — both meaningless without a bodyweight, and a 0 here
+          would render "0 g protein" all over again. Hidden entirely
+          rather than shown with a stand-in; derivation is non-null
+          exactly when the weight exists, so the assertion is safe. */}
+      {derivation && (
       <MacroSplitCard
         profile={profile}
-        effectiveWeightKg={effectiveProfile.weight_kg}
+        effectiveWeightKg={effectiveProfile.weight_kg!}
         calorieTarget={macros.calories}
         applies={mode === 'STANDARD_STATIC' && profile.fitness_goal !== 'conditioning'}
         disabledReason={
@@ -319,6 +325,7 @@ export function NutritionDisplay({
         isGeneratingMeals={isGeneratingMeals}
         onRegenerateAllMeals={onRegenerateAllMeals}
       />
+      )}
 
       {mode === 'DYNAMIC_CSCS' && weeklySchedule && (
         <Card>
