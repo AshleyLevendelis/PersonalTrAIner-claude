@@ -7,10 +7,27 @@ export interface ConcurrentActivity {
 
 export interface UserProfile {
   id?: string
-  age: number
-  gender: 'male' | 'female'
-  height_cm: number
-  weight_kg: number
+  /**
+   * BODY METRICS — all four are OPTIONAL, and undefined means "the user has
+   * not told us", never "assume something sensible".
+   *
+   * These exist for calorie and protein targets. They are NOT needed to hold
+   * an account or to receive a training plan, and a user is allowed to
+   * decline any of them and still use the app. That is the whole point: the
+   * columns were NOT NULL until 2026-08-17, which is what made refusing a
+   * weight trap someone in onboarding with nowhere to record the refusal.
+   *
+   * NEVER substitute a default when one of these is missing. A missing
+   * weight previously became 0 (via `Number('')`) and produced a confident
+   * 1502 kcal target alongside 0g of protein — protein is proteinPerKg x
+   * bodyweight, so it collapsed honestly, while the calorie floor caught the
+   * calories and made them look deliberate. Render an ABSENCE instead: say
+   * targets need a weight and offer a way to add one.
+   */
+  age?: number
+  gender?: 'male' | 'female'
+  height_cm?: number
+  weight_kg?: number
   activity_level: ActivityLevel
   fitness_goal: FitnessGoal
   /**
