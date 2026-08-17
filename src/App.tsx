@@ -18,6 +18,7 @@ import { OfflineStatusIndicator } from '@/components/OfflineStatusIndicator'
 import { BottomDock } from '@/components/BottomDock'
 import { ActiveSessionProvider } from '@/hooks/useActiveSession'
 import { TimersProvider } from '@/hooks/useTimers'
+import { BottomDockHeightProvider } from '@/hooks/useBottomDockHeight'
 import { isDevAccount, getSessionDateContext, getAppNow } from '@/lib/dev-clock'
 import { useAppRoute, tabHash, isTab, isKnownTabHash, type Tab } from '@/lib/app-route'
 
@@ -1499,6 +1500,9 @@ function App() {
       refreshToken={logsVersion}
     >
     <TimersProvider profileId={profile.id}>
+    {/* Lets the chat composer sit above the rest-timer dock instead of
+        underneath it — the dock measures itself into here. */}
+    <BottomDockHeightProvider>
     <div className="min-h-screen bg-background">
       {/* The old full-width header duplicated what the bottom tab bar
           already communicates (which screen you're on). These two floating
@@ -1719,6 +1723,7 @@ function App() {
         </DialogContent>
       </Dialog>
     </div>
+    </BottomDockHeightProvider>
     </TimersProvider>
     </ActiveSessionProvider>
   )

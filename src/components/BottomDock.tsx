@@ -20,6 +20,7 @@ import { useDeadlineTick } from '@/hooks/useDeadlineTick'
 import { useTimers } from '@/hooks/useTimers'
 import { useViewportInset } from '@/hooks/useViewportInset'
 import { TAB_BAR_HEIGHT_PX } from '@/components/BottomTabBar'
+import { useBottomDockHeight } from '@/hooks/useBottomDockHeight'
 import { tabHash } from '@/lib/app-route'
 import { getAppNow } from '@/lib/dev-clock'
 import { playTimerCue } from '@/lib/timer-cues'
@@ -37,6 +38,11 @@ export function BottomDock() {
   const timers = useTimers()
   const { insetPx, isKeyboardOpen } = useViewportInset()
   const chimedForRef = useRef<string | null>(null)
+  // Publish our real height so the chat composer can ride above us instead of
+  // underneath — see useBottomDockHeight for why this is measured, not a
+  // constant. Attached to whichever branch renders; only one ever does.
+  const { reportDockHeight } = useBottomDockHeight()
+  const dockRef = useRef<HTMLDivElement | null>(null)
 
   const hasRestForTick = !!restEndsAt && restRemainingMs != null
   const hasSessionIndicator = !hasRestForTick && !timers.isActive && sessionStatus === 'running'
@@ -73,8 +79,31 @@ export function BottomDock() {
 
   const hasRest = hasRestForTick
   const hasStandaloneTimer = !hasRest && timers.isActive
+  const dockVisible = hasRest || hasStandaloneTimer || hasSessionIndicator
 
-  if (!hasRest && !hasStandaloneTimer && !hasSessionIndicator) return null
+  // Measure and publish, so the chat composer can offset above us. Observed
+  // rather than measured once: the rest card grows a line when the exercise
+  // name wraps, and the label changes mid-countdown. Reports 0 whenever the
+  // dock isn't rendered so the composer drops straight back down.
+  useEffect(() => {
+    if (!dockVisible) {
+      reportDockHeight(0)
+      return
+    }
+    const el = dockRef.current
+    if (!el) return
+    const publish = () => reportDockHeight(el.getBoundingClientRect().height)
+    publish()
+    const ro = new ResizeObserver(publish)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [dockVisible, reportDockHeight])
+
+  // Unmounting must not strand a stale offset — without this the composer
+  // would stay pushed up after a session ends.
+  useEffect(() => () => reportDockHeight(0), [reportDockHeight])
+
+  if (!dockVisible) return null
 
   const restMs = restRemainingMs ?? 0
   const isOverrun = hasRest && restMs <= 0
@@ -102,7 +131,7 @@ export function BottomDock() {
         : 'Round timer')
       : `${timers.mode === 'lap' ? 'Lap' : 'Stopwatch'} · ${formatDuration(timers.elapsedMs)}`
     return (
-      <div className="fixed left-4 right-4 z-50 md:left-auto md:right-4 md:w-96" style={bottomStyle}>
+      <div ref={dockRef} className="fixed left-4 right-4 z-50 md:left-auto md:right-4 md:w-96" style={bottomStyle}>
         <button
           type="button"
           onClick={timers.requestScreenOpen}
@@ -124,7 +153,7 @@ export function BottomDock() {
   if (hasSessionIndicator) {
     const elapsedMs = startedAtIso ? getAppNow(profileId).getTime() - new Date(startedAtIso).getTime() : 0
     return (
-      <div className="fixed left-4 right-4 z-50 md:left-auto md:right-4 md:w-96" style={bottomStyle}>
+      <div ref={dockRef} className="fixed left-4 right-4 z-50 md:left-auto md:right-4 md:w-96" style={bottomStyle}>
         <button
           type="button"
           onClick={() => { if (!window.location.hash.startsWith('#/tab/exercise')) window.location.hash = tabHash('exercise') }}
@@ -141,7 +170,7 @@ export function BottomDock() {
   // full two-row card would occlude the very row the user is editing (§3.6).
   if (isKeyboardOpen) {
     return (
-      <div className="fixed left-4 right-4 z-50 md:left-auto md:right-4 md:w-96" style={bottomStyle}>
+      <div ref={dockRef} className="fixed left-4 right-4 z-50 md:left-auto md:right-4 md:w-96" style={bottomStyle}>
         <div className="rounded-xl bg-card/95 glow-mint-box backdrop-blur-sm shadow-lg px-3 py-1.5 inline-flex items-center gap-1.5 text-xs font-medium tabular-nums">
           <Timer className="h-3 w-3 text-primary shrink-0" />
           {isOverrun
@@ -154,7 +183,7 @@ export function BottomDock() {
 
   if (isOverrun) {
     return (
-      <div className="fixed left-4 right-4 z-50 md:left-auto md:right-4 md:w-96" style={bottomStyle}>
+      <div ref={dockRef} className="fixed left-4 right-4 z-50 md:left-auto md:right-4 md:w-96" style={bottomStyle}>
         <Card className="bg-card/95 backdrop-blur-sm shadow-lg">
           <div className="p-3 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 min-w-0">
@@ -195,7 +224,7 @@ export function BottomDock() {
   const fillFraction = restTotalMs ? Math.min(1, Math.max(0, 1 - restMs / restTotalMs)) : 0
 
   return (
-    <div className="fixed left-4 right-4 z-50 md:left-auto md:right-4 md:w-96" style={bottomStyle}>
+    <div ref={dockRef} className="fixed left-4 right-4 z-50 md:left-auto md:right-4 md:w-96" style={bottomStyle}>
       <div className="relative overflow-hidden rounded-[14px] bg-card/95 backdrop-blur-sm shadow-lg">
         <div
           aria-hidden

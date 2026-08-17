@@ -23,6 +23,7 @@ import { useActiveSession } from '@/hooks/useActiveSession'
 import { useSpeechToText } from '@/hooks/useSpeechToText'
 import { useViewportInset } from '@/hooks/useViewportInset'
 import { TAB_BAR_HEIGHT_PX } from '@/components/BottomTabBar'
+import { useBottomDockHeight } from '@/hooks/useBottomDockHeight'
 import { cn } from '@/lib/utils'
 import { parseWorkoutEntries, type ParsedSetGroup, type WorkoutEntryInput } from '@/lib/set-parse'
 import { executeLogWorkout } from '@/lib/nl-logging-executor'
@@ -2299,9 +2300,23 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     },
   }
 
+  const { dockHeightPx } = useBottomDockHeight()
+
+  // Ride above BottomDock when it's showing, not underneath it. The dock is
+  // fixed to the same baseline as this composer and sits at z-50 against our
+  // z-40, so a running rest timer used to cover the input completely and a
+  // session chip clipped the placeholder — reported from a real gym session,
+  // where "ask the coach something mid-set" is exactly when the dock is up.
+  // dockHeightPx is measured by the dock itself (see useBottomDockHeight);
+  // it's 0 whenever the dock is hidden, so this collapses to the old value.
+  // The extra 12px matches the dock's own gap above the tab bar, keeping the
+  // two apart rather than flush.
+  const dockGapPx = dockHeightPx > 0 ? dockHeightPx + 12 : 0
   const composerBottomStyle = composerKeyboardOpen
-    ? { bottom: composerInsetPx + 16 }
-    : { bottom: `calc(${TAB_BAR_HEIGHT_PX}px + env(safe-area-inset-bottom))` }
+    // Keyboard open: the tab bar hides and the dock rides the keyboard inset
+    // too, so stack above it there as well.
+    ? { bottom: composerInsetPx + 16 + dockGapPx }
+    : { bottom: `calc(${TAB_BAR_HEIGHT_PX}px + env(safe-area-inset-bottom) + ${dockGapPx}px)` }
 
   return (
     <>
