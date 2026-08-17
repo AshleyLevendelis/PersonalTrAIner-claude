@@ -12,6 +12,7 @@ import type { MacroTargets, UserProfile, WorkoutDay, MacroCalculationMode } from
 import type { MealSlotName } from '@/lib/meal-store'
 import type { PoolOption } from '@/lib/meal-generation'
 import { calculateWeeklySchedule, getMacroDerivation } from '@/lib/macro-calculator'
+import { MissingBodyMetricsNotice } from '@/components/MissingBodyMetricsNotice'
 
 const WATER_QUICK_ADD_ML = [250, 500]
 
@@ -265,6 +266,11 @@ export function NutritionDisplay({
           adjustment/target, no expand needed. The "how it's derived" prose
           moves to the caption below; the numbers themselves are the whole
           point of this card now that meals sit above it. */}
+      {/* No body metrics means no target to explain. The notice replaces the
+          whole derivation card rather than showing it with holes in it — a
+          BMR row with a blank number reads as a loading bug, not as a
+          deliberate absence. */}
+      {derivation ? (
       <Card>
         <CardHeader className="pb-1">
           <CardTitle className="text-base">How your targets are set</CardTitle>
@@ -295,6 +301,9 @@ export function NutritionDisplay({
           </p>
         </CardContent>
       </Card>
+      ) : (
+        <MissingBodyMetricsNotice profile={profile} />
+      )}
 
       <MacroSplitCard
         profile={profile}
