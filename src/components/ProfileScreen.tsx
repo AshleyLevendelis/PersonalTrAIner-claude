@@ -89,15 +89,21 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   )
 }
 
+/**
+ * value may be undefined — a body metric the user hasn't given. The field
+ * stays fully editable in that state (the slot stays OPEN, per the refusal
+ * ruling); it just starts empty and shows a "Not set" placeholder rather
+ * than pretending to hold a number.
+ */
 function EditableTextField({
   value, unit, onSave, min, max,
-}: { value: number; unit?: string; onSave: (n: number) => void; min?: number; max?: number }) {
-  const [input, setInput] = useState(String(value))
-  useEffect(() => { setInput(String(value)) }, [value])
+}: { value?: number; unit?: string; onSave: (n: number) => void; min?: number; max?: number }) {
+  const [input, setInput] = useState(value == null ? '' : String(value))
+  useEffect(() => { setInput(value == null ? '' : String(value)) }, [value])
   const commit = () => {
     const n = Number(input)
     if (Number.isFinite(n) && (min == null || n >= min) && (max == null || n <= max) && n !== value) onSave(n)
-    else setInput(String(value))
+    else setInput(value == null ? '' : String(value))
   }
   return (
     <div className="flex items-center gap-1">
@@ -114,11 +120,12 @@ function EditableTextField({
   )
 }
 
+/** value may be undefined — see EditableTextField. Renders unselected, still choosable. */
 function EditableSelectField<T extends string | number>({
   value, options, onSave,
-}: { value: T; options: { value: T; label: string }[]; onSave: (v: T) => void }) {
+}: { value?: T; options: { value: T; label: string }[]; onSave: (v: T) => void }) {
   return (
-    <Select value={String(value)} onValueChange={v => {
+    <Select value={value == null ? undefined : String(value)} onValueChange={v => {
       const match = options.find(o => String(o.value) === v)
       if (match) onSave(match.value)
     }}>
