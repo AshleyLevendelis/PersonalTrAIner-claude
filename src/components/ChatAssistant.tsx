@@ -103,8 +103,8 @@ interface FavoriteMeal {
 
 interface ChatAssistantProps {
   profile: UserProfile
-  /** Living targets from computeTargets (M0) — the SAME numbers the Nutrition tab shows, respecting the user's selected macro mode. */
-  macros: MacroTargets
+  /** Living targets from computeTargets (M0) — the SAME numbers the Nutrition tab shows, respecting the user's selected macro mode. Null when a body metric is missing; already guarded internally (line ~355) before any use. */
+  macros: MacroTargets | null
   exercisePlan: WorkoutDay[]
   mesocycle: MesocycleWeek[]
   /** When the CURRENT plan was generated — the live-week anchor (C0 Part 6). Falls back to profile.created_at upstream. */

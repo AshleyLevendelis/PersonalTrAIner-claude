@@ -235,10 +235,15 @@ function App() {
 
     const restoredProfile: UserProfile = {
       id: profileRow.id,
-      age: profileRow.age,
-      gender: profileRow.gender,
-      height_cm: Number(profileRow.height_cm),
-      weight_kg: Number(profileRow.weight_kg),
+      // Number(null) is 0, not undefined — that silently turned "never given"
+      // back into a fabricated measurement right at the restore boundary,
+      // undoing the whole absence fix for every returning user. age/gender
+      // pass through as-is (already null | T from Postgres); height/weight
+      // need the Number() cast for real values but must skip it for null.
+      age: profileRow.age ?? undefined,
+      gender: profileRow.gender ?? undefined,
+      height_cm: profileRow.height_cm == null ? undefined : Number(profileRow.height_cm),
+      weight_kg: profileRow.weight_kg == null ? undefined : Number(profileRow.weight_kg),
       activity_level: profileRow.activity_level,
       fitness_goal: profileRow.fitness_goal,
       training_days: profileRow.training_days,
@@ -1465,7 +1470,16 @@ function App() {
     }
   }
 
-  if (!profile || !macros) {
+  // NOT `|| !macros` — that was the refusal trap's other half. macros is
+  // null (not undefined-while-loading; isRestoring already returned above)
+  // whenever computeTargets found a missing body metric, which is a
+  // deliberate, valid state for an otherwise-complete profile. Gating whole-
+  // app entry on it meant declining a weight bounced a fully onboarded user
+  // straight back into onboarding, forever — the exact trap the absence
+  // work exists to remove. Every consumer below already accepts
+  // MacroTargets | null (macros has always been typed that way), so no
+  // downstream change was needed once this line stopped requiring it.
+  if (!profile) {
     if (isGenerating) {
       return (
         <div className="min-h-screen bg-background flex items-center justify-center">
