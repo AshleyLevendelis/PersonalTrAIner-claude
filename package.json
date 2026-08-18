@@ -55,7 +55,8 @@
     "test:activity-streak": "tsx scripts/test-activity-streak.ts",
     "test:starting-out": "tsx scripts/test-starting-out.ts",
     "test:coach-rules-sync": "tsx scripts/test-coach-rules-sync.ts",
-    "report:trim-magnitude": "tsx scripts/run-trim-magnitude-report.ts"
+    "report:trim-magnitude": "tsx scripts/run-trim-magnitude-report.ts",
+    "report:equipment-fit": "tsx scripts/report-equipment-fit.ts"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.4",
