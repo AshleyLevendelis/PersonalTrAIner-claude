@@ -54,19 +54,44 @@ option" from data. That does not block this plan (filtering covers it),
 but it means the reasoning is invisible to every future change. Tagging it
 is a separate small item.
 
-## Data inconsistency that must be fixed first
+## CORRECTION: do NOT normalise the equipment vocabulary
 
-The equipment vocabulary is freeform and has at least one true duplicate:
+An earlier revision of this plan said `dumbbells` (22 entries) and
+`dumbbell` (5 entries) were a typo to normalise. **That was wrong, and
+acting on it would have been a live injury-adjacent bug.**
 
-- `dumbbells` — 22 entries
-- `dumbbell` — 5 entries
+They are a deliberate, load-bearing distinction, documented at
+load-prescription.ts:415 and consumed by `loadingMode()`:
 
-Any equipment logic keying on exact strings treats these as different
-implements. Before adding preference scoring, normalise the vocabulary
-(and add a gate test asserting every `equipment` value is drawn from a
-known set, so this cannot silently regress). Full current vocabulary is 31
-distinct strings; the rest looked internally consistent on inspection but
-should be eyeballed as part of this step.
+- `dumbbells` (plural) — TWO implements, one per hand (bench press, rows,
+  curls). The prescribed weight is halved and labelled "per hand".
+- `dumbbell` (singular) and `kettlebell` — ONE implement, held centrally
+  or in one hand (goblet squats, carries, swings). The weight is the
+  total, NOT halved.
+
+Collapsing them converts five single-implement exercises into
+two-implement ones and **doubles their prescribed load**. The existing
+comment names the exact defect this prevents: a goblet squat prescribed
+"~60kg per hand". TypeScript cannot catch it — both are `string[]`.
+
+Rules for this plan and any future equipment work:
+
+1. Never merge equipment strings on the basis of them looking similar.
+   The vocabulary is deliberately fine-grained; assume near-duplicates
+   are meaningful until a consumer proves otherwise.
+2. Before changing ANY value in the `equipment` field, grep every reader
+   of that field first. `loadingMode()` is the one that silently changes
+   prescribed weight rather than failing loudly.
+3. For equipment-quality ranking specifically this costs nothing: both
+   `dumbbell` and `dumbbells` rank "high". They simply must be listed
+   separately rather than collapsed.
+
+How this was caught: the singular/plural split was spotted as a frequency
+anomaly (22 vs 5) and pattern-matched to "inconsistent data" WITHOUT
+reading any consumer of the field. The edit was made, then reverted only
+because a follow-up grep for dependants ran afterwards. That grep belongs
+first. A frequency count is not evidence of a defect — it only resembles
+one.
 
 ---
 
@@ -78,7 +103,9 @@ Rank implements by how well they load a working set — roughly:
 
 - **high**: barbell, EZ bar, trap bar, cable machine, machine, leg press
   machine, hack squat machine, dip bars, pull-up bar, dumbbells,
-  kettlebell
+  dumbbell, kettlebell
+  (`dumbbell` and `dumbbells` listed SEPARATELY and both high — see the
+  correction section above for why they must never be collapsed)
 - **medium**: bodyweight, bench/incline bench (as the loaded implement),
   medicine ball, plyo box, ab wheel
 - **low**: resistance band, weighted backpack
