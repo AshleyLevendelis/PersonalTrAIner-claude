@@ -26,6 +26,9 @@ import {
 //                      function never grows its own copy of the closed sets),
 //       filled:        { key: displayValue } for every answered slot,
 //       remaining:     keys still unanswered (required first),
+//       declined:      keys the user was asked and chose not to answer —
+//                      never re-ask these, and never speak as if a value
+//                      exists for them,
 //     }
 //   Response: { reply, actions: [{ name, args }...] }
 //     Every functionCall part is passed through verbatim; the CLIENT
@@ -72,6 +75,18 @@ const toolDeclarations = [
         },
       },
       required: ["slot_key", "value"],
+    },
+  },
+  {
+    name: "skip_slot",
+    description:
+      "Record that the user was asked something and chose not to answer — 'rather not say', 'skip that one', 'does it matter?', or a clear brush-off. This is an ANSWER, not a failure: it stops the question coming back and it never blocks their plan. Call it the moment they decline, then move on to something else in the same turn. Do NOT call this for a value you simply failed to map (use present_slot so they can tap), and do NOT call it pre-emptively on their behalf — only when they have actually declined.",
+    parameters: {
+      type: "object",
+      properties: {
+        slot_key: { type: "string" },
+      },
+      required: ["slot_key"],
     },
   },
   {
@@ -206,6 +221,10 @@ Deno.serve(async (req: Request) => {
     const catalog: SlotCatalogEntry[] = Array.isArray(state?.slotCatalog) ? state.slotCatalog : [];
     const filled: Record<string, string> = state?.filled ?? {};
     const remaining: string[] = Array.isArray(state?.remaining) ? state.remaining : [];
+    // Asked and declined. Deliberately NOT merged into `filled` — the model
+    // must know not to ask again WITHOUT being handed a value it would then
+    // start referring to. There is no value; that is the whole point.
+    const declined: string[] = Array.isArray(state?.declined) ? state.declined : [];
 
     const filledLines = Object.entries(filled)
       .map(([k, v]) => `- ${k}: ${v}`)
@@ -244,6 +263,8 @@ This is a checklist for YOU, never a route to march. Pick whatever comes next na
 - Multi-select slots (trainingDays, injuries, dietaryPreferences, favoriteCuisines): set_slot with a comma-separated list of allowed values, or present_slot for tapping. An explicit "none" is a real answer (set_slot with an empty value) — record it, don't just move on.
 - ONE ANSWER PER set_slot, AND ONE PER THING THEY TOLD YOU. If they hand you four values in one breath ("41, female, 170cm, 87kg"), that is FOUR separate set_slot calls in that turn — age, gender, heightCm, weightKg. Dropping three of them means asking again for something they already told you, which is the single most annoying thing you can do. Sweep their message for every slot it answers before you reply.
 - IF THEY TYPE (RATHER THAN TAP) SOMETHING THAT MATCHES AN OPTION YOU JUST OFFERED — even the exact label, like "Getting By" or "Functional / Athletic" — that is CERTAIN. Call set_slot for it. Reacting to it in prose without the call means the app never recorded it and will ask again; the app has its own backstop for a dead-exact match, but don't rely on that — the call is yours to make.
+- A DECLINE IS AN ANSWER TOO. "rather not say", "skip that", "does it matter?", "why do you need that" about a personal question — call skip_slot for it, say in one clause what it costs them ("no problem — that just means I can't do calorie targets, everything else is unaffected"), and move on. Never ask it again, never ask twice in different words, never make them justify it. Nothing here is required to build their plan except knowing whether anything hurts, so a decline is genuinely fine and should sound like it.
+- ALREADY DECLINED (never re-ask, and never refer to a value for these — there isn't one): ${declined.length > 0 ? declined.join(", ") : "nothing"}
 - NEGATIONS ARE ANSWERS, not just something to acknowledge. "No snacks", "none really", "nothing", "no restrictions" are certain, closed-set answers — set_slot with an empty value for multi-selects (dietaryPreferences, injuries, favoriteCuisines), or the matching "false"/"no" option for a yes-no slot (includeSnacks). Saying "got it, noted" without the call leaves the slot empty and the app will ask again.
 - INJURIES CAN GROW. If injuries was already answered and the user later mentions a NEW pain or niggle, call set_slot(injuries=...) again with the FULL list — everything already recorded, plus the new one. Losing a previously-recorded injury because a later message only mentioned the new one is a safety miss, not a UI quirk.
 - One present_slot per turn at most — only one set of chips can render. So when you group two asks in a turn, at most ONE of them gets chips; ask the other in plain text and map their answer with set_slot. Numeric asks (age/height/weight) have no chips at all, which is exactly why they group so easily. The slot_key you present MUST be the exact question your sentence just asked — if your words ask about cardio, present conditioningPreference, not something else. Chips under the wrong question are worse than no chips.
@@ -277,7 +298,7 @@ ONBOARDING-SPECIFIC: this applies from the FIRST message, not only once the diet
 ONBOARDING-SPECIFIC (mechanical, not just framing): milk/dairy, egg, fish, tree nuts, peanuts, soy, gluten, and shellfish are the app's eight tagged, enforced categories. When the user discloses an allergy to any of them, call set_slot(dietaryPreferences=...) with the matching tag (dairy-free / egg-free / fish-free / nut-free — covers both peanuts and tree nuts — soy-free / gluten-free / shellfish-free) ADDED to whatever they've already told you, in the SAME turn you acknowledge it. This is not optional and record_context_fact is not a substitute for it — only a value on dietaryPreferences actually keeps that food out of their meals; a context fact is memory only, never read by meal generation. The five untagged allergens (celery, sesame, mustard, lupin, sulphites) have no tag mechanism at all — for THOSE, record_context_fact really is the only thing there is, per the framing above.
 
 === FINISHING ===
-When STILL UNKNOWN is empty, give a one-line warm recap of the shape of what you'll build and call complete_onboarding. The app shows them the full review and the generate button — you don't generate anything yourself. If they want to change an earlier answer at any point, just set_slot the new value.`;
+Nothing here is mandatory except knowing whether anything hurts (the app blocks on that one alone, for safety) — so if they want to stop and start training, let them: recap warmly, name anything they've left out in one clause, and call complete_onboarding. Otherwise, when STILL UNKNOWN is empty, give a one-line warm recap of the shape of what you'll build and call complete_onboarding. The app shows them the full review and the generate button — you don't generate anything yourself. If they want to change an earlier answer at any point, just set_slot the new value.`;
 
     const contents: Array<{ role: string; parts: Array<{ text: string }> }> = [];
     if (Array.isArray(history) && history.length > 0) {

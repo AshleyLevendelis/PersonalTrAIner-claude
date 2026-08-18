@@ -50,10 +50,22 @@ export interface PendingGoal {
 }
 
 export interface OnboardingDraft {
-  version: 1
+  version: 2
   values: OnboardingSlotValues
-  /** Slot keys explicitly answered or explicitly skipped — the tracker's "asked" set. */
+  /** Slot keys explicitly ANSWERED with a value that passed validation. */
   confirmedSlots: string[]
+  /**
+   * Slot keys the user was asked and explicitly declined. Separate from
+   * confirmedSlots on purpose: a declined slot is settled (it must stop being
+   * re-asked, and it must not block the plan) but it is NOT answered, so
+   * nothing downstream may read a value for it. Merging the two sets would
+   * re-create the fabrication this exists to prevent.
+   *
+   * Added in v2. A v1 draft has no skipped set; loadOnboardingDraft migrates
+   * it to an empty one rather than discarding the draft, so someone mid-
+   * conversation when this shipped keeps every answer they'd already given.
+   */
+  skippedSlots: string[]
   messages: DraftMessage[]
   pendingContextFacts: PendingContextFact[]
   pendingGoals: PendingGoal[]
@@ -70,9 +82,10 @@ export interface OnboardingDraft {
 
 export function emptyDraft(): OnboardingDraft {
   return {
-    version: 1,
+    version: 2,
     values: initialSlotValues(),
     confirmedSlots: [],
+    skippedSlots: [],
     messages: [],
     pendingContextFacts: [],
     pendingGoals: [],
@@ -84,8 +97,17 @@ export function loadOnboardingDraft(): OnboardingDraft | null {
   try {
     const raw = localStorage.getItem(DRAFT_KEY)
     if (!raw) return null
-    const parsed = JSON.parse(raw) as OnboardingDraft
-    if (parsed?.version !== 1 || !parsed.values || !Array.isArray(parsed.confirmedSlots)) {
+    // `version` widened to number on purpose: the literal type is the CURRENT
+    // version, and this function's whole job is recognising older ones.
+    const parsed = JSON.parse(raw) as Omit<OnboardingDraft, 'version'> & { version: number }
+    // v1 and v2 are both loadable. v1 predates the skipped set and is
+    // MIGRATED, not discarded — dropping it would throw away a real
+    // conversation someone was part-way through when this shipped, which is
+    // precisely what the draft exists to prevent. v1's confirmedSlots only
+    // ever held answered slots (its only writer validated first), so an empty
+    // skipped set is the correct reading of an old draft, not a guess.
+    const version = parsed?.version
+    if ((version !== 1 && version !== 2) || !parsed.values || !Array.isArray(parsed.confirmedSlots)) {
       localStorage.removeItem(DRAFT_KEY)
       return null
     }
@@ -96,7 +118,9 @@ export function loadOnboardingDraft(): OnboardingDraft | null {
     return {
       ...emptyDraft(),
       ...parsed,
+      version: 2,
       values: { ...initialSlotValues(), ...parsed.values },
+      skippedSlots: Array.isArray(parsed.skippedSlots) ? parsed.skippedSlots : [],
       messages: Array.isArray(parsed.messages) ? parsed.messages : [],
       pendingContextFacts: Array.isArray(parsed.pendingContextFacts) ? parsed.pendingContextFacts : [],
       pendingGoals: Array.isArray(parsed.pendingGoals) ? parsed.pendingGoals : [],

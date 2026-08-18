@@ -11,6 +11,8 @@ import {
   buildSlotCatalog,
   missingRequiredSlots,
   unconfirmedOptionalSlots,
+  missingPlanFloor,
+  statedAssumptions,
   isSlotRequired,
   isSlotApplicable,
   assembleProfile,
@@ -84,6 +86,14 @@ interface ChatMsg extends DraftMessage {
 interface WorkingState {
   values: OnboardingSlotValues
   confirmed: Set<string>
+  /**
+   * Asked and explicitly declined. Kept apart from `confirmed` because the two
+   * mean different things to different readers: both stop the coach re-asking,
+   * but only `confirmed` means a value exists. Collapsing them would let a
+   * decline read as an answer, which is the fabrication this whole line of
+   * work exists to remove.
+   */
+  skipped: Set<string>
   pendingContextFacts: PendingContextFact[]
   pendingGoals: PendingGoal[]
   newMessages: ChatMsg[]
@@ -303,6 +313,13 @@ function applySlot(
   const alreadySame = JSON.stringify(prior[key]) === JSON.stringify(coerced) && ws.confirmed.has(key)
   ws.values = { ...ws.values, [key]: coerced } as OnboardingSlotValues
   ws.confirmed = new Set(ws.confirmed).add(key)
+  // Answering something previously declined clears the decline — people change
+  // their mind ("actually, 78kg"), and leaving it in both sets would make
+  // "did they tell us?" depend on which set the reader happened to check.
+  if (ws.skipped.has(key)) {
+    ws.skipped = new Set(ws.skipped)
+    ws.skipped.delete(key)
+  }
   ws.resolveCards.add(key)
   if (showReceipt && !alreadySame) {
     ws.newMessages.push({
@@ -316,10 +333,51 @@ function applySlot(
   return true
 }
 
+/**
+ * Record that a slot was asked and declined.
+ *
+ * The counterpart to applySlot, and deliberately NOT a value write: nothing
+ * is stored, so every downstream reader still sees the absence and renders it
+ * honestly (MissingBodyMetricsNotice and friends). All this does is stop the
+ * question coming back and stop it blocking the plan.
+ *
+ * The receipt says "not given" rather than a dash or a blank, because the
+ * review card is the last thing seen before a plan is built and it should
+ * read as a choice the person made, not as something the app failed to
+ * collect.
+ */
+/**
+ * Answered ∪ declined, off the WORKING state rather than React state.
+ * Everything inside a turn must read this, not the component's memo — the
+ * memo is a render-time snapshot and a slot written earlier in the same turn
+ * would not be in it yet.
+ */
+function settledSlots(ws: WorkingState): Set<string> {
+  return new Set<string>([...ws.confirmed, ...ws.skipped])
+}
+
+function skipSlot(ws: WorkingState, key: SlotKey): boolean {
+  const def = getSlotDef(key)
+  if (!def) return false
+  // A slot that already has a real answer is not skippable — a stray
+  // skip_slot after a set_slot must never silently un-answer something.
+  if (ws.confirmed.has(key)) return false
+  if (ws.skipped.has(key)) return true
+  ws.skipped = new Set(ws.skipped).add(key)
+  ws.resolveCards.add(key)
+  ws.newMessages.push({
+    role: 'assistant',
+    content: `${RECEIPT_PREFIX}${def.shortLabel} — not given`,
+    isReceipt: true,
+  })
+  return true
+}
+
 export function ConversationalOnboarding({ onComplete }: { onComplete: (profile: UserProfile) => void }) {
   const [draftLoaded] = useState<OnboardingDraft | null>(() => loadOnboardingDraft())
   const [values, setValues] = useState<OnboardingSlotValues>(() => draftLoaded?.values ?? initialSlotValues())
   const [confirmed, setConfirmed] = useState<Set<string>>(() => new Set(draftLoaded?.confirmedSlots ?? []))
+  const [skipped, setSkipped] = useState<Set<string>>(() => new Set(draftLoaded?.skippedSlots ?? []))
   const [pendingContextFacts, setPendingContextFacts] = useState<PendingContextFact[]>(() => draftLoaded?.pendingContextFacts ?? [])
   const [pendingGoals, setPendingGoals] = useState<PendingGoal[]>(() => draftLoaded?.pendingGoals ?? [])
   const [messages, setMessages] = useState<ChatMsg[]>(() => {
@@ -344,22 +402,35 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
   const [reviewOpen, setReviewOpen] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
 
+  // Answered OR declined. Both stop the coach re-asking; only `confirmed`
+  // means a value exists, so the two sets are merged for "what's left to
+  // raise" and kept apart everywhere a value is read.
+  const settled = useMemo(() => new Set<string>([...confirmed, ...skipped]), [confirmed, skipped])
   const missing = useMemo(() => missingRequiredSlots(values), [values])
-  const unconfirmedOptional = useMemo(() => unconfirmedOptionalSlots(confirmed, values), [confirmed, values])
+  const unconfirmedOptional = useMemo(() => unconfirmedOptionalSlots(settled, values), [settled, values])
   // requiredIf-aware: the denominator shrinks the moment an activity format is
   // chosen, so the tracker never counts gym-only questions this profile will
   // never be asked.
   const requiredCount = useMemo(() => ONBOARDING_SLOTS.filter(s => isSlotRequired(s, values)).length, [values])
   const answeredCount = requiredCount - missing.length
-  // What both the manual escape hatch and Generate gate on. Required-missing
-  // alone was the wrong bar: it let "Review and build my plan" appear (and
-  // Generate succeed) before injuries or dietary restrictions had ever been
-  // asked, since neither is required — an unconfirmed injuries slot then
-  // silently assembles into an empty array, indistinguishable from "no
-  // injuries" the user actually gave. This is the same bar the auto-open
-  // effect below already uses; the escape hatch existing on a looser one was
-  // the gap.
-  const readyToGenerate = missing.length === 0 && unconfirmedOptional.length === 0
+  // TWO different bars, because they answer two different questions. Running
+  // one bar for both is what produced the trap.
+  //
+  // readyToGenerate — MAY they build a plan? Ashley's ruling: "no fixed detail
+  // to create a plan". So this is the plan floor and nothing else (see
+  // PLAN_FLOOR_SLOTS: injuries, asked-or-declined, for safety). Whatever else
+  // they've chosen not to share, they get a plan and the app is honest about
+  // what it assumed.
+  //
+  // conversationComplete — should the coach OFFER to wrap up? That still waits
+  // until everything applicable is settled, so nobody is nudged toward the
+  // exit after three questions. The old code used the second as if it were
+  // the first, which meant a person who wouldn't give their weight could never
+  // press Generate at all — the exact refusal trap the nutrition work removed
+  // everywhere the number is USED, still standing where it is ASKED.
+  const readyToGenerate = missingPlanFloor(settled, values).length === 0
+  const conversationComplete = missing.length === 0 && unconfirmedOptional.length === 0
+  const assumptions = useMemo(() => statedAssumptions(values), [values])
 
   // Persist the draft after every state change — this is the whole
   // "a dropped connection never loses answered slots" guarantee.
@@ -368,12 +439,13 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
       ...emptyDraft(),
       values,
       confirmedSlots: Array.from(confirmed),
+      skippedSlots: Array.from(skipped),
       messages: toDraftMessages(messages),
       pendingContextFacts,
       pendingGoals,
     }
     saveOnboardingDraft(draft)
-  }, [values, confirmed, messages, pendingContextFacts, pendingGoals])
+  }, [values, confirmed, skipped, messages, pendingContextFacts, pendingGoals])
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
@@ -388,20 +460,25 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
   // screen (no tab bar until a profile exists) that was a dead end with no
   // way out. A stall here is uniquely costly, so it gets a guard that no
   // request path can route around.
+  // NOTE the bar here is conversationComplete, NOT readyToGenerate. The floor
+  // is met early now, and auto-opening the review the moment it is would shove
+  // someone toward "build my plan" three questions in. Offering to wrap up
+  // still waits until there is genuinely nothing left to ask.
   useEffect(() => {
     if (busy || reviewOpen) return
-    if (!readyToGenerate) return
+    if (!conversationComplete) return
     setMessages(prev =>
       prev.some(m => m.content === COMPLETE_MESSAGE)
         ? prev
         : [...prev, { role: 'assistant', content: COMPLETE_MESSAGE }],
     )
     setReviewOpen(true)
-  }, [values, confirmed, busy, reviewOpen])
+  }, [conversationComplete, busy, reviewOpen])
 
   const makeWorkingState = (): WorkingState => ({
     values,
     confirmed,
+    skipped,
     pendingContextFacts,
     pendingGoals,
     newMessages: [],
@@ -412,6 +489,7 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
   const commitWorkingState = (ws: WorkingState) => {
     setValues(ws.values)
     setConfirmed(ws.confirmed)
+    setSkipped(ws.skipped)
     setPendingContextFacts(ws.pendingContextFacts)
     setPendingGoals(ws.pendingGoals)
     if (ws.newMessages.length > 0 || ws.resolveCards.size > 0) {
@@ -428,10 +506,15 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
     for (const def of ONBOARDING_SLOTS) {
       if (ws.confirmed.has(def.key)) filled[def.key] = displayValueFor(def, ws.values)
     }
+    const settled = settledSlots(ws)
     return {
       slotCatalog: buildSlotCatalog(ws.values),
       filled,
-      remaining: [...missingRequiredSlots(ws.values), ...unconfirmedOptionalSlots(ws.confirmed, ws.values)],
+      // Declines are sent as their own list rather than folded into `filled`.
+      // The coach needs to know not to ask again; it must NOT be told a value
+      // exists, or it will start referring to one.
+      declined: [...ws.skipped],
+      remaining: [...missingRequiredSlots(ws.values), ...unconfirmedOptionalSlots(settled, ws.values)],
     }
   }
 
@@ -491,7 +574,9 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
           console.warn('onboarding: present_slot with unknown slot_key', action.args.slot_key)
           continue
         }
-        if (ws.confirmed.has(key)) continue
+        // Settled, not just confirmed: re-offering chips for something they
+        // already declined is the nagging this change exists to stop.
+        if (settledSlots(ws).has(key)) continue
         if (!isSlotApplicable(def, ws.values)) continue
         // One live card per question. The model can ask for the same chips on
         // both legs of the round trip, and the second copy found the coach's
@@ -544,16 +629,26 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
             },
           ]
         }
+      } else if (action.name === 'skip_slot') {
+        const key = normalizeSlotKey(String(action.args.slot_key ?? ''))
+        const def = getSlotDef(key)
+        if (!def) {
+          console.warn('onboarding: skip_slot with unknown slot_key', action.args.slot_key)
+          continue
+        }
+        if (!isSlotApplicable(def, ws.values)) continue
+        skipSlot(ws, def.key)
       } else if (action.name === 'complete_onboarding') {
-        const stillMissing = missingRequiredSlots(ws.values)
-        const stillUnasked = unconfirmedOptionalSlots(ws.confirmed, ws.values)
-        if (stillMissing.length > 0 || stillUnasked.length > 0) {
-          // The model jumped early — refuse, visibly. Injuries especially
-          // must never be skipped past into generation.
-          const names = [...stillMissing, ...stillUnasked].map(k => getSlotDef(k)?.question ?? k).slice(0, 4)
+        // Only the FLOOR blocks now. Everything else the person hasn't given
+        // is their choice, and the review card names what the app assumed
+        // rather than pretending it knows. Refusing here on unanswered
+        // optionals is what made a declined weight unrecoverable.
+        const stillMissing = missingPlanFloor(settledSlots(ws), ws.values)
+        if (stillMissing.length > 0) {
+          const names = stillMissing.map(k => getSlotDef(k)?.question ?? k)
           ws.newMessages.push({
             role: 'assistant',
-            content: `Almost — a couple of things I still need before I can build this properly: ${names.join(' · ')}`,
+            content: `Before I build this — one thing I do have to ask: ${names.join(' · ')}`,
           })
         } else {
           ws.openReview = true
@@ -703,7 +798,7 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
       // with its chips instead of leaving silence.
       const producedVisible = responseWs.newMessages.some(m => !m.isReceipt) || responseWs.openReview
       if (!producedVisible) {
-        const next = [...missingRequiredSlots(responseWs.values), ...unconfirmedOptionalSlots(responseWs.confirmed, responseWs.values)][0]
+        const next = [...missingRequiredSlots(responseWs.values), ...unconfirmedOptionalSlots(settledSlots(responseWs), responseWs.values)][0]
         const nextDef = next ? getSlotDef(next) : undefined
         if (nextDef) {
           responseWs.newMessages.push({
@@ -742,7 +837,7 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
       // legitimate steady progress through a long slot list never trips it,
       // only genuine standstill does.
       if (!responseWs.openReview) {
-        const canonicalNext = [...missingRequiredSlots(responseWs.values), ...unconfirmedOptionalSlots(responseWs.confirmed, responseWs.values)][0]
+        const canonicalNext = [...missingRequiredSlots(responseWs.values), ...unconfirmedOptionalSlots(settledSlots(responseWs), responseWs.values)][0]
         if (canonicalNext) {
           const priorAsks = priorMessages.filter(m => m.slotCard === canonicalNext).length
           const askedThisTurn = responseWs.newMessages.some(m => m.slotCard === canonicalNext)
@@ -843,6 +938,7 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
       ...emptyDraft(),
       values,
       confirmedSlots: Array.from(confirmed),
+      skippedSlots: Array.from(skipped),
       messages: toDraftMessages(messages),
       pendingContextFacts,
       pendingGoals,
@@ -925,11 +1021,10 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
               from the review card. Onboarding hides the tab bar (there's no
               profile yet), so any state where the user can see no way forward
               is a dead end — this makes "finish" always reachable.
-              Gated on readyToGenerate, not just required-missing: required
-              alone let this appear (and Generate succeed) before injuries or
-              dietary restrictions had ever been asked — neither is required,
-              so an unconfirmed injuries slot silently assembles into an empty
-              array, indistinguishable from a real "no injuries" answer. */}
+              Gated on the plan FLOOR, so it appears as soon as a plan can
+              honestly be built rather than waiting for a full sheet. Someone
+              who wants to stop answering and start training can, at any point
+              — that is the whole "no fixed detail" ruling, made reachable. */}
           {!reviewOpen && readyToGenerate && (
             <Button onClick={() => setReviewOpen(true)} className="w-full h-11">
               Review and build my plan
@@ -944,11 +1039,26 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
                   // my lifts" answer shouldn't leave three blank weight rows
                   // in the summary they're being asked to confirm.
                   .filter(s => isSlotApplicable(s, values))
-                  .filter(s => isSlotRequired(s, values) || confirmed.has(s.key))
+                  .filter(s => isSlotRequired(s, values) || settled.has(s.key))
                   .map(def => (
                   <p key={def.key}>
                     <span className="font-medium text-foreground">{def.shortLabel}:</span>{' '}
-                    <span className="text-muted-foreground">{displayValueFor(def, values)}</span>
+                    {/* A declined slot reads as a choice they made, not as a
+                        gap the app failed to fill — and never as a value.
+                        displayValueFor would print "—" here, which looks like
+                        a missing field rather than an answer. */}
+                    <span className="text-muted-foreground">
+                      {skipped.has(def.key) ? 'not given' : displayValueFor(def, values)}
+                    </span>
+                  </p>
+                ))}
+                {/* Everything the app will INVENT, said out loud before the
+                    plan is built rather than discovered in it. Same rule the
+                    nutrition surfaces follow for a missing weight: state the
+                    absence, never paper over it. */}
+                {assumptions.map(line => (
+                  <p key={line} className="pt-1 text-[13px] leading-normal text-muted-foreground">
+                    {line}
                   </p>
                 ))}
                 {/* VISION.md: "someone beginning exercise for the first time

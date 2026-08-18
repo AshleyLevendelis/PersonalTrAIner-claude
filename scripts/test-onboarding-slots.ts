@@ -16,6 +16,9 @@ import {
   assembleProfile,
   missingRequiredSlots,
   unconfirmedOptionalSlots,
+  missingPlanFloor,
+  statedAssumptions,
+  PLAN_FLOOR_SLOTS,
   isSlotRequired,
   isSlotApplicable,
   offeredOptionsFor,
@@ -30,7 +33,7 @@ import {
   type SlotKey,
 } from '../src/lib/onboarding-slots'
 import { DIETARY_PREFERENCES } from '../src/lib/diet-rules'
-import { getFlaggedJoints } from '../src/lib/exercise-plan'
+import { getFlaggedJoints, generateExercisePlan } from '../src/lib/exercise-plan'
 import { isStartingOut } from '../src/lib/starting-out'
 import type { UserProfile } from '../src/lib/types'
 
@@ -359,6 +362,88 @@ check(
   'the five untagged allergens (no enforcement mechanism exists) are correctly never returned',
   detectAllergenTags('allergic to celery, sesame, mustard, lupin, and sulphites').length === 0,
 )
+
+// ---------------------------------------------------------------------------
+// 17. THE REFUSAL PATH — someone who declines the personal questions still
+//     gets a plan
+// ---------------------------------------------------------------------------
+// This section exists because its absence let a shipped ruling be violated in
+// production. The nutrition work made a declined weight honest everywhere the
+// number is USED — nullable columns, resolveBodyMetrics -> null, an absence
+// notice on screen — and it was verified by taking a profile that HAD a weight
+// and removing it. Nobody walked the path from the start, where the number is
+// ASKED, and there the old gate still demanded a valid value for age, height,
+// weight and sex with no way to say "rather not". Generate stayed disabled
+// forever.
+//
+// Ashley's ruling, verbatim: "Nobody is blocked from creating an account or
+// getting a training plan because they won't share a weight."
+console.log('\n17. The refusal path — declining still yields a plan')
+
+{
+  const declined = new Set<string>(['age', 'heightCm', 'weightKg', 'gender', 'injuries'])
+  const bare = initialSlotValues()
+
+  check(
+    'a person who has declined every personal question still clears the plan floor',
+    missingPlanFloor(declined, bare).length === 0,
+    JSON.stringify(missingPlanFloor(declined, bare)),
+  )
+
+  check(
+    'the floor is genuinely small — one member, and it is the safety one',
+    PLAN_FLOOR_SLOTS.length === 1 && PLAN_FLOOR_SLOTS[0] === 'injuries',
+    JSON.stringify(PLAN_FLOOR_SLOTS),
+  )
+
+  // The one thing that DOES block, and why: an untouched injuries slot
+  // assembles to [], byte-identical to a real "nothing bothers me", and that
+  // array feeds the exercise filter. Silence must not equal "I'm fine".
+  check(
+    'injuries alone blocks while un-asked',
+    missingPlanFloor(new Set<string>(), bare).includes('injuries'),
+  )
+  check(
+    'and DECLINING injuries unblocks it — asked-or-declined, never must-answer',
+    missingPlanFloor(new Set<string>(['injuries']), bare).length === 0,
+  )
+
+  // The absence must survive assembly: declining is not a value.
+  const profile = assembleProfile(bare)
+  check('declined age assembles to undefined, never 0', profile.age === undefined, String(profile.age))
+  check('declined height assembles to undefined, never 0', profile.height_cm === undefined, String(profile.height_cm))
+  check('declined weight assembles to undefined, never 0', profile.weight_kg === undefined, String(profile.weight_kg))
+  check('declined sex assembles to undefined, never a fabricated "male"', profile.gender === undefined, String(profile.gender))
+
+  // ... and a plan must actually come out the other end.
+  const plan = generateExercisePlan(profile)
+  check(
+    'a plan generates from an almost-empty profile',
+    Array.isArray(plan.plan) && plan.plan.length > 0,
+    `days=${plan.plan?.length}`,
+  )
+  check(
+    'and it contains real training days, not an empty week',
+    plan.plan.some(d => d.exercises.length > 0),
+  )
+
+  // The training-day fallback must be DISCLOSED, not silent.
+  check(
+    'an unanswered training-days slot produces a stated assumption',
+    statedAssumptions(bare).length === 1 && statedAssumptions(bare)[0].includes('Monday'),
+    JSON.stringify(statedAssumptions(bare)),
+  )
+  check(
+    'and once days ARE chosen, nothing is assumed',
+    statedAssumptions({ ...bare, trainingDays: ['Mon', 'Tue'] }).length === 0,
+  )
+  check(
+    'the assumed week is what actually reaches the profile',
+    profile.training_days.filter(d => d.available).length === 3,
+    JSON.stringify(profile.training_days.filter(d => d.available).map(d => d.day)),
+  )
+}
+
 
 if (failures > 0) {
   console.error(`\n${failures} failure(s)`)

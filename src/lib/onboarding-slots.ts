@@ -566,13 +566,20 @@ export function missingRequiredSlots(values: OnboardingSlotValues): SlotKey[] {
 }
 
 /**
- * Optional slots that must still have been explicitly asked/skipped before
- * completion — the conversational tracker passes its confirmed-set here.
- * Injuries is the load-bearing member: the safety filter must never be left
- * simply un-asked because the model skipped ahead.
+ * Optional slots not yet SETTLED — where settled means answered OR explicitly
+ * declined. The caller passes the union of its confirmed and skipped sets.
+ *
+ * The parameter is deliberately named `settled`, not `confirmed`: for most of
+ * this file's life there was no way to record a decline at all, so "confirmed"
+ * was the only membership that existed and the two words meant the same thing.
+ * They no longer do, and reading a skipped slot as unconfirmed is exactly the
+ * bug that trapped people (see PLAN_FLOOR_SLOTS below).
+ *
+ * This list drives what the coach still has to RAISE. It is no longer what
+ * gates the Generate button — that is missingPlanFloor().
  */
 export function unconfirmedOptionalSlots(
-  confirmed: ReadonlySet<string>,
+  settled: ReadonlySet<string>,
   values: OnboardingSlotValues = initialSlotValues(),
 ): SlotKey[] {
   return ONBOARDING_SLOTS
@@ -581,9 +588,80 @@ export function unconfirmedOptionalSlots(
     // optional we still owe the user" — nobody is asked for a squat number
     // after saying they don't know their lifts, even as a skip.
     .filter(s => isSlotApplicable(s, values))
-    .filter(s => !confirmed.has(s.key))
+    .filter(s => !settled.has(s.key))
     .map(s => s.key)
 }
+
+// ---------------------------------------------------------------------------
+// The plan floor — what actually blocks building a plan
+// ---------------------------------------------------------------------------
+// Ashley's ruling: "With no fixed detail to create a plan. But the more detail
+// the better." The engine already agrees — every profile read in
+// generateExercisePlan/generateMesocycle is `|| defaulted`, and neither reads
+// age, sex, height or weight at all. The database agrees too (the four body
+// metrics were made nullable in 20260817120000_allow_absent_body_metrics).
+//
+// Onboarding was the last thing that didn't. The old gate demanded 23 of 27
+// slots, and four of them — age, height, weight, sex — could not be declined
+// at all, because a slot only counted as answered by passing its own
+// validator and none of those validators has a value meaning "declined". So
+// someone who wouldn't give their weight could never press Generate. That is
+// the exact trap the nutrition work was supposed to remove; it was fixed
+// everywhere the number is USED and left standing where it is ASKED.
+//
+// So the floor is almost empty by design. It holds one member, and the reason
+// is safety rather than plan quality:
+//
+//   injuries — must have been ASKED once (answered or explicitly declined),
+//   never merely left alone. assembleProfile turns an untouched injuries slot
+//   into `[]`, which is byte-identical to a real "nothing bothers me" — and
+//   that array feeds the exercise filter that keeps people off movements that
+//   hurt them. Silence and "I'm fine" must not be the same input to a safety
+//   filter. Declining is fine and takes one tap; not being asked is not.
+//
+// Deliberately NOT here, though both were candidates:
+//   trainingDays — an empty array yields a zero-day plan, which is nonsense
+//   rather than a crash. Handled as a stated assumption at review time
+//   ("I'll assume Mon/Wed/Fri") rather than as a gate, so it can't trap.
+//   Everything else — every one of them has an honest default in the engine.
+export const PLAN_FLOOR_SLOTS: SlotKey[] = ['injuries']
+
+/**
+ * Floor members not yet settled. Empty means a plan can be built — however
+ * little else the person has chosen to share.
+ */
+export function missingPlanFloor(
+  settled: ReadonlySet<string>,
+  values: OnboardingSlotValues = initialSlotValues(),
+): SlotKey[] {
+  return PLAN_FLOOR_SLOTS
+    .filter(key => {
+      const def = getSlotDef(key)
+      return def ? isSlotApplicable(def, values) : false
+    })
+    .filter(key => !settled.has(key))
+}
+
+/**
+ * Answers the app will INVENT if the user never gives them, in the words it
+ * should own up to. Rendered on the review card so nobody is handed a plan
+ * shaped by a number they never said — the same rule the nutrition surfaces
+ * follow, applied to training.
+ */
+export function statedAssumptions(values: OnboardingSlotValues): string[] {
+  const out: string[] = []
+  if (values.trainingDays.length === 0) {
+    out.push("You haven't picked training days — I'll start you on Monday, Wednesday and Friday. Change them whenever.")
+  }
+  return out
+}
+
+/**
+ * Days to build the plan around. Falls back to a 3-day week ONLY when the user
+ * never chose — paired with statedAssumptions() above so the fallback is always
+ * disclosed, never silent.
+ */
+export const ASSUMED_TRAINING_DAYS = ['Mon', 'Wed', 'Fri']
 
 // ---------------------------------------------------------------------------
 // Profile assembly — the single transform from slot values to UserProfile.
@@ -624,9 +702,15 @@ export function assembleProfile(data: OnboardingSlotValues): UserProfile {
   // on training_days without a null guard (exercise-plan.ts's availableDays,
   // macro-calculator's training-day lookup) — the guards added alongside this
   // are a backstop, this is the contract.
+  // The one place a training-day fallback is allowed, and it is disclosed
+  // rather than silent — statedAssumptions() puts it on the review card in
+  // plain words before the plan is built. Without this an unanswered
+  // trainingDays produces seven `available: false` entries, i.e. a zero-day
+  // plan: not a crash, just a plan with nothing in it.
+  const chosenDays = data.trainingDays.length > 0 ? data.trainingDays : ASSUMED_TRAINING_DAYS
   const trainingDaysFull = DAYS_FULL.map(day => ({
     day,
-    available: data.trainingDays.includes(day.slice(0, 3)),
+    available: chosenDays.includes(day.slice(0, 3)),
   }))
 
   return {
