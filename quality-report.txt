@@ -3,14 +3,14 @@ PLAN QUALITY SCORE REPORT
 ================================================================================
 
 Combinations scored: 9216
-Runtime: 1149.8s
-Overall average: 11.04 / 12
+Runtime: 2386.5s
+Overall average: 11.02 / 12
 
 Per-dimension averages (max 2.0 each):
   Time fit         1.53
   Structure        1.95
   Progression      1.65
-  Selection        1.94
+  Selection        1.92
   Goal alignment   1.97
   Primer fit       2.00
 
@@ -23,8 +23,8 @@ Score distribution:
   [5-6)  0
   [6-7)  0
   [7-8)  0
-  [8-9)  12
-  [9-10) ############################################################ 9204
+  [8-9)  20
+  [9-10) ############################################################ 9196
 
 Plans below the 7.2 floor: 0 / 9216
 
@@ -63,60 +63,31 @@ Score 8.2/12 — full_gym / knees / 30-45 / bodybuilding / beginner / functional
   Goal alignment (1.0/2):
     [recovery_volume_not_reduced] wk1: low recovery_capacity weekly sets (42) not >=15% below high (54)
 
-Score 8.4/12 — home_gym / lower_back+knees / 60-90 / combat / novice / conditioning / recovery=moderate / cardio=love
-  Time fit (0.0/2):
-    [time_fit] wk5 Tuesday: Worst day (week 5 Tuesday) is 36% under budget (expected: 75min, actual: 48min)
-  Structure (1.6/2):
-    [main_lift_short_rest] wk1 Monday: Main lift "Barbell Bench Press" rest is "45s", not a full rest period
-    [main_lift_short_rest] wk1 Tuesday: Main lift "Barbell Bench Press" rest is "45s", not a full rest period
-  Progression (1.6/2):
-    [frozen_week] wk6 Monday: Barbell Bench Press: load and reps both unchanged from week 6 to week 7 (10-12 @ 42.5) — only the RPE label differs
-    [frozen_week] wk6 Tuesday: Barbell Bench Press: load and reps both unchanged from week 6 to week 7 (10-12 @ 42.5) — only the RPE label differs
-    [frozen_week] wk9 Monday: Farmer's Walk: load and reps both unchanged from week 9 to week 10 (40m @ 22) — only the RPE label differs
-    [frozen_week] wk9 Tuesday: Farmer's Walk: load and reps both unchanged from week 9 to week 10 (40m @ 22) — only the RPE label differs
-    [frozen_week] wk9 Thursday: Farmer's Walk: load and reps both unchanged from week 9 to week 10 (40m @ 22) — only the RPE label differs
-    [frozen_week] wk9 Friday: Farmer's Walk: load and reps both unchanged from week 9 to week 10 (40m @ 22) — only the RPE label differs
-    [frozen_week] wk10 Monday: Barbell Bench Press: load and reps both unchanged from week 10 to week 11 (6-8 @ 47.5) — only the RPE label differs
-    [frozen_week] wk10 Monday: Farmer's Walk: load and reps both unchanged from week 10 to week 11 (40m @ 22) — only the RPE label differs
-    [frozen_week] wk10 Tuesday: Barbell Bench Press: load and reps both unchanged from week 10 to week 11 (6-8 @ 47.5) — only the RPE label differs
-    [frozen_week] wk10 Tuesday: Farmer's Walk: load and reps both unchanged from week 10 to week 11 (40m @ 22) — only the RPE label differs
-    [frozen_week] wk10 Thursday: Farmer's Walk: load and reps both unchanged from week 10 to week 11 (40m @ 22) — only the RPE label differs
-    [frozen_week] wk10 Friday: Farmer's Walk: load and reps both unchanged from week 10 to week 11 (40m @ 22) — only the RPE label differs
-    [frozen_week] wk13 Monday: Barbell Bench Press: load and reps both unchanged from week 13 to week 14 (10-12 @ 42.5) — only the RPE label differs
-    [frozen_week] wk13 Tuesday: Barbell Bench Press: load and reps both unchanged from week 13 to week 14 (10-12 @ 42.5) — only the RPE label differs
-    [frozen_week] wk14 Monday: Barbell Bench Press: load and reps both unchanged from week 14 to week 15 (10-12 @ 42.5) — only the RPE label differs
-    [frozen_week] wk14 Tuesday: Barbell Bench Press: load and reps both unchanged from week 14 to week 15 (10-12 @ 42.5) — only the RPE label differs
-  Selection (1.2/2):
-    [load_incoherent] wk1 Tuesday: Unilateral "Landmine Press" (20kg) outweighs this day's bilateral main lift "Barbell Bench Press" (22.5kg)
-    [push_pull_imbalance] wk1: Weekly push:pull set ratio is 1.71 (push=12, pull=7) (expected: 0.6 - 1.6, actual: 1.71)
-
 Score 8.6/12 — full_gym / knees / 30-45 / bodybuilding / beginner / hypertrophy / recovery=low / cardio=avoid
   Time fit (0.0/2):
     [time_fit] wk5 Tuesday: Worst day (week 5 Tuesday) is 23% over budget (expected: 37min, actual: 46min)
   Progression (1.6/2):
     [frozen_week] wk5 Tuesday: Neutral-Grip Seated Cable Row: load and reps both unchanged from week 5 to week 6 (8-10 @ 30) — only the RPE label differs
+    [frozen_week] wk5 Friday: Romanian Deadlifts: load and reps both unchanged from week 5 to week 6 (8-10 @ 28) — only the RPE label differs
     [frozen_week] wk6 Monday: Barbell Bench Press: load and reps both unchanged from week 6 to week 7 (8-10 @ 30) — only the RPE label differs
     [frozen_week] wk6 Tuesday: Neutral-Grip Seated Cable Row: load and reps both unchanged from week 6 to week 7 (8-10 @ 30) — only the RPE label differs
     [frozen_week] wk6 Friday: Barbell Bench Press: load and reps both unchanged from week 6 to week 7 (8-10 @ 30) — only the RPE label differs
+    [frozen_week] wk6 Friday: Romanian Deadlifts: load and reps both unchanged from week 6 to week 7 (8-10 @ 28) — only the RPE label differs
     [frozen_week] wk9 Monday: Barbell Bench Press: load and reps both unchanged from week 9 to week 10 (8-10 @ 30) — only the RPE label differs
     [frozen_week] wk9 Monday: Push-Ups: load and reps both unchanged from week 9 to week 10 (8-10 @ bodyweight) — only the RPE label differs
     [frozen_week] wk9 Tuesday: T-Bar Rows: load and reps both unchanged from week 9 to week 10 (8-10 @ 30) — only the RPE label differs
     [frozen_week] wk9 Tuesday: Pull-Ups (Assisted): load and reps both unchanged from week 9 to week 10 (8-10 @ bodyweight) — only the RPE label differs
-    [frozen_week] wk9 Thursday: Romanian Deadlifts: load and reps both unchanged from week 9 to week 10 (8-10 @ 28) — only the RPE label differs
     [frozen_week] wk9 Thursday: Seated Calf Raises: load and reps both unchanged from week 9 to week 10 (12-17 @ 25) — only the RPE label differs
     [frozen_week] wk9 Friday: Barbell Bench Press: load and reps both unchanged from week 9 to week 10 (8-10 @ 30) — only the RPE label differs
     [frozen_week] wk9 Friday: Arnold Press: load and reps both unchanged from week 9 to week 10 (8-10 @ 10) — only the RPE label differs
-    [frozen_week] wk9 Friday: Romanian Deadlifts: load and reps both unchanged from week 9 to week 10 (8-10 @ 8) — only the RPE label differs
     [frozen_week] wk10 Monday: Barbell Bench Press: load and reps both unchanged from week 10 to week 11 (8-10 @ 30) — only the RPE label differs
     [frozen_week] wk10 Monday: Push-Ups: load and reps both unchanged from week 10 to week 11 (8-10 @ bodyweight) — only the RPE label differs
     [frozen_week] wk10 Tuesday: Close-Grip Lat Pulldown: load and reps both unchanged from week 10 to week 11 (8-10 @ 30) — only the RPE label differs
     [frozen_week] wk10 Tuesday: T-Bar Rows: load and reps both unchanged from week 10 to week 11 (8-10 @ 30) — only the RPE label differs
     [frozen_week] wk10 Tuesday: Pull-Ups (Assisted): load and reps both unchanged from week 10 to week 11 (8-10 @ bodyweight) — only the RPE label differs
-    [frozen_week] wk10 Thursday: Romanian Deadlifts: load and reps both unchanged from week 10 to week 11 (8-10 @ 28) — only the RPE label differs
     [frozen_week] wk10 Thursday: Seated Calf Raises: load and reps both unchanged from week 10 to week 11 (12-17 @ 25) — only the RPE label differs
     [frozen_week] wk10 Friday: Barbell Bench Press: load and reps both unchanged from week 10 to week 11 (8-10 @ 30) — only the RPE label differs
     [frozen_week] wk10 Friday: Arnold Press: load and reps both unchanged from week 10 to week 11 (8-10 @ 10) — only the RPE label differs
-    [frozen_week] wk10 Friday: Romanian Deadlifts: load and reps both unchanged from week 10 to week 11 (8-10 @ 8) — only the RPE label differs
     [frozen_week] wk13 Monday: Barbell Bench Press: load and reps both unchanged from week 13 to week 14 (8-10 @ 30) — only the RPE label differs
     [frozen_week] wk13 Tuesday: Close-Grip Lat Pulldown: load and reps both unchanged from week 13 to week 14 (8-10 @ 30) — only the RPE label differs
     [frozen_week] wk13 Tuesday: T-Bar Rows: load and reps both unchanged from week 13 to week 14 (8-10 @ 30) — only the RPE label differs
@@ -173,31 +144,95 @@ Score 8.8/12 — full_gym / none / 90+ / combat / beginner / conditioning / reco
   Selection (1.6/2):
     [load_incoherent] wk1 Tuesday: Unilateral "Landmine Press" (20kg) outweighs this day's bilateral main lift "Barbell Bench Press" (20kg)
 
-Score 8.8/12 — full_gym / lower_back / 30-45 / combat / beginner / conditioning / recovery=high / cardio=love
+Score 8.8/12 — full_gym / knees / 45-60 / bodybuilding / beginner / hypertrophy / recovery=moderate / cardio=avoid
   Time fit (0.0/2):
-    [time_fit] wk7 Monday: Worst day (week 7 Monday) is 20% over budget (expected: 37min, actual: 44min)
+    [time_fit] wk9 Tuesday: Worst day (week 9 Tuesday) is 24% over budget (expected: 52min, actual: 65min)
+  Progression (1.6/2):
+    [frozen_week] wk5 Tuesday: Neutral-Grip Seated Cable Row: load and reps both unchanged from week 5 to week 6 (8-10 @ 30) — only the RPE label differs
+    [frozen_week] wk5 Friday: Romanian Deadlifts: load and reps both unchanged from week 5 to week 6 (8-10 @ 28) — only the RPE label differs
+    [frozen_week] wk6 Monday: Barbell Bench Press: load and reps both unchanged from week 6 to week 7 (8-10 @ 30) — only the RPE label differs
+    [frozen_week] wk6 Tuesday: Neutral-Grip Seated Cable Row: load and reps both unchanged from week 6 to week 7 (8-10 @ 30) — only the RPE label differs
+    [frozen_week] wk6 Friday: Barbell Bench Press: load and reps both unchanged from week 6 to week 7 (8-10 @ 30) — only the RPE label differs
+    [frozen_week] wk6 Friday: Romanian Deadlifts: load and reps both unchanged from week 6 to week 7 (8-10 @ 28) — only the RPE label differs
+    [frozen_week] wk9 Monday: Barbell Bench Press: load and reps both unchanged from week 9 to week 10 (8-10 @ 30) — only the RPE label differs
+    [frozen_week] wk9 Monday: Push-Ups: load and reps both unchanged from week 9 to week 10 (8-10 @ bodyweight) — only the RPE label differs
+    [frozen_week] wk9 Tuesday: T-Bar Rows: load and reps both unchanged from week 9 to week 10 (8-10 @ 30) — only the RPE label differs
+    [frozen_week] wk9 Thursday: Calf Raises: load and reps both unchanged from week 9 to week 10 (12-17 @ 25) — only the RPE label differs
+    [frozen_week] wk9 Friday: Barbell Bench Press: load and reps both unchanged from week 9 to week 10 (8-10 @ 30) — only the RPE label differs
+    [frozen_week] wk9 Friday: Dumbbell Shoulder Press: load and reps both unchanged from week 9 to week 10 (8-10 @ 10) — only the RPE label differs
+    [frozen_week] wk9 Friday: Bodyweight Good Morning: load and reps both unchanged from week 9 to week 10 (8-10 @ bodyweight) — only the RPE label differs
+    [frozen_week] wk10 Monday: Barbell Bench Press: load and reps both unchanged from week 10 to week 11 (8-10 @ 30) — only the RPE label differs
+    [frozen_week] wk10 Monday: Push-Ups: load and reps both unchanged from week 10 to week 11 (8-10 @ bodyweight) — only the RPE label differs
+    [frozen_week] wk10 Tuesday: Lat Pulldown: load and reps both unchanged from week 10 to week 11 (8-10 @ 30) — only the RPE label differs
+    [frozen_week] wk10 Tuesday: T-Bar Rows: load and reps both unchanged from week 10 to week 11 (8-10 @ 30) — only the RPE label differs
+    [frozen_week] wk10 Tuesday: Seated Cable Row: load and reps both unchanged from week 10 to week 11 (8-10 @ 30) — only the RPE label differs
+    [frozen_week] wk10 Thursday: Calf Raises: load and reps both unchanged from week 10 to week 11 (12-17 @ 25) — only the RPE label differs
+    [frozen_week] wk10 Friday: Barbell Bench Press: load and reps both unchanged from week 10 to week 11 (8-10 @ 30) — only the RPE label differs
+    [frozen_week] wk10 Friday: Dumbbell Shoulder Press: load and reps both unchanged from week 10 to week 11 (8-10 @ 10) — only the RPE label differs
+    [frozen_week] wk10 Friday: Bodyweight Good Morning: load and reps both unchanged from week 10 to week 11 (8-10 @ bodyweight) — only the RPE label differs
+    [frozen_week] wk13 Monday: Barbell Bench Press: load and reps both unchanged from week 13 to week 14 (8-10 @ 30) — only the RPE label differs
+    [frozen_week] wk13 Tuesday: Lat Pulldown: load and reps both unchanged from week 13 to week 14 (8-10 @ 30) — only the RPE label differs
+    [frozen_week] wk13 Tuesday: T-Bar Rows: load and reps both unchanged from week 13 to week 14 (8-10 @ 30) — only the RPE label differs
+    [frozen_week] wk13 Tuesday: Seated Cable Row: load and reps both unchanged from week 13 to week 14 (8-10 @ 30) — only the RPE label differs
+    [frozen_week] wk13 Thursday: Seated Calf Raises: load and reps both unchanged from week 13 to week 14 (15-20 @ 27.5) — only the RPE label differs
+    [frozen_week] wk13 Friday: Barbell Bench Press: load and reps both unchanged from week 13 to week 14 (8-10 @ 30) — only the RPE label differs
+    [frozen_week] wk14 Monday: Barbell Bench Press: load and reps both unchanged from week 14 to week 15 (8-10 @ 30) — only the RPE label differs
+    [frozen_week] wk14 Tuesday: Lat Pulldown: load and reps both unchanged from week 14 to week 15 (8-10 @ 30) — only the RPE label differs
+    [frozen_week] wk14 Tuesday: T-Bar Rows: load and reps both unchanged from week 14 to week 15 (8-10 @ 30) — only the RPE label differs
+    [frozen_week] wk14 Tuesday: Seated Cable Row: load and reps both unchanged from week 14 to week 15 (8-10 @ 30) — only the RPE label differs
+    [frozen_week] wk14 Thursday: Seated Calf Raises: load and reps both unchanged from week 14 to week 15 (15-20 @ 27.5) — only the RPE label differs
+    [frozen_week] wk14 Friday: Barbell Bench Press: load and reps both unchanged from week 14 to week 15 (8-10 @ 30) — only the RPE label differs
+  Selection (1.2/2):
+    [load_incoherent] wk1 Friday: Unilateral "Landmine Press" (20kg) outweighs this day's bilateral main lift "Barbell Bench Press" (20kg)
+    [worse_implement_than_available] wk1 Tuesday: "Kneeling Band Lat Pulldown" uses resistance band when this full gym profile has a better-loading option for the same pattern and tier
+
+Score 8.8/12 — full_gym / knees / 60-90 / bodybuilding / beginner / conditioning / recovery=moderate / cardio=love
+  Time fit (0.0/2):
+    [time_fit] wk1 Thursday: Worst day (week 1 Thursday) is 36% under budget (expected: 75min, actual: 48min)
+  Progression (1.6/2):
+    [frozen_week] wk6 Monday: Barbell Bench Press: load and reps both unchanged from week 6 to week 7 (12-14 @ 27.5) — only the RPE label differs
+    [frozen_week] wk6 Friday: Barbell Bench Press: load and reps both unchanged from week 6 to week 7 (12-14 @ 27.5) — only the RPE label differs
+    [frozen_week] wk9 Monday: Barbell Bench Press: load and reps both unchanged from week 9 to week 10 (8-10 @ 30) — only the RPE label differs
+    [frozen_week] wk9 Friday: Barbell Bench Press: load and reps both unchanged from week 9 to week 10 (8-10 @ 30) — only the RPE label differs
+    [frozen_week] wk10 Monday: Barbell Bench Press: load and reps both unchanged from week 10 to week 11 (8-10 @ 30) — only the RPE label differs
+    [frozen_week] wk10 Friday: Barbell Bench Press: load and reps both unchanged from week 10 to week 11 (8-10 @ 30) — only the RPE label differs
+    [frozen_week] wk13 Monday: Barbell Bench Press: load and reps both unchanged from week 13 to week 14 (12-14 @ 27.5) — only the RPE label differs
+    [frozen_week] wk13 Friday: Barbell Bench Press: load and reps both unchanged from week 13 to week 14 (12-14 @ 27.5) — only the RPE label differs
+    [frozen_week] wk14 Monday: Barbell Bench Press: load and reps both unchanged from week 14 to week 15 (12-14 @ 27.5) — only the RPE label differs
+    [frozen_week] wk14 Friday: Barbell Bench Press: load and reps both unchanged from week 14 to week 15 (12-14 @ 27.5) — only the RPE label differs
+  Selection (1.2/2):
+    [load_incoherent] wk1 Friday: Unilateral "Landmine Press" (20kg) outweighs this day's bilateral main lift "Barbell Bench Press" (20kg)
+    [worse_implement_than_available] wk1 Tuesday: "Kneeling Band Lat Pulldown" uses resistance band when this full gym profile has a better-loading option for the same pattern and tier
+
+Score 8.8/12 — full_gym / knees / 90+ / combat / novice / conditioning / recovery=moderate / cardio=tolerate
+  Time fit (0.0/2):
+    [time_fit] wk1 Monday: Worst day (week 1 Monday) is 40% under budget (expected: 100min, actual: 60min)
   Structure (1.6/2):
     [main_lift_short_rest] wk1 Tuesday: Main lift "Barbell Bench Press" rest is "45s", not a full rest period
+    [main_lift_short_rest] wk1 Thursday: Main lift "Barbell Rows" rest is "45s", not a full rest period
   Progression (1.6/2):
-    [frozen_week] wk6 Tuesday: Barbell Bench Press: load and reps both unchanged from week 6 to week 7 (12-14 @ 27.5) — only the RPE label differs
-    [frozen_week] wk9 Monday: Farmer's Walk: load and reps both unchanged from week 9 to week 10 (40m @ 14) — only the RPE label differs
-    [frozen_week] wk9 Tuesday: Barbell Bench Press: load and reps both unchanged from week 9 to week 10 (8-10 @ 30) — only the RPE label differs
-    [frozen_week] wk9 Tuesday: Farmer's Walk: load and reps both unchanged from week 9 to week 10 (40m @ 14) — only the RPE label differs
-    [frozen_week] wk9 Thursday: Farmer's Walk: load and reps both unchanged from week 9 to week 10 (40m @ 14) — only the RPE label differs
-    [frozen_week] wk9 Friday: Farmer's Walk: load and reps both unchanged from week 9 to week 10 (40m @ 14) — only the RPE label differs
-    [frozen_week] wk10 Monday: Farmer's Walk: load and reps both unchanged from week 10 to week 11 (40m @ 14) — only the RPE label differs
-    [frozen_week] wk10 Tuesday: Barbell Bench Press: load and reps both unchanged from week 10 to week 11 (8-10 @ 30) — only the RPE label differs
-    [frozen_week] wk10 Tuesday: Farmer's Walk: load and reps both unchanged from week 10 to week 11 (40m @ 14) — only the RPE label differs
-    [frozen_week] wk10 Thursday: Farmer's Walk: load and reps both unchanged from week 10 to week 11 (40m @ 14) — only the RPE label differs
-    [frozen_week] wk10 Friday: Farmer's Walk: load and reps both unchanged from week 10 to week 11 (40m @ 14) — only the RPE label differs
-    [frozen_week] wk13 Tuesday: Barbell Bench Press: load and reps both unchanged from week 13 to week 14 (12-14 @ 27.5) — only the RPE label differs
-    [frozen_week] wk14 Tuesday: Barbell Bench Press: load and reps both unchanged from week 14 to week 15 (12-14 @ 27.5) — only the RPE label differs
+    [frozen_week] wk6 Tuesday: Barbell Bench Press: load and reps both unchanged from week 6 to week 7 (10-12 @ 42.5) — only the RPE label differs
+    [frozen_week] wk6 Thursday: Barbell Rows: load and reps both unchanged from week 6 to week 7 (10-12 @ 42.5) — only the RPE label differs
+    [frozen_week] wk9 Monday: Farmer's Walk: load and reps both unchanged from week 9 to week 10 (40m @ 22) — only the RPE label differs
+    [frozen_week] wk9 Tuesday: Farmer's Walk: load and reps both unchanged from week 9 to week 10 (40m @ 22) — only the RPE label differs
+    [frozen_week] wk9 Thursday: Farmer's Walk: load and reps both unchanged from week 9 to week 10 (40m @ 22) — only the RPE label differs
+    [frozen_week] wk9 Friday: Farmer's Walk: load and reps both unchanged from week 9 to week 10 (40m @ 22) — only the RPE label differs
+    [frozen_week] wk10 Monday: Farmer's Walk: load and reps both unchanged from week 10 to week 11 (40m @ 22) — only the RPE label differs
+    [frozen_week] wk10 Tuesday: Barbell Bench Press: load and reps both unchanged from week 10 to week 11 (6-8 @ 47.5) — only the RPE label differs
+    [frozen_week] wk10 Tuesday: Farmer's Walk: load and reps both unchanged from week 10 to week 11 (40m @ 22) — only the RPE label differs
+    [frozen_week] wk10 Thursday: Barbell Rows: load and reps both unchanged from week 10 to week 11 (6-8 @ 47.5) — only the RPE label differs
+    [frozen_week] wk10 Thursday: Farmer's Walk: load and reps both unchanged from week 10 to week 11 (40m @ 22) — only the RPE label differs
+    [frozen_week] wk10 Friday: Farmer's Walk: load and reps both unchanged from week 10 to week 11 (40m @ 22) — only the RPE label differs
+    [frozen_week] wk13 Tuesday: Barbell Bench Press: load and reps both unchanged from week 13 to week 14 (10-12 @ 42.5) — only the RPE label differs
+    [frozen_week] wk13 Thursday: Barbell Rows: load and reps both unchanged from week 13 to week 14 (10-12 @ 42.5) — only the RPE label differs
+    [frozen_week] wk14 Tuesday: Barbell Bench Press: load and reps both unchanged from week 14 to week 15 (10-12 @ 42.5) — only the RPE label differs
+    [frozen_week] wk14 Thursday: Barbell Rows: load and reps both unchanged from week 14 to week 15 (10-12 @ 42.5) — only the RPE label differs
   Selection (1.6/2):
-    [load_incoherent] wk1 Tuesday: Unilateral "Landmine Press" (20kg) outweighs this day's bilateral main lift "Barbell Bench Press" (20kg)
+    [load_incoherent] wk1 Tuesday: Unilateral "Landmine Press" (20kg) outweighs this day's bilateral main lift "Barbell Bench Press" (22.5kg)
 
 Score 8.8/12 — full_gym / neck / 30-45 / hybrid / novice / conditioning / recovery=moderate / cardio=avoid
   Time fit (0.0/2):
-    [time_fit] wk1 Friday: Worst day (week 1 Friday) is 38% under budget (expected: 37min, actual: 23min)
+    [time_fit] wk5 Friday: Worst day (week 5 Friday) is 39% under budget (expected: 37min, actual: 23min)
   Structure (1.6/2):
     [main_lift_short_rest] wk1 Monday: Main lift "Barbell Bench Press" rest is "57s", not a full rest period
     [main_lift_short_rest] wk1 Tuesday: Main lift "Deadlifts" rest is "57s", not a full rest period
@@ -217,6 +252,22 @@ Score 8.8/12 — full_gym / neck / 30-45 / hybrid / novice / conditioning / reco
     [frozen_week] wk14 Thursday: Overhead Carry: load and reps both unchanged from week 14 to week 15 (40m @ 18) — only the RPE label differs
   Selection (1.6/2):
     [load_incoherent] wk1 Monday: Unilateral "Landmine Press" (20kg) outweighs this day's bilateral main lift "Barbell Bench Press" (22.5kg)
+
+Score 8.8/12 — full_gym / wrists / 90+ / functional / novice / conditioning / recovery=high / cardio=love
+  Time fit (0.0/2):
+    [time_fit] wk1 Tuesday: Worst day (week 1 Tuesday) is 36% under budget (expected: 100min, actual: 64min)
+  Structure (1.6/2):
+    [main_lift_short_rest] wk1 Monday: Main lift "Trap Bar Deadlift" rest is "57s", not a full rest period
+    [main_lift_short_rest] wk1 Thursday: Main lift "Trap Bar Deadlift" rest is "57s", not a full rest period
+  Progression (1.6/2):
+    [frozen_week] wk5 Friday: Loaded Backpack Walk: load and reps both unchanged from week 5 to week 6 (40m @ 12) — only the RPE label differs
+    [frozen_week] wk6 Friday: Loaded Backpack Walk: load and reps both unchanged from week 6 to week 7 (40m @ 12) — only the RPE label differs
+    [frozen_week] wk13 Monday: Trap Bar Deadlift: load and reps both unchanged from week 13 to week 14 (10-12 @ 82.5) — only the RPE label differs
+    [frozen_week] wk13 Thursday: Trap Bar Deadlift: load and reps both unchanged from week 13 to week 14 (10-12 @ 82.5) — only the RPE label differs
+    [frozen_week] wk13 Friday: Loaded Backpack Walk: load and reps both unchanged from week 13 to week 14 (40m @ 12) — only the RPE label differs
+    [frozen_week] wk14 Friday: Loaded Backpack Walk: load and reps both unchanged from week 14 to week 15 (40m @ 12) — only the RPE label differs
+  Selection (1.6/2):
+    [worse_implement_than_available] wk1 Thursday: "Kneeling Band Lat Pulldown" uses resistance band when this full gym profile has a better-loading option for the same pattern and tier
 
 Score 8.8/12 — full_gym / lower_back+knees / 90+ / combat / novice / conditioning / recovery=high / cardio=love
   Time fit (0.0/2):
@@ -280,48 +331,5 @@ Score 8.8/12 — home_gym / none / 90+ / combat / beginner / conditioning / reco
     [frozen_week] wk14 Thursday: Barbell Rows: load and reps both unchanged from week 14 to week 15 (12-14 @ 27.5) — only the RPE label differs
   Selection (1.6/2):
     [load_incoherent] wk1 Tuesday: Unilateral "Landmine Press" (20kg) outweighs this day's bilateral main lift "Barbell Bench Press" (20kg)
-
-Score 8.8/12 — home_gym / lower_back / 30-45 / combat / beginner / conditioning / recovery=high / cardio=love
-  Time fit (0.0/2):
-    [time_fit] wk7 Monday: Worst day (week 7 Monday) is 20% over budget (expected: 37min, actual: 44min)
-  Structure (1.6/2):
-    [main_lift_short_rest] wk1 Tuesday: Main lift "Barbell Bench Press" rest is "45s", not a full rest period
-  Progression (1.6/2):
-    [frozen_week] wk6 Tuesday: Barbell Bench Press: load and reps both unchanged from week 6 to week 7 (12-14 @ 27.5) — only the RPE label differs
-    [frozen_week] wk9 Monday: Farmer's Walk: load and reps both unchanged from week 9 to week 10 (40m @ 14) — only the RPE label differs
-    [frozen_week] wk9 Tuesday: Barbell Bench Press: load and reps both unchanged from week 9 to week 10 (8-10 @ 30) — only the RPE label differs
-    [frozen_week] wk9 Tuesday: Farmer's Walk: load and reps both unchanged from week 9 to week 10 (40m @ 14) — only the RPE label differs
-    [frozen_week] wk9 Thursday: Farmer's Walk: load and reps both unchanged from week 9 to week 10 (40m @ 14) — only the RPE label differs
-    [frozen_week] wk9 Friday: Farmer's Walk: load and reps both unchanged from week 9 to week 10 (40m @ 14) — only the RPE label differs
-    [frozen_week] wk10 Monday: Farmer's Walk: load and reps both unchanged from week 10 to week 11 (40m @ 14) — only the RPE label differs
-    [frozen_week] wk10 Tuesday: Barbell Bench Press: load and reps both unchanged from week 10 to week 11 (8-10 @ 30) — only the RPE label differs
-    [frozen_week] wk10 Tuesday: Farmer's Walk: load and reps both unchanged from week 10 to week 11 (40m @ 14) — only the RPE label differs
-    [frozen_week] wk10 Thursday: Farmer's Walk: load and reps both unchanged from week 10 to week 11 (40m @ 14) — only the RPE label differs
-    [frozen_week] wk10 Friday: Farmer's Walk: load and reps both unchanged from week 10 to week 11 (40m @ 14) — only the RPE label differs
-    [frozen_week] wk13 Tuesday: Barbell Bench Press: load and reps both unchanged from week 13 to week 14 (12-14 @ 27.5) — only the RPE label differs
-    [frozen_week] wk14 Tuesday: Barbell Bench Press: load and reps both unchanged from week 14 to week 15 (12-14 @ 27.5) — only the RPE label differs
-  Selection (1.6/2):
-    [load_incoherent] wk1 Tuesday: Unilateral "Landmine Press" (20kg) outweighs this day's bilateral main lift "Barbell Bench Press" (20kg)
-
-Score 8.8/12 — home_gym / lower_back+knees / 90+ / combat / novice / conditioning / recovery=high / cardio=love
-  Time fit (0.0/2):
-    [time_fit] wk1 Monday: Worst day (week 1 Monday) is 44% under budget (expected: 100min, actual: 56min)
-  Structure (1.6/2):
-    [main_lift_short_rest] wk1 Tuesday: Main lift "Barbell Bench Press" rest is "45s", not a full rest period
-  Progression (1.6/2):
-    [frozen_week] wk6 Tuesday: Barbell Bench Press: load and reps both unchanged from week 6 to week 7 (10-12 @ 42.5) — only the RPE label differs
-    [frozen_week] wk9 Monday: Farmer's Walk: load and reps both unchanged from week 9 to week 10 (40m @ 22) — only the RPE label differs
-    [frozen_week] wk9 Tuesday: Farmer's Walk: load and reps both unchanged from week 9 to week 10 (40m @ 22) — only the RPE label differs
-    [frozen_week] wk9 Thursday: Farmer's Walk: load and reps both unchanged from week 9 to week 10 (40m @ 22) — only the RPE label differs
-    [frozen_week] wk9 Friday: Farmer's Walk: load and reps both unchanged from week 9 to week 10 (40m @ 22) — only the RPE label differs
-    [frozen_week] wk10 Monday: Farmer's Walk: load and reps both unchanged from week 10 to week 11 (40m @ 22) — only the RPE label differs
-    [frozen_week] wk10 Tuesday: Barbell Bench Press: load and reps both unchanged from week 10 to week 11 (6-8 @ 47.5) — only the RPE label differs
-    [frozen_week] wk10 Tuesday: Farmer's Walk: load and reps both unchanged from week 10 to week 11 (40m @ 22) — only the RPE label differs
-    [frozen_week] wk10 Thursday: Farmer's Walk: load and reps both unchanged from week 10 to week 11 (40m @ 22) — only the RPE label differs
-    [frozen_week] wk10 Friday: Farmer's Walk: load and reps both unchanged from week 10 to week 11 (40m @ 22) — only the RPE label differs
-    [frozen_week] wk13 Tuesday: Barbell Bench Press: load and reps both unchanged from week 13 to week 14 (10-12 @ 42.5) — only the RPE label differs
-    [frozen_week] wk14 Tuesday: Barbell Bench Press: load and reps both unchanged from week 14 to week 15 (10-12 @ 42.5) — only the RPE label differs
-  Selection (1.6/2):
-    [load_incoherent] wk1 Tuesday: Unilateral "Landmine Press" (20kg) outweighs this day's bilateral main lift "Barbell Bench Press" (22.5kg)
 
 ================================================================================

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -33,6 +33,45 @@ const NUTRITION_RINGS = [
   { key: 'fat', r: 14, strokeWidth: 5, color: 'var(--text-tertiary)' },
 ] as const
 const NUTRITION_RING_CIRC: Record<string, number> = Object.fromEntries(NUTRITION_RINGS.map(r => [r.key, 2 * Math.PI * r.r]))
+
+// ---------------------------------------------------------------------------
+// Water-target sparkle
+// ---------------------------------------------------------------------------
+// Three stars placed ON the water ring's own arc (r=50, centre 56,56) rather
+// than scattered around the meter, so the effect reads as "this ring
+// completed" and not "something happened near the rings". Angles are measured
+// the same way the ring fills — from 12 o'clock, clockwise — and spread across
+// the upper arc where the ring isn't overlapped by the legend column.
+//
+// The stagger is deliberately long (~1.45s between plays, ~4s total): three
+// quick pops in succession reads as a loading state, three slow ones read as
+// a small celebration and then stop.
+const WATER_RING_R = 50
+const SPARKLES = [
+  { angleDeg: 312, size: 9, delayMs: 0 },
+  { angleDeg: 28, size: 6.5, delayMs: 1450 },
+  // Not pushed further clockwise than this: at ~3 o'clock the star's own
+  // drop-shadow reaches the 112-wide viewBox edge and gets clipped by the
+  // svg's default overflow, which reads as a rendering glitch rather than a
+  // sparkle. Verified numerically — bbox stays ~14px clear here.
+  { angleDeg: 140, size: 7.5, delayMs: 2900 },
+] as const
+/** How long after the crossing the nodes are torn out — last delay + one play + a frame of slack. */
+const SPARKLE_TEARDOWN_MS = 4100
+
+/** Four-point star as a path, centred on (cx, cy). Concave control points at 38% give the pinched arms a "sparkle" reads as; a plain rotated square does not. */
+function starPath(cx: number, cy: number, size: number): string {
+  const o = size / 2
+  const i = o * 0.38
+  return [
+    `M ${cx} ${cy - o}`,
+    `Q ${cx + i} ${cy - i} ${cx + o} ${cy}`,
+    `Q ${cx + i} ${cy + i} ${cx} ${cy + o}`,
+    `Q ${cx - i} ${cy + i} ${cx - o} ${cy}`,
+    `Q ${cx - i} ${cy - i} ${cx} ${cy - o}`,
+    'Z',
+  ].join(' ')
+}
 
 export interface NutritionDisplayProps {
   profile: UserProfile
@@ -138,6 +177,27 @@ export function NutritionDisplay({
     await setWaterTargetMl(profileId, n)
   }
 
+  // Fires on the CROSSING, not on the state. `wasComplete` starts as null and
+  // is seeded on the first pass with whatever the day already is, so opening
+  // the screen on an already-hit target is not a crossing and shows nothing —
+  // the sparkle marks the moment it happened, and re-showing it on every
+  // mount would turn a reward into wallpaper. Ref, not state: seeding it must
+  // not itself cause a render.
+  const wasWaterComplete = useRef<boolean | null>(null)
+  const [waterJustCompleted, setWaterJustCompleted] = useState(false)
+  const waterComplete = waterTarget > 0 && todayWaterMl >= waterTarget
+
+  useEffect(() => {
+    const previous = wasWaterComplete.current
+    wasWaterComplete.current = waterComplete
+    if (previous !== false || !waterComplete) return
+    setWaterJustCompleted(true)
+    const timer = setTimeout(() => setWaterJustCompleted(false), SPARKLE_TEARDOWN_MS)
+    // Clearing on unmount matters: leaving the timer live would call
+    // setState on a gone component if the trainee switches tabs mid-sparkle.
+    return () => clearTimeout(timer)
+  }, [waterComplete])
+
   const ringValues: Record<string, { eaten: number; target: number }> = {
     water: { eaten: todayWaterMl, target: waterTarget },
     calories: { eaten: eaten.kcal, target: macros?.calories ?? 0 },
@@ -169,6 +229,23 @@ export function NutritionDisplay({
                   transform="rotate(-90 56 56)"
                   className={r.key === 'calories' ? 'glow-icon' : undefined}
                   style={{ transition: 'stroke-dasharray 400ms ease' }}
+                />
+              )
+            })}
+            {waterJustCompleted && SPARKLES.map(s => {
+              // -90 puts 0deg at 12 o'clock, matching the ring fill's own
+              // rotate(-90) so an angle here means the same thing it does there.
+              const rad = ((s.angleDeg - 90) * Math.PI) / 180
+              return (
+                <path
+                  key={`sparkle-${s.angleDeg}`}
+                  className="ds-sparkle"
+                  d={starPath(56 + WATER_RING_R * Math.cos(rad), 56 + WATER_RING_R * Math.sin(rad), s.size)}
+                  fill="var(--chart-3)"
+                  style={{
+                    animationDelay: `${s.delayMs}ms`,
+                    filter: 'drop-shadow(0 0 3px var(--chart-3))',
+                  }}
                 />
               )
             })}

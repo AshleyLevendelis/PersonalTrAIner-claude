@@ -336,6 +336,136 @@ const EQUIPMENT_SETS: Record<EquipmentAccess, Set<string> | null> = {
 }
 
 // ---------------------------------------------------------------------------
+// Equipment QUALITY — how well an implement loads a working set
+// ---------------------------------------------------------------------------
+// EQUIPMENT_SETS above answers "can they physically do this?". This answers
+// the separate question "is this the best tool they own for the job?", which
+// nothing asked until now: equipment was a filter and never a preference, so
+// for a full-gym trainee a resistance band and a cable stack scored
+// IDENTICALLY in a tricep slot and the pick came down to the +/-0.3 jitter.
+// That is the whole mechanism behind "why is there a band in my full gym" —
+// not a broken filter, just an absent preference.
+//
+// Deliberately keyed on the IMPLEMENT, not on exercise names. The existing
+// REGRESSION_VARIATIONS list (periodization.ts) demotes easier variants by
+// hardcoded name, which means every exercise added later starts unranked;
+// keying on equipment means a new band exercise is ranked correctly the day
+// it's added, with no list to maintain.
+//
+// NOT a blacklist. A band is the right answer often — see the injury note on
+// scoreCandidate's equipment_fit factor: injury filtering runs BEFORE
+// scoring, so when a shoulder rules out pushdowns the band is the only
+// survivor and wins regardless of this rank.
+//
+// Absent from this map = unranked = contributes nothing:
+//   - accessories that aren't the loading implement at all ('bench',
+//     'incline bench', 'squat rack', 'box', 'farmer handles')
+//   - cardio machines ('treadmill', 'rowing machine', 'stationary bike',
+//     'elliptical machine', 'battle ropes', 'jump rope') — these are picked
+//     by the cardio reservation, not ranked against strength implements, and
+//     ranking a treadmill against a barbell is a category error.
+// Both cases fall through to a 0 contribution rather than a low one, so an
+// unranked entry is never quietly penalised for being unranked.
+const EQUIPMENT_QUALITY: Record<string, 'high' | 'medium' | 'low'> = {
+  // Externally loaded in fine increments — the tools a working set is
+  // actually built on.
+  barbell: 'high',
+  'EZ bar': 'high',
+  'trap bar': 'high',
+  't-bar': 'high',
+  'cable machine': 'high',
+  machine: 'high',
+  'leg press machine': 'high',
+  'hack squat machine': 'high',
+  'assisted pull-up machine': 'high',
+  // 'dumbbells' (two implements, one per hand) and 'dumbbell' (ONE implement,
+  // held centrally) are listed SEPARATELY and deliberately. They are not a
+  // typo for each other: loadingMode() (load-prescription.ts:415) reads that
+  // distinction to decide whether to halve the prescribed weight and label it
+  // "per hand". Collapsing them doubles the prescribed load on goblet squats,
+  // carries and swings, and TypeScript cannot catch it because both are
+  // string[]. They rank the same here, which costs nothing — but they must
+  // stay two keys.
+  dumbbells: 'high',
+  dumbbell: 'high',
+  kettlebell: 'high',
+  'dip bars': 'high',
+  'pull-up bar': 'high',
+  // Real training tools whose load is fixed, coarse, or capped by the
+  // trainee's own mass.
+  bodyweight: 'medium',
+  'ab wheel': 'medium',
+  'medicine ball': 'medium',
+  'plyo box': 'medium',
+  // Loadable, but by an accommodating resistance curve (lightest exactly
+  // where a muscle is strongest) or in crude, unrepeatable increments.
+  'resistance band': 'low',
+  'weighted backpack': 'low',
+}
+
+/**
+ * The best-ranked implement this exercise actually uses, or null when none of
+ * its equipment is ranked (pure cardio, or an accessory-only entry).
+ *
+ * Takes the MAXIMUM rather than the minimum because the equipment array means
+ * two different things depending on `equipment_alternatives`: with the flag
+ * it's a list of interchangeable options (['barbell','dumbbells'] — either
+ * works), without it every item is required (['dumbbells','bench'] — the
+ * bench is furniture, not the load). Max is right in both readings: the best
+ * option they'd choose, or the primary implement rather than its furniture.
+ */
+export function bestEquipmentRank(entry: ExerciseEntry): 'high' | 'medium' | 'low' | null {
+  let best: 'high' | 'medium' | 'low' | null = null
+  for (const eq of entry.equipment) {
+    const rank = EQUIPMENT_QUALITY[eq]
+    if (!rank) continue
+    if (rank === 'high') return 'high'
+    if (rank === 'medium' || best === null) best = rank
+  }
+  return best
+}
+
+/**
+ * Two places where "the band is a compromise" is simply false, so the
+ * preference must not apply — Ashley's ruling, after a full-grid measurement
+ * showed the first draft demoting both:
+ *
+ * 1. REHAB WORK (`indicated_joints` non-empty). A banded terminal knee
+ *    extension is prescribed for a knee BECAUSE of the band's accommodating
+ *    resistance — light where the joint is vulnerable, building as it
+ *    straightens. Ranking it below an unloaded quad set inverted the point of
+ *    the exercise: measured at a 90% drop (1637 -> 162 appearances across the
+ *    grid) before this exemption existed.
+ * 2. CORE WORK (`movement_pattern === 'core'`). Anti-rotation and
+ *    anti-extension work isn't judged by how much load an implement carries —
+ *    the resistance of a band or cable IS the exercise. Pallof Press is the
+ *    clearest case: its equipment reads ['resistance band'] only because the
+ *    array is AND-ed during filtering, so tagging the cable too would have
+ *    narrowed it to full-gym-only (see its own comment in exercise-db.ts) —
+ *    its form cues literally say "band or cable". The tag is an availability
+ *    floor, not a claim about the right tool, and reading it as the latter
+ *    cost it 29% of its appearances.
+ *
+ * Applied to the CANDIDATE, which makes it symmetric where it matters: every
+ * candidate in a core slot scores 0 here, so core selection is left exactly
+ * as it was rather than being re-ranked by implement.
+ */
+export function isEquipmentQualityExempt(entry: ExerciseEntry): boolean {
+  return entry.movement_pattern === 'core' || (entry.indicated_joints?.length ?? 0) > 0
+}
+
+/**
+ * Tiers where preferring the better implement is a real choice.
+ *
+ * `bodyweight` is excluded outright: that trainee owns bodyweight, a pull-up
+ * bar and a backpack, so a band-style "make do" option genuinely IS their
+ * best available tool and demoting it would be demoting the only thing they
+ * have. Every other tier owns dumbbells or better, so the preference has
+ * something to prefer.
+ */
+export const EQUIPMENT_QUALITY_TIERS = new Set<EquipmentAccess>(['full_gym', 'home_gym', 'minimalist'])
+
+// ---------------------------------------------------------------------------
 // Context-aware required patterns (adjusted for infeasible scenarios)
 // ---------------------------------------------------------------------------
 
@@ -1066,6 +1196,14 @@ interface ScoreContext {
   trackPatterns: MovementPattern[]
   selectedSoFar: ExerciseEntry[]
   weeklyAppearanceCount?: Map<string, number>
+  /**
+   * What the trainee can train with — used ONLY to decide whether the
+   * equipment_fit factor applies at all (see EQUIPMENT_QUALITY_TIERS). The
+   * pool reaching this scorer is already equipment-filtered, so this is not
+   * a second filter; omitted means the factor is off, which is why every
+   * call site passes it explicitly rather than defaulting to full_gym.
+   */
+  equipmentAccess?: EquipmentAccess
 }
 
 /**
@@ -1085,6 +1223,7 @@ interface ScoreFactors {
   experience_fit: number
   session_balance: number
   weekly_variety: number
+  equipment_fit: number
 }
 
 interface ScoredCandidate {
@@ -1109,7 +1248,7 @@ interface ScoredCandidate {
  * moment of the initial pick.
  */
 function scoreCandidate(candidate: ExerciseEntry, policy: GoalPolicy, rawExperience: TrainingExperience, ctx: ScoreContext): { score: number; factors: ScoreFactors } {
-  const factors: ScoreFactors = { role_support: 0, goal_fit: 0, experience_fit: 0, session_balance: 0, weekly_variety: 0 }
+  const factors: ScoreFactors = { role_support: 0, goal_fit: 0, experience_fit: 0, session_balance: 0, weekly_variety: 0, equipment_fit: 0 }
 
   // 1. Quality for the role: an isolation exercise that directly supports
   // today's main compound pattern (hamstring work on a hinge day) beats one
@@ -1148,7 +1287,30 @@ function scoreCandidate(candidate: ExerciseEntry, policy: GoalPolicy, rawExperie
   // the cap ever has to step in.
   factors.weekly_variety = ctx.weeklyAppearanceCount ? -(ctx.weeklyAppearanceCount.get(candidate.name) ?? 0) : 0
 
-  let score = factors.role_support + factors.goal_fit + factors.experience_fit + factors.session_balance + factors.weekly_variety
+  // 6. Best tool for the job — prefer the implement that loads a working set
+  // well over one that merely qualifies, when the trainee owns both. Before
+  // this existed equipment was a filter and never a preference, so a
+  // full-gym tricep slot scored a resistance band and a cable stack
+  // identically and resolved on jitter.
+  //
+  // Kept at +/-1 ON PURPOSE — the same order as role_support and goal_fit,
+  // and an order of magnitude below the tier gap (30/60/90) so it can
+  // reorder two same-tier candidates but can NEVER promote an isolation
+  // exercise over a compound. role_support (+2) alone outweighs it, which is
+  // the right precedence: an exercise that genuinely supports today's main
+  // pattern beats a nicer implement doing something less relevant.
+  //
+  // Injuries need no carve-out here. Injury filtering runs BEFORE scoring
+  // (findForSlot scores an already-filtered `pool`), so when a shoulder
+  // rules out pushdowns and skull crushers those candidates are gone and the
+  // band wins for being the only survivor, whatever it scores. A preference
+  // can only ever choose between options that are already safe.
+  if (ctx.equipmentAccess && EQUIPMENT_QUALITY_TIERS.has(ctx.equipmentAccess) && !isEquipmentQualityExempt(candidate)) {
+    const rank = bestEquipmentRank(candidate)
+    factors.equipment_fit = rank === 'high' ? 1 : rank === 'low' ? -1 : 0
+  }
+
+  let score = factors.role_support + factors.goal_fit + factors.experience_fit + factors.session_balance + factors.weekly_variety + factors.equipment_fit
 
   // Tier preference — deliberately UNCONDITIONAL and with a much bigger gap
   // than every other factor combined can ever swing (roughly +/-10 at the
@@ -1207,6 +1369,13 @@ const REASON_CLAUSES: { [K in keyof ScoreFactors]: (winner: ExerciseEntry, runne
   experience_fit: (w, r) => `${w.name} over ${r.name} because you're ready for the standard version, not the easier on-ramp.`,
   session_balance: (w, r) => `${w.name} over ${r.name} to avoid repeating a muscle group you already worked earlier in this session.`,
   weekly_variety: (w, r) => `${w.name} over ${r.name} because it's fresher — ${r.name} already showed up earlier this week.`,
+  // Names the runner-up's implement rather than praising the winner's, because
+  // the runner-up is the one whose absence needs explaining — a trainee who
+  // expected a band and got a cable wants to know why, and "you've got better
+  // available" is the honest answer. Only ever fires when the trainee's own
+  // equipment includes the better tool (the factor is gated on that), so it
+  // can't tell a home trainee they should have used a machine.
+  equipment_fit: (w, r) => `${w.name} over ${r.name} because it loads the movement better with the equipment you've got.`,
 }
 
 /**
@@ -1375,6 +1544,7 @@ function selectExercisesForTrack(
   weeklyAppearanceCount?: Map<string, number>,
   rawExperience: TrainingExperience = 'novice',
   sessionDurationPreference?: SessionDuration,
+  equipmentAccess?: EquipmentAccess,
 ): { primer: ExerciseEntry | null; main: ExerciseEntry[]; requiredNames: Set<string>; uncoveredPatterns: MovementPattern[]; selectionNotes: Map<string, string> } {
   const counts = applyIsolationSlotShift(countsIn, policy.isolationSlotShift)
   const allPatterns = new Set([...track.primary_patterns, ...track.secondary_patterns])
@@ -1455,7 +1625,7 @@ function selectExercisesForTrack(
       ),
       policy,
       rawExperience,
-      { trackPatterns: [...track.primary_patterns, ...track.secondary_patterns], selectedSoFar: selected, weeklyAppearanceCount },
+      { trackPatterns: [...track.primary_patterns, ...track.secondary_patterns], selectedSoFar: selected, weeklyAppearanceCount, equipmentAccess },
     )
     const winner = candidates[0]
     if (winner) {
@@ -1515,7 +1685,7 @@ function selectExercisesForTrack(
       ),
       policy,
       rawExperience,
-      { trackPatterns: [...track.primary_patterns, ...track.secondary_patterns], selectedSoFar: selected, weeklyAppearanceCount },
+      { trackPatterns: [...track.primary_patterns, ...track.secondary_patterns], selectedSoFar: selected, weeklyAppearanceCount, equipmentAccess },
     )
     for (let i = 0; i < candidates.length; i++) {
       const c = candidates[i]
@@ -1596,7 +1766,7 @@ function selectExercisesForTrack(
       ),
       policy,
       rawExperience,
-      { trackPatterns: [...track.primary_patterns, ...track.secondary_patterns], selectedSoFar: selected, weeklyAppearanceCount },
+      { trackPatterns: [...track.primary_patterns, ...track.secondary_patterns], selectedSoFar: selected, weeklyAppearanceCount, equipmentAccess },
     )
     for (let i = 0; i < cardioCandidates.length; i++) {
       const c = cardioCandidates[i]
@@ -1663,7 +1833,7 @@ function selectExercisesForTrack(
         ),
         policy,
         rawExperience,
-        { trackPatterns: [...track.primary_patterns, ...track.secondary_patterns], selectedSoFar: selected, weeklyAppearanceCount },
+        { trackPatterns: [...track.primary_patterns, ...track.secondary_patterns], selectedSoFar: selected, weeklyAppearanceCount, equipmentAccess },
       )
 
       for (let i = 0; i < candidates.length; i++) {
@@ -3543,7 +3713,7 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
     const trackFocus = getViableTrack(rawTrack, pool)
     const track = TRACKS[trackFocus]
 
-    const { primer, main, requiredNames, uncoveredPatterns, selectionNotes } = selectExercisesForTrack(track, pool, counts, weeklyUsed, styleConfig, trace, policy, feasiblePatterns, weeklyAppearanceCount, profile.training_experience || 'novice', profile.session_duration_preference)
+    const { primer, main, requiredNames, uncoveredPatterns, selectionNotes } = selectExercisesForTrack(track, pool, counts, weeklyUsed, styleConfig, trace, policy, feasiblePatterns, weeklyAppearanceCount, profile.training_experience || 'novice', profile.session_duration_preference, profile.equipment_access || 'full_gym')
     for (const name of requiredNames) weeklyRequiredNames.add(name)
 
     // Build exercise list with sets/reps from style config

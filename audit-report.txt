@@ -3,14 +3,14 @@ EXERCISE ENGINE CONSTRAINT AUDIT REPORT
 ================================================================================
 
 Total Combinations Tested: 13967
-Passed: 13913 (99.6%)
-Failed: 54 (0.4%)
-Total Runtime: 96890ms (96.89s)
+Passed: 13912 (99.6%)
+Failed: 55 (0.4%)
+Total Runtime: 278078ms (278.08s)
 
 FAILURE BREAKDOWN:
 --------------------------------------------------------------------------------
-  load_cap: 51 failure(s)
-  rotation_relative_load: 3 failure(s)
+  load_cap: 50 failure(s)
+  rotation_relative_load: 5 failure(s)
 
 FAILED COMBINATIONS:
 --------------------------------------------------------------------------------
@@ -23,16 +23,16 @@ FAILED COMBINATIONS:
     ✗ [load_cap] Suggested load 35kg exceeds the 25kg outer-bound safety ceiling for category "isolation_shoulder"
       Exercise: Cable Lateral Raises
 
-  Combination: full_gym / none / 45-60 / hybrid
-    ✗ [load_cap] Suggested load 35kg exceeds the 25kg outer-bound safety ceiling for category "isolation_shoulder"
-      Exercise: Cable Lateral Raises
-
   Combination: full_gym / none / 60-90 / hybrid
     ✗ [load_cap] Suggested load 27.5kg exceeds the 25kg outer-bound safety ceiling for category "isolation_shoulder"
       Exercise: Cable Lateral Raises
 
   Combination: full_gym / none / 60-90 / hybrid
     ✗ [load_cap] Suggested load 35kg exceeds the 25kg outer-bound safety ceiling for category "isolation_shoulder"
+      Exercise: Cable Lateral Raises
+
+  Combination: full_gym / none / 90+ / bodybuilding
+    ✗ [load_cap] Suggested load 27.5kg exceeds the 25kg outer-bound safety ceiling for category "isolation_shoulder"
       Exercise: Cable Lateral Raises
 
   Combination: full_gym / none / 90+ / bodybuilding
@@ -45,10 +45,6 @@ FAILED COMBINATIONS:
 
   Combination: full_gym / none / 90+ / hybrid
     ✗ [load_cap] Suggested load 35kg exceeds the 25kg outer-bound safety ceiling for category "isolation_shoulder"
-      Exercise: Cable Lateral Raises
-
-  Combination: full_gym / lower_back / 30-45 / hybrid
-    ✗ [load_cap] Suggested load 27.5kg exceeds the 25kg outer-bound safety ceiling for category "isolation_shoulder"
       Exercise: Cable Lateral Raises
 
   Combination: full_gym / lower_back / 30-45 / hybrid
@@ -71,6 +67,10 @@ FAILED COMBINATIONS:
     ✗ [load_cap] Suggested load 35kg exceeds the 25kg outer-bound safety ceiling for category "isolation_shoulder"
       Exercise: Cable Lateral Raises
 
+  Combination: full_gym / lower_back / 90+ / bodybuilding
+    ✗ [load_cap] Suggested load 35kg exceeds the 25kg outer-bound safety ceiling for category "isolation_shoulder"
+      Exercise: Cable Lateral Raises
+
   Combination: full_gym / lower_back / 90+ / hybrid
     ✗ [load_cap] Suggested load 27.5kg exceeds the 25kg outer-bound safety ceiling for category "isolation_shoulder"
       Exercise: Cable Lateral Raises
@@ -81,10 +81,6 @@ FAILED COMBINATIONS:
 
   Combination: full_gym / knees / 45-60 / bodybuilding
     ✗ [load_cap] Suggested load 30kg exceeds the 25kg outer-bound safety ceiling for category "isolation_shoulder"
-      Exercise: Cable Lateral Raises
-
-  Combination: full_gym / knees / 45-60 / bodybuilding
-    ✗ [load_cap] Suggested load 35kg exceeds the 25kg outer-bound safety ceiling for category "isolation_shoulder"
       Exercise: Cable Lateral Raises
 
   Combination: full_gym / knees / 45-60 / hybrid
@@ -99,35 +95,31 @@ FAILED COMBINATIONS:
     ✗ [load_cap] Suggested load 35kg exceeds the 25kg outer-bound safety ceiling for category "isolation_shoulder"
       Exercise: Cable Lateral Raises
 
-  Combination: full_gym / knees / 90+ / hybrid
-    ✗ [load_cap] Suggested load 27.5kg exceeds the 25kg outer-bound safety ceiling for category "isolation_shoulder"
-      Exercise: Cable Lateral Raises
-
-  Combination: full_gym / knees / 90+ / hybrid
-    ✗ [load_cap] Suggested load 35kg exceeds the 25kg outer-bound safety ceiling for category "isolation_shoulder"
-      Exercise: Cable Lateral Raises
-
-  Combination: full_gym / neck / 30-45 / hybrid
-    ✗ [load_cap] Suggested load 27.5kg exceeds the 25kg outer-bound safety ceiling for category "isolation_shoulder"
-      Exercise: Cable Lateral Raises
-
-  Combination: full_gym / neck / 30-45 / hybrid
-    ✗ [load_cap] Suggested load 35kg exceeds the 25kg outer-bound safety ceiling for category "isolation_shoulder"
-      Exercise: Cable Lateral Raises
-
-  Combination: full_gym / neck / 45-60 / hybrid
-    ✗ [load_cap] Suggested load 27.5kg exceeds the 25kg outer-bound safety ceiling for category "isolation_shoulder"
-      Exercise: Cable Lateral Raises
-
-  Combination: full_gym / neck / 45-60 / hybrid
-    ✗ [load_cap] Suggested load 35kg exceeds the 25kg outer-bound safety ceiling for category "isolation_shoulder"
-      Exercise: Cable Lateral Raises
-
-  Combination: full_gym / neck / 60-90 / bodybuilding
+  Combination: full_gym / knees / 90+ / bodybuilding
     ✗ [load_cap] Suggested load 30kg exceeds the 25kg outer-bound safety ceiling for category "isolation_shoulder"
       Exercise: Cable Lateral Raises
 
-  Combination: full_gym / neck / 60-90 / bodybuilding
+  Combination: full_gym / knees / 90+ / hybrid
+    ✗ [load_cap] Suggested load 27.5kg exceeds the 25kg outer-bound safety ceiling for category "isolation_shoulder"
+      Exercise: Cable Lateral Raises
+
+  Combination: full_gym / knees / 90+ / hybrid
+    ✗ [load_cap] Suggested load 35kg exceeds the 25kg outer-bound safety ceiling for category "isolation_shoulder"
+      Exercise: Cable Lateral Raises
+
+  Combination: full_gym / neck / 30-45 / hybrid
+    ✗ [load_cap] Suggested load 27.5kg exceeds the 25kg outer-bound safety ceiling for category "isolation_shoulder"
+      Exercise: Cable Lateral Raises
+
+  Combination: full_gym / neck / 30-45 / hybrid
+    ✗ [load_cap] Suggested load 35kg exceeds the 25kg outer-bound safety ceiling for category "isolation_shoulder"
+      Exercise: Cable Lateral Raises
+
+  Combination: full_gym / neck / 45-60 / hybrid
+    ✗ [load_cap] Suggested load 27.5kg exceeds the 25kg outer-bound safety ceiling for category "isolation_shoulder"
+      Exercise: Cable Lateral Raises
+
+  Combination: full_gym / neck / 45-60 / hybrid
     ✗ [load_cap] Suggested load 35kg exceeds the 25kg outer-bound safety ceiling for category "isolation_shoulder"
       Exercise: Cable Lateral Raises
 
@@ -175,6 +167,10 @@ FAILED COMBINATIONS:
     ✗ [load_cap] Suggested load 27.5kg exceeds the 25kg outer-bound safety ceiling for category "isolation_shoulder"
       Exercise: Cable Lateral Raises
 
+  Combination: full_gym / wrists / 90+ / bodybuilding
+    ✗ [load_cap] Suggested load 35kg exceeds the 25kg outer-bound safety ceiling for category "isolation_shoulder"
+      Exercise: Cable Lateral Raises
+
   Combination: full_gym / wrists / 90+ / hybrid
     ✗ [load_cap] Suggested load 27.5kg exceeds the 25kg outer-bound safety ceiling for category "isolation_shoulder"
       Exercise: Cable Lateral Raises
@@ -188,7 +184,7 @@ FAILED COMBINATIONS:
       Exercise: Cable Lateral Raises
 
   Combination: full_gym / lower_back+knees / 30-45 / hybrid
-    ✗ [load_cap] Suggested load 30kg exceeds the 25kg outer-bound safety ceiling for category "isolation_shoulder"
+    ✗ [load_cap] Suggested load 27.5kg exceeds the 25kg outer-bound safety ceiling for category "isolation_shoulder"
       Exercise: Cable Lateral Raises
 
   Combination: full_gym / lower_back+knees / 60-90 / bodybuilding
@@ -224,11 +220,19 @@ FAILED COMBINATIONS:
       Exercise: Dumbbell Curls
 
   Combination: full_gym / none / 45-60 / hybrid
+    ✗ [rotation_relative_load] week 3 Wednesday rotated "Cable Curls" -> "Dumbbell Curls" at 6kg, 150% of a fresh 4kg estimate for that exercise — exceeds the 125% category-standard band
+      Exercise: Dumbbell Curls
+
+  Combination: full_gym / none / 45-60 / hybrid
     ✗ [rotation_relative_load] week 3 Wednesday rotated "Cable Lateral Raises" -> "Lateral Raises" at 6kg, 150% of a fresh 4kg estimate for that exercise — exceeds the 125% category-standard band
       Exercise: Lateral Raises
 
   Combination: full_gym / none / 45-60 / hybrid
     ✗ [rotation_relative_load] week 3 Monday rotated "Cable Lateral Raises" -> "Lateral Raises" at 6kg, 150% of a fresh 4kg estimate for that exercise — exceeds the 125% category-standard band
+      Exercise: Lateral Raises
+
+  Combination: full_gym / none / 45-60 / hybrid
+    ✗ [rotation_relative_load] week 3 Wednesday rotated "Cable Lateral Raises" -> "Lateral Raises" at 6kg, 150% of a fresh 4kg estimate for that exercise — exceeds the 125% category-standard band
       Exercise: Lateral Raises
 
 STATISTICS:
@@ -300,7 +304,7 @@ block 1 coach note: Higher reps, lighter loads, shorter rest. This phase prepare
     tier_2_secondary Hanging Leg Raises           sets=3 reps=9-11     load=Bodyweight
     tier_3_isolation Cable Lateral Raises         sets=3 reps=15-18    load=7.5kg
     tier_3_isolation Dumbbell Shrugs              sets=3 reps=15-18    load=14kg
-    tier_3_isolation Band Tricep Pushdown         sets=3 reps=15-18    load=Bodyweight
+    tier_3_isolation Tricep Pushdowns             sets=3 reps=15-18    load=10kg
     tier_3_isolation Pallof Press                 sets=3 reps=15-18    load=Bodyweight
   week_in_block 2 (loading):
     tier_0_primer    Plyo Push-Ups                sets=2 reps=8        load=Light
@@ -310,7 +314,7 @@ block 1 coach note: Higher reps, lighter loads, shorter rest. This phase prepare
     tier_2_secondary Hanging Leg Raises           sets=3 reps=10-12    load=Bodyweight
     tier_3_isolation Cable Lateral Raises         sets=3 reps=16-19    load=7.5kg
     tier_3_isolation Dumbbell Shrugs              sets=3 reps=16-19    load=14kg
-    tier_3_isolation Band Tricep Pushdown         sets=3 reps=16-19    load=Bodyweight
+    tier_3_isolation Tricep Pushdowns             sets=3 reps=16-19    load=10kg
     tier_3_isolation Pallof Press                 sets=3 reps=16-19    load=Bodyweight
   week_in_block 3 (loading):
     tier_0_primer    Plyo Push-Ups                sets=2 reps=8        load=Light
@@ -320,7 +324,7 @@ block 1 coach note: Higher reps, lighter loads, shorter rest. This phase prepare
     tier_2_secondary Hanging Leg Raises           sets=3 reps=11-13    load=Bodyweight
     tier_3_isolation Lateral Raises               sets=3 reps=17-20    load=8kg
     tier_3_isolation Shrugs                       sets=3 reps=17-20    load=14kg
-    tier_3_isolation Overhead Tricep Extension    sets=3 reps=15-18    load=22kg
+    tier_3_isolation Overhead Tricep Extension    sets=3 reps=17-20    load=10kg
     tier_3_isolation Pallof Press                 sets=3 reps=17-20    load=Bodyweight
   week_in_block 4 (deload):
     tier_0_primer    Plyo Push-Ups                sets=2 reps=10       load=Light
@@ -330,7 +334,7 @@ block 1 coach note: Higher reps, lighter loads, shorter rest. This phase prepare
     tier_2_secondary Hanging Leg Raises           sets=2 reps=11-13    load=Bodyweight
     tier_3_isolation Lateral Raises               sets=2 reps=17-20    load=6kg
     tier_3_isolation Shrugs                       sets=2 reps=17-20    load=10kg
-    tier_3_isolation Overhead Tricep Extension    sets=2 reps=17-20    load=16kg
+    tier_3_isolation Overhead Tricep Extension    sets=2 reps=17-20    load=8kg
     tier_3_isolation Pallof Press                 sets=2 reps=17-20    load=Bodyweight
 
 --- conditioning ---
@@ -344,7 +348,7 @@ block 1 coach note: Higher reps, lighter loads, shorter rest. This phase prepare
     tier_2_secondary Push-Ups                     sets=3 reps=13-15    load=Bodyweight
     tier_2_secondary Hanging Leg Raises           sets=3 reps=13-15    load=Bodyweight
     tier_3_isolation Shrugs                       sets=3 reps=18-23    load=14kg
-    tier_3_isolation Band Tricep Kickback         sets=3 reps=18-23    load=Bodyweight
+    tier_3_isolation Tricep Pushdowns             sets=3 reps=18-23    load=10kg
     tier_3_isolation Side Plank                   sets=3 reps=33-48s   load=Bodyweight
   week_in_block 2 (loading):
     tier_0_primer    Band Dislocates              sets=2 reps=9        load=Light
@@ -354,7 +358,7 @@ block 1 coach note: Higher reps, lighter loads, shorter rest. This phase prepare
     tier_2_secondary Push-Ups                     sets=3 reps=14-16    load=Bodyweight
     tier_2_secondary Hanging Leg Raises           sets=3 reps=14-16    load=Bodyweight
     tier_3_isolation Shrugs                       sets=3 reps=19-24    load=14kg
-    tier_3_isolation Band Tricep Kickback         sets=3 reps=19-24    load=Bodyweight
+    tier_3_isolation Tricep Pushdowns             sets=3 reps=19-24    load=10kg
     tier_3_isolation Side Plank                   sets=3 reps=34-49s   load=Bodyweight
   week_in_block 3 (loading):
     tier_0_primer    Band Dislocates              sets=2 reps=10       load=Light
@@ -364,7 +368,7 @@ block 1 coach note: Higher reps, lighter loads, shorter rest. This phase prepare
     tier_2_secondary Push-Ups                     sets=3 reps=15-17    load=Bodyweight
     tier_2_secondary Hanging Leg Raises           sets=3 reps=15-17    load=Bodyweight
     tier_3_isolation Dumbbell Shrugs              sets=3 reps=20-25    load=14kg
-    tier_3_isolation Band Tricep Pushdown         sets=3 reps=20-25    load=Bodyweight
+    tier_3_isolation Overhead Tricep Extension    sets=3 reps=20-25    load=10kg
     tier_3_isolation Side Plank                   sets=3 reps=35-50s   load=Bodyweight
   week_in_block 4 (deload):
     tier_0_primer    Band Dislocates              sets=2 reps=10       load=Light
@@ -374,7 +378,7 @@ block 1 coach note: Higher reps, lighter loads, shorter rest. This phase prepare
     tier_2_secondary Push-Ups                     sets=2 reps=15-17    load=Bodyweight
     tier_2_secondary Hanging Leg Raises           sets=2 reps=15-17    load=Bodyweight
     tier_3_isolation Dumbbell Shrugs              sets=2 reps=20-25    load=10kg
-    tier_3_isolation Band Tricep Pushdown         sets=2 reps=20-25    load=Bodyweight
+    tier_3_isolation Overhead Tricep Extension    sets=2 reps=20-25    load=8kg
     tier_3_isolation Side Plank                   sets=2 reps=35-50s   load=Bodyweight
 
 --- functional ---
@@ -388,7 +392,7 @@ block 1 coach note: Higher reps, lighter loads, shorter rest. This phase prepare
     tier_2_secondary Push-Ups                     sets=3 reps=11-13    load=Bodyweight
     tier_2_secondary Hanging Leg Raises           sets=3 reps=11-13    load=Bodyweight
     tier_3_isolation Cable Lateral Raises         sets=3 reps=15-18    load=7.5kg
-    tier_3_isolation Band Tricep Kickback         sets=3 reps=15-18    load=Bodyweight
+    tier_3_isolation Skull Crushers               sets=3 reps=15-18    load=10kg
     tier_3_isolation Side Plank                   sets=3 reps=33-48s   load=Bodyweight
   week_in_block 2 (loading):
     tier_0_primer    Band Dislocates              sets=2 reps=9        load=Light
@@ -398,7 +402,7 @@ block 1 coach note: Higher reps, lighter loads, shorter rest. This phase prepare
     tier_2_secondary Push-Ups                     sets=3 reps=12-14    load=Bodyweight
     tier_2_secondary Hanging Leg Raises           sets=3 reps=12-14    load=Bodyweight
     tier_3_isolation Lateral Raises               sets=3 reps=16-19    load=8kg
-    tier_3_isolation Band Tricep Pushdown         sets=3 reps=16-19    load=Bodyweight
+    tier_3_isolation Tricep Pushdowns             sets=3 reps=16-19    load=10kg
     tier_3_isolation Side Plank                   sets=3 reps=34-49s   load=Bodyweight
   week_in_block 3 (loading):
     tier_0_primer    Band Dislocates              sets=2 reps=10       load=Light
@@ -408,7 +412,7 @@ block 1 coach note: Higher reps, lighter loads, shorter rest. This phase prepare
     tier_2_secondary Push-Ups                     sets=3 reps=13-15    load=Bodyweight
     tier_2_secondary Hanging Leg Raises           sets=3 reps=13-15    load=Bodyweight
     tier_3_isolation Cable Lateral Raises         sets=3 reps=17-20    load=7.5kg
-    tier_3_isolation Overhead Tricep Extension    sets=3 reps=17-20    load=22kg
+    tier_3_isolation Overhead Tricep Extension    sets=3 reps=17-20    load=10kg
     tier_3_isolation Side Plank                   sets=3 reps=35-50s   load=Bodyweight
   week_in_block 4 (deload):
     tier_0_primer    Band Dislocates              sets=2 reps=10       load=Light
@@ -418,7 +422,7 @@ block 1 coach note: Higher reps, lighter loads, shorter rest. This phase prepare
     tier_2_secondary Push-Ups                     sets=2 reps=13-15    load=Bodyweight
     tier_2_secondary Hanging Leg Raises           sets=2 reps=13-15    load=Bodyweight
     tier_3_isolation Lateral Raises               sets=2 reps=17-20    load=6kg
-    tier_3_isolation Skull Crushers               sets=2 reps=17-20    load=15kg
+    tier_3_isolation Skull Crushers               sets=2 reps=13-16    load=10kg
     tier_3_isolation Side Plank                   sets=2 reps=35-50s   load=Bodyweight
 
 ================================================================================
