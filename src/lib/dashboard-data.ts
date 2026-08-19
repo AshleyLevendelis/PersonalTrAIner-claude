@@ -59,14 +59,16 @@ export interface DashboardData {
   session: TodaySession
   tomorrowLabel: string
   coachTip: string | null
-  caloriesEaten: number
-  caloriesTarget: number
-  proteinEaten: number
-  proteinTarget: number
-  carbsEaten: number
-  carbsTarget: number
-  fatEaten: number
-  fatTarget: number
+  // All null together when the profile has no body metrics — see `macros`
+  // on the input type. Null means "no target exists", never "the target is 0".
+  caloriesEaten: number | null
+  caloriesTarget: number | null
+  proteinEaten: number | null
+  proteinTarget: number | null
+  carbsEaten: number | null
+  carbsTarget: number | null
+  fatEaten: number | null
+  fatTarget: number | null
   weightTrend: WeightTrendResult | null
   /** Oldest-first — for the Home trend chart (tab-restructure). Same source as weightTrend (getRecentWeighIns), just re-mapped/re-ordered for charting rather than averaging. */
   weightSeries: WeightSeriesPoint[]
@@ -97,7 +99,16 @@ function daysAgo(dateStr: string, todayStr: string): number {
 
 export interface LoadDashboardDataInput {
   profile: UserProfile
-  macros: MacroTargets
+  /**
+   * Null when the profile has no weight/height/age/sex — targets are ABSENT,
+   * not estimated (macro-calculator.ts's resolveBodyMetrics). Every nutrition
+   * field below then comes back null and the dashboard renders the absence,
+   * exactly as the Nutrition tab does. This was `MacroTargets` and the caller
+   * guarded with `if (!macros) return` BEFORE clearing its loading flag —
+   * which left Home stuck on "Loading your day…" forever for anyone who
+   * declined a weight.
+   */
+  macros: MacroTargets | null
   /** Flat week-1 plan — used as the day-of-week SCHEDULE pattern (which weekdays are training days) for both the streak and rest-day detection. */
   exercisePlan: WorkoutDay[]
   mesocycle: MesocycleWeek[]
@@ -156,7 +167,7 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
       }
 
   // ---- Nutrition ----------------------------------------------------------
-  const ledger = await getTodayLedger(profileId, todayStr, macros)
+  const ledger = macros ? await getTodayLedger(profileId, todayStr, macros) : null
   const waterMl = await getWaterTotalForDate(profileId, todayStr)
   const waterTargetMl = profile.water_target_ml ?? 2000
 
@@ -228,13 +239,13 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
   // function for this first pass (read-cost discipline's actual
   // requirement — "fetch once per mount, not on every render" — still
   // holds, since this whole function runs once per dashboard mount).
-  const proteinTarget = macros.protein
+  const proteinTarget = macros?.protein ?? 0
   let proteinStreak = 0
-  if (proteinTarget > 0) {
+  if (macros && proteinTarget > 0) {
     for (let i = 1; i <= 14; i++) {
       const d = new Date(now.getTime() - i * 86_400_000)
       const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-      const dayLedger = await getTodayLedger(profileId, dateStr, macros).catch(() => null)
+      const dayLedger = await getTodayLedger(profileId, dateStr, macros!).catch(() => null)
       if (!dayLedger || dayLedger.eaten.protein < proteinTarget * 0.95) break
       proteinStreak++
     }
@@ -269,7 +280,10 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
     const remaining = session.setsPlanned - session.setsLogged
     if (remaining > 0) gaps.push(`${remaining} set${remaining === 1 ? '' : 's'} left in today's session`)
   }
-  if (ledger.eaten.kcal === 0) gaps.push('no meals logged yet')
+  // Only a gap if there ARE targets to fall short of. With no body metrics
+  // there is no meal ledger at all, and "no meals logged yet" would be
+  // nagging about something the app can't currently help with.
+  if (ledger && ledger.eaten.kcal === 0) gaps.push('no meals logged yet')
   const weighedInRecently = weighIns.filter(w => daysAgo(w.date, todayStr) <= 13).length >= 3
   const weighedInToday = weighIns.some(w => w.date === todayStr)
   if (weighedInRecently && !weighedInToday) gaps.push('no weigh-in yet today')
@@ -293,14 +307,16 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
     session,
     tomorrowLabel,
     coachTip,
-    caloriesEaten: ledger.eaten.kcal,
-    caloriesTarget: ledger.targets.calories,
-    proteinEaten: ledger.eaten.protein,
-    proteinTarget: ledger.targets.protein,
-    carbsEaten: ledger.eaten.carbs,
-    carbsTarget: ledger.targets.carbs,
-    fatEaten: ledger.eaten.fat,
-    fatTarget: ledger.targets.fat,
+    // Null, not 0 — a zero target is the fabrication this whole line of work
+    // removed. The dashboard hides the tile rather than printing "0 of 0".
+    caloriesEaten: ledger ? ledger.eaten.kcal : null,
+    caloriesTarget: ledger ? ledger.targets.calories : null,
+    proteinEaten: ledger ? ledger.eaten.protein : null,
+    proteinTarget: ledger ? ledger.targets.protein : null,
+    carbsEaten: ledger ? ledger.eaten.carbs : null,
+    carbsTarget: ledger ? ledger.targets.carbs : null,
+    fatEaten: ledger ? ledger.eaten.fat : null,
+    fatTarget: ledger ? ledger.targets.fat : null,
     weightTrend,
     weightSeries,
     weightGoalKg: weightGoal?.target_value ?? null,

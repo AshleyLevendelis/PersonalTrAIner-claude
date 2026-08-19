@@ -711,10 +711,15 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       : null
     const line = pickAccountabilityCheckIn({
       hour: new Date().getHours(),
-      proteinEaten: proactiveData.proteinEaten,
-      proteinTarget: proactiveData.proteinTarget,
-      caloriesEaten: proactiveData.caloriesEaten,
-      caloriesTarget: proactiveData.caloriesTarget,
+      // 0/0 rather than null: pickAccountabilityCheckIn's own rules are all
+      // "eaten vs target" comparisons, and a zero target makes every one of
+      // them false — so a trainee with no calorie targets simply gets no
+      // nutrition check-in, instead of being nagged about a number that
+      // doesn't exist. The zeros never reach the screen.
+      proteinEaten: proactiveData.proteinEaten ?? 0,
+      proteinTarget: proactiveData.proteinTarget ?? 0,
+      caloriesEaten: proactiveData.caloriesEaten ?? 0,
+      caloriesTarget: proactiveData.caloriesTarget ?? 0,
       waterMl: proactiveData.waterMl,
       waterTargetMl: proactiveData.waterTargetMl,
       streak: proactiveData.streak,

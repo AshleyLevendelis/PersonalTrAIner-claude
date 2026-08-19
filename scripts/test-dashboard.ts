@@ -240,10 +240,38 @@ async function main() {
   console.log('\n[4] dashboard-data.ts: calories-in is a direct passthrough from getTodayLedger, never recomputed')
 
   const dashSrc = fs.readFileSync('src/lib/dashboard-data.ts', 'utf-8')
-  check('caloriesEaten is assigned directly from ledger.eaten.kcal (no arithmetic in between)',
-    /caloriesEaten:\s*ledger\.eaten\.kcal/.test(dashSrc))
-  check('caloriesTarget is assigned directly from ledger.targets.calories', /caloriesTarget:\s*ledger\.targets\.calories/.test(dashSrc))
-  check('proteinEaten is assigned directly from ledger.eaten.protein', /proteinEaten:\s*ledger\.eaten\.protein/.test(dashSrc))
+  // The point of these three is that nothing DERIVES a nutrition number — the
+  // ledger's value reaches the screen untouched, or not at all. An
+  // absent-ledger guard (`ledger ? ledger.eaten.kcal : null`) is allowed
+  // because it adds no arithmetic and cannot invent a value; a profile with
+  // no body metrics has no targets, and null is how that is said. What stays
+  // forbidden is any operator between the ledger and the field.
+  // The ASSIGNMENT line, not the interface's type declaration — both start
+  // `caloriesEaten:` and the declaration would otherwise shadow the thing
+  // being checked.
+  const fieldLine = (field: string) =>
+    (dashSrc.split('\n').find(l => l.trimStart().startsWith(`${field}:`) && l.includes('ledger')) ?? '').replace(/\/\/.*/, '')
+  /** The ledger's own value reaches the field, with at most a null guard around it. */
+  const passthrough = (field: string, path: string) => {
+    const line = fieldLine(field)
+    if (!line.includes(path)) return false
+    // No operator may sit between the ledger and the field — that would be a
+    // derived number, which is exactly what this section exists to forbid.
+    if (/[+\-*/%]|Math\./.test(line)) return false
+    // Only `x` or `ledger ? x : null` are acceptable shapes.
+    return new RegExp(`${field}:\\s*(?:ledger\\s*\\?\\s*)?${path.replace(/\./g, '\\.')}(?:\\s*:\\s*null)?\\s*,`).test(line)
+  }
+  check('caloriesEaten passes the ledger value straight through (or null when there is no ledger)',
+    passthrough('caloriesEaten', 'ledger.eaten.kcal'), fieldLine('caloriesEaten'))
+  check('caloriesTarget passes the ledger value straight through (or null)',
+    passthrough('caloriesTarget', 'ledger.targets.calories'), fieldLine('caloriesTarget'))
+  check('proteinEaten passes the ledger value straight through (or null)',
+    passthrough('proteinEaten', 'ledger.eaten.protein'), fieldLine('proteinEaten'))
+  // New, and the reason this whole section needed revisiting: a missing
+  // target must be NULL, never 0. A zero target renders as "0 of 0 kcal",
+  // which is a prescription, not an absence.
+  check('a missing target is null, never a zero fallback',
+    !/(?:calories|protein|carbs|fat)(?:Eaten|Target):[^,\n]*\?\?\s*0/.test(dashSrc))
 
   // End-to-end: seed a meal_events row and confirm loadDashboardData's
   // caloriesEaten matches it exactly.

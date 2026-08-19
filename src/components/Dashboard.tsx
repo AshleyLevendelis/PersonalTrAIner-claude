@@ -171,7 +171,12 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
   const [weighInVersion, setWeighInVersion] = useState(0)
 
   useEffect(() => {
-    if (!activeSession.ready || !profile.id || !macros) return
+    // NOT gated on `macros`. It used to be, and because this early return
+    // happens before setLoading(false), a profile with no calorie targets
+    // (declined weight) left Home on "Loading your day…" permanently while
+    // every other tab rendered fine. The dashboard is mostly training and
+    // habit data; nutrition is one tile, and it can be absent.
+    if (!activeSession.ready || !profile.id) return
     let cancelled = false
     setLoading(true)
     loadDashboardData({
@@ -311,13 +316,17 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
               <circle cx="17" cy="17" r={CALORIE_TILE_RING_R} fill="none" stroke="rgba(69,60,142,.9)" strokeWidth="4" />
               <circle
                 cx="17" cy="17" r={CALORIE_TILE_RING_R} fill="none" stroke="var(--primary)" strokeWidth="4" strokeLinecap="round"
-                strokeDasharray={`${CALORIE_TILE_RING_CIRC * Math.min(1, data.caloriesTarget > 0 ? data.caloriesEaten / data.caloriesTarget : 0)} ${CALORIE_TILE_RING_CIRC}`}
+                strokeDasharray={`${CALORIE_TILE_RING_CIRC * Math.min(1, data.caloriesTarget != null && data.caloriesTarget > 0 && data.caloriesEaten != null ? data.caloriesEaten / data.caloriesTarget : 0)} ${CALORIE_TILE_RING_CIRC}`}
                 transform="rotate(-90 17 17)"
               />
             </svg>
             <div>
-              <p className="tabular-mono text-[19px] font-bold">{Math.round(data.caloriesEaten)}</p>
-              <p className="text-[9px] uppercase tracking-[.14em] text-muted-foreground">of {Math.round(data.caloriesTarget)} kcal</p>
+              <p className="tabular-mono text-[19px] font-bold">
+                {data.caloriesEaten == null ? '—' : Math.round(data.caloriesEaten)}
+              </p>
+              <p className="text-[9px] uppercase tracking-[.14em] text-muted-foreground">
+                {data.caloriesTarget == null ? 'add your weight' : `of ${Math.round(data.caloriesTarget)} kcal`}
+              </p>
             </div>
             <span className="text-[11px] font-semibold text-primary">Nutrition ›</span>
           </button>

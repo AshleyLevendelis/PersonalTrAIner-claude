@@ -198,12 +198,17 @@ export function NutritionDisplay({
     return () => clearTimeout(timer)
   }, [waterComplete])
 
-  const ringValues: Record<string, { eaten: number; target: number }> = {
+  // `target: null` means NO TARGET EXISTS. The `?? 0` this replaced rendered
+  // the legend as "0 / 0g", which is the same confidently-wrong number the
+  // hero line above already refuses to print — a 0g protein target reads as a
+  // prescription, not as an absence. Water is never null: it has a real
+  // default that doesn't depend on body metrics.
+  const ringValues: Record<string, { eaten: number; target: number | null }> = {
     water: { eaten: todayWaterMl, target: waterTarget },
-    calories: { eaten: eaten.kcal, target: macros?.calories ?? 0 },
-    protein: { eaten: eaten.protein, target: macros?.protein ?? 0 },
-    carbs: { eaten: eaten.carbs, target: macros?.carbs ?? 0 },
-    fat: { eaten: eaten.fat, target: macros?.fat ?? 0 },
+    calories: { eaten: eaten.kcal, target: macros?.calories ?? null },
+    protein: { eaten: eaten.protein, target: macros?.protein ?? null },
+    carbs: { eaten: eaten.carbs, target: macros?.carbs ?? null },
+    fat: { eaten: eaten.fat, target: macros?.fat ?? null },
   }
 
   return (
@@ -219,7 +224,7 @@ export function NutritionDisplay({
             {NUTRITION_RINGS.map(r => {
               const { eaten: e, target: t } = ringValues[r.key]
               const circ = NUTRITION_RING_CIRC[r.key]
-              const frac = t > 0 ? Math.min(1, e / t) : 0
+              const frac = t != null && t > 0 ? Math.min(1, e / t) : 0
               return (
                 <circle
                   key={`fill-${r.key}`}
@@ -273,7 +278,10 @@ export function NutritionDisplay({
                     <span className="h-[9px] w-[9px] shrink-0 rounded-[3px]" style={{ background: ring.color }} />
                     <span className="flex-1 text-[10px] uppercase tracking-[.16em] text-muted-foreground">{row.label}</span>
                     <span className="tabular-mono text-[12.5px]">
-                      {Math.round(e)}<span className="text-muted-foreground"> / {Math.round(t)}{row.unit}</span>
+                      {t == null ? '—' : Math.round(e)}
+                      <span className="text-muted-foreground">
+                        {t == null ? ' · no target yet' : ` / ${Math.round(t)}${row.unit}`}
+                      </span>
                     </span>
                   </div>
                 )
