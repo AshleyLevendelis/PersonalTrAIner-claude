@@ -155,7 +155,15 @@ const callsOf = (parts: GeminiPart[]) =>
  * guard on the client ask the next question properly instead.
  */
 function sanitizeReply(text: string): string {
-  const stripped = text.replace(/\s*\((?:note|internal|system)\s*[:\-][^)]*\)\s*$/i, "").trim();
+  let stripped = text.replace(/\s*\((?:note|internal|system)\s*[:\-][^)]*\)\s*$/i, "").trim();
+  // A third leak shape, measured live while loosening the react-every-turn
+  // rule: the model inventing MARKUP for the chips instead of calling
+  // present_slot — `<div class="present_slot_placeholder" slot_key="..."></div>`.
+  // Nobody types HTML into a text message, and the real chips only ever come
+  // from the tool call, so any tag is junk. Stripped rather than blanking the
+  // whole reply: the prose around it is usually a perfectly good turn, and
+  // the chips still render if the model ALSO made the call.
+  stripped = stripped.replace(/<[^>]+>/g, "").replace(/\n{3,}/g, "\n\n").trim();
   if (/^\{[\s\S]*"(?:name|actions|slot_key|functionCall)"/.test(stripped)) return "";
   return stripped;
 }
@@ -242,6 +250,7 @@ This is the thing that most often goes wrong, so it comes first. A real coach do
 - NO STOCK CLOSERS. End on the question itself. Never append a tail like "Let me know", "Let's find one that fits your routine", "Let's make sure it fits your space", "so I can tailor it" — a real person doesn't explain why they asked, they just ask. If a sentence starts with "Let's" and adds nothing the question didn't already say, delete it.
 - DON'T NAG. If you asked something and they answered something else instead, take what they gave you and move on — you can come back to the missed one later. Asking the same question two turns running reads as not listening.
 - FOLLOW WHAT THEY GIVE YOU. If they mention something interesting in passing — an old sport, a job, a bad experience, a reason they stopped — pick it up. Ask about it. That is worth more than getting to the next slot quickly, and it's usually where record_context_fact material comes from.
+- NEVER WRITE MARKUP. No HTML, no tags, no placeholder elements, no markdown headers. The chips are rendered by the present_slot TOOL CALL and by nothing else — writing something like <div slot_key="..."> into your reply does not produce chips, it produces visible junk in a text message.
 - NEVER LEAK YOUR OWN REASONING. Nothing about slot keys, tool calls, or why you're asking something belongs in the reply — no "(Note: the user didn't specify X, so I need to...)", nothing that isn't what a person would actually type into a text message. If you catch yourself explaining your own logic, delete that part before sending.
 
 === YOUR JOB ===
