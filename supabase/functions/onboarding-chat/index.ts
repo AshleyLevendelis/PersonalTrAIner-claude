@@ -6,6 +6,13 @@ import {
   SCOPE_SAFETY_RULES,
   ALLERGEN_HONESTY_BLOCK,
 } from "../_shared/coach-rules.ts";
+import {
+  callsOf,
+  resolveReply,
+  type GeminiLegResult,
+  type GeminiPart,
+  type SlotCatalogEntry,
+} from "./reply-resolver.ts";
 
 // ---------------------------------------------------------------------------
 // Conversational onboarding — a separate, purpose-built sibling of
@@ -117,34 +124,6 @@ const toolDeclarations = [
   },
 ];
 
-interface GeminiFunctionCall {
-  name: string;
-  args: Record<string, unknown>;
-}
-type GeminiPart = { text?: string; functionCall?: GeminiFunctionCall };
-
-const textOf = (parts: GeminiPart[]) =>
-  parts.filter((p) => typeof p.text === "string").map((p) => p.text).join("").trim();
-const callsOf = (parts: GeminiPart[]) =>
-  parts.filter((p) => p.functionCall).map((p) => p.functionCall!);
-
-/**
- * Defense in depth against two leak shapes measured live: a trailing
- * parenthetical explaining the model's own slot logic to itself ("(Note: the
- * user didn't specify days, so I need to present the training days
- * option.)"), and a reply that IS bare tool-call/JSON syntax instead of the
- * functionCall part it should have been. Neither belongs in a text message a
- * real coach would send. The prompt now says not to do either (see "NEVER
- * LEAK YOUR OWN REASONING" below); this is the deterministic backstop for
- * when it does anyway — sanitizing to empty text lets the existing dead-air
- * guard on the client ask the next question properly instead.
- */
-function sanitizeReply(text: string): string {
-  const stripped = text.replace(/\s*\((?:note|internal|system)\s*[:\-][^)]*\)\s*$/i, "").trim();
-  if (/^\{[\s\S]*"(?:name|actions|slot_key|functionCall)"/.test(stripped)) return "";
-  return stripped;
-}
-
 /** snake_case → camelCase, cheap recovery for a model-emitted key like "recovery_capacity". */
 function toCamelCase(key: string): string {
   return key.replace(/_([a-zA-Z])/g, (_, c: string) => c.toUpperCase());
@@ -156,16 +135,6 @@ function normalizeSlotKey(catalog: SlotCatalogEntry[], rawKey: unknown): unknown
   if (catalog.some((c) => c.key === rawKey)) return rawKey;
   const camel = toCamelCase(rawKey);
   return catalog.some((c) => c.key === camel) ? camel : rawKey;
-}
-
-interface SlotCatalogEntry {
-  key: string;
-  question: string;
-  control: string;
-  required: boolean;
-  values?: { value: string; label: string }[];
-  min?: number;
-  max?: number;
 }
 
 function describeCatalog(catalog: SlotCatalogEntry[]): string {
@@ -331,87 +300,36 @@ When STILL UNKNOWN is empty, give a one-line warm recap of the shape of what you
     const data = await response.json();
     const parts: GeminiPart[] = data?.candidates?.[0]?.content?.parts ?? [];
 
-    // Unlike chat-gemini's per-tool dispatch, every functionCall here is a
-    // pure instruction for the client (which owns validation and all writes)
-    // — so the whole set passes through in order, alongside any text.
-    let reply = textOf(parts);
-    const actions = callsOf(parts).map((c) => ({ name: c.name, args: c.args ?? {} }));
-
     // ---------------------------------------------------------------------
-    // Second leg of the function-calling loop. Gemini answers a tool-using
-    // turn with functionCall parts and NOTHING ELSE — measured, not assumed:
-    // across a full 15-turn scripted onboarding, EVERY turn came back with
-    // zero text. The coach's voice never reached the screen at all; what the
-    // user read was the client's dead-air fallback printing each slot's
-    // canonical question, which is exactly why the flow read like a form
-    // being filled in rather than a conversation.
-    //
-    // The protocol's own answer is to feed the calls' results back and let
-    // the model produce its natural-language turn. The calls are pure client
-    // instructions here (this function owns no state), so every response is
-    // simply "recorded" — the point of the round trip is the prose, not the
-    // payload. Any further calls it makes on this leg are merged in.
+    // The reply guarantee. Gemini answers a tool-using turn with
+    // functionCall parts and NOTHING ELSE — measured, not assumed: across a
+    // full 15-turn scripted onboarding, EVERY turn came back with zero
+    // text; and a loosened prompt showed the model can also return entirely
+    // empty turns. resolveReply (reply-resolver.ts, gate-tested with a
+    // mocked model by scripts/test-onboarding-reply-guarantee.ts) runs the
+    // function-response round trip, a text-only leg, one transport retry,
+    // and a deterministic floor — so the reply it returns is non-empty by
+    // construction, whatever the model did. Sanitizing happens per leg in
+    // there, before the chip-recovery pass below reads reply.includes("?").
     // ---------------------------------------------------------------------
-    if (!reply && actions.length > 0) {
-      const resolvedTurns = [
-        ...contents,
-        { role: "model", parts: callsOf(parts).map((functionCall) => ({ functionCall })) },
-        {
-          role: "user",
-          parts: callsOf(parts).map((c) => ({
-            functionResponse: { name: c.name, response: { status: "recorded" } },
-          })),
-        },
-        {
-          role: "user",
-          parts: [{
-            text:
-              "(System: those are recorded and the app has already shown the user a confirmation for each. Now write your actual turn to them — react to what they just told you, then carry on. Two to four sentences, one paragraph, no lists, no \"let me know\" ending, and do not repeat the recorded values back at them. If your turn asks a closed-set question, call present_slot for it in this same turn so the chips render.)",
-          }],
-        },
-      ];
-
-      const followUp = await callGemini(resolvedTurns);
-      if (followUp.ok) {
-        const followData = await followUp.json();
-        const followParts: GeminiPart[] = followData?.candidates?.[0]?.content?.parts ?? [];
-        reply = textOf(followParts);
-        for (const c of callsOf(followParts)) {
-          // Drop what the first leg already asked for. A repeated present_slot
-          // is the damaging one — it renders a second copy of the same
-          // question — so identical (tool, slot) pairs never merge twice.
-          const dup = actions.some(
-            (a) => a.name === c.name && a.args?.slot_key === (c.args ?? {}).slot_key,
-          );
-          if (!dup) actions.push({ name: c.name, args: c.args ?? {} });
-        }
-      } else {
-        console.error("onboarding-chat: follow-up leg failed", followUp.status, await followUp.text());
+    const callLeg = async (turns: unknown[], withTools: boolean): Promise<GeminiLegResult> => {
+      try {
+        const r = await callGemini(turns, withTools);
+        if (!r.ok) return { ok: false, status: r.status, parts: [], errorText: await r.text() };
+        const legData = await r.json();
+        return { ok: true, parts: legData?.candidates?.[0]?.content?.parts ?? [] };
+      } catch (e) {
+        return { ok: false, parts: [], errorText: e instanceof Error ? e.message : String(e) };
       }
-
-      // Given tools, the model can answer with tool calls again and still say
-      // nothing — measured at roughly a third of turns. Taking the tools away
-      // removes the option: there is nothing left to emit but prose. Only the
-      // voice is at stake by this point; every call it wanted has already been
-      // collected from the legs above.
-      if (!reply) {
-        const forcedText = await callGemini(resolvedTurns, false);
-        if (forcedText.ok) {
-          const forcedData = await forcedText.json();
-          reply = textOf(forcedData?.candidates?.[0]?.content?.parts ?? []);
-        } else {
-          // Non-fatal: the client's dead-air guard still asks the next
-          // question, so a failed leg costs voice, not the flow.
-          console.error("onboarding-chat: text-only leg failed", forcedText.status, await forcedText.text());
-        }
-      }
-    }
-
-    // See sanitizeReply's own comment — cheap backstop for two leak shapes
-    // measured live. Applied before the chip-recovery pass below reads
-    // reply.includes("?"), so a stripped-to-empty reply is handled the same
-    // way as any other bare-tool-call turn.
-    reply = sanitizeReply(reply);
+    };
+    const { reply, actions } = await resolveReply({
+      firstParts: parts,
+      contents,
+      callGemini: callLeg,
+      catalog,
+      remaining,
+      log: console.error,
+    });
 
     // -----------------------------------------------------------------------
     // Chips must not depend on the model remembering to ask for them.

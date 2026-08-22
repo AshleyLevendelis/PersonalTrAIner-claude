@@ -700,7 +700,10 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
       // Dead-air guard: a turn of bare tool calls (receipts only, no text,
       // no chip card, review not opening) would stall the conversation —
       // deterministically ask the next unanswered slot's canonical question
-      // with its chips instead of leaving silence.
+      // with its chips instead of leaving silence. Since the reply guarantee
+      // landed server-side (onboarding-chat/reply-resolver.ts), a 200 with
+      // empty reply text should no longer occur — this stays as defense in
+      // depth, not as the mechanism that keeps the conversation moving.
       const producedVisible = responseWs.newMessages.some(m => !m.isReceipt) || responseWs.openReview
       if (!producedVisible) {
         const next = [...missingRequiredSlots(responseWs.values), ...unconfirmedOptionalSlots(responseWs.confirmed, responseWs.values)][0]

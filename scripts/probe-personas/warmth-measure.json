@@ -1,0 +1,13 @@
+{
+  "name": "warmth-measure",
+  "comment": "Fixed 7-turn persona for the before/after warmth measurement (docs/PLAN-guaranteed-reply-text.md). Deliberately heavy on routine answers — numerics, negations — where the graded-every-answer voice shows most. Keep this file stable so runs stay comparable.",
+  "messages": [
+    "Hey — I'm Sam. Want to drop some weight, I've been out of the gym for a couple of years.",
+    "I lifted for years before that, I'd say I'm intermediate. There's a full gym at my office.",
+    "Monday, Wednesday and Friday work. About 45 minutes realistically.",
+    "41, 178cm, 92kg, male.",
+    "Desk job mostly. No injuries, nothing I avoid.",
+    "No dietary restrictions, I eat pretty much anything. Three meals a day, no snacks.",
+    "Italian and Thai I guess."
+  ]
+}

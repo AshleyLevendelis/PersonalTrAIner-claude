@@ -108,6 +108,13 @@ const requiredMissing = ONBOARDING_SLOTS
   .filter((d:any)=>!confirmed.has(d.key)).map((d:any)=>d.key)
 console.log('\n--- answered: '+[...confirmed].join(', '))
 console.log('--- required still missing: '+(requiredMissing.join(', ')||'none'))
+// The reliability number the reply guarantee is measured by — counted
+// separately from transport failures so an unreachable function is never
+// misread as model silence.
+const emptyTurns = transcript.filter(t=>!t.error&&!String(t.reply??'').trim()).length
+const errorTurns = transcript.filter(t=>t.error).length
+console.log(`--- empty-reply turns: ${emptyTurns}/${transcript.length}`)
+if (errorTurns) console.log(`--- transport-error turns (not counted as empty): ${errorTurns}/${transcript.length}`)
 if (outPath) {
   fs.writeFileSync(outPath, JSON.stringify({
     persona: personaName,
