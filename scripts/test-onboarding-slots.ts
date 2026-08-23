@@ -57,7 +57,6 @@ const fullValues = (): OnboardingSlotValues => ({
   recoveryCapacity: 'moderate',
   conditioningPreference: 'tolerate',
   sessionDuration: '45-60',
-  trainingTime: 'midday',
   equipment: 'home_gym',
   trainingStyle: 'hybrid',
   injuries: ['knees'],
@@ -119,9 +118,10 @@ check('empty numeric rejected', !getSlotDef('age')!.validate(''))
 
 console.log('\n4. assembleProfile preserves the questionnaire\'s exact historical transform')
 const p = assembleProfile(fullValues())
-check('midday collapses to morning', p.preferred_time === 'morning')
-check('night collapses to evening', assembleProfile({ ...fullValues(), trainingTime: 'night' }).preferred_time === 'evening')
-check('varies collapses to evening', assembleProfile({ ...fullValues(), trainingTime: 'varies' }).preferred_time === 'evening')
+// The time-of-day question is gone (it produced byte-identical plans), so
+// preferred_time is now a fixed default rather than a collapse. Both of its
+// consumers already fall back to the same value on their own.
+check('preferred_time defaults to morning now the question is gone', p.preferred_time === 'morning')
 check('7 training-day entries', p.training_days.length === 7)
 check('Mon expands available', p.training_days.find(d => d.day === 'Monday')?.available === true)
 check('Tue expands unavailable', p.training_days.find(d => d.day === 'Tuesday')?.available === false)
@@ -335,18 +335,32 @@ check(
 )
 check('gender — most sensitive, least gating — is declared last', indexOf('gender') === ONBOARDING_SLOTS.length - 1)
 
-console.log('\n15. trainingTime — measured to change nothing plan-side, so it must never block')
-const timeDef = getSlotDef('trainingTime')!
-check('trainingTime.required is false on the definition itself', timeDef.required === false)
-for (const [label, v] of [
-  ['fresh', initialSlotValues()],
-  ['fully answered', fullValues()],
-] as const) {
-  check(`${label}: trainingTime never counts as required`, !isSlotRequired(timeDef, v))
+console.log('\n15. The trimmed ask set — what is allowed to block a plan')
+// Each of these steers one sentence of a meal prompt or a chat greeting. They
+// are still asked when the conversation goes there, and all are editable in
+// the Profile screen afterwards — they just must never hold the door shut.
+const NON_BLOCKING: SlotKey[] = ['displayName', 'cookingTime', 'favoriteCuisines', 'breakfastStyle']
+for (const key of NON_BLOCKING) {
+  check(`${key} never blocks completion`, !unconfirmedOptionalSlots(new Set()).includes(key))
+  check(`${key} is not required`, !isSlotRequired(getSlotDef(key)!, fresh))
 }
-// Still worth asking once (small chat-greeting value) — confirm it stays in
-// the optional/ask-anyway pool rather than being silently skipped entirely.
-check('trainingTime still needs an explicit ask/skip (it is not in NEVER_BLOCKING)', unconfirmedOptionalSlots(new Set()).includes('trainingTime'))
+check('the time-of-day question is gone entirely', getSlotDef('trainingTime') === undefined)
+// The safety path and the answers that genuinely reshape the plan stay put.
+for (const key of ['injuries', 'dietaryPreferences'] as SlotKey[]) {
+  check(`${key} still must be explicitly asked`, unconfirmedOptionalSlots(new Set()).includes(key))
+}
+// The headline number this trim claims, measured rather than asserted.
+// Counts every slot that COULD hold a plan up — required-and-applicable
+// plus ask-anyway-and-applicable — NOT how many are still unanswered, which
+// is a different (and flattering) number.
+const blockingFor = (v: OnboardingSlotValues) =>
+  ONBOARDING_SLOTS.filter(sd => isSlotRequired(sd, v)).length + unconfirmedOptionalSlots(new Set(), v).length
+// knowsWorkingLifts only applies once we know they have barbells and aren't
+// starting from nothing, so the barbell profile is the worst case.
+const barbell: OnboardingSlotValues = { ...initialSlotValues(), equipment: 'full_gym', trainingExperience: 'intermediate', activityLevel: 'moderate' }
+console.log(`  → questions that can block a plan: ${blockingFor(fresh)} fresh, ${blockingFor(barbell)} for a barbell lifter (was 22 / 23)`)
+check('fresh blocking count is down to 17 or fewer (was 22)', blockingFor(fresh) <= 17, `got ${blockingFor(fresh)}`)
+check('barbell blocking count is down to 18 or fewer (was 23)', blockingFor(barbell) <= 18, `got ${blockingFor(barbell)}`)
 
 console.log('\n16. detectAllergenTags — deterministic safety backstop, model-independent')
 // A live onboarding transcript disclosed a "severe peanut allergy" and got a

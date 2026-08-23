@@ -3,7 +3,6 @@ import type {
   UserProfile,
   FitnessGoal,
   SessionDuration,
-  TrainingTime,
   WorkoutSplit,
   EquipmentAccess,
   TrainingStyle,
@@ -32,15 +31,16 @@ import type {
 //      This is what lets a chat surface validate a mapped answer instead of
 //      trusting free text ("fail loud, never store silently").
 //   3. assembleProfile() — the ONE place slot values become a UserProfile,
-//      including the lossy trainingTime→preferred_time collapse and the
-//      never-asked constants, so both paths produce identical rows by
-//      construction rather than by parallel maintenance.
+//      including the never-asked constants and defaults, so both paths
+//      produce identical rows by construction rather than by parallel
+//      maintenance.
 //
 // Two destination subtleties encoded here rather than left as tribal
 // knowledge: dislikedFoods does NOT go to a profile column (its real
 // destination is user_facts — see the deprecation note on
-// UserProfile.disliked_foods in types.ts), and trainingTime's 5-way answer
-// is deliberately collapsed to the 2-way preferred_time column.
+// UserProfile.disliked_foods in types.ts), and 'derived' currently has no
+// members — the time-of-day question that used it was removed once measured
+// to change nothing about the plan.
 // ---------------------------------------------------------------------------
 
 export interface SlotOption {
@@ -86,13 +86,6 @@ export const DURATION_OPTIONS: { value: SessionDuration; icon: string; label: st
   { value: '90+', icon: '🔥', label: '90+ min', description: 'Maximum volume' },
 ]
 
-export const TIME_OPTIONS: { value: TrainingTime; icon: string; label: string; description: string }[] = [
-  { value: 'morning', icon: '🌅', label: 'Morning', description: '5 AM - 10 AM' },
-  { value: 'midday', icon: '☀️', label: 'Midday', description: '10 AM - 2 PM' },
-  { value: 'evening', icon: '🌆', label: 'Evening', description: '4 PM - 8 PM' },
-  { value: 'night', icon: '🌙', label: 'Night', description: '8 PM - 12 AM' },
-  { value: 'varies', icon: '🔄', label: 'It Varies', description: 'No fixed time' },
-]
 
 export const EQUIPMENT_OPTIONS: { value: EquipmentAccess; icon: string; label: string; description: string }[] = [
   { value: 'full_gym', icon: '🏢', label: 'Full Gym', description: 'All machines & free weights' },
@@ -260,7 +253,6 @@ export interface OnboardingSlotValues {
   recoveryCapacity: RecoveryCapacity | null
   conditioningPreference: ConditioningPreference | null
   sessionDuration: SessionDuration | null
-  trainingTime: TrainingTime | null
   equipment: EquipmentAccess | null
   trainingStyle: TrainingStyle | null
   trainingExperience: TrainingExperience | null
@@ -298,7 +290,6 @@ export function initialSlotValues(): OnboardingSlotValues {
     recoveryCapacity: null,
     conditioningPreference: null,
     sessionDuration: null,
-    trainingTime: null,
     equipment: null,
     trainingStyle: null,
     trainingExperience: null,
@@ -372,8 +363,9 @@ export interface SlotDef {
   /**
    * 'column'     → a fitness_profiles column via assembleProfile.
    * 'user_facts' → NOT a profile column (dislikedFoods → user_facts rows).
-   * 'derived'    → feeds a transform, stored only in collapsed form
-   *                (trainingTime → preferred_time).
+   * 'derived'    → feeds a transform, stored only in collapsed form.
+   *                No slot uses this today (the time-of-day question did,
+   *                until it was removed for changing nothing).
    */
   destination: 'column' | 'user_facts' | 'derived'
   validate: (value: unknown) => boolean
@@ -474,7 +466,7 @@ const SNACKS_OPTIONS: SlotOption[] = [
  * "last bits, for the calorie maths" note rather than an unannounced tail.
  */
 export const ONBOARDING_SLOTS: SlotDef[] = [
-  { key: 'displayName', question: 'What should I call you?', shortLabel: 'Name', control: 'text', required: true, destination: 'column', validate: v => typeof v === 'string' && v.trim().length > 0 && v.trim().length <= 30 },
+  { key: 'displayName', question: 'What should I call you?', shortLabel: 'Name', control: 'text', required: false, destination: 'column', validate: v => typeof v === 'string' && v.trim().length > 0 && v.trim().length <= 30 },
   { key: 'fitnessGoal', question: "What's your main goal?", shortLabel: 'Goal', control: 'single', required: true, options: GOAL_OPTIONS, destination: 'column', validate: isOneOf(GOAL_OPTIONS) },
   { key: 'trainingExperience', question: 'How much training have you done?', shortLabel: 'Experience', control: 'single', required: true, options: EXPERIENCE_OPTIONS, destination: 'column', validate: isOneOf(EXPERIENCE_OPTIONS) },
   { key: 'activityLevel', question: 'How active is your day-to-day, outside training?', shortLabel: 'Daily activity', control: 'single', required: true, options: ACTIVITY_OPTIONS, destination: 'column', validate: isOneOf(ACTIVITY_OPTIONS) },
@@ -491,7 +483,6 @@ export const ONBOARDING_SLOTS: SlotDef[] = [
   // only real consumer is a chat-greeting default. Still worth asking once
   // for that small personalization, but it must never block completion the
   // way a plan-shaping answer does.
-  { key: 'trainingTime', question: 'When do you usually train?', shortLabel: 'Time of day', control: 'single', required: false, options: TIME_OPTIONS, destination: 'derived', validate: isOneOf(TIME_OPTIONS) },
   { key: 'recoveryCapacity', question: "How's your recovery capacity — sleep, stress, physical job?", shortLabel: 'Recovery', control: 'single', required: true, options: RECOVERY_OPTIONS, destination: 'column', validate: isOneOf(RECOVERY_OPTIONS) },
   { key: 'conditioningPreference', question: 'How do you feel about cardio?', shortLabel: 'Cardio', control: 'single', required: true, options: CONDITIONING_PREF_OPTIONS, destination: 'column', validate: isOneOf(CONDITIONING_PREF_OPTIONS) },
   { key: 'trainingStyle', question: "What's your training style?", shortLabel: 'Style', control: 'single', required: true, options: STYLE_OPTIONS, destination: 'column', validate: isOneOf(STYLE_OPTIONS) },
@@ -501,7 +492,7 @@ export const ONBOARDING_SLOTS: SlotDef[] = [
   { key: 'favoriteCuisines', question: 'Any favourite cuisines?', shortLabel: 'Cuisines', control: 'multi', required: false, options: FAVORITE_CUISINE_OPTIONS, destination: 'column', validate: isSubsetOf(FAVORITE_CUISINE_OPTIONS) },
   { key: 'mealsPerDay', question: 'How many meals a day suits you?', shortLabel: 'Meals a day', control: 'single', required: true, options: MEALS_PER_DAY_OPTIONS, destination: 'column', validate: isOneOf(MEALS_PER_DAY_OPTIONS) },
   { key: 'breakfastStyle', question: "What's breakfast usually like for you?", shortLabel: 'Breakfast', control: 'single', required: false, options: BREAKFAST_STYLE_OPTIONS, destination: 'column', validate: isOneOf(BREAKFAST_STYLE_OPTIONS) },
-  { key: 'cookingTime', question: 'How much time do you want to spend cooking?', shortLabel: 'Cooking time', control: 'single', required: true, options: COOKING_TIME_OPTIONS, destination: 'column', validate: isOneOf(COOKING_TIME_OPTIONS) },
+  { key: 'cookingTime', question: 'How much time do you want to spend cooking?', shortLabel: 'Cooking time', control: 'single', required: false, options: COOKING_TIME_OPTIONS, destination: 'column', validate: isOneOf(COOKING_TIME_OPTIONS) },
   { key: 'includeSnacks', question: 'Snacks too, or meals only?', shortLabel: 'Snacks', control: 'single', required: false, options: SNACKS_OPTIONS, destination: 'column', validate: v => v === true || v === false || v === 'true' || v === 'false' },
   { key: 'age', question: 'How old are you?', shortLabel: 'Age', control: 'numeric', required: false, min: 13, max: 100, destination: 'column', validate: isNumberIn(13, 100) },
   { key: 'heightCm', question: 'How tall are you (cm)?', shortLabel: 'Height', control: 'numeric', required: false, min: 100, max: 250, destination: 'column', validate: isNumberIn(100, 250) },
@@ -576,7 +567,16 @@ export function canDeclineSlot(def: SlotDef, values: OnboardingSlotValues): bool
   return !isSlotRequired(def, values)
 }
 
-export const NEVER_BLOCKING_SLOTS: SlotKey[] = ['knownSquatKg', 'knownBenchKg', 'knownDeadliftKg', 'includeSnacks']
+export const NEVER_BLOCKING_SLOTS: SlotKey[] = [
+  'knownSquatKg', 'knownBenchKg', 'knownDeadliftKg', 'includeSnacks',
+  // Added when the ask set was trimmed to what shapes the first plan. Each
+  // of these was measured to steer ONE sentence of a meal prompt or a chat
+  // greeting — real, but not worth holding someone at the door for. They are
+  // still asked whenever the conversation goes there, and all four are
+  // editable afterwards in the Profile screen; they simply stop being able
+  // to block a plan.
+  'displayName', 'cookingTime', 'favoriteCuisines', 'breakfastStyle',
+]
 
 /** Required slots whose VALUE must validate before completion, per the current answers (requiredIf-aware). */
 export function missingRequiredSlots(values: OnboardingSlotValues): SlotKey[] {
@@ -642,9 +642,6 @@ function numericOrUndefined(raw: unknown): number | undefined {
 }
 
 export function assembleProfile(data: OnboardingSlotValues): UserProfile {
-  const mappedTime: 'morning' | 'evening' =
-    data.trainingTime === 'morning' || data.trainingTime === 'midday' ? 'morning' : 'evening'
-
   // ALWAYS a 7-entry array, both formats. Several readers call .filter/.some
   // on training_days without a null guard (exercise-plan.ts's availableDays,
   // macro-calculator's training-day lookup) — the guards added alongside this
@@ -675,7 +672,13 @@ export function assembleProfile(data: OnboardingSlotValues): UserProfile {
     breakfast_style: data.breakfastStyle ?? undefined,
     fitness_goal: data.fitnessGoal!,
     training_days: trainingDaysFull,
-    preferred_time: mappedTime,
+    // No longer asked. It was measured to produce byte-identical plans and
+    // mesocycles for every answer, and its only consumer is a chat greeting
+    // — which already falls back to 'morning' on its own
+    // (ChatAssistant's `profile.preferred_time || 'morning'`). The column is
+    // non-optional, so it is written to that same default rather than left
+    // to drift. Nothing reads it to decide when a session happens.
+    preferred_time: 'morning',
     dietary_preferences: data.dietaryPreferences,
     session_duration_preference: data.sessionDuration!,
     equipment_access: data.equipment!,
