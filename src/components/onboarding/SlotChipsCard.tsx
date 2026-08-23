@@ -1,6 +1,6 @@
 import { OptionCard } from './OptionCard'
 import { Button } from '@/components/ui/button'
-import { getSlotDef, offeredOptionsFor, type OnboardingSlotValues, type SlotKey } from '@/lib/onboarding-slots'
+import { getSlotDef, offeredOptionsFor, canDeclineSlot, type OnboardingSlotValues, type SlotKey } from '@/lib/onboarding-slots'
 
 // ---------------------------------------------------------------------------
 // The REAL onboarding chips, rendered inside the conversational flow — same
@@ -20,6 +20,7 @@ export function SlotChipsCard({
   onToggleMulti,
   onResolveSingle,
   onResolveMulti,
+  onDecline,
 }: {
   slotKey: string
   values: OnboardingSlotValues
@@ -29,6 +30,8 @@ export function SlotChipsCard({
   onToggleMulti: (key: SlotKey, value: string) => void
   onResolveSingle: (key: SlotKey, value: string) => void
   onResolveMulti: (key: SlotKey) => void
+  /** Record this slot as answered with NO value — see canDeclineSlot. */
+  onDecline: (keys: SlotKey[]) => void
 }) {
   const def = getSlotDef(slotKey)
   // Via offeredOptionsFor so any future "hidden until the engine can honour
@@ -76,6 +79,21 @@ export function SlotChipsCard({
           preparation, or cross-contamination. If you have a food allergy,
           always check ingredients yourself.
         </p>
+      )}
+      {/* A single-select the plan doesn't require needs a way to say no.
+          Sex is the one that traps people — two options and no third answer,
+          on a question that is optional everywhere downstream. Multi-selects
+          are excluded on purpose: their Done button already records an
+          explicit empty list, which MEANS "none" rather than "not saying". */}
+      {def.control === 'single' && canDeclineSlot(def, values) && (
+        <Button
+          variant="ghost"
+          className="w-full min-h-[44px] text-sm text-muted-foreground"
+          disabled={busy}
+          onClick={() => onDecline([def.key])}
+        >
+          Prefer not to say
+        </Button>
       )}
       {def.control === 'multi' && (
         <Button

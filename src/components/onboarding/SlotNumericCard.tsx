@@ -6,6 +6,7 @@ import {
   numericGroupFor,
   isSlotApplicable,
   isSlotRequired,
+  canDeclineSlot,
   type OnboardingSlotValues,
   type SlotKey,
 } from '@/lib/onboarding-slots'
@@ -13,8 +14,8 @@ import {
 // ---------------------------------------------------------------------------
 // The numeric counterpart to SlotChipsCard.
 //
-// Age, height and weight are required, bounded fields. In chat they had NO
-// control at all:
+// Age, height and weight are bounded fields the plan can be built without.
+// In chat they had NO control at all:
 // present_slot marked a card for them, but the chips component draws only
 // closed-set options and returned null for anything numeric, so the question
 // fell through to free text. The bounds then went unchecked until the very
@@ -26,6 +27,10 @@ import {
 // Validation is the slot definition's own `validate`, so this control can
 // never accept a value the engine would reject; the bounds shown in the hint
 // are the same numbers the check uses, rather than a second copy to drift.
+//
+// "Prefer not to say" exists because optional used to mean "the plan can be
+// built without it" everywhere EXCEPT here — with no way to say no, a user
+// who wouldn't give a weight could never finish. See canDeclineSlot.
 // ---------------------------------------------------------------------------
 
 export function SlotNumericCard({
@@ -35,6 +40,7 @@ export function SlotNumericCard({
   resolved,
   busy,
   onResolve,
+  onDecline,
 }: {
   slotKey: string
   values: OnboardingSlotValues
@@ -42,6 +48,8 @@ export function SlotNumericCard({
   resolved: boolean
   busy: boolean
   onResolve: (entries: { key: SlotKey; raw: string }[]) => void
+  /** Record these as answered with NO value — see canDeclineSlot. */
+  onDecline: (keys: SlotKey[]) => void
 }) {
   const def = getSlotDef(slotKey)
   const fields = (def ? numericGroupFor(def.key) : [])
@@ -62,6 +70,11 @@ export function SlotNumericCard({
     return d.validate(raw)
   }
   const allOk = fields.every(isOk)
+  // Every field on this card can be refused, so the card can offer a refusal.
+  // Mixed cards (some required) deliberately get no button: a partial decline
+  // would leave the required one unanswered with nothing saying so.
+  const declinable = fields.every(d => canDeclineSlot(d, values))
+  const allBlank = fields.every(d => rawOf(d.key).trim() === '')
 
   return (
     <div className={`mt-2 space-y-2 ${busy ? 'pointer-events-none opacity-60' : ''}`}>
@@ -107,6 +120,15 @@ export function SlotNumericCard({
             setShowErrors(true)
             return
           }
+          // ...and neither is an all-blank Save, which used to return here
+          // with nothing recorded, no message and an unchanged card — the
+          // exact silent no-op the comment above promises never happens.
+          // Blank is legitimate on an optional field, so this is a real
+          // choice to make, not an error: point at the button that makes it.
+          if (allBlank) {
+            setShowErrors(true)
+            return
+          }
           onResolve(
             fields
               .filter(d => rawOf(d.key).trim() !== '')
@@ -116,6 +138,23 @@ export function SlotNumericCard({
       >
         Save
       </Button>
+      {showErrors && allBlank && (
+        <p className="text-[11px] text-muted-foreground">
+          {declinable
+            ? 'Fill in what you can, or tap “Prefer not to say”.'
+            : 'Fill these in to carry on.'}
+        </p>
+      )}
+      {declinable && (
+        <Button
+          variant="ghost"
+          className="w-full min-h-[44px] text-sm text-muted-foreground"
+          disabled={busy}
+          onClick={() => onDecline(fields.map(d => d.key))}
+        >
+          Prefer not to say
+        </Button>
+      )}
     </div>
   )
 }

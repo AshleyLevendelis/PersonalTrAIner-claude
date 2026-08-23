@@ -13,6 +13,7 @@ import {
   unconfirmedOptionalSlots,
   isSlotRequired,
   isSlotApplicable,
+  canDeclineSlot,
   assembleProfile,
   toggleValue,
   numericGroupFor,
@@ -387,6 +388,45 @@ function applySlot(
   return true
 }
 
+/**
+ * Record slots as ANSWERED with no value — the user declined them.
+ *
+ * This is the counterpart to applySlot, and the distinction it draws is the
+ * whole point: `confirmed` means "we asked and got an answer", `values` means
+ * "here is the answer". A decline is the first case without the second, and
+ * until it existed the two were welded together, so a question the plan
+ * didn't need could still hold onboarding open forever.
+ *
+ * The value is left untouched (null) rather than written as a sentinel, so
+ * everything downstream — assembleProfile's numericOrUndefined, computeTargets
+ * returning null, MissingBodyMetricsNotice — keeps working exactly as the
+ * absence work built it. No receipt: the user's own message bubble says they
+ * skipped it, the same reasoning that suppresses a receipt on a chip tap.
+ */
+function declineSlots(ws: WorkingState, keys: SlotKey[]): SlotKey[] {
+  const declined: SlotKey[] = []
+  for (const key of keys) {
+    const def = getSlotDef(key)
+    if (!def || !canDeclineSlot(def, ws.values)) continue
+    // Write null EXPLICITLY rather than leaving the initial value in place.
+    // Numeric slots start as '' and gender as null, so "confirmed but empty"
+    // was not a reliable signal for a decline — age/height/weight read as
+    // plain blanks. null is the fact, not an inference, and it lands in the
+    // same absence handling ('' and null both become undefined in
+    // assembleProfile's numericOrUndefined).
+    ws.values = { ...ws.values, [key]: null } as OnboardingSlotValues
+    ws.confirmed = new Set(ws.confirmed).add(key)
+    ws.resolveCards.add(key)
+    declined.push(key)
+  }
+  return declined
+}
+
+/** Confirmed, but holding no value — the user was asked and said no. */
+function isDeclined(key: SlotKey, values: OnboardingSlotValues, confirmed: ReadonlySet<string>): boolean {
+  return confirmed.has(key) && (values[key] === null || values[key] === undefined)
+}
+
 export function ConversationalOnboarding({ onComplete }: { onComplete: (profile: UserProfile) => void }) {
   const [draftLoaded] = useState<OnboardingDraft | null>(() => loadOnboardingDraft())
   const [values, setValues] = useState<OnboardingSlotValues>(() => draftLoaded?.values ?? initialSlotValues())
@@ -497,7 +537,15 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
   const buildState = (ws: WorkingState) => {
     const filled: Record<string, string> = {}
     for (const def of ONBOARDING_SLOTS) {
-      if (ws.confirmed.has(def.key)) filled[def.key] = displayValueFor(def, ws.values)
+      // A declined slot must read as ANSWERED here. It is already out of
+      // `remaining`, but a bare "—" invites the model to have another go at
+      // it; saying so plainly is what stops the coach re-asking for a weight
+      // the user just refused.
+      if (ws.confirmed.has(def.key)) {
+        filled[def.key] = isDeclined(def.key, ws.values, ws.confirmed)
+          ? "not given — they'd rather not say, don't ask again"
+          : displayValueFor(def, ws.values)
+      }
     }
     return {
       slotCatalog: buildSlotCatalog(ws.values),
@@ -593,6 +641,20 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
           host.slotCard = key
         } else {
           ws.newMessages.push({ role: 'assistant', content: def.question, slotCard: key })
+        }
+      } else if (action.name === 'decline_slot') {
+        const key = normalizeSlotKey(String(action.args.slot_key ?? '')) as SlotKey
+        const def = getSlotDef(key)
+        if (!def) {
+          console.warn('onboarding: decline_slot with unknown slot_key', action.args.slot_key)
+          continue
+        }
+        // canDeclineSlot inside declineSlots is the real guard: the model is
+        // told not to decline anything required or safety-path, and this is
+        // what makes that non-negotiable rather than a request. A refused
+        // decline just leaves the slot open, so the coach asks again.
+        if (declineSlots(ws, [key]).length === 0) {
+          console.warn('onboarding: refused decline_slot for a slot the plan needs', key)
         }
       } else if (action.name === 'record_context_fact') {
         const displayText = String(action.args.display_text ?? '').trim()
@@ -923,6 +985,19 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
     void sendMessage(saved.join(', '), ws)
   }
 
+  /**
+   * The user tapped "Prefer not to say". Records the decline(s), then sends
+   * ONE turn saying so in their own voice — the coach needs to hear it, or
+   * its next turn asks the same question again.
+   */
+  const handleDecline = (keys: SlotKey[]) => {
+    const ws = makeWorkingState()
+    const declined = declineSlots(ws, keys)
+    if (declined.length === 0) return
+    const labels = declined.map(k => getSlotDef(k)?.shortLabel.toLowerCase() ?? k)
+    void sendMessage(`I'd rather not say — skip ${labels.join(', ')}`, ws)
+  }
+
   const handleGenerate = () => {
     if (!readyToGenerate) return
     // Stamp the draft as a chat-path completion BEFORE handing off: App.tsx
@@ -992,6 +1067,7 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
                     resolved={!!msg.slotCardResolved}
                     busy={busy}
                     onResolve={handleResolveNumeric}
+                    onDecline={handleDecline}
                   />
                 )}
                 {msg.slotCard && (
@@ -1003,6 +1079,7 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
                     onToggleMulti={handleToggleMulti}
                     onResolveSingle={handleResolveSingle}
                     onResolveMulti={handleResolveMulti}
+                    onDecline={handleDecline}
                   />
                 )}
               </div>
@@ -1038,7 +1115,9 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
                   .map(def => (
                   <p key={def.key}>
                     <span className="font-medium text-foreground">{def.shortLabel}:</span>{' '}
-                    <span className="text-muted-foreground">{displayValueFor(def, values)}</span>
+                    <span className="text-muted-foreground">
+                      {isDeclined(def.key, values, confirmed) ? 'Not given' : displayValueFor(def, values)}
+                    </span>
                   </p>
                 ))}
                 {/* VISION.md: "someone beginning exercise for the first time

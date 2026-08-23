@@ -16,6 +16,7 @@ import {
   assembleProfile,
   missingRequiredSlots,
   unconfirmedOptionalSlots,
+  canDeclineSlot,
   isSlotRequired,
   isSlotApplicable,
   offeredOptionsFor,
@@ -153,6 +154,36 @@ check('injuries must be explicitly asked', unasked.includes('injuries'))
 check('dietaryPreferences must be explicitly asked', unasked.includes('dietaryPreferences'))
 check('known-lift numbers never block', !unasked.includes('knownSquatKg') && !unasked.includes('knownBenchKg') && !unasked.includes('knownDeadliftKg'))
 check('all-confirmed clears the list', unconfirmedOptionalSlots(new Set(ONBOARDING_SLOTS.map(s => s.key))).length === 0)
+
+console.log('\n5b. Refusal: what a user is allowed to decline')
+// THE TRAP: age/height/weight/gender are required:false but were held by
+// unconfirmedOptionalSlots until confirmed, and confirmed only came from a
+// value that validated — so declining meant never reaching Generate. These
+// assert the escape hatch exists AND that it stops exactly where it should.
+const BODY_METRICS: SlotKey[] = ['age', 'heightCm', 'weightKg', 'gender']
+for (const key of BODY_METRICS) {
+  check(`${key} can be declined`, canDeclineSlot(getSlotDef(key)!, fresh))
+}
+const SAFETY_AND_ESSENTIAL: SlotKey[] = [
+  'fitnessGoal', 'trainingDays', 'equipment', 'trainingExperience',
+  'sessionDuration', 'trainingStyle', 'recoveryCapacity',
+]
+for (const key of SAFETY_AND_ESSENTIAL) {
+  check(`${key} can NOT be declined`, !canDeclineSlot(getSlotDef(key)!, fresh))
+}
+// Declining is recorded as "asked and answered" with no value — the same
+// shape the client produces — so the completion gate must clear.
+const declinedAll = new Set(ONBOARDING_SLOTS.map(s => s.key))
+check(
+  'a profile that declined every optional slot still completes',
+  unconfirmedOptionalSlots(declinedAll, fullValues()).length === 0,
+)
+// ...and a declined body metric must not fabricate a number downstream.
+const declinedProfile = assembleProfile({ ...fullValues(), age: null, heightCm: null, weightKg: null, gender: null })
+check('declined age stays absent', declinedProfile.age === undefined)
+check('declined height stays absent', declinedProfile.height_cm === undefined)
+check('declined weight stays absent', declinedProfile.weight_kg === undefined)
+check('declined sex stays absent', declinedProfile.gender === undefined)
 
 console.log('\n6. Safety coupling: injury chips vs the engine\'s joint filter')
 const FILTERING_CODES = ['lower_back', 'knees', 'shoulders', 'neck', 'wrists']

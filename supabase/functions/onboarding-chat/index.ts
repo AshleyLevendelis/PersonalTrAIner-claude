@@ -82,6 +82,21 @@ const toolDeclarations = [
     },
   },
   {
+    name: "decline_slot",
+    description:
+      "Record that the user does not want to answer one of the OPTIONAL questions — age, height, weight, sex, and the other non-essential ones. The app marks it answered with no value and never asks again, and the plan is built without it. Call this the moment they decline, deflect it twice, or say it's private. NEVER call it for something the plan genuinely needs (goal, training days, session length, equipment, experience) or anything on the safety path (injuries, dietary restrictions) — if they resist one of those, keep talking instead; the app will not let the conversation finish without them.",
+    parameters: {
+      type: "object",
+      properties: {
+        slot_key: {
+          type: "string",
+          description: "One of the slot keys from the SLOT CATALOG in your instructions.",
+        },
+      },
+      required: ["slot_key"],
+    },
+  },
+  {
     name: "record_context_fact",
     description:
       "Save a piece of life-context, history, or motivation the user volunteered that should shape how their coach talks to them long after onboarding — e.g. 'tried 5-day splits three times, always collapsed by week 3', 'Fridays are chaotic with the kids', 'training for a wedding in June'. Not for slot answers — those go through set_slot.",
@@ -216,6 +231,7 @@ This is a checklist for YOU, never a route to march, and it is NOT an order. It 
 - Multi-select slots (trainingDays, injuries, dietaryPreferences, favoriteCuisines): set_slot with a comma-separated list of allowed values, or present_slot for tapping. An explicit "none" is a real answer (set_slot with an empty value) — record it, don't just move on.
 - ONE ANSWER PER set_slot, AND ONE PER THING THEY TOLD YOU. If they hand you four values in one breath ("41, female, 170cm, 87kg"), that is FOUR separate set_slot calls in that turn — age, gender, heightCm, weightKg. Dropping three of them means asking again for something they already told you, which is the single most annoying thing you can do. Sweep their message for every slot it answers before you reply.
 - IF THEY TYPE (RATHER THAN TAP) SOMETHING THAT MATCHES AN OPTION YOU JUST OFFERED — even the exact label, like "Getting By" or "Functional / Athletic" — that is CERTAIN. Call set_slot for it. Reacting to it in prose without the call means the app never recorded it and will ask again; the app has its own backstop for a dead-exact match, but don't rely on that — the call is yours to make.
+- A REFUSAL IS ALSO AN ANSWER. "I'd rather not say", "why do you need that?", "skip it" about an OPTIONAL question (age, height, weight, sex, and the other non-essential ones) → call decline_slot for it, say something light and unbothered, and move on. Do not bargain, do not explain why you wanted it, and never ask it again. They can always add it later. The app also shows a "Prefer not to say" button on those questions, so a refusal is expected, not a problem. For anything the plan genuinely needs, or anything on the safety path, do NOT decline it — keep the conversation going.
 - NEGATIONS ARE ANSWERS, not just something to acknowledge. "No snacks", "none really", "nothing", "no restrictions" are certain, closed-set answers — set_slot with an empty value for multi-selects (dietaryPreferences, injuries, favoriteCuisines), or the matching "false"/"no" option for a yes-no slot (includeSnacks). Saying "got it, noted" without the call leaves the slot empty and the app will ask again.
 - INJURIES CAN GROW. If injuries was already answered and the user later mentions a NEW pain or niggle, call set_slot(injuries=...) again with the FULL list — everything already recorded, plus the new one. Losing a previously-recorded injury because a later message only mentioned the new one is a safety miss, not a UI quirk.
 - One present_slot per turn at most — only one set of chips can render. So when you group two asks in a turn, at most ONE of them gets chips; ask the other in plain text and map their answer with set_slot. Numeric asks (age/height/weight) have no chips at all, which is exactly why they group so easily. The slot_key you present MUST be the exact question your sentence just asked — if your words ask about cardio, present conditioningPreference, not something else. Chips under the wrong question are worse than no chips.

@@ -551,6 +551,31 @@ export function offeredOptionsFor(def: SlotDef): readonly SlotOption[] | undefin
  * includeSnacks carries a real default, and the three known-lift numbers are
  * optional-within-a-question (the form treats them the same).
  */
+/**
+ * Can the user refuse this question outright and still finish onboarding?
+ *
+ * THE TRAP THIS FIXES: age, height, weight and sex are all `required: false`,
+ * but "optional" only ever meant "the plan can be built without it" — the
+ * conversation still held them, because `unconfirmedOptionalSlots` keeps a
+ * slot until it is CONFIRMED, and `confirmed` was only ever set by a value
+ * that passed `validate`. `isNumberIn` rejects '', and GENDER_OPTIONS offers
+ * no third answer, so someone who would not give a weight could answer every
+ * other question and never reach Generate. That is the same refusal trap the
+ * absence work removed from the calculation layer (a declined metric yields
+ * `undefined`, targets go null, and the app says so) — it simply never
+ * reached the gate that decides when onboarding is done.
+ *
+ * The rule is exactly "not currently required": anything the plan genuinely
+ * needs (goal, days, equipment, and injuries/diet on the safety path) stays
+ * unskippable, and everything else can be declined. Declining records the
+ * slot as answered WITHOUT storing a value, so the null flows into
+ * `assembleProfile`'s existing `numericOrUndefined` / `?? undefined` handling
+ * — no new "unknown" sentinel, nothing downstream to teach.
+ */
+export function canDeclineSlot(def: SlotDef, values: OnboardingSlotValues): boolean {
+  return !isSlotRequired(def, values)
+}
+
 export const NEVER_BLOCKING_SLOTS: SlotKey[] = ['knownSquatKg', 'knownBenchKg', 'knownDeadliftKg', 'includeSnacks']
 
 /** Required slots whose VALUE must validate before completion, per the current answers (requiredIf-aware). */

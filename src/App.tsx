@@ -129,6 +129,18 @@ function App() {
   const [isRestoring, setIsRestoring] = useState(true)
   const [isGenerating, setIsGenerating] = useState(false)
   const [setupError, setSetupError] = useState<string | null>(null)
+  /**
+   * The plan generated but the profile row did not save.
+   *
+   * Kept SEPARATE from setupError deliberately. setupError's screen lives
+   * inside `if (!profile)`, which is right for a failure that leaves us with
+   * no profile — but a failed INSERT still runs setProfile below, so that
+   * screen could never render for it and the warning was invisible. The user
+   * was dropped into a working app holding a plan that silently vanishes on
+   * reload, which is the exact outcome the insert-error branch says it
+   * exists to prevent. This one renders over the app instead.
+   */
+  const [unsavedProfileWarning, setUnsavedProfileWarning] = useState<string | null>(null)
   const [generatingStatus, setGeneratingStatus] = useState('')
   const [exerciseExclusions, setExerciseExclusions] = useState<string[]>([])
   // Memory & goals (VISION-ARCHITECTURE.md §1) — active facts/goals for the
@@ -653,9 +665,9 @@ function App() {
       // schema change is a column the database does not have yet — silently
       // continuing would leave the user with a plan that vanishes on reload.
       console.error('Saving profile failed:', insertError)
-      setSetupError(
-        `Your plan was generated but could not be saved: ${insertError.message}. ` +
-        `You can keep using it now, but it will not persist if you reload.`
+      setUnsavedProfileWarning(
+        `Your plan was built, but we couldn't save it: ${insertError.message}. ` +
+        `You can keep using it now, but it won't be here if you reload.`
       )
     }
 
@@ -1533,6 +1545,26 @@ function App() {
         underneath it — the dock measures itself into here. */}
     <BottomDockHeightProvider>
     <div className="min-h-screen bg-background">
+      {/* The plan exists in memory but not in the database. Says so once, in
+          plain terms, and stays dismissible — the user can carry on, but
+          they are never left believing it was saved. */}
+      {unsavedProfileWarning && (
+        <div
+          role="alert"
+          className="fixed inset-x-0 z-50 px-3"
+          style={{ top: 'calc(0.625rem + env(safe-area-inset-top))' }}
+        >
+          <div className="mx-auto max-w-md rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 backdrop-blur">
+            <p className="text-xs text-foreground break-words">{unsavedProfileWarning}</p>
+            <button
+              className="mt-1 text-[11px] font-medium underline text-muted-foreground min-h-[32px]"
+              onClick={() => setUnsavedProfileWarning(null)}
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
       {/* The old full-width header duplicated what the bottom tab bar
           already communicates (which screen you're on). These two floating
           icons replace it — no shared bar, no vertical strip, each reachable
