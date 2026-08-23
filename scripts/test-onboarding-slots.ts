@@ -345,6 +345,14 @@ for (const key of NON_BLOCKING) {
   check(`${key} is not required`, !isSlotRequired(getSlotDef(key)!, fresh))
 }
 check('the time-of-day question is gone entirely', getSlotDef('trainingTime') === undefined)
+// A never-blocking slot must STAY in the catalog the model receives, or a
+// name (or cuisine, or breakfast style) offered later in the conversation
+// could never be recorded — the whole point of demoting rather than deleting.
+const catalogKeys = buildSlotCatalog(fresh).map(c => c.key)
+for (const key of NON_BLOCKING) {
+  check(`${key} is still offered to the model`, catalogKeys.includes(key))
+}
+check('displayName is offered as not-required', buildSlotCatalog(fresh).find(c => c.key === 'displayName')?.required === false)
 // The safety path and the answers that genuinely reshape the plan stay put.
 for (const key of ['injuries', 'dietaryPreferences'] as SlotKey[]) {
   check(`${key} still must be explicitly asked`, unconfirmedOptionalSlots(new Set()).includes(key))

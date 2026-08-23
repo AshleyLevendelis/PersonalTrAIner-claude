@@ -18,6 +18,7 @@ import { pickAccountabilityCheckIn } from '@/lib/accountability'
 import { executeExerciseSwap, executeMealSwap, undoExerciseSwap, executeInjuryAdaptation, executeLastingInjury, executeInjuryRecovered, executeEquipmentAdaptation, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type LastingInjuryPayload, type InjuryRecoveredPayload, type EquipmentAdaptationPayload } from '@/lib/pending-action-executor'
 import type { SwapScope } from '@/lib/mesocycle-edit'
 import { createPlanAdaptation } from '@/lib/plan-adaptations-store'
+import { updateProfileField } from '@/lib/profile-store'
 import { substituteForInjury, substituteForEquipment, assessAdaptation, countSlots } from '@/lib/plan-adaptations'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { useSpeechToText } from '@/hooks/useSpeechToText'
@@ -831,7 +832,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     // server never writes user_facts/user_goals/user_context_facts, it
     // forwards the validated tool args. resolveAndSaveMemory resolves
     // targets, checks a baseline, runs reconciliation, and only then writes.
-    memoryIntent?: { tool: 'record_fact' | 'record_goal' | 'record_context_fact'; rawArgs: Record<string, unknown> }
+    memoryIntent?: { tool: 'record_fact' | 'record_goal' | 'record_context_fact' | 'set_display_name'; rawArgs: Record<string, unknown> }
     // VISION-ARCHITECTURE.md §5.4 — the first IMMEDIATE-action chat door
     // with no confirmation card (append-only ⇒ execute + receipt + undo).
     // Same I1 shape as memoryIntent: the server never writes grocery_items.
@@ -1266,10 +1267,35 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
    * once it has the number), or a reconciliation conflict (asks instead of
    * guessing which fact is current).
    */
-  const resolveAndSaveMemory = async (intent: { tool: 'record_fact' | 'record_goal' | 'record_context_fact'; rawArgs: Record<string, unknown> }): Promise<{ text: string; receipt?: ChatReceiptView }> => {
+  const resolveAndSaveMemory = async (intent: { tool: 'record_fact' | 'record_goal' | 'record_context_fact' | 'set_display_name'; rawArgs: Record<string, unknown> }): Promise<{ text: string; receipt?: ChatReceiptView }> => {
     const args = intent.rawArgs
     const profileId = profile.id
     if (!profileId) return { text: "I can't save that yet — your profile hasn't finished setting up." }
+
+    if (intent.tool === 'set_display_name') {
+      // A name is an observation about the person, not a plan mutation, so
+      // it takes the same IMMEDIATE road as record_context_fact rather than
+      // a confirmation card (Ashley's call). The receipt is what keeps
+      // "no silent writes" true; correcting it is just saying another name,
+      // which is why there is no undo token here.
+      const name = String(args.display_name || '').trim().slice(0, 30)
+      if (!name) return { text: '' }
+      await updateProfileField(profileId, { display_name: name })
+      // Keeps App.tsx's profile state in step with a write chat made
+      // outside its own setProfile calls — same reason the injury path
+      // calls this.
+      onProfileChanged({ display_name: name })
+      return {
+        text: `${name} it is.`,
+        receipt: {
+          kind: 'display_name_saved',
+          title: 'Name updated',
+          rows: [{ label: "I'll call you", detail: name }],
+          status: 'done',
+          resolvedAt: new Date().toISOString(),
+        },
+      }
+    }
 
     if (intent.tool === 'record_context_fact') {
       const displayText = String(args.display_text || '').trim()

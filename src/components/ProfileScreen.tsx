@@ -120,6 +120,38 @@ function EditableTextField({
   )
 }
 
+/**
+ * A free-text field. Despite its name, EditableTextField above is numeric —
+ * it coerces with Number() and validates against min/max — so a plain string
+ * needs its own control rather than a fifth parameter on that one.
+ *
+ * Blank is a real answer here: the name is optional throughout (see
+ * canDeclineSlot in onboarding-slots.ts), and clearing it simply means the
+ * coach stops using one rather than being a validation error.
+ */
+function EditableStringField({
+  value, placeholder, maxLength = 30, onSave,
+}: { value?: string; placeholder?: string; maxLength?: number; onSave: (v: string) => void }) {
+  const [input, setInput] = useState(value ?? '')
+  useEffect(() => { setInput(value ?? '') }, [value])
+  const commit = () => {
+    const next = input.trim().slice(0, maxLength)
+    if (next !== (value ?? '')) onSave(next)
+    else setInput(value ?? '')
+  }
+  return (
+    <Input
+      value={input}
+      placeholder={placeholder}
+      maxLength={maxLength}
+      onChange={e => setInput(e.target.value)}
+      onBlur={commit}
+      onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+      className="h-7 w-32 text-sm text-right"
+    />
+  )
+}
+
 /** value may be undefined — see EditableTextField. Renders unselected, still choosable. */
 function EditableSelectField<T extends string | number>({
   value, options, onSave,
@@ -499,6 +531,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
         <div className="space-y-2">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Identity &amp; metrics</h3>
           <div className="rounded-md border p-2.5 space-y-2 text-sm">
+            <Row label="Name"><EditableStringField value={profile.display_name} placeholder="Not set" onSave={v => savePatch({ display_name: v })} /></Row>
             <Row label="Age"><EditableTextField value={profile.age} unit="years" min={13} max={100} onSave={n => savePatch({ age: n })} /></Row>
             <Row label="Gender"><EditableSelectField value={profile.gender} options={GENDER_OPTIONS as { value: 'male' | 'female'; label: string }[]} onSave={v => savePatch({ gender: v })} /></Row>
             <Row label="Height"><EditableTextField value={profile.height_cm} unit="cm" min={100} max={250} onSave={n => savePatch({ height_cm: n })} /></Row>

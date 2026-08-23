@@ -720,6 +720,22 @@ const toolDeclarations = [
     },
   },
   {
+    name: "set_display_name",
+    description:
+      "Records what the user wants to be called, when they tell you in chat — \"call me Sam\", \"my name's Sam actually\", \"it's Sam, not Samuel\". Also use it when someone who has no name on file introduces themselves. This only changes how you address them; it affects nothing about their plan, so record it and mention it in passing rather than asking them to confirm. Do NOT call it for a name that isn't theirs (a partner, a coach, a friend), and never guess a name from an email or a signature.",
+    parameters: {
+      type: "object",
+      properties: {
+        origin_verbatim_quote: {
+          type: "string",
+          description: "The exact substring of the user's current message giving the name. Must be a literal quote, not a paraphrase.",
+        },
+        display_name: { type: "string", description: "Just the name itself, as they'd want it said — 'Sam', not 'call me Sam'." },
+      },
+      required: ["origin_verbatim_quote", "display_name"],
+    },
+  },
+  {
     name: "add_to_grocery_list",
     description:
       "Adds one or more items to the user's grocery list (VISION-ARCHITECTURE.md §5.4). IMMEDIATE, append-only — call this the moment the user instructs an add ('add eggs to my list', 'add milk and bread'). Do NOT call this for a mere statement that something is running low ('we're out of eggs') without an instruction to add it — that gets an offer instead, gated the same way record_fact is.",
@@ -1993,6 +2009,30 @@ Keep this context in mind to ensure your greetings and questions naturally align
         // not a command. I1 still holds: forwarded, never written here.
         const quote = String(args.origin_verbatim_quote || "").trim();
         if (!quote || !message.toLowerCase().includes(quote.toLowerCase())) {
+          return new Response(
+            JSON.stringify({ reply: textPart?.text || "" }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        return new Response(
+          JSON.stringify({
+            reply: "",
+            memoryIntent: { tool: name, rawArgs: args },
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (name === "set_display_name") {
+        // Same shape as record_context_fact above: IMMEDIATE, forwarded not
+        // written (I1), and gated on a real verbatim quote so a name can
+        // never be invented or lifted from somewhere the user didn't say it.
+        // Ashley's ruling: a name changes nothing about the plan, so it
+        // saves without a confirmation card — the client's receipt is what
+        // keeps "no silent writes" true.
+        const quote = String(args.origin_verbatim_quote || "").trim();
+        const proposed = String(args.display_name || "").trim();
+        if (!quote || !proposed || !message.toLowerCase().includes(quote.toLowerCase())) {
           return new Response(
             JSON.stringify({ reply: textPart?.text || "" }),
             { headers: { ...corsHeaders, "Content-Type": "application/json" } }
