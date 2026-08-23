@@ -190,6 +190,18 @@ const run = async () => {
     check('an existing complete_onboarding is not duplicated', r2.actions.filter((a) => a.name === 'complete_onboarding').length === 1)
   }
 
+  console.log('floor opener varies between turns (no stuck-record repetition):')
+  {
+    const seen = new Set<string>()
+    for (const seed of [0, 1, 2]) {
+      const fr = floorReply(CATALOG, ['trainingDays'], [], seed)
+      seen.add(fr.reply)
+      check(`seed ${seed} still asks the right question`, fr.reply.includes('Which days can you actually train?'))
+    }
+    check('three consecutive floors use three different openers', seen.size === 3, [...seen].join(' | '))
+    check('the seed only changes the opener, never the slot', floorReply(CATALOG, ['age'], [], 7).reply.includes('How old are you?'))
+  }
+
   console.log('the invariant itself, across every shape a first leg can take:')
   {
     const shapes: Array<[string, GeminiPart[], string[]]> = [

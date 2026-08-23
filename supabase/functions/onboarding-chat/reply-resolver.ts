@@ -88,6 +88,15 @@ const TEXT_ONLY_RECORDED_NUDGE =
 const TEXT_ONLY_EMPTY_NUDGE =
   "(System: your last turn came back empty — the user is looking at silence. Plain text only on this attempt: tool calls are unavailable and anything that looks like one will be discarded. Write your turn to them now — pick the conversation up and carry it forward. Two to four sentences, one paragraph, no lists.)";
 
+const FLOOR_LEADS = [
+  "Right, next thing I need —",
+  "Let's keep going —",
+  "One more for you —",
+] as const;
+
+/** Rotates the floor's opener so consecutive fallbacks don't read as a stuck record. */
+const floorLead = (seed: number) => FLOOR_LEADS[Math.abs(seed) % FLOOR_LEADS.length];
+
 /**
  * The deterministic floor: composes a reply from state alone, for the turn
  * where every model leg came back empty or failed. One warm clause plus the
@@ -109,21 +118,23 @@ export function floorReply(
   catalog: SlotCatalogEntry[],
   remaining: string[],
   actions: ClientAction[],
+  variantSeed = 0,
 ): { reply: string; extraActions: ClientAction[] } {
   const entryOf = (key: unknown) =>
     typeof key === "string" ? catalog.find((c) => c.key === key) : undefined;
+  const lead = floorLead(variantSeed);
 
   const presented = actions.find((a) => a.name === "present_slot");
   const presentedEntry = presented ? entryOf(presented.args?.slot_key) : undefined;
   if (presentedEntry) {
-    return { reply: `Right, next thing I need — ${presentedEntry.question}`, extraActions: [] };
+    return { reply: `${lead} ${presentedEntry.question}`, extraActions: [] };
   }
 
   const nextEntry = remaining.map(entryOf).find(Boolean);
   if (nextEntry) {
     const chippable = nextEntry.control === "single" || nextEntry.control === "multi";
     return {
-      reply: `Right, next thing I need — ${nextEntry.question}`,
+      reply: `${lead} ${nextEntry.question}`,
       extraActions: chippable ? [{ name: "present_slot", args: { slot_key: nextEntry.key } }] : [],
     };
   }
@@ -164,9 +175,11 @@ export async function resolveReply(opts: {
   callGemini: GeminiLegCaller;
   catalog: SlotCatalogEntry[];
   remaining: string[];
+  /** Varies the deterministic floor's opener between turns — pass the turn count. */
+  variantSeed?: number;
   log?: (...args: unknown[]) => void;
 }): Promise<{ reply: string; actions: ClientAction[] }> {
-  const { firstParts, contents, callGemini, catalog, remaining } = opts;
+  const { firstParts, contents, callGemini, catalog, remaining, variantSeed = 0 } = opts;
   const log = opts.log ?? (() => {});
 
   // Unlike chat-gemini's per-tool dispatch, every functionCall here is a
@@ -240,7 +253,7 @@ export async function resolveReply(opts: {
   }
 
   if (!reply) {
-    const floor = floorReply(catalog, remaining, actions);
+    const floor = floorReply(catalog, remaining, actions, variantSeed);
     reply = floor.reply;
     actions.push(...floor.extraActions);
     // Loud on purpose: every firing means three model legs produced nothing.

@@ -254,9 +254,80 @@ function tryVolunteeredCapture(
 }
 
 // How many turns the stuck-slot breaker below tolerates with no confirmed
-// answer anywhere before forcing the canonical-next question regardless of
-// how many times (if any) that specific slot has been asked.
-const STALL_TURN_LIMIT = 6
+// answer anywhere before forcing a question regardless of how many times
+// (if any) that specific slot has been asked.
+const STALL_TURN_LIMIT = 4
+
+// How many times the app will force the SAME question before treating it as
+// one this person isn't going to answer right now and moving to a different
+// one. Nothing is skipped — an unanswered required slot still blocks
+// completion — it just stops being the only thing on offer. Measured need:
+// ten unusable answers in a row produced the goal question three times over,
+// which reads as a form that won't let you past.
+const MAX_FORCED_ASKS_PER_SLOT = 2
+
+/**
+ * Which question the app should put in front of someone when it has to step
+ * in. Not simply the first unanswered slot: a slot already forced
+ * MAX_FORCED_ASKS_PER_SLOT times is passed over in favour of one they
+ * haven't been stuck on, and a tappable question beats a typed one when
+ * somebody is plainly struggling. Canonical order breaks remaining ties, so
+ * required things still surface first among equals.
+ */
+function pickSlotToForce(
+  openSlots: SlotKey[],
+  values: OnboardingSlotValues,
+  askCount: (key: SlotKey) => number,
+  hasLiveCard: (key: SlotKey) => boolean,
+): SlotKey | undefined {
+  const candidates = openSlots.filter(k => {
+    const def = getSlotDef(k)
+    // A question already on screen unanswered doesn't need a second copy —
+    // that stacking IS the defect this guard exists to stop.
+    return def && isSlotApplicable(def, values) && !hasLiveCard(k)
+  })
+  if (candidates.length === 0) return undefined
+  const notExhausted = candidates.filter(k => askCount(k) < MAX_FORCED_ASKS_PER_SLOT)
+  const pool = notExhausted.length > 0 ? notExhausted : candidates
+  const tappable = pool.filter(k => {
+    const c = getSlotDef(k)?.control
+    return c === 'single' || c === 'multi'
+  })
+  return (tappable.length > 0 ? tappable : pool)[0]
+}
+
+/**
+ * What the app says when it steps in. Varied deliberately: the same sentence
+ * every time is what made a stuck conversation read like a machine repeating
+ * itself. `movedOn` covers the rotation case, where saying so out loud is
+ * the difference between "it's ignoring me" and "fine, we'll do this later".
+ */
+const STAY_LEADS = [
+  "Let's lock this one in —",
+  "Easiest if you just tap one here —",
+  "Pick whichever is closest and we'll move on —",
+] as const
+const MOVE_ON_LEADS = [
+  "Let's leave that one for now and come back to it.",
+  "We'll park that one — no rush on it.",
+  "Skipping ahead a bit; we can circle back.",
+  "That one can wait.",
+] as const
+
+/**
+ * Every phrasing the app itself can open a forced ask with. Counting these in
+ * the transcript is how the next one knows to say something different, so the
+ * list and the counter can never drift apart.
+ */
+const FORCED_ASK_MARKERS: readonly string[] = [...STAY_LEADS, ...MOVE_ON_LEADS]
+
+function forcedAskLead(timesSteppedIn: number, movedOn: boolean): string {
+  const leads = movedOn ? MOVE_ON_LEADS : STAY_LEADS
+  // Cycle, don't clamp: clamping to the last variant meant every step-in
+  // after the first said the same sentence, which is the exact repetition
+  // these variants exist to avoid.
+  return leads[timesSteppedIn % leads.length]
+}
 
 /**
  * Turns since ANY slot last got confirmed — not since the conversation
@@ -745,18 +816,34 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
       // legitimate steady progress through a long slot list never trips it,
       // only genuine standstill does.
       if (!responseWs.openReview) {
-        const canonicalNext = [...missingRequiredSlots(responseWs.values), ...unconfirmedOptionalSlots(responseWs.confirmed, responseWs.values)][0]
+        const openSlots = [...missingRequiredSlots(responseWs.values), ...unconfirmedOptionalSlots(responseWs.confirmed, responseWs.values)]
+        const canonicalNext = openSlots[0]
+        const allMsgs = [...priorMessages, ...responseWs.newMessages]
         if (canonicalNext) {
           const priorAsks = priorMessages.filter(m => m.slotCard === canonicalNext).length
           const askedThisTurn = responseWs.newMessages.some(m => m.slotCard === canonicalNext)
-          const stalledTurns = turnsSinceLastConfirmation([...priorMessages, ...responseWs.newMessages])
+          const stalledTurns = turnsSinceLastConfirmation(allMsgs)
           if ((priorAsks >= 3 || stalledTurns >= STALL_TURN_LIMIT) && !askedThisTurn) {
-            const def = getSlotDef(canonicalNext)
-            if (def) {
+            // Which question to force is a choice, not just "the first one
+            // still missing". Hammering one slot the user plainly can't or
+            // won't answer produced the same question three times over with
+            // a duplicate chip grid each time; rotating to something else
+            // they haven't been stuck on keeps the conversation moving, and
+            // nothing is skipped — an unanswered required slot still blocks
+            // completion, so we come back to it.
+            const askCount = (k: SlotKey) => allMsgs.filter(m => m.slotCard === k).length
+            const hasLiveCard = (k: SlotKey) =>
+              allMsgs.some(m => m.slotCard === k && !m.slotCardResolved && !responseWs.resolveCards.has(k)) ||
+              responseWs.newMessages.some(m => m.slotCard === k)
+            const target = pickSlotToForce(openSlots, responseWs.values, askCount, hasLiveCard)
+            const def = target ? getSlotDef(target) : undefined
+            if (def && target) {
+              const timesSteppedIn = allMsgs.filter(m => FORCED_ASK_MARKERS.some(marker => m.content.startsWith(marker))).length
+              const lead = forcedAskLead(timesSteppedIn, target !== canonicalNext)
               responseWs.newMessages.push({
                 role: 'assistant',
-                content: `Let's lock this one in — ${def.question}`,
-                slotCard: def.control === 'text' ? undefined : canonicalNext,
+                content: `${lead} ${def.question}`,
+                slotCard: def.control === 'text' ? undefined : target,
               })
             }
           }
