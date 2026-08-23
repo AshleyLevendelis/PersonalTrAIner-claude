@@ -33,6 +33,16 @@ export interface DraftMessage {
   slotCard?: string
   /** Chip card already answered/locked (so resume doesn't re-open it). */
   slotCardResolved?: boolean
+  /**
+   * This card was re-opened by the user to CHANGE an answer they already
+   * gave, rather than asked for the first time.
+   *
+   * Persisted rather than kept local because SlotNumericCard hides fields
+   * that are already confirmed — without this flag surviving a refresh, a
+   * reload part-way through an edit would render the card with no inputs
+   * in it at all.
+   */
+  slotCardEditing?: boolean
 }
 
 export interface PendingContextFact {

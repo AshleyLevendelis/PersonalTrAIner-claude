@@ -16,6 +16,7 @@ import {
   assembleProfile,
   missingRequiredSlots,
   unconfirmedOptionalSlots,
+  NEVER_BLOCKING_SLOTS,
   canDeclineSlot,
   isSlotRequired,
   isSlotApplicable,
@@ -368,6 +369,15 @@ const blockingFor = (v: OnboardingSlotValues) =>
 const barbell: OnboardingSlotValues = { ...initialSlotValues(), equipment: 'full_gym', trainingExperience: 'intermediate', activityLevel: 'moderate' }
 console.log(`  → questions that can block a plan: ${blockingFor(fresh)} fresh, ${blockingFor(barbell)} for a barbell lifter (was 22 / 23)`)
 check('fresh blocking count is down to 17 or fewer (was 22)', blockingFor(fresh) <= 17, `got ${blockingFor(fresh)}`)
+// The progress bar's denominator is defined independently in the component
+// as "applicable AND not never-blocking". It MUST equal the blocking count
+// above, or the bar goes back to promising an end that isn't there — which
+// is exactly how it came to read 100% with the whole ask-anyway set left.
+const barDenominator = (v: OnboardingSlotValues) =>
+  ONBOARDING_SLOTS.filter(sd => isSlotApplicable(sd, v) && !NEVER_BLOCKING_SLOTS.includes(sd.key)).length
+for (const [label, v] of [['fresh', fresh], ['barbell', barbell]] as [string, OnboardingSlotValues][]) {
+  check(`${label}: bar denominator matches what can actually block`, barDenominator(v) === blockingFor(v), `${barDenominator(v)} vs ${blockingFor(v)}`)
+}
 check('barbell blocking count is down to 18 or fewer (was 23)', blockingFor(barbell) <= 18, `got ${blockingFor(barbell)}`)
 
 console.log('\n16. detectAllergenTags — deterministic safety backstop, model-independent')

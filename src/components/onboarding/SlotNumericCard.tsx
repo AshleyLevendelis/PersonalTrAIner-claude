@@ -39,6 +39,7 @@ export function SlotNumericCard({
   confirmed,
   resolved,
   busy,
+  editing = false,
   onResolve,
   onDecline,
 }: {
@@ -47,14 +48,19 @@ export function SlotNumericCard({
   confirmed: ReadonlySet<string>
   resolved: boolean
   busy: boolean
+  /**
+   * The user re-opened this from the review to CHANGE an answer. Shows the
+   * one slot they asked to change, even though it's already confirmed —
+   * without this the confirmed-filter below leaves the card with no fields.
+   */
+  editing?: boolean
   onResolve: (entries: { key: SlotKey; raw: string }[]) => void
   /** Record these as answered with NO value — see canDeclineSlot. */
   onDecline: (keys: SlotKey[]) => void
 }) {
   const def = getSlotDef(slotKey)
-  const fields = (def ? numericGroupFor(def.key) : [])
-    .map(k => getSlotDef(k)!)
-    .filter(d => d.control === 'numeric' && isSlotApplicable(d, values) && !confirmed.has(d.key))
+  const fields = (editing ? (def ? [def] : []) : (def ? numericGroupFor(def.key) : []).map(k => getSlotDef(k)!))
+    .filter(d => d.control === 'numeric' && isSlotApplicable(d, values) && (editing || !confirmed.has(d.key)))
 
   const [draft, setDraft] = useState<Record<string, string>>({})
   const [showErrors, setShowErrors] = useState(false)

@@ -14,6 +14,7 @@ import {
   isSlotRequired,
   isSlotApplicable,
   canDeclineSlot,
+  NEVER_BLOCKING_SLOTS,
   assembleProfile,
   toggleValue,
   numericGroupFor,
@@ -110,7 +111,7 @@ const RESUME_BANNER = "Welcome back — picking up right where we left off. Say 
 function toDraftMessages(messages: ChatMsg[]): DraftMessage[] {
   return messages
     .filter(m => m.content.trim().length > 0 && m.content !== RESUME_BANNER)
-    .map(({ role, content, slotCard, slotCardResolved }) => ({ role, content, slotCard, slotCardResolved }))
+    .map(({ role, content, slotCard, slotCardResolved, slotCardEditing }) => ({ role, content, slotCard, slotCardResolved, slotCardEditing }))
 }
 
 const COMPLETE_MESSAGE = "That's everything I need. Here's what I've got — have a look, and if it's right I'll build your plan."
@@ -446,7 +447,7 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
       {
         role: 'assistant',
         content:
-          "Hey — I'm your coach. Before I build your plan I want to actually get to know you a bit: what you're after, what's worked, what hasn't. Takes a few minutes, and you can type or tap. First things first — what should I call you?",
+          "Hey — I'm your coach. Before I build your plan I want to actually get to know you a bit: what you're after, what's worked, what hasn't. Takes a few minutes, you can type or tap, and you can change any answer later. First things first — what should I call you?",
       },
     ]
   })
@@ -460,8 +461,26 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
   // requiredIf-aware: the denominator shrinks the moment an activity format is
   // chosen, so the tracker never counts gym-only questions this profile will
   // never be asked.
-  const requiredCount = useMemo(() => ONBOARDING_SLOTS.filter(s => isSlotRequired(s, values)).length, [values])
-  const answeredCount = requiredCount - missing.length
+  //
+  // It counts every slot that can actually HOLD THE PLAN UP, not just the
+  // required ones. The old denominator was required-only while
+  // readyToGenerate (below) also waits on unconfirmedOptional — so the bar
+  // filled completely with the whole ask-anyway set still to come, promising
+  // an end and then carrying on. A required slot is never in
+  // NEVER_BLOCKING_SLOTS, so "applicable and not never-blocking" is exactly
+  // required + ask-anyway: the same set readyToGenerate gates on.
+  const trackedSlots = useMemo(
+    () => ONBOARDING_SLOTS.filter(s => isSlotApplicable(s, values) && !NEVER_BLOCKING_SLOTS.includes(s.key)),
+    [values],
+  )
+  const requiredCount = trackedSlots.length
+  // CONFIRMED, not values. `confirmed` is only ever set by applySlot (which
+  // validates first) or declineSlots, so it means "we asked and got an
+  // answer" — whereas values is written the instant a multi chip is tapped,
+  // before Done (handleToggleMulti), which made merely touching one
+  // training-day chip nudge the bar and drop the slot out of the missing
+  // list. Counting confirmations fixes the honesty and that leak together.
+  const answeredCount = trackedSlots.filter(s => confirmed.has(s.key)).length
   // What both the manual escape hatch and Generate gate on. Required-missing
   // alone was the wrong bar: it let "Review and build my plan" appear (and
   // Generate succeed) before injuries or dietary restrictions had ever been
@@ -998,6 +1017,41 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
     void sendMessage(`I'd rather not say — skip ${labels.join(', ')}`, ws)
   }
 
+  /**
+   * Re-open one already-answered question so the user can change it.
+   *
+   * Deliberately does NOT clear the slot from `confirmed`. Clearing it would
+   * flip readyToGenerate false, so anyone who opened a row and then changed
+   * their mind would be left staring at a disabled Generate with nothing
+   * telling them why — a brand-new dead end in the pass meant to remove
+   * them. Leaving it confirmed costs nothing: applySlot has no
+   * confirmed-guard on write, so answering the re-opened card simply
+   * overwrites, and commitWorkingState marks every card carrying this slot
+   * key resolved, this new one included.
+   *
+   * This is a USER action, so it bypasses the `confirmed.has(key)` guard in
+   * executeActions — that guard stops the MODEL re-asking answered
+   * questions, which is still exactly what we want.
+   */
+  const handleEditSlot = (key: SlotKey) => {
+    if (busy) return
+    const def = getSlotDef(key)
+    if (!def || !isSlotApplicable(def, values)) return
+    setMessages(prev => [
+      ...prev,
+      {
+        role: 'assistant',
+        content: def.control === 'text'
+          // A text slot has no card to render, so the composer is the only
+          // way to answer it — say so rather than leaving a dead prompt.
+          ? `Sure — type what you'd like ${def.shortLabel.toLowerCase()} to be instead.`
+          : `Sure — pick a different ${def.shortLabel.toLowerCase()}.`,
+        slotCard: def.control === 'text' ? undefined : key,
+        slotCardEditing: def.control === 'text' ? undefined : true,
+      },
+    ])
+  }
+
   const handleGenerate = () => {
     if (!readyToGenerate) return
     // Stamp the draft as a chat-path completion BEFORE handing off: App.tsx
@@ -1032,7 +1086,16 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
           but dropping progress entirely leaves an open-ended chat with no
           sense of how long it runs, so the reassurance stays, wordlessly. */}
       <div className="px-4 pb-3 max-w-md w-full mx-auto">
-        <div className="h-0.5 w-full rounded-full bg-muted overflow-hidden">
+        <div
+          className="h-0.5 w-full rounded-full bg-muted overflow-hidden"
+          // Wordless to the eye, but not to a screen reader — the bar was
+          // previously invisible to one entirely.
+          role="progressbar"
+          aria-label="Setup progress"
+          aria-valuemin={0}
+          aria-valuemax={requiredCount}
+          aria-valuenow={answeredCount}
+        >
           <div
             className="h-full bg-primary/60 transition-all duration-500"
             style={{ width: `${requiredCount > 0 ? Math.round((answeredCount / requiredCount) * 100) : 0}%` }}
@@ -1066,6 +1129,7 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
                     confirmed={confirmed}
                     resolved={!!msg.slotCardResolved}
                     busy={busy}
+                    editing={!!msg.slotCardEditing}
                     onResolve={handleResolveNumeric}
                     onDecline={handleDecline}
                   />
@@ -1113,13 +1177,21 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
                   .filter(s => isSlotApplicable(s, values))
                   .filter(s => isSlotRequired(s, values) || confirmed.has(s.key))
                   .map(def => (
-                  <p key={def.key}>
+                  <button
+                    key={def.key}
+                    type="button"
+                    onClick={() => handleEditSlot(def.key)}
+                    disabled={busy}
+                    className="w-full text-left min-h-[32px] rounded px-1 -mx-1 hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-60"
+                    aria-label={`Change ${def.shortLabel}`}
+                  >
                     <span className="font-medium text-foreground">{def.shortLabel}:</span>{' '}
                     <span className="text-muted-foreground">
                       {isDeclined(def.key, values, confirmed) ? 'Not given' : displayValueFor(def, values)}
                     </span>
-                  </p>
+                  </button>
                 ))}
+                <p className="text-[11px] text-muted-foreground/70 pt-1">Tap anything above to change it.</p>
                 {/* VISION.md: "someone beginning exercise for the first time
                     is told, once, plainly and without alarm, to check with a
                     doctor before starting something new — at the point their
@@ -1129,6 +1201,20 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
                 {isStartingFromNothing(values) && (
                   <p className="text-xs text-muted-foreground border-t border-border/40 pt-2 mt-1">
                     Quick note: if you have any health concerns, it's worth checking with a doctor before starting something new.
+                  </p>
+                )}
+                {/* The button greys out whenever readyToGenerate flips false,
+                    which an EDIT can now cause: changing equipment to a
+                    barbell tier makes the working-lifts question newly
+                    required. Silently disabling it leaves the user with no
+                    idea what they did — so name what's outstanding, the same
+                    way the early-complete refusal does. */}
+                {!readyToGenerate && (
+                  <p className="text-xs text-muted-foreground border-t border-border/40 pt-2 mt-1">
+                    Still to answer: {[...missing, ...unconfirmedOptional]
+                      .map(k => getSlotDef(k)?.shortLabel ?? k)
+                      .slice(0, 4)
+                      .join(' · ')}
                   </p>
                 )}
                 <Button onClick={handleGenerate} disabled={!readyToGenerate} className="w-full mt-3 h-12 text-base font-semibold">
@@ -1153,8 +1239,15 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
               }
             }}
             placeholder="Say anything…"
-            className="h-11"
-            disabled={busy}
+            // NOT `disabled` while busy: on a phone, disabling the focused
+            // input dismisses the keyboard, so the user had to re-tap the
+            // field on every single turn. Read-only keeps focus and the
+            // keyboard up, and the Enter handler above already refuses to
+            // send while busy — the same soft treatment the chips use
+            // (pointer-events-none rather than a hard disable).
+            readOnly={busy}
+            aria-busy={busy}
+            className={`h-11 ${busy ? 'opacity-60' : ''}`}
           />
           <Button
             size="icon"
