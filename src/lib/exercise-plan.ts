@@ -2275,6 +2275,13 @@ const RELATED_PRESS_FRACTION_CEILING = 0.55 // curls/laterals/shrugs vs. the day
 const UNILATERAL_VS_MAIN_FRACTION_CEILING = 0.65 // unilateral accessory vs. the day's bilateral main, same broad pattern
 const SAME_MUSCLE_GROUP_MAX_RATIO = 2 // heaviest same-group accessory vs. lightest, within the week
 
+// Most extra reps a lift may accumulate while its weight sits at the
+// unverified ramp's ceiling — see frozenLoadStreakByLift. shiftReps enforces a
+// floor and no ceiling of its own, and a rep range carries its block's intent:
+// let a strength block's 4-6 climb far enough and it quietly becomes an
+// endurance block.
+const MAX_FROZEN_LOAD_REP_BUMP = 3
+
 type BroadPattern = 'push' | 'pull' | 'squat' | 'hinge' | null
 
 function broadPattern(pattern: MovementPattern): BroadPattern {
@@ -4711,6 +4718,27 @@ export function generateMesocycle(
   // uses that instead.
   const lastUnverifiedLoadingWeekKgByLift = new Map<string, number>()
 
+  // How many extra reps a lift has accumulated while its weight has refused to
+  // move, and the weight it has refused to move FROM.
+  //
+  // UNVERIFIED_RAMP_STEP_KG's ramp is a CEILING APPROACH, not a target: each
+  // loading week steps up from the last but is capped by that week's fresh
+  // standards estimate (load-prescription.ts:1264). The cap is right — for
+  // someone the app has never seen lift, prescribing past the standards
+  // estimate would be inventing strength data. But once the ramp converges on
+  // the ceiling, Math.min pins it there for good, and these are
+  // load-progression lifts, so reps are held flat BECAUSE load was supposed to
+  // be the lever. Nothing moves. Ashley's ruling: buy a rep with the week.
+  //
+  // Both are PRE-coherence figures, and both sides of every comparison below
+  // are too. enforceLoadCoherence settles almost everything it touches (4 of
+  // 2,406 loaded exercise-weeks still sit above a clamp afterwards), so the
+  // two bases barely differ — but mixing them is what broke an earlier
+  // attempt, which compared a pre-coherence probe against post-coherence
+  // history and pinned loads coherence would otherwise have moved.
+  const frozenLoadStreakByLift = new Map<string, number>()
+  const previousWeekPreCoherenceKgByLift = new Map<string, number>()
+
   sequence.forEach((phase, blockIndex) => {
     let phaseConfig = getPhaseConfig(phase)
     // A metabolic/metcon block at full volume is the right call for someone
@@ -4870,6 +4898,20 @@ export function generateMesocycle(
       // since calibration is a one-time "find the weight" exercise, not a
       // recurring one.
       const isCalibrationWeek = weekCounter === 1 && !canSkipCalibration
+
+      // Each lift's NATURAL load this week — what the ramp resolved to before
+      // any rep bump or pin. Recorded even when the displayed weight is
+      // pinned, because this is the value next week's "has it moved yet?"
+      // probe compares against, and that question has to stay honest about the
+      // underlying prescription rather than about a number we held ourselves.
+      const thisWeekPreCoherenceKg = new Map<string, number>()
+      // The rep bump already decided for a lift THIS week. A lift can hold two
+      // slots in a week, and the streak is keyed by name, so without this the
+      // second slot incremented the streak a second time and came out one rep
+      // above the first — the same exercise, the same weight, "4-6" on Monday
+      // and "5-7" on Thursday. Measured: lift-weeks showing more than one rep
+      // range at the same weight went from 19 to 108 before this was fixed.
+      const frozenBumpDecidedThisWeek = new Map<string, number>()
 
       const days: WorkoutDay[] = blockDays.map((day, dayIdx) => {
         // Fixed for this week (main/core never rotate weekly), so these
@@ -5215,6 +5257,100 @@ export function generateMesocycle(
               loadIsProgressing: rampLoad,
             })
 
+            // ---- The weight didn't move: buy a rep with it. ----------------
+            //
+            // OBSERVE FIRST, THEN PIN. The load above was resolved with BASE
+            // reps and no pin, which makes it an honest probe of the
+            // underlying prescription: "would this lift's weight have moved
+            // on its own this week?" Only if the answer is no does anything
+            // change. That ordering is the whole fix. An earlier attempt
+            // pinned first, and pinning made the freeze self-perpetuating —
+            // this week was set equal to last week, so the lift still read as
+            // stuck, so it pinned again, and the weight could never escape
+            // even once the estimate had risen enough to afford a real step.
+            // It ended up prescribing a stated 55kg profile a 6kg Romanian
+            // Deadlift, below an empty bar, and LIGHTER than the same lift for
+            // a profile that declined its body metrics entirely.
+            //
+            // The probe is also why the bump can't poison itself: extra reps
+            // lower a standards estimate, so probing with the bumped reps
+            // would make a lift look like it had dropped rather than frozen.
+            // Base reps every time, whatever we have added on top.
+            const naturalKg = load.starting_weight_kg
+            if (naturalKg != null) {
+              const already = thisWeekPreCoherenceKg.get(dbEntry.name)
+              // One lift can hold two slots in a week at two loads; take the
+              // lighter, matching lastUnverifiedLoadingWeekKgByLift's own rule.
+              thisWeekPreCoherenceKg.set(dbEntry.name, already == null ? naturalKg : Math.min(already, naturalKg))
+            }
+
+            const canBuyReps = !isCarry && !isDeload && !isCalibrationWeek
+              && dbEntry.prescription_type !== 'intervals'
+              && dbEntry.prescription_type !== 'steady_state'
+
+            const previousNaturalKg = previousWeekPreCoherenceKgByLift.get(dbEntry.name)
+            if (canBuyReps && naturalKg != null && previousNaturalKg != null && naturalKg === previousNaturalKg) {
+              // Decided once per lift per week, then reused by any other slot
+              // holding the same lift, so both slots show the same target.
+              const alreadyDecided = frozenBumpDecidedThisWeek.get(dbEntry.name)
+              const bump = alreadyDecided ?? Math.min((frozenLoadStreakByLift.get(dbEntry.name) ?? 0) + 1, MAX_FROZEN_LOAD_REP_BUMP)
+              const bumpedReps = shiftReps(baseReps, repShift + bump, expConfig.min_reps)
+              // The pinned weight has to satisfy the same divergence backstop
+              // every other forced weight does — a held number that sits too
+              // far above a fresh estimate for the exercise actually in this
+              // slot is indistinguishable from a contaminated anchor carried
+              // through a rotation, and the audit reads it as exactly that.
+              // Extra reps LOWER a standards estimate, so the ratio drifts
+              // upward precisely because of the rep we are trying to buy:
+              // measured, a rotated-in "Walking Lunges" held at 8kg against a
+              // 6kg fresh estimate (133%) tripped rotation_relative_load.
+              //
+              // When it would breach, decline the rep rather than lower the
+              // weight. Buying a rep must never cost weight, so the only
+              // honest alternative to holding the bar is to leave the week
+              // alone.
+              const pinnedReference = bumpedReps === reps ? null : prescribeLoad(dbEntry, profile, {
+                targetRpeLabel: intensity, isFirstBlock: blockIndex === 0, sets, phase,
+                isCalibrationWeek, knownWorkingWeights, repRangeLabel: bumpedReps, loadIsProgressing: rampLoad,
+              })
+              const pinWithinBand = pinnedReference != null
+                && (pinnedReference.starting_weight_kg == null
+                  || previousNaturalKg <= pinnedReference.starting_weight_kg * 1.25)
+              if (pinWithinBand) {
+                reps = bumpedReps
+                // Advanced ONLY when the rep is actually bought. Recording the
+                // streak on a week where the bump was declined — the band
+                // breach above, or a rep range shiftReps could not move — would
+                // let next week start from a level this week never reached, and
+                // silently skip a rep.
+                frozenBumpDecidedThisWeek.set(dbEntry.name, bump)
+                frozenLoadStreakByLift.set(dbEntry.name, bump)
+                // Pinned to the lift's OWN previous natural figure — never to
+                // unverifiedPreviousLoadingWeekKg, which is
+                // Math.min(name-keyed, SLOT-keyed) and whose slot half belongs
+                // to whatever variation occupied that slot last week. Pinning
+                // to it held a rotated-in lift at the outgoing variation's
+                // weight and produced 9 rotation_relative_load failures.
+                load = prescribeLoad(dbEntry, profile, {
+                  targetRpeLabel: intensity,
+                  isFirstBlock: blockIndex === 0,
+                  sets,
+                  phase,
+                  isCalibrationWeek,
+                  knownWorkingWeights,
+                  forceStartingWeightKg: previousNaturalKg,
+                  repRangeLabel: reps,
+                  loadIsProgressing: rampLoad,
+                })
+              }
+            } else if (canBuyReps && naturalKg != null && previousNaturalKg != null) {
+              // It moved. Drop the accumulated reps with it — a weight
+              // increase is exactly when double progression resets the range,
+              // and carrying the bump forward would tax a lift for having once
+              // been stuck.
+              frozenLoadStreakByLift.set(dbEntry.name, 0)
+            }
+
             if (w === 1) {
               blockBaselineKg[dayIdx][exIdx] = load.starting_weight_kg
               blockBaselineName[dayIdx][exIdx] = dbEntry.name
@@ -5283,6 +5419,18 @@ export function generateMesocycle(
       })
 
       enforceLoadCoherence(days)
+
+      // Roll this week's natural loads forward as next week's comparison
+      // basis. Deload weeks are deliberately NOT recorded: a deload is
+      // supposed to differ from its neighbours, so letting it become the
+      // baseline would make every first week of a block look like it had
+      // moved, and no freeze could ever be detected across a block boundary.
+      // Skipping it means week 9 compares against week 7 — the last week that
+      // was actually trying to progress.
+      if (!isDeload) {
+        previousWeekPreCoherenceKgByLift.clear()
+        for (const [name, kg] of thisWeekPreCoherenceKg) previousWeekPreCoherenceKgByLift.set(name, kg)
+      }
 
       // Anchor to the FINAL, post-coherence displayed number — see
       // unverifiedLoadingFlags's declaration for why this can't be written

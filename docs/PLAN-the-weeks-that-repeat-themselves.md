@@ -1,9 +1,12 @@
 # The weeks that repeat themselves
 
-**Status: NOT BUILT. Diagnosed, measured, and reverted after five failed
-attempts.** The measurement script shipped; no engine change did. Read this
-before trying again — most of the work is already done, and the traps are
-named.
+**Status: BUILT, on the sixth attempt.** Frozen transitions 518 -> 264 (9.0%
+-> 4.6%); the loaded non-carry bucket the ruling targets, 380 -> 126 (-67%).
+`test:assumed-body` passes and `test:audit` holds at 0/13,967.
+
+The five failed attempts below are kept deliberately. Each one improved the
+headline number and broke something else, and every rule in
+`scripts/test-frozen-weeks.ts` is one of them turned into an assertion.
 
 ## What Ashley asked for
 
@@ -137,10 +140,83 @@ Non-negotiables for whoever tries:
 - Compare post-`enforceLoadCoherence` on both sides.
 - Carries stay excluded until Ashley rules on distance.
 
-## What shipped from this round
+*(That list of non-negotiables was written before the sixth attempt and one
+line of it turned out to be wrong: "compare post-`enforceLoadCoherence` on both
+sides" is unachievable, because a probe is necessarily pre-coherence for the
+current week. What actually matters is that both sides use the SAME basis, and
+the shipped version compares pre-coherence to pre-coherence. See below.)*
 
-- `scripts/report-frozen-weeks.ts` / `npm run report:frozen-weeks` — the
-  before-and-after measurement, split by cause so a fix that drives the total
-  down while quietly leaving a bucket untouched cannot read as success.
-- This document.
-- No engine change. `src/lib/exercise-plan.ts` is untouched.
+---
+
+# The sixth attempt — what shipped
+
+## Observe first, then pin
+
+The load is resolved once with **base reps and no pin**. That makes it an
+honest probe of the underlying prescription: *would this lift's weight have
+moved on its own this week?* Only if the answer is no does anything change —
+reps go up by one more than last week's accumulated total, and the weight is
+pinned to the lift's own previous natural figure so the extra rep cannot drag
+it down.
+
+That ordering is the entire fix. Attempt 5 pinned first, and pinning made the
+freeze self-perpetuating: this week was set equal to last week, so the lift
+still read as stuck, so it pinned again, and the weight could never escape even
+once the estimate had risen enough to afford a real step.
+
+The probe also has to use **base** reps, never the bumped ones. Extra reps
+lower a standards estimate, so probing with them would make a lift look like it
+had dropped rather than frozen.
+
+## Four more corrections along the way
+
+- **The pin must respect the divergence backstop.** The second `prescribeLoad`
+  call passes `forceStartingWeightKg` directly, bypassing the 1.25x clamp every
+  other forced weight goes through. A rotated-in Walking Lunges held at 8kg
+  against a 6kg fresh estimate (133%) tripped `rotation_relative_load`. When
+  the pin would breach the band, **decline the rep** — buying a rep must never
+  cost weight, so the only honest alternative to holding the bar is to leave
+  the week alone.
+- **One decision per lift per week.** The streak is keyed by lift name but was
+  applied per slot, so a lift on two days incremented twice and the second slot
+  came out a rep above the first: the same exercise at the same weight showing
+  "4-6" on Monday and "5-7" on Thursday. Lift-weeks with two rep ranges at one
+  weight went 19 -> 108; now back to 19, exactly the HEAD baseline.
+- **Deloads are not recorded as the comparison basis.** A deload is supposed to
+  differ, so letting it become the baseline would make every first week of a
+  block look like it had moved and no freeze could be detected across a block
+  boundary. Week 9 compares against week 7.
+- **Both sides of the comparison are pre-coherence.** Mixing the bases is what
+  broke attempt 2. Measured to justify the choice: `enforceLoadCoherence`
+  leaves only 4 of 2,406 loaded exercise-weeks above a clamp, so the two bases
+  barely differ — but consistency is what matters, not closeness.
+
+## What it looks like
+
+A real 16-week plan, 66kg intermediate woman, full gym:
+
+```
+Barbell Squats   wk 9  4-6 @ 52.5     Leg Extensions  wk 9  12-17 @ 20
+                 wk10  4-6 @ 55                       wk10  14-19 @ 20
+                 wk11  5-7 @ 55                       wk11  12-17 @ 25
+                 wk13  6-8 @ 50                       wk13  15-20 @ 22.5
+                 wk14  6-8 @ 52.5                     wk14  16-21 @ 22.5
+                 wk15  7-9 @ 52.5                     wk15  18-23 @ 22.5
+```
+
+The weight climbs while it can; when it stalls, the reps take over.
+
+## Left alone, on purpose
+
+- **Carries — 100 of the 254 remaining freezes.** `shiftReps` passes `'40m'`
+  through untouched, so a rep bump there is silently inert. Their lever is
+  distance, and whether distance should progress is a product decision Ashley
+  has not been asked. The gate asserts they are STILL frozen, so the exclusion
+  cannot rot into an accident.
+- **Bodyweight — 38 of them.** Already reps-led; something downstream flattens
+  them. Uninvestigated.
+- **A pre-existing defect this work uncovered but did not cause.** Ten
+  transitions raise reps while the weight drops — "Lateral Raises wk9->10:
+  12-17@6 -> 13-18@4" — a reps-led lift crossing into a new block re-deriving a
+  lighter estimate. Identical 10 cases at HEAD. The gate pins the count at 10
+  so it cannot grow.

@@ -62,6 +62,7 @@
     "test:per-side-load": "tsx scripts/test-per-side-load.ts",
     "test:pattern-tags": "tsx scripts/test-movement-pattern-tags.ts",
     "test:rehab-prescribed": "tsx scripts/test-rehab-prescribed.ts",
+    "test:frozen-weeks": "tsx scripts/test-frozen-weeks.ts",
     "report:frozen-weeks": "tsx scripts/report-frozen-weeks.ts",
     "report:rehab-coverage": "tsx scripts/report-rehab-coverage.ts",
     "report:trim-magnitude": "tsx scripts/run-trim-magnitude-report.ts"
