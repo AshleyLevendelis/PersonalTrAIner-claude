@@ -4,7 +4,7 @@ import type {
   FatigueCost, MesocycleMovementPattern, EquipmentAccess, TrainingStyle,
   ConstraintTrace, ConstraintTraceEntry, PlanResult, TrainingExperience,
 } from './types'
-import { EXERCISE_DATABASE, getMovementFamily, getVolumeRole, meetsCapabilityRequirement, getExerciseId, contraindicatedJoints, isContraindicatedFor, isIndicatedFor, type ExerciseEntry, type MovementPattern, type AngleVector, type VolumeRole } from './exercise-db'
+import { EXERCISE_DATABASE, getMovementFamily, getVolumeRole, meetsCapabilityRequirement, getExerciseId, contraindicatedJoints, isContraindicatedFor, isIndicatedFor, NEAREST_PATTERN_FALLBACK, type ExerciseEntry, type MovementPattern, type AngleVector, type VolumeRole } from './exercise-db'
 import {
   getExperienceConfig, getSkillDemand, isSkillAppropriate, applyRepFloor,
   type ExperienceConfig,
@@ -70,31 +70,6 @@ interface TrackSlot {
   tier: 'tier1_compound' | 'tier2_compound' | 'tier3_isolation' | 'cardio'
   /** Never silently dropped — falls through to NEAREST_PATTERN_FALLBACK and logs via trace if even that fails. */
   required: boolean
-}
-
-// Last-resort substitution when a required slot's own patterns have zero
-// eligible candidates anywhere in the constrained pool (equipment/injury
-// genuinely forbids the whole category) — the nearest coaching-equivalent
-// pattern, not a random one, so a missing vertical press becomes a second
-// horizontal press rather than an unrelated isolation exercise.
-const NEAREST_PATTERN_FALLBACK: Partial<Record<MovementPattern, MovementPattern[]>> = {
-  vertical_push: ['horizontal_push'],
-  horizontal_push: ['vertical_push'],
-  vertical_pull: ['horizontal_pull'],
-  horizontal_pull: ['vertical_pull'],
-  hip_hinge: ['knee_dominant', 'single_leg'],
-  knee_dominant: ['hip_hinge', 'single_leg'],
-  single_leg: ['knee_dominant', 'hip_hinge'],
-  carry: ['core'],
-  isolation_bicep: ['horizontal_pull'],
-  isolation_tricep: ['horizontal_push'],
-  isolation_shoulder: ['vertical_push'],
-  // Traps mirror the shoulder entry above, on the pulling side — a shrug's
-  // nearest relative is a row, not a press.
-  isolation_trap: ['horizontal_pull', 'vertical_pull'],
-  isolation_quad: ['knee_dominant'],
-  isolation_hamstring: ['hip_hinge'],
-  isolation_calf: ['knee_dominant'],
 }
 
 const TRACKS: Record<TrackFocus, TrackDefinition> = {
@@ -555,13 +530,34 @@ const MIN_VIABLE_POOL = 12
 function stageStyleFilter(
   pool: ExerciseEntry[],
   style: TrainingStyle,
-  trace: ConstraintTrace
+  trace: ConstraintTrace,
+  /**
+   * A style preference must not be able to delete an injury RESPONSE. This
+   * function's own comment below already draws the line — "style is a
+   * preference, not a safety constraint — unlike equipment (you physically
+   * don't have the kit) or injury (it will hurt you)" — and rehab work sits
+   * on the injury axis, not the taste one.
+   *
+   * MEASURED, which is how this was found: a knee-injured trainee who picked
+   * 'bodybuilding' had EVERY knee-rehab movement stripped here. Full gym left
+   * exactly one survivor (Lying Leg Curl, a machine); home gym, minimalist
+   * and bodyweight left ZERO, because a seated short-arc quad set is tagged
+   * functional/hybrid and nobody tags a rehab drill 'bodybuilding'. That was
+   * 36 of 144 knee plans containing no knee rehab at all, and the
+   * MIN_VIABLE_POOL escape hatch never fired because the pool was still
+   * plenty big — just missing the one category that mattered.
+   *
+   * Same defect shape as the four rounds before it: a tag answering one
+   * question ("what does this movement feel like to train?") used to answer
+   * another ("may this person have the work their joint needs?").
+   */
+  flaggedJoints: Set<string> = new Set(),
 ): ExerciseEntry[] {
   const result: ExerciseEntry[] = []
   const rejected: ExerciseEntry[] = []
 
   for (const ex of pool) {
-    if (ex.style_tags.includes(style)) {
+    if (ex.style_tags.includes(style) || isIndicatedFor(ex, flaggedJoints)) {
       result.push(ex)
     } else {
       rejected.push(ex)
@@ -1274,6 +1270,69 @@ export function getAffinityPrimerPool(pool: ExerciseEntry[], trackPatterns: Move
 }
 
 /**
+ * The gentlest movement the database marks as INDICATED for an injured
+ * joint — the rehab work a physio would prescribe FOR it, as opposed to
+ * merely tolerate.
+ *
+ * exercise-db.ts's own doc comment on `indicated_joints` has always said
+ * "the plan should deliberately include them when the matching injury is
+ * present, which is the whole reason this is a third state rather than a
+ * boolean." Until this function existed, nothing did: `isIndicatedFor` was
+ * read only by `isContraindicatedFor` (to keep rehab ELIGIBLE) and by the
+ * line that labels a rehab movement "Chosen to help your shoulder" — a
+ * sentence that was untrue, because nothing had chosen it. MEASURED before
+ * this landed, across 576 training days per joint: rehab arrived on 51.0%
+ * of a shoulder-injured trainee's days and 50.7% of a knee-injured
+ * trainee's, purely by luck of the shuffle, and 40 of 144 knee plans
+ * contained no knee rehab at all.
+ *
+ * GENTLEST IS TIER-THEN-DURATION, and it has to be, because the obvious
+ * signal doesn't work: every knee-indicated entry in the database is
+ * `joint_stress: 'low'`, so that field cannot discriminate between a
+ * 24-second seated quad set and a 40-second wall sit, and using it would
+ * only look principled.
+ *
+ * tier2_compound is excluded outright rather than merely ranked last. That
+ * is Ashley's ruling made mechanical: rehab goes in EVERY session, and the
+ * only version of "every session" that stays defensible is the small one —
+ * a short-arc quad set on a bench-press day is prep, a Spanish Squat is leg
+ * day arriving uninvited. Those movements stay fully available through
+ * ordinary slots; they're just not what a guaranteed slot reaches for.
+ */
+export function pickRehabMovement(
+  pool: ExerciseEntry[],
+  flaggedJoints: Set<string>,
+  weeklyUsed: Set<string>,
+): ExerciseEntry | null {
+  if (flaggedJoints.size === 0) return null
+  // `pool` is already equipment/injury/experience filtered, so anything here
+  // is genuinely available to this trainee.
+  const indicated = pool.filter(e => isIndicatedFor(e, flaggedJoints) && e.mechanics_tier !== 'tier2_compound')
+  if (indicated.length === 0) return null
+
+  // Warm-up tier first where it exists (the whole shoulder set), isolation
+  // otherwise (the whole knee set) — never both at once, so a 15-second band
+  // pull-apart is never compared against a 28-second leg curl as though the
+  // numbers meant the same thing.
+  const primers = indicated.filter(e => e.mechanics_tier === 'primer')
+  const band = primers.length > 0 ? primers : indicated
+
+  // "Gentlest" is a BAND, not the single cheapest entry, and that distinction
+  // is load-bearing. MEASURED with a strict minimum: Seated Short-Arc Quad
+  // Set (24s) is uniquely the shortest knee drill, so it won every session of
+  // every knee plan — 576 of 576, the same movement for sixteen weeks. Rehab
+  // is repetitive by nature but that is monotony, not prescription. Within a
+  // quarter of the cheapest option everything is equivalently gentle, so
+  // rotate freely inside that; Ashley's ruling survives intact because the
+  // band still excludes Wall Sit (40s) and tier2 was never in the running.
+  const cheapest = Math.min(...band.map(e => e.avg_duration_seconds))
+  const gentlest = band.filter(e => e.avg_duration_seconds <= cheapest * 1.25)
+  // Prefer one not already used this week, then shuffle — the same idiom the
+  // primer pick uses immediately below.
+  return shuffle(gentlest.filter(e => !weeklyUsed.has(e.name)))[0] ?? shuffle(gentlest)[0] ?? null
+}
+
+/**
  * Which isolation patterns are "the target muscle" for a given day's own
  * compound pattern(s) — e.g. a hinge day's hamstring isolation work directly
  * supports the hinge; its bicep/tricep isolation work does not. Drives the
@@ -1396,7 +1455,8 @@ function selectExercisesForTrack(
   weeklyAppearanceCount?: Map<string, number>,
   rawExperience: TrainingExperience = 'novice',
   sessionDurationPreference?: SessionDuration,
-): { primer: ExerciseEntry | null; main: ExerciseEntry[]; requiredNames: Set<string>; uncoveredPatterns: MovementPattern[]; selectionNotes: Map<string, string> } {
+  flaggedJoints: Set<string> = new Set(),
+): { primer: ExerciseEntry | null; rehab: ExerciseEntry | null; main: ExerciseEntry[]; requiredNames: Set<string>; uncoveredPatterns: MovementPattern[]; selectionNotes: Map<string, string> } {
   const counts = applyIsolationSlotShift(countsIn, policy.isolationSlotShift)
   const allPatterns = new Set([...track.primary_patterns, ...track.secondary_patterns])
   const forbidden = new Set(track.forbidden_patterns)
@@ -1431,6 +1491,25 @@ function selectExercisesForTrack(
     ? shuffle(primerPool.filter(p => !weeklyUsed.has(p.name)))[0] ?? shuffle(primerPool)[0]
     : null
 
+  // Rehab is picked BEFORE the main selection below, for the same reason the
+  // primer is: `usedGroups` has to know about it, or a knee-injured trainee
+  // draws Sliding Leg Curl as their guaranteed rehab and again as an
+  // accessory. Deliberately NOT filtered by primer_pattern_affinity — that
+  // is track fit, and the shoulder primers are tagged for push/pull
+  // patterns, so an affinity-respecting pick would find nothing on leg day.
+  // A shoulder needs its band pull-aparts on leg day too; rehab is not track
+  // work.
+  //
+  // Nothing to add when the day's own primer is ALREADY rehab for the injured
+  // joint. Seven of the nine shoulder-indicated movements are primers, so an
+  // ordinary primer pick lands on one often — and adding a second alongside
+  // it produced exactly what you would expect: a session opening "Scapular
+  // Push-Ups, Scapular Push-Ups", and, where the names differed, two warm-ups
+  // doing the same job. The guarantee is that every session carries rehab,
+  // not that every session carries a rehab SLOT.
+  const primerIsRehab = primer != null && isIndicatedFor(primer, flaggedJoints)
+  const rehab = primerIsRehab ? null : pickRehabMovement(pool, flaggedJoints, weeklyUsed)
+
   // Keyed by movement family, not substitution_group, so the same movement
   // cannot appear twice under two different classifications. Seeded with the
   // primer's family (if any) up front — Kettlebell Swings (primer,
@@ -1440,6 +1519,7 @@ function selectExercisesForTrack(
   // existed, so nothing stopped both from landing in the same session.
   const usedGroups = new Set<string>()
   if (primer) usedGroups.add(getMovementFamily(primer))
+  if (rehab) usedGroups.add(getMovementFamily(rehab))
   const selected: ExerciseEntry[] = []
   // Names that filled a REQUIRED slot — stageTimeCap must never silently
   // drop one of these under duration pressure (that's exactly the "never
@@ -1831,7 +1911,14 @@ function selectExercisesForTrack(
     return tierDiff !== 0 ? tierDiff : isolationPriority(a) - isolationPriority(b)
   })
 
-  return { primer, main: selected, requiredNames, uncoveredPatterns, selectionNotes }
+  // "In every session" and "the first thing dropped when the session runs
+  // long" cannot both be true. requiredNames is already exactly the set
+  // stageTimeCap's protectedNames parameter refuses to remove outright (it
+  // may still trim sets), so the guarantee is the existing mechanism reused
+  // rather than a second one invented beside it.
+  if (rehab) requiredNames.add(rehab.name)
+
+  return { primer, rehab, main: selected, requiredNames, uncoveredPatterns, selectionNotes }
 }
 
 // ---------------------------------------------------------------------------
@@ -3413,7 +3500,7 @@ export function getConstrainedPool(profile: UserProfile, exclusions: string[] = 
   )
   pool = stageEquipmentFilter(pool, profile.equipment_access || 'full_gym', throwaway)
   pool = stageInjuryFilter(pool, [...pool], profile.injuries || [], throwaway)
-  pool = stageStyleFilter(pool, profile.training_style || 'hybrid', throwaway)
+  pool = stageStyleFilter(pool, profile.training_style || 'hybrid', throwaway, getFlaggedJoints(profile.injuries || []))
   pool = stageSkillFilter(pool, profile.training_experience || 'novice', throwaway)
   return pool
 }
@@ -3454,8 +3541,17 @@ export function getExerciseCompatibilityWarnings(
   // included as rehab for the injured joint (Band Pull-Aparts for a
   // shoulder) does load that joint — warning "you've flagged an injury
   // there" about it would contradict the reason it's in the plan.
+  //
+  // "Good for" rather than the "Chosen to help" this said until rehab was
+  // actually prescribed. That older wording was simply false — nothing
+  // chose anything, the movement had arrived by luck of the shuffle. It is
+  // true now for the guaranteed rehab slot, but this function sees only an
+  // exercise and a profile, never which slot placed it, so it still fires
+  // on an indicated movement that a perfectly ordinary accessory slot
+  // happened to pick. "Good for" is true in both cases and needs no
+  // provenance threaded down here to stay true.
   if (isIndicatedFor(exercise, flaggedJoints)) {
-    warnings.push(`Chosen to help your ${(exercise.indicated_joints ?? []).join(', ').replace(/_/g, ' ')} — keep it light and controlled.`)
+    warnings.push(`Good for your ${(exercise.indicated_joints ?? []).join(', ').replace(/_/g, ' ')} — keep it light and controlled.`)
   } else {
     const conflictingJoints = contraindicatedJoints(exercise).filter(j => flaggedJoints.has(j))
     if (conflictingJoints.length > 0) {
@@ -3526,7 +3622,7 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
   pool = stageInjuryFilter(pool, [...pool], profile.injuries || [], trace)
 
   // STAGE 3: Style
-  pool = stageStyleFilter(pool, trainingStyle, trace)
+  pool = stageStyleFilter(pool, trainingStyle, trace, getFlaggedJoints(profile.injuries || []))
 
   // STAGE 4: Skill / experience
   pool = stageSkillFilter(pool, profile.training_experience || 'novice', trace)
@@ -3564,7 +3660,7 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
     const trackFocus = getViableTrack(rawTrack, pool)
     const track = TRACKS[trackFocus]
 
-    const { primer, main, requiredNames, uncoveredPatterns, selectionNotes } = selectExercisesForTrack(track, pool, counts, weeklyUsed, styleConfig, trace, policy, feasiblePatterns, weeklyAppearanceCount, profile.training_experience || 'novice', profile.session_duration_preference)
+    const { primer, rehab, main, requiredNames, uncoveredPatterns, selectionNotes } = selectExercisesForTrack(track, pool, counts, weeklyUsed, styleConfig, trace, policy, feasiblePatterns, weeklyAppearanceCount, profile.training_experience || 'novice', profile.session_duration_preference, getFlaggedJoints(profile.injuries ?? []))
     for (const name of requiredNames) weeklyRequiredNames.add(name)
 
     // Build exercise list with sets/reps from style config
@@ -3574,6 +3670,19 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
       weeklyUsed.add(primer.name)
       const sr = assignSetsRepsFromConfig(primer, styleConfig, experience, policy, profile.session_duration_preference)
       daySlots.push({ entry: primer, ...sr })
+    }
+
+    // Straight after the warm-up, before the working sets: rehab is prep for
+    // the joint that's complaining, so it belongs where the joint is still
+    // fresh. Deliberately NOT folded into `main` — that list is sorted by
+    // tier at the end of selectExercisesForTrack, which would bury a tier3
+    // quad set behind every compound in the session.
+    if (rehab) {
+      weeklyUsed.add(rehab.name)
+      allSelectedNames.add(rehab.name)
+      weeklyAppearanceCount.set(rehab.name, (weeklyAppearanceCount.get(rehab.name) ?? 0) + 1)
+      const sr = assignSetsRepsFromConfig(rehab, styleConfig, experience, policy, profile.session_duration_preference)
+      daySlots.push({ entry: rehab, ...sr })
     }
 
     for (const entry of main) {

@@ -3052,6 +3052,37 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
  * advanced lifter swapping out Barbell Squats should never be offered
  * Goblet Squats as a same-tier alternative.
  */
+/**
+ * The nearest coaching-equivalent pattern when a movement's OWN pattern has
+ * no eligible candidates left — a missing vertical press becomes a second
+ * horizontal press, not an unrelated isolation exercise.
+ *
+ * Lives here, beside MovementPattern itself, rather than in exercise-plan.ts
+ * where it started, because it now has two readers that reach a pattern dead
+ * end by different routes: selectExercisesForTrack's required slots, and
+ * getSmartReplacements below. It was one map with one reader when a slot
+ * could only be orphaned at plan-BUILD time; a swap can orphan one too.
+ */
+export const NEAREST_PATTERN_FALLBACK: Partial<Record<MovementPattern, MovementPattern[]>> = {
+  vertical_push: ['horizontal_push'],
+  horizontal_push: ['vertical_push'],
+  vertical_pull: ['horizontal_pull'],
+  horizontal_pull: ['vertical_pull'],
+  hip_hinge: ['knee_dominant', 'single_leg'],
+  knee_dominant: ['hip_hinge', 'single_leg'],
+  single_leg: ['knee_dominant', 'hip_hinge'],
+  carry: ['core'],
+  isolation_bicep: ['horizontal_pull'],
+  isolation_tricep: ['horizontal_push'],
+  isolation_shoulder: ['vertical_push'],
+  // Traps mirror the shoulder entry above, on the pulling side — a shrug's
+  // nearest relative is a row, not a press.
+  isolation_trap: ['horizontal_pull', 'vertical_pull'],
+  isolation_quad: ['knee_dominant'],
+  isolation_hamstring: ['hip_hinge'],
+  isolation_calf: ['knee_dominant'],
+}
+
 export function getSmartReplacements(
   exerciseName: string,
   pool: ExerciseEntry[],
@@ -3090,13 +3121,38 @@ export function getSmartReplacements(
   // here for the identical reason: different equipment genuinely takes a
   // different number, and a fresh prescription is computed either way, so
   // there's no "stealth regression" to protect against on a manual pick.
-  const candidates = pool.filter(e => {
+  const eligible = (e: ExerciseEntry, patterns: MovementPattern[]) => {
     if (excludedSet.has(e.name.toLowerCase())) return false
-    if (e.movement_pattern !== current.movement_pattern) return false
+    if (!patterns.includes(e.movement_pattern)) return false
     if (e.name === current.name) return false
     if (isRegressionFor(e.name, experience) && !isRegressionFor(current.name, experience)) return false
     return true
-  })
+  }
+
+  // Same pattern first, always — a swap should stay the same KIND of movement.
+  let candidates = pool.filter(e => eligible(e, [current.movement_pattern]))
+
+  // Only when that comes back empty: the nearest coaching-equivalent pattern,
+  // rather than dropping the slot.
+  //
+  // REGRESSION THIS FIXES, caught by test:injury-rebuild after it had already
+  // shipped: splitting isolation_trap out of isolation_shoulder left the trap
+  // pattern holding exactly two movements, both shrugs, and both
+  // contraindicated for a NECK injury. So a neck-injured trainee's shrug
+  // slots had no same-pattern replacement and were dropped outright — 32 of
+  // them — which reads downstream as "a whole movement pattern was wiped" and
+  // forced a full plan rebuild over what is genuinely a thinning injury.
+  // Before the split those slots fell back to lateral raises, which a neck
+  // injury permits, so nothing had ever exercised this path.
+  //
+  // The general bug is that this filter demanded an exact pattern match with
+  // no fallback at all, while plan-build has had NEAREST_PATTERN_FALLBACK for
+  // exactly this since long before traps existed. Any thin pattern could hit
+  // the same wall; traps are just the one that did.
+  if (candidates.length === 0) {
+    const fallback = NEAREST_PATTERN_FALLBACK[current.movement_pattern] ?? []
+    if (fallback.length > 0) candidates = pool.filter(e => eligible(e, fallback))
+  }
 
   const scored = candidates.map(candidate => {
     let score = 0
