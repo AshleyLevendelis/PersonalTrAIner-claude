@@ -60,6 +60,7 @@
     "test:assumed-body": "tsx scripts/test-assumed-body-loads.ts",
     "test:weight-basis": "tsx scripts/test-weight-basis-offer.ts",
     "test:per-side-load": "tsx scripts/test-per-side-load.ts",
+    "test:pattern-tags": "tsx scripts/test-movement-pattern-tags.ts",
     "report:trim-magnitude": "tsx scripts/run-trim-magnitude-report.ts"
   },
   "dependencies": {

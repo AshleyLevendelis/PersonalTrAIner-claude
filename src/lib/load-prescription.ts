@@ -370,6 +370,13 @@ export function categorize(entry: ExerciseEntry): string | null {
     // distinguishes them.
     if (n.includes('shrug')) return 'shrug'
     switch (entry.movement_pattern) {
+      // Reached only by a trap movement whose NAME lacks "shrug" — the
+      // name-match above catches both of today's. Without this case such an
+      // entry falls to this switch's `default`, which is isolation_chest:
+      // trap work priced as a cable fly. Caught by test:pattern-tags' own
+      // trapdoor check, which is the third time this session a pattern
+      // fallback has quietly mis-priced something.
+      case 'isolation_trap': return 'shrug'
       case 'isolation_bicep': return 'isolation_bicep'
       case 'isolation_tricep': return 'isolation_tricep'
       case 'isolation_shoulder': return 'isolation_shoulder'
@@ -442,6 +449,12 @@ export function categorize(entry: ExerciseEntry): string | null {
       return 'isolation_tricep'
     case 'isolation_shoulder':
       return 'isolation_shoulder'
+    // Shrugs are name-matched far above this, so today this case never fires.
+    // It exists so a future trap movement whose name lacks "shrug" doesn't
+    // fall through to null and get no load at all — exactly what the
+    // vertical_push fallback did to Landmine Press before it was split.
+    case 'isolation_trap':
+      return 'shrug'
     case 'isolation_quad':
       return 'isolation_quad'
     case 'isolation_hamstring':

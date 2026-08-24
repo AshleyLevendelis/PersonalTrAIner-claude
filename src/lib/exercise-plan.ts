@@ -89,6 +89,9 @@ const NEAREST_PATTERN_FALLBACK: Partial<Record<MovementPattern, MovementPattern[
   isolation_bicep: ['horizontal_pull'],
   isolation_tricep: ['horizontal_push'],
   isolation_shoulder: ['vertical_push'],
+  // Traps mirror the shoulder entry above, on the pulling side — a shrug's
+  // nearest relative is a row, not a press.
+  isolation_trap: ['horizontal_pull', 'vertical_pull'],
   isolation_quad: ['knee_dominant'],
   isolation_hamstring: ['hip_hinge'],
   isolation_calf: ['knee_dominant'],
@@ -113,7 +116,7 @@ const TRACKS: Record<TrackFocus, TrackDefinition> = {
   'Pull & Hinge': {
     label: 'Pull & Hinge',
     primary_patterns: ['horizontal_pull', 'vertical_pull', 'hip_hinge'],
-    secondary_patterns: ['isolation_bicep', 'isolation_hamstring', 'core'],
+    secondary_patterns: ['isolation_bicep', 'isolation_hamstring', 'isolation_trap', 'core'],
     forbidden_patterns: ['isolation_tricep', 'horizontal_push', 'vertical_push'],
     primer_patterns: ['horizontal_pull', 'vertical_pull', 'hip_hinge'],
     required_patterns: ['hip_hinge'],
@@ -123,6 +126,10 @@ const TRACKS: Record<TrackFocus, TrackDefinition> = {
       { patterns: ['horizontal_pull'], tier: 'tier2_compound', required: true },
       { patterns: ['isolation_bicep'], tier: 'tier3_isolation', required: false },
       { patterns: ['isolation_hamstring'], tier: 'tier3_isolation', required: false },
+      // Where shrugs live now. Splitting isolation_trap out of
+      // isolation_shoulder took away the (push-day) slot they used to fill;
+      // a fix that left them unreachable would be worse than the bug.
+      { patterns: ['isolation_trap'], tier: 'tier3_isolation', required: false },
       { patterns: ['core'], tier: 'tier3_isolation', required: false },
     ],
   },
@@ -145,7 +152,11 @@ const TRACKS: Record<TrackFocus, TrackDefinition> = {
   'Upper Pull & Core': {
     label: 'Upper Pull & Core',
     primary_patterns: ['vertical_pull', 'horizontal_pull'],
-    secondary_patterns: ['core', 'isolation_bicep', 'isolation_shoulder'],
+    // isolation_shoulder here is REAR-delt work on a pull day, which is
+    // ordinary. It could already serve a shrug too — correctly, but by the
+    // same accident that made 'Push & Press' serve one incorrectly. The two
+    // are now separate slots that each mean what they say.
+    secondary_patterns: ['core', 'isolation_bicep', 'isolation_shoulder', 'isolation_trap'],
     forbidden_patterns: ['isolation_tricep', 'horizontal_push'],
     primer_patterns: ['vertical_pull', 'horizontal_pull'],
     required_patterns: ['core'],
@@ -154,6 +165,7 @@ const TRACKS: Record<TrackFocus, TrackDefinition> = {
       { patterns: ['horizontal_pull'], tier: 'tier2_compound', required: true },
       { patterns: ['isolation_bicep'], tier: 'tier3_isolation', required: false },
       { patterns: ['isolation_shoulder'], tier: 'tier3_isolation', required: false },
+      { patterns: ['isolation_trap'], tier: 'tier3_isolation', required: false },
       { patterns: ['core'], tier: 'tier3_isolation', required: true },
     ],
   },
@@ -201,6 +213,14 @@ const TRACKS: Record<TrackFocus, TrackDefinition> = {
   'Back & Biceps': {
     label: 'Back & Biceps',
     primary_patterns: ['horizontal_pull', 'vertical_pull'],
+    // NO isolation_trap slot here, despite a dedicated back day being the
+    // textbook home for shrugs. Measured: swapping the second bicep slot for
+    // one put this track's 30-45min sessions at 43min against a 37min budget
+    // — 4 duration failures in an audit that was otherwise at zero. This
+    // track is already at its time ceiling at the short tier, and shrugs have
+    // two other homes ('Pull & Hinge', 'Upper Pull & Core') carrying 54 of
+    // their 66 measured placements. Worth revisiting if this track's budget
+    // ever loosens; not worth buying with a duration overrun.
     secondary_patterns: ['isolation_bicep'],
     forbidden_patterns: ['horizontal_push', 'vertical_push', 'hip_hinge', 'knee_dominant', 'single_leg', 'carry', 'isolation_tricep', 'isolation_shoulder', 'isolation_quad', 'isolation_calf'],
     primer_patterns: ['horizontal_pull', 'vertical_pull'],
@@ -1268,8 +1288,8 @@ const PATTERN_TO_RELATED_ISOLATION: Partial<Record<MovementPattern, MovementPatt
   single_leg: ['isolation_quad', 'isolation_hamstring'],
   horizontal_push: ['isolation_tricep', 'isolation_shoulder'],
   vertical_push: ['isolation_shoulder', 'isolation_tricep'],
-  horizontal_pull: ['isolation_bicep'],
-  vertical_pull: ['isolation_bicep'],
+  horizontal_pull: ['isolation_bicep', 'isolation_trap'],
+  vertical_pull: ['isolation_bicep', 'isolation_trap'],
 }
 
 /**
@@ -1281,7 +1301,7 @@ const PATTERN_TO_RELATED_ISOLATION: Partial<Record<MovementPattern, MovementPatt
  * covers" half, which draws from whatever actually got selected (isolation/
  * core/cardio work included), not just required patterns.
  */
-function patternLabel(pattern: MovementPattern): string {
+export function patternLabel(pattern: MovementPattern): string {
   switch (pattern) {
     case 'vertical_push': return 'an overhead press'
     case 'vertical_pull': return 'a pull-up or pulldown movement'
@@ -1294,6 +1314,7 @@ function patternLabel(pattern: MovementPattern): string {
     case 'isolation_bicep': return 'bicep work'
     case 'isolation_tricep': return 'tricep work'
     case 'isolation_shoulder': return 'shoulder isolation work'
+    case 'isolation_trap': return 'trap work'
     case 'isolation_quad': return 'quad work'
     case 'isolation_hamstring': return 'hamstring work'
     case 'isolation_calf': return 'calf work'
@@ -1792,7 +1813,7 @@ function selectExercisesForTrack(
   const MUSCLE_SIZE_RANK: Partial<Record<MovementPattern, number>> = {
     isolation_hamstring: 0, isolation_quad: 0,
     isolation_calf: 1,
-    isolation_shoulder: 2,
+    isolation_shoulder: 2, isolation_trap: 2,
     isolation_bicep: 3, isolation_tricep: 3,
   }
   const relatedIsolation = new Set<MovementPattern>()

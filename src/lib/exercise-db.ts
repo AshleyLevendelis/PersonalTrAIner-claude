@@ -13,6 +13,16 @@ export type MovementPattern =
   | 'isolation_bicep'
   | 'isolation_tricep'
   | 'isolation_shoulder'
+  // Upper-trap work (shrugs) — scapular ELEVATION, which is functionally a
+  // pulling movement. Split out of 'isolation_shoulder', where it sat
+  // alongside lateral raises and let a shrug fill a push day's shoulder
+  // accessory slot: measured, 31 of 59 shrug placements landed on a pressing
+  // day. The file already knew the tag was wrong — load-prescription.ts's
+  // categorize() has carried a name-matched `shrug` special case, and a
+  // comment explaining it, for as long as both have shared this pattern
+  // ("shrugs track deadlift; lateral raises track bench"). That workaround
+  // fixed the WEIGHT and never the placement.
+  | 'isolation_trap'
   | 'isolation_quad'
   | 'isolation_hamstring'
   | 'isolation_calf'
@@ -1069,7 +1079,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   {
     name: 'Shrugs',
     id: 'shrugs',
-    movement_pattern: 'isolation_shoulder',
+    movement_pattern: 'isolation_trap',
     mechanics_tier: 'tier3_isolation',
     prescription_type: 'reps',
     angle_vector: 'vertical',
@@ -1093,7 +1103,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   {
     name: 'Dumbbell Shrugs',
     id: 'dumbbell-shrugs',
-    movement_pattern: 'isolation_shoulder',
+    movement_pattern: 'isolation_trap',
     mechanics_tier: 'tier3_isolation',
     prescription_type: 'reps',
     angle_vector: 'vertical',
