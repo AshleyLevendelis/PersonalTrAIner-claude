@@ -497,7 +497,7 @@ export const ONBOARDING_SLOTS: SlotDef[] = [
   { key: 'age', question: 'How old are you?', shortLabel: 'Age', control: 'numeric', required: false, min: 13, max: 100, destination: 'column', validate: isNumberIn(13, 100) },
   { key: 'heightCm', question: 'How tall are you (cm)?', shortLabel: 'Height', control: 'numeric', required: false, min: 100, max: 250, destination: 'column', validate: isNumberIn(100, 250) },
   { key: 'weightKg', question: 'What do you weigh right now (kg)?', shortLabel: 'Weight', control: 'numeric', required: false, min: 25, max: 350, destination: 'column', validate: isNumberIn(25, 350) },
-  { key: 'gender', question: 'Which should I use for your calorie maths?', shortLabel: 'Sex', control: 'single', required: false, options: GENDER_OPTIONS, destination: 'column', validate: isOneOf(GENDER_OPTIONS) },
+  { key: 'gender', question: 'Which should I use for your calorie and starting-weight maths?', shortLabel: 'Sex', control: 'single', required: false, options: GENDER_OPTIONS, destination: 'column', validate: isOneOf(GENDER_OPTIONS) },
 ]
 
 export function getSlotDef(key: string): SlotDef | undefined {

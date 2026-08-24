@@ -57,6 +57,7 @@
     "test:training-week": "tsx scripts/test-training-week.ts",
     "test:coach-rules-sync": "tsx scripts/test-coach-rules-sync.ts",
     "test:reply-guarantee": "tsx scripts/test-onboarding-reply-guarantee.ts",
+    "test:assumed-body": "tsx scripts/test-assumed-body-loads.ts",
     "report:trim-magnitude": "tsx scripts/run-trim-magnitude-report.ts"
   },
   "dependencies": {

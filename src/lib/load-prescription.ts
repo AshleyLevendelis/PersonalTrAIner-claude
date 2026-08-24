@@ -29,6 +29,27 @@ import type { ExerciseEntry } from './exercise-db'
 // relationship) so the clamps are no longer needed to keep numbers sane, and
 // deletes them.
 
+/**
+ * Provenance of a load prescribed by this module. The UI adds 'logged' on
+ * top once real session history exists — see LoadChip's LoadSource.
+ */
+export type PrescribedLoadSource = 'estimate' | 'known_weight' | 'assumed_body'
+
+/**
+ * "Is this number still a guess?" — the question every UI and derivation
+ * call site was really asking when it compared against 'estimate'. Adding
+ * 'assumed_body' silently broke each of those comparisons in the direction
+ * that matters (the LEAST trustworthy state would have read as the most),
+ * so the test lives here once rather than in five string equalities.
+ *
+ * `undefined` counts as unverified: legacy rows written before load_source
+ * existed are estimates, and rows are JSONB inside mesocycle_weeks.days, so
+ * old ones are still out there.
+ */
+export function isUnverifiedLoadSource(source: string | undefined): boolean {
+  return source == null || source === 'estimate' || source === 'assumed_body'
+}
+
 export interface PerSetLoad {
   set_number: number
   load_kg: number
@@ -41,16 +62,29 @@ export interface LoadPrescription {
   display: string
   basis: string
   /**
-   * Where starting_weight_kg came from — 'known_weight' when anchored to a
-   * working weight the trainee reported during onboarding (real, verified
-   * data), 'estimate' otherwise (a population standards-table guess, however
-   * it was subsequently ramped/capped/dampened — calibration, the unverified
-   * per-week step, or a plain fresh estimate are all still unverified). UI
-   * layers that also know about logged history (the live progression engine)
-   * layer a third 'logged' state on top of this; prescribeLoad itself has no
-   * visibility into that.
+   * Where starting_weight_kg came from:
+   *
+   *   'known_weight'  anchored to a working weight the trainee reported at
+   *                   onboarding — real, verified data about THIS person.
+   *   'estimate'      a population standards-table guess built from body
+   *                   metrics they actually gave us (however it was
+   *                   subsequently ramped/capped/dampened — calibration, the
+   *                   unverified per-week step and a plain fresh estimate are
+   *                   all still unverified, but they are about their body).
+   *   'assumed_body'  the same standards guess, except one or more of the
+   *                   body metrics behind it was never given and had to be
+   *                   substituted (see resolveBodyBasis). Held under the
+   *                   standards number for as long as that stays true.
+   *
+   * The third state exists because 'estimate' was being used for both of the
+   * last two, which is how a woman who declined her weight was handed a man's
+   * squat under the word "suggested".
+   *
+   * UI layers that also know about logged history (the live progression
+   * engine) layer a fourth 'logged' state on top of this; prescribeLoad has
+   * no visibility into that.
    */
-  load_source: 'estimate' | 'known_weight'
+  load_source: PrescribedLoadSource
   /**
    * Per-set breakdown for externally-loaded work — null under the same
    * conditions as starting_weight_kg (bodyweight movement, uncategorizable
@@ -839,12 +873,115 @@ function buildRepsProgressionBasis(repRangeLabel: string | undefined): string {
     : `Weight holds here by design this block — reps are the lever climbing week to week, not load.`
 }
 
+/**
+ * The body the standards model is about to use, and whether any of it is
+ * ours rather than theirs.
+ *
+ * types.ts states the policy for these fields: "undefined means 'the user
+ * has not told us', never 'assume something sensible' … NEVER substitute a
+ * default when one of these is missing." The nutrition side honours it
+ * (resolveBodyMetrics -> null -> MissingBodyMetricsNotice). This file did
+ * not. Three `||`s turned a refusal into a 30-year-old 75kg man, silently,
+ * and every prescribed kilo in the app came out of them — including for
+ * the ~12 standards categories the onboarding "I know my numbers" answer
+ * never anchors.
+ *
+ * Measured before this change (scripts/run-assumed-body-report.ts): a 55kg
+ * 52-year-old woman who declined all three was prescribed a mean 2.01x her
+ * own week-1 loads, rising to 2.09x by week 5, with 18 of 18 shared lifts
+ * more than 15% too heavy and a worst case of 3.00x. Every one of those
+ * numbers was labelled "suggested" — the same word used for an estimate
+ * built from a real body. Sex is the larger half of the error: female
+ * standards are 0.53-0.67x male, and the old check was
+ * `=== 'female' ? … : 'male'`, so *unknown* fell to male rather than being
+ * treated as unknown.
+ *
+ * Why this does NOT return null the way resolveBodyMetrics does: a refusal
+ * must still produce a plan, and Ashley's ruling was to keep a real number
+ * on screen and make it start low and self-correct. So it returns the
+ * substituted body AND the fact that it is substituted — no consumer can
+ * read the number without also being handed the caveat.
+ */
+export interface BodyBasis {
+  weightKg: number
+  gender: 'male' | 'female'
+  ageYears: number
+  /** True when ANY of the three below was invented rather than reported. */
+  assumed: boolean
+  /** Which ones, in the same user-facing words missingBodyMetrics() uses. */
+  missing: ('weight' | 'sex' | 'age')[]
+}
+
+/**
+ * The body used when we have nothing.
+ *
+ * Named, and in one place, so it can never again be three anonymous literals
+ * inside an expression — the form the defect took for its whole life.
+ *
+ * DELIBERATELY NOT AN AVERAGE PERSON. The old values (75kg, male, 30) were
+ * the middle of the population, which sounds neutral and is not: it makes the
+ * error symmetric when the CONSEQUENCES of the error are not. Prescribing a
+ * light trainee twice what they can lift is a squat that can hurt them on
+ * their first ever session. Prescribing a heavy trainee half what they can
+ * lift is one boring set, which they then correct by logging what they
+ * actually did — the app's whole self-correction path, and the exact thing a
+ * calibration week asks them to do.
+ *
+ * So: the light end of the adult range, and the lower of the two standards
+ * tables. Not a guess at who they are — a floor to start from until they tell
+ * us or lift something. It is released per-field: someone who gives a weight
+ * but declines their age keeps their real weight.
+ *
+ * Age 60 rather than 30 for the same reason — ageAdjustment() is flat to 40
+ * and only falls after, so an assumed 30 was the single most aggressive
+ * choice available.
+ */
+const ASSUMED_BODY = { weightKg: 50, gender: 'female' as const, ageYears: 60 }
+
+export function resolveBodyBasis(profile: UserProfile): BodyBasis {
+  const missing: BodyBasis['missing'] = []
+  if (!profile.weight_kg) missing.push('weight')
+  if (!profile.gender) missing.push('sex')
+  if (!profile.age) missing.push('age')
+  return {
+    weightKg: profile.weight_kg || ASSUMED_BODY.weightKg,
+    // Explicit on both real values, so only genuine absence falls through to
+    // the assumed default — the old ternary silently sorted "unknown" into
+    // the heavier of the two standards tables.
+    gender: profile.gender === 'female' ? 'female' : profile.gender === 'male' ? 'male' : ASSUMED_BODY.gender,
+    ageYears: profile.age || ASSUMED_BODY.ageYears,
+    assumed: missing.length > 0,
+    missing,
+  }
+}
+
+/**
+ * What we say about a number we could not build from this person's body.
+ *
+ * House style is MissingBodyMetricsNotice's: name the gap, say what still
+ * works, give one action, stop. No apology, no nagging, and above all no
+ * placeholder dressed up as a measurement — the number on screen is real,
+ * it is just deliberately low, and the copy says so rather than letting
+ * "suggested" imply it was derived from them.
+ */
+function bodyGapPhrase(missing: BodyBasis['missing']): string {
+  if (missing.length === 1) return `your ${missing[0]}`
+  if (missing.length === 2) return `your ${missing[0]} or ${missing[1]}`
+  return `your ${missing.slice(0, -1).join(', ')} or ${missing[missing.length - 1]}`
+}
+
+function buildAssumedBodyBasis(profile: UserProfile, isCalibrationWeek: boolean): string {
+  const gap = bodyGapPhrase(resolveBodyBasis(profile).missing)
+  const opener = `We don't know ${gap}, so this can't be worked out from your body — it starts low on purpose instead of guessing.`
+  return isCalibrationWeek
+    ? `${opener} Find the weight where the last rep feels like RPE 6 and log it; next week builds from YOUR number.`
+    : `${opener} Log what you actually lift and the plan rebuilds from it — or add ${gap === 'your weight' ? 'it' : 'them'} in Profile.`
+}
+
 function resolveParentOneRepMaxKg(lift: LiftFamily, profile: UserProfile): number {
   const experience = profile.training_experience || 'novice'
-  const bodyweight = profile.weight_kg || 75
-  const gender = profile.gender === 'female' ? 'female' : 'male'
-  const age = ageAdjustment(profile.age || 30)
-  return bodyweight * STRENGTH_STANDARDS_1RM_PER_BW[lift][gender][experience] * age
+  const body = resolveBodyBasis(profile)
+  return body.weightKg * STRENGTH_STANDARDS_1RM_PER_BW[lift][body.gender][experience] * ageAdjustment(body.ageYears)
 }
 
 /**
@@ -904,6 +1041,11 @@ export function isolationTargetBelowFloor(entry: ExerciseEntry, profile: UserPro
   if (!category) return false
   const reference = resolveIsolationReferenceKg(category, profile)
   if (reference == null) return false
+  // Fed by resolveParentOneRepMaxKg, so an assumed body flows through here
+  // for free — which is the point. Exercise SELECTION was contaminated by the
+  // same substitution as load: with the old 75kg male stand-in, a 50kg woman
+  // never got the lower-floor dumbbell sibling and was handed a 20kg barbell
+  // curl. Nothing to add here; it just had to be true at the chokepoint.
   return reference < LOADING_FLOOR_KG[mode]
 }
 
@@ -964,6 +1106,15 @@ export function prescribeLoad(
   const knownAnchor = knownFamily ? options.knownWorkingWeights?.[knownFamily] : undefined
   const fromKnownWeight = knownAnchor != null && knownAnchor > 0
 
+  // Hoisted for the same reason fromKnownWeight is: the forceStartingWeightKg
+  // branch below short-circuits without re-deriving anything, but the number
+  // it carries forward still traces back to a baseline built on an assumed
+  // body, so the provenance has to be decided outside that branch. A
+  // known-weight anchor is exempt — no body metric enters that path at all,
+  // so a trainee who reported their squat but declined their weight gets an
+  // honest 'known_weight' on squats and 'assumed_body' on everything else.
+  const bodyAssumed = !fromKnownWeight && resolveBodyBasis(profile).assumed
+
   if (options.forceStartingWeightKg != null) {
     // Within-block double-progression ramp (or a live logged-history
     // override) — the caller has already worked out the exact top-set
@@ -1008,6 +1159,16 @@ export function prescribeLoad(
       // ceiling that overrides the RPE/reps math (see
       // CALIBRATION_WEEK_CONSERVATISM_BY_EXPERIENCE's doc comment for why
       // this is tiered rather than flat).
+      //
+      // No SECOND multiplier for an assumed body. That was tried and measured:
+      // because a real profile's week 1 is also a calibration week, damping
+      // both sides left the declined/stated ratio at 2.01x, exactly where it
+      // started — the discount cancelled out and only made everyone's numbers
+      // smaller. The fix for an unknown body has to be the body (see
+      // ASSUMED_BODY), which moves the estimate AND the ceiling the
+      // unverified ramp climbs toward. Stacking a discount on top of a
+      // conservative body compounds to absurdity (a 100kg man on 2kg
+      // dumbbells) without adding safety.
       const experienceTier = profile.training_experience || 'novice'
       estimate *= CALIBRATION_WEEK_CONSERVATISM_BY_EXPERIENCE[experienceTier]
     }
@@ -1068,20 +1229,28 @@ export function prescribeLoad(
     ? (options.loadIsProgressing === false
         ? buildRepsProgressionBasis(options.repRangeLabel)
         : buildProgressionBasis(options.repRangeLabel, getLoadIncrementKg(entry, category, rounded), labelMode))
-    : options.isCalibrationWeek && !fromKnownWeight
-      ? 'Loads start deliberately light — find the weight where the last rep feels like RPE 6, log it, and next week builds from YOUR numbers.'
-      : options.unverifiedPreviousLoadingWeekKg != null && !fromKnownWeight
-        ? 'Still no logged number for this lift, so this week goes up by one small step from last time, capped by the standards estimate. Log it and let the effort target correct it.'
-        : fromKnownWeight
-          ? 'Seeded from the working weight you reported for this lift. Let the effort target correct it if it has changed.'
-          : 'Starting estimate from strength standards for your bodyweight, sex and experience — not a tested max. ' +
-            'Let the effort target correct it: too easy, add load next set; too hard, drop it.'
+    // Ordered ABOVE the calibration and ramp branches: both of those say
+    // "the standards estimate" as though it described this person, and for
+    // an assumed body that is the specific sentence that isn't true. The
+    // old final branch was worse still — "from strength standards for your
+    // bodyweight, sex and experience" printed verbatim to someone who gave
+    // us none of the three.
+    : bodyAssumed
+      ? buildAssumedBodyBasis(profile, options.isCalibrationWeek === true)
+      : options.isCalibrationWeek && !fromKnownWeight
+        ? 'Loads start deliberately light — find the weight where the last rep feels like RPE 6, log it, and next week builds from YOUR numbers.'
+        : options.unverifiedPreviousLoadingWeekKg != null && !fromKnownWeight
+          ? 'Still no logged number for this lift, so this week goes up by one small step from last time, capped by the standards estimate. Log it and let the effort target correct it.'
+          : fromKnownWeight
+            ? 'Seeded from the working weight you reported for this lift. Let the effort target correct it if it has changed.'
+            : 'Starting estimate from strength standards for your bodyweight, sex and experience — not a tested max. ' +
+              'Let the effort target correct it: too easy, add load next set; too hard, drop it.'
 
   return {
     starting_weight_kg: rounded,
     display: formatLoad(rounded, labelMode),
     basis,
-    load_source: fromKnownWeight ? 'known_weight' : 'estimate',
+    load_source: fromKnownWeight ? 'known_weight' : bodyAssumed ? 'assumed_body' : 'estimate',
     per_set,
   }
 }

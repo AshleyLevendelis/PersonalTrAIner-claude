@@ -7,6 +7,7 @@ import { getExerciseId } from '@/lib/exercise-db'
 import { formatRampSets, formatCompletedSummary } from '@/lib/session-derive'
 import { RampStrip } from './RampStrip'
 import { LoadChip, loadSourceLabel, type LoadSource } from './LoadChip'
+import { isUnverifiedLoadSource } from '@/lib/load-prescription'
 import { AssistanceChip } from './AssistanceChip'
 import { CalibrationCue } from './CalibrationCue'
 import { SetGrid, type SetGridProps } from './SetGrid'
@@ -85,6 +86,13 @@ export function ExerciseRow({
     return () => cancelAnimationFrame(raf)
   }, [requestedSetFocus, expanded, ex.name, exerciseId, onToggleExpanded, clearSetFocusRequest])
 
+  // "Is this number still a guess?" — true for both unverified states.
+  // undefined is excluded deliberately: that means bodyweight, where there is
+  // no load to be unsure about (isUnverifiedLoadSource treats undefined as
+  // unverified for legacy JSONB rows, which is the opposite of what a
+  // bodyweight row means here).
+  const loadIsUnverified = loadSource != null && isUnverifiedLoadSource(loadSource)
+
   const nameLine = (
     <div className="flex items-center gap-2 flex-wrap min-w-0">
       {supersetLabel && (
@@ -93,7 +101,7 @@ export function ExerciseRow({
       <span
         className={`truncate ${expanded ? 'text-[19px] font-semibold' : 'text-[15.5px] font-medium'} ${
           allSetsLogged ? 'line-through text-muted-foreground' : ''
-        } ${!expanded && loadSource === 'estimate' ? 'border-b border-dotted border-muted-foreground/50' : ''}`}
+        } ${!expanded && loadIsUnverified ? 'border-b border-dotted border-muted-foreground/50' : ''}`}
       >
         {ex.name}
       </span>
@@ -256,7 +264,7 @@ export function ExerciseRow({
             tier={ex.tier}
             suggestedLoadKg={ex.suggested_load_kg}
             perSetLoadKg={ex.per_set_load?.map(s => s.load_kg)}
-            loadIsEstimate={loadSource === 'estimate'}
+            loadIsEstimate={loadIsUnverified}
             onOpenPlateCalc={onOpenPlateCalc}
             onSetCompleted={onSetCompleted}
             onFirstEverLog={onFirstEverLog}

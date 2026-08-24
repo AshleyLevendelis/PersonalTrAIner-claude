@@ -230,14 +230,20 @@ export interface Exercise {
   /**
    * Where suggested_load_kg came from: 'known_weight' when anchored to a
    * working weight the trainee reported during onboarding, 'estimate' when
-   * it's a population standards-table guess (however it was subsequently
+   * it's a population standards-table guess built from body metrics they
+   * gave us, 'assumed_body' when one or more of those metrics was never
+   * given and had to be substituted (however each was subsequently
    * ramped/capped) — see LoadPrescription.load_source in load-prescription.ts.
    * undefined for bodyweight movements/primers, where no weight is shown.
-   * The UI layers a third 'logged' state on top of this once real logged
+   * The UI layers a fourth 'logged' state on top of this once real logged
    * history exists for the exercise (see getDoubleProgressionRecommendation)
    * — that state is never persisted here, only computed at render time.
+   *
+   * Written into mesocycle_weeks.days JSONB, so rows predating 'assumed_body'
+   * are still out there carrying 'estimate'; isUnverifiedLoadSource() treats
+   * both (and undefined) as "still a guess".
    */
-  load_source?: 'estimate' | 'known_weight'
+  load_source?: 'estimate' | 'known_weight' | 'assumed_body'
   /**
    * Per-set load breakdown for externally-loaded work — the last entry is
    * always the top/working set (same value as suggested_load_kg). Ramps

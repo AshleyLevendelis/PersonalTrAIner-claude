@@ -1,6 +1,6 @@
 import type { EquipmentAccess, TrainingExperience } from './types'
 import type { ExerciseEntry, MovementPattern } from './exercise-db'
-import { isExternallyLoaded } from './load-prescription'
+import { isExternallyLoaded, type PrescribedLoadSource } from './load-prescription'
 
 // ---------------------------------------------------------------------------
 // WARM-UPS
@@ -40,13 +40,13 @@ export interface RampBlock {
   abbreviated: boolean
   /**
    * Provenance of the WORKING weight these ramp percentages are relative to
-   * (see WarmupContext.compounds) — 'estimate' when the day's working set
-   * itself is still an unverified standards-table guess, so the UI can apply
-   * the same muted "suggested" styling to the ramp percentages as it does to
-   * the working-set chip they're building toward. undefined when unknown
-   * (e.g. a bodyweight compound has no load provenance to inherit).
+   * (see WarmupContext.compounds) — 'estimate' or 'assumed_body' when the
+   * day's working set is itself still an unverified guess, so the UI can
+   * apply the same muted styling to the ramp percentages as it does to the
+   * working-set chip they're building toward. undefined when unknown (e.g. a
+   * bodyweight compound has no load provenance to inherit).
    */
-  loadSource?: 'estimate' | 'known_weight'
+  loadSource?: PrescribedLoadSource
 }
 
 export interface WarmupBlock {
@@ -340,7 +340,7 @@ function buildRampSetsFor(
   entry: ExerciseEntry,
   scheme: { load_percent: number; reps: number }[],
   abbreviated: boolean,
-  loadSource: 'estimate' | 'known_weight' | undefined,
+  loadSource: PrescribedLoadSource | undefined,
 ): RampBlock {
   const sets: RampSet[] = scheme.map((s, i) => ({
     set_number: i + 1,
@@ -369,7 +369,7 @@ export interface WarmupContext {
    * round, Fix 2): a day with two main lifts used to ramp only whichever
    * came first, sending the second in cold.
    */
-  compounds: { entry: ExerciseEntry; suggestedLoadKg: number | null; loadSource?: 'estimate' | 'known_weight' }[]
+  compounds: { entry: ExerciseEntry; suggestedLoadKg: number | null; loadSource?: PrescribedLoadSource }[]
   equipment: EquipmentAccess
   injuries: string[]
   experience: TrainingExperience

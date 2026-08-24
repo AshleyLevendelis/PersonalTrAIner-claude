@@ -11,7 +11,7 @@
 
 import { getExerciseEntry } from './exercise-db'
 import { isMalformedZeroWeight } from './set-log-store'
-import { loadingMode, roundToPlate, getEquipmentFloorKg } from './load-prescription'
+import { loadingMode, roundToPlate, getEquipmentFloorKg, isUnverifiedLoadSource } from './load-prescription'
 import type { Exercise, ExerciseSetLog, WorkoutDay } from './types'
 import type { WarmupItem } from './warmup'
 
@@ -176,7 +176,7 @@ export function groupExercises(exercises: Exercise[]): ExerciseGroup[] {
 export function resolveCalibrationAnchorIndex(exercises: Exercise[]): number | null {
   if (exercises.length === 0) return null
   const estimateIdx = exercises.findIndex(
-    ex => ex.suggested_load_kg != null && (ex.load_source ?? 'estimate') === 'estimate'
+    ex => ex.suggested_load_kg != null && isUnverifiedLoadSource(ex.load_source)
   )
   if (estimateIdx !== -1) return estimateIdx
   const anyLoadedIdx = exercises.findIndex(ex => ex.suggested_load_kg != null)

@@ -1,31 +1,52 @@
 import { Dumbbell, Info } from 'lucide-react'
 import type { Exercise } from '@/lib/types'
+import type { PrescribedLoadSource } from '@/lib/load-prescription'
 
 // ---------------------------------------------------------------------------
-// The provenance-styled load chip (LAYOUT-DESIGN.md §1.6.3 / §6.2) — three
-// states app-wide, Exercise is the source of truth: 'estimate' (unverified
-// standards-table guess), 'known_weight' (a real number the trainee
-// reported at onboarding), 'logged' (the live progression engine's
-// recommendation from an actual past session — only ever true on today's
-// session; browse/peek surfaces never pass this). Bodyweight
-// (source === undefined) renders no chip and no ⓘ — there is no load to
-// explain.
+// The provenance-styled load chip (LAYOUT-DESIGN.md §1.6.3 / §6.2) — four
+// states app-wide, Exercise is the source of truth:
+//
+//   'assumed_body'  a standards guess we could not build from this person's
+//                   body, because they declined a weight/age/sex. Held
+//                   deliberately low (load-prescription.ts's
+//                   assumedBodyConservatism) and labelled as such.
+//   'estimate'      a standards guess from body metrics they DID give.
+//   'known_weight'  a real number the trainee reported at onboarding.
+//   'logged'        the live progression engine's recommendation from an
+//                   actual past session — only ever true on today's session;
+//                   browse/peek surfaces never pass this.
+//
+// Bodyweight (source === undefined) renders no chip and no ⓘ — there is no
+// load to explain.
+//
+// 'assumed_body' was split out of 'estimate' because one word was covering
+// two very different claims. A 55kg woman who declined her weight was shown
+// a 30-year-old man's squat under the label "suggested" — the same word used
+// for a number derived from her own body. The chip is the last place that
+// distinction is visible to her, so it has to carry it.
 //
 // The ⓘ is an explicit, always-visible affordance wherever a chip exists
 // (today's ExercisePlan.tsx made the whole chip a silent role="button" only
 // when estimate — this renders a real glyph for every state that has copy).
 // ---------------------------------------------------------------------------
 
-export type LoadSource = 'estimate' | 'known_weight' | 'logged'
+export type LoadSource = PrescribedLoadSource | 'logged'
 
 const ESTIMATE_CHIP_CLASS = 'border-dashed border-muted-foreground/40 text-muted-foreground/70'
+// Fainter still than an estimate, and italic: the visual order on screen has
+// to match the confidence order, or the styling is just decoration.
+const ASSUMED_CHIP_CLASS = 'border-dashed border-muted-foreground/30 text-muted-foreground/60 italic'
 const CONFIDENT_CHIP_CLASS = 'border-foreground/25 bg-foreground/5 text-foreground/90 font-medium'
 
 export function loadChipClass(source: LoadSource | undefined): string {
+  if (source === 'assumed_body') return ASSUMED_CHIP_CLASS
   return source === 'estimate' ? ESTIMATE_CHIP_CLASS : CONFIDENT_CHIP_CLASS
 }
 
 export function loadSourceLabel(source: LoadSource | undefined): string | null {
+  // Not "suggested" — that word implies we suggested it FOR THEM. This number
+  // is a floor to start from, and saying so is the whole point of the state.
+  if (source === 'assumed_body') return 'starting light'
   if (source === 'estimate') return 'suggested'
   if (source === 'known_weight') return 'you told us'
   if (source === 'logged') return 'from your last session'
@@ -33,6 +54,12 @@ export function loadSourceLabel(source: LoadSource | undefined): string | null {
 }
 
 function explainerFor(source: LoadSource | undefined, loadGuidance?: string): string | null {
+  if (source === 'assumed_body') {
+    // MissingBodyMetricsNotice's rule: name the gap, say what still works,
+    // give one action, stop. No placeholder figure dressed up as a
+    // measurement — the number IS real, it is just deliberately low.
+    return "We don't have the body details this would normally be worked out from, so it starts low on purpose rather than guessing. Log what you actually lift and the plan rebuilds from it — or add your weight in Profile." + (loadGuidance ? ` ${loadGuidance}` : '')
+  }
   if (source === 'estimate') {
     return "A starting suggestion — we haven't seen you lift yet. Find your real weight and log it; the plan rebuilds from your numbers." + (loadGuidance ? ` ${loadGuidance}` : '')
   }

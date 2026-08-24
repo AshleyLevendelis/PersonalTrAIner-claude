@@ -38,18 +38,31 @@ export function MissingBodyMetricsNotice({
 }) {
   const missing = missingBodyMetrics(profile)
   if (missing.length === 0) return null
+  // Height is nutrition-only. Weight, age and sex also drive prescribed load.
+  const affectsTraining = missing.some(m => m !== 'height')
 
   return (
     <Card className={className}>
       <CardContent className="p-4">
         <p className="text-sm font-medium">Food targets need your {listPhrase(missing)}</p>
         <p className="mt-1 text-[13px] leading-normal text-muted-foreground">
-          {/* Says what still works, because most of the app does. The training
-              plan is unaffected by this gap and people should not think they
-              have half an app. */}
-          Your training plan is unaffected — this only changes calorie and
-          protein targets. Add {missing.length === 1 ? 'it' : 'them'} whenever
-          you like and your targets will appear.
+          {/* Says what still works, because most of the app does — people
+              should not think they have half an app.
+
+              This used to read "Your training plan is unaffected", which was
+              true only for height. Weight, age and sex ARE what the strength
+              standards scale off (load-prescription.ts's resolveBodyBasis),
+              so with any of those missing the plan starts deliberately light
+              instead. Saying "unaffected" while quietly starting them
+              somewhere else is the same class of untruth this whole notice
+              exists to stop. */}
+          {affectsTraining
+            ? <>Your plan still works — starting weights just begin light and correct
+                themselves as you log real sets. Add {missing.length === 1 ? 'it' : 'them'} whenever
+                you like and your food targets appear too.</>
+            : <>Your training plan is unaffected — this only changes calorie and
+                protein targets. Add {missing.length === 1 ? 'it' : 'them'} whenever
+                you like and your targets will appear.</>}
         </p>
         {onAdd ? (
           <Button variant="outline" size="sm" className="mt-3 h-9" onClick={onAdd}>

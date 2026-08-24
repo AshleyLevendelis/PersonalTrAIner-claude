@@ -1192,6 +1192,32 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
                   </button>
                 ))}
                 <p className="text-[11px] text-muted-foreground/70 pt-1">Tap anything above to change it.</p>
+                {/* Ashley's ruling: ask once more, at the point it matters.
+                    Weight is optional and stays optional — this is not a
+                    second attempt at the same question in the conversation,
+                    where it would just read as nagging. It is here because
+                    THIS is where the number is about to be used: weight is
+                    what sets every starting weight in the plan, and until now
+                    nothing told them that. Says what happens either way and
+                    then gets out of the way. */}
+                {!values.weightKg && (
+                  <p className="text-xs text-muted-foreground border-t border-border/40 pt-2 mt-1">
+                    Worth knowing before you build: your weight is what sets the
+                    starting weight on every lift. Without it we start
+                    everything deliberately light and let your logged sets
+                    correct it — that works, it just takes a few sessions to
+                    settle.{' '}
+                    <button
+                      type="button"
+                      onClick={() => handleEditSlot('weightKg')}
+                      disabled={busy}
+                      className="underline underline-offset-2 font-medium text-foreground disabled:opacity-60"
+                    >
+                      Add it now
+                    </button>
+                    , or carry on without it.
+                  </p>
+                )}
                 {/* VISION.md: "someone beginning exercise for the first time
                     is told, once, plainly and without alarm, to check with a
                     doctor before starting something new — at the point their

@@ -15,6 +15,7 @@
 // This file is retired entirely in P4, replaced by ProgramWeekList/Detail.
 // ---------------------------------------------------------------------------
 
+import type { PrescribedLoadSource } from '@/lib/load-prescription'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
@@ -61,11 +62,11 @@ function isTimeBased(reps: string, prescriptionType?: string): boolean {
 }
 
 // Browse surfaces show plan-derived loads and honest provenance only
-// (§2.2): 'estimate' or 'known_weight', never 'logged' (that requires the
-// live progression engine, which only runs for today's session in
-// TodayPanel). LoadChip's type is the full 3-state union; this component
+// (§2.2): whatever prescribeLoad persisted, never 'logged' (that requires
+// the live progression engine, which only runs for today's session in
+// TodayPanel). LoadChip's type is the full 4-state union; this component
 // simply never passes 'logged'.
-type LoadSource = 'estimate' | 'known_weight'
+type LoadSource = PrescribedLoadSource
 
 function getRepsLabel(reps: string, prescriptionType?: string): string {
   switch (prescriptionType) {

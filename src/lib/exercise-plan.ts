@@ -10,7 +10,7 @@ import {
   type ExperienceConfig,
 } from './experience-config'
 import { buildWarmup, getWarmupReserveSeconds } from './warmup'
-import { prescribeLoad, categorize, getLoadIncrementKg, isExternallyLoaded, getEquipmentFloorKg, loadingMode, roundToPlate, formatLoad, labelModeForEntry, hasKnownWorkingWeight, unverifiedRampStepKg, isolationTargetBelowFloor, prescribeAssistance, assistanceGuidance, type KnownWorkingWeights } from './load-prescription'
+import { prescribeLoad, categorize, getLoadIncrementKg, isExternallyLoaded, getEquipmentFloorKg, loadingMode, roundToPlate, formatLoad, labelModeForEntry, hasKnownWorkingWeight, unverifiedRampStepKg, isolationTargetBelowFloor, resolveBodyBasis, prescribeAssistance, assistanceGuidance, type KnownWorkingWeights } from './load-prescription'
 import {
   getPhaseSequence, getPhaseConfig, rotateVariation, resolveTargetRpe,
   shiftReps, adjustRest, dedupeAdjacentPhases, isRegressionFor, stepIntervalSeconds, type PhaseConfig, type TrainingPhase,
@@ -4520,6 +4520,35 @@ export function generateMesocycle(
       }
     : undefined
 
+  // Whether this trainee may skip the calibration week.
+  //
+  // `skip_calibration_week` is not sufficient on its own, for two independent
+  // reasons, both of which produced a plan that started heavy on a number
+  // nobody had ever verified:
+  //
+  //  1. THE FLAG CAN BE TRUE WITH NOTHING BEHIND IT. onboarding-slots.ts sets
+  //     it from `knowsWorkingLifts === true` alone, and the three lift-number
+  //     slots are in NEVER_BLOCKING_SLOTS — so tapping "I know my numbers"
+  //     and then entering none of them skipped calibration with zero anchors.
+  //     Measured: that path prescribed a 55kg woman a mean 2.22x her own
+  //     week-1 loads, with no calibration damping anywhere in the program.
+  //  2. THE BODY CAN BE ASSUMED. Only squat/goblet_squat/bench/deadlift are
+  //     anchored by known weights (KNOWN_WEIGHT_FAMILY); the other ~12
+  //     standards categories still come from bodyweight/sex/age. If any of
+  //     those was never given, those categories are guesses about a stranger
+  //     and calibration is exactly what they need.
+  //
+  // Ashley's ruling: for someone who still declines, force a calibration week
+  // and say why. Note `knownWorkingWeights` above is deliberately NOT gated on
+  // this — a trainee who gave real lift numbers but declined their weight
+  // keeps those numbers on the lifts they anchor, and gets a calibration week
+  // for everything else.
+  const hasAnyKnownLift = [profile.known_squat_kg, profile.known_bench_kg, profile.known_deadlift_kg]
+    .some(v => v != null && v > 0)
+  const canSkipCalibration = profile.skip_calibration_week === true
+    && hasAnyKnownLift
+    && !resolveBodyBasis(profile).assumed
+
   // Persists ACROSS blocks (unlike blockBaselineKg/blockWeek3Kg below, which
   // reset every block) — the last loading week's actual resolved load for a
   // still-unverified exercise, keyed by [dayIndex][exerciseIndex]. Stable
@@ -4528,6 +4557,29 @@ export function generateMesocycle(
   // the next block's week 1 steps from the last real loading week, not the
   // deload number. See UNVERIFIED_RAMP_STEP_KG's doc comment.
   const lastUnverifiedLoadingWeekKg: (number | null)[][] = baseWeek.map(day => day.exercises.map(() => null))
+
+  // The same history keyed by EXERCISE NAME rather than by slot position.
+  //
+  // The slot tracker above is indexed by [dayIndex][exerciseIndex], and the
+  // variation occupying a slot ROTATES at block boundaries — so a lift
+  // returning to a slot it left five weeks ago was stepping up from whatever
+  // had been sitting there in the meantime, not from its own last number.
+  // Caught end-to-end by test:assumed-body: Romanian Deadlifts ran 8kg in
+  // week 3, vanished from the slot for a block, and came back at 16kg in week
+  // 9 — a doubling on an unverified lift, inherited from a stranger. That is
+  // the same contamination the forceStartingWeightKg path already guards
+  // against ("a capped or broken anchor must never propagate through a
+  // rotation"); this path had no equivalent, and it breaks the invariant
+  // UNVERIFIED_RAMP_STEP_KG is written around: never more than one increment
+  // between an unverified lift's own consecutive loading weeks.
+  //
+  // Not simply REPLACING the slot tracker: a variation appearing for the
+  // first time has no history of its own, and discarding the slot's value
+  // there would drop it back to a fresh, undamped estimate — precisely the
+  // block-boundary snap the ramp exists to prevent. So the slot value stays
+  // as the fallback for a genuinely new lift, and a lift with its own history
+  // uses that instead.
+  const lastUnverifiedLoadingWeekKgByLift = new Map<string, number>()
 
   sequence.forEach((phase, blockIndex) => {
     let phaseConfig = getPhaseConfig(phase)
@@ -4657,7 +4709,7 @@ export function generateMesocycle(
       // onboarding they don't know their numbers — not repeated per block,
       // since calibration is a one-time "find the weight" exercise, not a
       // recurring one.
-      const isCalibrationWeek = weekCounter === 1 && profile.skip_calibration_week !== true
+      const isCalibrationWeek = weekCounter === 1 && !canSkipCalibration
 
       const days: WorkoutDay[] = blockDays.map((day, dayIdx) => {
         // Fixed for this week (main/core never rotate weekly), so these
@@ -4935,7 +4987,15 @@ export function generateMesocycle(
             // progression lever is reps, not this.
             const unverifiedForCategory = !hasKnownWorkingWeight(category, knownWorkingWeights)
             if (rampLoad && unverifiedForCategory && !isDeload && !isCalibrationWeek) {
-              const previous = lastUnverifiedLoadingWeekKg[dayIdx][exIdx]
+              const previousInSlot = lastUnverifiedLoadingWeekKg[dayIdx][exIdx]
+              const previousForThisLift = dbEntry ? lastUnverifiedLoadingWeekKgByLift.get(dbEntry.name) : undefined
+              // Both, when both exist: never step up from a number that was
+              // not this lift's, and never step up past what this slot
+              // actually displayed last week either. See
+              // lastUnverifiedLoadingWeekKgByLift's declaration.
+              const previous = previousForThisLift != null && previousInSlot != null
+                ? Math.min(previousForThisLift, previousInSlot)
+                : previousForThisLift ?? previousInSlot
               if (previous != null) unverifiedPreviousLoadingWeekKg = previous
             }
             if (unverifiedPreviousLoadingWeekKg == null && baselineKg != null) {
@@ -5061,14 +5121,24 @@ export function generateMesocycle(
       // Anchor to the FINAL, post-coherence displayed number — see
       // unverifiedLoadingFlags's declaration for why this can't be written
       // during the exercises.map above.
+      // Collected for the week first, then merged, because one exercise can
+      // occupy two slots in the same week (different days) at two different
+      // loads — the per-lift history takes the LIGHTER of them rather than
+      // whichever happened to be written last.
+      const thisWeekByLift = new Map<string, number>()
       for (let dayIdx = 0; dayIdx < days.length; dayIdx++) {
         const dayExercises = days[dayIdx].exercises
         for (let exIdx = 0; exIdx < dayExercises.length; exIdx++) {
           if (!unverifiedLoadingFlags[dayIdx][exIdx]) continue
           const finalKg = dayExercises[exIdx].suggested_load_kg
-          if (finalKg != null) lastUnverifiedLoadingWeekKg[dayIdx][exIdx] = finalKg
+          if (finalKg == null) continue
+          lastUnverifiedLoadingWeekKg[dayIdx][exIdx] = finalKg
+          const name = dayExercises[exIdx].name
+          const already = thisWeekByLift.get(name)
+          thisWeekByLift.set(name, already == null ? finalKg : Math.min(already, finalKg))
         }
       }
+      for (const [name, kg] of thisWeekByLift) lastUnverifiedLoadingWeekKgByLift.set(name, kg)
 
       progressConditioningWeek(days, w, isDeload)
 
