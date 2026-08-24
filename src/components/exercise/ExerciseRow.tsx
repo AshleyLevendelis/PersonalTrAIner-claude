@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { Ban, History, MoreVertical, ChevronDown, Info } from 'lucide-react'
+import { Ban, History, MoreVertical, Info } from 'lucide-react'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { getExerciseId } from '@/lib/exercise-db'
 import { formatRampSets, formatCompletedSummary } from '@/lib/session-derive'
 import { RampStrip } from './RampStrip'
 import { LoadChip, loadSourceLabel, type LoadSource } from './LoadChip'
+import { ExerciseLine } from './ExerciseLine'
 import { isUnverifiedLoadSource } from '@/lib/load-prescription'
 import { AssistanceChip } from './AssistanceChip'
 import { CalibrationCue } from './CalibrationCue'
@@ -93,34 +94,7 @@ export function ExerciseRow({
   // bodyweight row means here).
   const loadIsUnverified = loadSource != null && isUnverifiedLoadSource(loadSource)
 
-  const nameLine = (
-    <div className="flex items-center gap-2 flex-wrap min-w-0">
-      {supersetLabel && (
-        <span className="shrink-0 font-mono text-[10px] font-semibold text-primary glow-mint">{supersetLabel}</span>
-      )}
-      <span
-        className={`truncate ${expanded ? 'text-[19px] font-semibold' : 'text-[15.5px] font-medium'} ${
-          allSetsLogged ? 'line-through text-muted-foreground' : ''
-        } ${!expanded && loadIsUnverified ? 'border-b border-dotted border-muted-foreground/50' : ''}`}
-      >
-        {ex.name}
-      </span>
-    </div>
-  )
 
-  // Tab-restructure handoff — collapsed rows go back to a mono
-  // "{sets}×{reps} · {load}kg" summary + chevron, matching the meal-slot
-  // idiom (MealPlan's collapsed row: kcal text + chevron) instead of turn
-  // 5's dot ladder.
-  const collapsedSummary = allSetsLogged ? (
-    <span className="tabular-mono text-xs text-primary glow-mint">✓ {formatCompletedSummary(loggedSets)}</span>
-  ) : (
-    <span className="tabular-mono text-xs text-muted-foreground">
-      {ex.sets}×{ex.reps}
-      {ex.suggested_load_kg != null ? ` · ${ex.suggested_load_kg}kg` : ''}
-      {ex.suggested_assistance_kg != null ? ` · ${ex.assistance_ready_to_graduate ? 'no assist' : `${ex.suggested_assistance_kg}kg assist`}` : ''}
-    </span>
-  )
 
   // Density pass 3b "Borderless": the active (expanded) exercise is no longer
   // a bordered card — it separates by a swept mint hairline along its top edge
@@ -147,26 +121,22 @@ export function ExerciseRow({
           another button (the browser silently splits/corrupts the DOM when
           it tries, which reads as "nothing ever expands"). role="button" +
           tabIndex + Enter/Space keeps this a real, keyboard-operable control. */}
-      <div
-        role="button"
-        tabIndex={0}
-        onClick={onToggleExpanded}
-        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggleExpanded() } }}
-        className="w-full text-left flex items-baseline justify-between gap-2.5 cursor-pointer"
-      >
-        <div className="min-w-0 flex-1 space-y-1">
-          {nameLine}
-          {expanded && completedSets > 0 && !allSetsLogged && (
-            <span className="font-mono text-[10px] text-muted-foreground">{completedSets}/{ex.sets} sets</span>
-          )}
-        </div>
-        {!expanded && (
-          <span className="flex shrink-0 items-center gap-1">
-            {collapsedSummary}
-            <ChevronDown className="size-3.5 text-muted-foreground" />
-          </span>
-        )}
-      </div>
+      {/* The collapsed line is shared with the upcoming-day peek (see
+          ExerciseLine) so the two surfaces cannot drift apart again. Today's
+          session-derived extras — the logged-set count while part-way
+          through — hang off it here rather than inside it. */}
+      <ExerciseLine
+        ex={ex}
+        supersetLabel={supersetLabel}
+        loadSource={loadSource}
+        expanded={expanded}
+        onToggleExpanded={onToggleExpanded}
+        allSetsLogged={allSetsLogged}
+        loggedSummary={formatCompletedSummary(loggedSets)}
+      />
+      {expanded && completedSets > 0 && !allSetsLogged && (
+        <span className="font-mono text-[10px] text-muted-foreground">{completedSets}/{ex.sets} sets</span>
+      )}
 
       {expanded && (
         <>

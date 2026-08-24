@@ -12,6 +12,7 @@ import { getLocalDateString } from '@/lib/dev-clock'
 import { tabHash } from '@/lib/app-route'
 import { WeekContextRow } from './WeekContextRow'
 import { PeekPanel } from './PeekPanel'
+import { SectionLabel, sectionLabelFor } from './ExerciseLine'
 import { WarmupSection } from './WarmupSection'
 import { ExerciseRow } from './ExerciseRow'
 import { SupersetGroup } from './SupersetGroup'
@@ -438,9 +439,7 @@ function ExerciseList({
             className={`flex flex-col gap-2.5 py-3 ${i > 0 ? '' : 'pb-3'}`}
             style={i > 0 ? { borderTop: '1px solid var(--hairline)' } : undefined}
           >
-            <span className={expanded ? 'ds-label-compact text-primary glow-mint' : 'ds-label-compact'}>
-              {sectionLabelFor(g, i === firstMainLiftGroupIndex)}{expanded ? ' · open' : ''}
-            </span>
+            <SectionLabel text={sectionLabelFor(g, i === firstMainLiftGroupIndex)} expanded={expanded} />
             {g.kind === 'single' ? (
               <ExerciseRow {...rowProps(g.ex, g.exIndex)} />
             ) : (
@@ -454,14 +453,6 @@ function ExerciseList({
       })}
     </div>
   )
-}
-
-function sectionLabelFor(group: ExerciseGroup, isFirstMainLift: boolean): string {
-  if (group.kind === 'superset') return `Superset ${group.label}`
-  if (isFirstMainLift) return 'Main lift'
-  if (group.ex.tier === 'tier_0_primer') return 'Primer'
-  if (group.ex.tier === 'tier_4_finisher') return 'Finisher'
-  return 'Accessory'
 }
 
 function parseRepsHigh(reps: string): number {

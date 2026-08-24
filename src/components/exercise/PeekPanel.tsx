@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { ArrowRightLeft, Ban, X } from 'lucide-react'
-import { formatRampSets } from '@/lib/session-derive'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { ArrowRightLeft, Ban, MoreVertical, X } from 'lucide-react'
+import { formatRampSets, groupExercises, type ExerciseGroup } from '@/lib/session-derive'
 import { RampStrip } from './RampStrip'
 import { LoadChip, type LoadSource } from './LoadChip'
-import type { WorkoutDay } from '@/lib/types'
+import { ExerciseLine, SectionLabel, sectionLabelFor } from './ExerciseLine'
+import type { Exercise, WorkoutDay } from '@/lib/types'
 
 // ---------------------------------------------------------------------------
 // LAYOUT-DESIGN.md §2.2 — one other day's content, in place, one tap, one
@@ -17,6 +18,17 @@ import type { WorkoutDay } from '@/lib/types'
 // Swap/ban stay available (they're plan edits, not session acts) via
 // callbacks — the confirm dialog itself is owned by the caller (ExerciseTab)
 // and shared with the main day's rows.
+//
+// LOOKS LIKE TODAY, DELIBERATELY. This used to render a stack of raised
+// cards with every exercise forced open — ramp box, RPE line, per-set chips,
+// two always-visible icons — while today's list was hairline-separated bare
+// lines with a tier label and a mono "3×6-8 · 42.5kg" summary. Same data,
+// same app, two visual languages, and nothing about being read-only required
+// the difference: it was markup duplication, not a real constraint. The
+// collapsed line and the tier label now come from ExerciseLine, shared with
+// today's rows so they cannot drift apart again. What stays different is
+// only what genuinely differs — no set grid, no logged-set state, no
+// calibration cue, no plate calculator.
 // ---------------------------------------------------------------------------
 
 export function PeekPanel({
@@ -33,63 +45,98 @@ export function PeekPanel({
   banBusyName: string | null
 }) {
   const [explainedKey, setExplainedKey] = useState<string | null>(null)
+  const [expandedKey, setExpandedKey] = useState<string | null>(null)
+
+  const groups = groupExercises(workout.exercises)
+  const firstMainLiftGroupIndex = groups.findIndex(
+    g => g.kind === 'single' && g.ex.tier === 'tier_1_primary'
+  )
+
+  const loadSourceFor = (ex: Exercise): LoadSource | undefined =>
+    ex.suggested_load_kg == null ? undefined : (ex.load_source ?? 'estimate')
+
+  const renderRow = (ex: Exercise, exIndex: number, supersetLabel?: string) => {
+    const key = `${exIndex}:${ex.name}`
+    const expanded = expandedKey === key
+    const ramp = formatRampSets(ex)
+    return (
+      <div key={key} className="space-y-2">
+        <ExerciseLine
+          ex={ex}
+          supersetLabel={supersetLabel}
+          loadSource={loadSourceFor(ex)}
+          expanded={expanded}
+          onToggleExpanded={() => setExpandedKey(prev => (prev === key ? null : key))}
+          trailing={
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="size-7 shrink-0" aria-label="Exercise options">
+                  <MoreVertical className="size-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => onSwap(exIndex, ex.name)}>
+                  <ArrowRightLeft className="size-3.5" />
+                  Swap exercise
+                </DropdownMenuItem>
+                <DropdownMenuItem variant="destructive" disabled={banBusyName === ex.name} onClick={() => onBan(ex.name)}>
+                  <Ban className="size-3.5" />
+                  {banBusyName === ex.name ? 'Removing…' : 'Never show this again'}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          }
+        />
+        {expanded && (
+          <div className="space-y-1.5">
+            {/* The ramp ladder is why a peeked day is worth opening at all —
+                it is the safety-relevant half of the prescription, and it
+                stays exactly as it was, just behind one tap now instead of
+                always on screen. */}
+            {ramp && <RampStrip ramp={ramp} />}
+            <LoadChip
+              ex={ex}
+              source={loadSourceFor(ex)}
+              explained={explainedKey === key}
+              onToggleExplain={() => setExplainedKey(prev => (prev === key ? null : key))}
+            />
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  const isGroupExpanded = (g: ExerciseGroup) =>
+    g.kind === 'single'
+      ? expandedKey === `${g.exIndex}:${g.ex.name}`
+      : g.members.some(m => expandedKey === `${m.exIndex}:${m.ex.name}`)
 
   return (
     <div className="rounded-xl bg-card">
-      <div className="flex items-center justify-between px-3 py-2 border-b">
+      <div className="flex items-center justify-between px-4 py-3 border-b">
         <span className="text-sm font-medium">{workout.day} · {workout.focus}</span>
         <Button variant="ghost" size="icon" className="size-7" onClick={onExit} aria-label="Close">
           <X className="size-3.5" />
         </Button>
       </div>
-      <div className="p-3 space-y-2">
-        {workout.exercises.map((ex, exIndex) => {
-          const ramp = formatRampSets(ex)
-          const loadSource: LoadSource | undefined = ex.suggested_load_kg == null
-            ? undefined
-            : (ex.load_source ?? 'estimate')
-          return (
-            <div key={exIndex} className="rounded-lg bg-[color:var(--surface-raised)] p-2.5 space-y-1">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {ex.superset_label && (
-                      <Badge variant="outline" className="text-[10px] font-mono px-1.5 py-0.5">{ex.superset_label}</Badge>
-                    )}
-                    <span className="font-medium text-sm">{ex.name}</span>
-                    <span className="text-xs text-muted-foreground">{ex.sets}×{ex.reps}</span>
-                  </div>
-                  {ramp && <RampStrip ramp={ramp} />}
-                  <LoadChip
-                    ex={ex}
-                    source={loadSource}
-                    explained={explainedKey === ex.name}
-                    onToggleExplain={() => setExplainedKey(prev => prev === ex.name ? null : ex.name)}
-                  />
-                </div>
-                <div className="flex items-center gap-1 shrink-0">
-                  <Button variant="ghost" size="icon" className="size-7" onClick={() => onSwap(exIndex, ex.name)} aria-label="Swap exercise">
-                    <ArrowRightLeft className="size-3.5" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="size-7 text-destructive hover:text-destructive"
-                    disabled={banBusyName === ex.name}
-                    onClick={() => onBan(ex.name)}
-                    aria-label="Ban exercise"
-                  >
-                    {banBusyName === ex.name ? (
-                      <div className="size-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                    ) : (
-                      <Ban className="size-3.5" />
-                    )}
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )
-        })}
+      {/* Same list chrome as today's ExerciseList: hairline-separated rows in
+          one column, not gap-separated cards. */}
+      <div className="flex flex-col px-4 pb-2">
+        {groups.map((g, i) => (
+          <div
+            key={i}
+            className="flex flex-col gap-2.5 py-3"
+            style={i > 0 ? { borderTop: '1px solid var(--hairline)' } : undefined}
+          >
+            <SectionLabel
+              text={sectionLabelFor(g, i === firstMainLiftGroupIndex)}
+              expanded={isGroupExpanded(g)}
+            />
+            {g.kind === 'single'
+              ? renderRow(g.ex, g.exIndex)
+              : g.members.map(m => renderRow(m.ex, m.exIndex, g.label))}
+          </div>
+        ))}
       </div>
     </div>
   )
