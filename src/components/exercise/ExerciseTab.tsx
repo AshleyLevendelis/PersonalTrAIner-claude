@@ -126,6 +126,7 @@ export function ExerciseTab({
         exclusions={exclusions}
         profile={profile}
         profileId={profileId}
+        planCreatedAt={planCreatedAt}
         devOverrideDay={devOverrideDay}
         onOpenProgram={() => { window.location.hash = programHash(liveWeek) }}
         onOpenSwap={(dayName, exIndex, exerciseName) => setSwapTarget({ dayName, exIndex, exerciseName })}

@@ -40,6 +40,7 @@ export function TodayPanel({
   exclusions,
   profile,
   profileId,
+  planCreatedAt,
   devOverrideDay,
   onOpenProgram,
   onOpenSwap,
@@ -53,6 +54,8 @@ export function TodayPanel({
   exclusions: string[]
   profile?: UserProfile
   profileId?: string
+  /** When this plan came into being — days before it were never prescribed. */
+  planCreatedAt?: string
   devOverrideDay?: string | null
   onOpenProgram: () => void
   onOpenSwap: (dayName: string, exIndex: number, exerciseName: string) => void
@@ -125,7 +128,7 @@ export function TodayPanel({
     setBorrowedDayName(null)
   }, [todayName])
 
-  const weekTrain = useTrainingWeek(profileId, today, liveWeekPlan)
+  const weekTrain = useTrainingWeek(profileId, today, liveWeekPlan, planCreatedAt)
 
   const effectiveDayName = borrowedDayName ?? todayName
   const workout = liveWeekPlan.find(d => d.day === effectiveDayName)

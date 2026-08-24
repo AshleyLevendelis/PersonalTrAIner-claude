@@ -54,6 +54,7 @@
     "test:onboarding-slots": "tsx scripts/test-onboarding-slots.ts",
     "test:activity-streak": "tsx scripts/test-activity-streak.ts",
     "test:starting-out": "tsx scripts/test-starting-out.ts",
+    "test:training-week": "tsx scripts/test-training-week.ts",
     "test:coach-rules-sync": "tsx scripts/test-coach-rules-sync.ts",
     "test:reply-guarantee": "tsx scripts/test-onboarding-reply-guarantee.ts",
     "report:trim-magnitude": "tsx scripts/run-trim-magnitude-report.ts"

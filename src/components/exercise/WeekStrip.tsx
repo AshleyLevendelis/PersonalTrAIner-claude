@@ -15,6 +15,25 @@ const GLYPH: Record<TrainingWeekDay['state'], string> = {
   missed: '○',
   rest: '–',
   recovery: '~',
+  // A training day that fell before this plan existed. Deliberately the
+  // faintest mark in the set: it is not a rest day (the plan didn't choose
+  // it) and emphatically not a missed one (nothing was ever owed).
+  before_plan: '·',
+}
+
+/**
+ * Spoken form of each state. The aria-label used to interpolate the raw
+ * state name, so a screen reader announced "partial" and would now announce
+ * "before_plan" — identifiers, not English.
+ */
+const STATE_LABEL: Record<TrainingWeekDay['state'], string> = {
+  done: 'done',
+  partial: 'partly done',
+  due: 'due',
+  missed: 'missed',
+  rest: 'rest day',
+  recovery: 'active recovery',
+  before_plan: 'before your plan started',
 }
 
 const SHORT_DAY: Record<string, string> = {
@@ -47,7 +66,7 @@ export function WeekStrip({
             className={`flex flex-col items-center gap-1 rounded-md py-1.5 text-xs transition-colors ${
               isToday ? 'font-semibold' : 'hover:bg-accent/40'
             }`}
-            aria-label={`${d.dayName}: ${d.state}`}
+            aria-label={`${d.dayName}: ${STATE_LABEL[d.state]}`}
           >
             <span className={`text-[10px] ${isToday ? 'text-primary glow-mint' : 'text-muted-foreground'}`}>
               {SHORT_DAY[d.dayName] ?? d.dayName.slice(0, 3)}

@@ -25,6 +25,10 @@ const GLYPH: Record<TrainingWeekDay['state'], string> = {
   missed: '○',
   rest: '–',
   recovery: '~',
+  // A training day that fell before this plan existed. Deliberately the
+  // faintest mark in the set: it is not a rest day (the plan didn't choose
+  // it) and emphatically not a missed one (nothing was ever owed).
+  before_plan: '·',
 }
 
 const SHORT_DAY: Record<string, string> = {
