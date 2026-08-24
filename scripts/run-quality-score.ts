@@ -224,6 +224,33 @@ async function main() {
   lines.push('')
   lines.push(`Plans below the ${OVERALL_FLOOR} floor: ${belowFloor.length} / ${scored.length}`)
   lines.push('')
+
+  // How many of the swept combinations trip each rule, across ALL of them —
+  // not just the ten sampled below. Added after attributing a 0.11 overall
+  // drop cost stashing the work and re-running two 14-minute sweeps, only to
+  // find a single rule was the whole delta. The worst-10 section shows what a
+  // bad plan looks like; this shows what CHANGED, which is a different
+  // question and the one asked far more often. Counted per combination, not
+  // per occurrence, to match how scoreFromViolatedRules actually penalises.
+  const ruleCounts = new Map<string, number>()
+  for (const s of scored) {
+    const rules = new Set<string>()
+    for (const key of DIMENSION_KEYS) {
+      for (const d of s.result.dimensions[key].deductions) rules.add(`${key}/${d.rule}`)
+    }
+    for (const r of rules) ruleCounts.set(r, (ruleCounts.get(r) ?? 0) + 1)
+  }
+  lines.push('-'.repeat(80))
+  lines.push('RULE FREQUENCY — combinations tripping each rule (of ' + scored.length + ')')
+  lines.push('-'.repeat(80))
+  if (ruleCounts.size === 0) {
+    lines.push('  (none)')
+  } else {
+    for (const [rule, n] of [...ruleCounts].sort((a, b) => b[1] - a[1])) {
+      lines.push(`  ${rule.padEnd(46)} ${String(n).padStart(6)}  ${((n / scored.length) * 100).toFixed(1)}%`)
+    }
+  }
+  lines.push('')
   lines.push('-'.repeat(80))
   lines.push('10 WORST-SCORING PLANS')
   lines.push('-'.repeat(80))

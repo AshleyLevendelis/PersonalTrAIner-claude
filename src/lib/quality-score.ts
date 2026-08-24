@@ -1,6 +1,6 @@
 import type { UserProfile, MesocycleWeek, WorkoutDay, Exercise } from './types'
-import { EXERCISE_DATABASE, getMovementFamily, getVolumeRole, type ExerciseEntry } from './exercise-db'
-import { getConstrainedPool, generateMesocycle, primerPatternsForTrack, getAffinityPrimerPool, CARDIO_RESERVED_SHARE } from './exercise-plan'
+import { EXERCISE_DATABASE, getMovementFamily, getVolumeRole, isIndicatedFor, type ExerciseEntry } from './exercise-db'
+import { getConstrainedPool, generateMesocycle, primerPatternsForTrack, getAffinityPrimerPool, getFlaggedJoints, CARDIO_RESERVED_SHARE } from './exercise-plan'
 import { getGoalPolicy, resolveConditioningFrequency, RECOVERY_SET_MULTIPLIER } from './goal-policies'
 import { EXPERIENCE_RPE_CEILING } from './periodization'
 import { setRandomSource, resetRandomSource } from './exercise-plan'
@@ -207,17 +207,42 @@ function scoreTimeFit(profile: UserProfile, mesocycle: MesocycleWeek[]): Dimensi
 // 2. Structure
 // ---------------------------------------------------------------------------
 
-function scoreStructure(mesocycle: MesocycleWeek[]): DimensionResult {
+function scoreStructure(mesocycle: MesocycleWeek[], profile: UserProfile): DimensionResult {
   const week1 = mesocycle.find(w => w.week_number === 1)
   const deductions: Deduction[] = []
   const violatedRules = new Set<string>()
+  // Only THIS trainee's reported joints. Deliberately not "does the movement
+  // carry any indicated_joints" — that would pass a rehab warm-up to someone
+  // who never reported the injury, which is the exact shape of the last five
+  // defects in this engine: a tag answering a question it was not asked.
+  const flaggedJoints = getFlaggedJoints(profile.injuries ?? [])
 
   for (const day of week1?.days ?? []) {
     if (day.exercises.length === 0) continue
 
+    // WARM-UPS FIRST, AND CONTIGUOUS. This used to read "a primer anywhere
+    // but position 0 is a violation", which encoded "a session has exactly
+    // one warm-up" — true until rehab was actually prescribed, and wrong
+    // for injured trainees since. An injured session now opens with the
+    // primer for the day's training AND the rehab primer for the complaining
+    // joint (roughly 15 seconds each), which is Ashley's explicit ruling:
+    // a shoulder-injured trainee warms up for what they are about to do and
+    // does their rehab, rather than choosing.
+    //
+    // METRIC CHANGE, stated because it is one: Structure readings for
+    // INJURED profiles from before this are not comparable with readings
+    // after it. The 1.81 average this replaces was the scorer penalising a
+    // deliberate decision, not plans getting worse; the ~1.95 it restores is
+    // not plans getting better. Uninjured profiles are untouched either way.
+    //
+    // The rule keeps its teeth. Two arbitrary warm-ups still violate. A
+    // warm-up after the main lift still violates. A knee drill in a
+    // shoulder-injured trainee's session still violates.
     day.exercises.forEach((ex, i) => {
       const entry = dbEntry(ex.name)
       if (entry?.mechanics_tier === 'primer' && i !== 0) {
+        const allPrimersBefore = day.exercises.slice(0, i).every(e => dbEntry(e.name)?.mechanics_tier === 'primer')
+        if (allPrimersBefore && isIndicatedFor(entry, flaggedJoints)) return
         violatedRules.add('primer_not_first')
         deductions.push({
           rule: 'primer_not_first', day: day.day, weekNumber: 1,
@@ -1093,7 +1118,7 @@ function scoreGoalAlignment(profile: UserProfile, mesocycle: MesocycleWeek[], co
 export function scorePlan(profile: UserProfile, mesocycle: MesocycleWeek[], comboKey: string): PlanScoreResult {
   const dimensions: Record<DimensionKey, DimensionResult> = {
     timeFit: scoreTimeFit(profile, mesocycle),
-    structure: scoreStructure(mesocycle),
+    structure: scoreStructure(mesocycle, profile),
     progression: scoreProgression(profile, mesocycle),
     selection: scoreSelection(profile, mesocycle),
     goalAlignment: scoreGoalAlignment(profile, mesocycle, comboKey),

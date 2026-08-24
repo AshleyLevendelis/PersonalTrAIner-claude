@@ -257,3 +257,69 @@ Five of the eight injury codes a user can pick have no rehab movements at all
 have indicated entries). Someone reporting a hip, ankle, elbow, wrist or back
 problem sees no change. Whether the app should SAY so rather than stay quiet is
 a user-facing question for Ashley.
+
+---
+
+# Follow-up: the quality score had to be told
+
+## The measurement, and why it moved
+
+Adding a rehab warm-up to every injured session cost 0.11 of the overall
+quality score. Measured on one machine, same 9,216 combinations, with the work
+stashed for the baseline:
+
+| dimension | before | after |
+|---|---|---|
+| Time fit | 1.53 | 1.55 |
+| **Structure** | **1.95** | **1.81** |
+| Progression | 1.66 | 1.66 |
+| Selection | 1.95 | 1.94 |
+| Goal alignment | 1.97 | 1.96 |
+| Primer fit | 2.00 | 2.00 |
+| **Overall** | **11.05** | **10.94** |
+
+Structure was the entire delta, and one rule caused it. `primer_not_first`
+flagged any primer at any position but the first — encoding "a session has
+exactly one warm-up". True until rehab was prescribed; wrong for injured
+trainees after. At 0.4 per distinct rule type, a third of combinations newly
+tripped it.
+
+## Ashley's ruling
+
+Keep both warm-ups and fix the check. The alternative — making rehab REPLACE
+the day's primer — would have restored 11.05 with nothing measured differently,
+at the cost of a shoulder-injured trainee having no leg preparation before
+squatting on leg day. A metric problem traded for a training one.
+
+## The change
+
+A primer past position 0 is now acceptable only when **every exercise before
+it is also a primer** AND it is **indicated for a joint this trainee actually
+reported**. `scoreStructure` takes the profile (one argument threaded from
+`scorePlan`, which already had it) and reuses `getFlaggedJoints` and
+`isIndicatedFor`.
+
+Deliberately NOT relaxed to "any primer carrying `indicated_joints`" — that
+passes a rehab warm-up for someone who never reported the injury, which is the
+same tag-answering-the-wrong-question shape as the five defects before it.
+
+The rule keeps its teeth, and `test:rehab-prescribed` §7 asserts all three:
+a second warm-up that is not rehab is still flagged; a rehab warm-up after the
+main lift is still flagged; and an uninjured profile with the identical day is
+still flagged.
+
+## METRIC CHANGE — prior numbers stop being comparable
+
+**Structure readings for INJURED profiles from before this change cannot be
+compared with readings after it.** The 1.81 was the scorer penalising a
+deliberate, approved decision, not plans getting worse; the recovery is not
+plans getting better. Uninjured profiles are unaffected in both directions,
+so their figures remain comparable.
+
+## Also added
+
+`run-quality-score.ts` now prints a per-rule frequency table across all swept
+combinations, not just the ten worst-scoring plans it samples. Attributing this
+0.11 drop required stashing the work and running two 14-minute sweeps to
+discover a single rule was responsible. The next such question is a diff
+between two reports.

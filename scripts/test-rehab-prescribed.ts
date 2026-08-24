@@ -27,10 +27,11 @@
 // ---------------------------------------------------------------------------
 
 import {
-  generateExercisePlan, setRandomSource, resetRandomSource,
+  generateExercisePlan, generateMesocycle, setRandomSource, resetRandomSource,
   getConstrainedPool, getFlaggedJoints, pickRehabMovement,
 } from '../src/lib/exercise-plan'
 import { getExerciseEntry, isIndicatedFor, EXERCISE_DATABASE } from '../src/lib/exercise-db'
+import { scorePlan } from '../src/lib/quality-score'
 import { seededRngFromKey } from '../src/lib/seeded-random'
 import type { UserProfile, WorkoutDay } from '../src/lib/types'
 
@@ -270,6 +271,78 @@ console.log('\n6. The data the guarantee rests on')
   console.log(`      joints with rehab movements: ${[...joints].join(', ')} (${tagged.length} entries)`)
   check('the two joints this feature covers are still covered',
     joints.has('shoulder') && joints.has('knee'), [...joints].join(', '))
+}
+
+// ---------------------------------------------------------------------------
+console.log('\n7. The quality score knows a rehab warm-up is a legitimate second one')
+// ---------------------------------------------------------------------------
+{
+  // Ashley's ruling was to keep BOTH warm-ups — the one for the day's training
+  // and the rehab one — and teach the check, rather than drop one to protect a
+  // number. quality-score.ts's `primer_not_first` used to fire on any primer
+  // past position 0, which encoded "a session has exactly one warm-up".
+  //
+  // These assertions exist so the relaxation cannot quietly widen into "any
+  // second warm-up is fine". Structure readings for INJURED profiles are not
+  // comparable across this change; uninjured ones are unaffected, which is
+  // itself asserted below.
+  const structureRules = (profile: UserProfile, seed: string) => {
+    setRandomSource(seededRngFromKey(seed))
+    const d = console.debug, w = console.warn
+    console.debug = () => {}; console.warn = () => {}
+    try {
+      const plan = generateExercisePlan(profile).plan
+      const meso = generateMesocycle(profile, plan)
+      return new Set(scorePlan(profile, meso, seed).dimensions.structure.deductions.map(x => x.rule))
+    } finally { console.debug = d; console.warn = w; resetRandomSource() }
+  }
+
+  let injuredClean = 0, injuredTotal = 0
+  for (const injury of ['shoulders', 'knees'] as const) {
+    for (const split of SPLITS) {
+      injuredTotal++
+      const rules = structureRules(buildProfile({ injuries: [injury], workout_split_preference: split }), `qs:${injury}:${split}`)
+      if (!rules.has('primer_not_first')) injuredClean++
+    }
+  }
+  check(`an injured trainee's rehab warm-up is not scored as misplaced (${injuredClean}/${injuredTotal})`,
+    injuredClean === injuredTotal, `${injuredTotal - injuredClean} still flagged`)
+
+  // The teeth. A hand-built day with a SECOND warm-up that is not rehab for
+  // this trainee must still be flagged, or the rule has stopped meaning
+  // anything. Built by hand rather than generated, because the engine will no
+  // longer produce this shape — which is the point.
+  const shoulderRehabPrimer = EXERCISE_DATABASE.find(e => e.mechanics_tier === 'primer' && (e.indicated_joints ?? []).includes('shoulder'))!
+  const plainPrimer = EXERCISE_DATABASE.find(e => e.mechanics_tier === 'primer' && (e.indicated_joints ?? []).length === 0)!
+  const mainLift = EXERCISE_DATABASE.find(e => e.mechanics_tier === 'tier1_compound')!
+  const slot = (name: string, tier: string) => ({
+    id: name, name, sets: 2, reps: '8', rest: '60s', intensity: 'Light — movement prep', tier,
+  }) as unknown as import('../src/lib/types').Exercise
+  const dayOf = (names: [string, string][]) => ({
+    day: 'Monday', focus: 'Full Body Power',
+    exercises: names.map(([n, t]) => slot(n, t)),
+    warmup: { total_seconds: 300 },
+  }) as unknown as import('../src/lib/types').WorkoutDay
+  const mesoOf = (day: unknown) => ([{ week_number: 1, block_number: 1, label: 'Wk 1', days: [day] }] as unknown as import('../src/lib/types').MesocycleWeek[])
+  const injuredProfile = buildProfile({ injuries: ['shoulders'] })
+
+  const twoPlain = scorePlan(injuredProfile, mesoOf(dayOf([
+    [plainPrimer.name, 'tier_0_primer'], [plainPrimer.name, 'tier_0_primer'], [mainLift.name, 'tier_1_primary'],
+  ])), 'k').dimensions.structure.deductions.map(d => d.rule)
+  check('a second warm-up that is NOT rehab is still flagged',
+    twoPlain.includes('primer_not_first'), twoPlain.join(', ') || '(nothing flagged)')
+
+  const rehabAfterMain = scorePlan(injuredProfile, mesoOf(dayOf([
+    [plainPrimer.name, 'tier_0_primer'], [mainLift.name, 'tier_1_primary'], [shoulderRehabPrimer.name, 'tier_0_primer'],
+  ])), 'k').dimensions.structure.deductions.map(d => d.rule)
+  check('a rehab warm-up AFTER the main lift is still flagged',
+    rehabAfterMain.includes('primer_not_first'), rehabAfterMain.join(', ') || '(nothing flagged)')
+
+  const uninjured = scorePlan(buildProfile({}), mesoOf(dayOf([
+    [plainPrimer.name, 'tier_0_primer'], [shoulderRehabPrimer.name, 'tier_0_primer'], [mainLift.name, 'tier_1_primary'],
+  ])), 'k').dimensions.structure.deductions.map(d => d.rule)
+  check('the exemption needs the INJURY, not just the tag — uninjured is still flagged',
+    uninjured.includes('primer_not_first'), uninjured.join(', ') || '(nothing flagged)')
 }
 
 console.log(failures === 0 ? '\nAll rehab-prescription checks passed.\n' : `\n${failures} FAILED\n`)
