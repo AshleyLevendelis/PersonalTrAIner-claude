@@ -405,8 +405,26 @@ export function categorize(entry: ExerciseEntry): string | null {
 
   switch (entry.movement_pattern) {
     case 'horizontal_push':
-    case 'vertical_push':
       return 'bench'
+    // Split from horizontal_push, which it used to share a case with. A
+    // vertical push is overhead pressing and has its own, materially lighter
+    // standard (0.65 vs 1.0 x bodyweight at intermediate) — collapsing the
+    // two meant any overhead movement reaching this fallback was scaled off
+    // the BENCH press.
+    //
+    // Only one exercise was actually reaching it, because the three others
+    // are caught by the name-substring rules above ('overhead press',
+    // 'shoulder press', 'arnold'). That one was Landmine Press, prescribed
+    // 132.5kg to a 120kg advanced male whose two-arm barbell overhead press
+    // is 80kg — a ONE-ARMED press at 1.66x the two-arm press. Nothing caught
+    // it either: SAFETY_CEILING_KG is keyed by category, so sitting in
+    // 'bench' gave it a 220kg ceiling instead of overhead's 140kg.
+    //
+    // The exercise was never the bug. The fallback was, and it was a
+    // trapdoor: any future overhead movement whose NAME missed that
+    // substring list would have fallen through it too.
+    case 'vertical_push':
+      return 'overhead'
     case 'horizontal_pull':
     case 'vertical_pull':
       return 'row'

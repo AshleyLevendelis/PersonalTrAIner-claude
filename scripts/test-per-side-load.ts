@@ -32,7 +32,7 @@
 
 import {
   isPerSideLoad, labelModeForEntry, prescribeLoad, estimateEffectiveTotalKg,
-  isExternallyLoaded, loadingMode,
+  isExternallyLoaded, loadingMode, categorize,
 } from '../src/lib/load-prescription'
 import { EXERCISE_DATABASE, type ExerciseEntry } from '../src/lib/exercise-db'
 import { generateMesocycle, setRandomSource, resetRandomSource } from '../src/lib/exercise-plan'
@@ -103,16 +103,87 @@ console.log('\n2. ...and does not over-fire')
   check('a bilateral single implement (held centrally) is not per-side',
     !isPerSideLoad(byName('Goblet Squats')))
 
-  // Deliberately left alone: a landmine is a loaded bar end, so "halve it" may
-  // be the wrong answer even though the movement is one-armed. Flagged in
-  // BACKLOG.md as its own item; this asserts the current, deliberate state so
-  // a later change to it is a decision rather than a drift.
+  // Deliberately left alone, and now for a stated reason rather than a
+  // deferral. Two corrections oppose and roughly cancel on a landmine: one
+  // arm can press about HALF what two can, but the far end sits in a floor
+  // pivot that carries part of the load, so the bar-end number reads HIGHER
+  // than what the hand feels. Modelling each separately means inventing a
+  // lever coefficient and a per-side factor and hoping the product is right;
+  // using the overhead standard directly asserts only that they cancel, which
+  // is the weaker and more defensible claim. Section 5 gates the consequence.
   const landmine = byName('Landmine Press')
   check('a unilateral BARBELL lift is (still) not per-side', !isPerSideLoad(landmine) && landmine.unilateral)
 }
 
 // ---------------------------------------------------------------------------
-console.log('\n3. Every consumer agrees with the rule, for every exercise')
+console.log('\n3. A one-arm press is never heavier than the same trainee\'s two-arm press')
+// ---------------------------------------------------------------------------
+{
+  // The invariant that replaces a lever model. It needs no coefficient, it is
+  // checkable at every body and rep bracket, and it was violated at 1.66x:
+  // Landmine Press resolved to the BENCH standard because categorize()'s
+  // pattern fallback collapsed horizontal_push and vertical_push into one
+  // case, so a 120kg advanced male was prescribed 132.5kg one-armed against
+  // his own 80kg two-arm barbell press. Same shape of reasoning the file
+  // already uses for overhead_carry: "if you can't press 10kg overhead for
+  // reps, you cannot hold 36kg overhead and walk."
+  const landmine = byName('Landmine Press')
+  const ohp = byName('Overhead Press')
+  const BODIES: [string, Partial<UserProfile>][] = [
+    ['120kg advanced male', { weight_kg: 120, training_experience: 'advanced' }],
+    ['100kg intermediate male', { weight_kg: 100, training_experience: 'intermediate' }],
+    ['80kg novice male', { weight_kg: 80, training_experience: 'novice' }],
+    ['50kg novice female', { weight_kg: 50, gender: 'female', training_experience: 'novice' }],
+    ['60kg 70yo advanced female', { weight_kg: 60, age: 70, gender: 'female', training_experience: 'advanced' }],
+  ]
+  const BRACKETS = [
+    { repRangeLabel: '6-8', targetRpeLabel: 'RPE 8-9' },
+    { repRangeLabel: '8-10', targetRpeLabel: 'RPE 7-8' },
+    { repRangeLabel: '12-15', targetRpeLabel: 'RPE 6-7' },
+  ]
+  let worst: { body: string; lm: number; ohp: number } | null = null
+  for (const [label, o] of BODIES) {
+    const prof = buildProfile(o)
+    for (const b of BRACKETS) {
+      const lmKg = prescribeLoad(landmine, prof, { ...b, sets: 3 }).starting_weight_kg ?? 0
+      const ohpKg = prescribeLoad(ohp, prof, { ...b, sets: 3 }).starting_weight_kg ?? 0
+      if (!worst || lmKg - ohpKg > worst.lm - worst.ohp) worst = { body: label, lm: lmKg, ohp: ohpKg }
+    }
+  }
+  check('the one-arm landmine never exceeds the two-arm barbell press',
+    worst != null && worst.lm <= worst.ohp,
+    worst ? `worst: ${worst.body} landmine ${worst.lm}kg vs OHP ${worst.ohp}kg` : '')
+  console.log(`      closest case: ${worst?.body} — landmine ${worst?.lm}kg, overhead press ${worst?.ohp}kg`)
+
+  // The trapdoor itself, not just the one exercise that fell through it.
+  const strays = EXERCISE_DATABASE
+    .filter(e => e.movement_pattern === 'vertical_push' && categorize(e) !== 'overhead')
+    .map(e => `${e.name} -> ${categorize(e)}`)
+  check('EVERY vertical push resolves to the overhead standard, not bench',
+    strays.length === 0, strays.join(', '))
+
+  // The over-fire check: horizontal push really is the bench, and splitting
+  // the case must not have moved it.
+  const pushStrays = EXERCISE_DATABASE
+    .filter(e => e.movement_pattern === 'horizontal_push' && e.mechanics_tier !== 'tier3_isolation')
+    .filter(e => categorize(e) !== 'bench')
+    .map(e => `${e.name} -> ${categorize(e)}`)
+  check('horizontal push still resolves to bench', pushStrays.length === 0, pushStrays.join(', '))
+
+  // And the three lifts that were already right must be untouched — a fix
+  // that moved correct numbers would be a regression wearing a fix's clothes.
+  const prof = buildProfile({ weight_kg: 120, training_experience: 'advanced' })
+  const unchanged = [
+    ['Overhead Press', 80], ['Dumbbell Shoulder Press', 40], ['Arnold Press', 40],
+  ] as const
+  for (const [name, expected] of unchanged) {
+    const kg = prescribeLoad(byName(name), prof, { repRangeLabel: '8-10', targetRpeLabel: 'RPE 7-8', sets: 3 }).starting_weight_kg
+    check(`${name} is unchanged at ${expected}kg`, kg === expected, `${kg}kg`)
+  }
+}
+
+// ---------------------------------------------------------------------------
+console.log('\n4. Every consumer agrees with the rule, for every exercise')
 // ---------------------------------------------------------------------------
 {
   const labelDisagreements: string[] = []
@@ -145,7 +216,7 @@ console.log('\n3. Every consumer agrees with the rule, for every exercise')
 }
 
 // ---------------------------------------------------------------------------
-console.log('\n4. The number that started this')
+console.log('\n5. The number that started this')
 // ---------------------------------------------------------------------------
 {
   const cable = byName('Cable Lateral Raises')
@@ -163,7 +234,7 @@ console.log('\n4. The number that started this')
 }
 
 // ---------------------------------------------------------------------------
-console.log('\n5. A block baseline never survives a rotation')
+console.log('\n6. A block baseline never survives a rotation')
 // ---------------------------------------------------------------------------
 {
   // The invariant, run over real generated mesocycles: whenever a slot's
