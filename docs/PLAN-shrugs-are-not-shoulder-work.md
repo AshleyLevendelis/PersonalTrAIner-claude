@@ -100,6 +100,11 @@ budget ever loosens; not worth buying with a duration overrun.
   one kind of thing; shrugs are off pressing days; shrugs are *not orphaned*
   by the split; lateral raises still get their push-day slot (the over-fire
   check); load byte-identical; and the trapdoor is shut.
+- **`test:quality` over 9,216 combinations: Selection 1.94 → 1.95**, every
+  other dimension unchanged (Time fit 1.53, Structure 1.95, Progression 1.66,
+  Goal alignment 1.97, Primer fit 2.00; overall 11.05/12, the +0.01 hidden by
+  rounding). Small, but Selection is precisely the dimension a placement fix
+  should move, and it is the only one that did.
 - `test:per-side-load`, `test:workout`, `test:injury-separation`,
   `test:slot-replacement`, `test:assumed-body`, `test:weight-basis`,
   `test:mesocycle-roundtrip`, `test:block-consistency`,
