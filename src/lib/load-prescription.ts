@@ -808,18 +808,71 @@ function getSetPercents(sets: number, ramping: boolean): number[] {
  * free. 'total' is everything else (barbells, bilateral single-implement
  * work like goblet squats, stacks).
  */
+/**
+ * Equipment that IS a selectorised weight stack, as opposed to everything
+ * loadingMode() sorts into 'stack' by falling through.
+ *
+ * The distinction matters because 'stack' is the fallback bucket: 18 of the
+ * database's 28 unilateral entries land in it, and 17 of those are bodyweight
+ * or resistance-band work. Keying the per-side rule on the bucket would get
+ * the right answer for the wrong reason and would start halving band and
+ * bodyweight movements the moment one of them became externally loaded.
+ */
+const STACK_MACHINE_EQUIPMENT = new Set([
+  'cable machine', 'machine', 'leg press machine', 'hack squat machine',
+])
+
+/**
+ * Does this exercise's prescribed number describe what ONE SIDE handles,
+ * rather than the total the body moves?
+ *
+ * Three ways that happens, and they had been written out by hand at each call
+ * site, which is how the third went missing for as long as it did:
+ *
+ *   1. A dumbbell PAIR — two implements, one per hand.
+ *   2. A unilateral SINGLE IMPLEMENT — one kettlebell, one side working
+ *      (Suitcase Carry, Overhead Carry). A review caught this one: a one-arm
+ *      overhead carry was prescribed 36kg to a lifter who presses 42.5kg with
+ *      a barbell, because a single implement was assumed to be held
+ *      bilaterally like a goblet squat.
+ *   3. A unilateral WEIGHT STACK — a one-arm cable movement. Missed entirely
+ *      until now, because a cable machine falls into loadingMode()'s 'stack'
+ *      bucket and nothing there was ever tested for unilateral. Measured
+ *      before this fix: Cable Lateral Raises at 37.5kg for a 120kg advanced
+ *      male, against a 25kg category ceiling — 51 of the 54 remaining
+ *      failures in the whole constraint audit, all one exercise, all one arm
+ *      being handed the number derived for two.
+ *
+ * The standards model always produces a TOTAL, so per-side means halve it.
+ */
+export function isPerSideLoad(entry: ExerciseEntry): boolean {
+  const mode = loadingMode(entry)
+  if (mode === 'dumbbell') return true
+  if (!entry.unilateral) return false
+  if (mode === 'single_implement') return true
+  return entry.equipment.some(e => STACK_MACHINE_EQUIPMENT.has(e))
+}
+
 export type LoadLabelMode = 'per_hand' | 'single_side' | 'total'
 
-export function loadLabelMode(isDumbbell: boolean, isUnilateralSingleImplement: boolean): LoadLabelMode {
+export function loadLabelMode(isDumbbell: boolean, isSingleSide: boolean): LoadLabelMode {
   if (isDumbbell) return 'per_hand'
-  if (isUnilateralSingleImplement) return 'single_side'
+  if (isSingleSide) return 'single_side'
   return 'total'
 }
 
-/** Any exercise's `entry.unilateral && loadingMode(entry) === 'single_implement'` case — the correct, general test for "single implement worked one side at a time" that every display-label call site should use instead of re-deriving it. */
+/**
+ * The display label for an exercise — the one place every call site should
+ * ask, instead of re-deriving it.
+ *
+ * Must agree with isPerSideLoad by construction, not by coincidence: a number
+ * that gets halved while its caption still says "total" is worse than either
+ * error alone, because the caption is what a trainee uses to decide whether
+ * to load one dumbbell or two.
+ */
 export function labelModeForEntry(entry: ExerciseEntry): LoadLabelMode {
   const mode = loadingMode(entry)
-  return loadLabelMode(mode === 'dumbbell', mode === 'single_implement' && entry.unilateral)
+  return loadLabelMode(mode === 'dumbbell', isPerSideLoad(entry) && mode !== 'dumbbell')
 }
 
 export function formatLoad(kg: number, labelMode: LoadLabelMode): string {
@@ -1079,21 +1132,11 @@ export function prescribeLoad(
 
   const mode = loadingMode(entry)
   const isDumbbell = mode === 'dumbbell'
-  // A two-implement dumbbell pair (Farmer's Walk) is halved and labeled "per
-  // hand" via isDumbbell above. But a SINGLE implement carried unilaterally
-  // (Suitcase Carry, Overhead Carry — one kettlebell, one side working) was
-  // getting the single_implement mode's "no halving" treatment meant for
-  // BILATERAL single-implement lifts like a goblet squat (held centrally,
-  // both sides loading it). That treated a one-arm overhead carry as if the
-  // whole body were pressing it, producing "hold 66kg overhead in one hand"
-  // for a lifter who presses 42.5kg overhead with a barbell — a review
-  // flagged exactly this ("if you can't press 10kg overhead for reps, you
-  // cannot hold 36kg overhead and walk"). `entry.unilateral` is the correct
-  // signal: single implement + unilateral means only one side is ever
-  // loaded at a time, same as a per-hand dumbbell number.
-  const isUnilateralSingleImplement = mode === 'single_implement' && entry.unilateral
-  const perSideLoad = isDumbbell || isUnilateralSingleImplement
-  const labelMode = loadLabelMode(isDumbbell, isUnilateralSingleImplement)
+  // "Is this number for one side or both?" — see isPerSideLoad, which owns
+  // all three cases. It used to be spelled out here, and the spelling missed
+  // one arm on a cable stack for as long as the file has existed.
+  const perSideLoad = isPerSideLoad(entry)
+  const labelMode = labelModeForEntry(entry)
 
   let rounded: number
   // Hoisted above the forceStartingWeightKg branch — that path short-circuits
@@ -1286,10 +1329,16 @@ export function estimateEffectiveTotalKg(entry: ExerciseEntry, profile: UserProf
     sets: 1,
   })
   if (load.starting_weight_kg == null) return null
-  // A two-implement dumbbell pair's starting_weight_kg is already the
-  // per-hand number — double it back to total load moved, the quantity
-  // that actually matters for "did this rotation preserve the demand."
-  return loadingMode(entry) === 'dumbbell' ? load.starting_weight_kg * 2 : load.starting_weight_kg
+  // A per-side prescription is already one side's number — double it back to
+  // total load moved, the quantity that actually matters for "did this
+  // rotation preserve the demand."
+  //
+  // Tested 'dumbbell' only until the unilateral-stack case landed, which would
+  // have traded one audit failure for another: the newly-halved cable lift
+  // would read as half its real demand here and the rotation guard would
+  // start firing on it. Unilateral single-implement carries were already
+  // wrong for the same reason, just never surfaced.
+  return isPerSideLoad(entry) ? load.starting_weight_kg * 2 : load.starting_weight_kg
 }
 
 /**

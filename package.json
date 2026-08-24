@@ -59,6 +59,7 @@
     "test:reply-guarantee": "tsx scripts/test-onboarding-reply-guarantee.ts",
     "test:assumed-body": "tsx scripts/test-assumed-body-loads.ts",
     "test:weight-basis": "tsx scripts/test-weight-basis-offer.ts",
+    "test:per-side-load": "tsx scripts/test-per-side-load.ts",
     "report:trim-magnitude": "tsx scripts/run-trim-magnitude-report.ts"
   },
   "dependencies": {

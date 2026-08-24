@@ -4674,6 +4674,36 @@ export function generateMesocycle(
     // whatever week 3 actually ended up being, regardless of emphasis.
     const blockWeek3Kg: (number | null)[][] = blockDays.map(day => day.exercises.map(() => null))
 
+    // WHICH EXERCISE each of those numbers belongs to.
+    //
+    // Both trackers above are indexed by [dayIndex][exerciseIndex] — slot
+    // POSITION — but an accessory's variation rotates on a two-week
+    // sub-cycle WITHIN the block. So from week 3 the slot can hold a
+    // different exercise than the one whose baseline is sitting in it, and
+    // weeks 3-4 were being built from a stranger's number.
+    //
+    // This file already states the rule ("a capped or broken anchor must
+    // never propagate through a rotation") and implemented it as a 25%
+    // divergence backstop, which turns out to be porous in both directions:
+    // its comparison is exclusive, so a value at exactly 125% of a fresh
+    // estimate passes, and plate rounding then rounds that value UP after
+    // the check. Traced live: a 50kg advanced female carried a 5kg Cable
+    // Lateral Raises baseline into Lateral Raises, passed the backstop at
+    // exactly 5 vs a 5.0 limit, and rounded to 6kg — 150% of a fresh
+    // estimate for the exercise actually in the slot.
+    //
+    // Name-keying removes the cause rather than bounding the symptom: a slot
+    // whose exercise changed simply has no baseline, and weeks 2-3 fall
+    // through to a fresh estimate for the exercise that is really there.
+    // Exactly the treatment lastUnverifiedLoadingWeekKg needed for the same
+    // reason, one tracker over.
+    const blockBaselineName: (string | null)[][] = blockDays.map(day => day.exercises.map(() => null))
+    const blockWeek3Name: (string | null)[][] = blockDays.map(day => day.exercises.map(() => null))
+    const baselineForSlot = (dayIdx: number, exIdx: number, name: string): number | null =>
+      blockBaselineName[dayIdx][exIdx] === name ? blockBaselineKg[dayIdx][exIdx] : null
+    const week3ForSlot = (dayIdx: number, exIdx: number, name: string): number | null =>
+      blockWeek3Name[dayIdx][exIdx] === name ? blockWeek3Kg[dayIdx][exIdx] : null
+
     // Rotation tier per (day, exercise) — fixed for the whole block; only an
     // accessory's specific variation moves within it (see fortnightOffset).
     const rotationTiers: RotationTier[][] = blockDays.map(day => classifyRotationTiers(day.exercises))
@@ -4778,7 +4808,7 @@ export function generateMesocycle(
           // into volume instead.
           const isLoadedNonPrimer = !!dbEntry && !isPrimer && isExternallyLoaded(dbEntry)
           const equipmentFloor = isLoadedNonPrimer ? getEquipmentFloorKg(dbEntry!) : null
-          const week3KgForFloorCheck = isDeload ? blockWeek3Kg[dayIdx][exIdx] : null
+          const week3KgForFloorCheck = isDeload && dbEntry ? week3ForSlot(dayIdx, exIdx, dbEntry.name) : null
           const deloadAtFloor =
             isDeload && equipmentFloor != null && week3KgForFloorCheck != null &&
             week3KgForFloorCheck * 0.7 < equipmentFloor
@@ -4889,7 +4919,7 @@ export function generateMesocycle(
           // not a bug).
           let loadStepUnaffordable = false
           if (rampLoadCandidate && !isCarry && dbEntry) {
-            const affordabilityBaseline = blockBaselineKg[dayIdx][exIdx]
+            const affordabilityBaseline = baselineForSlot(dayIdx, exIdx, dbEntry.name)
             if (affordabilityBaseline != null && affordabilityBaseline > 0) {
               const stepKg = getLoadIncrementKg(dbEntry, category, affordabilityBaseline)
               loadStepUnaffordable = stepKg / affordabilityBaseline > 0.12
@@ -4953,7 +4983,7 @@ export function generateMesocycle(
           // any of the load engine's baseline-carry/calibration machinery.
           const assistance = dbEntry && !isPrimer ? prescribeAssistance(dbEntry, profile, w, isDeload) : null
           if (dbEntry && !isPrimer) {
-            const baselineKg = blockBaselineKg[dayIdx][exIdx]
+            const baselineKg = baselineForSlot(dayIdx, exIdx, dbEntry.name)
             const increment = getLoadIncrementKg(dbEntry, category, baselineKg ?? 0)
 
             // Week 1 sets the baseline through the normal estimate pipeline
@@ -5031,7 +5061,7 @@ export function generateMesocycle(
               }
             }
             if (isDeload) {
-              const week3Kg = blockWeek3Kg[dayIdx][exIdx]
+              const week3Kg = week3ForSlot(dayIdx, exIdx, dbEntry.name)
               if (week3Kg != null) {
                 // At the equipment floor, prescribeLoad's own rounding would
                 // clamp 70% right back up to the floor anyway — set it
@@ -5055,8 +5085,14 @@ export function generateMesocycle(
               loadIsProgressing: rampLoad,
             })
 
-            if (w === 1) blockBaselineKg[dayIdx][exIdx] = load.starting_weight_kg
-            if (w === 3) blockWeek3Kg[dayIdx][exIdx] = load.starting_weight_kg
+            if (w === 1) {
+              blockBaselineKg[dayIdx][exIdx] = load.starting_weight_kg
+              blockBaselineName[dayIdx][exIdx] = dbEntry.name
+            }
+            if (w === 3) {
+              blockWeek3Kg[dayIdx][exIdx] = load.starting_weight_kg
+              blockWeek3Name[dayIdx][exIdx] = dbEntry.name
+            }
             // Deload weeks are read-only for this tracker (see its
             // declaration) — the next block's week 1 must step from the
             // last real loading week, not the deload back-off. Written
