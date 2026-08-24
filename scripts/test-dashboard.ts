@@ -285,6 +285,23 @@ async function main() {
   check('loadDashboardData.caloriesTarget matches the targets passed in (2400)', dashData.caloriesTarget === 2400, dashData.caloriesTarget)
   check('a day with no plan entry (Thursday, empty exercises) resolves to a rest-day session', dashData.session.status === 'rest', dashData.session)
 
+  // The trainee who declined a body metric. computeTargets returns null for
+  // them, and Dashboard used to require macros before it would load anything
+  // at all — so the entire Home tab sat on "Loading your day…" forever, and
+  // the weigh-in card inside it (the one thing that would have given us their
+  // weight) was unreachable. The payload must survive an absent target, and
+  // must MARK it rather than reporting a zero as though it were a target.
+  const noTargets = await loadDashboardData({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    profile: profile as any, macros: null, exercisePlan: restDayPlan as any, mesocycle: [], planCreatedAt: undefined,
+    todayLogs: [], liveWeek: 1, dayName: 'Thursday', todayStr: today2, now,
+  })
+  check('the dashboard still loads with no macro targets at all', !!noTargets)
+  check('...and says so, rather than reporting a target of zero', noTargets.hasNutritionTargets === false)
+  check('...while what was actually EATEN is still real and unchanged', noTargets.caloriesEaten === 620, noTargets.caloriesEaten)
+  check('...and the training half is completely unaffected', noTargets.session.status === 'rest', noTargets.session)
+  check('a profile WITH targets is still marked as having them', dashData.hasNutritionTargets === true)
+
   // ---- 5. Weight trend: rolling average + sparse data -------------------------
   console.log('\n[5] weight-trend.ts: rolling average, and honest handling of sparse data')
 

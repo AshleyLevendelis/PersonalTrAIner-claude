@@ -1304,7 +1304,20 @@ function App() {
         mesocycleCreatedAt: mesocycleCreatedAt ?? profile.created_at,
         now: getAppNow(profile.id),
       })
-      if (rebuilt) setMesocycle(rebuilt)
+      if (!rebuilt) {
+        // confirmWeightBasisOffer returns null when it did NOT rebuild — the
+        // row was already answered elsewhere, or there were no future weeks
+        // left to touch. An earlier cut posted the success receipt anyway,
+        // which is the app claiming a write that never happened; a browser
+        // run caught it. Leave the offer standing so the choice is still
+        // theirs to make.
+        setAdaptationMessages(prev => [
+          ...prev,
+          { text: "That offer had already been answered, so nothing changed. Your plan is as it was." },
+        ])
+        return
+      }
+      setMesocycle(rebuilt)
       setAdaptationMessages(prev => [
         ...prev.filter(m => m.weightBasisOfferId !== id),
         // A receipt, not a celebration — the same plain statement of what

@@ -67,6 +67,18 @@ export interface DashboardData {
   carbsTarget: number
   fatEaten: number
   fatTarget: number
+  /**
+   * False when the trainee has no body metrics on record, so the four
+   * *Target numbers above are placeholders and MUST NOT be rendered.
+   *
+   * The absence doctrine (MissingBodyMetricsNotice): "Deliberately NOT here:
+   * a placeholder figure, a dash standing in for a real number, a population
+   * average... The rule is an absence, stated plainly." The zeroes are only
+   * here because getTodayLedger needs a target shape to compute what was
+   * EATEN, which is a real number either way; this flag is what stops "of 0
+   * kcal" reaching a screen.
+   */
+  hasNutritionTargets: boolean
   weightTrend: WeightTrendResult | null
   /** Oldest-first — for the Home trend chart (tab-restructure). Same source as weightTrend (getRecentWeighIns), just re-mapped/re-ordered for charting rather than averaging. */
   weightSeries: WeightSeriesPoint[]
@@ -97,7 +109,13 @@ function daysAgo(dateStr: string, todayStr: string): number {
 
 export interface LoadDashboardDataInput {
   profile: UserProfile
-  macros: MacroTargets
+  /**
+   * Null when the trainee declined a body metric, so no calorie/protein
+   * target can be computed. NOT a reason to withhold the whole dashboard —
+   * the training half of this payload doesn't depend on it at all. See
+   * hasNutritionTargets below.
+   */
+  macros: MacroTargets | null
   /** Flat week-1 plan — used as the day-of-week SCHEDULE pattern (which weekdays are training days) for both the streak and rest-day detection. */
   exercisePlan: WorkoutDay[]
   mesocycle: MesocycleWeek[]
@@ -156,7 +174,12 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
       }
 
   // ---- Nutrition ----------------------------------------------------------
-  const ledger = await getTodayLedger(profileId, todayStr, macros)
+  // A zeroed target shape when we have no body metrics: getTodayLedger needs
+  // one to compute what was EATEN, which is real either way. The targets it
+  // returns in that case are not, which is what hasNutritionTargets marks.
+  const NO_TARGETS: MacroTargets = { calories: 0, protein: 0, carbs: 0, fat: 0 }
+  const hasNutritionTargets = macros != null
+  const ledger = await getTodayLedger(profileId, todayStr, macros ?? NO_TARGETS)
   const waterMl = await getWaterTotalForDate(profileId, todayStr)
   const waterTargetMl = profile.water_target_ml ?? 2000
 
@@ -228,13 +251,13 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
   // function for this first pass (read-cost discipline's actual
   // requirement — "fetch once per mount, not on every render" — still
   // holds, since this whole function runs once per dashboard mount).
-  const proteinTarget = macros.protein
+  const proteinTarget = macros?.protein ?? 0
   let proteinStreak = 0
   if (proteinTarget > 0) {
     for (let i = 1; i <= 14; i++) {
       const d = new Date(now.getTime() - i * 86_400_000)
       const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-      const dayLedger = await getTodayLedger(profileId, dateStr, macros).catch(() => null)
+      const dayLedger = await getTodayLedger(profileId, dateStr, macros!).catch(() => null)
       if (!dayLedger || dayLedger.eaten.protein < proteinTarget * 0.95) break
       proteinStreak++
     }
@@ -301,6 +324,7 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
     carbsTarget: ledger.targets.carbs,
     fatEaten: ledger.eaten.fat,
     fatTarget: ledger.targets.fat,
+    hasNutritionTargets,
     weightTrend,
     weightSeries,
     weightGoalKg: weightGoal?.target_value ?? null,

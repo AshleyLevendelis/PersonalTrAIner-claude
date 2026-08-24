@@ -171,7 +171,14 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
   const [weighInVersion, setWeighInVersion] = useState(0)
 
   useEffect(() => {
-    if (!activeSession.ready || !profile.id || !macros) return
+    // Deliberately NOT gated on `macros`. computeTargets returns null for
+    // anyone who declined a body metric, and `loading` initialises to true —
+    // so requiring macros here left the entire Home tab stuck on "Loading
+    // your day…" forever for exactly the trainee item 2b exists to serve. It
+    // also made the weigh-in card unreachable, which is the one thing that
+    // would have given us their weight. Nothing else on this screen needs a
+    // calorie target; see hasNutritionTargets for the part that does.
+    if (!activeSession.ready || !profile.id) return
     let cancelled = false
     setLoading(true)
     loadDashboardData({
@@ -182,7 +189,7 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
     }).then(d => { if (!cancelled) setData(d) }).finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeSession.ready, activeSession.date, activeSession.logs.length, profile.id, weighInVersion])
+  }, [activeSession.ready, activeSession.date, activeSession.logs.length, profile.id, weighInVersion, macros])
 
   const handleWeighInChanged = async () => {
     setWeighInVersion(v => v + 1)
@@ -309,15 +316,25 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
           >
             <svg width="34" height="34" viewBox="0 0 34 34" className="shrink-0">
               <circle cx="17" cy="17" r={CALORIE_TILE_RING_R} fill="none" stroke="rgba(69,60,142,.9)" strokeWidth="4" />
-              <circle
-                cx="17" cy="17" r={CALORIE_TILE_RING_R} fill="none" stroke="var(--primary)" strokeWidth="4" strokeLinecap="round"
-                strokeDasharray={`${CALORIE_TILE_RING_CIRC * Math.min(1, data.caloriesTarget > 0 ? data.caloriesEaten / data.caloriesTarget : 0)} ${CALORIE_TILE_RING_CIRC}`}
-                transform="rotate(-90 17 17)"
-              />
+              {/* No ring at all without a target — a ring at 0% reads as "you
+                  have eaten nothing of your allowance", which is a claim we
+                  cannot make. */}
+              {data.hasNutritionTargets && (
+                <circle
+                  cx="17" cy="17" r={CALORIE_TILE_RING_R} fill="none" stroke="var(--primary)" strokeWidth="4" strokeLinecap="round"
+                  strokeDasharray={`${CALORIE_TILE_RING_CIRC * Math.min(1, data.caloriesTarget > 0 ? data.caloriesEaten / data.caloriesTarget : 0)} ${CALORIE_TILE_RING_CIRC}`}
+                  transform="rotate(-90 17 17)"
+                />
+              )}
             </svg>
             <div>
               <p className="tabular-mono text-[19px] font-bold">{Math.round(data.caloriesEaten)}</p>
-              <p className="text-[9px] uppercase tracking-[.14em] text-muted-foreground">of {Math.round(data.caloriesTarget)} kcal</p>
+              {/* "of 0 kcal" is the placeholder the absence doctrine forbids
+                  (MissingBodyMetricsNotice): a figure that looks deliberate
+                  and means nothing. Say what is missing instead. */}
+              <p className="text-[9px] uppercase tracking-[.14em] text-muted-foreground">
+                {data.hasNutritionTargets ? `of ${Math.round(data.caloriesTarget)} kcal` : 'kcal · no target yet'}
+              </p>
             </div>
             <span className="text-[11px] font-semibold text-primary">Nutrition ›</span>
           </button>
