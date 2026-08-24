@@ -724,6 +724,15 @@ project, check which file actually supplied the URL.
 
 ### 7.2 Migrations
 
+**Superseded as of 2026-08-11 — read CLAUDE.md before this section.** The
+project split into TEST (`vswuurrtbzbrgubddefv`) and PRODUCTION
+(`sdkhuczcfnqqimdgfiks`), and the CLI's ambient link now defaults to TEST, so
+the bare command below reaches only whichever project happens to be linked.
+The sanctioned path is `npm run db:push-both`, which pushes to TEST, waits for
+a typed `yes-production`, pushes to PRODUCTION, and relinks to TEST either way.
+`npm run test:schema-parity` confirms both carry the identical set. The rest of
+this section is kept for the reasoning it records, not the command.
+
 Plain numbered SQL files in `supabase/migrations/`
 (`YYYYMMDDHHMMSS_description.sql`), 39 as of 2026-08-09. Write one, then:
 
@@ -762,7 +771,10 @@ vercel --prod
 
 Both have been run together at the end of nearly every substantive round
 in this project's history — treat "ship it" as meaning both, not just the
-git push.
+git push. Whether the repo's Vercel git integration would deploy from the
+push alone has never actually been established here, which is the reason the
+pairing is the rule: **the push moves `main`, it is not proof the live site
+moved.** Confirm the deploy by looking at the site, not by the push exiting 0.
 
 ### 7.5 Conventions this repo has enforced consistently
 
