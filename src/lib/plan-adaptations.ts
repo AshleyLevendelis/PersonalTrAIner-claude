@@ -219,15 +219,69 @@ export interface RebuildForInjuryParams {
  */
 export async function rebuildForInjury(params: RebuildForInjuryParams): Promise<MesocycleWeek[]> {
   const { profile, injuryCode, exclusions, mesocycle, weekNumbers } = params
-  const targetWeeks = weekNumbers ? new Set(weekNumbers) : null
   const injuredProfile: UserProfile = {
     ...profile,
     injuries: profile.injuries.includes(injuryCode) ? profile.injuries : [...profile.injuries, injuryCode],
   }
+  return rebuildAgainstProfile(injuredProfile, exclusions, mesocycle, weekNumbers)
+}
 
-  const { generateExercisePlan, generateMesocycle } = await import('./exercise-plan')
-  const plan = generateExercisePlan(injuredProfile, exclusions)
-  const rebuilt = generateMesocycle(injuredProfile, plan.plan)
+/**
+ * The shared half of every "regenerate rather than subtract" rebuild: run the
+ * normal generation pipeline against a LOCAL profile clone and splice the
+ * result into the live mesocycle, preserving week identity.
+ *
+ * Extracted when the weight-basis rebuild arrived, because it is the same
+ * operation with a different clone — and the identity-preservation below is
+ * the part that must not be re-derived per caller. Anything holding a week
+ * reference (logged sets, an active session, the week strip, the load-
+ * suggestion rows keyed by block_number) resolves through week_number and
+ * block_number; a rebuild that renumbered them would orphan all of it while
+ * looking perfectly correct in isolation.
+ *
+ * The clone is never written back. Whether the underlying profile row
+ * changes is the CALLER's decision every time — executeLastingInjury writes
+ * injuries, the time-bounded adaptation deliberately doesn't, and the
+ * weight-basis rebuild must not touch weight_kg at all (it is formally the
+ * immutable onboarding weight). The same separation
+ * test:plan-adaptations-separation and test:injury-separation protect.
+ */
+async function rebuildAgainstProfile(
+  clone: UserProfile,
+  exclusions: string[],
+  mesocycle: MesocycleWeek[],
+  weekNumbers?: number[],
+  /**
+   * Makes generation REPRODUCIBLE for callers that run it twice and must get
+   * the same answer both times — see rebuildForWeightBasis, which previews a
+   * rebuild to show the trainee what they would be agreeing to and then runs
+   * it again when they agree.
+   *
+   * Without this the two runs disagree: exercise selection shuffles, so the
+   * preview could name a lift ("this would take Barbell Squats from 32.5kg to
+   * 67.5kg") that the applied rebuild does not even contain. A flaky assertion
+   * in test:weight-basis is what surfaced it — the check passed or failed by
+   * luck depending on what Math.random happened to return.
+   *
+   * Omitted by the injury rebuild, which generates once and applies it, so it
+   * has no second run to agree with and keeps its existing variety.
+   */
+  seedKey?: string,
+): Promise<MesocycleWeek[]> {
+  const targetWeeks = weekNumbers ? new Set(weekNumbers) : null
+  const { generateExercisePlan, generateMesocycle, setRandomSource, resetRandomSource } = await import('./exercise-plan')
+  const { seededRngFromKey } = await import('./seeded-random')
+
+  // Both generate* calls are synchronous, so the seeded window never spans an
+  // await and cannot leak into unrelated generation happening elsewhere.
+  if (seedKey) setRandomSource(seededRngFromKey(seedKey))
+  let plan, rebuilt
+  try {
+    plan = generateExercisePlan(clone, exclusions)
+    rebuilt = generateMesocycle(clone, plan.plan)
+  } finally {
+    if (seedKey) resetRandomSource()
+  }
 
   // Keep the outgoing week identity (numbers, labels, block boundaries) so
   // anything holding a week reference — logged sets, an active session, the
@@ -244,6 +298,52 @@ export async function rebuildForInjury(params: RebuildForInjuryParams): Promise<
       phase_label: original.phase_label,
     }
   })
+}
+
+export interface RebuildForWeightBasisParams {
+  profile: UserProfile
+  /**
+   * The weight to rebuild from — the rolling-average anchor
+   * (getEffectiveTargetWeightKg), not a single raw reading. Overrides
+   * profile.weight_kg on the LOCAL clone only; the profile row keeps its
+   * onboarding weight, which is formally immutable (see nutrition-targets.ts).
+   */
+  basisWeightKg: number
+  exclusions: string[]
+  mesocycle: MesocycleWeek[]
+  /**
+   * Which weeks may be replaced. The caller passes the live week onward — a
+   * past week is history and is never rewritten, however wrong its numbers
+   * turned out to be.
+   */
+  weekNumbers: number[]
+}
+
+/**
+ * Rebuilds the remaining programme now that we know what this person
+ * actually weighs.
+ *
+ * Backlog item 2b made a declined bodyweight honest: loads come from a
+ * deliberately light stand-in and are labelled 'assumed_body'. The cost is
+ * that nothing releases it — food targets follow later weigh-ins on their
+ * own (computeTargets prefers the latest daily_metrics reading), but the
+ * training side reads only profile.weight_kg and generateMesocycle runs once,
+ * at onboarding. Measured before this: a 100kg man who declines is prescribed
+ * 0.35x his real loads, and weighing in every day for a year would not move
+ * them.
+ *
+ * Deliberately NOT applied on sight. Ashley's ruling was to ask first — see
+ * weight-basis-offer.ts, which owns the offer, the diff the trainee is shown,
+ * and the permanence of a decline. This function is only the "yes" branch.
+ */
+export async function rebuildForWeightBasis(params: RebuildForWeightBasisParams): Promise<MesocycleWeek[]> {
+  const { profile, basisWeightKg, exclusions, mesocycle, weekNumbers } = params
+  const reweighed: UserProfile = { ...profile, weight_kg: basisWeightKg }
+  // Seeded on the two things that define this rebuild, so the preview the
+  // trainee is shown and the rebuild they get on confirm are the same plan.
+  // See rebuildAgainstProfile's seedKey doc comment.
+  const seedKey = `weight-basis:${profile.id ?? 'anon'}:${basisWeightKg}`
+  return rebuildAgainstProfile(reweighed, exclusions, mesocycle, weekNumbers, seedKey)
 }
 
 export interface SubstituteForEquipmentParams {

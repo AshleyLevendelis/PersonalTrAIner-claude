@@ -18,6 +18,7 @@
 // ---------------------------------------------------------------------------
 
 import { generateMesocycle, setRandomSource, resetRandomSource } from '../src/lib/exercise-plan'
+import { rebuildForWeightBasis } from '../src/lib/plan-adaptations'
 import { seededRngFromKey } from '../src/lib/seeded-random'
 import type { UserProfile, MesocycleWeek, WorkoutDay } from '../src/lib/types'
 
@@ -68,6 +69,13 @@ function declineBody(p: UserProfile): UserProfile {
   return out
 }
 
+/** Declines the WEIGHT only — the case a weigh-in can fully close. */
+function declineWeightOnly(p: UserProfile): UserProfile {
+  const out = { ...p }
+  delete (out as Record<string, unknown>).weight_kg
+  return out
+}
+
 function generateSeeded(profile: UserProfile, seedKey: string): MesocycleWeek[] {
   setRandomSource(seededRngFromKey(seedKey))
   const originalDebug = console.debug
@@ -109,7 +117,13 @@ function fmt(n: number): string {
   return n.toFixed(2)
 }
 
-interface Persona { key: string; label: string; overrides: Partial<UserProfile> }
+interface Persona {
+  key: string
+  label: string
+  overrides: Partial<UserProfile>
+  /** Which metrics this persona declines. 'all' is the "Prefer not to say" default; 'weight' isolates what a weigh-in alone can fix. */
+  declines?: 'all' | 'weight'
+}
 
 const PERSONAS: Persona[] = [
   {
@@ -124,8 +138,19 @@ const PERSONAS: Persona[] = [
   },
   {
     key: 'control-male',
-    label: '30yo man, 75kg, novice  (CONTROL — this IS the assumed body)',
+    label: '30yo man, 75kg, novice  (CONTROL — this IS the old assumed body)',
     overrides: { age: 30, gender: 'male', weight_kg: 75, height_cm: 178, training_experience: 'novice' },
+  },
+  {
+    // Isolates what a weigh-in can actually fix. The personas above decline
+    // all three metrics, so a rebuild from a weigh-in corrects one of three —
+    // and sex is the LARGER term (female standards are 0.53-0.67x male), so
+    // their ratio lands around 0.6, not 1.0. This one gave everything but the
+    // weight, so the same rebuild closes the whole gap.
+    key: 'weight-gap-only',
+    label: '40yo woman, 68kg, intermediate — declined WEIGHT only',
+    overrides: { age: 40, gender: 'female', weight_kg: 68, height_cm: 168, training_experience: 'intermediate' },
+    declines: 'weight',
   },
 ]
 
@@ -136,14 +161,33 @@ push('='.repeat(78))
 push('ASSUMED-BODY LOAD REPORT')
 push('Ratio = what a DECLINED profile is prescribed / what the SAME person is')
 push('prescribed once the app knows their body. 1.00 means no fabrication.')
+push('')
+push('"after weighing in + confirming" is the weight-basis rebuild offer applied.')
+push('It corrects the WEIGHT only, so for a persona who declined all three it')
+push('closes about half the gap — sex is the larger term and is still unknown.')
+push('The last persona declined weight alone, and there it closes all of it.')
 push('='.repeat(78))
 
 for (const persona of PERSONAS) {
   const stated = buildProfile(persona.overrides)
-  const declined = declineBody(stated)
+  const declined = persona.declines === 'weight' ? declineWeightOnly(stated) : declineBody(stated)
   const seed = `assumed-body:${persona.key}`
   const mesoStated = generateSeeded(stated, seed)
   const mesoDeclined = generateSeeded(declined, seed)
+
+  // The third column: declined at signup, then weighed in and accepted the
+  // rebuild offer (weight-basis-offer.ts). Uses the real rebuild path, not a
+  // fresh generation, so what this measures is what the app actually applies.
+  const quietDebug = console.debug, quietWarn = console.warn
+  console.debug = () => {}; console.warn = () => {}
+  const mesoRebuilt = await rebuildForWeightBasis({
+    profile: declined,
+    basisWeightKg: stated.weight_kg!,
+    exclusions: [],
+    mesocycle: mesoDeclined,
+    weekNumbers: mesoDeclined.map(w => w.week_number),
+  })
+  console.debug = quietDebug; console.warn = quietWarn
 
   push()
   push(`--- ${persona.label} ---`)
@@ -167,6 +211,20 @@ for (const persona of PERSONAS) {
     const label = pick === 'first' ? `week 1        ` : `week ${wD.week_number ?? '?'} (later)`
     push(`${label}  shared lifts=${String(ratios.length).padStart(2)}  mean ratio=${fmt(mean)}  over-prescribed(>1.15x)=${overCount}` +
       (worst ? `  worst=${worst.name} ${fmt(worst.r)}x (${worst.s}kg -> ${worst.d}kg)` : ''))
+    // The same ratio for someone who declined, later weighed in, and accepted
+    // the rebuild. This is the column the offer exists to produce.
+    const wR = weekOf(mesoRebuilt, pick)
+    const rowsR = wR ? loadedRows(wR.days) : new Map<string, Row>()
+    const rebuiltRatios: number[] = []
+    for (const [name, s] of rowsS) {
+      const r = rowsR.get(name)
+      if (r) rebuiltRatios.push(r.kg / s.kg)
+    }
+    const rebuiltMean = rebuiltRatios.length
+      ? rebuiltRatios.reduce((t, x) => t + x, 0) / rebuiltRatios.length
+      : 0
+    push(`${' '.repeat(label.length)}  after weighing in + confirming: mean ratio=${fmt(rebuiltMean)} over ${rebuiltRatios.length} shared lifts`)
+
     if (pick === 'representative') {
       const sources = new Map<string, number>()
       for (const r of rowsD.values()) sources.set(r.source, (sources.get(r.source) ?? 0) + 1)

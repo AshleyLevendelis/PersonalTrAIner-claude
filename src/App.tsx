@@ -38,6 +38,7 @@ import { checkAndRevertExpiredAdaptations, getActiveAdaptations, type PlanAdapta
 import { checkForBlockReview } from '@/lib/block-review'
 import { checkForConsistencyHold } from '@/lib/block-consistency'
 import { checkForLoadSuggestions, confirmLoadSuggestion, declineLoadSuggestion } from '@/lib/load-suggestions'
+import { checkForWeightBasisOffer, confirmWeightBasisOffer, declineWeightBasisOffer, planHasAssumedBodyLoads } from '@/lib/weight-basis-offer'
 import { getRevealSpeed, saveRevealSpeed, DEFAULT_REVEAL_SPEED, type RevealSpeed } from '@/lib/reveal-speed-store'
 import { InsightBanner } from '@/components/ui/insight-banner'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
@@ -73,13 +74,16 @@ function App() {
   // (checkAndRevertExpiredAdaptations), a living-target recalculation
   // (snapshotTargetsIfChanged's changedFromPrior), a goal-proximity ask
   // (goal-proximity.ts), and — Vision Step 6 — a pending load suggestion
-  // (checkForLoadSuggestions). goalId is set only for the goal-proximity
+  // (checkForLoadSuggestions), and a weight-basis rebuild offer
+  // (checkForWeightBasisOffer). goalId is set only for the goal-proximity
   // case — its dismiss must also persist via dismissGoalProximity so it
-  // doesn't reappear next load. loadSuggestionId is set only for the
-  // Step 6 case, and changes what the banner renders: Confirm/Decline
-  // instead of a plain Dismiss, since this is the one message in this list
-  // that represents an action rather than a fact.
-  const [adaptationMessages, setAdaptationMessages] = useState<{ text: string; goalId?: string; loadSuggestionId?: string }[]>([])
+  // doesn't reappear next load. loadSuggestionId and weightBasisOfferId mark
+  // the two messages that are an ACTION rather than a fact, and change what
+  // the banner renders: Confirm/Decline instead of a plain Dismiss. Neither
+  // may be dismissed — a dismiss that didn't record an answer would silently
+  // re-ask forever, or (worse, for the weight-basis offer) look answered
+  // while nothing had been decided.
+  const [adaptationMessages, setAdaptationMessages] = useState<{ text: string; goalId?: string; loadSuggestionId?: string; weightBasisOfferId?: string }[]>([])
   /** Which load_suggestions row a Confirm/Decline tap is currently in flight for — disables both buttons on that one banner only. */
   const [loadSuggestionBusy, setLoadSuggestionBusy] = useState<string | null>(null)
   /** When the CURRENT mesocycle was generated — anchors live-week detection (falls back to profile.created_at for legacy profiles without persisted weeks). */
@@ -547,6 +551,38 @@ function App() {
               ...prev,
               ...loadSuggestionResult.suggestions.map(s => ({ text: s.text, loadSuggestionId: s.id })),
             ])
+          }
+
+          // Backlog 2b follow-on — offer to rebuild starting weights now that
+          // we know what they actually weigh. Like Step 6 above it never
+          // patches anything itself; it only ever surfaces an offer.
+          //
+          // The cheap gate runs HERE rather than inside the check so the
+          // getActiveFacts read below only happens for a profile that could
+          // actually be offered something — the vast majority of plans hold
+          // no 'assumed_body' loads at all and should cost nothing.
+          if (!planHasAssumedBodyLoads(workingMesocycle)) return null
+          // Read the exclusions fresh rather than closing over
+          // compiledExerciseExclusions: that memo is derived from memoryFacts,
+          // which reloadMemory populates asynchronously AFTER this chain
+          // starts, so the closed-over value here is empty on a cold load.
+          // The preview would then be built against a different exercise pool
+          // than the confirm, and could name a banned lift in the offer text.
+          return getActiveFacts(restoredProfile.id!)
+            .catch(() => [] as UserFactRow[])
+            .then(facts => checkForWeightBasisOffer({
+              profileId: restoredProfile.id!,
+              profile: restoredProfile,
+              mesocycle: workingMesocycle,
+              basisWeightKg: effectiveTargetWeight.weightKg,
+              exclusions: compileExerciseExclusions(facts),
+              planCreatedAt: blockCheckPlanCreatedAt,
+              now: blockCheckNow,
+            }))
+        })
+        .then(weightBasisOffer => {
+          if (weightBasisOffer) {
+            setAdaptationMessages(prev => [...prev, { text: weightBasisOffer.text, weightBasisOfferId: weightBasisOffer.id }])
           }
         })
         .catch(console.error)
@@ -1249,6 +1285,53 @@ function App() {
     }
   }
 
+  // The weight-basis offer's own pair. Same shape as the load-suggestion
+  // handlers above and deliberately not merged with them: that one patches a
+  // single exercise across one block via forceStartingWeightKg, this one
+  // regenerates whole weeks. Sharing a handler would mean sharing a branch on
+  // which kind of row it is, which is how the two would eventually drift.
+  const handleWeightBasisConfirm = async (id: string) => {
+    if (!profile?.id) return
+    setLoadSuggestionBusy(id)
+    try {
+      const rebuilt = await confirmWeightBasisOffer({
+        offerId: id,
+        profileId: profile.id,
+        profile,
+        mesocycle,
+        exclusions: compiledExerciseExclusions,
+        planCreatedAt: mesocycleCreatedAt ?? profile.created_at ?? new Date().toISOString(),
+        mesocycleCreatedAt: mesocycleCreatedAt ?? profile.created_at,
+        now: getAppNow(profile.id),
+      })
+      if (rebuilt) setMesocycle(rebuilt)
+      setAdaptationMessages(prev => [
+        ...prev.filter(m => m.weightBasisOfferId !== id),
+        // A receipt, not a celebration — the same plain statement of what
+        // changed that every other write in this app produces.
+        { text: 'Done — the rest of your plan now uses your real weight. Log a set and it keeps tuning from there.' },
+      ])
+    } catch (err) {
+      console.error('Weight-basis rebuild failed:', err)
+      setAdaptationMessages(prev => [
+        ...prev.filter(m => m.weightBasisOfferId !== id),
+        { text: "Couldn't rebuild your plan just then — nothing was changed. Try again in a moment." },
+      ])
+    } finally {
+      setLoadSuggestionBusy(null)
+    }
+  }
+
+  const handleWeightBasisDecline = async (id: string) => {
+    setLoadSuggestionBusy(id)
+    try {
+      await declineWeightBasisOffer(id)
+      setAdaptationMessages(prev => prev.filter(m => m.weightBasisOfferId !== id))
+    } finally {
+      setLoadSuggestionBusy(null)
+    }
+  }
+
   const handleBanExercise = async (exerciseName: string) => {
     if (!profile?.id) return
     // Fix — food/exercise preferences have two competing stores: this used
@@ -1445,6 +1528,35 @@ function App() {
       }
     })
 
+    // The training half of the same event. Food targets follow a weigh-in on
+    // their own (above); prescribed loads never did — generateMesocycle runs
+    // once, at onboarding, so someone who declined their weight stays on a
+    // deliberately-light plan forever. Ashley's ruling was to ask rather than
+    // rebuild silently, so this only ever surfaces an offer.
+    if (mesocycle.length > 0 && planHasAssumedBodyLoads(mesocycle)) {
+      checkForWeightBasisOffer({
+        profileId: profile.id,
+        profile,
+        mesocycle,
+        basisWeightKg: effectiveTargetWeight.weightKg,
+        exclusions: compiledExerciseExclusions,
+        planCreatedAt: mesocycleCreatedAt ?? profile.created_at ?? new Date().toISOString(),
+        now: getAppNow(profile.id),
+      })
+        .then(offer => {
+          // Never stacks: checkForWeightBasisOffer returns the SAME row while
+          // one is outstanding, so a second weigh-in re-surfaces the existing
+          // offer rather than adding a second banner.
+          if (offer) {
+            setAdaptationMessages(prev =>
+              prev.some(m => m.weightBasisOfferId === offer.id)
+                ? prev
+                : [...prev, { text: offer.text, weightBasisOfferId: offer.id }])
+          }
+        })
+        .catch(console.error)
+    }
+
     // Goal-proximity nudge — same ask-first check as the initial load path.
     const goals = await getActiveGoals(profile.id).catch(() => [])
     const weightGoal = goals.find(g => g.metric === 'body_weight_kg')
@@ -1613,6 +1725,30 @@ function App() {
                       className="text-xs underline opacity-70 hover:opacity-100 disabled:opacity-50"
                     >
                       Keep as is
+                    </button>
+                  </div>
+                ) : msg.weightBasisOfferId ? (
+                  <div className="flex shrink-0 items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => void handleWeightBasisConfirm(msg.weightBasisOfferId!)}
+                      disabled={loadSuggestionBusy === msg.weightBasisOfferId}
+                      className="text-xs font-semibold underline opacity-90 hover:opacity-100 disabled:opacity-50"
+                    >
+                      {loadSuggestionBusy === msg.weightBasisOfferId ? 'Rebuilding…' : 'Yes, redo them'}
+                    </button>
+                    {/* "No thanks" and not "Dismiss": this records a permanent
+                        answer, and the label has to say so. A dismiss-shaped
+                        control on a decision that never comes back would be
+                        the app deciding something on their behalf while
+                        looking like it hadn't. */}
+                    <button
+                      type="button"
+                      onClick={() => void handleWeightBasisDecline(msg.weightBasisOfferId!)}
+                      disabled={loadSuggestionBusy === msg.weightBasisOfferId}
+                      className="text-xs underline opacity-70 hover:opacity-100 disabled:opacity-50"
+                    >
+                      No thanks
                     </button>
                   </div>
                 ) : (
