@@ -72,6 +72,7 @@
     "test:main-lift-rest": "tsx scripts/test-main-lift-rest.ts",
     "report:added-load": "tsx scripts/report-added-load.ts",
     "report:band-slots": "tsx scripts/report-band-slots.ts",
+    "report:swap-coverage": "tsx scripts/report-swap-coverage.ts",
     "report:frozen-weeks": "tsx scripts/report-frozen-weeks.ts",
     "report:rehab-coverage": "tsx scripts/report-rehab-coverage.ts",
     "report:trim-magnitude": "tsx scripts/run-trim-magnitude-report.ts"

@@ -603,6 +603,62 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     avg_duration_seconds: 35,
   },
 
+  // Swap-depth fix, and the one a real gym session found: a busy machine
+  // sent the trainee looking for another machine that was physically in
+  // front of her, and the app had no flat machine press at all. The
+  // catalogue held Incline Machine Press and Pec Deck Machine but not the
+  // most-used chest machine on any commercial floor. Name matters here
+  // beyond labelling: categorize() (load-prescription.ts) matches
+  // 'chest press' and anchors this to the BENCH standard — a machine named
+  // e.g. "Seated Press" would miss every substring and fall through to the
+  // pattern default instead.
+  {
+    name: 'Chest Press Machine',
+    id: 'chest-press-machine',
+    movement_pattern: 'horizontal_push',
+    mechanics_tier: 'tier2_compound',
+    prescription_type: 'reps',
+    angle_vector: 'horizontal',
+    primary_muscles: ['chest', 'anterior deltoid', 'triceps'],
+    equipment: ['machine'],
+    joint_stress: 'low',
+    form_cues: [
+      'Set the seat so the handles sit level with mid-chest',
+      'Shoulder blades stay back against the pad',
+      'Press straight forward, not up',
+      'Stop just short of locking the elbows',
+    ],
+    coach_note_swap: 'A fixed path lets you push close to failure without a spotter.',
+    loads_joints: ['shoulder'],
+    style_tags: ['bodybuilding', 'hybrid'],
+    substitution_group: 'bench_press',
+    unilateral: false,
+    avg_duration_seconds: 28,
+  },
+  {
+    name: 'Cable Crossover',
+    id: 'cable-crossover',
+    movement_pattern: 'horizontal_push',
+    mechanics_tier: 'tier3_isolation',
+    prescription_type: 'reps',
+    angle_vector: 'horizontal',
+    primary_muscles: ['chest'],
+    equipment: ['cable machine'],
+    joint_stress: 'low',
+    form_cues: [
+      'Set both pulleys above shoulder height',
+      'Keep a soft bend in the elbows and hold it',
+      'Bring the hands together in front of the hips',
+      'Resist the stretch on the way back',
+    ],
+    coach_note_swap: 'Cable tension stays on the chest exactly where a dumbbell fly goes slack.',
+    loads_joints: ['shoulder'],
+    style_tags: ['bodybuilding', 'hybrid'],
+    substitution_group: 'chest_fly',
+    unilateral: false,
+    avg_duration_seconds: 28,
+  },
+
   // HORIZONTAL PULL
   {
     name: 'Barbell Rows',
@@ -849,6 +905,35 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     substitution_group: 'rear_delt',
     unilateral: false,
     avg_duration_seconds: 28,
+  },
+
+  // Swap-depth fix: every row in the catalogue was a cable, a barbell, a
+  // dumbbell or bodyweight — no plate-loaded machine row, which is standard
+  // kit on any commercial floor and the obvious fallback when the cable
+  // station is occupied.
+  {
+    name: 'Seated Machine Row',
+    id: 'seated-machine-row',
+    movement_pattern: 'horizontal_pull',
+    mechanics_tier: 'tier2_compound',
+    prescription_type: 'reps',
+    angle_vector: 'horizontal',
+    primary_muscles: ['lats', 'rhomboids', 'mid traps', 'biceps'],
+    equipment: ['machine'],
+    joint_stress: 'low',
+    form_cues: [
+      'Chest stays against the pad the whole set',
+      'Drive the elbows back, not down',
+      'Squeeze the shoulder blades at the finish',
+      'Let the weight stretch the lats before the next rep',
+    ],
+    coach_note_swap: 'Chest support takes the lower back out of it entirely.',
+    loads_joints: ['shoulder', 'elbow'],
+    contraindicated_joints: ['shoulder'],
+    style_tags: ['bodybuilding', 'hybrid'],
+    substitution_group: 'row',
+    unilateral: false,
+    avg_duration_seconds: 30,
   },
 
   // VERTICAL PULL
@@ -1152,6 +1237,87 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     substitution_group: 'shrug',
     unilateral: false,
     avg_duration_seconds: 28,
+  },
+
+  // Swap-depth fix, and the widest gap the coverage audit found: overhead
+  // pressing held FIVE movements and not one machine — two barbell, two
+  // dumbbell, one band. A trainee whose shoulder press station was busy had
+  // only free-weight options, every one of them harder to self-spot.
+  // 'shoulder press' in the name is load-bearing: it anchors this to the
+  // OVERHEAD standard rather than the materially heavier bench one. See the
+  // Landmine Press note in load-prescription.ts for what that fallback cost
+  // last time it was missed.
+  {
+    name: 'Shoulder Press Machine',
+    id: 'shoulder-press-machine',
+    movement_pattern: 'vertical_push',
+    mechanics_tier: 'tier2_compound',
+    prescription_type: 'reps',
+    angle_vector: 'vertical',
+    primary_muscles: ['anterior deltoid', 'lateral deltoid', 'triceps'],
+    equipment: ['machine'],
+    joint_stress: 'low',
+    form_cues: [
+      'Set the seat so the handles start at ear height',
+      'Press up without shrugging the shoulders',
+      'Keep the ribs down rather than arching the back',
+      'Lower under control to the starting height',
+    ],
+    coach_note_swap: 'Guided overhead pressing when a bar overhead is the part that is limiting you.',
+    loads_joints: ['shoulder', 'elbow'],
+    contraindicated_joints: ['shoulder'],
+    style_tags: ['bodybuilding', 'hybrid'],
+    substitution_group: 'overhead_press',
+    unilateral: false,
+    avg_duration_seconds: 30,
+  },
+
+  // Swap-depth fix, measured: isolation_shoulder and isolation_trap were the
+  // two thinnest patterns in the whole catalogue — ONE alternative each, at
+  // every equipment tier. Thin enough that at home_gym and minimalist the
+  // same-pattern list came back empty and NEAREST_PATTERN_FALLBACK took over,
+  // handing a trainee who wanted a lateral raise a list of overhead presses.
+  // Not a dead end (the fallback is doing its job) but not a real choice
+  // either, which is a distinction worth keeping: see report:swap-coverage,
+  // whose first cut reported this as a dead end and was wrong.
+  //
+  // ONLY THE SHRUG LANDED HERE. A 'Machine Lateral Raise' was written,
+  // measured, and pulled back out: it put the constraint audit 56 failures
+  // into the red against the 25kg isolation_shoulder safety ceiling. Not a
+  // fault in the entry — dev-constraint-audit.ts already records that the
+  // 0.19-of-bench shoulder fraction is the real defect and that the ceiling
+  // is deliberately left failing rather than raised to hide it. Every
+  // existing lateral raise is a dumbbell or a per-hand cable, and BOTH are
+  // clamped by a separate implement ceiling before they can breach; a
+  // machine has neither clamp, so the underlying over-prescription became
+  // visible for the first time (120kg advanced male: dumbbell 20kg, cable
+  // 20kg, machine 40kg — and 40kg is the exact figure that comment
+  // predicted). Fixing the fraction changes what every trainee is
+  // prescribed for lateral raises, so it is its own round with its own
+  // plan, not a side effect of adding a machine. isolation_shoulder
+  // therefore stays at one same-pattern alternative for now, on purpose.
+  {
+    name: 'Cable Shrug',
+    id: 'cable-shrug',
+    movement_pattern: 'isolation_trap',
+    mechanics_tier: 'tier3_isolation',
+    prescription_type: 'reps',
+    angle_vector: 'vertical',
+    primary_muscles: ['upper traps'],
+    equipment: ['cable machine'],
+    joint_stress: 'low',
+    form_cues: [
+      'Stand tall with the cable in front of the thighs',
+      'Shrug straight up, no rolling',
+      'Hold the top for a beat',
+      'Let the shoulders travel all the way down',
+    ],
+    coach_note_swap: 'Constant tension through the whole shrug, including the bottom.',
+    loads_joints: ['shoulder', 'neck'],
+    style_tags: ['bodybuilding', 'hybrid'],
+    substitution_group: 'shrug',
+    unilateral: false,
+    avg_duration_seconds: 26,
   },
 
   // HIP HINGE
@@ -1481,6 +1647,40 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     substitution_group: 'leg_curl',
     unilateral: false,
     avg_duration_seconds: 30,
+  },
+
+  // No hip thrust existed anywhere in the catalogue — glute work was carried
+  // entirely by hinges and single-leg movements. LOAD NOTE, deliberate and
+  // flagged rather than discovered later: the name matches none of
+  // categorize()'s substrings, so it falls through to the hip_hinge pattern
+  // default and is priced as 'hinge_accessory' (0.55x deadlift 1RM). A real
+  // hip thrust is usually HEAVIER than an RDL, so this under-prescribes. That
+  // is the safe direction and it is left deliberately conservative — a
+  // trainee adding plates is a better failure than a trainee pinned under
+  // them on the first session.
+  {
+    name: 'Hip Thrust',
+    id: 'hip-thrust',
+    movement_pattern: 'hip_hinge',
+    mechanics_tier: 'tier2_compound',
+    prescription_type: 'reps',
+    angle_vector: 'horizontal',
+    primary_muscles: ['glutes', 'hamstrings'],
+    equipment: ['barbell', 'bench'],
+    joint_stress: 'low',
+    form_cues: [
+      'Shoulder blades on the bench, feet flat and shins vertical at the top',
+      'Drive through the heels',
+      'Squeeze the glutes at the top, ribs down',
+      'Do not arch the lower back to gain height',
+    ],
+    coach_note_swap: 'Loads the glutes hard with almost nothing on the spine.',
+    loads_joints: ['hip'],
+    contraindicated_joints: [],
+    style_tags: ['bodybuilding', 'functional', 'hybrid'],
+    substitution_group: 'hip_thrust',
+    unilateral: false,
+    avg_duration_seconds: 32,
   },
 
   // KNEE DOMINANT
@@ -2261,6 +2461,27 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     avg_duration_seconds: 30,
   },
 
+  // NO PREACHER CURL, and the reason is a constraint on every future
+  // catalogue addition, not a fact about preacher curls.
+  //
+  // One was written and pulled back out: it put 3 of 13,967 audit
+  // combinations over the duration tolerance, all of them the same
+  // "Back & Biceps" day on a 30-45 minute bodybuilding split, landing at
+  // exactly the +15% boundary. Traced rather than guessed — that day went
+  // from FIVE exercises to SEVEN, gaining a second bicep movement alongside
+  // Barbell Curls. Adding a candidate does not merely change which exercise
+  // is picked; a deeper pool lets the day-filler fit one more distinct
+  // movement, and on a short session that is the difference between fitting
+  // and not.
+  //
+  // So depth is not free, and it is least free where the pattern is ALREADY
+  // deep: isolation_bicep had six entries and no swap problem at all. The
+  // additions that earn their duration cost are the ones in thin patterns
+  // (vertical_push had five movements and no machine) or the ones a trainee
+  // physically cannot substitute for (a flat chest press machine). Any
+  // future entry in an already-deep pattern must be measured against
+  // test:audit before it is assumed harmless.
+  //
   // TRICEPS
   {
     name: 'Tricep Dips',
@@ -3210,16 +3431,28 @@ export function getSmartReplacements(
   })
 
   scored.sort((a, b) => b.score - a.score)
-  // Swap-dead-end fix: was a hard 5, which is exactly why a real user's swap
-  // dialog dead-ended (flat bench busy -> only incline offered, also busy —
-  // decline bench, which conflicts with nothing, simply never made the cut).
-  // Raised to 8; ExercisePlan.tsx's dialog shows the top few and offers
-  // "show more" for the rest rather than dumping all 8 at once.
-  return scored.slice(0, MAX_SMART_REPLACEMENTS).map(({ exercise, note }) => ({ exercise, note }))
+  // NO CAP, and the history is the argument for that.
+  //
+  // This was a hard 5, which dead-ended a real user's swap: flat bench busy,
+  // only incline offered, also busy, and decline bench — which conflicts with
+  // nothing — never made the cut. The fix then was to raise it to 8. A second
+  // real gym session then dead-ended at 8, on chest again: 14 legitimate
+  // alternatives existed and 6 were withheld.
+  //
+  // Raising it a third time would be the same mistake a third time, and the
+  // number was never the problem — a COUNT is the wrong mechanism for "don't
+  // overwhelm the trainee". Truncating a ranked list silently discards real
+  // options and looks identical, from the outside, to a catalogue that has
+  // run out. SwapDialog is where the "don't overwhelm" job belongs and it
+  // already does it properly: it shows the top few and offers "Show N more",
+  // which now reaches everything eligible instead of everything up to 8.
+  //
+  // Unbounded is safe here because the list is already constrained hard
+  // upstream — same movement pattern, this trainee's equipment, no skill
+  // regression, no injury conflict. The widest pattern in the catalogue
+  // yields 14. See `npm run report:swap-coverage`.
+  return scored.map(({ exercise, note }) => ({ exercise, note }))
 }
-
-/** Cap for getSmartReplacements — see its call site's comment for why this changed from 5. */
-export const MAX_SMART_REPLACEMENTS = 8
 
 /**
  * The joints that actually disqualify this movement for an injured trainee.

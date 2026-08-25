@@ -213,14 +213,33 @@ console.log('\n4. The weight holds all block — one lever, not two')
   check(`the added weight never changes inside a block (${t.blockVaries.length} blocks vary)`,
     t.blockVaries.length === 0, t.blockVaries.slice(0, 3).join(' | '))
   // And the reps DO move underneath it, or "one lever" would mean none.
+  //
+  // Asserted for EVERY lift that carries added weight, not for Pull-Ups by
+  // name. The original pinned this to Pull-Ups and went red the moment six
+  // machines were added to the catalogue — not because added load broke, but
+  // because the shifted selection put Pull-Ups outside a strength phase in
+  // this one seeded plan while Chin-Ups and Tricep Dips still carried the
+  // belt correctly. The exercise name was never what the check meant; the
+  // coupling was incidental, and any catalogue change could break it again.
+  //
+  // Deliberately STRONGER than what it replaces: it demands climbing reps
+  // from every added-load lift in the plan rather than from one, and it
+  // still fails if no lift carries added weight at all — so it cannot pass
+  // by the feature silently disappearing, which is the failure the original
+  // was really guarding against.
   const weeks = plan({ equipment_access: 'full_gym', training_experience: 'advanced' }, 'ag:full_gym:advanced:hypertrophy:upper_lower')
-  const loadedWeeks = weeks.filter(wk => wk.days.some(d => d.exercises.some(e => e.suggested_added_load_kg != null)))
-  const repsSeen = new Set<string>()
-  for (const wk of loadedWeeks) for (const d of wk.days) for (const e of d.exercises) {
-    if (e.suggested_added_load_kg != null && e.name === 'Pull-Ups') repsSeen.add(String(e.reps))
+  const repsByLift = new Map<string, Set<string>>()
+  for (const wk of weeks) for (const d of wk.days) for (const e of d.exercises) {
+    if (e.suggested_added_load_kg == null) continue
+    if (!repsByLift.has(e.name)) repsByLift.set(e.name, new Set())
+    repsByLift.get(e.name)!.add(String(e.reps))
   }
-  check(`reps still climb under the constant weight (${[...repsSeen].join(', ') || 'none seen'})`,
-    repsSeen.size > 1, [...repsSeen].join(', '))
+  check(`some lift actually carries added weight here (${repsByLift.size} found)`,
+    repsByLift.size > 0, String(repsByLift.size))
+  const flat = [...repsByLift.entries()].filter(([, reps]) => reps.size <= 1).map(([n]) => n)
+  const summary = [...repsByLift.entries()].map(([n, r]) => `${n}: ${[...r].join('/')}`).join(', ')
+  check(`reps still climb under the constant weight (${summary || 'none seen'})`,
+    repsByLift.size > 0 && flat.length === 0, flat.join(', '))
 }
 
 // ---------------------------------------------------------------------------
