@@ -56,6 +56,7 @@
     "test:starting-out": "tsx scripts/test-starting-out.ts",
     "test:training-week": "tsx scripts/test-training-week.ts",
     "test:coach-rules-sync": "tsx scripts/test-coach-rules-sync.ts",
+    "test:coach-promises": "tsx scripts/test-coach-promises.ts",
     "test:reply-guarantee": "tsx scripts/test-onboarding-reply-guarantee.ts",
     "test:assumed-body": "tsx scripts/test-assumed-body-loads.ts",
     "test:weight-basis": "tsx scripts/test-weight-basis-offer.ts",

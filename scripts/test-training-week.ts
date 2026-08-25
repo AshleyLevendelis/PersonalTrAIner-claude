@@ -76,9 +76,44 @@ console.log('\n5. Without a plan start date, behaviour is exactly as before')
 check('past unlogged training day is missed', classifyDay('Monday', MON, TODAY, PLAN, undefined, undefined) === 'missed')
 check('future training day is due', classifyDay('Friday', '2026-08-28', TODAY, PLAN, undefined, undefined) === 'due')
 
-console.log('\n6. Tally predicate')
+console.log('\n6. A day swapped for something else is not a day you failed')
+{
+  // Ashley told the coach in advance she was doing Muay Thai instead of
+  // weights. It said "I'll make sure today is marked as a rest day" and could
+  // not — no tool touched a day's status — so the day showed as MISSED the
+  // next morning and the Muay Thai was recorded nowhere. Same shape as the
+  // pre-plan bug above: the reward for telling the app was being told you
+  // failed.
+  const swapped = { session: { swapped_for_activity: 'Muay Thai' }, workoutLogs: [] } as never
+  check('a past swapped day reads swapped, not missed',
+    classifyDay('Monday', MON, TODAY, PLAN, swapped, undefined) === 'swapped')
+  check('...and it drops out of the tally rather than counting against you',
+    !countsTowardWeekTally('swapped'))
+
+  // Logged work still outranks everything, exactly as it outranks before_plan.
+  // Someone who announced a swap and then trained anyway has earned the tick.
+  const swappedButTrained = {
+    session: { swapped_for_activity: 'Muay Thai', is_completed: true }, workoutLogs: [],
+  } as never
+  check('a swapped day they trained anyway reads done, not swapped',
+    classifyDay('Monday', MON, TODAY, PLAN, swappedButTrained, undefined) === 'done')
+  const swappedPartLogged = {
+    session: { swapped_for_activity: 'Muay Thai' }, workoutLogs: [{}],
+  } as never
+  check('a swapped day with sets logged reads partial, not swapped',
+    classifyDay('Monday', MON, TODAY, PLAN, swappedPartLogged, undefined) === 'partial')
+
+  // The over-fire check: an ordinary skipped day is still missed. A state
+  // that swallowed every absence would be worse than the bug.
+  check('an ordinary unlogged past day is still missed',
+    classifyDay('Monday', MON, TODAY, PLAN, undefined, undefined) === 'missed')
+  check('a FUTURE day marked swapped still reads swapped, not due',
+    classifyDay('Friday', '2026-08-28', TODAY, PLAN, swapped, undefined) === 'swapped')
+}
+
+console.log('\n7. Tally predicate')
 const counted: DayGlyphState[] = ['done', 'partial', 'due', 'missed']
-const skipped: DayGlyphState[] = ['rest', 'recovery', 'before_plan']
+const skipped: DayGlyphState[] = ['rest', 'recovery', 'before_plan', 'swapped']
 for (const s of counted) check(`'${s}' counts`, countsTowardWeekTally(s))
 for (const s of skipped) check(`'${s}' does not count`, !countsTowardWeekTally(s))
 

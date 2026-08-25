@@ -29,6 +29,10 @@ const GLYPH: Record<TrainingWeekDay['state'], string> = {
   // faintest mark in the set: it is not a rest day (the plan didn't choose
   // it) and emphatically not a missed one (nothing was ever owed).
   before_plan: '·',
+  // Lifting deliberately swapped for something else, announced at the time.
+  // Distinct from every mark above because it is the only one that says work
+  // HAPPENED but not this work — an arrow, not an absence.
+  swapped: '⇄',
 }
 
 const SHORT_DAY: Record<string, string> = {

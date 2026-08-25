@@ -635,6 +635,18 @@ export interface WorkoutSession {
   week_number?: number | null
   day?: string | null
   notes?: string | null
+  /**
+   * Set when the trainee deliberately swapped this day's lifting for something
+   * else ("I'm doing Muay Thai instead") — the activity's name, as they said
+   * it. Absence means an ordinary session, so no existing row changes meaning.
+   *
+   * Exists because the coach used to reply "I'll make sure today is marked as
+   * a rest day" and had no tool that could: classifyDay ends
+   * `dateStr < todayStr ? 'missed' : 'due'` with nothing in between, so a day
+   * announced in advance showed as MISSED the next morning. What they did
+   * instead goes to cardio_logs, not here — one fact, one home.
+   */
+  swapped_for_activity?: string | null
 }
 
 export interface WorkoutExerciseRow {
