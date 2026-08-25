@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { useTrainingWeek } from '@/hooks/useTrainingWeek'
 import { useTimers } from '@/hooks/useTimers'
-import { getDoubleProgressionRecommendation, type DoubleProgressionRecommendation } from '@/lib/progression-engine'
+import { getDoubleProgressionRecommendation, getAddedLoadProgression, type DoubleProgressionRecommendation } from '@/lib/progression-engine'
 import { groupExercises, resolveCalibrationAnchorIndex, computeSessionSummary, type ExerciseGroup } from '@/lib/session-derive'
 import { computeSessionPRs } from '@/lib/pr-engine'
 import { getExerciseId } from '@/lib/exercise-db'
@@ -100,10 +100,20 @@ export function TodayPanel({
     const dayAfter = new Date(today)
     dayAfter.setDate(dayAfter.getDate() + 1)
     const dayAfterStr = getLocalDateString(dayAfter)
+    // Same widening as the live rows above, and for the same reason: the
+    // four lifts that take added weight were excluded from this filter too,
+    // so "what next session prescribes" silently omitted them. One filter,
+    // two call sites — the re-assert-at-every-path shape this codebase keeps
+    // meeting.
     const progressions = await Promise.all(
       workout.exercises
-        .filter(ex => ex.suggested_load_kg != null)
-        .map(async ex => [ex.name, await getDoubleProgressionRecommendation(profileId!, ex.name, dayAfterStr, parseRepsHigh(ex.reps))] as const)
+        .filter(ex => ex.suggested_load_kg != null || ex.suggested_added_load_kg != null)
+        .map(async ex => {
+          const rec = ex.suggested_added_load_kg != null
+            ? await getAddedLoadProgression(profileId!, ex.name, dayAfterStr, parseRepsHigh(ex.reps))
+            : await getDoubleProgressionRecommendation(profileId!, ex.name, dayAfterStr, parseRepsHigh(ex.reps))
+          return [ex.name, rec] as const
+        })
     )
     setSummaryData({ summary, prs, progressions })
     setSummaryOpen(true)
@@ -140,30 +150,48 @@ export function TodayPanel({
   // passed to the peek or program browse (§2.2/§7.4: those show
   // plan-derived loads and honest provenance only).
   const [progressedLoads, setProgressedLoads] = useState<Record<string, number>>({})
+  // Its own map, never merged with progressedLoads: one is the weight of the
+  // bar and the other is what you hang off yourself.
+  const [progressedAddedLoads, setProgressedAddedLoads] = useState<Record<string, number>>({})
   const [progressionNotes, setProgressionNotes] = useState<Record<string, { note: string; didProgress: boolean }>>({})
   useEffect(() => {
     if (!profileId || liveWeek <= 1 || !workout || workout.exercises.length === 0) {
       setProgressedLoads({})
+      setProgressedAddedLoads({})
       setProgressionNotes({})
       return
     }
     let cancelled = false
     Promise.all(
+      // A pull-up's suggested_load_kg is null, so this filter meant the
+      // progression engine was NEVER asked about the four lifts that take
+      // added weight — the read-back half of that loop was not merely
+      // unwired, it was unreachable.
       workout.exercises
-        .filter(ex => ex.suggested_load_kg != null)
+        .filter(ex => ex.suggested_load_kg != null || ex.suggested_added_load_kg != null)
         .map(async ex => {
+          if (ex.suggested_added_load_kg != null) {
+            const added = await getAddedLoadProgression(profileId, ex.name, today, parseRepsHigh(ex.reps))
+            return [ex.name, added, 'added'] as const
+          }
           const rec = await getDoubleProgressionRecommendation(profileId, ex.name, today, parseRepsHigh(ex.reps))
-          return [ex.name, rec] as const
+          return [ex.name, rec, 'load'] as const
         })
     ).then(results => {
       if (cancelled) return
       const nextLoads: Record<string, number> = {}
+      const nextAdded: Record<string, number> = {}
       const nextNotes: Record<string, { note: string; didProgress: boolean }> = {}
-      for (const [name, rec] of results) {
+      for (const [name, rec, kind] of results) {
         if (!rec) continue
-        nextLoads[name] = rec.weightKg
+        // Kept in separate maps on purpose: one is the weight of the bar,
+        // the other is what you hang off yourself, and a consumer that
+        // confused them would render "+15kg" as a 15kg lift.
+        if (kind === 'added') nextAdded[name] = (rec as { addedKg: number }).addedKg
+        else nextLoads[name] = (rec as { weightKg: number }).weightKg
         nextNotes[name] = { note: rec.note, didProgress: rec.didProgress }
       }
+      setProgressedAddedLoads(nextAdded)
       setProgressedLoads(nextLoads)
       setProgressionNotes(nextNotes)
     }).catch(() => {})
@@ -302,6 +330,7 @@ export function TodayPanel({
             dayName={effectiveDayName}
             currentMesoWeekObj={currentMesoWeekObj}
             progressedLoads={progressedLoads}
+            progressedAddedLoads={progressedAddedLoads}
             progressionNotes={progressionNotes}
             onOpenSwap={onOpenSwap}
             onOpenPlateCalc={onOpenPlateCalc}
@@ -339,6 +368,7 @@ function ExerciseList({
   dayName,
   currentMesoWeekObj,
   progressedLoads,
+  progressedAddedLoads,
   progressionNotes,
   onOpenSwap,
   onOpenPlateCalc,
@@ -351,6 +381,7 @@ function ExerciseList({
   dayName: string
   currentMesoWeekObj?: MesocycleWeek
   progressedLoads: Record<string, number>
+  progressedAddedLoads: Record<string, number>
   progressionNotes: Record<string, { note: string; didProgress: boolean }>
   onOpenSwap: (dayName: string, exIndex: number, exerciseName: string) => void
   onOpenPlateCalc: (weightKg: number) => void
@@ -395,8 +426,17 @@ function ExerciseList({
   const rowProps = (ex: WorkoutDay['exercises'][number], exIndex: number) => {
     const defaultExpanded = exIndex === firstIncompleteExIndex
     const expanded = exIndex in expandOverrides ? expandOverrides[exIndex] : defaultExpanded
+    // The progressed added weight REPLACES the plan's figure on the row, so a
+    // trainee who hit their reps last week actually sees +17.5kg rather than
+    // the plan's +15kg with a note about it. Substituted here, on a copy,
+    // rather than mutating the plan — the peek and program-browse surfaces
+    // deliberately show plan-derived numbers only.
+    const progressedAdded = progressedAddedLoads[ex.name]
+    const rowEx = progressedAdded != null && ex.suggested_added_load_kg != null
+      ? { ...ex, suggested_added_load_kg: progressedAdded }
+      : ex
     return {
-      ex,
+      ex: rowEx,
       dayName,
       loadSource: loadSourceFor(ex),
       // A persisted block-level hold (VISION.md Step 4 — see block-review.ts)

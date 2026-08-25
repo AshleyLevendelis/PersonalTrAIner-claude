@@ -102,6 +102,13 @@ export function SetGrid({
   // hiding it for a movement we simply don't have catalog data for.
   const catalogEntry = getExerciseEntry(exerciseName)
   const isBodyweightCapable = catalogEntry ? !isExternallyLoaded(catalogEntry) : true
+  // On the four lifts you can hang weight from (accepts_added_load — pull-ups,
+  // chin-ups, dips), the weight box means ADDED weight, not the weight of the
+  // thing being lifted. Typing 15 here used to write weight_kg 15 with
+  // is_bodyweight false — "this pull-up weighed 15kg" — a row indistinguishable
+  // from an ordinary 15kg lift. Same field, different question, which is why
+  // the value goes to its own column rather than being reinterpreted.
+  const takesAddedLoad = catalogEntry?.accepts_added_load === true
 
   const existingLogs = setsFor(exerciseId, exerciseName)
   const ghostValues = ghosts(exerciseId)
@@ -191,6 +198,15 @@ export function SetGrid({
       setRowErrors(prev => ({ ...prev, [setNumber]: 'Enter the weight you lifted' }))
       return
     }
+
+    // A weighted pull-up is bodyweight PLUS a belt: the base is always
+    // bodyweight, and the typed figure is what was added. Splitting it here
+    // rather than downstream keeps every existing reader
+    // (isMalformedZeroWeight, maxWorkingWeight, ghosts, the PR cache) seeing
+    // exactly the row shape it has always seen.
+    const addedLoadKg = takesAddedLoad && weight > 0 ? weight : null
+    const storedWeightKg = addedLoadKg != null ? 0 : weight
+    const storedIsBodyweight = addedLoadKg != null ? true : isBodyweight
     if (rowErrors[setNumber]) {
       setRowErrors(prev => { const next = { ...prev }; delete next[setNumber]; return next })
     }
@@ -209,15 +225,23 @@ export function SetGrid({
       exerciseId,
       exerciseName,
       setNumber,
-      weightKg: weight,
+      weightKg: storedWeightKg,
       repsCompleted: reps,
       unit: prescriptionUnit(prescriptionType),
-      isBodyweight,
+      isBodyweight: storedIsBodyweight,
+      addedLoadKg,
     })
 
     if (wasFirstEverLog) onFirstEverLog?.(exerciseName)
 
-    const pr = checkForPR(profileId, exerciseName, weight, reps)
+    // Both PR paths read the STORED weight, deliberately, so a weighted
+    // pull-up keeps exactly today's behaviour (bodyweight, PR by reps) rather
+    // than half-adopting added weight as the PR metric. checkForPR here and
+    // getTopPRSet below must agree; passing the raw typed figure to one and
+    // the stored 0 to the other would make the badge and the check disagree
+    // inside one function. PRs on added weight are a real thing and are
+    // flagged in BACKLOG as their own pass.
+    const pr = checkForPR(profileId, exerciseName, storedWeightKg, reps)
     if (pr) {
       setAnimatingPr(true)
       setTimeout(() => setAnimatingPr(false), 2000)
@@ -227,7 +251,7 @@ export function SetGrid({
     // for this row so the PR badge doesn't lag a render).
     const projectedLogs = [
       ...existingLogs.filter(l => l.set_number !== setNumber),
-      { user_id: profileId, date: today, exercise_name: exerciseName, exercise_id: exerciseId, set_number: setNumber, weight_kg: weight, reps_completed: reps, is_bodyweight: isBodyweight },
+      { user_id: profileId, date: today, exercise_name: exerciseName, exercise_id: exerciseId, set_number: setNumber, weight_kg: storedWeightKg, reps_completed: reps, is_bodyweight: storedIsBodyweight, added_load_kg: addedLoadKg },
     ]
     const topPR = getTopPRSet(profileId, exerciseName, toSessionSets(projectedLogs))
     setPrBadgeSet(topPR)

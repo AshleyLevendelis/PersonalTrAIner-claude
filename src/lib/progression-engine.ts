@@ -169,6 +169,63 @@ export async function getDoubleProgressionRecommendation(
   }
 }
 
+/**
+ * Double progression on ADDED weight — the same rule as
+ * getDoubleProgressionRecommendation above, applied to the belt rather than
+ * the bar: hit the top of the rep range on every set and the added weight
+ * goes up one plate pair; anything short and it holds while reps catch up.
+ *
+ * Its own function rather than a flag on the one above, because the two
+ * return different things and mean different things. That one answers "what
+ * should the bar weigh"; this answers "what should you hang off yourself",
+ * and a caller that confused them would render "+15kg" as a 15kg lift — the
+ * exact untrue statement AddedLoadChip exists to prevent.
+ *
+ * 2.5kg is one plate pair, matching prescribeAddedLoad's own rounding, so a
+ * progressed figure is always a number someone can actually load.
+ */
+export const ADDED_LOAD_PROGRESSION_STEP_KG = 2.5
+
+export interface AddedLoadProgression {
+  addedKg: number
+  didProgress: boolean
+  note: string
+}
+
+export async function getAddedLoadProgression(
+  profileId: string,
+  exerciseName: string,
+  sessionDate: string,
+  prescribedRepRangeHigh: number,
+): Promise<AddedLoadProgression | null> {
+  const exerciseId = getExerciseId(exerciseName)
+  const sessionSets = await getLastSessionSets(profileId, exerciseId, sessionDate)
+  if (sessionSets.length === 0) return null
+
+  // A session where nothing carried added weight tells us nothing about it —
+  // returning 0 would read as "you used no belt last time, add 2.5kg", which
+  // is a claim about a session we have no such record of.
+  const withAdded = sessionSets.filter(s => s.added_load_kg != null)
+  if (withAdded.length === 0) return null
+
+  const lastAdded = withAdded.reduce((max, s) => Math.max(max, s.added_load_kg ?? 0), 0)
+  const hitTopOnAllSets = sessionSets.every(s => s.reps_completed >= prescribedRepRangeHigh)
+
+  if (!hitTopOnAllSets) {
+    return {
+      addedKg: lastAdded,
+      didProgress: false,
+      note: `Holding at +${lastAdded}kg — didn't hit ${prescribedRepRangeHigh} reps on every set last time. Chase the reps before adding more.`,
+    }
+  }
+  const addedKg = lastAdded + ADDED_LOAD_PROGRESSION_STEP_KG
+  return {
+    addedKg,
+    didProgress: true,
+    note: `Hit ${prescribedRepRangeHigh} reps on every set last time — up to +${addedKg}kg. Reps reset toward the bottom of the range.`,
+  }
+}
+
 /** Most recent logged working set for an exercise (optionally scoped to a mesocycle week). */
 export async function getLastLoggedWeight(
   userId: string,

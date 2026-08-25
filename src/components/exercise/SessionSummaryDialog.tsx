@@ -15,7 +15,14 @@ import type { DoubleProgressionRecommendation } from '@/lib/progression-engine'
 export interface SessionSummaryData {
   summary: SessionSummary
   prs: SessionPRHit[]
-  progressions: (readonly [string, DoubleProgressionRecommendation | null])[]
+  /**
+   * Narrowed to what this dialog actually renders — a note and whether it
+   * went up — so an ADDED-load progression (a belt, not a bar) can share the
+   * line without this component having to know which kind it is. It never
+   * shows the number itself, only the sentence, and both engines write their
+   * own units into that sentence.
+   */
+  progressions: (readonly [string, { note: string; didProgress: boolean } | null])[]
 }
 
 export function SessionSummaryDialog({
@@ -27,7 +34,7 @@ export function SessionSummaryDialog({
   onOpenChange: (open: boolean) => void
   data: SessionSummaryData | null
 }) {
-  const progressionLines = (data?.progressions ?? []).filter((entry): entry is readonly [string, DoubleProgressionRecommendation] => entry[1] != null)
+  const progressionLines = (data?.progressions ?? []).filter((entry): entry is readonly [string, { note: string; didProgress: boolean }] => entry[1] != null)
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

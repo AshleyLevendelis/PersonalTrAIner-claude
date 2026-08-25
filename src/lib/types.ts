@@ -705,6 +705,17 @@ export interface ExerciseSetLog {
    * are not wired yet — see this round's decision log.
    */
   assistance_kg?: number | null
+  /**
+   * Weight ADDED to bodyweight for this set — a dip belt, a dumbbell between
+   * the feet, a loaded backpack. NULL for every ordinary lift.
+   *
+   * Deliberately not weight_kg with is_bodyweight switched on: that column
+   * means the weight of the thing you lifted, and making it mean two things
+   * depending on a flag is the one-field-two-questions defect this repo keeps
+   * relearning. A weighted pull-up is weight_kg 0, is_bodyweight true,
+   * added_load_kg 15.
+   */
+  added_load_kg?: number | null
 }
 
 export interface CardioLog {
