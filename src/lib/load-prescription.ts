@@ -1483,11 +1483,22 @@ export function prescribeAssistance(
 // fresh every call.
 
 /**
- * Fraction of BODYWEIGHT added, held constant across a heavy block. Anchored
- * on real weighted pull-up standards and set on the cautious side BECAUSE it
- * holds: an 80kg advanced male carries 15kg through a strength block whose
- * reps climb 3-5 -> 5-7 underneath it, which is demanding by the end. Too
- * light costs a boring set; too heavy costs a shoulder.
+ * Fraction of BODYWEIGHT added for a weighted PULL-UP, held constant across a
+ * heavy block. The per-movement baseline: a dip multiplies this by its own
+ * added_load_scale, since a dip is genuinely the stronger movement.
+ *
+ * Bodyweight-relative on purpose, and it is the answer to "is this a set
+ * number or does it depend on the person": a pull-up or a dip IS lifting your
+ * bodyweight, so what you can add on top is proportional to what you are
+ * already moving. A 62kg trainee and a 110kg one doing the same chest dip get
+ * 15kg and 27.5kg. What it does NOT yet depend on is anything the app has
+ * WATCHED them do — see this module's note on the missing logged-history
+ * path.
+ *
+ * Set on the cautious side BECAUSE the weight holds all block: an 80kg
+ * advanced male carries 15kg through a strength block whose reps climb
+ * 3-5 -> 5-7 underneath it, which is demanding by the end. Too light costs a
+ * boring set; too heavy costs a shoulder.
  *
  * Beginner and novice are 0 rather than absent. All three of Pull-Ups,
  * Chin-Ups and Chest Dips already carry capability_requirement
@@ -1533,6 +1544,12 @@ const ADDED_LOAD_MAX_REPS = 10
 /**
  * Absolute backstop, in the spirit of SAFETY_CEILING_KG: a fraction no
  * arithmetic error may exceed regardless of how the number was derived.
+ *
+ * It has to bind LAST, after the per-movement scale, and it is not decorative:
+ * the rejected "true to the strength charts" option (chest dip at 2.0x the
+ * pull-up) put a 50kg trainee's chest dip at exactly 17.5kg — the cap itself
+ * — which is the formula asking for more than we are willing to give. The
+ * shipped 1.4x leaves margin at every body measured.
  */
 const ADDED_LOAD_MAX_BODYWEIGHT_FRACTION = 0.35
 
@@ -1578,7 +1595,14 @@ export function prescribeAddedLoad(
   if (midReps == null || midReps > ADDED_LOAD_MAX_REPS) return null
 
   const body = resolveBodyBasis(profile)
-  let kg = Math.min(body.weightKg * fraction, body.weightKg * ADDED_LOAD_MAX_BODYWEIGHT_FRACTION)
+  // Per-movement, because a dip is not a pull-up. See added_load_scale's own
+  // comment in exercise-db.ts; absent means 1.0, so the three-line change
+  // that added dips could not silently alter pull-ups.
+  const movementScale = entry.added_load_scale ?? 1
+  let kg = Math.min(
+    body.weightKg * fraction * movementScale,
+    body.weightKg * ADDED_LOAD_MAX_BODYWEIGHT_FRACTION,
+  )
 
   // SAFETY, and currently defensive rather than live: with no gym the added
   // weight IS a loaded backpack — straps, no rigid frame, the exact failure

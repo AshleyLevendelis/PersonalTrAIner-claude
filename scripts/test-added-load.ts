@@ -247,5 +247,55 @@ console.log('\n5. It reaches the screen, and never as a bare weight')
   check(`suggested_load_kg stays null on these lifts (${smuggled.length})`, smuggled.length === 0, smuggled.join(', '))
 }
 
+// ---------------------------------------------------------------------------
+console.log('\n6. A dip is not a pull-up')
+// ---------------------------------------------------------------------------
+{
+  // Ashley's ruling: take the real step up (a dip IS the stronger movement,
+  // and the upright tricep-emphasis version sits between the two) but stay
+  // well inside the safety ceiling rather than matching the strength charts
+  // outright. Asserted on PRESCRIBED values, not on the constants, so a
+  // ceiling quietly clamping one of them shows up as a failure here.
+  const opts = { repRangeLabel: '5-7', phase: 'strength', isDeload: false, isCalibrationWeek: false }
+  const at = (name: string, body: Partial<UserProfile>) =>
+    prescribeAddedLoad(getExerciseEntry(name)!, buildProfile(body), opts)?.added_kg ?? 0
+
+  for (const [label, body] of [
+    ['62kg advanced woman', { gender: 'female' as const, weight_kg: 62, training_experience: 'advanced' as const }],
+    ['80kg advanced man', { gender: 'male' as const, weight_kg: 80, training_experience: 'advanced' as const }],
+    ['110kg advanced man', { gender: 'male' as const, weight_kg: 110, training_experience: 'advanced' as const }],
+    ['80kg intermediate man', { gender: 'male' as const, weight_kg: 80, training_experience: 'intermediate' as const }],
+  ] as const) {
+    const pull = at('Pull-Ups', body), tri = at('Tricep Dips', body), chest = at('Chest Dips', body)
+    check(`${label}: chest dip (${chest}) >= upright dip (${tri}) >= pull-up (${pull})`,
+      chest >= tri && tri >= pull, `${chest} / ${tri} / ${pull}`)
+    check(`${label}: a dip actually beats a pull-up rather than tying`, chest > pull, `${chest} vs ${pull}`)
+  }
+
+  // The scale must be ABSENT on pull-ups, not set to 1 — so the change that
+  // added dips could not have moved them even by rounding.
+  check('pull-ups and chin-ups carry no scale at all',
+    getExerciseEntry('Pull-Ups')!.added_load_scale === undefined &&
+    getExerciseEntry('Chin-Ups')!.added_load_scale === undefined)
+  check('the two dips carry one',
+    getExerciseEntry('Chest Dips')!.added_load_scale === 1.4 &&
+    getExerciseEntry('Tricep Dips')!.added_load_scale === 1.2,
+    `${getExerciseEntry('Chest Dips')!.added_load_scale} / ${getExerciseEntry('Tricep Dips')!.added_load_scale}`)
+
+  // THE REASON THE CHARTS OPTION WAS REJECTED. At 2.0x, a 50kg trainee's
+  // chest dip landed on exactly 17.5kg — the 35% cap itself — which is the
+  // formula asking for more than we will give. The shipped scale has to leave
+  // margin at every body, or the cap is silently doing the prescribing.
+  const clamped: string[] = []
+  for (const kgBody of [50, 55, 62, 70, 80, 95, 110]) {
+    for (const name of ['Pull-Ups', 'Chin-Ups', 'Tricep Dips', 'Chest Dips']) {
+      const v = at(name, { gender: 'male', weight_kg: kgBody, training_experience: 'advanced' })
+      if (v >= kgBody * 0.35) clamped.push(`${name}@${kgBody}kg -> ${v} (cap ${(kgBody * 0.35).toFixed(1)})`)
+    }
+  }
+  check(`the 35% ceiling never binds — it is a backstop, not the prescriber (${clamped.length})`,
+    clamped.length === 0, clamped.slice(0, 3).join(', '))
+}
+
 console.log(failures === 0 ? '\nAll added-load checks passed.\n' : `\n${failures} FAILED\n`)
 process.exit(failures === 0 ? 0 : 1)

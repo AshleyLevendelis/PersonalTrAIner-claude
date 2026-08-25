@@ -167,6 +167,22 @@ export interface ExerciseEntry {
   /** Hard experience gate + regression — see CapabilityRequirement. Absent means no gate beyond the generic SKILL_DEMAND ceiling. */
   capability_requirement?: CapabilityRequirement
   /**
+   * How much weight this movement takes relative to a weighted PULL-UP, which
+   * is the 1.0 baseline. Absent means 1.0.
+   *
+   * A dip is genuinely the stronger movement — a trainee adding 15kg to a
+   * pull-up will usually manage more on the bars — and the upright,
+   * tricep-emphasis dip sits between the two, because the triceps are the
+   * limiter rather than the larger chest musculature. Ashley's ruling was to
+   * take the real step up but stay well inside the safety ceiling rather than
+   * matching the strength charts outright: these are estimates for someone
+   * the app has never watched do a single rep, on a movement this very entry
+   * marks joint_stress 'high' and loads_joints ['shoulder'].
+   *
+   * Only read alongside accepts_added_load; meaningless without it.
+   */
+  added_load_scale?: number
+  /**
    * True when a trainee can hang real weight on this movement — a dip belt,
    * a dumbbell between the feet, a loaded backpack. Pull-ups, chin-ups and
    * dips are the whole set; everything else on the "bodyweight" list
@@ -580,6 +596,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     loads_joints: ['shoulder'],
     style_tags: ['bodybuilding', 'functional', 'combat', 'hybrid'],
     capability_requirement: { minExperience: 'intermediate', regression: 'Tricep Dips' },
+    added_load_scale: 1.4,
     accepts_added_load: true,
     substitution_group: 'dip',
     unilateral: false,
@@ -2260,6 +2277,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     loads_joints: ['shoulder'],
     style_tags: ['bodybuilding', 'functional', 'combat', 'hybrid'],
     capability_requirement: { minExperience: 'novice', regression: 'Push-Ups' },
+    added_load_scale: 1.2,
     accepts_added_load: true,
     substitution_group: 'dip',
     unilateral: false,
