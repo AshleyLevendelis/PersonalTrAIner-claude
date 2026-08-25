@@ -227,6 +227,14 @@ export interface Exercise {
    * describeTempo (periodization.ts); '4-1-1' means nothing to a trainee.
    */
   tempo?: string
+  /**
+   * Weight ADDED to bodyweight — a dip belt, a dumbbell between the feet, a
+   * loaded backpack. Deliberately NOT suggested_load_kg: putting 17.5 there
+   * would render "17.5kg" beside "Pull-Ups", which reads as *lift 17.5kg*.
+   * Only ever set on the four entries carrying accepts_added_load, and only
+   * on the low-rep weeks where adding weight is the point.
+   */
+  suggested_added_load_kg?: number | null
   /** Target effort level for working sets, e.g. 'RPE 6-7'. */
   intensity?: string
   /** Plain-English guidance on picking a starting load. */

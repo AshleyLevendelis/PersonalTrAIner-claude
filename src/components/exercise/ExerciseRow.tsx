@@ -10,6 +10,7 @@ import { LoadChip, TempoChip, loadSourceLabel, type LoadSource } from './LoadChi
 import { ExerciseLine } from './ExerciseLine'
 import { isUnverifiedLoadSource } from '@/lib/load-prescription'
 import { AssistanceChip } from './AssistanceChip'
+import { AddedLoadChip } from './AddedLoadChip'
 import { CalibrationCue } from './CalibrationCue'
 import { SetGrid, type SetGridProps } from './SetGrid'
 import type { Exercise, ExerciseSetLog } from '@/lib/types'
@@ -162,7 +163,9 @@ export function ExerciseRow({
                     header). Tempo takes that slot when there is one — it is
                     what the trainee is actually meant to progress. */}
                 <TempoChip tempo={ex.tempo} />
-                {ex.suggested_assistance_kg != null ? (
+                {ex.suggested_added_load_kg != null ? (
+                  <AddedLoadChip ex={ex} />
+                ) : ex.suggested_assistance_kg != null ? (
                   <AssistanceChip ex={ex} />
                 ) : (
                   <LoadChip

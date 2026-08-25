@@ -10,7 +10,7 @@ import {
   type ExperienceConfig,
 } from './experience-config'
 import { buildWarmup, getWarmupReserveSeconds } from './warmup'
-import { prescribeLoad, categorize, getLoadIncrementKg, isExternallyLoaded, getEquipmentFloorKg, loadingMode, roundToPlate, formatLoad, labelModeForEntry, hasKnownWorkingWeight, unverifiedRampStepKg, isolationTargetBelowFloor, resolveBodyBasis, prescribeAssistance, assistanceGuidance, type KnownWorkingWeights } from './load-prescription'
+import { prescribeLoad, prescribeAddedLoad, categorize, getLoadIncrementKg, isExternallyLoaded, getEquipmentFloorKg, loadingMode, roundToPlate, formatLoad, labelModeForEntry, hasKnownWorkingWeight, unverifiedRampStepKg, isolationTargetBelowFloor, resolveBodyBasis, prescribeAssistance, assistanceGuidance, type KnownWorkingWeights } from './load-prescription'
 import {
   getPhaseSequence, getPhaseConfig, rotateVariation, resolveTargetRpe,
   shiftReps, adjustRest, dedupeAdjacentPhases, isRegressionFor, stepIntervalSeconds, getPhaseTempo, formatTempo, type PhaseConfig, type TrainingPhase,
@@ -5608,6 +5608,20 @@ export function generateMesocycle(
             }
           }
 
+          // Computed HERE rather than beside prescribeAssistance above,
+          // because the rep guard reads the week's FINAL rep target,
+          // including the frozen-load rep bump, and reps only settle here.
+          // The weight itself keys on the PHASE, so it is constant across a
+          // block and cannot fight the within-block rep ramp.
+          const addedLoad = dbEntry && !isPrimer
+            ? prescribeAddedLoad(dbEntry, profile, {
+                repRangeLabel: reps,
+                phase: phaseConfig.phase,
+                isDeload,
+                isCalibrationWeek,
+              })
+            : null
+
           return {
             ...ex,
             name: weeklyName,
@@ -5619,12 +5633,21 @@ export function generateMesocycle(
               ? (deloadNeedsRepCut
                   ? 'Bar stays the same — reduced reps this week. Recovery comes from doing less, not lifting lighter.'
                   : 'Bar stays the same — reduced sets this week. Recovery comes from doing less, not lifting lighter.')
-              : (assistance ? assistanceGuidance(assistance) : (load ? `${expConfig.load_guidance} ${load.basis}` : ex.load_guidance)),
+              : (assistance
+                  ? assistanceGuidance(assistance)
+                  : addedLoad
+                    // Takes precedence over the generic bodyweight guidance:
+                    // that copy says "progress by adding reps or slowing the
+                    // tempo before adding load", which is the opposite of
+                    // what this week is asking for.
+                    ? addedLoad.basis
+                    : (load ? `${expConfig.load_guidance} ${load.basis}` : ex.load_guidance)),
             suggested_load: load ? load.display : ex.suggested_load,
             suggested_load_kg: load ? load.starting_weight_kg : ex.suggested_load_kg,
             load_source: load ? load.load_source : ex.load_source,
             per_set_load: load ? load.per_set : (ex.per_set_load ?? null),
             suggested_assistance_kg: assistance ? assistance.assistance_kg : ex.suggested_assistance_kg,
+            suggested_added_load_kg: addedLoad ? addedLoad.added_kg : null,
             assistance_ready_to_graduate: assistance ? assistance.ready_to_graduate : ex.assistance_ready_to_graduate,
             movement_pattern: dbEntry ? mapMovementPattern(dbEntry.movement_pattern) : undefined,
             tier: dbEntry ? mapTier(dbEntry.mechanics_tier) : undefined,
