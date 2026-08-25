@@ -134,6 +134,7 @@ export function executeLogWorkout(groups: ParsedSetGroup[], ctx: LogWorkoutConte
         exerciseName,
         setNumber,
         weightKg: set.weightKg,
+        addedLoadKg: set.addedLoadKg ?? null,
         repsCompleted: set.reps,
         rpe: set.rpe ?? null,
         unit: prescriptionUnit(),
@@ -143,7 +144,13 @@ export function executeLogWorkout(groups: ParsedSetGroup[], ctx: LogWorkoutConte
       loggedKeys.push({ exerciseId, setNumber })
     })
 
-    const weightLabel = group.sets[0]?.isBodyweight ? 'BW' : `${group.sets[0]?.weightKg}kg`
+    // "+15kg", never a bare "15kg" — the receipt is the trainee's confirmation
+    // of what we recorded, and a bare figure beside a chin-up reads as the
+    // weight of the lift itself.
+    const first = group.sets[0]
+    const weightLabel = first?.addedLoadKg != null
+      ? `BW +${first.addedLoadKg}kg`
+      : first?.isBodyweight ? 'BW' : `${first?.weightKg}kg`
     const repsLabel = group.sets[0]?.repsRangeLabel ?? String(group.sets[0]?.reps)
     const note = group.resolution === 'unknown'
       ? 'Logged as a custom exercise — counts toward volume/history, excluded from progression'
