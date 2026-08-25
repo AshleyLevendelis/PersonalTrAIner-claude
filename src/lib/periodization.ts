@@ -39,6 +39,21 @@ export interface PhaseConfig {
   /** Upper bound before the experience cap is applied. */
   target_rpe: number
   coach_note: string
+  /**
+   * The same note for a trainee with nothing to add weight to.
+   *
+   * MEASURED defect: someone whose equipment answer was "bodyweight" — no
+   * gym, no dumbbells — was told every week to add load, find the weight,
+   * and drop the load if needed, on a session of Box Squats, Deficit
+   * Push-Ups and Table Rows. Every one of those instructions is about a
+   * weight she does not have, which puts the app in the position of
+   * asserting something untrue about her own session.
+   *
+   * Present on EVERY phase, including the two a bodyweight trainee cannot
+   * currently reach (BODYWEIGHT_ALLOWED_PHASES excludes strength and power),
+   * so relaxing that restriction can never silently reintroduce the defect.
+   */
+  coach_note_loadless: string
 }
 
 const PHASE_CONFIGS: Record<TrainingPhase, PhaseConfig> = {
@@ -52,6 +67,8 @@ const PHASE_CONFIGS: Record<TrainingPhase, PhaseConfig> = {
     target_rpe: 6.5,
     coach_note:
       'Higher reps, lighter loads, shorter rest. This phase prepares tendons and ligaments, which adapt more slowly than muscle. Do not rush it.',
+    coach_note_loadless:
+      'Higher reps, easier variations, shorter rest. This phase prepares tendons and ligaments, which adapt more slowly than muscle. Do not rush it.',
   },
   hypertrophy: {
     phase: 'hypertrophy',
@@ -62,6 +79,11 @@ const PHASE_CONFIGS: Record<TrainingPhase, PhaseConfig> = {
     rest_adjust_seconds: 0,
     target_rpe: 8,
     coach_note:
+      'The volume phase. Take most sets close to failure but keep form clean — quality reps drive growth, not grinding.',
+    // Already says nothing about weight, so the two are identical on purpose
+    // rather than by omission — the field is required so a future edit to
+    // one has to consider the other.
+    coach_note_loadless:
       'The volume phase. Take most sets close to failure but keep form clean — quality reps drive growth, not grinding.',
   },
   strength: {
@@ -74,6 +96,8 @@ const PHASE_CONFIGS: Record<TrainingPhase, PhaseConfig> = {
     target_rpe: 8.5,
     coach_note:
       'Heavier and lower rep. Rest fully between sets — cutting rest here undermines the whole point of the phase.',
+    coach_note_loadless:
+      'Fewer reps, taken harder. With no weight to add, the difficulty comes from how you move: about three seconds lowering, a pause at the bottom, no bounce. Rest fully between sets — cutting rest here undermines the whole point of the phase.',
   },
   power: {
     phase: 'power',
@@ -85,6 +109,8 @@ const PHASE_CONFIGS: Record<TrainingPhase, PhaseConfig> = {
     target_rpe: 7.5,
     coach_note:
       'Move the weight fast. Stop the set the moment bar speed drops — this phase is about speed, not fatigue.',
+    coach_note_loadless:
+      'Move fast and with intent — jump, push or pull as explosively as you can. Stop the set the moment your speed drops; this phase is about speed, not fatigue.',
   },
   metabolic: {
     phase: 'metabolic',
@@ -96,6 +122,8 @@ const PHASE_CONFIGS: Record<TrainingPhase, PhaseConfig> = {
     target_rpe: 7.5,
     coach_note:
       'Short rest is the stimulus here. Drop the load if you need to in order to keep the pace.',
+    coach_note_loadless:
+      'Short rest is the stimulus here. Cut a rep or two if you need to in order to keep the pace.',
   },
 }
 

@@ -3925,17 +3925,29 @@ function buildProgressionNote(
   isDeload: boolean,
   isCalibrationWeek: boolean,
   policy: GoalPolicy,
+  // True when almost nothing this week carries a weight — see
+  // isLoadlessWeek. Every branch below used to instruct the trainee to add,
+  // find, or drop load, which for a bodyweight-only trainee is an
+  // instruction about equipment she does not own.
+  loadless = false,
 ): string {
   if (isDeload) {
-    return 'Deload week — load and volume both step back so you arrive at the next block recovered, not because progress stalled.'
+    return loadless
+      ? 'Deload week — volume steps back so you arrive at the next block recovered, not because progress stalled.'
+      : 'Deload week — load and volume both step back so you arrive at the next block recovered, not because progress stalled.'
   }
   if (isCalibrationWeek) {
-    return 'Loads start deliberately light — find the weight where the last rep feels like RPE 6, log it, and next week builds from YOUR numbers.'
+    return loadless
+      ? 'Start easier than you think you need — find the version of each move where the last rep feels like RPE 6, log what you actually did, and next week builds from YOUR numbers.'
+      : 'Loads start deliberately light — find the weight where the last rep feels like RPE 6, log it, and next week builds from YOUR numbers.'
   }
-  const rampsLoad = policy.progressionEmphasis === 'load'
+  // A loadless week has no weight lever, so it reads as reps-emphasis
+  // regardless of what the goal would otherwise ramp.
+  const rampsLoad = policy.progressionEmphasis === 'load' && !loadless
   if (weekInBlock === 1) {
-    return rampsLoad
-      ? 'Baseline week — this sets the working weight every later week in the block adds load on top of.'
+    if (rampsLoad) return 'Baseline week — this sets the working weight every later week in the block adds load on top of.'
+    return loadless
+      ? 'Baseline week — this sets the rep target every later week in the block builds on.'
       : 'Baseline week — weight holds flat this block by design; this sets the rep target every later week builds on.'
   }
   if (rampsLoad) {
@@ -3943,11 +3955,48 @@ function buildProgressionNote(
       ? 'Load goes up this week on the main lifts — same rep target, more weight than last week.'
       : 'Load goes up again this week — the heaviest working sets of the block before the deload.'
   }
+  if (loadless) {
+    return weekInBlock === 2
+      ? 'The work goes up this week — same movements, more reps than last week. That IS the progression when there is no weight to add, not a missing one.'
+      : 'More again this week — the hardest working sets of the block before the deload.'
+  }
   // 'reps' or 'maintain' emphasis: weight intentionally holds flat, reps are
   // the real lever. Named explicitly so this doesn't read as stagnation.
   return weekInBlock === 2
     ? 'Weight holds flat by design — reps climb this week. That IS the progression for this goal, not a missing one.'
     : 'Weight still holds flat, reps climb again — building work capacity before the next block changes the stimulus.'
+}
+
+/**
+ * True when a week's working sets are overwhelmingly weightless, so every
+ * sentence about adding, finding or dropping load is talking about equipment
+ * this trainee does not have.
+ *
+ * Asked of the WEEK'S OWN EXERCISES rather than of equipment_access, and that
+ * is the point. EQUIPMENT_SETS.bodyweight includes 'weighted backpack' —
+ * genuinely the one progressive load available with no gym — so a
+ * bodyweight-tier plan does contain a couple of real numbers (Backpack Row,
+ * Loaded Backpack Walk). Keying on the equipment answer would have declared
+ * those weightless; keying on the plan gets both right. MEASURED share of
+ * working sets carrying a load, across four goals x three experience levels
+ * x three splits: bodyweight 12.2%, minimalist 52.2%, full_gym 77.0%. The
+ * threshold sits in the gap with room on both sides rather than on top of
+ * either number, and test:loadless-notes prints all three every run so it
+ * cannot drift without someone seeing it.
+ */
+const LOADLESS_WEEK_MAX_LOADED_SHARE = 0.25
+
+function isLoadlessWeek(days: WorkoutDay[]): boolean {
+  let working = 0, loaded = 0
+  for (const day of days) {
+    for (const ex of day.exercises) {
+      if (ex.tier === 'tier_0_primer') continue
+      working++
+      if (ex.suggested_load_kg != null) loaded++
+    }
+  }
+  if (working === 0) return false
+  return loaded / working <= LOADLESS_WEEK_MAX_LOADED_SHARE
 }
 
 // A bodyweight trainee has no external load to ramp — 'strength' and
@@ -5631,17 +5680,23 @@ export function generateMesocycle(
         phase_focus: phaseConfig.focus,
         is_deload: isDeload,
         isCalibrationWeek,
-        coach_note: [
-          isDeload
-            ? 'Deload week — volume is deliberately cut so you arrive at the next block recovered. Resist the urge to push.'
-            // The goal's own framing shows once per block, alongside the
-            // phase's — repeating it every week would bury the phase-specific
-            // note under the same paragraph four times over.
-            : w === 1
-              ? `${phaseConfig.coach_note} ${policy.coachNote}`
-              : phaseConfig.coach_note,
-          buildProgressionNote(w, isDeload, isCalibrationWeek, policy),
-        ].join(' '),
+        coach_note: (() => {
+          // Decided once per week, from the week that was actually built.
+          const loadless = isLoadlessWeek(days)
+          const phaseNote = loadless ? phaseConfig.coach_note_loadless : phaseConfig.coach_note
+          const goalNote = loadless ? policy.coachNoteLoadless : policy.coachNote
+          return [
+            isDeload
+              ? 'Deload week — volume is deliberately cut so you arrive at the next block recovered. Resist the urge to push.'
+              // The goal's own framing shows once per block, alongside the
+              // phase's — repeating it every week would bury the phase-specific
+              // note under the same paragraph four times over.
+              : w === 1
+                ? `${phaseNote} ${goalNote}`
+                : phaseNote,
+            buildProgressionNote(w, isDeload, isCalibrationWeek, policy, loadless),
+          ].join(' ')
+        })(),
         label: isDeload
           ? `Week ${weekCounter} — ${phaseConfig.label}: Deload`
           : `Week ${weekCounter} — ${phaseConfig.label} (wk ${w} of block ${blockIndex + 1})`,

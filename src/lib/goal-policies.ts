@@ -59,6 +59,14 @@ export interface GoalPolicy {
   progressionEmphasis: ProgressionEmphasis
   coachNote: string
   /**
+   * The goal's framing for a trainee with nothing to add weight to. See
+   * PhaseConfig.coach_note_loadless — a bodyweight-only trainee was being
+   * told "load climbing week to week" about a session of Box Squats and
+   * Push-Ups. Required rather than optional so a new goal cannot ship
+   * without someone deciding what it says to that trainee.
+   */
+  coachNoteLoadless: string
+  /**
    * Differentiation round (VISION-ARCHITECTURE differentiation audit):
    * signed rep-count shift applied to STYLE_CONFIGS' base rep range for
    * each tier, before the experience floor. This is what makes fat_loss's
@@ -132,6 +140,7 @@ const HYPERTROPHY_POLICY: GoalPolicy = {
   allowedPhases: ['anatomical_adaptation', 'hypertrophy', 'strength', 'power'],
   progressionEmphasis: 'load',
   coachNote: 'Volume drives growth here — the program is built around moderate-rep working sets taken close to failure, with load climbing week to week within each block.',
+  coachNoteLoadless: 'Volume drives growth here — the program is built around moderate-rep working sets taken close to failure, with the work climbing week to week within each block through reps and harder variations.',
   // Higher accessory/isolation reps (more time under tension), untouched
   // rest (rep-range and isolation count are the differentiators, not
   // density), and more isolation slots for wider per-muscle-group variety.
@@ -157,6 +166,8 @@ const FAT_LOSS_POLICY: GoalPolicy = {
   progressionEmphasis: 'load',
   coachNote:
     "Diet drives the fat loss here, not the workout — this program is built to protect the muscle you already have while you're in a deficit. Weights stay real weights and progression keeps climbing; conditioning is appended on top, never substituted for lifting.",
+  coachNoteLoadless:
+    "Diet drives the fat loss here, not the workout — this program is built to protect the muscle you already have while you're in a deficit. The strength work stays real strength work and keeps getting harder; conditioning is appended on top, never substituted for it.",
   // Lower main-lift reps (quality over accumulation — deliberately NOT
   // lighter/higher-rep, which would be the circuit-conversion myth this
   // goal exists to avoid), shorter accessory rest for density, fewer
@@ -180,6 +191,8 @@ const CONDITIONING_POLICY: GoalPolicy = {
   allowedPhases: ['anatomical_adaptation', 'hypertrophy', 'metabolic'],
   progressionEmphasis: 'reps',
   coachNote: 'Lifting supports the engine work here, not the other way around — two to three full-body sessions keep you strong enough to train hard, while dedicated conditioning is the main driver of this goal.',
+  // Says nothing about weight either way; kept identical deliberately.
+  coachNoteLoadless: 'Strength work supports the engine work here, not the other way around — two to three full-body sessions keep you strong enough to train hard, while dedicated conditioning is the main driver of this goal.',
   // Strength-endurance rep ranges across every tier (including main lifts —
   // this goal's lifting is real support work, not a heavy-strength focus),
   // circuit-adjacent density via shortened rest everywhere, fewer isolation
@@ -205,6 +218,7 @@ const FUNCTIONAL_POLICY: GoalPolicy = {
   allowedPhases: ['anatomical_adaptation', 'hypertrophy', 'strength', 'power'],
   progressionEmphasis: 'maintain',
   coachNote: 'This program favors variety and movement quality over chasing a number on the bar — exercises rotate faster, and the aim is consistent, sustainable training rather than maximal overload.',
+  coachNoteLoadless: 'This program favors variety and movement quality over chasing a number — exercises rotate faster, and the aim is consistent, sustainable training rather than maximal overload.',
   // Standard rep ranges (variety is the differentiator here, not rep
   // scheme), slightly fuller tier1 recovery (supports power/explosive work
   // where experience allows), fewer isolation slots in favor of unilateral/
