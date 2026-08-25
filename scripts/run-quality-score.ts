@@ -134,17 +134,31 @@ interface ScoredCombo {
   result: PlanScoreResult
 }
 
-function formatHistogram(scores: number[]): string {
-  const buckets = new Array(11).fill(0) // 0-1, 1-2, ..., 9-10, and a top bucket for exactly 10
-  for (const s of scores) {
-    const bucket = Math.min(10, Math.floor(s))
-    buckets[bucket]++
-  }
+/**
+ * Buckets span the score's REAL range, derived from the dimension count
+ * rather than hardcoded.
+ *
+ * This was hardcoded to 0-10 while the score is out of 12 (six dimensions x
+ * 2). Math.min(10, ...) clamped every plan scoring 10 or more into the top
+ * bucket, which the loop then LABELLED "[9-10)". The last sweep reported
+ * "9214 plans in [9-10)" against an overall average of 11.28 — arithmetically
+ * impossible, and the giveaway. The data was right the whole time; the axis
+ * was two points short and the label was actively wrong.
+ *
+ * `belowFloor` is counted separately and was never affected.
+ */
+function formatHistogram(scores: number[], maxScore: number): string {
+  const top = Math.max(1, Math.ceil(maxScore))
+  const buckets = new Array(top + 1).fill(0)
+  for (const s of scores) buckets[Math.max(0, Math.min(top, Math.floor(s)))]++
   const lines: string[] = []
-  for (let i = 0; i <= 9; i++) {
-    const count = buckets[i] + (i === 9 ? buckets[10] : 0)
+  for (let i = 0; i < top; i++) {
+    // The final bucket absorbs a perfect score, so its label says so.
+    const isLast = i === top - 1
+    const count = buckets[i] + (isLast ? buckets[top] : 0)
     const barLen = Math.round((count / scores.length) * 60)
-    lines.push(`  [${i}-${i + 1}) ${'#'.repeat(barLen)} ${count}`)
+    const label = isLast ? `[${i}-${top}]` : `[${i}-${i + 1})`
+    lines.push(`  ${label.padEnd(8)} ${'#'.repeat(barLen)} ${count}`)
   }
   return lines.join('\n')
 }
@@ -200,6 +214,13 @@ async function main() {
   // exists — was 6.0/10 before primerFit; the ratio is what's held constant,
   // not the literal number, so this floor means the same thing it always did.
   const OVERALL_FLOOR = 7.2
+  // Derived, not written down: every dimension is worth 2, so the total moves
+  // by itself when a dimension is added. The histogram's axis was hardcoded to
+  // 10 and silently kept that value when primerFit made the total 12 — see
+  // formatHistogram. The hardcoded "/ 12" in the line above and the 7.2 floor
+  // are both still literals, deliberately: the floor is a RATIO decision
+  // (60%) that should be re-argued rather than drift with the dimension count.
+  const MAX_OVERALL_SCORE = DIMENSION_KEYS.length * 2
   const belowFloor = scored.filter(s => s.result.overall < OVERALL_FLOOR)
   const dimensionsBelowFloor = DIMENSION_KEYS.filter(key => dimensionAverages[key] < 1.2)
 
@@ -219,8 +240,8 @@ async function main() {
     lines.push(`  ${label.padEnd(16)} ${dimensionAverages[key].toFixed(2)}${flag}`)
   }
   lines.push('')
-  lines.push('Score distribution:')
-  lines.push(formatHistogram(overallScores))
+  lines.push(`Score distribution (out of ${MAX_OVERALL_SCORE}):`)
+  lines.push(formatHistogram(overallScores, MAX_OVERALL_SCORE))
   lines.push('')
   lines.push(`Plans below the ${OVERALL_FLOOR} floor: ${belowFloor.length} / ${scored.length}`)
   lines.push('')
