@@ -103,6 +103,11 @@ export interface GoalPolicy {
    * the goal rather than applied globally: a hypertrophy bench at 75s is a
    * deliberate, normal prescription, and a blanket floor would have quietly
    * rewritten a fifth of every other goal's main lifts too.
+   *
+   * This is the LOADED floor and it still is. It sits ON TOP of
+   * MAIN_LIFT_REST_FLOOR_SECONDS below, which applies to every main lift
+   * including bodyweight ones — see that constant for why the
+   * "it's about a bar, not a tier" scoping stops at 60 seconds.
    */
   minLoadedMainLiftRestSeconds?: number
   /**
@@ -228,6 +233,35 @@ const FUNCTIONAL_POLICY: GoalPolicy = {
   isolationSlotShift: -1,
   preferUnilateralCarry: true,
 }
+
+/**
+ * Hard floor, in seconds, under the day's main lift — ANY main lift, loaded
+ * or bodyweight. Nothing may take a tier1 compound below this: not the
+ * selection-time time-cap trim, not the phase's own rest_adjust_seconds, not
+ * the final per-week budget trim.
+ *
+ * Distinct from minLoadedMainLiftRestSeconds above, and deliberately a
+ * different question. That floor asks "is there a bar on your back", and
+ * Ashley's ruling was that a bodyweight main lift keeps the goal's density
+ * because the risk being guarded is a loaded bar. That ruling still holds
+ * ABOVE this number — conditioning's 90s floor stays loaded-only, and a
+ * bodyweight chin-up in a conditioning block still rests less than a squat
+ * does. It stops holding below 60, because at that point the constraint is
+ * no longer about load management, it is about whether the trainee can
+ * physically complete the next set.
+ *
+ * MEASURED before this existed: 553 of 9,216 profile combinations (6.0%)
+ * had the day's main lift resting under a minute — every observed instance
+ * a bodyweight pull-up, at 42s or 57s. Traced: a hybrid tier1 base of 90s,
+ * times conditioning's 0.8 multiplier (72s), minus stageTimeCap's blanket
+ * -15s (57s), minus anatomical adaptation's -15s rest_adjust (42s). Two of
+ * those three paths had no main-lift gate at all.
+ *
+ * 60 is not a new number — it is the floor trimWeekRestForBudget already
+ * used and the line quality-score's own main_lift_short_rest check already
+ * drew. Before this, the rule and the check disagreed.
+ */
+export const MAIN_LIFT_REST_FLOOR_SECONDS = 60
 
 export const GOAL_POLICIES: Record<FitnessGoal, GoalPolicy> = {
   hypertrophy: HYPERTROPHY_POLICY,

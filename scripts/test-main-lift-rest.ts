@@ -25,6 +25,20 @@
 // (trimWeekRestForBudget, which carried its own hardcoded 60s). Fixing only
 // the first left 288 of 432 still under the floor; fixing the first two left
 // 285. Each path needs it.
+//
+// FOUR PLACES, as it turned out — and this gate did not catch the fourth,
+// which is why section 4 below exists. All three floors above were gated on
+// isExternallyLoaded, so they only ever guarded a bar. stageTimeCap's Phase 2
+// takes a blanket -15s off EVERY non-cardio exercise with a 30s floor and no
+// main-lift gate at all, and a BODYWEIGHT main lift fell straight through it:
+// measured, 553 of 9,216 combinations (6.0%) had the day's main lift under a
+// minute, every observed one a pull-up at 42s or 57s.
+//
+// Ashley's second ruling: a flat 60-second minimum under any main lift,
+// bodyweight included, and nothing may take it below — not the time squeeze,
+// not the phase. Her first ruling still stands ABOVE that line, which is what
+// section 3 keeps honest: conditioning's 90s floor is still loaded-only, so a
+// conditioning chin-up still rests less than a conditioning squat.
 // ---------------------------------------------------------------------------
 
 import { generateExercisePlan, generateMesocycle, setRandomSource, resetRandomSource } from '../src/lib/exercise-plan'
@@ -67,11 +81,11 @@ const GOALS: FitnessGoal[] = ['hypertrophy', 'fat_loss', 'strength', 'endurance'
 const STYLES = ['hybrid', 'bodybuilding', 'functional'] as const
 const DURATIONS: SessionDuration[] = ['30-45', '45-60', '60-90']
 
-interface Row { loaded: number; underFloor: number; underSixty: number; bodyweight: number; bodyweightShort: number }
+interface Row { loaded: number; underFloor: number; underSixty: number; bodyweight: number; bodyweightShort: number; bodyweightUnderSixty: number; deloadMains: number; deloadUnderSixty: number }
 const rows = new Map<FitnessGoal, Row>()
 
 for (const goal of GOALS) {
-  const row: Row = { loaded: 0, underFloor: 0, underSixty: 0, bodyweight: 0, bodyweightShort: 0 }
+  const row: Row = { loaded: 0, underFloor: 0, underSixty: 0, bodyweight: 0, bodyweightShort: 0, bodyweightUnderSixty: 0, deloadMains: 0, deloadUnderSixty: 0 }
   const floor = getGoalPolicy(goal).minLoadedMainLiftRestSeconds ?? 60
   for (const training_style of STYLES) {
     for (const session_duration_preference of DURATIONS) {
@@ -84,8 +98,6 @@ for (const goal of GOALS) {
       finally { console.debug = d; console.warn = w; resetRandomSource() }
 
       for (const week of plan) {
-        // Deloads deliberately back everything off, rest included.
-        if (week.is_deload) continue
         for (const day of week.days) {
           const i = day.exercises.findIndex(ex => ex.tier === 'tier_1_primary')
           if (i < 0) continue
@@ -94,9 +106,19 @@ for (const goal of GOALS) {
           if (!entry) continue
           const seconds = parseInt(String(main.rest), 10)
           if (!Number.isFinite(seconds)) continue
+          // The 60s floor is NOT a density rule, so unlike the goal's loaded
+          // floor it holds on a deload too — a light week does not make a set
+          // easier to finish 42 seconds after the last one. Counted
+          // separately so section 4 can say so out loud.
+          if (week.is_deload) {
+            row.deloadMains++
+            if (seconds < 60) row.deloadUnderSixty++
+            continue
+          }
           if (!isExternallyLoaded(entry)) {
             row.bodyweight++
             if (seconds < floor) row.bodyweightShort++
+            if (seconds < 60) row.bodyweightUnderSixty++
             continue
           }
           row.loaded++
@@ -141,12 +163,35 @@ console.log('\n3. Conditioning keeps its density everywhere else')
   const c = rows.get('conditioning')!
   check(`conditioning bodyweight main lifts keep short rest (${c.bodyweightShort} of ${c.bodyweight} still under 90s)`,
     c.bodyweight === 0 || c.bodyweightShort > 0, `${c.bodyweightShort}/${c.bodyweight}`)
+  // The 60s floor must not have swallowed the density it was scoped to
+  // preserve: "under 90 but at or above 60" is the band that has to survive.
+  const inBand = c.bodyweightShort - c.bodyweightUnderSixty
+  check(`...and they land in the 60-90s band, not at the 90s loaded floor (${inBand} of ${c.bodyweight})`,
+    c.bodyweight === 0 || inBand > 0, `${inBand}/${c.bodyweight}`)
 
   // And the floor must not have leaked into goals that never asked for it.
   for (const goal of GOALS) {
     if (goal === 'conditioning') continue
     check(`${goal} has no floor of its own`, getGoalPolicy(goal).minLoadedMainLiftRestSeconds === undefined)
   }
+}
+
+// ---------------------------------------------------------------------------
+console.log('\n4. No main lift anywhere rests under a minute — bar or no bar')
+// ---------------------------------------------------------------------------
+{
+  // The check that was missing. Section 2 asks the same question of LOADED
+  // main lifts only, which is exactly how a bodyweight pull-up at 42s passed
+  // this gate green while quality-score was deducting for it in 6% of plans.
+  const bwShort = GOALS.reduce((n, g) => n + rows.get(g)!.bodyweightUnderSixty, 0)
+  const bwSeen = GOALS.reduce((n, g) => n + rows.get(g)!.bodyweight, 0)
+  check(`no bodyweight main lift rests under 60s (${bwShort} of ${bwSeen})`, bwShort === 0, String(bwShort))
+  check('...and there are bodyweight main lifts to check', bwSeen > 100, String(bwSeen))
+
+  const dShort = GOALS.reduce((n, g) => n + rows.get(g)!.deloadUnderSixty, 0)
+  const dSeen = GOALS.reduce((n, g) => n + rows.get(g)!.deloadMains, 0)
+  check(`the floor holds on deload weeks too (${dShort} of ${dSeen})`, dShort === 0, String(dShort))
+  check('...and there are deload main lifts to check', dSeen > 100, String(dSeen))
 }
 
 console.log(failures === 0 ? '\nAll main-lift-rest checks passed.\n' : `\n${failures} FAILED\n`)

@@ -15,7 +15,7 @@ import {
   getPhaseSequence, getPhaseConfig, rotateVariation, resolveTargetRpe,
   shiftReps, adjustRest, dedupeAdjacentPhases, isRegressionFor, stepIntervalSeconds, getPhaseTempo, formatTempo, type PhaseConfig, type TrainingPhase,
 } from './periodization'
-import { getGoalPolicy, restrictPhaseSequence, resolveConditioningFrequency, RECOVERY_SET_MULTIPLIER, type GoalPolicy } from './goal-policies'
+import { getGoalPolicy, restrictPhaseSequence, resolveConditioningFrequency, RECOVERY_SET_MULTIPLIER, MAIN_LIFT_REST_FLOOR_SECONDS, type GoalPolicy } from './goal-policies'
 import { isStartingOut, applyStartingOut, startingOutMinutes } from './starting-out'
 import { getDurationBudgetSeconds, getSessionMinimumSeconds, getSessionMaximumSeconds, getSteadyStateSeconds, DEFAULT_CARRY_DISTANCE_M, estimateDaySeconds, estimateSlotsSeconds, parseRestSeconds, SESSION_OVERHEAD_SECONDS } from './session-duration'
 
@@ -759,10 +759,38 @@ function buildSupersetPairs(
   return ordered
 }
 
+/**
+ * The rest floor under one exercise, in seconds — 0 for anything that is not
+ * the day's main lift, so callers can write Math.max(rest, floor)
+ * unconditionally.
+ *
+ * ONE function rather than a Math.max sprinkled at each site, because the
+ * defect this closes was exactly that shape: the goal's loaded floor WAS
+ * asserted at three separate paths (prescription, the weekly rest_adjust,
+ * trimWeekRestForBudget) and a fourth path — stageTimeCap's blanket -15s —
+ * had no main-lift gate at all, so it silently undercut all three. Every
+ * path that can lower a main lift's rest calls this; adding a fifth path
+ * without calling it is the only way to reintroduce the bug.
+ *
+ * `policy` is optional so the duration ESTIMATORS (computeDurationTopUp,
+ * sizeBlockToRestBudget) can apply the universal floor without pretending to
+ * know the goal's loaded one. They under-estimate rest slightly for a
+ * conditioning loaded main lift as a result — pre-existing, unchanged by
+ * this, and it errs toward a shorter forecast, never a longer one.
+ */
+function mainLiftRestFloor(entry: ExerciseEntry | undefined, policy?: GoalPolicy): number {
+  if (!entry || entry.mechanics_tier !== 'tier1_compound') return 0
+  const loaded = policy?.minLoadedMainLiftRestSeconds
+  return loaded && isExternallyLoaded(entry)
+    ? Math.max(MAIN_LIFT_REST_FLOOR_SECONDS, loaded)
+    : MAIN_LIFT_REST_FLOOR_SECONDS
+}
+
 function stageTimeCap(
   dayExercises: { entry: ExerciseEntry; sets: number; reps: string; rest: string; restSeconds: number }[],
   budgetSeconds: number,
   style: TrainingStyle,
+  policy: GoalPolicy,
   trace: ConstraintTrace,
   /**
    * Names that filled a REQUIRED track slot (selectExercisesForTrack) —
@@ -812,9 +840,21 @@ function stageTimeCap(
   // new cardio reservation, where Elliptical still showed "30s" instead
   // of its real "0s" (Math.max(30, 0 - 15) = 30) despite never going
   // through trimWeekRestForBudget at all.
+  //
+  // The day's main lift is floored here too. Phase 1 above already exempts
+  // it (isSupersetEligible excludes tier1/tier2 compounds), and the comment
+  // there says "main lifts keep full rest even under time pressure" — but
+  // that was only ever true of Phase 1. This blanket -15s was the path that
+  // took a conditioning pull-up from 72s to 57s, and then anatomical
+  // adaptation's own -15s took it to 42s. Both later floors were gated on
+  // isExternallyLoaded, so a bodyweight main lift fell through every one.
   for (let i = 0; i < dayExercises.length; i++) {
     if (dayExercises[i].entry.mechanics_tier === 'cardio') continue
-    const newRest = Math.max(30, dayExercises[i].restSeconds - 15)
+    // Math.max, not an early `continue`: for everything that is not a main
+    // lift the floor stays 30 and the expression is byte-identical to what
+    // shipped before, so this change cannot move an accessory's rest.
+    const floor = Math.max(30, mainLiftRestFloor(dayExercises[i].entry, policy))
+    const newRest = Math.max(floor, dayExercises[i].restSeconds - 15)
     dayExercises[i] = { ...dayExercises[i], restSeconds: newRest, rest: `${newRest}s` }
   }
 
@@ -2183,10 +2223,11 @@ function assignSetsRepsFromConfig(
       // designed, on the one exercise where it should not. Gated on
       // isExternallyLoaded so a bodyweight main lift (chin-ups) keeps the
       // goal's density; the floor is about a bar, not about tier.
-      const loadedMainLiftFloor = tierKey === 'tier1' ? policy.minLoadedMainLiftRestSeconds : undefined
-      if (loadedMainLiftFloor && isExternallyLoaded(entry)) {
-        restSeconds = Math.max(restSeconds, loadedMainLiftFloor)
-      }
+      // ...and under MAIN_LIFT_REST_FLOOR_SECONDS the scoping stops: 60s is
+      // the floor for any main lift, bodyweight included. mainLiftRestFloor
+      // returns the higher of the two, so this one expression carries both
+      // rules and neither can be applied without the other.
+      restSeconds = Math.max(restSeconds, mainLiftRestFloor(entry, policy))
       return {
         sets: scaleSets(config.setRange[tierKey]),
         reps: snapToRepBracket(applyRepFloor(shiftRepRange(config.repRange[tierKey], policy.repRangeShift[tierKey]), experience.min_reps)),
@@ -3818,7 +3859,7 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
 
     // STAGE 5: Time-cap optimization per day
     const preTimeCapNames = new Set(daySlots.map(s => s.entry.name))
-    const optimized = stageTimeCap(daySlots, budgetSeconds, trainingStyle, trace, requiredNames)
+    const optimized = stageTimeCap(daySlots, budgetSeconds, trainingStyle, policy, trace, requiredNames)
     // stageTimeCap's Phase 4 can drop an exercise outright under duration
     // pressure — that name was already added to weeklyUsed/allSelectedNames
     // above, on the assumption it was staying. Left uncleared, it becomes a
@@ -4406,10 +4447,13 @@ function computeDurationTopUp(
       (day.recommendedCardio?.timing === 'post_session' ? day.recommendedCardio.duration * 60 : 0)
     const targetSeconds = (totalBudgetSeconds - fixedCostSeconds) * 0.95
     const entries = day.exercises.map(ex => EXERCISE_DATABASE.find(e => e.name.toLowerCase() === ex.name.toLowerCase()))
-    const restSeconds = day.exercises.map(ex => {
+    const restSeconds = day.exercises.map((ex, i) => {
       const match = ex.rest.match(/(\d+)/)
       const base = match ? parseInt(match[1], 10) : 60
-      return Math.max(20, base + phaseConfig.rest_adjust_seconds)
+      // Same main-lift floor the real per-week derivation applies. Without
+      // it this forecast under-costs exactly the sessions the floor makes
+      // longer, and top-up would re-add sets the day can no longer afford.
+      return Math.max(20, base + phaseConfig.rest_adjust_seconds, mainLiftRestFloor(entries[i], policy))
     })
     const roles = entries.map(e => e ? getVolumeRole(e) : null)
     const roleCeilings = day.exercises.map((_, i) => roles[i] ? getRoleSetCeiling(roles[i]!, isLongSession) : EXTRA_SETS_CAP + 99)
@@ -4552,8 +4596,8 @@ function trimWeekRestForBudget(
         // it was set at prescription time — a bodyweight main lift keeps the
         // goal's density, because the risk this guards is a bar, not a tier.
         const mainFloor = isMain && loadedMainLiftFloorSeconds && isExternallyLoaded(findEntry(ex.name) ?? ({} as ExerciseEntry))
-          ? Math.max(60, loadedMainLiftFloorSeconds)
-          : 60
+          ? Math.max(MAIN_LIFT_REST_FLOOR_SECONDS, loadedMainLiftFloorSeconds)
+          : MAIN_LIFT_REST_FLOOR_SECONDS
         const floor = isMain ? mainFloor : 30
         if (restSeconds <= floor) continue
         const newRest = Math.max(floor, restSeconds - 15)
@@ -4626,6 +4670,7 @@ export function sizeBlockToRestBudget(
   restAdjustSeconds: number,
   totalBudgetSeconds: number,
   protectedNames: Set<string>,
+  policy: GoalPolicy,
   trimLog?: ConstraintTraceEntry[],
 ): WorkoutDay[] {
   return blockDays.map(day => {
@@ -4639,7 +4684,10 @@ export function sizeBlockToRestBudget(
     // accounting trimWeekRestForBudget checks against later.
     const estimate = (exercises: Exercise[]) => estimateDaySeconds({
       ...day,
-      exercises: exercises.map(ex => ({ ...ex, rest: `${Math.max(20, parseRestSeconds(ex.rest) + restAdjustSeconds)}s` })),
+      exercises: exercises.map(ex => ({
+        ...ex,
+        rest: `${Math.max(20, parseRestSeconds(ex.rest) + restAdjustSeconds, mainLiftRestFloor(findEntry(ex.name), policy))}s`,
+      })),
     })
 
     let exercises = day.exercises
@@ -5069,7 +5117,7 @@ export function generateMesocycle(
     // is already known — so trimWeekRestForBudget below goes back to being
     // the rare last-resort nudge it was designed as, not the mechanism
     // carrying the whole mesocycle every week.
-    const blockDays = sizeBlockToRestBudget(rotatedBlockDays, phaseConfig.rest_adjust_seconds, totalBudgetSeconds, requiredNames, trimLog)
+    const blockDays = sizeBlockToRestBudget(rotatedBlockDays, phaseConfig.rest_adjust_seconds, totalBudgetSeconds, requiredNames, policy, trimLog)
 
     // Double progression's within-block memory: each exercise's week-1
     // ("baseline") load, keyed by [dayIndex][exerciseIndex] — weeks 2-3 are
@@ -5405,15 +5453,22 @@ export function generateMesocycle(
           // rest independently, so the floor has to be re-asserted at each;
           // fixing only the first left 288 of 432 loaded main lifts still
           // below it.
-          if (
-            policy.minLoadedMainLiftRestSeconds
-            && dbEntry?.mechanics_tier === 'tier1_compound'
-            && isExternallyLoaded(dbEntry)
-            && !isDeload
-          ) {
+          //
+          // Not gated on isDeload any more. The loaded floor skipped deloads
+          // because a deload deliberately backs OFF, and forcing 90s rest on
+          // a light week was reading the goal's density rule as a training
+          // rule. The 60s floor is not that: it is "can the trainee finish
+          // the next set", which a lighter week does not change. Deloads
+          // carry roughly half the sets, so the added rest has slack to come
+          // out of — measured, not assumed (see the session-length delta).
+          {
+            const floor = mainLiftRestFloor(
+              dbEntry,
+              isDeload ? undefined : policy,
+            )
             const current = parseRestSeconds(restForWeek)
-            if (current > 0 && current < policy.minLoadedMainLiftRestSeconds) {
-              restForWeek = `${policy.minLoadedMainLiftRestSeconds}s`
+            if (floor > 0 && current > 0 && current < floor) {
+              restForWeek = `${floor}s`
             }
           }
 
