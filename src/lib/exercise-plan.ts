@@ -17,7 +17,7 @@ import {
 } from './periodization'
 import { getGoalPolicy, restrictPhaseSequence, resolveConditioningFrequency, RECOVERY_SET_MULTIPLIER, type GoalPolicy } from './goal-policies'
 import { isStartingOut, applyStartingOut, startingOutMinutes } from './starting-out'
-import { getDurationBudgetSeconds, getSteadyStateSeconds, estimateDaySeconds, estimateSlotsSeconds, parseRestSeconds, SESSION_OVERHEAD_SECONDS } from './session-duration'
+import { getDurationBudgetSeconds, getSessionMinimumSeconds, getSteadyStateSeconds, estimateDaySeconds, estimateSlotsSeconds, parseRestSeconds, SESSION_OVERHEAD_SECONDS } from './session-duration'
 
 // ---------------------------------------------------------------------------
 // Track definitions (unchanged — used for day-level focus selection)
@@ -4492,6 +4492,12 @@ function applyDurationFiller(
   profile: UserProfile,
   policy: GoalPolicy,
   totalBudgetSeconds: number,
+  /**
+   * The LOW end of the trainee's stated range, not the midpoint budget. A
+   * session under the midpoint can be perfectly fine; a session under the
+   * MINIMUM is shorter than the time they actually set aside.
+   */
+  sessionMinimumSeconds: number,
 ): void {
   const recovery = profile.recovery_capacity || 'moderate'
   const mobilityOnly = recovery === 'low' || recovery === 'moderate' || profile.conditioning_preference === 'avoid'
@@ -4500,7 +4506,17 @@ function applyDurationFiller(
     if (day.exercises.length === 0 || day.conditioning_note) continue
     const actualSeconds = estimateDaySeconds(day)
     const underBySeconds = totalBudgetSeconds - actualSeconds
-    if (underBySeconds <= FILLER_TRIGGER_SECONDS) continue
+    // Two triggers, because one flat number cannot serve every tier. The
+    // 15-minute gap catches a session well short of the midpoint budget. The
+    // minimum catches one that is merely a few minutes short of the midpoint
+    // but still under the time the trainee told us they had — and that second
+    // case is the one a flat threshold kept missing, because 15 minutes only
+    // happens to line up with a tier minimum for "60-90" (75 - 15 = 60
+    // exactly). Every other tier had a hole beneath its own minimum: "45-60"
+    // filled nothing between 37 and 45 minutes. MEASURED on loading weeks
+    // before this: 13% of "45-60" sessions came in under 45 minutes, against
+    // 1% for "60-90".
+    if (underBySeconds <= FILLER_TRIGGER_SECONDS && actualSeconds >= sessionMinimumSeconds) continue
 
     // Capped higher than the old 20min (then 30min, then 60min) ceiling now
     // that the honest duration model (session-duration.ts) charges real
@@ -5466,7 +5482,7 @@ export function generateMesocycle(
         // the filler to fill either, so the two never fight over the same
         // day.
         trimWeekRestForBudget(days, totalBudgetSeconds, trimLog)
-        applyDurationFiller(days, profile, policy, totalBudgetSeconds)
+        applyDurationFiller(days, profile, policy, totalBudgetSeconds, getSessionMinimumSeconds(profile.session_duration_preference || '45-60'))
         // Runs last, after rotation, periodization and duration-budget
         // trimming have all had their say — see enforceWeeklyPatternBalance's
         // doc comment. Deload weeks are exempt (like the duration filler

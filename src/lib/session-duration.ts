@@ -34,6 +34,29 @@ export function getDurationBudgetSeconds(duration: SessionDuration): number {
   return DURATION_BUDGET_SECONDS[duration] ?? DURATION_BUDGET_SECONDS['45-60']
 }
 
+// The LOW end of what the trainee actually told us they had — 45 minutes for
+// "45-60", not the 52-minute midpoint the budget uses. A session may
+// legitimately come in under the midpoint; coming in under the minimum means
+// it is shorter than the time they set aside, which is a different and worse
+// thing.
+//
+// Exists because applyDurationFiller used to trigger on a flat 15-minute gap,
+// and that number is only correct for one tier by coincidence: 75 - 15 lands
+// exactly on the 60-90 tier's 60-minute minimum, while 52 - 15 = 37 leaves an
+// eight-minute hole below the 45-60 tier's minimum where nothing topped the
+// session up. MEASURED across loading weeks: 1% of "60-90" sessions fell below
+// their stated minimum against 13% of "45-60" ones, purely from that.
+export const SESSION_MINIMUM_SECONDS: Record<SessionDuration, number> = {
+  '30-45': 30 * 60,
+  '45-60': 45 * 60,
+  '60-90': 60 * 60,
+  '90+': 90 * 60,
+}
+
+export function getSessionMinimumSeconds(duration: SessionDuration): number {
+  return SESSION_MINIMUM_SECONDS[duration] ?? SESSION_MINIMUM_SECONDS['45-60']
+}
+
 // Steady-state cardio (currently: Elliptical) is one continuous block, not a
 // fixed 20 minutes for every trainee — roughly 35-40% of the total session
 // budget, since it's normally paired with at least a warm-up and one or two
