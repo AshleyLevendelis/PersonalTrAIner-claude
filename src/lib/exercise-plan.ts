@@ -2092,7 +2092,17 @@ function assignSetsRepsFromConfig(
       // reaches every call site (initial build, block rotation, weekly
       // accessory sub-rotation, swap/gap-fill repair) for free.
       const tierKey = entry.mechanics_tier === 'tier1_compound' ? 'tier1' : entry.mechanics_tier === 'tier2_compound' ? 'tier2' : 'tier3'
-      const restSeconds = shiftRestSeconds(config.restSeconds[tierKey], policy.restSecondsMultiplier[tierKey])
+      let restSeconds = shiftRestSeconds(config.restSeconds[tierKey], policy.restSecondsMultiplier[tierKey])
+      // A goal may compress rest as hard as it likes, except under a loaded
+      // main lift. Conditioning's multiplier took Barbell Squats to 42s
+      // between sets on a short session — the goal working exactly as
+      // designed, on the one exercise where it should not. Gated on
+      // isExternallyLoaded so a bodyweight main lift (chin-ups) keeps the
+      // goal's density; the floor is about a bar, not about tier.
+      const loadedMainLiftFloor = tierKey === 'tier1' ? policy.minLoadedMainLiftRestSeconds : undefined
+      if (loadedMainLiftFloor && isExternallyLoaded(entry)) {
+        restSeconds = Math.max(restSeconds, loadedMainLiftFloor)
+      }
       return {
         sets: scaleSets(config.setRange[tierKey]),
         reps: snapToRepBracket(applyRepFloor(shiftRepRange(config.repRange[tierKey], policy.repRangeShift[tierKey]), experience.min_reps)),
@@ -4289,7 +4299,19 @@ function computeDurationTopUp(
  * shorter" reasoning applyDurationFiller and scoreTimeFit already carve out
  * for them.
  */
-function trimWeekRestForBudget(days: WorkoutDay[], budgetSeconds: number, trimLog?: ConstraintTraceEntry[]): void {
+function trimWeekRestForBudget(
+  days: WorkoutDay[],
+  budgetSeconds: number,
+  trimLog?: ConstraintTraceEntry[],
+  /**
+   * Floor under a LOADED main lift's rest, from the goal's own
+   * minLoadedMainLiftRestSeconds. Without it this function's hardcoded 60s
+   * quietly overrode the goal floor set at prescription time — the
+   * prescription said 90s for a conditioning squat and the trimmer took it
+   * straight back to 60. Undefined keeps the historical 60s.
+   */
+  loadedMainLiftFloorSeconds?: number,
+): void {
   for (const day of days) {
     if (day.exercises.length === 0) continue
     let seconds = estimateDaySeconds(day)
@@ -4321,7 +4343,13 @@ function trimWeekRestForBudget(days: WorkoutDay[], budgetSeconds: number, trimLo
         if (seconds <= budgetSeconds) break
         const ex = day.exercises[i]
         const restSeconds = parseRestSeconds(ex.rest)
-        const floor = isMain ? 60 : 30
+        // The goal's floor only applies to a LOADED main lift, matching where
+        // it was set at prescription time — a bodyweight main lift keeps the
+        // goal's density, because the risk this guards is a bar, not a tier.
+        const mainFloor = isMain && loadedMainLiftFloorSeconds && isExternallyLoaded(findEntry(ex.name) ?? ({} as ExerciseEntry))
+          ? Math.max(60, loadedMainLiftFloorSeconds)
+          : 60
+        const floor = isMain ? mainFloor : 30
         if (restSeconds <= floor) continue
         const newRest = Math.max(floor, restSeconds - 15)
         day.exercises[i] = { ...ex, rest: `${newRest}s` }
@@ -5156,6 +5184,27 @@ export function generateMesocycle(
             restForWeek = adjustRest(ex.rest, restShift)
           }
 
+          // Third and last place the goal's loaded-main-lift rest floor has to
+          // hold. The phase's own rest_adjust_seconds is applied AFTER the
+          // prescription, so a metabolic block's negative shift took a
+          // conditioning squat from 75s to 55s — under the floor, and under
+          // the 60s even the trimmer respects. Each of the three paths
+          // (prescription, this weekly adjust, trimWeekRestForBudget) sets
+          // rest independently, so the floor has to be re-asserted at each;
+          // fixing only the first left 288 of 432 loaded main lifts still
+          // below it.
+          if (
+            policy.minLoadedMainLiftRestSeconds
+            && dbEntry?.mechanics_tier === 'tier1_compound'
+            && isExternallyLoaded(dbEntry)
+            && !isDeload
+          ) {
+            const current = parseRestSeconds(restForWeek)
+            if (current > 0 && current < policy.minLoadedMainLiftRestSeconds) {
+              restForWeek = `${policy.minLoadedMainLiftRestSeconds}s`
+            }
+          }
+
           // Primers stay submaximal and un-scaled for the same reason as the
           // base plan — a warm-up movement should never carry a working-set
           // RPE or a load that scales with the block.
@@ -5481,7 +5530,7 @@ export function generateMesocycle(
         // after this (rest already at floor) has nothing under-budget for
         // the filler to fill either, so the two never fight over the same
         // day.
-        trimWeekRestForBudget(days, totalBudgetSeconds, trimLog)
+        trimWeekRestForBudget(days, totalBudgetSeconds, trimLog, policy.minLoadedMainLiftRestSeconds)
         applyDurationFiller(days, profile, policy, totalBudgetSeconds, getSessionMinimumSeconds(profile.session_duration_preference || '45-60'))
         // Runs last, after rotation, periodization and duration-budget
         // trimming have all had their say — see enforceWeeklyPatternBalance's

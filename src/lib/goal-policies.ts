@@ -78,6 +78,26 @@ export interface GoalPolicy {
    */
   restSecondsMultiplier: { tier1: number; tier2: number; tier3: number }
   /**
+   * Floor, in seconds, under a tier1 main lift that carries EXTERNAL LOAD —
+   * a bar or dumbbells, not a chin-up. Absent means no floor.
+   *
+   * Exists for conditioning, and only conditioning. Its 0.8 tier1 multiplier
+   * on top of a short session's base rest produced Barbell Squats and Bench
+   * Press at 42 SECONDS between sets. Short rest is the whole point of the
+   * goal, and it keeps it everywhere else — accessories, machines,
+   * bodyweight, carries — but a loaded bar recovered for 42 seconds is how
+   * form fails, and the cost is asymmetric: too much rest on one lift is a
+   * slightly easier session, too little is a rep failing under load.
+   *
+   * MEASURED before this existed: 91% of conditioning's loaded main lifts
+   * rested under 90s, against 17-27% for every other goal — and conditioning
+   * was the ONLY goal that ever went below 60s at all. So this is scoped to
+   * the goal rather than applied globally: a hypertrophy bench at 75s is a
+   * deliberate, normal prescription, and a blanket floor would have quietly
+   * rewritten a fifth of every other goal's main lifts too.
+   */
+  minLoadedMainLiftRestSeconds?: number
+  /**
    * Signed shift in isolation (tier3) slot count; the same magnitude moves
    * the OPPOSITE way for tier2 (compound-accessory) slots, so total
    * accessory count is unchanged — only the isolation:compound-accessory
@@ -166,6 +186,9 @@ const CONDITIONING_POLICY: GoalPolicy = {
   // slots in favor of full-body/compound accessories.
   repRangeShift: { tier1: 2, tier2: 3, tier3: 4 },
   restSecondsMultiplier: { tier1: 0.8, tier2: 0.7, tier3: 0.65 },
+  // Ashley's ruling: the session still conditions, the part with a bar on
+  // your back does not. See minLoadedMainLiftRestSeconds' doc comment.
+  minLoadedMainLiftRestSeconds: 90,
   isolationSlotShift: -1,
   preferUnilateralCarry: false,
 }
