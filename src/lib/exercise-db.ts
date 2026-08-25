@@ -3201,6 +3201,19 @@ export function isIndicatedFor(entry: ExerciseEntry, flaggedJoints: Set<string>)
   return (entry.indicated_joints ?? []).some(j => flaggedJoints.has(j))
 }
 
+/**
+ * True when this movement's resistance comes from a band.
+ *
+ * Lives next to the joint predicates rather than in load-prescription.ts on
+ * purpose: this answers "what is the implement", which is a property of the
+ * catalogue entry, while `isExternallyLoaded` answers "can we put a number in
+ * kilograms on it" — a band is the one implement where those two disagree,
+ * which is exactly why the distinction needs a name of its own.
+ */
+export function isBandEquipped(entry: ExerciseEntry): boolean {
+  return entry.equipment.some(e => e === 'resistance band')
+}
+
 /** True when this movement must be excluded for a trainee with these flagged joints. An indicated movement is never excluded, even if it loads the joint. */
 export function isContraindicatedFor(entry: ExerciseEntry, flaggedJoints: Set<string>): boolean {
   if (isIndicatedFor(entry, flaggedJoints)) return false

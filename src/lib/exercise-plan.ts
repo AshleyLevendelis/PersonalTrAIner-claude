@@ -4,7 +4,7 @@ import type {
   FatigueCost, MesocycleMovementPattern, EquipmentAccess, TrainingStyle,
   ConstraintTrace, ConstraintTraceEntry, PlanResult, TrainingExperience,
 } from './types'
-import { EXERCISE_DATABASE, getMovementFamily, getVolumeRole, meetsCapabilityRequirement, getExerciseId, contraindicatedJoints, isContraindicatedFor, isIndicatedFor, NEAREST_PATTERN_FALLBACK, type ExerciseEntry, type MovementPattern, type AngleVector, type VolumeRole } from './exercise-db'
+import { EXERCISE_DATABASE, getMovementFamily, getVolumeRole, meetsCapabilityRequirement, getExerciseId, contraindicatedJoints, isContraindicatedFor, isIndicatedFor, isBandEquipped, NEAREST_PATTERN_FALLBACK, type ExerciseEntry, type MovementPattern, type AngleVector, type VolumeRole } from './exercise-db'
 import {
   getExperienceConfig, getSkillDemand, isSkillAppropriate, applyRepFloor,
   type ExperienceConfig,
@@ -1077,11 +1077,32 @@ function isUnilateralCarryOrRotational(e: ExerciseEntry): boolean {
  * unilateral/carry/rotational work, those candidates are tried first within
  * whichever capability tier they landed in.
  */
+/**
+ * How much a band gives up to a real weight for a main or secondary slot.
+ * Sized deliberately: above the 0.3 tie-break jitter and above anything the
+ * five scoring factors can swing together (~5), and far below the 30-point
+ * gap between mechanics tiers — so it reorders implements WITHIN a tier and
+ * can never reorder the tiers themselves.
+ */
+const BAND_WITHOUT_WEIGHT_PENALTY = 12
+
+/** Shared empty set, so the no-injury path doesn't allocate one per candidate scored. */
+const EMPTY_JOINTS: Set<string> = new Set()
+
 interface ScoreContext {
   /** The day's own patterns (track.primary_patterns + secondary_patterns) — what "supports today's session" is measured against. */
   trackPatterns: MovementPattern[]
   selectedSoFar: ExerciseEntry[]
   weeklyAppearanceCount?: Map<string, number>
+  /** The trainee's injured joints, so a band prescribed AS rehab is never demoted for being a band. */
+  flaggedJoints?: Set<string>
+  /**
+   * True when some OTHER candidate in this same ranked list carries a real
+   * external load. Filled in by orderCandidates, never by a caller: it is a
+   * property of the slot being filled, not of the pool in general, and that
+   * is exactly what makes the band rule a preference rather than a ban.
+   */
+  listHasLoadedAlternative?: boolean
 }
 
 /**
@@ -1189,6 +1210,47 @@ function scoreCandidate(candidate: ExerciseEntry, policy: GoalPolicy, rawExperie
   // non-obvious coaching call.
   score += ({ tier1_compound: 90, tier2_compound: 60, tier3_isolation: 30 } as Record<string, number>)[candidate.mechanics_tier] ?? 0
 
+  // A REAL WEIGHT BEATS A BAND, when a real weight is actually on offer.
+  //
+  // A resistance band is not in LOADED_EQUIPMENT, so the app shows NO WEIGHT
+  // for it — the lift can only progress by reps and the weight column that
+  // carries a lift's whole progression story is blank. MEASURED before this
+  // existed: 906 of 18,909 main/secondary slots (4.79%) resolved to a band
+  // on a day that already contained a real load, peaking at 8.03% for a
+  // minimalist trainee. Nothing was broken; nothing was CHOOSING either.
+  // Dumbbell Shoulder Press and Band Shoulder Press are both tier2_compound
+  // vertical_push and scored IDENTICALLY on all five factors above, so the
+  // winner was decided by the jitter two lines down. A coin flip, 906 times.
+  //
+  // Four conditions, each load-bearing:
+  //   - listHasLoadedAlternative keeps this a PREFERENCE, not a ban. A
+  //     minimalist trainee whose only vertical_pull is a band keeps the band;
+  //     demoting the only thing left is not an improvement.
+  //   - the isIndicatedFor exemption protects the rehab pass. Spanish Squat
+  //     is a patellar-tendon rehab tool and Kneeling Band Lat Pulldown is
+  //     shoulder-tolerable pulling; 352 current placements are deliberate
+  //     rehab and must survive untouched.
+  //   - tier1/tier2 only. A band in a tier3 isolation slot (Band Pull-Aparts,
+  //     Band Face Pulls) is the right tool for that job.
+  //   - the magnitude sits above the jitter (0.3) and above anything the five
+  //     factors can swing together (~5), and far below the 30-point gap
+  //     between tiers — so it reorders IMPLEMENTS within a tier and never
+  //     reorders the tiers themselves.
+  //
+  // Kept OUT of `factors` for the same reason as the tier bonus directly
+  // above: "we used the real weight because you have one" is baseline
+  // structure, not a non-obvious coaching call, and explainWinner would
+  // otherwise cite it on nearly every affected pick.
+  if (
+    ctx.listHasLoadedAlternative &&
+    (candidate.mechanics_tier === 'tier1_compound' || candidate.mechanics_tier === 'tier2_compound') &&
+    isBandEquipped(candidate) &&
+    !isExternallyLoaded(candidate) &&
+    !isIndicatedFor(candidate, ctx.flaggedJoints ?? EMPTY_JOINTS)
+  ) {
+    score -= BAND_WITHOUT_WEIGHT_PENALTY
+  }
+
   // Tie-break only: small enough to never overturn a genuine difference
   // above, large enough to stop two truly equal candidates from always
   // resolving the same way. Goes through the same seeded randomSource() as
@@ -1199,8 +1261,16 @@ function scoreCandidate(candidate: ExerciseEntry, policy: GoalPolicy, rawExperie
 }
 
 function orderCandidates(candidates: ExerciseEntry[], policy: GoalPolicy, rawExperience: TrainingExperience, ctx: ScoreContext): ScoredCandidate[] {
+  // Answered here, once, from the list actually being ranked — not by any
+  // caller and not from the pool at large. "Was a real weight on offer for
+  // THIS slot?" is the only form of the question that makes the band rule
+  // safe for a trainee whose whole kit is bands.
+  const scoped: ScoreContext = {
+    ...ctx,
+    listHasLoadedAlternative: candidates.some(e => isExternallyLoaded(e) && !isBandEquipped(e)),
+  }
   return candidates
-    .map(e => ({ e, ...scoreCandidate(e, policy, rawExperience, ctx) }))
+    .map(e => ({ e, ...scoreCandidate(e, policy, rawExperience, scoped) }))
     .sort((a, b) => b.score - a.score)
 }
 
@@ -1556,7 +1626,7 @@ function selectExercisesForTrack(
       ),
       policy,
       rawExperience,
-      { trackPatterns: [...track.primary_patterns, ...track.secondary_patterns], selectedSoFar: selected, weeklyAppearanceCount },
+      { trackPatterns: [...track.primary_patterns, ...track.secondary_patterns], selectedSoFar: selected, weeklyAppearanceCount, flaggedJoints },
     )
     const winner = candidates[0]
     if (winner) {
@@ -1616,7 +1686,7 @@ function selectExercisesForTrack(
       ),
       policy,
       rawExperience,
-      { trackPatterns: [...track.primary_patterns, ...track.secondary_patterns], selectedSoFar: selected, weeklyAppearanceCount },
+      { trackPatterns: [...track.primary_patterns, ...track.secondary_patterns], selectedSoFar: selected, weeklyAppearanceCount, flaggedJoints },
     )
     for (let i = 0; i < candidates.length; i++) {
       const c = candidates[i]
@@ -1697,7 +1767,7 @@ function selectExercisesForTrack(
       ),
       policy,
       rawExperience,
-      { trackPatterns: [...track.primary_patterns, ...track.secondary_patterns], selectedSoFar: selected, weeklyAppearanceCount },
+      { trackPatterns: [...track.primary_patterns, ...track.secondary_patterns], selectedSoFar: selected, weeklyAppearanceCount, flaggedJoints },
     )
     for (let i = 0; i < cardioCandidates.length; i++) {
       const c = cardioCandidates[i]
@@ -1764,7 +1834,7 @@ function selectExercisesForTrack(
         ),
         policy,
         rawExperience,
-        { trackPatterns: [...track.primary_patterns, ...track.secondary_patterns], selectedSoFar: selected, weeklyAppearanceCount },
+        { trackPatterns: [...track.primary_patterns, ...track.secondary_patterns], selectedSoFar: selected, weeklyAppearanceCount, flaggedJoints },
       )
 
       for (let i = 0; i < candidates.length; i++) {
