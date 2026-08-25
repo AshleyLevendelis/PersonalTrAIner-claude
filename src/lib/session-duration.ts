@@ -94,6 +94,18 @@ export function getSteadyStateSeconds(duration: SessionDuration): number {
   return STEADY_STATE_SECONDS[duration] ?? STEADY_STATE_SECONDS['45-60']
 }
 
+/**
+ * The distance every carry is prescribed at before anything progresses it —
+ * `fixedUnitPrescription`'s `'40m'`, named so the duration model and the
+ * progression pass agree on what "unprogressed" means rather than each
+ * carrying its own literal.
+ *
+ * Lives here rather than in exercise-plan.ts because THIS file needs it to
+ * convert a distance into seconds, and exercise-plan already imports from
+ * here (not the other way round).
+ */
+export const DEFAULT_CARRY_DISTANCE_M = 40
+
 // Rough controlled-tempo pace for a rep-based working set — covers a
 // deliberate eccentric/concentric plus the brief pause most working sets
 // have at the top or bottom. At 10 reps this lands at 35s, matching the
@@ -132,7 +144,19 @@ function computeSetWorkSeconds(reps: string, fallbackSeconds: number, exerciseNa
   if (timeRange) return (parseInt(timeRange[1], 10) + parseInt(timeRange[2], 10)) / 2
   const timeSingle = reps.match(/^(\d+)\s*s$/)
   if (timeSingle) return parseInt(timeSingle[1], 10)
-  if (/^\d+\s*m$/.test(reps)) return fallbackSeconds
+  // A CARRY SCALES WITH ITS DISTANCE. This used to return the exercise's flat
+  // avg_duration_seconds for any distance, so a 50m carry was costed exactly
+  // the same as a 40m one — fine while distance was a hardcoded constant,
+  // and a silent way to blow a session's budget the moment it isn't.
+  //
+  // No new pace constant: each entry's own avg_duration_seconds already
+  // implies one over the default distance (Farmer's Walk 35s/40m = 1.14 m/s;
+  // Loaded Backpack Walk 40s = 1.00 m/s), so every carry keeps its own tuned
+  // pace and simply scales.
+  const distance = reps.match(/^(\d+)\s*m$/)
+  if (distance) {
+    return fallbackSeconds * (parseInt(distance[1], 10) / DEFAULT_CARRY_DISTANCE_M)
+  }
 
   // A prescribed tempo REPLACES the generic pace rather than adding to it —
   // SECONDS_PER_REP is itself a tempo assumption ("a deliberate eccentric/

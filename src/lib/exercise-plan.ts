@@ -17,7 +17,7 @@ import {
 } from './periodization'
 import { getGoalPolicy, restrictPhaseSequence, resolveConditioningFrequency, RECOVERY_SET_MULTIPLIER, type GoalPolicy } from './goal-policies'
 import { isStartingOut, applyStartingOut, startingOutMinutes } from './starting-out'
-import { getDurationBudgetSeconds, getSessionMinimumSeconds, getSessionMaximumSeconds, getSteadyStateSeconds, estimateDaySeconds, estimateSlotsSeconds, parseRestSeconds, SESSION_OVERHEAD_SECONDS } from './session-duration'
+import { getDurationBudgetSeconds, getSessionMinimumSeconds, getSessionMaximumSeconds, getSteadyStateSeconds, DEFAULT_CARRY_DISTANCE_M, estimateDaySeconds, estimateSlotsSeconds, parseRestSeconds, SESSION_OVERHEAD_SECONDS } from './session-duration'
 
 // ---------------------------------------------------------------------------
 // Track definitions (unchanged — used for day-level focus selection)
@@ -2065,10 +2065,18 @@ function shiftRestSeconds(seconds: number, multiplier: number): number {
 
 /**
  * The prescription for every non-'reps' unit — a hold duration, a measured
- * carry distance, a work:rest interval. These are FIXED: unlike a rep range,
- * they don't bend to training style, experience or goal (a 40m farmer's walk
- * is 40m for everyone; only the load moves). Returns null for 'reps', which
- * genuinely does need the style/experience/policy chain.
+ * carry distance, a work:rest interval. These are the STARTING values: unlike
+ * a rep range they don't bend to training style, experience or goal — a 40m
+ * farmer's walk starts at 40m for everyone.
+ *
+ * "Only the load moves" is what this comment used to say, and it stopped
+ * being true. A carry's load converges on its ceiling and then nothing moved
+ * at all — measured, 100 of 265 frozen week-to-week transitions, the largest
+ * single bucket. generateMesocycle now walks the distance up (+5m per frozen
+ * week, capped) when the weight has stopped; see FROZEN_CARRY_DISTANCE_STEP_M.
+ * This function still returns the DEFAULT, which is what a rotated-in carry
+ * must start from. Returns null for 'reps', which genuinely does need the
+ * style/experience/policy chain.
  *
  * Exported because any path that changes WHICH exercise occupies a slot has
  * to re-derive these when the incoming exercise's prescription_type differs
@@ -2086,7 +2094,13 @@ export function fixedUnitPrescription(
     case 'time':
       return { sets: 3, reps: '30-45s', rest: '45s', restSeconds: 45 }
     case 'distance_load':
-      return { sets: 3, reps: '40m', rest: '60s', restSeconds: 60 }
+      // The DEFAULT, and always the default — a carry rotated into a slot by
+      // swap/ban/injury/equipment starts here, never at the outgoing carry's
+      // progressed distance. That is the whole reason this function is the
+      // shared choke point (see its doc comment: "a carry ended up prescribed
+      // 8-12 reps and a hold ended up 40m"), and test:slot-replacement is the
+      // gate that asserts no outgoing-exercise data survives a swap.
+      return { sets: 3, reps: `${DEFAULT_CARRY_DISTANCE_M}m`, rest: '60s', restSeconds: 60 }
     case 'intervals': {
       // Rounds of work:rest, never a rep count — a jump-rope or battle-rope
       // set is not "15-18 reps." Differentiated by category rather than one
@@ -2361,6 +2375,28 @@ const SAME_MUSCLE_GROUP_MAX_RATIO = 2 // heaviest same-group accessory vs. light
 // let a strength block's 4-6 climb far enough and it quietly becomes an
 // endurance block.
 const MAX_FROZEN_LOAD_REP_BUMP = 3
+
+/**
+ * One step further, when a carry's weight has stopped moving.
+ *
+ * A carry's design is "only the load moves" (see fixedUnitPrescription) —
+ * coherent until the load converges on its ceiling, after which NOTHING
+ * moves: carries are excluded from rampReps and from the frozen-load rep
+ * bump because shiftReps passes '40m' straight through. MEASURED, they were
+ * 100 of 265 frozen week-to-week transitions, the largest single bucket.
+ *
+ * Ashley's ruling: when the weight can't move, walk further. 5m is one
+ * honest increment on a 40m carry (12.5%) — small enough that the session
+ * budget absorbs it, big enough to read as progress on the card.
+ */
+const FROZEN_CARRY_DISTANCE_STEP_M = 5
+
+/**
+ * Cap on the accumulated distance bump, in steps. Three takes a 40m carry to
+ * 55m across a plan; without it a sixteen-week plan walks to 100m, which is
+ * a different exercise. Mirrors MAX_FROZEN_LOAD_REP_BUMP's role exactly.
+ */
+const MAX_FROZEN_CARRY_DISTANCE_STEPS = 3
 
 type BroadPattern = 'push' | 'pull' | 'squat' | 'hinge' | null
 
@@ -4950,6 +4986,9 @@ export function generateMesocycle(
   // attempt, which compared a pre-coherence probe against post-coherence
   // history and pinned loads coherence would otherwise have moved.
   const frozenLoadStreakByLift = new Map<string, number>()
+  // The carry equivalent, and outside the week loop for the same reason: it
+  // is a STREAK across weeks, not a per-week decision.
+  const frozenCarryStepsByLift = new Map<string, number>()
   const previousWeekPreCoherenceKgByLift = new Map<string, number>()
 
   sequence.forEach((phase, blockIndex) => {
@@ -5125,6 +5164,10 @@ export function generateMesocycle(
       // and "5-7" on Thursday. Measured: lift-weeks showing more than one rep
       // range at the same weight went from 19 to 108 before this was fixed.
       const frozenBumpDecidedThisWeek = new Map<string, number>()
+      // Carry twin of the line above, and per-WEEK for the same reason: one
+      // carry can hold two slots in a week and both must show the same
+      // distance.
+      const carryStepDecidedThisWeek = new Map<string, number>()
 
       const days: WorkoutDay[] = blockDays.map((day, dayIdx) => {
         // Fixed for this week (main/core never rotate weekly), so these
@@ -5583,6 +5626,34 @@ export function generateMesocycle(
               // and carrying the bump forward would tax a lift for having once
               // been stuck.
               frozenLoadStreakByLift.set(dbEntry.name, 0)
+            }
+
+            // WALK FURTHER WHEN THE WEIGHT WON'T MOVE — the carry twin of the
+            // rep bump above, on the identical trigger (this week's resolved
+            // load equals the previous loading week's).
+            //
+            // Simpler than the rep version, and deliberately so: distance
+            // does NOT feed prescribeLoad the way reps do (load-prescription
+            // .ts parses a carry by load only — reading '40m' as a rep count
+            // "would wildly overshoot"), so there is nothing to re-derive, no
+            // weight to pin, and no divergence backstop to satisfy. Adding
+            // distance cannot pull the weight down, which is the entire
+            // hazard the rep version had to engineer around.
+            const canBuyDistance = isCarry && !isDeload && !isCalibrationWeek
+              && /^\d+\s*m$/.test(String(reps))
+            if (canBuyDistance && naturalKg != null && previousNaturalKg != null && naturalKg === previousNaturalKg) {
+              const alreadyStepped = carryStepDecidedThisWeek.get(dbEntry.name)
+              const steps = alreadyStepped
+                ?? Math.min((frozenCarryStepsByLift.get(dbEntry.name) ?? 0) + 1, MAX_FROZEN_CARRY_DISTANCE_STEPS)
+              carryStepDecidedThisWeek.set(dbEntry.name, steps)
+              frozenCarryStepsByLift.set(dbEntry.name, steps)
+              const baseM = parseInt(String(reps), 10)
+              reps = `${baseM + steps * FROZEN_CARRY_DISTANCE_STEP_M}m`
+            } else if (canBuyDistance && naturalKg != null && previousNaturalKg != null) {
+              // The weight moved, so the distance resets — same reasoning as
+              // the rep reset above. A carry that earned a heavier load should
+              // not also still be walking the accumulated extra.
+              frozenCarryStepsByLift.set(dbEntry.name, 0)
             }
 
             if (w === 1) {
