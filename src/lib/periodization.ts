@@ -450,6 +450,87 @@ export function rotateVariation(
 }
 
 // ---------------------------------------------------------------------------
+// Tempo — the phase's voice for a lift that cannot take weight
+// ---------------------------------------------------------------------------
+//
+// For a loaded lift the phase expresses itself through the weight: a strength
+// block means heavier. For a WEIGHTLESS lift there is nothing for it to
+// express itself through, and that is the root of the defect this exists to
+// fix — the reps fall (rep_shift is negative in a strength block) and nothing
+// else on screen changes, so a bodyweight trainee watches their numbers go
+// down for sixteen weeks with no explanation. MEASURED: 84.7% of bodyweight
+// lifts end a plan on fewer reps than they started.
+//
+// The loadless coach note shipped in 074ad9d already TELLS them the answer —
+// "the difficulty comes from how you move: about three seconds lowering, a
+// pause at the bottom" — but that was prose. Nothing prescribed it, nothing
+// tracked it, nothing progressed it. A promise with no delivery, which is the
+// same shape as update_workout_schedule and the Muay Thai swap.
+//
+// ONE LEVER AT A TIME, following loadStepUnaffordable's precedent: tempo is
+// set by the BLOCK and constant within it, while reps stay the within-block
+// lever exactly as before. That also makes the falling reps legible — they
+// fall BECAUSE each rep got slower.
+//
+// Notation is the standard eccentric-pause-concentric triple. Two phases get
+// none, deliberately: 'power' wants explosive intent and a slow eccentric
+// fights it, and 'metabolic' wants short rest as the stimulus, which a long
+// time-under-tension set undercuts. Absent means "no tempo instruction",
+// never "we forgot".
+export interface Tempo {
+  /** Seconds lowering (the eccentric) — where the difficulty actually lives. */
+  eccentric: number
+  /** Seconds paused at the hard position. */
+  pause: number
+  /** Seconds lifting (the concentric). */
+  concentric: number
+}
+
+const PHASE_TEMPO: Record<TrainingPhase, Tempo | null> = {
+  anatomical_adaptation: { eccentric: 2, pause: 0, concentric: 1 },
+  hypertrophy: { eccentric: 3, pause: 0, concentric: 1 },
+  strength: { eccentric: 4, pause: 1, concentric: 1 },
+  power: null,
+  metabolic: null,
+}
+
+export function getPhaseTempo(phase: TrainingPhase): Tempo | null {
+  return PHASE_TEMPO[phase]
+}
+
+/** Canonical notation, e.g. '4-1-1'. This is what is stored on the exercise. */
+export function formatTempo(t: Tempo): string {
+  return `${t.eccentric}-${t.pause}-${t.concentric}`
+}
+
+/** Parses the stored notation back. Returns null for anything unrecognised. */
+export function parseTempo(tempo: string | undefined | null): Tempo | null {
+  if (!tempo) return null
+  const m = /^(\d+)-(\d+)-(\d+)$/.exec(tempo.trim())
+  if (!m) return null
+  return { eccentric: Number(m[1]), pause: Number(m[2]), concentric: Number(m[3]) }
+}
+
+/**
+ * Plain English for the trainee. '4-1-1' is standard coaching notation and
+ * completely opaque to someone who has never seen it, so the stored value is
+ * canonical and this is what actually goes on screen.
+ */
+export function describeTempo(tempo: string | undefined | null): string | null {
+  const t = parseTempo(tempo)
+  if (!t) return null
+  const parts = [`${t.eccentric}s down`]
+  if (t.pause > 0) parts.push(`${t.pause}s pause`)
+  parts.push(t.concentric <= 1 ? 'drive up' : `${t.concentric}s up`)
+  return parts.join(' · ')
+}
+
+/** Seconds one rep takes at this tempo. No fudge factor: the tempo IS the rep time. */
+export function tempoSecondsPerRep(t: Tempo): number {
+  return t.eccentric + t.pause + t.concentric
+}
+
+// ---------------------------------------------------------------------------
 // Block assembly
 // ---------------------------------------------------------------------------
 

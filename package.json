@@ -56,6 +56,7 @@
     "test:onboarding-slots": "tsx scripts/test-onboarding-slots.ts",
     "test:activity-streak": "tsx scripts/test-activity-streak.ts",
     "test:starting-out": "tsx scripts/test-starting-out.ts",
+    "test:tempo-prescription": "tsx scripts/test-tempo-prescription.ts",
     "test:training-week": "tsx scripts/test-training-week.ts",
     "test:coach-rules-sync": "tsx scripts/test-coach-rules-sync.ts",
     "test:coach-promises": "tsx scripts/test-coach-promises.ts",

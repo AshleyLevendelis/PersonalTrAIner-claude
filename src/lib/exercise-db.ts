@@ -166,6 +166,21 @@ export interface ExerciseEntry {
   style_tags: TrainingStyle[]
   /** Hard experience gate + regression — see CapabilityRequirement. Absent means no gate beyond the generic SKILL_DEMAND ceiling. */
   capability_requirement?: CapabilityRequirement
+  /**
+   * True when a trainee can hang real weight on this movement — a dip belt,
+   * a dumbbell between the feet, a loaded backpack. Pull-ups, chin-ups and
+   * dips are the whole set; everything else on the "bodyweight" list
+   * progresses by LEVERAGE instead (a deficit push-up, a straighter hanging
+   * leg raise), and an assisted pull-up loads the other way entirely.
+   *
+   * Exists to keep the tempo prescription honest. Tempo is the progression
+   * lever for a lift with no weight to add — and for a chin-up that premise
+   * is false. Showing no weight on a chin-up is a GAP IN THIS APP, not a
+   * fact about the exercise, and prescribing a slow eccentric there would
+   * paper over the gap rather than close it. See BACKLOG: the real fix is
+   * prescribing the added load, which is its own round of work.
+   */
+  accepts_added_load?: boolean
   substitution_group: string
   unilateral: boolean
   avg_duration_seconds: number
@@ -565,6 +580,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     loads_joints: ['shoulder'],
     style_tags: ['bodybuilding', 'functional', 'combat', 'hybrid'],
     capability_requirement: { minExperience: 'intermediate', regression: 'Tricep Dips' },
+    accepts_added_load: true,
     substitution_group: 'dip',
     unilateral: false,
     avg_duration_seconds: 35,
@@ -878,6 +894,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     loads_joints: ['shoulder'],
     style_tags: ['bodybuilding', 'functional', 'combat', 'hybrid'],
     capability_requirement: { minExperience: 'intermediate', regression: 'Pull-Ups (Assisted)' },
+    accepts_added_load: true,
     substitution_group: 'vertical_pull',
     unilateral: false,
     avg_duration_seconds: 35,
@@ -904,6 +921,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     loads_joints: ['shoulder'],
     style_tags: ['bodybuilding', 'functional', 'combat', 'hybrid'],
     capability_requirement: { minExperience: 'intermediate', regression: 'Pull-Ups (Assisted)' },
+    accepts_added_load: true,
     substitution_group: 'vertical_pull',
     unilateral: false,
     avg_duration_seconds: 35,
@@ -2242,6 +2260,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     loads_joints: ['shoulder'],
     style_tags: ['bodybuilding', 'functional', 'combat', 'hybrid'],
     capability_requirement: { minExperience: 'novice', regression: 'Push-Ups' },
+    accepts_added_load: true,
     substitution_group: 'dip',
     unilateral: false,
     avg_duration_seconds: 35,

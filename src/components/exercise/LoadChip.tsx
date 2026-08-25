@@ -1,4 +1,5 @@
-import { Dumbbell, Info } from 'lucide-react'
+import { Dumbbell, Info, Timer } from 'lucide-react'
+import { describeTempo } from '@/lib/periodization'
 import type { Exercise } from '@/lib/types'
 import type { PrescribedLoadSource } from '@/lib/load-prescription'
 
@@ -70,6 +71,27 @@ function explainerFor(source: LoadSource | undefined, loadGuidance?: string): st
     return 'Calculated from your last session on this lift.' + (loadGuidance ? ` ${loadGuidance}` : '')
   }
   return null
+}
+
+/**
+ * The tempo chip — deliberately rendered in the SAME slot a weight would
+ * occupy, because it is the weight's stand-in. For a lift with nothing to
+ * load, tempo is the progression lever, and putting it anywhere else would
+ * leave that slot reading as empty on the one lift class where the whole
+ * defect was "the numbers change and nothing explains why".
+ *
+ * Styled as CONFIDENT rather than estimate-dashed: unlike a standards-derived
+ * weight, this is not a guess about the trainee — it is an instruction, and
+ * the visual order on screen has to match the confidence order.
+ */
+export function TempoChip({ tempo }: { tempo: string | undefined }) {
+  const described = describeTempo(tempo)
+  if (!described) return null
+  return (
+    <span className={`inline-flex items-center gap-0.5 rounded border px-1 py-0 text-[10px] leading-4 ${CONFIDENT_CHIP_CLASS}`}>
+      <Timer className="size-2.5" />{described}
+    </span>
+  )
 }
 
 export function LoadChip({

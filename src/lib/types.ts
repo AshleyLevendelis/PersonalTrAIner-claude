@@ -219,6 +219,14 @@ export interface Exercise {
   movement_pattern?: MesocycleMovementPattern
   tier?: ExerciseTier
   fatigue_cost?: FatigueCost
+  /**
+   * Prescribed lifting speed, canonical eccentric-pause-concentric notation
+   * ('4-1-1'). Present only where tempo is the actual progression lever — a
+   * rep-based lift with no weight to add — so absence means "no tempo
+   * instruction", never "we forgot". Rendered in plain English via
+   * describeTempo (periodization.ts); '4-1-1' means nothing to a trainee.
+   */
+  tempo?: string
   /** Target effort level for working sets, e.g. 'RPE 6-7'. */
   intensity?: string
   /** Plain-English guidance on picking a starting load. */

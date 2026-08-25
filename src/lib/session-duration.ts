@@ -1,5 +1,6 @@
 import type { SessionDuration, WorkoutDay } from './types'
 import { EXERCISE_DATABASE, type ExerciseEntry } from './exercise-db'
+import { parseTempo, tempoSecondsPerRep } from './periodization'
 
 // ---------------------------------------------------------------------------
 // SESSION DURATION — single source of truth
@@ -57,6 +58,24 @@ export function getSessionMinimumSeconds(duration: SessionDuration): number {
   return SESSION_MINIMUM_SECONDS[duration] ?? SESSION_MINIMUM_SECONDS['45-60']
 }
 
+/**
+ * The upper end of what the trainee actually said they had — '30-45' is 45
+ * minutes. Distinct from getDurationBudgetSeconds, which is the MIDPOINT the
+ * generator aims at: a session at 44 minutes is on target for a "30-45"
+ * trainee and 121% of the midpoint, which is why measuring overshoot against
+ * the budget flagged 69 perfectly good sessions once already.
+ *
+ * This is the number nothing may exceed, and it is the target of the final
+ * safety trim in generateMesocycle.
+ */
+export const SESSION_MAXIMUM_SECONDS: Record<SessionDuration, number> = {
+  '30-45': 45 * 60, '45-60': 60 * 60, '60-90': 90 * 60, '90+': 120 * 60,
+}
+
+export function getSessionMaximumSeconds(duration: SessionDuration): number {
+  return SESSION_MAXIMUM_SECONDS[duration] ?? SESSION_MAXIMUM_SECONDS['45-60']
+}
+
 // Steady-state cardio (currently: Elliptical) is one continuous block, not a
 // fixed 20 minutes for every trainee — roughly 35-40% of the total session
 // budget, since it's normally paired with at least a warm-up and one or two
@@ -108,17 +127,23 @@ export const SESSION_OVERHEAD_SECONDS = 120
  *    anatomical-adaptation phase and a low-rep strength phase are no longer
  *    charged the same time for a set that takes visibly different effort
  */
-function computeSetWorkSeconds(reps: string, fallbackSeconds: number, exerciseName?: string): number {
+function computeSetWorkSeconds(reps: string, fallbackSeconds: number, exerciseName?: string, tempo?: string): number {
   const timeRange = reps.match(/^(\d+)\s*-\s*(\d+)\s*s$/)
   if (timeRange) return (parseInt(timeRange[1], 10) + parseInt(timeRange[2], 10)) / 2
   const timeSingle = reps.match(/^(\d+)\s*s$/)
   if (timeSingle) return parseInt(timeSingle[1], 10)
   if (/^\d+\s*m$/.test(reps)) return fallbackSeconds
 
+  // A prescribed tempo REPLACES the generic pace rather than adding to it —
+  // SECONDS_PER_REP is itself a tempo assumption ("a deliberate eccentric/
+  // concentric plus the brief pause"), so adding them would double-count.
+  const parsed = parseTempo(tempo)
+  const perRep = parsed ? tempoSecondsPerRep(parsed) : SECONDS_PER_REP
+
   const repRange = reps.match(/^(\d+)\s*-\s*(\d+)$/)
-  if (repRange) return ((parseInt(repRange[1], 10) + parseInt(repRange[2], 10)) / 2) * SECONDS_PER_REP
+  if (repRange) return ((parseInt(repRange[1], 10) + parseInt(repRange[2], 10)) / 2) * perRep
   const repSingle = reps.match(/^(\d+)$/)
-  if (repSingle) return parseInt(repSingle[1], 10) * SECONDS_PER_REP
+  if (repSingle) return parseInt(repSingle[1], 10) * perRep
 
   // A string that matches none of the above is a real prescription-format
   // bug, not a rare edge case a silent default should absorb — this is the
@@ -162,6 +187,15 @@ export interface DurationSlot {
   sets: number
   reps: string
   restSeconds: number
+  /**
+   * Canonical tempo notation, when the exercise carries one. MUST be
+   * threaded through by every caller: SECONDS_PER_REP already assumes a
+   * controlled ~3.5s rep, so a prescribed 4-1-1 is 6s and the model would
+   * under-count that set by 71%. A prescription the duration model cannot
+   * see is the exact mechanism that let a steady-state block be estimated at
+   * 30s instead of twenty minutes.
+   */
+  tempo?: string
 }
 
 /**
@@ -173,7 +207,7 @@ export interface DurationSlot {
 export function estimateSlotsSeconds(slots: DurationSlot[]): number {
   let total = 0
   for (const slot of slots) {
-    const workPerSet = computeSetWorkSeconds(slot.reps, slot.entry?.avg_duration_seconds ?? 35, slot.entry?.name)
+    const workPerSet = computeSetWorkSeconds(slot.reps, slot.entry?.avg_duration_seconds ?? 35, slot.entry?.name, slot.tempo)
     total += getSetupSeconds(slot.entry) + slot.sets * (workPerSet + slot.restSeconds)
   }
   return total
@@ -187,6 +221,7 @@ export function estimateDaySeconds(day: WorkoutDay): number {
     sets: ex.sets,
     reps: ex.reps,
     restSeconds: parseRestSeconds(ex.rest),
+    tempo: ex.tempo,
   }))
   // A post-session finisher (assignConditioningNotes' heavy/light-day brief,
   // or applyDurationFiller's mobility/conditioning fill — exercise-plan.ts)

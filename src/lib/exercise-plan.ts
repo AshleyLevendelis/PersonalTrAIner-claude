@@ -13,11 +13,11 @@ import { buildWarmup, getWarmupReserveSeconds } from './warmup'
 import { prescribeLoad, categorize, getLoadIncrementKg, isExternallyLoaded, getEquipmentFloorKg, loadingMode, roundToPlate, formatLoad, labelModeForEntry, hasKnownWorkingWeight, unverifiedRampStepKg, isolationTargetBelowFloor, resolveBodyBasis, prescribeAssistance, assistanceGuidance, type KnownWorkingWeights } from './load-prescription'
 import {
   getPhaseSequence, getPhaseConfig, rotateVariation, resolveTargetRpe,
-  shiftReps, adjustRest, dedupeAdjacentPhases, isRegressionFor, stepIntervalSeconds, type PhaseConfig, type TrainingPhase,
+  shiftReps, adjustRest, dedupeAdjacentPhases, isRegressionFor, stepIntervalSeconds, getPhaseTempo, formatTempo, type PhaseConfig, type TrainingPhase,
 } from './periodization'
 import { getGoalPolicy, restrictPhaseSequence, resolveConditioningFrequency, RECOVERY_SET_MULTIPLIER, type GoalPolicy } from './goal-policies'
 import { isStartingOut, applyStartingOut, startingOutMinutes } from './starting-out'
-import { getDurationBudgetSeconds, getSessionMinimumSeconds, getSteadyStateSeconds, estimateDaySeconds, estimateSlotsSeconds, parseRestSeconds, SESSION_OVERHEAD_SECONDS } from './session-duration'
+import { getDurationBudgetSeconds, getSessionMinimumSeconds, getSessionMaximumSeconds, getSteadyStateSeconds, estimateDaySeconds, estimateSlotsSeconds, parseRestSeconds, SESSION_OVERHEAD_SECONDS } from './session-duration'
 
 // ---------------------------------------------------------------------------
 // Track definitions (unchanged — used for day-level focus selection)
@@ -3999,6 +3999,56 @@ function isLoadlessWeek(days: WorkoutDay[]): boolean {
   return loaded / working <= LOADLESS_WEEK_MAX_LOADED_SHARE
 }
 
+/**
+ * Gives a weightless, rep-based working lift the block's tempo — the phase's
+ * only available voice when there is no weight for it to speak through.
+ *
+ * Runs AFTER enforceLoadCoherence (loads are final, so "is this weightless"
+ * is answerable) and BEFORE trimWeekRestForBudget/applyDurationFiller, which
+ * is not a style preference: a 4-1-1 rep is 6s against SECONDS_PER_REP's
+ * assumed 3.5, so a tempo assigned after the duration passes would be 71%
+ * of working time those passes never saw. Same failure shape as a
+ * prescription string the duration model cannot parse.
+ *
+ * Four exclusions, each for a different reason:
+ *   - DELOAD: the week exists to back off. A slower, harder rep is the
+ *     opposite of that.
+ *   - non-'reps' prescriptions: a hold ('30-45s'), a carry ('40m') and an
+ *     interval have no reps to slow down, so a tempo would be a unit
+ *     mismatch — the same class of error as shiftReps' minReps being used as
+ *     a seconds floor.
+ *   - primers: movement prep, deliberately easy, never a working set.
+ *   - anything carrying a weight: there the weight IS the lever, and adding
+ *     a second one at the same time is what "one lever at a time" exists to
+ *     prevent.
+ */
+function applyTempoPrescription(days: WorkoutDay[], phase: TrainingPhase, isDeload: boolean): void {
+  if (isDeload) return
+  const tempo = getPhaseTempo(phase)
+  if (!tempo) return
+  const notation = formatTempo(tempo)
+  for (const day of days) {
+    for (const ex of day.exercises) {
+      if (ex.suggested_load_kg != null) continue
+      const entry = EXERCISE_DATABASE.find(e => e.name === ex.name)
+      if (!entry || entry.mechanics_tier === 'primer') continue
+      if (entry.prescription_type !== 'reps') continue
+      // A chin-up or a dip CAN take a belt or a loaded backpack, so "there is
+      // no weight to add" is false for them — showing no weight there is a
+      // gap in this app, not a fact about the movement. Ashley's call, and
+      // the right one: slowing the rep down would paper over that gap
+      // instead of closing it. Excluded here and flagged in BACKLOG; the
+      // real fix is prescribing the added load.
+      if (entry.accepts_added_load) continue
+      // Belt and braces: prescription_type says what the entry IS, this says
+      // what the string actually holds. A mismatch between them has shipped
+      // before (fixedUnitPrescription exists because of it).
+      if (!/^\d+(\s*-\s*\d+)?$/.test(String(ex.reps).trim())) continue
+      ex.tempo = notation
+    }
+  }
+}
+
 // A bodyweight trainee has no external load to ramp — 'strength' and
 // 'power' phases both assume one. Restricted to the same set beginners get
 // (see periodization.ts's getPhaseSequence), regardless of experience.
@@ -5604,6 +5654,12 @@ export function generateMesocycle(
 
       enforceLoadCoherence(days)
 
+      // Decided ONCE, here, and used by both the tempo pass below and the
+      // week's coach note. Splitting the decision would let a week be told
+      // "no weight to add" while its lifts were prescribed as if there were.
+      const loadlessWeek = isLoadlessWeek(days)
+      applyTempoPrescription(days, phaseConfig.phase, isDeload)
+
       // Roll this week's natural loads forward as next week's comparison
       // basis. Deload weeks are deliberately NOT recorded: a deload is
       // supposed to differ from its neighbours, so letting it become the
@@ -5657,6 +5713,32 @@ export function generateMesocycle(
         // above): their volume is deliberately, uniformly cut, and nudging
         // set counts would fight that.
         enforceWeeklyPatternBalance(days)
+
+        // FINAL SAFETY TRIM, against the stated MAXIMUM rather than the
+        // midpoint budget the pass above already aimed at.
+        //
+        // enforceWeeklyPatternBalance is documented as needing to run last —
+        // after rotation, periodization and duration trimming have all had
+        // their say — and it BUMPS SETS to balance push against pull. It has
+        // no idea the duration passes already finished, which is a known and
+        // accepted couple-of-minutes drift (BACKLOG). Tempo made those
+        // minutes cost more: a 4-1-1 rep is 6s against SECONDS_PER_REP's
+        // assumed 3.5, so a bumped 4-set push-up in a Maximal Strength week
+        // put two "30-45" sessions at 45.8 minutes — 48 seconds past a
+        // ceiling that read 0 before.
+        //
+        // Deliberately targets the MAXIMUM, not the budget, so it is a
+        // backstop and not a second opinion: every day already inside what
+        // the trainee asked for is skipped untouched (the trimmer's own
+        // first line), and only a day that broke the ceiling gives up rest.
+        // Rest is also the one lever this is allowed to pull — trimming sets
+        // here would fight the very pass that just set them.
+        trimWeekRestForBudget(
+          days,
+          getSessionMaximumSeconds(profile.session_duration_preference || '45-60'),
+          trimLog,
+          policy.minLoadedMainLiftRestSeconds,
+        )
       }
 
       // Starting-out weeks progress on DURATION, not load. Everything above
@@ -5681,8 +5763,9 @@ export function generateMesocycle(
         is_deload: isDeload,
         isCalibrationWeek,
         coach_note: (() => {
-          // Decided once per week, from the week that was actually built.
-          const loadless = isLoadlessWeek(days)
+          // Decided once per week, from the week that was actually built —
+          // see loadlessWeek above, shared with the tempo pass.
+          const loadless = loadlessWeek
           const phaseNote = loadless ? phaseConfig.coach_note_loadless : phaseConfig.coach_note
           const goalNote = loadless ? policy.coachNoteLoadless : policy.coachNote
           return [
