@@ -6,7 +6,7 @@ import type {
   WorkoutDay, ConstraintTrace, PlanResult, TrainingExperience, RecoveryCapacity, FitnessGoal,
 } from './types'
 import { getSkillDemand, isSkillAppropriate } from './experience-config'
-import { categorize, isImprovisedLoadImplement, IMPROVISED_IMPLEMENT_CEILING_KG, estimateEffectiveTotalKg, isExternallyLoaded, prescribeLoad, getEquipmentFloorKg, getLoadingCeilingKg, loadingMode, unverifiedRampStepKg } from './load-prescription'
+import { categorize, isImprovisedLoadImplement, IMPROVISED_IMPLEMENT_CEILING_KG, estimateEffectiveTotalKg, isExternallyLoaded, isPerSideLoad, prescribeLoad, getEquipmentFloorKg, getLoadingCeilingKg, loadingMode, unverifiedRampStepKg } from './load-prescription'
 
 // A genuine outer-bound safety backstop — not a conservatism patch (the
 // capability-model round replaced the old CATEGORY_CAPS_KG, which existed to
@@ -25,23 +25,53 @@ import { categorize, isImprovisedLoadImplement, IMPROVISED_IMPLEMENT_CEILING_KG,
 // "no correct estimate should ever approach this" intent while actually
 // covering the population.
 //
-// DELIBERATELY NOT RAISED — isolation_shoulder (stays 25kg, still breached
-// at 40kg by Cable Lateral Raises for a 120kg advanced male). A 40kg
-// lateral raise is not a real prescription at any bodyweight; the shoulder
-// isolation fraction (0.19 of bench, load-prescription.ts) is what's wrong,
-// not this ceiling. Raising it here would silence a genuine defect, which
-// is the one thing an outer-bound backstop must never do. The audit keeps
-// failing on it on purpose.
-const SAFETY_CEILING_KG: Partial<Record<string, number>> = {
+// EVERY VALUE HERE IS A TOTAL, IN KILOGRAMS, AND THE COMPARISON NORMALISES
+// TO MATCH. That was not previously true and it was a real trapdoor.
+//
+// prescribeLoad stores its number in the unit that exercise is loaded in:
+// per hand for a dumbbell pair, total otherwise (see isPerSideLoad and
+// implementCeilingKg in load-prescription.ts). This table compared against
+// that number directly, with no idea which unit it was reading. It survived
+// only because each ceiling had been calibrated from whatever exercises
+// happened to populate its category — ten of the twenty categories are
+// already mixed-unit, where the largest observed value is a total, so those
+// ceilings were total-shaped by accident. Three categories contain ONLY
+// per-side movements (isolation_shoulder, overhead_carry,
+// single_leg_dumbbell) and their ceilings were therefore per-hand-shaped.
+//
+// WHAT THAT COST, and it is the reason this is now explicit: a machine
+// lateral raise was added to the catalogue, priced correctly at 40kg TOTAL
+// — the identical real load to the 20kg-per-hand dumbbell version — and
+// this check compared that total against a 25kg PER-HAND ceiling and failed
+// it 56 times. The entry was then deleted as unsafe. It was not unsafe. A
+// sweep of the whole population (both sexes, 50-120kg, all four experience
+// tiers, every rep bracket) puts the heaviest per-hand lateral raise the
+// app will ever prescribe at 20kg, comfortably inside 25.
+//
+// The three pure-per-hand ceilings are doubled here to express the same
+// limit as a total, so no movement's real allowance changed. The other
+// seventeen are unchanged because they were already totals.
+//
+// THE COMMENT THIS REPLACES SAID THE OPPOSITE, and believing it is what
+// caused the deletion. It read: "DELIBERATELY NOT RAISED —
+// isolation_shoulder (stays 25kg, still breached at 40kg by Cable Lateral
+// Raises for a 120kg advanced male)... the shoulder isolation fraction
+// (0.19 of bench) is what's wrong, not this ceiling." The 40kg it cites is
+// a TOTAL for a movement whose ceiling is per-hand — the same unit
+// mismatch, recorded as a formula defect. The fraction was never wrong;
+// measured, that exact trainee gets 20kg per hand. The comment predates
+// isPerSideLoad landing (see BACKLOG, the per-side round) and was stale
+// rather than mistaken when written.
+const SAFETY_CEILING_KG_TOTAL: Partial<Record<string, number>> = {
   squat: 260, deadlift: 325, bench: 220, overhead: 140, row: 200,
   pulldown: 180, leg_press: 400, goblet_squat: 60, hinge_accessory: 180,
   isolation_bicep: 70, isolation_tricep: 80, isolation_chest: 95,
-  isolation_shoulder: 25, shrug: 140, isolation_quad: 115,
+  shrug: 140, isolation_quad: 115,
   isolation_hamstring: 115, isolation_calf: 140, carry: 130,
-  // Previously had no ceiling at all — a category with no entry here is
-  // silently exempt from the whole check, which is how these two went
-  // unbounded. Observed peaks 48kg / 42kg respectively.
-  overhead_carry: 70, single_leg_dumbbell: 60,
+  // The three that were per-hand, doubled to say the same thing as a total.
+  // 25 -> 50, 70 -> 140, 60 -> 120: the allowance each movement actually
+  // has is identical, only the unit it is written in changed.
+  isolation_shoulder: 50, overhead_carry: 140, single_leg_dumbbell: 120,
 }
 import { getReplacementCandidates, swapExerciseInMesocycle, banExerciseFromMesocycle, containsExerciseName } from './mesocycle-edit'
 import { estimateDaySeconds, DURATION_BUDGET_SECONDS } from './session-duration'
@@ -415,20 +445,30 @@ function runSingleAudit(
   }
 
   // CHECK 7: No suggested load exceeds its category's absolute first-block
-  // safety ceiling (see SAFETY_CEILING_KG above) — a formula regression
+  // safety ceiling (see SAFETY_CEILING_KG_TOTAL above) — a formula regression
   // backstop, not a conservatism cap.
+  //
+  // BOTH SIDES ARE NORMALISED TO A TOTAL before comparing. suggested_load_kg
+  // is stored per hand for a dumbbell pair and as a total otherwise, so
+  // reading it raw meant a per-hand number and a total number were being
+  // measured against the same ceiling. See SAFETY_CEILING_KG_TOTAL's comment
+  // for what that cost — a correctly-priced machine lateral raise deleted as
+  // unsafe on 56 false failures.
   for (const ex of allExercises) {
     if (ex.suggested_load_kg == null) continue
     const entry = EXERCISE_DATABASE.find(e => e.name === ex.name)
     if (!entry) continue
     const category = categorize(entry)
     if (!category) continue
-    const cap = SAFETY_CEILING_KG[category]
-    if (cap != null && ex.suggested_load_kg > cap) {
+    const cap = SAFETY_CEILING_KG_TOTAL[category]
+    if (cap == null) continue
+    const perSide = isPerSideLoad(entry)
+    const totalKg = perSide ? ex.suggested_load_kg * 2 : ex.suggested_load_kg
+    if (totalKg > cap) {
       failures.push({
         check: 'load_cap',
         combination: comboLabel,
-        details: `Suggested load ${ex.suggested_load_kg}kg exceeds the ${cap}kg outer-bound safety ceiling for category "${category}"`,
+        details: `Suggested load ${ex.suggested_load_kg}kg${perSide ? ' per hand (= ' + totalKg + 'kg total)' : ' total'} exceeds the ${cap}kg total outer-bound safety ceiling for category "${category}"`,
         exercise: ex.name,
       })
     }

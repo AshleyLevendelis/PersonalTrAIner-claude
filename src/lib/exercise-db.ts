@@ -1281,21 +1281,39 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   // either, which is a distinction worth keeping: see report:swap-coverage,
   // whose first cut reported this as a dead end and was wrong.
   //
-  // ONLY THE SHRUG LANDED HERE. A 'Machine Lateral Raise' was written,
-  // measured, and pulled back out: it put the constraint audit 56 failures
-  // into the red against the 25kg isolation_shoulder safety ceiling. Not a
-  // fault in the entry — dev-constraint-audit.ts already records that the
-  // 0.19-of-bench shoulder fraction is the real defect and that the ceiling
-  // is deliberately left failing rather than raised to hide it. Every
-  // existing lateral raise is a dumbbell or a per-hand cable, and BOTH are
-  // clamped by a separate implement ceiling before they can breach; a
-  // machine has neither clamp, so the underlying over-prescription became
-  // visible for the first time (120kg advanced male: dumbbell 20kg, cable
-  // 20kg, machine 40kg — and 40kg is the exact figure that comment
-  // predicted). Fixing the fraction changes what every trainee is
-  // prescribed for lateral raises, so it is its own round with its own
-  // plan, not a side effect of adding a machine. isolation_shoulder
-  // therefore stays at one same-pattern alternative for now, on purpose.
+  // Machine Lateral Raise below was briefly deleted and then restored, and
+  // the reason is worth keeping. It put the constraint audit 56 failures
+  // red against what was then a 25kg isolation_shoulder ceiling — and the
+  // entry was correct all along. prescribeLoad stores a dumbbell pair PER
+  // HAND and a machine as a TOTAL, so this movement's honest 40kg total
+  // (identical real load to the dumbbell version's 20kg per hand) was being
+  // compared against a ceiling calibrated in per-hand units. A sweep of the
+  // whole population puts the heaviest per-hand lateral raise the app ever
+  // prescribes at 20kg, inside 25. The ceiling table now states its unit
+  // and the check normalises both sides; see SAFETY_CEILING_KG_TOTAL.
+  {
+    name: 'Machine Lateral Raise',
+    id: 'machine-lateral-raise',
+    movement_pattern: 'isolation_shoulder',
+    mechanics_tier: 'tier3_isolation',
+    prescription_type: 'reps',
+    angle_vector: 'lateral',
+    primary_muscles: ['lateral deltoid'],
+    equipment: ['machine'],
+    joint_stress: 'low',
+    form_cues: [
+      'Set the pads against the outside of the upper arms',
+      'Lead with the elbows, not the hands',
+      'Stop at shoulder height',
+      'Lower slowly rather than letting the stack drop',
+    ],
+    coach_note_swap: 'The pad keeps the load on the side delt when a dumbbell would start swinging.',
+    loads_joints: ['shoulder'],
+    style_tags: ['bodybuilding', 'hybrid'],
+    substitution_group: 'lateral_delt',
+    unilateral: false,
+    avg_duration_seconds: 28,
+  },
   {
     name: 'Cable Shrug',
     id: 'cable-shrug',
