@@ -82,17 +82,32 @@ The comment above it reads:
 > (every option produces a byte-identical plan and mesocycle) — its only real
 > consumer is a chat-greeting default."*
 
-**Half of that is now false.** Measured today:
+**Half of that is now false.** `RECOVERY_SET_MULTIPLIER` landed after the
+comment was written. Re-measured on a stated profile — full_gym / intermediate
+/ hypertrophy / 4 days / 45-60:
 
-| | distinct outputs |
+| | result |
 |---|---|
-| base week (`generateExercisePlan`) | 1 of 3 — comment correct |
-| full 16-week build (`generateMesocycle`) | **58 sets vs 77 sets**, low vs high |
+| base week (`generateExercisePlan`) | **81 sets for all three** — comment correct |
+| 16 weeks (`generateMesocycle`) | low **912** / moderate **1125** / high **1125** |
 
-`RECOVERY_SET_MULTIPLIER` landed after that comment was written. The field is
-correctly `required: true`; the comment now argues for making it optional,
-which would quietly hand tired trainees a third more volume. Rewrite it with
-both numbers so the next reader cannot make that mistake.
+So "low" removes 213 sets — 19% of the block.
+
+> **DENOMINATOR CHANGED.** An earlier note in this session quoted "58 sets vs
+> 77 sets" for the same comparison. That was a different profile, and the two
+> pairs of numbers are not comparable — do not read 912/1125 as a regression
+> against 58/77. The figures above are the ones `report:slot-impact`
+> reproduces, and the comment in the code now names the profile they came from.
+
+The field is correctly `required: true`; the old comment read as an argument
+for making it optional, which would have handed the most tired trainees the
+most work.
+
+**Found while measuring, flagged not fixed:** moderate and high produce a
+byte-identical mesocycle despite distinct multipliers (0.9 vs 1.0) — the
+difference is absorbed by set-count rounding. Three answers, two outcomes.
+Whether high recovery should earn more volume than moderate is a training
+call, not a bug.
 
 ### 3. Adaptivity, driven by measurement rather than instinct
 
@@ -102,35 +117,73 @@ distinct **mesocycle** outputs (not base plans — that is the distinction §2
 turns on). Report per equipment tier, since a question can matter in a gym
 and not at home.
 
-Already measured, as the starting table:
+**BUILT, and the result is the answer to "does it collect too much".**
+`npm run report:slot-impact`, distinct 16-week mesocycles per equipment tier:
 
-| slot | distinct training outputs |
-|---|---|
-| `activityLevel` | **1 of 4** — no training effect at all; it drives TDEE |
-| `recoveryCapacity` | 1 base / **2+ mesocycle** |
-| `conditioningPreference` | 3 of 3 |
-| `trainingStyle` | 4 of 4 |
-| `fitnessGoal` | 4 of 4 |
-| `trainingExperience` | 4 of 4 |
+| slot | full_gym | home_gym | minimalist | bodyweight |
+|---|---|---|---|---|
+| `fitnessGoal` | 4 of 4 | 4 of 4 | 4 of 4 | 4 of 4 |
+| `trainingExperience` | 4 of 4 | 4 of 4 | 4 of 4 | 4 of 4 |
+| `sessionDuration` | 4 of 4 | 4 of 4 | 4 of 4 | 4 of 4 |
+| `trainingStyle` | 4 of 4 | 4 of 4 | 4 of 4 | 4 of 4 |
+| `trainingDays` (count) | 5 of 5 | 5 of 5 | 5 of 5 | 5 of 5 |
+| `conditioningPreference` | 3 of 3 | 3 of 3 | 3 of 3 | 3 of 3 |
+| `weightKg` | 3 of 3 | 3 of 3 | 3 of 3 | 2 of 3 |
+| `recoveryCapacity` | 2 of 3 | 2 of 3 | 2 of 3 | 2 of 3 |
+| `gender` | 2 of 2 | 2 of 2 | 2 of 2 | 2 of 2 |
+| `age` | 2 of 3 | 2 of 3 | 2 of 3 | **1 of 3** |
+| `activityLevel` | **1 of 4** | **1 of 4** | **1 of 4** | **1 of 4** |
+| `heightCm` | **1 of 3** | **1 of 3** | **1 of 3** | **1 of 3** |
 
-Only slots the report shows inert *for a given tier* become candidates for
-skipping, and each skip is then a separate, argued decision — not a batch.
+**Candidates for cutting, after the nutrition filter: NONE.** All three inert
+rows feed BMR or TDEE (`macro-calculator`'s `bodyMetrics()` returns null
+without weight, height, age and sex, and every target goes blank), so cutting
+any of them would blank somebody's calorie numbers.
 
-**`activityLevel` is not a candidate despite reading 1**: it is a nutrition
-input, and the report only measures training. The report must say which half
-it measures, or it will be misread exactly the way the `recoveryCapacity`
-comment was.
+Two design points the report had to get right:
 
-### 4. Trim two questions, and move them
+**The seed is held FIXED across the variations of one slot.** Selection
+carries a ±0.3 tie-break jitter; seeding per-variation would have made every
+slot read 100% influential, because it would be measuring the seed.
 
-`favoriteCuisines` and `breakfastStyle` are personalisation, not structure.
-Neither belongs in the path between download and first workout. Move both out
-of onboarding and ask them in the Nutrition tab, the first time meal plans
-are actually opened — the same "ask at first use" principle Ashley chose for
-load ceilings.
+**The nutrition caveat is attached by data, not by a special case.** The plan
+originally singled out `activityLevel` as the one row not to misread.
+`heightCm` reads 1-of-3 too, and would have appeared under a heading saying
+"candidates for skipping" with no caveat at all.
 
-This is a judgement, not a measurement: both genuinely feed meal generation,
-so the argument is about *placement*, not value.
+### 4. ~~Trim two questions, and move them~~ — WRONG, AND WITHDRAWN
+
+**This section was built, broke a gate, and was reverted. Left in place rather
+than deleted, because the mistake is the useful part.**
+
+It proposed moving `favoriteCuisines` and `breakfastStyle` out of onboarding
+to first use in the Nutrition tab, on the reasoning that neither is structural
+and neither belongs between downloading a training app and reaching a first
+workout.
+
+**They were already not being asked.** Both are in `NEVER_BLOCKING_SLOTS`, and
+`ConversationalOnboarding` filters that list out of `trackedSlots` — the
+questioning list. So the section was solving a problem that had been solved,
+and the "fix" (deleting them from `ONBOARDING_SLOTS`) removed the only path by
+which a volunteered answer could be *recorded*. The file says so directly:
+
+> *"A never-blocking slot must STAY in the catalog the model receives, or a
+> name (or cuisine, or breakfast style) offered later in the conversation
+> could never be recorded — the whole point of demoting rather than
+> deleting."*
+
+**How I got it wrong:** I read the slot array, saw both questions in it, and
+concluded they were being asked. I did not read `trackedSlots`, which is where
+the questioning list is actually derived, three files away. The array is the
+catalogue, not the queue — and this codebase had already written that
+distinction down.
+
+**Worth checking for the same error shape elsewhere:** any claim of the form
+"the app asks X" that was reached by reading `ONBOARDING_SLOTS` alone.
+
+Both slots are restored, at the end of the array, and `test:onboarding-order`
+now fails by name if a `NEVER_BLOCKING_SLOTS` entry is deleted rather than
+demoted — it surfaced the first time as a `TypeError` in an unrelated file.
 
 ### 5. The ordering constraint that makes this non-trivial
 
@@ -153,6 +206,20 @@ label and a description. Four options fill a phone viewport. The `compact`
 variant already exists and is the fix for the 4-option questions; adopting it
 is a one-word change per call site.
 
+> **CORRECTED WHILE BUILDING.** Two things above are wrong. There is one call
+> site, not several, and `compact` is *derived* there rather than passed. More
+> importantly, `compact` did two jobs at once — tighter padding **and no
+> description** — because every existing compact caller happened to have no
+> descriptions to show. So "adopt compact on the 4-option questions" would
+> have deleted the option descriptions from goal, experience, activity and
+> style: the exact lines this plan names above as one of the three things
+> onboarding already gets right.
+>
+> Built as a split instead: `compact` is size, `showDescription` is content.
+> Four-option questions tighten and keep their descriptions. A compact card
+> that has a description also keeps its label at `text-sm`, since at `text-xs`
+> the label and description are the same size and the card loses its headline.
+
 **The emoji are the risk worth naming.** 🌱📈🎯🏅 render differently on every
 platform and age badly. They do real work here — fast visual scanning — so
 this is not a "rip them out" recommendation. It is the single thing most
@@ -161,19 +228,28 @@ should be a deliberate decision rather than an inherited default.
 
 `scale-[1.02]` on selection is a nice detail most apps miss. Keep.
 
-## Verification
+## Verification — what was actually run
 
-- **New gate `test:onboarding-order`**: every `requiredIf` slot follows its
-  dependency; body metrics precede all nutrition slots; the required set still
-  gates completion; and a profile built from the new order produces the same
-  plan as one built from the old (a reorder must change nothing but sequence).
-- **`report:slot-impact` before/after**, stating which half — training or
-  nutrition — it measures.
-- `test:audit` 0 / 13,967, and the existing onboarding gates.
-- **Walk the flow in the browser** for three personas — bodyweight beginner,
-  full-gym intermediate, minimalist with an injury — and count taps to a plan.
-  A reorder that reads well in an array can still feel wrong in sequence.
-- No migration. Frontend only, ships with the Vercel push.
+| check | result |
+|---|---|
+| `test:onboarding-order` (new, 17 checks) | **pass** — and it caught the plan's own dropped `activityLevel` before the reorder was applied |
+| `test:onboarding-slots` | **pass** — it caught the §4 deletion |
+| `test:audit` | **0 / 13,967** |
+| 38 further gates | **all pass** (workout, added-load, band-slots, mesocycle- and logging-roundtrip, macro-split, injury-separation, no-forked-state, memory, diet-tag-sync, chat-app-reality, dashboard, slot-replacement, joint-tags, block-review, block-consistency, loadless-notes, load-suggestions, interval-prescription, block-rest-sizing, starting-out, tempo-prescription, training-week, coach-rules-sync, coach-promises, reply-guarantee, assumed-body, weight-basis, per-side-load, pattern-tags, rehab-prescribed, frozen-weeks, session-length, load-ceilings, ceiling-units, main-lift-rest) |
+| `tsc -b` | clean |
+| `npm run build` | see the commit message |
+
+The engine is untouched by this round — the reorder changes the sequence
+questions are asked in, not what any answer means — which is why `test:audit`
+holding at 0 is the load-bearing number rather than a formality.
+
+**NOT DONE, and it matters:** walking the flow in a browser for the three
+personas. It was in this plan and is not in the build. The sandbox cannot
+reach Supabase (`*.supabase.co` returns 403 at the network layer), so
+onboarding cannot be driven end to end from here. A reorder that reads well in
+an array can still feel wrong in sequence, and nobody has felt this one yet.
+
+No migration. Frontend only, ships with the Vercel push.
 
 ## Out of scope, flagged
 

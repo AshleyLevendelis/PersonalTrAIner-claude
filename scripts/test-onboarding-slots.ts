@@ -327,14 +327,47 @@ check(
   indexOf('trainingExperience') < indexOf('activityLevel'),
 )
 check(
-  'safety/enforcement asks (injuries, dietaryPreferences) precede the food-taste asks (cuisines, cooking time) they used to follow',
-  indexOf('injuries') < indexOf('favoriteCuisines') && indexOf('dietaryPreferences') < indexOf('cookingTime'),
+  'safety/enforcement asks (injuries, dietaryPreferences) precede the food-taste asks they used to follow',
+  // Checked against cookingTime rather than favoriteCuisines: the cuisine and
+  // breakfast questions now sit LAST in the array on purpose (they are in
+  // NEVER_BLOCKING_SLOTS and are never proactively asked, so their position
+  // is about catalogue tidiness, not conversation order). cookingTime is the
+  // food-taste ask that is still genuinely in the sequence, so it is the one
+  // that can carry this property.
+  indexOf('injuries') < indexOf('cookingTime') && indexOf('dietaryPreferences') < indexOf('cookingTime'),
 )
 check(
-  'the three body-metric numerics are adjacent and sit near the end',
+  'the body-metric numerics are adjacent',
   indexOf('heightCm') === indexOf('age') + 1 && indexOf('weightKg') === indexOf('heightCm') + 1,
 )
-check('gender — most sensitive, least gating — is declared last', indexOf('gender') === ONBOARDING_SLOTS.length - 1)
+// ### REVERSED, DELIBERATELY. This used to assert 'gender — most sensitive,
+// least gating — is declared last'.
+//
+// That reasoning was sound and is now outweighed. Sex is the most
+// load-bearing of the four body values, not the least: female strength
+// standards run roughly 0.53-0.67x male, so a missing or late-abandoned
+// answer skews every prescribed weight further than age or height do. Asking
+// the highest-impact question at the point of lowest attention was the
+// original order's central fault, and gender sat at the very bottom of it.
+//
+// Two things make the move safe rather than merely convenient. The question
+// is already framed as a calculation input — "Which should I use for your
+// calorie and starting-weight maths?" — which does most of the work the
+// last-position rule was doing. And it remains required: false, so anyone can
+// decline and still finish, falling back to the conservative assumed body.
+//
+// Ashley's call, taken against the alternative of moving only age/height/
+// weight and leaving sex where it was.
+check(
+  'sex sits WITH the other body metrics, not last',
+  indexOf('gender') === indexOf('weightKg') + 1,
+  `gender=${indexOf('gender')} weightKg=${indexOf('weightKg')}`,
+)
+check(
+  '...and body metrics come before the food block',
+  indexOf('gender') < indexOf('dietaryPreferences'),
+  `gender=${indexOf('gender')} dietaryPreferences=${indexOf('dietaryPreferences')}`,
+)
 
 console.log('\n15. The trimmed ask set — what is allowed to block a plan')
 // Each of these steers one sentence of a meal prompt or a chat greeting. They

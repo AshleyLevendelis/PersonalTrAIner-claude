@@ -459,11 +459,31 @@ const SNACKS_OPTIONS: SlotOption[] = [
  * The fix is structural, not cosmetic: routing facts (experience, daily
  * activity, equipment) move to the front so both gates resolve by question 5,
  * and knowsWorkingLifts becomes reachable exactly where it was always meant
- * to sit. From there: the life logistics block (days, session length),
- * training preferences, the safety/enforcement asks (injuries, diet
- * restrictions) BEFORE the food-preference asks that used to precede them,
- * and the sensitive/boring body-metric block last, closing on a predictable
- * "last bits, for the calorie maths" note rather than an unannounced tail.
+ * to sit. From there: the life logistics block (days, session length), then
+ * the rest as described in the second reorder below.
+ *
+ * SECOND REORDER — body metrics move up, and the order is now GATED
+ * (scripts/test-onboarding-order.ts).
+ *
+ * age, heightCm, weightKg and gender used to sit LAST, at #22-25, behind nine
+ * consecutive nutrition questions. Those four values drive every prescribed
+ * weight in the app — they are why it was once caught fabricating a 50kg
+ * woman's loads for everybody — so the single most load-bearing block in
+ * onboarding was being collected when attention was lowest and abandonment
+ * most likely, and someone who downloaded a TRAINING app was seven questions
+ * deep into breakfast before seeing a workout. They now sit at #12-15, and
+ * the rule the gate enforces is: everything the training half needs comes
+ * before anything the food half needs.
+ *
+ * Sex moved up with the other three on Ashley's call, overriding the earlier
+ * "keep the sensitive question last" placement — the four read as one block
+ * ("the bits for the maths") and splitting them made the tail feel like an
+ * unannounced appendix, which is the same complaint the first reorder fixed.
+ *
+ * NEARLY BROKEN AGAIN WHILE FIXING IT: the first draft of this new sequence
+ * dropped activityLevel from before the barbell chain, recreating the exact
+ * defect the paragraph above describes. The gate caught it — keep
+ * activityLevel above knowsWorkingLifts.
  */
 export const ONBOARDING_SLOTS: SlotDef[] = [
   { key: 'displayName', question: 'What should I call you?', shortLabel: 'Name', control: 'text', required: false, destination: 'column', validate: v => typeof v === 'string' && v.trim().length > 0 && v.trim().length <= 30 },
@@ -478,26 +498,52 @@ export const ONBOARDING_SLOTS: SlotDef[] = [
   { key: 'knownDeadliftKg', question: 'Deadlift working weight (kg)?', shortLabel: 'Deadlift', control: 'numeric', required: false, requiredIf: knowsTheirLifts, min: 1, max: 500, destination: 'column', validate: isNumberIn(1, 500) },
   { key: 'trainingDays', question: 'Which days can you actually train?', shortLabel: 'Training days', control: 'multi', required: true, options: DAY_OPTIONS, destination: 'column', validate: v => isSubsetOf(DAY_OPTIONS)(v) && Array.isArray(v) && v.length > 0 },
   { key: 'sessionDuration', question: 'How long can your sessions usually run?', shortLabel: 'Session length', control: 'single', required: true, options: DURATION_OPTIONS, destination: 'column', validate: isOneOf(DURATION_OPTIONS) },
-  // Not required: measured to have zero effect anywhere in the generated
-  // plan (every option produces a byte-identical plan and mesocycle) — its
-  // only real consumer is a chat-greeting default. Still worth asking once
-  // for that small personalization, but it must never block completion the
-  // way a plan-shaping answer does.
-  { key: 'recoveryCapacity', question: "How's your recovery capacity — sleep, stress, physical job?", shortLabel: 'Recovery', control: 'single', required: true, options: RECOVERY_OPTIONS, destination: 'column', validate: isOneOf(RECOVERY_OPTIONS) },
-  { key: 'conditioningPreference', question: 'How do you feel about cardio?', shortLabel: 'Cardio', control: 'single', required: true, options: CONDITIONING_PREF_OPTIONS, destination: 'column', validate: isOneOf(CONDITIONING_PREF_OPTIONS) },
-  { key: 'trainingStyle', question: "What's your training style?", shortLabel: 'Style', control: 'single', required: true, options: STYLE_OPTIONS, destination: 'column', validate: isOneOf(STYLE_OPTIONS) },
-  { key: 'injuries', question: 'Anything that bothers you when you train — something you avoid or work around?', shortLabel: 'Niggles', control: 'multi', required: false, options: INJURY_OPTIONS, destination: 'column', validate: isSubsetOf(INJURY_OPTIONS) },
-  { key: 'dietaryPreferences', question: 'Any dietary preferences or restrictions?', shortLabel: 'Diet', control: 'multi', required: false, options: DIETARY_OPTIONS, destination: 'column', validate: isSubsetOf(DIETARY_OPTIONS) },
-  { key: 'dislikedFoods', question: 'Any foods you just won\'t eat?', shortLabel: 'Foods to avoid', control: 'text', required: false, destination: 'user_facts', validate: v => typeof v === 'string' },
-  { key: 'favoriteCuisines', question: 'Any favourite cuisines?', shortLabel: 'Cuisines', control: 'multi', required: false, options: FAVORITE_CUISINE_OPTIONS, destination: 'column', validate: isSubsetOf(FAVORITE_CUISINE_OPTIONS) },
-  { key: 'mealsPerDay', question: 'How many meals a day suits you?', shortLabel: 'Meals a day', control: 'single', required: true, options: MEALS_PER_DAY_OPTIONS, destination: 'column', validate: isOneOf(MEALS_PER_DAY_OPTIONS) },
-  { key: 'breakfastStyle', question: "What's breakfast usually like for you?", shortLabel: 'Breakfast', control: 'single', required: false, options: BREAKFAST_STYLE_OPTIONS, destination: 'column', validate: isOneOf(BREAKFAST_STYLE_OPTIONS) },
-  { key: 'cookingTime', question: 'How much time do you want to spend cooking?', shortLabel: 'Cooking time', control: 'single', required: false, options: COOKING_TIME_OPTIONS, destination: 'column', validate: isOneOf(COOKING_TIME_OPTIONS) },
-  { key: 'includeSnacks', question: 'Snacks too, or meals only?', shortLabel: 'Snacks', control: 'single', required: false, options: SNACKS_OPTIONS, destination: 'column', validate: v => v === true || v === false || v === 'true' || v === 'false' },
   { key: 'age', question: 'How old are you?', shortLabel: 'Age', control: 'numeric', required: false, min: 13, max: 100, destination: 'column', validate: isNumberIn(13, 100) },
   { key: 'heightCm', question: 'How tall are you (cm)?', shortLabel: 'Height', control: 'numeric', required: false, min: 100, max: 250, destination: 'column', validate: isNumberIn(100, 250) },
   { key: 'weightKg', question: 'What do you weigh right now (kg)?', shortLabel: 'Weight', control: 'numeric', required: false, min: 25, max: 350, destination: 'column', validate: isNumberIn(25, 350) },
   { key: 'gender', question: 'Which should I use for your calorie and starting-weight maths?', shortLabel: 'Sex', control: 'single', required: false, options: GENDER_OPTIONS, destination: 'column', validate: isOneOf(GENDER_OPTIONS) },
+  { key: 'injuries', question: 'Anything that bothers you when you train — something you avoid or work around?', shortLabel: 'Niggles', control: 'multi', required: false, options: INJURY_OPTIONS, destination: 'column', validate: isSubsetOf(INJURY_OPTIONS) },
+  { key: 'trainingStyle', question: "What's your training style?", shortLabel: 'Style', control: 'single', required: true, options: STYLE_OPTIONS, destination: 'column', validate: isOneOf(STYLE_OPTIONS) },
+  { key: 'conditioningPreference', question: 'How do you feel about cardio?', shortLabel: 'Cardio', control: 'single', required: true, options: CONDITIONING_PREF_OPTIONS, destination: 'column', validate: isOneOf(CONDITIONING_PREF_OPTIONS) },
+  // REQUIRED, and the comment that used to sit here argued the opposite.
+  //
+  // It read: "measured to have zero effect anywhere in the generated plan
+  // (every option produces a byte-identical plan and mesocycle) — its only
+  // real consumer is a chat-greeting default." That was true when written and
+  // stopped being true when RECOVERY_SET_MULTIPLIER (goal-policies.ts) landed.
+  // Re-measured, full_gym / intermediate / hypertrophy / 4 days / 45-60:
+  //
+  //   base week (generateExercisePlan)       81 sets for all three — still true
+  //   16 weeks (generateMesocycle)           low 912 / moderate 1125 / high 1125
+  //
+  // So "low" removes 213 sets — 19% of the block. The old comment read as an
+  // argument for demoting this to optional, which would have handed the most
+  // tired trainees the most work. Left required.
+  //
+  // FLAGGED, NOT FIXED: moderate and high produce a BYTE-IDENTICAL mesocycle
+  // despite distinct multipliers (0.9 vs 1.0) — the difference is absorbed by
+  // set-count rounding at this profile, so the question has three answers and
+  // two outcomes. Whether "high recovery" should earn more volume than
+  // "moderate" is a training call, not a bug; it is in BACKLOG for Ashley.
+  // Run `npm run report:slot-impact` to see this alongside every other slot.
+  { key: 'recoveryCapacity', question: "How's your recovery capacity — sleep, stress, physical job?", shortLabel: 'Recovery', control: 'single', required: true, options: RECOVERY_OPTIONS, destination: 'column', validate: isOneOf(RECOVERY_OPTIONS) },
+  { key: 'dietaryPreferences', question: 'Any dietary preferences or restrictions?', shortLabel: 'Diet', control: 'multi', required: false, options: DIETARY_OPTIONS, destination: 'column', validate: isSubsetOf(DIETARY_OPTIONS) },
+  { key: 'dislikedFoods', question: 'Any foods you just won\'t eat?', shortLabel: 'Foods to avoid', control: 'text', required: false, destination: 'user_facts', validate: v => typeof v === 'string' },
+  { key: 'mealsPerDay', question: 'How many meals a day suits you?', shortLabel: 'Meals a day', control: 'single', required: true, options: MEALS_PER_DAY_OPTIONS, destination: 'column', validate: isOneOf(MEALS_PER_DAY_OPTIONS) },
+  { key: 'cookingTime', question: 'How much time do you want to spend cooking?', shortLabel: 'Cooking time', control: 'single', required: false, options: COOKING_TIME_OPTIONS, destination: 'column', validate: isOneOf(COOKING_TIME_OPTIONS) },
+  { key: 'includeSnacks', question: 'Snacks too, or meals only?', shortLabel: 'Snacks', control: 'single', required: false, options: SNACKS_OPTIONS, destination: 'column', validate: v => v === true || v === false || v === 'true' || v === 'false' },
+  // Last, and NEVER PROACTIVELY ASKED — both are in NEVER_BLOCKING_SLOTS, so
+  // trackedSlots filters them out of the questioning list entirely. They stay
+  // in this array so the model still has them in its catalogue and can record
+  // a cuisine or a breakfast habit the moment someone volunteers one.
+  //
+  // A ROUND OF THIS PLAN PROPOSED DELETING THEM and was wrong: the plan
+  // argued they should "move out of onboarding and be asked at first use",
+  // not having checked that they were already demoted and already not being
+  // asked. Deleting them removed the recording path this file's own comment
+  // (below, on NEVER_BLOCKING_SLOTS) warns about, and the slot gate caught it.
+  { key: 'favoriteCuisines', question: 'Any favourite cuisines?', shortLabel: 'Cuisines', control: 'multi', required: false, options: FAVORITE_CUISINE_OPTIONS, destination: 'column', validate: isSubsetOf(FAVORITE_CUISINE_OPTIONS) },
+  { key: 'breakfastStyle', question: "What's breakfast usually like for you?", shortLabel: 'Breakfast', control: 'single', required: false, options: BREAKFAST_STYLE_OPTIONS, destination: 'column', validate: isOneOf(BREAKFAST_STYLE_OPTIONS) },
 ]
 
 export function getSlotDef(key: string): SlotDef | undefined {

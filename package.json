@@ -54,6 +54,7 @@
     "test:interval-prescription": "tsx scripts/test-interval-prescription.ts",
     "test:cardio-share-score": "tsx scripts/test-cardio-share-score.ts",
     "test:block-rest-sizing": "tsx scripts/test-block-rest-sizing.ts",
+    "test:onboarding-order": "tsx scripts/test-onboarding-order.ts",
     "test:onboarding-slots": "tsx scripts/test-onboarding-slots.ts",
     "test:activity-streak": "tsx scripts/test-activity-streak.ts",
     "test:starting-out": "tsx scripts/test-starting-out.ts",
@@ -75,6 +76,7 @@
     "report:added-load": "tsx scripts/report-added-load.ts",
     "report:band-slots": "tsx scripts/report-band-slots.ts",
     "report:swap-coverage": "tsx scripts/report-swap-coverage.ts",
+    "report:slot-impact": "tsx scripts/report-slot-impact.ts",
     "report:frozen-weeks": "tsx scripts/report-frozen-weeks.ts",
     "report:rehab-coverage": "tsx scripts/report-rehab-coverage.ts",
     "report:trim-magnitude": "tsx scripts/run-trim-magnitude-report.ts"

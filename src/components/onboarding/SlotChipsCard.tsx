@@ -46,7 +46,19 @@ export function SlotChipsCard({
       ? selectedMulti.includes(String(value))
       : current !== null && current !== undefined && String(current) === String(value)
 
-  const compact = options.length > 4 || options.every(o => !o.description)
+  // TWO DECISIONS, deliberately separated — they used to be one boolean.
+  //
+  // `compact` is size. Four bordered tiles at p-5 with a text-3xl emoji fill a
+  // phone viewport, and the four-option questions (goal, experience, activity,
+  // style) are the most common shape in the flow, so 4 is where tightening
+  // starts paying — not 5.
+  //
+  // `showDescription` is content, and is UNCHANGED. It stays at "4 or fewer,
+  // and at least one option actually has one". The single boolean made these
+  // move together, which meant the obvious size fix would have deleted the
+  // descriptions from exactly the questions that most need them.
+  const compact = options.length >= 4
+  const showDescription = options.length <= 4 && options.some(o => o.description)
 
   // Answered: the chips simply go away. They used to collapse into a small
   // "you picked X" line, but the user's own message bubble sits directly
@@ -62,7 +74,7 @@ export function SlotChipsCard({
             key={String(opt.value)}
             icon={opt.icon}
             label={opt.label}
-            description={compact ? undefined : opt.description}
+            description={showDescription ? opt.description : undefined}
             selected={isSelected(opt.value)}
             compact={compact}
             onClick={() => {
