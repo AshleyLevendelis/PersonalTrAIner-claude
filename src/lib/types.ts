@@ -587,7 +587,28 @@ export interface LogWorkoutSetAction {
   rpe?: number
 }
 
-export type PlanAction = AdjustVolumeAction | BanExerciseAction | UpdateScheduleAction | LogWorkoutSessionAction | LogWeightAction | LogWorkoutSetAction
+/**
+ * The coach marked a day as deliberately swapped for another activity.
+ *
+ * The edge function has ALREADY written workout_sessions.swapped_for_activity
+ * by the time this arrives — it only emits the action when its own write
+ * succeeded (`action: dbSuccess ? {...} : undefined`). So the client's job is
+ * purely to refresh, exactly like log_workout_session.
+ *
+ * MISSING FROM THIS UNION UNTIL NOW, which is the whole reason this type
+ * exists: applyPlanAction fell through to `return false` and told the user
+ * "Action failed — the change was not applied" about a write that HAD landed.
+ * The comment on LogWorkoutSetAction's branch describes the identical bug,
+ * one action type earlier. See test:chat-actions, which now makes it
+ * impossible to add a server action and forget the client half.
+ */
+export interface SwapSessionForActivityAction {
+  type: 'swap_session_for_activity'
+  activity_name: string
+  date?: string
+}
+
+export type PlanAction = AdjustVolumeAction | BanExerciseAction | UpdateScheduleAction | LogWorkoutSessionAction | LogWeightAction | LogWorkoutSetAction | SwapSessionForActivityAction
 
 // ============================================================================
 // Daily Tracking Types (connects workout engine to nutrition/carb-cycling)
