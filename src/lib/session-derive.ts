@@ -10,6 +10,7 @@
 // ---------------------------------------------------------------------------
 
 import { getExerciseEntry } from './exercise-db'
+import { anchorDifficultyBump } from './movement-difficulty'
 import { isMalformedZeroWeight } from './set-log-store'
 import { loadingMode, roundToPlate, getEquipmentFloorKg, isUnverifiedLoadSource } from './load-prescription'
 import type { Exercise, ExerciseSetLog, WorkoutDay } from './types'
@@ -208,6 +209,22 @@ export function anchorRank(mechanicsTier: string | undefined): number {
 }
 
 /**
+ * The full ordering the anchor is chosen on: tier first, then difficulty
+ * within it.
+ *
+ * Tier is multiplied by 10 so it always dominates — a tier-2 movement can
+ * never outrank a tier-1 however hard it is, because tier still decides sets,
+ * reps and rest and the anchor must not disagree with the prescription. The
+ * bump only orders movements the catalogue currently calls equal, which is
+ * the entire defect: Pistol Squat Progression and Air Squat are both
+ * tier2_compound, so the anchor used to break that tie on list position.
+ */
+export function anchorScore(mechanicsTier: string | undefined, name: string): number {
+  const rank = anchorRank(mechanicsTier)
+  return rank === 0 ? 0 : rank * 10 + anchorDifficultyBump(name)
+}
+
+/**
  * The day's hardest STANDALONE movement, or undefined when the day already
  * has a real tier-1 (the existing path owns those and promotion must not
  * touch them) or when nothing qualifies.
@@ -237,9 +254,13 @@ export function dayAnchorExercise(exercises: Exercise[]): Exercise | undefined {
     const entry = getExerciseEntry(ex.name)
     if (!entry || entry.mechanics_tier === 'primer') continue
     if (ex.prescription_type === 'steady_state' || ex.tier === 'tier_4_finisher') continue
-    const rank = ANCHOR_RANK[String(entry.mechanics_tier)] ?? 0
-    // Strictly greater: ties go to the earlier exercise, which is the order
-    // the generator already put them in.
+    // Tier THEN difficulty. Before this carried the difficulty half, a day
+    // holding both a Pistol Squat and an Air Squat picked whichever the
+    // generator happened to list first — they are the same tier, and the
+    // catalogue has no other way to tell them apart.
+    const rank = anchorScore(entry.mechanics_tier, ex.name)
+    // Strictly greater: genuine ties still go to the earlier exercise, which
+    // is the order the generator already put them in.
     if (rank > bestRank) { bestRank = rank; best = ex }
   }
   return best

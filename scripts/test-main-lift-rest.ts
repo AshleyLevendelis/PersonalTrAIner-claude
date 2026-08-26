@@ -47,6 +47,8 @@ import { isExternallyLoaded } from '../src/lib/load-prescription'
 import { getGoalPolicy } from '../src/lib/goal-policies'
 import { seededRngFromKey } from '../src/lib/seeded-random'
 import { dayAnchorExercise } from '../src/lib/session-derive'
+import { ANCHOR_DIFFICULTY_BUMP } from '../src/lib/movement-difficulty'
+import { EXERCISE_DATABASE } from '../src/lib/exercise-db'
 import { parseRestSeconds } from '../src/lib/session-duration'
 import type { UserProfile, FitnessGoal, SessionDuration, EquipmentAccess } from '../src/lib/types'
 
@@ -286,6 +288,29 @@ console.log('\n6. Promotion is a FLOOR, never a ceiling')
   }
   check(`anchors resting ABOVE 60s are left alone (${above} above, ${exactlySixty} at exactly 60)`,
     above > 0, 'every anchor landed on exactly 60 — the floor is being assigned, not floored')
+}
+
+// ---------------------------------------------------------------------------
+console.log('\n7. The difficulty list has not rotted')
+// ---------------------------------------------------------------------------
+{
+  // ANCHOR_DIFFICULTY_BUMP is hand-maintained and there is no way around
+  // that: "a Nordic curl is brutal" is editorial, with no property of an
+  // entry to derive it from. What CAN be guaranteed is that it never drifts
+  // silently — a renamed exercise would otherwise drop back to baseline and
+  // the day would quietly nominate something easier, with nothing red.
+  const known = new Set(EXERCISE_DATABASE.map(e => e.name))
+  const orphans = Object.keys(ANCHOR_DIFFICULTY_BUMP).filter(n => !known.has(n))
+  check(`every ranked movement still exists in the catalogue (${Object.keys(ANCHOR_DIFFICULTY_BUMP).length} ranked)`,
+    orphans.length === 0, orphans.join(', '))
+
+  // Spanish Squat is a patellar-tendon rehab tool that the injury pass places
+  // deliberately. Promoting it to a day's MAIN LIFT would turn a rehab
+  // prescription into the centrepiece of the session, so its absence from the
+  // list is load-bearing rather than an oversight — named here so it cannot
+  // be "helpfully" added later.
+  check('Spanish Squat is not ranked — it is rehab, not a main lift',
+    !(('Spanish Squat') in ANCHOR_DIFFICULTY_BUMP))
 }
 
 console.log(failures === 0 ? '\nAll main-lift-rest checks passed.\n' : `\n${failures} FAILED\n`)

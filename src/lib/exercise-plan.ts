@@ -16,7 +16,7 @@ import {
   shiftReps, adjustRest, dedupeAdjacentPhases, isRegressionFor, stepIntervalSeconds, getPhaseTempo, formatTempo, type PhaseConfig, type TrainingPhase,
 } from './periodization'
 import { getGoalPolicy, restrictPhaseSequence, resolveConditioningFrequency, RECOVERY_SET_MULTIPLIER, MAIN_LIFT_REST_FLOOR_SECONDS, type GoalPolicy } from './goal-policies'
-import { dayAnchorExercise, anchorRank } from './session-derive'
+import { dayAnchorExercise, anchorScore } from './session-derive'
 import { isStartingOut, applyStartingOut, startingOutMinutes } from './starting-out'
 import { getDurationBudgetSeconds, getSessionMinimumSeconds, getSessionMaximumSeconds, getSteadyStateSeconds, DEFAULT_CARRY_DISTANCE_M, estimateDaySeconds, estimateSlotsSeconds, parseRestSeconds, SESSION_OVERHEAD_SECONDS } from './session-duration'
 
@@ -882,7 +882,7 @@ function stageTimeCap(
     for (let i = 0; i < dayExercises.length; i++) {
       const t = dayExercises[i].entry.mechanics_tier
       if (t === 'cardio' || t === 'primer') continue
-      const r = anchorRank(t)
+      const r = anchorScore(t, dayExercises[i].entry.name)
       if (r > bestRank) { bestRank = r; best = i }
     }
     return best
@@ -6000,6 +6000,34 @@ export function generateMesocycle(
       for (const [name, kg] of thisWeekByLift) lastUnverifiedLoadingWeekKgByLift.set(name, kg)
 
       progressConditioningWeek(days, w, isDeload)
+
+      // THE PROMOTED FLOOR, RE-ASSERTED ON THE FINAL DAY.
+      //
+      // The per-exercise floor above reads an anchor computed from the day's
+      // BASE names, and its comment claimed that was safe because "rotation
+      // is within-tier, so the RANK the anchor is chosen on cannot change —
+      // only the name". That was true while the anchor ranked on tier alone.
+      // It stopped being true the moment difficulty entered the ordering: a
+      // weekly rotation swapping Air Squat for Goblet Squats is within-tier
+      // AND changes which movement is hardest, so the anchor moves and the
+      // floor lands on the wrong exercise. Measured: 97 days.
+      //
+      // So the floor is re-applied here, over the day as it finally stands,
+      // once. trimWeekRestForBudget below re-derives the anchor correctly too
+      // but only visits days that are OVER budget, so it cannot cover this.
+      //
+      // Still a floor, never a ceiling — Math.max, so an anchor already
+      // resting longer keeps its rest.
+      for (const day of days) {
+        const anchor = dayAnchorExercise(day.exercises)
+        if (!anchor) continue
+        const i = day.exercises.indexOf(anchor)
+        if (i === -1) continue
+        const current = parseRestSeconds(day.exercises[i].rest)
+        if (current > 0 && current < MAIN_LIFT_REST_FLOOR_SECONDS) {
+          day.exercises[i] = { ...day.exercises[i], rest: `${MAIN_LIFT_REST_FLOOR_SECONDS}s` }
+        }
+      }
 
       // Deload weeks are SUPPOSED to run short (half volume, by design) — a
       // filler there would fight the whole point of the recovery week, so
