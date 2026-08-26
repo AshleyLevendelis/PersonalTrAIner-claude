@@ -40,6 +40,7 @@
 // ---------------------------------------------------------------------------
 
 import React from 'react'
+import { MessageCircle } from 'lucide-react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { execFileSync } from 'node:child_process'
 import { readFileSync, writeFileSync, mkdirSync, readdirSync, existsSync } from 'node:fs'
@@ -53,6 +54,7 @@ import { WarmupSection } from '@/components/exercise/WarmupSection'
 import { LoadCeilingPrompt } from '@/components/exercise/LoadCeilingPrompt'
 import { SlotChipsCard } from '@/components/onboarding/SlotChipsCard'
 import { initialSlotValues, ONBOARDING_SLOTS } from '@/lib/onboarding-slots'
+import { buildFirstRunIntro } from '@/lib/first-run-intro'
 import type { UserProfile, WorkoutDay, EquipmentAccess } from '@/lib/types'
 
 const CHROMIUM = '/opt/pw-browsers/chromium'
@@ -129,6 +131,62 @@ function worstDay(days: WorkoutDay[]): WorkoutDay {
   return [...days].filter(d => d.exercises.length > 0).sort((a, b) => cost(b) - cost(a))[0]
 }
 
+/**
+ * The first-run intro, at phone width.
+ *
+ * ChatAssistant itself cannot render here — it needs a live session, a
+ * profile and a Supabase client, so it lands in `skipped`. The message-row
+ * markup below is therefore a REPLICA of ChatAssistant's assistant turn
+ * (avatar column, max-w-[80%], pl-9 offset, the quick-reply pill classes),
+ * copied class-for-class.
+ *
+ * What is NOT a replica is the part that matters: the words and the chips
+ * come from buildFirstRunIntro — the same function the app calls — so the
+ * question this screen answers ("does that middle paragraph read as a wall on
+ * a phone, and do three chips fit?") is answered about the real strings. If
+ * the chrome drifts, the screen looks slightly wrong; if the copy drifts, it
+ * cannot, because there is only one copy.
+ */
+function FirstRunChat() {
+  const intro = buildFirstRunIntro('Morning, Ashley', "It's a squat and carry day — six exercises, about 50 minutes.")
+  return (
+    <div className="space-y-3 px-4 py-3">
+      {intro.map((msg, i) => (
+        <div key={i} className="flex justify-start">
+          <div className="max-w-[80%]">
+            <div className="flex items-start gap-2.5">
+              <span
+                className="flex size-[26px] shrink-0 items-center justify-center rounded-full text-[#08281F]"
+                style={{ background: 'linear-gradient(180deg, color-mix(in oklab, var(--primary) 84%, white), var(--primary-2))', boxShadow: '0 0 18px rgba(var(--glow-rgb),.45)' }}
+              >
+                <MessageCircle className="size-3.5" strokeWidth={2.4} />
+              </span>
+              <div className="min-w-0 flex-1 pt-0.5 text-sm leading-relaxed text-foreground">
+                {msg.content}
+              </div>
+            </div>
+            {msg.quickReplies && msg.quickReplies.length > 0 && (
+              <div className="pl-9">
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {msg.quickReplies.map(option => (
+                    <button
+                      key={option}
+                      type="button"
+                      className="rounded-full bg-[color:var(--surface-raised)] px-3 py-2.5 text-xs font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground active:bg-accent/80 min-h-[44px]"
+                    >
+                      {option}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 const screens: Screen[] = [
   {
     name: 'day-bodyweight-week11',
@@ -167,6 +225,11 @@ const screens: Screen[] = [
     name: 'load-ceiling-prompt',
     title: 'What can you actually load',
     node: <LoadCeilingPrompt kind="dumbbell" onSave={async () => {}} onDecline={async () => {}} />,
+  },
+  {
+    name: 'first-run-chat',
+    title: 'Coach chat · the first thing a new user ever sees',
+    node: <FirstRunChat />,
   },
 ]
 

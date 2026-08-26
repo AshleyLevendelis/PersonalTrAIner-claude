@@ -29,6 +29,7 @@ import { cn } from '@/lib/utils'
 import { parseWorkoutEntries, type ParsedSetGroup, type WorkoutEntryInput } from '@/lib/set-parse'
 import { executeLogWorkout } from '@/lib/nl-logging-executor'
 import { normalizeExternalUrl } from '@/lib/chat-links'
+import { buildFirstRunIntro } from '@/lib/first-run-intro'
 import { createFact, createGoal, createContextFact, retireFact, retireContextFact, abandonGoal, type UserFactRow, type UserGoalRow, type UserContextFactRow } from '@/lib/memory-store'
 import { resolveExerciseTarget, resolveFoodTarget } from '@/lib/fact-compiler'
 import { checkFactConflict, checkGoalConflict } from '@/lib/memory-reconcile'
@@ -392,22 +393,24 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         ? `${greetName()} — nice PR on ${recentPR.exerciseName} at ${recentPR.weightKg}kg. ${detail.charAt(0).toUpperCase()}${detail.slice(1)}`
         : buildInitialGreeting()
       // Chat round 2, item 1 — a brand-new user meets someone, rather than
-      // opening a tool. Three short messages instead of one block: who this
+      // opening a tool. Several short messages instead of one block: who this
       // is, what it'll do for them (in plain language, NOT a feature list),
       // then one real opening question. Returning users (isFirstEverChat
       // false) skip the introduction entirely and get the specific-today
       // line on its own, exactly as before.
+      //
+      // ROUND 3 — Ashley: "clearly explain in the first few messages what it
+      // does, how it can help and how the user can use it." The words and the
+      // chips both live in first-run-intro.ts, with the reasoning for each;
+      // this only turns them into ChatMsg rows. CHIPS SHOW RATHER THAN TELL,
+      // which is what keeps the how-to-use-it half out of the prose.
       if (isFirstEverChat) {
         const detailSentence = `${detail.charAt(0).toUpperCase()}${detail.slice(1)}`
-        setMessages([
-          { role: 'assistant', content: `${greetName()} — I'm your coach. Good to meet you.`, status: 'complete' },
-          {
-            role: 'assistant',
-            content: "Your plan's built and ready. From here I'll keep it moving with you — tell me how a session went, what you'd rather not eat, anything that's nagging, and I'll adjust things and remember them.",
-            status: 'complete',
-          },
-          { role: 'assistant', content: detailSentence, status: 'complete' },
-        ])
+        setMessages(buildFirstRunIntro(greetName(), detailSentence).map(m => ({
+          role: 'assistant' as const,
+          status: 'complete' as const,
+          ...m,
+        })))
         return
       }
 
