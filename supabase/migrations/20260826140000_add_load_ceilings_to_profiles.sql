@@ -15,7 +15,7 @@
 --
 -- Nullable on purpose: absent means "not asked yet", which is different from
 -- both "declined" and "zero".
-alter table profiles
+alter table fitness_profiles
   add column if not exists max_dumbbell_kg numeric null,
   add column if not exists max_single_implement_kg numeric null,
   add column if not exists max_improvised_kg numeric null;
@@ -30,12 +30,12 @@ alter table profiles
 -- A trainee who says "I don't know what my dumbbells weigh" must be able to
 -- say it once and never be asked again. Without this flag, "null" would mean
 -- both "not asked" and "refused", and the prompt would return forever.
-alter table profiles
+alter table fitness_profiles
   add column if not exists load_ceilings_declined boolean not null default false;
 
-comment on column profiles.max_dumbbell_kg is
+comment on column fitness_profiles.max_dumbbell_kg is
   'Heaviest dumbbell PAIR the trainee owns, per hand, in kg. Clamps loading downward only -- never raises a load above the table ceiling, which is also a safety backstop.';
-comment on column profiles.max_improvised_kg is
+comment on column fitness_profiles.max_improvised_kg is
   'What the backpack actually holds, in kg. Lowers IMPROVISED_IMPLEMENT_CEILING_KG, never raises it past the strap/posture limit.';
-comment on column profiles.load_ceilings_declined is
+comment on column fitness_profiles.load_ceilings_declined is
   'The trainee was asked and chose not to say. Distinct from null, which means not yet asked.';

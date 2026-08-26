@@ -164,7 +164,7 @@ export async function saveStatedCeiling(
   kg: number,
 ): Promise<CeilingWriteResult> {
   if (!isValidCeilingKg(kg)) return { saved: false, needsMigration: false }
-  const { error } = await supabase.from('profiles')
+  const { error } = await supabase.from('fitness_profiles')
     .update({ [LOAD_CEILING_COLUMN[kind]]: kg })
     .eq('id', profileId)
   if (error) return { saved: false, needsMigration: isMissingColumnError(error) }
@@ -180,7 +180,7 @@ export async function saveStatedCeiling(
  * different noun is the same nag wearing a hat.
  */
 export async function declineStatedCeilings(profileId: string): Promise<CeilingWriteResult> {
-  const { error } = await supabase.from('profiles')
+  const { error } = await supabase.from('fitness_profiles')
     .update({ load_ceilings_declined: true })
     .eq('id', profileId)
   if (error) return { saved: false, needsMigration: isMissingColumnError(error) }
