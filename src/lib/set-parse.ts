@@ -14,6 +14,13 @@ export interface ParsedSet {
   reps: number
   repsRangeLabel?: string
   weightKg: number
+  /**
+   * Weight ADDED to bodyweight, for the four lifts you can hang a belt from
+   * (accepts_added_load). Kept apart from weightKg for the same reason
+   * ExerciseSetLog does: that field means the weight of the thing you
+   * lifted, and a chin-up does not weigh 15kg.
+   */
+  addedLoadKg?: number | null
   isBodyweight: boolean
   rpe?: number
 }
@@ -246,6 +253,19 @@ export function parseWorkoutEntries(input: ParseWorkoutInput): ParseWorkoutResul
     // exercise or an explicit @bodyweight token is the only legitimate 0kg.
     const entryIsLoaded = entryEntry ? isExternallyLoaded(entryEntry) : true
     const isBodyweight = parsed.isBodyweight || (entryEntry != null && !entryIsLoaded)
+
+    // A chin-up or a dip is bodyweight PLUS a belt, so the override above
+    // used to throw the stated figure away: MEASURED, "3x5 @15kg",
+    // "3x5 with 15kg", "3x5" and "3x5 @bodyweight" on Chin-Ups all produced
+    // the identical row, weightKg 0. Silently, which is the worst version —
+    // a LOADED lift whose weight won't parse asks "what weight did you
+    // use?", these four just dropped it.
+    //
+    // Captured from parsed.weightKg BEFORE the bodyweight override, since
+    // that override is what was discarding it.
+    const addedLoadKg = entryEntry?.accepts_added_load && parsed.weightKg != null && parsed.weightKg > 0
+      ? parsed.weightKg
+      : null
     if (!isBodyweight && parsed.weightKg == null) {
       return {
         matchedRawPhrase: entry.rawText,
@@ -262,6 +282,7 @@ export function parseWorkoutEntries(input: ParseWorkoutInput): ParseWorkoutResul
       reps,
       repsRangeLabel: parsed.repsRangeLabel,
       weightKg: isBodyweight ? 0 : (parsed.weightKg ?? 0),
+      addedLoadKg,
       isBodyweight,
       rpe: parsed.rpe,
     }))

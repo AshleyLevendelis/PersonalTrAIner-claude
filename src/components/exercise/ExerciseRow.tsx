@@ -6,10 +6,11 @@ import { useActiveSession } from '@/hooks/useActiveSession'
 import { getExerciseId } from '@/lib/exercise-db'
 import { formatRampSets, formatCompletedSummary } from '@/lib/session-derive'
 import { RampStrip } from './RampStrip'
-import { LoadChip, loadSourceLabel, type LoadSource } from './LoadChip'
+import { LoadChip, TempoChip, loadSourceLabel, type LoadSource } from './LoadChip'
 import { ExerciseLine } from './ExerciseLine'
 import { isUnverifiedLoadSource } from '@/lib/load-prescription'
 import { AssistanceChip } from './AssistanceChip'
+import { AddedLoadChip } from './AddedLoadChip'
 import { CalibrationCue } from './CalibrationCue'
 import { SetGrid, type SetGridProps } from './SetGrid'
 import type { Exercise, ExerciseSetLog } from '@/lib/types'
@@ -158,7 +159,13 @@ export function ExerciseRow({
                 <p className="text-[10px] uppercase tracking-[.1em] text-muted-foreground">{loadSourceLabel(loadSource)}</p>
               )}
               <div className="mt-1.5">
-                {ex.suggested_assistance_kg != null ? (
+                {/* A lift with no weight renders no LoadChip at all (see its
+                    header). Tempo takes that slot when there is one — it is
+                    what the trainee is actually meant to progress. */}
+                <TempoChip tempo={ex.tempo} />
+                {ex.suggested_added_load_kg != null ? (
+                  <AddedLoadChip ex={ex} />
+                ) : ex.suggested_assistance_kg != null ? (
                   <AssistanceChip ex={ex} />
                 ) : (
                   <LoadChip

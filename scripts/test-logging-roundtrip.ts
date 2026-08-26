@@ -43,6 +43,7 @@ const UNIQUES: Record<string, string[][]> = {
 
 const db: Record<string, Row[]> = { workout_sessions: [], exercise_set_logs: [] }
 let fakeOffline = false
+let fakeMissingAddedLoadColumn = false
 
 function cmp(a: unknown, b: unknown): number {
   if (typeof a === 'number' && typeof b === 'number') return a - b
@@ -75,6 +76,14 @@ function fakeFrom(table: string) {
   const numericOverflow = (row: Row): boolean =>
     table === 'exercise_set_logs' && typeof row.weight_kg === 'number' && (row.weight_kg > 9999.99 || row.weight_kg < 0)
 
+  // Mirrors a database that has not run migration 20260825120000 yet.
+  // PostgREST answers an unknown column with PGRST204 and names it. This is
+  // the state every live user is in until Ashley runs db:push-both, so the
+  // "degrade, never lose the set" path is exercised here rather than
+  // reasoned about.
+  const missingAddedLoadColumn = (row: Row): boolean =>
+    fakeMissingAddedLoadColumn && table === 'exercise_set_logs' && row.added_load_kg !== undefined
+
   // Mirrors exercise_set_logs.session_id REFERENCES workout_sessions(id) —
   // a stale cached session id (e.g. the session was deleted by a dev-tool
   // wipe on another device) fails with a real FK violation, 23503, in
@@ -89,6 +98,7 @@ function fakeFrom(table: string) {
       for (const raw of payload) {
         const row: Row = { id: crypto.randomUUID(), ...raw }
         if (table === 'workout_sessions') row.is_completed = row.is_completed ?? false
+        if (missingAddedLoadColumn(row)) return { data: null, error: { code: 'PGRST204', message: "Could not find the 'added_load_kg' column of 'exercise_set_logs' in the schema cache" } }
         if (numericOverflow(row)) return { data: null, error: { code: '22003', message: 'numeric field overflow' } }
         if (fkViolation(row)) return { data: null, error: { code: '23503', message: 'insert or update on table "exercise_set_logs" violates foreign key constraint' } }
         if (uniqueViolation(table, row)) return { data: null, error: { code: '23505', message: 'duplicate key value violates unique constraint' } }
@@ -113,6 +123,7 @@ function fakeFrom(table: string) {
         }
       }
       for (const raw of payload) {
+        if (missingAddedLoadColumn(raw)) return { data: null, error: { code: 'PGRST204', message: "Could not find the 'added_load_kg' column of 'exercise_set_logs' in the schema cache" } }
         if (numericOverflow(raw)) return { data: null, error: { code: '22003', message: 'numeric field overflow' } }
         if (fkViolation(raw)) return { data: null, error: { code: '23503', message: 'insert or update on table "exercise_set_logs" violates foreign key constraint' } }
         const existing = onConflict ? db[table].find(r => onConflict!.every(c => r[c] === raw[c])) : undefined
@@ -725,6 +736,118 @@ async function main() {
   const dayOrder = [...new Set(recent.map(l => l.date))]
   const sortedDesc = [...dayOrder].sort().reverse()
   check('days are ordered newest-first', dayOrder.join(',') === sortedDesc.join(','), { dayOrder, sortedDesc })
+
+  // ---- 8. Added weight: the belt, not the bar ------------------------------
+  // The prescription side shipped first (prescribeAddedLoad): the app could
+  // tell you to add 15kg to a pull-up and had nowhere to record that you did.
+  // Worse than a gap — SetGrid already let you type 15 there and wrote
+  // weight_kg 15, is_bodyweight false: "the pull-up weighed 15kg", a row
+  // indistinguishable from an ordinary 15kg lift.
+  console.log('\n8. Added weight is recorded as added weight')
+  {
+    const day = isoDatePlusDays(-9)
+    saveSet({
+      userId, date: day, weekNumber: 3, day: 'Monday',
+      exerciseId: 'pull-ups', exerciseName: 'Pull-Ups', setNumber: 1,
+      weightKg: 0, repsCompleted: 5, isBodyweight: true, addedLoadKg: 15,
+    })
+    await flushPending()
+    const rows = db.exercise_set_logs.filter(r => r.exercise_id === 'pull-ups' && r.week_number === 3)
+    check('the set reached the server', rows.length === 1, rows.length)
+    check('added_load_kg carries the belt figure', rows[0]?.added_load_kg === 15, rows[0]?.added_load_kg)
+    check('weight_kg stays 0 — the pull-up did not weigh 15kg', rows[0]?.weight_kg === 0, rows[0]?.weight_kg)
+    check('is_bodyweight stays true — the base is still bodyweight', rows[0]?.is_bodyweight === true, rows[0]?.is_bodyweight)
+
+    const back = await getSetsForDate(userId, day)
+    const mine = back.find(l => l.exercise_id === 'pull-ups')
+    check('it reads back through the store view', mine?.added_load_kg === 15, mine?.added_load_kg)
+
+    // The row must NOT look malformed — that predicate drops rows from every
+    // summary and history view, and a bodyweight+belt row is perfectly real.
+    const { isMalformedZeroWeight } = await import('../src/lib/set-log-store')
+    check('a bodyweight+belt row is not treated as malformed',
+      !isMalformedZeroWeight({ weight_kg: 0, is_bodyweight: true }))
+    check('...but a plain 0kg non-bodyweight row still is',
+      isMalformedZeroWeight({ weight_kg: 0, is_bodyweight: false }))
+  }
+
+  // ---- 9. An ordinary set's payload is untouched ---------------------------
+  // THE PRE-MIGRATION SAFETY PROPERTY, and it is asserted on the PAYLOAD
+  // rather than the outcome. Both write paths spread a fixed object, so
+  // including added_load_kg unconditionally would make EVERY set write fail
+  // with "column does not exist" until db:push-both runs — on live users, on
+  // the one path where losing data is unforgivable.
+  console.log('\n9. An ordinary set never mentions the new column')
+  {
+    const day = isoDatePlusDays(-8)
+    saveSet({
+      userId, date: day, weekNumber: 3, day: 'Tuesday',
+      exerciseId: 'barbell-bench-press', exerciseName: 'Barbell Bench Press', setNumber: 1,
+      weightKg: 60, repsCompleted: 8,
+    })
+    await flushPending()
+    const row = db.exercise_set_logs.find(r => r.exercise_id === 'barbell-bench-press' && r.week_number === 3)
+    check('the ordinary set landed', row != null)
+    check('the key is ABSENT, not null — a database without the column accepts this row',
+      row != null && !('added_load_kg' in row), row && Object.keys(row).filter(k => k.includes('added')))
+  }
+
+  // ---- 10. Degrade, never lose the set -------------------------------------
+  // Until the migration runs, a weighted pull-up's write WILL fail. The
+  // trainee did the work; they must not lose the record of it because a
+  // migration is pending.
+  console.log('\n10. A pending migration costs the belt figure, never the set')
+  {
+    fakeMissingAddedLoadColumn = true
+    const day = isoDatePlusDays(-7)
+    saveSet({
+      userId, date: day, weekNumber: 3, day: 'Wednesday',
+      exerciseId: 'chin-ups', exerciseName: 'Chin-Ups', setNumber: 1,
+      weightKg: 0, repsCompleted: 6, isBodyweight: true, addedLoadKg: 12.5,
+    })
+    await flushPending()
+    fakeMissingAddedLoadColumn = false
+    const rows = db.exercise_set_logs.filter(r => r.exercise_id === 'chin-ups')
+    check('the set was still saved', rows.length === 1, rows.length)
+    check('the reps survived', rows[0]?.reps_completed === 6, rows[0]?.reps_completed)
+    check('only the belt figure was dropped', rows[0]?.added_load_kg === undefined, rows[0]?.added_load_kg)
+  }
+
+  // ---- 11. Double progression on the belt ----------------------------------
+  // Same rule as the bar: top of the rep range on every set and it goes up by
+  // one plate pair; short of it and it holds while reps catch up.
+  console.log('\n11. Double progression reads the belt')
+  {
+    const { getAddedLoadProgression, ADDED_LOAD_PROGRESSION_STEP_KG } = await import('../src/lib/progression-engine')
+    // Logged "today" and read from a cutoff a week out, matching section 3's
+    // pattern — saveSet always stamps completed_at from getAppNow (real now,
+    // deliberately: see its dev-clock comment), so a back-dated `date` alone
+    // cannot satisfy getLastSessionSets's strictly-before-completed_at filter.
+    const day = isoDatePlusDays(0)
+    for (const setNumber of [1, 2, 3]) {
+      saveSet({
+        userId, date: day, weekNumber: 4, day: 'Thursday',
+        exerciseId: 'chest-dips', exerciseName: 'Chest Dips', setNumber,
+        weightKg: 0, repsCompleted: 7, isBodyweight: true, addedLoadKg: 20,
+      })
+    }
+    await flushPending()
+    const after = isoDatePlusDays(7)
+    const hit = await getAddedLoadProgression(userId, 'Chest Dips', after, 7)
+    check('all sets at the top of the range -> the belt goes up',
+      hit?.didProgress === true && hit?.addedKg === 20 + ADDED_LOAD_PROGRESSION_STEP_KG, hit)
+    check('the note is written in added terms, not as a bare weight',
+      !!hit && hit.note.includes(`+${20 + ADDED_LOAD_PROGRESSION_STEP_KG}kg`), hit?.note)
+
+    const short = await getAddedLoadProgression(userId, 'Chest Dips', after, 9)
+    check('short of the top -> it holds and chases reps',
+      short?.didProgress === false && short?.addedKg === 20, short)
+
+    // A session with no belt at all must say nothing rather than "you used
+    // 0kg, add 2.5" — a claim about a session we have no such record of.
+    const none = await getAddedLoadProgression(userId, 'Barbell Bench Press', after, 8)
+    check('a session with no added weight yields no added-weight advice', none === null, none)
+  }
 
   // ---- Summary -------------------------------------------------------------
   if (failures > 0) {

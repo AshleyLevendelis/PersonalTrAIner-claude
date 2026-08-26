@@ -582,6 +582,33 @@ const toolDeclarations = [
     },
   },
   {
+    name: "swap_session_for_activity",
+    description:
+      "Call when the user says they are NOT doing their prescribed lifting session on a given day and names what they are doing instead (e.g. 'skipping weights today but I'm doing Muay Thai in the evening', 'no gym tonight, playing football', 'swapping legs for a long run'). Marks that day's lifting as a deliberate swap rather than a missed session, and records the activity so it counts toward their streak. Do NOT call this when they simply missed a session with no replacement, when they are asking hypothetically ('what if I skipped'), or when they describe a workout they ALREADY completed alongside their lifting — that is log_workout. If they say they are skipping but name no activity, ask what they are doing instead before calling.",
+    parameters: {
+      type: "object",
+      properties: {
+        activity_name: {
+          type: "string",
+          description: "What they are doing instead, in their own words, e.g. 'Muay Thai', 'five-a-side football', 'long run'",
+        },
+        duration_minutes: {
+          type: "number",
+          description: "How long the activity is, if they said. Omit if they didn't — do not guess.",
+        },
+        intensity_rpe: {
+          type: "number",
+          description: "Perceived effort 1-10, if they said or it is obvious from how they described it. Omit if unclear.",
+        },
+        date: {
+          type: "string",
+          description: "ISO date (YYYY-MM-DD) of the day being swapped. Omit for today.",
+        },
+      },
+      required: ["activity_name"],
+    },
+  },
+  {
     name: "log_meal",
     description:
       "Call whenever the user describes food they ate, OR asks a MACRO question about specific food (e.g. 'how many calories is 2 eggs and toast', 'what's the protein in this shake'). Do NOT call this for an allergen or food-safety question ('does this have nuts', 'is this safe for my allergy', 'is there dairy in it') — those never get a tool call, they're answered in plain reply text under ALLERGEN HONESTY. Extract ONLY the ingredients the user actually stated, with their exact quantities and units — the app computes real macros from a verified food database from what you extract, so you must never calculate or state a macro number yourself. Never add an ingredient the user didn't mention (no assumed cooking oil, seasoning, or protein powder) — if an addition seems implied, ask instead of guessing. If an ingredient has an ambiguous variant (e.g. 'greek yoghurt' could be 0% or full-fat, 'milk' could be whole or skimmed), name the SPECIFIC variant you're assuming (e.g. 'greek yoghurt 0%', not 'greek yoghurt') and record it in assumptions. If a quantity is missing, use a typical portion and record that assumption too.",
@@ -1388,6 +1415,12 @@ SESSION PLANNING RULES:
 3. Never place high-intensity cardio before heavy compounds on the same day.
 4. Cross-reference workout and cardio logs above. If the user logged high-RPE work (7+) back-to-back, suggest active recovery or volume reduction.
 
+NEVER CLAIM AN ACTION YOU DID NOT TAKE:
+1. Do not say a day has been marked, moved, rescheduled, skipped or set to rest unless you actually called a tool that does it. Saying "I'll make sure today is marked as a rest day" and then not calling one is a lie the user only discovers the next morning, when the day shows as missed.
+2. When the user says they are skipping their lifting for something else and names it, call swap_session_for_activity. That is the tool for exactly this, and it is the only thing that changes what the Exercise tab shows.
+3. When they want something you have no tool for — moving a session to another day, rewriting the week's schedule — say plainly that you cannot do it from chat and point them at the Exercise tab. An honest "I can't do that from here" is always better than a confident sentence that turns out to be false.
+4. Speak in the past tense about a change ONLY after the tool has run. Before that, say what you are about to do, not what you have done.
+
 Always use the user's specific data when answering. Nutrition, supplements, and recovery questions are always within your scope — answer them directly. For anything genuinely off-topic, see §1e above (factual question vs. task request get different treatment).
 
 CONTEXT: Current Time: ${context.current_time_formatted || new Date().toLocaleString('en-US', { weekday: 'long', hour: 'numeric', minute: '2-digit', hour12: true })} | Preferred Training Time: ${context.profile?.preferred_time || context.training_time_preference || 'morning'} | Workout Logged Today: ${context.workout_logged_today ? 'Yes' : (todaysLoggedSets ? 'Yes' : 'No')}.
@@ -1685,6 +1718,129 @@ Keep this context in mind to ensure your greetings and questions naturally align
 
         return new Response(
           JSON.stringify({ reply: confirmText, action: dbSuccess ? { type: "log_weight", weight_kg: weightKg } : undefined }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (name === "swap_session_for_activity") {
+        // Ashley told the coach she was doing Muay Thai instead of weights.
+        // It replied "I'll make sure today is marked as a rest day for
+        // lifting" and did nothing, because until this tool existed nothing
+        // could: no tool touched a day's status at all. Worse than a no-op —
+        // classifyDay ends `dateStr < todayStr ? 'missed' : 'due'`, so the day
+        // she announced IN ADVANCE showed as missed the next morning.
+        //
+        // The trap here is documented on update_workout_schedule, which is
+        // disabled because it "used to write to a profile field the app
+        // doesn't actually render from, so schedule 'changes' looked applied
+        // in chat but never showed up on the Exercise tab." So this writes
+        // only to workout_sessions and cardio_logs — the two tables the
+        // Exercise tab and the streak actually read.
+        const profileId = context.profile_id;
+        const activityName = typeof args.activity_name === "string" ? args.activity_name.trim() : "";
+        if (!profileId || !activityName) {
+          return new Response(
+            JSON.stringify({ reply: "What are you doing instead? I'll swap the day over to that." }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        const swapDate = typeof args.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(args.date)
+          ? args.date
+          : new Date().toISOString().split("T")[0];
+
+        let dbSuccess = true;
+        try {
+          const restHeaders = {
+            Authorization: `Bearer ${serviceKey}`,
+            Apikey: serviceKey,
+            "Content-Type": "application/json",
+          };
+          // Read before write, rather than an upsert. workout_sessions.
+          // split_type is NOT NULL with no default, so an upsert payload would
+          // have to carry it — and would then overwrite a real session's split
+          // with a placeholder whenever the row already existed.
+          const existing = await fetch(
+            `${supabaseUrl}/rest/v1/workout_sessions?profile_id=eq.${profileId}&date=eq.${swapDate}&select=id`,
+            { headers: restHeaders }
+          );
+          const rows = existing.ok ? await existing.json() : [];
+          const sessionId = Array.isArray(rows) && rows.length > 0 ? rows[0].id : null;
+
+          const resp = sessionId
+            ? await fetch(`${supabaseUrl}/rest/v1/workout_sessions?id=eq.${sessionId}`, {
+                method: "PATCH",
+                headers: { ...restHeaders, Prefer: "return=minimal" },
+                body: JSON.stringify({ swapped_for_activity: activityName, updated_at: new Date().toISOString() }),
+              })
+            : await fetch(`${supabaseUrl}/rest/v1/workout_sessions`, {
+                method: "POST",
+                headers: { ...restHeaders, Prefer: "return=minimal" },
+                // 'swapped' names what this row is rather than borrowing a
+                // training split it never had; 0 is the honest LIFTING
+                // duration. What they actually did, and for how long, is the
+                // cardio_logs row below.
+                body: JSON.stringify({
+                  profile_id: profileId,
+                  date: swapDate,
+                  split_type: "swapped",
+                  duration_minutes: 0,
+                  is_completed: false,
+                  swapped_for_activity: activityName,
+                }),
+              });
+          if (!resp.ok) {
+            console.error(`workout_sessions swap write failed: ${resp.status}`, await resp.text());
+            dbSuccess = false;
+          }
+        } catch (err) {
+          console.error("swap_session_for_activity error:", err);
+          dbSuccess = false;
+        }
+
+        // The activity itself, only when they gave a duration. Guessing one
+        // would put an invented number into the streak and the weekly load.
+        const durationMinutes = Number(args.duration_minutes);
+        let activityLogged = false;
+        if (dbSuccess && Number.isFinite(durationMinutes) && durationMinutes > 0 && durationMinutes <= 600) {
+          const rpe = Number(args.intensity_rpe);
+          try {
+            const resp = await fetch(`${supabaseUrl}/rest/v1/cardio_logs`, {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${serviceKey}`,
+                Apikey: serviceKey,
+                "Content-Type": "application/json",
+                Prefer: "return=minimal",
+              },
+              body: JSON.stringify({
+                user_id: profileId,
+                date: swapDate,
+                activity_name: activityName,
+                duration_minutes: Math.round(durationMinutes),
+                intensity_rpe: Number.isFinite(rpe) && rpe >= 1 && rpe <= 10 ? Math.round(rpe) : 6,
+                notes: "Swapped in place of the prescribed lifting session",
+              }),
+            });
+            activityLogged = resp.ok;
+            if (!resp.ok) console.error(`cardio_logs insert failed: ${resp.status}`, await resp.text());
+          } catch (err) {
+            console.error("swap activity log error:", err);
+          }
+        }
+
+        // Never claims more than happened — the whole reason this tool exists
+        // is a reply that claimed more than happened.
+        const confirmText = !dbSuccess
+          ? "I couldn't update that day just now — give it another go in a moment."
+          : (textPart?.text || (activityLogged
+              ? `Done — that day is marked as ${activityName} instead of lifting, and the session is logged.`
+              : `Done — that day is marked as ${activityName} instead of lifting. Tell me how long it was and I'll log it properly.`));
+
+        return new Response(
+          JSON.stringify({
+            reply: confirmText,
+            action: dbSuccess ? { type: "swap_session_for_activity", activity_name: activityName, date: swapDate } : undefined,
+          }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }

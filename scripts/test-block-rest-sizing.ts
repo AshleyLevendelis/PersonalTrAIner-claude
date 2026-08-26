@@ -7,6 +7,7 @@
  * budget is left untouched.
  */
 import { sizeBlockToRestBudget } from '../src/lib/exercise-plan'
+import { getGoalPolicy } from '../src/lib/goal-policies'
 import type { WorkoutDay, Exercise } from '../src/lib/types'
 
 let failures = 0
@@ -45,14 +46,14 @@ const DAY_BUDGET_SECONDS = 45 * 60 // ~a 45-60min session's working-set budget
 
 function main() {
   console.log('[1] a day within budget at real rest is untouched')
-  const fine = sizeBlockToRestBudget([bigDay()], -15, DAY_BUDGET_SECONDS * 3, new Set(), [])
+  const fine = sizeBlockToRestBudget([bigDay()], -15, DAY_BUDGET_SECONDS * 3, new Set(), getGoalPolicy('hypertrophy'), [])
   check('exercise count unchanged', fine[0].exercises.length === bigDay().exercises.length)
   check('no block_size_note when nothing was removed', fine[0].block_size_note === undefined)
   check('sets unchanged', JSON.stringify(fine[0].exercises.map(e => e.sets)) === JSON.stringify(bigDay().exercises.map(e => e.sets)))
 
   console.log('[2] moderate overage trims sets before removing anything')
   const trimLog1: any[] = []
-  const trimmed = sizeBlockToRestBudget([bigDay()], 45, DAY_BUDGET_SECONDS, new Set(), trimLog1)
+  const trimmed = sizeBlockToRestBudget([bigDay()], 45, DAY_BUDGET_SECONDS, new Set(), getGoalPolicy('hypertrophy'), trimLog1)
   const originalCount = bigDay().exercises.length
   check('set-trim events were logged', trimLog1.some(e => e.reason.includes('sets trimmed')), trimLog1)
 
@@ -69,7 +70,7 @@ function main() {
   console.log('[4] a severe overage removes whole exercises, protected names survive')
   const protectedNames = new Set(['Barbell Bench Press'])
   const trimLog2: any[] = []
-  const severe = sizeBlockToRestBudget([bigDay()], 200, DAY_BUDGET_SECONDS, protectedNames, trimLog2)
+  const severe = sizeBlockToRestBudget([bigDay()], 200, DAY_BUDGET_SECONDS, protectedNames, getGoalPolicy('hypertrophy'), trimLog2)
   check('exercise count dropped', severe[0].exercises.length < originalCount, severe[0].exercises.length)
   check('protected main lift survived', severe[0].exercises.some(e => e.name === 'Barbell Bench Press'))
   check('block_size_note set when an exercise was actually removed', severe[0].block_size_note === 'Fewer exercises this block — heavier lifts need longer rest between sets.')
@@ -81,7 +82,7 @@ function main() {
     day: 'Thursday', focus: 'Conditioning & Core',
     exercises: [ex('Barbell Squats', 3, '90s'), ex('Cycling Intervals', 6, '45s', '45s')],
   }
-  const cardioResult = sizeBlockToRestBudget([cardioDay], 200, 1, new Set(), []) // budget=1s forces max trimming
+  const cardioResult = sizeBlockToRestBudget([cardioDay], 200, 1, new Set(), getGoalPolicy('hypertrophy'), []) // budget=1s forces max trimming
   const cardioSurvivor = cardioResult[0].exercises.find(e => e.name === 'Cycling Intervals')
   check('cardio exercise survives even under an impossible budget', !!cardioSurvivor)
   check('cardio sets unchanged', cardioSurvivor?.sets === 6, cardioSurvivor?.sets)

@@ -4,20 +4,20 @@ import type {
   FatigueCost, MesocycleMovementPattern, EquipmentAccess, TrainingStyle,
   ConstraintTrace, ConstraintTraceEntry, PlanResult, TrainingExperience,
 } from './types'
-import { EXERCISE_DATABASE, getMovementFamily, getVolumeRole, meetsCapabilityRequirement, getExerciseId, contraindicatedJoints, isContraindicatedFor, isIndicatedFor, NEAREST_PATTERN_FALLBACK, type ExerciseEntry, type MovementPattern, type AngleVector, type VolumeRole } from './exercise-db'
+import { EXERCISE_DATABASE, getMovementFamily, getVolumeRole, meetsCapabilityRequirement, getExerciseId, contraindicatedJoints, isContraindicatedFor, isIndicatedFor, isBandEquipped, NEAREST_PATTERN_FALLBACK, type ExerciseEntry, type MovementPattern, type AngleVector, type VolumeRole } from './exercise-db'
 import {
   getExperienceConfig, getSkillDemand, isSkillAppropriate, applyRepFloor,
   type ExperienceConfig,
 } from './experience-config'
 import { buildWarmup, getWarmupReserveSeconds } from './warmup'
-import { prescribeLoad, categorize, getLoadIncrementKg, isExternallyLoaded, getEquipmentFloorKg, loadingMode, roundToPlate, formatLoad, labelModeForEntry, hasKnownWorkingWeight, unverifiedRampStepKg, isolationTargetBelowFloor, resolveBodyBasis, prescribeAssistance, assistanceGuidance, type KnownWorkingWeights } from './load-prescription'
+import { prescribeLoad, prescribeAddedLoad, categorize, getLoadIncrementKg, isExternallyLoaded, getEquipmentFloorKg, loadingMode, roundToPlate, formatLoad, labelModeForEntry, hasKnownWorkingWeight, unverifiedRampStepKg, isolationTargetBelowFloor, resolveBodyBasis, prescribeAssistance, assistanceGuidance, type KnownWorkingWeights } from './load-prescription'
 import {
   getPhaseSequence, getPhaseConfig, rotateVariation, resolveTargetRpe,
-  shiftReps, adjustRest, dedupeAdjacentPhases, isRegressionFor, stepIntervalSeconds, type PhaseConfig, type TrainingPhase,
+  shiftReps, adjustRest, dedupeAdjacentPhases, isRegressionFor, stepIntervalSeconds, getPhaseTempo, formatTempo, type PhaseConfig, type TrainingPhase,
 } from './periodization'
-import { getGoalPolicy, restrictPhaseSequence, resolveConditioningFrequency, RECOVERY_SET_MULTIPLIER, type GoalPolicy } from './goal-policies'
+import { getGoalPolicy, restrictPhaseSequence, resolveConditioningFrequency, RECOVERY_SET_MULTIPLIER, MAIN_LIFT_REST_FLOOR_SECONDS, type GoalPolicy } from './goal-policies'
 import { isStartingOut, applyStartingOut, startingOutMinutes } from './starting-out'
-import { getDurationBudgetSeconds, getSteadyStateSeconds, estimateDaySeconds, estimateSlotsSeconds, parseRestSeconds, SESSION_OVERHEAD_SECONDS } from './session-duration'
+import { getDurationBudgetSeconds, getSessionMinimumSeconds, getSessionMaximumSeconds, getSteadyStateSeconds, DEFAULT_CARRY_DISTANCE_M, estimateDaySeconds, estimateSlotsSeconds, parseRestSeconds, SESSION_OVERHEAD_SECONDS } from './session-duration'
 
 // ---------------------------------------------------------------------------
 // Track definitions (unchanged — used for day-level focus selection)
@@ -759,10 +759,38 @@ function buildSupersetPairs(
   return ordered
 }
 
+/**
+ * The rest floor under one exercise, in seconds — 0 for anything that is not
+ * the day's main lift, so callers can write Math.max(rest, floor)
+ * unconditionally.
+ *
+ * ONE function rather than a Math.max sprinkled at each site, because the
+ * defect this closes was exactly that shape: the goal's loaded floor WAS
+ * asserted at three separate paths (prescription, the weekly rest_adjust,
+ * trimWeekRestForBudget) and a fourth path — stageTimeCap's blanket -15s —
+ * had no main-lift gate at all, so it silently undercut all three. Every
+ * path that can lower a main lift's rest calls this; adding a fifth path
+ * without calling it is the only way to reintroduce the bug.
+ *
+ * `policy` is optional so the duration ESTIMATORS (computeDurationTopUp,
+ * sizeBlockToRestBudget) can apply the universal floor without pretending to
+ * know the goal's loaded one. They under-estimate rest slightly for a
+ * conditioning loaded main lift as a result — pre-existing, unchanged by
+ * this, and it errs toward a shorter forecast, never a longer one.
+ */
+function mainLiftRestFloor(entry: ExerciseEntry | undefined, policy?: GoalPolicy): number {
+  if (!entry || entry.mechanics_tier !== 'tier1_compound') return 0
+  const loaded = policy?.minLoadedMainLiftRestSeconds
+  return loaded && isExternallyLoaded(entry)
+    ? Math.max(MAIN_LIFT_REST_FLOOR_SECONDS, loaded)
+    : MAIN_LIFT_REST_FLOOR_SECONDS
+}
+
 function stageTimeCap(
   dayExercises: { entry: ExerciseEntry; sets: number; reps: string; rest: string; restSeconds: number }[],
   budgetSeconds: number,
   style: TrainingStyle,
+  policy: GoalPolicy,
   trace: ConstraintTrace,
   /**
    * Names that filled a REQUIRED track slot (selectExercisesForTrack) —
@@ -812,9 +840,21 @@ function stageTimeCap(
   // new cardio reservation, where Elliptical still showed "30s" instead
   // of its real "0s" (Math.max(30, 0 - 15) = 30) despite never going
   // through trimWeekRestForBudget at all.
+  //
+  // The day's main lift is floored here too. Phase 1 above already exempts
+  // it (isSupersetEligible excludes tier1/tier2 compounds), and the comment
+  // there says "main lifts keep full rest even under time pressure" — but
+  // that was only ever true of Phase 1. This blanket -15s was the path that
+  // took a conditioning pull-up from 72s to 57s, and then anatomical
+  // adaptation's own -15s took it to 42s. Both later floors were gated on
+  // isExternallyLoaded, so a bodyweight main lift fell through every one.
   for (let i = 0; i < dayExercises.length; i++) {
     if (dayExercises[i].entry.mechanics_tier === 'cardio') continue
-    const newRest = Math.max(30, dayExercises[i].restSeconds - 15)
+    // Math.max, not an early `continue`: for everything that is not a main
+    // lift the floor stays 30 and the expression is byte-identical to what
+    // shipped before, so this change cannot move an accessory's rest.
+    const floor = Math.max(30, mainLiftRestFloor(dayExercises[i].entry, policy))
+    const newRest = Math.max(floor, dayExercises[i].restSeconds - 15)
     dayExercises[i] = { ...dayExercises[i], restSeconds: newRest, rest: `${newRest}s` }
   }
 
@@ -1077,11 +1117,32 @@ function isUnilateralCarryOrRotational(e: ExerciseEntry): boolean {
  * unilateral/carry/rotational work, those candidates are tried first within
  * whichever capability tier they landed in.
  */
+/**
+ * How much a band gives up to a real weight for a main or secondary slot.
+ * Sized deliberately: above the 0.3 tie-break jitter and above anything the
+ * five scoring factors can swing together (~5), and far below the 30-point
+ * gap between mechanics tiers — so it reorders implements WITHIN a tier and
+ * can never reorder the tiers themselves.
+ */
+const BAND_WITHOUT_WEIGHT_PENALTY = 12
+
+/** Shared empty set, so the no-injury path doesn't allocate one per candidate scored. */
+const EMPTY_JOINTS: Set<string> = new Set()
+
 interface ScoreContext {
   /** The day's own patterns (track.primary_patterns + secondary_patterns) — what "supports today's session" is measured against. */
   trackPatterns: MovementPattern[]
   selectedSoFar: ExerciseEntry[]
   weeklyAppearanceCount?: Map<string, number>
+  /** The trainee's injured joints, so a band prescribed AS rehab is never demoted for being a band. */
+  flaggedJoints?: Set<string>
+  /**
+   * True when some OTHER candidate in this same ranked list carries a real
+   * external load. Filled in by orderCandidates, never by a caller: it is a
+   * property of the slot being filled, not of the pool in general, and that
+   * is exactly what makes the band rule a preference rather than a ban.
+   */
+  listHasLoadedAlternative?: boolean
 }
 
 /**
@@ -1189,6 +1250,47 @@ function scoreCandidate(candidate: ExerciseEntry, policy: GoalPolicy, rawExperie
   // non-obvious coaching call.
   score += ({ tier1_compound: 90, tier2_compound: 60, tier3_isolation: 30 } as Record<string, number>)[candidate.mechanics_tier] ?? 0
 
+  // A REAL WEIGHT BEATS A BAND, when a real weight is actually on offer.
+  //
+  // A resistance band is not in LOADED_EQUIPMENT, so the app shows NO WEIGHT
+  // for it — the lift can only progress by reps and the weight column that
+  // carries a lift's whole progression story is blank. MEASURED before this
+  // existed: 906 of 18,909 main/secondary slots (4.79%) resolved to a band
+  // on a day that already contained a real load, peaking at 8.03% for a
+  // minimalist trainee. Nothing was broken; nothing was CHOOSING either.
+  // Dumbbell Shoulder Press and Band Shoulder Press are both tier2_compound
+  // vertical_push and scored IDENTICALLY on all five factors above, so the
+  // winner was decided by the jitter two lines down. A coin flip, 906 times.
+  //
+  // Four conditions, each load-bearing:
+  //   - listHasLoadedAlternative keeps this a PREFERENCE, not a ban. A
+  //     minimalist trainee whose only vertical_pull is a band keeps the band;
+  //     demoting the only thing left is not an improvement.
+  //   - the isIndicatedFor exemption protects the rehab pass. Spanish Squat
+  //     is a patellar-tendon rehab tool and Kneeling Band Lat Pulldown is
+  //     shoulder-tolerable pulling; 352 current placements are deliberate
+  //     rehab and must survive untouched.
+  //   - tier1/tier2 only. A band in a tier3 isolation slot (Band Pull-Aparts,
+  //     Band Face Pulls) is the right tool for that job.
+  //   - the magnitude sits above the jitter (0.3) and above anything the five
+  //     factors can swing together (~5), and far below the 30-point gap
+  //     between tiers — so it reorders IMPLEMENTS within a tier and never
+  //     reorders the tiers themselves.
+  //
+  // Kept OUT of `factors` for the same reason as the tier bonus directly
+  // above: "we used the real weight because you have one" is baseline
+  // structure, not a non-obvious coaching call, and explainWinner would
+  // otherwise cite it on nearly every affected pick.
+  if (
+    ctx.listHasLoadedAlternative &&
+    (candidate.mechanics_tier === 'tier1_compound' || candidate.mechanics_tier === 'tier2_compound') &&
+    isBandEquipped(candidate) &&
+    !isExternallyLoaded(candidate) &&
+    !isIndicatedFor(candidate, ctx.flaggedJoints ?? EMPTY_JOINTS)
+  ) {
+    score -= BAND_WITHOUT_WEIGHT_PENALTY
+  }
+
   // Tie-break only: small enough to never overturn a genuine difference
   // above, large enough to stop two truly equal candidates from always
   // resolving the same way. Goes through the same seeded randomSource() as
@@ -1199,8 +1301,16 @@ function scoreCandidate(candidate: ExerciseEntry, policy: GoalPolicy, rawExperie
 }
 
 function orderCandidates(candidates: ExerciseEntry[], policy: GoalPolicy, rawExperience: TrainingExperience, ctx: ScoreContext): ScoredCandidate[] {
+  // Answered here, once, from the list actually being ranked — not by any
+  // caller and not from the pool at large. "Was a real weight on offer for
+  // THIS slot?" is the only form of the question that makes the band rule
+  // safe for a trainee whose whole kit is bands.
+  const scoped: ScoreContext = {
+    ...ctx,
+    listHasLoadedAlternative: candidates.some(e => isExternallyLoaded(e) && !isBandEquipped(e)),
+  }
   return candidates
-    .map(e => ({ e, ...scoreCandidate(e, policy, rawExperience, ctx) }))
+    .map(e => ({ e, ...scoreCandidate(e, policy, rawExperience, scoped) }))
     .sort((a, b) => b.score - a.score)
 }
 
@@ -1556,7 +1666,7 @@ function selectExercisesForTrack(
       ),
       policy,
       rawExperience,
-      { trackPatterns: [...track.primary_patterns, ...track.secondary_patterns], selectedSoFar: selected, weeklyAppearanceCount },
+      { trackPatterns: [...track.primary_patterns, ...track.secondary_patterns], selectedSoFar: selected, weeklyAppearanceCount, flaggedJoints },
     )
     const winner = candidates[0]
     if (winner) {
@@ -1616,7 +1726,7 @@ function selectExercisesForTrack(
       ),
       policy,
       rawExperience,
-      { trackPatterns: [...track.primary_patterns, ...track.secondary_patterns], selectedSoFar: selected, weeklyAppearanceCount },
+      { trackPatterns: [...track.primary_patterns, ...track.secondary_patterns], selectedSoFar: selected, weeklyAppearanceCount, flaggedJoints },
     )
     for (let i = 0; i < candidates.length; i++) {
       const c = candidates[i]
@@ -1697,7 +1807,7 @@ function selectExercisesForTrack(
       ),
       policy,
       rawExperience,
-      { trackPatterns: [...track.primary_patterns, ...track.secondary_patterns], selectedSoFar: selected, weeklyAppearanceCount },
+      { trackPatterns: [...track.primary_patterns, ...track.secondary_patterns], selectedSoFar: selected, weeklyAppearanceCount, flaggedJoints },
     )
     for (let i = 0; i < cardioCandidates.length; i++) {
       const c = cardioCandidates[i]
@@ -1764,7 +1874,7 @@ function selectExercisesForTrack(
         ),
         policy,
         rawExperience,
-        { trackPatterns: [...track.primary_patterns, ...track.secondary_patterns], selectedSoFar: selected, weeklyAppearanceCount },
+        { trackPatterns: [...track.primary_patterns, ...track.secondary_patterns], selectedSoFar: selected, weeklyAppearanceCount, flaggedJoints },
       )
 
       for (let i = 0; i < candidates.length; i++) {
@@ -1995,10 +2105,18 @@ function shiftRestSeconds(seconds: number, multiplier: number): number {
 
 /**
  * The prescription for every non-'reps' unit — a hold duration, a measured
- * carry distance, a work:rest interval. These are FIXED: unlike a rep range,
- * they don't bend to training style, experience or goal (a 40m farmer's walk
- * is 40m for everyone; only the load moves). Returns null for 'reps', which
- * genuinely does need the style/experience/policy chain.
+ * carry distance, a work:rest interval. These are the STARTING values: unlike
+ * a rep range they don't bend to training style, experience or goal — a 40m
+ * farmer's walk starts at 40m for everyone.
+ *
+ * "Only the load moves" is what this comment used to say, and it stopped
+ * being true. A carry's load converges on its ceiling and then nothing moved
+ * at all — measured, 100 of 265 frozen week-to-week transitions, the largest
+ * single bucket. generateMesocycle now walks the distance up (+5m per frozen
+ * week, capped) when the weight has stopped; see FROZEN_CARRY_DISTANCE_STEP_M.
+ * This function still returns the DEFAULT, which is what a rotated-in carry
+ * must start from. Returns null for 'reps', which genuinely does need the
+ * style/experience/policy chain.
  *
  * Exported because any path that changes WHICH exercise occupies a slot has
  * to re-derive these when the incoming exercise's prescription_type differs
@@ -2016,7 +2134,13 @@ export function fixedUnitPrescription(
     case 'time':
       return { sets: 3, reps: '30-45s', rest: '45s', restSeconds: 45 }
     case 'distance_load':
-      return { sets: 3, reps: '40m', rest: '60s', restSeconds: 60 }
+      // The DEFAULT, and always the default — a carry rotated into a slot by
+      // swap/ban/injury/equipment starts here, never at the outgoing carry's
+      // progressed distance. That is the whole reason this function is the
+      // shared choke point (see its doc comment: "a carry ended up prescribed
+      // 8-12 reps and a hold ended up 40m"), and test:slot-replacement is the
+      // gate that asserts no outgoing-exercise data survives a swap.
+      return { sets: 3, reps: `${DEFAULT_CARRY_DISTANCE_M}m`, rest: '60s', restSeconds: 60 }
     case 'intervals': {
       // Rounds of work:rest, never a rep count — a jump-rope or battle-rope
       // set is not "15-18 reps." Differentiated by category rather than one
@@ -2092,7 +2216,18 @@ function assignSetsRepsFromConfig(
       // reaches every call site (initial build, block rotation, weekly
       // accessory sub-rotation, swap/gap-fill repair) for free.
       const tierKey = entry.mechanics_tier === 'tier1_compound' ? 'tier1' : entry.mechanics_tier === 'tier2_compound' ? 'tier2' : 'tier3'
-      const restSeconds = shiftRestSeconds(config.restSeconds[tierKey], policy.restSecondsMultiplier[tierKey])
+      let restSeconds = shiftRestSeconds(config.restSeconds[tierKey], policy.restSecondsMultiplier[tierKey])
+      // A goal may compress rest as hard as it likes, except under a loaded
+      // main lift. Conditioning's multiplier took Barbell Squats to 42s
+      // between sets on a short session — the goal working exactly as
+      // designed, on the one exercise where it should not. Gated on
+      // isExternallyLoaded so a bodyweight main lift (chin-ups) keeps the
+      // goal's density; the floor is about a bar, not about tier.
+      // ...and under MAIN_LIFT_REST_FLOOR_SECONDS the scoping stops: 60s is
+      // the floor for any main lift, bodyweight included. mainLiftRestFloor
+      // returns the higher of the two, so this one expression carries both
+      // rules and neither can be applied without the other.
+      restSeconds = Math.max(restSeconds, mainLiftRestFloor(entry, policy))
       return {
         sets: scaleSets(config.setRange[tierKey]),
         reps: snapToRepBracket(applyRepFloor(shiftRepRange(config.repRange[tierKey], policy.repRangeShift[tierKey]), experience.min_reps)),
@@ -2281,6 +2416,28 @@ const SAME_MUSCLE_GROUP_MAX_RATIO = 2 // heaviest same-group accessory vs. light
 // let a strength block's 4-6 climb far enough and it quietly becomes an
 // endurance block.
 const MAX_FROZEN_LOAD_REP_BUMP = 3
+
+/**
+ * One step further, when a carry's weight has stopped moving.
+ *
+ * A carry's design is "only the load moves" (see fixedUnitPrescription) —
+ * coherent until the load converges on its ceiling, after which NOTHING
+ * moves: carries are excluded from rampReps and from the frozen-load rep
+ * bump because shiftReps passes '40m' straight through. MEASURED, they were
+ * 100 of 265 frozen week-to-week transitions, the largest single bucket.
+ *
+ * Ashley's ruling: when the weight can't move, walk further. 5m is one
+ * honest increment on a 40m carry (12.5%) — small enough that the session
+ * budget absorbs it, big enough to read as progress on the card.
+ */
+const FROZEN_CARRY_DISTANCE_STEP_M = 5
+
+/**
+ * Cap on the accumulated distance bump, in steps. Three takes a 40m carry to
+ * 55m across a plan; without it a sixteen-week plan walks to 100m, which is
+ * a different exercise. Mirrors MAX_FROZEN_LOAD_REP_BUMP's role exactly.
+ */
+const MAX_FROZEN_CARRY_DISTANCE_STEPS = 3
 
 type BroadPattern = 'push' | 'pull' | 'squat' | 'hinge' | null
 
@@ -3702,7 +3859,7 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
 
     // STAGE 5: Time-cap optimization per day
     const preTimeCapNames = new Set(daySlots.map(s => s.entry.name))
-    const optimized = stageTimeCap(daySlots, budgetSeconds, trainingStyle, trace, requiredNames)
+    const optimized = stageTimeCap(daySlots, budgetSeconds, trainingStyle, policy, trace, requiredNames)
     // stageTimeCap's Phase 4 can drop an exercise outright under duration
     // pressure — that name was already added to weeklyUsed/allSelectedNames
     // above, on the assumption it was staying. Left uncleared, it becomes a
@@ -3845,17 +4002,29 @@ function buildProgressionNote(
   isDeload: boolean,
   isCalibrationWeek: boolean,
   policy: GoalPolicy,
+  // True when almost nothing this week carries a weight — see
+  // isLoadlessWeek. Every branch below used to instruct the trainee to add,
+  // find, or drop load, which for a bodyweight-only trainee is an
+  // instruction about equipment she does not own.
+  loadless = false,
 ): string {
   if (isDeload) {
-    return 'Deload week — load and volume both step back so you arrive at the next block recovered, not because progress stalled.'
+    return loadless
+      ? 'Deload week — volume steps back so you arrive at the next block recovered, not because progress stalled.'
+      : 'Deload week — load and volume both step back so you arrive at the next block recovered, not because progress stalled.'
   }
   if (isCalibrationWeek) {
-    return 'Loads start deliberately light — find the weight where the last rep feels like RPE 6, log it, and next week builds from YOUR numbers.'
+    return loadless
+      ? 'Start easier than you think you need — find the version of each move where the last rep feels like RPE 6, log what you actually did, and next week builds from YOUR numbers.'
+      : 'Loads start deliberately light — find the weight where the last rep feels like RPE 6, log it, and next week builds from YOUR numbers.'
   }
-  const rampsLoad = policy.progressionEmphasis === 'load'
+  // A loadless week has no weight lever, so it reads as reps-emphasis
+  // regardless of what the goal would otherwise ramp.
+  const rampsLoad = policy.progressionEmphasis === 'load' && !loadless
   if (weekInBlock === 1) {
-    return rampsLoad
-      ? 'Baseline week — this sets the working weight every later week in the block adds load on top of.'
+    if (rampsLoad) return 'Baseline week — this sets the working weight every later week in the block adds load on top of.'
+    return loadless
+      ? 'Baseline week — this sets the rep target every later week in the block builds on.'
       : 'Baseline week — weight holds flat this block by design; this sets the rep target every later week builds on.'
   }
   if (rampsLoad) {
@@ -3863,11 +4032,98 @@ function buildProgressionNote(
       ? 'Load goes up this week on the main lifts — same rep target, more weight than last week.'
       : 'Load goes up again this week — the heaviest working sets of the block before the deload.'
   }
+  if (loadless) {
+    return weekInBlock === 2
+      ? 'The work goes up this week — same movements, more reps than last week. That IS the progression when there is no weight to add, not a missing one.'
+      : 'More again this week — the hardest working sets of the block before the deload.'
+  }
   // 'reps' or 'maintain' emphasis: weight intentionally holds flat, reps are
   // the real lever. Named explicitly so this doesn't read as stagnation.
   return weekInBlock === 2
     ? 'Weight holds flat by design — reps climb this week. That IS the progression for this goal, not a missing one.'
     : 'Weight still holds flat, reps climb again — building work capacity before the next block changes the stimulus.'
+}
+
+/**
+ * True when a week's working sets are overwhelmingly weightless, so every
+ * sentence about adding, finding or dropping load is talking about equipment
+ * this trainee does not have.
+ *
+ * Asked of the WEEK'S OWN EXERCISES rather than of equipment_access, and that
+ * is the point. EQUIPMENT_SETS.bodyweight includes 'weighted backpack' —
+ * genuinely the one progressive load available with no gym — so a
+ * bodyweight-tier plan does contain a couple of real numbers (Backpack Row,
+ * Loaded Backpack Walk). Keying on the equipment answer would have declared
+ * those weightless; keying on the plan gets both right. MEASURED share of
+ * working sets carrying a load, across four goals x three experience levels
+ * x three splits: bodyweight 12.2%, minimalist 52.2%, full_gym 77.0%. The
+ * threshold sits in the gap with room on both sides rather than on top of
+ * either number, and test:loadless-notes prints all three every run so it
+ * cannot drift without someone seeing it.
+ */
+const LOADLESS_WEEK_MAX_LOADED_SHARE = 0.25
+
+function isLoadlessWeek(days: WorkoutDay[]): boolean {
+  let working = 0, loaded = 0
+  for (const day of days) {
+    for (const ex of day.exercises) {
+      if (ex.tier === 'tier_0_primer') continue
+      working++
+      if (ex.suggested_load_kg != null) loaded++
+    }
+  }
+  if (working === 0) return false
+  return loaded / working <= LOADLESS_WEEK_MAX_LOADED_SHARE
+}
+
+/**
+ * Gives a weightless, rep-based working lift the block's tempo — the phase's
+ * only available voice when there is no weight for it to speak through.
+ *
+ * Runs AFTER enforceLoadCoherence (loads are final, so "is this weightless"
+ * is answerable) and BEFORE trimWeekRestForBudget/applyDurationFiller, which
+ * is not a style preference: a 4-1-1 rep is 6s against SECONDS_PER_REP's
+ * assumed 3.5, so a tempo assigned after the duration passes would be 71%
+ * of working time those passes never saw. Same failure shape as a
+ * prescription string the duration model cannot parse.
+ *
+ * Four exclusions, each for a different reason:
+ *   - DELOAD: the week exists to back off. A slower, harder rep is the
+ *     opposite of that.
+ *   - non-'reps' prescriptions: a hold ('30-45s'), a carry ('40m') and an
+ *     interval have no reps to slow down, so a tempo would be a unit
+ *     mismatch — the same class of error as shiftReps' minReps being used as
+ *     a seconds floor.
+ *   - primers: movement prep, deliberately easy, never a working set.
+ *   - anything carrying a weight: there the weight IS the lever, and adding
+ *     a second one at the same time is what "one lever at a time" exists to
+ *     prevent.
+ */
+function applyTempoPrescription(days: WorkoutDay[], phase: TrainingPhase, isDeload: boolean): void {
+  if (isDeload) return
+  const tempo = getPhaseTempo(phase)
+  if (!tempo) return
+  const notation = formatTempo(tempo)
+  for (const day of days) {
+    for (const ex of day.exercises) {
+      if (ex.suggested_load_kg != null) continue
+      const entry = EXERCISE_DATABASE.find(e => e.name === ex.name)
+      if (!entry || entry.mechanics_tier === 'primer') continue
+      if (entry.prescription_type !== 'reps') continue
+      // A chin-up or a dip CAN take a belt or a loaded backpack, so "there is
+      // no weight to add" is false for them — showing no weight there is a
+      // gap in this app, not a fact about the movement. Ashley's call, and
+      // the right one: slowing the rep down would paper over that gap
+      // instead of closing it. Excluded here and flagged in BACKLOG; the
+      // real fix is prescribing the added load.
+      if (entry.accepts_added_load) continue
+      // Belt and braces: prescription_type says what the entry IS, this says
+      // what the string actually holds. A mismatch between them has shipped
+      // before (fixedUnitPrescription exists because of it).
+      if (!/^\d+(\s*-\s*\d+)?$/.test(String(ex.reps).trim())) continue
+      ex.tempo = notation
+    }
+  }
 }
 
 // A bodyweight trainee has no external load to ramp — 'strength' and
@@ -4191,10 +4447,13 @@ function computeDurationTopUp(
       (day.recommendedCardio?.timing === 'post_session' ? day.recommendedCardio.duration * 60 : 0)
     const targetSeconds = (totalBudgetSeconds - fixedCostSeconds) * 0.95
     const entries = day.exercises.map(ex => EXERCISE_DATABASE.find(e => e.name.toLowerCase() === ex.name.toLowerCase()))
-    const restSeconds = day.exercises.map(ex => {
+    const restSeconds = day.exercises.map((ex, i) => {
       const match = ex.rest.match(/(\d+)/)
       const base = match ? parseInt(match[1], 10) : 60
-      return Math.max(20, base + phaseConfig.rest_adjust_seconds)
+      // Same main-lift floor the real per-week derivation applies. Without
+      // it this forecast under-costs exactly the sessions the floor makes
+      // longer, and top-up would re-add sets the day can no longer afford.
+      return Math.max(20, base + phaseConfig.rest_adjust_seconds, mainLiftRestFloor(entries[i], policy))
     })
     const roles = entries.map(e => e ? getVolumeRole(e) : null)
     const roleCeilings = day.exercises.map((_, i) => roles[i] ? getRoleSetCeiling(roles[i]!, isLongSession) : EXTRA_SETS_CAP + 99)
@@ -4289,7 +4548,19 @@ function computeDurationTopUp(
  * shorter" reasoning applyDurationFiller and scoreTimeFit already carve out
  * for them.
  */
-function trimWeekRestForBudget(days: WorkoutDay[], budgetSeconds: number, trimLog?: ConstraintTraceEntry[]): void {
+function trimWeekRestForBudget(
+  days: WorkoutDay[],
+  budgetSeconds: number,
+  trimLog?: ConstraintTraceEntry[],
+  /**
+   * Floor under a LOADED main lift's rest, from the goal's own
+   * minLoadedMainLiftRestSeconds. Without it this function's hardcoded 60s
+   * quietly overrode the goal floor set at prescription time — the
+   * prescription said 90s for a conditioning squat and the trimmer took it
+   * straight back to 60. Undefined keeps the historical 60s.
+   */
+  loadedMainLiftFloorSeconds?: number,
+): void {
   for (const day of days) {
     if (day.exercises.length === 0) continue
     let seconds = estimateDaySeconds(day)
@@ -4321,7 +4592,13 @@ function trimWeekRestForBudget(days: WorkoutDay[], budgetSeconds: number, trimLo
         if (seconds <= budgetSeconds) break
         const ex = day.exercises[i]
         const restSeconds = parseRestSeconds(ex.rest)
-        const floor = isMain ? 60 : 30
+        // The goal's floor only applies to a LOADED main lift, matching where
+        // it was set at prescription time — a bodyweight main lift keeps the
+        // goal's density, because the risk this guards is a bar, not a tier.
+        const mainFloor = isMain && loadedMainLiftFloorSeconds && isExternallyLoaded(findEntry(ex.name) ?? ({} as ExerciseEntry))
+          ? Math.max(MAIN_LIFT_REST_FLOOR_SECONDS, loadedMainLiftFloorSeconds)
+          : MAIN_LIFT_REST_FLOOR_SECONDS
+        const floor = isMain ? mainFloor : 30
         if (restSeconds <= floor) continue
         const newRest = Math.max(floor, restSeconds - 15)
         day.exercises[i] = { ...ex, rest: `${newRest}s` }
@@ -4393,6 +4670,7 @@ export function sizeBlockToRestBudget(
   restAdjustSeconds: number,
   totalBudgetSeconds: number,
   protectedNames: Set<string>,
+  policy: GoalPolicy,
   trimLog?: ConstraintTraceEntry[],
 ): WorkoutDay[] {
   return blockDays.map(day => {
@@ -4406,7 +4684,10 @@ export function sizeBlockToRestBudget(
     // accounting trimWeekRestForBudget checks against later.
     const estimate = (exercises: Exercise[]) => estimateDaySeconds({
       ...day,
-      exercises: exercises.map(ex => ({ ...ex, rest: `${Math.max(20, parseRestSeconds(ex.rest) + restAdjustSeconds)}s` })),
+      exercises: exercises.map(ex => ({
+        ...ex,
+        rest: `${Math.max(20, parseRestSeconds(ex.rest) + restAdjustSeconds, mainLiftRestFloor(findEntry(ex.name), policy))}s`,
+      })),
     })
 
     let exercises = day.exercises
@@ -4492,6 +4773,12 @@ function applyDurationFiller(
   profile: UserProfile,
   policy: GoalPolicy,
   totalBudgetSeconds: number,
+  /**
+   * The LOW end of the trainee's stated range, not the midpoint budget. A
+   * session under the midpoint can be perfectly fine; a session under the
+   * MINIMUM is shorter than the time they actually set aside.
+   */
+  sessionMinimumSeconds: number,
 ): void {
   const recovery = profile.recovery_capacity || 'moderate'
   const mobilityOnly = recovery === 'low' || recovery === 'moderate' || profile.conditioning_preference === 'avoid'
@@ -4500,7 +4787,17 @@ function applyDurationFiller(
     if (day.exercises.length === 0 || day.conditioning_note) continue
     const actualSeconds = estimateDaySeconds(day)
     const underBySeconds = totalBudgetSeconds - actualSeconds
-    if (underBySeconds <= FILLER_TRIGGER_SECONDS) continue
+    // Two triggers, because one flat number cannot serve every tier. The
+    // 15-minute gap catches a session well short of the midpoint budget. The
+    // minimum catches one that is merely a few minutes short of the midpoint
+    // but still under the time the trainee told us they had — and that second
+    // case is the one a flat threshold kept missing, because 15 minutes only
+    // happens to line up with a tier minimum for "60-90" (75 - 15 = 60
+    // exactly). Every other tier had a hole beneath its own minimum: "45-60"
+    // filled nothing between 37 and 45 minutes. MEASURED on loading weeks
+    // before this: 13% of "45-60" sessions came in under 45 minutes, against
+    // 1% for "60-90".
+    if (underBySeconds <= FILLER_TRIGGER_SECONDS && actualSeconds >= sessionMinimumSeconds) continue
 
     // Capped higher than the old 20min (then 30min, then 60min) ceiling now
     // that the honest duration model (session-duration.ts) charges real
@@ -4737,6 +5034,9 @@ export function generateMesocycle(
   // attempt, which compared a pre-coherence probe against post-coherence
   // history and pinned loads coherence would otherwise have moved.
   const frozenLoadStreakByLift = new Map<string, number>()
+  // The carry equivalent, and outside the week loop for the same reason: it
+  // is a STREAK across weeks, not a per-week decision.
+  const frozenCarryStepsByLift = new Map<string, number>()
   const previousWeekPreCoherenceKgByLift = new Map<string, number>()
 
   sequence.forEach((phase, blockIndex) => {
@@ -4817,7 +5117,7 @@ export function generateMesocycle(
     // is already known — so trimWeekRestForBudget below goes back to being
     // the rare last-resort nudge it was designed as, not the mechanism
     // carrying the whole mesocycle every week.
-    const blockDays = sizeBlockToRestBudget(rotatedBlockDays, phaseConfig.rest_adjust_seconds, totalBudgetSeconds, requiredNames, trimLog)
+    const blockDays = sizeBlockToRestBudget(rotatedBlockDays, phaseConfig.rest_adjust_seconds, totalBudgetSeconds, requiredNames, policy, trimLog)
 
     // Double progression's within-block memory: each exercise's week-1
     // ("baseline") load, keyed by [dayIndex][exerciseIndex] — weeks 2-3 are
@@ -4912,6 +5212,10 @@ export function generateMesocycle(
       // and "5-7" on Thursday. Measured: lift-weeks showing more than one rep
       // range at the same weight went from 19 to 108 before this was fixed.
       const frozenBumpDecidedThisWeek = new Map<string, number>()
+      // Carry twin of the line above, and per-WEEK for the same reason: one
+      // carry can hold two slots in a week and both must show the same
+      // distance.
+      const carryStepDecidedThisWeek = new Map<string, number>()
 
       const days: WorkoutDay[] = blockDays.map((day, dayIdx) => {
         // Fixed for this week (main/core never rotate weekly), so these
@@ -5140,6 +5444,34 @@ export function generateMesocycle(
             restForWeek = adjustRest(ex.rest, restShift)
           }
 
+          // Third and last place the goal's loaded-main-lift rest floor has to
+          // hold. The phase's own rest_adjust_seconds is applied AFTER the
+          // prescription, so a metabolic block's negative shift took a
+          // conditioning squat from 75s to 55s — under the floor, and under
+          // the 60s even the trimmer respects. Each of the three paths
+          // (prescription, this weekly adjust, trimWeekRestForBudget) sets
+          // rest independently, so the floor has to be re-asserted at each;
+          // fixing only the first left 288 of 432 loaded main lifts still
+          // below it.
+          //
+          // Not gated on isDeload any more. The loaded floor skipped deloads
+          // because a deload deliberately backs OFF, and forcing 90s rest on
+          // a light week was reading the goal's density rule as a training
+          // rule. The 60s floor is not that: it is "can the trainee finish
+          // the next set", which a lighter week does not change. Deloads
+          // carry roughly half the sets, so the added rest has slack to come
+          // out of — measured, not assumed (see the session-length delta).
+          {
+            const floor = mainLiftRestFloor(
+              dbEntry,
+              isDeload ? undefined : policy,
+            )
+            const current = parseRestSeconds(restForWeek)
+            if (floor > 0 && current > 0 && current < floor) {
+              restForWeek = `${floor}s`
+            }
+          }
+
           // Primers stay submaximal and un-scaled for the same reason as the
           // base plan — a warm-up movement should never carry a working-set
           // RPE or a load that scales with the block.
@@ -5351,6 +5683,34 @@ export function generateMesocycle(
               frozenLoadStreakByLift.set(dbEntry.name, 0)
             }
 
+            // WALK FURTHER WHEN THE WEIGHT WON'T MOVE — the carry twin of the
+            // rep bump above, on the identical trigger (this week's resolved
+            // load equals the previous loading week's).
+            //
+            // Simpler than the rep version, and deliberately so: distance
+            // does NOT feed prescribeLoad the way reps do (load-prescription
+            // .ts parses a carry by load only — reading '40m' as a rep count
+            // "would wildly overshoot"), so there is nothing to re-derive, no
+            // weight to pin, and no divergence backstop to satisfy. Adding
+            // distance cannot pull the weight down, which is the entire
+            // hazard the rep version had to engineer around.
+            const canBuyDistance = isCarry && !isDeload && !isCalibrationWeek
+              && /^\d+\s*m$/.test(String(reps))
+            if (canBuyDistance && naturalKg != null && previousNaturalKg != null && naturalKg === previousNaturalKg) {
+              const alreadyStepped = carryStepDecidedThisWeek.get(dbEntry.name)
+              const steps = alreadyStepped
+                ?? Math.min((frozenCarryStepsByLift.get(dbEntry.name) ?? 0) + 1, MAX_FROZEN_CARRY_DISTANCE_STEPS)
+              carryStepDecidedThisWeek.set(dbEntry.name, steps)
+              frozenCarryStepsByLift.set(dbEntry.name, steps)
+              const baseM = parseInt(String(reps), 10)
+              reps = `${baseM + steps * FROZEN_CARRY_DISTANCE_STEP_M}m`
+            } else if (canBuyDistance && naturalKg != null && previousNaturalKg != null) {
+              // The weight moved, so the distance resets — same reasoning as
+              // the rep reset above. A carry that earned a heavier load should
+              // not also still be walking the accumulated extra.
+              frozenCarryStepsByLift.set(dbEntry.name, 0)
+            }
+
             if (w === 1) {
               blockBaselineKg[dayIdx][exIdx] = load.starting_weight_kg
               blockBaselineName[dayIdx][exIdx] = dbEntry.name
@@ -5374,6 +5734,20 @@ export function generateMesocycle(
             }
           }
 
+          // Computed HERE rather than beside prescribeAssistance above,
+          // because the rep guard reads the week's FINAL rep target,
+          // including the frozen-load rep bump, and reps only settle here.
+          // The weight itself keys on the PHASE, so it is constant across a
+          // block and cannot fight the within-block rep ramp.
+          const addedLoad = dbEntry && !isPrimer
+            ? prescribeAddedLoad(dbEntry, profile, {
+                repRangeLabel: reps,
+                phase: phaseConfig.phase,
+                isDeload,
+                isCalibrationWeek,
+              })
+            : null
+
           return {
             ...ex,
             name: weeklyName,
@@ -5385,12 +5759,21 @@ export function generateMesocycle(
               ? (deloadNeedsRepCut
                   ? 'Bar stays the same — reduced reps this week. Recovery comes from doing less, not lifting lighter.'
                   : 'Bar stays the same — reduced sets this week. Recovery comes from doing less, not lifting lighter.')
-              : (assistance ? assistanceGuidance(assistance) : (load ? `${expConfig.load_guidance} ${load.basis}` : ex.load_guidance)),
+              : (assistance
+                  ? assistanceGuidance(assistance)
+                  : addedLoad
+                    // Takes precedence over the generic bodyweight guidance:
+                    // that copy says "progress by adding reps or slowing the
+                    // tempo before adding load", which is the opposite of
+                    // what this week is asking for.
+                    ? addedLoad.basis
+                    : (load ? `${expConfig.load_guidance} ${load.basis}` : ex.load_guidance)),
             suggested_load: load ? load.display : ex.suggested_load,
             suggested_load_kg: load ? load.starting_weight_kg : ex.suggested_load_kg,
             load_source: load ? load.load_source : ex.load_source,
             per_set_load: load ? load.per_set : (ex.per_set_load ?? null),
             suggested_assistance_kg: assistance ? assistance.assistance_kg : ex.suggested_assistance_kg,
+            suggested_added_load_kg: addedLoad ? addedLoad.added_kg : null,
             assistance_ready_to_graduate: assistance ? assistance.ready_to_graduate : ex.assistance_ready_to_graduate,
             movement_pattern: dbEntry ? mapMovementPattern(dbEntry.movement_pattern) : undefined,
             tier: dbEntry ? mapTier(dbEntry.mechanics_tier) : undefined,
@@ -5419,6 +5802,12 @@ export function generateMesocycle(
       })
 
       enforceLoadCoherence(days)
+
+      // Decided ONCE, here, and used by both the tempo pass below and the
+      // week's coach note. Splitting the decision would let a week be told
+      // "no weight to add" while its lifts were prescribed as if there were.
+      const loadlessWeek = isLoadlessWeek(days)
+      applyTempoPrescription(days, phaseConfig.phase, isDeload)
 
       // Roll this week's natural loads forward as next week's comparison
       // basis. Deload weeks are deliberately NOT recorded: a deload is
@@ -5465,14 +5854,40 @@ export function generateMesocycle(
         // after this (rest already at floor) has nothing under-budget for
         // the filler to fill either, so the two never fight over the same
         // day.
-        trimWeekRestForBudget(days, totalBudgetSeconds, trimLog)
-        applyDurationFiller(days, profile, policy, totalBudgetSeconds)
+        trimWeekRestForBudget(days, totalBudgetSeconds, trimLog, policy.minLoadedMainLiftRestSeconds)
+        applyDurationFiller(days, profile, policy, totalBudgetSeconds, getSessionMinimumSeconds(profile.session_duration_preference || '45-60'))
         // Runs last, after rotation, periodization and duration-budget
         // trimming have all had their say — see enforceWeeklyPatternBalance's
         // doc comment. Deload weeks are exempt (like the duration filler
         // above): their volume is deliberately, uniformly cut, and nudging
         // set counts would fight that.
         enforceWeeklyPatternBalance(days)
+
+        // FINAL SAFETY TRIM, against the stated MAXIMUM rather than the
+        // midpoint budget the pass above already aimed at.
+        //
+        // enforceWeeklyPatternBalance is documented as needing to run last —
+        // after rotation, periodization and duration trimming have all had
+        // their say — and it BUMPS SETS to balance push against pull. It has
+        // no idea the duration passes already finished, which is a known and
+        // accepted couple-of-minutes drift (BACKLOG). Tempo made those
+        // minutes cost more: a 4-1-1 rep is 6s against SECONDS_PER_REP's
+        // assumed 3.5, so a bumped 4-set push-up in a Maximal Strength week
+        // put two "30-45" sessions at 45.8 minutes — 48 seconds past a
+        // ceiling that read 0 before.
+        //
+        // Deliberately targets the MAXIMUM, not the budget, so it is a
+        // backstop and not a second opinion: every day already inside what
+        // the trainee asked for is skipped untouched (the trimmer's own
+        // first line), and only a day that broke the ceiling gives up rest.
+        // Rest is also the one lever this is allowed to pull — trimming sets
+        // here would fight the very pass that just set them.
+        trimWeekRestForBudget(
+          days,
+          getSessionMaximumSeconds(profile.session_duration_preference || '45-60'),
+          trimLog,
+          policy.minLoadedMainLiftRestSeconds,
+        )
       }
 
       // Starting-out weeks progress on DURATION, not load. Everything above
@@ -5496,17 +5911,24 @@ export function generateMesocycle(
         phase_focus: phaseConfig.focus,
         is_deload: isDeload,
         isCalibrationWeek,
-        coach_note: [
-          isDeload
-            ? 'Deload week — volume is deliberately cut so you arrive at the next block recovered. Resist the urge to push.'
-            // The goal's own framing shows once per block, alongside the
-            // phase's — repeating it every week would bury the phase-specific
-            // note under the same paragraph four times over.
-            : w === 1
-              ? `${phaseConfig.coach_note} ${policy.coachNote}`
-              : phaseConfig.coach_note,
-          buildProgressionNote(w, isDeload, isCalibrationWeek, policy),
-        ].join(' '),
+        coach_note: (() => {
+          // Decided once per week, from the week that was actually built —
+          // see loadlessWeek above, shared with the tempo pass.
+          const loadless = loadlessWeek
+          const phaseNote = loadless ? phaseConfig.coach_note_loadless : phaseConfig.coach_note
+          const goalNote = loadless ? policy.coachNoteLoadless : policy.coachNote
+          return [
+            isDeload
+              ? 'Deload week — volume is deliberately cut so you arrive at the next block recovered. Resist the urge to push.'
+              // The goal's own framing shows once per block, alongside the
+              // phase's — repeating it every week would bury the phase-specific
+              // note under the same paragraph four times over.
+              : w === 1
+                ? `${phaseNote} ${goalNote}`
+                : phaseNote,
+            buildProgressionNote(w, isDeload, isCalibrationWeek, policy, loadless),
+          ].join(' ')
+        })(),
         label: isDeload
           ? `Week ${weekCounter} — ${phaseConfig.label}: Deload`
           : `Week ${weekCounter} — ${phaseConfig.label} (wk ${w} of block ${blockIndex + 1})`,

@@ -303,6 +303,45 @@ async function main() {
     benchGroup.ambiguity?.field === 'weight' && benchGroup.sets.length === 0, benchGroup)
   check('the overall parse needsClarification for this case', parsedNoWeight.needsClarification === true)
 
+  // --- Added weight through the coach ---------------------------------------
+  // MEASURED before this landed: "3x5 @15kg", "3x5 with 15kg", "3x5" and
+  // "3x5 @bodyweight" on Chin-Ups all produced the IDENTICAL row, weightKg 0
+  // — the stated figure silently discarded by the bodyweight override, on the
+  // four lifts you can actually hang a belt from. Silently is the worst
+  // version of it: the bench check directly above shows a LOADED lift asks
+  // "what weight did you use?" rather than guessing.
+  const chinParse = (setsPhrase: string) => parseWorkoutEntries({
+    entries: [{ rawText: `chin-ups ${setsPhrase}`, exercisePhrase: 'chin-ups', setsPhrase }],
+    todaysPlanExerciseNames: ['Chin-Ups'],
+  }).groups[0]
+
+  const chinWeighted = chinParse('3 sets of 5 @15kg')
+  check('a stated weight on a chin-up survives as ADDED weight',
+    chinWeighted.sets[0]?.addedLoadKg === 15, chinWeighted.sets[0])
+  check('...and weight_kg stays 0 — the chin-up did not weigh 15kg',
+    chinWeighted.sets[0]?.weightKg === 0 && chinWeighted.sets[0]?.isBodyweight === true, chinWeighted.sets[0])
+
+  const dipsWeighted = parseWorkoutEntries({
+    entries: [{ rawText: 'chest dips 4x6 @20kg', exercisePhrase: 'chest dips', setsPhrase: '4x6 @20kg' }],
+    todaysPlanExerciseNames: ['Chest Dips'],
+  }).groups[0]
+  check('the same holds for dips', dipsWeighted.sets[0]?.addedLoadKg === 20, dipsWeighted.sets[0])
+
+  check('a plain bodyweight chin-up carries no added weight',
+    chinParse('3x5').sets[0]?.addedLoadKg == null, chinParse('3x5').sets[0])
+  check('an explicit @bodyweight chin-up carries none either',
+    chinParse('3x5 @bodyweight').sets[0]?.addedLoadKg == null, chinParse('3x5 @bodyweight').sets[0])
+
+  // The over-fire check: an ordinary loaded lift must be completely untouched
+  // — its number is the weight of the bar, not something added to a body.
+  const benchWeighted = parseWorkoutEntries({
+    entries: [{ rawText: 'bench 3x8 @80kg', exercisePhrase: 'bench', setsPhrase: '3x8 @80kg' }],
+    todaysPlanExerciseNames: [benchEntry.name],
+  }).groups[0]
+  check('a barbell lift still puts its number in weight_kg, not added load',
+    benchWeighted.sets[0]?.weightKg === 80 && benchWeighted.sets[0]?.addedLoadKg == null, benchWeighted.sets[0])
+
+
   const bodyweightParsed = parseWorkoutEntries({
     entries: [{ rawText: '3 sets of 12 push-ups', exercisePhrase: 'push-ups', setsPhrase: '3 sets of 12' }],
     todaysPlanExerciseNames: [],
@@ -359,6 +398,34 @@ async function main() {
   check('chat-logged sets pass the IDENTICAL predicate, same shape as tap-logged', chatLoggable.length === 3 && chatLoggable.every(s => s.weight_kg === 60 && !s.is_warmup), chatLoggable)
   check('both sit in the same exercise_set_logs rows — no forked storage for chat vs tap',
     db.exercise_set_logs.some(r => r.exercise_id === squatId) && db.exercise_set_logs.some(r => r.exercise_id === getExerciseId(ohpEntry.name)))
+
+  // And the added weight has to reach the store, not stop at the parser — the
+  // same written-but-never-read trap update_workout_schedule died on. Placed
+  // here rather than beside the parse checks above because userId/today/day
+  // are only initialised by this point.
+  {
+    const captured: { addedLoadKg?: number | null }[] = []
+    const chinGroups = parseWorkoutEntries({
+      entries: [{ rawText: 'chin-ups 3 sets of 5 @15kg', exercisePhrase: 'chin-ups', setsPhrase: '3 sets of 5 @15kg' }],
+      todaysPlanExerciseNames: ['Chin-Ups'],
+    }).groups
+    const { rows: chinRows } = executeLogWorkout(chinGroups, {
+      profileId: userId,
+      date: today,
+      weekNumber: 1,
+      dayName: day,
+      setsFor: () => [],
+      logSet: input => { captured.push(input); return saveSet(input) },
+      declareOffPlan: () => {},
+      todaysPlanSetCounts: new Map(),
+      todaysPlanLoads: new Map(),
+    })
+    check('the executor forwards the added weight to the set log',
+      captured.length === 3 && captured.every(c => c.addedLoadKg === 15), captured.map(c => c.addedLoadKg))
+    check('the receipt says "BW +15kg", never a bare 15kg beside a chin-up',
+      JSON.stringify(chinRows).includes('BW +15kg'), chinRows)
+  }
+
 
   // ---- 6a. Undo: exercise swap restores the mesocycle byte-identical ------
   console.log('\n[6a] exercise-swap undo restores the mesocycle byte-identical to the pre-image')

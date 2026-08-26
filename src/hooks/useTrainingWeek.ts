@@ -13,7 +13,7 @@ import { getWeeklyDashboard, type WeeklyDashboardDay } from '@/lib/daily-trackin
 import { getAppNow, getLocalDateString } from '@/lib/dev-clock'
 import type { WorkoutDay } from '@/lib/types'
 
-export type DayGlyphState = 'done' | 'partial' | 'due' | 'missed' | 'rest' | 'recovery' | 'before_plan'
+export type DayGlyphState = 'done' | 'partial' | 'due' | 'missed' | 'rest' | 'recovery' | 'before_plan' | 'swapped'
 
 export interface TrainingWeekDay {
   date: string
@@ -45,9 +45,20 @@ function mondayOf(date: Date): Date {
  * 'before_plan' is excluded alongside rest/recovery: a day the plan never
  * covered is not a session you owe, so it must not inflate M. Exported and
  * named rather than inlined so the tally and its test can't drift.
+ *
+ * 'swapped' joins them, and the reasoning is worth stating because it changes
+ * what this number measures. The tally counts sessions OF THE LIFTING PLAN. A
+ * swapped day is one the trainee deliberately did not do, so counting it as
+ * done would inflate lifting adherence, and counting it as missed is the
+ * exact bug the state exists to fix. Dropping it mirrors 'before_plan'.
+ *
+ * The alternative — counting it as done, on the grounds that Muay Thai is
+ * real training — is defensible, and it is one entry in this predicate if
+ * Ashley prefers it. What the trainee actually did is not lost either way:
+ * it goes to cardio_logs and the streak already reads that table.
  */
 export function countsTowardWeekTally(state: DayGlyphState): boolean {
-  return state !== 'rest' && state !== 'recovery' && state !== 'before_plan'
+  return state !== 'rest' && state !== 'recovery' && state !== 'before_plan' && state !== 'swapped'
 }
 
 export function classifyDay(
@@ -67,6 +78,14 @@ export function classifyDay(
   // real work to make a tidier calendar.
   if (dashboardDay?.session?.is_completed) return 'done'
   if (dashboardDay && dashboardDay.workoutLogs.length > 0) return 'partial'
+
+  // Deliberately swapped for something else, and said so at the time. Ranked
+  // BELOW the logged-work checks above on purpose: someone who announced a
+  // swap and then lifted anyway has earned the 'done', and the rule this file
+  // already states — logged work outranks every date judgement — must keep
+  // holding. Ranked above the date judgement because a swap is exactly the
+  // thing that stops a day being 'missed'.
+  if (dashboardDay?.session?.swapped_for_activity) return 'swapped'
 
   // Nothing was prescribed before the plan existed, so nothing was missed.
   // Without this, someone who finished onboarding on a Thursday opened the

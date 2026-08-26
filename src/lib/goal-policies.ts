@@ -59,6 +59,14 @@ export interface GoalPolicy {
   progressionEmphasis: ProgressionEmphasis
   coachNote: string
   /**
+   * The goal's framing for a trainee with nothing to add weight to. See
+   * PhaseConfig.coach_note_loadless — a bodyweight-only trainee was being
+   * told "load climbing week to week" about a session of Box Squats and
+   * Push-Ups. Required rather than optional so a new goal cannot ship
+   * without someone deciding what it says to that trainee.
+   */
+  coachNoteLoadless: string
+  /**
    * Differentiation round (VISION-ARCHITECTURE differentiation audit):
    * signed rep-count shift applied to STYLE_CONFIGS' base rep range for
    * each tier, before the experience floor. This is what makes fat_loss's
@@ -77,6 +85,31 @@ export interface GoalPolicy {
    * hypertrophy's differentiators, not rest).
    */
   restSecondsMultiplier: { tier1: number; tier2: number; tier3: number }
+  /**
+   * Floor, in seconds, under a tier1 main lift that carries EXTERNAL LOAD —
+   * a bar or dumbbells, not a chin-up. Absent means no floor.
+   *
+   * Exists for conditioning, and only conditioning. Its 0.8 tier1 multiplier
+   * on top of a short session's base rest produced Barbell Squats and Bench
+   * Press at 42 SECONDS between sets. Short rest is the whole point of the
+   * goal, and it keeps it everywhere else — accessories, machines,
+   * bodyweight, carries — but a loaded bar recovered for 42 seconds is how
+   * form fails, and the cost is asymmetric: too much rest on one lift is a
+   * slightly easier session, too little is a rep failing under load.
+   *
+   * MEASURED before this existed: 91% of conditioning's loaded main lifts
+   * rested under 90s, against 17-27% for every other goal — and conditioning
+   * was the ONLY goal that ever went below 60s at all. So this is scoped to
+   * the goal rather than applied globally: a hypertrophy bench at 75s is a
+   * deliberate, normal prescription, and a blanket floor would have quietly
+   * rewritten a fifth of every other goal's main lifts too.
+   *
+   * This is the LOADED floor and it still is. It sits ON TOP of
+   * MAIN_LIFT_REST_FLOOR_SECONDS below, which applies to every main lift
+   * including bodyweight ones — see that constant for why the
+   * "it's about a bar, not a tier" scoping stops at 60 seconds.
+   */
+  minLoadedMainLiftRestSeconds?: number
   /**
    * Signed shift in isolation (tier3) slot count; the same magnitude moves
    * the OPPOSITE way for tier2 (compound-accessory) slots, so total
@@ -112,6 +145,7 @@ const HYPERTROPHY_POLICY: GoalPolicy = {
   allowedPhases: ['anatomical_adaptation', 'hypertrophy', 'strength', 'power'],
   progressionEmphasis: 'load',
   coachNote: 'Volume drives growth here — the program is built around moderate-rep working sets taken close to failure, with load climbing week to week within each block.',
+  coachNoteLoadless: 'Volume drives growth here — the program is built around moderate-rep working sets taken close to failure, with the work climbing week to week within each block through reps and harder variations.',
   // Higher accessory/isolation reps (more time under tension), untouched
   // rest (rep-range and isolation count are the differentiators, not
   // density), and more isolation slots for wider per-muscle-group variety.
@@ -137,6 +171,8 @@ const FAT_LOSS_POLICY: GoalPolicy = {
   progressionEmphasis: 'load',
   coachNote:
     "Diet drives the fat loss here, not the workout — this program is built to protect the muscle you already have while you're in a deficit. Weights stay real weights and progression keeps climbing; conditioning is appended on top, never substituted for lifting.",
+  coachNoteLoadless:
+    "Diet drives the fat loss here, not the workout — this program is built to protect the muscle you already have while you're in a deficit. The strength work stays real strength work and keeps getting harder; conditioning is appended on top, never substituted for it.",
   // Lower main-lift reps (quality over accumulation — deliberately NOT
   // lighter/higher-rep, which would be the circuit-conversion myth this
   // goal exists to avoid), shorter accessory rest for density, fewer
@@ -160,12 +196,17 @@ const CONDITIONING_POLICY: GoalPolicy = {
   allowedPhases: ['anatomical_adaptation', 'hypertrophy', 'metabolic'],
   progressionEmphasis: 'reps',
   coachNote: 'Lifting supports the engine work here, not the other way around — two to three full-body sessions keep you strong enough to train hard, while dedicated conditioning is the main driver of this goal.',
+  // Says nothing about weight either way; kept identical deliberately.
+  coachNoteLoadless: 'Strength work supports the engine work here, not the other way around — two to three full-body sessions keep you strong enough to train hard, while dedicated conditioning is the main driver of this goal.',
   // Strength-endurance rep ranges across every tier (including main lifts —
   // this goal's lifting is real support work, not a heavy-strength focus),
   // circuit-adjacent density via shortened rest everywhere, fewer isolation
   // slots in favor of full-body/compound accessories.
   repRangeShift: { tier1: 2, tier2: 3, tier3: 4 },
   restSecondsMultiplier: { tier1: 0.8, tier2: 0.7, tier3: 0.65 },
+  // Ashley's ruling: the session still conditions, the part with a bar on
+  // your back does not. See minLoadedMainLiftRestSeconds' doc comment.
+  minLoadedMainLiftRestSeconds: 90,
   isolationSlotShift: -1,
   preferUnilateralCarry: false,
 }
@@ -182,6 +223,7 @@ const FUNCTIONAL_POLICY: GoalPolicy = {
   allowedPhases: ['anatomical_adaptation', 'hypertrophy', 'strength', 'power'],
   progressionEmphasis: 'maintain',
   coachNote: 'This program favors variety and movement quality over chasing a number on the bar — exercises rotate faster, and the aim is consistent, sustainable training rather than maximal overload.',
+  coachNoteLoadless: 'This program favors variety and movement quality over chasing a number — exercises rotate faster, and the aim is consistent, sustainable training rather than maximal overload.',
   // Standard rep ranges (variety is the differentiator here, not rep
   // scheme), slightly fuller tier1 recovery (supports power/explosive work
   // where experience allows), fewer isolation slots in favor of unilateral/
@@ -191,6 +233,35 @@ const FUNCTIONAL_POLICY: GoalPolicy = {
   isolationSlotShift: -1,
   preferUnilateralCarry: true,
 }
+
+/**
+ * Hard floor, in seconds, under the day's main lift — ANY main lift, loaded
+ * or bodyweight. Nothing may take a tier1 compound below this: not the
+ * selection-time time-cap trim, not the phase's own rest_adjust_seconds, not
+ * the final per-week budget trim.
+ *
+ * Distinct from minLoadedMainLiftRestSeconds above, and deliberately a
+ * different question. That floor asks "is there a bar on your back", and
+ * Ashley's ruling was that a bodyweight main lift keeps the goal's density
+ * because the risk being guarded is a loaded bar. That ruling still holds
+ * ABOVE this number — conditioning's 90s floor stays loaded-only, and a
+ * bodyweight chin-up in a conditioning block still rests less than a squat
+ * does. It stops holding below 60, because at that point the constraint is
+ * no longer about load management, it is about whether the trainee can
+ * physically complete the next set.
+ *
+ * MEASURED before this existed: 553 of 9,216 profile combinations (6.0%)
+ * had the day's main lift resting under a minute — every observed instance
+ * a bodyweight pull-up, at 42s or 57s. Traced: a hybrid tier1 base of 90s,
+ * times conditioning's 0.8 multiplier (72s), minus stageTimeCap's blanket
+ * -15s (57s), minus anatomical adaptation's -15s rest_adjust (42s). Two of
+ * those three paths had no main-lift gate at all.
+ *
+ * 60 is not a new number — it is the floor trimWeekRestForBudget already
+ * used and the line quality-score's own main_lift_short_rest check already
+ * drew. Before this, the rule and the check disagreed.
+ */
+export const MAIN_LIFT_REST_FLOOR_SECONDS = 60
 
 export const GOAL_POLICIES: Record<FitnessGoal, GoalPolicy> = {
   hypertrophy: HYPERTROPHY_POLICY,

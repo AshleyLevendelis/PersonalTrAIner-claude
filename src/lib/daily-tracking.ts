@@ -434,3 +434,69 @@ export function formatCardioLogsForAI(logs: CardioLog[]): string {
 
   return lines.join('\n')
 }
+
+/**
+ * Mark a day's lifting as deliberately swapped for something else, and record
+ * what that something was.
+ *
+ * Exists because the coach used to say "I'll make sure today is marked as a
+ * rest day for lifting" and had no tool that could. There is a lesson already
+ * written down about this: `update_workout_schedule` is disabled precisely
+ * because it "used to write to a profile field the app doesn't actually render
+ * from, so schedule 'changes' looked applied in chat but never showed up on
+ * the Exercise tab." So this writes ONLY where the Exercise tab already reads
+ * — workout_sessions, which useTrainingWeek's classifyDay consults through
+ * getWeeklyDashboard.
+ *
+ * Deliberately NOT upsertWorkoutSession: that helper deletes and reinserts the
+ * day's workout_exercises, which would destroy the prescription for a day
+ * someone merely said they were skipping — and destroy it irreversibly if they
+ * changed their mind an hour later. Marking a swap must not touch the plan.
+ */
+export async function markSessionSwapped(
+  profileId: string,
+  date: string,
+  activityName: string,
+): Promise<void> {
+  const { data: existing, error: readError } = await supabase
+    .from('workout_sessions')
+    .select('id')
+    .eq('profile_id', profileId)
+    .eq('date', date)
+    .maybeSingle()
+  if (readError) throw readError
+
+  if (existing) {
+    const { error } = await supabase
+      .from('workout_sessions')
+      .update({ swapped_for_activity: activityName, updated_at: new Date().toISOString() })
+      .eq('id', (existing as { id: string }).id)
+    if (error) throw error
+    return
+  }
+
+  // No row yet — the common case, since a session row is only created once
+  // the first set is saved. split_type and duration_minutes are NOT NULL, so
+  // they need values; 'swapped' names what this row is rather than borrowing
+  // a training split it never had, and 0 minutes is the honest lifting
+  // duration. What they actually did, and for how long, lives in cardio_logs.
+  const { error } = await supabase.from('workout_sessions').insert({
+    profile_id: profileId,
+    date,
+    split_type: 'swapped',
+    duration_minutes: 0,
+    is_completed: false,
+    swapped_for_activity: activityName,
+  })
+  if (error) throw error
+}
+
+/** Undo a swap — they changed their mind and trained after all. */
+export async function clearSessionSwap(profileId: string, date: string): Promise<void> {
+  const { error } = await supabase
+    .from('workout_sessions')
+    .update({ swapped_for_activity: null, updated_at: new Date().toISOString() })
+    .eq('profile_id', profileId)
+    .eq('date', date)
+  if (error) throw error
+}

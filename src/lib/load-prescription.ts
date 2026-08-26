@@ -1458,6 +1458,183 @@ export function prescribeAssistance(
   }
 }
 
+// ---------------------------------------------------------------------------
+// ADDED LOAD — the other inverse, for a lift you can hang weight on
+// ---------------------------------------------------------------------------
+// Ashley, while scoping the tempo work: "Pull ups can add weight." Right, and
+// the app had never given them any. MEASURED across 8,928 slots (four
+// equipment tiers x four experience levels x four goals x three splits x four
+// bodies): Pull-Ups 3,960, Chin-Ups 3,912, Tricep Dips 608, Chest Dips 448 —
+// and ZERO carrying a weight.
+//
+// The defect that produces, traced on a full-gym advanced 80kg male:
+//
+//   Pull-Ups  w1:9-11 w2:10-12 w3:11-13 | w5:6-8 ... | w9:3-5 w10:4-6 w11:5-7
+//
+// Week 9 prescribes THREE reps to someone the plan believes can do eleven,
+// with nothing added. That is not a strength block; it is less work. The
+// phase note promises "Heavier and lower rep" and delivers only the second
+// half.
+//
+// Mirrors prescribeAssistance rather than prescribeLoad, for that function's
+// own stated reasons: there is no "known weighted-pull-up weight" reported at
+// onboarding, no logged history that records added weight, and nothing to
+// carry forward across a rotation. Stateless, experience-scaled, recomputed
+// fresh every call.
+
+/**
+ * Fraction of BODYWEIGHT added for a weighted PULL-UP, held constant across a
+ * heavy block. The per-movement baseline: a dip multiplies this by its own
+ * added_load_scale, since a dip is genuinely the stronger movement.
+ *
+ * Bodyweight-relative on purpose, and it is the answer to "is this a set
+ * number or does it depend on the person": a pull-up or a dip IS lifting your
+ * bodyweight, so what you can add on top is proportional to what you are
+ * already moving. A 62kg trainee and a 110kg one doing the same chest dip get
+ * 15kg and 27.5kg. What it does NOT yet depend on is anything the app has
+ * WATCHED them do — see this module's note on the missing logged-history
+ * path.
+ *
+ * Set on the cautious side BECAUSE the weight holds all block: an 80kg
+ * advanced male carries 15kg through a strength block whose reps climb
+ * 3-5 -> 5-7 underneath it, which is demanding by the end. Too light costs a
+ * boring set; too heavy costs a shoulder.
+ *
+ * Beginner and novice are 0 rather than absent. All three of Pull-Ups,
+ * Chin-Ups and Chest Dips already carry capability_requirement
+ * minExperience 'intermediate', so those tiers are unreachable today
+ * (measured: 0 slots) — the zeros are here so that relaxing the capability
+ * gate cannot silently start loading a novice's dips.
+ */
+const ADDED_LOAD_BODYWEIGHT_FRACTION: Record<TrainingExperience, number> = {
+  beginner: 0,
+  novice: 0,
+  intermediate: 0.10,
+  advanced: 0.18,
+}
+
+/**
+ * Only the heavy blocks, and this is the load-bearing decision.
+ *
+ * The first cut of this keyed on the WEEK'S rep count instead, scaling the
+ * weight down as reps rose. It produced exactly the defect this repo keeps
+ * relearning — two levers fighting:
+ *
+ *   Pull-Ups  w9:3-5@+12.5  w10:4-6@+15  w11:5-7@+10  ...  w7:8-10 (none)
+ *
+ * The weight went UP then DOWN inside one block and vanished at the top of
+ * another, because reps climb within a block (that is the within-block lever)
+ * and the rep scale cut the weight as they climbed. More reps at less weight
+ * is a deload wearing progress's clothes.
+ *
+ * Keying on the PHASE fixes it by construction: a phase cannot change inside
+ * a block, so the weight is constant for the whole block and reps stay the
+ * within-block lever. One lever at a time, the same rule loadStepUnaffordable
+ * follows, and the same rule the tempo prescription follows one file over.
+ */
+const ADDED_LOAD_PHASES: ReadonlySet<string> = new Set(['strength', 'power'])
+
+/**
+ * A guard, not a scale. A heavy block should not be prescribing twelve reps,
+ * but a goal whose phase sequence does something unexpected must not end up
+ * with a belt on a set of fifteen. Never fires on today's phase configs.
+ */
+const ADDED_LOAD_MAX_REPS = 10
+
+/**
+ * Absolute backstop, in the spirit of SAFETY_CEILING_KG: a fraction no
+ * arithmetic error may exceed regardless of how the number was derived.
+ *
+ * It has to bind LAST, after the per-movement scale, and it is not decorative:
+ * the rejected "true to the strength charts" option (chest dip at 2.0x the
+ * pull-up) put a 50kg trainee's chest dip at exactly 17.5kg — the cap itself
+ * — which is the formula asking for more than we are willing to give. The
+ * shipped 1.4x leaves margin at every body measured.
+ */
+const ADDED_LOAD_MAX_BODYWEIGHT_FRACTION = 0.35
+
+export interface AddedLoadPrescription {
+  added_kg: number
+  /** Always signed, always relative — "+15kg", never a bare weight. See the field's own comment on Exercise. */
+  display: string
+  basis: string
+}
+
+/**
+ * Returns null for every exercise that cannot take a belt — i.e. all but
+ * four — so callers can call this unconditionally alongside prescribeLoad and
+ * just check for null, exactly as they already do for prescribeAssistance.
+ */
+export function prescribeAddedLoad(
+  entry: ExerciseEntry,
+  profile: UserProfile,
+  options: {
+    repRangeLabel?: string
+    phase: string
+    isDeload: boolean
+    isCalibrationWeek?: boolean
+  },
+): AddedLoadPrescription | null {
+  if (!entry.accepts_added_load) return null
+
+  // A deload exists to back off. Recovery comes from doing less, not from
+  // carrying the same belt for fewer reps — the same reason tempo skips it.
+  if (options.isDeload) return null
+
+  // The app has never seen this person do a single rep. Week one finds the
+  // baseline, the same discipline every other lift already gets.
+  if (options.isCalibrationWeek) return null
+
+  if (!ADDED_LOAD_PHASES.has(options.phase)) return null
+
+  const experience = profile.training_experience || 'novice'
+  const fraction = ADDED_LOAD_BODYWEIGHT_FRACTION[experience] ?? 0
+  if (fraction <= 0) return null
+
+  const midReps = parseRepsMidpoint(options.repRangeLabel)
+  if (midReps == null || midReps > ADDED_LOAD_MAX_REPS) return null
+
+  const body = resolveBodyBasis(profile)
+  // Per-movement, because a dip is not a pull-up. See added_load_scale's own
+  // comment in exercise-db.ts; absent means 1.0, so the three-line change
+  // that added dips could not silently alter pull-ups.
+  const movementScale = entry.added_load_scale ?? 1
+  let kg = Math.min(
+    body.weightKg * fraction * movementScale,
+    body.weightKg * ADDED_LOAD_MAX_BODYWEIGHT_FRACTION,
+  )
+
+  // SAFETY, and currently defensive rather than live: with no gym the added
+  // weight IS a loaded backpack — straps, no rigid frame, the exact failure
+  // mode IMPROVISED_IMPLEMENT_CEILING_KG exists for. Unreachable today
+  // because BODYWEIGHT_ALLOWED_PHASES excludes strength and power, so a
+  // bodyweight-tier plan never enters a phase this function loads. Kept so
+  // that relaxing THAT restriction cannot hand someone a 25kg backpack.
+  if (profile.equipment_access === 'bodyweight') {
+    kg = Math.min(kg, IMPROVISED_IMPLEMENT_CEILING_KG[experience] ?? IMPROVISED_IMPLEMENT_CEILING_KG.novice)
+  }
+
+  // Plate-rounded — a number nobody can actually load is worse than no
+  // number. Below one plate pair, prescribe plain bodyweight instead.
+  const rounded = Math.round(kg / 2.5) * 2.5
+  if (rounded < 2.5) return null
+
+  return {
+    added_kg: rounded,
+    display: `+${rounded}kg`,
+    basis: addedLoadGuidance(rounded, body.assumed),
+  }
+}
+
+/** The load_guidance equivalent for added load — framed around what to hang the weight from, since that is the part a trainee has to solve. */
+export function addedLoadGuidance(addedKg: number, bodyAssumed: boolean): string {
+  const how = `Bodyweight plus about ${addedKg}kg — a dip belt, a dumbbell between the feet, or a loaded backpack. It holds all block while the reps climb underneath it.`
+  if (bodyAssumed) {
+    return `${how} We don't have the body details this would normally be worked out from, so it starts low on purpose rather than guessing. Drop the weight and keep the reps if it costs you form.`
+  }
+  return `${how} Scaled from your bodyweight, not a tested max — drop the weight and keep the reps if it costs you form.`
+}
+
 /** The load_guidance-equivalent copy for an assistance exercise — parallels ExperienceConfig.load_guidance's role for prescribeLoad, but framed around removing help rather than adding weight. */
 export function assistanceGuidance(prescription: AssistancePrescription): string {
   if (prescription.ready_to_graduate) {

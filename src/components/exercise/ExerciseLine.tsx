@@ -1,5 +1,6 @@
 import { ChevronDown } from 'lucide-react'
 import { isUnverifiedLoadSource } from '@/lib/load-prescription'
+import { describeTempo } from '@/lib/periodization'
 import type { LoadSource } from './LoadChip'
 import type { Exercise } from '@/lib/types'
 import type { ExerciseGroup } from '@/lib/session-derive'
@@ -56,6 +57,14 @@ export function ExerciseLine({
       {ex.sets}×{ex.reps}
       {ex.suggested_load_kg != null ? ` · ${ex.suggested_load_kg}kg` : ''}
       {ex.suggested_assistance_kg != null ? ` · ${ex.assistance_ready_to_graduate ? 'no assist' : `${ex.suggested_assistance_kg}kg assist`}` : ''}
+      {/* Signed, always. "+15kg" beside a pull-up is an instruction to add
+          weight; "15kg" would read as the weight of the lift itself. */}
+      {ex.suggested_added_load_kg != null ? ` · +${ex.suggested_added_load_kg}kg` : ''}
+      {/* Sits where the weight would be, because it IS the weight's stand-in:
+          the progression lever for a lift with nothing to load. Stored as
+          '3-0-1' and rendered in words — the notation means nothing to a
+          trainee who has never seen it. */}
+      {describeTempo(ex.tempo) ? ` · ${describeTempo(ex.tempo)}` : ''}
     </span>
   )
 

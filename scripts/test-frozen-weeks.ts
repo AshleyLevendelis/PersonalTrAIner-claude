@@ -32,8 +32,18 @@
 
 import { generateExercisePlan, generateMesocycle, setRandomSource, resetRandomSource } from '../src/lib/exercise-plan'
 import { getExerciseEntry } from '../src/lib/exercise-db'
+import { readFileSync } from 'fs'
+import { join, dirname } from 'path'
+import { fileURLToPath } from 'url'
+import { DEFAULT_CARRY_DISTANCE_M } from '../src/lib/session-duration'
 import { seededRngFromKey } from '../src/lib/seeded-random'
 import type { UserProfile, MesocycleWeek } from '../src/lib/types'
+
+// Read from source rather than restated, so raising either constant in
+// exercise-plan.ts fails this gate instead of silently widening the cap.
+const PLAN_SRC = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../src/lib/exercise-plan.ts'), 'utf8')
+const STEP_M = Number(/const FROZEN_CARRY_DISTANCE_STEP_M = (\d+)/.exec(PLAN_SRC)?.[1] ?? NaN)
+const MAX_STEPS = Number(/const MAX_FROZEN_CARRY_DISTANCE_STEPS = (\d+)/.exec(PLAN_SRC)?.[1] ?? NaN)
 
 let failures = 0
 const check = (name: string, ok: boolean, detail = '') => {
@@ -186,6 +196,11 @@ console.log('\n3. The bump accumulates, and then it stops')
       }
     }
     for (const [name, history] of byLift) {
+      // A REP ceiling, so carries are not its business — repLow('45m') reads
+      // 45 and cheerfully compares it against a 40m baseline as "+5 reps".
+      // Correct arithmetic, wrong unit. Carry distance has its own cap,
+      // asserted against the source constants in section 4.
+      if (history.some(h => /^\d+\s*m$/.test(String(h.reps)))) continue
       let baseLow: number | null = null
       for (let i = 1; i < history.length; i++) {
         // A phase change rewrites the base rep range wholesale — Maximal
@@ -223,18 +238,87 @@ console.log('\n4. Where it deliberately does not fire')
 // ---------------------------------------------------------------------------
 {
   const plan = meso(buildProfile({}), 'frozen:full_gym:upper_lower:intermediate')
-  // Carries: shiftReps passes '40m' through untouched, so a bump would be
-  // silently inert. Their lever is distance, and whether distance should
-  // progress is a product decision Ashley has not been asked. Asserted as a
-  // DELIBERATE exclusion so changing it later is a decision, not a drift.
-  const carryChanged: string[] = []
+  // THIS ASSERTION USED TO SAY THE OPPOSITE, and the change of meaning is
+  // deliberate rather than a drift. It read "carries keep their fixed
+  // distance", written so the exclusion could not quietly rot into an
+  // accident — at the time their lever was load only, and whether distance
+  // should progress was an unasked product question. Ashley has now answered
+  // it: when the weight can't move, walk further. MEASURED, carries were 100
+  // of 265 frozen transitions before that and are 52 after, with 52 of the
+  // residual sitting at exactly the 55m cap.
+  //
+  // The teeth move to the other side. Distance must move ONLY when load
+  // didn't, never on a deload or calibration week, and never past the cap.
+  // SWEPT, not sampled. The first version of this block ran one profile and
+  // its over-fire check asserted "distance never moves in the same week the
+  // load did" — it passed, and it was WRONG on both counts: swept across
+  // every combo the real figure is 8 of 272, and all 8 are the deliberate
+  // reset (a carry that earned a heavier weight goes back to the base
+  // distance, exactly as double progression resets a rep range). A gate that
+  // passes because its one profile happens not to show the behaviour is a
+  // gate with a blind spot.
+  const carryDistances = new Set<string>()
+  const wentBackwardsUnearned: string[] = []
+  const grewWhileLoadGrew: string[] = []
+  const overCap: string[] = []
   let carrySeen = 0
-  for (const { exA, exB, weekA, weekB } of transitions(plan)) {
-    if (getExerciseEntry(exA.name)?.movement_pattern !== 'carry') continue
-    carrySeen++
-    if (/m$/.test(exA.reps) && exA.reps !== exB.reps) carryChanged.push(`${exA.name} wk${weekA}->${weekB}: ${exA.reps} -> ${exB.reps}`)
+  for (const { profile, seed } of everyCombo()) {
+    const plan = meso(profile, seed)
+    for (const { exA, exB, weekA, weekB } of transitions(plan)) {
+      if (getExerciseEntry(exA.name)?.movement_pattern !== 'carry') continue
+      // The isometric carry HOLD is time-prescribed; distance is not its unit.
+      if (!/^\d+\s*m$/.test(String(exA.reps)) || !/^\d+\s*m$/.test(String(exB.reps))) continue
+      const wkA = plan.find(w => w.week_number === weekA)
+      const wkB = plan.find(w => w.week_number === weekB)
+      // A deload resets to the base distance by design — see
+      // fixedUnitPrescription. Comparing across one measures the reset, not
+      // the progression.
+      if (wkA?.is_deload || wkB?.is_deload) continue
+      carrySeen++
+      carryDistances.add(String(exA.reps))
+      const dA = parseInt(String(exA.reps), 10), dB = parseInt(String(exB.reps), 10)
+      const lA = exA.suggested_load_kg ?? 0, lB = exB.suggested_load_kg ?? 0
+      const where = `${exA.name} wk${weekA}->${weekB}: ${dA}m@${lA} -> ${dB}m@${lB}`
+
+      // THE PROPERTY THAT ACTUALLY MATTERS. Walking LESS far is only ever
+      // acceptable as the price of a heavier carry. Shorter for the same or
+      // less weight is a straight regression the trainee would see on the
+      // card, and is what the naive one-profile check failed to look for.
+      if (dB < dA && lB <= lA) wentBackwardsUnearned.push(where)
+      // And distance must never climb in the same week the weight did — that
+      // is two levers at once, which is what buying distance exists to avoid.
+      if (dB > dA && lB !== lA) grewWhileLoadGrew.push(where)
+
+      for (const m of [dA, dB]) {
+        if (m > DEFAULT_CARRY_DISTANCE_M + MAX_STEPS * STEP_M) overCap.push(`${exA.name}: ${m}m`)
+      }
+    }
   }
-  check(`carries keep their fixed distance (${carrySeen} carry transitions)`, carryChanged.length === 0, carryChanged.slice(0, 2).join(' | '))
+  check(`carry distance actually progresses (${carryDistances.size} distinct distances across ${carrySeen} loading transitions)`,
+    carryDistances.size > 1 && carrySeen > 200, `${[...carryDistances].join(', ')} over ${carrySeen}`)
+  check(`distance never shortens unless the weight went up (${wentBackwardsUnearned.length} of ${carrySeen})`,
+    wentBackwardsUnearned.length === 0, wentBackwardsUnearned.slice(0, 3).join(' | '))
+  check(`distance never grows in the same week the weight did (${grewWhileLoadGrew.length})`,
+    grewWhileLoadGrew.length === 0, grewWhileLoadGrew.slice(0, 3).join(' | '))
+  check(`never past the ${DEFAULT_CARRY_DISTANCE_M + MAX_STEPS * STEP_M}m cap (${overCap.length})`,
+    overCap.length === 0, [...new Set(overCap)].slice(0, 3).join(', '))
+
+  // Deloads and calibration weeks are excluded at the source; asserted here
+  // because a carry walking further on a recovery week is the exact shape of
+  // "the fix fired where it shouldn't".
+  const deloadCarries: string[] = []
+  for (const wk of plan) {
+    if (!wk.is_deload && !wk.isCalibrationWeek) continue
+    for (const day of wk.days) for (const ex of day.exercises) {
+      if (getExerciseEntry(ex.name)?.movement_pattern !== 'carry') continue
+      if (/^\d+\s*m$/.test(String(ex.reps)) && parseInt(String(ex.reps), 10) > DEFAULT_CARRY_DISTANCE_M + MAX_STEPS * STEP_M) {
+        deloadCarries.push(`w${wk.week_number} ${ex.name} ${ex.reps}`)
+      }
+    }
+  }
+  check(`a deload or calibration week never walks past the cap either (${deloadCarries.length})`,
+    deloadCarries.length === 0, deloadCarries.slice(0, 2).join(', '))
+
   check('deload weeks still generate normally', plan.filter(w => w.is_deload).every(w => w.days.every(d => d.exercises.every(e => !!e.reps))))
 }
 
@@ -265,9 +349,15 @@ console.log('\n5. The measured improvement holds')
   console.log(`      ${frozen}/${total} frozen (${rate.toFixed(1)}%) — ${loadedFrozen} loaded non-carry, ${carryFrozen} carries`)
   check('the frozen rate stays well below the 9.0% it started at', rate < 6.0, `${rate.toFixed(1)}%`)
   check('loaded non-carry freezes stay far below the 380 they started at', loadedFrozen < 180, String(loadedFrozen))
-  // Reported, not asserted down: carries are untouched on purpose, and a run
-  // that quietly "fixed" them would mean the exclusion had broken.
-  check('carries are still frozen — the exclusion is real, not accidental', carryFrozen > 50, String(carryFrozen))
+  // This assertion also changed meaning with the carry work. It used to read
+  // "carries are still frozen — the exclusion is real, not accidental",
+  // guarding an exclusion that no longer exists. MEASURED across this sweep:
+  // 100 carries frozen before distance progressed, 52 after — and 52 of the
+  // residual sit at exactly the 55m cap, which is a ceiling reached rather
+  // than a lever missing. Asserted as a real reduction with a floor under it,
+  // so neither a regression NOR a silent walk past the cap passes.
+  check(`carries roughly halved and stopped at the cap (${carryFrozen}, was 100)`,
+    carryFrozen < 70 && carryFrozen > 20, String(carryFrozen))
 }
 
 console.log(failures === 0 ? '\nAll frozen-week checks passed.\n' : `\n${failures} FAILED\n`)

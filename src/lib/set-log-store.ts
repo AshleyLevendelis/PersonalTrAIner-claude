@@ -46,6 +46,8 @@ export interface SaveSetInput {
   unit?: SetUnit
   isBodyweight?: boolean
   isWarmup?: boolean
+  /** Weight added to bodyweight (dip belt, backpack) — see ExerciseSetLog.added_load_kg. Absent on every ordinary set. */
+  addedLoadKg?: number | null
 }
 
 interface PendingSet {
@@ -63,6 +65,7 @@ interface PendingSet {
   unit: SetUnit
   isBodyweight: boolean
   isWarmup: boolean
+  addedLoadKg: number | null
   completedAt: string
   attempts: number
 }
@@ -315,6 +318,7 @@ function toView(set: PendingSet): ExerciseSetLog {
     is_warmup: set.isWarmup,
     unit: set.unit,
     rpe: set.rpe,
+    added_load_kg: set.addedLoadKg,
     completed_at: set.completedAt,
   }
 }
@@ -340,6 +344,7 @@ export function saveSet(input: SaveSetInput): ExerciseSetLog {
     unit: input.unit ?? 'reps',
     isBodyweight: input.isBodyweight ?? false,
     isWarmup: input.isWarmup ?? false,
+    addedLoadKg: input.addedLoadKg ?? null,
     // Dev-clock aware (C0 fix #8) — a real wall-clock timestamp under a
     // simulated date would satisfy getLastSessionSets's strictly-before-
     // sessionDate filter for the CURRENT simulated session (its real
@@ -499,27 +504,73 @@ export function flushPending(): Promise<void> {
   return flushPromise
 }
 
+/**
+ * True when a write failed because the database has not run a migration this
+ * payload depends on. PostgREST reports an unknown column as PGRST204 with
+ * the column named in the message; the string check is a belt-and-braces
+ * second reading of the same fact, since the code has moved between
+ * PostgREST versions before.
+ */
+function isMissingColumnError(error: { code?: string; message?: string } | null, column: string): boolean {
+  if (!error) return false
+  const msg = String(error.message ?? '')
+  return error.code === 'PGRST204' || (msg.includes(column) && /column|schema cache/i.test(msg))
+}
+
+/**
+ * The added-load key is included ONLY when it has a value, and that is a
+ * safety property rather than tidiness.
+ *
+ * Both write paths spread a fixed object, so adding the key unconditionally
+ * would make EVERY set write fail with "column does not exist" until
+ * db:push-both runs — on live users, on the one path where losing data is
+ * unforgivable, for a feature almost nobody is using yet. Omitting it when
+ * null keeps an ordinary set's payload byte-identical to what shipped
+ * before, so 99.9% of logging cannot be affected by this migration being
+ * pending.
+ */
+function addedLoadPayload(addedLoadKg: number | null): { added_load_kg?: number } {
+  return addedLoadKg == null ? {} : { added_load_kg: addedLoadKg }
+}
+
 async function upsertSetRow(sessionId: string, set: PendingSet): Promise<void> {
+  const base = {
+    session_id: sessionId,
+    user_id: set.userId,
+    exercise_id: set.exerciseId,
+    exercise_name: set.exerciseName,
+    week_number: set.weekNumber,
+    day: set.day,
+    set_number: set.setNumber,
+    weight_kg: set.weightKg,
+    reps_completed: set.repsCompleted,
+    rpe: set.rpe,
+    unit: set.unit,
+    is_bodyweight: set.isBodyweight,
+    is_warmup: set.isWarmup,
+    completed_at: set.completedAt,
+    client_id: set.clientId,
+  }
+  const conflict = { onConflict: 'user_id,session_id,exercise_id,set_number,is_warmup' }
   const { error } = await supabase
     .from('exercise_set_logs')
-    .upsert({
-      session_id: sessionId,
-      user_id: set.userId,
-      exercise_id: set.exerciseId,
-      exercise_name: set.exerciseName,
-      week_number: set.weekNumber,
-      day: set.day,
-      set_number: set.setNumber,
-      weight_kg: set.weightKg,
-      reps_completed: set.repsCompleted,
-      rpe: set.rpe,
-      unit: set.unit,
-      is_bodyweight: set.isBodyweight,
-      is_warmup: set.isWarmup,
-      completed_at: set.completedAt,
-      client_id: set.clientId,
-    }, { onConflict: 'user_id,session_id,exercise_id,set_number,is_warmup' })
-  if (error) throw error
+    .upsert({ ...base, ...addedLoadPayload(set.addedLoadKg) }, conflict)
+  if (!error) return
+
+  // DEGRADE, NEVER LOSE THE SET. The trainee did the work; a pending
+  // migration must not cost them the record of it. Retry once without the
+  // added weight — their reps and RPE still land, and only the belt figure
+  // is dropped, only until db:push-both runs.
+  if (set.addedLoadKg != null && isMissingColumnError(error, 'added_load_kg')) {
+    console.warn(
+      '[Set Log] added_load_kg column not present — the set was saved WITHOUT its added weight. ' +
+      'Run `npm run db:push-both` to apply migration 20260825120000.'
+    )
+    const { error: retryError } = await supabase.from('exercise_set_logs').upsert(base, conflict)
+    if (retryError) throw retryError
+    return
+  }
+  throw error
 }
 
 /** Drops a cached serverId so the next ensureSessionSynced call re-resolves (or recreates) the session from scratch. */
@@ -663,6 +714,8 @@ interface ServerSetRow {
   unit: SetUnit
   is_bodyweight: boolean
   is_warmup: boolean
+  /** Optional: absent from a database that has not run the added_load_kg migration yet. */
+  added_load_kg?: number | string | null
   completed_at: string
 }
 
@@ -692,6 +745,7 @@ function serverRowToView(row: ServerSetRow, date: string): ExerciseSetLog {
     is_warmup: row.is_warmup,
     unit: row.unit,
     rpe: row.rpe,
+    added_load_kg: row.added_load_kg == null ? null : Number(row.added_load_kg),
     completed_at: row.completed_at,
   }
 }
@@ -869,6 +923,8 @@ export async function writeHistoricalSession(params: {
     unit?: SetUnit
     isBodyweight?: boolean
     isWarmup?: boolean
+    /** Historical seeding may carry an added-load figure; omitted from the payload when absent, see addedLoadPayload. */
+    addedLoadKg?: number | null
     completedAt: string
   }>
 }): Promise<void> {
@@ -895,6 +951,7 @@ export async function writeHistoricalSession(params: {
     is_bodyweight: s.isBodyweight ?? false,
     is_warmup: s.isWarmup ?? false,
     completed_at: s.completedAt,
+    ...addedLoadPayload(s.addedLoadKg ?? null),
   }))
   const { error } = await supabase
     .from('exercise_set_logs')

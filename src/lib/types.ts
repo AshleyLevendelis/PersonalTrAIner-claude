@@ -219,6 +219,22 @@ export interface Exercise {
   movement_pattern?: MesocycleMovementPattern
   tier?: ExerciseTier
   fatigue_cost?: FatigueCost
+  /**
+   * Prescribed lifting speed, canonical eccentric-pause-concentric notation
+   * ('4-1-1'). Present only where tempo is the actual progression lever — a
+   * rep-based lift with no weight to add — so absence means "no tempo
+   * instruction", never "we forgot". Rendered in plain English via
+   * describeTempo (periodization.ts); '4-1-1' means nothing to a trainee.
+   */
+  tempo?: string
+  /**
+   * Weight ADDED to bodyweight — a dip belt, a dumbbell between the feet, a
+   * loaded backpack. Deliberately NOT suggested_load_kg: putting 17.5 there
+   * would render "17.5kg" beside "Pull-Ups", which reads as *lift 17.5kg*.
+   * Only ever set on the four entries carrying accepts_added_load, and only
+   * on the low-rep weeks where adding weight is the point.
+   */
+  suggested_added_load_kg?: number | null
   /** Target effort level for working sets, e.g. 'RPE 6-7'. */
   intensity?: string
   /** Plain-English guidance on picking a starting load. */
@@ -635,6 +651,18 @@ export interface WorkoutSession {
   week_number?: number | null
   day?: string | null
   notes?: string | null
+  /**
+   * Set when the trainee deliberately swapped this day's lifting for something
+   * else ("I'm doing Muay Thai instead") — the activity's name, as they said
+   * it. Absence means an ordinary session, so no existing row changes meaning.
+   *
+   * Exists because the coach used to reply "I'll make sure today is marked as
+   * a rest day" and had no tool that could: classifyDay ends
+   * `dateStr < todayStr ? 'missed' : 'due'` with nothing in between, so a day
+   * announced in advance showed as MISSED the next morning. What they did
+   * instead goes to cardio_logs, not here — one fact, one home.
+   */
+  swapped_for_activity?: string | null
 }
 
 export interface WorkoutExerciseRow {
@@ -677,6 +705,17 @@ export interface ExerciseSetLog {
    * are not wired yet — see this round's decision log.
    */
   assistance_kg?: number | null
+  /**
+   * Weight ADDED to bodyweight for this set — a dip belt, a dumbbell between
+   * the feet, a loaded backpack. NULL for every ordinary lift.
+   *
+   * Deliberately not weight_kg with is_bodyweight switched on: that column
+   * means the weight of the thing you lifted, and making it mean two things
+   * depending on a flag is the one-field-two-questions defect this repo keeps
+   * relearning. A weighted pull-up is weight_kg 0, is_bodyweight true,
+   * added_load_kg 15.
+   */
+  added_load_kg?: number | null
 }
 
 export interface CardioLog {
