@@ -62,7 +62,10 @@ import { categorize, isImprovisedLoadImplement, IMPROVISED_IMPLEMENT_CEILING_KG,
 // measured, that exact trainee gets 20kg per hand. The comment predates
 // isPerSideLoad landing (see BACKLOG, the per-side round) and was stale
 // rather than mistaken when written.
-const SAFETY_CEILING_KG_TOTAL: Partial<Record<string, number>> = {
+// Exported so test:ceiling-units can assert against THIS table rather than a
+// copy of it. A gate that duplicates the numbers it guards drifts from them
+// silently, which is the same class of defect as the unit mismatch above.
+export const SAFETY_CEILING_KG_TOTAL: Partial<Record<string, number>> = {
   squat: 260, deadlift: 325, bench: 220, overhead: 140, row: 200,
   pulldown: 180, leg_press: 400, goblet_squat: 60, hinge_accessory: 180,
   isolation_bicep: 70, isolation_tricep: 80, isolation_chest: 95,

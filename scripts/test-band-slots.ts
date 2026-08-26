@@ -190,10 +190,67 @@ console.log('\n3. Rehab placements survive untouched')
   // used to tie with. (report:band-slots reads 352 both before and after; it
   // sweeps the same grid under different seeds, so the two numbers are
   // independent samples of the same property, not a contradiction.)
-  check(`rehab-indicated bands still reach main slots (${t.bandIndicated}, HEAD baseline 348)`,
-    t.bandIndicated >= 348, String(t.bandIndicated))
+  //
+  // FLOOR MOVED 348 -> 335, AND THE REASON MATTERS MORE THAN THE NUMBER.
+  // Nine exercises were added to the catalogue (six commercial-gym machines,
+  // then Front Raises / Band Lateral Raise / Band Shrug for home and
+  // minimalist kit). A bigger pool reshuffles ranked selection, and 8 of
+  // these placements moved out of MAIN slots — measured at 340.
+  //
+  // I MISSED THIS WHEN THE MACHINES SHIPPED. That round ran twelve gates and
+  // this was not one of them, so 340 reached main before anyone looked. Owned
+  // here rather than quietly renumbered.
+  //
+  // Lowering a floor is normally how a real regression gets hidden, so what
+  // was verified before touching it: `test:rehab-prescribed` passes in full,
+  // and every knee-injured profile in this grid — 64 of 64 — still receives a
+  // knee-indicated movement. Nobody lost their rehab; 8 instances stopped
+  // being the day's MAIN lift. The mechanism this check was written to guard
+  // is the band penalty eating rehab placements, and that is not what moved.
+  //
+  // The count is kept as a floor because a real suppression would still show
+  // up as a large drop, but the property check below is the one that cannot
+  // drift with catalogue size — which is exactly why the count alone was not
+  // enough to be trusted.
+  check(`rehab-indicated bands still reach main slots (${t.bandIndicated}, floor 335, was 348 before the catalogue grew)`,
+    t.bandIndicated >= 335, String(t.bandIndicated))
   check(`a knee-injured trainee still gets Spanish Squat (${t.spanishSquatForKnees} placements)`,
     t.spanishSquatForKnees > 0, String(t.spanishSquatForKnees))
+
+  // THE ASSERTION THE COUNT CANNOT MAKE. A placement total is a snapshot that
+  // any catalogue change moves; what must never be true is that a trainee who
+  // reported a joint gets NOTHING indicated for it. Independent of pool size,
+  // ranking, and every seed in this file.
+  {
+    const withoutRehab: string[] = []
+    let profilesChecked = 0
+    const kneeFlagged = getFlaggedJoints(['knees'])
+    for (const equipment_access of EQUIP) {
+      for (const training_experience of EXP) {
+        for (const fitness_goal of GOALS) {
+          const profile = buildProfile({
+            equipment_access, training_experience, fitness_goal, injuries: ['knees'],
+          } as Partial<UserProfile>)
+          setRandomSource(seededRngFromKey(`bandrehab:${equipment_access}:${training_experience}:${fitness_goal}`))
+          const d = console.debug, w = console.warn
+          console.debug = () => {}; console.warn = () => {}
+          let plan
+          try { plan = generateExercisePlan(profile).plan }
+          finally { console.debug = d; console.warn = w; resetRandomSource() }
+          const hasIndicated = plan.some(day => day.exercises.some(ex => {
+            const entry = getExerciseEntry(ex.name)
+            return entry != null && isIndicatedFor(entry, kneeFlagged)
+          }))
+          profilesChecked++
+          if (!hasIndicated) withoutRehab.push(`${equipment_access}/${training_experience}/${fitness_goal}`)
+        }
+      }
+    }
+    check(`every knee-injured profile still gets something indicated for the knee (${profilesChecked} checked, ${withoutRehab.length} without)`,
+      withoutRehab.length === 0, withoutRehab.slice(0, 4).join(', '))
+    // "0 without" also passes when the loop never ran. Say the denominator.
+    check(`...and there were profiles to check (${profilesChecked})`, profilesChecked > 20, String(profilesChecked))
+  }
 }
 
 // ---------------------------------------------------------------------------
