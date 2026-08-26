@@ -113,9 +113,36 @@ export function PeekPanel({
 
   return (
     <div className="rounded-xl bg-card">
-      <div className="flex items-center justify-between px-4 py-3 border-b">
-        <span className="text-sm font-medium">{workout.day} · {workout.focus}</span>
-        <Button variant="ghost" size="icon" className="size-7" onClick={onExit} aria-label="Close">
+      {/* THE SAME HERO AS TODAY, and deliberately so.
+       *
+       * This was one small line — "Friday · Full Body Power" at text-sm —
+       * while today's screen gave the focus a 36px bold headline. Ashley's
+       * ask: "I want all days to look like that, but still make it obvious
+       * which is the current day's plan." A day's focus is the one thing
+       * that tells you what the session IS; it should read the same on
+       * Friday as it does on Wednesday.
+       *
+       * WHAT STILL SEPARATES TODAY, now that the type matches — three
+       * things, none of them the headline:
+       *   1. the eyebrow. Today's reads "Today · Wednesday" in mint with a
+       *      glow; a peeked day reads just "Friday", muted and unglowing.
+       *      Same slot, same size, deliberately different colour, so the
+       *      distinction sits exactly where the eye already goes.
+       *   2. today has Start session. A peeked day has an X.
+       *   3. today has the session-progress line under the title. A day
+       *      that is not today has no progress to show.
+       *
+       * Kept a touch smaller than today's 36px (30px): identical size with
+       * a different colour reads as a bug, whereas a clear step down reads
+       * as a deliberate hierarchy — today first, this second. */}
+      <div className="flex items-start justify-between gap-2.5 px-4 pt-3.5 pb-3 border-b">
+        <div className="min-w-0">
+          <span className="text-[10.5px] uppercase tracking-[.2em] text-muted-foreground">
+            {workout.day}
+          </span>
+          <p className="mt-1.5 text-[30px] font-bold leading-[1.05] tracking-[-.03em]">{workout.focus}</p>
+        </div>
+        <Button variant="ghost" size="icon" className="size-7 shrink-0" onClick={onExit} aria-label="Close">
           <X className="size-3.5" />
         </Button>
       </div>

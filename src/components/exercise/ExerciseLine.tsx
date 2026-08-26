@@ -79,9 +79,28 @@ export function ExerciseLine({
         tabIndex={0}
         onClick={onToggleExpanded}
         onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggleExpanded() } }}
-        className="min-w-0 flex-1 text-left flex items-baseline justify-between gap-2.5 cursor-pointer"
+        /* THE NAME IS THE ROW. It wraps rather than crushes.
+         *
+         * Reported from a phone: an accessory row read "B · 3×9-11 · 25kg ·
+         * 2s down · drive up". "B" was Backpack Row. Ashley's words were
+         * "you can't see the exercises until you click into it" — which was
+         * literally true, since expanding was the only way to read a name.
+         *
+         * CAUSE: the summary was shrink-0 and the name was min-w-0 +
+         * truncate, so 100% of any shortfall came out of the name. The
+         * summary is unbounded — sets, reps, load, assistance, added load
+         * AND a tempo phrase — so a tempo'd accessory could eat the whole
+         * line. It looked fine on today's screen only because today's rows
+         * happened to carry shorter summaries; same component, same bug.
+         *
+         * flex-wrap plus a name box that is NOT min-w-0 inverts the
+         * priority: the name's nowrap text sets the row's min-content, so
+         * when the two cannot share a line the SUMMARY drops to the next one
+         * and the name keeps its full width. max-w-full keeps truncate as a
+         * last resort for a name longer than the row itself. */
+        className="min-w-0 flex-1 text-left flex flex-wrap items-baseline justify-between gap-x-2.5 gap-y-0.5 cursor-pointer"
       >
-        <div className="flex items-center gap-2 flex-wrap min-w-0">
+        <div className="flex items-center gap-2 max-w-full">
           {supersetLabel && (
             <span className="shrink-0 font-mono text-[10px] font-semibold text-primary glow-mint">{supersetLabel}</span>
           )}
@@ -93,6 +112,11 @@ export function ExerciseLine({
             {ex.name}
           </span>
         </div>
+        {/* No ml-auto. With justify-between a summary that shares the line
+            still sits right; one that has WRAPPED is alone on its line, and
+            left is where it belongs there — it reads as a caption under the
+            name rather than floating mid-row. Rendered both ways at 412px in
+            a real browser before choosing. */}
         {!expanded && (
           <span className="flex shrink-0 items-center gap-1">
             {summary}
