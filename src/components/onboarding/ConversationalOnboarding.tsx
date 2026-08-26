@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
@@ -456,6 +456,11 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
   const [busy, setBusy] = useState(false)
   const [reviewOpen, setReviewOpen] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const contentRef = useRef<HTMLDivElement>(null)
+  const isNearBottomRef = useRef(true)
+  // Read here rather than down in the render block: BOTH the composer offset
+  // and the auto-scroll below depend on it. See the composer's comment.
+  const { insetPx, isKeyboardOpen } = useViewportInset()
 
   const missing = useMemo(() => missingRequiredSlots(values), [values])
   const unconfirmedOptional = useMemo(() => unconfirmedOptionalSlots(confirmed, values), [confirmed, values])
@@ -506,9 +511,55 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
     saveOnboardingDraft(draft)
   }, [values, confirmed, messages, pendingContextFacts, pendingGoals])
 
+  // KEEPING THE LATEST MESSAGE IN VIEW.
+  //
+  // This used to be `useEffect(..., [messages, busy, reviewOpen])` — scroll
+  // once, when the message list changes. Reported from a real phone: "I have
+  // to keep scrolling to the bottom of the chat."
+  //
+  // The message list is the wrong thing to watch, because in this screen the
+  // height keeps growing AFTER it settles:
+  //   - a question renders, THEN its SlotChipsCard renders the option grid
+  //     below it, so the buttons that answer the question land off-screen
+  //   - a multi-select grows as options are toggled, with no new message
+  //   - the review card opens
+  //   - the keyboard opens, which both shrinks the container (100dvh) and
+  //     grows its padding (insetPx, just above) — neither is a message
+  //
+  // ChatAssistant already hit this and already fixed it; its own comment
+  // reads "ResizeObserver-based scroll instead of setTimeout/useEffect
+  // [messages]". Onboarding was still on the approach that was abandoned.
+  // Same pattern here: watch the CONTENT BOX, not the data.
+  const scrollToBottom = useCallback((force = false) => {
+    if (!force && !isNearBottomRef.current) return
+    // rAF so the scroll runs after layout, not against a height React has
+    // mutated but the browser has not measured yet.
+    requestAnimationFrame(() => {
+      const el = scrollRef.current
+      if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'instant' as ScrollBehavior })
+    })
+  }, [])
+
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
-  }, [messages, busy, reviewOpen])
+    const content = contentRef.current
+    if (!content) return
+    const observer = new ResizeObserver(() => scrollToBottom())
+    observer.observe(content)
+    return () => observer.disconnect()
+  }, [scrollToBottom])
+
+  // The container itself changes height when the keyboard opens (100dvh on
+  // Android) — that resizes the viewport, not the content, so the observer
+  // above never sees it.
+  useEffect(() => { scrollToBottom() }, [isKeyboardOpen, insetPx, scrollToBottom])
+
+  // Deliberate scroll-up is respected: nothing yanks the view back while
+  // re-reading an earlier answer. 120px of slack so "near enough the bottom"
+  // survives a rubber-band overscroll.
+  const handleScroll = useCallback(() => {
+    const el = scrollRef.current
+    if (el) isNearBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120
+  }, [])
 
   // Completion is the CLIENT's call, never the model's. The moment every
   // required slot validates and every ask-anyway slot has been answered, the
@@ -724,6 +775,11 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
     const trimmed = text.trim()
     if (!trimmed || busy) return
     setBusy(true)
+    // FORCED, overriding the near-bottom guard. The guard exists so someone
+    // re-reading an earlier answer isn't yanked away — but they have just
+    // answered, so the reply is the thing they are waiting for. Without this
+    // a chip tapped while scrolled up leaves them stranded above the answer.
+    scrollToBottom(true)
 
     // Typed-exact-label backstop (see tryExactLabelMatch): if this is raw
     // typed text — not already a chip tap — and it exactly matches an option
@@ -1095,7 +1151,8 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
   //
   // Simpler than ChatAssistant's version: onboarding has no tab bar and no
   // BottomDock to clear, so the only offset is the keyboard itself.
-  const { insetPx, isKeyboardOpen } = useViewportInset()
+  // (useViewportInset is called up with the refs — the scroll effects need it
+  // too, and a hook cannot be read before it runs.)
   const composerBottomStyle = isKeyboardOpen
     ? { bottom: insetPx }
     : { bottom: 'env(safe-area-inset-bottom)' }
@@ -1139,10 +1196,11 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
           and the composer would ride up over the last message instead. */}
       <div
         ref={scrollRef}
+        onScroll={handleScroll}
         className="flex-1 overflow-y-auto px-4 pb-28"
         style={isKeyboardOpen ? { paddingBottom: insetPx + 112 } : undefined}
       >
-        <div className="max-w-md w-full mx-auto space-y-3">
+        <div ref={contentRef} className="max-w-md w-full mx-auto space-y-3">
           {messages.map((msg, i) =>
             msg.isReceipt ? (
               <div key={i} className="flex items-center gap-1.5 pl-1">
