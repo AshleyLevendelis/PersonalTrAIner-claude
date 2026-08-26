@@ -771,6 +771,26 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       return true
     }
 
+    if (action.type === 'swap_session_for_activity') {
+      // The edge function already wrote workout_sessions.swapped_for_activity
+      // — it only emits this action when its own write succeeded. So this is
+      // a refresh, not a write, and the week strip picks up the ⇄ from the
+      // session row on the next read.
+      //
+      // THE SAME BUG AS THE BRANCH BELOW, one action type later: this type was
+      // missing from the PlanAction union, so applyPlanAction fell through to
+      // `return false` and the user was told "Action failed — the change was
+      // not applied" about a change that HAD been applied. Reported live, from
+      // a phone, minutes after the migration that made the write possible.
+      //
+      // The lesson was already written down here and it still happened again,
+      // so it is now a gate rather than a comment: test:chat-actions parses
+      // every `action: { type: … }` the edge function can emit and fails if
+      // any of them is unhandled here.
+      onLogsUpdated?.()
+      return true
+    }
+
     if (action.type === 'log_workout_set') {
       // Same single-write-path pattern as log_workout_session, just for one
       // set (chat-gemini/index.ts's log_workout_set handler). Fix 3
