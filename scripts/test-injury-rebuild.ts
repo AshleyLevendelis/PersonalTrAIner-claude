@@ -8,7 +8,29 @@
  * replacement — measured at 146 of ~190 slots on a real full_gym profile.
  * This asserts we detect that and produce a real plan instead.
  */
-import { generateExercisePlan, generateMesocycle, getFlaggedJoints } from '../src/lib/exercise-plan'
+import { generateExercisePlan, generateMesocycle, getFlaggedJoints, setRandomSource, resetRandomSource } from '../src/lib/exercise-plan'
+import { seededRngFromKey } from '../src/lib/seeded-random'
+
+// ---------------------------------------------------------------------------
+// SEEDED, because this gate was not and its verdict moved on its own.
+//
+// Three consecutive runs of IDENTICAL code produced 452, 452 and 436 rebuilt
+// slots, against a fixed 448 for substitute — so `rebuiltSlots > subSlots`
+// passed twice and failed once with nothing changed. That is not a red gate,
+// it is a coin flip, and a coin flip is worse: it made an unrelated change
+// look like it had caused a regression (measured one run against one run,
+// concluded wrongly, and only caught it by re-running).
+//
+// selectExercisesForTrack carries a ±0.3 tie-break jitter, so any count
+// derived from selection needs a fixed stream. Every other report in this
+// repo already seeds for exactly this reason; this gate was the exception.
+//
+// The SUBSTANCE of what it asserts is untouched — whether rebuild should
+// yield more slots than substitute is a training question that is flagged and
+// still open. This only makes the question answerable.
+// ---------------------------------------------------------------------------
+setRandomSource(seededRngFromKey('injury-rebuild:fixed'))
+process.on('exit', () => resetRandomSource())
 import { substituteForInjury, assessAdaptation, rebuildForInjury, countSlots } from '../src/lib/plan-adaptations'
 import { getExerciseEntry, isContraindicatedFor, isIndicatedFor } from '../src/lib/exercise-db'
 import type { UserProfile } from '../src/lib/types'

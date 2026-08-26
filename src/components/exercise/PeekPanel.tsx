@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { ArrowRightLeft, Ban, MoreVertical, X } from 'lucide-react'
-import { formatRampSets, groupExercises, type ExerciseGroup } from '@/lib/session-derive'
+import { formatRampSets, groupExercises, mainLiftGroupIndex, type ExerciseGroup } from '@/lib/session-derive'
 import { RampStrip } from './RampStrip'
 import { LoadChip, type LoadSource } from './LoadChip'
 import { ExerciseLine, SectionLabel, sectionLabelFor } from './ExerciseLine'
@@ -49,9 +49,12 @@ export function PeekPanel({
   const [expandedKey, setExpandedKey] = useState<string | null>(null)
 
   const groups = groupExercises(workout.exercises)
-  const firstMainLiftGroupIndex = groups.findIndex(
-    g => g.kind === 'single' && g.ex.tier === 'tier_1_primary'
-  )
+  // Via the shared helper, which falls back to the day's hardest standalone
+  // movement when the day has no tier-1 at all — 37.5% of generated days, and
+  // every one of them on bodyweight or minimalist. Both screens had their own
+  // copy of the tier-1 findIndex; that duplication is the same shape that let
+  // this panel's superset chrome drift until a screenshot caught it.
+  const firstMainLiftGroupIndex = mainLiftGroupIndex(groups, workout.exercises)
 
   const loadSourceFor = (ex: Exercise): LoadSource | undefined =>
     ex.suggested_load_kg == null ? undefined : (ex.load_source ?? 'estimate')

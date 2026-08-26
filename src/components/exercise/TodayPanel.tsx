@@ -5,7 +5,7 @@ import { useActiveSession } from '@/hooks/useActiveSession'
 import { useTrainingWeek } from '@/hooks/useTrainingWeek'
 import { useTimers } from '@/hooks/useTimers'
 import { getDoubleProgressionRecommendation, getAddedLoadProgression, type DoubleProgressionRecommendation } from '@/lib/progression-engine'
-import { groupExercises, resolveCalibrationAnchorIndex, computeSessionSummary, type ExerciseGroup } from '@/lib/session-derive'
+import { groupExercises, mainLiftGroupIndex, resolveCalibrationAnchorIndex, computeSessionSummary, type ExerciseGroup } from '@/lib/session-derive'
 import { computeSessionPRs } from '@/lib/pr-engine'
 import { getExerciseId } from '@/lib/exercise-db'
 import { getLocalDateString } from '@/lib/dev-clock'
@@ -490,9 +490,9 @@ function ExerciseList({
     }
   }
 
-  const firstMainLiftGroupIndex = groups.findIndex(
-    g => g.kind === 'single' && g.ex.tier === 'tier_1_primary'
-  )
+  // See PeekPanel for the reasoning — one definition, so a promoted main lift
+  // can never appear on one screen and not the other.
+  const firstMainLiftGroupIndex = mainLiftGroupIndex(groups, workout!.exercises)
 
   const isGroupExpanded = (g: ExerciseGroup) =>
     g.kind === 'single'

@@ -167,6 +167,102 @@ export function groupExercises(exercises: Exercise[]): ExerciseGroup[] {
 }
 
 // ---------------------------------------------------------------------------
+// THE DAY'S ANCHOR — which exercise is "the main lift" when nothing is tier-1.
+//
+// 96 of 256 generated days contain no tier_1_primary exercise at all, and the
+// split is not subtle: full_gym 0, home_gym 0, minimalist 48 of 64, bodyweight
+// 48 of 64. The cause is arithmetic in the catalogue — only 8 of 145 entries
+// are tier1_compound and SIX OF THE EIGHT NEED A BARBELL. Without one, the
+// only tier-1s reachable are Pull-Ups and Chin-Ups, so a home trainee's pull
+// day has a main lift and every squat, press and hinge day has none.
+//
+// That is behaviour, not decoration: MAIN_LIFT_REST_FLOOR_SECONDS keys on
+// tier1_compound, so on those days nothing receives the 60-second floor. The
+// round that shipped the floor was called "the day's hardest lift keeps its
+// rest"; on 37.5% of days there was nothing for the rule to point at.
+//
+// ONE DEFINITION, TWO CONSUMERS. The engine needs it to floor the rest; the
+// screens need it to print MAIN LIFT. Both read this. It lives here because
+// session-derive already owns groupExercises and already imports exercise-db,
+// and the engine imports nothing from here — the dependency runs one way.
+// ---------------------------------------------------------------------------
+
+/** tier1 beats tier2 beats tier3. Primers and anything unrecognised score 0. */
+const ANCHOR_RANK: Record<string, number> = {
+  tier1_compound: 3,
+  tier2_compound: 2,
+  tier3_isolation: 1,
+}
+
+/**
+ * How "main lift"-ish a movement is, from its mechanics tier alone.
+ *
+ * Exported because the ENGINE has to rank the same way while it is still
+ * holding ExerciseEntry objects (stageTimeCap works on entries, before a day
+ * of Exercise rows exists), and the screens rank Exercise rows. Two rankings
+ * that agree by coincidence is how the "Main lift" label and the 60-second
+ * rest floor would end up on different exercises.
+ */
+export function anchorRank(mechanicsTier: string | undefined): number {
+  return ANCHOR_RANK[String(mechanicsTier)] ?? 0
+}
+
+/**
+ * The day's hardest STANDALONE movement, or undefined when the day already
+ * has a real tier-1 (the existing path owns those and promotion must not
+ * touch them) or when nothing qualifies.
+ *
+ * SUPERSET MEMBERS ARE EXCLUDED, and this is the load-bearing exclusion. A
+ * promoted anchor earns a 60-second rest floor; a superset prints "alternate
+ * — no rest between" directly underneath it. Promoting a paired movement
+ * would have the app contradict itself inside one card. 128 of the days
+ * measured had their hardest movement inside a superset, and every one of
+ * them keeps no main lift rather than getting a contradictory one — the
+ * conservative direction on purpose.
+ *
+ * Cardio and finishers are excluded because they are not the session's work,
+ * and primers because a warm-up movement is never the point of the day.
+ */
+export function dayAnchorExercise(exercises: Exercise[]): Exercise | undefined {
+  // A day with a genuine tier-1 needs no promotion — say so by returning
+  // undefined rather than handing back the tier-1 itself, so a caller can
+  // never confuse "promoted" with "was always the main lift".
+  if (exercises.some(ex => getExerciseEntry(ex.name)?.mechanics_tier === 'tier1_compound')) return undefined
+
+  let best: Exercise | undefined
+  let bestRank = 0
+  for (const group of groupExercises(exercises)) {
+    if (group.kind !== 'single') continue
+    const ex = group.ex
+    const entry = getExerciseEntry(ex.name)
+    if (!entry || entry.mechanics_tier === 'primer') continue
+    if (ex.prescription_type === 'steady_state' || ex.tier === 'tier_4_finisher') continue
+    const rank = ANCHOR_RANK[String(entry.mechanics_tier)] ?? 0
+    // Strictly greater: ties go to the earlier exercise, which is the order
+    // the generator already put them in.
+    if (rank > bestRank) { bestRank = rank; best = ex }
+  }
+  return best
+}
+
+/**
+ * Which GROUP index carries the "Main lift" label — the real tier-1 if the
+ * day has one, otherwise the promoted anchor. -1 when neither exists.
+ *
+ * Shared because TodayPanel and PeekPanel each had their own copy of the
+ * tier-1 findIndex. That duplication is exactly the shape that let the
+ * superset chrome drift between those two screens until a screenshot caught
+ * it; one definition means the promotion cannot land on one screen only.
+ */
+export function mainLiftGroupIndex(groups: ExerciseGroup[], exercises: Exercise[]): number {
+  const real = groups.findIndex(g => g.kind === 'single' && g.ex.tier === 'tier_1_primary')
+  if (real !== -1) return real
+  const anchor = dayAnchorExercise(exercises)
+  if (!anchor) return -1
+  return groups.findIndex(g => g.kind === 'single' && g.ex === anchor)
+}
+
+// ---------------------------------------------------------------------------
 // Calibration cue anchor (§1.6.4) — resolves to exactly one exercise row per
 // calibration-week day, with a three-step fallback so a known_weight or
 // all-bodyweight day still gets the instruction instead of it silently

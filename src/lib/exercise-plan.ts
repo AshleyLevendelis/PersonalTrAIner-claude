@@ -16,6 +16,7 @@ import {
   shiftReps, adjustRest, dedupeAdjacentPhases, isRegressionFor, stepIntervalSeconds, getPhaseTempo, formatTempo, type PhaseConfig, type TrainingPhase,
 } from './periodization'
 import { getGoalPolicy, restrictPhaseSequence, resolveConditioningFrequency, RECOVERY_SET_MULTIPLIER, MAIN_LIFT_REST_FLOOR_SECONDS, type GoalPolicy } from './goal-policies'
+import { dayAnchorExercise, anchorRank } from './session-derive'
 import { isStartingOut, applyStartingOut, startingOutMinutes } from './starting-out'
 import { getDurationBudgetSeconds, getSessionMinimumSeconds, getSessionMaximumSeconds, getSteadyStateSeconds, DEFAULT_CARRY_DISTANCE_M, estimateDaySeconds, estimateSlotsSeconds, parseRestSeconds, SESSION_OVERHEAD_SECONDS } from './session-duration'
 
@@ -778,8 +779,30 @@ function buildSupersetPairs(
  * conditioning loaded main lift as a result — pre-existing, unchanged by
  * this, and it errs toward a shorter forecast, never a longer one.
  */
-function mainLiftRestFloor(entry: ExerciseEntry | undefined, policy?: GoalPolicy): number {
-  if (!entry || entry.mechanics_tier !== 'tier1_compound') return 0
+function mainLiftRestFloor(
+  entry: ExerciseEntry | undefined,
+  policy?: GoalPolicy,
+  /**
+   * This exercise is the day's PROMOTED anchor — it is not tier-1, but its
+   * day contains no tier-1 at all and it is the hardest standalone thing in
+   * the session (see dayAnchorExercise in session-derive).
+   *
+   * 96 of 256 generated days have no tier-1, all of them bodyweight or
+   * minimalist, because 6 of the catalogue's 8 tier1_compound entries need a
+   * barbell. Without this flag the floor those days get is zero, and the rule
+   * "the day's hardest lift keeps its rest" silently covers a pull-up day
+   * while leaving a leg day on accessory rest.
+   *
+   * Only the FLAT 60s applies to a promoted anchor, never the goal's higher
+   * loaded floor: minLoadedMainLiftRestSeconds is a density rule about a
+   * barbell main lift, and a promoted Air Squat is not one. Promotion should
+   * make the app honest about the hardest movement, not quietly rewrite a
+   * bodyweight session into a strength session.
+   */
+  promoted = false,
+): number {
+  if (!entry) return 0
+  if (entry.mechanics_tier !== 'tier1_compound') return promoted ? MAIN_LIFT_REST_FLOOR_SECONDS : 0
   const loaded = policy?.minLoadedMainLiftRestSeconds
   return loaded && isExternallyLoaded(entry)
     ? Math.max(MAIN_LIFT_REST_FLOOR_SECONDS, loaded)
@@ -848,12 +871,28 @@ function stageTimeCap(
   // took a conditioning pull-up from 72s to 57s, and then anatomical
   // adaptation's own -15s took it to 42s. Both later floors were gated on
   // isExternallyLoaded, so a bodyweight main lift fell through every one.
+  // The PROMOTED anchor, computed once for this day rather than per exercise.
+  // stageTimeCap holds ExerciseEntry objects, not the Exercise rows
+  // dayAnchorExercise takes, so it ranks with the shared anchorRank instead —
+  // same rule, one definition, no chance of the label and the floor landing
+  // on different movements. Nothing is promoted on a day that HAS a tier-1.
+  const promotedIdx = (() => {
+    if (dayExercises.some(d => d.entry.mechanics_tier === 'tier1_compound')) return -1
+    let best = -1, bestRank = 0
+    for (let i = 0; i < dayExercises.length; i++) {
+      const t = dayExercises[i].entry.mechanics_tier
+      if (t === 'cardio' || t === 'primer') continue
+      const r = anchorRank(t)
+      if (r > bestRank) { bestRank = r; best = i }
+    }
+    return best
+  })()
   for (let i = 0; i < dayExercises.length; i++) {
     if (dayExercises[i].entry.mechanics_tier === 'cardio') continue
     // Math.max, not an early `continue`: for everything that is not a main
     // lift the floor stays 30 and the expression is byte-identical to what
     // shipped before, so this change cannot move an accessory's rest.
-    const floor = Math.max(30, mainLiftRestFloor(dayExercises[i].entry, policy))
+    const floor = Math.max(30, mainLiftRestFloor(dayExercises[i].entry, policy, i === promotedIdx))
     const newRest = Math.max(floor, dayExercises[i].restSeconds - 15)
     dayExercises[i] = { ...dayExercises[i], restSeconds: newRest, rest: `${newRest}s` }
   }
@@ -4475,13 +4514,19 @@ function computeDurationTopUp(
       (day.recommendedCardio?.timing === 'post_session' ? day.recommendedCardio.duration * 60 : 0)
     const targetSeconds = (totalBudgetSeconds - fixedCostSeconds) * 0.95
     const entries = day.exercises.map(ex => EXERCISE_DATABASE.find(e => e.name.toLowerCase() === ex.name.toLowerCase()))
+    const topUpAnchor = dayAnchorExercise(day.exercises)
     const restSeconds = day.exercises.map((ex, i) => {
       const match = ex.rest.match(/(\d+)/)
       const base = match ? parseInt(match[1], 10) : 60
       // Same main-lift floor the real per-week derivation applies. Without
       // it this forecast under-costs exactly the sessions the floor makes
       // longer, and top-up would re-add sets the day can no longer afford.
-      return Math.max(20, base + phaseConfig.rest_adjust_seconds, mainLiftRestFloor(entries[i], policy))
+      // The estimator must see the promoted floor too, or it under-costs
+      // exactly the days the floor lengthens and top-up re-adds sets the
+      // session can no longer afford — the failure the tier-1 round already
+      // hit once and fixed here.
+      return Math.max(20, base + phaseConfig.rest_adjust_seconds,
+        mainLiftRestFloor(entries[i], policy, ex === topUpAnchor))
     })
     const roles = entries.map(e => e ? getVolumeRole(e) : null)
     const roleCeilings = day.exercises.map((_, i) => roles[i] ? getRoleSetCeiling(roles[i]!, isLongSession) : EXTRA_SETS_CAP + 99)
@@ -4609,8 +4654,19 @@ function trimWeekRestForBudget(
     // arbitrary survivor's rest quietly degraded here; a day over budget
     // for other reasons still trims normally, cardio just isn't a
     // candidate.
+    // THE FIFTH PATH. The promoted floor was applied at four sites and missed
+    // here, and this one trims LAST — so 227 promoted anchors were floored to
+    // 60s upstream and then walked back down to 30 by this loop. Exactly the
+    // shape the tier-1 round already recorded ("a constraint asserted at
+    // three paths, missed at the fourth"), repeated one round later on the
+    // same constraint. Caught by measuring the outcome rather than trusting
+    // that wiring the call sites was the whole job.
+    //
+    // A promoted anchor counts as main HERE TOO: it is trimmed last, and its
+    // floor is 60 rather than 30.
+    const trimAnchor = dayAnchorExercise(day.exercises)
     const order = day.exercises
-      .map((ex, i) => ({ i, isMain: ex.tier === 'tier_1_primary' }))
+      .map((ex, i) => ({ i, isMain: ex.tier === 'tier_1_primary' || ex === trimAnchor }))
       .filter(({ i }) => day.exercises[i].tier !== 'tier_4_finisher')
       .sort((a, b) => Number(a.isMain) - Number(b.isMain))
 
@@ -4623,7 +4679,12 @@ function trimWeekRestForBudget(
         // The goal's floor only applies to a LOADED main lift, matching where
         // it was set at prescription time — a bodyweight main lift keeps the
         // goal's density, because the risk this guards is a bar, not a tier.
-        const mainFloor = isMain && loadedMainLiftFloorSeconds && isExternallyLoaded(findEntry(ex.name) ?? ({} as ExerciseEntry))
+        // A PROMOTED anchor gets the flat 60 only, never the goal's loaded
+        // floor — same scoping as mainLiftRestFloor itself: that higher
+        // number is a density rule about a barbell main lift, and a promoted
+        // Air Squat is not one.
+        const isRealMain = ex.tier === 'tier_1_primary'
+        const mainFloor = isRealMain && loadedMainLiftFloorSeconds && isExternallyLoaded(findEntry(ex.name) ?? ({} as ExerciseEntry))
           ? Math.max(MAIN_LIFT_REST_FLOOR_SECONDS, loadedMainLiftFloorSeconds)
           : MAIN_LIFT_REST_FLOOR_SECONDS
         const floor = isMain ? mainFloor : 30
@@ -4710,13 +4771,18 @@ export function sizeBlockToRestBudget(
     // estimateDaySeconds directly (rather than re-deriving its formula)
     // via a throwaway day object so this can never drift from the same
     // accounting trimWeekRestForBudget checks against later.
-    const estimate = (exercises: Exercise[]) => estimateDaySeconds({
-      ...day,
-      exercises: exercises.map(ex => ({
-        ...ex,
-        rest: `${Math.max(20, parseRestSeconds(ex.rest) + restAdjustSeconds, mainLiftRestFloor(findEntry(ex.name), policy))}s`,
-      })),
-    })
+    const estimate = (exercises: Exercise[]) => {
+      // Re-derived per call rather than hoisted: `exercises` shrinks as this
+      // function trims, and the anchor can move when the previous one is cut.
+      const anchor = dayAnchorExercise(exercises)
+      return estimateDaySeconds({
+        ...day,
+        exercises: exercises.map(ex => ({
+          ...ex,
+          rest: `${Math.max(20, parseRestSeconds(ex.rest) + restAdjustSeconds, mainLiftRestFloor(findEntry(ex.name), policy, ex === anchor))}s`,
+        })),
+      })
+    }
 
     let exercises = day.exercises
     if (estimate(exercises) <= totalBudgetSeconds) return day
@@ -5264,6 +5330,15 @@ export function generateMesocycle(
       const carryStepDecidedThisWeek = new Map<string, number>()
 
       const days: WorkoutDay[] = blockDays.map((day, dayIdx) => {
+        // The day's PROMOTED anchor, decided once per day. Undefined whenever
+        // the day already has a real tier-1 — those keep the existing floor
+        // and nothing here touches them.
+        //
+        // Read from the day's BASE names, before the weekly accessory
+        // rotation below picks substitutes. That is sound because rotation is
+        // within-tier (an accessory is only ever replaced by an accessory),
+        // so the RANK the anchor is chosen on cannot change — only the name.
+        const promotedAnchor = dayAnchorExercise(day.exercises)
         // Fixed for this week (main/core never rotate weekly), so these
         // names are known up front — seeding the avoidance set with them
         // means an accessory rotation can never collide with a sibling slot
@@ -5511,8 +5586,18 @@ export function generateMesocycle(
             const floor = mainLiftRestFloor(
               dbEntry,
               isDeload ? undefined : policy,
+              // Compared by identity against the day's base row, which is
+              // what dayAnchorExercise returned. `ex` is that same object
+              // here — the rotation above produces `weeklyName`, a string,
+              // and leaves this reference alone.
+              ex === promotedAnchor,
             )
             const current = parseRestSeconds(restForWeek)
+            // A FLOOR, NEVER A CEILING. `current < floor` is what makes that
+            // true: 388 of the measured days already rest at or above 60s on
+            // their hardest movement, and promotion must not pull any of them
+            // DOWN to the floor. Same one-way rule the stated load ceilings
+            // follow — new information may raise a prescription, never cut it.
             if (floor > 0 && current > 0 && current < floor) {
               restForWeek = `${floor}s`
             }

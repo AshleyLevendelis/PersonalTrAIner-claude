@@ -46,7 +46,16 @@ import { getExerciseEntry } from '../src/lib/exercise-db'
 import { isExternallyLoaded } from '../src/lib/load-prescription'
 import { getGoalPolicy } from '../src/lib/goal-policies'
 import { seededRngFromKey } from '../src/lib/seeded-random'
-import type { UserProfile, FitnessGoal, SessionDuration } from '../src/lib/types'
+import { dayAnchorExercise } from '../src/lib/session-derive'
+import { parseRestSeconds } from '../src/lib/session-duration'
+import type { UserProfile, FitnessGoal, SessionDuration, EquipmentAccess } from '../src/lib/types'
+
+/** Sections 5-6 generate a lot of plans; the engine's debug chatter drowns the result. */
+function quietly<T>(fn: () => T): T {
+  const d = console.debug, w = console.warn, l = console.log
+  console.debug = () => {}; console.warn = () => {}; console.log = () => {}
+  try { return fn() } finally { console.debug = d; console.warn = w; console.log = l }
+}
 
 let failures = 0
 const check = (name: string, ok: boolean, detail = '') => {
@@ -192,6 +201,91 @@ console.log('\n4. No main lift anywhere rests under a minute — bar or no bar')
   const dSeen = GOALS.reduce((n, g) => n + rows.get(g)!.deloadMains, 0)
   check(`the floor holds on deload weeks too (${dShort} of ${dSeen})`, dShort === 0, String(dShort))
   check('...and there are deload main lifts to check', dSeen > 100, String(dSeen))
+}
+
+// ---------------------------------------------------------------------------
+console.log('\n5. A day with NO tier-1 still has a hardest lift, and it keeps its rest')
+// ---------------------------------------------------------------------------
+{
+  // 96 of 256 generated days contain no tier_1_primary at all — full_gym 0,
+  // home_gym 0, minimalist 48 of 64, bodyweight 48 of 64 — because 6 of the
+  // catalogue's 8 tier1_compound entries need a barbell. Sections 1-4 above
+  // all ask their question OF a main lift, so every one of them passed green
+  // while 37.5% of days had nothing for the rule to point at.
+  //
+  // The floor now promotes the day's hardest standalone movement. Three
+  // things have to hold, and the third is the one that bit: the promoted
+  // floor was wired at four call sites and MISSED at trimWeekRestForBudget,
+  // which trims last — 227 anchors were floored to 60s and then walked back
+  // down to 30. Measured, not assumed.
+  const TIERS: EquipmentAccess[] = ['full_gym', 'home_gym', 'minimalist', 'bodyweight']
+  let noTierOne = 0, anchored = 0, underSixty = 0, inSuperset = 0, pulledDown = 0
+  const before = new Map<string, number>()
+
+  for (const equipment_access of TIERS)
+    for (const fitness_goal of GOALS)
+      for (const session_duration_preference of ['30-45', '45-60', '60-90'] as SessionDuration[]) {
+        const profile = buildProfile({ equipment_access, fitness_goal, session_duration_preference } as Partial<UserProfile>)
+        const key = `anchor:${equipment_access}:${fitness_goal}:${session_duration_preference}`
+        const weeks = quietly(() => {
+          setRandomSource(seededRngFromKey(key))
+          try { return generateMesocycle(profile) } finally { resetRandomSource() }
+        })
+        for (const wk of weeks) for (const day of wk.days) {
+          if (!day.exercises.length) continue
+          if (day.exercises.some(e => e.tier === 'tier_1_primary')) continue
+          noTierOne++
+          const anchor = dayAnchorExercise(day.exercises)
+          if (!anchor) continue
+          anchored++
+          if (anchor.superset_label) inSuperset++
+          const rest = parseRestSeconds(anchor.rest)
+          if (rest > 0 && rest < 60) underSixty++
+          before.set(anchor.name, (before.get(anchor.name) ?? 0) + 1)
+        }
+      }
+
+  check(`days with no tier-1 exist to check (${noTierOne})`, noTierOne > 200, String(noTierOne))
+  check(`every one of them gets a promoted anchor (${anchored} of ${noTierOne})`, anchored === noTierOne, `${noTierOne - anchored} without`)
+  check(`no promoted anchor rests under 60s (${underSixty})`, underSixty === 0, String(underSixty))
+  // The invariant that stops the app contradicting itself on screen: a
+  // superset prints "alternate — no rest between" directly under its members,
+  // so promoting one and giving it a 60s floor would print both at once.
+  check(`no superset member is ever promoted (${inSuperset})`, inSuperset === 0, String(inSuperset))
+  check(`...and promotion reaches more than one movement (${before.size} distinct)`, before.size >= 4, String(before.size))
+}
+
+// ---------------------------------------------------------------------------
+console.log('\n6. Promotion is a FLOOR, never a ceiling')
+// ---------------------------------------------------------------------------
+{
+  // 388 of the days measured already rested at or above 60s on their hardest
+  // movement. Promotion must not pull a single one of them DOWN to the floor
+  // — the same one-way rule the stated load ceilings follow, where new
+  // information may raise a prescription but never cut it.
+  //
+  // Asked of a LONG-REST goal, because that is where a ceiling bug would show
+  // up: strength rests longest, so if the floor were being applied as an
+  // assignment rather than a Math.max, strength anchors would all read 60.
+  let above = 0, exactlySixty = 0
+  for (const equipment_access of ['bodyweight', 'minimalist'] as EquipmentAccess[]) {
+    const profile = buildProfile({ equipment_access, fitness_goal: 'strength', session_duration_preference: '60-90' } as Partial<UserProfile>)
+    const weeks = quietly(() => {
+      setRandomSource(seededRngFromKey(`ceil:${equipment_access}`))
+      try { return generateMesocycle(profile) } finally { resetRandomSource() }
+    })
+    for (const wk of weeks) for (const day of wk.days) {
+      if (!day.exercises.length) continue
+      if (day.exercises.some(e => e.tier === 'tier_1_primary')) continue
+      const anchor = dayAnchorExercise(day.exercises)
+      if (!anchor) continue
+      const rest = parseRestSeconds(anchor.rest)
+      if (rest > 60) above++
+      else if (rest === 60) exactlySixty++
+    }
+  }
+  check(`anchors resting ABOVE 60s are left alone (${above} above, ${exactlySixty} at exactly 60)`,
+    above > 0, 'every anchor landed on exactly 60 — the floor is being assigned, not floored')
 }
 
 console.log(failures === 0 ? '\nAll main-lift-rest checks passed.\n' : `\n${failures} FAILED\n`)
