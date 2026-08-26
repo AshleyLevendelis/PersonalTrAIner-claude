@@ -6,6 +6,7 @@ import { formatRampSets, groupExercises, type ExerciseGroup } from '@/lib/sessio
 import { RampStrip } from './RampStrip'
 import { LoadChip, type LoadSource } from './LoadChip'
 import { ExerciseLine, SectionLabel, sectionLabelFor } from './ExerciseLine'
+import { SupersetShell } from './SupersetGroup'
 import type { Exercise, WorkoutDay } from '@/lib/types'
 
 // ---------------------------------------------------------------------------
@@ -159,9 +160,23 @@ export function PeekPanel({
               text={sectionLabelFor(g, i === firstMainLiftGroupIndex)}
               expanded={isGroupExpanded(g)}
             />
+            {/* Via the SAME shell today's supersets use. This used to map the
+                members into two bare rows both badged with the group letter
+                — no rail, no A1/A2, and no "alternate — no rest between".
+                That last one is an instruction, not decoration: a peeked day
+                was showing the two exercises without saying they alternate.
+                The header comment above promises these two surfaces cannot
+                drift because ExerciseLine is shared; that was true of the row
+                and false of everything around it. */}
             {g.kind === 'single'
               ? renderRow(g.ex, g.exIndex)
-              : g.members.map(m => renderRow(m.ex, m.exIndex, g.label))}
+              : (
+                <SupersetShell
+                  label={g.label}
+                  count={g.members.length}
+                  renderMember={(i, memberLabel) => renderRow(g.members[i].ex, g.members[i].exIndex, memberLabel)}
+                />
+              )}
           </div>
         ))}
       </div>

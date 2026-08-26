@@ -77,6 +77,7 @@
     "report:band-slots": "tsx scripts/report-band-slots.ts",
     "report:swap-coverage": "tsx scripts/report-swap-coverage.ts",
     "report:slot-impact": "tsx scripts/report-slot-impact.ts",
+    "render:screens": "npm run build && tsx scripts/render-screens.tsx",
     "report:frozen-weeks": "tsx scripts/report-frozen-weeks.ts",
     "report:rehab-coverage": "tsx scripts/report-rehab-coverage.ts",
     "report:trim-magnitude": "tsx scripts/run-trim-magnitude-report.ts"

@@ -12,3 +12,6 @@ dist/
 # Local tooling state
 .vercel
 supabase/.temp/
+
+# Screenshots from `npm run render:screens` — a looking tool, not an artifact.
+.screens/
