@@ -1,6 +1,10 @@
 # Plan: make exercise selection prefer the best tool the trainee actually owns
 
-Status: PLAN ONLY — approved to write, not yet built.
+Status: BUILT 2026-08-18. See "What actually happened" at the foot of this
+file — the measurement changed the design in one significant way, and that
+correction is the most useful thing in here.
+
+Original status line: PLAN ONLY — approved to write, not yet built.
 Origin: a real Push day put Band Tricep Kickback in a full-gym advanced
 profile's tricep slot, while the Pull day two days later correctly used a
 lat pulldown and a cable row.
@@ -185,3 +189,77 @@ has happened repeatedly on this engine and is worth naming when it does.
   declined) — already logged in BACKLOG.md, separate plan.
 - Retagging Band Tricep Kickback with `indicated_joints`. Small, real,
   but a data-quality task rather than part of this behaviour change.
+
+---
+
+# What actually happened (built 2026-08-18)
+
+## The design changed once, and the measurement is why
+
+The plan above assumed a single rank per implement applied everywhere. A
+full-grid before/after (9216 combinations, week-1 selection dumped and diffed
+exercise by exercise via `scripts/report-equipment-fit.ts`) showed that was
+too broad in two places, both of which Ashley then ruled on:
+
+| exercise | before | first cut | after ruling |
+|---|---|---|---|
+| Banded Terminal Knee Extension | 1637 | **162** (-90%) | 1587 (-3%) |
+| Pallof Press | 4809 | **3427** (-29%) | 4810 (unchanged) |
+
+Both were the rule being right about implements and wrong about purpose:
+
+- **Rehab.** A banded terminal knee extension is prescribed for a knee
+  BECAUSE of the band's accommodating resistance. Ranking it under an
+  unloaded quad set inverted the point of the exercise.
+- **Core.** Pallof Press is tagged `['resistance band']` only because the
+  equipment array is AND-ed during filtering, so adding 'cable machine' would
+  have narrowed it to full-gym-only rather than widening it — its own source
+  comment says so and its form cues say "band or cable". The tag was an
+  availability floor and the ranking read it as a preference.
+
+Ashley's ruling: skip rehab and core, apply everywhere else. Implemented as
+`isEquipmentQualityExempt` (exercise-plan.ts), shared with the harness so the
+scorer can never flag a pick the engine deliberately makes.
+
+## What it does now, measured
+
+Intended effect, net appearances across the grid:
+
+- Band Curl **1080 -> 0**, Band Shoulder Press **625 -> 0**
+- Band Tricep Kickback **-864** (the originally reported complaint)
+- Band Tricep Pushdown **-499**, Backpack Row **-878**, Table Row **-580**
+- gained: Dumbbell Leg Curl +1204, Walking Lunges +1187, Overhead Tricep
+  Extension +879, Dumbbell Rows +728, Goblet Squats +725, Dumbbell Curls +463
+
+Bodyweight-tier profiles: **0 changes, 0 slots** — the plan's hard
+requirement, met exactly. For that trainee the band genuinely IS the best
+tool they own, so the factor is gated off at the tier.
+
+## A measurement trap worth knowing about
+
+The raw "37% of slots changed" from the first cut was mostly NOT the effect.
+One genuine swap early in a day changes how many candidates the scorer sees
+later, which re-rolls the seeded jitter for every pick after it. Bucketing
+changes by RANK TRANSITION separates signal from that cascade — medium->medium
+reshuffles were 16.6% of all changes and mean nothing. Any future
+selection-engine measurement should bucket the same way rather than trusting
+a raw diff count.
+
+## Residual, reported not fixed
+
+- **Seated Band Leg Curl -379 (-21%).** It IS rehab-exempt (scores 0), but
+  Dumbbell Leg Curl is not exempt and scores +1, so it still loses some
+  slots. The exemption is per-candidate, not per-slot. Far milder than the
+  -99% the first cut produced, but not zero.
+- **`rotation_relative_load` 3 -> 5 audit failures.** Not a new defect —
+  two more instances of two already-failing shapes, because more profiles now
+  correctly reach a cable isolation exercise in week 1 and therefore reach the
+  pre-existing faulty week-3 rotation estimate. Logged in BACKLOG.md.
+- **`load_cap` 51 -> 50.** Two worse shoulder-isolation breaches (30kg, 35kg
+  over a 25kg ceiling) replaced by one milder one (27.5kg).
+- **Goal differentiation shifted both ways** and is worth a look: a
+  preference that applies identically regardless of goal will pull every goal
+  toward the same implements. hypertrophy-vs-functional pattern TVD fell
+  32.6% -> 23.3% (less differentiated); hypertrophy-vs-fat_loss name overlap
+  fell 55.0% -> 51.2% (more differentiated). The gate passes, but "did not
+  shift" would be false.
