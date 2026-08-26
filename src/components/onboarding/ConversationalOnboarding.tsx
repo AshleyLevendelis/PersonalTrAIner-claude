@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { Dumbbell, Send, Check } from 'lucide-react'
+import { useViewportInset } from '@/hooks/useViewportInset'
 import { SlotChipsCard } from './SlotChipsCard'
 import { SlotNumericCard } from './SlotNumericCard'
 import {
@@ -1072,8 +1073,35 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
 
   // --- render ------------------------------------------------------------
 
+  // THE COMPOSER MUST RIDE ABOVE THE SOFT KEYBOARD, and until now it was the
+  // one screen in the app that didn't.
+  //
+  // Reported from a real phone: with the keyboard up, the text field sat
+  // BELOW the fold and had to be scrolled to. On the very first screen a new
+  // user ever sees, on the only control that moves the conversation forward.
+  //
+  // Cause: this wrapper was `min-h-screen` (100vh) with the composer as an
+  // ordinary last flex child. 100vh is the viewport WITHOUT the keyboard, so
+  // once the keyboard opened the layout stayed full height while the visible
+  // area halved, pushing the composer off-screen. Android also counts the
+  // collapsing URL bar in 100vh, which is why it could need a scroll even
+  // before anything was focused.
+  //
+  // Fixed the way ChatAssistant already does it — fixed position plus
+  // useViewportInset — rather than with 100dvh, because dvh alone does not
+  // cover iOS Safari: it resizes the VISUAL viewport but not the LAYOUT
+  // viewport, so a bottom-anchored element still ends up under the keyboard.
+  // The hook's own doc comment records that; it is why the hook exists.
+  //
+  // Simpler than ChatAssistant's version: onboarding has no tab bar and no
+  // BottomDock to clear, so the only offset is the keyboard itself.
+  const { insetPx, isKeyboardOpen } = useViewportInset()
+  const composerBottomStyle = isKeyboardOpen
+    ? { bottom: insetPx }
+    : { bottom: 'env(safe-area-inset-bottom)' }
+
   return (
-    <div className="min-h-screen flex flex-col bg-background">
+    <div className="min-h-[100dvh] flex flex-col bg-background">
       <div className="flex items-center justify-between gap-2 px-4 pt-4 pb-2 max-w-md w-full mx-auto">
         <div className="flex items-center gap-2">
           <Dumbbell className="size-5 text-primary" />
@@ -1103,7 +1131,17 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
         </div>
       </div>
 
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 pb-4">
+      {/* The base pb-28 clears the now-fixed composer — without it the last
+          chip card or the Generate button sits underneath it and cannot be
+          tapped. The extra insetPx is for iOS: 100dvh above shrinks with the
+          keyboard on Chrome Android, but iOS Safari leaves the LAYOUT
+          viewport at full height, so there the container never gets shorter
+          and the composer would ride up over the last message instead. */}
+      <div
+        ref={scrollRef}
+        className="flex-1 overflow-y-auto px-4 pb-28"
+        style={isKeyboardOpen ? { paddingBottom: insetPx + 112 } : undefined}
+      >
         <div className="max-w-md w-full mx-auto space-y-3">
           {messages.map((msg, i) =>
             msg.isReceipt ? (
@@ -1252,7 +1290,10 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
         </div>
       </div>
 
-      <div className="border-t border-border/40 px-4 py-3">
+      <div
+        className="fixed left-0 right-0 z-40 border-t border-border/40 bg-background px-4 py-3"
+        style={composerBottomStyle}
+      >
         <div className="max-w-md w-full mx-auto flex items-center gap-2">
           <Input
             value={input}
