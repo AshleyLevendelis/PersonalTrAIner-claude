@@ -1317,8 +1317,47 @@ export function prescribeLoad(
           ? 'Still no logged number for this lift, so this week goes up by one small step from last time, capped by the standards estimate. Log it and let the effort target correct it.'
           : fromKnownWeight
             ? 'Seeded from the working weight you reported for this lift. Let the effort target correct it if it has changed.'
-            : 'Starting estimate from strength standards for your bodyweight, sex and experience — not a tested max. ' +
-              'Let the effort target correct it: too easy, add load next set; too hard, drop it.'
+            : isImprovisedLoadImplement(entry)
+              // AN IMPROVISED IMPLEMENT NEEDS ITS OWN SENTENCE, because the
+              // standard one is untrue for it in two specific ways.
+              //
+              // "from strength standards for your bodyweight" describes how
+              // the number STARTED, but an improvised load is then clamped to
+              // IMPROVISED_IMPLEMENT_CEILING_KG — a fixed 8/12/20/25kg by
+              // experience that has nothing to do with this trainee. For most
+              // bodies the clamp IS the number, so the sentence credits the
+              // estimate for a figure the ceiling decided.
+              //
+              // "too easy, add load next set" is worse: it assumes weight
+              // exists to add. The app has never asked what is in the bag and
+              // has no way to know. Someone whose rucksack holds 8kg of books
+              // was being told 20kg as a fact, with an instruction they
+              // cannot follow.
+              //
+              // The honest version says it is a guess about the BAG rather
+              // than about them, and points at the mechanism that actually
+              // fixes it — getDoubleProgressionRecommendation reads the last
+              // logged sets and works from that number, so one logged session
+              // replaces this guess entirely.
+              ? 'A starting guess — I have no way to know what your bag actually holds. ' +
+                'Load what you have, log it, and I will work from your number from next session.'
+              // Same untruth, wider audience. "Add load next set" is only
+              // true where there is a rack to take it from.
+              // LOADING_CEILING_KG_PER_HAND_OR_TOTAL already records that its
+              // values "are full-gym ceilings and do not scale down by
+              // equipment tier — a home_gym/minimalist trainee's actual
+              // adjustable dumbbells realistically top out well below 50kg",
+              // so the app knowingly prices home kit against a commercial
+              // rack. It should at least not INSTRUCT them to add weight it
+              // has no reason to think they own.
+              //
+              // full_gym is deliberately untouched: there the original
+              // sentence is simply true.
+              : profile.equipment_access === 'home_gym' || profile.equipment_access === 'minimalist'
+                ? 'A starting guess — I do not know which weights you actually have. ' +
+                  'Use the closest thing you own, log it, and I will work from your number from next session.'
+                : 'Starting estimate from strength standards for your bodyweight, sex and experience — not a tested max. ' +
+                  'Let the effort target correct it: too easy, add load next set; too hard, drop it.'
 
   return {
     starting_weight_kg: rounded,
