@@ -442,6 +442,30 @@
 }
 
 /*
+ * One-shot sparkle for the moment the water ring first reaches its target
+ * (NutritionDisplay.tsx). Deliberately a single play with a hard end, not a
+ * loop: hitting the target is an event, and a permanently twinkling ring
+ * would read as a status the trainee has to keep interpreting rather than a
+ * moment that happened. The component removes the nodes once the last play
+ * finishes, so nothing is left animating off-screen either.
+ *
+ * transform-box/transform-origin are load-bearing on SVG children: without
+ * them the scale/rotate resolve against the SVG root's origin and the star
+ * flies across the meter instead of turning on the spot.
+ */
+@keyframes dsSparkleOnce {
+  0% { opacity: 0; transform: scale(.4) rotate(-18deg); }
+  35% { opacity: .85; transform: scale(1) rotate(0deg); }
+  100% { opacity: 0; transform: scale(.72) rotate(16deg); }
+}
+.ds-sparkle {
+  transform-box: fill-box;
+  transform-origin: center;
+  opacity: 0;
+  animation: dsSparkleOnce 1.1s ease-in-out both;
+}
+
+/*
  * Reduced motion kills the animations outright, independently of glow
  * strength — someone can want the halos and not the pulsing. Matches the
  * convention already used in chat/TypewriterMarkdown.tsx.
@@ -451,7 +475,11 @@
   .glow-dot,
   .glow-warn-dot,
   .glow-sweep,
-  .glow-bloom-once {
+  .glow-bloom-once,
+  /* Kept invisible rather than merely un-animated: with the animation
+     stripped, `opacity: 0` above is what the sparkles fall back to, so they
+     never appear as three static stars stuck on the ring. */
+  .ds-sparkle {
     animation: none;
   }
 }
