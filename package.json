@@ -69,6 +69,7 @@
     "test:rehab-prescribed": "tsx scripts/test-rehab-prescribed.ts",
     "test:frozen-weeks": "tsx scripts/test-frozen-weeks.ts",
     "test:session-length": "tsx scripts/test-session-length.ts",
+    "test:load-ceilings": "tsx scripts/test-load-ceilings.ts",
     "test:ceiling-units": "tsx scripts/test-load-ceiling-units.ts",
     "test:main-lift-rest": "tsx scripts/test-main-lift-rest.ts",
     "report:added-load": "tsx scripts/report-added-load.ts",

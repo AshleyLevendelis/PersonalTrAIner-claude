@@ -569,6 +569,59 @@ export function getLoadingCeilingKg(entry: ExerciseEntry, category: string | nul
   return LOADING_CEILING_KG_PER_HAND_OR_TOTAL[loadingMode(entry)]
 }
 
+/**
+ * What this trainee says they can ACTUALLY load, if they have said.
+ *
+ * Returns null when unstated — which is not the same as declined, and not the
+ * same as zero. Callers treat null as "no opinion" and fall back to the table.
+ *
+ * Reading these off the profile with optional chaining is deliberate: the
+ * columns arrive in migration 20260826140000 and the app must behave exactly
+ * as it did before that migration is applied. Same degradation rule as
+ * added_load_kg — profiles are read with select('*'), so a missing column is
+ * simply absent rather than an error.
+ */
+export function statedCeilingKg(entry: ExerciseEntry, profile: UserProfile): number | null {
+  const p = profile as UserProfile & {
+    max_dumbbell_kg?: number | null
+    max_single_implement_kg?: number | null
+    max_improvised_kg?: number | null
+  }
+  // Checked before loadingMode, because a weighted backpack falls through
+  // that function's cases to 'stack' — it is not a cable machine, and pricing
+  // it against one is how Backpack Row was once estimated at 45-65kg.
+  if (isImprovisedLoadImplement(entry)) return p.max_improvised_kg ?? null
+  switch (loadingMode(entry)) {
+    case 'dumbbell': return p.max_dumbbell_kg ?? null
+    case 'single_implement': return p.max_single_implement_kg ?? null
+    // A barbell trainee is already asked their squat/bench/deadlift, and a
+    // cable stack means a gym. Neither is asked, so neither has an answer.
+    default: return null
+  }
+}
+
+/**
+ * The ceiling actually in force: the lower of what the app allows and what
+ * the trainee says they own.
+ *
+ * ONLY EVER DOWNWARD, and that asymmetry is the whole safety argument. A
+ * stated 15kg replaces an invented 50kg, because the invented number was
+ * describing a commercial gym rack rather than this person's spare room. A
+ * stated 200kg changes nothing, because the table is ALSO a formula-regression
+ * backstop and this is the loading path — the same one-way rule the
+ * weight-basis offer used when a weigh-in could only ever correct a load, not
+ * inflate one.
+ */
+export function effectiveLoadingCeilingKg(
+  entry: ExerciseEntry,
+  category: string | null,
+  profile: UserProfile,
+): number {
+  const table = getLoadingCeilingKg(entry, category)
+  const stated = statedCeilingKg(entry, profile)
+  return stated == null ? table : Math.min(table, stated)
+}
+
 /** Round to something actually loadable rather than a number like 43.7kg. */
 export function roundToPlate(kg: number, mode: LoadingMode): number {
   const floor = LOADING_FLOOR_KG[mode]
@@ -1273,15 +1326,26 @@ export function prescribeLoad(
   // rather than clamping quietly — see LOADING_CEILING_KG_PER_HAND_OR_TOTAL's
   // doc comment for why a clip that looks plausible afterward is worse than
   // no clip at all.
-  const loadingCeiling = getLoadingCeilingKg(entry, category)
-  if (rounded > loadingCeiling) {
+  //
+  // The trainee's OWN stated ceiling participates here, and only downward.
+  // Before this, a home trainee's dumbbells were priced against a commercial
+  // gym rack (50kg per hand) — a fact the table's own comment admits and had
+  // deferred. A stated 15kg replaces that; a stated 200kg changes nothing.
+  //
+  // The warning fires only for the TABLE ceiling. Hitting your own stated
+  // limit is not a formula regression, it is the app finally knowing
+  // something — shouting about it in the console would train us to ignore a
+  // message that exists to catch real arithmetic faults.
+  const tableCeiling = getLoadingCeilingKg(entry, category)
+  const loadingCeiling = effectiveLoadingCeilingKg(entry, category, profile)
+  if (rounded > tableCeiling) {
     console.warn(
-      `[Load Prescription] "${entry.name}" computed ${rounded}kg, above the ${loadingCeiling}kg realistic ` +
+      `[Load Prescription] "${entry.name}" computed ${rounded}kg, above the ${tableCeiling}kg realistic ` +
       `ceiling for its implement — clamping. This is a safety net, not a fix: something upstream produced ` +
       `a wrong number and should be traced, not just the clamp trusted.`
     )
-    rounded = Math.min(rounded, loadingCeiling)
   }
+  rounded = Math.min(rounded, loadingCeiling)
 
   // SAFETY ceiling — applied last, after both the estimate path and the
   // forced-ramp/deload path above, so nothing (a within-block double-
@@ -1289,7 +1353,13 @@ export function prescribeLoad(
   // push an improvised-implement prescription past it. See
   // IMPROVISED_IMPLEMENT_CEILING_KG's doc comment.
   if (isImprovisedLoadImplement(entry)) {
-    rounded = Math.min(rounded, IMPROVISED_IMPLEMENT_CEILING_KG[profile.training_experience || 'novice'])
+    // What the bag actually holds lowers this; it can never raise it. The
+    // strap/posture limit is a safety judgement about the implement, not a
+    // statement about the trainee, so someone insisting their rucksack takes
+    // 40kg still gets the experience-scaled figure.
+    const strapLimit = IMPROVISED_IMPLEMENT_CEILING_KG[profile.training_experience || 'novice']
+    const statedBag = statedCeilingKg(entry, profile)
+    rounded = Math.min(rounded, statedBag == null ? strapLimit : Math.min(strapLimit, statedBag))
   }
 
   // Only compounds in a strength/power phase ramp; hypertrophy-phase work and

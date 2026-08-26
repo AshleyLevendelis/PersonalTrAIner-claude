@@ -10,6 +10,8 @@ import { computeSessionPRs } from '@/lib/pr-engine'
 import { getExerciseId } from '@/lib/exercise-db'
 import { getLocalDateString } from '@/lib/dev-clock'
 import { tabHash } from '@/lib/app-route'
+import { ceilingToAskFor, saveStatedCeiling, declineStatedCeilings } from '@/lib/load-ceiling-prompt'
+import { LoadCeilingPrompt } from './LoadCeilingPrompt'
 import { WeekContextRow } from './WeekContextRow'
 import { PeekPanel } from './PeekPanel'
 import { SectionLabel, sectionLabelFor } from './ExerciseLine'
@@ -154,6 +156,10 @@ export function TodayPanel({
   // bar and the other is what you hang off yourself.
   const [progressedAddedLoads, setProgressedAddedLoads] = useState<Record<string, number>>({})
   const [progressionNotes, setProgressionNotes] = useState<Record<string, { note: string; didProgress: boolean }>>({})
+  // Answered or dismissed THIS session. The durable record is on the profile;
+  // this only stops the card lingering after a tap, since `profile` is a prop
+  // and does not refetch mid-session.
+  const [ceilingHandled, setCeilingHandled] = useState(false)
   useEffect(() => {
     if (!profileId || liveWeek <= 1 || !workout || workout.exercises.length === 0) {
       setProgressedLoads({})
@@ -313,6 +319,34 @@ export function TodayPanel({
             )}
           </div>
           <SessionSummaryDialog open={summaryOpen} onOpenChange={setSummaryOpen} data={summaryData} />
+          {/* WHAT CAN YOU ACTUALLY LOAD — asked at first use, not in
+              onboarding (Ashley's call: someone who has never trained cannot
+              answer it, and onboarding is where people drop out). Rendered
+              inline and scrollable-past on purpose: ignoring it is "not now",
+              while "I'm not sure" is a deliberate tap that stops it for
+              good. */}
+          {profile && profileId && !ceilingHandled && (() => {
+            const kind = ceilingToAskFor(profile, workout)
+            if (!kind) return null
+            return (
+              <LoadCeilingPrompt
+                kind={kind}
+                className="mt-3"
+                onSave={async kg => {
+                  // Optimistic close either way. A write that fails because
+                  // the migration is unapplied must not trap the trainee in a
+                  // card that never goes away — the app simply keeps guessing,
+                  // exactly as it did before.
+                  await saveStatedCeiling(profileId, kind, kg)
+                  setCeilingHandled(true)
+                }}
+                onDecline={async () => {
+                  await declineStatedCeilings(profileId)
+                  setCeilingHandled(true)
+                }}
+              />
+            )
+          })()}
           {workout!.pattern_gap_note && (
             <InsightBanner tone="warning" className="text-xs">
               {workout!.pattern_gap_note}
