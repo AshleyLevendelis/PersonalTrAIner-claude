@@ -5212,6 +5212,24 @@ export function generateMesocycle(
       // and "5-7" on Thursday. Measured: lift-weeks showing more than one rep
       // range at the same weight went from 19 to 108 before this was fixed.
       const frozenBumpDecidedThisWeek = new Map<string, number>()
+      // The reps a lift SHOWS are decided once per lift per week.
+      //
+      // Not the same thing as memoising the bump size, which was already done
+      // and was not enough. Whether a lift reads as frozen is resolved per
+      // SLOT, from that slot's own pre-coherence figure, and two slots of one
+      // lift can disagree even when the shipped weight is identical — so the
+      // dissenting slot never entered the frozen branch at all and never read
+      // the bump memo. Observed directly: Backpack Row, week 11, Monday
+      // 16-18 @20 / Tuesday 14-16 @20 / Thursday 16-18 @20 — same weight,
+      // same sets, same RPE, one rep bracket apart.
+      //
+      // MEASURED, THE OBVIOUS FIX MAKES IT WORSE. Memoising the frozen
+      // VERDICT (first slot decides, rest follow) took the count from 22 to
+      // 37: forcing a later slot into the frozen branch buys reps for lifts
+      // whose own figure genuinely moved. So this memoises the OUTCOME — the
+      // rep string a trainee reads — and leaves every load decision exactly
+      // where it was.
+      const repsShownThisWeek = new Map<string, string>()
       // Carry twin of the line above, and per-WEEK for the same reason: one
       // carry can hold two slots in a week and both must show the same
       // distance.
@@ -5641,13 +5659,29 @@ export function generateMesocycle(
               // weight. Buying a rep must never cost weight, so the only
               // honest alternative to holding the bar is to leave the week
               // alone.
-              const pinnedReference = bumpedReps === reps ? null : prescribeLoad(dbEntry, profile, {
+              //
+              // ONCE THE REP IS BOUGHT FOR THIS LIFT THIS WEEK, IT IS BOUGHT.
+              // The band check below is evaluated per SLOT, against that
+              // slot's own sets/intensity — so a lift holding two slots in a
+              // week could pass it on one and fail it on the other, ending up
+              // with two different rep targets at the same weight. That is
+              // precisely what the comment above claims cannot happen, and
+              // memoising only the bump SIZE was not enough to prevent it:
+              // the accept/decline outcome has to be memoised too.
+              //
+              // MEASURED, the 4x4x4 combination sweep: 19 such lift-weeks,
+              // concentrated in Backpack Row, Lateral Raises and Walking
+              // Lunges — every one a lift that legitimately appears twice in
+              // a week. Not introduced by the catalogue additions that
+              // surfaced three more of them; the mechanism predates both.
+              const alreadyBought = alreadyDecided != null
+              const pinnedReference = alreadyBought || bumpedReps === reps ? null : prescribeLoad(dbEntry, profile, {
                 targetRpeLabel: intensity, isFirstBlock: blockIndex === 0, sets, phase,
                 isCalibrationWeek, knownWorkingWeights, repRangeLabel: bumpedReps, loadIsProgressing: rampLoad,
               })
-              const pinWithinBand = pinnedReference != null
+              const pinWithinBand = alreadyBought || (pinnedReference != null
                 && (pinnedReference.starting_weight_kg == null
-                  || previousNaturalKg <= pinnedReference.starting_weight_kg * 1.25)
+                  || previousNaturalKg <= pinnedReference.starting_weight_kg * 1.25))
               if (pinWithinBand) {
                 reps = bumpedReps
                 // Advanced ONLY when the rep is actually bought. Recording the
@@ -5710,6 +5744,15 @@ export function generateMesocycle(
               // not also still be walking the accumulated extra.
               frozenCarryStepsByLift.set(dbEntry.name, 0)
             }
+
+            // ONE REP TARGET PER LIFT PER WEEK. Applied here, after every
+            // rep lever has settled (phase shift, frozen-load bump, carry
+            // distance), and deliberately AFTER the load is resolved so it
+            // cannot change a single weight — it only stops the same lift on
+            // two days of one week disagreeing about what to aim for.
+            const shownAlready = repsShownThisWeek.get(dbEntry.name)
+            if (shownAlready != null && shownAlready !== reps) reps = shownAlready
+            else if (shownAlready == null) repsShownThisWeek.set(dbEntry.name, reps)
 
             if (w === 1) {
               blockBaselineKg[dayIdx][exIdx] = load.starting_weight_kg

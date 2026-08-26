@@ -1291,6 +1291,66 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   // whole population puts the heaviest per-hand lateral raise the app ever
   // prescribes at 20kg, inside 25. The ceiling table now states its unit
   // and the check normalises both sides; see SAFETY_CEILING_KG_TOTAL.
+  // HOME-GYM AND MINIMALIST DEPTH, measured rather than guessed
+  // (report:swap-coverage). isolation_shoulder held exactly one movement a
+  // home trainee could reach — Lateral Raises — and Cable/Machine variants
+  // need a gym, so the same-pattern list came back EMPTY and
+  // NEAREST_PATTERN_FALLBACK handed them overhead presses instead. Not a dead
+  // end, but being offered a compound press when you wanted a side-delt
+  // isolation is not a real choice. Both entries below are reachable at
+  // home_gym AND minimalist (dumbbells and a band are in both equipment
+  // sets), which is the whole point of choosing these two implements.
+  //
+  // Neither carries a load-ceiling risk: a band is not in LOADED_EQUIPMENT so
+  // no kilogram figure is prescribed at all, and Front Raises is a per-side
+  // dumbbell pair like the Lateral Raises it sits beside — same category,
+  // same unit, well inside the ceiling test:ceiling-units now guards.
+  {
+    name: 'Front Raises',
+    id: 'front-raises',
+    movement_pattern: 'isolation_shoulder',
+    mechanics_tier: 'tier3_isolation',
+    prescription_type: 'reps',
+    angle_vector: 'vertical',
+    primary_muscles: ['anterior deltoid'],
+    equipment: ['dumbbells'],
+    joint_stress: 'low',
+    form_cues: [
+      'Start with the weights against the thighs',
+      'Raise to shoulder height, no higher',
+      'Keep the elbows almost straight',
+      'Do not lean back to get them up',
+    ],
+    coach_note_swap: 'Hits the front of the shoulder, which pressing works but rarely finishes off.',
+    loads_joints: ['shoulder'],
+    style_tags: ['bodybuilding', 'hybrid'],
+    substitution_group: 'front_delt',
+    unilateral: false,
+    avg_duration_seconds: 26,
+  },
+  {
+    name: 'Band Lateral Raise',
+    id: 'band-lateral-raise',
+    movement_pattern: 'isolation_shoulder',
+    mechanics_tier: 'tier3_isolation',
+    prescription_type: 'reps',
+    angle_vector: 'lateral',
+    primary_muscles: ['lateral deltoid'],
+    equipment: ['resistance band'],
+    joint_stress: 'low',
+    form_cues: [
+      'Stand on the middle of the band',
+      'Raise the arms out to the sides to shoulder height',
+      'The band gets harder as you go — slow down, do not swing',
+      'Resist all the way back down',
+    ],
+    coach_note_swap: 'The band is hardest at the top, exactly where a lateral raise is weakest.',
+    loads_joints: ['shoulder'],
+    style_tags: ['functional', 'hybrid'],
+    substitution_group: 'lateral_delt',
+    unilateral: false,
+    avg_duration_seconds: 26,
+  },
   {
     name: 'Machine Lateral Raise',
     id: 'machine-lateral-raise',
@@ -1313,6 +1373,29 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     substitution_group: 'lateral_delt',
     unilateral: false,
     avg_duration_seconds: 28,
+  },
+  {
+    name: 'Band Shrug',
+    id: 'band-shrug',
+    movement_pattern: 'isolation_trap',
+    mechanics_tier: 'tier3_isolation',
+    prescription_type: 'reps',
+    angle_vector: 'vertical',
+    primary_muscles: ['upper traps'],
+    equipment: ['resistance band'],
+    joint_stress: 'low',
+    form_cues: [
+      'Stand on the band with the handles at your sides',
+      'Shrug straight up, no rolling',
+      'Pause at the top',
+      'Let the shoulders travel all the way down',
+    ],
+    coach_note_swap: 'Trap work without needing a heavy bar or a cable stack.',
+    loads_joints: ['shoulder', 'neck'],
+    style_tags: ['functional', 'hybrid'],
+    substitution_group: 'shrug',
+    unilateral: false,
+    avg_duration_seconds: 24,
   },
   {
     name: 'Cable Shrug',
