@@ -5,7 +5,7 @@ import { getGoalPolicy, resolveConditioningFrequency, RECOVERY_SET_MULTIPLIER } 
 import { EXPERIENCE_RPE_CEILING } from './periodization'
 import { setRandomSource, resetRandomSource } from './exercise-plan'
 import { seededRngFromKey } from './seeded-random'
-import { DURATION_BUDGET_SECONDS, estimateDaySeconds, estimateSlotsSeconds, parseRestSeconds } from './session-duration'
+import { DURATION_BUDGET_SECONDS, getSessionMinimumSeconds, getSessionMaximumSeconds, estimateDaySeconds, estimateSlotsSeconds, parseRestSeconds } from './session-duration'
 import { getEquipmentFloorKg, labelModeForEntry } from './load-prescription'
 
 // ---------------------------------------------------------------------------
@@ -72,17 +72,38 @@ function isMainCompound(ex: Exercise): boolean {
 // ---------------------------------------------------------------------------
 
 /**
- * Overrun and underrun are not the same failure. Running long eats into
- * whatever the trainee had scheduled after the session — a real cost, and
- * worth staying strict about (±10%/±20%). Running short costs nothing but an
- * unmet expectation; the exercise selection simply didn't need the full
- * window that day. Underrun gets a genuinely gentler curve, not just the
- * same thresholds relabeled.
+ * SCORED AGAINST THE RANGE THE TRAINEE GAVE US, not the midpoint we aim at.
+ *
+ * ### METRIC CHANGE — Time fit readings before this are NOT comparable with
+ * readings after it. Say so wherever an old figure is quoted.
+ *
+ * This used to measure every day against DURATION_BUDGET_SECONDS, which is
+ * the MIDPOINT the generator targets — 37 minutes for someone who said
+ * "30-45". A session landing at 45 was therefore reported as "21% over
+ * budget" when 45 minutes is precisely what that trainee said they had. It
+ * was the single largest source of deductions in the whole score (2,749 of
+ * 9,216 combinations, 29.8%) and a large share of it was measuring against a
+ * number nobody was ever promised.
+ *
+ * The promise is a RANGE, so that is what the score judges:
+ *   - anywhere inside [minimum, maximum] is on target, full marks
+ *   - past the maximum is genuinely running long, and is measured from the
+ *     MAXIMUM rather than the midpoint
+ *   - below the minimum is shorter than the time they set aside, measured
+ *     from the MINIMUM, and keeps its gentler curve
+ *
+ * The generator still AIMS at the midpoint — that is a separate and correct
+ * design choice about where to target inside the range. What changed is only
+ * what counts as a miss. The tolerances either side are unchanged in shape;
+ * they simply hang off the promise instead of the aim.
  */
-function scoreTimeRatio(seconds: number, budget: number, exemptUnderrun: boolean): number {
-  const diff = seconds - budget
+function scoreTimeRatio(seconds: number, minimum: number, maximum: number, exemptUnderrun: boolean): number {
+  // On target. The whole point: a 45-minute session for a "30-45" trainee is
+  // the plan doing its job, not a near-miss.
+  if (seconds >= minimum && seconds <= maximum) return 2
+  const diff = seconds - maximum
   if (diff >= 0) {
-    const ratio = diff / budget
+    const ratio = diff / maximum
     return ratio <= 0.10 ? 2 : ratio <= 0.20 ? 1 : 0
   }
   // LOAD-BEARING COUPLING with exercise-plan.ts's computeDurationTopUp — do
@@ -99,7 +120,7 @@ function scoreTimeRatio(seconds: number, budget: number, exemptUnderrun: boolean
   // catching genuine under-fill for that profile. Overrun is untouched —
   // running long is a real cost regardless of recovery tier.
   if (exemptUnderrun) return 2
-  const ratio = -diff / budget
+  const ratio = (minimum - seconds) / minimum
   return ratio <= 0.20 ? 2 : ratio <= 0.35 ? 1 : 0
 }
 
@@ -142,7 +163,14 @@ export function cardioOnlySeconds(day: WorkoutDay): number {
 }
 
 function scoreTimeFit(profile: UserProfile, mesocycle: MesocycleWeek[]): DimensionResult {
-  const budget = DURATION_BUDGET_SECONDS[profile.session_duration_preference || '45-60']
+  const duration = profile.session_duration_preference || '45-60'
+  // The midpoint stays in use for ONE thing: scoreCardioShare asks what
+  // proportion of the session a cardio block reserved, which is a question
+  // about the target we aim at, not about the promise. Day-total fit uses the
+  // range below.
+  const budget = DURATION_BUDGET_SECONDS[duration]
+  const minimum = getSessionMinimumSeconds(duration)
+  const maximum = getSessionMaximumSeconds(duration)
   // See scoreTimeRatio's own comment — this is only valid while
   // computeDurationTopUp (exercise-plan.ts) returns zero top-up for low
   // recovery_capacity. The two must move together.
@@ -162,11 +190,16 @@ function scoreTimeFit(profile: UserProfile, mesocycle: MesocycleWeek[]): Dimensi
     for (const day of week.days) {
       if (day.exercises.length === 0) continue
       const seconds = estimateDaySeconds(day)
-      const dayScore = scoreTimeRatio(seconds, budget, exemptUnderrun)
+      const dayScore = scoreTimeRatio(seconds, minimum, maximum, exemptUnderrun)
       if (dayScore < worstScore) {
-        const diff = seconds - budget
+        // Reported against the same edge it was JUDGED against, or the
+        // message contradicts the score — "21% over budget (expected 37min)"
+        // for a 45-minute session that was inside a 30-45 promise is exactly
+        // the confusion this round removed.
+        const isOver = seconds > maximum
+        const edge = isOver ? maximum : minimum
         worstScore = dayScore
-        worst = { week: week.week_number, day: day.day, seconds, ratio: Math.abs(diff) / budget, isOver: diff >= 0 }
+        worst = { week: week.week_number, day: day.day, seconds, ratio: Math.abs(seconds - edge) / edge, isOver }
       }
 
       const cardioSeconds = cardioOnlySeconds(day)
@@ -182,10 +215,10 @@ function scoreTimeFit(profile: UserProfile, mesocycle: MesocycleWeek[]): Dimensi
   if (worstScore < 2 && worst) {
     deductions.push({
       rule: 'time_fit',
-      detail: `Worst day (week ${worst.week} ${worst.day}) is ${(worst.ratio * 100).toFixed(0)}% ${worst.isOver ? 'over' : 'under'} budget`,
+      detail: `Worst day (week ${worst.week} ${worst.day}) is ${(worst.ratio * 100).toFixed(0)}% ${worst.isOver ? 'over the maximum' : 'under the minimum'} of the ${Math.round(minimum / 60)}-${Math.round(maximum / 60)}min they asked for`,
       weekNumber: worst.week,
       day: worst.day,
-      expected: `${Math.round(budget / 60)}min`,
+      expected: `${Math.round(minimum / 60)}-${Math.round(maximum / 60)}min`,
       actual: `${Math.round(worst.seconds / 60)}min`,
     })
   }
