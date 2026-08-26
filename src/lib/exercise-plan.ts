@@ -10,7 +10,7 @@ import {
   type ExperienceConfig,
 } from './experience-config'
 import { buildWarmup, getWarmupReserveSeconds } from './warmup'
-import { prescribeLoad, prescribeAddedLoad, categorize, getLoadIncrementKg, isExternallyLoaded, getEquipmentFloorKg, loadingMode, roundToPlate, formatLoad, labelModeForEntry, hasKnownWorkingWeight, unverifiedRampStepKg, isolationTargetBelowFloor, resolveBodyBasis, prescribeAssistance, assistanceGuidance, type KnownWorkingWeights } from './load-prescription'
+import { prescribeLoad, prescribeAddedLoad, categorize, getLoadIncrementKg, isExternallyLoaded, getEquipmentFloorKg, loadingMode, roundToPlate, formatLoad, labelModeForEntry, hasKnownWorkingWeight, unverifiedRampStepKg, isolationTargetBelowFloor, resolveBodyBasis, prescribeAssistance, assistanceGuidance, isImprovisedLoadImplement, IMPROVISED_IMPLEMENT_CEILING_KG, type KnownWorkingWeights } from './load-prescription'
 import {
   getPhaseSequence, getPhaseConfig, rotateVariation, resolveTargetRpe,
   shiftReps, adjustRest, dedupeAdjacentPhases, isRegressionFor, stepIntervalSeconds, getPhaseTempo, formatTempo, type PhaseConfig, type TrainingPhase,
@@ -4099,14 +4099,42 @@ function isLoadlessWeek(days: WorkoutDay[]): boolean {
  *     a second one at the same time is what "one lever at a time" exists to
  *     prevent.
  */
-function applyTempoPrescription(days: WorkoutDay[], phase: TrainingPhase, isDeload: boolean): void {
+function applyTempoPrescription(
+  days: WorkoutDay[],
+  phase: TrainingPhase,
+  isDeload: boolean,
+  experience: TrainingExperience,
+): void {
   if (isDeload) return
   const tempo = getPhaseTempo(phase)
   if (!tempo) return
   const notation = formatTempo(tempo)
+  const improvisedCeiling = IMPROVISED_IMPLEMENT_CEILING_KG[experience]
+    ?? IMPROVISED_IMPLEMENT_CEILING_KG.novice
   for (const day of days) {
     for (const ex of day.exercises) {
-      if (ex.suggested_load_kg != null) continue
+      const entryForLoad = ex.suggested_load_kg != null
+        ? EXERCISE_DATABASE.find(e => e.name === ex.name)
+        : undefined
+      // "NO MORE LOAD TO ADD", not "no load at all" — the condition this
+      // function was written with, widened to the case it always meant.
+      //
+      // A weighted backpack has a hard physical ceiling
+      // (IMPROVISED_IMPLEMENT_CEILING_KG, 8/12/20/25kg by experience). A lift
+      // sitting on it has a weight — 20kg — and was therefore skipped, even
+      // though 20kg is every kilogram it will ever have. MEASURED: Backpack
+      // Row was 91 of 217 repeated week-to-week transitions, the single
+      // largest contributor in the app.
+      //
+      // The exclusion below for accepts_added_load is Ashley's earlier ruling
+      // and is NOT disturbed by this: a belt can always take another plate,
+      // so slowing a chin-up down would paper over a gap instead of closing
+      // it. A backpack cannot. That is the whole distinction — one implement
+      // has more to give and one does not.
+      const atImprovisedCeiling = entryForLoad != null
+        && isImprovisedLoadImplement(entryForLoad)
+        && (ex.suggested_load_kg ?? 0) >= improvisedCeiling
+      if (ex.suggested_load_kg != null && !atImprovisedCeiling) continue
       const entry = EXERCISE_DATABASE.find(e => e.name === ex.name)
       if (!entry || entry.mechanics_tier === 'primer') continue
       if (entry.prescription_type !== 'reps') continue
@@ -5850,7 +5878,7 @@ export function generateMesocycle(
       // week's coach note. Splitting the decision would let a week be told
       // "no weight to add" while its lifts were prescribed as if there were.
       const loadlessWeek = isLoadlessWeek(days)
-      applyTempoPrescription(days, phaseConfig.phase, isDeload)
+      applyTempoPrescription(days, phaseConfig.phase, isDeload, experience)
 
       // Roll this week's natural loads forward as next week's comparison
       // basis. Deload weeks are deliberately NOT recorded: a deload is

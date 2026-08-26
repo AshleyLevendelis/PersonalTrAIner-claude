@@ -35,6 +35,7 @@
 
 import { generateExercisePlan, generateMesocycle, setRandomSource, resetRandomSource } from '../src/lib/exercise-plan'
 import { getExerciseEntry } from '../src/lib/exercise-db'
+import { isImprovisedLoadImplement, IMPROVISED_IMPLEMENT_CEILING_KG } from '../src/lib/load-prescription'
 import { getPhaseTempo, formatTempo, parseTempo, describeTempo, tempoSecondsPerRep } from '../src/lib/periodization'
 import { estimateSlotsSeconds } from '../src/lib/session-duration'
 import { seededRngFromKey } from '../src/lib/seeded-random'
@@ -80,6 +81,9 @@ interface T {
   working: number
   tempoed: number
   loadedWithTempo: number
+  cappedBackpackWithTempo: number
+  cappedBackpackNoTempo: number
+  underCapWithTempo: string[]
   primerWithTempo: number
   nonRepWithTempo: number
   deloadWithTempo: number
@@ -89,7 +93,8 @@ interface T {
   unparseable: string[]
 }
 const t: T = {
-  working: 0, tempoed: 0, loadedWithTempo: 0, primerWithTempo: 0, nonRepWithTempo: 0,
+  working: 0, tempoed: 0, loadedWithTempo: 0, cappedBackpackWithTempo: 0, cappedBackpackNoTempo: 0, underCapWithTempo: [],
+  primerWithTempo: 0, nonRepWithTempo: 0,
   deloadWithTempo: 0, addedLoadWithTempo: [], phaseMismatch: [], blockInconsistent: [], unparseable: [],
 }
 const byEquip = new Map<string, { working: number; tempoed: number }>()
@@ -117,7 +122,21 @@ for (const equipment_access of EQUIP) {
         t.tempoed++; row.tempoed++
 
         if (!parseTempo(ex.tempo)) t.unparseable.push(`${ex.name} "${ex.tempo}"`)
-        if (ex.suggested_load_kg != null) t.loadedWithTempo++
+        if (ex.suggested_load_kg != null) {
+          // A loaded lift with a tempo is a DEFECT unless it is an improvised
+          // implement sitting at its physical ceiling — a weighted backpack
+          // with nothing left to add. Counted apart rather than exempted, so
+          // the original "no tempo on a lift that already shows a weight"
+          // property keeps its teeth for every other lift.
+          const e = getExerciseEntry(ex.name)
+          const cap = IMPROVISED_IMPLEMENT_CEILING_KG[training_experience]
+          if (e && isImprovisedLoadImplement(e)) {
+            if (ex.suggested_load_kg >= cap) t.cappedBackpackWithTempo++
+            // Still has weight left to add and yet is being slowed down —
+            // the over-fire this round must not commit.
+            else t.underCapWithTempo.push(`${equipment_access}/${training_experience} ${ex.name} wk${wk.week_number} ${ex.suggested_load_kg}kg of ${cap}kg`)
+          } else t.loadedWithTempo++
+        }
         if (ex.tier === 'tier_0_primer') t.primerWithTempo++
         if (wk.is_deload) t.deloadWithTempo++
 
@@ -166,6 +185,16 @@ console.log('\n2. It never reaches a lift that could take real weight')
   check(`no tempo on a pull-up, chin-up or dip (${t.addedLoadWithTempo.length})`,
     t.addedLoadWithTempo.length === 0, t.addedLoadWithTempo.slice(0, 4).join(', '))
   check(`no tempo on a lift that already shows a weight (${t.loadedWithTempo})`, t.loadedWithTempo === 0, String(t.loadedWithTempo))
+  // ...EXCEPT a backpack with nothing left to add, which is the point of this
+  // round. MEASURED before it existed: Backpack Row was 91 of 217 repeated
+  // week-to-week transitions, the largest single contributor in the app.
+  check(`a backpack AT its ceiling does get one (${t.cappedBackpackWithTempo})`,
+    t.cappedBackpackWithTempo > 0, String(t.cappedBackpackWithTempo))
+  // The over-fire check, and the one that keeps this honest: a backpack still
+  // climbing must NOT be slowed down. Tempo is what you reach for when the
+  // weight has stopped, not instead of adding weight that is still available.
+  check(`a backpack BELOW its ceiling gets none (${t.underCapWithTempo.length})`,
+    t.underCapWithTempo.length === 0, t.underCapWithTempo.slice(0, 3).join(' | '))
   // And the flag has to actually be set on something, or check one is vacuous.
   const flagged = ['Pull-Ups', 'Chin-Ups', 'Chest Dips', 'Tricep Dips'].filter(n => getExerciseEntry(n)?.accepts_added_load)
   check(`accepts_added_load is set on the four that take a belt (${flagged.length}/4)`, flagged.length === 4, flagged.join(', '))
