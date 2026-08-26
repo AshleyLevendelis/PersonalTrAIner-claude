@@ -108,15 +108,32 @@ export const STYLE_OPTIONS: { value: TrainingStyle; icon: string; label: string;
  * hips/ankles/elbows. A conversational capture must resolve into THESE exact
  * codes or re-ask — an unrecognized string is silently inert in every filter.
  */
+/*
+ * ICONS ARE PRESENTATION; `value` IS THE CONTRACT. Nothing below changes a
+ * value, so no filter, tag or rebuild is affected by this list's appearance.
+ *
+ * Two icons changed after `npm run render:screens` put the real question on
+ * screen and a duplicate check confirmed what it showed:
+ *   - Shoulders and Elbows BOTH rendered 💪. Two different joints, one icon,
+ *     on the question that drives injury filtering — precisely where a
+ *     mis-tap costs the most. 💪 is a flexed bicep, which reads as the upper
+ *     arm, so Elbows was the one out of place.
+ *   - Lower Back was 🔙, the "BACK" arrow — a pun on the English word, not a
+ *     body part, and it means "go back" everywhere else a user has seen it.
+ *
+ * Kept associative rather than anatomical, because this list already is
+ * (a scarf for the neck). 🦾 was rejected for Elbows: a prosthetic arm beside
+ * an injury checkbox reads as something it does not mean.
+ */
 export const INJURY_OPTIONS: { value: string; icon: string; label: string }[] = [
-  { value: 'lower_back', icon: '🔙', label: 'Lower Back' },
+  { value: 'lower_back', icon: '🧍', label: 'Lower Back' },
   { value: 'knees', icon: '🦵', label: 'Knees' },
   { value: 'shoulders', icon: '💪', label: 'Shoulders' },
   { value: 'neck', icon: '🧣', label: 'Neck' },
   { value: 'wrists', icon: '✋', label: 'Wrists' },
   { value: 'hips', icon: '🦴', label: 'Hips' },
   { value: 'ankles', icon: '🦶', label: 'Ankles' },
-  { value: 'elbows', icon: '💪', label: 'Elbows' },
+  { value: 'elbows', icon: '🤜', label: 'Elbows' },
 ]
 
 // Dietary-safety audit fix — values come from diet-rules.ts's
@@ -129,7 +146,12 @@ export const INJURY_OPTIONS: { value: string; icon: string; label: string }[] = 
 const DIETARY_META: Record<DietaryPreference, { icon: string; label: string }> = {
   vegetarian: { icon: '🥬', label: 'Vegetarian' },
   vegan: { icon: '🌱', label: 'Vegan' },
-  pescatarian: { icon: '🐟', label: 'Pescatarian' },
+  // 🍣, not 🐟 — Fish-Free below owns the plain fish. Sharing it meant one
+  // icon stood for BOTH "I eat fish" and "I cannot eat fish", opposite
+  // meanings on the allergen path. Every other exclusion here wears the food
+  // it excludes (🥛 dairy-free, 🥜 nut-free, 🥚 egg-free, 🦐 shellfish-free),
+  // so the convention was consistent and Pescatarian was the row breaking it.
+  pescatarian: { icon: '🍣', label: 'Pescatarian' },
   keto: { icon: '🥑', label: 'Keto' },
   'low-carb': { icon: '🥩', label: 'Low-Carb' },
   halal: { icon: '☪️', label: 'Halal' },
