@@ -1,6 +1,6 @@
 import type { UserProfile, MesocycleWeek, WorkoutDay, Exercise } from './types'
 import { EXERCISE_DATABASE, getMovementFamily, getVolumeRole, isIndicatedFor, type ExerciseEntry } from './exercise-db'
-import { getConstrainedPool, generateMesocycle, primerPatternsForTrack, getAffinityPrimerPool, getFlaggedJoints, CARDIO_RESERVED_SHARE } from './exercise-plan'
+import { getConstrainedPool, generateMesocycle, primerPatternsForTrack, getAffinityPrimerPool, getFlaggedJoints, CARDIO_RESERVED_SHARE, bestEquipmentRank, EQUIPMENT_QUALITY_TIERS, isEquipmentQualityExempt } from './exercise-plan'
 import { getGoalPolicy, resolveConditioningFrequency, RECOVERY_SET_MULTIPLIER } from './goal-policies'
 import { EXPERIENCE_RPE_CEILING } from './periodization'
 import { setRandomSource, resetRandomSource } from './exercise-plan'
@@ -876,6 +876,45 @@ function scoreSelection(profile: UserProfile, mesocycle: MesocycleWeek[]): Dimen
             detail: `"${ex.name}" (${ex.suggested_load_kg}kg) is not a sane fraction of this day's main press "${mainPress.name}" (${mainPress.suggested_load_kg}kg)`,
           })
         }
+      }
+    }
+  }
+
+  // Best tool for the job — a trainee with a cable stack and a rack should
+  // not be handed a resistance band for a slot the better implement could
+  // have filled. Before this check existed the harness was blind to it: the
+  // reported full-gym Push day (band tricep kickback) and the Pull day two
+  // days later (lat pulldown, cable row) scored IDENTICALLY here, so the
+  // whole class of problem could regress with no signal at all.
+  //
+  // Deliberately asks "was a better implement genuinely available FOR THIS
+  // SLOT", not "does a better implement exist somewhere" — the pool is the
+  // profile's own equipment- AND injury-filtered pool, so a band that
+  // survived because a shoulder ruled out every cable and barbell option
+  // correctly scores clean. That is the same ordering guarantee the engine
+  // relies on (filter first, prefer second) rather than a second opinion
+  // about it.
+  const equipmentTier = profile.equipment_access || 'full_gym'
+  if (EQUIPMENT_QUALITY_TIERS.has(equipmentTier)) {
+    const equipmentPool = getConstrainedPool(profile, [])
+    for (const day of week1?.days ?? []) {
+      for (const ex of day.exercises) {
+        const entry = dbEntry(ex.name)
+        // Same exemptions the engine applies (rehab-indicated work, core) —
+        // imported rather than restated so the harness can never start
+        // penalising a pick the engine deliberately makes.
+        if (!entry || isEquipmentQualityExempt(entry) || bestEquipmentRank(entry) !== 'low') continue
+        const betterAvailable = equipmentPool.some(p =>
+          p.movement_pattern === entry.movement_pattern &&
+          p.mechanics_tier === entry.mechanics_tier &&
+          bestEquipmentRank(p) === 'high'
+        )
+        if (!betterAvailable) continue
+        violatedRules.add('worse_implement_than_available')
+        deductions.push({
+          rule: 'worse_implement_than_available', day: day.day, weekNumber: 1,
+          detail: `"${ex.name}" uses ${entry.equipment.join('/')} when this ${equipmentTier.replace(/_/g, ' ')} profile has a better-loading option for the same pattern and tier`,
+        })
       }
     }
   }

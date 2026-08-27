@@ -114,6 +114,16 @@ console.log('--- required still missing: '+(requiredMissing.join(', ')||'none'))
 const emptyTurns = transcript.filter(t=>!t.error&&!String(t.reply??'').trim()).length
 const errorTurns = transcript.filter(t=>t.error).length
 console.log(`--- empty-reply turns: ${emptyTurns}/${transcript.length}`)
+// THE QUESTIONNAIRE NUMBER. Ashley: "a real coach wouldn't be sending you
+// buttons to click." Chips are now a rescue (present_slot's description names
+// the three cases), so this should be LOW and each one should correspond to a
+// turn where the user was genuinely stuck or ambiguous — not simply to every
+// question that happens to have a fixed set of answers. Before the change it
+// was effectively one per closed-set question, because a forced second model
+// call stapled chips onto any question that lacked them.
+const chipTurns = transcript.filter(t=>(t.actions??[]).some((a:any)=>a.name==='present_slot'))
+console.log(`--- turns that offered chips: ${chipTurns.length}/${transcript.length}`)
+if (chipTurns.length) console.log('    on: '+chipTurns.map((t:any)=>(t.actions??[]).filter((a:any)=>a.name==='present_slot').map((a:any)=>a.args?.slot_key).join('/')).join(', '))
 if (errorTurns) console.log(`--- transport-error turns (not counted as empty): ${errorTurns}/${transcript.length}`)
 if (outPath) {
   fs.writeFileSync(outPath, JSON.stringify({

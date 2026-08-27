@@ -52,7 +52,7 @@ const toolDeclarations = [
   {
     name: "present_slot",
     description:
-      "Render the tappable option chips for one onboarding question, under your message. Call this whenever you ask a closed-set question (goal, experience, days, equipment, injuries, diet, etc.) so the user can tap instead of type. Ask the question in your reply text in your own words; the chips carry the exact values.",
+      "Render the tappable option chips for one onboarding question, under your message. This is a RESCUE, not the way questions are asked. A real coach asks and waits for an answer; they do not hand you a menu. So ask your question in plain words and let them type. Call this ONLY when they are actually stuck: they said they don't know or asked what the options are, their answer was too ambiguous to map with certainty, or you have already asked this same question once and still have no answer. Never call it on the first asking of a question.",
     parameters: {
       type: "object",
       properties: {
@@ -75,7 +75,7 @@ const toolDeclarations = [
         value: {
           type: "string",
           description:
-            "The mapped value. For multi-select slots, a comma-separated list of allowed values. For numeric slots, the number. For displayName/dislikedFoods, the literal text.",
+            "The mapped value. For multi-select slots, a comma-separated list of allowed values. For numeric slots, the number. For displayName/dislikedFoods/dislikedExercises, the literal text (comma-separated for more than one).",
         },
       },
       required: ["slot_key", "value"],
@@ -225,7 +225,8 @@ STILL UNKNOWN — ${remaining.join(", ") || "none — wrap up"}
 This is a checklist for YOU, never a route to march, and it is NOT an order. It is written required-first purely so nothing gets lost — reading it top to bottom is the one thing that makes this feel like a form. Pick whatever comes next naturally from what they just said. Follow the thread of the conversation: if they mention their job, ask about their week; if they mention an old injury, go there. Answers can arrive in ANY order, including ones you never asked for — take them, tick them off, and never re-ask something already answered. When what you already know makes a question matter, say WHY in a short clause ("since you've only got three days, session length decides a lot — how long can you usually stay?"). The only ordering rule: don't leave required things until they're bored.
 
 === SLOT MECHANICS ===
-- Closed-set question → ask it in your own words AND call present_slot so the chips render. The user can tap or type.
+- Closed-set question → ask it in your own words and WAIT for a typed answer. Do NOT call present_slot on the first asking. This app used to put chips under every question and it made the whole conversation feel like a form being filled in — a coach asks you what your goal is and listens, they don't hand you a multiple-choice sheet. Their answer arrives as free text; your job is to map it with set_slot.
+- CHIPS ARE A RESCUE, and there are exactly three times to call present_slot: (a) they said they don't know, or asked what the options are; (b) their answer is too ambiguous to map with certainty; (c) you already asked this same question once and still have no answer. In case (a) and (c), present the slot you actually just asked about.
 - They answered in free text and the mapping is CERTAIN ("just some dumbbells at home" → equipment=home_gym... careful: home_gym means barbell+dumbbells+bench; dumbbells only is minimalist) → call set_slot with the exact allowed value. The app shows them what was recorded — never map silently in your head and move on without the call.
 - Mapping unclear or between two values → do NOT set_slot. Say what you're unsure about in one clause and call present_slot — them tapping beats you guessing. Never store their raw words for a closed slot.
 - Multi-select slots (trainingDays, injuries, dietaryPreferences, favoriteCuisines): set_slot with a comma-separated list of allowed values, or present_slot for tapping. An explicit "none" is a real answer (set_slot with an empty value) — record it, don't just move on.
@@ -234,6 +235,7 @@ This is a checklist for YOU, never a route to march, and it is NOT an order. It 
 - THEIR NAME IS OPTIONAL. You open by asking what to call them, and most people answer — but if they don't, take it and move on, and never chase it. The plan does not need it and the app is built to work without one (you simply won't use a name). If they offer it later, at any point, record it then. Never invent one, and never lift one from something they said about someone else.
 - A REFUSAL IS ALSO AN ANSWER. "I'd rather not say", "why do you need that?", "skip it" about an OPTIONAL question (age, height, weight, sex, and the other non-essential ones) → call decline_slot for it, say something light and unbothered, and move on. Do not bargain, do not explain why you wanted it, and never ask it again. They can always add it later. The app also shows a "Prefer not to say" button on those questions, so a refusal is expected, not a problem. For anything the plan genuinely needs, or anything on the safety path, do NOT decline it — keep the conversation going.
 - NEGATIONS ARE ANSWERS, not just something to acknowledge. "No snacks", "none really", "nothing", "no restrictions" are certain, closed-set answers — set_slot with an empty value for multi-selects (dietaryPreferences, injuries, favoriteCuisines), or the matching "false"/"no" option for a yes-no slot (includeSnacks). Saying "got it, noted" without the call leaves the slot empty and the app will ask again.
+- EXERCISES THEY WON'T DO ARE AN ANSWER, not just a grumble. "Never give me burpees", "I hate lunges, don't put them in" → set_slot(dislikedExercises=...) with the exercise name as they said it, comma-separated for several. This is the exact mirror of dislikedFoods and it works the same way: the named exercise is kept out of the plan being built. NEVER ASK for this — it is not on the question list and adding it would be a question nobody needs — but record it the moment they volunteer one. Distinguish a hard no from a moan: "burpees are horrible but fine" is NOT a dislikedExercises answer, "never give me burpees" is. If you are not sure which they mean, ask in one clause.
 - INJURIES CAN GROW. If injuries was already answered and the user later mentions a NEW pain or niggle, call set_slot(injuries=...) again with the FULL list — everything already recorded, plus the new one. Losing a previously-recorded injury because a later message only mentioned the new one is a safety miss, not a UI quirk.
 - One present_slot per turn at most — only one set of chips can render. So when you group two asks in a turn, at most ONE of them gets chips; ask the other in plain text and map their answer with set_slot. Numeric asks (age/height/weight) have no chips at all, which is exactly why they group so easily. The slot_key you present MUST be the exact question your sentence just asked — if your words ask about cardio, present conditioningPreference, not something else. Chips under the wrong question are worse than no chips.
 - EVERY turn must contain conversational reply text — never a bare tool call with nothing said. After recording an answer, keep talking in the SAME turn — carry the conversation forward (the app renders a dead silence otherwise). This is about saying SOMETHING, not about passing judgment on what they answered: a natural next sentence is enough.
@@ -330,7 +332,7 @@ When STILL UNKNOWN is empty, give a one-line warm recap of the shape of what you
     // function-response round trip, a text-only leg, one transport retry,
     // and a deterministic floor — so the reply it returns is non-empty by
     // construction, whatever the model did. Sanitizing happens per leg in
-    // there, before the chip-recovery pass below reads reply.includes("?").
+    // there.
     // ---------------------------------------------------------------------
     const callLeg = async (turns: unknown[], withTools: boolean): Promise<GeminiLegResult> => {
       try {
@@ -355,46 +357,43 @@ When STILL UNKNOWN is empty, give a one-line warm recap of the shape of what you
     });
 
     // -----------------------------------------------------------------------
-    // Chips must not depend on the model remembering to ask for them.
-    // present_slot fires on most turns but not all, and a missed one leaves a
-    // closed-set question with nothing to tap — the user has to guess the
-    // wording of an answer the app will only accept from a fixed list.
+    // THE FORCED-CHIPS LEG USED TO LIVE HERE, AND IT WAS THE QUESTIONNAIRE.
     //
-    // So when a turn asks something and no chips were requested, ask one
-    // narrow question with function calling FORCED: which slot is this about?
-    // The answer is checked against what's actually still unanswered, and
-    // dropped if it isn't one of them — that's what makes a free-text or
-    // numeric question (age, weight, "what went wrong last time") correctly
-    // produce no chips rather than the wrong ones.
+    // Ashley: "the onboarding feels too much like a questionnaire because it
+    // is that. a real coach wouldn't be sending you buttons to click. they'd
+    // be waiting for a text reply."
+    //
+    // She was right, and it was literal. Whenever a turn asked something and
+    // the model had not requested chips, this made a SECOND Gemini call with
+    // function calling FORCED — mode: "ANY" — whose only job was to work out
+    // which slot the question was about and staple chips underneath it. Its
+    // own comment read "chips must not depend on the model remembering to ask
+    // for them", which is exactly right for a form and exactly wrong for a
+    // conversation. Between it and the old "closed-set question → call
+    // present_slot" prompt rule, essentially every question in the entire
+    // onboarding arrived with a menu attached. No coach does that.
+    //
+    // Chips are now a RESCUE (present_slot's description says so, and the
+    // SLOT MECHANICS section names the three cases). The model asks and
+    // waits. When someone is genuinely stuck, chips still come — from the
+    // model when it can see they are stuck, and from the client's own
+    // deterministic backstop when it cannot (ConversationalOnboarding.tsx,
+    // the stuck-user path), which is the same model-first/deterministic-
+    // behind shape the rest of this file already uses.
+    //
+    // Deleting this also removes an entire extra Gemini round trip from
+    // nearly every turn, so replies get cheaper and faster.
+    //
+    // WHAT IS DELIBERATELY UNCHANGED: every path that fires when something
+    // has actually gone wrong. A set_slot value that fails validation still
+    // re-asks with chips, the client's dead-air guard still renders the next
+    // question with its card, and pickSlotToForce still steps in when the
+    // conversation stalls. Those are rescues too — they were never the
+    // questionnaire.
     // -----------------------------------------------------------------------
-    if (reply.includes("?") && !actions.some((a) => a.name === "present_slot") && remaining.length > 0) {
-      const identify = await callGemini(
-        [
-          { role: "user", parts: [{ text: `The coach just said this to the user:
-
-"${reply}"
-
-Still unanswered: ${remaining.join(", ")}. If that message is asking the user one of those questions AND it has a fixed set of answers to choose from, call present_slot with its key. If it is asking for something free-form or a plain number, call present_slot with slot_key "none".` }] },
-        ],
-        true,
-        { functionCallingConfig: { mode: "ANY", allowedFunctionNames: ["present_slot"] } },
-      );
-      if (identify.ok) {
-        const identifyData = await identify.json();
-        const key = normalizeSlotKey(catalog, callsOf(identifyData?.candidates?.[0]?.content?.parts ?? [])[0]?.args?.slot_key);
-        const named = catalog.find((c) => c.key === key);
-        // Only a still-unanswered slot that genuinely renders chips.
-        if (typeof key === "string" && remaining.includes(key) && named &&
-            (named.control === "single" || named.control === "multi")) {
-          actions.push({ name: "present_slot", args: { slot_key: key } });
-        }
-      } else {
-        console.error("onboarding-chat: chip-recovery leg failed", identify.status, await identify.text());
-      }
-    }
 
     // Normalize every action's slot_key against the real catalog — the source
-    // for ALL of them (initial leg, follow-up leg, chip-recovery leg), so a
+    // for ALL of them (initial leg and follow-up leg), so a
     // snake_case slip like present_slot("recovery_capacity") is caught once,
     // here, rather than needing the same fix repeated at every call site (or
     // in the client, which would only cover it for THIS function's callers).

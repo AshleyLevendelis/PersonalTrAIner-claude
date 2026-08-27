@@ -22,6 +22,7 @@
 import { readFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
+import { FIRST_RUN_QUICK_REPLIES, buildFirstRunIntro } from '../src/lib/first-run-intro'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(__dirname, '..')
@@ -107,6 +108,102 @@ console.log('\n5. The migration exists and is additive')
   const migration = readFileSync(join(ROOT, 'supabase/migrations/20260824210000_add_swapped_for_activity.sql'), 'utf8')
   check('adds the column with IF NOT EXISTS', /ADD COLUMN IF NOT EXISTS swapped_for_activity/.test(migration))
   check('no destructive statement', !/DROP\s+(TABLE|COLUMN)|TRUNCATE|DELETE\s+FROM/i.test(migration))
+}
+
+console.log('\n6. The first-run starter chips only offer things that work')
+{
+  // A quick-reply chip is a promise in the app's OWN voice, not the model's —
+  // which makes it the strongest form of the bug this file exists for. The
+  // model at least has the honesty rule; a hardcoded chip has nothing. Tapping
+  // one is the new user's first-ever sentence to the coach, so a chip that
+  // lands on a declining stub teaches them, in their first interaction, that
+  // the coach says no to obvious asks.
+  //
+  // Two independent checks, because neither alone is enough:
+  //   (a) every chip must NAME the tool it routes to, and that tool must be
+  //       declared, executed, and not one of the two stubs. This is the check
+  //       with teeth: adding a chip without declaring where it lands fails.
+  //   (b) a keyword screen for schedule/volume vocabulary. Weaker — routing is
+  //       the model's decision and no static check can prove it — but it
+  //       catches the chip that was never thought about at all.
+  const ui = readFileSync(join(ROOT, 'src/components/ChatAssistant.tsx'), 'utf8')
+  const chips = FIRST_RUN_QUICK_REPLIES
+  check('there are chips to check, so this has teeth', chips.length > 0, chips.length)
+
+  // (a) Each chip's destination, declared here on purpose. `null` = answered
+  // from the plan context the request already carries, with no tool call.
+  const CHIP_DESTINATION: Record<string, string | null> = {
+    'Talk me through today': null,
+    'Swap an exercise': 'propose_exercise_swap',
+    "There's a food I won't eat": 'record_fact',
+  }
+  const DECLINING_STUBS = ['adjust_volume', 'update_workout_schedule']
+  const declared = new Set([...chat.matchAll(/^\s*name:\s*"([a-z_]+)",\s*$/gm)].map(m => m[1]))
+  const executed = new Set([...chat.matchAll(/name\s*===\s*"([a-z_]+)"/g)].map(m => m[1]))
+
+  for (const chip of chips) {
+    if (!(chip in CHIP_DESTINATION)) {
+      check(`chip "${chip}" declares which tool it routes to`, false)
+      continue
+    }
+    const tool = CHIP_DESTINATION[chip]
+    if (tool === null) {
+      check(`chip "${chip}" is answered from context, no tool needed`, true)
+      continue
+    }
+    check(`chip "${chip}" -> ${tool} is declared`, declared.has(tool))
+    check(`chip "${chip}" -> ${tool} has an executor`, executed.has(tool))
+    check(`chip "${chip}" -> ${tool} is not a declining stub`, !DECLINING_STUBS.includes(tool))
+  }
+
+  // (b) Vocabulary that would pull the model toward a stub whatever the chip
+  // was written to mean. Deliberately narrow: "3 sets of squats" is a LOG and
+  // works fine, so bare "sets" is not the trigger — a change verb next to it
+  // is.
+  const PULLS_TOWARD_A_STUB: Array<[RegExp, string]> = [
+    [/\bre-?schedul/i, 'update_workout_schedule'],
+    [/\bschedule\b/i, 'update_workout_schedule'],
+    [/\brest day\b/i, 'update_workout_schedule'],
+    [/\bday off\b/i, 'update_workout_schedule'],
+    [/\b(add|drop|move|remove|clear|skip)\s+(a\s+|the\s+)?(training\s+|gym\s+)?day\b/i, 'update_workout_schedule'],
+    [/\bvolume\b/i, 'adjust_volume'],
+    [/\b(more|fewer|less|extra|cut|reduce|increase|add|drop)\s+\w*\s*\breps?\b/i, 'adjust_volume'],
+    [/\b(more|fewer|less|extra|cut|reduce|increase|add|drop)\s+\w*\s*\bsets?\b/i, 'adjust_volume'],
+  ]
+  for (const chip of chips) {
+    const hit = PULLS_TOWARD_A_STUB.find(([re]) => re.test(chip))
+    check(`chip "${chip}" avoids stub vocabulary`, hit === undefined, hit?.[1])
+  }
+
+  // The chips only render if they are on the LAST message — getQuickReplies-
+  // ForLastMessage reads messages[messages.length - 1].quickReplies and
+  // nothing else. Attaching them to the first or middle intro message is a
+  // silent no-op, which is exactly the kind of half-landed feature that keeps
+  // recurring here.
+  const intro = buildFirstRunIntro('Morning, Ashley', 'Today is a squat day.')
+  check('the intro is more than one message', intro.length > 1, intro.length)
+  check('only the LAST intro message carries chips, the only one that renders them',
+    intro.filter(m => m.quickReplies?.length).length === 1 &&
+    (intro[intro.length - 1].quickReplies?.length ?? 0) > 0,
+    intro.map(m => m.quickReplies?.length ?? 0))
+  check('every intro message has words in it', intro.every(m => m.content.trim().length > 0))
+
+  // ...and the component actually renders the builder's output in order. The
+  // builder being right is worthless if ChatAssistant hand-rolls the array
+  // beside it — that is the two-halves defect this repo keeps hitting.
+  check('ChatAssistant builds the intro from buildFirstRunIntro',
+    /setMessages\(buildFirstRunIntro\(/.test(ui))
+  check('...and does not also hand-roll the chips beside it',
+    !/quickReplies:\s*FIRST_RUN_QUICK_REPLIES/.test(ui))
+
+  // Why the restriction exists, asserted rather than assumed. When either of
+  // these stops declining, this check fails and points at CHIP_DESTINATION —
+  // which is the moment the chip set is free to widen.
+  for (const stub of DECLINING_STUBS) {
+    const at = chat.indexOf(`if (name === "${stub}")`)
+    check(`${stub} is still a stub that declines`,
+      at !== -1 && /can't safely make plan changes yet/.test(chat.slice(at, at + 1200)))
+  }
 }
 
 if (failures > 0) {

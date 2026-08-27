@@ -132,6 +132,8 @@ export interface UserProfile {
    * (and any value still sitting in it) isn't silently lost.
    */
   disliked_foods?: string[]
+  /** Onboarding's "exercises to avoid" answer. Like disliked_foods this is NOT a profile column — it becomes user_facts rows (kind 'exercise_preference') at signup, the same shape a later "never give me burpees" chat turn produces. Held here only to carry the in-memory answer from onboarding to first generation. */
+  disliked_exercises?: string[]
   breakfast_style?: BreakfastStyle
   /**
    * Dashboard round: a plain user-editable daily hydration goal in

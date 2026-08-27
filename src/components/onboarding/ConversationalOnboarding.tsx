@@ -22,6 +22,7 @@ import {
   initialSlotValues,
   isStartingFromNothing,
   detectAllergenTags,
+  isStuckMessage,
   DIETARY_OPTIONS,
   type OnboardingSlotValues,
   type SlotKey,
@@ -260,6 +261,27 @@ function tryVolunteeredCapture(
 // answer anywhere before forcing a question regardless of how many times
 // (if any) that specific slot has been asked.
 const STALL_TURN_LIMIT = 4
+
+/**
+ * Is the message at `index` part of a run the coach is already in?
+ *
+ * Used only to decide whether to repeat the COACH mark. Receipts ("✓ Goal —
+ * fat loss") are the app speaking, not a turn change, so they do NOT break a
+ * run — otherwise recording an answer mid-reply would re-label the coach's
+ * own next sentence as a new speaker.
+ *
+ * `index` may be messages.length, which is how the typing indicator asks the
+ * same question about the message that has not arrived yet.
+ */
+function isCoachContinuation(messages: ChatMsg[], index: number): boolean {
+  for (let i = Math.min(index, messages.length) - 1; i >= 0; i--) {
+    const m = messages[i]
+    if (m.isReceipt) continue
+    return m.role === 'assistant'
+  }
+  return false
+}
+
 
 // How many times the app will force the SAME question before treating it as
 // one this person isn't going to answer right now and moving to a different
@@ -869,6 +891,10 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
       }
     }
 
+    // Captured before the round trip: the rescue below needs to know the
+    // user said "I don't know" even after the model's reply has come back.
+    const userWasStuck = isStuckMessage(trimmed)
+
     const priorMessages = messages
     // User bubble first, THEN the tap's receipt — the transcript reads in
     // the order things actually happened.
@@ -936,6 +962,44 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
           responseWs.openReview = true
         }
       }
+      // THE STUCK-USER RESCUE — the deterministic half of "chips only when
+      // you're stuck".
+      //
+      // The model is told to call present_slot when someone says they don't
+      // know or asks what the options are. If it did, there is already a card
+      // on screen and this does nothing. This is here for when it didn't,
+      // because a user who has just said "I don't know" and been handed
+      // another sentence of prose is worse off than they were before chips
+      // were ever removed — that is the one case where a list genuinely helps
+      // and withholding it is stubbornness, not conversation.
+      //
+      // Which slot: the canonical next open one. That is a guess about what
+      // the coach just asked, and the prompt is right that chips under the
+      // wrong question are worse than none — so the lead sentence names the
+      // question out loud rather than silently attaching a grid, and the
+      // guess is only made for a message that was NOTHING but "I don't know"
+      // (see STUCK_SIGNAL), where there is no answer to lose.
+      if (userWasStuck && !responseWs.openReview) {
+        const openNow = [...missingRequiredSlots(responseWs.values), ...unconfirmedOptionalSlots(responseWs.confirmed, responseWs.values)]
+        const target = openNow[0]
+        const def = target ? getSlotDef(target) : undefined
+        const alreadyHasCard = [...priorMessages, ...responseWs.newMessages].some(
+          m => m.slotCard === target && !m.slotCardResolved && !responseWs.resolveCards.has(target as SlotKey),
+        )
+        // Only slots that genuinely HAVE a list. "I don't know" against age
+        // or weight is a refusal, not someone needing options — that already
+        // has a path (decline_slot, and the "Prefer not to say" button), and
+        // a numeric card carries nothing to choose from anyway. Same pair the
+        // server's own present_slot guard used.
+        if (def && target && !alreadyHasCard && (def.control === 'single' || def.control === 'multi')) {
+          responseWs.newMessages.push({
+            role: 'assistant',
+            content: `No problem — here are the options. ${def.question}`,
+            slotCard: target,
+          })
+        }
+      }
+
       // Stuck-slot breaker: several live transcripts showed the coach
       // re-asking the SAME still-unanswered question 6-8 times, reworded
       // each time, because a captured answer kept failing to register (the
@@ -1200,7 +1264,7 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
         className="flex-1 overflow-y-auto px-4 pb-28"
         style={isKeyboardOpen ? { paddingBottom: insetPx + 112 } : undefined}
       >
-        <div ref={contentRef} className="max-w-md w-full mx-auto space-y-3">
+        <div ref={contentRef} className="max-w-md w-full mx-auto flex flex-col gap-[22px]">
           {messages.map((msg, i) =>
             msg.isReceipt ? (
               <div key={i} className="flex items-center gap-1.5 pl-1">
@@ -1209,11 +1273,31 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
               </div>
             ) : (
               <div key={i}>
+                {/* TEXT-ONLY CONVERSATION DESIGN. The coach no longer speaks
+                    from a bubble: bubbles on both sides read as a messaging
+                    UI, and the point of this screen is a person talking. So
+                    the coach is plain text on the canvas at 19px — big enough
+                    to be the thing you read, not a label to skim — under a
+                    small COACH mark. Only the user gets a fill, and it stays
+                    compact at 17px, which is what makes the two sides read as
+                    different kinds of speech rather than a transcript.
+
+                    The COACH mark is suppressed on a run of consecutive coach
+                    messages (receipts don't break a run). DEVIATION FROM THE
+                    HANDOFF, which labels every coach message: in the mock each
+                    coach turn is separated by a user reply, but onboarding
+                    genuinely sends two or three in a row — the intro, the
+                    dead-air guard, the stuck rescue — and stacking COACH three
+                    times reads as three speakers, not one. The mark says who
+                    is talking; it does not need repeating mid-sentence. */}
+                {msg.role === 'assistant' && !isCoachContinuation(messages, i) && (
+                  <div className="ds-label mb-1.5">Coach</div>
+                )}
                 <div
                   className={
                     msg.role === 'user'
-                      ? 'ml-auto max-w-[85%] w-fit rounded-2xl rounded-br-md bg-primary/15 px-3.5 py-2 text-sm'
-                      : 'mr-auto max-w-[85%] w-fit rounded-2xl rounded-bl-md bg-muted px-3.5 py-2 text-sm'
+                      ? 'ml-auto w-fit max-w-[80%] rounded-[20px_20px_4px_20px] bg-secondary px-[18px] py-3 text-[17px]/[1.5] text-foreground'
+                      : 'max-w-[88%] text-[19px]/[1.6] text-foreground [text-wrap:pretty]'
                   }
                 >
                   {msg.content}
@@ -1245,7 +1329,20 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
               </div>
             ),
           )}
-          {busy && <p className="text-xs text-muted-foreground pl-1">…</p>}
+          {/* The coach thinking. Was a single "…" character, which read as a
+              rendering glitch more than as someone typing. */}
+          {busy && (
+            <div aria-live="polite" aria-label="Coach is typing">
+              {!isCoachContinuation(messages, messages.length) && (
+                <div className="ds-label mb-1.5">Coach</div>
+              )}
+              <div className="flex items-center gap-1.5" aria-hidden="true">
+                <span className="ds-typing-dot" />
+                <span className="ds-typing-dot [animation-delay:150ms]" />
+                <span className="ds-typing-dot [animation-delay:300ms]" />
+              </div>
+            </div>
+          )}
 
           {/* Escape hatch: if the tracker says everything is answered, the
               Generate button is reachable from the composer area too, not only
@@ -1352,7 +1449,7 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
         className="fixed left-0 right-0 z-40 border-t border-border/40 bg-background px-4 py-3"
         style={composerBottomStyle}
       >
-        <div className="max-w-md w-full mx-auto flex items-center gap-2">
+        <div className="max-w-md w-full mx-auto flex items-center gap-2.5">
           <Input
             value={input}
             onChange={e => setInput(e.target.value)}
@@ -1372,11 +1469,20 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
             // (pointer-events-none rather than a hard disable).
             readOnly={busy}
             aria-busy={busy}
-            className={`h-11 ${busy ? 'opacity-60' : ''}`}
+            // The pill, per the text-only conversation design: no fill, a
+            // 1.5px accent hairline, fully rounded. A filled box reads as a
+            // form field; an outlined pill reads as somewhere to talk. Every
+            // colour is a token — the app has four themes and an accent
+            // override on top, so a hex here would be wrong on three of them.
+            className={`h-auto rounded-full border-[1.5px] border-primary bg-transparent px-5 py-[15px] text-[16px] text-foreground placeholder:text-muted-foreground focus-visible:ring-primary/40 ${busy ? 'opacity-60' : ''}`}
           />
           <Button
             size="icon"
-            className="h-11 w-11 shrink-0"
+            // 52x52 with a 16px radius — a squircle beside the round pill,
+            // which is what stops the pair reading as two of the same
+            // control. active:scale-[.94] gives the tap somewhere to land on
+            // a phone, where there is no hover to confirm the press.
+            className="size-[52px] shrink-0 rounded-2xl bg-primary text-primary-foreground transition-transform hover:bg-primary active:scale-[.94]"
             disabled={busy || !input.trim()}
             onClick={() => {
               const text = input
@@ -1384,7 +1490,7 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
               void sendMessage(text)
             }}
           >
-            <Send className="size-4" />
+            <Send className="size-[22px]" />
           </Button>
         </div>
       </div>
