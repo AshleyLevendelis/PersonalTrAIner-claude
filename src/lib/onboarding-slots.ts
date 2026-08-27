@@ -318,6 +318,7 @@ export interface OnboardingSlotValues {
   cookingTime: CookingTimePreference | null
   favoriteCuisines: string[]
   dislikedFoods: string
+  dislikedExercises: string
   breakfastStyle: BreakfastStyle | null
 }
 
@@ -354,6 +355,7 @@ export function initialSlotValues(): OnboardingSlotValues {
     cookingTime: null,
     favoriteCuisines: [],
     dislikedFoods: '',
+    dislikedExercises: '',
     breakfastStyle: null,
   }
 }
@@ -589,6 +591,21 @@ export const ONBOARDING_SLOTS: SlotDef[] = [
   // (below, on NEVER_BLOCKING_SLOTS) warns about, and the slot gate caught it.
   { key: 'favoriteCuisines', question: 'Any favourite cuisines?', shortLabel: 'Cuisines', control: 'multi', required: false, options: FAVORITE_CUISINE_OPTIONS, destination: 'column', validate: isSubsetOf(FAVORITE_CUISINE_OPTIONS) },
   { key: 'breakfastStyle', question: "What's breakfast usually like for you?", shortLabel: 'Breakfast', control: 'single', required: false, options: BREAKFAST_STYLE_OPTIONS, destination: 'column', validate: isOneOf(BREAKFAST_STYLE_OPTIONS) },
+  // THE MIRROR OF dislikedFoods, and it was missing. "I won't eat mushrooms"
+  // in onboarding lands in user_facts and is kept out of every meal; "never
+  // give me burpees", said in the same breath, had nowhere to go at all —
+  // exercise exclusions compile from user_facts rows tagged
+  // 'exercise_preference', and the only writers were the coach chat and the
+  // swap button. Onboarding never wrote one. So a person could rule out a
+  // food and an exercise together and have only the food honoured.
+  //
+  // NEVER PROACTIVELY ASKED (it is in NEVER_BLOCKING_SLOTS) — deliberately
+  // unlike dislikedFoods, which is asked. Onboarding was just made
+  // conversational precisely so it would stop marching through questions,
+  // and adding a new one to fix a capture gap would take back what that
+  // bought. In the catalogue, though, the model can record it the moment
+  // someone volunteers it, which is exactly the case this exists for.
+  { key: 'dislikedExercises', question: "Any exercises you'd rather never see?", shortLabel: 'Exercises to avoid', control: 'text', required: false, destination: 'user_facts', validate: v => typeof v === 'string' },
 ]
 
 export function getSlotDef(key: string): SlotDef | undefined {
@@ -667,6 +684,8 @@ export const NEVER_BLOCKING_SLOTS: SlotKey[] = [
   // editable afterwards in the Profile screen; they simply stop being able
   // to block a plan.
   'displayName', 'cookingTime', 'favoriteCuisines', 'breakfastStyle',
+  // Never asked at all, only ever volunteered — see its slot def above.
+  'dislikedExercises',
 ]
 
 /** Required slots whose VALUE must validate before completion, per the current answers (requiredIf-aware). */
@@ -760,6 +779,7 @@ export function assembleProfile(data: OnboardingSlotValues): UserProfile {
     cooking_time_preference: data.cookingTime ?? 'moderate',
     favorite_cuisines: data.favoriteCuisines,
     disliked_foods: data.dislikedFoods.split(',').map(f => f.trim()).filter(Boolean),
+    disliked_exercises: data.dislikedExercises.split(',').map(f => f.trim()).filter(Boolean),
     breakfast_style: data.breakfastStyle ?? undefined,
     fitness_goal: data.fitnessGoal!,
     training_days: trainingDaysFull,

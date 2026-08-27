@@ -43,7 +43,7 @@ import { getRevealSpeed, saveRevealSpeed, DEFAULT_REVEAL_SPEED, type RevealSpeed
 import { InsightBanner } from '@/components/ui/insight-banner'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { getActiveFacts, getActiveGoals, getActiveContextFacts, createFact, createContextFact, createGoal, type UserFactRow, type UserGoalRow, type UserContextFactRow } from '@/lib/memory-store'
-import { compileExerciseExclusions, compileFoodDislikes, compileTimingRules, resolveFoodTarget } from '@/lib/fact-compiler'
+import { compileExerciseExclusions, compileFoodDislikes, compileTimingRules, resolveFoodTarget, resolveExerciseTarget } from '@/lib/fact-compiler'
 import { getAllItems as getAllGroceryItems, flushPending as flushGroceryPending, type GroceryItemRow } from '@/lib/grocery-store'
 import { flushPending as flushSetLogPending } from '@/lib/set-log-store'
 import { flushPending as flushWaterPending } from '@/lib/water-store'
@@ -633,9 +633,32 @@ function App() {
       fat_g: calculatedMacros?.fat,
     }
 
-    const planResult = generateExercisePlan(enrichedProfile, exerciseExclusions)
+    // "Never give me burpees" has to reach THIS call, not just the database.
+    // The user_facts rows written after the insert below are what keeps the
+    // exclusion alive for every later regenerate — but they are written after
+    // the plan already exists, and exerciseExclusions is [] for a brand-new
+    // signup, so relying on them alone would hand someone a first plan
+    // containing the exact exercise they just said they never wanted to see.
+    // That is the half-landed shape this whole change exists to fix, so the
+    // in-memory answer is resolved and merged in here.
+    //
+    // resolveExerciseTarget returns 'unresolved' for a phrase that matches no
+    // catalogue entry ("those jumpy squat things"). Those contribute nothing
+    // to the exclusion list — there is no name to exclude — but they are
+    // still recorded below, so the answer is never silently dropped and the
+    // coach can pick it up in conversation.
+    const onboardingExerciseDislikes = enrichedProfile.disliked_exercises ?? []
+    const resolvedDislikeRefs = [...new Set(
+      onboardingExerciseDislikes.flatMap(phrase => {
+        const r = resolveExerciseTarget(phrase)
+        return r.resolution === 'resolved' ? r.resolvedRefs : []
+      }),
+    )]
+    const effectiveOnboardingExclusions = [...new Set([...exerciseExclusions, ...resolvedDislikeRefs])]
+
+    const planResult = generateExercisePlan(enrichedProfile, effectiveOnboardingExclusions)
     const workout = planResult.plan
-    const mesocycleData = generateMesocycle(enrichedProfile, workout)
+    const mesocycleData = generateMesocycle(enrichedProfile, workout, effectiveOnboardingExclusions)
 
     const { data, error: insertError } = await supabase
       .from('fitness_profiles')
@@ -810,6 +833,33 @@ function App() {
           })
         } catch (err) {
           console.error('Seeding onboarding weigh-in failed:', err)
+        }
+      }
+      // Same shape as the food block below, on purpose: one createFact per
+      // phrase, source 'onboarding', hard dislike — identical to what a later
+      // "never give me burpees" chat turn writes, so both paths land in
+      // exactly one place and compileExerciseExclusions sees them the same
+      // way. An unresolved phrase still gets a row (nothing is lost, and it
+      // shows on the Profile screen) with no resolved_refs, so it excludes
+      // nothing rather than excluding something wrong.
+      if (onboardingExerciseDislikes.length > 0) {
+        try {
+          await Promise.all(onboardingExerciseDislikes.map(phrase => {
+            const r = resolveExerciseTarget(phrase)
+            return createFact({
+              profileId: data.id,
+              kind: 'exercise_preference',
+              source: 'onboarding',
+              rawPhrase: phrase,
+              displayText: `won't eat/do ${phrase}`,
+              polarity: 'dislike',
+              hardness: 'hard',
+              resolvedRefs: r.resolution === 'resolved' ? r.resolvedRefs : [],
+            })
+          }))
+          await reloadMemory(data.id)
+        } catch (err) {
+          console.error('Recording onboarding exercise dislikes failed:', err)
         }
       }
       if (enrichedProfile.disliked_foods && enrichedProfile.disliked_foods.length > 0) {
