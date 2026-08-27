@@ -105,10 +105,32 @@ export function buildFirstRunIntro(greeting: string, detailSentence: string): Fi
 //
 // THE WORDS ARE ASHLEY'S, and that is a constraint, not a credit. She wrote
 // the draft, rejected a capabilities-first restructure of it outright, ruled
-// out any question count ("don't say dozen questions"), and picked this
-// version verbatim from three complete candidates. Editorial "improvements"
-// here are how her decision gets quietly unmade — change this copy only on
-// her say-so.
+// out any question count ("don't say dozen questions"), and picked each
+// version verbatim from complete candidates. Editorial "improvements" here
+// are how her decision gets quietly unmade — change this copy only on her
+// say-so.
+//
+// CUT FROM THREE MESSAGES TO TWO, 88 words to 42, on her say-so — she read
+// the opener as too long. The message that went was the capabilities pitch
+// ("I'll log your workouts, swap what isn't working, plan around injuries…").
+//
+// It went because its job moved, not because it was bad. When it was written
+// nothing else explained the app; the post-onboarding tour now demonstrates
+// each of those four things on the real screen at the moment it makes sense,
+// which an opening paragraph cannot do for someone who has not seen the app
+// yet. Arguing for the app before showing it is the weaker half of that pair.
+//
+// "Nothing changes without your okay" was deliberately KEPT and moved to sit
+// beside the name question. It is the one line that is reassurance rather
+// than sales, and it is the promise the propose-then-confirm cards spend the
+// rest of the app keeping.
+//
+// THE SPLIT POINT IS A MEASUREMENT, NOT A PREFERENCE. Ashley's approved copy
+// was one 188-character opening bubble, and test:onboarding-conversational
+// caps a message at 170 — about six lines at 412px, ~28 characters each. So
+// it ran to seven lines, which is the wall of text this rewrite existed to
+// remove. Split at its own comma, every word hers; "then build" became "Then
+// I'll build" only because the clause became a sentence.
 //
 // Same honesty rule as the main-chat intro above: every claim maps to a
 // shipped mechanism. Log workouts -> natural-language logging; swap what
@@ -124,13 +146,10 @@ export function buildFirstRunIntro(greeting: string, detailSentence: string): Fi
 // ---------------------------------------------------------------------------
 
 export const ONBOARDING_INTRO_WHO =
-  "Hi — I'm your personal trainer. I want to get to know you a bit, then build your training and your food around what you tell me."
-
-export const ONBOARDING_INTRO_WHAT_I_DO =
-  "After that you just talk to me — I'll log your workouts, swap what isn't working, plan around injuries, and remember what matters. Nothing changes without your okay."
+  "Hi — I'm your personal trainer. I'll ask about your goals, what you've got to train with and what your week actually looks like."
 
 export const ONBOARDING_INTRO_THE_ASK =
-  "I'll ask about your goals, what you've got to train with, what your week actually looks like — and you can ask me anything as we go. First: what should I call you?"
+  "Then I'll build your training and your food around your answers. Nothing changes without your okay. First — what should I call you?"
 
 /**
  * The messages a brand-new user sees before anything else in the app.
@@ -147,7 +166,6 @@ export const ONBOARDING_INTRO_THE_ASK =
 export function buildOnboardingIntro(): FirstRunMessage[] {
   return [
     { content: ONBOARDING_INTRO_WHO },
-    { content: ONBOARDING_INTRO_WHAT_I_DO },
     { content: ONBOARDING_INTRO_THE_ASK },
   ]
 }

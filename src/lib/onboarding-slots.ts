@@ -572,6 +572,17 @@ export const ONBOARDING_SLOTS: SlotDef[] = [
   { key: 'trainingExperience', question: 'How much training have you done?', inputHint: 'Where are you at?', shortLabel: 'Experience', control: 'single', required: true, options: EXPERIENCE_OPTIONS, destination: 'column', validate: isOneOf(EXPERIENCE_OPTIONS) },
   { key: 'activityLevel', question: 'How active is your day-to-day, outside training?', inputHint: 'How active is your day?', shortLabel: 'Daily activity', control: 'single', required: true, options: ACTIVITY_OPTIONS, destination: 'column', validate: isOneOf(ACTIVITY_OPTIONS) },
   { key: 'equipment', question: 'What equipment do you have access to?', inputHint: 'Gym, home, or a mix?', shortLabel: 'Equipment', control: 'single', required: true, options: EQUIPMENT_OPTIONS, destination: 'column', validate: isOneOf(EQUIPMENT_OPTIONS) },
+  // MOVED FROM 16th TO 5th (Ashley's ruling). It is the only question whose
+  // absence can hurt someone: every other unanswered slot costs accuracy,
+  // this one costs safety. At 16th it sat behind the age/height/weight/sex
+  // block — the four people most often abandon — so someone who answered the
+  // first eleven and stopped received a complete plan with no injury
+  // filtering at all.
+  //
+  // Above the barbell chain deliberately, not incidentally: asking a trainee
+  // to type a deadlift number BEFORE they have had a chance to mention their
+  // back is the wrong order to ask those two questions in.
+  { key: 'injuries', question: 'Anything that bothers you when you train — something you avoid or work around?', inputHint: 'Anything that bothers you?', shortLabel: 'Niggles', control: 'multi', required: false, options: INJURY_OPTIONS, destination: 'column', validate: isSubsetOf(INJURY_OPTIONS) },
   { key: 'knowsWorkingLifts', question: 'Do you know your working lifts (squat, bench, deadlift)?', inputHint: 'Do you know your numbers?', shortLabel: 'Working lifts', control: 'single', required: true, requiredIf: willBeLiftingBarbells, options: KNOWS_LIFTS_OPTIONS, destination: 'column', validate: v => v === true || v === false || v === 'true' || v === 'false' },
   // Only meaningful once someone has said they DO know their numbers.
   { key: 'knownSquatKg', question: 'Squat working weight (kg)?', shortLabel: 'Squat', control: 'numeric', required: false, requiredIf: knowsTheirLifts, min: 1, max: 500, destination: 'column', validate: isNumberIn(1, 500) },
@@ -583,7 +594,6 @@ export const ONBOARDING_SLOTS: SlotDef[] = [
   { key: 'heightCm', question: 'How tall are you (cm)?', inputHint: 'Height in cm…', shortLabel: 'Height', control: 'numeric', required: false, min: 100, max: 250, destination: 'column', validate: isNumberIn(100, 250) },
   { key: 'weightKg', question: 'What do you weigh right now (kg)?', inputHint: 'Weight in kg…', shortLabel: 'Weight', control: 'numeric', required: false, min: 25, max: 350, destination: 'column', validate: isNumberIn(25, 350) },
   { key: 'gender', question: 'Which should I use for your calorie and starting-weight maths?', inputHint: 'Whichever fits…', shortLabel: 'Sex', control: 'single', required: false, options: GENDER_OPTIONS, destination: 'column', validate: isOneOf(GENDER_OPTIONS) },
-  { key: 'injuries', question: 'Anything that bothers you when you train — something you avoid or work around?', inputHint: 'Anything that bothers you?', shortLabel: 'Niggles', control: 'multi', required: false, options: INJURY_OPTIONS, destination: 'column', validate: isSubsetOf(INJURY_OPTIONS) },
   { key: 'trainingStyle', question: "What's your training style?", inputHint: 'How do you like to train?', shortLabel: 'Style', control: 'single', required: true, options: STYLE_OPTIONS, destination: 'column', validate: isOneOf(STYLE_OPTIONS) },
   { key: 'conditioningPreference', question: 'How do you feel about cardio?', inputHint: 'How do you feel about cardio?', shortLabel: 'Cardio', control: 'single', required: true, options: CONDITIONING_PREF_OPTIONS, destination: 'column', validate: isOneOf(CONDITIONING_PREF_OPTIONS) },
   // REQUIRED, and the comment that used to sit here argued the opposite.
