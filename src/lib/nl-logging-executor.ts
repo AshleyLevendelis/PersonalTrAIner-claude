@@ -27,6 +27,18 @@ export interface LogWorkoutContext {
   todaysPlanSetCounts: Map<string, number>
   /** name -> today's suggested_load_kg, for exercises that ARE in today's plan and are externally loaded. Used only for the §3.5 progression-moment receipt note — never a write. */
   todaysPlanLoads: Map<string, number>
+  /**
+   * This log CORRECTS what is already recorded for these exercises today
+   * rather than adding to it. Clears each exercise's existing sets for the
+   * day before writing, so a re-stated "no, it was 3x10" replaces the wrong
+   * 3x8 instead of sitting alongside it.
+   *
+   * Opt-in, and it must stay that way: "I did three more sets" is the common
+   * case and appending is correct there. Requires deleteSet — without it this
+   * flag is ignored rather than half-applied.
+   */
+  replaceExisting?: boolean
+  deleteSet?: (key: { exerciseId: string; setNumber: number }) => void
 }
 
 /**
@@ -93,10 +105,11 @@ export interface LoggedSetKey {
   setNumber: number
 }
 
-export function executeLogWorkout(groups: ParsedSetGroup[], ctx: LogWorkoutContext): { rows: LogWorkoutReceiptRow[]; totalSets: number; loggedKeys: LoggedSetKey[] } {
+export function executeLogWorkout(groups: ParsedSetGroup[], ctx: LogWorkoutContext): { rows: LogWorkoutReceiptRow[]; totalSets: number; loggedKeys: LoggedSetKey[]; replacedSets: number } {
   const rows: LogWorkoutReceiptRow[] = []
   const loggedKeys: LoggedSetKey[] = []
   let totalSets = 0
+  let replacedSets = 0
 
   for (const group of groups) {
     if (group.routesToCardio) {
@@ -119,8 +132,26 @@ export function executeLogWorkout(groups: ParsedSetGroup[], ctx: LogWorkoutConte
     if (isOffPlan) ctx.declareOffPlan(exerciseName)
     const prescribedSets = ctx.todaysPlanSetCounts.get(exerciseName) ?? 0
 
+    // A CORRECTION REPLACES; IT NEVER APPENDS.
+    //
+    // Found live: Ashley logged deadlifts, the reps came out wrong, she said
+    // "No 3x10 deadlifts" — and the app wrote sets 4, 5 and 6 alongside the
+    // wrong 1, 2 and 3. Her log read "3 working sets · 6 logged", and every
+    // future weight for that lift would have built on six sets she never did.
+    //
+    // allocateSetNumbers below is append-only by design and that is right for
+    // "I did three more" — the bug was that nothing above it could tell the
+    // two apart. When the caller says this is a correction, the exercise's
+    // existing sets for the day go first, so the allocator sees a clean slate
+    // and refills from set 1.
     const existingLogs = ctx.setsFor(exerciseId, exerciseName)
-    const loggedSetNumbers = existingLogs.map(l => l.set_number)
+    if (ctx.replaceExisting && ctx.deleteSet) {
+      for (const l of existingLogs) {
+        ctx.deleteSet({ exerciseId, setNumber: l.set_number })
+        replacedSets++
+      }
+    }
+    const loggedSetNumbers = ctx.replaceExisting && ctx.deleteSet ? [] : existingLogs.map(l => l.set_number)
     const setNumbers = allocateSetNumbers(group.sets.length, prescribedSets, loggedSetNumbers)
 
     group.sets.forEach((set, i) => {
@@ -166,5 +197,5 @@ export function executeLogWorkout(groups: ParsedSetGroup[], ctx: LogWorkoutConte
     })
   }
 
-  return { rows, totalSets, loggedKeys }
+  return { rows, totalSets, loggedKeys, replacedSets }
 }

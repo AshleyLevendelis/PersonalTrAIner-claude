@@ -511,7 +511,7 @@ const toolDeclarations = [
               },
               reps_completed: {
                 type: "integer",
-                description: "Reps per set (use the average if they varied)",
+                description: "Reps per set, ONLY as the user actually stated them (use the average if they genuinely varied). NEVER fill this from what the plan PRESCRIBED, from history, or from what seems likely. Found live: the user answered 'How many sets and reps?' with '3', and the app logged 3x8 because 8 was the prescribed rep target — a number she never said, written into her training history. If sets are given but reps are not, do NOT call this tool: ask 'how many reps?' and wait. Required precisely so that an unstated rep count blocks the call instead of being invented.",
               },
               weight_kg: {
                 type: "number",
@@ -539,6 +539,10 @@ const toolDeclarations = [
         date: {
           type: "string",
           description: "ISO date (YYYY-MM-DD) this session happened. Omit to default to today.",
+        },
+        corrects_previous: {
+          type: "boolean",
+          description: "TRUE when this message FIXES sets already logged for the same exercise(s), rather than adding new ones — 'no, it was 3x10', 'actually 100kg not 90', 'sorry, only 2 sets'. The app then REPLACES that exercise's sets for the day instead of appending. Get this right: a correction logged as an addition doubles the session and every future weight builds on sets they never did. Leave false/omitted for 'I did 3 more sets' and anything genuinely additional. If you cannot tell which they mean, ASK — do not guess.",
         },
         entries: {
           type: "array",
@@ -665,7 +669,7 @@ const toolDeclarations = [
         },
         reps: {
           type: "integer",
-          description: "Number of reps completed",
+          description: "Number of reps completed, ONLY as the user actually stated them. NEVER fill this from the prescription, from history, or from what seems likely — same rule as exercise_name above, and for the same reason: a guessed number is indistinguishable from a reported one once it is written. If they gave sets but not reps, ask and wait.",
         },
         weight_kg: {
           type: "number",
@@ -1267,6 +1271,10 @@ PERIODIZATION COACHING RULES:
 === NATURAL LANGUAGE WORKOUT LOGGING ===
 - When the user describes exercises they completed (e.g. "Just did bench 3x8 at 90kg", "Finished my push day", "Hit squats for 4 sets of 6 at 100"), ALWAYS invoke the log_workout tool to record their performance — including for a single exercise. log_workout is preferred over log_workout_session/log_workout_set for every natural-language description because it's the one tool with a clarification round-trip when the exercise name is ambiguous or missing; the others write immediately with no chance to ask first.
 - CRITICAL — never invent an exercise name. exercise_phrase/exercise_name must be a span of text the user actually wrote. If the message states sets/reps/weight but names no exercise at all (e.g. "I did 5x5 at 80kg", "just hit 3x10 at 60"), do NOT guess one from today's plan, their history, or the conversation so far — however confident the guess feels, a wrong guess silently writes sets against the wrong exercise with no easy way to notice. Ask a single short question instead ("Which exercise was that?") and wait for their answer before calling any log tool.
+- CRITICAL — NEVER INVENT REPS OR SETS EITHER. The same rule as the exercise name above, and it was learned the same way. If the user says "3" when asked for sets and reps, that is a SET COUNT and the rep count is still missing — do not complete it from the prescription, the plan, their history, or what would be typical. Measured live: the plan said 3x8, she answered "3", and the app recorded 3x8 @100kg. The 8 was never said by anyone but the app. Ask "how many reps?" and wait. A number you supplied is indistinguishable from a number they reported the moment it is written.
+- A CORRECTION REPLACES; IT NEVER ADDS. When a message fixes something just logged — "no, 3x10 deadlifts", "actually 100kg", "sorry, only 2 sets" — call log_workout with corrects_previous: true. Getting this wrong is not a cosmetic error: logged as an addition, the same session is counted twice and every future weight builds on sets that never happened. Live example: 3x8 was logged wrongly, she said "No 3x10 deadlifts", and her log ended up with SIX sets against three prescribed. If you genuinely cannot tell a correction from extra work, ask which — do not guess.
+- DO NOT THROW AWAY WHAT THEY JUST TOLD YOU. "No 3x10 deadlifts" contains the exercise, the sets AND the reps. Carry every stated value into the tool call and ask only for what is actually still missing. Re-asking for something they said in the very message you are replying to reads as not listening, and it is how a two-turn exchange becomes six.
+- NEVER ASK THE SAME QUESTION TWICE IN A ROW. If you asked for a weight and their answer did not get you there, do NOT repeat the identical sentence — either the question was ambiguous or their answer was, and repeating it verbatim changes neither. Say what you have and what is missing ("got 100kg for the deadlifts — how many reps per set?"), or ask a narrower question. Measured live: "What weight did you use for Deadlifts?" three times running, answered "100kg" every time.
 - Parse exercise names, sets, reps, and weights from the user's message. If a weight isn't mentioned, do NOT guess or default to 0 — omit weight_kg from that log entry entirely and let the app resolve it from their history or plan. Only set is_bodyweight (and weight_kg: 0) when the movement is genuinely bodyweight-only (push-ups, pull-ups, dips, planks, etc.) or the user explicitly says "bodyweight"/"no weight".
 - If the day isn't mentioned, default to today.
 - After logging, congratulate them and note if they hit the top of their rep range (which triggers progressive overload).
@@ -1948,7 +1956,7 @@ Keep this context in mind to ensure your greetings and questions naturally align
         return new Response(
           JSON.stringify({
             reply: "",
-            logWorkout: { date: args.date || null, entries: Array.isArray(args.entries) ? args.entries : [] },
+            logWorkout: { date: args.date || null, corrects_previous: args.corrects_previous === true, entries: Array.isArray(args.entries) ? args.entries : [] },
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );

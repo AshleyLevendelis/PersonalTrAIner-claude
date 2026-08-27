@@ -850,7 +850,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     // names verbatim (Gemini function-call args come back exactly as
     // declared) — mapped to WorkoutEntryInput's camelCase at the one
     // boundary that consumes it (resolveAndMaybeLog), not here.
-    logWorkout?: { date: string | null; entries: { raw_text: string; exercise_phrase: string; sets_phrase: string }[] }
+    logWorkout?: { date: string | null; corrects_previous?: boolean; entries: { raw_text: string; exercise_phrase: string; sets_phrase: string }[] }
     // Memory & goals (VISION-ARCHITECTURE.md §1 Part 2) — I1 holds: the
     // server never writes user_facts/user_goals/user_context_facts, it
     // forwards the validated tool args. resolveAndSaveMemory resolves
@@ -1620,7 +1620,14 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     }
   }
 
-  const resolveAndMaybeLog = (entries: WorkoutEntryInput[]): { text: string; receipt?: ChatReceiptView; clarification?: ChatClarificationView } => {
+  /**
+   * @param correctsPrevious  The user is FIXING what was just logged, not
+   *   adding to it. Replaces the named exercises' sets for the day instead of
+   *   appending. See the executor's comment: "No 3x10 deadlifts" previously
+   *   produced 6 logged sets against 3 prescribed, and every future weight
+   *   would have built on three sets that never happened.
+   */
+  const resolveAndMaybeLog = (entries: WorkoutEntryInput[], correctsPrevious = false): { text: string; receipt?: ChatReceiptView; clarification?: ChatClarificationView } => {
     const todaysWorkout = exercisePlan.find(d => d.day === activeSession.dayName)
     const todaysPlanExerciseNames = todaysWorkout?.exercises.map(e => e.name) ?? []
     const parsed = parseWorkoutEntries({ entries, todaysPlanExerciseNames })
@@ -1646,7 +1653,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         .filter(e => e.suggested_load_kg != null)
         .map(e => [e.name, e.suggested_load_kg as number] as const)
     )
-    const { rows, totalSets, loggedKeys } = executeLogWorkout(parsed.groups, {
+    const { rows, totalSets, loggedKeys, replacedSets } = executeLogWorkout(parsed.groups, {
       profileId: activeSession.profileId ?? '',
       date: activeSession.date,
       weekNumber: activeSession.liveWeek,
@@ -1656,15 +1663,30 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       declareOffPlan: activeSession.declareOffPlan,
       todaysPlanSetCounts,
       todaysPlanLoads,
+      replaceExisting: correctsPrevious,
+      deleteSet: key => activeSession.deleteSet({
+        userId: activeSession.profileId ?? '',
+        date: activeSession.date,
+        exerciseId: key.exerciseId,
+        setNumber: key.setNumber,
+      }),
     })
     onLogsUpdated?.()
     const exerciseCount = parsed.groups.filter((g: ParsedSetGroup) => !g.routesToCardio).length
-    const summary = `${exerciseCount} exercise${exerciseCount === 1 ? '' : 's'} · ${totalSets} set${totalSets === 1 ? '' : 's'}`
+    // SAY WHICH IT DID. A correction and an addition write the same rows, so
+    // without this the receipt for "no, 3x10" is indistinguishable from the
+    // receipt for "I did 3 more" — and the wrong one of those quietly doubles
+    // the session. Naming the replaced count makes a mis-call visible on the
+    // spot, while Undo is still one tap away.
+    const summary = replacedSets > 0
+      ? `${exerciseCount} exercise${exerciseCount === 1 ? '' : 's'} · ${totalSets} set${totalSets === 1 ? '' : 's'} · replaced ${replacedSets}`
+      : `${exerciseCount} exercise${exerciseCount === 1 ? '' : 's'} · ${totalSets} set${totalSets === 1 ? '' : 's'}`
+    const title = replacedSets > 0 ? `Corrected · ${activeSession.dayName}` : `Logged · ${activeSession.dayName}`
     return {
-      text: `Logged · ${activeSession.dayName}`,
+      text: title,
       receipt: {
         kind: 'log_workout',
-        title: `Logged · ${activeSession.dayName}`,
+        title,
         rows,
         summary,
         status: 'done',
@@ -1766,7 +1788,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         exercisePhrase: e.exercise_phrase,
         setsPhrase: e.sets_phrase,
       }))
-      return resolveAndMaybeLog(entries)
+      return resolveAndMaybeLog(entries, result.logWorkout.corrects_previous === true)
     }
     if (result.memoryIntent) {
       return resolveAndSaveMemory(result.memoryIntent)
