@@ -679,6 +679,37 @@ function macroDistanceScore(totals: MacroTargets, targets: MacroTargets): number
 }
 
 /**
+ * How much a day that works in nothing the user has said they LIKE is
+ * penalised. Same magnitude as the day-to-day repeat penalty above it, and
+ * for the same reason: a soft preference is a tiebreak between days that fit
+ * equally well, never a reason to ship a worse-fitting day. A 5% calorie miss
+ * already scores 0.05, five times this — so macro fit always wins.
+ */
+export const SOFT_FOOD_MISS_PENALTY = 0.01
+
+/**
+ * Does this dish involve something they said they liked?
+ *
+ * Matches the option's NAME as well as its ingredients, which is deliberately
+ * WIDER than the hard dislike filter in verifyProposal (ingredients only), and
+ * the asymmetry is the point: a soft like is a nudge where a false positive
+ * costs nothing, while a hard dislike is a filter where a false positive takes
+ * food off someone's plate that they would happily have eaten. A like is also
+ * far more likely to name a dish than an ingredient — "I love a curry",
+ * "porridge is my go-to" — and a preference that can never match anything is
+ * worse than not collecting it.
+ */
+function optionMatchesLikedFood(option: PoolOption, liked: string[]): boolean {
+  if (liked.length === 0) return false
+  const name = option.name.toLowerCase()
+  const ingredientNames = option.ingredients.map(i => i.name.toLowerCase())
+  return liked.some(food => {
+    const f = food.trim().toLowerCase()
+    return f.length > 0 && (name.includes(f) || ingredientNames.some(n => n.includes(f)))
+  })
+}
+
+/**
  * Picks one option per active slot from `pools` to best match the day's
  * targets across all four macros: calories within ±5%, protein within
  * −5%/+15% (a real two-sided band, not a one-sided floor), carbs and fat
@@ -702,6 +733,15 @@ export function assembleDay(
   pools: Partial<Record<MealSlotName, PoolOption[]>>,
   targets: MacroTargets,
   recentNames: Partial<Record<MealSlotName, string[]>> = {},
+  /**
+   * Soft food LIKES (compileSoftFoodPreferences) — a tiebreak, nothing more.
+   * VISION-ARCHITECTURE.md §1.2 always named this as the consumer; until now
+   * the compiler had zero call sites, so "I love salmon" was recorded, shown
+   * back in the memory screen, and read by nothing. Hard dislikes are a
+   * different channel entirely (verifyProposal's dislikedFoods filter) and are
+   * unaffected by this.
+   */
+  softLikedFoods: string[] = [],
 ): AssembledDay {
   const requestedSlots = Object.keys(pools) as MealSlotName[]
   const slots = requestedSlots.filter(s => (pools[s]?.length ?? 0) > 0)
@@ -733,7 +773,12 @@ export function assembleDay(
       // same-as-recent combo or multi-exotic day is only a mild tiebreak
       // penalty — variety/coherence are preferences, never worth shipping a
       // worse-fitting day for.
+      // At least ONE liked thing in the day, not as many as possible: someone
+      // who says they love salmon wants salmon once, not at every meal.
+      const missesEveryLikedFood = softLikedFoods.length > 0
+        && !slots.some(s => optionMatchesLikedFood(combo[s]!, softLikedFoods))
       const score = macroDistanceScore(totals, targets) + (repeatsAny ? 0.01 : 0) + exoticPenalty
+        + (missesEveryLikedFood ? SOFT_FOOD_MISS_PENALTY : 0)
       if (!state.best || score < state.best.score) state.best = { combo: { ...combo }, totals, score }
       return
     }

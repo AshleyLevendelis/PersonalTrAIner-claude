@@ -581,11 +581,12 @@ function assembleHorizon(
   pools: Partial<Record<MealSlotName, PoolOption[]>>,
   targets: MacroTargets,
   days: number,
+  softLikedFoods: string[],
 ): { day: number; chosen: Partial<Record<MealSlotName, PoolOption>> }[] {
   const recentNames: Partial<Record<MealSlotName, string[]>> = {}
   const out: { day: number; chosen: Partial<Record<MealSlotName, PoolOption>> }[] = []
   for (let day = 0; day < days; day++) {
-    const { chosen } = assembleDay(pools, targets, recentNames)
+    const { chosen } = assembleDay(pools, targets, recentNames, softLikedFoods)
     out.push({ day, chosen })
     for (const [slot, option] of Object.entries(chosen) as [MealSlotName, PoolOption][]) {
       const list = recentNames[slot] ?? []
@@ -610,6 +611,14 @@ export interface GenerateGroceryListInput {
   targets: MacroTargets
   /** Horizon length in days, default the coming week. Clamped to [1, MAX_HORIZON_DAYS]. */
   days?: number
+  /**
+   * Soft food likes, passed straight to assembleDay. NOT optional garnish:
+   * assembleDay is deterministic for fixed inputs, and the shopping list is
+   * built by assembling the SAME days the Nutrition tab shows. Withhold the
+   * preferences here and the two assemble different days — a list for meals
+   * the app never serves.
+   */
+  softLikedFoods?: string[]
 }
 
 export interface GenerateGroceryListResult {
@@ -632,7 +641,7 @@ export interface GenerateGroceryListResult {
  */
 export async function generateGroceryList(input: GenerateGroceryListInput): Promise<GenerateGroceryListResult> {
   const days = Math.max(1, Math.min(MAX_HORIZON_DAYS, input.days ?? DEFAULT_HORIZON_DAYS))
-  const horizon = assembleHorizon(input.mealPools, input.targets, days)
+  const horizon = assembleHorizon(input.mealPools, input.targets, days, input.softLikedFoods ?? [])
 
   const aggregate = new Map<string, AggregatedIngredient>()
   for (const { day, chosen } of horizon) {

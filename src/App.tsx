@@ -43,7 +43,7 @@ import { getRevealSpeed, saveRevealSpeed, DEFAULT_REVEAL_SPEED, type RevealSpeed
 import { InsightBanner } from '@/components/ui/insight-banner'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { getActiveFacts, getActiveGoals, getActiveContextFacts, createFact, createContextFact, createGoal, type UserFactRow, type UserGoalRow, type UserContextFactRow } from '@/lib/memory-store'
-import { compileExerciseExclusions, compileFoodDislikes, compileTimingRules, compileSoftExercisePreferences, resolveFoodTarget, resolveExerciseTarget } from '@/lib/fact-compiler'
+import { compileExerciseExclusions, compileFoodDislikes, compileTimingRules, compileSoftExercisePreferences, compileSoftFoodPreferences, resolveFoodTarget, resolveExerciseTarget } from '@/lib/fact-compiler'
 import { getAllItems as getAllGroceryItems, flushPending as flushGroceryPending, type GroceryItemRow } from '@/lib/grocery-store'
 import { flushPending as flushSetLogPending } from '@/lib/set-log-store'
 import { flushPending as flushWaterPending } from '@/lib/water-store'
@@ -106,12 +106,29 @@ function App() {
    * regenerating makes the banner go away on its own.
    */
   const [unrecognisedDietaryRestrictions, setUnrecognisedDietaryRestrictions] = useState<string[] | null>(null)
+  // Memory & goals (VISION-ARCHITECTURE.md §1) — active facts/goals for the
+  // current profile, loaded once alongside it. fact-compiler.ts's pure
+  // functions turn these into the exact arguments generateExercisePlan/
+  // generateMealPools already accept; nothing here writes plan state.
+  const [memoryFacts, setMemoryFacts] = useState<UserFactRow[]>([])
+  const [memoryGoals, setMemoryGoals] = useState<UserGoalRow[]>([])
+  const [memoryContextFacts, setMemoryContextFacts] = useState<UserContextFactRow[]>([])
   /** Slot -> pool-option name the user explicitly picked this session, overriding assembleDay's automatic choice for that slot until the next regenerate. */
   const [manualMealPicks, setManualMealPicks] = useState<Partial<Record<MealSlotName, string>>>({})
+  // A LEAN, not a filter — "I love salmon" biases which combination of pool
+  // options gets picked for the day, and only when two combinations fit the
+  // macros about equally (SOFT_FOOD_MISS_PENALTY is a fifth of a 5% calorie
+  // miss). Hard dislikes are a different channel entirely: those are filtered
+  // out of the pool at generation time and never reach here.
+  //
+  // Declared above assembleDay rather than beside the other compilers further
+  // down, because the assembled day is derived on this line and a const
+  // declared later would be a use-before-define.
+  const compiledSoftFoodPreferences = compileSoftFoodPreferences(memoryFacts)
   // assembleDay is pure — deriving today's picks from pools+targets on every
   // render (rather than storing them) means a pool refresh or a target
   // change (a new weigh-in) can never leave a stale assembled day on screen.
-  const assembledMeals = macros ? assembleDay(mealPools, macros) : null
+  const assembledMeals = macros ? assembleDay(mealPools, macros, {}, compiledSoftFoodPreferences) : null
   const chosenMeals: Partial<Record<MealSlotName, PoolOption>> = { ...assembledMeals?.chosen }
   for (const [slot, name] of Object.entries(manualMealPicks) as [MealSlotName, string][]) {
     const override = mealPools[slot]?.find(o => o.name === name)
@@ -147,13 +164,6 @@ function App() {
   const [unsavedProfileWarning, setUnsavedProfileWarning] = useState<string | null>(null)
   const [generatingStatus, setGeneratingStatus] = useState('')
   const [exerciseExclusions, setExerciseExclusions] = useState<string[]>([])
-  // Memory & goals (VISION-ARCHITECTURE.md §1) — active facts/goals for the
-  // current profile, loaded once alongside it. fact-compiler.ts's pure
-  // functions turn these into the exact arguments generateExercisePlan/
-  // generateMealPools already accept; nothing here writes plan state.
-  const [memoryFacts, setMemoryFacts] = useState<UserFactRow[]>([])
-  const [memoryGoals, setMemoryGoals] = useState<UserGoalRow[]>([])
-  const [memoryContextFacts, setMemoryContextFacts] = useState<UserContextFactRow[]>([])
   const [profileInfoOpen, setProfileInfoOpen] = useState(false)
   const [profileInfoSection, setProfileInfoSection] = useState<'goals' | 'facts' | 'context' | 'dietary' | undefined>(undefined)
   const [newPlanConfirmOpen, setNewPlanConfirmOpen] = useState(false)
@@ -1894,7 +1904,7 @@ function App() {
           </TabsContent>
 
           <TabsContent value="tools">
-            <ToolsTab profileId={profile.id} mealPools={mealPools} targets={macros} />
+            <ToolsTab profileId={profile.id} mealPools={mealPools} targets={macros} softLikedFoods={compiledSoftFoodPreferences} />
           </TabsContent>
 
           <TabsContent value="chat" forceMount className="data-[state=inactive]:hidden">

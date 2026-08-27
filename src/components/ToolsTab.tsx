@@ -16,9 +16,11 @@ export interface ToolsTabProps {
   profileId?: string
   mealPools: Partial<Record<MealSlotName, PoolOption[]>>
   targets: MacroTargets | null
+  /** Passed straight through to GroceryList — the shopping list assembles the same days the Nutrition tab shows, so it needs the same preferences or the two diverge. */
+  softLikedFoods: string[]
 }
 
-export function ToolsTab({ profileId, mealPools, targets }: ToolsTabProps) {
+export function ToolsTab({ profileId, mealPools, targets, softLikedFoods }: ToolsTabProps) {
   return (
     <div className="space-y-8">
       <div>
@@ -30,7 +32,7 @@ export function ToolsTab({ profileId, mealPools, targets }: ToolsTabProps) {
       <div>
         <p className="ds-label">Grocery list</p>
         <div className="mt-2.5">
-          <GroceryList profileId={profileId} mealPools={mealPools} targets={targets} />
+          <GroceryList profileId={profileId} mealPools={mealPools} targets={targets} softLikedFoods={softLikedFoods} />
         </div>
       </div>
     </div>
