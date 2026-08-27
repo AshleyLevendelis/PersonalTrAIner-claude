@@ -239,7 +239,7 @@ const toolDeclarations = [
   {
     name: "propose_meal_swap",
     description:
-      "PROPOSES swapping which verified pool option is assigned to a meal slot — this does NOT apply the change. Call this when the user gives an explicit command to change a meal (e.g. 'swap my lunch', 'change breakfast to something else'). Do NOT invent a new dish or ingredients — new_item, if given, must be the exact name of an existing alternative already in that slot's pool (mention one from the meal summary below if you know it; otherwise omit new_item and the app will pick the best available alternative). The app shows the user a card with the exact before/after macros and they tap Confirm themselves — do not describe the swap as already done.",
+      "PROPOSES swapping which verified pool option is assigned to a meal slot — this does NOT apply the change. Call this when the user gives an explicit command to change a meal (e.g. 'swap my lunch', 'change breakfast to something else'). Do NOT invent a new dish or ingredients — use propose_meal_addition for a dish that isn't already one of their options. new_item, if given, must be the exact name of an existing alternative already in that slot's pool (mention one from the meal summary below if you know it); otherwise omit new_item and the app steps them through their remaining options, one per swap, and offers to find new ones once they have seen them all. old_item should be the meal they are looking at RIGHT NOW, which after an earlier swap is the one that swap moved them to — not the one they started with. The app shows the user a card with the exact before/after macros and they tap Confirm themselves — do not describe the swap as already done.",
     parameters: {
       type: "object",
       properties: {
@@ -1328,6 +1328,7 @@ ${context.exercise_exclusions && context.exercise_exclusions.length > 0 ? `\nPER
 - Extract ONLY what the user actually stated. Never add an ingredient they didn't mention (no assumed cooking oil, seasoning, or protein powder) — if an addition seems implied, ask the user rather than silently including it.
 - If an ingredient has an ambiguous variant (fat content, whole vs. skimmed, etc.), pick one explicit, precisely-named variant and record the assumption. If a quantity is missing, use a typical portion and record that assumption too. See log_meal's parameter descriptions for exact requirements.
 - propose_meal_swap does not take a macro field at all — the app computes the swap's macros itself from the verified pool, shown on the confirm card.
+- When someone asks to swap a meal AGAIN because they didn't like the alternative either, just call propose_meal_swap again — the app tracks what it has already shown them for that slot and, once they have been through the lot, offers to go and find new ones instead of re-serving the same list. Never tell them they have run out of options yourself; you can't see the pool.
 - ADDING A MEAL vs SWAPPING ONE. A swap changes which of their EXISTING options is picked; propose_meal_addition puts a NEW dish into the plan. "Add salmon to my dinners", "can I have overnight oats for breakfast", "put a curry in for Friday" are ADDITIONS — use propose_meal_addition. "Swap my lunch", "change breakfast to something else", "give me the other one" are SWAPS. If they name a dish that isn't already one of their options, it is an addition, not a swap.
 - When you call propose_meal_addition, give rough ingredient quantities and then say nothing about the numbers. The app re-measures every ingredient against its own food database, re-portions the dish to that slot's targets, and checks it against their allergies and dietary restrictions — it may refuse the dish outright. So never state its calories or macros, never say it has been added, and never promise it will fit.
 
@@ -1559,69 +1560,23 @@ Keep this context in mind to ensure your greetings and questions naturally align
       const textPart = parts.find((p: { text?: string }) => p.text);
 
       if (name === "propose_meal_swap") {
-        // VISION-ARCHITECTURE.md §2/Part 3 — replaces replace_food and
-        // swap_meal entirely. Unlike propose_exercise_swap, the server CAN
-        // cheaply build the full diff here: pool data is a plain REST
-        // fetch (meal_plan_slots), no client-only TS modules needed. I1
-        // still holds — this only READS meal_plan_slots, it never writes.
-        // Structural fix: a non-imperative quote used to downgrade to a
-        // plain-text `offer` with no pending_actions row, so a later "yes"
-        // had nothing to resolve and went back through the model — which
-        // could fail the same classification again, looping (the bug fixed
-        // for record_fact in the "never give it to me" case, generalized
-        // here). classifyImperative's result no longer branches the
-        // response shape: every propose_* call now returns the same
-        // resolvable `proposal`, so confirmation is available on the first
-        // reply regardless of whether the quote classified as imperative.
-        const profileId = context.profile_id;
-        const slot = String(args.meal_slot || "").toLowerCase();
-        let proposalResult = null;
-        if (profileId && slot) {
-          try {
-            const poolResp = await fetch(
-              `${supabaseUrl}/rest/v1/meal_plan_slots?profile_id=eq.${profileId}&slot=eq.${slot}&select=name,macros&order=pool_index.asc`,
-              { headers: { Authorization: `Bearer ${serviceKey}`, Apikey: serviceKey } }
-            );
-            const options: { name: string; macros?: { kcal?: number; protein?: number; carbs?: number; fat?: number } }[] = poolResp.ok ? await poolResp.json() : [];
-            const oldOption = options.find((o) => o.name.toLowerCase() === String(args.old_item || "").toLowerCase());
-            const requestedNew = args.new_item ? options.find((o) => o.name.toLowerCase() === String(args.new_item).toLowerCase()) : undefined;
-            const alternatives = options.filter((o) => o.name.toLowerCase() !== String(args.old_item || "").toLowerCase());
-            const newOption = requestedNew ?? alternatives[0];
-
-            if (newOption) {
-              const oldMacros = oldOption?.macros ?? {};
-              const newMacros = newOption.macros ?? {};
-              proposalResult = {
-                kind: "propose_meal_swap",
-                scopeKey: `${profileId}:propose_meal_swap:${slot}`,
-                preconditions: { slot, currentItemName: args.old_item },
-                payload: { slot, currentName: args.old_item, chooseName: newOption.name },
-                diff: {
-                  rows: [
-                    { field: "Meal", before: args.old_item, after: newOption.name },
-                    { field: "Calories", before: `${Math.round(oldMacros.kcal ?? 0)} kcal`, after: `${Math.round(newMacros.kcal ?? 0)} kcal` },
-                    { field: "Protein", before: `${Math.round(oldMacros.protein ?? 0)}g`, after: `${Math.round(newMacros.protein ?? 0)}g` },
-                  ],
-                  implications: [],
-                  rationale: typeof args.reason === "string" ? args.reason : undefined,
-                  reversible: true,
-                },
-              };
-            }
-          } catch (err) {
-            console.error("propose_meal_swap: pool lookup failed", err);
-          }
-        }
-
-        if (!proposalResult) {
-          return new Response(
-            JSON.stringify({ reply: `I couldn't find another option for your ${args.meal_slot} right now.` }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-
+        // A COURIER, like propose_meal_addition and propose_exercise_swap.
+        //
+        // This used to fetch meal_plan_slots and build the whole diff here,
+        // which meant it also had to CHOOSE the target meal — and it chose
+        // `alternatives[0]`, the first pool option that isn't the current
+        // one. Repeated swaps therefore ping-ponged between the first two
+        // options (A -> B -> A -> B) and the other three of a five-option
+        // pool were unreachable from chat entirely. Worse, because it always
+        // filled in chooseName, meal-store's own chooser never ran, so the
+        // rule existed twice and the live copy was the broken one.
+        //
+        // The client now rotates through the pool with nextPoolOption — the
+        // single chooser — and builds the diff from the same data. An edge
+        // function cannot import src/lib, so any chooser here is a second
+        // copy by construction. Nothing is written on this path either way.
         return new Response(
-          JSON.stringify({ reply: "", proposal: proposalResult }),
+          JSON.stringify({ reply: "", proposal: { kind: "propose_meal_swap", rawArgs: args } }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }

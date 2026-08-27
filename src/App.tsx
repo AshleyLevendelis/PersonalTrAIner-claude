@@ -1939,6 +1939,51 @@ function App() {
                 setManualMealPicks(prev => ({ ...prev, [slot]: chosenName }))
                 return true
               }}
+              onFindMoreMealOptions={async slot => {
+                // Ashley's ruling on running out of swaps: OFFER to find new
+                // ones, never do it unasked. This only runs on a confirmed
+                // card, and appendToExisting is what keeps the meals they
+                // already have — a plain regenerate would delete the pool and
+                // hand them five different meals instead of five more.
+                if (!profile?.id || !macros) return { added: [], error: "I need your body details before I can fit new meals to your targets." }
+                try {
+                  const result = await generateMealPools({
+                    profileId: profile.id,
+                    targets: macros,
+                    dietaryPreferences: profile.dietary_preferences,
+                    mealsPerDay: profile.meals_per_day,
+                    includeSnacks: profile.include_snacks,
+                    cookingTimePreference: profile.cooking_time_preference,
+                    favoriteCuisines: profile.favorite_cuisines,
+                    dislikedFoods: effectiveDislikedFoods,
+                    timingRules: compiledTimingRules,
+                    breakfastStyle: profile.breakfast_style,
+                    onlySlots: [slot],
+                    appendToExisting: true,
+                  })
+                  if (result.unrecognisedPreferences.length > 0) {
+                    setUnrecognisedDietaryRestrictions(result.unrecognisedPreferences)
+                    return { added: [], error: `I can't check meals against "${result.unrecognisedPreferences.join('", "')}" — that needs fixing in Profile first.` }
+                  }
+                  const added = result.accepted[slot] ?? []
+                  if (added.length === 0) {
+                    // Same distinction handleRegenerateMealSlot draws: the
+                    // generator running and finding nothing that fits is
+                    // deterministic advice, not "try again".
+                    return { added: [], error: result.generatorReached
+                      ? `I couldn't find any new ${slot} options that fit your targets — loosening a restriction or widening your calorie range would give me more to work with.`
+                      : `I couldn't reach the meal generator just then — try me again in a moment.` }
+                  }
+                  // Refresh the on-screen pool so the Meals tab shows them
+                  // immediately; the DB write already happened inside
+                  // generateMealPools.
+                  const pools = await getPools(profile.id)
+                  setMealPools(pools)
+                  return { added: added.map(o => o.name) }
+                } catch {
+                  return { added: [], error: `I couldn't reach the meal generator just then — try me again in a moment.` }
+                }
+              }}
               memoryFacts={memoryFacts}
               memoryGoals={memoryGoals}
               memoryContextFacts={memoryContextFacts}

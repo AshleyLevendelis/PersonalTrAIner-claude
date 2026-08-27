@@ -33,7 +33,7 @@ import { computeMealMacros, type Macros100g } from './food-db'
 import { validateMealAgainstDiet } from './diet-rules'
 import { parseIngredientLines, scaleToTarget, isWithinCalorieTolerance, meetsProteinFloor } from './portion-scaler'
 import type { MacroTargets, CookingTimePreference, BreakfastStyle } from './types'
-import type { MealSlotName } from './meal-store'
+import { getPools, type MealSlotName } from './meal-store'
 
 export const MIN_COVERAGE = 0.8
 export const DEFAULT_POOL_SIZE = 5
@@ -422,12 +422,28 @@ export async function generateMealPools(params: {
   timingRules?: import('./fact-compiler').CompiledTimingRule[]
   /** Steering only — nudges the breakfast slot's prompt guidance. */
   breakfastStyle?: BreakfastStyle
+  /**
+   * ADD to the slot's existing pool instead of replacing it — the "you've seen
+   * them all, want me to find some new ones?" path. The default (false) is a
+   * regenerate: persistPools deletes the slot's rows first, which is right
+   * when the user asked for a fresh set and catastrophic when they asked for
+   * MORE. With this set, the existing options are loaded up front so the
+   * duplicate-name and cuisine-coherence checks see them too — otherwise
+   * "find me something new" could return the four meals already sitting there.
+   */
+  appendToExisting?: boolean
 }): Promise<GenerateMealPoolsResult> {
   const poolSize = params.poolSize ?? DEFAULT_POOL_SIZE
   const budgets = computeSlotBudgets(params.targets, params.mealsPerDay, params.includeSnacks)
   const activeSlots = (Object.keys(budgets) as MealSlotName[]).filter(
     s => !params.onlySlots || params.onlySlots.includes(s)
   )
+
+  // What they already have, when appending. Never written back — only used to
+  // stop the generator handing them the same meals again.
+  const existingBySlot: Partial<Record<MealSlotName, PoolOption[]>> = params.appendToExisting
+    ? await getPools(params.profileId)
+    : {}
 
   const accepted: Partial<Record<MealSlotName, PoolOption[]>> = {}
   const rejectionLog: string[] = []
@@ -479,8 +495,9 @@ export async function generateMealPools(params: {
       const budget = budgets[slot]
       if (!budget) continue
 
+      const existing = existingBySlot[slot] ?? []
       const isExoticProposal = EXOTIC_CUISINES.has(proposal.cuisine)
-      const poolAlreadyHasExotic = accepted[slot]?.some(isExoticOption) ?? false
+      const poolAlreadyHasExotic = (accepted[slot]?.some(isExoticOption) ?? false) || existing.some(isExoticOption)
       if (isExoticProposal && poolAlreadyHasExotic) {
         rejectionLog.push(`[${slot}] "${proposal.name}": pool already has an exotic-cuisine option — cuisine coherence cap (${proposal.cuisine})`)
         continue
@@ -498,7 +515,8 @@ export async function generateMealPools(params: {
       // source keeps that whole downstream chain honest without needing to
       // special-case it again at render time.
       const normalizedName = proposal.name.trim().toLowerCase()
-      if (accepted[slot]?.some(o => o.name.trim().toLowerCase() === normalizedName)) {
+      if (accepted[slot]?.some(o => o.name.trim().toLowerCase() === normalizedName)
+        || existing.some(o => o.name.trim().toLowerCase() === normalizedName)) {
         rejectionLog.push(`[${slot}] "${proposal.name}": duplicate name already in this slot's pool`)
         continue
       }
@@ -520,9 +538,39 @@ export async function generateMealPools(params: {
     console.warn('generateMealPools: some slots did not reach target pool size', shortfalls, rejectionLog)
   }
 
-  await persistPools(params.profileId, accepted)
+  if (params.appendToExisting) await appendPools(params.profileId, accepted, existingBySlot)
+  else await persistPools(params.profileId, accepted)
 
   return { accepted, rejectionLog, shortfalls, unrecognisedPreferences: [...unrecognisedPreferences].sort(), generatorReached }
+}
+
+/**
+ * Adds newly accepted options ON TOP of what the slot already holds, at the
+ * next pool_index. The counterpart to persistPools, and deliberately a
+ * separate function rather than a flag inside it: the difference between the
+ * two is a DELETE, and a flag that decides whether a user's meals survive is
+ * one misread argument away from wiping them.
+ */
+async function appendPools(
+  profileId: string,
+  accepted: Partial<Record<MealSlotName, PoolOption[]>>,
+  existing: Partial<Record<MealSlotName, PoolOption[]>>,
+): Promise<void> {
+  for (const [slot, options] of Object.entries(accepted) as [MealSlotName, PoolOption[]][]) {
+    if (options.length === 0) continue
+    const base = existing[slot]?.length ?? 0
+    const rows = options.map((opt, i) => ({
+      profile_id: profileId,
+      slot,
+      pool_index: base + i,
+      name: opt.name,
+      ingredients: opt.ingredients,
+      macros: { kcal: opt.macros.calories, protein: opt.macros.protein, carbs: opt.macros.carbs, fat: opt.macros.fat },
+      tags: opt.tags,
+    }))
+    const { error } = await supabase.from('meal_plan_slots').insert(rows)
+    if (error) console.error(`Failed to append pool options for slot ${slot}:`, error)
+  }
 }
 
 /** Replaces a profile's stored pool for each touched slot with the newly accepted options. */

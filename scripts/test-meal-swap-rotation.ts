@@ -109,5 +109,84 @@ console.log('\n4. The other two entry points still behave')
   check('with no current meal it returns a pool option', noCurrent !== null && POOL.includes(noCurrent.name))
 }
 
+console.log('\n5. THE PING-PONG REGRESSION: the chat swap reaches the whole pool')
+{
+  // The bug this section exists for. chat-gemini used to fetch the pool and
+  // pick `alternatives[0]` — the first option that isn't the current one — so
+  // a chat swap went A -> B, then B -> A, then A -> B, forever. Three of five
+  // generated meals were unreachable from the chat entirely, and because the
+  // server always filled in chooseName, meal-store's own chooser never ran:
+  // the rule existed twice and the live copy was the broken one.
+  const { buildMealSwapProposal } = await import('../src/lib/meal-swap-proposal')
+
+  const seen: string[] = []
+  let current = POOL[0]
+  const alreadySeen: string[] = [POOL[0]]
+  for (let i = 0; i < POOL.length - 1; i++) {
+    const r = await buildMealSwapProposal({ rawArgs: { meal_slot: 'breakfast', old_item: current }, profileId: 'p', alreadySeen })
+    if (!r.ok) break
+    seen.push(r.payload.chooseName)
+    alreadySeen.push(r.payload.chooseName)
+    current = r.payload.chooseName
+  }
+  check(`${POOL.length - 1} chat swaps reach ${POOL.length - 1} distinct meals`,
+    new Set(seen).size === POOL.length - 1, seen)
+  check('...covering the whole pool, not just the first two',
+    POOL.slice(1).every(n => seen.includes(n)), { seen, unreachable: POOL.slice(1).filter(n => !seen.includes(n)) })
+
+  const alternatives0 = POOL.filter(n => n !== POOL[1])[0]
+  check('the old alternatives[0] answer is genuinely different, so this has teeth',
+    seen[1] !== alternatives0, { rotation: seen[1], oldBehaviour: alternatives0 })
+
+  // The chooser must exist ONCE. An edge function can't import src/lib, so a
+  // chooser living there is a second copy by construction.
+  const edge = readFileSync(join(ROOT, 'supabase/functions/chat-gemini/index.ts'), 'utf8')
+  const swapBranch = edge.slice(edge.indexOf('name === "propose_meal_swap"'), edge.indexOf('name === "propose_meal_addition"'))
+  const code = swapBranch.split('\n').filter(l => !/^\s*(\/\/|\*|\/\*)/.test(l)).join('\n')
+  check('the edge function no longer picks the swap target itself', !/alternatives\[0\]|\.filter\(/.test(code))
+  check('...and no longer reads the pool at all', !/meal_plan_slots/.test(code))
+  check('...it just forwards the raw arguments', /rawArgs: args/.test(code))
+}
+
+console.log('\n6. Running out of options offers new ones instead of repeating')
+{
+  const { buildMealSwapProposal } = await import('../src/lib/meal-swap-proposal')
+  // Ashley's ruling: once they have seen the lot, OFFER — never silently
+  // spend a generation call, and never re-serve what they already rejected.
+  const r = await buildMealSwapProposal({ rawArgs: { meal_slot: 'breakfast', old_item: POOL[0] }, profileId: 'p', alreadySeen: POOL })
+  check('a fully-seen pool does not propose a swap', !r.ok)
+  check('...it reports the pool as exhausted so the caller can offer', !r.ok && r.exhausted?.slot === 'breakfast', (r as { exhausted?: unknown }).exhausted)
+  check('...and says how many they have seen', !r.ok && new RegExp(`all ${POOL.length}`).test(r.reason), (r as { reason?: string }).reason)
+
+  // Naming a meal explicitly is the user choosing, and must never be
+  // overridden by the exhausted path.
+  const explicit = await buildMealSwapProposal({ rawArgs: { meal_slot: 'breakfast', old_item: POOL[0], new_item: POOL[3] }, profileId: 'p', alreadySeen: POOL })
+  check('an explicitly named meal still swaps even when everything has been seen',
+    explicit.ok && explicit.payload.chooseName === POOL[3], explicit.ok ? explicit.payload.chooseName : explicit.reason)
+}
+
+console.log('\n7. Finding new options ADDS, it never replaces')
+{
+  // persistPools deletes a slot's rows before inserting. Reaching for it here
+  // would answer "find me some more" by deleting the five they have and
+  // handing back five different ones — the pool-wipe trap, second instance.
+  const gen = readFileSync(join(ROOT, 'src/lib/meal-generation.ts'), 'utf8')
+  const appendBody = gen.slice(gen.indexOf('async function appendPools'), gen.indexOf('async function persistPools'))
+  check('appendPools never deletes', !/\.delete\(/.test(appendBody))
+  check('...and offsets new rows past the existing ones', /pool_index: base \+ i/.test(appendBody))
+  check('appendToExisting routes to appendPools, not persistPools',
+    /if \(params\.appendToExisting\) await appendPools/.test(gen))
+  // The half that makes "new" mean new: the duplicate-name check has to see
+  // what the slot ALREADY holds, or "find me something else" can hand back
+  // the four meals sitting in the pool.
+  const dedupe = gen.slice(gen.indexOf('const normalizedName = proposal.name'), gen.indexOf('const slotTimingDislikes'))
+  check('the duplicate-name check consults the existing pool', /existing\.some\(o => o\.name/.test(dedupe), dedupe.slice(0, 200))
+  check('...and `existing` is the slot\'s stored options', /const existing = existingBySlot\[slot\] \?\? \[\]/.test(gen))
+  check('...loaded only when appending', /params\.appendToExisting\s*\n?\s*\? await getPools/.test(gen))
+
+  const app = readFileSync(join(ROOT, 'src/App.tsx'), 'utf8')
+  check('the confirm path passes appendToExisting', /onFindMoreMealOptions[\s\S]{0,2000}appendToExisting: true/.test(app))
+}
+
 if (failures > 0) { console.error(`\n${failures} check(s) failed`); process.exit(1) }
 console.log('\nAll meal-swap rotation checks passed.\n')

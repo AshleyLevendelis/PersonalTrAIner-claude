@@ -289,6 +289,37 @@ export async function getPools(profileId: string): Promise<Partial<Record<MealSl
 }
 
 /**
+ * The one rule for "give me a different one": step forward from where you are,
+ * in pool order.
+ *
+ * THIS IS THE ONLY CHOOSER. It used to exist twice and neither copy worked.
+ * swapPoolMeal drew at random, and chat-gemini — which had to pick a target
+ * server-side to build the confirm card's before/after macros — took
+ * `alternatives[0]`, the first option that isn't the current one. With a pool
+ * of five, that made chat swaps ping-pong: A -> B -> A -> B forever, leaving
+ * three of the five generated meals unreachable from the chat entirely. The
+ * random draw was never the live path at all, because chat-gemini always
+ * filled in chooseName.
+ *
+ * Rotation is deterministic, so N-1 swaps show N-1 different meals and the
+ * order is stable across calls and reloads. `options` arrives ordered by
+ * pool_index (see getPools), which is what makes "forward" mean something.
+ *
+ * currentIndex === -1 is the real case where the current meal isn't in the
+ * pool — an assembleDay choice, or one added from chat before the pool
+ * reloads — and the first option in pool order is the right answer for it.
+ */
+export function nextPoolOption<T extends { name: string }>(options: T[], currentName?: string): T | null {
+  if (options.length === 0) return null
+  const currentIndex = currentName ? options.findIndex(o => o.name === currentName) : -1
+  const next = options[(currentIndex + 1) % options.length]
+  if (next && next.name !== currentName) return next
+  // Only reachable when the pool holds nothing but the current meal.
+  const other = options.find(o => o.name !== currentName)
+  return other ?? null
+}
+
+/**
  * Swaps which option from the same slot's stored pool is the current pick.
  * `chooseName` picks that specific pool option (the UI's per-alternative
  * "swap to this" buttons); omitted, picks a random option excluding
@@ -314,29 +345,11 @@ export async function swapPoolMeal(
   const options = pools[slot] ?? []
   if (options.length === 0) return null
 
-  let chosen: PoolOption | undefined
+  let chosen: PoolOption | null | undefined
   if (chooseName) {
     chosen = options.find(o => o.name === chooseName)
   } else {
-    const alternatives = currentName ? options.filter(o => o.name !== currentName) : options
-    if (alternatives.length === 0) return null
-    // ROTATION, not a random draw. This used to be
-    // alternatives[Math.floor(Math.random() * alternatives.length)], which
-    // meant "swap this for something else" could hand back the option the
-    // user had just rejected — with a pool of five, a one-in-four chance
-    // every time, and no way for them to tell it apart from the app ignoring
-    // them. Stepping forward from the current option's own pool position
-    // instead walks the whole pool before repeating anything, so N-1 swaps
-    // show N-1 different meals. `options` is ordered by pool_index (see
-    // getPools), so the order is stable across calls and across reloads.
-    //
-    // findIndex === -1 is the real case where the current meal isn't in the
-    // pool at all — an assembleDay choice, or a meal added from chat before
-    // the pool reloads — and starting at 0 is right for it: the first
-    // alternative in pool order.
-    const currentIndex = currentName ? options.findIndex(o => o.name === currentName) : -1
-    const next = options[(currentIndex + 1) % options.length]
-    chosen = next && next.name !== currentName ? next : alternatives[0]
+    chosen = nextPoolOption(options, currentName)
   }
   if (!chosen) return null
 

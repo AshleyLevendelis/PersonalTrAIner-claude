@@ -17,6 +17,7 @@ import { APPEND_PROPOSAL_KINDS, INTENT_PROPOSAL_VERB, buildIntentProposal } from
 import { pickAccountabilityCheckIn } from '@/lib/accountability'
 import { executeExerciseSwap, executeMealSwap, executeMealAddition, undoMealAddition, undoExerciseSwap, executeInjuryAdaptation, executeLastingInjury, executeInjuryRecovered, executeEquipmentAdaptation, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type LastingInjuryPayload, type InjuryRecoveredPayload, type EquipmentAdaptationPayload } from '@/lib/pending-action-executor'
 import { buildMealAdditionProposal, type MealAdditionPayload } from '@/lib/meal-addition'
+import { buildMealSwapProposal } from '@/lib/meal-swap-proposal'
 import type { SwapScope } from '@/lib/mesocycle-edit'
 import { createPlanAdaptation } from '@/lib/plan-adaptations-store'
 import { updateProfileField } from '@/lib/profile-store'
@@ -127,6 +128,8 @@ interface ChatAssistantProps {
   /** Fired after a confirmed propose_meal_swap executes — mirrors App.tsx's handleSwapMealSlot's setManualMealPicks, the ONLY thing that makes a swapped-in pool option actually render as today's pick. Without this the receipt would claim a swap the Nutrition tab never shows — exactly the incident this framework exists to prevent. */
   /** Returns whether the pick actually persisted — a receipt must never say "Swapped" for a write that didn't land. */
   onMealSwapApplied: (slot: MealSlotName, chosenName: string) => Promise<boolean>
+  /** Confirmed propose_meal_pool_refresh — generates ADDITIONAL options for one slot and keeps the existing ones. Lives in App.tsx because that's where every generation input (disliked foods, timing rules, cuisines) already is. Returns the names added, or an error string. */
+  onFindMoreMealOptions: (slot: MealSlotName) => Promise<{ added: string[]; error?: string }>
   /** Memory & goals (VISION-ARCHITECTURE.md §1) — active facts/goals/context, loaded by App.tsx alongside the profile. Read-only here: resolveAndSaveMemory writes through memory-store directly and calls onMemoryChanged so App.tsx re-fetches, the same "the client is the only writer, the caller reloads after" shape pending_actions uses. */
   memoryFacts: UserFactRow[]
   memoryGoals: UserGoalRow[]
@@ -149,7 +152,7 @@ interface ChatAssistantProps {
   pendingLoadSuggestions?: string[]
 }
 
-export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onProfileChanged, onMealSwapApplied, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenProfile, groceryItems, onGroceryChanged, onOpenGrocery, onWaterChanged, onOpenDashboard, revealSpeed = DEFAULT_REVEAL_SPEED, pendingLoadSuggestions }: ChatAssistantProps) {
+export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onProfileChanged, onMealSwapApplied, onFindMoreMealOptions, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenProfile, groceryItems, onGroceryChanged, onOpenGrocery, onWaterChanged, onOpenDashboard, revealSpeed = DEFAULT_REVEAL_SPEED, pendingLoadSuggestions }: ChatAssistantProps) {
   // NL logging (§3) writes through the SAME frozen session identity +
   // logSet facade SetGrid.tsx uses — never saveSet directly (see
   // nl-logging-executor.ts's own doc comment).
@@ -178,6 +181,24 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
   // resets naturally on remount, which is the conversation boundary the
   // brief means.
   const checkInUsedRef = useRef(false)
+  /**
+   * Every meal option this conversation has actually shown the user, per slot.
+   * A ref, not state: nothing renders from it, and it must be readable inside
+   * the same async turn that writes it — a setState here would have the swap
+   * builder reading the previous render's value and the "you've seen them all"
+   * offer arriving one swap late.
+   *
+   * Deliberately per-conversation rather than persisted. "You've been through
+   * your options" is a claim about this sitting; someone coming back a week
+   * later should get their pool offered again before being asked to spend on
+   * new ones.
+   */
+  const mealOptionsSeenRef = useRef<Partial<Record<MealSlotName, string[]>>>({})
+  const noteMealOptionSeen = (slot: MealSlotName, name: string) => {
+    if (!name) return
+    const seen = mealOptionsSeenRef.current[slot] ?? []
+    if (!seen.some(n => n.toLowerCase() === name.toLowerCase())) mealOptionsSeenRef.current[slot] = [...seen, name]
+  }
 
   // Synchronous fallback opener — used as the initial message before any
   // data has loaded, and upgraded in place once real PR/trend data resolves
@@ -969,6 +990,9 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     // Not "swap X for Y" — nothing is being replaced, and the default
     // headline below would read the slot name as the thing being lost.
     if (pendingAction.kind === 'propose_meal_addition') return `I can add **${rows[0].after}** to your ${rows[0].before}:`
+    // The rationale IS the offer here ("that's all five I've got — want me to
+    // find new ones?"), so repeating a headline above it would say it twice.
+    if (pendingAction.kind === 'propose_meal_pool_refresh') return pendingAction.diff.rationale ?? 'Want me to find you some new options?'
     if (pendingAction.kind === 'propose_injury_adaptation' || pendingAction.kind === 'propose_injury_as_lasting' || pendingAction.kind === 'propose_equipment_adaptation') {
       const count = rows.length
       return `I can adjust ${count} exercise${count === 1 ? '' : 's'} across your plan:`
@@ -1745,8 +1769,51 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       // current plan" — which for a meal rejected on an allergen would be
       // both unhelpful and untrue.
       let refusal: string | null = null
+      // The exhausted-pool case answers a propose_meal_swap call with a
+      // DIFFERENT kind of card. Plain text would have been the trap the
+      // record_fact fix already documented here: an offer with no
+      // pending_actions row means a later "yes" has nothing to resolve and
+      // goes back through the model, which can misclassify it again and loop.
+      let kindOverride: string | null = null
 
-      if (result.proposal.kind === 'propose_meal_addition' && result.proposal.rawArgs) {
+      if (result.proposal.kind === 'propose_meal_swap' && result.proposal.rawArgs) {
+        // The client chooses the target, not the server — see
+        // meal-swap-proposal.ts. `mealOptionsSeen` is what makes "you've seen
+        // the lot" a fact rather than a guess: it is every option this
+        // conversation has actually put in front of them for this slot.
+        const swap = await buildMealSwapProposal({
+          rawArgs: result.proposal.rawArgs,
+          profileId: profile.id,
+          alreadySeen: mealOptionsSeenRef.current[result.proposal.rawArgs.meal_slot as MealSlotName] ?? [],
+        })
+        if (swap.ok) {
+          built = { scopeKey: swap.scopeKey, preconditions: swap.preconditions, payload: swap.payload as unknown as Record<string, unknown>, diff: swap.diff }
+          noteMealOptionSeen(swap.payload.slot, swap.payload.chooseName)
+          noteMealOptionSeen(swap.payload.slot, swap.payload.currentName)
+        } else if (swap.exhausted) {
+          // Ashley's ruling: offer, never do it for them — generating costs
+          // money. The card is the offer; Confirm is the only thing that
+          // spends anything, and their existing options are kept either way.
+          const { slot: exSlot, poolSize } = swap.exhausted
+          kindOverride = 'propose_meal_pool_refresh'
+          built = {
+            scopeKey: `${profile.id}:propose_meal_pool_refresh:${exSlot}`,
+            preconditions: { slot: exSlot, poolSizeAtOffer: poolSize },
+            payload: { slot: exSlot },
+            diff: {
+              rows: [{ field: `${exSlot} options`, before: `${poolSize} saved`, after: `${poolSize} saved, plus new ones` }],
+              implications: [
+                { severity: 'info', text: 'Your current options are kept — these are added alongside them.' },
+                { severity: 'info', text: 'Takes a few seconds while I put them together.' },
+              ],
+              rationale: swap.reason,
+              reversible: false,
+            },
+          }
+        } else {
+          refusal = swap.reason
+        }
+      } else if (result.proposal.kind === 'propose_meal_addition' && result.proposal.rawArgs) {
         // The verification gate for a user-requested dish. buildMealAddition-
         // Proposal runs it through verifyProposal — the same function every
         // generated meal passes — so an allergen, an unmeasurable ingredient
@@ -1797,10 +1864,11 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         return { text: refusal ?? "I couldn't find that on your current plan — it may have changed since you last looked." }
       }
 
+      const proposalKind = kindOverride ?? result.proposal.kind
       const row = await createPendingAction({
         profileId: profile.id,
-        actionClass: APPEND_PROPOSAL_KINDS.has(result.proposal.kind) ? 'append' : 'plan_mutation',
-        kind: result.proposal.kind,
+        actionClass: APPEND_PROPOSAL_KINDS.has(proposalKind) ? 'append' : 'plan_mutation',
+        kind: proposalKind,
         scopeKey: built.scopeKey,
         preconditions: built.preconditions,
         payload: built.payload,
@@ -2183,6 +2251,23 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         })
       }
       undoToken = ok ? row.id : undefined
+    } else if (row.kind === 'propose_meal_pool_refresh') {
+      const slot = (row.payload as { slot: MealSlotName }).slot
+      const result = await onFindMoreMealOptions(slot)
+      const ok = result.added.length > 0
+      if (ok) {
+        // The new options join the pool, so "you've seen them all" is
+        // genuinely over — clearing the record is what lets the next swap
+        // propose one of them instead of re-offering the refresh forever.
+        mealOptionsSeenRef.current[slot] = []
+      }
+      receipt = ok
+        ? { landed: result.added.map(n => `${slot}: + ${n}`), failed: [] }
+        : { landed: [], failed: [{ op: 'propose_meal_pool_refresh', error: result.error ?? `Couldn't find any new ${slot} options that fit your targets` }] }
+      title = ok ? `${result.added.length} new option${result.added.length === 1 ? '' : 's'}` : "Couldn't find new options"
+      rows = ok ? result.added.map(n => ({ label: slot, detail: n })) : []
+      // No undo: generating already cost a model call, and undoing would only
+      // delete options the user can ignore for free.
     } else if (row.kind === 'propose_meal_addition') {
       const payload = row.payload as unknown as MealAdditionPayload
       const result = await executeMealAddition(profile.id, payload)
