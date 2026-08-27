@@ -43,6 +43,8 @@ interface ExercisePlanProps {
   plan: WorkoutDay[]
   mesocycle?: MesocycleWeek[]
   exclusions: string[]
+  /** Soft likes/dislikes — floats liked swaps up, sinks disliked ones. Removes nothing. */
+  softExercisePreferences?: { liked: string[]; disliked: string[] }
   profile?: UserProfile
   profileId?: string
   planCreatedAt?: string
@@ -291,7 +293,7 @@ function WarmupSection({ warmup, open, onToggle }: { warmup: WorkoutDay['warmup'
   )
 }
 
-export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, onSwapExercise, onBanExercise, onOpenHistory }: ExercisePlanProps) {
+export function ExercisePlan({ plan, mesocycle, exclusions, softExercisePreferences, profile, profileId, onSwapExercise, onBanExercise, onOpenHistory }: ExercisePlanProps) {
   // generateMesocycle produces 4 weeks PER BLOCK, not 4 weeks total — a
   // hypertrophy sequence alone is 4 blocks (16 weeks). Falling back to 4 only
   // applies before the mesocycle has loaded.
@@ -353,7 +355,7 @@ export function ExercisePlan({ plan, mesocycle, exclusions, profile, profileId, 
   }
 
   const replacements = swapDialog && profile
-    ? getReplacementCandidates(swapDialog.exerciseName, profile, exclusions)
+    ? getReplacementCandidates(swapDialog.exerciseName, profile, exclusions, softExercisePreferences)
     : []
   const INITIAL_REPLACEMENTS_SHOWN = 4
   const visibleReplacements = showAllReplacements ? replacements : replacements.slice(0, INITIAL_REPLACEMENTS_SHOWN)

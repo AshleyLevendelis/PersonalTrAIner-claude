@@ -31,12 +31,15 @@ export function SwapDialog({
   onClose,
   profile,
   exclusions,
+  softExercisePreferences,
   onConfirm,
 }: {
   target: SwapTarget | null
   onClose: () => void
   profile?: UserProfile
   exclusions: string[]
+  /** Soft likes/dislikes — floats liked swaps up, sinks disliked ones. Removes nothing. */
+  softExercisePreferences?: { liked: string[]; disliked: string[] }
   onConfirm: (exIndex: number, dayName: string, newExercise: ExerciseEntry, scope: SwapScope) => Promise<void>
 }) {
   const [pendingSwap, setPendingSwap] = useState<ExerciseEntry | null>(null)
@@ -57,7 +60,7 @@ export function SwapDialog({
   }
 
   const replacements = target && profile
-    ? getReplacementCandidates(target.exerciseName, profile, exclusions)
+    ? getReplacementCandidates(target.exerciseName, profile, exclusions, softExercisePreferences)
     : []
   const INITIAL_SHOWN = 4
   const visibleReplacements = showAllReplacements ? replacements : replacements.slice(0, INITIAL_SHOWN)

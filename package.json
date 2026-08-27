@@ -58,6 +58,7 @@
     "test:onboarding-conversational": "tsx scripts/test-onboarding-conversational.ts",
     "test:onboarding-style": "tsx scripts/test-onboarding-conversation-style.ts",
     "test:week-load-consistency": "tsx scripts/test-week-load-consistency.ts",
+    "test:soft-preferences": "tsx scripts/test-soft-preferences.ts",
     "test:onboarding-exercise-dislikes": "tsx scripts/test-onboarding-exercise-dislikes.ts",
     "test:option-icons": "tsx scripts/test-option-icons.ts",
     "test:table-names": "tsx scripts/test-table-names.ts",

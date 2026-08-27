@@ -24,6 +24,8 @@ interface ExerciseTabProps {
   plan: WorkoutDay[]
   mesocycle?: MesocycleWeek[]
   exclusions: string[]
+  /** Soft likes/dislikes — reorders the swap list, removes nothing. */
+  softExercisePreferences?: { liked: string[]; disliked: string[] }
   profile?: UserProfile
   profileId?: string
   planCreatedAt?: string
@@ -42,6 +44,7 @@ export function ExerciseTab({
   plan,
   mesocycle,
   exclusions,
+  softExercisePreferences,
   profile,
   profileId,
   planCreatedAt,
@@ -97,6 +100,7 @@ export function ExerciseTab({
           plan={plan}
           mesocycle={mesocycle}
           exclusions={exclusions}
+          softExercisePreferences={softExercisePreferences}
           profile={profile}
           profileId={profileId}
           planCreatedAt={planCreatedAt}
@@ -140,6 +144,7 @@ export function ExerciseTab({
         onClose={() => setSwapTarget(null)}
         profile={profile}
         exclusions={exclusions}
+        softExercisePreferences={softExercisePreferences}
         onConfirm={handleConfirmSwap}
       />
       <PlateCalculator

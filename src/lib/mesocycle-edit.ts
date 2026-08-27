@@ -24,13 +24,41 @@ import { prescribeLoad, type LoadPrescription } from './load-prescription'
 export type SwapScope = 'today' | 'permanent'
 
 /** Constraint-filtered, ranked candidates for swapping OUT `exerciseName` — the same pool equipment/injury/style/skill filtering that generation itself uses. */
+/**
+ * @param soft  Soft exercise likes/dislikes — a LEAN, not a ban. Liked
+ *   movements float toward the top of the swap list, disliked ones sink; the
+ *   set of candidates is identical either way. This is the only place they
+ *   are allowed to act: VISION-ARCHITECTURE.md §1.2 scopes soft exercise
+ *   preferences to `getReplacementCandidates` and explicitly leaves rotation
+ *   unaffected, and the doc records why (threading a ranker into
+ *   `rotateVariation` means changing two exported signatures, generateMesocycle's
+ *   parameter list, and the audit's independent copies).
+ *
+ *   compileSoftExercisePreferences existed for this and had ZERO call sites —
+ *   its own comment said "scoped to swap-candidate ranking only
+ *   (mesocycle-edit.getReplacementCandidates)", describing a wiring that was
+ *   never done. Optional so the callers with no memory to hand (the audit,
+ *   plan-adaptations' internal sweeps) keep their existing behaviour exactly.
+ */
 export function getReplacementCandidates(
   exerciseName: string,
   profile: UserProfile,
   exclusions: string[],
+  soft?: { liked: string[]; disliked: string[] },
 ): { exercise: ExerciseEntry; note: string }[] {
   const pool = getConstrainedPool(profile, exclusions)
-  return getSmartReplacements(exerciseName, pool, profile.training_experience || 'novice', exclusions)
+  const candidates = getSmartReplacements(exerciseName, pool, profile.training_experience || 'novice', exclusions)
+  if (!soft || (soft.liked.length === 0 && soft.disliked.length === 0)) return candidates
+  // Stable partition, never a filter: a disliked movement stays offered — it
+  // is a lean, and someone who asks for a swap may still want it. Order is
+  // preserved within each band so the ranker underneath still decides.
+  const liked = new Set(soft.liked)
+  const disliked = new Set(soft.disliked)
+  const rank = (name: string) => (liked.has(name) ? 0 : disliked.has(name) ? 2 : 1)
+  return candidates
+    .map((c, i) => ({ c, i, r: rank(c.exercise.name) }))
+    .sort((a, b) => a.r - b.r || a.i - b.i)
+    .map(x => x.c)
 }
 
 function parseRepsHigh(reps: string): number | null {

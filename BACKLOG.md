@@ -2,6 +2,14 @@
 
 Newest first. One line each.
 
+- [x] **THE SOFT PREFERENCES ARE READ BY SOMETHING NOW** — they were compiled and read by nothing. "I prefer chicken to fish", "not a fan of burpees but I'll do them" were recorded, compiled by `compileSoftExercisePreferences`, and had **zero call sites** outside the file defining them. The comment above it said *"scoped to swap-candidate ranking only (mesocycle-edit.getReplacementCandidates)"* — describing a consumer that did not exist. A truthful-looking comment over dead code is how the next person gets misled, which is exactly what happened when the capture trace first read it.
+
+- [x] NOT A NEW DECISION — VISION-ARCHITECTURE.md §1.2 already ruled it: soft exercise dislike/like → *"ranking"*, *"scoped to `getReplacementCandidates` only"*, rotation explicitly unaffected (the doc even records why rotation is out of reach — threading a ranker through `rotateVariation` means changing two exported signatures, `generateMesocycle`'s parameter list, and the audit's independent copies). Wiring it executes that ruling rather than inventing one.
+
+- [x] **IT REORDERS, IT NEVER REMOVES, and that is the line the gate defends.** A lean is not a ban: a movement someone is lukewarm about sinks to the bottom of the swap list and is **still offered**, because they may well pick it anyway. A hard dislike is a different channel entirely — it becomes an exclusion — and `test:soft-preferences` asserts a hard fact can never leak into ranking, where it would leave a banned movement on the menu. Proven to bite: making a soft dislike filter instead of sink turns two checks red.
+
+- [ ] **THE FOOD HALF IS STILL UNREAD.** `compileSoftFoodPreferences` has the same zero call sites, and §1.2 says it belongs in `assembleDay` candidate scoring. Not done here — meal generation is a different subsystem and deserves its own pass rather than being tacked onto an exercise change.
+
 - [x] **`test:audit` IS BACK TO 0 / 13,967** — the two `rotation_relative_load` failures Ashley chose to ship around are fixed. But the audit's description of them was wrong, and the real defect is both simpler and a hundred times larger.
 
 - [x] **THE SAME LIFT, IN THE SAME WEEK, WITH IDENTICAL SETS/REPS/RPE, WAS PRESCRIBED TWO DIFFERENT WEIGHTS.** Not a rotation problem at all. `Calf Raises 3×15-20 @ RPE 6-7` came out at **12.5kg on one day and 20kg on another in the same week** — a user opening the app has no way to tell which is right. The audit only compares consecutive weeks at the same slot INDEX, so it saw just the 2 cases where the second instance happened to land in a slot that changed hands. **Measured across the audit's own 4×4×4 sweep: 202 of 1,536 lift-weeks, not 2.**

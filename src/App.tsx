@@ -43,7 +43,7 @@ import { getRevealSpeed, saveRevealSpeed, DEFAULT_REVEAL_SPEED, type RevealSpeed
 import { InsightBanner } from '@/components/ui/insight-banner'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { getActiveFacts, getActiveGoals, getActiveContextFacts, createFact, createContextFact, createGoal, type UserFactRow, type UserGoalRow, type UserContextFactRow } from '@/lib/memory-store'
-import { compileExerciseExclusions, compileFoodDislikes, compileTimingRules, resolveFoodTarget, resolveExerciseTarget } from '@/lib/fact-compiler'
+import { compileExerciseExclusions, compileFoodDislikes, compileTimingRules, compileSoftExercisePreferences, resolveFoodTarget, resolveExerciseTarget } from '@/lib/fact-compiler'
 import { getAllItems as getAllGroceryItems, flushPending as flushGroceryPending, type GroceryItemRow } from '@/lib/grocery-store'
 import { flushPending as flushSetLogPending } from '@/lib/set-log-store'
 import { flushPending as flushWaterPending } from '@/lib/water-store'
@@ -185,6 +185,11 @@ function App() {
     setGroceryItems(await getAllGroceryItems(profileId))
   }
   const compiledExerciseExclusions = compileExerciseExclusions(memoryFacts)
+  // A LEAN, not a ban — "not a fan of burpees but I'll do them". Reorders the
+  // swap list only (VISION-ARCHITECTURE.md §1.2 scopes soft exercise
+  // preferences to getReplacementCandidates and leaves rotation alone), so
+  // nothing is removed from the plan and nothing is removed from the offer.
+  const compiledSoftExercisePreferences = compileSoftExercisePreferences(memoryFacts)
   const compiledFoodDislikes = compileFoodDislikes(memoryFacts)
   const compiledTimingRules = compileTimingRules(memoryFacts)
   // user_facts is now the ONLY source for hard exercise/food dislikes —
@@ -1872,6 +1877,7 @@ function App() {
               plan={exercisePlan}
               mesocycle={mesocycle}
               exclusions={effectiveExclusions}
+              softExercisePreferences={compiledSoftExercisePreferences}
               profile={profile ?? undefined}
               profileId={profile?.id}
               planCreatedAt={mesocycleCreatedAt ?? profile?.created_at}

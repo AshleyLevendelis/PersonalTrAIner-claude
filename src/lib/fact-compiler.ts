@@ -67,7 +67,7 @@ export function compileExerciseExclusions(facts: UserFactRow[]): string[] {
   return [...new Set(hard.flatMap(f => f.resolved_refs ?? []))]
 }
 
-/** Soft exercise likes/dislikes → NOT the exclusions channel. Scoped to swap-candidate ranking only (mesocycle-edit.getReplacementCandidates), per the vision doc's §1.2 resolution — rotation itself is unaffected. */
+/** Soft exercise likes/dislikes → NOT the exclusions channel. Scoped to swap-candidate ranking only (mesocycle-edit.getReplacementCandidates's `soft` parameter), per the vision doc's §1.2 resolution — rotation itself is unaffected. This claim was untrue for a while: the consumer it names did not exist, so the function was compiled and read by nothing. */
 export function compileSoftExercisePreferences(facts: UserFactRow[]): { liked: string[]; disliked: string[] } {
   const liked = preferenceFacts(facts, 'exercise_preference', 'like', 'soft')
   const disliked = preferenceFacts(facts, 'exercise_preference', 'dislike', 'soft')
