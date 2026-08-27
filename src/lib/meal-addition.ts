@@ -93,8 +93,21 @@ function explainRejection(log: string[], dishName: string, slot: MealSlotName): 
   const line = log[log.length - 1] ?? ''
 
   if (/diet violation/i.test(line)) {
-    const detail = line.split('—').slice(1).join('—').trim()
-    return `I can't add ${dishName} — it clashes with what you've told me you avoid${detail ? ` (${detail})` : ''}. Give me a version without it and I'll add that instead.`
+    // The log line reads: ... diet violation(s) — "chicken breast" is tagged
+    // contains_meat, which vegetarian forbids. That is written for someone
+    // reading a generation run; a user must never be shown "tagged
+    // contains_meat". Pull out the FOODS and the RESTRICTION and say it in
+    // English, falling back to the plain sentence if the shape ever changes.
+    const detail = line.split('—').slice(1).join('—')
+    const foods = [...detail.matchAll(/"([^"]+)"/g)].map(m => m[1])
+    const restriction = /which ([a-z-]+) forbids/i.exec(detail)?.[1]
+    const foodList = foods.length > 0
+      ? foods.slice(0, 3).join(', ').replace(/, ([^,]*)$/, ' and $1')
+      : null
+    if (foodList) {
+      return `I can't add ${dishName} — it's got ${foodList} in it${restriction ? `, and you've told me you're ${restriction.replace(/-free$/, '-free')}` : ", which is on your avoid list"}. Give me a version without it and I'll add that instead.`
+    }
+    return `I can't add ${dishName} — it clashes with what you've told me you avoid. Give me a version without it and I'll add that instead.`
   }
   if (/unrecognised dietary restriction/i.test(line)) {
     return `Something's wrong with the dietary restrictions saved on your profile, so I can't safely check ${dishName} against them. Worth fixing those in Profile first — I'd rather stop than guess.`

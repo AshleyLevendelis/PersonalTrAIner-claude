@@ -72,7 +72,7 @@ export async function buildMealSwapProposal(input: BuildMealSwapInput): Promise<
   if (!chosen) {
     return {
       ok: false,
-      reason: `That's the only ${slot} I've got saved for you.`,
+      reason: `That's the only ${slot} I've got saved for you. Want me to go and find you some more?`,
       exhausted: { slot, poolSize: options.length },
     }
   }

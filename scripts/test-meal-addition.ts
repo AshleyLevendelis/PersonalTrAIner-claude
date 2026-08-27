@@ -54,7 +54,7 @@ const CLEAN_DINNER = {
 // The DIET branch of explainRejection, and only that branch. Asserting on the
 // generic "I couldn't add that" would pass for a dish rejected on coverage,
 // which is exactly the false green this section exists to avoid.
-const DIET_REFUSAL = /clashes with what you've told me you avoid/
+const DIET_REFUSAL = /clashes with what you've told me you avoid|it's got .* in it/
 
 console.log('\n1. THE SAFETY SECTION: every dietary preference is enforced on a user-requested dish')
 {
@@ -90,6 +90,14 @@ console.log('\n1. THE SAFETY SECTION: every dietary preference is enforced on a 
       continue
     }
     check(`${pref}: ${offender.name} refused, and refused as a diet clash`, DIET_REFUSAL.test(result.reason), result.reason)
+    // Ashley reads this app on a phone, not in a log viewer. verifyProposal's
+    // own reject line says `"chicken breast" is tagged contains_meat, which
+    // vegetarian forbids` — written for someone reading a generation run. If
+    // that leaks through untranslated, a user is shown a tag name.
+    check(`${pref}: ...in English, with no tag names in it`,
+      !/tagged|contains_|is_high_carb|is_refined_sugar|is_grain|is_legume|rejectLog|\[dinner\]/.test(result.reason), result.reason)
+    check(`${pref}: ...and it names the food so they can ask for it without`,
+      result.reason.toLowerCase().includes(offender.name.toLowerCase().split(' ')[0]), result.reason)
   }
   check('every preference with forbidden tags had a food to test with', uncovered.length === 0, uncovered)
   // Named out loud rather than silently skipped: a preference that enforces
