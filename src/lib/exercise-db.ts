@@ -2929,7 +2929,26 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     joint_stress: 'low',
     form_cues: ['Back flat on floor', 'Extend opposite arm and leg', 'Maintain low-back contact', 'Exhale on extension'],
     coach_note_swap: 'Teaches anti-extension with zero spinal load — excellent for back pain.',
-    loads_joints: [],
+    // Declares the joint it treats. test:rehab-prescribed §6 requires this —
+    // "every indicated movement records the joint it loads, honestly" — and
+    // caught these three when they claimed to be back rehab while recording
+    // that they load nothing.
+    //
+    // The explicit empty contraindicated_joints is NOT redundant: that getter
+    // is `contraindicated_joints ?? loads_joints`, so naming the joint here
+    // without it would mark the movement DANGEROUS for the very joint it
+    // treats. Same trap as 31b05d7, running the other way.
+    loads_joints: ['lower_back_axial'],
+    contraindicated_joints: [],
+    // The note directly above has always said "excellent for back pain" and
+    // nothing acted on it: indicated_joints was the field that would have,
+    // and it was empty, so a trainee who reported a bad back was never
+    // deliberately given this. Tagged now.
+    //
+    // lower_back_axial, NOT lower_back. INJURED_JOINTS (exercise-plan.ts:499)
+    // maps the injury CODE `lower_back` to the joint TAG `lower_back_axial`;
+    // tagging the code here would match nothing and read as done.
+    indicated_joints: ['lower_back_axial'],
     style_tags: ['functional', 'combat', 'hybrid'],
     substitution_group: 'core_stability',
     unilateral: false,
@@ -3042,6 +3061,140 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     avg_duration_seconds: 28,
   },
   {
+    // -----------------------------------------------------------------------
+    // HIP REHAB. Four entries written rather than tagged, and the reason is
+    // mechanical: pickRehabMovement excludes tier2_compound outright (Ashley's
+    // ruling — "a Spanish Squat is leg day arriving uninvited"), and every hip
+    // movement the catalogue already owned is tier2_compound. Glute Bridge,
+    // Hip Thrust, Step-Ups: tagging any of them would have been a no-op that
+    // read as a fix. The only non-tier2 hip_hinge entries are Deadlifts and
+    // Trap Bar Deadlift, both contraindicated for an injured hip.
+    //
+    // So a bad hip had NOTHING the guaranteed rehab slot could reach for:
+    // measured at 0 of 576 training days, 144 of 144 plans with no hip work
+    // at all, before these existed.
+    //
+    // ACTIVATION PRIMERS, matching the seven shoulder-rehab entries exactly
+    // rather than inventing a shape. pickRehabMovement prefers the primer
+    // tier when any indicated primer exists, so these three ARE the hip
+    // rotation; Bird Dog stays tier3 and is deliberately not in it.
+    //
+    // DURATIONS ARE LOAD-BEARING, not decorative. The slot keeps everything
+    // within 1.25x the cheapest indicated movement, so 30/30/32 puts all
+    // three inside one band (30 x 1.25 = 37.5) and it rotates between them.
+    //
+    // All bodyweight or band, so the minimalist and bodyweight tiers get them
+    // too; a hip is not only injured in a commercial gym.
+    // -----------------------------------------------------------------------
+    name: 'Clamshell',
+    id: 'clamshell',
+    movement_pattern: 'activation',
+    mechanics_tier: 'primer',
+    prescription_type: 'reps',
+    angle_vector: 'lateral',
+    primary_muscles: ['glute medius', 'glute minimus', 'external rotators'],
+    equipment: ['bodyweight', 'resistance band'],
+    equipment_alternatives: true,
+    joint_stress: 'low',
+    form_cues: ['Lie on your side, knees bent about 45 degrees', 'Heels together throughout', 'Open the top knee slowly', 'Do not let the hips roll back'],
+    coach_note_swap: 'Wakes up the glute medius without loading the hip joint through range.',
+    loads_joints: ['hip'],
+    contraindicated_joints: [],
+    indicated_joints: ['hip'],
+    style_tags: ['functional', 'hybrid', 'bodybuilding'],
+    substitution_group: 'conditioning',
+    unilateral: true,
+    avg_duration_seconds: 30,
+    // A primer with no affinity is never selected by getAffinityPrimerPool
+    // (`.some()` over an empty array is false), so it would exist only for
+    // the rehab slot and be dead weight everywhere else. Lower-body days.
+    primer_pattern_affinity: ['hip_hinge', 'knee_dominant', 'single_leg'],
+  },
+  {
+    name: 'Side-Lying Hip Abduction',
+    id: 'side-lying-hip-abduction',
+    movement_pattern: 'activation',
+    mechanics_tier: 'primer',
+    prescription_type: 'reps',
+    angle_vector: 'lateral',
+    primary_muscles: ['glute medius', 'tensor fasciae latae'],
+    equipment: ['bodyweight'],
+    joint_stress: 'low',
+    form_cues: ['Lie on your side, bottom knee bent for balance', 'Top leg straight, lift to about 30 degrees', 'Lead with the heel, not the toes', 'Lower under control — do not drop it'],
+    coach_note_swap: 'Straight-leg abduction with body weight only — the standard lateral hip drill.',
+    loads_joints: ['hip'],
+    contraindicated_joints: [],
+    indicated_joints: ['hip'],
+    style_tags: ['functional', 'hybrid', 'bodybuilding'],
+    substitution_group: 'conditioning',
+    unilateral: true,
+    avg_duration_seconds: 30,
+    // A primer with no affinity is never selected by getAffinityPrimerPool
+    // (`.some()` over an empty array is false), so it would exist only for
+    // the rehab slot and be dead weight everywhere else. Lower-body days.
+    primer_pattern_affinity: ['hip_hinge', 'knee_dominant', 'single_leg'],
+  },
+  {
+    name: 'Standing Band Hip Abduction',
+    id: 'standing-band-hip-abduction',
+    movement_pattern: 'activation',
+    mechanics_tier: 'primer',
+    prescription_type: 'reps',
+    angle_vector: 'lateral',
+    primary_muscles: ['glute medius', 'glute minimus'],
+    equipment: ['resistance band'],
+    joint_stress: 'low',
+    form_cues: ['Band around both ankles', 'Stand tall, hold something for balance', 'Take the working leg out to the side', 'Keep the standing hip level — do not lean away'],
+    coach_note_swap: 'Loads the lateral hip standing up, which is how it actually has to work.',
+    loads_joints: ['hip'],
+    contraindicated_joints: [],
+    indicated_joints: ['hip'],
+    style_tags: ['functional', 'hybrid', 'bodybuilding'],
+    substitution_group: 'conditioning',
+    unilateral: true,
+    avg_duration_seconds: 32,
+    // A primer with no affinity is never selected by getAffinityPrimerPool
+    // (`.some()` over an empty array is false), so it would exist only for
+    // the rehab slot and be dead weight everywhere else. Lower-body days.
+    primer_pattern_affinity: ['hip_hinge', 'knee_dominant', 'single_leg'],
+  },
+  {
+    // BOTH JOINTS, and genuinely so — bird dog is a hip-extension drill and
+    // one of McGill's big three for a bad back, which is also why it is
+    // classed with Dead Bug and Side Plank rather than with the three hip
+    // primers above.
+    //
+    // THAT TIER IS NOT COSMETIC. pickRehabMovement takes the primer tier
+    // EXCLUSIVELY when any indicated primer exists. Making this a primer
+    // would put it alone in the lower back's band — no other back movement
+    // is a primer — and the back would get Bird Dog every session forever,
+    // collapsing the Dead Bug / Side Plank rotation this work exists to
+    // create. Staying tier3 keeps the back at a three-way rotation (all
+    // three sit at 45s) and leaves the hip rotation to the primers.
+    //
+    // The band is SHARED ACROSS JOINTS, so a tier or duration chosen for one
+    // joint silently reshapes what stays eligible for the other. That is why
+    // both rotations get measured after the fact rather than reasoned about.
+    name: 'Bird Dog',
+    id: 'bird-dog',
+    movement_pattern: 'core',
+    mechanics_tier: 'tier3_isolation',
+    prescription_type: 'reps',
+    angle_vector: 'anti_extension',
+    primary_muscles: ['glute max', 'erector spinae', 'transverse abdominis'],
+    equipment: ['bodyweight'],
+    joint_stress: 'low',
+    form_cues: ['On hands and knees, spine neutral', 'Extend opposite arm and leg', 'Keep the hips square to the floor', 'Move slowly — no arching the low back'],
+    coach_note_swap: 'Hip extension and anti-rotation together, with no load on the spine.',
+    loads_joints: ['hip', 'lower_back_axial'],
+    contraindicated_joints: [],
+    indicated_joints: ['hip', 'lower_back_axial'],
+    style_tags: ['functional', 'combat', 'hybrid'],
+    substitution_group: 'core_stability',
+    unilateral: true,
+    avg_duration_seconds: 45,
+  },
+  {
     name: 'Side Plank',
     id: 'side-plank',
     movement_pattern: 'core',
@@ -3053,7 +3206,14 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     joint_stress: 'low',
     form_cues: ['Elbow under shoulder', 'Hips stacked', 'Body forms straight line', 'Hold position steadily'],
     coach_note_swap: 'Anti-lateral flexion hold targeting oblique and hip stability.',
-    loads_joints: [],
+    loads_joints: ['lower_back_axial'],
+    contraindicated_joints: [],
+    // Paired with Dead Bug at the SAME 45s on purpose. pickRehabMovement
+    // keeps everything within 1.25x the cheapest indicated movement, so two
+    // equal durations put both inside the band and the guaranteed slot
+    // rotates between them instead of picking one movement for sixteen
+    // weeks (the 576/576 monotony documented at exercise-plan.ts:1650).
+    indicated_joints: ['lower_back_axial'],
     style_tags: ['functional', 'combat', 'hybrid'],
     substitution_group: 'core_stability',
     unilateral: true,
@@ -3595,6 +3755,37 @@ export function getSmartReplacements(
  */
 export function contraindicatedJoints(entry: ExerciseEntry): string[] {
   return entry.contraindicated_joints ?? entry.loads_joints
+}
+
+/**
+ * Plain English for a joint tag, for anything a trainee reads.
+ *
+ * The tags are internal strings and one of them is not a phrase: rendering
+ * `lower_back_axial` by swapping underscores for spaces produces "lower back
+ * axial", which is what the two injury sentences in exercise-plan.ts did.
+ * That was ALREADY SHIPPING on the contraindication branch — anyone with a
+ * bad back looking at a conflicting exercise read "Loads your lower back
+ * axial — you've flagged an injury there." It is not a new bug, it is one
+ * this work would have doubled.
+ *
+ * Same rule as the meal refusals: the trainee sees English, never a tag name.
+ * Unknown tags fall back to the underscore swap, which is right for every
+ * single-word joint (`hip`, `knee`, `wrist`) and keeps a newly added tag
+ * readable rather than blank.
+ */
+const JOINT_DISPLAY_NAME: Record<string, string> = {
+  lower_back_axial: 'lower back',
+}
+
+export function jointDisplayName(joint: string): string {
+  return JOINT_DISPLAY_NAME[joint] ?? joint.replace(/_/g, ' ')
+}
+
+/** Several joints, written the way a person would say them: "knee and lower back". */
+export function jointListDisplay(joints: string[]): string {
+  const names = joints.map(jointDisplayName)
+  if (names.length <= 1) return names[0] ?? ''
+  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
 }
 
 /** True when this movement is prep/rehab work FOR one of the flagged joints — it should be actively included, not merely allowed. */

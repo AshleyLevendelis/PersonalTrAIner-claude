@@ -160,10 +160,23 @@ async function main() {
     // transformation before the persistence guard, so this exercises the
     // real production branch without touching a database.
     const { executeLastingInjury } = await import('../src/lib/pending-action-executor')
-    const viaRebuild = await executeLastingInjury(
-      { ...profile, id: undefined } as UserProfile, meso,
-      { injuryCode: 'shoulders', weekNumbers, exclusions: [], mode: 'rebuild' },
-    )
+    // BOTH CALLS RUN UNDER THE SAME SEED, and that is what makes the
+    // comparison below mean anything. executeLastingInjury is NOT
+    // deterministic: two rebuilds of the same mesocycle differ in ~250 of 436
+    // slots purely by shuffle. An unseeded diff therefore "passes" when the
+    // two modes are identical, which is precisely the no-op this section
+    // exists to catch — caught by mutating the substitute call to 'rebuild'
+    // and watching the check stay green.
+    const runSeeded = async (mode: 'rebuild' | 'substitute') => {
+      setRandomSource(seededRngFromKey('injury-rebuild:modes'))
+      try {
+        return await executeLastingInjury(
+          { ...profile, id: undefined } as UserProfile, meso,
+          { injuryCode: 'shoulders', weekNumbers, exclusions: [], mode },
+        )
+      } finally { resetRandomSource() }
+    }
+    const viaRebuild = await runSeeded('rebuild')
     const rebuiltSlots = viaRebuild.mesocycle.flatMap(w => w.days.flatMap(d => d.exercises)).length
     const unsafeWired: string[] = []
     for (const w of viaRebuild.mesocycle) for (const d of w.days) for (const ex of d.exercises) {
@@ -174,13 +187,42 @@ async function main() {
     check('executor rebuild keeps the plan whole', rebuiltSlots >= slotsBefore * 0.8, rebuiltSlots)
     check('executor rebuild is safe for the injury', unsafeWired.length === 0, unsafeWired.slice(0, 5))
 
-    const viaSubstitute = await executeLastingInjury(
-      { ...profile, id: undefined } as UserProfile, meso,
-      { injuryCode: 'shoulders', weekNumbers, exclusions: [], mode: 'substitute' },
-    )
+    const viaSubstitute = await runSeeded('substitute')
     const subSlots = viaSubstitute.mesocycle.flatMap(w => w.days.flatMap(d => d.exercises)).length
     console.log(`     executor(mode=substitute) -> ${subSlots} slots`)
-    check('the two modes genuinely differ (rebuild is not a no-op)', rebuiltSlots > subSlots, { rebuiltSlots, subSlots })
+
+    // THIS USED TO READ `rebuiltSlots > subSlots` AND THAT WAS A PROXY, not
+    // the property. It tested "rebuild is not a no-op" by way of substitute
+    // DROPPING slots it could not safely fill — 436 vs 432. Adding four
+    // bodyweight/band hip movements to the catalogue gave substitution
+    // something safe for those four slots, so both modes now return 436 and
+    // the proxy went stably false while the thing it stood for stayed true.
+    //
+    // The four extra slots are an improvement, not a regression: a
+    // shoulder-injured trainee's substituted plan is fuller than it was. A
+    // check that goes red BECAUSE the app got better is measuring the wrong
+    // thing. Same lesson as test:band-slots' frozen count.
+    //
+    // So compare CONTENT, which is what "genuinely differ" always meant.
+    const namesOf = (m: typeof viaRebuild) =>
+      m.mesocycle.flatMap(w => w.days.flatMap(d => d.exercises.map(e => e.name)))
+    const rNames = namesOf(viaRebuild), sNames = namesOf(viaSubstitute)
+    // Compared over the COMMON PREFIX only. The two modes legitimately return
+    // different lengths, and counting positions past the shorter array as
+    // "different" (they compare against undefined) would inflate the number
+    // with something that is not a content difference at all.
+    const common = Math.min(rNames.length, sNames.length)
+    const positionsDiffer = rNames.slice(0, common).filter((n, i) => n !== sNames[i]).length
+    const rSet = new Set(rNames), sSet = new Set(sNames)
+    const onlyRebuild = [...rSet].filter(n => !sSet.has(n))
+    check(`the two modes genuinely differ (${positionsDiffer} of ${common} shared slots hold a different exercise)`,
+      positionsDiffer > common * 0.1, { positionsDiffer, common, rLen: rNames.length, sLen: sNames.length })
+    check(`...and rebuild reaches exercises substitution never does (${onlyRebuild.slice(0, 3).join(', ')})`,
+      onlyRebuild.length > 0, onlyRebuild.slice(0, 5))
+    // The old proxy's real content, kept as an assertion that cannot invert:
+    // substitution must never come back EMPTIER than it used to be able to.
+    check(`substitution still fills the plan (${subSlots} slots, was 432 before hip work existed)`,
+      subSlots >= 432, { subSlots })
   }
 
   if (failures > 0) { console.error(`\n${failures} check(s) FAILED.`); process.exit(1) }

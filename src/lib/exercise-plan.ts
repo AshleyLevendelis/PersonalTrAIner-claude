@@ -4,7 +4,7 @@ import type {
   FatigueCost, MesocycleMovementPattern, EquipmentAccess, TrainingStyle,
   ConstraintTrace, ConstraintTraceEntry, PlanResult, TrainingExperience,
 } from './types'
-import { EXERCISE_DATABASE, getMovementFamily, getVolumeRole, meetsCapabilityRequirement, getExerciseId, contraindicatedJoints, isContraindicatedFor, isIndicatedFor, isBandEquipped, NEAREST_PATTERN_FALLBACK, type ExerciseEntry, type MovementPattern, type AngleVector, type VolumeRole } from './exercise-db'
+import { EXERCISE_DATABASE, getMovementFamily, getVolumeRole, meetsCapabilityRequirement, getExerciseId, contraindicatedJoints, isContraindicatedFor, isIndicatedFor, isBandEquipped, jointListDisplay, NEAREST_PATTERN_FALLBACK, type ExerciseEntry, type MovementPattern, type AngleVector, type VolumeRole } from './exercise-db'
 import {
   getExperienceConfig, getSkillDemand, isSkillAppropriate, applyRepFloor,
   type ExperienceConfig,
@@ -3937,11 +3937,11 @@ export function getExerciseCompatibilityWarnings(
   // happened to pick. "Good for" is true in both cases and needs no
   // provenance threaded down here to stay true.
   if (isIndicatedFor(exercise, flaggedJoints)) {
-    warnings.push(`Good for your ${(exercise.indicated_joints ?? []).join(', ').replace(/_/g, ' ')} — keep it light and controlled.`)
+    warnings.push(`Good for your ${jointListDisplay(exercise.indicated_joints ?? [])} — keep it light and controlled.`)
   } else {
     const conflictingJoints = contraindicatedJoints(exercise).filter(j => flaggedJoints.has(j))
     if (conflictingJoints.length > 0) {
-      warnings.push(`Loads your ${conflictingJoints.join(', ').replace(/_/g, ' ')} — you've flagged an injury there.`)
+      warnings.push(`Loads your ${jointListDisplay(conflictingJoints)} — you've flagged an injury there.`)
     }
   }
 

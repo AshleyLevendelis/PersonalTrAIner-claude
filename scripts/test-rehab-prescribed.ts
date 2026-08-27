@@ -35,6 +35,18 @@ import { scorePlan } from '../src/lib/quality-score'
 import { seededRngFromKey } from '../src/lib/seeded-random'
 import type { UserProfile, WorkoutDay } from '../src/lib/types'
 
+/**
+ * Every injury the catalogue can actually prescribe FOR. Was a repeated
+ * ['shoulders','knees'] literal in six loops, which is how hips and the lower
+ * back stayed untested after they were given rehab of their own — six places
+ * to update, and the gate would have gone on passing had any been missed.
+ *
+ * Named once so adding a joint's rehab reaches every section at the same
+ * time. The four still absent (ankle, elbow, wrist, neck) belong here the day
+ * they get any indicated work.
+ */
+const REHAB_INJURIES = ['shoulders', 'knees', 'hips', 'lower_back'] as const
+
 let failures = 0
 const check = (name: string, ok: boolean, detail = '') => {
   if (ok) console.log(`  ✓ ${name}`)
@@ -78,7 +90,7 @@ const EQUIP = ['full_gym', 'home_gym', 'minimalist', 'bodyweight'] as const
 // ---------------------------------------------------------------------------
 console.log('\n1. Every session carries the joint\'s own rehab work')
 // ---------------------------------------------------------------------------
-for (const injury of ['shoulders', 'knees'] as const) {
+for (const injury of REHAB_INJURIES) {
   const flagged = getFlaggedJoints([injury])
   let days = 0
   const misses: string[] = []
@@ -112,7 +124,7 @@ console.log('\n2. Gentlest means gentlest — the guaranteed slot stays small')
   // rehab picker reaches for, not what a plan may contain.
   const TOO_BIG = ['Spanish Squat', 'Wall Sit', 'Step-Down (Eccentric)', 'Low Box Step-Up']
   const picked = new Set<string>()
-  for (const injury of ['shoulders', 'knees'] as const) {
+  for (const injury of REHAB_INJURIES) {
     const flagged = getFlaggedJoints([injury])
     for (const style of STYLES) {
       for (const equipment_access of EQUIP) {
@@ -149,7 +161,7 @@ console.log('\n2b. The guaranteed slot never doubles up on the warm-up')
   // stopped `main` colliding with rehab and said nothing about the primer.
   const dupes: string[] = []
   let days = 0
-  for (const injury of ['shoulders', 'knees'] as const) {
+  for (const injury of REHAB_INJURIES) {
     for (const split of SPLITS) {
       for (const style of STYLES) {
         for (const equipment_access of EQUIP) {
@@ -174,7 +186,7 @@ console.log('\n2b. The guaranteed slot never doubles up on the warm-up')
 // ---------------------------------------------------------------------------
 console.log('\n3. Rehab rotates across a week rather than repeating')
 // ---------------------------------------------------------------------------
-for (const injury of ['shoulders', 'knees'] as const) {
+for (const injury of REHAB_INJURIES) {
   const flagged = getFlaggedJoints([injury])
   let sawVariety = 0, weeks = 0
   for (const split of SPLITS) {
@@ -202,8 +214,18 @@ console.log('\n4. The over-fire check — nothing fires for an uninjured trainee
   const pool = getConstrainedPool(profile, [])
   check('no flagged joints means no rehab pick at all',
     pickRehabMovement(pool, new Set(), new Set()) === null)
-  check('an unmapped injury code is not a licence to invent one',
-    pickRehabMovement(pool, getFlaggedJoints(['hips']), new Set()) === null)
+  // Used 'hips' as its example of a joint with no rehab until hips was given
+  // some, at which point this went red — correctly, and it is the check
+  // catching its own staleness rather than a regression. Swapped to a code
+  // that is still genuinely empty.
+  //
+  // 'ankles' is the STRONGER case anyway: it maps to a real joint tag (all
+  // eight codes have mapped since 31b05d7) and simply has no indicated work
+  // behind it, so this now asserts the interesting half — a joint the app
+  // knows about but cannot treat must return null rather than reach for
+  // something approximate. Move it on the day ankles gets rehab.
+  check('a mapped joint with no rehab content is not a licence to invent some',
+    pickRehabMovement(pool, getFlaggedJoints(['ankles']), new Set()) === null)
 
   // The real regression risk of the style-filter change: for someone who
   // reported no injury, the new joints argument is an empty set, so the pool
@@ -236,7 +258,7 @@ console.log('\n5. A style preference may not delete a safety response')
   // rehab drill 'bodybuilding'. Full gym left one survivor; home gym,
   // minimalist and bodyweight left zero. MIN_VIABLE_POOL never fired — the
   // pool stayed large, just missing the category that mattered.
-  for (const injury of ['shoulders', 'knees'] as const) {
+  for (const injury of REHAB_INJURIES) {
     const flagged = getFlaggedJoints([injury])
     for (const equipment_access of EQUIP) {
       const profile = buildProfile({ injuries: [injury], training_style: 'bodybuilding', equipment_access })
@@ -265,12 +287,14 @@ console.log('\n6. The data the guarantee rests on')
   check('every indicated movement records the joint it loads, honestly',
     tagged.every(e => (e.indicated_joints ?? []).every(j => e.loads_joints.includes(j))),
     tagged.filter(e => (e.indicated_joints ?? []).some(j => !e.loads_joints.includes(j))).map(e => e.name).join(', '))
-  // Documents the coverage gap rather than asserting it away: five of the
-  // eight injury codes a user can pick have no rehab movements at all, so
-  // this feature is silent for them. Flagged for Ashley, not fixed here.
+  // Documents the coverage gap rather than asserting it away. It read "five
+  // of the eight injury codes have no rehab movements at all"; hips and the
+  // lower back have since been filled, leaving FOUR — ankles, elbows, wrists
+  // and neck — for which this feature is still silent. Flagged for Ashley,
+  // not fixed here.
   console.log(`      joints with rehab movements: ${[...joints].join(', ')} (${tagged.length} entries)`)
-  check('the two joints this feature covers are still covered',
-    joints.has('shoulder') && joints.has('knee'), [...joints].join(', '))
+  check('every joint this feature claims to cover is still covered',
+    ['shoulder', 'knee', 'hip', 'lower_back_axial'].every(j => joints.has(j)), [...joints].join(', '))
 }
 
 // ---------------------------------------------------------------------------
@@ -298,7 +322,7 @@ console.log('\n7. The quality score knows a rehab warm-up is a legitimate second
   }
 
   let injuredClean = 0, injuredTotal = 0
-  for (const injury of ['shoulders', 'knees'] as const) {
+  for (const injury of REHAB_INJURIES) {
     for (const split of SPLITS) {
       injuredTotal++
       const rules = structureRules(buildProfile({ injuries: [injury], workout_split_preference: split }), `qs:${injury}:${split}`)

@@ -107,14 +107,21 @@ console.log('\n3. TRAPDOOR: no other exercise in the database moved')
     hinge_accessory: ["Bodyweight Good Morning", "Glute Bridge", "Good Mornings", "Hip Thrust", "Romanian Deadlifts", "Single-Leg RDL (Bodyweight)"],
     isolation_bicep: ["Band Curl", "Barbell Curls", "Cable Curls", "Dumbbell Curls", "Hammer Curls", "Incline Dumbbell Curls"],
     isolation_calf: ["Calf Raises", "Calf Raises (Bodyweight)", "Seated Calf Raises", "Single-Leg Calf Raise (Bodyweight)", "Single-Leg Dumbbell Calf Raise"],
-    isolation_chest: ["Cable Crossover", "Cable Flyes", "Cable Woodchops", "Dead Bug", "Dumbbell Flyes", "Face Pulls", "Pallof Press", "Pec Deck Machine", "Plank", "Rear Delt Flyes", "Reverse Pec Deck", "Russian Twist", "Side Plank", "Straight-Arm Pulldown", "Wall Sit"],
+    // isolation_chest carries Dead Bug, Plank, Side Plank, Pallof Press, Wall
+    // Sit and now Bird Dog, none of which is a chest movement. That is the
+    // switch's `default:` catching core work (load-prescription.ts:394), and
+    // it PREDATES this table. Verified inert rather than assumed so: every
+    // one of them prescribes "Bodyweight" with starting_weight_kg null, so
+    // the wrong category never becomes a wrong weight. Frozen honestly here —
+    // recorded as it is, not as it ought to be — and logged in BACKLOG.
+    isolation_chest: ["Bird Dog", "Cable Crossover", "Cable Flyes", "Cable Woodchops", "Dead Bug", "Dumbbell Flyes", "Face Pulls", "Pallof Press", "Pec Deck Machine", "Plank", "Rear Delt Flyes", "Reverse Pec Deck", "Russian Twist", "Side Plank", "Straight-Arm Pulldown", "Wall Sit"],
     isolation_hamstring: ["Dumbbell Leg Curl", "Lying Leg Curl", "Nordic Hamstring Curl", "Seated Band Leg Curl", "Seated Leg Curl", "Single-Leg Sliding Leg Curl", "Sliding Leg Curl"],
     isolation_quad: ["Banded Terminal Knee Extension", "Chair Leg Extension", "Leg Extensions", "Seated Short-Arc Quad Set", "Sissy Squat"],
     isolation_shoulder: ["Band Lateral Raise", "Cable Lateral Raises", "Front Raises", "Lateral Raises", "Machine Lateral Raise"],
     isolation_tricep: ["Band Tricep Kickback", "Band Tricep Pushdown", "Overhead Tricep Extension", "Skull Crushers", "Tricep Dips", "Tricep Pushdowns"],
     kettlebell_swing: ["Kettlebell Swing (Heavy)", "Kettlebell Swings"],
     leg_press: ["Hack Squat", "Leg Press"],
-    null: ["Ab Wheel Rollout", "Arm Circles", "Band Dislocates", "Band Face Pulls", "Band Pull-Aparts", "Battle Ropes", "Box Jumps", "Broad Jumps", "Burpees", "Cycling Intervals", "Elliptical", "Hanging Leg Raises", "Jump Rope", "Lateral Step Touches", "Leg Swings", "Medicine Ball Slams", "Mountain Climbers", "Plyo Push-Ups", "Prone Y-T Raises", "Scapular Push-Ups", "Treadmill Intervals", "Wall Slides"],
+    null: ["Ab Wheel Rollout", "Arm Circles", "Band Dislocates", "Band Face Pulls", "Band Pull-Aparts", "Battle Ropes", "Box Jumps", "Broad Jumps", "Burpees", "Clamshell", "Cycling Intervals", "Elliptical", "Hanging Leg Raises", "Jump Rope", "Lateral Step Touches", "Leg Swings", "Medicine Ball Slams", "Mountain Climbers", "Plyo Push-Ups", "Prone Y-T Raises", "Scapular Push-Ups", "Side-Lying Hip Abduction", "Standing Band Hip Abduction", "Treadmill Intervals", "Wall Slides"],
     overhead: ["Arnold Press", "Band Shoulder Press", "Dumbbell Shoulder Press", "Landmine Press", "Overhead Press", "Shoulder Press Machine"],
     overhead_carry: ["Overhead Carry"],
     pulldown: ["Close-Grip Lat Pulldown", "Kneeling Band Lat Pulldown", "Lat Pulldown"],

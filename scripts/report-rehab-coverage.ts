@@ -114,6 +114,13 @@ console.log(`Sweep: ${SPLITS.length} splits x ${STYLES.length} styles x ${EQUIP.
 report('SHOULDER injury (9 movements marked: 7 warm-up tier, 2 isolation)', sweep('shoulders'))
 report('KNEE injury (10 movements marked: 0 warm-up tier, 7 isolation, 3 compound)', sweep('knees'))
 
+// Added when hips and the lower back got rehab of their own. They read 0/0
+// BEFORE that work and are the headline it has to move — kept in the same
+// script as the two that already worked so all four numbers come off one
+// sweep, rather than from a second tool that could drift from this one.
+report('HIP injury (4 marked: 3 activation primers written for this, plus Bird Dog)', sweep('hips'))
+report('LOWER BACK injury (3 marked, all tier3: Dead Bug, Side Plank, Bird Dog)', sweep('lower_back'))
+
 // The over-fire control. An uninjured trainee has no flagged joints, so this
 // must read 0 both before and after the fix — if the AFTER run moves this off
 // zero, the rehab slot is firing for people who never reported an injury.

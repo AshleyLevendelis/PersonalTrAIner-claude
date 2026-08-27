@@ -261,7 +261,14 @@ console.log('\n3. Rehab placements survive untouched')
   // floor on it is what produced three false alarms.
   for (const [code, r] of Object.entries(t.rehab).sort())
     console.log(`    (reported, not asserted) ${code}: rehab reaches a main slot in ${r.mainSlot}/${r.profiles} profiles`)
-  console.log(`    (reported, not asserted) rehab-indicated bands in main slots: ${t.bandIndicated} — was 348, then 340, now 318 since 987531f`)
+  // 348 -> 340 (nine new catalogue entries) -> 318 (987531f, the
+  // equipment-quality preference) -> 315 (four new hip/back rehab entries).
+  // The fourth move is the same benign mechanism as the second: a bigger pool
+  // reshuffles ranked selection. It is REPORTED rather than asserted for
+  // exactly this reason — under the old >= 335 floor this drift would have
+  // turned the gate red a fourth time, while the coverage checks above show
+  // no profile lost anything.
+  console.log(`    (reported, not asserted) rehab-indicated bands in main slots: ${t.bandIndicated} — 348 -> 340 -> 318 -> 315, all four moves benign`)
 
   check(`a knee-injured trainee still gets Spanish Squat (${t.spanishSquatForKnees} placements)`,
     t.spanishSquatForKnees > 0, String(t.spanishSquatForKnees))
@@ -274,19 +281,21 @@ console.log('\n3. Rehab placements survive untouched')
   check(`rehab bands have not collapsed out of main slots (${t.bandIndicated}, collapse floor 160)`,
     t.bandIndicated >= 160, String(t.bandIndicated))
 
-  // THE GAP THIS GATE CAN SEE AND SHOULD NOT HIDE. Only two joints in the
-  // catalogue have any indicated_joints tagging at all, so six of the eight
-  // injuries a user can report get subtraction and no rehab: a bad hip,
-  // elbow, ankle, wrist, neck or lower back has dangerous work removed and
-  // nothing prescribed back. That is a CONTENT gap, not a filter gap, and it
-  // is Ashley's call to fill — see BACKLOG.
+  // THE GAP THIS GATE CAN SEE AND SHOULD NOT HIDE. Frozen as a list so it is
+  // impossible to leave un-noticed in either direction. This is a RECORD OF A
+  // GAP, NOT A TARGET: if adding rehab for a new joint turns this red, the fix
+  // is to add the joint here, not to question the work.
   //
-  // Frozen as a list so it is impossible to leave un-noticed in either
-  // direction. This is a RECORD OF A GAP, NOT A TARGET: if adding rehab for
-  // a new joint turns this red, the fix is to add the joint here, not to
-  // question the work.
-  check(`joints that have rehab at all: ${REHAB_JOINTS.join(', ')} — six of the eight injuries still have none`,
-    JSON.stringify(REHAB_JOINTS) === JSON.stringify(['knee', 'shoulder']), REHAB_JOINTS.join(', '))
+  // It did exactly that once already, on purpose. It read ['knee','shoulder']
+  // when six of the eight injuries got subtraction and no rehab; hips and the
+  // lower back have since been filled — three activation primers written for
+  // the hip, Dead Bug / Side Plank / Bird Dog tagged for the back — and this
+  // line went red as designed and was updated deliberately.
+  //
+  // FOUR STILL HAVE NOTHING: ankle, elbow, wrist and neck. Ashley's call, and
+  // a content decision rather than a mechanical one — see BACKLOG.
+  check(`joints that have rehab at all: ${REHAB_JOINTS.join(', ')} — ankle, elbow, wrist and neck still have none`,
+    JSON.stringify(REHAB_JOINTS) === JSON.stringify(['hip', 'knee', 'lower_back_axial', 'shoulder']), REHAB_JOINTS.join(', '))
 }
 
 // ---------------------------------------------------------------------------

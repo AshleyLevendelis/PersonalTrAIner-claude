@@ -75,13 +75,62 @@ console.log('\n[4] An indicated movement is never excluded even though it loads 
   check(`all ${indicated.length} reach the constrained pool`, inPool === indicated.length, { inPool })
 }
 
-console.log('\n[5] Injuries not yet reviewed are untouched (lower_back/neck — knees/wrists reviewed below)')
+console.log('\n[5] Injuries not yet reviewed are untouched (neck — the rest reviewed below)')
 {
-  for (const inj of ['lower_back', 'neck']) {
+  // lower_back USED TO BE LISTED HERE and this check went red when it got
+  // rehab, correctly. The two paths are meant to agree only while a joint is
+  // unreviewed; reviewing one is precisely what makes them diverge.
+  for (const inj of ['neck']) {
     const j = getFlaggedJoints([inj])
     const viaNew = EXERCISE_DATABASE.filter(e => isContraindicatedFor(e, j)).length
     const viaOld = EXERCISE_DATABASE.filter(e => e.loads_joints.some(x => j.has(x))).length
     check(`${inj}: exclusion count unchanged (${viaNew})`, viaNew === viaOld, { viaNew, viaOld })
+  }
+}
+
+console.log('\n[5b] The lower back was reviewed: the two paths diverge by exactly its rehab')
+{
+  // THE 31b05d7 LESSON, ASSERTED. contraindicatedJoints() is
+  // `contraindicated_joints ?? loads_joints`, so touching either field on an
+  // entry can silently move what gets EXCLUDED. Dead Bug, Side Plank and Bird
+  // Dog gained `loads_joints: ['lower_back_axial']` — they genuinely work the
+  // joint — and each carries an explicit `contraindicated_joints: []` so the
+  // fallback never fires and none of them is filtered out of the plan of the
+  // person they were added for.
+  //
+  // So the OLD path must gain exactly those three while the NEW path holds
+  // still. If viaNew moves, a back-injured trainee's options changed and this
+  // is a regression, not a review.
+  const j = getFlaggedJoints(['lower_back'])
+  const viaNew = EXERCISE_DATABASE.filter(e => isContraindicatedFor(e, j))
+  const viaOld = EXERCISE_DATABASE.filter(e => e.loads_joints.some(x => j.has(x)))
+  const REHAB = ['Dead Bug', 'Side Plank', 'Bird Dog']
+  check(`what a bad back excludes did NOT move (${viaNew.length})`, viaNew.length === 12, { viaNew: viaNew.length })
+  check('...and none of the rehab movements is among the exclusions',
+    REHAB.every(n => !viaNew.some(e => e.name === n)),
+    viaNew.filter(e => REHAB.includes(e.name)).map(e => e.name).join(', '))
+  const onlyOld = viaOld.filter(e => !viaNew.some(x => x.name === e.name)).map(e => e.name).sort()
+  check(`the legacy path diverges by exactly the rehab (${onlyOld.join(', ')})`,
+    JSON.stringify(onlyOld) === JSON.stringify([...REHAB].sort()), onlyOld.join(', '))
+}
+
+console.log('\n[5c] Hip and lower-back rehab reaches the trainee it was written for')
+{
+  // Mirrors [4], which asserts the same for shoulders. Both joints read 0 of
+  // 576 training days before this work — the movements did not exist for the
+  // hip and were untagged for the back.
+  for (const [inj, joint] of [['hips', 'hip'], ['lower_back', 'lower_back_axial']] as const) {
+    const flagged = getFlaggedJoints([inj])
+    const indicated = EXERCISE_DATABASE.filter(e => isIndicatedFor(e, flagged))
+    check(`${inj}: indicated movements exist`, indicated.length > 0, indicated.length)
+    check(`${inj}: none of them is excluded for the joint it treats`,
+      indicated.every(e => !isContraindicatedFor(e, flagged)),
+      indicated.filter(e => isContraindicatedFor(e, flagged)).map(e => e.name).join(', '))
+    // The shoulder lesson, restated per joint: an injury must never remove
+    // its own rehab.
+    check(`${inj}: every one reaches the constrained pool`,
+      indicated.every(e => getConstrainedPool({ ...profile, injuries: [inj] }, [])
+        .some(p => p.name === e.name)), joint)
   }
 }
 
