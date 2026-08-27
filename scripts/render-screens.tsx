@@ -40,7 +40,7 @@
 // ---------------------------------------------------------------------------
 
 import React from 'react'
-import { MessageCircle } from 'lucide-react'
+import { MessageCircle, Send } from 'lucide-react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { execFileSync } from 'node:child_process'
 import { readFileSync, writeFileSync, mkdirSync, readdirSync, existsSync } from 'node:fs'
@@ -187,6 +187,63 @@ function FirstRunChat() {
   )
 }
 
+/**
+ * The onboarding conversation, at phone width.
+ *
+ * ConversationalOnboarding itself cannot render here (Supabase, a live slot
+ * tracker, effects), so this is a REPLICA of its message rows and composer —
+ * copied class-for-class from the component, which is the whole point: the
+ * text-only design lives in those exact classes, and this is the only way to
+ * see whether 19px coach text and a 17px user bubble actually read as two
+ * kinds of speech at 412px rather than just in a spec.
+ */
+function OnboardingConversation() {
+  const turns: { role: 'coach' | 'user'; text: string }[] = [
+    { role: 'coach', text: "Great to meet you, Ashley. Let's start with what we're actually aiming for — what's the big goal that's got you wanting a plan right now?" },
+    { role: 'user', text: "I want to lose fat but keep the muscle I've built" },
+    { role: 'coach', text: "Got it — that tells me a lot. And how would you describe where you're at right now: brand new to training, coming back after a break, or already lifting regularly?" },
+    { role: 'user', text: 'Coming back after about a year off' },
+  ]
+  return (
+    <div className="flex flex-col bg-background px-4 py-4">
+      <div className="max-w-md w-full mx-auto flex flex-col gap-[22px]">
+        {turns.map((t, i) => (
+          <div key={i}>
+            {t.role === 'coach' && (i === 0 || turns[i - 1].role === 'user') && (
+              <div className="ds-label mb-1.5">Coach</div>
+            )}
+            <div
+              className={
+                t.role === 'user'
+                  ? 'ml-auto w-fit max-w-[80%] rounded-[20px_20px_4px_20px] bg-secondary px-[18px] py-3 text-[17px]/[1.5] text-foreground'
+                  : 'max-w-[88%] text-[19px]/[1.6] text-foreground [text-wrap:pretty]'
+              }
+            >
+              {t.text}
+            </div>
+          </div>
+        ))}
+        <div>
+          <div className="ds-label mb-1.5">Coach</div>
+          <div className="flex items-center gap-1.5">
+            <span className="ds-typing-dot" />
+            <span className="ds-typing-dot [animation-delay:150ms]" />
+            <span className="ds-typing-dot [animation-delay:300ms]" />
+          </div>
+        </div>
+        <div className="flex items-center gap-2.5 pt-2">
+          <div className="flex-1 h-auto rounded-full border-[1.5px] border-primary bg-transparent px-5 py-[15px] text-[16px] text-muted-foreground">
+            Say anything…
+          </div>
+          <div className="size-[52px] shrink-0 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center">
+            <Send className="size-[22px]" />
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 const screens: Screen[] = [
   {
     name: 'day-bodyweight-week11',
@@ -225,6 +282,11 @@ const screens: Screen[] = [
     name: 'load-ceiling-prompt',
     title: 'What can you actually load',
     node: <LoadCeilingPrompt kind="dumbbell" onSave={async () => {}} onDecline={async () => {}} />,
+  },
+  {
+    name: 'onboarding-conversation',
+    title: 'Onboarding · text-only, no buttons',
+    node: <OnboardingConversation />,
   },
   {
     name: 'first-run-chat',

@@ -262,6 +262,20 @@
 }
 
 @layer utilities {
+  /* One dot of the onboarding typing indicator. Reduced motion keeps the
+   * dots visible and simply stops them moving — removing them entirely would
+   * leave a silent gap where the app is in fact working. */
+  .ds-typing-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 9999px;
+    background: var(--muted-foreground);
+    animation: dsTypingDot 1.2s ease-in-out infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ds-typing-dot { animation: none; opacity: .55; }
+  }
+
   /* Headline numbers — Nightshift type scale. */
   .ds-num-hero {
     font-size: 34px;
@@ -426,6 +440,17 @@
 @keyframes dsDotPulse {
   0%, 100% { box-shadow: 0 0 calc(10px * var(--glow-strength)) rgba(var(--glow-rgb), calc(.8 * var(--glow-strength))); transform: scale(1); }
   50% { box-shadow: 0 0 calc(22px * var(--glow-strength)) rgba(var(--glow-rgb), var(--glow-strength)); transform: scale(1.18); }
+}
+/* Onboarding typing indicator — the coach thinking, per the text-only
+ * conversation design. Deliberately far smaller than Tailwind's animate-bounce
+ * (which lifts 25% and reads as a toy): a 3px rise with the opacity carrying
+ * most of the signal, so three dots under a COACH label look like someone
+ * typing rather than a loading spinner. Staggered 0.15s per dot at the call
+ * site. Sits outside the glow system on purpose — this is motion, not a halo,
+ * so --glow-strength must not be able to switch it off. */
+@keyframes dsTypingDot {
+  0%, 60%, 100% { transform: translateY(0); opacity: .25; }
+  30% { transform: translateY(-3px); opacity: 1; }
 }
 @keyframes dsWarnPulse {
   0%, 100% { box-shadow: 0 0 calc(8px * var(--glow-strength)) rgba(255, 180, 84, calc(.7 * var(--glow-strength))); }
