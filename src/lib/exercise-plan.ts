@@ -501,14 +501,27 @@ const INJURED_JOINTS: Record<string, string[]> = {
   shoulders: ['shoulder'],
   neck: ['neck'],
   wrists: ['wrist'],
+  // hips/elbows/ankles were collected at onboarding and mapped to NOTHING, so
+  // a plan built for someone with a bad hip came out byte-for-byte identical
+  // to a healthy person's — they were still handed Deadlifts. Three of the
+  // eight injuries a user can report did nothing at all, and the comment that
+  // used to sit here said so without anyone acting on it.
+  hips: ['hip'],
+  elbows: ['elbow'],
+  ankles: ['ankle'],
 }
 
 /**
  * Single source of truth for injury-code -> flagged-joint mapping, exported
  * so callers outside this module (the injury-adaptation feature,
  * dev-constraint-audit.ts) read the real map instead of hand-duplicating it.
- * Only 5 of the 8 INJURY_OPTIONS codes are mapped — hips/ankles/elbows are
- * collected at onboarding but currently have no joint tag to filter on.
+ *
+ * ALL EIGHT INJURY_OPTIONS codes are mapped. Keep it that way: a code missing
+ * here is not a partial feature, it is an injury the app collects, stores,
+ * shows back to the user and then silently ignores. test:injury-coverage
+ * asserts the map covers every option and that each one visibly changes a
+ * plan, because "mapped" and "has any effect" are different claims — hip and
+ * elbow tags existed on 1 and 2 exercises respectively while doing nothing.
  */
 export function getFlaggedJoints(injuries: string[]): Set<string> {
   const joints = new Set<string>()

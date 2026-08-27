@@ -1,0 +1,213 @@
+/**
+ * Gate: every injury a user can report actually changes their plan.
+ *
+ * Found by generating two plans and diffing them. Three of the eight
+ * INJURY_OPTIONS codes — hips, elbows, ankles — produced a plan BYTE-FOR-BYTE
+ * IDENTICAL to a healthy person's. Someone with a bad hip was still handed
+ * Deadlifts. The app collected the injury, stored it, showed it back on the
+ * profile screen, and threw it away.
+ *
+ * It was known. `getFlaggedJoints`' own doc comment said "Only 5 of the 8
+ * INJURY_OPTIONS codes are mapped — hips/ankles/elbows are collected at
+ * onboarding but currently have no joint tag to filter on." Written down,
+ * never acted on, and nothing failed while it was true.
+ *
+ * TWO CLAIMS, and they are different, which is why both are checked:
+ *   §1 every code is MAPPED to a joint;
+ *   §2 every code visibly CHANGES a plan.
+ * `hip` and `elbow` were already valid joint names sitting on 1 and 2
+ * exercises, so a mapping alone would have satisfied §1 while still doing
+ * nothing. Coverage is not effect.
+ */
+import { setRandomSource, resetRandomSource, generateExercisePlan, getFlaggedJoints, isEquipmentAllowed } from '../src/lib/exercise-plan'
+import { seededRngFromKey } from '../src/lib/seeded-random'
+import { EXERCISE_DATABASE, contraindicatedJoints, isIndicatedFor } from '../src/lib/exercise-db'
+import { INJURY_OPTIONS } from '../src/lib/onboarding-slots'
+import type { UserProfile, EquipmentAccess } from '../src/lib/types'
+
+let failures = 0
+const check = (l: string, ok: boolean, extra?: unknown) => {
+  if (ok) console.log(`  ok: ${l}`)
+  else { failures++; console.error(`  FAIL: ${l}${extra !== undefined ? ` — ${JSON.stringify(extra)}` : ''}`) }
+}
+
+const base = (injuries: string[], equipment_access: EquipmentAccess = 'full_gym'): UserProfile => ({
+  age: 34, gender: 'male', height_cm: 178, weight_kg: 82, activity_level: 'moderate',
+  fitness_goal: 'hypertrophy', preferred_time: 'morning', bmr: 1800, tdee: 2600,
+  equipment_access, injuries, training_style: 'hybrid',
+  training_experience: 'intermediate', session_duration_preference: '45-60',
+  workout_split_preference: 'ai_recommendation',
+  training_days: [
+    { day: 'Monday', available: true }, { day: 'Tuesday', available: true },
+    { day: 'Wednesday', available: false }, { day: 'Thursday', available: true },
+    { day: 'Friday', available: true }, { day: 'Saturday', available: false }, { day: 'Sunday', available: false },
+  ],
+  weekly_schedule: {}, dietary_preferences: [], concurrent_activities: [],
+  macro_calculation_mode: 'STANDARD_STATIC', coaching_persona: 'supportive',
+  recovery_capacity: 'moderate', conditioning_preference: 'tolerate',
+  created_at: new Date().toISOString(),
+} as unknown as UserProfile)
+
+/** Seeded, because generation is deliberately random for variety and an unseeded diff would be a coin flip. */
+const namesFor = (injuries: string[], tier: EquipmentAccess = 'full_gym'): string[] => {
+  setRandomSource(seededRngFromKey(`injury-coverage:${tier}`))
+  try { return generateExercisePlan(base(injuries, tier)).plan.flatMap(d => d.exercises.map(e => e.name)) }
+  finally { resetRandomSource() }
+}
+
+const CODES = INJURY_OPTIONS.map(o => o.value)
+
+console.log('\n1. Every injury the user can select is mapped to a joint')
+{
+  check('there are options to check, so this has teeth', CODES.length >= 8, CODES.length)
+  const unmapped = CODES.filter(c => getFlaggedJoints([c]).size === 0)
+  check('no selectable injury maps to nothing', unmapped.length === 0, unmapped)
+}
+
+console.log('\n2. ...and every one of them visibly CHANGES the plan')
+{
+  // The check that actually matters. A mapping to a joint nothing carries is
+  // still a no-op, which is exactly what hip (1 tagged exercise) and elbow (2)
+  // were before this.
+  const healthy = namesFor([])
+  const inert: string[] = []
+  for (const code of CODES) {
+    const injured = namesFor([code])
+    const removed = healthy.filter(n => !injured.includes(n))
+    if (JSON.stringify(healthy) === JSON.stringify(injured)) inert.push(code)
+    else console.log(`     ${code.padEnd(12)} removes ${removed.length}`)
+  }
+  check('no injury leaves the plan untouched', inert.length === 0, inert)
+}
+
+console.log('\n3. THE SHOULDER LESSON: an injury never removes its own rehab')
+{
+  // The shoulder tag audit found the filter stripping Band Pull-Aparts, Wall
+  // Slides and Prone Y-T Raises from a shoulder-injured plan — the exercises
+  // a physio prescribes FOR that injury. Tagging by "does this joint
+  // participate" instead of "is this dangerous" is what caused it, and this
+  // is the check that makes the mistake impossible to repeat silently.
+  const contradictions: string[] = []
+  for (const code of CODES) {
+    const flagged = getFlaggedJoints([code])
+    if (flagged.size === 0) continue
+    for (const e of EXERCISE_DATABASE) {
+      if (!isIndicatedFor(e, flagged)) continue
+      if (contraindicatedJoints(e).some(j => flagged.has(j))) contradictions.push(`${code}: ${e.name}`)
+    }
+  }
+  check('no exercise is both rehab FOR a joint and banned for it', contradictions.length === 0, contradictions.slice(0, 5))
+}
+
+console.log('\n4. The plan does not collapse — wiped patterns are named, not discovered')
+{
+  // A wiped movement pattern means every slot in it drops with no replacement
+  // by construction (see assessAdaptation's wipedPatterns). Some wipes are
+  // CORRECT — every calf exercise loads the ankle, so you do not train calves
+  // on a bad ankle. Others are content gaps: below full_gym the only cardio
+  // is jumping, and at bodyweight the only vertical pull is a pull-up.
+  //
+  // Frozen so a future over-broad tag shows up BY NAME rather than as a
+  // quietly thinner plan.
+  const EXPECTED_WIPES: Record<string, string[]> = {
+    // PRE-EXISTING, verified by computing this same list at the pre-change
+    // state and diffing: every shoulder/neck/wrist entry below was already
+    // true and none of it is caused by the hip/elbow/ankle work. These are
+    // the wipes the shoulder tag audit documented — a shoulder injury really
+    // does rule out pressing and overhead pulling, and below full_gym there
+    // is nothing left to do it with.
+    'shoulders|full_gym': ['isolation_shoulder', 'vertical_pull'],
+    'shoulders|home_gym': ['isolation_shoulder', 'vertical_pull'],
+    'shoulders|minimalist': ['isolation_shoulder', 'vertical_pull', 'vertical_push'],
+    'shoulders|bodyweight': ['horizontal_push', 'vertical_pull'],
+    'neck|full_gym': ['isolation_trap'],
+    'neck|home_gym': ['isolation_trap'],
+    'neck|minimalist': ['isolation_trap'],
+    'wrists|home_gym': ['cardio'],
+    'wrists|minimalist': ['cardio'],
+    'wrists|bodyweight': ['cardio', 'horizontal_push'],
+
+    // NEW with this work — the only five, and each deliberate.
+    // ankle + calves is CORRECT: every calf exercise loads the ankle, so you
+    // do not train calves on a bad one. The cardio and vertical-pull entries
+    // are CONTENT GAPS, the shape the shoulder audit named ("a content gap,
+    // not a filter gap; even a perfect filter can't substitute what doesn't
+    // exist") — below full_gym the only cardio is jumping, and at bodyweight
+    // the only vertical pull is a pull-up.
+    'ankles|full_gym': ['isolation_calf'],
+    'ankles|home_gym': ['cardio', 'isolation_calf'],
+    'ankles|minimalist': ['cardio', 'isolation_calf'],
+    'ankles|bodyweight': ['cardio', 'isolation_calf'],
+    'elbows|bodyweight': ['vertical_pull'],
+  }
+
+  const patterns = [...new Set(EXERCISE_DATABASE.map(e => e.movement_pattern))]
+  const surprises: string[] = []
+  for (const code of CODES) {
+    const flagged = getFlaggedJoints([code])
+    for (const tier of ['full_gym', 'home_gym', 'minimalist', 'bodyweight'] as EquipmentAccess[]) {
+      const wiped: string[] = []
+      for (const p of patterns) {
+        const all = EXERCISE_DATABASE.filter(e => e.movement_pattern === p && isEquipmentAllowed(e, tier))
+        if (all.length === 0) continue
+        if (all.every(e => contraindicatedJoints(e).some(j => flagged.has(j)))) wiped.push(p)
+      }
+      const expected = EXPECTED_WIPES[`${code}|${tier}`] ?? []
+      const unexpected = wiped.filter(w => !expected.includes(w))
+      const gone = expected.filter(w => !wiped.includes(w))
+      if (unexpected.length) surprises.push(`${code}/${tier} NEW wipe: ${unexpected.join(',')}`)
+      if (gone.length) surprises.push(`${code}/${tier} no longer wipes: ${gone.join(',')} — update EXPECTED_WIPES`)
+    }
+  }
+  check('the only wiped patterns are the ones already understood', surprises.length === 0, surprises.slice(0, 6))
+  console.log('     (ankle wiping calf work is CORRECT; the cardio and vertical-pull wipes are content gaps — no safe variant exists at those tiers)')
+  // HIP IS THE ONE THAT MUST STAY CLEAN. Ashley's ruling was calibrated so a
+  // hip-injured trainee still gets a full leg day — drop the heavy loaded
+  // work, keep the controlled movements. If hip ever starts wiping a pattern,
+  // the tagging has drifted past what she agreed to.
+  check('a hip injury wipes no pattern at any tier',
+    !Object.keys(EXPECTED_WIPES).some(k => k.startsWith('hips|')),
+    Object.keys(EXPECTED_WIPES).filter(k => k.startsWith('hips|')))
+}
+
+console.log('\n5. How MUCH each injury removes, frozen')
+{
+  // Found by mutation. Tagging five more squat variants as hip-contraindicated
+  // took a hip-injured trainee's knee_dominant options from 8 to 2 — a large
+  // change to what a real person gets — and every check above stayed green,
+  // because no pattern was fully wiped and the plan still "differed from
+  // healthy". Coverage and wipe-detection both pass straight over an
+  // over-broad tag that stops just short of emptying a pattern.
+  //
+  // Ashley's hip ruling was calibrated on exactly this: drop the heavy loaded
+  // work, KEEP the controlled movements, the session stays whole. A count is
+  // the only thing that holds that line. Generated from the code, not typed
+  // from memory — the hand-written version of a frozen table in this repo has
+  // been wrong before.
+  const AT_THE_FIX: Record<string, number> = {
+    // The five pre-existing codes are at their ORIGINAL pre-change values.
+    // The first attempt at this work silently cut them — knees 25 -> 15,
+    // wrists 21 -> 13, lower_back 12 -> 5, shoulders 47 -> 40 — because
+    // `contraindicatedJoints()` is `contraindicated_joints ?? loads_joints`,
+    // so writing that field AT ALL replaces the loads_joints fallback rather
+    // than adding to it. Tagging an exercise for the hip therefore un-banned
+    // it for the knee. Caught by test:band-slots moving, then measured. The
+    // tagging now merges loads_joints in; these numbers are what proves it.
+    lower_back: 12, knees: 25, shoulders: 47, neck: 5, wrists: 21,
+    hips: 9, ankles: 13, elbows: 10,
+  }
+  const drift: string[] = []
+  for (const code of CODES) {
+    const flagged = getFlaggedJoints([code])
+    const n = EXERCISE_DATABASE.filter(e => contraindicatedJoints(e).some(j => flagged.has(j))).length
+    const expected = AT_THE_FIX[code]
+    if (expected === undefined) drift.push(`${code}: NEW injury code, ${n} contraindicated — add it here deliberately`)
+    else if (n !== expected) drift.push(`${code}: ${n} (was ${expected})`)
+  }
+  check('no injury quietly started removing more or less', drift.length === 0, drift)
+  check('...and every code is accounted for', Object.keys(AT_THE_FIX).length === CODES.length,
+    { frozen: Object.keys(AT_THE_FIX).length, codes: CODES.length })
+}
+
+if (failures > 0) { console.error(`\n${failures} check(s) failed`); process.exit(1) }
+console.log('\nAll injury-coverage checks passed.\n')
