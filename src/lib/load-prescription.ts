@@ -591,9 +591,9 @@ export function getEquipmentFloorKg(entry: ExerciseEntry): number {
  * - single_implement (kettlebell / single dumbbell) 48kg — top of commercial kettlebell ranges
  * - ez_bar 60kg — a curl/skullcrusher bar, not a pressing bar; far fewer plates fit than an Olympic bar
  * - barbell 300kg — bar + realistic plate loading, clears an advanced deadlift with room
- * - stack 100kg — most cable/machine stacks top out there (leg press is the one exception — see LEG_PRESS_CEILING_KG)
+ * - stack 100kg — most cable/machine stacks top out there (leg press and the calf machines are the exceptions — see LEG_PRESS_CEILING_KG / CALF_MACHINE_CEILING_KG)
  */
-const LOADING_CEILING_KG_PER_HAND_OR_TOTAL: Record<LoadingMode, number> = {
+export const LOADING_CEILING_KG_PER_HAND_OR_TOTAL: Record<LoadingMode, number> = {
   dumbbell: 50, // PER HAND — never the total pair load
   single_implement: 48,
   barbell: 300,
@@ -609,9 +609,33 @@ const LOADING_CEILING_KG_PER_HAND_OR_TOTAL: Record<LoadingMode, number> = {
 // achievable advanced leg press number.
 const LEG_PRESS_CEILING_KG = 400
 
+// Same shape as the leg press, and found the same way: test:quality logged
+// 45,239 clamp warnings on Calf Raises / Seated Calf Raises, all of them
+// 102.5kg against the generic 100kg stack ceiling.
+//
+// THE CEILING WAS WRONG, NOT THE LOAD — which is why this is a ceiling change
+// and not a smaller multiplier. A dedicated calf machine is plate-loaded or
+// has its own stack and routinely takes 150-200kg; it is not a cable tower.
+// Calves are also genuinely strong: an advanced 85kg male doing 12-15 rep
+// seated calf raises at 100kg is a normal working weight, arguably light.
+// Cutting the formula to fit a ceiling that was never meant for this machine
+// would have under-prescribed a whole muscle group to silence a warning.
+//
+// 250 rather than a token 110: the ceiling exists to reject arithmetic
+// faults, and test:load-ceiling-units wants roughly 25% of headroom over the
+// highest legitimate value. It changes no prescribed weight below 102.5kg,
+// which is everything the formula currently produces.
+//
+// Deliberately gated on loading mode too. Single-Leg Dumbbell Calf Raise is
+// isolation_calf as well, and its 48kg clamp is CORRECT and stays: 48kg is
+// the heaviest dumbbell most gyms own, so a strong lifter really has run out
+// of implement. That is the honest kind of clamp.
+const CALF_MACHINE_CEILING_KG = 250
+
 /** The realistic implement ceiling for this exercise, in the same units prescribeLoad's `rounded` already uses for its loading mode (per hand for a dumbbell pair, total otherwise). */
 export function getLoadingCeilingKg(entry: ExerciseEntry, category: string | null): number {
   if (category === 'leg_press') return LEG_PRESS_CEILING_KG
+  if (category === 'isolation_calf' && loadingMode(entry) === 'stack') return CALF_MACHINE_CEILING_KG
   return LOADING_CEILING_KG_PER_HAND_OR_TOTAL[loadingMode(entry)]
 }
 

@@ -50,30 +50,56 @@ async function substituteSlots(
 
     const days = await Promise.all(week.days.map(async day => {
       let changed = false
-      const exercises = await Promise.all(day.exercises.map(async (slot, idx) => {
-        if (!conflicts(slot)) return slot
+
+      // SEQUENTIAL WITHIN A DAY, and that is the whole fix.
+      //
+      // This used to be `await Promise.all(day.exercises.map(...))`, with a
+      // duplicate guard that could not possibly work: it read the ORIGINAL
+      // `day.exercises` (so it only knew names that were already there, never
+      // ones picked during this pass), and every slot resolved in parallel
+      // (so no slot could observe another's choice). Two conflicting slots in
+      // one session therefore computed the same "already used" set, got the
+      // same ranked candidates, and both took candidates[0]. Measured on a
+      // shoulder injury: 28 duplicate placements, producing sessions like
+      //   Band Dislocates | Barbell Floor Press | Landmine Press |
+      //   Landmine Press | Tricep Pushdowns | Side Plank | Barbell Floor Press
+      // — seven "exercises", four movements. The comment explaining the
+      // filtering gave false confidence over a mechanism that never ran.
+      //
+      // Days and weeks stay parallel; only slots inside one day need
+      // ordering, because that is the only place the collision can occur.
+      const usedInDay = new Set(day.exercises.filter(e => !conflicts(e)).map(e => e.name))
+      const exercises: (Exercise | null)[] = []
+
+      for (const slot of day.exercises) {
+        if (!conflicts(slot)) { exercises.push(slot); continue }
         const entry = getExerciseEntry(slot.name)
-        if (!entry) return slot
+        if (!entry) { exercises.push(slot); continue }
 
         // getReplacementCandidates already filters against candidateProfile's
         // constraint pool (equipment/injury/style/skill), so every candidate
         // here is already guaranteed conflict-free — no re-check needed.
-        const alreadyUsedInDay = new Set(day.exercises.filter((_, i) => i !== idx).map(e => e.name))
         const candidates = getReplacementCandidates(slot.name, candidateProfile, exclusions)
-          .filter(c => !alreadyUsedInDay.has(c.exercise.name))
+          .filter(c => !usedInDay.has(c.exercise.name))
 
         changed = true
         if (candidates.length === 0) {
+          // No UNIQUE candidate left. Dropping is the honest outcome — a
+          // session listing the same lift twice is not an extra exercise,
+          // and this raises `dropped`, which is what assessAdaptation reads
+          // to decide a rebuild would serve the user better.
           touchedSlots.push({ weekNumber: week.week_number, dayName: day.day, before: slot.name, after: null })
           droppedPatterns.push(slot.movement_pattern ?? entry.movement_pattern)
-          return null
+          exercises.push(null)
+          continue
         }
 
         const replacement = candidates[0].exercise
+        usedInDay.add(replacement.name)
         const load = await recomputeLoad(replacement, profile, slot.intensity || '', slot.sets, slot.reps, isMainLiftSlot(slot))
         touchedSlots.push({ weekNumber: week.week_number, dayName: day.day, before: slot.name, after: replacement.name })
-        return applyReplacement(slot, replacement, load, profile.session_duration_preference)
-      }))
+        exercises.push(applyReplacement(slot, replacement, load, profile.session_duration_preference))
+      }
 
       if (!changed) return day
       const kept = exercises.filter((e): e is Exercise => e !== null)

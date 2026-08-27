@@ -37,6 +37,7 @@
 import { EXERCISE_DATABASE } from '../src/lib/exercise-db'
 import {
   categorize, isPerSideLoad, isExternallyLoaded, prescribeLoad, getLoadingCeilingKg,
+  loadingMode, LOADING_CEILING_KG_PER_HAND_OR_TOTAL,
 } from '../src/lib/load-prescription'
 import { SAFETY_CEILING_KG_TOTAL } from '../src/lib/dev-constraint-audit'
 import type { UserProfile, TrainingExperience } from '../src/lib/types'
@@ -172,6 +173,31 @@ console.log('\n2. ...and with real headroom — a ceiling is a backstop, not a t
   }
   check(`no category's worst legitimate total reaches its ceiling unclamped (${tight.length})`,
     tight.length === 0, tight.join(', '))
+
+  // A NAMED CEILING EXCEPTION MAY ONLY EVER APPLY TO `stack` MODE.
+  //
+  // The other four modes are physical facts about the implement — the heaviest
+  // dumbbell a gym owns, the heaviest kettlebell, what fits on a bar. `stack`
+  // is the odd one out: it is a rough default for "some machine", and real
+  // machines vary wildly, which is why leg_press and the calf machines have
+  // their own figures.
+  //
+  // Found by mutation: pointing the calf exception at the whole
+  // `isolation_calf` category — which would hand Single-Leg Dumbbell Calf
+  // Raise a 250kg ceiling — passed every gate here. Nothing asserted that a
+  // dumbbell exercise gets a dumbbell-sized ceiling, so the app could have
+  // prescribed a dumbbell heavier than any that exists and no check would
+  // have said a word.
+  const implementViolations: string[] = []
+  for (const entry of EXERCISE_DATABASE) {
+    if (!isExternallyLoaded(entry)) continue
+    const mode = loadingMode(entry)
+    if (mode === 'stack') continue
+    const expected = LOADING_CEILING_KG_PER_HAND_OR_TOTAL[mode]
+    const actual = getLoadingCeilingKg(entry, categorize(entry))
+    if (actual !== expected) implementViolations.push(`${entry.name} (${mode}): ${actual} != ${expected}`)
+  }
+  check('every non-stack lift keeps its implement\'s own ceiling', implementViolations.length === 0, implementViolations.slice(0, 5))
   if (clampedToCeiling.length) {
     console.log(`  · at their ceiling only because the implement clamp put them there: ${clampedToCeiling.join(', ')}`)
   }

@@ -86,6 +86,42 @@ async function main() {
   console.log(`     touched=${verdictNeck.touched} dropped=${verdictNeck.dropped} planLoss=${(verdictNeck.planLossRatio*100).toFixed(1)}%`)
   check('a thinning injury does not trigger a rebuild', !verdictNeck.shouldRebuild, verdictNeck)
 
+  console.log('\n[2b] Substitution never puts the same exercise in a session twice')
+  {
+    // THE BUG THIS SECTION EXISTS FOR, and nothing caught it for months: the
+    // duplicate guard in substituteSlots read the ORIGINAL day.exercises and
+    // every slot resolved inside a Promise.all, so no slot could see what
+    // another had chosen. Two conflicting slots got the same ranked list and
+    // both took candidates[0]. A real shoulder-injured session read:
+    //   Band Dislocates | Barbell Floor Press | Landmine Press |
+    //   Landmine Press | Tricep Pushdowns | Side Plank | Barbell Floor Press
+    // — seven "exercises", four movements, 28 such placements across the plan.
+    //
+    // The count assertions in [3] DID fail because of this, but they blamed
+    // the rebuild: substitution's slot total was inflated by the duplicates,
+    // so an honest rebuild looked worse than a padded substitution. This
+    // check names the real defect, so the next failure points at the right
+    // thing.
+    const dupes: string[] = []
+    for (const w of sub.mesocycle) {
+      for (const d of w.days) {
+        const names = d.exercises.map(e => e.name)
+        for (const n of names.filter((n, i) => names.indexOf(n) !== i)) {
+          dupes.push(`wk${w.week_number}/${d.day}: ${n}`)
+        }
+      }
+    }
+    check('no exercise appears twice in one substituted session', dupes.length === 0, dupes.slice(0, 5))
+
+    // A dropped slot is the HONEST outcome when no unique candidate remains —
+    // better than a session listing the same lift twice. It shows up as a
+    // higher planLossRatio, which is what assessAdaptation reads to decide a
+    // rebuild would serve the user better. Asserted so nobody "fixes" the
+    // drop rate by bringing the duplicates back.
+    check('...and dropping rather than repeating is reflected in the loss ratio',
+      verdict.dropped > 0, verdict)
+  }
+
   console.log('\n[3] The rebuild produces a real plan, not a hollow one')
   const rebuilt = await rebuildForInjury({ profile, injuryCode: 'shoulders', exclusions: [], mesocycle: meso })
   const slotsBefore = meso.flatMap(w => w.days.flatMap(d => d.exercises)).length

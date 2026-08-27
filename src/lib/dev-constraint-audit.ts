@@ -73,7 +73,21 @@ export const SAFETY_CEILING_KG_TOTAL: Partial<Record<string, number>> = {
   kettlebell_swing: 60,
   isolation_bicep: 70, isolation_tricep: 80, isolation_chest: 95,
   shrug: 140, isolation_quad: 115,
-  isolation_hamstring: 115, isolation_calf: 140, carry: 130,
+  isolation_hamstring: 115,
+  // 140 was calibrated when the IMPLEMENT clamp held calf work at 100kg, so
+  // it was never exercised above that. With calf machines given their own
+  // 250kg implement ceiling (CALF_MACHINE_CEILING_KG — a dedicated calf
+  // machine is not a cable tower), the formula's real top is 182.5kg for a
+  // 120kg advanced male at 3-5 reps, about 1.5x bodyweight. This gate wants
+  // roughly 25% of headroom over the highest legitimate value, hence 230.
+  //
+  // ASHLEY'S RULING, taken on the weights rather than the number: heavier and
+  // more advanced people should be allowed past 100kg. The old cap flattened
+  // every rep bracket to the same 100kg for a 120kg advanced lifter, heavy
+  // triples and sets of twenty alike — the prescription had stopped adjusting
+  // for them, the same failure the kettlebell ceiling produced.
+  isolation_calf: 230,
+  carry: 130,
   // The three that were per-hand, doubled to say the same thing as a total.
   // 25 -> 50, 70 -> 140, 60 -> 120: the allowance each movement actually
   // has is identical, only the unit it is written in changed.

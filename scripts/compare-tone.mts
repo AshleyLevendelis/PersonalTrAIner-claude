@@ -38,9 +38,28 @@ interface Turn {
   user: string
   reply: string
   error?: unknown
+  /** Onboarding shape: every tool call that turn. */
   actions?: { name: string; args?: Record<string, unknown> }[]
+  /** Coach shape: at most one action, and no `actions` field at all. */
+  action?: { name?: string } | null
 }
 interface Transcript { persona?: string; turns: Turn[] }
+
+/**
+ * WHICH PROBE WROTE THIS. The two write different shapes — onboarding emits
+ * `actions` (an array), the coach emits `action` (singular, nullable) — and
+ * that difference decides which metrics MEAN anything.
+ *
+ * Reading `actions` off a coach transcript does not crash, it quietly yields
+ * `[]`, and the chip count then reports a confident 0 forever. A fabricated
+ * zero that looks like a measurement is worse than an absent one, so a metric
+ * that does not apply is OMITTED rather than printed.
+ *
+ * Chips are an onboarding concept anyway: the main chat has no present_slot.
+ */
+function shapeOf(t: Transcript): 'onboarding' | 'coach' {
+  return t.turns.some(x => Array.isArray(x.actions)) ? 'onboarding' : 'coach'
+}
 
 const STOPWORDS = new Set([
   'about', 'after', 'again', 'been', 'being', 'could', 'doing', 'down', 'each', 'from',
@@ -130,11 +149,21 @@ if (!beforePath) {
 }
 
 const load = (p: string): Transcript => JSON.parse(fs.readFileSync(p, 'utf8'))
-const before = analyse(load(beforePath))
-const after = afterPath ? analyse(load(afterPath)) : null
+const beforeT = load(beforePath)
+const afterT = afterPath ? load(afterPath) : null
+const shape = shapeOf(beforeT)
+if (afterT && shapeOf(afterT) !== shape) {
+  console.error(`refusing to compare a ${shape} transcript against a ${shapeOf(afterT)} one — different probes, different conversations`)
+  process.exit(1)
+}
+const before = analyse(beforeT)
+const after = afterT ? analyse(afterT) : null
+
+/** Metrics that only mean something for one probe. Omitted, never zeroed. */
+const APPLIES: Partial<Record<keyof Stats, 'onboarding' | 'coach'>> = { chipTurns: 'onboarding' }
 
 console.log(`\n${'='.repeat(72)}`)
-console.log('ONBOARDING TONE' + (after ? ' — BEFORE vs AFTER' : ''))
+console.log((shape === 'onboarding' ? 'ONBOARDING TONE' : 'COACH TONE (main chat)') + (after ? ' — BEFORE vs AFTER' : ''))
 console.log('='.repeat(72))
 console.log(`sample: ${before.turns} turns${after ? ` vs ${after.turns} turns` : ''}` +
   ` — one turn is ~${Math.round(100 / (before.turns || 1))} percentage points, so read the big moves only`)
@@ -148,6 +177,7 @@ console.log(`  ${'metric'.padEnd(36)}${pad('before', 8)}${after ? pad('after', 8
 console.log(`  ${'-'.repeat(36)}${'-'.repeat(after ? 25 : 8)}`)
 
 for (const m of METRICS) {
+  if (APPLIES[m.key] && APPLIES[m.key] !== shape) continue
   const b = before[m.key] as number
   const a = after ? (after[m.key] as number) : null
   let move = ''
