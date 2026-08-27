@@ -208,7 +208,10 @@ export function NutritionDisplay({
 
   return (
     <div className="space-y-6">
-      <div>
+      {/* data-tour: the app tour spotlights the rings AND the water row as one
+          unit — its copy names both, and water is the only quick-add the tour
+          promises ("+250 / +500 log water in one tap"). */}
+      <div data-tour="rings">
         <p className="ds-label">Nutrition · {dayName}</p>
 
         <div className="mt-3.5 flex items-center gap-[18px]">

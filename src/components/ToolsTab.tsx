@@ -22,7 +22,7 @@ export interface ToolsTabProps {
 
 export function ToolsTab({ profileId, mealPools, targets, softLikedFoods }: ToolsTabProps) {
   return (
-    <div className="space-y-8">
+    <div data-tour="toolsall" className="space-y-8">
       <div>
         <p className="ds-label">Timer</p>
         <div className="mt-2.5">

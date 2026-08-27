@@ -254,7 +254,9 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
 
         {/* 2. Today's session — the hero. Borderless: it's the type scale, the
             local glow blooms and the lit CTA that make this the focal unit. */}
-        <div className="relative mt-4 pt-1">
+        {/* data-tour: the app tour spotlights this whole unit (focus + CTA +
+            tomorrow line) as "Home answers one question — what's next". */}
+        <div data-tour="hero" className="relative mt-4 pt-1">
           <div
             aria-hidden
             className="pointer-events-none absolute -left-8 -top-10 size-[200px] rounded-full"
@@ -306,6 +308,10 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
             read-only tiles that deep-link into Nutrition — Home never
             mutates nutrition state, it only shows where things stand and
             hands off. */}
+        {/* data-tour wraps the LABEL and the tiles together — the tour's copy
+            is about the pair ("calories and water at a glance"), and a
+            spotlight that cut the label off would read as a mistake. */}
+        <div data-tour="tiles">
         <p className="ds-label mt-8">Today</p>
         <div className="mt-3.5 grid grid-cols-2 gap-2.5">
           <button
@@ -352,6 +358,7 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
             </div>
             <button type="button" onClick={() => { window.location.hash = tabHash('nutrition') }} className="text-[11px] font-semibold text-primary">Nutrition ›</button>
           </div>
+        </div>
         </div>
 
         {/* Steps — unchanged; still logged here. */}

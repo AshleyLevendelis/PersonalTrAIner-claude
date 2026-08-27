@@ -18,6 +18,20 @@ import type { Tab } from '@/lib/app-route'
 
 export const TAB_BAR_HEIGHT_PX = 64
 
+/**
+ * `data-tour` keys for the app tour's nav stops (AppTour.tsx). Derived from
+ * the tab rather than passed in per call site: the tour needs to spotlight
+ * the REAL tab button so the user's own tap does the navigating, and a key
+ * that is computed here cannot be forgotten when a tab is added.
+ */
+const TOUR_KEY: Record<Tab, string> = {
+  dashboard: 'navHome',
+  nutrition: 'navNutrition',
+  exercise: 'navExercise',
+  tools: 'navTools',
+  chat: 'chatfab',
+}
+
 const SIDE_TABS: { tab: Tab; label: string; icon: typeof LayoutDashboard }[] = [
   { tab: 'dashboard', label: 'Home', icon: LayoutDashboard },
   { tab: 'nutrition', label: 'Nutrition', icon: PieChart },
@@ -58,6 +72,7 @@ export function BottomTabBar({
         <div className="flex flex-1 items-center justify-center">
           <button
             type="button"
+            data-tour={TOUR_KEY.chat}
             onClick={() => onTabChange('chat')}
             aria-label="Chat"
             aria-current={activeTab === 'chat' ? 'page' : undefined}
@@ -79,6 +94,7 @@ export function BottomTabBar({
 }
 
 function SideTabButton({
+  tab,
   label,
   icon: Icon,
   active,
@@ -93,6 +109,7 @@ function SideTabButton({
   return (
     <button
       type="button"
+      data-tour={TOUR_KEY[tab]}
       onClick={onClick}
       aria-current={active ? 'page' : undefined}
       className={`flex flex-1 flex-col items-center justify-center gap-0.5 ${

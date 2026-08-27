@@ -143,7 +143,7 @@ export function MealPlan({
   }
 
   return (
-    <div className="space-y-4">
+    <div data-tour="meals" className="space-y-4">
       {unrecognisedBanner || errorBanner}
       <div className="flex items-center justify-between">
         <span className="ds-label">Today's meals</span>

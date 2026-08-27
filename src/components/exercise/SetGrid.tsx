@@ -369,7 +369,16 @@ export function SetGrid({
               {/* 3b: the outstanding set's save control is the lit mint square —
                   the one thing on the row asking to be tapped. Once saved it
                   recedes to a quiet mint tick. */}
+              {/* data-tour ONLY while the row is still open, and that is the
+                  whole mechanism behind the tour's set stop rather than a
+                  detail. The tour waits for this element to DISAPPEAR, which
+                  happens precisely when saveSet returns and isSaved flips —
+                  so a save that fails validation leaves the row open, leaves
+                  this attribute in place, and correctly leaves the tour
+                  waiting instead of congratulating the user for a set that
+                  was never logged. See AppTour.tsx's measure loop. */}
               <Button
+                data-tour={isSaved ? undefined : 'setrow'}
                 variant="ghost"
                 size="icon"
                 className={`size-7 shrink-0 ${isSaved ? 'text-primary' : 'text-[color:var(--primary-foreground)] glow-pulse'}`}

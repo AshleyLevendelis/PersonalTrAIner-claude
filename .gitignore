@@ -23,3 +23,5 @@ supabase/.temp/
 # committed, but the file itself stays), so they can't be listed here —
 # .githooks/pre-commit refuses those instead.
 meal-quality-report.txt
+.tour-harness/dist/
+.tour-harness/*.png

@@ -19,6 +19,7 @@ import { BottomDock } from '@/components/BottomDock'
 import { ActiveSessionProvider } from '@/hooks/useActiveSession'
 import { TimersProvider } from '@/hooks/useTimers'
 import { BottomDockHeightProvider } from '@/hooks/useBottomDockHeight'
+import { AppTour } from '@/components/AppTour'
 import { isDevAccount, getSessionDateContext, getAppNow } from '@/lib/dev-clock'
 import { useAppRoute, tabHash, isTab, isKnownTabHash, type Tab } from '@/lib/app-route'
 
@@ -150,6 +151,18 @@ function App() {
   const [isRestoring, setIsRestoring] = useState(true)
   const [isGenerating, setIsGenerating] = useState(false)
   const [setupError, setSetupError] = useState<string | null>(null)
+  /**
+   * True only from the moment onboarding SUCCEEDS, for the rest of that
+   * session. AppTour will not start without it.
+   *
+   * A component-local flag rather than something derived from the profile,
+   * because "has a plan" is not the question — every returning user has one.
+   * The question is "did this person just finish onboarding in front of me",
+   * and only this call site knows that. Someone who has been using the app for
+   * a month opens it with no stored tour state either, and must not be handed
+   * a tour of a plan they already know.
+   */
+  const [tourArmed, setTourArmed] = useState(false)
   /**
    * The plan generated but the profile row did not save.
    *
@@ -940,6 +953,11 @@ function App() {
 
     setProfile(enrichedProfile)
     setMacros(calculatedMacros)
+    // Arms the app tour. Deliberately here and not in the `finally` below:
+    // this line is only reached when a plan was genuinely built, and a tour of
+    // an app whose onboarding just failed would be the wrong thing to show
+    // someone staring at an error.
+    setTourArmed(true)
     // The onboarding weight IS the first weigh-in (it's written to
     // daily_metrics above) — seed the shared latestWeightKg from it so the
     // derivation/targets never render a previous profile's stale weight.
@@ -1761,6 +1779,7 @@ function App() {
           in one tap. Positioned above <main> so they never depend on which
           tab is mounted. */}
       <div
+        data-tour="settings"
         className="fixed right-3 z-40"
         style={{ top: 'calc(0.625rem + env(safe-area-inset-top))' }}
       >
@@ -2011,6 +2030,10 @@ function App() {
       </main>
       <BottomDock />
       <BottomTabBar activeTab={activeTab} onTabChange={handleTabChange} />
+      {/* Sibling of <main>, like BottomDock, so it overlays every tab AND the
+          tab bar — the tour's nav stops spotlight the real tab buttons, which
+          it could not reach from inside a tab's own subtree. */}
+      <AppTour profileId={profile.id} armed={tourArmed} />
       <ProfileScreen
         open={profileInfoOpen}
         onOpenChange={setProfileInfoOpen}

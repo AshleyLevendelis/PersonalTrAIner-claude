@@ -84,7 +84,7 @@ export function WeekContextRow({
   if (estimatedMinutes != null) headerParts.push(`~${estimatedMinutes} min`)
 
   return (
-    <div className="rounded-2xl p-3.5" style={{ background: 'var(--surface-raised)' }}>
+    <div data-tour="extoday" className="rounded-2xl p-3.5" style={{ background: 'var(--surface-raised)' }}>
       <div className="flex items-center justify-between gap-3">
         <button
           type="button"
