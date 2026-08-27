@@ -103,34 +103,39 @@ export function buildFirstRunIntro(greeting: string, detailSentence: string): Fi
 // bit") and never once says what the app is for. You were asked your name by
 // something you had no reason to trust yet.
 //
-// Same restraint as above, and it matters more here because nothing has been
-// built yet: only claims the app actually delivers. Every sentence below maps
-// to something real — plan generation, the injury/equipment adaptation paths,
-// natural-language logging, user_facts memory, and the propose-then-confirm
-// card. No feature list, no capability the coach would then decline.
+// THE WORDS ARE ASHLEY'S, and that is a constraint, not a credit. She wrote
+// the draft, rejected a capabilities-first restructure of it outright, ruled
+// out any question count ("don't say dozen questions"), and picked this
+// version verbatim from three complete candidates. Editorial "improvements"
+// here are how her decision gets quietly unmade — change this copy only on
+// her say-so.
 //
-// Four short messages rather than one, for the reason FIRST_RUN_WHAT_TO_SAY
-// records: as a single paragraph this runs to a wall of text at 412px, which
-// is the thing the split exists to avoid. Checked with `render:screens`,
-// not guessed.
+// Same honesty rule as the main-chat intro above: every claim maps to a
+// shipped mechanism. Log workouts -> natural-language logging; swap what
+// isn't working -> swap/addition proposals; plan around injuries -> the
+// injury adaptation path; remember what matters -> user_facts; nothing
+// changes without your okay -> propose-then-confirm cards; ask me anything
+// -> the onboarding chat answers free questions. No capability the coach
+// would then decline.
+//
+// Three short messages rather than one paragraph — two earlier drafts ran to
+// a wall of text at 412px with the question below the fold. Checked with
+// `render:screens`, not guessed.
 // ---------------------------------------------------------------------------
 
 export const ONBOARDING_INTRO_WHO =
-  "Hey — I'm your coach. Good to meet you."
+  "Hi — I'm your personal trainer. I want to get to know you a bit, then build your training and your food around what you tell me."
 
 export const ONBOARDING_INTRO_WHAT_I_DO =
-  "I'll build your training and your food, then keep them working as life gets in the way — a sore shoulder, a short week, a food you hate."
-
-export const ONBOARDING_INTRO_HOW_TO_USE =
-  "After that you just talk to me. I'll log it, sort it, remember it — and nothing changes without your say-so."
+  "After that you just talk to me — I'll log your workouts, swap what isn't working, plan around injuries, and remember what matters. Nothing changes without your okay."
 
 export const ONBOARDING_INTRO_THE_ASK =
-  "Few minutes to set up, and you can change anything later. First — what should I call you?"
+  "I'll ask about your goals, what you've got to train with, what your week actually looks like — and you can ask me anything as we go. First: what should I call you?"
 
 /**
  * The messages a brand-new user sees before anything else in the app.
  *
- * Order is deliberate: who you are, what you do, how they use you, THEN the
+ * Order is Ashley's: get to know you first, then what gets built, then the
  * first question. The name ask lands last because asking it first — which is
  * what this used to do — is a form opening with a field.
  *
@@ -143,7 +148,6 @@ export function buildOnboardingIntro(): FirstRunMessage[] {
   return [
     { content: ONBOARDING_INTRO_WHO },
     { content: ONBOARDING_INTRO_WHAT_I_DO },
-    { content: ONBOARDING_INTRO_HOW_TO_USE },
     { content: ONBOARDING_INTRO_THE_ASK },
   ]
 }

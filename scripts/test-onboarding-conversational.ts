@@ -148,9 +148,17 @@ console.log('\n5b. THE FIRST SCREEN: it says what the app is for before it asks 
 
   // The promise that makes the first proposal card read as designed rather
   // than as the app hesitating. Only claim things that are true: every
-  // plan-changing tool is propose-then-confirm.
-  check('it states that nothing changes without their say-so',
-    /without your say-so|show you first/i.test(intro.map(m => m.content).join(' ')))
+  // plan-changing tool is propose-then-confirm. "without your okay" joined
+  // the accepted phrasings when Ashley chose that wording verbatim — the
+  // gate serves the approved copy, not the other way round.
+  check('it states that nothing changes without their okay',
+    /without your (say-so|okay)|show you first/i.test(intro.map(m => m.content).join(' ')))
+
+  // "Explains what the app can do" is an explicit product requirement from
+  // Ashley, not a nice-to-have — and logging is the capability that turns
+  // "talk to me" from a slogan into a mechanic. An intro that drops it has
+  // lost the explanation she asked for.
+  check('it names the log-your-workouts capability before asking anything', /\blog\b|\blogs?\b|\blogging\b/i.test(before))
 
   // (1) again, now unbreakable by a file move.
   const all = intro.map(m => m.content).join(' ')
