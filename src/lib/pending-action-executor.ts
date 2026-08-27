@@ -16,7 +16,9 @@ import type { MesocycleWeek, UserProfile, EquipmentAccess } from './types'
 import { swapExerciseInMesocycle, type SwapScope } from './mesocycle-edit'
 import { saveMesocycle, saveMesocycleWeek } from './mesocycle-persistence'
 import { getExerciseEntry } from './exercise-db'
-import { swapPoolMeal, type MealSlotName } from './meal-store'
+import { swapPoolMeal, clearMealPick, getMealPicksForDate, type MealSlotName } from './meal-store'
+import { supabase } from './supabase'
+import type { MealAdditionPayload } from './meal-addition'
 import { substituteForInjury, substituteForEquipment, rebuildForInjury } from './plan-adaptations'
 import { updateProfileField } from './profile-store'
 import type { PendingActionReceipt } from './pending-actions-store'
@@ -142,6 +144,75 @@ export async function executeMealSwap(profileId: string, payload: MealSwapPayloa
     appliedMacros: applied.macros,
     receipt: { landed: [`${payload.slot}: → ${applied.name}`], failed: [] },
   }
+}
+
+/**
+ * Adds a VERIFIED meal option to a slot's pool.
+ *
+ * The payload carries the option verifyProposal already accepted (see
+ * meal-addition.ts) — nothing is re-derived here and the model's own ingredient
+ * quantities never reach the database. What was shown on the card is what gets
+ * written.
+ *
+ * Deliberately NOT persistPools: that function deletes the slot's existing pool
+ * before inserting, which is right for a regenerate and catastrophic for an
+ * add — asking for one curry would silently delete the other four dinners.
+ *
+ * This owns the POOL write only. Making the meal that day's pick is the
+ * caller's job, through the same onMealSwapApplied path a confirmed swap uses
+ * — the one already proven to make a pick actually render. Two writers of the
+ * same pick is how the swap receipt started claiming things the Nutrition tab
+ * never showed. `poolIndex` comes back so the caller can undo this half if the
+ * pick doesn't land.
+ */
+export async function executeMealAddition(
+  profileId: string,
+  payload: MealAdditionPayload,
+): Promise<{ receipt: PendingActionReceipt; poolIndex: number | null }> {
+  const { slot, option } = payload
+
+  const { data: existing, error: readError } = await supabase
+    .from('meal_plan_slots')
+    .select('pool_index')
+    .eq('profile_id', profileId)
+    .eq('slot', slot)
+    .order('pool_index', { ascending: false })
+    .limit(1)
+
+  if (readError) {
+    return { receipt: { landed: [], failed: [{ op: 'propose_meal_addition', error: "Couldn't read your current meal options" }] }, poolIndex: null }
+  }
+
+  const nextIndex = (existing?.[0]?.pool_index ?? -1) + 1
+
+  const { error: insertError } = await supabase.from('meal_plan_slots').insert({
+    profile_id: profileId,
+    slot,
+    pool_index: nextIndex,
+    name: option.name,
+    ingredients: option.ingredients,
+    macros: { kcal: option.macros.calories, protein: option.macros.protein, carbs: option.macros.carbs, fat: option.macros.fat },
+    tags: option.tags,
+  })
+  if (insertError) {
+    return { receipt: { landed: [], failed: [{ op: 'propose_meal_addition', error: "Couldn't save the meal to your plan" }] }, poolIndex: null }
+  }
+
+  return { receipt: { landed: [`${slot}: + ${option.name}`], failed: [] }, poolIndex: nextIndex }
+}
+
+/**
+ * Removes an added option from the pool and clears the pick it set — both
+ * halves. This is the undo, and also the rollback when the pool write lands
+ * but the pick doesn't: a meal left in the pool after a receipt said
+ * "Couldn't add it" is the same kind of quiet disagreement between what the
+ * app claims and what it stored that this framework exists to prevent.
+ */
+export async function undoMealAddition(profileId: string, payload: MealAdditionPayload): Promise<void> {
+  const { slot, date, option } = payload
+  await supabase.from('meal_plan_slots').delete().eq('profile_id', profileId).eq('slot', slot).eq('name', option.name)
+  const picks = await getMealPicksForDate(profileId, date)
+  if (picks[slot] === option.name) await clearMealPick(profileId, date, slot)
 }
 
 export interface InjuryAdaptationPayload {

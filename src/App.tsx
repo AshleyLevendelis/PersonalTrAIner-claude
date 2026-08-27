@@ -1919,6 +1919,16 @@ function App() {
                 // downgrades the receipt to "Couldn't apply" on failure
                 // instead of claiming a swap that didn't actually land.
                 if (!profile?.id) return true
+                // An empty name means "no pick" — undoing a meal ADDITION,
+                // where the slot goes back to whatever assembleDay chose
+                // rather than to a named previous option. undoMealAddition
+                // has already cleared the stored pick, so this only has to
+                // drop the on-screen override; writing '' as a meal_name
+                // here would persist a pick for a meal that doesn't exist.
+                if (!chosenName) {
+                  setManualMealPicks(prev => { const next = { ...prev }; delete next[slot]; return next })
+                  return true
+                }
                 const todayDate = getSessionDateContext(profile.id).date
                 try {
                   await setMealPick(profile.id, todayDate, slot, chosenName)

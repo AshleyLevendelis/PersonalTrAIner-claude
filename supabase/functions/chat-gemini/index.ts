@@ -268,6 +268,46 @@ const toolDeclarations = [
     },
   },
   {
+    name: "propose_meal_addition",
+    description:
+      "PROPOSES adding a specific dish to the user's meal plan — this does NOT apply the change. Call this when the user asks for a meal to be ADDED rather than swapped ('add chicken tikka masala to my dinners', 'can you put overnight oats in my breakfasts', 'I want to have salmon for dinner tomorrow'). Use propose_meal_swap instead when they want to change which of their EXISTING options is picked. You must list the ingredients with rough quantities — but do NOT try to be precise about macros or portions: the app re-measures every ingredient against its own food database and re-portions the whole dish to fit that meal slot's calorie and protein targets, so your quantities are a starting point, not the answer. Never state the calories or macros of the dish in your reply; the confirmation card shows the app's own verified numbers. The app also checks the dish against the user's allergies and dietary restrictions and will refuse it if it clashes, so never promise it has been added — they tap Confirm themselves.",
+    parameters: {
+      type: "object",
+      properties: {
+        meal_slot: {
+          type: "string",
+          description: "Which slot it goes in: breakfast, lunch, dinner or snack.",
+        },
+        meal_name: {
+          type: "string",
+          description: "The name of the dish, as the user would say it.",
+        },
+        ingredients: {
+          type: "array",
+          items: { type: "string" },
+          description: "One line per ingredient with a rough quantity and unit, e.g. '150g chicken breast', '80g basmati rice', '1 tbsp olive oil'. Use everyday ingredient names — the app matches these against a food database and refuses the dish rather than guessing if it can't resolve them. Quantities get rescaled, so approximate is fine.",
+        },
+        prep: {
+          type: "string",
+          description: "A short prep description, including rough time, e.g. 'Grill the chicken, 20 minutes'.",
+        },
+        cuisine: {
+          type: "string",
+          description: "One word for the cuisine, e.g. 'Indian', 'Italian', 'British'.",
+        },
+        date: {
+          type: "string",
+          description: "The date it should become their meal for, as YYYY-MM-DD. Omit for today.",
+        },
+        reason: {
+          type: "string",
+          description: "One short sentence on why this fits — shown on the card as the rationale.",
+        },
+      },
+      required: ["meal_slot", "meal_name", "ingredients"],
+    },
+  },
+  {
     name: "propose_exercise_swap",
     description:
       "PROPOSES swapping an exercise in the user's workout plan for a biomechanically similar alternative — this does NOT apply the change. Call this when the user gives an explicit command to modify their plan (e.g. 'swap bench press for push-ups', 'replace squats with leg press') OR proposes a swap due to pain/fatigue that the user has confirmed. The app shows the user a card with the exact before/after and they tap Confirm themselves — do not describe the swap as already done, and do not ask for a SEPARATE confirmation in your own text (the card IS the confirmation step). origin_verbatim_quote must be the exact substring of the user's message that makes this an imperative request, not a paraphrase.",
@@ -1153,7 +1193,7 @@ When the user says they're away or at a different gym for a period ("hotel gym f
   - Feel/effort check-ins: "how did that feel?" / "how's the shoulder holding up?" -> "Easy" | "About right" | "Hard" (adapt wording to what was actually asked)
   - A named choice between two or more specific things you just mentioned (exercises, meals, days) — the options ARE the names, e.g. asking whether they meant Front Squat or Back Squat -> "Front Squat" | "Back Squat"
   - Scope questions: "just today, or the rest of the block?" -> "Today only" | "Rest of block"
-  Do NOT add the tag when the question is genuinely open-ended — asks for a number, a description, a reason, or anything where the honest answer space isn't a short known set (e.g. "how much did you lift?", "what's been going on?"). When in doubt: if you could plausibly render the answer as 2-4 short buttons without stripping out anything the user might actually want to say, add it — free text is always still available underneath either way. Plan-mutation proposals (propose_exercise_swap, propose_meal_swap, propose_injury_adaptation, propose_equipment_adaptation) already render their own Confirm/Not-now buttons via the card — never add a redundant [QUICK_REPLIES] tag to those turns. The one exception is the equipment-clarifying question itself (§3b) — that's asked BEFORE the tool call, not on the proposal turn, so it gets a normal [QUICK_REPLIES] tag.
+  Do NOT add the tag when the question is genuinely open-ended — asks for a number, a description, a reason, or anything where the honest answer space isn't a short known set (e.g. "how much did you lift?", "what's been going on?"). When in doubt: if you could plausibly render the answer as 2-4 short buttons without stripping out anything the user might actually want to say, add it — free text is always still available underneath either way. Plan-mutation proposals (propose_exercise_swap, propose_meal_swap, propose_meal_addition, propose_injury_adaptation, propose_equipment_adaptation) already render their own Confirm/Not-now buttons via the card — never add a redundant [QUICK_REPLIES] tag to those turns. The one exception is the equipment-clarifying question itself (§3b) — that's asked BEFORE the tool call, not on the proposal turn, so it gets a normal [QUICK_REPLIES] tag.
 
 === FEW-SHOT EXAMPLES ===
 User: "Hey"
@@ -1288,6 +1328,8 @@ ${context.exercise_exclusions && context.exercise_exclusions.length > 0 ? `\nPER
 - Extract ONLY what the user actually stated. Never add an ingredient they didn't mention (no assumed cooking oil, seasoning, or protein powder) — if an addition seems implied, ask the user rather than silently including it.
 - If an ingredient has an ambiguous variant (fat content, whole vs. skimmed, etc.), pick one explicit, precisely-named variant and record the assumption. If a quantity is missing, use a typical portion and record that assumption too. See log_meal's parameter descriptions for exact requirements.
 - propose_meal_swap does not take a macro field at all — the app computes the swap's macros itself from the verified pool, shown on the confirm card.
+- ADDING A MEAL vs SWAPPING ONE. A swap changes which of their EXISTING options is picked; propose_meal_addition puts a NEW dish into the plan. "Add salmon to my dinners", "can I have overnight oats for breakfast", "put a curry in for Friday" are ADDITIONS — use propose_meal_addition. "Swap my lunch", "change breakfast to something else", "give me the other one" are SWAPS. If they name a dish that isn't already one of their options, it is an addition, not a swap.
+- When you call propose_meal_addition, give rough ingredient quantities and then say nothing about the numbers. The app re-measures every ingredient against its own food database, re-portions the dish to that slot's targets, and checks it against their allergies and dietary restrictions — it may refuse the dish outright. So never state its calories or macros, never say it has been added, and never promise it will fit.
 
 DYNAMIC QUANTITY SCALING (CRITICAL - MATHEMATICAL CONSTRAINT):
 You are strictly responsible for scaling ingredient quantities so that the physical weights add up to the requested target metrics. Do NOT use rigid, static portion templates (e.g., always defaulting to 150g chicken or 200g rice). Instead, you MUST dynamically calculate gram weights based on the specific calorie and macro budget for the meal slot you are filling.
@@ -1342,7 +1384,7 @@ FUNCTION CALL RULES (CRITICAL):
 - Trigger ban_exercise when the user says "I hate X", "never give me X", "remove X permanently", or explicitly flags an exercise to blacklist.
 - When a food LOGGING command is given (log_meal), execute it immediately. Scale portions to the meal slot budget above. Do NOT ask for macro details.
 - If the user does not specify which meal slot for a swap, infer it from the current meal plan.
-- When calling propose_meal_swap, call the function FIRST. Do NOT write a long preamble — put reasoning in the "reason" field.
+- When calling propose_meal_swap or propose_meal_addition, call the function FIRST. Do NOT write a long preamble — put reasoning in the "reason" field.
 - Do NOT trigger function calls for hypothetical questions, comparisons, or educational questions about exercise technique (answer those directly as text).
 - When genuinely unsure if the user wants a change applied, don't call a propose_* tool at all — ask in plain text first, and only call the tool on their next, unambiguous reply.
 
@@ -1580,6 +1622,22 @@ Keep this context in mind to ensure your greetings and questions naturally align
 
         return new Response(
           JSON.stringify({ reply: "", proposal: proposalResult }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (name === "propose_meal_addition") {
+        // A COURIER, not a verifier. The dish has to pass verifyProposal —
+        // food-DB resolution, the coverage floor, validateMealAgainstDiet,
+        // and rescaling to the slot budget — and that lives in
+        // src/lib/meal-generation.ts, which a Deno edge function cannot
+        // import. So the raw arguments go to the client, which builds the
+        // proposal through buildMealAdditionProposal and refuses it there if
+        // it clashes with an allergy. Nothing is written here, and the reply
+        // is deliberately empty: the client authors the text for a proposal
+        // turn, so the model cannot describe a meal as added.
+        return new Response(
+          JSON.stringify({ reply: "", proposal: { kind: "propose_meal_addition", rawArgs: args } }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }

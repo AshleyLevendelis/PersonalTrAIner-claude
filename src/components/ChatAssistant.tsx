@@ -6,16 +6,17 @@ import { Textarea } from '@/components/ui/textarea'
 import { Send, CheckCircle2, ArrowDown, RotateCcw, AlertCircle, Trash2, Mic, MessageCircle } from 'lucide-react'
 import { calculateCalories, getActiveMesocycleWeek } from '@/lib/calculations'
 import { computeBMR, computeStaticTDEE, resolveBodyMetrics } from '@/lib/macro-calculator'
-import { getAppNow } from '@/lib/dev-clock'
+import { getAppNow, getSessionDateContext } from '@/lib/dev-clock'
 import { supabase } from '@/lib/supabase'
 import { getRecentLogs, formatLogsForAI, getRecentCardioLogs, formatCardioLogsForAI } from '@/lib/daily-tracking'
 import { saveChatCache, loadChatCache, clearChatCache } from '@/lib/chat-cache'
-import { swapPoolMeal, type MealSlotName } from '@/lib/meal-store'
+import { swapPoolMeal, setMealPick, type MealSlotName } from '@/lib/meal-store'
 import { getExerciseEntry } from '@/lib/exercise-db'
 import { createPendingAction, claimPendingAction, declinePendingAction, markExecuting, resolvePendingAction, getPendingAction, isWithinUndoWindow, type PendingActionReceipt } from '@/lib/pending-actions-store'
 import { APPEND_PROPOSAL_KINDS, INTENT_PROPOSAL_VERB, buildIntentProposal } from '@/lib/intent-proposal'
 import { pickAccountabilityCheckIn } from '@/lib/accountability'
-import { executeExerciseSwap, executeMealSwap, undoExerciseSwap, executeInjuryAdaptation, executeLastingInjury, executeInjuryRecovered, executeEquipmentAdaptation, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type LastingInjuryPayload, type InjuryRecoveredPayload, type EquipmentAdaptationPayload } from '@/lib/pending-action-executor'
+import { executeExerciseSwap, executeMealSwap, executeMealAddition, undoMealAddition, undoExerciseSwap, executeInjuryAdaptation, executeLastingInjury, executeInjuryRecovered, executeEquipmentAdaptation, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type LastingInjuryPayload, type InjuryRecoveredPayload, type EquipmentAdaptationPayload } from '@/lib/pending-action-executor'
+import { buildMealAdditionProposal, type MealAdditionPayload } from '@/lib/meal-addition'
 import type { SwapScope } from '@/lib/mesocycle-edit'
 import { createPlanAdaptation } from '@/lib/plan-adaptations-store'
 import { updateProfileField } from '@/lib/profile-store'
@@ -965,6 +966,9 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     const rows = pendingAction.diff.rows
     if (rows.length === 0) return "Here's a change I can make:"
     if (pendingAction.kind === 'propose_injury_recovered') return "Here's the injury update:"
+    // Not "swap X for Y" — nothing is being replaced, and the default
+    // headline below would read the slot name as the thing being lost.
+    if (pendingAction.kind === 'propose_meal_addition') return `I can add **${rows[0].after}** to your ${rows[0].before}:`
     if (pendingAction.kind === 'propose_injury_adaptation' || pendingAction.kind === 'propose_injury_as_lasting' || pendingAction.kind === 'propose_equipment_adaptation') {
       const count = rows.length
       return `I can adjust ${count} exercise${count === 1 ? '' : 's'} across your plan:`
@@ -1736,8 +1740,35 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       // I1: the client is the ONLY writer of pending_actions — this INSERT
       // is what actually creates the row the edge function only described.
       let built: { scopeKey: string; preconditions: Record<string, unknown>; payload: Record<string, unknown>; preImage?: unknown; diff: import('@/lib/pending-actions-store').ProposalDiff } | null = null
+      // A builder that refuses for a REASON puts it here, so the fallback
+      // below says why instead of the generic "I couldn't find that on your
+      // current plan" — which for a meal rejected on an allergen would be
+      // both unhelpful and untrue.
+      let refusal: string | null = null
 
-      if (result.proposal.kind === 'propose_exercise_swap' && result.proposal.rawArgs) {
+      if (result.proposal.kind === 'propose_meal_addition' && result.proposal.rawArgs) {
+        // The verification gate for a user-requested dish. buildMealAddition-
+        // Proposal runs it through verifyProposal — the same function every
+        // generated meal passes — so an allergen, an unmeasurable ingredient
+        // or a dish that can't be portioned into the slot's budget is refused
+        // HERE, before any pending_actions row exists to confirm.
+        if (!macros) {
+          refusal = "I need your height, weight, age and sex before I can fit a meal to your targets — you can add them in Profile."
+        } else {
+          const addition = buildMealAdditionProposal({
+            rawArgs: result.proposal.rawArgs,
+            profileId: profile.id,
+            targets: macros,
+            mealsPerDay: profile.meals_per_day,
+            includeSnacks: profile.include_snacks,
+            dietaryPreferences: profile.dietary_preferences ?? [],
+            dislikedFoods: profile.disliked_foods ?? [],
+            todayDate: getSessionDateContext(profile.id).date,
+          })
+          if (addition.ok) built = { scopeKey: addition.scopeKey, preconditions: addition.preconditions, payload: addition.payload as unknown as Record<string, unknown>, diff: addition.diff }
+          else refusal = addition.reason
+        }
+      } else if (result.proposal.kind === 'propose_exercise_swap' && result.proposal.rawArgs) {
         const swap = buildExerciseSwapProposal(result.proposal.rawArgs)
         if (swap) built = { scopeKey: swap.scopeKey, preconditions: swap.preconditions, payload: swap.payload as unknown as Record<string, unknown>, preImage: swap.preImage, diff: swap.diff }
       } else if (result.proposal.kind === 'propose_injury_adaptation' && result.proposal.rawArgs) {
@@ -1763,7 +1794,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       }
 
       if (!built) {
-        return { text: "I couldn't find that on your current plan — it may have changed since you last looked." }
+        return { text: refusal ?? "I couldn't find that on your current plan — it may have changed since you last looked." }
       }
 
       const row = await createPendingAction({
@@ -2152,6 +2183,35 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         })
       }
       undoToken = ok ? row.id : undefined
+    } else if (row.kind === 'propose_meal_addition') {
+      const payload = row.payload as unknown as MealAdditionPayload
+      const result = await executeMealAddition(profile.id, payload)
+      receipt = result.receipt
+      let ok = receipt.failed.length === 0
+      if (ok) {
+        // The pool write landed; now make it the pick. Today goes through
+        // onMealSwapApplied — the same path a confirmed swap uses, and the
+        // only one that also updates what the Nutrition tab is rendering
+        // right now. A future date has no on-screen state to update, so it
+        // writes the pick directly.
+        const todayDate = getSessionDateContext(profile.id).date
+        let picked = true
+        if (payload.date === todayDate) {
+          picked = await onMealSwapApplied(payload.slot, payload.option.name)
+        } else {
+          try { await setMealPick(profile.id, payload.date, payload.slot, payload.option.name) } catch { picked = false }
+        }
+        if (!picked) {
+          // Roll the pool write back rather than leaving a meal in the plan
+          // that the receipt is about to say couldn't be added.
+          await undoMealAddition(profile.id, payload)
+          receipt = { landed: [], failed: [{ op: 'save', error: "The meal didn't save — try again" }] }
+          ok = false
+        }
+      }
+      title = ok ? 'Added' : "Couldn't add the meal"
+      rows = ok ? [{ label: payload.slot, detail: `+ ${payload.option.name}` }] : []
+      undoToken = ok ? row.id : undefined
     } else if (row.kind === 'propose_injury_adaptation') {
       const payload = row.payload as unknown as InjuryAdaptationPayload
       const result = await executeInjuryAdaptation(profile, mesocycle, payload)
@@ -2341,6 +2401,17 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         if (!payload.currentName) return
         const persisted = await onMealSwapApplied(payload.slot, payload.currentName)
         if (!persisted) return // leave the Undo button in place so the user can retry
+      } else if (row.kind === 'propose_meal_addition') {
+        // Removes the option from the pool AND clears the pick, both — an
+        // undo that only dropped the pick would leave the meal sitting in
+        // the slot's options forever, which is not what "undo" said.
+        const payload = row.payload as unknown as MealAdditionPayload
+        await undoMealAddition(profile.id, payload)
+        // Nothing to restore as the on-screen pick: the slot had whatever
+        // assembleDay chose before this, and clearing the pick is what makes
+        // the Nutrition tab fall back to it. onMealSwapApplied can't express
+        // "no pick", so the reload does it.
+        await onMealSwapApplied(payload.slot, '')
       } else {
         return
       }
