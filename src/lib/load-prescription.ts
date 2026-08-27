@@ -252,6 +252,14 @@ const DERIVED_COMPOUND_SCALE: Record<string, { parent: LiftFamily; scale: number
   leg_press: { parent: 'squat', scale: 2.2 },
   goblet_squat: { parent: 'squat', scale: 0.35 },
   hinge_accessory: { parent: 'deadlift', scale: 0.55 },
+  // Ashley's ruling, given the resulting weights rather than the multiplier:
+  // an 85kg man doing sets of 15 gets 32kg advanced, 26kg intermediate, 14kg
+  // starting out; a 60kg woman 12kg. Nobody is pinned to the 48kg implement
+  // ceiling any more (was 19 of 48 sampled profiles). Calibrated for general
+  // fitness rather than for a dedicated kettlebell athlete, and the direction
+  // of the change is downward, which is the safe direction for a lift nobody
+  // has verified a working weight for.
+  kettlebell_swing: { parent: 'deadlift', scale: 0.22 },
   // Two-dumbbell unilateral leg work (walking lunge, step-up, split squat,
   // Bulgarian split squat) was falling through to the generic 'squat'
   // category via movement_pattern 'single_leg' — anchoring a per-hand
@@ -417,7 +425,21 @@ export function categorize(entry: ExerciseEntry): string | null {
   // moved carry up WITHOUT keeping overhead_carry ahead of it and silently
   // reclassified Overhead Carry — caught by the whole-DB sweep, which is why
   // these four live together here rather than sorted by topic.
-  if (n.includes('good morning') || n.includes('romanian') || n.includes('swing')) return 'hinge_accessory'
+  // A kettlebell swing is not 55% of a deadlift. It is ballistic and hip-snap
+  // driven, its implement stops at 48kg, and it is prescribed at 12-15 reps.
+  // Sharing hinge_accessory's anchor put an 85kg intermediate man on the
+  // heaviest bell in the gym and an 85kg beginner on 32kg — 19 of 48 sampled
+  // profiles landed on exactly 48kg, so the prescription had stopped telling
+  // people apart. Its own category, because hinge_accessory also holds
+  // barbell Good Mornings, Hip Thrust and RDLs where 0.55 is right (or, for
+  // hip thrust, deliberately conservative — see its note in exercise-db.ts);
+  // re-scaling the shared bucket would have dragged those down with it.
+  //
+  // Equipment-gated, not name-gated: "Leg Swings" is a warm-up mobility drill
+  // that was sitting in hinge_accessory purely because its name contains
+  // "swing".
+  if (n.includes('swing') && (entry.equipment.includes('kettlebell') || entry.equipment.includes('dumbbell'))) return 'kettlebell_swing'
+  if (n.includes('good morning') || n.includes('romanian')) return 'hinge_accessory'
   // Two-dumbbell unilateral leg work — see single_leg_dumbbell's doc comment
   // above for why this can't share the bilateral 'squat' standard.
   if (n.includes('lunge') || n.includes('step-up') || n.includes('step up') || n.includes('split squat') || n.includes('bulgarian')) {

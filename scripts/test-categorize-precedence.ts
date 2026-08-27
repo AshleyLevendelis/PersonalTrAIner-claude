@@ -25,8 +25,20 @@
  *   §2 a whole-DB trapdoor: nothing outside those four may move. That is what
  *      catches the next reorder, including the one this fix nearly shipped.
  */
-import { categorize } from '../src/lib/load-prescription'
+import { categorize, prescribeLoad } from '../src/lib/load-prescription'
 import { getExerciseEntry, EXERCISE_DATABASE } from '../src/lib/exercise-db'
+import type { UserProfile } from '../src/lib/types'
+
+const profileFor = (o: Partial<UserProfile>): UserProfile => ({
+  age: 34, gender: 'male', height_cm: 178, weight_kg: 85, activity_level: 'moderate',
+  fitness_goal: 'hypertrophy', preferred_time: 'morning', bmr: 0, tdee: 0,
+  equipment_access: 'full_gym', injuries: [], training_style: 'hybrid',
+  training_experience: 'intermediate', session_duration_preference: '60-90',
+  workout_split_preference: 'upper_lower', training_days: [], weekly_schedule: {},
+  dietary_preferences: [], concurrent_activities: [], exercise_exclusions: [],
+  macro_calculation_mode: 'STANDARD_STATIC', coaching_persona: 'supportive',
+  recovery_capacity: 'moderate', conditioning_preference: 'tolerate', ...o,
+} as UserProfile)
 
 let failures = 0
 const check = (l: string, ok: boolean, extra?: unknown) => {
@@ -79,12 +91,20 @@ console.log('\n3. TRAPDOOR: no other exercise in the database moved')
   // `carry` above `overhead_carry` and silently reclassified Overhead Carry;
   // §2 names that one, but only a whole-DB comparison catches the case nobody
   // thought to name.
+  //
+  // UPDATED ONCE, deliberately, when kettlebell_swing was split out of
+  // hinge_accessory: it flagged exactly three moves (the two swings out, and
+  // Leg Swings — a warm-up mobility drill that had been sitting in
+  // hinge_accessory purely because its name contains "swing" — out to no
+  // category at all, which renders as "Bodyweight"). Re-snapshotting is the
+  // right response to a change you meant; the wrong response is loosening
+  // the check so it stops noticing.
   const AT_THE_FIX: Record<string, string[]> = {
     bench: ["Archer Push-Ups", "Barbell Bench Press", "Barbell Floor Press", "Chest Dips", "Chest Press Machine", "Deficit Push-Ups", "Dumbbell Bench Press", "Dumbbell Floor Press", "Incline Dumbbell Press", "Incline Machine Press", "Incline Push-Ups", "Neutral-Grip Dumbbell Press", "Push-Ups"],
     carry: ["Farmer Squat Hold (Isometric Carry)", "Farmer's Walk", "Loaded Backpack Walk", "Suitcase Carry", "Trap Bar Carry"],
     deadlift: ["Deadlifts", "Trap Bar Deadlift"],
     goblet_squat: ["Goblet Squats"],
-    hinge_accessory: ["Bodyweight Good Morning", "Glute Bridge", "Good Mornings", "Hip Thrust", "Kettlebell Swing (Heavy)", "Kettlebell Swings", "Leg Swings", "Romanian Deadlifts", "Single-Leg RDL (Bodyweight)"],
+    hinge_accessory: ["Bodyweight Good Morning", "Glute Bridge", "Good Mornings", "Hip Thrust", "Romanian Deadlifts", "Single-Leg RDL (Bodyweight)"],
     isolation_bicep: ["Band Curl", "Barbell Curls", "Cable Curls", "Dumbbell Curls", "Hammer Curls", "Incline Dumbbell Curls"],
     isolation_calf: ["Calf Raises", "Calf Raises (Bodyweight)", "Seated Calf Raises", "Single-Leg Calf Raise (Bodyweight)", "Single-Leg Dumbbell Calf Raise"],
     isolation_chest: ["Cable Crossover", "Cable Flyes", "Cable Woodchops", "Dead Bug", "Dumbbell Flyes", "Face Pulls", "Pallof Press", "Pec Deck Machine", "Plank", "Rear Delt Flyes", "Reverse Pec Deck", "Russian Twist", "Side Plank", "Straight-Arm Pulldown", "Wall Sit"],
@@ -92,8 +112,9 @@ console.log('\n3. TRAPDOOR: no other exercise in the database moved')
     isolation_quad: ["Banded Terminal Knee Extension", "Chair Leg Extension", "Leg Extensions", "Seated Short-Arc Quad Set", "Sissy Squat"],
     isolation_shoulder: ["Band Lateral Raise", "Cable Lateral Raises", "Front Raises", "Lateral Raises", "Machine Lateral Raise"],
     isolation_tricep: ["Band Tricep Kickback", "Band Tricep Pushdown", "Overhead Tricep Extension", "Skull Crushers", "Tricep Dips", "Tricep Pushdowns"],
+    kettlebell_swing: ["Kettlebell Swing (Heavy)", "Kettlebell Swings"],
     leg_press: ["Hack Squat", "Leg Press"],
-    null: ["Ab Wheel Rollout", "Arm Circles", "Band Dislocates", "Band Face Pulls", "Band Pull-Aparts", "Battle Ropes", "Box Jumps", "Broad Jumps", "Burpees", "Cycling Intervals", "Elliptical", "Hanging Leg Raises", "Jump Rope", "Lateral Step Touches", "Medicine Ball Slams", "Mountain Climbers", "Plyo Push-Ups", "Prone Y-T Raises", "Scapular Push-Ups", "Treadmill Intervals", "Wall Slides"],
+    null: ["Ab Wheel Rollout", "Arm Circles", "Band Dislocates", "Band Face Pulls", "Band Pull-Aparts", "Battle Ropes", "Box Jumps", "Broad Jumps", "Burpees", "Cycling Intervals", "Elliptical", "Hanging Leg Raises", "Jump Rope", "Lateral Step Touches", "Leg Swings", "Medicine Ball Slams", "Mountain Climbers", "Plyo Push-Ups", "Prone Y-T Raises", "Scapular Push-Ups", "Treadmill Intervals", "Wall Slides"],
     overhead: ["Arnold Press", "Band Shoulder Press", "Dumbbell Shoulder Press", "Landmine Press", "Overhead Press", "Shoulder Press Machine"],
     overhead_carry: ["Overhead Carry"],
     pulldown: ["Close-Grip Lat Pulldown", "Kneeling Band Lat Pulldown", "Lat Pulldown"],
@@ -140,6 +161,64 @@ console.log('\n4. The generic rules still work for the lifts they are FOR')
   const squats = EXERCISE_DATABASE.filter(e => e.name.toLowerCase().includes('squat'))
   check('there are still real squats routed as squats',
     squats.some(e => categorize(e) === 'squat'), squats.map(e => `${e.name}=${categorize(e)}`))
+}
+
+console.log('\n5. Kettlebell swings are a weight that exists')
+{
+  // The category split is only half of it — the point was the WEIGHTS. Ashley
+  // ruled on these as numbers, not as a multiplier, so they are pinned as
+  // numbers here. Sharing hinge_accessory's 0.55x deadlift anchor put an 85kg
+  // intermediate man on the heaviest bell in the gym and an 85kg beginner on
+  // 32kg.
+  const e = getExerciseEntry('Kettlebell Swing (Heavy)')
+  if (!e) check('Kettlebell Swing (Heavy) exists', false)
+  else {
+    const opts = { sets: 3, reps: '12-15', intensity: 'RPE 7-8' } as unknown as Parameters<typeof prescribeLoad>[2]
+    let pinned = 0, total = 0
+    for (const gender of ['male', 'female'] as const)
+      for (const training_experience of ['beginner', 'novice', 'intermediate', 'advanced'] as const)
+        for (const weight_kg of [50, 60, 70, 85, 100, 120]) {
+          const l = prescribeLoad(e, profileFor({ gender, training_experience, weight_kg }), opts)
+          total++
+          if (l?.starting_weight_kg === 48) pinned++
+        }
+    // THE PROPERTY THAT MATTERS: a clamp makes the prescription stop telling
+    // people apart. 19 of 48 used to land on exactly 48kg.
+    check('nobody is pinned to the 48kg implement ceiling', pinned === 0, { pinned, total })
+
+    const at = (gender: 'male' | 'female', training_experience: string, weight_kg: number) =>
+      prescribeLoad(e, profileFor({ gender, training_experience: training_experience as never, weight_kg }), opts)?.starting_weight_kg ?? null
+    // Ashley's chosen numbers, verbatim.
+    for (const [g, exp, w, want] of [
+      ['male', 'beginner', 85, 14], ['male', 'intermediate', 85, 26],
+      ['male', 'advanced', 85, 32], ['female', 'intermediate', 60, 12],
+    ] as [('male'|'female'), string, number, number][]) {
+      check(`${g} ${exp} ${w}kg -> ${want}kg`, at(g, exp, w) === want, at(g, exp, w))
+    }
+    // A swing must still get HEAVIER with experience and bodyweight, or the
+    // fix has traded one flat prescription for another.
+    check('still increases with experience',
+      at('male', 'beginner', 85)! < at('male', 'intermediate', 85)! && at('male', 'intermediate', 85)! < at('male', 'advanced', 85)!)
+    check('still increases with bodyweight',
+      at('male', 'intermediate', 60)! < at('male', 'intermediate', 100)!,
+      { at60: at('male', 'intermediate', 60), at100: at('male', 'intermediate', 100) })
+  }
+
+  // The barbell lifts that share the old bucket must NOT have moved — this is
+  // why swings got their own category instead of a smaller shared multiplier.
+  for (const [name, expect] of [['Good Mornings', 82.5], ['Hip Thrust', 82.5]] as [string, number][]) {
+    const ex = getExerciseEntry(name)
+    if (!ex) { check(`${name} exists`, false); continue }
+    const l = prescribeLoad(ex, profileFor({ gender: 'male', training_experience: 'advanced', weight_kg: 85 }), { sets: 3, reps: '10-12', intensity: 'RPE 7-8' } as unknown as Parameters<typeof prescribeLoad>[2])
+    check(`${name} is untouched by the swing recalibration (${expect}kg)`, l?.starting_weight_kg === expect, l?.starting_weight_kg)
+  }
+
+  // Leg Swings was in hinge_accessory only because its name contains "swing".
+  const legSwings = getExerciseEntry('Leg Swings')
+  if (legSwings) {
+    const l = prescribeLoad(legSwings, profileFor({ gender: 'male', training_experience: 'advanced', weight_kg: 85 }), { sets: 2, reps: '10', intensity: 'Light' } as unknown as Parameters<typeof prescribeLoad>[2])
+    check('a mobility drill named "swing" carries no load', l?.starting_weight_kg == null && l?.display === 'Bodyweight', l?.display)
+  }
 }
 
 if (failures > 0) { console.error(`\n${failures} check(s) failed`); process.exit(1) }

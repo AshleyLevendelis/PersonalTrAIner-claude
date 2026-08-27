@@ -68,6 +68,9 @@ import { categorize, isImprovisedLoadImplement, IMPROVISED_IMPLEMENT_CEILING_KG,
 export const SAFETY_CEILING_KG_TOTAL: Partial<Record<string, number>> = {
   squat: 260, deadlift: 325, bench: 220, overhead: 140, row: 200,
   pulldown: 180, leg_press: 400, goblet_squat: 60, hinge_accessory: 180,
+  // The heaviest kettlebell that exists is 48kg; the usual ~25% headroom over
+  // the highest legitimate value puts the audit ceiling at 60.
+  kettlebell_swing: 60,
   isolation_bicep: 70, isolation_tricep: 80, isolation_chest: 95,
   shrug: 140, isolation_quad: 115,
   isolation_hamstring: 115, isolation_calf: 140, carry: 130,

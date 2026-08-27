@@ -88,16 +88,51 @@ moved `carry` up without keeping `overhead_carry` ahead of it, silently
 reclassifying `Overhead Carry`. That is the argument for keeping these four
 rules adjacent and commented rather than sorted by topic.
 
-## Defect 2 — `hinge_accessory` is one bucket for two different implements
+## Defect 2 — `hinge_accessory` is one bucket for four different things
 
 Separate from the routing, and it survives Defect 1's fix. `hinge_accessory`
-is `0.55 x deadlift 1RM`, which is reasonable for a **barbell** good morning
-or RDL and impossible for a **kettlebell swing**, whose implement stops at
-48kg. PROJECT-LOG already flags the swing mapping as known and untraced.
+is a single `0.55 x deadlift 1RM`, and after Defect 1 it holds:
 
-Defect 1's fix moves Romanian Deadlifts *into* this bucket, so the bucket
-matters more afterwards, not less. It needs splitting by implement, not
-re-scaling as a whole.
+| Exercise | implement | 85kg male, beg / int / adv |
+|---|---|---|
+| Good Mornings | barbell | 32.5 / 65 / 82.5 |
+| Hip Thrust | barbell | 32.5 / 65 / 82.5 |
+| Kettlebell Swing (Heavy) | kettlebell | 32 / **48** / **48** |
+| Romanian Deadlifts | barbell *or* dumbbells | 16 / 32 / 40 |
+| Glute Bridge, Single-Leg RDL, BW Good Morning | bodyweight | unloaded |
+| Leg Swings | bodyweight | unloaded |
+
+Four distinct problems fall out, and they point in **different directions** —
+which is why this is a split, not a re-scale:
+
+1. **Swings are far too heavy.** 32kg for a *beginner*'s heavy swing (a
+   typical beginner heavy swing is 16-20kg), and intermediate and advanced
+   both pinned at the 48kg implement ceiling. A swing is ballistic and
+   hip-snap driven; it is not 55% of a deadlift.
+2. **Hip thrust is too light — but ALREADY KNOWN AND DELIBERATE.** 82.5kg for
+   an advanced 85kg male, where a barbell hip thrust is routinely loaded at or
+   above deadlift weight. `exercise-db.ts` says so at the entry itself: the
+   name matches none of `categorize()`'s substrings, it falls through to the
+   `hip_hinge` pattern default, *"so this under-prescribes. That is the safe
+   direction and it is left deliberately conservative — a trainee adding
+   plates is a better failure than a trainee pinned under them on the first
+   session."* Listed here as a problem in the first draft of this plan; it
+   isn't one. Read the entry's own comment before calling a number wrong.
+3. **Romanian Deadlifts is implement-ambiguous — traced, and NOT a defect.**
+   Its equipment list is `["barbell","dumbbells"]`, and `loadingMode` checks
+   `dumbbells` first, so it is always priced and labelled *per hand*
+   regardless of what the user has. 40kg per hand is a sensible advanced
+   dumbbell RDL, and crucially the label SAYS "per hand" — so the app is
+   telling the user which implement it means rather than leaving it
+   ambiguous. A full-gym user who would naturally reach for a barbell gets a
+   dumbbell prescription, which is a defensible default, not a wrong number.
+   Recorded because it was checked, not because it needs changing.
+4. **`Leg Swings` is in the bucket at all**, matched by the `swing` substring.
+   It is a warm-up mobility drill, not a hip hinge. Harmless today because it
+   is unloaded — which is exactly how a mis-route survives.
+
+None of these is fixable by moving one multiplier. Each needs its own anchor
+and its own before/after, and (1) is the one that touches safety.
 
 ## Defect 3 — the question that isn't mine
 
@@ -110,14 +145,21 @@ and goes to Ashley before anything is built for it.
 
 ## Order of work
 
-1. **Defect 1 first, alone.** Mechanical, has a right answer, and the numbers
-   above are the before/after. Gate: every one of the four routes to its
-   intended category, the three deliberate-precedence cases still hold, and
-   the whole-DB sweep still shows exactly 4 changes.
+1. **Defect 1 first, alone.** DONE — mechanical, has a right answer, and the
+   numbers above are the before/after. Gated by `test:categorize-precedence`.
 2. **Re-measure the clamp count.** The 357,497 figure is the baseline; a
    substantial part of it should disappear with Defect 1 and the remainder
    isolates Defect 2's true size.
-3. **Defect 2**, with its own before/after.
+3. **Defect 2** — DONE for the swing half (the safety-relevant one). Ashley
+   ruled on the resulting WEIGHTS rather than a multiplier: an 85kg man doing
+   sets of 15 gets 32kg advanced / 26kg intermediate / 14kg starting out, a
+   60kg woman 12kg, and **nobody is pinned to the 48kg ceiling** (was 19 of
+   48). Built as a `kettlebell_swing` category rather than a smaller shared
+   multiplier — mutation-tested: re-scaling the shared bucket instead drops
+   Good Mornings and Hip Thrust from 82.5kg to 32.5kg. `Leg Swings`, a warm-up
+   mobility drill that was in the hinge bucket purely because its name
+   contains "swing", is out and reads "Bodyweight". Hip thrust left alone per
+   the note above.
 4. **Defect 3** only after Ashley rules.
 
 ## Verification
