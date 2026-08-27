@@ -130,11 +130,48 @@ function calorieFloor(gender: 'male' | 'female'): number {
   return gender === 'male' ? 1500 : 1200
 }
 
-function applyGoalAdjustment(tdee: number, goal: FitnessGoal, gender: 'male' | 'female'): number {
+/**
+ * The fat-loss cut, as a SHARE of maintenance rather than a flat number,
+ * capped so nobody's deficit is deeper than it was before.
+ *
+ * A flat 500 kcal is the same arithmetic for everyone and therefore a very
+ * different diet for everyone. MEASURED across a realistic sweep of bodies:
+ * a 45kg woman training moderately was cut 28% below maintenance and a 50kg
+ * woman 27% (landing exactly on the 1200 floor), while a 100kg active man was
+ * cut 14%. Six of 36 fat-loss profiles exceeded a 25% deficit and every one of
+ * them was female — the flat number is simply a bigger share of a smaller
+ * TDEE, so the harshness fell entirely on lighter people.
+ *
+ * 20% is the middle of the commonly-recommended 15-25% band for sustainable
+ * fat loss. The 500 CAP is what makes this change safe to ship to people
+ * already using the app: nobody's deficit gets deeper, because anyone whose
+ * 20% exceeds 500 keeps the 500 they had. Only the people being cut hardest
+ * move, and they move toward eating more.
+ *
+ * The floor still applies underneath both.
+ */
+export const FAT_LOSS_DEFICIT_FRACTION = 0.20
+export const FAT_LOSS_DEFICIT_CAP_KCAL = 500
+
+/**
+ * Exported so `test:fat-loss-deficit` can call the real thing. It used to be
+ * private and the gate re-implemented the arithmetic beside it from the two
+ * constants — which meant the gate proved its own copy correct and would have
+ * stayed green through any mutation of this function. Caught by mutation-
+ * testing the gate itself.
+ */
+export function applyGoalAdjustment(tdee: number, goal: FitnessGoal, gender: 'male' | 'female'): number {
   switch (goal) {
-    case 'fat_loss':
-      return Math.max(calorieFloor(gender), tdee - 500)
+    case 'fat_loss': {
+      const deficit = Math.min(FAT_LOSS_DEFICIT_CAP_KCAL, Math.round(tdee * FAT_LOSS_DEFICIT_FRACTION))
+      return Math.max(calorieFloor(gender), tdee - deficit)
+    }
     case 'hypertrophy':
+      // NOT scaled, deliberately: Ashley's ruling covered the fat-loss cut
+      // only. The same disproportion exists here (+300 is 17% of a 45kg
+      // woman's maintenance and 10% of a 100kg man's), but a surplus that is
+      // slightly large costs a little unwanted weight, where a deficit that is
+      // too deep costs muscle and adherence. Worth revisiting; not silently.
       return tdee + 300
     default:
       return tdee

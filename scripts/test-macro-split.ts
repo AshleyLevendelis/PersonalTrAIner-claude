@@ -9,6 +9,7 @@
 import {
   getProfileMacroSplit, computeMacroSplitTargets, getStaticDailyMacros, getMacroDerivation,
   MACRO_SPLIT_PRESET_VALUES, DEFAULT_MACRO_SPLIT, CARB_FLOOR_G, FAT_FLOOR_PER_KG,
+  applyGoalAdjustment,
 } from '../src/lib/macro-calculator'
 import type { UserProfile } from '../src/lib/types'
 
@@ -95,7 +96,15 @@ function main() {
         ? Math.round(10 * profile.weight_kg + 6.25 * profile.height_cm - 5 * profile.age + 5)
         : Math.round(10 * profile.weight_kg + 6.25 * profile.height_cm - 5 * profile.age - 161)
       const tdee = Math.round(bmr * 1.55) // 'moderate' activity PAL
-      const calorieTarget = goal === 'fat_loss' ? Math.max(1500, tdee - 500) : goal === 'hypertrophy' ? tdee + 300 : tdee
+      // The calorie TARGET comes from the product's own goal adjustment, not a
+      // copy of it. This section guards the SPLIT — that DEFAULT_MACRO_SPLIT
+      // still reproduces the old protein/fat/carb allocation bit-for-bit — and
+      // the split reallocates within whatever target it is handed. Hardcoding
+      // `tdee - 500` here made it a second, undeclared assertion about the
+      // fat-loss deficit, which went red the moment that deficit was
+      // deliberately changed to scale with bodyweight. The deficit has its own
+      // gate now (test:fat-loss-deficit); this one must not shadow it.
+      const calorieTarget = applyGoalAdjustment(tdee, goal, profile.gender as 'male' | 'female')
       const expectedProtein = Math.round(2.0 * weight)
       const expectedFat = Math.round((calorieTarget * 0.25) / 9)
       const expectedCarbs = Math.max(50, Math.round((calorieTarget - expectedProtein * 4 - expectedFat * 9) / 4))

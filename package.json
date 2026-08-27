@@ -61,6 +61,7 @@
     "test:soft-preferences": "tsx scripts/test-soft-preferences.ts",
     "test:food-db-parity": "tsx scripts/test-food-db-parity.ts",
     "test:log-correction": "tsx scripts/test-log-correction.ts",
+    "test:fat-loss-deficit": "tsx scripts/test-fat-loss-deficit.ts",
     "test:onboarding-exercise-dislikes": "tsx scripts/test-onboarding-exercise-dislikes.ts",
     "test:option-icons": "tsx scripts/test-option-icons.ts",
     "test:table-names": "tsx scripts/test-table-names.ts",
