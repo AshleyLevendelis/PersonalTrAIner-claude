@@ -63,6 +63,7 @@
     "test:log-correction": "tsx scripts/test-log-correction.ts",
     "test:fat-loss-deficit": "tsx scripts/test-fat-loss-deficit.ts",
     "test:meal-addition": "tsx scripts/test-meal-addition.ts",
+    "test:meal-swap-rotation": "tsx scripts/test-meal-swap-rotation.ts",
     "test:onboarding-exercise-dislikes": "tsx scripts/test-onboarding-exercise-dislikes.ts",
     "test:option-icons": "tsx scripts/test-option-icons.ts",
     "test:table-names": "tsx scripts/test-table-names.ts",

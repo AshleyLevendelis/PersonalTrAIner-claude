@@ -320,7 +320,23 @@ export async function swapPoolMeal(
   } else {
     const alternatives = currentName ? options.filter(o => o.name !== currentName) : options
     if (alternatives.length === 0) return null
-    chosen = alternatives[Math.floor(Math.random() * alternatives.length)]
+    // ROTATION, not a random draw. This used to be
+    // alternatives[Math.floor(Math.random() * alternatives.length)], which
+    // meant "swap this for something else" could hand back the option the
+    // user had just rejected — with a pool of five, a one-in-four chance
+    // every time, and no way for them to tell it apart from the app ignoring
+    // them. Stepping forward from the current option's own pool position
+    // instead walks the whole pool before repeating anything, so N-1 swaps
+    // show N-1 different meals. `options` is ordered by pool_index (see
+    // getPools), so the order is stable across calls and across reloads.
+    //
+    // findIndex === -1 is the real case where the current meal isn't in the
+    // pool at all — an assembleDay choice, or a meal added from chat before
+    // the pool reloads — and starting at 0 is right for it: the first
+    // alternative in pool order.
+    const currentIndex = currentName ? options.findIndex(o => o.name === currentName) : -1
+    const next = options[(currentIndex + 1) % options.length]
+    chosen = next && next.name !== currentName ? next : alternatives[0]
   }
   if (!chosen) return null
 
