@@ -129,6 +129,28 @@ console.log('\n5b. The app\'s own copy does not promise buttons')
   check('...it invites words instead', /in your own words/.test(opener))
 }
 
+console.log('\n5c. A stated goal is taken, not appraised and re-asked')
+{
+  // Both halves found on Ashley's phone in one exchange: she typed "to get to
+  // 12% body fat" and got back "That 12% target is a classic, sharp goal to
+  // aim for" — a verdict — followed by "does that sound right?" and the full
+  // four-option goal menu, about a goal she had just stated in plain words.
+  const grade = fn.slice(fn.indexOf('NEVER grade their answers'), fn.indexOf('NEVER grade their answers') + 900)
+  check('the no-grading rule exists', grade.length > 100)
+  check('...and covers the compliment shaped like a description',
+    /COMPLIMENT WEARING A DESCRIPTION/.test(grade))
+  check('...naming the real phrasings, not just the obvious ones',
+    /classic, sharp goal/.test(grade) && /solid target/.test(grade))
+  check('...and gives the test: are you appraising THEM', /appraising THEM/.test(grade))
+
+  const dir = fn.slice(fn.indexOf('A TARGET THAT NAMES ITS OWN DIRECTION'), fn.indexOf('A TARGET THAT NAMES ITS OWN DIRECTION') + 900)
+  check('a self-describing target skips confirmation', dir.length > 100)
+  check('...with the case that prompted it', /12% body fat/.test(dir))
+  check('...and says re-asking reads as not listening', /not having listened/.test(dir))
+  check('...while a genuinely ambiguous number is still confirmed',
+    /bare number with no current value/.test(dir))
+}
+
 console.log('\n6. Nothing that was actually load-bearing was removed')
 {
   // Chips were the questionnaire. These were never the questionnaire — they
