@@ -38,6 +38,11 @@ export type DietaryPreference =
   | 'shellfish-free'
   | 'fish-free'
   | 'low-fodmap'
+  | 'celery-free'
+  | 'sesame-free'
+  | 'mustard-free'
+  | 'lupin-free'
+  | 'sulphite-free'
 
 type TagKey = keyof FoodTags
 
@@ -102,6 +107,21 @@ export const FORBIDDEN_TAGS: Record<DietaryPreference, TagKey[]> = {
   // hidden cases a name match would sail past) but no preference consumed it
   // on its own. vegetarian/vegan reach it too; this is the standalone lane.
   'fish-free': ['contains_fish'],
+  // THE FIVE THAT COULD ONLY BE REMEMBERED. Legally-declarable allergens in
+  // the UK/EU alongside the seven above; until now a disclosure could reach
+  // memory and nothing else, while celery, mustard, sesame oil and sesame
+  // seeds sat in food-db as servable ingredients with empty tag sets.
+  'celery-free': ['contains_celery'],
+  'sesame-free': ['contains_sesame'],
+  'mustard-free': ['contains_mustard'],
+  // NO food in the database carries contains_lupin, and that is not the
+  // is_grain bug repeating. is_grain was a rule over data that should have
+  // existed and did not, so it silently enforced nothing while bread was
+  // served. Here the absence IS the safety: there is no lupin-containing food
+  // to serve. The rule exists so the day one is added it is already covered,
+  // rather than the gap being rediscovered later.
+  'lupin-free': ['contains_lupin'],
+  'sulphite-free': ['contains_sulphites'],
   'low-fodmap': ['is_high_fodmap'],
 }
 

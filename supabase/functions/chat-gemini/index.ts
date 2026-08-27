@@ -886,6 +886,25 @@ function buildDietarySafetyBlock(preferences: string[]): string {
   if (preferences.includes("fish-free")) {
     rules.push("FISH-FREE: No fish of any kind (salmon, tuna, cod, haddock, tilapia, sea bass, mackerel, sardines, anchovies, trout, red snapper) and no fish-derived condiments (fish sauce, worcestershire sauce, anchovy paste). Zero matching allergens may pass into the ingredients array.");
   }
+  // The five that had no tag to enforce until now. This is the FOURTH place a
+  // dietary preference has to be listed (diet-rules' FORBIDDEN_TAGS, both
+  // food-db copies' tags, generate-meals' block, and here) — test:diet-tag-sync
+  // is what caught this one being missed.
+  if (preferences.includes("celery-free")) {
+    rules.push("CELERY-FREE: No celery, celeriac, celery salt, or stock/bouillon containing celery. Zero matching allergens may pass into the ingredients array.");
+  }
+  if (preferences.includes("sesame-free")) {
+    rules.push("SESAME-FREE: No sesame seeds, sesame oil, tahini, or hummus (tahini-based). Zero matching allergens may pass into the ingredients array.");
+  }
+  if (preferences.includes("mustard-free")) {
+    rules.push("MUSTARD-FREE: No mustard of any kind (dijon, wholegrain, english, mustard powder) and no dressings built on it. Zero matching allergens may pass into the ingredients array.");
+  }
+  if (preferences.includes("lupin-free")) {
+    rules.push("LUPIN-FREE: No lupin flour or lupin-containing bread and baked goods. Zero matching allergens may pass into the ingredients array.");
+  }
+  if (preferences.includes("sulphite-free")) {
+    rules.push("SULPHITE-FREE: No sulphite-preserved dried fruit, wine or wine vinegars, or anything declaring sulphur dioxide. Zero matching allergens may pass into the ingredients array.");
+  }
   if (preferences.includes("low-fodmap")) {
     rules.push("LOW-FODMAP: Avoid garlic, onion, wheat, and high-fructose fruit where possible.");
   }

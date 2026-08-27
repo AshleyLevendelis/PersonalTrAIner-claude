@@ -45,6 +45,23 @@ export interface FoodTags {
   contains_soy?: boolean
   contains_honey?: boolean
   contains_alcohol?: boolean
+  // THE FIVE THAT HAD NO TAG AT ALL. celery, sesame, mustard, lupin and
+  // sulphites are legally-declarable allergens in the UK/EU alongside the
+  // seven already here, and until now a disclosure of any of them could only
+  // be REMEMBERED — meal generation had nothing to filter on, while celery,
+  // mustard, sesame oil and sesame seeds sat in this very file as servable
+  // ingredients with empty tag sets.
+  //
+  // contains_lupin is declared with NO entry currently carrying it, and that
+  // is deliberate rather than the is_grain bug repeating: no lupin-containing
+  // food exists in this database, so a lupin allergy is already safe by
+  // absence. The tag exists so that the day lupin flour is added, the rule is
+  // already waiting for it instead of being remembered later.
+  contains_celery?: boolean
+  contains_sesame?: boolean
+  contains_mustard?: boolean
+  contains_lupin?: boolean
+  contains_sulphites?: boolean
   is_grain?: boolean
   is_legume?: boolean
   is_refined_sugar?: boolean
@@ -175,7 +192,7 @@ export const FOOD_DB: FoodEntry[] = [
   // into disagreeing about a safety fact.
   f('peanut butter', [], { kcal: 588, protein: 25, carbs: 20, fat: 50 }, 'fat', { contains_nuts: true }, { tbsp: 16 }),
   f('almond butter', [], { kcal: 614, protein: 21, carbs: 19, fat: 56 }, 'fat', { contains_nuts: true }, { tbsp: 16 }),
-  f('hummus', [], { kcal: 166, protein: 7.9, carbs: 11, fat: 9.6 }, 'other', { is_legume: true }),
+  f('hummus', [], { kcal: 166, protein: 7.9, carbs: 11, fat: 9.6 }, 'other', { contains_sesame: true, is_legume: true }),
 
   // ===== CARB: grains, bread, potato ==================================
   f('white rice cooked', ['white rice', 'cooked rice', 'boiled rice', 'jasmine rice'], { kcal: 130, protein: 2.7, carbs: 28, fat: 0.3 }, 'carb', { is_grain: true, is_high_carb: true }),
@@ -223,7 +240,8 @@ export const FOOD_DB: FoodEntry[] = [
   f('sunflower seeds', [], { kcal: 584, protein: 21, carbs: 20, fat: 51 }, 'fat', {}),
   f('pumpkin seeds', [], { kcal: 559, protein: 30.2, carbs: 10.7, fat: 49 }, 'fat', {}),
   f('coconut milk canned', ['coconut milk', 'canned coconut milk'], { kcal: 230, protein: 2.3, carbs: 5.5, fat: 24 }, 'fat', {}),
-  f('tahini', [], { kcal: 595, protein: 17, carbs: 21, fat: 54 }, 'fat', {}, { tbsp: 15 }),
+  f('lupin flour', ['lupin bean flour'], { kcal: 371, protein: 36.2, carbs: 10.4, fat: 9.7 }, 'carb', { contains_lupin: true }),
+  f('tahini', [], { kcal: 595, protein: 17, carbs: 21, fat: 54 }, 'fat', { contains_sesame: true }, { tbsp: 15 }),
 
   // ===== VEG ===========================================================
   f('broccoli', ['steamed broccoli', 'broccoli florets'], { kcal: 34, protein: 2.8, carbs: 6.6, fat: 0.4 }, 'veg', {}),
@@ -248,7 +266,7 @@ export const FOOD_DB: FoodEntry[] = [
   f('cabbage', ['white cabbage', 'red cabbage'], { kcal: 25, protein: 1.3, carbs: 5.8, fat: 0.1 }, 'veg', {}),
   f('aubergine', ['eggplant'], { kcal: 25, protein: 1, carbs: 5.9, fat: 0.2 }, 'veg', {}),
   f('leek', ['leeks'], { kcal: 61, protein: 1.5, carbs: 14, fat: 0.3 }, 'veg', { is_high_fodmap: true }),
-  f('celery', [], { kcal: 16, protein: 0.7, carbs: 3, fat: 0.2 }, 'veg', {}),
+  f('celery', [], { kcal: 16, protein: 0.7, carbs: 3, fat: 0.2 }, 'veg', { contains_celery: true }),
   f('beetroot', ['beets'], { kcal: 43, protein: 1.6, carbs: 10, fat: 0.2 }, 'veg', {}),
   f('butternut squash', ['squash'], { kcal: 45, protein: 1, carbs: 12, fat: 0.1 }, 'veg', {}),
   f('sweet potato raw', [], { kcal: 86, protein: 1.6, carbs: 20, fat: 0.1 }, 'carb', { is_high_carb: true }),
@@ -266,7 +284,7 @@ export const FOOD_DB: FoodEntry[] = [
   f('pineapple', [], { kcal: 50, protein: 0.5, carbs: 13, fat: 0.1 }, 'fruit', {}),
   f('dates', ['medjool dates'], { kcal: 277, protein: 1.8, carbs: 75, fat: 0.2 }, 'fruit', { is_high_carb: true, is_high_fodmap: true }),
   f('raisins', [], { kcal: 299, protein: 3.1, carbs: 79, fat: 0.5 }, 'fruit', { is_high_carb: true, is_high_fodmap: true }),
-  f('dried apricots', [], { kcal: 241, protein: 3.4, carbs: 63, fat: 0.5 }, 'fruit', { is_high_carb: true, is_high_fodmap: true }),
+  f('dried apricots', [], { kcal: 241, protein: 3.4, carbs: 63, fat: 0.5 }, 'fruit', { contains_sulphites: true, is_high_carb: true, is_high_fodmap: true }),
   f('kiwi', ['kiwi fruit'], { kcal: 61, protein: 1.1, carbs: 15, fat: 0.5 }, 'fruit', {}),
   f('watermelon', [], { kcal: 30, protein: 0.6, carbs: 7.6, fat: 0.2 }, 'fruit', { is_high_fodmap: true }),
   f('pear', ['pears'], { kcal: 57, protein: 0.4, carbs: 15, fat: 0.1 }, 'fruit', { is_high_fodmap: true }, { medium: 178 }),
@@ -278,14 +296,14 @@ export const FOOD_DB: FoodEntry[] = [
   f('tamari', ['gluten free soy sauce'], { kcal: 60, protein: 10, carbs: 5.6, fat: 0 }, 'condiment', { contains_soy: true }, { tbsp: 18 }),
   f('mayonnaise', ['mayo'], { kcal: 680, protein: 1, carbs: 1.3, fat: 75 }, 'condiment', { contains_egg: true }, { tbsp: 14 }),
   f('ketchup', ['tomato ketchup'], { kcal: 101, protein: 1.2, carbs: 24, fat: 0.1 }, 'condiment', { is_refined_sugar: true }, { tbsp: 17 }),
-  f('mustard', ['dijon mustard', 'english mustard'], { kcal: 66, protein: 4.4, carbs: 5, fat: 3.3 }, 'condiment', {}, { tbsp: 16 }),
+  f('mustard', ['dijon mustard', 'english mustard'], { kcal: 66, protein: 4.4, carbs: 5, fat: 3.3 }, 'condiment', { contains_mustard: true }, { tbsp: 16 }),
   f('bbq sauce', ['barbecue sauce'], { kcal: 172, protein: 1, carbs: 40, fat: 0.5 }, 'condiment', { is_refined_sugar: true }, { tbsp: 17 }),
   f('sriracha', ['hot sauce'], { kcal: 93, protein: 1.9, carbs: 19, fat: 0.9 }, 'condiment', {}, { tbsp: 17 }),
   f('honey', [], { kcal: 304, protein: 0.3, carbs: 82, fat: 0 }, 'condiment', { contains_honey: true, is_refined_sugar: true }, { tbsp: 21, tsp: 7 }),
   f('maple syrup', [], { kcal: 260, protein: 0, carbs: 67, fat: 0.2 }, 'condiment', { is_refined_sugar: true }, { tbsp: 20 }),
   f('sugar white', ['sugar', 'white sugar', 'granulated sugar'], { kcal: 387, protein: 0, carbs: 100, fat: 0 }, 'condiment', { is_refined_sugar: true }, { tsp: 4, tbsp: 12 }),
   f('brown sugar', [], { kcal: 380, protein: 0, carbs: 98, fat: 0 }, 'condiment', { is_refined_sugar: true }, { tsp: 4, tbsp: 12 }),
-  f('balsamic vinegar', [], { kcal: 88, protein: 0.5, carbs: 17, fat: 0 }, 'condiment', {}, { tbsp: 15 }),
+  f('balsamic vinegar', [], { kcal: 88, protein: 0.5, carbs: 17, fat: 0 }, 'condiment', { contains_sulphites: true }, { tbsp: 15 }),
   f('salsa', [], { kcal: 36, protein: 1.3, carbs: 7, fat: 0.3 }, 'condiment', { is_high_fodmap: true }),
   f('pesto', ['basil pesto'], { kcal: 303, protein: 4, carbs: 4, fat: 30 }, 'condiment', { contains_dairy: true, contains_nuts: true }, { tbsp: 16 }),
   f('tomato passata', ['passata'], { kcal: 32, protein: 1.6, carbs: 5.5, fat: 0.3 }, 'condiment', {}),
@@ -295,7 +313,7 @@ export const FOOD_DB: FoodEntry[] = [
   f('gravy granules made', ['gravy'], { kcal: 65, protein: 1.2, carbs: 9, fat: 2.6 }, 'condiment', { contains_gluten: true }),
   f('worcestershire sauce', [], { kcal: 78, protein: 0, carbs: 19.5, fat: 0 }, 'condiment', { contains_fish: true }, { tbsp: 17 }),
   f('teriyaki sauce', [], { kcal: 89, protein: 5.9, carbs: 16, fat: 0 }, 'condiment', { contains_soy: true, contains_gluten: true }, { tbsp: 18 }),
-  f('vegetable stock cube', ['stock cube', 'vegetable stock'], { kcal: 233, protein: 8, carbs: 40, fat: 5 }, 'condiment', { is_high_fodmap: true }),
+  f('vegetable stock cube', ['stock cube', 'vegetable stock'], { kcal: 233, protein: 8, carbs: 40, fat: 5 }, 'condiment', { contains_celery: true, is_high_fodmap: true }),
   // Soy lecithin is a near-ubiquitous emulsifier in commercial chocolate —
   // brand-dependent, not knowable from the name. Absent reads as safe, so
   // true is the only fail-safe state this schema can express. Kept in
@@ -357,7 +375,7 @@ export const FOOD_DB: FoodEntry[] = [
   f('buckwheat cooked', ['buckwheat', 'soba noodles'], { kcal: 92, protein: 3.4, carbs: 19.9, fat: 0.6 }, 'carb', { is_grain: true, is_high_carb: true }),
 
   // ===== FAT: more oils / dairy fats ======================================
-  f('sesame oil', [], { kcal: 884, protein: 0, carbs: 0, fat: 100 }, 'fat', {}, { tbsp: 14, tsp: 4.5 }),
+  f('sesame oil', [], { kcal: 884, protein: 0, carbs: 0, fat: 100 }, 'fat', { contains_sesame: true }, { tbsp: 14, tsp: 4.5 }),
   f('ghee', ['clarified butter'], { kcal: 900, protein: 0, carbs: 0, fat: 100 }, 'fat', { contains_dairy: true }, { tbsp: 13 }),
   f('brazil nuts', [], { kcal: 659, protein: 14.3, carbs: 12, fat: 66 }, 'fat', { contains_nuts: true }),
   f('pecans', [], { kcal: 691, protein: 9.2, carbs: 14, fat: 72 }, 'fat', { contains_nuts: true }),
@@ -473,7 +491,7 @@ export const FOOD_DB: FoodEntry[] = [
   f('paneer', ['low fat paneer'], { kcal: 265, protein: 18.3, carbs: 3.6, fat: 20.8 }, 'dairy', { contains_dairy: true }),
   f('skyr', ['icelandic skyr'], { kcal: 63, protein: 11, carbs: 4, fat: 0.2 }, 'dairy', { contains_dairy: true }),
   f('sulguni cheese', ['sulguni'], { kcal: 280, protein: 22, carbs: 2, fat: 21 }, 'dairy', { contains_dairy: true }),
-  f('sesame seeds', ['roasted sesame seeds'], { kcal: 573, protein: 17.7, carbs: 23.4, fat: 49.7 }, 'fat', {}),
+  f('sesame seeds', ['roasted sesame seeds'], { kcal: 573, protein: 17.7, carbs: 23.4, fat: 49.7 }, 'fat', { contains_sesame: true }),
   f('hemp seeds', [], { kcal: 553, protein: 31.6, carbs: 8.7, fat: 48.8 }, 'fat', {}),
   // Untagged before this round (absent reads as safe). Tagged for the same
   // reason as 'peanut butter' above; kept in lockstep with src/lib/food-db.ts.

@@ -2,6 +2,24 @@
 
 Newest first. One line each.
 
+- [x] **CELERY, SESAME, MUSTARD, LUPIN AND SULPHITES ARE ENFORCED NOW** — five legally-declarable allergens that could previously only be REMEMBERED. And it was worse than "no mechanism": **celery, mustard, sesame oil and sesame seeds were real, servable entries in the food database with empty tag sets.** Not theoretical. All five now have tags, rules, options and prompt text, taking the app from 17 dietary preferences to 22.
+
+- [x] **THE PARITY GATE WAS WRITTEN FIRST, BEFORE ANY TAGGING, AND WAS RED ON ALL EIGHT CHECKS.** The food database exists TWICE — `src/lib/food-db.ts` (332 foods) and `supabase/functions/_shared/food-db.ts` (323), because a Deno edge function cannot import across the `src/lib` boundary — and nothing kept them in step. A tag added to one protects nothing in the other, and the result would have looked finished. `test:food-db-parity` proves both copies agree on every allergen tag; proven to bite by untagging sesame seeds on the server side only, which is precisely the half-safe failure it exists for.
+
+- [x] IT TOOK FOUR PLACES, NOT TWO, and `test:diet-tag-sync` caught the one I missed: `FORBIDDEN_TAGS`, both food-db copies' tags, **generate-meals' prompt block**, and **chat-gemini's prompt block**. A preference absent from either prompt is one the model is never told about however well it is tagged. The 17→22 count assertion in that gate is a deliberate tripwire and it worked exactly as designed.
+
+- [x] **A GATE WAS ASSERTING THE GAP AS CORRECT.** `test:onboarding-slots` contained *"the five untagged allergens (no enforcement mechanism exists) are correctly never returned"* — and passed. A gate that describes a hole as intended is how the hole survives: it makes the missing thing look deliberate and defended. Now inverted: the same disclosure must return all five.
+
+- [x] THE DETECTOR MISSED AN ORDINARY PHRASING, and the fix reaches all twelve allergens rather than the five. "Sulphites give me a reaction" scanned completely clean — the signal list matched the noun form "reaction to" but not "gives me a reaction" or "I react to". Broadened deliberately: this governs every allergen, and a missed disclosure is a worse failure than a tagged food someone could have eaten.
+
+- [x] LUPIN FLOUR WAS ADDED TO THE DATABASE, and that is a safety decision rather than a gate-satisfying one. **An ingredient absent from the database cannot be tag-checked at all** — a proposal containing lupin flour was unfilterable by construction. `test:diet-tag-sync` [11] independently forbids a rule with zero data (the `is_grain` bug, where a rule read correct and never fired), and this satisfies it honestly rather than by exemption.
+
+- [x] **AND ONE OF MY OWN NEW CHECKS WAS A LIAR.** A section landed AFTER the `if (failures > 0) process.exit(1)` line, so `test:onboarding-slots` printed a ✗ on screen and exited 0. A gate that reports pass while showing a failure is worse than no gate. The epilogue now sits at the end of the file, and the same run exits 1 as it should.
+
+- [x] FOUND EN ROUTE: **choosing "Mediterranean" did nothing whatsoever.** It has no hard exclusions by design — it is a style, not a restriction — but it was also absent from the meal generator entirely, so the option was offered and silently ignored. It now gets a positive style steer, phrased so it cannot read as a ban. The new coverage check found this on its first run.
+
+- [ ] `test:meal-quality` cannot run from the sandbox — it creates a throwaway profile against the TEST project and `*.supabase.co` is unreachable here. Verified pre-existing by stashing the changes and re-running. It is the gate that would prove end-to-end that a tagged allergen never reaches a plate, and it needs Ashley's machine.
+
 - [x] **THE SOFT PREFERENCES ARE READ BY SOMETHING NOW** — they were compiled and read by nothing. "I prefer chicken to fish", "not a fan of burpees but I'll do them" were recorded, compiled by `compileSoftExercisePreferences`, and had **zero call sites** outside the file defining them. The comment above it said *"scoped to swap-candidate ranking only (mesocycle-edit.getReplacementCandidates)"* — describing a consumer that did not exist. A truthful-looking comment over dead code is how the next person gets misled, which is exactly what happened when the capture trace first read it.
 
 - [x] NOT A NEW DECISION — VISION-ARCHITECTURE.md §1.2 already ruled it: soft exercise dislike/like → *"ranking"*, *"scoped to `getReplacementCandidates` only"*, rotation explicitly unaffected (the doc even records why rotation is out of reach — threading a ranker through `rotateVariation` means changing two exported signatures, `generateMesocycle`'s parameter list, and the audit's independent copies). Wiring it executes that ruling rather than inventing one.

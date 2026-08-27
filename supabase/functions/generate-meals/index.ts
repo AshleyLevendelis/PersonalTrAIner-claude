@@ -110,7 +110,20 @@ function buildDietarySafetyBlock(preferences: string[]): string {
   if (has("soy-free")) rules.push("SOY-FREE: no tofu, tempeh, soy sauce, edamame, or soy milk.");
   if (has("shellfish-free")) rules.push("SHELLFISH-FREE: no prawns, crab, lobster, mussels, or scallops.");
   if (has("fish-free")) rules.push("FISH-FREE: no fish of any kind, and no fish sauce, worcestershire sauce, or anchovy paste.");
+  // The five that previously had no rule here at all — a preference absent
+  // from this list is one the model is never told about, however well it is
+  // tagged in food-db.
+  if (has("celery-free")) rules.push("CELERY-FREE: no celery, celeriac, celery salt, or stock/bouillon containing celery.");
+  if (has("sesame-free")) rules.push("SESAME-FREE: no sesame seeds, sesame oil, tahini, or hummus (tahini-based).");
+  if (has("mustard-free")) rules.push("MUSTARD-FREE: no mustard of any kind, including dijon, wholegrain, mustard powder, and dressings built on it.");
+  if (has("lupin-free")) rules.push("LUPIN-FREE: no lupin flour or lupin-containing bread and baked goods.");
+  if (has("sulphite-free")) rules.push("SULPHITE-FREE: no sulphite-preserved dried fruit, wine or wine vinegars, or products declaring sulphur dioxide.");
   if (has("low-fodmap")) rules.push("LOW-FODMAP: avoid garlic, onion, wheat, and high-fructose fruit where possible.");
+  // Mediterranean is a STYLE, not a restriction — diet-rules.ts gives it no
+  // hard exclusions on purpose. But it was also absent from this block, so
+  // selecting it did nothing whatsoever: an option the app offers and then
+  // silently ignores. A positive steer, phrased so it cannot read as a ban.
+  if (has("mediterranean")) rules.push("MEDITERRANEAN (a style, NOT an exclusion — nothing is forbidden): lean toward olive oil, fish, legumes, wholegrains, vegetables, nuts and yoghurt; keep red and processed meat occasional.");
 
   if (rules.length === 0) return "";
 

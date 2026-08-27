@@ -157,6 +157,14 @@ const DIETARY_META: Record<DietaryPreference, { icon: string; label: string }> =
   halal: { icon: '☪️', label: 'Halal' },
   kosher: { icon: '✡️', label: 'Kosher' },
   paleo: { icon: '🦴', label: 'Paleo' },
+  // Wearing the food they exclude, the convention the comment above defends.
+  // No celery emoji exists, so the herb stands in; sesame wears the bagel it
+  // is most recognisably on, and sulphites wear the wine they are declared on.
+  'celery-free': { icon: '🌿', label: 'Celery-Free' },
+  'sesame-free': { icon: '🥯', label: 'Sesame-Free' },
+  'mustard-free': { icon: '🌭', label: 'Mustard-Free' },
+  'lupin-free': { icon: '🫛', label: 'Lupin-Free' },
+  'sulphite-free': { icon: '🍷', label: 'Sulphite-Free' },
   mediterranean: { icon: '🫒', label: 'Mediterranean' },
   'dairy-free': { icon: '🥛', label: 'Dairy-Free' },
   'gluten-free': { icon: '🌾', label: 'Gluten-Free' },
@@ -178,7 +186,14 @@ export const DIETARY_OPTIONS: { value: DietaryPreference; icon: string; label: s
 // meal generation never reads that table. Confirmed missing live: a "severe
 // peanut allergy" disclosed in an onboarding transcript got a reassuring
 // reply and a memory note, but the generated plan's filter never saw it.
-const ALLERGEN_SIGNAL = /allerg|intoleran|anaphyla|can'?t (eat|have)|cannot (eat|have)|reaction to|sensitive to|makes? me (sick|ill)|gets? me sick/i
+// "gives me a reaction" and "I react to X" are ordinary ways people disclose
+// an allergy and neither fired: "reaction to" only matches the noun form, so
+// "sulphites give me a reaction" scanned clean. Broadened deliberately — this
+// governs ALL twelve allergens, not just the five added with it, and the
+// failure it prevents (a missed disclosure) is worse than the one it risks
+// (a tagged food someone could have eaten). Both new forms are unambiguous
+// food-allergy phrasings rather than a loosening of the word "reaction".
+const ALLERGEN_SIGNAL = /allerg|intoleran|anaphyla|can'?t (eat|have)|cannot (eat|have)|reaction to|gives? me a reaction|\breacts? to\b|brings? me out in|sensitive to|makes? me (sick|ill)|gets? me sick/i
 
 const ALLERGEN_FOOD_PATTERNS: Partial<Record<DietaryPreference, RegExp>> = {
   'nut-free': /\b(peanuts?|tree nuts?|almonds?|cashews?|walnuts?|pistachios?|hazelnuts?|pecans?|macadamia|nuts?)\b/i,
@@ -188,6 +203,14 @@ const ALLERGEN_FOOD_PATTERNS: Partial<Record<DietaryPreference, RegExp>> = {
   'soy-free': /\b(soy|soya|soybeans?)\b/i,
   'shellfish-free': /\b(shellfish|shrimp|prawns?|crab|lobster|crustaceans?|mollus[ck]s?|clams?|mussels?|oysters?|scallops?)\b/i,
   'fish-free': /\bfish\b/i,
+  // The five that used to have no tag to become. Same conservative shape as
+  // the seven above: naming the food is not enough on its own — ALLERGEN_SIGNAL
+  // must also fire — so "I love sesame prawn toast" never tags anything.
+  'celery-free': /\b(celery|celeriac)\b/i,
+  'sesame-free': /\b(sesame|tahini|hummus|houmous)\b/i,
+  'mustard-free': /\bmustard\b/i,
+  'lupin-free': /\blupins?\b/i,
+  'sulphite-free': /\b(sulphites?|sulfites?|sulphur dioxide|sulfur dioxide)\b/i,
 }
 
 /**

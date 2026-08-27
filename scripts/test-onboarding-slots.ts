@@ -31,10 +31,15 @@ import {
   type OnboardingSlotValues,
   type SlotKey,
 } from '../src/lib/onboarding-slots'
+import { readFileSync } from 'fs'
+import { join, dirname } from 'path'
+import { fileURLToPath } from 'url'
 import { DIETARY_PREFERENCES } from '../src/lib/diet-rules'
 import { getFlaggedJoints } from '../src/lib/exercise-plan'
 import { isStartingOut } from '../src/lib/starting-out'
 import type { UserProfile } from '../src/lib/types'
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 
 let failures = 0
 const check = (name: string, ok: boolean, detail = '') => {
@@ -451,13 +456,64 @@ const falseCases = [
 for (const text of falseCases) {
   check(`"${text}" does NOT falsely detect an allergen`, detectAllergenTags(text).length === 0, JSON.stringify(detectAllergenTags(text)))
 }
+// THIS CHECK USED TO ASSERT THE OPPOSITE, and that is worth recording: it
+// read "the five untagged allergens (no enforcement mechanism exists) are
+// correctly never returned" and passed, because at the time there was genuinely
+// nothing for them to become. A gate describing a gap as correct is how a gap
+// survives — it makes the missing thing look deliberate and defended. Now that
+// all five have tags, the same disclosure must return all five.
 check(
-  'the five untagged allergens (no enforcement mechanism exists) are correctly never returned',
-  detectAllergenTags('allergic to celery, sesame, mustard, lupin, and sulphites').length === 0,
+  'a five-allergen disclosure now returns all five, where it used to return none',
+  detectAllergenTags('allergic to celery, sesame, mustard, lupin, and sulphites').length === 5,
+  JSON.stringify(detectAllergenTags('allergic to celery, sesame, mustard, lupin, and sulphites')),
 )
+
+
+console.log('\n16b. The five that used to have nowhere to go')
+{
+  // Until this landed, disclosing any of these got a warm reply and a memory
+  // note, and meal generation never saw it — while celery, mustard, sesame
+  // oil and sesame seeds sat in food-db as servable ingredients with empty
+  // tag sets. They are not theoretical.
+  for (const [text, tag] of [
+    ['I am allergic to sesame', 'sesame-free'],
+    ['celery makes me sick', 'celery-free'],
+    ['allergic to mustard', 'mustard-free'],
+    ['I have a lupin allergy', 'lupin-free'],
+    ['sulphites give me a reaction', 'sulphite-free'],
+    ['tahini makes me ill', 'sesame-free'],
+  ] as [string, string][]) {
+    check(`"${text}" detects ${tag}`, detectAllergenTags(text).includes(tag as never), JSON.stringify(detectAllergenTags(text)))
+  }
+  // The conservative half. Naming the food is not a disclosure — over-tagging
+  // strips safe food out of someone's plan, which is its own harm.
+  for (const text of ['I love sesame prawn toast', 'celery is my favourite snack', 'extra mustard please']) {
+    check(`"${text}" does NOT falsely detect`, detectAllergenTags(text).length === 0, JSON.stringify(detectAllergenTags(text)))
+  }
+}
+
+console.log('\n16c. Every dietary preference the app offers is enforced in BOTH places')
+{
+  // Two independent lists have to agree with DIETARY_PREFERENCES: the
+  // structural filter (FORBIDDEN_TAGS, which DIETARY_PREFERENCES is derived
+  // from, so that one is safe by construction) and the generate-meals PROMPT,
+  // which is a hand-written if/else chain. A preference missing from the
+  // prompt is one the model is never told about, however well it is tagged.
+  const gen = readFileSync(join(ROOT, 'supabase/functions/generate-meals/index.ts'), 'utf8')
+  const told = new Set([...gen.matchAll(/has\("([a-z-]+)"\)/g)].map(m => m[1]))
+  const missing = DIETARY_PREFERENCES.filter(p => !told.has(p))
+  // "Told about" deliberately, not "filters on": mediterranean has no hard
+  // exclusions by design (diet-rules.ts says so), but it was absent from the
+  // block entirely, so choosing it did NOTHING — an option offered and then
+  // silently ignored. It now gets a positive style steer. The invariant is
+  // that no preference is silently dropped, whether it bans or leans.
+  check('no preference is silently ignored by the meal generator', missing.length === 0, missing)
+  check('...and there are enough to matter', DIETARY_PREFERENCES.length >= 12, DIETARY_PREFERENCES.length)
+}
+
+console.log('\nAll onboarding-slot checks passed.')
 
 if (failures > 0) {
   console.error(`\n${failures} failure(s)`)
   process.exit(1)
 }
-console.log('\nAll onboarding-slot checks passed.')

@@ -75,8 +75,12 @@ async function main() {
   check('generate-meals buildDietarySafetyBlock has no "pork-free" literal', !generateMealsBlock.includes('"pork-free"'))
   check('generate-meals buildDietarySafetyBlock has no "seafood-free" literal', !generateMealsBlock.includes('"seafood-free"'))
 
-  console.log(`\n[5] DIETARY_PREFERENCES itself has no duplicates and covers all 17 onboarding categories`)
-  check('exactly 17 preferences', DIETARY_PREFERENCES.length === 17, DIETARY_PREFERENCES)
+  console.log(`\n[5] DIETARY_PREFERENCES itself has no duplicates and covers all 22 onboarding categories`)
+  // 17 -> 22 when celery/sesame/mustard/lupin/sulphite-free were added. The
+  // count is a deliberate tripwire: adding a preference without updating both
+  // prompt blocks and both food-db copies is the failure this file exists to
+  // catch, and this line is what makes someone come and look.
+  check('exactly 22 preferences', DIETARY_PREFERENCES.length === 22, DIETARY_PREFERENCES)
   check('no duplicate tags', new Set(DIETARY_PREFERENCES).size === DIETARY_PREFERENCES.length, DIETARY_PREFERENCES)
   check('fish-free is present (round 2 — contains_fish had no standalone lane)', DIETARY_PREFERENCES.includes('fish-free'))
 
