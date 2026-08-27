@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# Refuse to commit a regenerated report/build artifact.
+#
+# PROJECT-LOG has said "never commit a regenerated report" for a long time, and
+# it was violated TWICE in one session anyway — both times the same way: a
+# `test:audit` / `test:quality` sweep running in the background rewrote the file
+# inside the window where `git add -A` picked it up. Remembering is not the fix;
+# a sweep finishing at an unlucky moment beats anyone's memory.
+#
+# These files are diagnostic snapshots. The audit is deliberately
+# non-deterministic run to run (exercise-plan.ts uses Math.random for variety),
+# so a regenerated diff looks like a result and measures nothing.
+#
+# Deliberately blocks rather than un-stages: silently dropping a staged file
+# would make `git add -A && git commit` quietly not commit what it said it did,
+# which is a worse surprise than an error you can read.
+set -euo pipefail
+
+ARTIFACTS='^(audit-report\.txt|quality-report\.txt|meal-quality-report\.txt|differentiation-audit-report\.txt|tsconfig\.tsbuildinfo)$'
+staged=$(git diff --cached --name-only | grep -E "$ARTIFACTS" || true)
+
+if [ -n "$staged" ]; then
+  echo "pre-commit: refusing to commit a regenerated report artifact:" >&2
+  echo "$staged" | sed 's/^/  /' >&2
+  echo "" >&2
+  echo "These are diagnostic snapshots, not source. Un-stage them and commit again:" >&2
+  echo "  git restore --staged $(echo "$staged" | tr '\n' ' ')" >&2
+  echo "  git checkout -- $(echo "$staged" | tr '\n' ' ')" >&2
+  echo "" >&2
+  echo "If you genuinely mean to update a committed snapshot, say so:  git commit --no-verify" >&2
+  exit 1
+fi
