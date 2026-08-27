@@ -2,6 +2,16 @@
 
 Newest first. One line each.
 
+- [x] **THE COACH CHAT CAN NOW BE MEASURED, WHICH IT NEVER COULD BEFORE.** Phase 1 of the tone work, and deliberately no prompt change: `scripts/probe-coach-tone.mts` + a fixed `coach-warmth` persona, mirroring the onboarding probe that has existed for a while. **`chat-gemini` had no probe, no persona, and — verified today — no reply guarantee either**, while `onboarding-chat` has all three. So the risk is the opposite way round from how it looks: the function that already burned us is the protected one, and the coach chat is the exposed one.
+
+- [x] THE NUMBER THAT DECIDES IT IS PRINTED FIRST AND LABELLED AS SUCH: **turns that spoke at all**. `fa683fc` shipped a voice improvement that fixed 7/7 grading openers and simultaneously silenced the model on 4 of 7 turns — worse than neutral, because an empty reply trips the dead-air guard that prints the slot's canonical form wording. A change aimed at less form-feel produced more of it. Nothing on this summary outranks that line, and the probe says so out loud.
+
+- [x] FOUR SECONDARY MEASURES so a before/after is readable without re-reading two transcripts: verdict openers, longer-than-a-text, lists/headers, more than one emoji. All deterministic text checks, verified against canned replies covering each shape — silent turn, verdict opener, wall of text, emoji pile.
+
+- [ ] AND ONE OF THOSE MEASURES WAS WRONG ON ITS FIRST RUN, caught by the same canned check: a bulleted reply scored 3 sentences because a list has few full stops, so a plainly-too-long reply passed the length test. Now `sentences > 3 || lines > 3`. Stated as what it is — a proxy for "too long to be a text message", not a parser.
+
+- [ ] PHASE 2 IS NOT BUILT, on purpose. The wording change to both prompts waits until this probe has run against the deployed function and answered a question nothing currently can: **does `chat-gemini` ever return an empty reply today?** If it does, that is a live bug independent of tone and it changes what the tone change is allowed to do. Needs Ashley's machine — `*.supabase.co` is unreachable from the sandbox and the probe costs real Gemini calls.
+
 - [x] **ONBOARDING v2 — THE CONVERSATION NOW HAS SOMEONE AT THE TOP OF IT.** A header with a slowly pulsing mint avatar, "Personal TrAIner", and what it is currently doing ("Building your plan"). That header is also what let the per-message COACH label GO: v1 stamped it above every coach line, which said the same thing twice once identity was stated permanently. The run-suppression helper that existed only to stop the label repeating went with it — dead code removed rather than left looking finished, which is exactly the failure the capture-trace report had just named.
 
 - [x] **EVERY HEX IN THE v2 SPEC WAS CONVERTED, NOT PASTED.** The design names `#453C8E`, `#332A6E`, `#1E1941`, `#3BAE8E`, `rgba(91,233,194,…)`, `rgba(69,60,142,…)` — all correct in Nightshift, all wrong in Ember, Field and Graphite. Each maps to something the app already has: `--border` IS `#453C8E`, `--glow-rgb` IS the accent's rgb triplet, `--primary-2` IS the gradient's darker mint, `--input` IS `#241E4E`. The two the app had no token for (`#332A6E`, `#1E1941`) are `color-mix` steps between tokens. **Zero hex in the component**, and the gate fails on any.
