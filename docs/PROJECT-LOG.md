@@ -715,12 +715,37 @@ is green, then either continue from this list or ask.
 
 ### 7.1 The two Supabase projects — read this before touching `.env*`
 
-Both `.env` and `.env.local` exist. **`.env.local` (project ref
-`sdkhuczcfnqqimdgfiks`) is the live, CLI-linked project** — `npx supabase
-db push` and `npx supabase functions deploy` target it. `.env` points at
-an older project. Vite's env precedence means `.env.local` wins at dev/
-build time, but don't assume — if a command seems to hit the wrong
-project, check which file actually supplied the URL.
+**CORRECTED 27 Aug 2026. The paragraph below said `.env.local` was
+`sdkhuczcfnqqimdgfiks` and that `functions deploy` targets it. Both halves
+are now false, and believing them is how a deploy silently misses
+production.** What is actually true:
+
+| | project | what it is |
+|---|---|---|
+| `.env.local` | `vswuurrtbzbrgubddefv` | **TEST** — added 12 Aug, the day after the split, so local dev writes somewhere safe |
+| `.env` | `aoksyzjrrikvuhxatljy` | a third, older project — not TEST and not production |
+| CLI ambient link | `vswuurrtbzbrgubddefv` | **TEST**, by design (`db-link-test.sh`) |
+| PRODUCTION | `sdkhuczcfnqqimdgfiks` | reachable only via `npm run db:link-prod` |
+
+So a bare `npx supabase functions deploy <fn>` deploys to **TEST**. It
+prints the project ref it used — read that line, every time. This was found
+when the onboarding warm-voice prompt was deployed and the output read
+`Deployed Functions on project vswuurrtbzbrgubddefv`, while production was
+still serving the old prompt.
+
+Anything reading `.env.local` — the tone probes, `test:meal-quality` — is
+therefore pointed at TEST, not production. That is the safe default and the
+reason those probes can be run freely; an earlier backlog note claiming they
+would write to the live database was wrong on both counts.
+
+Original text, kept because the warning in its last sentence is the right
+instinct even though its facts had gone stale: *"Both `.env` and `.env.local`
+exist. `.env.local` (project ref `sdkhuczcfnqqimdgfiks`) is the live,
+CLI-linked project — `npx supabase db push` and `npx supabase functions
+deploy` target it. `.env` points at an older project. Vite's env precedence
+means `.env.local` wins at dev/build time, but don't assume — if a command
+seems to hit the wrong project, check which file actually supplied the
+URL."*
 
 ### 7.2 Migrations
 
@@ -755,6 +780,20 @@ Deno, deployed independently of the frontend build:
 ```bash
 npx supabase functions deploy <function-name>
 ```
+
+**That command deploys to TEST**, because the CLI's ambient link is TEST
+(§7.1). Production takes three commands and the middle one is the same as
+above:
+
+```bash
+npm run db:link-prod                              # type yes-production
+npx supabase functions deploy <function-name>     # now targets production
+npm run db:link-test                              # back to the safe default
+```
+
+`db-link-prod.sh` names `functions deploy` explicitly as one of the commands
+the link governs, so this is the sanctioned path rather than a `--project-ref`
+flag — the confirmation phrase is the point.
 
 Docker-not-running produces a harmless warning; the deploy still succeeds
 (asset upload, not a local build). **A local edit to an edge function has

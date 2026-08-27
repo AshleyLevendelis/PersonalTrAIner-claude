@@ -2,6 +2,14 @@
 
 Newest first. One line each.
 
+- [ ] **THE ONBOARDING TONE DEPLOY WENT TO TEST, NOT PRODUCTION.** The CLI printed `Deployed Functions on project vswuurrtbzbrgubddefv` — that is TEST. The ambient link is TEST *by design*, and the 27 Aug production deploy deliberately relinked back to it afterwards, so a bare `functions deploy` has pointed at TEST ever since. `223d3c7` (the warm-voice prompt) is **not** an ancestor of `94508e1`, so production is still serving the old onboarding prompt. Live path: `npm run db:link-prod` → `npx supabase functions deploy onboarding-chat` → `npm run db:link-test`.
+
+- [x] **PROJECT-LOG §7.1 SAID THE OPPOSITE, AND THAT IS WHY THIS WAS EASY TO MISS.** It claimed `.env.local` was `sdkhuczcfnqqimdgfiks` and that `functions deploy` targets it. Both false: `.env.local` is **TEST** (added 12 Aug, the day after the split), `.env` is a **third, older** project (`aoksyzjrrikvuhxatljy`), and the CLI link is TEST. Corrected in place with the original kept, because its last sentence — *"don't assume; check which file actually supplied the URL"* — was exactly right even as its facts went stale. §7.3 now gives the three-command production path.
+
+- [x] AND IT CORRECTS A SECOND STALE CLAIM: the 27 Aug note said the tone probes and `test:meal-quality` read `.env.local` and would therefore "create profile rows on the live database". They read `.env.local`, which is TEST. Combined with the earlier finding that `onboarding-chat` performs no DB writes at all, those probes were never a production risk in either respect.
+
+- [ ] WORTH ONE LOOK, NOT YET CHECKED: `.env.local` is **committed**, not gitignored, and points at TEST. Vite prefers real process-env vars over `.env` files, so Vercel's own dashboard variables should win at build time — but if they are unset, a production build would take the TEST URL from this file. Cannot be verified from the sandbox; confirm `VITE_SUPABASE_URL` is set in the Vercel project.
+
 - [x] **THE POST-ONBOARDING TOUR IS BUILT — "TAP-TO-LEARN", TEN STOPS.** From Ashley's design handoff. It never renders a mock of a screen: it measures a real element by `data-tour` key, cuts a hole in a scrim, and lets the real app take the tap. So every stop shows the CURRENT app with the user's own plan in it, and the nav stops advance because the hash actually changed. The set at stop 7 is a genuine week-1 calibration set — the point, not a side effect. Ends in Chat where `buildFirstRunIntro` takes over.
 
 - [x] **TWO REAL DEFECTS, BOTH FOUND BY DRIVING IT IN A BROWSER, NEITHER VISIBLE TO ANY STATIC CHECK.** (1) The tour detects "the set saved" by `data-tour="setrow"` disappearing — and detected "today is a rest day" by *the same absence*, so logging the set skipped the stop the user had just completed and renumbered to "of 9" behind them. (2) `bringIntoView` tried to bring the fixed tab bar to 130px from the top; being fixed it never moved, and the whole page scrolled 650px underneath it instead.
