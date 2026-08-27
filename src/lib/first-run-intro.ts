@@ -93,3 +93,57 @@ export function buildFirstRunIntro(greeting: string, detailSentence: string): Fi
     { content: detailSentence, quickReplies: FIRST_RUN_QUICK_REPLIES },
   ]
 }
+
+// ---------------------------------------------------------------------------
+// THE OTHER FIRST RUN — the one that actually comes first.
+//
+// Everything above fires in the main chat AFTER a plan exists. Ashley found
+// the gap on a real phone: a brand-new user's genuine first message was the
+// interview opener, which explains the QUESTIONS ("I want to get to know you a
+// bit") and never once says what the app is for. You were asked your name by
+// something you had no reason to trust yet.
+//
+// Same restraint as above, and it matters more here because nothing has been
+// built yet: only claims the app actually delivers. Every sentence below maps
+// to something real — plan generation, the injury/equipment adaptation paths,
+// natural-language logging, user_facts memory, and the propose-then-confirm
+// card. No feature list, no capability the coach would then decline.
+//
+// Four short messages rather than one, for the reason FIRST_RUN_WHAT_TO_SAY
+// records: as a single paragraph this runs to a wall of text at 412px, which
+// is the thing the split exists to avoid. Checked with `render:screens`,
+// not guessed.
+// ---------------------------------------------------------------------------
+
+export const ONBOARDING_INTRO_WHO =
+  "Hey — I'm your coach. Good to meet you."
+
+export const ONBOARDING_INTRO_WHAT_I_DO =
+  "I'll build your training and your food, then keep them working as life gets in the way — a sore shoulder, a short week, a food you hate."
+
+export const ONBOARDING_INTRO_HOW_TO_USE =
+  "After that you just talk to me. I'll log it, sort it, remember it — and nothing changes without your say-so."
+
+export const ONBOARDING_INTRO_THE_ASK =
+  "Few minutes to set up, and you can change anything later. First — what should I call you?"
+
+/**
+ * The messages a brand-new user sees before anything else in the app.
+ *
+ * Order is deliberate: who you are, what you do, how they use you, THEN the
+ * first question. The name ask lands last because asking it first — which is
+ * what this used to do — is a form opening with a field.
+ *
+ * No quick replies. Onboarding's whole redesign was that a coach waits for a
+ * text reply rather than handing over buttons (chips are a rescue now, see
+ * present_slot's description), so opening with chips would contradict the
+ * screen it opens.
+ */
+export function buildOnboardingIntro(): FirstRunMessage[] {
+  return [
+    { content: ONBOARDING_INTRO_WHO },
+    { content: ONBOARDING_INTRO_WHAT_I_DO },
+    { content: ONBOARDING_INTRO_HOW_TO_USE },
+    { content: ONBOARDING_INTRO_THE_ASK },
+  ]
+}

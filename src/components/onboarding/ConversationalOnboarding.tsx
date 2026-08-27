@@ -38,6 +38,7 @@ import {
   type PendingGoal,
 } from '@/lib/onboarding-draft-store'
 import type { UserProfile } from '@/lib/types'
+import { buildOnboardingIntro } from '@/lib/first-run-intro'
 
 // ---------------------------------------------------------------------------
 // THE onboarding. Ashley's call: one way in, the conversation — the
@@ -451,18 +452,19 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
         { role: 'assistant', content: RESUME_BANNER },
       ]
     }
-    return [
-      {
-        role: 'assistant',
-        content:
-          // "you can type or tap" was still here after the buttons stopped
-          // being how questions get answered — the very first thing a new user
-          // reads was promising an interaction the redesign removed. Caught by
-          // Ashley on a real phone, not by any gate: no check looks at whether
-          // the app's own copy still describes the app.
-          "Hey — I'm your coach. Before I build your plan I want to actually get to know you a bit: what you're after, what's worked, what hasn't. Takes a few minutes, just tell me in your own words, and you can change any answer later. First things first — what should I call you?",
-      },
-    ]
+    // The intro explaining what the app DOES, before it asks for anything —
+    // Ashley's second finding on a real phone. This used to be one paragraph
+    // about the interview itself ("I want to get to know you a bit"), so a
+    // brand-new user was asked their name by something that had never said
+    // what it was for. The four messages come from buildOnboardingIntro so
+    // `render:screens` sees the real strings; the equivalent copy for the
+    // main chat sits beside it in the same file.
+    //
+    // A previous version of this same line promised "you can type or tap"
+    // after the buttons had been removed — no gate looks at whether the app's
+    // own copy still describes the app, which is why this one is asserted in
+    // test:onboarding-intro.
+    return buildOnboardingIntro().map(m => ({ role: 'assistant' as const, content: m.content }))
   })
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)

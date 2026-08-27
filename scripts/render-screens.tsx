@@ -53,6 +53,7 @@ import { RestDayCard } from '@/components/exercise/RestDayCard'
 import { WarmupSection } from '@/components/exercise/WarmupSection'
 import { LoadCeilingPrompt } from '@/components/exercise/LoadCeilingPrompt'
 import { SlotChipsCard } from '@/components/onboarding/SlotChipsCard'
+import { buildOnboardingIntro } from '@/lib/first-run-intro'
 import { initialSlotValues, ONBOARDING_SLOTS } from '@/lib/onboarding-slots'
 import { buildFirstRunIntro } from '@/lib/first-run-intro'
 import type { UserProfile, WorkoutDay, EquipmentAccess } from '@/lib/types'
@@ -197,13 +198,12 @@ function FirstRunChat() {
  * see whether 19px coach text and a 17px user bubble actually read as two
  * kinds of speech at 412px rather than just in a spec.
  */
-function OnboardingConversation() {
-  const turns: { role: 'coach' | 'user'; text: string }[] = [
-    { role: 'coach', text: "Great to meet you, Ashley. Let's start with what we're actually aiming for — what's the big goal that's got you wanting a plan right now?" },
-    { role: 'user', text: "I want to lose fat but keep the muscle I've built" },
-    { role: 'coach', text: "Got it — that tells me a lot. And how would you describe where you're at right now: brand new, coming back after a break, or already lifting regularly?" },
-    { role: 'user', text: 'Coming back after about a year off' },
-  ]
+function OnboardingShell({ turns, ticks, placeholder, typing }: {
+  turns: { role: 'coach' | 'user'; text: string }[]
+  ticks: boolean[]
+  placeholder: string
+  typing: boolean
+}) {
   return (
     <div className="ob-canvas flex flex-col">
       <div className="flex items-center gap-3 px-5 pt-5 pb-3.5 max-w-md w-full mx-auto border-b border-[color:color-mix(in_oklab,var(--border)_35%,transparent)]">
@@ -218,7 +218,7 @@ function OnboardingConversation() {
           </span>
         </div>
         <div className="flex gap-1 shrink-0">
-          {[true, true, false, false].map((on, i) => (
+          {ticks.map((on, i) => (
             <span key={i} className={`ob-tick ${on ? 'ob-tick-on' : 'ob-tick-off'}`} />
           ))}
         </div>
@@ -236,15 +236,17 @@ function OnboardingConversation() {
             {t.text}
           </div>
         ))}
-        <div className="flex items-center gap-1.5 py-1.5">
-          <span className="ds-typing-dot" />
-          <span className="ds-typing-dot" />
-          <span className="ds-typing-dot" />
-        </div>
+        {typing && (
+          <div className="flex items-center gap-1.5 py-1.5">
+            <span className="ds-typing-dot" />
+            <span className="ds-typing-dot" />
+            <span className="ds-typing-dot" />
+          </div>
+        )}
       </div>
       <div className="ob-composer-fade px-4 pt-6 pb-4 max-w-md w-full mx-auto flex items-center gap-2.5">
         <div className="ob-input flex-1 rounded-full px-5 py-[15px] text-[16px] text-muted-foreground">
-          Where are you at?
+          {placeholder}
         </div>
         <div className="size-[52px] shrink-0 rounded-full bg-[color:color-mix(in_oklab,var(--border)_50%,transparent)] text-muted-foreground flex items-center justify-center">
           <Send className="size-[22px]" />
@@ -252,6 +254,36 @@ function OnboardingConversation() {
       </div>
     </div>
   )
+}
+
+/**
+ * THE VERY FIRST SCREEN of the app, with the REAL strings imported rather than
+ * retyped — the whole reason buildOnboardingIntro lives in a module. A replica
+ * that copies the copy drifts from it silently, which defeats looking at it.
+ *
+ * What this screen is for: four messages is a judgement call about how much
+ * text someone will read before they have typed anything, and the only honest
+ * way to make it is to look at the thing at 412px.
+ */
+function OnboardingIntro() {
+  return (
+    <OnboardingShell
+      turns={buildOnboardingIntro().map(m => ({ role: 'coach' as const, text: m.content }))}
+      ticks={[false, false, false, false]}
+      placeholder="Your name"
+      typing={false}
+    />
+  )
+}
+
+function OnboardingConversation() {
+  const turns: { role: 'coach' | 'user'; text: string }[] = [
+    { role: 'coach', text: "Great to meet you, Ashley. Let's start with what we're actually aiming for — what's the big goal that's got you wanting a plan right now?" },
+    { role: 'user', text: "I want to lose fat but keep the muscle I've built" },
+    { role: 'coach', text: "Got it — that tells me a lot. And how would you describe where you're at right now: brand new, coming back after a break, or already lifting regularly?" },
+    { role: 'user', text: 'Coming back after about a year off' },
+  ]
+  return <OnboardingShell turns={turns} ticks={[true, true, false, false]} placeholder="Where are you at?" typing />
 }
 
 const screens: Screen[] = [
@@ -292,6 +324,11 @@ const screens: Screen[] = [
     name: 'load-ceiling-prompt',
     title: 'What can you actually load',
     node: <LoadCeilingPrompt kind="dumbbell" onSave={async () => {}} onDecline={async () => {}} />,
+  },
+  {
+    name: 'onboarding-intro',
+    title: 'THE FIRST SCREEN — what the app says before it asks anything',
+    node: <OnboardingIntro />,
   },
   {
     name: 'onboarding-conversation',

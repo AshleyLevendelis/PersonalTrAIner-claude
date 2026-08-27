@@ -26,6 +26,7 @@
 import { readFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
+import { buildOnboardingIntro } from '../src/lib/first-run-intro'
 import { isStuckMessage, detectAllergenTags } from '../src/lib/onboarding-slots'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -116,17 +117,63 @@ console.log('\n5. The detector is narrow enough not to eat real answers')
   }
 }
 
-console.log('\n5b. The app\'s own copy does not promise buttons')
+console.log('\n5b. THE FIRST SCREEN: it says what the app is for before it asks anything')
 {
-  // Caught on a real phone, by nobody's gate: the opening message still said
-  // "you can type or tap" long after tapping stopped being how questions are
-  // answered. The first thing a new user reads was describing the old app.
-  // Scoped to the OPENER — the rescue paths ("tap the option that fits") are
-  // correct, because a card really is on screen when they fire.
-  const opener = ui.slice(ui.indexOf("Hey — I'm your coach."), ui.indexOf("Hey — I'm your coach.") + 400)
-  check('the opener exists', opener.length > 100)
-  check('...and does not offer tapping as a way to answer', !/\btap\b/i.test(opener), opener.slice(0, 80))
-  check('...it invites words instead', /in your own words/.test(opener))
+  // Two findings on a real phone, both by Ashley, neither by any gate:
+  //
+  //   (1) the opener said "you can type or tap" long after tapping stopped
+  //       being how questions are answered — the first thing a new user read
+  //       was describing the previous version of the app;
+  //   (2) the explanation of WHAT THE APP DOES only ever appeared in the main
+  //       chat, after a plan existed. So a brand-new user was asked their name
+  //       by something that had never said what it was for.
+  //
+  // Asserted against the real buildOnboardingIntro rather than by scanning the
+  // component for a string. The string scan is what broke when this copy moved
+  // into a module — it was checking where the words lived, not what they said.
+  const intro = buildOnboardingIntro()
+  check('there is an intro, and it is more than one message', intro.length > 1, intro.length)
+  check('every message has words in it', intro.every(m => m.content.trim().length > 0))
+
+  // ASHLEY'S ACTUAL REQUEST: the explanation comes FIRST, the name ask LAST.
+  const last = intro[intro.length - 1].content
+  check('the LAST message is the one that asks for a name', /what should I call you/i.test(last), last)
+  check('...and no earlier message asks for it first',
+    intro.slice(0, -1).every(m => !/what should I call you/i.test(m.content)))
+
+  const before = intro.slice(0, -1).map(m => m.content).join(' ')
+  check('something before it says the app builds training', /\btrain(ing)?\b/i.test(before))
+  check('...and food', /\bfood\b|\bmeal|\beat\b/i.test(before))
+  check('...and that it keeps up as things change', /\bchange|\bkeep them working|\bgets in the way/i.test(before))
+
+  // The promise that makes the first proposal card read as designed rather
+  // than as the app hesitating. Only claim things that are true: every
+  // plan-changing tool is propose-then-confirm.
+  check('it states that nothing changes without their say-so',
+    /without your say-so|show you first/i.test(intro.map(m => m.content).join(' ')))
+
+  // (1) again, now unbreakable by a file move.
+  const all = intro.map(m => m.content).join(' ')
+  check('the intro never offers tapping as a way to answer', !/\btap\b/i.test(all), all.slice(0, 80))
+  check('...and no chips are attached to it', intro.every(m => !m.quickReplies?.length))
+
+  // THE WALL OF TEXT, which render:screens caught twice — once for the main
+  // chat's intro and again for this one, where the first draft ran to two
+  // eight-line blocks and pushed the actual question BELOW THE FOLD before
+  // the user had typed a word. ~28 characters per line at 412px, so 170
+  // characters is about six lines. Not a style preference: nobody reads a
+  // wall of text from something they have not agreed to yet.
+  const MAX_CHARS = 170
+  const tooLong = intro.filter(m => m.content.length > MAX_CHARS).map(m => `${m.content.length}: ${m.content.slice(0, 40)}...`)
+  check(`no message runs past ~6 lines at phone width (${MAX_CHARS} chars)`, tooLong.length === 0, tooLong)
+
+  // ...and the component must actually render the builder's output rather than
+  // hand-rolling the copy beside it. That is the two-halves defect this repo
+  // keeps producing, and it is exactly how the "type or tap" line survived.
+  check('ConversationalOnboarding builds its first messages from buildOnboardingIntro',
+    /return buildOnboardingIntro\(\)/.test(ui))
+  check("...and doesn't still carry the old hand-written opener",
+    !/Before I build your plan I want to actually get to know you/.test(ui))
 }
 
 console.log('\n5c. A stated goal is taken, not appraised and re-asked')

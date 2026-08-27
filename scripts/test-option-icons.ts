@@ -30,6 +30,7 @@
 // ---------------------------------------------------------------------------
 
 import { ONBOARDING_SLOTS } from '../src/lib/onboarding-slots'
+import { DIETARY_PREFERENCES } from '../src/lib/diet-rules'
 
 let failures = 0
 const check = (name: string, ok: boolean, detail = '') => {
@@ -106,10 +107,29 @@ console.log('\n4. Icons are presentation — the values they sit beside are unto
   const injValues = inj.map(o => String(o.value)).sort()
   check(`dietary values unchanged (${dietValues.length})`,
     dietValues.join(',') === [
-      'dairy-free', 'egg-free', 'fish-free', 'gluten-free', 'halal', 'keto', 'kosher',
-      'low-carb', 'low-fodmap', 'mediterranean', 'nut-free', 'paleo', 'pescatarian',
-      'shellfish-free', 'soy-free', 'vegan', 'vegetarian',
+      // UPDATED ONCE, deliberately, when celery/sesame/mustard/lupin/sulphite
+      // enforcement landed (17 -> 22). Those five were already selectable in
+      // spirit and enforced by nothing; adding them to FORBIDDEN_TAGS is what
+      // made them real. Re-freezing is the right response to a change you
+      // meant — the wrong one is deleting the check so it stops noticing.
+      //
+      // This gate went red at that change and stayed red, because it was not
+      // in the sweep run afterwards. A frozen list only works if it is
+      // actually run; see BACKLOG for the correction.
+      'celery-free', 'dairy-free', 'egg-free', 'fish-free', 'gluten-free', 'halal',
+      'keto', 'kosher', 'low-carb', 'low-fodmap', 'lupin-free', 'mediterranean',
+      'mustard-free', 'nut-free', 'paleo', 'pescatarian', 'sesame-free',
+      'shellfish-free', 'soy-free', 'sulphite-free', 'vegan', 'vegetarian',
     ].join(','), dietValues.join(','))
+  // The list is frozen so an ICON edit can't move a value. It must also stay
+  // in step with what is actually ENFORCED — an option nothing enforces is the
+  // exact state those five allergens were in before this session.
+  check('every dietary option is one diet-rules actually enforces',
+    dietValues.every(v => (DIETARY_PREFERENCES as string[]).includes(v)),
+    dietValues.filter(v => !(DIETARY_PREFERENCES as string[]).includes(v)))
+  check('...and every enforced preference is offered',
+    (DIETARY_PREFERENCES as string[]).every(p => dietValues.includes(p)),
+    (DIETARY_PREFERENCES as string[]).filter(p => !dietValues.includes(p)))
   check(`injury values unchanged (${injValues.length})`,
     injValues.join(',') === ['ankles', 'elbows', 'hips', 'knees', 'lower_back', 'neck', 'shoulders', 'wrists'].join(','),
     injValues.join(','))
