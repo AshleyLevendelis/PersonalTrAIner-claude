@@ -269,8 +269,48 @@
     width: 7px;
     height: 7px;
     border-radius: 9999px;
-    background: var(--muted-foreground);
+    /* v2: mint, not grey. Grey dots read as the app buffering; the accent
+     * says the coach specifically is composing a reply. */
+    background: var(--primary);
     animation: dsTypingDot 1.2s ease-in-out infinite;
+  }
+  /* Onboarding v2 chrome. Every value here is derived from a theme token —
+   * the design names raw hexes (#453C8E, #332A6E, #1E1941, rgba(91,233,194,…))
+   * because it was drawn in Nightshift, and each one is a different colour in
+   * Ember, Field and Graphite. --glow-rgb IS the accent's rgb triplet and
+   * --border IS #453C8E in Nightshift, so these are the same design expressed
+   * so it survives a theme switch. */
+  .ob-canvas {
+    background: linear-gradient(180deg,
+      color-mix(in oklab, var(--background) 88%, var(--border)) 0%,
+      var(--background) 30%);
+  }
+  .ob-message-in { animation: obMessageIn .35s ease both; }
+  .ob-coach-avatar {
+    background: linear-gradient(135deg, var(--primary), var(--primary-2));
+    animation: obCoachPulse 3s ease infinite;
+  }
+  .ob-user-bubble {
+    background: linear-gradient(135deg,
+      color-mix(in oklab, var(--secondary) 72%, var(--border)),
+      var(--secondary));
+    border: 1px solid rgba(var(--glow-rgb), .18);
+  }
+  .ob-tick { width: 16px; height: 4px; border-radius: 2px; transition: background .3s; }
+  .ob-tick-on { background: var(--primary); }
+  .ob-tick-off { background: color-mix(in oklab, var(--border) 60%, transparent); }
+  .ob-input {
+    background: color-mix(in oklab, var(--input) 70%, transparent);
+    border: 1.5px solid var(--border);
+    transition: border-color .2s;
+  }
+  .ob-input:focus { border-color: var(--primary); }
+  .ob-composer-fade {
+    background: linear-gradient(180deg, transparent 0%, var(--background) 40%);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ob-message-in { animation: none; }
+    .ob-coach-avatar { animation: none; }
   }
   @media (prefers-reduced-motion: reduce) {
     .ds-typing-dot { animation: none; opacity: .55; }
@@ -448,6 +488,20 @@
  * typing rather than a loading spinner. Staggered 0.15s per dot at the call
  * site. Sits outside the glow system on purpose — this is motion, not a halo,
  * so --glow-strength must not be able to switch it off. */
+/* Onboarding v2 — a message arriving. Small on purpose: the point is that
+ * the line was just said, not that it made an entrance. */
+@keyframes obMessageIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+/* Onboarding v2 — the coach avatar's heartbeat. A spreading ring rather than
+ * a blur halo, so it reads as "listening" and not as the glow system's
+ * emphasis. Multiplied by --glow-strength like every other halo, so the
+ * "Off" setting genuinely turns it off. */
+@keyframes obCoachPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(var(--glow-rgb), calc(.35 * var(--glow-strength))); }
+  50% { box-shadow: 0 0 0 calc(6px * var(--glow-strength)) rgba(var(--glow-rgb), 0); }
+}
 @keyframes dsTypingDot {
   0%, 60%, 100% { transform: translateY(0); opacity: .25; }
   30% { transform: translateY(-3px); opacity: 1; }

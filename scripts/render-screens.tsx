@@ -40,7 +40,7 @@
 // ---------------------------------------------------------------------------
 
 import React from 'react'
-import { MessageCircle, Send } from 'lucide-react'
+import { MessageCircle, Send, Dumbbell } from 'lucide-react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { execFileSync } from 'node:child_process'
 import { readFileSync, writeFileSync, mkdirSync, readdirSync, existsSync } from 'node:fs'
@@ -201,43 +201,53 @@ function OnboardingConversation() {
   const turns: { role: 'coach' | 'user'; text: string }[] = [
     { role: 'coach', text: "Great to meet you, Ashley. Let's start with what we're actually aiming for — what's the big goal that's got you wanting a plan right now?" },
     { role: 'user', text: "I want to lose fat but keep the muscle I've built" },
-    { role: 'coach', text: "Got it — that tells me a lot. And how would you describe where you're at right now: brand new to training, coming back after a break, or already lifting regularly?" },
+    { role: 'coach', text: "Got it — that tells me a lot. And how would you describe where you're at right now: brand new, coming back after a break, or already lifting regularly?" },
     { role: 'user', text: 'Coming back after about a year off' },
   ]
   return (
-    <div className="flex flex-col bg-background px-4 py-4">
-      <div className="max-w-md w-full mx-auto flex flex-col gap-[22px]">
+    <div className="ob-canvas flex flex-col">
+      <div className="flex items-center gap-3 px-5 pt-5 pb-3.5 max-w-md w-full mx-auto border-b border-[color:color-mix(in_oklab,var(--border)_35%,transparent)]">
+        <div className="ob-coach-avatar size-10 shrink-0 rounded-full flex items-center justify-center text-primary-foreground">
+          <Dumbbell className="size-5" strokeWidth={2.2} />
+        </div>
+        <div className="flex-1 min-w-0 flex flex-col gap-px">
+          <span className="text-base font-semibold text-foreground">Personal TrAIner</span>
+          <span className="text-xs text-primary flex items-center gap-1.5">
+            <span className="size-1.5 rounded-full bg-primary shrink-0" />
+            Building your plan
+          </span>
+        </div>
+        <div className="flex gap-1 shrink-0">
+          {[true, true, false, false].map((on, i) => (
+            <span key={i} className={`ob-tick ${on ? 'ob-tick-on' : 'ob-tick-off'}`} />
+          ))}
+        </div>
+      </div>
+      <div className="px-5 py-6 max-w-md w-full mx-auto flex flex-col gap-[22px]">
         {turns.map((t, i) => (
-          <div key={i}>
-            {t.role === 'coach' && (i === 0 || turns[i - 1].role === 'user') && (
-              <div className="ds-label mb-1.5">Coach</div>
-            )}
-            <div
-              className={
-                t.role === 'user'
-                  ? 'ml-auto w-fit max-w-[80%] rounded-[20px_20px_4px_20px] bg-secondary px-[18px] py-3 text-[17px]/[1.5] text-foreground'
-                  : 'max-w-[88%] text-[19px]/[1.6] text-foreground [text-wrap:pretty]'
-              }
-            >
-              {t.text}
-            </div>
+          <div
+            key={i}
+            className={
+              t.role === 'user'
+                ? 'ob-user-bubble ml-auto w-fit max-w-[80%] rounded-[20px_20px_4px_20px] px-[18px] py-3 text-[17px]/[1.5] text-foreground'
+                : 'max-w-[88%] text-[19px]/[1.6] text-foreground [text-wrap:pretty]'
+            }
+          >
+            {t.text}
           </div>
         ))}
-        <div>
-          <div className="ds-label mb-1.5">Coach</div>
-          <div className="flex items-center gap-1.5">
-            <span className="ds-typing-dot" />
-            <span className="ds-typing-dot [animation-delay:150ms]" />
-            <span className="ds-typing-dot [animation-delay:300ms]" />
-          </div>
+        <div className="flex items-center gap-1.5 py-1.5">
+          <span className="ds-typing-dot" />
+          <span className="ds-typing-dot" />
+          <span className="ds-typing-dot" />
         </div>
-        <div className="flex items-center gap-2.5 pt-2">
-          <div className="flex-1 h-auto rounded-full border-[1.5px] border-primary bg-transparent px-5 py-[15px] text-[16px] text-muted-foreground">
-            Say anything…
-          </div>
-          <div className="size-[52px] shrink-0 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center">
-            <Send className="size-[22px]" />
-          </div>
+      </div>
+      <div className="ob-composer-fade px-4 pt-6 pb-4 max-w-md w-full mx-auto flex items-center gap-2.5">
+        <div className="ob-input flex-1 rounded-full px-5 py-[15px] text-[16px] text-muted-foreground">
+          Where are you at?
+        </div>
+        <div className="size-[52px] shrink-0 rounded-full bg-[color:color-mix(in_oklab,var(--border)_50%,transparent)] text-muted-foreground flex items-center justify-center">
+          <Send className="size-[22px]" />
         </div>
       </div>
     </div>
@@ -285,7 +295,7 @@ const screens: Screen[] = [
   },
   {
     name: 'onboarding-conversation',
-    title: 'Onboarding · text-only, no buttons',
+    title: 'Onboarding · v2 (header, ticks, composer states)',
     node: <OnboardingConversation />,
   },
   {

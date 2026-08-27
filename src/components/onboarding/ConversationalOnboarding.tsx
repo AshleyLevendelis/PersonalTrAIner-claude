@@ -262,25 +262,10 @@ function tryVolunteeredCapture(
 // (if any) that specific slot has been asked.
 const STALL_TURN_LIMIT = 4
 
-/**
- * Is the message at `index` part of a run the coach is already in?
- *
- * Used only to decide whether to repeat the COACH mark. Receipts ("✓ Goal —
- * fat loss") are the app speaking, not a turn change, so they do NOT break a
- * run — otherwise recording an answer mid-reply would re-label the coach's
- * own next sentence as a new speaker.
- *
- * `index` may be messages.length, which is how the typing indicator asks the
- * same question about the message that has not arrived yet.
- */
-function isCoachContinuation(messages: ChatMsg[], index: number): boolean {
-  for (let i = Math.min(index, messages.length) - 1; i >= 0; i--) {
-    const m = messages[i]
-    if (m.isReceipt) continue
-    return m.role === 'assistant'
-  }
-  return false
-}
+/** Ticks in the header's progress row. Four, per the v2 design — enough to
+ *  show movement, too few to count against. */
+const PROGRESS_TICKS = 4
+
 
 
 // How many times the app will force the SAME question before treating it as
@@ -1217,38 +1202,60 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
   // BottomDock to clear, so the only offset is the keyboard itself.
   // (useViewportInset is called up with the refs — the scroll effects need it
   // too, and a hook cannot be read before it runs.)
+  const canSend = !busy && input.trim().length > 0
+  /* The v2 contextual placeholder. With no buttons on screen, this is the
+     only standing hint at what kind of answer fits. It follows the SAME slot
+     the stuck-rescue and the dead-air guard use — the canonical next open one
+     — so all three agree on what the coach is currently waiting for rather
+     than each guessing separately. Falls back to "Say anything…", which stays
+     honest when nothing specific is pending (the review, or a tangent). */
+  const pendingHint = (() => {
+    const next = [...missingRequiredSlots(values), ...unconfirmedOptionalSlots(confirmed, values)][0]
+    return (next ? getSlotDef(next)?.inputHint : undefined) ?? 'Say anything…'
+  })()
+
   const composerBottomStyle = isKeyboardOpen
     ? { bottom: insetPx }
     : { bottom: 'env(safe-area-inset-bottom)' }
 
   return (
-    <div className="min-h-[100dvh] flex flex-col bg-background">
-      <div className="flex items-center justify-between gap-2 px-4 pt-4 pb-2 max-w-md w-full mx-auto">
-        <div className="flex items-center gap-2">
-          <Dumbbell className="size-5 text-primary" />
-          <h1 className="text-base font-bold tracking-tight">Personal TrAIner</h1>
+    <div className="min-h-[100dvh] flex flex-col ob-canvas">
+      {/* v2 COACH HEADER. The conversation now has someone at the top of it:
+          an avatar with a slow pulse, a name, and what it is currently doing.
+          This is also what let the per-message COACH label go — identity is
+          stated once, persistently, instead of being restamped above every
+          line the coach says. */}
+      <div className="flex items-center gap-3 px-5 pt-5 pb-3.5 max-w-md w-full mx-auto border-b border-[color:color-mix(in_oklab,var(--border)_35%,transparent)]">
+        <div className="ob-coach-avatar size-10 shrink-0 rounded-full flex items-center justify-center text-primary-foreground">
+          <Dumbbell className="size-5" strokeWidth={2.2} />
         </div>
-      </div>
-      {/* Progress without a form's scorekeeping: a hairline that fills as
-          the conversation goes. "12 of 18 answered" told the user they were
-          working through a list, which is exactly the feel we're removing —
-          but dropping progress entirely leaves an open-ended chat with no
-          sense of how long it runs, so the reassurance stays, wordlessly. */}
-      <div className="px-4 pb-3 max-w-md w-full mx-auto">
+        <div className="flex-1 min-w-0 flex flex-col gap-px">
+          <span className="text-base font-semibold text-foreground">Personal TrAIner</span>
+          <span className="text-xs text-primary flex items-center gap-1.5">
+            <span className="size-1.5 rounded-full bg-primary shrink-0" />
+            Building your plan
+          </span>
+        </div>
+        {/* PROGRESS TICKS, and they are deliberately NOT a step counter.
+            "12 of 18 answered" tells you you are working through a list,
+            which is the exact feel this redesign removes — but no progress at
+            all leaves an open-ended chat with no sense of how long it runs.
+            Four ticks give the shape of the thing without the scorekeeping.
+            Wordless to the eye, but not to a screen reader: the real counts
+            stay on the progressbar role, which is how this was already fixed
+            once when the bar was invisible to one entirely. */}
         <div
-          className="h-0.5 w-full rounded-full bg-muted overflow-hidden"
-          // Wordless to the eye, but not to a screen reader — the bar was
-          // previously invisible to one entirely.
+          className="flex gap-1 shrink-0"
           role="progressbar"
           aria-label="Setup progress"
           aria-valuemin={0}
           aria-valuemax={requiredCount}
           aria-valuenow={answeredCount}
         >
-          <div
-            className="h-full bg-primary/60 transition-all duration-500"
-            style={{ width: `${requiredCount > 0 ? Math.round((answeredCount / requiredCount) * 100) : 0}%` }}
-          />
+          {Array.from({ length: PROGRESS_TICKS }, (_, i) => {
+            const filled = requiredCount > 0 && (i + 1) / PROGRESS_TICKS <= answeredCount / requiredCount
+            return <span key={i} className={`ob-tick ${filled ? 'ob-tick-on' : 'ob-tick-off'}`} />
+          })}
         </div>
       </div>
 
@@ -1273,31 +1280,25 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
               </div>
             ) : (
               <div key={i}>
-                {/* TEXT-ONLY CONVERSATION DESIGN. The coach no longer speaks
-                    from a bubble: bubbles on both sides read as a messaging
-                    UI, and the point of this screen is a person talking. So
-                    the coach is plain text on the canvas at 19px — big enough
-                    to be the thing you read, not a label to skim — under a
-                    small COACH mark. Only the user gets a fill, and it stays
-                    compact at 17px, which is what makes the two sides read as
-                    different kinds of speech rather than a transcript.
+                {/* TEXT-ONLY CONVERSATION, v2. The coach speaks as plain
+                    text on the canvas at 19px — no bubble, because two
+                    bubbles facing each other read as messaging furniture and
+                    the point of this screen is a person talking. Only the
+                    user gets a fill, kept compact at 17px, and that
+                    difference is what makes the two read as different kinds
+                    of speech rather than a transcript.
 
-                    The COACH mark is suppressed on a run of consecutive coach
-                    messages (receipts don't break a run). DEVIATION FROM THE
-                    HANDOFF, which labels every coach message: in the mock each
-                    coach turn is separated by a user reply, but onboarding
-                    genuinely sends two or three in a row — the intro, the
-                    dead-air guard, the stuck rescue — and stacking COACH three
-                    times reads as three speakers, not one. The mark says who
-                    is talking; it does not need repeating mid-sentence. */}
-                {msg.role === 'assistant' && !isCoachContinuation(messages, i) && (
-                  <div className="ds-label mb-1.5">Coach</div>
-                )}
+                    v2 DROPPED THE PER-MESSAGE "COACH" LABEL. v1 stamped it
+                    above every coach line; the header now states who is
+                    talking once and permanently, so repeating it above each
+                    line was saying the same thing twice. (It also retires the
+                    run-suppression this file used to need — with no label
+                    there is no repetition to suppress.) */}
                 <div
                   className={
                     msg.role === 'user'
-                      ? 'ml-auto w-fit max-w-[80%] rounded-[20px_20px_4px_20px] bg-secondary px-[18px] py-3 text-[17px]/[1.5] text-foreground'
-                      : 'max-w-[88%] text-[19px]/[1.6] text-foreground [text-wrap:pretty]'
+                      ? 'ob-message-in ob-user-bubble ml-auto w-fit max-w-[80%] rounded-[20px_20px_4px_20px] px-[18px] py-3 text-[17px]/[1.5] text-foreground'
+                      : 'ob-message-in max-w-[88%] text-[19px]/[1.6] text-foreground [text-wrap:pretty]'
                   }
                 >
                   {msg.content}
@@ -1330,17 +1331,13 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
             ),
           )}
           {/* The coach thinking. Was a single "…" character, which read as a
-              rendering glitch more than as someone typing. */}
+              rendering glitch more than as someone typing. No label in v2 —
+              the header already says who is composing. */}
           {busy && (
-            <div aria-live="polite" aria-label="Coach is typing">
-              {!isCoachContinuation(messages, messages.length) && (
-                <div className="ds-label mb-1.5">Coach</div>
-              )}
-              <div className="flex items-center gap-1.5" aria-hidden="true">
-                <span className="ds-typing-dot" />
-                <span className="ds-typing-dot [animation-delay:150ms]" />
-                <span className="ds-typing-dot [animation-delay:300ms]" />
-              </div>
+            <div className="ob-message-in flex items-center gap-1.5 py-1.5" aria-live="polite" aria-label="Coach is typing">
+              <span className="ds-typing-dot" />
+              <span className="ds-typing-dot [animation-delay:150ms]" />
+              <span className="ds-typing-dot [animation-delay:300ms]" />
             </div>
           )}
 
@@ -1446,7 +1443,7 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
       </div>
 
       <div
-        className="fixed left-0 right-0 z-40 border-t border-border/40 bg-background px-4 py-3"
+        className="ob-composer-fade fixed left-0 right-0 z-40 px-4 pt-6 pb-3"
         style={composerBottomStyle}
       >
         <div className="max-w-md w-full mx-auto flex items-center gap-2.5">
@@ -1460,7 +1457,7 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
                 void sendMessage(text)
               }
             }}
-            placeholder="Say anything…"
+            placeholder={pendingHint}
             // NOT `disabled` while busy: on a phone, disabling the focused
             // input dismisses the keyboard, so the user had to re-tap the
             // field on every single turn. Read-only keeps focus and the
@@ -1474,16 +1471,24 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
             // form field; an outlined pill reads as somewhere to talk. Every
             // colour is a token — the app has four themes and an accent
             // override on top, so a hex here would be wrong on three of them.
-            className={`h-auto rounded-full border-[1.5px] border-primary bg-transparent px-5 py-[15px] text-[16px] text-foreground placeholder:text-muted-foreground focus-visible:ring-primary/40 ${busy ? 'opacity-60' : ''}`}
+            // v2: a filled pill with a neutral hairline that turns mint on
+            // focus, rather than a permanently-accented outline. The accent
+            // now marks the field you are IN, so it means something.
+            className={`ob-input h-auto rounded-full px-5 py-[15px] text-[16px] text-foreground placeholder:text-muted-foreground focus-visible:ring-0 ${busy ? 'opacity-60' : ''}`}
           />
           <Button
             size="icon"
-            // 52x52 with a 16px radius — a squircle beside the round pill,
-            // which is what stops the pair reading as two of the same
-            // control. active:scale-[.94] gives the tap somewhere to land on
-            // a phone, where there is no hover to confirm the press.
-            className="size-[52px] shrink-0 rounded-2xl bg-primary text-primary-foreground transition-transform hover:bg-primary active:scale-[.94]"
-            disabled={busy || !input.trim()}
+            // v2: a 52px CIRCLE that stays dim until there is something to
+            // send, then lights up. The disabled state is the point — it is
+            // the only feedback that Enter will do nothing on an empty box.
+            // active:scale-[.92] gives the tap somewhere to land on a phone,
+            // where there is no hover to confirm the press.
+            className={`size-[52px] shrink-0 rounded-full transition-[background-color,transform] duration-200 active:scale-[.92] ${
+              canSend
+                ? 'bg-primary text-primary-foreground hover:bg-primary'
+                : 'bg-[color:color-mix(in_oklab,var(--border)_50%,transparent)] text-muted-foreground hover:bg-[color:color-mix(in_oklab,var(--border)_50%,transparent)]'
+            }`}
+            disabled={!canSend}
             onClick={() => {
               const text = input
               setInput('')

@@ -47,7 +47,7 @@ console.log('\n1. Every colour is a token, so all four themes still work')
 
 console.log('\n2. The coach is not in a bubble')
 {
-  const row = ui.slice(ui.indexOf('TEXT-ONLY CONVERSATION DESIGN'), ui.indexOf('{msg.slotCard'))
+  const row = ui.slice(ui.indexOf('TEXT-ONLY CONVERSATION, v2.'), ui.indexOf('{msg.slotCard'))
   check('the coach line exists', row.length > 100)
   const coach = /max-w-\[88%\] text-\[19px\]\/\[1\.6\] text-foreground \[text-wrap:pretty\]/.exec(row)
   check('coach text is 19px / 1.6, foreground, pretty-wrapped', coach !== null)
@@ -56,22 +56,46 @@ console.log('\n2. The coach is not in a bubble')
   const coachClasses = coach ? coach[0] : ''
   check('...with NO background', !/\bbg-/.test(coachClasses), coachClasses)
   check('...and NO border or radius', !/\bborder|\brounded/.test(coachClasses), coachClasses)
-  check('the user reply keeps its fill', /bg-secondary/.test(row))
+  // v2 moved the fill into a class so the gradient could be token-derived.
+  // Still --secondary underneath, which is what keeps it right in all four
+  // themes rather than only in the one it was drawn in.
+  check('the user reply keeps its fill', /ob-user-bubble/.test(row))
+  check('...still built from --secondary, not a pasted gradient',
+    /\.ob-user-bubble\s*\{[^}]*var\(--secondary\)/s.test(css))
+  check('...with the mint hairline derived from the accent',
+    /\.ob-user-bubble\s*\{[^}]*rgba\(var\(--glow-rgb\), \.18\)/s.test(css))
   check('...at 17px / 1.5, one step down from the coach', /text-\[17px\]\/\[1\.5\]/.test(row))
   check('...with the asymmetric corner', /rounded-\[20px_20px_4px_20px\]/.test(row))
   check('...and capped at 80%', /max-w-\[80%\]/.test(row))
 }
 
-console.log('\n3. The COACH mark says who is speaking, once per turn')
+console.log('\n3. v2 — a header says who is talking, once and permanently')
 {
-  check('the mark uses the existing .ds-label utility', /className="ds-label mb-1\.5">Coach</.test(ui))
-  check('.ds-label is 11px / 0.14em caps, as the design specifies',
-    /\.ds-label\s*\{[^}]*font-size:\s*11px[^}]*letter-spacing:\s*0\.14em/s.test(css))
-  // A run of coach messages is one person still talking. Onboarding really
-  // does send two or three in a row, and repeating the mark reads as three
-  // different speakers.
-  check('a run of coach messages is not re-labelled', /function isCoachContinuation/.test(ui))
-  check('...and a receipt does not break the run', /if \(m\.isReceipt\) continue/.test(ui))
+  // v1 stamped a COACH label above every coach line, and the run-suppression
+  // that needed was itself a workaround. v2 states identity once in a header,
+  // so the label is gone entirely — asserted, because re-adding it would put
+  // the same words on screen twice.
+  check('no per-message COACH label remains', !/ds-label mb-1\.5">Coach</.test(ui))
+  check('...and its run-suppression helper went with it', !/isCoachContinuation/.test(ui))
+
+  const header = ui.slice(ui.indexOf('v2 COACH HEADER'), ui.indexOf('The base pb-28'))
+  check('the header exists', header.length > 200)
+  check('...with the pulsing avatar', /ob-coach-avatar/.test(header))
+  check('...carrying the brand name', /Personal TrAIner/.test(header))
+  check('...and what it is currently doing', /Building your plan/.test(header))
+
+  // Progress ticks, NOT a step counter — "12 of 18" is the scorekeeping this
+  // whole redesign removes. But a screen reader still needs the real numbers,
+  // which is how the old invisible bar was fixed once already.
+  check('progress is ticks', /ob-tick/.test(header))
+  check('...four of them', /const PROGRESS_TICKS = 4/.test(ui))
+  // Scoped to RENDERED text: the progressbar's aria-valuenow legitimately
+  // carries answeredCount, and matching the bare word flagged that. What must
+  // not appear is a count the eye can read.
+  check('...with no visible count',
+    !/>\s*\{answeredCount\}|\{answeredCount\}\s*(of|\/)|of \{requiredCount\}/.test(header))
+  check('...but the real numbers still reach a screen reader',
+    /role="progressbar"/.test(header) && /aria-valuenow=\{answeredCount\}/.test(header))
 }
 
 console.log('\n4. The typing indicator is someone typing, not a spinner')
@@ -81,6 +105,10 @@ console.log('\n4. The typing indicator is someone typing, not a spinner')
   check('...staggered', /\[animation-delay:150ms\]/.test(busy) && /\[animation-delay:300ms\]/.test(busy))
   check('...and announced to a screen reader', /aria-live="polite"/.test(busy) && /Coach is typing/.test(busy))
   check('the dots are 7px', /\.ds-typing-dot\s*\{[^}]*width:\s*7px/s.test(css))
+  // v2: mint, not grey. Grey reads as the app buffering; the accent says the
+  // coach specifically is composing.
+  check('v2 — the dots are mint, not muted grey',
+    /\.ds-typing-dot\s*\{[^}]*background:\s*var\(--primary\)/s.test(css))
   check('the lift is 3px, not a cartoon bounce', /@keyframes dsTypingDot[\s\S]{0,200}translateY\(-3px\)/.test(css))
   check('the loop is 1.2s', /animation:\s*dsTypingDot 1\.2s/.test(css))
   // Motion, not decoration: --glow-strength must not be able to switch it off,
@@ -98,18 +126,43 @@ console.log('\n4. The typing indicator is someone typing, not a spinner')
     /prefers-reduced-motion[\s\S]{0,120}\.ds-typing-dot\s*\{\s*animation:\s*none;\s*opacity/.test(css))
 }
 
-console.log('\n5. The composer is a pill you talk into, not a form field')
+console.log('\n5. v2 — the composer')
 {
-  const composer = ui.slice(ui.indexOf('placeholder="Say anything'), ui.indexOf('placeholder="Say anything') + 2200)
-  check('the input is fully rounded', /rounded-full/.test(composer))
-  check('...with a 1.5px accent hairline', /border-\[1\.5px\] border-primary/.test(composer))
-  check('...and no fill', /bg-transparent/.test(composer))
+  const composer = ui.slice(ui.indexOf('ob-composer-fade'), ui.indexOf('ob-composer-fade') + 3400)
+  check('it sits on a fade-up of the canvas, not a hard rule', /ob-composer-fade/.test(ui))
+  // Scoped to the composer: the review card legitimately still uses that
+  // border on its own paragraphs, and an unscoped check flagged those.
+  check('...and the old hard rule is gone from it', !/border-t border-border\/40/.test(composer))
+  check('the input is a filled pill', /ob-input/.test(composer) && /rounded-full/.test(composer))
+  check('...neutral at rest, mint on focus — so the accent means "you are here"',
+    /\.ob-input\s*\{[^}]*border:\s*1\.5px solid var\(--border\)/s.test(css) &&
+    /\.ob-input:focus\s*\{\s*border-color:\s*var\(--primary\)/.test(css))
   check('...at 16px', /text-\[16px\]/.test(composer))
-  check('the send button is 52x52', /size-\[52px\]/.test(composer))
-  check('...a squircle beside the round pill', /rounded-2xl/.test(composer))
-  check('...in accent-on-accent tokens', /bg-primary/.test(composer) && /text-primary-foreground/.test(composer))
+
+  check('the send button is a 52px CIRCLE', /size-\[52px\]/.test(composer) && /rounded-full/.test(composer))
   check('...with a 22px icon', /size-\[22px\]/.test(composer))
-  check('...and a press state, since a phone has no hover', /active:scale-\[\.94\]/.test(composer))
+  check('...and a .92 press state', /active:scale-\[\.92\]/.test(composer))
+  // The disabled state is the point: it is the only feedback that Enter will
+  // do nothing on an empty box.
+  check('it is dim until there is something to send', /canSend\s*$|\{canSend/m.test(composer))
+  check('...lighting up in accent-on-accent when there is',
+    /bg-primary text-primary-foreground/.test(composer))
+  check('...and is genuinely disabled, not just dim', /disabled=\{!canSend\}/.test(composer))
+}
+
+console.log('\n5b. v2 — the placeholder follows the question')
+{
+  check('the placeholder is derived, not hard-coded', /placeholder=\{pendingHint\}/.test(ui))
+  check('...from the slot the coach is waiting on', /const pendingHint = /.test(ui))
+  check('...falling back honestly when nothing is pending', /\?\? 'Say anything…'/.test(ui))
+  const slots = readFileSync(join(ROOT, 'src/lib/onboarding-slots.ts'), 'utf8')
+  check('slots own their own hint', /inputHint\?: string/.test(slots))
+  const hints = (slots.match(/inputHint: '/g) ?? []).length
+  check('...and enough of them carry one to matter', hints >= 15, hints)
+  // A hint that names the slot instead of the answer would put the form's
+  // vocabulary back on screen, which is what this redesign removes.
+  const named = [...slots.matchAll(/inputHint: '([^']*)'/g)].map(m => m[1])
+  check('no hint reads like a field label', !named.some(h => /^[A-Z][a-z]+:$/.test(h)), named.slice(0, 3))
 }
 
 console.log('\n6. Regression: the behaviour this design depends on is still there')
@@ -117,8 +170,13 @@ console.log('\n6. Regression: the behaviour this design depends on is still ther
   // The design is "the coach asks and waits". That behaviour is held by
   // test:onboarding-conversational; this only checks the two things that
   // would make the SCREEN wrong if they regressed.
-  check('the composer still says "Say anything…"', /placeholder="Say anything…"/.test(ui))
+  check('"Say anything…" survives as the honest fallback', /\?\? 'Say anything…'/.test(ui))
   check('messages are still gapped as a conversation, not a list', /flex flex-col gap-\[22px\]/.test(ui))
+  check('v2 — messages animate in', /ob-message-in/.test(ui) && /@keyframes obMessageIn/.test(css))
+  check('...and reduced motion turns that off too',
+    /prefers-reduced-motion[\s\S]{0,200}\.ob-message-in\s*\{\s*animation:\s*none/.test(css))
+  check('the avatar pulse respects the glow setting',
+    /@keyframes obCoachPulse[\s\S]{0,300}--glow-strength/.test(css))
 }
 
 if (failures > 0) {
