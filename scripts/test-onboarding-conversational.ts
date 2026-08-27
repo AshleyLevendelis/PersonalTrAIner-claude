@@ -116,6 +116,19 @@ console.log('\n5. The detector is narrow enough not to eat real answers')
   }
 }
 
+console.log('\n5b. The app\'s own copy does not promise buttons')
+{
+  // Caught on a real phone, by nobody's gate: the opening message still said
+  // "you can type or tap" long after tapping stopped being how questions are
+  // answered. The first thing a new user reads was describing the old app.
+  // Scoped to the OPENER — the rescue paths ("tap the option that fits") are
+  // correct, because a card really is on screen when they fire.
+  const opener = ui.slice(ui.indexOf("Hey — I'm your coach."), ui.indexOf("Hey — I'm your coach.") + 400)
+  check('the opener exists', opener.length > 100)
+  check('...and does not offer tapping as a way to answer', !/\btap\b/i.test(opener), opener.slice(0, 80))
+  check('...it invites words instead', /in your own words/.test(opener))
+}
+
 console.log('\n6. Nothing that was actually load-bearing was removed')
 {
   // Chips were the questionnaire. These were never the questionnaire — they

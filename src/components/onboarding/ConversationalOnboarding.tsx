@@ -455,7 +455,12 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
       {
         role: 'assistant',
         content:
-          "Hey — I'm your coach. Before I build your plan I want to actually get to know you a bit: what you're after, what's worked, what hasn't. Takes a few minutes, you can type or tap, and you can change any answer later. First things first — what should I call you?",
+          // "you can type or tap" was still here after the buttons stopped
+          // being how questions get answered — the very first thing a new user
+          // reads was promising an interaction the redesign removed. Caught by
+          // Ashley on a real phone, not by any gate: no check looks at whether
+          // the app's own copy still describes the app.
+          "Hey — I'm your coach. Before I build your plan I want to actually get to know you a bit: what you're after, what's worked, what hasn't. Takes a few minutes, just tell me in your own words, and you can change any answer later. First things first — what should I call you?",
       },
     ]
   })
