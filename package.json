@@ -55,6 +55,7 @@
     "test:cardio-share-score": "tsx scripts/test-cardio-share-score.ts",
     "test:block-rest-sizing": "tsx scripts/test-block-rest-sizing.ts",
     "test:onboarding-order": "tsx scripts/test-onboarding-order.ts",
+    "test:onboarding-conversational": "tsx scripts/test-onboarding-conversational.ts",
     "test:option-icons": "tsx scripts/test-option-icons.ts",
     "test:table-names": "tsx scripts/test-table-names.ts",
     "test:chat-actions": "tsx scripts/test-chat-actions.ts",

@@ -208,6 +208,29 @@ export function detectAllergenTags(text: string): DietaryPreference[] {
   return hits
 }
 
+/**
+ * "I don't know" — the one moment a coach WOULD reach for a list.
+ *
+ * Ashley's ruling on the questionnaire feel was chips only when you're
+ * stuck, and this is the deterministic half of that. The model is told the
+ * same thing (present_slot's description, and the three cases in SLOT
+ * MECHANICS), but a prompt-only rule is exactly what failed in fa683fc — a
+ * loosened instruction changed behaviour nobody predicted and had to be
+ * reverted. So the app detects this itself and does not depend on the model
+ * noticing.
+ *
+ * Deliberately narrow: it must be the WHOLE message. "I don't know" alone is
+ * someone asking for help; "I don't know, maybe three days a week?" is an
+ * answer with a hedge in front of it, and burying that under a chip grid
+ * would throw away the answer they just gave.
+ */
+const STUCK_SIGNAL =
+  /^(i )?(really )?(don'?t|do not) know$|^no idea$|^not sure$|^unsure$|^dunno$|^\?+$|^(what|which) (are|were) (my |the )?options\??$|^what are the choices\??$|^(what|which) can i (pick|choose)( from)?\??$|^(give me|show me|what are) (my |the )?options\??$|^help\??$/i
+
+export function isStuckMessage(text: string): boolean {
+  return STUCK_SIGNAL.test(text.trim())
+}
+
 // Maps to the STATIC_PAL multipliers in macro-calculator.ts (1.2 / 1.375 /
 // 1.55 / 1.725). Four options rather than five: 'very_active' (1.9,
 // athlete-tier) stays reachable via the type but isn't offered — day-to-day

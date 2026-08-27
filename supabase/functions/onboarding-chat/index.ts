@@ -52,7 +52,7 @@ const toolDeclarations = [
   {
     name: "present_slot",
     description:
-      "Render the tappable option chips for one onboarding question, under your message. Call this whenever you ask a closed-set question (goal, experience, days, equipment, injuries, diet, etc.) so the user can tap instead of type. Ask the question in your reply text in your own words; the chips carry the exact values.",
+      "Render the tappable option chips for one onboarding question, under your message. This is a RESCUE, not the way questions are asked. A real coach asks and waits for an answer; they do not hand you a menu. So ask your question in plain words and let them type. Call this ONLY when they are actually stuck: they said they don't know or asked what the options are, their answer was too ambiguous to map with certainty, or you have already asked this same question once and still have no answer. Never call it on the first asking of a question.",
     parameters: {
       type: "object",
       properties: {
@@ -225,7 +225,8 @@ STILL UNKNOWN — ${remaining.join(", ") || "none — wrap up"}
 This is a checklist for YOU, never a route to march, and it is NOT an order. It is written required-first purely so nothing gets lost — reading it top to bottom is the one thing that makes this feel like a form. Pick whatever comes next naturally from what they just said. Follow the thread of the conversation: if they mention their job, ask about their week; if they mention an old injury, go there. Answers can arrive in ANY order, including ones you never asked for — take them, tick them off, and never re-ask something already answered. When what you already know makes a question matter, say WHY in a short clause ("since you've only got three days, session length decides a lot — how long can you usually stay?"). The only ordering rule: don't leave required things until they're bored.
 
 === SLOT MECHANICS ===
-- Closed-set question → ask it in your own words AND call present_slot so the chips render. The user can tap or type.
+- Closed-set question → ask it in your own words and WAIT for a typed answer. Do NOT call present_slot on the first asking. This app used to put chips under every question and it made the whole conversation feel like a form being filled in — a coach asks you what your goal is and listens, they don't hand you a multiple-choice sheet. Their answer arrives as free text; your job is to map it with set_slot.
+- CHIPS ARE A RESCUE, and there are exactly three times to call present_slot: (a) they said they don't know, or asked what the options are; (b) their answer is too ambiguous to map with certainty; (c) you already asked this same question once and still have no answer. In case (a) and (c), present the slot you actually just asked about.
 - They answered in free text and the mapping is CERTAIN ("just some dumbbells at home" → equipment=home_gym... careful: home_gym means barbell+dumbbells+bench; dumbbells only is minimalist) → call set_slot with the exact allowed value. The app shows them what was recorded — never map silently in your head and move on without the call.
 - Mapping unclear or between two values → do NOT set_slot. Say what you're unsure about in one clause and call present_slot — them tapping beats you guessing. Never store their raw words for a closed slot.
 - Multi-select slots (trainingDays, injuries, dietaryPreferences, favoriteCuisines): set_slot with a comma-separated list of allowed values, or present_slot for tapping. An explicit "none" is a real answer (set_slot with an empty value) — record it, don't just move on.
@@ -330,7 +331,7 @@ When STILL UNKNOWN is empty, give a one-line warm recap of the shape of what you
     // function-response round trip, a text-only leg, one transport retry,
     // and a deterministic floor — so the reply it returns is non-empty by
     // construction, whatever the model did. Sanitizing happens per leg in
-    // there, before the chip-recovery pass below reads reply.includes("?").
+    // there.
     // ---------------------------------------------------------------------
     const callLeg = async (turns: unknown[], withTools: boolean): Promise<GeminiLegResult> => {
       try {
@@ -355,46 +356,43 @@ When STILL UNKNOWN is empty, give a one-line warm recap of the shape of what you
     });
 
     // -----------------------------------------------------------------------
-    // Chips must not depend on the model remembering to ask for them.
-    // present_slot fires on most turns but not all, and a missed one leaves a
-    // closed-set question with nothing to tap — the user has to guess the
-    // wording of an answer the app will only accept from a fixed list.
+    // THE FORCED-CHIPS LEG USED TO LIVE HERE, AND IT WAS THE QUESTIONNAIRE.
     //
-    // So when a turn asks something and no chips were requested, ask one
-    // narrow question with function calling FORCED: which slot is this about?
-    // The answer is checked against what's actually still unanswered, and
-    // dropped if it isn't one of them — that's what makes a free-text or
-    // numeric question (age, weight, "what went wrong last time") correctly
-    // produce no chips rather than the wrong ones.
+    // Ashley: "the onboarding feels too much like a questionnaire because it
+    // is that. a real coach wouldn't be sending you buttons to click. they'd
+    // be waiting for a text reply."
+    //
+    // She was right, and it was literal. Whenever a turn asked something and
+    // the model had not requested chips, this made a SECOND Gemini call with
+    // function calling FORCED — mode: "ANY" — whose only job was to work out
+    // which slot the question was about and staple chips underneath it. Its
+    // own comment read "chips must not depend on the model remembering to ask
+    // for them", which is exactly right for a form and exactly wrong for a
+    // conversation. Between it and the old "closed-set question → call
+    // present_slot" prompt rule, essentially every question in the entire
+    // onboarding arrived with a menu attached. No coach does that.
+    //
+    // Chips are now a RESCUE (present_slot's description says so, and the
+    // SLOT MECHANICS section names the three cases). The model asks and
+    // waits. When someone is genuinely stuck, chips still come — from the
+    // model when it can see they are stuck, and from the client's own
+    // deterministic backstop when it cannot (ConversationalOnboarding.tsx,
+    // the stuck-user path), which is the same model-first/deterministic-
+    // behind shape the rest of this file already uses.
+    //
+    // Deleting this also removes an entire extra Gemini round trip from
+    // nearly every turn, so replies get cheaper and faster.
+    //
+    // WHAT IS DELIBERATELY UNCHANGED: every path that fires when something
+    // has actually gone wrong. A set_slot value that fails validation still
+    // re-asks with chips, the client's dead-air guard still renders the next
+    // question with its card, and pickSlotToForce still steps in when the
+    // conversation stalls. Those are rescues too — they were never the
+    // questionnaire.
     // -----------------------------------------------------------------------
-    if (reply.includes("?") && !actions.some((a) => a.name === "present_slot") && remaining.length > 0) {
-      const identify = await callGemini(
-        [
-          { role: "user", parts: [{ text: `The coach just said this to the user:
-
-"${reply}"
-
-Still unanswered: ${remaining.join(", ")}. If that message is asking the user one of those questions AND it has a fixed set of answers to choose from, call present_slot with its key. If it is asking for something free-form or a plain number, call present_slot with slot_key "none".` }] },
-        ],
-        true,
-        { functionCallingConfig: { mode: "ANY", allowedFunctionNames: ["present_slot"] } },
-      );
-      if (identify.ok) {
-        const identifyData = await identify.json();
-        const key = normalizeSlotKey(catalog, callsOf(identifyData?.candidates?.[0]?.content?.parts ?? [])[0]?.args?.slot_key);
-        const named = catalog.find((c) => c.key === key);
-        // Only a still-unanswered slot that genuinely renders chips.
-        if (typeof key === "string" && remaining.includes(key) && named &&
-            (named.control === "single" || named.control === "multi")) {
-          actions.push({ name: "present_slot", args: { slot_key: key } });
-        }
-      } else {
-        console.error("onboarding-chat: chip-recovery leg failed", identify.status, await identify.text());
-      }
-    }
 
     // Normalize every action's slot_key against the real catalog — the source
-    // for ALL of them (initial leg, follow-up leg, chip-recovery leg), so a
+    // for ALL of them (initial leg and follow-up leg), so a
     // snake_case slip like present_slot("recovery_capacity") is caught once,
     // here, rather than needing the same fix repeated at every call site (or
     // in the client, which would only cover it for THIS function's callers).

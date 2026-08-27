@@ -1,0 +1,15 @@
+{
+  "name": "conversational",
+  "comment": "Fixed persona for the chips-only-when-stuck measurement (Ashley: 'a real coach wouldn't be sending you buttons to click'). Every answer is phrased the way someone would actually TYPE it — never a chip label, never an exact enum value — so the run measures whether a text-first onboarding still resolves every required slot. Turn 6 is a deliberate bare 'I don't know', which is the one turn that SHOULD produce chips. Keep this file stable so runs stay comparable. NOTE the probe does not run the CLIENT's deterministic backstops, so the peanut line in turn 8 measures only whether the MODEL tags nut-free; the model-independent half (detectAllergenTags) is covered by test:onboarding-slots section 16, and the stuck-turn rescue by test:onboarding-conversational.",
+  "messages": [
+    "hey, I'm Jo. mainly want to get a bit stronger and less out of breath on the stairs",
+    "I did a bit of lifting at uni but that was ages ago, so pretty rusty",
+    "I've got a couple of dumbbells and a bench in the garage, that's it",
+    "probably three evenings, tue thu and sunday, maybe 40 mins each",
+    "34, 165cm, 68kg, female. desk job so I barely move during the day",
+    "I don't know",
+    "my left shoulder clicks and I've had a dodgy lower back since I had my daughter",
+    "I'm allergic to peanuts and I don't eat pork. three meals, no snacks, and I hate cooking anything that takes long",
+    "italian mostly, and I usually just have toast for breakfast"
+  ]
+}

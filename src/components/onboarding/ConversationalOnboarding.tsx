@@ -22,6 +22,7 @@ import {
   initialSlotValues,
   isStartingFromNothing,
   detectAllergenTags,
+  isStuckMessage,
   DIETARY_OPTIONS,
   type OnboardingSlotValues,
   type SlotKey,
@@ -260,6 +261,7 @@ function tryVolunteeredCapture(
 // answer anywhere before forcing a question regardless of how many times
 // (if any) that specific slot has been asked.
 const STALL_TURN_LIMIT = 4
+
 
 // How many times the app will force the SAME question before treating it as
 // one this person isn't going to answer right now and moving to a different
@@ -869,6 +871,10 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
       }
     }
 
+    // Captured before the round trip: the rescue below needs to know the
+    // user said "I don't know" even after the model's reply has come back.
+    const userWasStuck = isStuckMessage(trimmed)
+
     const priorMessages = messages
     // User bubble first, THEN the tap's receipt — the transcript reads in
     // the order things actually happened.
@@ -936,6 +942,44 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
           responseWs.openReview = true
         }
       }
+      // THE STUCK-USER RESCUE — the deterministic half of "chips only when
+      // you're stuck".
+      //
+      // The model is told to call present_slot when someone says they don't
+      // know or asks what the options are. If it did, there is already a card
+      // on screen and this does nothing. This is here for when it didn't,
+      // because a user who has just said "I don't know" and been handed
+      // another sentence of prose is worse off than they were before chips
+      // were ever removed — that is the one case where a list genuinely helps
+      // and withholding it is stubbornness, not conversation.
+      //
+      // Which slot: the canonical next open one. That is a guess about what
+      // the coach just asked, and the prompt is right that chips under the
+      // wrong question are worse than none — so the lead sentence names the
+      // question out loud rather than silently attaching a grid, and the
+      // guess is only made for a message that was NOTHING but "I don't know"
+      // (see STUCK_SIGNAL), where there is no answer to lose.
+      if (userWasStuck && !responseWs.openReview) {
+        const openNow = [...missingRequiredSlots(responseWs.values), ...unconfirmedOptionalSlots(responseWs.confirmed, responseWs.values)]
+        const target = openNow[0]
+        const def = target ? getSlotDef(target) : undefined
+        const alreadyHasCard = [...priorMessages, ...responseWs.newMessages].some(
+          m => m.slotCard === target && !m.slotCardResolved && !responseWs.resolveCards.has(target as SlotKey),
+        )
+        // Only slots that genuinely HAVE a list. "I don't know" against age
+        // or weight is a refusal, not someone needing options — that already
+        // has a path (decline_slot, and the "Prefer not to say" button), and
+        // a numeric card carries nothing to choose from anyway. Same pair the
+        // server's own present_slot guard used.
+        if (def && target && !alreadyHasCard && (def.control === 'single' || def.control === 'multi')) {
+          responseWs.newMessages.push({
+            role: 'assistant',
+            content: `No problem — here are the options. ${def.question}`,
+            slotCard: target,
+          })
+        }
+      }
+
       // Stuck-slot breaker: several live transcripts showed the coach
       // re-asking the SAME still-unanswered question 6-8 times, reworded
       // each time, because a captured answer kept failing to register (the
