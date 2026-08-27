@@ -66,6 +66,7 @@
     "test:meal-addition": "tsx scripts/test-meal-addition.ts",
     "test:meal-swap-rotation": "tsx scripts/test-meal-swap-rotation.ts",
     "test:categorize-precedence": "tsx scripts/test-categorize-precedence.ts",
+    "tone:compare": "tsx scripts/compare-tone.mts",
     "test:onboarding-exercise-dislikes": "tsx scripts/test-onboarding-exercise-dislikes.ts",
     "test:option-icons": "tsx scripts/test-option-icons.ts",
     "test:table-names": "tsx scripts/test-table-names.ts",
