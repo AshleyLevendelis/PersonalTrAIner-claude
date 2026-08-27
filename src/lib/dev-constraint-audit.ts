@@ -1143,8 +1143,15 @@ async function runMesocycleBehaviorChecks(): Promise<AuditTestCase[]> {
           }
         }
 
+          // duration/style here NAME the profile these cases actually ran on
+          // (baseMesocycleProfile: 60-90, hybrid) rather than a hardcoded
+          // guess. They said '45-60' while the profile used '60-90', so the
+          // FAILED COMBINATIONS line pointed at a configuration that was never
+          // generated — two reproduction attempts went to the wrong one before
+          // the mismatch was spotted. A failure label that misnames its own
+          // inputs costs more than no label.
           cases.push({
-            equipment, injuries: [], duration: '45-60', style: 'hybrid', experience,
+            equipment, injuries: [], duration: '60-90', style: 'hybrid', experience,
             passed: failures.length === 0, failures,
             planDays: 0, totalExercises: 0, estimatedDurationSec: 0,
           })
@@ -1192,8 +1199,15 @@ async function runMesocycleBehaviorChecks(): Promise<AuditTestCase[]> {
               })
             }
           }
+          // duration/style here NAME the profile these cases actually ran on
+          // (baseMesocycleProfile: 60-90, hybrid) rather than a hardcoded
+          // guess. They said '45-60' while the profile used '60-90', so the
+          // FAILED COMBINATIONS line pointed at a configuration that was never
+          // generated — two reproduction attempts went to the wrong one before
+          // the mismatch was spotted. A failure label that misnames its own
+          // inputs costs more than no label.
           cases.push({
-            equipment, injuries: [], duration: '45-60', style: 'hybrid', experience,
+            equipment, injuries: [], duration: '60-90', style: 'hybrid', experience,
             passed: failures.length === 0, failures,
             planDays: 0, totalExercises: 0, estimatedDurationSec: 0,
           })

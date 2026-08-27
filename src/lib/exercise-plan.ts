@@ -5475,6 +5475,26 @@ export function generateMesocycle(
       // above the first — the same exercise, the same weight, "4-6" on Monday
       // and "5-7" on Thursday. Measured: lift-weeks showing more than one rep
       // range at the same weight went from 19 to 108 before this was fixed.
+      // The WEIGHT already settled for a lift THIS week, keyed by the whole
+      // prescription (name|sets|reps|intensity), not just the name.
+      //
+      // Third memo of exactly this shape, and the one that was missing. The
+      // comment above describes the rep version of this bug — "the same
+      // exercise, the same weight, '4-6' on Monday and '5-7' on Thursday" —
+      // and carryStepDecidedThisWeek is the carry-distance version. Weight had
+      // none, so a lift holding two slots in a week re-derived independently
+      // in the second and could land an increment out: MEASURED at 202 of
+      // 1,536 lift-weeks across the 4x4x4 sweep, e.g. Calf Raises 3x15-20 at
+      // RPE 6-7 prescribed 12.5kg on one day and 20kg on another IN THE SAME
+      // WEEK. The audit saw only the 2 of those that happened to coincide
+      // with a slot changing hands, which is why it reads as a rotation bug.
+      //
+      // Keyed on the prescription because two slots of the same lift at
+      // DIFFERENT sets/reps/RPE legitimately differ (heavier for lower reps);
+      // only identical work must agree. Measured: of 203 same-lift
+      // different-weight lift-weeks, 202 are identical work — so this key
+      // costs one legitimate case and catches everything else.
+      const weightDecidedThisWeek = new Map<string, number>()
       const frozenBumpDecidedThisWeek = new Map<string, number>()
       // The reps a lift SHOWS are decided once per lift per week.
       //
@@ -6057,6 +6077,41 @@ export function generateMesocycle(
             // this just marks the slot as eligible.
             if (!isDeload && unverifiedForCategory) {
               unverifiedLoadingFlags[dayIdx][exIdx] = true
+            }
+          }
+
+          // ONE LIFT, ONE WEIGHT, IN A GIVEN WEEK.
+          //
+          // Everything above has settled this slot's weight independently. If
+          // the same lift already took a weight this week for the SAME
+          // sets/reps/intensity, the two must agree, and the LOWER one wins:
+          // never tell someone to lift more than the lift has earned
+          // elsewhere in the same week. That direction matches the file's
+          // other one-way rules — Math.min(name-keyed, SLOT-keyed) for the
+          // unverified previous week, and the main-lift floor that is "a
+          // FLOOR, never a ceiling".
+          //
+          // Re-prescribed rather than patched: load.display and load.per_set
+          // are derived from the weight, so overwriting starting_weight_kg
+          // alone would leave the printed text disagreeing with the number.
+          // forceStartingWeightKg is the same door the frozen-lift path uses.
+          if (dbEntry && load?.starting_weight_kg != null) {
+            const weekWeightKey = `${dbEntry.name}|${sets}|${reps}|${intensity}`
+            const settled = weightDecidedThisWeek.get(weekWeightKey)
+            if (settled != null && settled < load.starting_weight_kg) {
+              load = prescribeLoad(dbEntry, profile, {
+                targetRpeLabel: intensity,
+                isFirstBlock: blockIndex === 0,
+                sets,
+                phase,
+                isCalibrationWeek,
+                knownWorkingWeights,
+                repRangeLabel: reps,
+                loadIsProgressing: rampLoad,
+                forceStartingWeightKg: settled,
+              })
+            } else if (settled == null) {
+              weightDecidedThisWeek.set(weekWeightKey, load.starting_weight_kg)
             }
           }
 
