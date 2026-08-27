@@ -392,23 +392,47 @@ export function categorize(entry: ExerciseEntry): string | null {
   // and must not inherit the much heavier 'squat' standard.
   if (n.includes('goblet')) return 'goblet_squat'
   if (n.includes('leg press') || n.includes('hack squat')) return 'leg_press'
-  if (n.includes('deadlift')) return 'deadlift'
-  if (n.includes('squat')) return 'squat'
+  // SPECIFIC BEFORE GENERIC, and the order below IS the rule.
+  //
+  // These four used to sit AFTER the generic 'deadlift'/'squat' matches,
+  // which made them unreachable for any name containing those words. Four
+  // exercises were priced by a rule nobody wrote for them: Romanian
+  // Deadlifts as a full conventional deadlift, Bulgarian Split Squats and
+  // Split Squat (Bodyweight) as a bilateral barbell back squat, and Farmer
+  // Squat Hold as a back squat rather than a carry. Measured at the fix:
+  // Bulgarian split squats came down to 0.40x their old load (44kg per hand
+  // -> 18kg for a male intermediate at 85kg) and Romanian deadlifts to
+  // 0.56x.
+  //
+  // single_leg_dumbbell's own doc comment names "Bulgarian split squat" in
+  // the list of lifts it says it fixed. That fix only ever landed for lunges
+  // and step-ups, whose names happen not to contain "squat" — the same
+  // built-in-two-halves shape that keeps recurring here, with a
+  // truthful-looking comment sitting over the half that didn't land.
+  //
+  // Three cases where an earlier rule winning IS deliberate are unaffected
+  // and must stay that way: goblet_squat and leg_press are matched above
+  // this block, and overhead_carry stays ahead of carry for the reason its
+  // own comment gives (pressing-limited, not grip-limited). A first attempt
+  // moved carry up WITHOUT keeping overhead_carry ahead of it and silently
+  // reclassified Overhead Carry — caught by the whole-DB sweep, which is why
+  // these four live together here rather than sorted by topic.
   if (n.includes('good morning') || n.includes('romanian') || n.includes('swing')) return 'hinge_accessory'
-  if (n.includes('overhead press') || n.includes('shoulder press') || n.includes('arnold')) return 'overhead'
-  if (n.includes('bench') || n.includes('chest press') || n.includes('machine press')) return 'bench'
-  if (n.includes('pulldown')) return 'pulldown'
-  if (n.includes('row')) return 'row'
-  // Checked before the generic carry match below — an overhead carry is
-  // pressing-limited, not grip/hinge-limited (see overhead_carry's doc
-  // comment above).
-  if (n.includes('overhead') && n.includes('carry')) return 'overhead_carry'
-  if (n.includes('carry') || n.includes('farmer')) return 'carry'
   // Two-dumbbell unilateral leg work — see single_leg_dumbbell's doc comment
   // above for why this can't share the bilateral 'squat' standard.
   if (n.includes('lunge') || n.includes('step-up') || n.includes('step up') || n.includes('split squat') || n.includes('bulgarian')) {
     return 'single_leg_dumbbell'
   }
+  // An overhead carry is pressing-limited, not grip/hinge-limited — see
+  // overhead_carry's doc comment above.
+  if (n.includes('overhead') && n.includes('carry')) return 'overhead_carry'
+  if (n.includes('carry') || n.includes('farmer')) return 'carry'
+  if (n.includes('deadlift')) return 'deadlift'
+  if (n.includes('squat')) return 'squat'
+  if (n.includes('overhead press') || n.includes('shoulder press') || n.includes('arnold')) return 'overhead'
+  if (n.includes('bench') || n.includes('chest press') || n.includes('machine press')) return 'bench'
+  if (n.includes('pulldown')) return 'pulldown'
+  if (n.includes('row')) return 'row'
 
   switch (entry.movement_pattern) {
     case 'horizontal_push':
