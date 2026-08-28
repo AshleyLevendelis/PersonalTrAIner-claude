@@ -2,6 +2,18 @@
 
 Newest first. One line each.
 
+- [x] **THE PROFILE FORGOT EIGHT ANSWERS ON EVERY RELOAD — FIXED, AND GATED SO A NINTH CAN'T.** `restoreSession` rebuilds the profile column by column, so anything missing from that list was `undefined` for the whole session however faithfully Postgres stored it. Audited by parsing every `fitness_profiles` column out of the migrations and diffing: **51 columns, 42 restored, 9 dropped, 8 with live consumers.** All eight were written correctly — nothing in the database was ever wrong, only the read-back.
+
+- [x] WHAT EACH ONE COST A USER: the three implement ceilings and `load_ceilings_declined` meant **"I'm not sure" never stuck** — the button that exists to stop the asking didn't, and the function's own comment says *"a trainee who says 'I don't know what my dumbbells weigh' must be able to say it once"*. The three macro fields **silently moved a protein target** back to Balanced on every open, which is worse than re-asking because nothing tells you. `water_target_ml` reverted to 2000ml.
+
+- [x] **THE ROOT CAUSE WAS A LOCAL INTERSECTION TYPE.** The ceilings were declared inside `load-prescription.ts` and `load-ceiling-prompt.ts` as `UserProfile & { max_dumbbell_kg?: ... }`, so TypeScript never required `restoreSession` to map them and never complained. They're on `UserProfile` now, and reverting that is caught **by the compiler** — a cast that adds fields the profile doesn't really have will always compile and can never be checked.
+
+- [x] EXISTING PLANS REBUILD, on Ashley's ruling over waiting up to sixteen weeks for it to age out. `ceiling-reconcile.ts` detects **the violation, not a marker** — is any prescribed load above what this person said they own — which is self-correcting and safe to run every load. From the **active week forward only**: rewriting a load someone already trained against would change what their own logs are measured against. No new rebuild path; `rebuildAgainstProfile` already takes the profile and the profile now carries the ceiling. The coach says why, naming their own number back to them.
+
+- [x] MEASURED, AND IN THE DIRECTION I ASSERTED BEFOREHAND: with a 24kg-per-hand ceiling, **8 of 130 dumbbell prescriptions move DOWN, 0 move up** — a ceiling is a cap, so a rise would have meant the fix was wrong. Someone whose dumbbells stop at 24kg was being prescribed **30kg Farmer's Walks**.
+
+- [x] AND A SMALL LIE IN THE COACH'S PROMPT, found because my gate first called `training_time_preference` dead. It isn't dead — `chat-gemini` reads it — but the client never sends it, so the prompt printed a constant **"Training Time: morning"** directly beneath the real `Preferred Time: evening`. Both usages removed; the column is now genuinely unused and flagged for deletion rather than quietly mapped. The gate searches `supabase/functions/` too now: **a check that decides what is dead has to look everywhere the thing could be alive.**
+
 - [x] **THE STEP TARGET IS EDITABLE NOW** — `daily_step_target` on `fitness_profiles` (migration `20260828140000`), nullable, no default. Set it and the ring measures against it; leave it and the band derived from activity level stands. The settings row sits directly under Activity level, which is what it overrides, and its placeholder shows the band that activity level produces — so an empty box reads as a considered default rather than a gap. `stepsTargetFor` takes the **profile**, not the two fields, so no caller can read one and forget the other.
 
 - [ ] **NEEDS `npm run db:push-both` ON ASHLEY'S MACHINE.** The column does not exist on TEST or PRODUCTION until that runs, and the app tolerates its absence (the derivation stands) — but nobody can set a target until it does.

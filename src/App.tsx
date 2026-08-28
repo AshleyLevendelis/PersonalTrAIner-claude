@@ -23,7 +23,7 @@ import { AppTour } from '@/components/AppTour'
 import { isDevAccount, getSessionDateContext, getAppNow } from '@/lib/dev-clock'
 import { useAppRoute, tabHash, isTab, isKnownTabHash, type Tab } from '@/lib/app-route'
 
-import { calculateCalories } from '@/lib/calculations'
+import { calculateCalories, getActiveMesocycleWeek } from '@/lib/calculations'
 import { computeBMR, computeStaticTDEE, resolveBodyMetrics } from '@/lib/macro-calculator'
 import { computeTargets, getLatestWeightKg, getEffectiveTargetWeightKg, snapshotTargetsIfChanged } from '@/lib/nutrition-targets'
 import { describeGoalProximity, isGoalProximityDismissed, dismissGoalProximity } from '@/lib/goal-proximity'
@@ -36,6 +36,7 @@ import { saveMesocycle, saveMesocycleWeek, restoreMesocycle } from '@/lib/mesocy
 import { swapExerciseInMesocycle, banExerciseFromMesocycle, type SwapScope } from '@/lib/mesocycle-edit'
 import { sweepStaleForTarget } from '@/lib/pending-actions-store'
 import { checkAndRevertExpiredAdaptations, getActiveAdaptations, type PlanAdaptationRow } from '@/lib/plan-adaptations-store'
+import { reconcileToStatedCeilings } from '@/lib/ceiling-reconcile'
 import { checkForBlockReview } from '@/lib/block-review'
 import { checkForConsistencyHold } from '@/lib/block-consistency'
 import { checkForLoadSuggestions, confirmLoadSuggestion, declineLoadSuggestion } from '@/lib/load-suggestions'
@@ -332,6 +333,22 @@ function App() {
       // stores it. Absent stays absent (?? null, never 0) — a zero would be
       // a target of no steps rather than "never set one".
       daily_step_target: profileRow.daily_step_target ?? null,
+      // THE EIGHT THAT WERE SAVED AND NEVER READ BACK. All written correctly
+      // — water-store.ts, load-ceiling-prompt.ts, handleMacroSplitChange —
+      // and all undefined for the whole session because this list did not
+      // name them. Every one is `?? null`/`?? undefined`, never `?? 0` and
+      // never Number(): this function's own top comment exists because
+      // coercing a null to a number turned "never given" back into a
+      // fabricated measurement at exactly this boundary. A 0 ceiling is a
+      // trainee who can lift nothing; a 0 protein target is a diet.
+      max_dumbbell_kg: profileRow.max_dumbbell_kg ?? null,
+      max_single_implement_kg: profileRow.max_single_implement_kg ?? null,
+      max_improvised_kg: profileRow.max_improvised_kg ?? null,
+      load_ceilings_declined: profileRow.load_ceilings_declined ?? null,
+      macro_split_preset: profileRow.macro_split_preset ?? undefined,
+      macro_protein_per_kg: profileRow.macro_protein_per_kg ?? undefined,
+      macro_fat_percent: profileRow.macro_fat_percent ?? undefined,
+      water_target_ml: profileRow.water_target_ml ?? undefined,
       concurrent_activities: profileRow.concurrent_activities || [],
       weekly_schedule: profileRow.weekly_schedule || {},
       created_at: profileRow.created_at || new Date().toISOString(),
@@ -572,6 +589,37 @@ function App() {
             })
           }
           if (consistencyResult.messages.length > 0) setAdaptationMessages(prev => [...prev, ...consistencyResult.messages.map(text => ({ text }))])
+
+          // A plan can sit above a ceiling its own trainee already stated,
+          // because this function did not read those columns back for a
+          // while — so every plan generated after someone said "my dumbbells
+          // go to 24kg" was built as though they never had. Mapping the
+          // columns above fixes the NEXT plan; this fixes the one they are
+          // already in, which was Ashley's call over waiting up to sixteen
+          // weeks for it to age out.
+          //
+          // From the ACTIVE week forward only: rewriting a load someone has
+          // already trained against would change what their own logs are
+          // measured against. Idempotent — it looks for prescribed loads
+          // above the ceiling, so after a rebuild there is nothing to find.
+          return reconcileToStatedCeilings(
+            restoredProfile.id!,
+            workingMesocycle,
+            restoredProfile,
+            restoredExclusions,
+            getActiveMesocycleWeek(blockCheckPlanCreatedAt, blockCheckNow, workingMesocycle.length),
+          )
+        })
+        .then(ceilingResult => {
+          if (ceilingResult.mesocycle) {
+            workingMesocycle = ceilingResult.mesocycle
+            setMesocycle(prev => {
+              const byWeek = new Map(prev.map(w => [w.week_number, w]))
+              for (const w of ceilingResult.mesocycle!) byWeek.set(w.week_number, w)
+              return [...byWeek.values()].sort((a, b) => a.week_number - b.week_number)
+            })
+          }
+          if (ceilingResult.messages.length > 0) setAdaptationMessages(prev => [...prev, ...ceilingResult.messages.map(text => ({ text }))])
 
           // Vision Step 6 — never patches the mesocycle itself (see
           // load-suggestions.ts's own header comment for why); only ever

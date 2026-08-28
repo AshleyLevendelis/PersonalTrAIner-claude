@@ -272,7 +272,7 @@ export async function rebuildForInjury(params: RebuildForInjuryParams): Promise<
  * immutable onboarding weight). The same separation
  * test:plan-adaptations-separation and test:injury-separation protect.
  */
-async function rebuildAgainstProfile(
+export async function rebuildAgainstProfile(
   clone: UserProfile,
   exclusions: string[],
   mesocycle: MesocycleWeek[],

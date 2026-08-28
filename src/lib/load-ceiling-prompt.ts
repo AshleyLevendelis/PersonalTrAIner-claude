@@ -89,12 +89,15 @@ export function ceilingKindFor(exerciseName: string): LoadCeilingKind | null {
   }
 }
 
-type ProfileWithCeilings = UserProfile & {
-  max_dumbbell_kg?: number | null
-  max_single_implement_kg?: number | null
-  max_improvised_kg?: number | null
-  load_ceilings_declined?: boolean | null
-}
+/**
+ * RETIRED, kept as a name only so the diff is legible: these four are on
+ * UserProfile itself now. Declaring them here meant the compiler never
+ * required restoreSession to map them, and it did not — they were saved
+ * correctly and read back as undefined on every reload, so a stated ceiling
+ * never applied and "I'm not sure" never stuck. test:profile-restore is what
+ * catches the next one.
+ */
+type ProfileWithCeilings = UserProfile
 
 /** True when this trainee has already given a number for this implement. */
 export function hasStatedCeiling(profile: UserProfile, kind: LoadCeilingKind): boolean {

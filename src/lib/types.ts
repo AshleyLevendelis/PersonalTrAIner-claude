@@ -37,6 +37,25 @@ export interface UserProfile {
    * which is the overwhelming majority. A 0 would be a target of no steps.
    */
   daily_step_target?: number | null
+  /**
+   * What this trainee can ACTUALLY load, as opposed to what the app guessed
+   * (migration 20260826140000).
+   *
+   * DECLARED HERE, not inline in the two files that read them. They were
+   * typed locally in load-prescription.ts and load-ceiling-prompt.ts as
+   * `UserProfile & { max_dumbbell_kg?: ... }`, which meant TypeScript never
+   * required App.tsx's restoreSession to map them — and it did not. They were
+   * written to Postgres correctly and read back as undefined on every reload,
+   * so a stated ceiling never applied and "I'm not sure" never stuck.
+   *
+   * A local intersection type is how a column goes missing without a single
+   * compiler complaint. On the profile, the restore gate can see them.
+   */
+  max_dumbbell_kg?: number | null
+  max_single_implement_kg?: number | null
+  max_improvised_kg?: number | null
+  /** They were asked what they can load and said they don't know. A VALUE, not an absence — it ends the asking for every implement at once. */
+  load_ceilings_declined?: boolean | null
   fitness_goal: FitnessGoal
   /**
    * STAYS REQUIRED and array-typed for BOTH plan formats. Several readers

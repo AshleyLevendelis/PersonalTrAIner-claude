@@ -652,11 +652,13 @@ export function getLoadingCeilingKg(entry: ExerciseEntry, category: string | nul
  * simply absent rather than an error.
  */
 export function statedCeilingKg(entry: ExerciseEntry, profile: UserProfile): number | null {
-  const p = profile as UserProfile & {
-    max_dumbbell_kg?: number | null
-    max_single_implement_kg?: number | null
-    max_improvised_kg?: number | null
-  }
+  // NO LOCAL INTERSECTION TYPE. These three are declared on UserProfile now,
+  // and widening the type here is precisely how they went missing: with the
+  // columns known only inside this function, TypeScript never asked App.tsx's
+  // restoreSession to map them, so they were written to Postgres and read
+  // back as undefined on every reload. A cast that adds fields the profile
+  // does not really have will always compile and can never be checked.
+  const p = profile
   // Checked before loadingMode, because a weighted backpack falls through
   // that function's cases to 'stack' — it is not a cable machine, and pricing
   // it against one is how Backpack Row was once estimated at 45-65kg.
