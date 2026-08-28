@@ -28,6 +28,7 @@ import {
 import { resolveFoodTarget } from '@/lib/fact-compiler'
 import { supabase } from '@/lib/supabase'
 import { computeGoalProgress } from '@/lib/goal-progress'
+import { GoalWeightSetter } from '@/components/GoalWeightSetter'
 import { updateProfileField } from '@/lib/profile-store'
 import { useAppearance } from '@/hooks/useAppearance'
 import type { ThemeName, AccentOverride } from '@/lib/appearance-store'
@@ -648,6 +649,38 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
         {goals.length > 0 && (
           <div ref={goalsRef} className="space-y-2">
             <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Goals</h3>
+            {/* SETTING a goal weight lives here now, next to where a set one
+                already appeared. It used to be an input row on the dashboard —
+                the only place to create one was a screen it did not belong on,
+                and it cost the home screen an input box permanently for
+                something people do once. Shown only when there is no body-weight
+                goal yet, same condition the dashboard used. */}
+            {(() => {
+              // THE BASELINE HAS TO BE REAL. A goal weight stores where you
+              // started, and computeGoalProgress measures against it — so
+              // `?? 0` would have written a fabricated starting weight of zero
+              // for anyone who has not weighed in and never stated a weight,
+              // and every percentage off it would have been nonsense. Latest
+              // weigh-in first, then the weight given at onboarding, and if
+              // there is neither, say so instead of inventing one.
+              const baseline = latestWeightKg ?? profile.weight_kg ?? null
+              const alreadySet = goals.some(g => g.metric === 'body_weight_kg' && g.status === 'active')
+              if (!profileId || alreadySet) return null
+              if (baseline == null) {
+                return (
+                  <p className="text-xs text-muted-foreground">
+                    Log a weigh-in first — a goal weight needs a starting point to measure from.
+                  </p>
+                )
+              }
+              return (
+                <GoalWeightSetter
+                  profileId={profileId}
+                  baselineKg={baseline}
+                  onSet={async () => { await reload(); await onMemoryChanged() }}
+                />
+              )
+            })()}
             {goals.map(g => {
               const progress = profileId ? computeGoalProgress(g, profileId, latestWeightKg ?? null) : { current: null, percent: null }
               return (

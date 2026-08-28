@@ -12,7 +12,6 @@ import { getAppNow } from '@/lib/dev-clock'
 import { tabHash } from '@/lib/app-route'
 import { loadDashboardData, type DashboardData } from '@/lib/dashboard-data'
 import { getStepsForDate, logStepsManual, type DailyStepsRow } from '@/lib/steps-store'
-import { createGoal } from '@/lib/memory-store'
 import { WeighInCard } from '@/components/WeighInCard'
 import type { UserProfile, MacroTargets, WorkoutDay, MesocycleWeek } from '@/lib/types'
 
@@ -24,6 +23,8 @@ interface DashboardProps {
   planCreatedAt?: string
   /** Fired after a weigh-in is logged here so App.tsx recomputes living targets + latestWeightKg — same callback chat's log_weight already uses. */
   onWeightLogged?: () => void | Promise<void>
+  /** Opens the profile screen at its Goals section — where setting a goal weight lives now. Same pattern NutritionDisplay uses to route to the dietary section. */
+  onOpenGoals?: () => void
 }
 
 // Tab-restructure handoff — Dashboard.tsx no longer owns the macro ring
@@ -89,71 +90,8 @@ function WeighInTrendChart({ series, goalKg }: { series: { date: string; kg: num
   )
 }
 
-/** Inline goal-weight setter — shown only when no body_weight_kg goal
- * exists yet. Baseline is the latest logged weight (or the onboarding
- * weight if nothing's been logged) at the moment the goal is set; matches
- * `computeWeightTrend`'s own baseline-at-capture convention. */
-function GoalWeightSetter({ profileId, baselineKg, onSet }: { profileId: string; baselineKg: number; onSet: () => void | Promise<void> }) {
-  const [input, setInput] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
-  const handleSave = async () => {
-    const kg = parseFloat(input)
-    if (!Number.isFinite(kg) || kg < 25 || kg > 350) {
-      setError('Enter a weight between 25 and 350 kg')
-      return
-    }
-    setError(null)
-    setSaving(true)
-    try {
-      await createGoal({
-        profileId,
-        metric: 'body_weight_kg',
-        trackable: 'measurable',
-        baselineValue: baselineKg,
-        baselineSource: 'logged_data',
-        targetValue: kg,
-        source: 'manual',
-        rawPhrase: `goal weight ${kg}kg`,
-        displayText: `Goal weight: ${kg} kg`,
-      })
-      setInput('')
-      await onSet()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Save failed — try again')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  return (
-    <div className="mt-2 flex items-center gap-2">
-      <input
-        type="number"
-        inputMode="decimal"
-        step="0.1"
-        min={25}
-        max={350}
-        placeholder="Set a goal weight — kg"
-        value={input}
-        onChange={e => setInput(e.target.value)}
-        onKeyDown={e => { if (e.key === 'Enter') handleSave() }}
-        className="h-7 min-w-0 flex-1 rounded-md bg-[color:var(--surface-raised)] px-2 text-[13px]"
-      />
-      <button
-        onClick={handleSave}
-        disabled={saving || !input}
-        className="shrink-0 text-[13px] font-semibold text-primary glow-mint disabled:opacity-40 disabled:[text-shadow:none]"
-      >
-        {saving ? 'Saving…' : 'Set'}
-      </button>
-      {error && <p className="text-xs text-destructive">{error}</p>}
-    </div>
-  )
-}
-
-export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreatedAt, onWeightLogged }: DashboardProps) {
+export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreatedAt, onWeightLogged, onOpenGoals }: DashboardProps) {
   const activeSession = useActiveSession()
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -414,15 +352,22 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
                     })()}
                   </span>
                 )}
+                {/* ON A ROW THAT ALREADY EXISTS, opposite the weigh-in count.
+                    As a row of its own it cost 32px and saved almost nothing
+                    over the input it replaced — measured 1297px -> 1261px.
+                    The caption row has spare width and the delta only appears
+                    once there are two weigh-ins, so the two never collide. */}
+                {data.weightGoalKg == null && profile.id && onOpenGoals && data.weightSeries.length <= 1 && (
+                  <button
+                    type="button"
+                    onClick={onOpenGoals}
+                    className="text-[11px] font-medium text-primary"
+                  >
+                    Set a goal weight ›
+                  </button>
+                )}
               </div>
             </>
-          )}
-          {data.weightGoalKg == null && profile.id && (
-            <GoalWeightSetter
-              profileId={profile.id}
-              baselineKg={data.weightSeries[data.weightSeries.length - 1]?.kg ?? profile.weight_kg}
-              onSet={handleWeighInChanged}
-            />
           )}
           {profile.id && (
             <div className="mt-3">

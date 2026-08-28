@@ -154,7 +154,12 @@ function Harness() {
       <main className="mx-auto max-w-md px-4 pb-40 pt-14">
         {activeTab === 'dashboard' && (
           <Dashboard profile={profile} macros={macros} exercisePlan={exercisePlan}
-            mesocycle={mesocycle} planCreatedAt={profile.created_at} />
+            mesocycle={mesocycle} planCreatedAt={profile.created_at}
+            /* App.tsx passes this. Without it the "Set a goal weight" link
+               never renders and the harness measures a state no user is in —
+               which is exactly how the first before/after here read 1261px
+               twice and looked like the change had done nothing. */
+            onOpenGoals={noop} />
         )}
         {activeTab === 'nutrition' && (
           <NutritionDisplay profile={profile} macros={macros} exercisePlan={exercisePlan}

@@ -237,6 +237,35 @@ async function main() {
   check('both log rows synced to the fake DB via the local-first flush', db.water_logs.filter(r => r.profile_id === profileId).length === 2, logs)
 
   // ---- 4. Calories-in matches the ledger (direct passthrough) -----------------
+  console.log('\n[3b] the home screen asks for ONE weight, not two')
+  {
+    // Ashley: "Collapse Set goal weight into a setting modal, and keep only
+    // the quick weight logger visible to reduce scrolling." Two weight inputs
+    // stacked meant the second read as part of the first, and the page ran to
+    // 1212px — one and a half phone screens. Measured after: 1178px.
+    //
+    // The pixels are the smaller half. The point is that a goal weight is set
+    // once and the logger is used daily, so only one of them earns permanent
+    // space on the screen someone opens every morning.
+    const dash = fs.readFileSync('src/components/Dashboard.tsx', 'utf-8')
+    check('the dashboard no longer embeds the goal-weight form',
+      !/<GoalWeightSetter/.test(dash))
+    check('...and routes to the profile screen instead', /onOpenGoals/.test(dash))
+
+    // The form has to EXIST somewhere or the feature is simply gone — the
+    // Goals section listed a goal weight once set, with nowhere to set one.
+    const prof = fs.readFileSync('src/components/ProfileScreen.tsx', 'utf-8')
+    check('the profile screen owns the goal-weight form now', /<GoalWeightSetter/.test(prof))
+
+    // A goal weight stores where you started and progress is measured from
+    // it. `?? 0` would have written a starting weight of zero for anyone with
+    // no weigh-in and no stated weight — the fabricated-measurement shape the
+    // assumed-body work exists to prevent.
+    check('it never invents a baseline when there is no weight to use',
+      !/baselineKg=\{latestWeightKg \?\? 0\}/.test(prof) &&
+      /Log a weigh-in first/.test(prof))
+  }
+
   console.log('\n[4] dashboard-data.ts: calories-in is a direct passthrough from getTodayLedger, never recomputed')
 
   const dashSrc = fs.readFileSync('src/lib/dashboard-data.ts', 'utf-8')

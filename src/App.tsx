@@ -1874,6 +1874,7 @@ function App() {
               mesocycle={mesocycle}
               planCreatedAt={mesocycleCreatedAt ?? profile.created_at}
               onWeightLogged={handleWeightLogged}
+              onOpenGoals={() => { setProfileInfoSection('goals'); setProfileInfoOpen(true) }}
             />
           </TabsContent>
 
