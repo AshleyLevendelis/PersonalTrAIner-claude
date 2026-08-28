@@ -106,7 +106,7 @@ export function ExerciseLine({
          * when the two cannot share a line the SUMMARY drops to the next one
          * and the name keeps its full width. max-w-full keeps truncate as a
          * last resort for a name longer than the row itself. */
-        className="min-w-0 flex-1 text-left flex flex-wrap items-baseline justify-between gap-x-2.5 gap-y-0.5 cursor-pointer"
+        className="hit-slop-44 min-w-0 flex-1 text-left flex flex-wrap items-baseline justify-between gap-x-2.5 gap-y-0.5 cursor-pointer"
       >
         <div className="flex items-center gap-2 max-w-full">
           {supersetLabel && (

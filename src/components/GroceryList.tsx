@@ -210,7 +210,7 @@ export function GroceryList({ profileId, mealPools, targets, softLikedFoods, ref
             placeholder="Add an item, e.g. 2 eggs"
             className="h-8 text-sm"
           />
-          <Button size="icon" className="size-8 shrink-0" onClick={handleQuickAdd} disabled={!quickAdd.trim()}>
+          <Button size="icon" aria-label="Add item to list" className="size-8 shrink-0" onClick={handleQuickAdd} disabled={!quickAdd.trim()}>
             <Plus className="size-4" />
           </Button>
         </div>

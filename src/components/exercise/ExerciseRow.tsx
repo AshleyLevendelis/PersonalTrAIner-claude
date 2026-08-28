@@ -206,12 +206,12 @@ export function ExerciseRow({
                 </div>
               )}
               <div className="mt-1.5 flex items-center gap-3.5">
-                <button type="button" className="text-xs font-semibold text-primary" onClick={onSwap}>
+                <button type="button" className="hit-slop-44 text-xs font-semibold text-primary" onClick={onSwap}>
                   Swap exercise
                 </button>
                 <button
                   type="button"
-                  className="text-xs text-muted-foreground"
+                  className="hit-slop-44 text-xs text-muted-foreground"
                   onClick={() => onOpenPlateCalc(ex.suggested_load_kg ?? 0)}
                 >
                   Plate calculator

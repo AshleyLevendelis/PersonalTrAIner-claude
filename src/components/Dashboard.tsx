@@ -294,7 +294,7 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
             <div className="h-[2px] w-full rounded-full" style={{ background: 'var(--hairline)' }}>
               <div className="h-[2px] rounded-full bg-primary glow-mint-box" style={{ width: `${data.waterTargetMl > 0 ? Math.min(100, (data.waterMl / data.waterTargetMl) * 100) : 0}%` }} />
             </div>
-            <button type="button" onClick={() => { window.location.hash = tabHash('nutrition') }} className="text-[11px] font-semibold text-primary">Nutrition ›</button>
+            <button type="button" onClick={() => { window.location.hash = tabHash('nutrition') }} className="hit-slop-44 text-[11px] font-semibold text-primary">Nutrition ›</button>
           </div>
         </div>
         </div>

@@ -206,7 +206,7 @@ function EditableTagList({
           placeholder={placeholder}
           className="h-7 text-xs flex-1 min-w-0"
         />
-        <Button size="icon" variant="outline" className="size-7 shrink-0" onClick={add} disabled={!input.trim()}>
+        <Button size="icon" variant="outline" aria-label="Add" className="size-7 shrink-0" onClick={add} disabled={!input.trim()}>
           <Plus className="size-3.5" />
         </Button>
       </div>

@@ -306,11 +306,11 @@ export function NutritionDisplay({
             <span className="flex flex-wrap items-baseline justify-end gap-x-3 gap-y-1">
               <span className="tabular-mono text-[13px]">{todayWaterMl} / {waterTarget} ml</span>
               {WATER_QUICK_ADD_ML.map(ml => (
-                <button key={ml} className="text-xs font-semibold" style={{ color: 'var(--chart-3)' }} onClick={() => handleAddWater(ml)}>+{ml}</button>
+                <button key={ml} className="hit-slop-44 text-xs font-semibold" style={{ color: 'var(--chart-3)' }} onClick={() => handleAddWater(ml)}>+{ml}</button>
               ))}
-              <button className="text-xs text-muted-foreground" onClick={() => { setWaterTargetInput(String(waterTarget)); setEditingWaterTarget(true) }}>edit</button>
+              <button className="hit-slop-44 text-xs text-muted-foreground" onClick={() => { setWaterTargetInput(String(waterTarget)); setEditingWaterTarget(true) }}>edit</button>
               {lastWaterLog && (
-                <button className="text-xs text-muted-foreground" onClick={handleUndoWater}>undo</button>
+                <button className="hit-slop-44 text-xs text-muted-foreground" onClick={handleUndoWater}>undo</button>
               )}
             </span>
           )}
