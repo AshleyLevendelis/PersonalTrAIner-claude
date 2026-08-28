@@ -1446,7 +1446,9 @@ NUTRITION TARGETS:
 - Daily Calories: ${context.macros.calories} kcal
 - Protein: ${context.macros.protein}g | Carbs: ${context.macros.carbs}g | Fat: ${context.macros.fat}g
 
-CURRENT EXERCISE PLAN:
+CURRENT EXERCISE PLAN (this includes the PRESCRIBED WEIGHT for every movement — the "@" clause):
+Read "@ ~72.5kg" as the prescribed working weight, "@ ~14kg per hand" as 14kg in EACH hand (28kg total, never say 14kg total), "@ ~14kg (single side)" as one side at a time, "@ Bodyweight" as no external load, and "@ Bodyweight +17.5kg added" as a belt/dumbbell on a bodyweight movement. "top set (set by set: ...)" means the sets RAMP and are not all the same weight — quote the individual set weights, not the top set three times.
+You therefore HAVE the prescribed weights, for every exercise, right here. NEVER tell the user you don't have their prescribed weights or can't look up what was prescribed — that sentence was said to a real user while the Exercise tab beside it read "Deadlifts 72.5 kg". If you want the weight they ACTUALLY used, say what was prescribed and ask them to confirm it ("The plan had you at ~72.5kg — was that what you lifted?"), which is a question they can answer in one word. This does NOT relax the never-invent rule below: what is prescribed is yours to quote, never yours to log as done.
 ${context.exercise_summary}
 
 CURRENT MEAL PLAN:

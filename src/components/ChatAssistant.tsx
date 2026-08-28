@@ -32,6 +32,7 @@ import { parseWorkoutEntries, type ParsedSetGroup, type WorkoutEntryInput } from
 import { executeLogWorkout } from '@/lib/nl-logging-executor'
 import { normalizeExternalUrl } from '@/lib/chat-links'
 import { buildFirstRunIntro, type FirstRunSessionBrief } from '@/lib/first-run-intro'
+import { buildCoachExerciseSummary } from '@/lib/chat-plan-context'
 import { createFact, createGoal, createContextFact, retireFact, retireContextFact, abandonGoal, type UserFactRow, type UserGoalRow, type UserContextFactRow } from '@/lib/memory-store'
 import { resolveExerciseTarget, resolveFoodTarget } from '@/lib/fact-compiler'
 import { checkFactConflict, checkGoalConflict } from '@/lib/memory-reconcile'
@@ -656,13 +657,16 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     const activeMesoWeek = mesocycle.length > 0 ? mesocycle.find(w => w.week_number === activeWeek) : undefined
     const activeWeekData = activeMesoWeek?.days ?? exercisePlan
 
-    const exerciseSummary = activeWeekData
-      .map(d => `${d.day}: ${d.focus} - ${d.exercises.map(e => `${e.name} (${e.sets}x${e.reps}, rest ${e.rest})${e.selection_note ? ` [why: ${e.selection_note}]` : ''}${e.block_hold_note ? ` [note: ${e.block_hold_note}]` : ''}`).join(', ')}`)
-      .join('\n')
-      + (activeMesoWeek?.coach_note ? `\nThis week's coaching note: ${activeMesoWeek.coach_note}` : '')
-      + (pendingLoadSuggestions && pendingLoadSuggestions.length > 0
-        ? `\nPending suggestion(s) waiting on the dashboard, not yet answered: ${pendingLoadSuggestions.join(' | ')}`
-        : '')
+    // Every field the coach needs about the week lives in one place now
+    // (chat-plan-context.ts) so a gate can call it. It used to be a template
+    // literal right here, which is exactly how it went unnoticed that it
+    // carried no prescribed weight while the Exercise tab showed that weight
+    // on the next screen.
+    const exerciseSummary = buildCoachExerciseSummary({
+      days: activeWeekData,
+      coachNote: activeMesoWeek?.coach_note,
+      pendingLoadSuggestions,
+    })
 
     const mealSummary = mealPlan
       .map(m => `${m.meal}: ${m.items.map(i => `${i.name} (${i.calories} kcal, P:${i.protein}g C:${i.carbs}g F:${i.fat}g)`).join(', ')}`)

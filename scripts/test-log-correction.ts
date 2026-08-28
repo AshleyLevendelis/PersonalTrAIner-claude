@@ -15,6 +15,15 @@
  *      3x8 and 3x10 side by side, and every future weight for that lift would
  *      have built on six sets she never did.
  *
+ * SECOND INCIDENT, same exchange, found months later (§6). The coach replied
+ * "I don't actually have your past weights on hand to look up what was
+ * prescribed" — and it was telling the truth. The client's plan summary sent
+ * the day, the focus, the exercise, sets, reps and rest, and no weight at
+ * all, while the Exercise tab one tap away read "Deadlifts 72.5 kg
+ * SUGGESTED". So the coach asked for a number the app already had, twice.
+ * That is (3) with a supply-side cause, and no prompt rule can fix it: you
+ * cannot instruct a model out of missing data.
+ *
  * (4) is the one this file mostly defends, because it is the one that
  * silently corrupts data. The behavioural half is tested for real against the
  * executor; the model-facing half can only be asserted as prompt text, for the
@@ -25,8 +34,11 @@ import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { executeLogWorkout, type LogWorkoutContext } from '../src/lib/nl-logging-executor'
 import type { ParsedSetGroup } from '../src/lib/set-parse'
+import { buildCoachExerciseSummary, loadClauseForCoach } from '../src/lib/chat-plan-context'
+import type { Exercise, WorkoutDay } from '../src/lib/types'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
+const fnSrc = readFileSync(join(ROOT, 'supabase/functions/chat-gemini/index.ts'), 'utf8')
 let failures = 0
 const check = (l: string, ok: boolean, extra?: unknown) => {
   if (ok) console.log(`  ok: ${l}`)
@@ -100,7 +112,7 @@ console.log('\n3. The flag cannot half-apply')
 
 console.log('\n4. The model is told all four rules')
 {
-  const fn = readFileSync(join(ROOT, 'supabase/functions/chat-gemini/index.ts'), 'utf8')
+  const fn = fnSrc
   check('reps may never be invented', /NEVER INVENT REPS OR SETS EITHER/.test(fn))
   check('...with the case that proved it', /the plan said 3x8, she answered "3"/.test(fn))
   check('...and the schema says it too, on both tools',
@@ -120,6 +132,82 @@ console.log('\n5. The receipt says which it did')
   check('a replacement is titled differently', /Corrected · \$\{activeSession\.dayName\}/.test(ui))
   check('...and the count is shown', /replaced \$\{replacedSets\}/.test(ui))
   check('the flag reaches the executor', /replaceExisting: correctsPrevious/.test(ui))
+}
+
+console.log('\n6. The coach is GIVEN the prescribed weight, so it never has to ask for one the app already has')
+{
+  // The behavioural half. Not a regex over ChatAssistant: the summary builder
+  // is a function now precisely so this can call it on a real week and read
+  // what comes out. A regex would have passed against the broken version too,
+  // because the broken version was a perfectly well-formed template literal.
+  const ex = (o: Partial<Exercise>): Exercise => ({
+    name: 'Deadlifts', sets: 3, reps: '8-10', rest: '180s', substitution: 'Rack Pulls', ...o,
+  })
+  const dayOf = (...exercises: Exercise[]): WorkoutDay => ({ day: 'Thursday', focus: 'Pull', exercises })
+
+  const straight = buildCoachExerciseSummary({ days: [dayOf(
+    ex({ suggested_load: '~72.5kg', suggested_load_kg: 72.5,
+         per_set_load: [1, 2, 3].map(n => ({ set_number: n, load_kg: 72.5, display: '~72.5kg' })) }),
+  )] })
+  check('the prescribed weight reaches the coach at all — the whole incident',
+    straight.includes('72.5kg'), straight)
+  check('...attached to the exercise it belongs to, not floating',
+    /Deadlifts \(3x8-10 @ ~72\.5kg, rest 180s\)/.test(straight), straight)
+  check('...and a straight-across weight is NOT padded with a set-by-set list',
+    !straight.includes('set by set'), straight)
+
+  // The per-hand distinction, which is ~18% of every prescription in the
+  // sweep and 47.8% of externally-loaded work. `suggested_load_kg` would send
+  // a bare 14 the coach reads as a total; the formatted string is the only
+  // form that survives the trip.
+  const perHand = loadClauseForCoach(ex({ name: 'Dumbbell Rows', suggested_load: '~14kg per hand', suggested_load_kg: 14 }))
+  check('a per-hand load keeps "per hand" all the way to the coach',
+    perHand.includes('14kg per hand'), perHand)
+  check('...and the raw kg number alone is never what gets sent',
+    perHand !== ' @ 14', perHand)
+  const singleSide = loadClauseForCoach(ex({ name: 'Overhead Carry', suggested_load: '~6kg (single side)', suggested_load_kg: 6 }))
+  check('a single-side load keeps its qualifier too', singleSide.includes('(single side)'), singleSide)
+
+  // A ramp is 60/65/72.5. "I did the prescribed weights" must not become
+  // 72.5x3 — that is the same invented-number defect as filling reps from the
+  // prescription, one field over.
+  const ramp = loadClauseForCoach(ex({ name: 'Barbell Squats', suggested_load: '~42.5kg', suggested_load_kg: 42.5,
+    per_set_load: [{ set_number: 1, load_kg: 35, display: '~35kg' },
+                   { set_number: 2, load_kg: 40, display: '~40kg' },
+                   { set_number: 3, load_kg: 42.5, display: '~42.5kg' }] }))
+  check('a ramp sends every set, not the top set three times',
+    ramp.includes('~35kg') && ramp.includes('~40kg') && ramp.includes('~42.5kg'), ramp)
+  check('...and says which one is the top set', /top set/.test(ramp), ramp)
+
+  // Weighted bodyweight work: the entire prescription is the "+17.5kg", and
+  // suggested_load reads "Bodyweight". Sending only suggested_load loses it.
+  const added = loadClauseForCoach(ex({ name: 'Weighted Pull-Ups', suggested_load: 'Bodyweight', suggested_added_load_kg: 17.5 }))
+  check('added load on a bodyweight movement is sent', added.includes('17.5'), added)
+
+  // '' has to mean "there is no number", never "there is one and we dropped
+  // it". A primer with no load is the only legitimate empty clause.
+  check('a genuinely unloaded movement sends no load clause',
+    loadClauseForCoach(ex({ name: 'Arm Circles' })) === '', loadClauseForCoach(ex({ name: 'Arm Circles' })))
+
+  // The two-halves defect this repo keeps hitting: builder correct, caller
+  // still hand-rolling its own copy beside it.
+  const client = readFileSync(join(ROOT, 'src/components/ChatAssistant.tsx'), 'utf8')
+  check('ChatAssistant builds exercise_summary from the shared builder',
+    /const exerciseSummary = buildCoachExerciseSummary\(/.test(client))
+  check('...and no longer hand-rolls a rest-clause template beside it',
+    !/rest \$\{[a-z]\.rest\}/.test(client), client.match(/rest \$\{[a-z]\.rest\}/)?.[0])
+
+  // The model-facing half. It cannot be told it has the weights by the data
+  // alone — it said the sentence once, and a prompt that never mentions the
+  // "@" clause leaves it free to say it again.
+  check('the prompt names the "@" clause as the prescribed weight',
+    /includes the PRESCRIBED WEIGHT for every movement/.test(fnSrc))
+  check('...forbids the sentence that was actually said to a user',
+    /NEVER tell the user you don't have their prescribed weights/.test(fnSrc))
+  check('...teaches per-hand as each hand, not a total',
+    /14kg in EACH hand/.test(fnSrc))
+  check('...and does not let quoting a prescription become logging it',
+    /never yours to log as done/.test(fnSrc))
 }
 
 if (failures > 0) { console.error(`\n${failures} check(s) failed`); process.exit(1) }
