@@ -29,6 +29,14 @@ export interface UserProfile {
   height_cm?: number
   weight_kg?: number
   activity_level: ActivityLevel
+  /**
+   * A step target the trainee set for themselves, overriding the band
+   * derived from activity_level (see steps-target.ts).
+   *
+   * Absent is NOT zero: null means "never set one, use the derived band",
+   * which is the overwhelming majority. A 0 would be a target of no steps.
+   */
+  daily_step_target?: number | null
   fitness_goal: FitnessGoal
   /**
    * STAYS REQUIRED and array-typed for BOTH plan formats. Several readers

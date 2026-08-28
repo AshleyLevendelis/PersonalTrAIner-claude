@@ -281,16 +281,16 @@ async function main() {
     // which is exactly how the calorie target works (BMR/TDEE, shown as
     // "0 OF 3040 KCAL"). Not a new kind of claim, the existing one applied to
     // a second number.
-    const { stepsTargetFor } = await import('../src/lib/steps-target')
+    const { stepsTargetFor, derivedStepsTargetFor } = await import('../src/lib/steps-target')
     check('every activity level has a target', [
       'sedentary', 'light', 'moderate', 'active', 'very_active',
-    ].every(a => stepsTargetFor(a as never) > 0))
+    ].every(a => derivedStepsTargetFor(a as never) > 0))
 
     // Ordered, and ordered the SAME WAY as the calorie multipliers these
     // levels already drive. A step target that called a sedentary user more
     // active than a very active one would contradict their own calories.
     const ordered = ['sedentary', 'light', 'moderate', 'active', 'very_active']
-      .map(a => stepsTargetFor(a as never))
+      .map(a => derivedStepsTargetFor(a as never))
     check(`targets rise with activity (${ordered.join(' < ')})`,
       ordered.every((v, i) => i === 0 || v > ordered[i - 1]), ordered)
 
@@ -298,15 +298,57 @@ async function main() {
     // one that silently falls through a Record if anyone forgets it — tsc
     // caught exactly that while this was being written.
     check('very_active is covered, though onboarding never offers it',
-      stepsTargetFor('very_active' as never) > stepsTargetFor('active' as never))
+      derivedStepsTargetFor('very_active' as never) > derivedStepsTargetFor('active' as never))
 
     // An unknown/missing level must not produce 0 — a ring against a zero
     // denominator is a divide-by-zero on screen.
     check('a missing activity level still yields a usable target',
-      stepsTargetFor(undefined) > 0 && stepsTargetFor(null) > 0)
+      derivedStepsTargetFor(undefined) > 0 && derivedStepsTargetFor(null) > 0)
+
+    // THE OVERRIDE. A band cannot know that someone walks a dog twice a day.
+    const p = (activity: string, chosen?: number | null) =>
+      ({ activity_level: activity, daily_step_target: chosen } as never)
+    check('a chosen target wins over the derived band',
+      stepsTargetFor(p('sedentary', 12500)) === 12500)
+    check('...and null means "never set one", not zero',
+      stepsTargetFor(p('sedentary', null)) === derivedStepsTargetFor('sedentary' as never))
+    check('...and a 0 or negative stored value falls back rather than making the ring divide by zero',
+      stepsTargetFor(p('moderate', 0)) > 0 && stepsTargetFor(p('moderate', -5)) > 0)
+
+    // Taking the PROFILE, not the two fields, is what stops one caller
+    // reading the override and another the band — the app disagreeing with
+    // itself between the ring and the settings screen.
+    const stSrc = fs.readFileSync('src/lib/steps-target.ts', 'utf-8')
+    check('the ring reads the profile, so it cannot miss the override',
+      /stepsTargetFor\(profile: Pick<UserProfile/.test(stSrc))
+
+    // THE HALF THAT IS EASIEST TO FORGET. App.tsx's restoreSession builds the
+    // profile column by column, so a column missing from that list is
+    // silently undefined for the whole session however faithfully the
+    // database stores it — the override would save, survive in Postgres, and
+    // be gone on the next reload.
+    const app = fs.readFileSync('src/App.tsx', 'utf-8')
+    check('restoreSession maps the new column, or it does not exist at runtime',
+      /daily_step_target: profileRow\.daily_step_target/.test(app))
+    check('...and absent stays absent rather than becoming 0',
+      !/daily_step_target: profileRow\.daily_step_target \?\? 0/.test(app))
+
+    // The migration has to exist, and be additive-nullable like its
+    // neighbours — a NOT NULL default would hand every existing user a
+    // "chosen" target they never chose.
+    const mig = fs.readFileSync('supabase/migrations/20260828140000_add_daily_step_target_to_profiles.sql', 'utf-8')
+    check('the migration adds the column nullable',
+      /add column if not exists daily_step_target integer null/.test(mig))
+    check('...and sets no default', !/default/i.test(mig.split('alter table')[1] ?? ''))
+
+    // The settings row shows what the default WOULD be, so an empty box reads
+    // as a considered default rather than a gap.
+    const prof2 = fs.readFileSync('src/components/ProfileScreen.tsx', 'utf-8')
+    check('the settings row exists and shows the derived band as its placeholder',
+      /Daily steps/.test(prof2) && /derivedStepsTargetFor\(profile\.activity_level\)/.test(prof2))
 
     const dash = fs.readFileSync('src/components/Dashboard.tsx', 'utf-8')
-    check('the steps row draws a ring', /stepsTargetFor\(profile\.activity_level\)/.test(dash))
+    check('the steps row draws a ring', /stepsTargetFor\(profile\)/.test(dash))
     check('...using the same ring geometry as the calorie tile',
       /CALORIE_TILE_RING_CIRC \* Math\.min\(1, steps\.steps \/ stepsTarget\)/.test(dash))
   }
@@ -355,16 +397,16 @@ async function main() {
     // which is exactly how the calorie target works (BMR/TDEE, shown as
     // "0 OF 3040 KCAL"). Not a new kind of claim, the existing one applied to
     // a second number.
-    const { stepsTargetFor } = await import('../src/lib/steps-target')
+    const { stepsTargetFor, derivedStepsTargetFor } = await import('../src/lib/steps-target')
     check('every activity level has a target', [
       'sedentary', 'light', 'moderate', 'active', 'very_active',
-    ].every(a => stepsTargetFor(a as never) > 0))
+    ].every(a => derivedStepsTargetFor(a as never) > 0))
 
     // Ordered, and ordered the SAME WAY as the calorie multipliers these
     // levels already drive. A step target that called a sedentary user more
     // active than a very active one would contradict their own calories.
     const ordered = ['sedentary', 'light', 'moderate', 'active', 'very_active']
-      .map(a => stepsTargetFor(a as never))
+      .map(a => derivedStepsTargetFor(a as never))
     check(`targets rise with activity (${ordered.join(' < ')})`,
       ordered.every((v, i) => i === 0 || v > ordered[i - 1]), ordered)
 
@@ -372,15 +414,32 @@ async function main() {
     // one that silently falls through a Record if anyone forgets it — tsc
     // caught exactly that while this was being written.
     check('very_active is covered, though onboarding never offers it',
-      stepsTargetFor('very_active' as never) > stepsTargetFor('active' as never))
+      derivedStepsTargetFor('very_active' as never) > derivedStepsTargetFor('active' as never))
 
     // An unknown/missing level must not produce 0 — a ring against a zero
     // denominator is a divide-by-zero on screen.
     check('a missing activity level still yields a usable target',
-      stepsTargetFor(undefined) > 0 && stepsTargetFor(null) > 0)
+      derivedStepsTargetFor(undefined) > 0 && derivedStepsTargetFor(null) > 0)
+
+    // THE OVERRIDE. A band cannot know that someone walks a dog twice a day.
+    const p = (activity: string, chosen?: number | null) =>
+      ({ activity_level: activity, daily_step_target: chosen } as never)
+    check('a chosen target wins over the derived band',
+      stepsTargetFor(p('sedentary', 12500)) === 12500)
+    check('...and null means "never set one", not zero',
+      stepsTargetFor(p('sedentary', null)) === derivedStepsTargetFor('sedentary' as never))
+    check('...and a 0 or negative stored value falls back rather than making the ring divide by zero',
+      stepsTargetFor(p('moderate', 0)) > 0 && stepsTargetFor(p('moderate', -5)) > 0)
+
+    // Taking the PROFILE, not the two fields, is what stops one caller
+    // reading the override and another the band — the app disagreeing with
+    // itself between the ring and the settings screen.
+    const stSrc = fs.readFileSync('src/lib/steps-target.ts', 'utf-8')
+    check('the ring reads the profile, so it cannot miss the override',
+      /stepsTargetFor\(profile: Pick<UserProfile/.test(stSrc))
 
     const dash = fs.readFileSync('src/components/Dashboard.tsx', 'utf-8')
-    check('the steps row draws a ring', /stepsTargetFor\(profile\.activity_level\)/.test(dash))
+    check('the steps row draws a ring', /stepsTargetFor\(profile\)/.test(dash))
     check('...using the same ring geometry as the calorie tile',
       /CALORIE_TILE_RING_CIRC \* Math\.min\(1, steps\.steps \/ stepsTarget\)/.test(dash))
   }

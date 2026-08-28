@@ -91,7 +91,7 @@ function WeighInTrendChart({ series, goalKg }: { series: { date: string; kg: num
 
 
 export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreatedAt, onWeightLogged }: DashboardProps) {
-  const stepsTarget = stepsTargetFor(profile.activity_level)
+  const stepsTarget = stepsTargetFor(profile)
   const activeSession = useActiveSession()
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)

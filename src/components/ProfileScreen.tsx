@@ -29,6 +29,7 @@ import { resolveFoodTarget } from '@/lib/fact-compiler'
 import { supabase } from '@/lib/supabase'
 import { computeGoalProgress } from '@/lib/goal-progress'
 import { GoalWeightSetter } from '@/components/GoalWeightSetter'
+import { derivedStepsTargetFor } from '@/lib/steps-target'
 import { updateProfileField } from '@/lib/profile-store'
 import { useAppearance } from '@/hooks/useAppearance'
 import type { ThemeName, AccentOverride } from '@/lib/appearance-store'
@@ -97,8 +98,10 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
  * than pretending to hold a number.
  */
 function EditableTextField({
-  value, unit, onSave, min, max,
-}: { value?: number; unit?: string; onSave: (n: number) => void; min?: number; max?: number }) {
+  value, unit, onSave, min, max, placeholder,
+}: { value?: number; unit?: string; onSave: (n: number) => void; min?: number; max?: number
+     /** Shown when nothing is set — used by Daily steps to display the value the field would take from elsewhere, so an empty box reads as a default rather than a gap. */
+     placeholder?: string }) {
   const [input, setInput] = useState(value == null ? '' : String(value))
   useEffect(() => { setInput(value == null ? '' : String(value)) }, [value])
   const commit = () => {
@@ -114,7 +117,8 @@ function EditableTextField({
         onChange={e => setInput(e.target.value)}
         onBlur={commit}
         onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
-        className="h-7 w-20 text-sm text-right"
+        placeholder={placeholder}
+        className={placeholder ? 'h-7 w-44 text-sm text-right' : 'h-7 w-20 text-sm text-right'}
       />
       {unit && <span className="text-xs text-muted-foreground">{unit}</span>}
     </div>
@@ -561,6 +565,21 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
             <Row label="Session length"><EditableSelectField value={profile.session_duration_preference} options={DURATION_OPTIONS} onSave={v => savePatch({ session_duration_preference: v })} /></Row>
             <Row label="Style"><EditableSelectField value={profile.training_style ?? ''} options={STYLE_OPTIONS} onSave={v => savePatch({ training_style: v as TrainingStyle })} /></Row>
             <Row label="Activity level"><EditableSelectField value={profile.activity_level} options={ACTIVITY_OPTIONS} onSave={v => savePatch({ activity_level: v })} /></Row>
+            {/* Directly under Activity level, because that is what it
+                overrides. The placeholder shows the band that activity level
+                produces, so leaving it alone is visibly a choice rather than
+                an empty field — and someone who types the same number is not
+                changing anything they weren't already getting. */}
+            <Row label="Daily steps">
+              <EditableTextField
+                value={profile.daily_step_target ?? undefined}
+                unit="steps"
+                min={1000}
+                max={50000}
+                placeholder={`${derivedStepsTargetFor(profile.activity_level).toLocaleString()} (from activity level)`}
+                onSave={n => savePatch({ daily_step_target: n })}
+              />
+            </Row>
             <Row label="Recovery capacity"><EditableSelectField value={profile.recovery_capacity} options={RECOVERY_OPTIONS} onSave={v => savePatch({ recovery_capacity: v })} /></Row>
             <Row label="Conditioning"><EditableSelectField value={profile.conditioning_preference} options={CONDITIONING_PREF_OPTIONS} onSave={v => savePatch({ conditioning_preference: v })} /></Row>
           </div>

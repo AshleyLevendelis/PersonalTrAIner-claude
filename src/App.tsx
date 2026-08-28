@@ -326,6 +326,12 @@ function App() {
       known_bench_kg: profileRow.known_bench_kg != null ? Number(profileRow.known_bench_kg) : undefined,
       known_deadlift_kg: profileRow.known_deadlift_kg != null ? Number(profileRow.known_deadlift_kg) : undefined,
       display_name: profileRow.display_name || '',
+      // MAPPED HERE OR IT DOES NOT EXIST. restoreSession builds the profile
+      // column by column, so anything missing from this list is silently
+      // undefined for the whole session however faithfully the database
+      // stores it. Absent stays absent (?? null, never 0) — a zero would be
+      // a target of no steps rather than "never set one".
+      daily_step_target: profileRow.daily_step_target ?? null,
       concurrent_activities: profileRow.concurrent_activities || [],
       weekly_schedule: profileRow.weekly_schedule || {},
       created_at: profileRow.created_at || new Date().toISOString(),

@@ -18,13 +18,13 @@
 // to become personal, it needs real step history to personalise FROM — which
 // the app is only now starting to collect.
 //
-// NOT EDITABLE YET, deliberately: storing an override means a column on
-// fitness_profiles, and a migration only reaches production through
-// `npm run db:push-both` on Ashley's machine. Shipping the derived ring costs
-// nothing and blocks nothing; the override can follow.
+// AND NOW OVERRIDABLE. The band is a reasonable default and still cannot know
+// that someone walks a dog twice a day or works nights, so
+// `daily_step_target` (migration 20260828140000) wins whenever it is set.
+// Null means "never set one" — not zero, which would be a target of no steps.
 // ---------------------------------------------------------------------------
 
-import type { ActivityLevel } from './types'
+import type { ActivityLevel, UserProfile } from './types'
 
 // Ordered to match the STATIC_PAL multipliers these levels already drive
 // (1.2 / 1.375 / 1.55 / 1.725 / 1.9 in macro-calculator.ts), so the step
@@ -43,7 +43,21 @@ const STEP_TARGETS: Record<ActivityLevel, number> = {
   very_active: 14000,
 }
 
-/** The daily step target for someone's stated activity level. */
-export function stepsTargetFor(activityLevel: ActivityLevel | undefined | null): number {
+/** The band for a stated activity level. Exported for the settings UI, which shows what the default WOULD be beside the override box. */
+export function derivedStepsTargetFor(activityLevel: ActivityLevel | undefined | null): number {
   return (activityLevel && STEP_TARGETS[activityLevel]) || STEP_TARGETS.moderate
+}
+
+/**
+ * The target to measure against: what they chose, or the band for their
+ * activity level.
+ *
+ * Takes the PROFILE rather than the two fields, so no caller can read one and
+ * forget the other — a ring drawn against the derived band while the settings
+ * screen shows a personal number would be the app disagreeing with itself.
+ */
+export function stepsTargetFor(profile: Pick<UserProfile, 'activity_level' | 'daily_step_target'>): number {
+  const chosen = profile.daily_step_target
+  if (typeof chosen === 'number' && Number.isFinite(chosen) && chosen > 0) return Math.round(chosen)
+  return derivedStepsTargetFor(profile.activity_level)
 }
