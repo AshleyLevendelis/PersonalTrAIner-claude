@@ -22,7 +22,7 @@
 import { readFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import { FIRST_RUN_QUICK_REPLIES, buildFirstRunIntro } from '../src/lib/first-run-intro'
+import { FIRST_RUN_QUICK_REPLIES, FIRST_RUN_QUICK_REPLIES_AHEAD, buildFirstRunIntro } from '../src/lib/first-run-intro'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(__dirname, '..')
@@ -127,13 +127,16 @@ console.log('\n6. The first-run starter chips only offer things that work')
   //       the model's decision and no static check can prove it — but it
   //       catches the chip that was never thought about at all.
   const ui = readFileSync(join(ROOT, 'src/components/ChatAssistant.tsx'), 'utf8')
-  const chips = FIRST_RUN_QUICK_REPLIES
+  // Both lists: the ahead variant renders for anyone whose first session
+  // is not today, and an unvetted chip there is just as live as one here.
+  const chips = [...new Set([...FIRST_RUN_QUICK_REPLIES, ...FIRST_RUN_QUICK_REPLIES_AHEAD])]
   check('there are chips to check, so this has teeth', chips.length > 0, chips.length)
 
   // (a) Each chip's destination, declared here on purpose. `null` = answered
   // from the plan context the request already carries, with no tool call.
   const CHIP_DESTINATION: Record<string, string | null> = {
     'Talk me through today': null,
+    'Talk me through day one': null,
     'Swap an exercise': 'propose_exercise_swap',
     "There's a food I won't eat": 'record_fact',
   }
@@ -180,13 +183,60 @@ console.log('\n6. The first-run starter chips only offer things that work')
   // nothing else. Attaching them to the first or middle intro message is a
   // silent no-op, which is exactly the kind of half-landed feature that keeps
   // recurring here.
-  const intro = buildFirstRunIntro('Morning, Ashley', 'Today is a squat day.')
-  check('the intro is more than one message', intro.length > 1, intro.length)
-  check('only the LAST intro message carries chips, the only one that renders them',
-    intro.filter(m => m.quickReplies?.length).length === 1 &&
-    (intro[intro.length - 1].quickReplies?.length ?? 0) > 0,
-    intro.map(m => m.quickReplies?.length ?? 0))
+  const squat = { focus: 'Squat & Carry', movements: 'Barbell Squats, Loaded Backpack Walk…' }
+  const intro = buildFirstRunIntro('Hey Ashley', { ...squat, when: 'today' })
+
+  // ONE MESSAGE, on Ashley's ruling after seeing four on a real phone. The
+  // count is asserted because the pressure is always to add "just one more
+  // line" back, and four is where this started.
+  check('the opener is a single message', intro.length === 1, intro.length)
+  check('it carries the chips — the only message that can render them',
+    (intro[0].quickReplies?.length ?? 0) > 0, intro.map(m => m.quickReplies?.length ?? 0))
   check('every intro message has words in it', intro.every(m => m.content.trim().length > 0))
+
+  // THE WORDING SHE REJECTED, held so it cannot come back: "as far as the
+  // user is concerned it is a person, so I dont like this wording." Naming
+  // the thing it is pretending not to be is the one line that breaks it.
+  const allCopy = [
+    ...buildFirstRunIntro('Hey Ashley', { ...squat, when: 'today' }),
+    ...buildFirstRunIntro('Hey Ashley', { ...squat, when: 'whenever' }),
+    ...buildFirstRunIntro('Hey Ashley', { ...squat, when: 'Monday' }),
+    ...buildFirstRunIntro('Hey Ashley', null),
+  ].map(m => m.content).join(' ')
+  check('the opener never says "like a person" / "like a real person"',
+    !/like (you.?d talk to )?an? (real )?person/i.test(allCopy), allCopy.slice(0, 120))
+
+  // DAY ONE HAS TO BE TRUE FOR THIS USER. Ashley's sketch was "day one starts
+  // right now"; that is wrong for anyone whose first training day is not
+  // today, and the code it replaced was worse there — a brand-new user with
+  // no session today was asked "how's the recovery going?".
+  const today = buildFirstRunIntro('Hey Ashley', { ...squat, when: 'today' })[0].content
+  const later = buildFirstRunIntro('Hey Ashley', { ...squat, when: 'Monday' })[0].content
+  check('a session today is said to be today', /day one starts today/i.test(today), today)
+  check('a session later names the day instead', /day one is Monday/i.test(later), later)
+  check('...and never claims it starts today', !/starts today/i.test(later), later)
+  check('the no-session fallback invents no session',
+    !/day one/i.test(buildFirstRunIntro('Hey Ashley', null)[0].content))
+
+  // The chip has to agree with the sentence above it. "Talk me through today"
+  // under "day one is Monday" is the app contradicting itself on one screen.
+  const chipsFor = (when: string | null) =>
+    buildFirstRunIntro('Hey Ashley', when === null ? null : { ...squat, when })[0].quickReplies ?? []
+  check('a session today offers "Talk me through today"',
+    chipsFor('today').includes('Talk me through today'), chipsFor('today'))
+  check('a session later offers "Talk me through day one" instead',
+    chipsFor('Monday').includes('Talk me through day one') &&
+    !chipsFor('Monday').includes('Talk me through today'), chipsFor('Monday'))
+
+  // The ellipsis already ends the sentence; a full stop after it reads as a
+  // typo, and it shipped that way ("Neutral-Grip Dumbbell Press….").
+  const truncated = buildFirstRunIntro('Hey Ashley', { focus: 'X', movements: 'A, B, C…', when: 'today' })[0].content
+  check('a truncated movement list is not followed by a full stop',
+    !truncated.includes('….'), truncated)
+  for (const c of [today, later]) {
+    check(`the session is named in the opener — "${c.slice(0, 40)}…"`,
+      c.includes('Squat & Carry') && c.includes('Barbell Squats'))
+  }
 
   // ...and the component actually renders the builder's output in order. The
   // builder being right is worthless if ChatAssistant hand-rolls the array

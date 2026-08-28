@@ -37,37 +37,25 @@
  * message's max-w-[80%] and behind the pl-9 avatar offset, leaving ~294px,
  * which no two of these fit in. See `render:screens` / first-run-chat.
  */
+/**
+ * The same three, for someone whose first session is NOT today.
+ *
+ * Only the first differs, and it has to: "Talk me through today" under a
+ * message that just said day one is Monday is the app contradicting itself in
+ * the space of one screen. Same destination — both are answered from context
+ * with no tool call — so the promise the list makes is unchanged.
+ */
+export const FIRST_RUN_QUICK_REPLIES_AHEAD = [
+  'Talk me through day one',
+  'Swap an exercise',
+  "There's a food I won't eat",
+]
+
 export const FIRST_RUN_QUICK_REPLIES = [
   'Talk me through today',
   'Swap an exercise',
   "There's a food I won't eat",
 ]
-
-/**
- * The two middle messages — the ones carrying "what does this actually do".
- *
- * STILL NOT A FEATURE LIST, and that restraint is deliberate. A brand-new
- * user does not need an inventory of 22 tools; they need to know what KIND of
- * thing to type. So these describe the shape of the relationship — say it in
- * plain words, I act, I remember, nothing moves without your yes — and the
- * how-to-use-it half is carried by the chips rather than by prose.
- *
- * TWO messages, not one, and that is a `render:screens` finding rather than a
- * preference: as a single paragraph this ran to NINE lines at 412px, which is
- * the block of text the three-message split existed to avoid in the first
- * place. Split at the natural seam — what you say, then what I'll do with it
- * — and each half lands in three to six lines.
- *
- * "Anything that changes your plan, I'll show you first" is not a flourish:
- * six of the highest-value tools are propose-only and render a card the user
- * confirms. Saying so up front is what makes the first proposal card read as
- * designed rather than as the app hesitating.
- */
-export const FIRST_RUN_WHAT_TO_SAY =
-  "Your plan's built and ready. Talk to me like you'd talk to a person — how a session went, a food you can't stand, a shoulder that's grumbling. I'll sort it, and I'll remember it."
-
-export const FIRST_RUN_THE_PROMISE =
-  "Anything that changes your plan, I'll show you first — nothing moves without your say-so."
 
 export interface FirstRunMessage {
   content: string
@@ -77,23 +65,92 @@ export interface FirstRunMessage {
 }
 
 /**
- * Short messages instead of one block: who this is, what to say to it, what
- * it will and won't do without asking, then one real opening question.
+ * What day one actually is, for the opener to talk about.
  *
- * The chips go on the LAST message and only the last: getQuickRepliesFor-
- * LastMessage reads messages[messages.length - 1].quickReplies and nothing
- * else, so attaching them anywhere earlier is a silent no-op.
- *
- * @param greeting        e.g. "Morning, Ashley" — already name-aware.
- * @param detailSentence  the specific-today line, already capitalised.
+ * The FACTS are gathered by ChatAssistant, which holds the plan; the WORDS
+ * live here. Same split as the rest of this file, and it is what lets
+ * `render:screens` show the real opener instead of a replica.
  */
-export function buildFirstRunIntro(greeting: string, detailSentence: string): FirstRunMessage[] {
-  return [
-    { content: `${greeting} — I'm your coach. Good to meet you.` },
-    { content: FIRST_RUN_WHAT_TO_SAY },
-    { content: FIRST_RUN_THE_PROMISE },
-    { content: detailSentence, quickReplies: FIRST_RUN_QUICK_REPLIES },
-  ]
+export interface FirstRunSessionBrief {
+  /** The session's focus, e.g. "Full Body Power". */
+  focus: string
+  /** Its first few movements, already joined and truncated. */
+  movements: string
+  /**
+   * `today`   — a training day, and their training window has not passed.
+   * `whenever`— a training day, but past the hour they usually train.
+   * anything else — how to refer to the next one: "tomorrow", "Monday".
+   */
+  when: 'today' | 'whenever' | string
+}
+
+/**
+ * The FIRST message a brand-new user ever sees in the coach chat — and, since
+ * Ashley's call, the only one.
+ *
+ * IT USED TO BE FOUR. Who I am, what to say to me, what I won't do without
+ * asking, then today's session. She read it on a real phone and cut it to one:
+ * "we dont need to say that much and it could be 1 message."
+ *
+ * Three of those four went for a reason, not just for length:
+ *
+ *   "I'm your coach. Good to meet you."     the header says who is talking,
+ *                                           permanently. This said it again.
+ *   "Talk to me like you'd talk to a person" HER OBJECTION, and it is the
+ *                                           right one: "as far as the user is
+ *                                           concerned it is a person, so I
+ *                                           dont like this wording." Naming
+ *                                           the thing it is pretending not to
+ *                                           be breaks it. The three chips
+ *                                           underneath demonstrate what to say
+ *                                           without a sentence explaining it.
+ *   "Nothing moves without your say-so"     already said, minutes earlier, in
+ *                                           the onboarding opener. Saying it
+ *                                           twice made it read as a disclaimer
+ *                                           rather than a promise.
+ *
+ * WHAT REPLACED THEM IS MOMENTUM, and it has to be true of THIS user. Ashley's
+ * sketch was "Day one starts right now with {session}" — which is wrong for
+ * anyone whose first training day is not today, and the old code was worse
+ * there: it fell through to "it's a rest day on your plan. How's the recovery
+ * going?", asking a brand-new user how they are recovering from nothing. So
+ * the opener branches on when day one actually is, and says so.
+ */
+export function buildFirstRunIntro(
+  greeting: string,
+  session: FirstRunSessionBrief | null,
+): FirstRunMessage[] {
+  const opener = (() => {
+    if (!session) {
+      // No plan day to point at. Say the true thing rather than inventing a
+      // session — this is the branch a broken plan lands in, and a confident
+      // "day one starts now" there would be the app lying on its first line.
+      return `${greeting} — welcome aboard. Your plan's built and waiting. Have a look around, and tell me anything you need.`
+    }
+    // The movements list already ends in an ellipsis when it was truncated,
+    // and a full stop after one reads as a typo ("Dumbbell Press….").
+    const stop = session.movements.endsWith('…') ? '' : '.'
+    const brief = `${session.focus} — ${session.movements}${stop}`
+    if (session.when === 'today') {
+      return `${greeting} — welcome aboard. Day one starts today: ${brief} Give it a proper go and we'll build from there.`
+    }
+    if (session.when === 'whenever') {
+      // A training day, but past the hour they said they train. "Starts right
+      // now" would be pushing someone into a session at 10pm.
+      return `${greeting} — welcome aboard. Day one is ready when you are: ${brief} Tonight or tomorrow, your call.`
+    }
+    return `${greeting} — welcome aboard. Day one is ${session.when}: ${brief} Rest up and come in ready for it.`
+  })()
+
+  // The chips go on this message because it is the last one — getQuickReplies-
+  // ForLastMessage reads messages[messages.length - 1].quickReplies and
+  // nothing else. With one message that is trivially true; it was not before,
+  // and attaching them anywhere else was a silent no-op.
+  const dayOneIsToday = session?.when === 'today' || session?.when === 'whenever'
+  return [{
+    content: opener,
+    quickReplies: dayOneIsToday ? FIRST_RUN_QUICK_REPLIES : FIRST_RUN_QUICK_REPLIES_AHEAD,
+  }]
 }
 
 // ---------------------------------------------------------------------------

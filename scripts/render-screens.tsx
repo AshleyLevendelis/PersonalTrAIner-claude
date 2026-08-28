@@ -149,7 +149,11 @@ function worstDay(days: WorkoutDay[]): WorkoutDay {
  * cannot, because there is only one copy.
  */
 function FirstRunChat() {
-  const intro = buildFirstRunIntro('Morning, Ashley', "It's a squat and carry day — six exercises, about 50 minutes.")
+  const intro = buildFirstRunIntro('Hey Ashley', {
+    focus: 'Squat & Carry',
+    movements: 'Barbell Squats, Loaded Backpack Walk, Bulgarian Split Squat…',
+    when: 'today',
+  })
   return (
     <div className="space-y-3 px-4 py-3">
       {intro.map((msg, i) => (

@@ -31,7 +31,7 @@ import { cn } from '@/lib/utils'
 import { parseWorkoutEntries, type ParsedSetGroup, type WorkoutEntryInput } from '@/lib/set-parse'
 import { executeLogWorkout } from '@/lib/nl-logging-executor'
 import { normalizeExternalUrl } from '@/lib/chat-links'
-import { buildFirstRunIntro } from '@/lib/first-run-intro'
+import { buildFirstRunIntro, type FirstRunSessionBrief } from '@/lib/first-run-intro'
 import { createFact, createGoal, createContextFact, retireFact, retireContextFact, abandonGoal, type UserFactRow, type UserGoalRow, type UserContextFactRow } from '@/lib/memory-store'
 import { resolveExerciseTarget, resolveFoodTarget } from '@/lib/fact-compiler'
 import { checkFactConflict, checkGoalConflict } from '@/lib/memory-reconcile'
@@ -237,6 +237,46 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     return `it's a rest day on your plan. How's the recovery going?`
   }
 
+  /**
+   * When day one actually is, for the first-run opener.
+   *
+   * Separate from initialGreetingDetail because the two answer different
+   * questions. That one greets a RETURNING user, for whom "it's a rest day —
+   * how's the recovery going?" is a fair thing to say. For someone who
+   * finished onboarding ninety seconds ago it is not: there is no recovery
+   * yet, and the one thing they want to know is when they start. So a
+   * brand-new user whose first training day is not today gets pointed at it
+   * instead of asked about a rest they have not earned.
+   */
+  const firstRunSessionBrief = (): FirstRunSessionBrief | null => {
+    const now = new Date()
+    const nameOfDay = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'long' })
+    const sessionOn = (d: Date) => exercisePlan.find(x => x.day === nameOfDay(d))
+    const brief = (day: { focus: string; exercises: { name: string }[] }) => ({
+      focus: day.focus,
+      movements: day.exercises.map(e => e.name).slice(0, 3).join(', ')
+        + (day.exercises.length > 3 ? '…' : ''),
+    })
+
+    const today = sessionOn(now)
+    if (today) {
+      // Same per-preference cutoff the returning-user greeting uses, for the
+      // same reason: past the hour someone trains, "starts today" is a push
+      // rather than a welcome.
+      const cutoff: Record<string, number> = { morning: 13, midday: 16, evening: 21, night: 23, varies: 22 }
+      const past = now.getHours() >= (cutoff[profile.preferred_time || 'morning'] || 22)
+      return { ...brief(today), when: past ? 'whenever' : 'today' }
+    }
+
+    for (let ahead = 1; ahead <= 7; ahead++) {
+      const d = new Date(now)
+      d.setDate(d.getDate() + ahead)
+      const day = sessionOn(d)
+      if (day) return { ...brief(day), when: ahead === 1 ? 'tomorrow' : nameOfDay(d) }
+    }
+    return null
+  }
+
   const buildInitialGreeting = (): string => `${greetName()} — ${initialGreetingDetail()}`
 
   // Lazy init: restore the last-seen conversation from the synchronous
@@ -427,8 +467,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       // this only turns them into ChatMsg rows. CHIPS SHOW RATHER THAN TELL,
       // which is what keeps the how-to-use-it half out of the prose.
       if (isFirstEverChat) {
-        const detailSentence = `${detail.charAt(0).toUpperCase()}${detail.slice(1)}`
-        setMessages(buildFirstRunIntro(greetName(), detailSentence).map(m => ({
+        setMessages(buildFirstRunIntro(greetName(), firstRunSessionBrief()).map(m => ({
           role: 'assistant' as const,
           status: 'complete' as const,
           ...m,
