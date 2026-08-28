@@ -1,4 +1,4 @@
-import { OptionCard } from './OptionCard'
+import { OptionRow, OptionPill, OptionCell } from './OptionRow'
 import { Button } from '@/components/ui/button'
 import { getSlotDef, offeredOptionsFor, canDeclineSlot, type OnboardingSlotValues, type SlotKey } from '@/lib/onboarding-slots'
 
@@ -70,29 +70,30 @@ export function SlotChipsCard({
       ? selectedMulti.includes(String(value))
       : current !== null && current !== undefined && String(current) === String(value)
 
-  // TWO DECISIONS, deliberately separated — they used to be one boolean.
+  // THREE SHAPES, AND THE SHAPE OF THE OPTION SET PICKS WHICH — not the count
+  // alone. Rows are the default and the main event; the other two exist
+  // because one specific set each would be absurd as rows.
   //
-  // `compact` is size. Four bordered tiles at p-5 with a text-3xl emoji fill a
-  // phone viewport, and the four-option questions (goal, experience, activity,
-  // style) are the most common shape in the flow, so 4 is where tightening
-  // starts paying — not 5.
+  //   ROWS   any option carries a description. 13 slots: goal, experience,
+  //          activity, equipment, session length, style, cardio, recovery,
+  //          meals/day, cooking time, breakfast, knows-lifts, snacks.
+  //   STRIP  the seven training days — no descriptions, exactly 7, initials.
+  //   PILLS  no descriptions and more than 7: injuries (8), cuisines (10),
+  //          dietary (22). Twenty-two stacked rows is a scroll marathon.
   //
-  // `showDescription` is content, and is UNCHANGED. It stays at "4 or fewer,
-  // and at least one option actually has one". The single boolean made these
-  // move together, which meant the obvious size fix would have deleted the
-  // descriptions from exactly the questions that most need them.
-  // The shape switch. `hasDescriptions` is the question "does a card have
-  // anything to put in it here", which is the same question as "is a card
-  // worth its height".
+  // `gender` is why STRIP tests for SEVEN rather than "7 or fewer". It has two
+  // options and no descriptions, so a "≤ 7 short labels" rule would have put a
+  // two-answer question into a seven-across day grid. It falls through to rows,
+  // which is where the design intends it.
   const hasDescriptions = options.some(o => o.description)
-  // An icon repeated on every option is decoration, not information — the same
-  // judgement the pill rule makes, applied to the cards. mealsPerDay showed one
-  // plate emoji three times under "2 meals / 3 meals / 4 meals"; the labels were
-  // already doing the work and the icons were buying height. (trainingDays had
-  // seven identical calendars, but it is pills now and renders no icon at all.)
-  const iconsCarryMeaning = new Set(options.map(o => o.icon)).size > 1
-  const compact = options.length >= 4
-  const showDescription = options.length <= 4 && hasDescriptions
+  const isDayStrip = !hasDescriptions && options.length === 7 &&
+    options.every(o => o.label.length <= 3)
+  const shape: 'rows' | 'strip' | 'pills' =
+    hasDescriptions ? 'rows' : isDayStrip ? 'strip' : options.length > 7 ? 'pills' : 'rows'
+
+  // Descriptions render whenever an option has one, with NO count threshold.
+  // That deliberately drops the old `showDescription` rule: it existed because
+  // a 2-up tile had no room, and a full-width row does.
 
   // Answered: the chips simply go away. They used to collapse into a small
   // "you picked X" line, but the user's own message bubble sits directly
@@ -106,42 +107,64 @@ export function SlotChipsCard({
     else onResolveSingle(def.key, String(value))
   }
 
+  const selectionRole = def.control === 'multi' ? 'pressed' as const : 'radio' as const
+  // A single-select is a radiogroup; a multi-select is a set of independent
+  // toggles and must NOT be, or a screen reader announces "1 of 22 selected"
+  // semantics that do not apply.
+  const groupRole = def.control === 'single' ? { role: 'radiogroup' as const, 'aria-label': def.question } : {}
+
   return (
     <div className={`mt-2 space-y-2 ${busy ? 'pointer-events-none opacity-60' : ''}`}>
-      {hasDescriptions ? (
-        <div className={options.length > 6 ? 'grid grid-cols-3 gap-2' : 'grid grid-cols-2 gap-2'}>
+      {shape === 'rows' && (
+        <div
+          {...groupRole}
+          className="overflow-hidden rounded-[14px] border border-[color:var(--hairline)] bg-card"
+        >
           {options.map((opt, i) => (
-            <OptionCard
+            <OptionRow
               key={String(opt.value)}
-              icon={iconsCarryMeaning ? opt.icon : undefined}
               label={opt.label}
-              description={showDescription ? opt.description : undefined}
+              description={opt.description}
               selected={isSelected(opt.value)}
-              compact={compact}
-              // An odd count in a two-column grid strands the last card at half
-              // width beside an empty cell, which reads as a missing option
-              // rather than a deliberate layout. Six of the card questions have
-              // exactly three options, so this is most of them. The last one
-              // spans instead.
-              className={options.length % 2 === 1 && options.length <= 6 && i === options.length - 1
-                ? 'col-span-2'
-                : undefined}
+              selectionRole={selectionRole}
+              divided={i > 0}
               onClick={() => choose(opt.value)}
             />
           ))}
         </div>
-      ) : (
-        <div className="flex flex-wrap gap-2">
+      )}
+
+      {shape === 'strip' && (
+        <div
+          {...groupRole}
+          className="grid grid-cols-7 gap-1 rounded-xl border border-[color:var(--hairline)] bg-card p-1"
+        >
           {options.map(opt => (
-            <OptionPill
+            <OptionCell
               key={String(opt.value)}
-              label={opt.label}
+              initial={opt.label.slice(0, 1)}
+              accessibleLabel={opt.label}
               selected={isSelected(opt.value)}
               onClick={() => choose(opt.value)}
             />
           ))}
         </div>
       )}
+
+      {shape === 'pills' && (
+        <div {...groupRole} className="flex flex-wrap gap-2">
+          {options.map(opt => (
+            <OptionPill
+              key={String(opt.value)}
+              label={opt.label}
+              selected={isSelected(opt.value)}
+              selectionRole={selectionRole}
+              onClick={() => choose(opt.value)}
+            />
+          ))}
+        </div>
+      )}
+
       {def.key === 'dietaryPreferences' && (
         <p className="text-[11px] leading-snug text-muted-foreground/70">
           These filters check ingredients we recognise. We can't check brands,
@@ -154,16 +177,16 @@ export function SlotChipsCard({
           on a question that is optional everywhere downstream. Multi-selects
           are excluded on purpose: their Done button already records an
           explicit empty list, which MEANS "none" rather than "not saying". */}
-      {/* THE FOOTER MATCHES THE OPTIONS ABOVE IT. A full-width 44px bar under a
-          single tidy row of pills was the heaviest thing on the screen, for
-          the lightest question on it — and a disabled "Pick at least one"
-          reads as a caption rather than a control. Under pills the footer is
-          a pill too, sitting inline; under cards it stays the full-width
-          button, which is proportionate there. */}
+      {/* THE FOOTER MATCHES THE OPTIONS ABOVE IT, and that rule survives the
+          redesign unchanged in spirit — only the shape names moved. Under
+          rows the decline is a full-width bar, proportionate to a card that
+          already spans the column; under a strip or pills it stays inline, so
+          a tidy one-line question doesn't get the heaviest control on screen
+          hung underneath it. All resolve/decline behaviour is untouched. */}
       {def.control === 'single' && canDeclineSlot(def, values) && (
         <Button
           variant="ghost"
-          className={hasDescriptions
+          className={shape === 'rows'
             ? 'w-full min-h-[44px] text-sm text-muted-foreground'
             : 'min-h-[44px] rounded-full px-3 text-xs text-muted-foreground'}
           disabled={busy}
@@ -173,58 +196,39 @@ export function SlotChipsCard({
         </Button>
       )}
       {def.control === 'multi' && (
-        <Button
-          variant="outline"
-          className={hasDescriptions
-            ? 'w-full min-h-[44px] text-sm'
-            : 'min-h-[44px] rounded-full px-4 text-xs'}
-          // A REQUIRED multi (trainingDays) with nothing selected must not
-          // offer a skip that would silently fail validation downstream —
-          // the button says what's needed and stays disabled until then.
-          disabled={busy || (def.required && selectedMulti.length === 0)}
-          onClick={() => onResolveMulti(def.key)}
-        >
-          {selectedMulti.length === 0 ? (def.required ? 'Pick at least one' : 'None — skip') : 'Done'}
-        </Button>
+        shape === 'rows' ? (
+          <Button
+            variant="outline"
+            className="w-full min-h-[44px] text-sm"
+            // A REQUIRED multi with nothing selected must not offer a skip
+            // that would silently fail validation downstream — the button says
+            // what's needed and stays disabled until then.
+            disabled={busy || (def.required && selectedMulti.length === 0)}
+            onClick={() => onResolveMulti(def.key)}
+          >
+            {selectedMulti.length === 0 ? (def.required ? 'Pick at least one' : 'None — skip') : 'Done'}
+          </Button>
+        ) : (
+          // Strip and pills share a footer: the picks read back on the left,
+          // the Done button on the right. The read-back matters most on the
+          // strip, where the answer is seven single letters — "Mon · Wed · Fri"
+          // is the only place the choice is stated in words.
+          <div className="mt-2.5 flex items-center justify-between gap-3">
+            <p className="min-w-0 flex-1 truncate text-[11.5px] text-muted-foreground">
+              {selectedMulti.length > 0
+                ? options.filter(o => selectedMulti.includes(String(o.value))).map(o => o.label).join(' · ')
+                : ''}
+            </p>
+            <Button
+              className="h-[38px] shrink-0 rounded-[11px] px-[18px] text-[13px] font-semibold glow-mint-box"
+              disabled={busy || (def.required && selectedMulti.length === 0)}
+              onClick={() => onResolveMulti(def.key)}
+            >
+              {selectedMulti.length === 0 ? (def.required ? 'Pick at least one' : 'None — skip') : 'Done'}
+            </Button>
+          </div>
+        )
       )}
     </div>
-  )
-}
-
-/**
- * The pill. Deliberately the SAME shape as the coach chat's quick replies
- * (ChatAssistant.tsx) — rounded-full, surface-raised, text-xs, 44px tall —
- * because a new user meets those two surfaces within minutes of each other
- * and they should read as one app rather than two.
- *
- * No emoji, which is the point on a label-only question: the icon was
- * decoration that cost height, and all seven training-day options carried the
- * same one.
- *
- * min-h-[44px] is the tap target and is not negotiable — text-xs on its own
- * would make a 28px pill, under every touch guideline, trading one usability
- * problem for another.
- */
-function OptionPill({
-  label, selected, onClick,
-}: {
-  label: string
-  selected: boolean
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={selected}
-      className={
-        'inline-flex min-h-[44px] items-center rounded-full px-3 py-2.5 text-xs font-medium transition-colors ' +
-        (selected
-          ? 'bg-primary/15 text-primary ring-1 ring-primary glow-mint'
-          : 'bg-[color:var(--surface-raised)] text-foreground hover:bg-accent hover:text-accent-foreground active:bg-accent/80')
-      }
-    >
-      {label}
-    </button>
   )
 }

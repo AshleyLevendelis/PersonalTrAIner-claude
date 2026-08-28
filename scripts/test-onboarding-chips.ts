@@ -137,11 +137,21 @@ console.log('\n3. Options are offered on the FIRST asking, not as a rescue')
   const cardCode = card
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .split('\n').filter(l => !/^\s*\/\//.test(l)).join('\n')
-  const SHAPE_LOGIC = /const (hasDescriptions|iconsCarryMeaning) = [^\n]*/g
+  // THREE SHAPES NOW, not two: rows (the default), the 7-across day strip, and
+  // wrapping pills for long label-only sets. `iconsCarryMeaning` is gone
+  // because NO icon is rendered by the onboarding chips at all any more —
+  // a stronger guarantee than "don't render a repeated one", asserted below.
+  const SHAPE_LOGIC = /const (hasDescriptions|isDayStrip|shape)\b[^\n]*/g
   const decisions = cardCode.match(SHAPE_LOGIC) ?? []
-  check(`the shape decisions are derived (${decisions.length} of them)`, decisions.length === 2, decisions)
+  check(`the shape decisions are derived (${decisions.length} of them)`, decisions.length === 3, decisions)
   check('no slot is named in the shape decision',
     !decisions.some(d => ONBOARDING_SLOTS.some(s => d.includes(s.key))), decisions)
+  check('all three shapes are reachable', /'rows'/.test(cardCode) && /'strip'/.test(cardCode) && /'pills'/.test(cardCode))
+  // gender has two options and no descriptions. A "7 or fewer short labels"
+  // strip rule would have put a two-answer question into a seven-across day
+  // grid; testing for EXACTLY seven is what keeps it in rows.
+  check('the day strip requires exactly seven options, not "seven or fewer"',
+    /options\.length === 7/.test(cardCode), decisions)
 }
 
 // ---------------------------------------------------------------------------
@@ -235,23 +245,37 @@ console.log('\n6. Nothing is asked twice, and nothing decorative costs height')
   // DATA and paired with the render rule below, because either half alone is
   // half a fix.
   const card = readFileSync(join(ROOT, 'src/components/onboarding/SlotChipsCard.tsx'), 'utf8')
-  check('identical icons across a question are not rendered',
-    /new Set\(options\.map\(o => o\.icon\)\)\.size > 1/.test(card))
-  check('...and the card can actually omit one',
-    /\{icon && </.test(readFileSync(join(ROOT, 'src/components/onboarding/OptionCard.tsx'), 'utf8')))
+  // The rule got STRONGER, so the check did too. It used to be "an icon
+  // repeated across every option is not rendered"; the redesign renders no
+  // emoji at all, which cannot be got wrong by one question adding a second
+  // distinct glyph. The `icon` fields stay in the data (harmless, and other
+  // surfaces may want them) — what is asserted is that the chips never read
+  // them.
+  const rowSrc = readFileSync(join(ROOT, 'src/components/onboarding/OptionRow.tsx'), 'utf8')
+  check('the onboarding chips render no emoji at all', !/\bopt\.icon\b/.test(card), card.match(/.*opt\.icon.*/)?.[0])
+  check('...and the row component has no icon prop to pass one through',
+    !/\bicon\b/.test(rowSrc.replace(/\/\*[\s\S]*?\*\//g, '')), rowSrc.match(/.*\bicon\b.*/)?.[0])
 
-  // An odd number of cards in a two-column grid strands the last one beside a
-  // hole. Six of the card questions have exactly three options.
-  check('a stranded last card spans instead of leaving a gap', /col-span-2/.test(card))
+  // THE STRANDED-CARD RULE IS RETIRED, and its retirement is asserted rather
+  // than just deleted. It existed because a two-column grid with an odd option
+  // count left the last card beside a hole — six of the questions have exactly
+  // three options. Rows are full width, so an odd count cannot strand
+  // anything, and a leftover `col-span-2` would mean the grid came back.
+  check('the two-column grid is gone, so nothing can be stranded',
+    !/grid-cols-2/.test(card) && !/col-span-2/.test(card), card.match(/.*col-span-2.*|.*grid-cols-2.*/)?.[0])
   const oddCardQuestions = withOptions
     .filter(x => x.options.some(o => o.description) && x.options.length % 2 === 1)
     .map(x => x.slot.key)
-  check(`...and there are questions that need it (${oddCardQuestions.join(', ')})`,
+  check(`...and there are still odd-count questions, which now simply stack (${oddCardQuestions.join(', ')})`,
     oddCardQuestions.length > 0, oddCardQuestions)
 
-  // The footer matched the options: a full-width 44px bar under one row of
-  // pills was the heaviest thing on the lightest screen.
-  check('the footer button follows the option shape', /hasDescriptions\s*\n?\s*\?\s*'w-full min-h-\[44px\]/.test(card))
+  // The footer still matches the options above it: a full-width bar under a
+  // card that already spans the column, inline under a strip or pills so the
+  // lightest question doesn't get the heaviest control hung under it.
+  check('the footer button follows the option shape',
+    /shape === 'rows'\s*\n?\s*\?\s*'w-full min-h-\[44px\]/.test(card))
+  check('...and a multi-select footer reads the picks back in words',
+    /\.map\(o => o\.label\)\.join\(' · '\)/.test(card))
 
   // Units belong on the field, not only in a sentence that has scrolled — and
   // the grouped cards put three fields under one question, so at most one of

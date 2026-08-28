@@ -58,9 +58,9 @@ export const EXPERIENCE_OPTIONS: { value: TrainingExperience; icon: string; labe
 ]
 
 export const GOAL_OPTIONS: { value: FitnessGoal; icon: string; label: string; description: string }[] = [
-  { value: 'fat_loss', icon: '🔥', label: 'Fat Loss', description: 'Shred body fat, get lean' },
-  { value: 'hypertrophy', icon: '💪', label: 'Muscle Growth', description: 'Build size & strength' },
-  { value: 'functional', icon: '⚡', label: 'Functional Strength', description: 'Move better, lift heavier' },
+  { value: 'fat_loss', icon: '🔥', label: 'Fat loss', description: 'Shred body fat, get lean' },
+  { value: 'hypertrophy', icon: '💪', label: 'Muscle growth', description: 'Build size & strength' },
+  { value: 'functional', icon: '⚡', label: 'Functional strength', description: 'Move better, lift heavier' },
   { value: 'conditioning', icon: '❤️', label: 'Conditioning', description: 'Cardio & endurance' },
 ]
 
@@ -68,15 +68,15 @@ export const DAYS_OF_WEEK = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 export const DAYS_FULL = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
 export const RECOVERY_OPTIONS: { value: RecoveryCapacity; icon: string; label: string; description: string }[] = [
-  { value: 'low', icon: '🪫', label: 'Stretched Thin', description: 'Poor sleep, high stress, or a physically demanding job' },
-  { value: 'moderate', icon: '🔋', label: 'Getting By', description: 'Decent sleep most nights, manageable stress' },
-  { value: 'high', icon: '🔌', label: 'Well Rested', description: 'Good sleep, low stress, recovery is not a limiter' },
+  { value: 'low', icon: '🪫', label: 'Stretched thin', description: 'Poor sleep, high stress, or a physically demanding job' },
+  { value: 'moderate', icon: '🔋', label: 'Getting by', description: 'Decent sleep most nights, manageable stress' },
+  { value: 'high', icon: '🔌', label: 'Well rested', description: 'Good sleep, low stress, recovery is not a limiter' },
 ]
 
 export const CONDITIONING_PREF_OPTIONS: { value: ConditioningPreference; icon: string; label: string; description: string }[] = [
-  { value: 'love', icon: '🏃‍♂️', label: 'Love It', description: 'Give me plenty of cardio/conditioning' },
-  { value: 'tolerate', icon: '🙂', label: "It's Fine", description: "I'll do what the program calls for" },
-  { value: 'avoid', icon: '🙅', label: 'Not For Me', description: 'Keep it to the minimum the goal actually needs' },
+  { value: 'love', icon: '🏃‍♂️', label: 'Love it', description: 'Give me plenty of cardio/conditioning' },
+  { value: 'tolerate', icon: '🙂', label: "It's fine", description: "I'll do what the program calls for" },
+  { value: 'avoid', icon: '🙅', label: 'Not for me', description: 'Keep it to the minimum the goal actually needs' },
 ]
 
 export const DURATION_OPTIONS: { value: SessionDuration; icon: string; label: string; description: string }[] = [
@@ -88,16 +88,16 @@ export const DURATION_OPTIONS: { value: SessionDuration; icon: string; label: st
 
 
 export const EQUIPMENT_OPTIONS: { value: EquipmentAccess; icon: string; label: string; description: string }[] = [
-  { value: 'full_gym', icon: '🏢', label: 'Full Gym', description: 'All machines & free weights' },
-  { value: 'home_gym', icon: '🏠', label: 'Home Gym', description: 'Barbell, dumbbells, bench' },
+  { value: 'full_gym', icon: '🏢', label: 'Full gym', description: 'All machines & free weights' },
+  { value: 'home_gym', icon: '🏠', label: 'Home gym', description: 'Barbell, dumbbells, bench' },
   { value: 'minimalist', icon: '🎒', label: 'Minimalist', description: 'Bands & kettlebells' },
-  { value: 'bodyweight', icon: '🤸', label: 'Bodyweight Only', description: 'No equipment needed' },
+  { value: 'bodyweight', icon: '🤸', label: 'Bodyweight only', description: 'No equipment needed' },
 ]
 
 export const STYLE_OPTIONS: { value: TrainingStyle; icon: string; label: string; description: string }[] = [
-  { value: 'functional', icon: '🏃', label: 'Functional / Athletic', description: 'Explosive & dynamic' },
+  { value: 'functional', icon: '🏃', label: 'Functional / athletic', description: 'Explosive & dynamic' },
   { value: 'bodybuilding', icon: '🏆', label: 'Bodybuilding', description: 'Aesthetics & symmetry' },
-  { value: 'combat', icon: '🥊', label: 'Combat / Conditioning', description: 'Fight-ready fitness' },
+  { value: 'combat', icon: '🥊', label: 'Combat / conditioning', description: 'Fight-ready fitness' },
   { value: 'hybrid', icon: '⚙️', label: 'Hybrid', description: 'Best of everything' },
 ]
 
@@ -126,7 +126,7 @@ export const STYLE_OPTIONS: { value: TrainingStyle; icon: string; label: string;
  * an injury checkbox reads as something it does not mean.
  */
 export const INJURY_OPTIONS: { value: string; icon: string; label: string }[] = [
-  { value: 'lower_back', icon: '🧍', label: 'Lower Back' },
+  { value: 'lower_back', icon: '🧍', label: 'Lower back' },
   { value: 'knees', icon: '🦵', label: 'Knees' },
   { value: 'shoulders', icon: '💪', label: 'Shoulders' },
   { value: 'neck', icon: '🧣', label: 'Neck' },
@@ -153,26 +153,26 @@ const DIETARY_META: Record<DietaryPreference, { icon: string; label: string }> =
   // so the convention was consistent and Pescatarian was the row breaking it.
   pescatarian: { icon: '🍣', label: 'Pescatarian' },
   keto: { icon: '🥑', label: 'Keto' },
-  'low-carb': { icon: '🥩', label: 'Low-Carb' },
+  'low-carb': { icon: '🥩', label: 'Low-carb' },
   halal: { icon: '☪️', label: 'Halal' },
   kosher: { icon: '✡️', label: 'Kosher' },
   paleo: { icon: '🦴', label: 'Paleo' },
   // Wearing the food they exclude, the convention the comment above defends.
   // No celery emoji exists, so the herb stands in; sesame wears the bagel it
   // is most recognisably on, and sulphites wear the wine they are declared on.
-  'celery-free': { icon: '🌿', label: 'Celery-Free' },
-  'sesame-free': { icon: '🥯', label: 'Sesame-Free' },
-  'mustard-free': { icon: '🌭', label: 'Mustard-Free' },
-  'lupin-free': { icon: '🫛', label: 'Lupin-Free' },
-  'sulphite-free': { icon: '🍷', label: 'Sulphite-Free' },
+  'celery-free': { icon: '🌿', label: 'Celery-free' },
+  'sesame-free': { icon: '🥯', label: 'Sesame-free' },
+  'mustard-free': { icon: '🌭', label: 'Mustard-free' },
+  'lupin-free': { icon: '🫛', label: 'Lupin-free' },
+  'sulphite-free': { icon: '🍷', label: 'Sulphite-free' },
   mediterranean: { icon: '🫒', label: 'Mediterranean' },
-  'dairy-free': { icon: '🥛', label: 'Dairy-Free' },
-  'gluten-free': { icon: '🌾', label: 'Gluten-Free' },
-  'nut-free': { icon: '🥜', label: 'Nut-Free' },
-  'egg-free': { icon: '🥚', label: 'Egg-Free' },
-  'soy-free': { icon: '🫘', label: 'Soy-Free' },
-  'shellfish-free': { icon: '🦐', label: 'Shellfish-Free' },
-  'fish-free': { icon: '🐟', label: 'Fish-Free' },
+  'dairy-free': { icon: '🥛', label: 'Dairy-free' },
+  'gluten-free': { icon: '🌾', label: 'Gluten-free' },
+  'nut-free': { icon: '🥜', label: 'Nut-free' },
+  'egg-free': { icon: '🥚', label: 'Egg-free' },
+  'soy-free': { icon: '🫘', label: 'Soy-free' },
+  'shellfish-free': { icon: '🦐', label: 'Shellfish-free' },
+  'fish-free': { icon: '🐟', label: 'Fish-free' },
   'low-fodmap': { icon: '🧬', label: 'Low-FODMAP' },
 }
 
@@ -260,9 +260,9 @@ export function isStuckMessage(text: string): boolean {
 // self-reports at that level are nearly always overestimates.
 export const ACTIVITY_OPTIONS: { value: ActivityLevel; icon: string; label: string; description: string }[] = [
   { value: 'sedentary', icon: '🪑', label: 'Sedentary', description: 'Desk job, little movement outside training' },
-  { value: 'light', icon: '🚶', label: 'Lightly Active', description: 'On my feet some of the day, short walks' },
-  { value: 'moderate', icon: '🏃', label: 'Moderately Active', description: 'Regular movement most days' },
-  { value: 'active', icon: '⚡', label: 'Very Active', description: 'Physical job or on the move all day' },
+  { value: 'light', icon: '🚶', label: 'Lightly active', description: 'On my feet some of the day, short walks' },
+  { value: 'moderate', icon: '🏃', label: 'Moderately active', description: 'Regular movement most days' },
+  { value: 'active', icon: '⚡', label: 'Very active', description: 'Physical job or on the move all day' },
 ]
 
 export const MEALS_PER_DAY_OPTIONS: { value: 2 | 3 | 4; icon: string; label: string; description: string }[] = [
@@ -274,7 +274,7 @@ export const MEALS_PER_DAY_OPTIONS: { value: 2 | 3 | 4; icon: string; label: str
 export const COOKING_TIME_OPTIONS: { value: CookingTimePreference; icon: string; label: string; description: string }[] = [
   { value: 'quick', icon: '⏱️', label: 'Quick', description: 'Under 15 minutes — keep it simple' },
   { value: 'moderate', icon: '🍳', label: 'Moderate', description: 'Happy to spend up to ~30 minutes' },
-  { value: 'loves_cooking', icon: '👨‍🍳', label: 'Happy to Cook', description: 'Real recipes, real prep — I enjoy it' },
+  { value: 'loves_cooking', icon: '👨‍🍳', label: 'Happy to cook', description: 'Real recipes, real prep — I enjoy it' },
 ]
 
 // Short labels chosen to substring-match generate-meals's FAMILIAR_CUISINES/
@@ -289,15 +289,15 @@ export const FAVORITE_CUISINE_OPTIONS: { value: string; icon: string; label: str
   { value: 'Mediterranean', icon: '🫒', label: 'Mediterranean' },
   { value: 'Japanese', icon: '🍱', label: 'Japanese' },
   { value: 'Korean', icon: '🥢', label: 'Korean' },
-  { value: 'British / Classic', icon: '🇬🇧', label: 'British / Classic' },
+  { value: 'British / Classic', icon: '🇬🇧', label: 'British / classic' },
   { value: 'American / Diner Classic', icon: '🍔', label: 'American' },
   { value: 'Caribbean', icon: '🌴', label: 'Caribbean' },
 ]
 
 export const BREAKFAST_STYLE_OPTIONS: { value: BreakfastStyle; icon: string; label: string; description: string }[] = [
-  { value: 'quick_cold', icon: '🥣', label: 'Quick & Cold', description: 'Cereal, yoghurt, smoothies — no cooking' },
+  { value: 'quick_cold', icon: '🥣', label: 'Quick & cold', description: 'Cereal, yoghurt, smoothies — no cooking' },
   { value: 'cooked', icon: '🍳', label: 'Cooked', description: 'Eggs, pancakes, hot oats — happy to cook' },
-  { value: 'skip', icon: '⏭️', label: 'Usually Skip', description: 'Keep it minimal if I eat anything at all' },
+  { value: 'skip', icon: '⏭️', label: 'Usually skip', description: 'Keep it minimal if I eat anything at all' },
 ]
 
 /**
