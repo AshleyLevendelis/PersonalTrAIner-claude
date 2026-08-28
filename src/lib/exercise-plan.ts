@@ -6166,9 +6166,26 @@ export function generateMesocycle(
             suggested_load_kg: load ? load.starting_weight_kg : ex.suggested_load_kg,
             load_source: load ? load.load_source : ex.load_source,
             per_set_load: load ? load.per_set : (ex.per_set_load ?? null),
-            suggested_assistance_kg: assistance ? assistance.assistance_kg : ex.suggested_assistance_kg,
+            // THE FALLBACK USED TO BE A BARE `ex.suggested_assistance_kg`, and
+            // it leaked across a rotation. This slot's identity can CHANGE
+            // week to week; `ex` is what was here before. Swap Pull-Ups
+            // (Assisted) out for a Lat Pulldown and prescribeAssistance
+            // correctly returns null (the new entry declares no assistance),
+            // but the fallback then carried the old exercise's counterweight
+            // onto it. Measured across a 4x3x4x4 sweep: 84 prescriptions —
+            // Kneeling Band Lat Pulldown (64), Lat Pulldown (20) — arrived
+            // with machine assistance and no machine. Worse than a stray
+            // number: AssistanceChip renders it "40kg assist / less over time
+            // = stronger", an INVERTED progress cue on a lift where more
+            // weight is the progress. Carry it only where the entry that is
+            // here NOW can actually be assisted. Note suggested_added_load_kg
+            // below already nulls rather than carrying — same rule, and this
+            // line was the one that did not follow it.
+            suggested_assistance_kg: assistance ? assistance.assistance_kg
+              : (dbEntry?.assistance ? ex.suggested_assistance_kg : null),
             suggested_added_load_kg: addedLoad ? addedLoad.added_kg : null,
-            assistance_ready_to_graduate: assistance ? assistance.ready_to_graduate : ex.assistance_ready_to_graduate,
+            assistance_ready_to_graduate: assistance ? assistance.ready_to_graduate
+              : (dbEntry?.assistance ? ex.assistance_ready_to_graduate : undefined),
             movement_pattern: dbEntry ? mapMovementPattern(dbEntry.movement_pattern) : undefined,
             tier: dbEntry ? mapTier(dbEntry.mechanics_tier) : undefined,
             fatigue_cost: dbEntry ? deriveFatigueCost(dbEntry) : undefined,

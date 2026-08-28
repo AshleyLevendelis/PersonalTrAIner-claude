@@ -1,6 +1,13 @@
 # The coach still can't see four numbers the Exercise tab shows
 
-**Status: PLAN ONLY. Nothing here is built.** Load prescription gets a plan
+**Status: BUILT.** Ashley: *"fix it all in order."* Every mechanical item below
+is done and gated (`test:coach-plan-context`), and the one decision — item (5)
+— was taken as the recommended option (a) and recorded in BACKLOG.md. One
+deliberate deviation is flagged at the bottom.
+
+Original plan follows.
+
+**~~PLAN ONLY. Nothing here is built.~~** Load prescription gets a plan
 before a build (CLAUDE.md), and the last change in this area went in without
 one — which is how these were missed.
 
@@ -74,3 +81,29 @@ exists is that a guessed load must never be presented as a known one.
 - The same sweep asserting no day ever renders a trailing `- `.
 - Whatever (5) resolves to, asserted on both surfaces at once, so they cannot
   drift apart again.
+
+
+---
+
+## What was actually built, and the one thing that was not
+
+Items 1-4 and 6 as written. Item (5) took option **(a)** — the hedge travels
+with the number: `~40kg [STARTING LIGHT — no body details, deliberately low,
+not a target]`.
+
+**Deviation, item 6 (progressed added load).** The plan said send the progressed
+value instead of the stored one. `getAddedLoadProgression` is an async
+per-exercise database read and `buildContext` is synchronous, so honouring that
+literally means a progression query on every chat turn, duplicating an engine
+that already runs on the Exercise tab. The coach is instead told that the
+number is the plan's base, that the tab may show a higher one, and that **the
+screen is right** if they disagree. The false confidence is gone; the duplication
+was not worth its cost. Flagged rather than taken quietly.
+
+**Found while building, not planned for:** the teeth check — asserting that
+`suggested_assistance_kg` actually occurs in the sweep — turned up **84
+prescriptions giving machine assistance to exercises with no machine**
+(Kneeling Band Lat Pulldown, Lat Pulldown), because a rotation carried the
+previous exercise's counterweight onto its replacement. Fixed and gated. That
+is the whole argument for teeth checks: the assertion that could not fail was
+the one that found something.
