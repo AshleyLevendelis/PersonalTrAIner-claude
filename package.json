@@ -26,6 +26,7 @@
     "test:diet-tag-sync": "tsx scripts/test-diet-tag-sync.ts",
     "test:chat-app-reality": "tsx scripts/test-chat-app-reality.ts",
     "test:grocery": "tsx scripts/test-grocery.ts",
+    "test:profile-restore": "tsx scripts/test-profile-restore.ts",
     "test:dashboard": "tsx scripts/test-dashboard.ts",
     "test:timers": "tsx scripts/test-timers.ts",
     "test:cardio-log": "tsx scripts/test-cardio-log.ts",
