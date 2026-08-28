@@ -33,6 +33,20 @@ import {
 // who wouldn't give a weight could never finish. See canDeclineSlot.
 // ---------------------------------------------------------------------------
 
+/**
+ * Units, by slot. Deliberately not derived from the question text: the
+ * grouped cards put three fields under one question, so only one of them
+ * could ever have taken its unit from the sentence above.
+ */
+const UNIT: Record<string, string | undefined> = {
+  age: 'years',
+  heightCm: 'cm',
+  weightKg: 'kg',
+  knownSquatKg: 'kg',
+  knownBenchKg: 'kg',
+  knownDeadliftKg: 'kg',
+}
+
 export function SlotNumericCard({
   slotKey,
   values,
@@ -88,8 +102,14 @@ export function SlotNumericCard({
         const bad = showErrors && !isOk(d)
         return (
           <div key={d.key} className="space-y-1">
+            {/* The unit lives on the LABEL, not only in the coach's sentence.
+                A field labelled "Height" whose placeholder reads "100–250" is
+                asking for a number in a unit the user has to remember from a
+                message that has since scrolled — and the three barbell fields
+                are on one card, so the sentence naming kg belongs to only one
+                of them. */}
             <label className="text-xs text-muted-foreground" htmlFor={`slot-${d.key}`}>
-              {d.shortLabel}
+              {d.shortLabel}{UNIT[d.key] ? <span className="text-muted-foreground/70"> ({UNIT[d.key]})</span> : null}
             </label>
             <Input
               id={`slot-${d.key}`}

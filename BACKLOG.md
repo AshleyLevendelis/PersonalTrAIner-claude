@@ -2,6 +2,22 @@
 
 Newest first. One line each.
 
+- [x] **SECOND PASS ON THE ONBOARDING — WALKED ALL 27 SCREENS AT 390px AND FIXED WHAT THE WALK SHOWED.** Nothing overflows a phone now, which is the structural check; the rest were things only visible by looking.
+
+- [x] **THE TRAINING HALF WAS SPLIT DOWN THE MIDDLE.** Style, cardio and recovery are training questions and sat at #17-19, *after* the four body metrics — so the flow went training → body → training → food, a context switch out and back for no reason. They move up with days and session length. The body block stays intact and stays ahead of the food half, so the rule the order gate enforces is untouched. `dislikedExercises` came with them from **#27**, where it had been stranded seven questions past anything it related to.
+
+- [x] **THE LAST REQUIRED QUESTION WAS #22, BEHIND THE TALLEST SCREEN IN THE FLOW.** `mealsPerDay` sat after `dietaryPreferences` and `dislikedFoods`, so the biggest friction point stood between the user and a plan — give up there and nineteen answers bought nothing. It moves to **#21**, leaving six genuinely optional questions after it: abandon any time from there and a full plan still generates.
+
+- [x] TWO QUESTIONS READ AS THE SAME QUESTION ASKED TWICE, and moving them next to each other made it obvious: dietary's composer hint was literally *"Anything you avoid?"* and the next question was *"Any foods you just won't eat?"*. Dietary's hint now names what the tag list is for (*"Vegan, gluten-free, an allergy…"*) and the follow-up opens with **"Anything else"**. Deliberately not narrowed to "don't like the taste of" — `detectAllergenTags` reads that field, so it must stay somewhere an allergy can be typed.
+
+- [x] AND ONE QUESTION WAS ITS OWN PLACEHOLDER: `conditioningPreference` showed *"How do you feel about cardio?"* in the composer, under *"How do you feel about cardio?"*. `dislikedExercises` had no placeholder at all. Both gated now, across every slot.
+
+- [x] **FOUR LAYOUT FIXES THE MEASUREMENTS COULD NOT HAVE FOUND** — they needed the screenshot. (1) An odd number of cards stranded the last one at half width beside an empty cell; five questions have exactly three options, so it was most of them. The last card spans now. (2) A full-width 44px "Pick at least one" bar under one tidy row of pills was the heaviest thing on the lightest screen — the footer follows the option shape now, pill under pills. (3) `mealsPerDay` showed the **same plate emoji three times** under "2 meals / 3 meals / 4 meals" (364px → 276px once dropped) — same judgement as the pill rule, applied to icons. (4) Numeric fields carried no unit: a box labelled "Height" with placeholder "100–250", under a question that has scrolled — and the grouped cards put three fields under one question, so at most one could ever have taken its unit from the sentence above.
+
+- [x] ONE THING I NEARLY REPORTED AS A DEFECT AND WAS NOT: the three barbell questions each render a card showing all three fields. That is `NUMERIC_GROUPS` working — Save resolves the whole group in one call, so the coach asks once. The harness renders each slot standalone, which is a harness artifact. Checked the resolve path before writing it up.
+
+- [x] AND THE GATE CAUGHT ITSELF AGAIN: `no slot is named in the shape decision` fired on a **comment** that named `mealsPerDay` as an example of what the rule produces — the opposite of the failure it exists for. It strips comments now and asserts against the shape logic only.
+
 - [x] **"SOMETIMES THE QUICK REPLIES COME UP AND SOMETIMES THEY DON'T" — THEY WERE DOING EXACTLY WHAT THEY WERE TOLD.** `present_slot` read *"This is a RESCUE, not the way questions are asked… Never call it on the first asking"*, so whether you got help depended on the model judging you stuck. Unpredictable from the user's side and unmeasured from the codebase's — nothing asserted anything about it either way. Ashley's ruling: offer them on every closed-set question, first asking included.
 
 - [x] **THE OLD RULE WAS RIGHT ABOUT THE CAUSE AND WRONG ABOUT THE FIX.** It existed because chips-under-everything made onboarding feel like a form. Measured at 390px, the culprit was SIZE, not existence: **goal 213px, cardio 260px, days 308px, injuries 308px, dietary 771px** — the dietary question alone taking 771px of an 844px screen, before the coach's message above it or the keyboard below. And all seven training-day cards carried the **same 📅**: seven identical icons, each in a box sized to hold one, to say "Mon Tue Wed".

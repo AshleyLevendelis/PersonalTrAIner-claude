@@ -565,6 +565,43 @@ const SNACKS_OPTIONS: SlotOption[] = [
  * dropped activityLevel from before the barbell chain, recreating the exact
  * defect the paragraph above describes. The gate caught it — keep
  * activityLevel above knowsWorkingLifts.
+ *
+ * THIRD REORDER — the training half stops being interrupted, and the last
+ * REQUIRED question stops sitting behind two optional ones.
+ *
+ * Two problems, both only visible by reading the list end to end:
+ *
+ *   1. THE TRAINING BLOCK WAS SPLIT IN HALF. Style, cardio and recovery are
+ *      training questions and sat at #17-19, AFTER the four body metrics. So
+ *      the flow went training → body → training → food: a context switch out
+ *      and back, for no reason other than the order the second reorder left
+ *      behind. They move up to sit with days and session length; the body
+ *      block stays intact and stays ahead of the food half, so the rule the
+ *      gate enforces is untouched.
+ *
+ *   2. THE LAST REQUIRED QUESTION WAS #22, behind dietaryPreferences (#20)
+ *      and dislikedFoods (#21). Dietary was the single tallest screen in the
+ *      onboarding, so the biggest friction point in the flow sat immediately
+ *      before the finish line — someone who gave up there had answered 19
+ *      questions and still could not have a plan. mealsPerDay moves above
+ *      both, which makes everything after it genuinely optional: abandon any
+ *      time from there and a full plan still generates.
+ *
+ * WORDING, same pass: dietaryPreferences and dislikedFoods now sit next to
+ * each other, and read as the same question asked twice — dietary's composer
+ * hint was literally "Anything you avoid?" and the next question was "Any
+ * foods you just won't eat?". Dietary's hint now names what the tag list is
+ * FOR (an allergy, vegan, gluten-free) and the follow-up opens with "Anything
+ * else", which is the word that makes it additive rather than a repeat.
+ * Deliberately not narrowed to "don't like the taste of": detectAllergenTags
+ * reads this field too, so it must stay somewhere an allergy can be typed.
+ *
+ * And conditioningPreference's composer hint was the question verbatim —
+ * "How do you feel about cardio?" under "How do you feel about cardio?".
+ *
+ * dislikedExercises came with the training block from #27. It is a training
+ * question and it was stranded at the very end, seven questions past the last
+ * thing it had anything to do with.
  */
 export const ONBOARDING_SLOTS: SlotDef[] = [
   { key: 'displayName', question: 'What should I call you?', inputHint: 'Your name…', shortLabel: 'Name', control: 'text', required: false, destination: 'column', validate: v => typeof v === 'string' && v.trim().length > 0 && v.trim().length <= 30 },
@@ -590,12 +627,8 @@ export const ONBOARDING_SLOTS: SlotDef[] = [
   { key: 'knownDeadliftKg', question: 'Deadlift working weight (kg)?', shortLabel: 'Deadlift', control: 'numeric', required: false, requiredIf: knowsTheirLifts, min: 1, max: 500, destination: 'column', validate: isNumberIn(1, 500) },
   { key: 'trainingDays', question: 'Which days can you actually train?', inputHint: 'Which days?', shortLabel: 'Training days', control: 'multi', required: true, options: DAY_OPTIONS, destination: 'column', validate: v => isSubsetOf(DAY_OPTIONS)(v) && Array.isArray(v) && v.length > 0 },
   { key: 'sessionDuration', question: 'How long can your sessions usually run?', inputHint: 'How long have you got?', shortLabel: 'Session length', control: 'single', required: true, options: DURATION_OPTIONS, destination: 'column', validate: isOneOf(DURATION_OPTIONS) },
-  { key: 'age', question: 'How old are you?', inputHint: 'Your age…', shortLabel: 'Age', control: 'numeric', required: false, min: 13, max: 100, destination: 'column', validate: isNumberIn(13, 100) },
-  { key: 'heightCm', question: 'How tall are you (cm)?', inputHint: 'Height in cm…', shortLabel: 'Height', control: 'numeric', required: false, min: 100, max: 250, destination: 'column', validate: isNumberIn(100, 250) },
-  { key: 'weightKg', question: 'What do you weigh right now (kg)?', inputHint: 'Weight in kg…', shortLabel: 'Weight', control: 'numeric', required: false, min: 25, max: 350, destination: 'column', validate: isNumberIn(25, 350) },
-  { key: 'gender', question: 'Which should I use for your calorie and starting-weight maths?', inputHint: 'Whichever fits…', shortLabel: 'Sex', control: 'single', required: false, options: GENDER_OPTIONS, destination: 'column', validate: isOneOf(GENDER_OPTIONS) },
   { key: 'trainingStyle', question: "What's your training style?", inputHint: 'How do you like to train?', shortLabel: 'Style', control: 'single', required: true, options: STYLE_OPTIONS, destination: 'column', validate: isOneOf(STYLE_OPTIONS) },
-  { key: 'conditioningPreference', question: 'How do you feel about cardio?', inputHint: 'How do you feel about cardio?', shortLabel: 'Cardio', control: 'single', required: true, options: CONDITIONING_PREF_OPTIONS, destination: 'column', validate: isOneOf(CONDITIONING_PREF_OPTIONS) },
+  { key: 'conditioningPreference', question: 'How do you feel about cardio?', inputHint: 'Love it or loathe it?', shortLabel: 'Cardio', control: 'single', required: true, options: CONDITIONING_PREF_OPTIONS, destination: 'column', validate: isOneOf(CONDITIONING_PREF_OPTIONS) },
   // REQUIRED, and the comment that used to sit here argued the opposite.
   //
   // It read: "measured to have zero effect anywhere in the generated plan
@@ -618,23 +651,6 @@ export const ONBOARDING_SLOTS: SlotDef[] = [
   // "moderate" is a training call, not a bug; it is in BACKLOG for Ashley.
   // Run `npm run report:slot-impact` to see this alongside every other slot.
   { key: 'recoveryCapacity', question: "How's your recovery capacity — sleep, stress, physical job?", inputHint: 'How’s your sleep and stress?', shortLabel: 'Recovery', control: 'single', required: true, options: RECOVERY_OPTIONS, destination: 'column', validate: isOneOf(RECOVERY_OPTIONS) },
-  { key: 'dietaryPreferences', question: 'Any dietary preferences or restrictions?', inputHint: 'Anything you avoid?', shortLabel: 'Diet', control: 'multi', required: false, options: DIETARY_OPTIONS, destination: 'column', validate: isSubsetOf(DIETARY_OPTIONS) },
-  { key: 'dislikedFoods', question: 'Any foods you just won\'t eat?', inputHint: 'Foods you won’t eat…', shortLabel: 'Foods to avoid', control: 'text', required: false, destination: 'user_facts', validate: v => typeof v === 'string' },
-  { key: 'mealsPerDay', question: 'How many meals a day suits you?', inputHint: 'How many meals?', shortLabel: 'Meals a day', control: 'single', required: true, options: MEALS_PER_DAY_OPTIONS, destination: 'column', validate: isOneOf(MEALS_PER_DAY_OPTIONS) },
-  { key: 'cookingTime', question: 'How much time do you want to spend cooking?', inputHint: 'How long do you want to cook?', shortLabel: 'Cooking time', control: 'single', required: false, options: COOKING_TIME_OPTIONS, destination: 'column', validate: isOneOf(COOKING_TIME_OPTIONS) },
-  { key: 'includeSnacks', question: 'Snacks too, or meals only?', shortLabel: 'Snacks', control: 'single', required: false, options: SNACKS_OPTIONS, destination: 'column', validate: v => v === true || v === false || v === 'true' || v === 'false' },
-  // Last, and NEVER PROACTIVELY ASKED — both are in NEVER_BLOCKING_SLOTS, so
-  // trackedSlots filters them out of the questioning list entirely. They stay
-  // in this array so the model still has them in its catalogue and can record
-  // a cuisine or a breakfast habit the moment someone volunteers one.
-  //
-  // A ROUND OF THIS PLAN PROPOSED DELETING THEM and was wrong: the plan
-  // argued they should "move out of onboarding and be asked at first use",
-  // not having checked that they were already demoted and already not being
-  // asked. Deleting them removed the recording path this file's own comment
-  // (below, on NEVER_BLOCKING_SLOTS) warns about, and the slot gate caught it.
-  { key: 'favoriteCuisines', question: 'Any favourite cuisines?', shortLabel: 'Cuisines', control: 'multi', required: false, options: FAVORITE_CUISINE_OPTIONS, destination: 'column', validate: isSubsetOf(FAVORITE_CUISINE_OPTIONS) },
-  { key: 'breakfastStyle', question: "What's breakfast usually like for you?", shortLabel: 'Breakfast', control: 'single', required: false, options: BREAKFAST_STYLE_OPTIONS, destination: 'column', validate: isOneOf(BREAKFAST_STYLE_OPTIONS) },
   // THE MIRROR OF dislikedFoods, and it was missing. "I won't eat mushrooms"
   // in onboarding lands in user_facts and is kept out of every meal; "never
   // give me burpees", said in the same breath, had nowhere to go at all —
@@ -649,7 +665,28 @@ export const ONBOARDING_SLOTS: SlotDef[] = [
   // and adding a new one to fix a capture gap would take back what that
   // bought. In the catalogue, though, the model can record it the moment
   // someone volunteers it, which is exactly the case this exists for.
-  { key: 'dislikedExercises', question: "Any exercises you'd rather never see?", shortLabel: 'Exercises to avoid', control: 'text', required: false, destination: 'user_facts', validate: v => typeof v === 'string' },
+  { key: 'dislikedExercises', question: "Any exercises you'd rather never see?", inputHint: 'Exercises to skip…', shortLabel: 'Exercises to avoid', control: 'text', required: false, destination: 'user_facts', validate: v => typeof v === 'string' },
+  { key: 'age', question: 'How old are you?', inputHint: 'Your age…', shortLabel: 'Age', control: 'numeric', required: false, min: 13, max: 100, destination: 'column', validate: isNumberIn(13, 100) },
+  { key: 'heightCm', question: 'How tall are you (cm)?', inputHint: 'Height in cm…', shortLabel: 'Height', control: 'numeric', required: false, min: 100, max: 250, destination: 'column', validate: isNumberIn(100, 250) },
+  { key: 'weightKg', question: 'What do you weigh right now (kg)?', inputHint: 'Weight in kg…', shortLabel: 'Weight', control: 'numeric', required: false, min: 25, max: 350, destination: 'column', validate: isNumberIn(25, 350) },
+  { key: 'gender', question: 'Which should I use for your calorie and starting-weight maths?', inputHint: 'Whichever fits…', shortLabel: 'Sex', control: 'single', required: false, options: GENDER_OPTIONS, destination: 'column', validate: isOneOf(GENDER_OPTIONS) },
+  { key: 'mealsPerDay', question: 'How many meals a day suits you?', inputHint: 'How many meals?', shortLabel: 'Meals a day', control: 'single', required: true, options: MEALS_PER_DAY_OPTIONS, destination: 'column', validate: isOneOf(MEALS_PER_DAY_OPTIONS) },
+  { key: 'dietaryPreferences', question: 'Any dietary preferences or restrictions?', inputHint: 'Vegan, gluten-free, an allergy…', shortLabel: 'Diet', control: 'multi', required: false, options: DIETARY_OPTIONS, destination: 'column', validate: isSubsetOf(DIETARY_OPTIONS) },
+  { key: 'dislikedFoods', question: 'Anything else you\'d rather I left out?', inputHint: 'Foods to leave out…', shortLabel: 'Foods to avoid', control: 'text', required: false, destination: 'user_facts', validate: v => typeof v === 'string' },
+  { key: 'cookingTime', question: 'How much time do you want to spend cooking?', inputHint: 'How long do you want to cook?', shortLabel: 'Cooking time', control: 'single', required: false, options: COOKING_TIME_OPTIONS, destination: 'column', validate: isOneOf(COOKING_TIME_OPTIONS) },
+  { key: 'includeSnacks', question: 'Snacks too, or meals only?', shortLabel: 'Snacks', control: 'single', required: false, options: SNACKS_OPTIONS, destination: 'column', validate: v => v === true || v === false || v === 'true' || v === 'false' },
+  // Last, and NEVER PROACTIVELY ASKED — both are in NEVER_BLOCKING_SLOTS, so
+  // trackedSlots filters them out of the questioning list entirely. They stay
+  // in this array so the model still has them in its catalogue and can record
+  // a cuisine or a breakfast habit the moment someone volunteers one.
+  //
+  // A ROUND OF THIS PLAN PROPOSED DELETING THEM and was wrong: the plan
+  // argued they should "move out of onboarding and be asked at first use",
+  // not having checked that they were already demoted and already not being
+  // asked. Deleting them removed the recording path this file's own comment
+  // (below, on NEVER_BLOCKING_SLOTS) warns about, and the slot gate caught it.
+  { key: 'favoriteCuisines', question: 'Any favourite cuisines?', shortLabel: 'Cuisines', control: 'multi', required: false, options: FAVORITE_CUISINE_OPTIONS, destination: 'column', validate: isSubsetOf(FAVORITE_CUISINE_OPTIONS) },
+  { key: 'breakfastStyle', question: "What's breakfast usually like for you?", shortLabel: 'Breakfast', control: 'single', required: false, options: BREAKFAST_STYLE_OPTIONS, destination: 'column', validate: isOneOf(BREAKFAST_STYLE_OPTIONS) },
 ]
 
 export function getSlotDef(key: string): SlotDef | undefined {

@@ -2,7 +2,8 @@ import { cn } from '@/lib/utils'
 import { Check } from 'lucide-react'
 
 interface OptionCardProps {
-  icon: string
+  /** Omitted when every option on the question shares one icon — see SlotChipsCard. */
+  icon?: string
   label: string
   description?: string
   selected: boolean
@@ -20,9 +21,11 @@ interface OptionCardProps {
    * job of those three questions. The caller decides descriptions now.
    */
   compact?: boolean
+  /** Grid placement from the caller — used to span a stranded last card. */
+  className?: string
 }
 
-export function OptionCard({ icon, label, description, selected, onClick, compact }: OptionCardProps) {
+export function OptionCard({ icon, label, description, selected, onClick, compact, className }: OptionCardProps) {
   return (
     <button
       type="button"
@@ -32,10 +35,11 @@ export function OptionCard({ icon, label, description, selected, onClick, compac
         compact && 'p-3',
         selected
           ? 'border-primary bg-primary/5 shadow-md scale-[1.02]'
-          : 'border-border hover:border-primary/40 hover:bg-accent/50 active:scale-[0.97]'
+          : 'border-border hover:border-primary/40 hover:bg-accent/50 active:scale-[0.97]',
+        className
       )}
     >
-      <span className={cn('text-3xl mb-2', compact && 'text-2xl mb-1')}>{icon}</span>
+      {icon && <span className={cn('text-3xl mb-2', compact && 'text-2xl mb-1')}>{icon}</span>}
       {/* A compact card WITH a description keeps the label at text-sm: at
           text-xs the label and its description are the same size and the card
           stops having a headline. Only a label-only compact card shrinks. */}

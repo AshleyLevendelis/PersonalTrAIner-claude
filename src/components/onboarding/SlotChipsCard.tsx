@@ -85,6 +85,12 @@ export function SlotChipsCard({
   // anything to put in it here", which is the same question as "is a card
   // worth its height".
   const hasDescriptions = options.some(o => o.description)
+  // An icon repeated on every option is decoration, not information — the same
+  // judgement the pill rule makes, applied to the cards. mealsPerDay showed one
+  // plate emoji three times under "2 meals / 3 meals / 4 meals"; the labels were
+  // already doing the work and the icons were buying height. (trainingDays had
+  // seven identical calendars, but it is pills now and renders no icon at all.)
+  const iconsCarryMeaning = new Set(options.map(o => o.icon)).size > 1
   const compact = options.length >= 4
   const showDescription = options.length <= 4 && hasDescriptions
 
@@ -104,14 +110,22 @@ export function SlotChipsCard({
     <div className={`mt-2 space-y-2 ${busy ? 'pointer-events-none opacity-60' : ''}`}>
       {hasDescriptions ? (
         <div className={options.length > 6 ? 'grid grid-cols-3 gap-2' : 'grid grid-cols-2 gap-2'}>
-          {options.map(opt => (
+          {options.map((opt, i) => (
             <OptionCard
               key={String(opt.value)}
-              icon={opt.icon}
+              icon={iconsCarryMeaning ? opt.icon : undefined}
               label={opt.label}
               description={showDescription ? opt.description : undefined}
               selected={isSelected(opt.value)}
               compact={compact}
+              // An odd count in a two-column grid strands the last card at half
+              // width beside an empty cell, which reads as a missing option
+              // rather than a deliberate layout. Six of the card questions have
+              // exactly three options, so this is most of them. The last one
+              // spans instead.
+              className={options.length % 2 === 1 && options.length <= 6 && i === options.length - 1
+                ? 'col-span-2'
+                : undefined}
               onClick={() => choose(opt.value)}
             />
           ))}
@@ -140,10 +154,18 @@ export function SlotChipsCard({
           on a question that is optional everywhere downstream. Multi-selects
           are excluded on purpose: their Done button already records an
           explicit empty list, which MEANS "none" rather than "not saying". */}
+      {/* THE FOOTER MATCHES THE OPTIONS ABOVE IT. A full-width 44px bar under a
+          single tidy row of pills was the heaviest thing on the screen, for
+          the lightest question on it — and a disabled "Pick at least one"
+          reads as a caption rather than a control. Under pills the footer is
+          a pill too, sitting inline; under cards it stays the full-width
+          button, which is proportionate there. */}
       {def.control === 'single' && canDeclineSlot(def, values) && (
         <Button
           variant="ghost"
-          className="w-full min-h-[44px] text-sm text-muted-foreground"
+          className={hasDescriptions
+            ? 'w-full min-h-[44px] text-sm text-muted-foreground'
+            : 'min-h-[44px] rounded-full px-3 text-xs text-muted-foreground'}
           disabled={busy}
           onClick={() => onDecline([def.key])}
         >
@@ -153,7 +175,9 @@ export function SlotChipsCard({
       {def.control === 'multi' && (
         <Button
           variant="outline"
-          className="w-full min-h-[44px] text-sm"
+          className={hasDescriptions
+            ? 'w-full min-h-[44px] text-sm'
+            : 'min-h-[44px] rounded-full px-4 text-xs'}
           // A REQUIRED multi (trainingDays) with nothing selected must not
           // offer a skip that would silently fail validation downstream —
           // the button says what's needed and stays disabled until then.

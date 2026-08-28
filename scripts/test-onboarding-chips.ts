@@ -130,8 +130,18 @@ console.log('\n3. Options are offered on the FIRST asking, not as a rescue')
   check('...and keeps a 44px tap target', /min-h-\[44px\]/.test(card))
   check('the shape switch reads the options, not a list of slot names',
     /options\.some\(o => o\.description\)/.test(card))
+  // Comments are STRIPPED before this runs. The rule being asserted is that no
+  // slot name appears in the shape LOGIC — naming them in prose as examples of
+  // what the rule produces is the opposite of the failure, and the first
+  // version of this check fired on exactly that.
+  const cardCode = card
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .split('\n').filter(l => !/^\s*\/\//.test(l)).join('\n')
+  const SHAPE_LOGIC = /const (hasDescriptions|iconsCarryMeaning) = [^\n]*/g
+  const decisions = cardCode.match(SHAPE_LOGIC) ?? []
+  check(`the shape decisions are derived (${decisions.length} of them)`, decisions.length === 2, decisions)
   check('no slot is named in the shape decision',
-    !/hasDescriptions[\s\S]{0,200}(trainingDays|dietaryPreferences|injuries)/.test(card))
+    !decisions.some(d => ONBOARDING_SLOTS.some(s => d.includes(s.key))), decisions)
 }
 
 // ---------------------------------------------------------------------------
@@ -192,6 +202,100 @@ console.log('\n5. The injury question is asked while people are still answering'
   check('...and before the body metrics people abandon on',
     index('injuries') < index('age') && index('injuries') < index('weightKg'),
     { injuries: index('injuries') + 1, age: index('age') + 1 })
+}
+
+// ---------------------------------------------------------------------------
+console.log('\n6. Nothing is asked twice, and nothing decorative costs height')
+// ---------------------------------------------------------------------------
+{
+  // A composer placeholder that repeats the question adds nothing and takes a
+  // line — conditioningPreference had "How do you feel about cardio?" under
+  // "How do you feel about cardio?".
+  for (const s of ONBOARDING_SLOTS) {
+    if (!s.inputHint) continue
+    const norm = (t: string) => t.toLowerCase().replace(/[^a-z ]/g, '').trim()
+    check(`${s.key}: the placeholder is not the question again`,
+      norm(s.inputHint) !== norm(s.question), { q: s.question, hint: s.inputHint })
+  }
+
+  // A free-text slot with no placeholder is a blank box after a question that
+  // has scrolled — dislikedExercises was the one without.
+  for (const s of ONBOARDING_SLOTS) {
+    if (s.control !== 'text') continue
+    check(`${s.key}: free text has a placeholder`, !!s.inputHint?.trim(), s.inputHint)
+  }
+
+  // Two questions that read as the same question asked twice. These two sit
+  // next to each other, so the follow-up has to announce that it is one.
+  const dislikedFoods = ONBOARDING_SLOTS.find(s => s.key === 'dislikedFoods')!
+  check('the second food question says it is an addition, not a repeat',
+    /\b(else|other|besides|beyond)\b/i.test(dislikedFoods.question), dislikedFoods.question)
+
+  // An icon repeated on every option carries no information. Asserted on the
+  // DATA and paired with the render rule below, because either half alone is
+  // half a fix.
+  const card = readFileSync(join(ROOT, 'src/components/onboarding/SlotChipsCard.tsx'), 'utf8')
+  check('identical icons across a question are not rendered',
+    /new Set\(options\.map\(o => o\.icon\)\)\.size > 1/.test(card))
+  check('...and the card can actually omit one',
+    /\{icon && </.test(readFileSync(join(ROOT, 'src/components/onboarding/OptionCard.tsx'), 'utf8')))
+
+  // An odd number of cards in a two-column grid strands the last one beside a
+  // hole. Six of the card questions have exactly three options.
+  check('a stranded last card spans instead of leaving a gap', /col-span-2/.test(card))
+  const oddCardQuestions = withOptions
+    .filter(x => x.options.some(o => o.description) && x.options.length % 2 === 1)
+    .map(x => x.slot.key)
+  check(`...and there are questions that need it (${oddCardQuestions.join(', ')})`,
+    oddCardQuestions.length > 0, oddCardQuestions)
+
+  // The footer matched the options: a full-width 44px bar under one row of
+  // pills was the heaviest thing on the lightest screen.
+  check('the footer button follows the option shape', /hasDescriptions\s*\n?\s*\?\s*'w-full min-h-\[44px\]/.test(card))
+
+  // Units belong on the field, not only in a sentence that has scrolled — and
+  // the grouped cards put three fields under one question, so at most one of
+  // them could ever have taken its unit from the question above it.
+  const numeric = readFileSync(join(ROOT, 'src/components/onboarding/SlotNumericCard.tsx'), 'utf8')
+  check('numeric fields carry their unit', /const UNIT: Record<string, string \| undefined>/.test(numeric))
+  for (const key of ['heightCm', 'weightKg', 'knownSquatKg']) {
+    check(`${key} has a unit`, new RegExp(`${key}: '`).test(numeric))
+  }
+}
+
+// ---------------------------------------------------------------------------
+console.log('\n7. The order lets someone stop early and still get a plan')
+// ---------------------------------------------------------------------------
+{
+  const index = (key: string) => ONBOARDING_SLOTS.findIndex(s => s.key === key)
+  const required = ONBOARDING_SLOTS.filter(s => s.required)
+  const lastRequired = required[required.length - 1]
+  const lastRequiredAt = ONBOARDING_SLOTS.indexOf(lastRequired)
+
+  // The tallest screen in the onboarding used to sit between the user and the
+  // final required question, so giving up there meant nineteen answers and no
+  // plan. Everything after the last required question is now genuinely
+  // optional — abandon any time from there and a full plan still generates.
+  check(`the last required question is ${lastRequired.key} at #${lastRequiredAt + 1}`,
+    lastRequiredAt < index('dietaryPreferences'),
+    { lastRequired: lastRequired.key, at: lastRequiredAt + 1, dietary: index('dietaryPreferences') + 1 })
+  check(`...leaving a genuinely optional tail (${ONBOARDING_SLOTS.length - lastRequiredAt - 1} questions)`,
+    ONBOARDING_SLOTS.slice(lastRequiredAt + 1).every(s => !s.required),
+    ONBOARDING_SLOTS.slice(lastRequiredAt + 1).filter(s => s.required).map(s => s.key))
+
+  // The training half was split down the middle by the body-metric block:
+  // training -> body -> training -> food. Style, cardio and recovery are
+  // training questions and belong with the rest of them.
+  const TRAINING = ['fitnessGoal', 'trainingExperience', 'equipment', 'injuries', 'trainingDays',
+    'sessionDuration', 'trainingStyle', 'conditioningPreference', 'recoveryCapacity', 'dislikedExercises']
+  const BODY = ['age', 'heightCm', 'weightKg', 'gender']
+  const lastTraining = Math.max(...TRAINING.map(index))
+  const firstBody = Math.min(...BODY.map(index))
+  check('every training question comes before the body-metric block',
+    lastTraining < firstBody, { lastTraining: lastTraining + 1, firstBody: firstBody + 1 })
+  check('...and the body block is still contiguous',
+    Math.max(...BODY.map(index)) - firstBody === BODY.length - 1,
+    BODY.map(k => `${k}#${index(k) + 1}`))
 }
 
 console.log(failures === 0 ? '\nAll onboarding-chip checks passed.\n' : `\n${failures} FAILED\n`)
