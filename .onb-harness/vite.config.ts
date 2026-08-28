@@ -8,5 +8,5 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: { alias: { '@': path.resolve(repo, 'src') } },
   build: { outDir: path.resolve(__dirname, 'dist'), emptyOutDir: true,
-    rollupOptions: { input: path.resolve(__dirname, 'onb.html') } },
+    rollupOptions: { input: [path.resolve(__dirname, 'onb.html'), path.resolve(__dirname, 'composer.html')] } },
 })

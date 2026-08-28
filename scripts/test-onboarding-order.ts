@@ -21,8 +21,10 @@
 // mental model that produced the mistake.
 // ---------------------------------------------------------------------------
 
+import { readFileSync } from 'fs'
 import {
-  ONBOARDING_SLOTS, NEVER_BLOCKING_SLOTS, isSlotApplicable, type SlotDef,
+  ONBOARDING_SLOTS, NEVER_BLOCKING_SLOTS, isSlotApplicable, openSlotsInOrder,
+  initialSlotValues, type SlotDef, type SlotKey,
 } from '../src/lib/onboarding-slots'
 
 let failures = 0
@@ -173,6 +175,89 @@ console.log('\n5. The conditional chain still actually fires')
   check('the squat number is asked only after saying you know your lifts',
     isSlotApplicable(squat, { ...gymLifter, knowsWorkingLifts: true } as never) &&
     !isSlotApplicable(squat, { ...gymLifter, knowsWorkingLifts: false } as never))
+}
+
+// ---------------------------------------------------------------------------
+console.log('\n6. The order in this file is the order the coach is TOLD')
+// ---------------------------------------------------------------------------
+{
+  // THE GAP THIS CLOSES, and it made the whole file above decorative for two
+  // slots. Every caller built the outstanding-questions list as
+  // `[...missingRequiredSlots, ...unconfirmedOptionalSlots]`, and that list
+  // is `remaining` — literally what the model is told is left to ask. So the
+  // concatenation re-sorted the array this gate protects, required first:
+  //
+  //   injuries      5th here -> 11th as sent
+  //   mealsPerDay  15th here -> 10th as sent
+  //
+  // Injuries is the one that matters. It is `required: false` because a plan
+  // CAN be built without it, and it was moved to 5th precisely so it could
+  // not be stranded behind the questions people abandon on. Required-ness
+  // answers "can we finish without this"; it was never the asking order, and
+  // borrowing it as one silently undid a safety ruling.
+  const open = openSlotsInOrder(new Set(), initialSlotValues())
+  const canonical = ONBOARDING_SLOTS.map(s => s.key).filter(k => open.includes(k))
+  check('the open-question list is in ONBOARDING_SLOTS order',
+    open.join(',') === canonical.join(','), `\n      sent:      ${open.join(', ')}\n      canonical: ${canonical.join(', ')}`)
+
+  // Named explicitly, because "matches the array" stays true if the array
+  // itself is reordered. This is the ruling, not just the consistency.
+  const injuriesAt = open.indexOf('injuries' as SlotKey) + 1
+  check(`injuries is asked early, not stranded (position ${injuriesAt} of ${open.length})`,
+    injuriesAt > 0 && injuriesAt <= 6, String(injuriesAt))
+
+  // The concatenation must not come back anywhere. It reads as harmless.
+  const consumers = ['src/components/onboarding/ConversationalOnboarding.tsx']
+  for (const f of consumers) {
+    const src = readFileSync(new URL(`../${f}`, import.meta.url), 'utf8')
+    check(`${f.split('/').pop()} does not rebuild the list by concatenation`,
+      !/\.\.\.missingRequiredSlots\([^)]*\),\s*\.\.\.unconfirmedOptionalSlots/.test(src))
+  }
+}
+
+// ---------------------------------------------------------------------------
+console.log('\n7. The composer describes the question that is on screen')
+// ---------------------------------------------------------------------------
+{
+  // Ashley caught this on a real phone, twice in one run:
+  //
+  //   coach asked "what should I call you?"    composer: "Tell me your goal…"
+  //   coach asked about style and equipment    composer: "How active is your day?"
+  //
+  // The placeholder followed the canonical next open slot, which is a GUESS
+  // at what the coach just asked. The name case could never be right at all:
+  // displayName is in NEVER_BLOCKING_SLOTS, so it is in neither open list,
+  // so on the app's very first question the hint was GUARANTEED to describe
+  // a different question.
+  const src = readFileSync(new URL('../src/components/onboarding/ConversationalOnboarding.tsx', import.meta.url), 'utf8')
+  const block = /const pendingHint = \(\) => \{[\s\S]*?\}\)\(\)/.exec(src)?.[0]
+    ?? /const pendingHint = \(\(\) => \{[\s\S]*?\}\)\(\)/.exec(src)?.[0] ?? ''
+  check('the hint reads the conversation, not just the slot list',
+    /m\.slotCard && !m\.slotCardResolved/.test(block) && /m\.asksSlot/.test(block), block.slice(0, 200))
+  check('...and still falls back to the canonical next open slot',
+    /openSlotsInOrder\(confirmed, values\)\[0\]/.test(block))
+
+  // The opener asks for a name in prose with no card, so without this tag
+  // there is nothing for the composer to read.
+  const intro = readFileSync(new URL('../src/lib/first-run-intro.ts', import.meta.url), 'utf8')
+  check("the opener's name question is tagged with its slot",
+    /ONBOARDING_INTRO_THE_ASK, asksSlot: 'displayName'/.test(intro))
+  check('...and that question still ends by asking for the name',
+    /what should I call you\?/.test(intro))
+
+  // Every slot the coach can ask about needs something to show. A missing
+  // hint silently falls back to "Say anything…", which is the generic the
+  // contextual placeholder exists to replace.
+  const askable = ONBOARDING_SLOTS.filter(
+    s => !NEVER_BLOCKING_SLOTS.includes(s.key) && s.control !== 'numeric')
+  const hintless = askable.filter(s => !s.inputHint).map(s => s.key)
+  check(`every askable non-numeric slot has a composer hint (${askable.length} slots)`,
+    hintless.length === 0, hintless.join(', '))
+
+  // displayName is never in an open list, so it is the one slot that can
+  // only get its hint through asksSlot.
+  check('displayName has a hint even though it never blocks',
+    !!ONBOARDING_SLOTS.find(s => s.key === 'displayName')?.inputHint)
 }
 
 console.log(failures === 0 ? '\nAll onboarding-order checks passed.\n' : `\n${failures} FAILED\n`)

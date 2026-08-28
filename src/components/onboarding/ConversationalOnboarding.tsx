@@ -12,6 +12,7 @@ import {
   buildSlotCatalog,
   missingRequiredSlots,
   unconfirmedOptionalSlots,
+  openSlotsInOrder,
   isSlotRequired,
   isSlotApplicable,
   canDeclineSlot,
@@ -464,7 +465,7 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
     // after the buttons had been removed — no gate looks at whether the app's
     // own copy still describes the app, which is why this one is asserted in
     // test:onboarding-intro.
-    return buildOnboardingIntro().map(m => ({ role: 'assistant' as const, content: m.content }))
+    return buildOnboardingIntro().map(m => ({ role: 'assistant' as const, content: m.content, asksSlot: m.asksSlot }))
   })
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
@@ -635,7 +636,7 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
     return {
       slotCatalog: buildSlotCatalog(ws.values),
       filled,
-      remaining: [...missingRequiredSlots(ws.values), ...unconfirmedOptionalSlots(ws.confirmed, ws.values)],
+      remaining: openSlotsInOrder(ws.confirmed, ws.values),
     }
   }
 
@@ -933,7 +934,7 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
       // depth, not as the mechanism that keeps the conversation moving.
       const producedVisible = responseWs.newMessages.some(m => !m.isReceipt) || responseWs.openReview
       if (!producedVisible) {
-        const next = [...missingRequiredSlots(responseWs.values), ...unconfirmedOptionalSlots(responseWs.confirmed, responseWs.values)][0]
+        const next = openSlotsInOrder(responseWs.confirmed, responseWs.values)[0]
         const nextDef = next ? getSlotDef(next) : undefined
         if (nextDef) {
           responseWs.newMessages.push({
@@ -972,7 +973,7 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
       // guess is only made for a message that was NOTHING but "I don't know"
       // (see STUCK_SIGNAL), where there is no answer to lose.
       if (userWasStuck && !responseWs.openReview) {
-        const openNow = [...missingRequiredSlots(responseWs.values), ...unconfirmedOptionalSlots(responseWs.confirmed, responseWs.values)]
+        const openNow = openSlotsInOrder(responseWs.confirmed, responseWs.values)
         const target = openNow[0]
         const def = target ? getSlotDef(target) : undefined
         const alreadyHasCard = [...priorMessages, ...responseWs.newMessages].some(
@@ -1010,7 +1011,7 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
       // legitimate steady progress through a long slot list never trips it,
       // only genuine standstill does.
       if (!responseWs.openReview) {
-        const openSlots = [...missingRequiredSlots(responseWs.values), ...unconfirmedOptionalSlots(responseWs.confirmed, responseWs.values)]
+        const openSlots = openSlotsInOrder(responseWs.confirmed, responseWs.values)
         const canonicalNext = openSlots[0]
         const allMsgs = [...priorMessages, ...responseWs.newMessages]
         if (canonicalNext) {
@@ -1211,14 +1212,43 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
   // too, and a hook cannot be read before it runs.)
   const canSend = !busy && input.trim().length > 0
   /* The v2 contextual placeholder. With no buttons on screen, this is the
-     only standing hint at what kind of answer fits. It follows the SAME slot
-     the stuck-rescue and the dead-air guard use — the canonical next open one
-     — so all three agree on what the coach is currently waiting for rather
-     than each guessing separately. Falls back to "Say anything…", which stays
-     honest when nothing specific is pending (the review, or a tangent). */
+     only standing hint at what kind of answer fits.
+
+     IT USED TO FOLLOW THE CANONICAL NEXT OPEN SLOT, and Ashley caught it on
+     a real phone showing the wrong hint twice in one run:
+
+       coach asked "what should I call you?"     composer: "Tell me your goal…"
+       coach asked about style and equipment     composer: "How active is your day?"
+
+     Two different causes behind one symptom. The name one is structural:
+     displayName is in NEVER_BLOCKING_SLOTS, so it appears in NEITHER open
+     list and could never win the hint — on the very first question of the
+     app, the placeholder was guaranteed to describe a different question.
+     The second is that the canonical next slot is a GUESS at what the coach
+     just asked, and the coach does not always ask in canonical order.
+
+     So ask the conversation instead of the slot list. The most recent
+     message that actually put a question on screen — a live chip card, or
+     the scripted opener's own name ask — is the coach stating what it is
+     waiting for, rather than us inferring it. The canonical next open slot
+     stays as the fallback for turns that presented nothing (a tangent, a
+     free-text question), which is what it is genuinely good for.
+
+     Note this deliberately DIVERGES from the stuck-rescue and the dead-air
+     guard, which still use the canonical next: their job is "the coach
+     produced nothing useful, so pick the next question ourselves", where the
+     slot list is the right authority. This one's job is "describe the
+     question already on screen", where it is not.
+
+     Falls back to "Say anything…", which stays honest when nothing specific
+     is pending (the review, or a tangent). */
   const pendingHint = (() => {
-    const next = [...missingRequiredSlots(values), ...unconfirmedOptionalSlots(confirmed, values)][0]
-    return (next ? getSlotDef(next)?.inputHint : undefined) ?? 'Say anything…'
+    const asked = [...messages].reverse().find(
+      m => (m.slotCard && !m.slotCardResolved) || (m.asksSlot && !confirmed.has(m.asksSlot)),
+    )
+    const key = (asked?.slotCard && !asked.slotCardResolved ? asked.slotCard : asked?.asksSlot)
+      ?? openSlotsInOrder(confirmed, values)[0]
+    return (key ? getSlotDef(key as SlotKey)?.inputHint : undefined) ?? 'Say anything…'
   })()
 
   const composerBottomStyle = isKeyboardOpen

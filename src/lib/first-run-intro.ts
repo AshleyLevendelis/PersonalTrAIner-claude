@@ -72,6 +72,8 @@ export const FIRST_RUN_THE_PROMISE =
 export interface FirstRunMessage {
   content: string
   quickReplies?: string[]
+  /** The slot this message asks about, when it asks about one. */
+  asksSlot?: string
 }
 
 /**
@@ -166,6 +168,9 @@ export const ONBOARDING_INTRO_THE_ASK =
 export function buildOnboardingIntro(): FirstRunMessage[] {
   return [
     { content: ONBOARDING_INTRO_WHO },
-    { content: ONBOARDING_INTRO_THE_ASK },
+    // asksSlot, not a chip card: this question ends in "what should I call
+    // you?" and there is nothing to offer buttons for. It is what tells the
+    // composer to say "Your name…" rather than describing the next question.
+    { content: ONBOARDING_INTRO_THE_ASK, asksSlot: 'displayName' },
   ]
 }

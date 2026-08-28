@@ -31,6 +31,16 @@ export interface DraftMessage {
   content: string
   /** Present when this assistant turn rendered a chip card; value = slot key. */
   slotCard?: string
+  /**
+   * This turn ASKED about a slot without offering a card for it — the
+   * scripted opener's "what should I call you?" is the only one today.
+   *
+   * Separate from slotCard because the composer placeholder needs "what
+   * question is on screen", and a text slot never produces a card to read
+   * that from. Before this existed the app's very first question showed the
+   * NEXT question's hint underneath it.
+   */
+  asksSlot?: string
   /** Chip card already answered/locked (so resume doesn't re-open it). */
   slotCardResolved?: boolean
   /**

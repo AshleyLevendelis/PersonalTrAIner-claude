@@ -801,6 +801,41 @@ export function unconfirmedOptionalSlots(
     .map(s => s.key)
 }
 
+/**
+ * Every still-open question, IN THE ORDER THIS FILE PUTS THEM IN.
+ *
+ * THE BUG THIS FIXES, measured rather than reasoned about. Every caller used
+ * to build this list as `[...missingRequiredSlots, ...unconfirmedOptionalSlots]`
+ * — required first, optional after — and that concatenation quietly re-sorted
+ * the array above. `remaining` is what the model is TOLD the outstanding
+ * questions are, so the order in this file was not the order the coach asked
+ * in:
+ *
+ *   injuries      5th here (Ashley moved it from 16th so it could not be
+ *                 stranded behind the four questions people abandon on)
+ *                 -> 11th as sent, because it is `required: false`
+ *   mealsPerDay   15th here -> 10th as sent
+ *
+ * Injuries is the load-bearing one: it is optional to ANSWER, but it is the
+ * only question whose absence can hurt someone, and the reorder that put it
+ * fifth was a safety ruling. Required-ness is about whether a plan can be
+ * built without a slot; it was never meant to be the asking order, and using
+ * it as one silently undid the decision.
+ *
+ * Membership is identical to the two lists concatenated — this only fixes
+ * the order — so anything asking "is this slot still open" is unaffected.
+ */
+export function openSlotsInOrder(
+  confirmed: ReadonlySet<string>,
+  values: OnboardingSlotValues,
+): SlotKey[] {
+  const open = new Set<SlotKey>([
+    ...missingRequiredSlots(values),
+    ...unconfirmedOptionalSlots(confirmed, values),
+  ])
+  return ONBOARDING_SLOTS.filter(s => open.has(s.key)).map(s => s.key)
+}
+
 // ---------------------------------------------------------------------------
 // Profile assembly — the single transform from slot values to UserProfile.
 // ---------------------------------------------------------------------------
