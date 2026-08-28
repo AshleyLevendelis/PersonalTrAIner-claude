@@ -23,6 +23,7 @@ import { generateMesocycle, setRandomSource, resetRandomSource } from '../src/li
 import { seededRngFromKey } from '../src/lib/seeded-random'
 import { buildCoachExerciseSummary, loadClauseForCoach, describeExerciseForCoach } from '../src/lib/chat-plan-context'
 import { getExerciseEntry } from '../src/lib/exercise-db'
+import { isExternallyLoaded } from '../src/lib/load-prescription'
 import type { Exercise, UserProfile, EquipmentAccess, TrainingExperience } from '../src/lib/types'
 
 let failures = 0
@@ -71,8 +72,9 @@ const STYLES = ['bodybuilding', 'functional', 'hybrid'] as const
 
 console.log('\n1. Every prescribed number in a real plan reaches the coach')
 {
-  let exercises = 0, withNumber = 0
+  let exercises = 0, withNumber = 0, unloadedSeen = 0
   const missing: unknown[] = []
+  const weightOnUnloaded: unknown[] = []
   const danglingDays: string[] = []
   const seen = new Set<string>()
 
@@ -90,6 +92,24 @@ console.log('\n1. Every prescribed number in a real plan reaches the coach')
           for (const ex of day.exercises) {
             exercises++
             const clause = loadClauseForCoach(ex)
+
+            // SIBLING CHECK, added after the assistance leak. That bug was a
+            // carry-forward fallback (`load ? … : ex.<field>`) surviving a
+            // rotation that changed the slot's identity. Four sibling fields
+            // — load_guidance, suggested_load, suggested_load_kg, load_source
+            // — use the identical shape, so the same leak was possible: a
+            // barbell lift rotating out for a bodyweight movement, and the
+            // weight coming with it. Swept 74,628 exercises and it does NOT
+            // happen; assistance leaked precisely because prescribeAssistance
+            // sits OUTSIDE the load branch and had no equivalent guard. This
+            // pins the negative result so it stays true.
+            const entry = getExerciseEntry(ex.name)
+            if (entry && !isExternallyLoaded(entry)) {
+              unloadedSeen++
+              if (ex.suggested_load_kg != null && weightOnUnloaded.length < 8) {
+                weightOnUnloaded.push({ exercise: ex.name, kg: ex.suggested_load_kg, source: ex.load_source })
+              }
+            }
             for (const { field, label } of NUMERIC_PRESCRIPTIONS) {
               const v = ex[field] as number | null | undefined
               if (v == null) continue
@@ -120,10 +140,12 @@ console.log('\n1. Every prescribed number in a real plan reaches the coach')
     }
   }
 
-  console.log(`      swept ${exercises} exercises; ${withNumber} carry a prescribed number`)
+  console.log(`      swept ${exercises} exercises; ${withNumber} carry a prescribed number; ${unloadedSeen} have nothing to load`)
   check('the sweep actually produced exercises (sanity check on this gate)', exercises > 1000, exercises)
   check('every prescribed number appears in what the coach is sent', missing.length === 0, missing)
   check('no day is sent as a dangling separator with nothing after it', danglingDays.length === 0, danglingDays)
+  check('a movement with nothing to load carries no kg number', weightOnUnloaded.length === 0, weightOnUnloaded)
+  check('...and unloaded movements occur in the sweep, so that check has teeth', unloadedSeen > 0, unloadedSeen)
   // Without this, a field the generator stopped emitting would make its check
   // vacuously true — the tautological-control shape this repo has hit before.
   for (const { field } of NUMERIC_PRESCRIPTIONS) {
