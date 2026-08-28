@@ -99,6 +99,7 @@
     "test:ceiling-units": "tsx scripts/test-load-ceiling-units.ts",
     "test:main-lift-rest": "tsx scripts/test-main-lift-rest.ts",
     "test:composer-focus": "tsx scripts/test-composer-focus.ts",
+    "test:reset-clears-draft": "tsx scripts/test-reset-clears-draft.ts",
     "test:coach-plan-context": "tsx scripts/test-coach-plan-context.ts",
     "report:added-load": "tsx scripts/report-added-load.ts",
     "report:band-slots": "tsx scripts/report-band-slots.ts",

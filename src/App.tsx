@@ -1592,6 +1592,25 @@ function App() {
         new Promise(resolve => setTimeout(resolve, 4000)),
       ])
     } finally {
+      // THE ONBOARDING DRAFT IS PART OF THE RESET. Reported live: "New Plan"
+      // dropped straight onto the review card with every previous answer
+      // filled in and Generate armed, instead of starting a fresh
+      // conversation. The draft is a single GLOBAL key
+      // (fitplan_onboarding_draft), not a per-profile one, so wiping the
+      // profile left it behind for the next run to restore — every slot
+      // confirmed, so readyToGenerate was true on mount and the review card
+      // opened immediately.
+      //
+      // Completion already clears it (see handleOnboardingComplete); reset was
+      // the one path that did not. An audit of every global localStorage key
+      // in src/ says this was the only one missing: the appearance keys and
+      // the offline set-log queues survive a reset deliberately (a theme is
+      // not plan data, and queued sets carry their own profile id so they can
+      // still sync). `test:reset-clears-draft` holds the whole list.
+      clearOnboardingDraft()
+      // Found by that same audit: the tab the OLD profile was last on would
+      // otherwise greet the new one after onboarding.
+      localStorage.removeItem(LAST_TAB_KEY)
       localStorage.removeItem(STORAGE_KEY)
       localStorage.removeItem('active_session_cache')
       localStorage.removeItem('offline_log_queue')
