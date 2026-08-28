@@ -72,7 +72,29 @@ ever stated one — that is the point, but it is still a load change and it
 lands without warning on the next plan render. Worth deciding: does an
 already-generated plan get rebuilt against the newly-visible ceiling, or does
 the ceiling apply only from the next generation onward? The second is
-quieter; the first is more correct. **This is the decision that is Ashley's.**
+quieter; the first is more correct.
+
+**DECIDED — Ashley, 28 Aug 2026: rebuild the plan against it.**
+
+Chosen over "apply from the next plan onward" (anyone mid-plan keeps getting
+weights they cannot load, for up to sixteen weeks) and over a
+propose-then-confirm card (nothing moves without a yes, but it is another
+card to deal with on open).
+
+Two things follow from that choice and belong in the build:
+
+- **Reuse `rebuildForWeightBasis`**, not a second rebuild path. It already
+  exists for exactly this shape — a fact about the trainee's real equipment
+  becoming known after the plan was built.
+- **The coach has to say why.** Weights visibly changing on open, with no
+  explanation, is the app moving numbers under someone. The existing
+  adaptation banner is the surface: it already speaks when a plan changes,
+  and this is a plan change.
+
+Direction matters and is worth asserting rather than assuming: restoring a
+real ceiling should move loads **DOWN** for affected users, never up. A
+ceiling is a cap. If the after-numbers go up anywhere, something is wrong
+with the fix rather than with the old behaviour.
 
 Restoring the macro fields **changes calorie and macro targets** for anyone
 who set a custom split — again correct, again a number moving without being
