@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -167,6 +167,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
   // + keyboard-inset pattern BottomDock already uses.
   const { insetPx: composerInsetPx, isKeyboardOpen: composerKeyboardOpen } = useViewportInset()
   const composerRef = useRef<HTMLTextAreaElement>(null)
+  const composerBoxRef = useRef<HTMLDivElement>(null)
 
   // Keyed by an in-memory resolverId, not persisted: holds the full
   // entries/groups for a log_workout turn that hit a BLOCKING ambiguity, so
@@ -2599,6 +2600,33 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     ? { bottom: composerInsetPx + 16 + dockGapPx }
     : { bottom: `calc(${TAB_BAR_HEIGHT_PX}px + env(safe-area-inset-bottom) + ${dockGapPx}px)` }
 
+  // HOW MUCH OF THE THREAD THE COMPOSER IS SITTING ON, MEASURED.
+  //
+  // The Card is `h-[600px] max-h-[80dvh]` — a fixed box — while the composer
+  // is `position: fixed` to the VIEWPORT. With the keyboard shut they don't
+  // meet (measured at 390x844: card ends 648, composer starts 704). Open the
+  // keyboard and the composer rides UP into the card: composer top 416
+  // against a card bottom of 648, so it covers 232px of the message list and
+  // the newest message — at 512-552 — is entirely behind it. The scroller
+  // reserved a static `pb-24`, 96px, which never grew.
+  //
+  // That is the same defect reported on the onboarding composer, on the other
+  // screen. Onboarding grows its padding by `insetPx + 112` because its
+  // scroller ends at the viewport bottom; this one ends at the CARD's bottom,
+  // which sits an unknown distance above that (it depends on App.tsx's own
+  // page padding). So the overlap is measured rather than derived from a
+  // constant that would silently go stale the moment that padding changes.
+  //
+  // No feedback loop: padding is inside the border box, so growing it does
+  // not move the scroller's own getBoundingClientRect().bottom.
+  const [composerClearancePx, setComposerClearancePx] = useState(0)
+  useLayoutEffect(() => {
+    const sc = scrollRef.current, box = composerBoxRef.current
+    if (!sc || !box) return
+    const overlap = sc.getBoundingClientRect().bottom - box.getBoundingClientRect().top
+    setComposerClearancePx(overlap > 0 ? Math.round(overlap + 12) : 0)
+  }, [composerKeyboardOpen, composerInsetPx, dockHeightPx])
+
   return (
     <>
     <Card className="flex flex-col h-[600px] max-h-[80dvh]">
@@ -2622,6 +2650,9 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
           // by parity — this screen was NOT measured, because the tour
           // harness's chat tab is a stub rather than the real component.
           className="flex-1 min-h-0 overflow-y-auto p-4 pb-24 overscroll-contain"
+          // pb-24 stays as the floor for the keyboard-shut case; this only
+          // ever ADDS the measured overlap on top of it.
+          style={composerClearancePx > 0 ? { paddingBottom: composerClearancePx } : undefined}
           ref={scrollRef}
           onScroll={handleScroll}
         >
@@ -2828,6 +2859,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         BottomDock rides above the tab bar / keyboard — see the comment by
         useViewportInset's call above for why sticky never worked here. */}
     <div
+      ref={composerBoxRef}
       className="fixed left-0 right-0 z-40 mx-auto max-w-6xl px-4 bg-gradient-to-t from-[color:var(--background)] from-60% to-transparent pt-3 pb-3"
       style={composerBottomStyle}
     >

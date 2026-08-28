@@ -116,5 +116,36 @@ console.log('\n5. The input is still soft-disabled, never hard-disabled — the 
     !/\sdisabled=\{/.test(input), input.slice(0, 200))
 }
 
+console.log('\n6. The chat harness still reproduces the container App.tsx actually uses')
+{
+  // .tour-harness/chat.tsx COPIES App.tsx's shell so the measurement means
+  // something: ChatAssistant's Card is a fixed h-[600px] while its composer is
+  // fixed to the VIEWPORT, so whether they collide depends entirely on where
+  // App.tsx's <main> padding puts the card. Measuring inside a different
+  // wrapper answers a question about the harness — which this repo has now
+  // done twice (a harness page with no viewport meta reporting a composer at
+  // top: 2029px, and real.tsx measuring a panel it never passed a handler to).
+  //
+  // A copy that drifts is worse than no copy, so the two are pinned together.
+  const app = readFileSync(join(ROOT, 'src/App.tsx'), 'utf8')
+  const harness = readFileSync(join(ROOT, '.tour-harness/chat.tsx'), 'utf8')
+  const mainClass = app.match(/<main className="([^"]+)"/)?.[1]
+  check('App.tsx has a <main> wrapper to copy (sanity check on this gate)', !!mainClass, mainClass)
+  check('the harness reproduces it verbatim',
+    !!mainClass && harness.includes(`<main className="${mainClass}"`),
+    { app: mainClass, harnessHasIt: !!mainClass && harness.includes(mainClass) })
+
+  const shellClass = app.match(/<div className="(min-h-screen bg-background)">/)?.[1]
+  check('...and the shell around it', !!shellClass && harness.includes(shellClass), shellClass)
+
+  // The harness is worthless if it mounts a stub. real.tsx's chat tab was one
+  // for exactly as long as nobody measured the chat.
+  check('the harness mounts the real ChatAssistant, not a stand-in',
+    /<ChatAssistant\b/.test(harness))
+  check('...and seeds the thread through the real cache key',
+    harness.includes('chat_history_cache_'),
+    'the first attempt used fitplan_chat_cache_ and a { messages } wrapper, so the chat restored NOTHING and the harness measured an empty thread')
+}
+
 if (failures > 0) { console.error(`\n${failures} check(s) failed`); process.exit(1) }
 console.log('\nAll composer-focus checks passed.\n')

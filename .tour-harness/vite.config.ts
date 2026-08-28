@@ -15,6 +15,6 @@ export default defineConfig({
   build: {
     outDir: path.resolve(__dirname, 'dist'),
     emptyOutDir: true,
-    rollupOptions: { input: [path.resolve(__dirname, 'tour-harness.html'), path.resolve(__dirname, 'real.html')] },
+    rollupOptions: { input: [path.resolve(__dirname, 'tour-harness.html'), path.resolve(__dirname, 'real.html'), path.resolve(__dirname, 'chat.html')] },
   },
 })

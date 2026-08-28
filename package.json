@@ -111,6 +111,7 @@
     "verify:tour-real": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/drive-real.mjs",
     "verify:composer": "vite build --config .onb-harness/vite.config.ts && node .onb-harness/composer.mjs",
     "verify:keyboard": "vite build --config .onb-harness/vite.config.ts && node .onb-harness/keyboard.mjs",
+    "verify:chat-shell": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/chat-shell.mjs",
     "verify:reveal": "vite build --config .tw-harness/vite.config.ts && node .tw-harness/measure.mjs",
     "report:frozen-weeks": "tsx scripts/report-frozen-weeks.ts",
     "report:rehab-coverage": "tsx scripts/report-rehab-coverage.ts",
