@@ -38,10 +38,20 @@ export function supabase(args, { quiet = false } = {}) {
       throw new Error(`refusing to pass an unexpected argument to the Supabase CLI: ${a}`)
     }
   }
-  const r = spawnSync('npx', ['supabase', ...args], {
-    stdio: quiet ? ['inherit', 'ignore', 'ignore'] : 'inherit',
-    shell: WIN,
-  })
+  // ONE COMMAND STRING ON WINDOWS, not a command plus an args array. Node
+  // 22 warns DEP0190 for `shell: true` WITH args ("arguments are not escaped,
+  // only concatenated") — and that warning printed itself on top of the
+  // `Type 'yes-production' to continue:` prompt during a real production
+  // push, which is the one prompt in this repo that must be legible. Doing
+  // the concatenation ourselves is the documented way to silence it, and it
+  // is exactly as safe here for the reason above: every argument has already
+  // been checked against /^[a-z0-9-]+$/ or is a literal `--flag`, so there is
+  // nothing a shell could reinterpret. Off Windows we pass the array and no
+  // shell at all, which is stricter still.
+  const stdio = quiet ? ['inherit', 'ignore', 'ignore'] : 'inherit'
+  const r = WIN
+    ? spawnSync(['npx', 'supabase', ...args].join(' '), { stdio, shell: true })
+    : spawnSync('npx', ['supabase', ...args], { stdio, shell: false })
   return r.status ?? 1
 }
 
@@ -98,7 +108,10 @@ export async function confirmProduction() {
     process.exit(1)
   }
   const rl = createInterface({ input: process.stdin, output: process.stdout })
-  const answer = await new Promise((res) => rl.question("Type 'yes-production' to continue: ", res))
+  // Leading newline: async warnings and CLI chatter flush on their own
+  // schedule, and one landed mid-prompt on a real run. A prompt this
+  // consequential gets a clean line to itself.
+  const answer = await new Promise((res) => rl.question("\nType 'yes-production' to continue: ", res))
   rl.close()
   return answer.trim() === 'yes-production'
 }
