@@ -413,6 +413,32 @@ export interface SlotDef {
   shortLabel: string
   control: 'single' | 'multi' | 'text' | 'numeric' | 'boolean'
   /**
+   * The answer is guessable from the question, so do NOT put buttons under it
+   * unprompted.
+   *
+   * Ashley's ruling, in her words: "I dont think every question needs a quick
+   * reply always. Some have obvious answers." It narrows the previous ruling
+   * ("always, pills or cards as fits") rather than reversing the reasoning
+   * behind it — the point of that one was that options had become invisible,
+   * not that every question benefits from them.
+   *
+   * THE LINE IS WHETHER THE APP HAS ITS OWN WORDING FOR THE ANSWER. Nobody
+   * can guess that "home_gym" means barbell-plus-dumbbells-plus-bench, or
+   * where the app's line between "moderate" and "active" falls — those keep
+   * their buttons. A yes/no, a number of meals, male or female: a person
+   * knows what to type without being shown.
+   *
+   * It suppresses the FIRST offer only. Two paths still bring the buttons
+   * back, and both are the original "chips as a rescue" idea: an answer that
+   * fails to map re-asks with the real options attached, and the stuck-rescue
+   * offers them to anyone who says "I don't know". Nothing becomes
+   * unanswerable by tapping — it just stops being the opening move.
+   *
+   * Never set on injuries or dietaryPreferences whatever they look like: a
+   * missed tap there is a safety miss, not a UI preference.
+   */
+  obviousAnswer?: boolean
+  /**
    * required=true means the value must be non-empty/valid before completion.
    * required=false slots still must be explicitly ASKED (confirmed, possibly
    * as an explicit skip) unless listed in NEVER_BLOCKING below — mirroring
@@ -620,7 +646,7 @@ export const ONBOARDING_SLOTS: SlotDef[] = [
   // to type a deadlift number BEFORE they have had a chance to mention their
   // back is the wrong order to ask those two questions in.
   { key: 'injuries', question: 'Anything that bothers you when you train — something you avoid or work around?', inputHint: 'Anything that bothers you?', shortLabel: 'Niggles', control: 'multi', required: false, options: INJURY_OPTIONS, destination: 'column', validate: isSubsetOf(INJURY_OPTIONS) },
-  { key: 'knowsWorkingLifts', question: 'Do you know your working lifts (squat, bench, deadlift)?', inputHint: 'Do you know your numbers?', shortLabel: 'Working lifts', control: 'single', required: true, requiredIf: willBeLiftingBarbells, options: KNOWS_LIFTS_OPTIONS, destination: 'column', validate: v => v === true || v === false || v === 'true' || v === 'false' },
+  { key: 'knowsWorkingLifts', question: 'Do you know your working lifts (squat, bench, deadlift)?', inputHint: 'Do you know your numbers?', shortLabel: 'Working lifts', control: 'single', obviousAnswer: true, required: true, requiredIf: willBeLiftingBarbells, options: KNOWS_LIFTS_OPTIONS, destination: 'column', validate: v => v === true || v === false || v === 'true' || v === 'false' },
   // Only meaningful once someone has said they DO know their numbers.
   { key: 'knownSquatKg', question: 'Squat working weight (kg)?', shortLabel: 'Squat', control: 'numeric', required: false, requiredIf: knowsTheirLifts, min: 1, max: 500, destination: 'column', validate: isNumberIn(1, 500) },
   { key: 'knownBenchKg', question: 'Bench working weight (kg)?', shortLabel: 'Bench', control: 'numeric', required: false, requiredIf: knowsTheirLifts, min: 1, max: 400, destination: 'column', validate: isNumberIn(1, 400) },
@@ -669,12 +695,12 @@ export const ONBOARDING_SLOTS: SlotDef[] = [
   { key: 'age', question: 'How old are you?', inputHint: 'Your age…', shortLabel: 'Age', control: 'numeric', required: false, min: 13, max: 100, destination: 'column', validate: isNumberIn(13, 100) },
   { key: 'heightCm', question: 'How tall are you (cm)?', inputHint: 'Height in cm…', shortLabel: 'Height', control: 'numeric', required: false, min: 100, max: 250, destination: 'column', validate: isNumberIn(100, 250) },
   { key: 'weightKg', question: 'What do you weigh right now (kg)?', inputHint: 'Weight in kg…', shortLabel: 'Weight', control: 'numeric', required: false, min: 25, max: 350, destination: 'column', validate: isNumberIn(25, 350) },
-  { key: 'gender', question: 'Which should I use for your calorie and starting-weight maths?', inputHint: 'Whichever fits…', shortLabel: 'Sex', control: 'single', required: false, options: GENDER_OPTIONS, destination: 'column', validate: isOneOf(GENDER_OPTIONS) },
-  { key: 'mealsPerDay', question: 'How many meals a day suits you?', inputHint: 'How many meals?', shortLabel: 'Meals a day', control: 'single', required: true, options: MEALS_PER_DAY_OPTIONS, destination: 'column', validate: isOneOf(MEALS_PER_DAY_OPTIONS) },
+  { key: 'gender', question: 'Which should I use for your calorie and starting-weight maths?', inputHint: 'Whichever fits…', shortLabel: 'Sex', control: 'single', obviousAnswer: true, required: false, options: GENDER_OPTIONS, destination: 'column', validate: isOneOf(GENDER_OPTIONS) },
+  { key: 'mealsPerDay', question: 'How many meals a day suits you?', inputHint: 'How many meals?', shortLabel: 'Meals a day', control: 'single', obviousAnswer: true, required: true, options: MEALS_PER_DAY_OPTIONS, destination: 'column', validate: isOneOf(MEALS_PER_DAY_OPTIONS) },
   { key: 'dietaryPreferences', question: 'Any dietary preferences or restrictions?', inputHint: 'Vegan, gluten-free, an allergy…', shortLabel: 'Diet', control: 'multi', required: false, options: DIETARY_OPTIONS, destination: 'column', validate: isSubsetOf(DIETARY_OPTIONS) },
   { key: 'dislikedFoods', question: 'Anything else you\'d rather I left out?', inputHint: 'Foods to leave out…', shortLabel: 'Foods to avoid', control: 'text', required: false, destination: 'user_facts', validate: v => typeof v === 'string' },
   { key: 'cookingTime', question: 'How much time do you want to spend cooking?', inputHint: 'How long do you want to cook?', shortLabel: 'Cooking time', control: 'single', required: false, options: COOKING_TIME_OPTIONS, destination: 'column', validate: isOneOf(COOKING_TIME_OPTIONS) },
-  { key: 'includeSnacks', question: 'Snacks too, or meals only?', shortLabel: 'Snacks', control: 'single', required: false, options: SNACKS_OPTIONS, destination: 'column', validate: v => v === true || v === false || v === 'true' || v === 'false' },
+  { key: 'includeSnacks', question: 'Snacks too, or meals only?', shortLabel: 'Snacks', control: 'single', obviousAnswer: true, required: false, options: SNACKS_OPTIONS, destination: 'column', validate: v => v === true || v === false || v === 'true' || v === 'false' },
   // Last, and NEVER PROACTIVELY ASKED — both are in NEVER_BLOCKING_SLOTS, so
   // trackedSlots filters them out of the questioning list entirely. They stay
   // in this array so the model still has them in its catalogue and can record
@@ -935,6 +961,8 @@ export interface SlotCatalogEntry {
   question: string
   control: SlotDef['control']
   required: boolean
+  /** True when the answer is guessable — the model must not offer buttons for it unprompted. */
+  obviousAnswer?: boolean
   values?: { value: string; label: string }[]
   min?: number
   max?: number
@@ -971,6 +999,7 @@ export function buildSlotCatalog(values: OnboardingSlotValues = initialSlotValue
       question: s.question,
       control: s.control,
       required: isSlotRequired(s, values),
+      obviousAnswer: s.obviousAnswer,
       values: offeredOptionsFor(s)?.map(o => ({ value: String(o.value), label: o.label })),
       min: s.min,
       max: s.max,

@@ -298,5 +298,61 @@ console.log('\n7. The order lets someone stop early and still get a plan')
     BODY.map(k => `${k}#${index(k) + 1}`))
 }
 
+// ---------------------------------------------------------------------------
+console.log('\nNOT EVERY QUESTION NEEDS BUTTONS')
+// ---------------------------------------------------------------------------
+{
+  // Ashley, after seeing the always-offer version on a real phone: "I dont
+  // think every question needs a quick reply always. Some have obvious
+  // answers." That NARROWS the earlier "always, pills or cards as fits"
+  // ruling; it does not undo the reasoning behind it, which was that the
+  // options had become invisible, not that every question wants them.
+  //
+  // The line she picked: buttons stay wherever the app has its own wording
+  // for the answer (nobody can guess where "moderate" ends and "active"
+  // begins, or that home_gym means barbell + dumbbells + bench). They go
+  // where a person already knows what to type.
+  const OBVIOUS = ['knowsWorkingLifts', 'gender', 'mealsPerDay', 'includeSnacks']
+  const tagged = ONBOARDING_SLOTS.filter(s => s.obviousAnswer).map(s => s.key).sort()
+  check(`exactly the four she chose are button-free (${tagged.join(', ')})`,
+    tagged.join(',') === [...OBVIOUS].sort().join(','), tagged)
+
+  // THE ONE THAT MUST NEVER DRIFT. Both of these look like tag lists someone
+  // could type, and both are enforced downstream — a missed injury is a
+  // filtering miss, a missed allergen tag is a food the plan will serve them.
+  // A tap is the reliable path for those, so they keep it whatever else
+  // changes here.
+  for (const key of ['injuries', 'dietaryPreferences']) {
+    const def = ONBOARDING_SLOTS.find(s => s.key === key)!
+    check(`${key} always offers its options — a missed tap there is a safety miss`, !def.obviousAnswer)
+  }
+
+  // A slot with no options has nothing to suppress; the flag on one would be
+  // a statement that reads as meaningful and does nothing.
+  const flaggedWithoutOptions = ONBOARDING_SLOTS.filter(s => s.obviousAnswer && !offeredOptionsFor(s)).map(s => s.key)
+  check('the flag is only on slots that HAVE options', flaggedWithoutOptions.length === 0, flaggedWithoutOptions)
+
+  // BOTH SIDES. The prompt asks the model not to offer them; the client is
+  // what holds when it does anyway, which it will.
+  const component = readFileSync(join(ROOT, 'src/components/onboarding/ConversationalOnboarding.tsx'), 'utf8')
+  check('the client drops a present_slot for an obvious-answer slot',
+    /if \(def\.obviousAnswer\) continue/.test(component))
+
+  const fn = readFileSync(join(ROOT, 'supabase/functions/onboarding-chat/index.ts'), 'utf8')
+  check('the catalogue sent to the model marks them', /obviousAnswer \? " \[NO CHIPS/.test(fn))
+  check('...and the prompt says what the marking means', /Slots marked \[NO CHIPS\]/.test(fn))
+  check('...while still requiring the answer to map to a real value',
+    /map what they type to one of the listed values with set_slot/.test(fn))
+
+  // FIRST OFFER ONLY. If suppressing the opening chips also killed the
+  // rescues, someone who answers "no idea" to a yes/no would have no way to
+  // tap and no way to be understood.
+  check('an answer that fails to map still re-asks WITH the options',
+    /tap the option that fits:',\s*\n\s*slotCard: key/.test(component))
+  check('the stuck-rescue still offers options', /No problem — here are the options/.test(component))
+  check('...and the prompt keeps that door open too',
+    /THEN present_slot for it/.test(fn))
+}
+
 console.log(failures === 0 ? '\nAll onboarding-chip checks passed.\n' : `\n${failures} FAILED\n`)
 process.exit(failures === 0 ? 0 : 1)
