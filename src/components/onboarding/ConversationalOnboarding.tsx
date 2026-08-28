@@ -698,16 +698,6 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
         }
         if (ws.confirmed.has(key)) continue
         if (!isSlotApplicable(def, ws.values)) continue
-        // "Some have obvious answers" (Ashley). The prompt tells the model
-        // not to offer buttons for these; this is the half that holds when
-        // the model does it anyway, which it will — the same reason every
-        // other slot rule here is enforced on both sides.
-        //
-        // FIRST OFFER ONLY. The two rescues below build their own messages
-        // rather than coming through here, so someone who says "I don't
-        // know", or whose typed answer fails to map, still gets the real
-        // options — which is the original "chips as a rescue" idea, kept.
-        if (def.obviousAnswer) continue
         // One live card per question. The model can ask for the same chips on
         // both legs of the round trip, and the second copy found the coach's
         // message already taken, so it fell through to the raw-question

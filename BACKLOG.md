@@ -2,6 +2,12 @@
 
 Newest first. One line each.
 
+- [x] **QUICK REPLIES ARE BACK ON EVERY ONBOARDING QUESTION** — Ashley, reversing this morning's narrowing: *"ive changed my mind and I think actually the quick replies on the onboarding are better for all questions."* The four that had been exempted (do you know your lifts, male/female, how many meals, snacks yes/no) offer their options again — 2, 2, 3 and 2 respectively.
+
+- [x] THE EXEMPTION MECHANISM WAS **REMOVED**, NOT LEFT TAGGING NOTHING. `obviousAnswer` is gone from the slot type, the four slots, the catalogue sent to the model, the client's `present_slot` guard and the prompt's `[NO CHIPS]` rule. A flag no slot carries still reads as meaningful to the next person and does nothing — the same dead-code-with-a-truthful-comment shape this log keeps recording.
+
+- [x] THREE RULINGS ON ONE QUESTION, AND THE GATE NOW CARRIES THE HISTORY so a future session doesn't re-litigate it: **(1)** *"Always, pills or cards as fits"* — options had become invisible; **(2)** *"Some have obvious answers"* — four exempted; **(3)** *"better for all questions"* — back to always. `test:onboarding-chips` asserts the property plainly (a slot with a list offers it, 18 of them) and that no suppression mechanism exists in any of the four places it used to live. Bites: re-exempting one slot turns 2 red, restoring the client guard 1, dropping "every time" from the prompt 1.
+
 - [x] **HALF THE WEIGHTS IN A PLAN SAID THE WRONG THING, AND NOW THEY DON'T.** `formatLoad()` has always produced `~14kg per hand` and stored it on every exercise as `suggested_load`; only `LoadChip` read it. `ExerciseLine` and `ExerciseRow` re-rendered the raw number with a hard-coded "kg", so **1126 of 2356 prescriptions (47.8%)** showed a per-hand number in the same format as a total, sitting directly beneath one — a 14kg RDL reading as a third of a 42.5kg squat when it is two-thirds. Wording is Ashley's: **"14kg per hand"**, chosen from six candidates all measured against the real column width.
 
 - [x] THREE SURFACES, ONE UNIT, verified in Chromium at 390px: collapsed line `3×11-13 · ~14kg per hand`, expanded number `14` + `kg per hand`, logging header `Log weight · per hand`. A barbell lift is untouched at `~42.5kg`. **The logging column mattered most** — it doesn't just tell you a number, it asks you for one, and `exercise_set_logs` carries no unit of its own to catch a 2× mistake with. No prescribed number changed and no schema changed.

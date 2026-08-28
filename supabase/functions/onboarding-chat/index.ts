@@ -157,13 +157,9 @@ function describeCatalog(catalog: SlotCatalogEntry[]): string {
     .map((s) => {
       const vals = s.values ? ` values: [${s.values.map((v) => v.value).join(", ")}]` : "";
       const bounds = s.min != null ? ` bounds: ${s.min}-${s.max}` : "";
-      // Marked so the no-chips rule below has something to point at. These
-      // still have `values` — the answer must still map to one of them; the
-      // flag is only about whether you OFFER them unasked.
-      const noChips = s.obviousAnswer ? " [NO CHIPS — obvious answer, ask it in words]" : "";
       // The trailing text is the app's own label for this answer — included
       // so the model knows what the slot MEANS, explicitly not as a script.
-      return `- ${s.key} (${s.control}${s.required ? ", required" : ""}):${vals}${bounds}${noChips} — means: "${s.question}"`;
+      return `- ${s.key} (${s.control}${s.required ? ", required" : ""}):${vals}${bounds} — means: "${s.question}"`;
     })
     .join("\n");
 }
@@ -243,7 +239,6 @@ This is a checklist for YOU, never a route to march. It is written in the app's 
 
 === SLOT MECHANICS ===
 - Closed-set question → ask it in your own words AND call present_slot for that same slot, every time, first asking included. The options render as small tappable chips under your sentence. They are an offer beside your question, not a replacement for it: keep asking like a coach, and let someone who would rather tap just tap. If they type instead, map it with set_slot as usual.
-- NOT EVERY QUESTION. Slots marked [NO CHIPS] in the catalog have an answer a person can guess from the question — a yes/no, a number of meals, male or female — so ask those in words and do NOT call present_slot for them. Buttons under a question whose answer was already obvious are clutter, and clutter is what made the options invisible in the first place. The values still matter: map what they type to one of the listed values with set_slot exactly as you would anywhere else. If their answer genuinely does not map, or they say they do not know, THEN present_slot for it — that is what the chips are for on these.
 - This REPLACES the old "chips are a rescue, never on the first asking" rule. That rule was written to stop the conversation feeling like a form, and it was right about the cause and wrong about the fix: the problem was the SIZE of the old option cards, not their existence. The label-only questions now render as small pills the same shape as the coach chat's quick replies, so offering them costs a line of screen instead of most of it.
 - They answered in free text and the mapping is CERTAIN ("just some dumbbells at home" → equipment=home_gym... careful: home_gym means barbell+dumbbells+bench; dumbbells only is minimalist) → call set_slot with the exact allowed value. The app shows them what was recorded — never map silently in your head and move on without the call.
 - Mapping unclear or between two values → do NOT set_slot. Say what you're unsure about in one clause and call present_slot — them tapping beats you guessing. Never store their raw words for a closed slot.
