@@ -65,6 +65,45 @@ interface Row {
   byName: Map<string, number>
 }
 
+/**
+ * Same sweep, but for an UNINJURED profile, counting movements indicated for
+ * any joint at all. Split from sweep() rather than parameterised into it
+ * because the two answer different questions and conflating them is how the
+ * old control came to be reassuring about nothing.
+ */
+function sweepAnyJoint(joints: Set<string>): Row {
+  const row: Row = { days: 0, daysWithRehab: 0, plansWithNoRehabAtAll: 0, plans: 0, byName: new Map() }
+  for (const split of SPLITS) {
+    for (const style of STYLES) {
+      for (const equipment_access of EQUIP) {
+        for (const session_duration_preference of DURATIONS) {
+          const profile = buildProfile({
+            injuries: [], workout_split_preference: split, training_style: style,
+            equipment_access, session_duration_preference,
+          })
+          const plan = gen(profile, `none:${split}:${style}:${equipment_access}:${session_duration_preference}`)
+          row.plans++
+          let planHadAny = false
+          for (const day of plan) {
+            if (day.exercises.length === 0) continue
+            row.days++
+            const hits = day.exercises.filter(ex => {
+              const e = getExerciseEntry(ex.name)
+              return !!e && isIndicatedFor(e, joints)
+            })
+            if (hits.length === 0) continue
+            row.daysWithRehab++
+            planHadAny = true
+            for (const h of hits) row.byName.set(h.name, (row.byName.get(h.name) ?? 0) + 1)
+          }
+          if (!planHadAny) row.plansWithNoRehabAtAll++
+        }
+      }
+    }
+  }
+  return row
+}
+
 function sweep(injury: string): Row {
   const flagged = getFlaggedJoints([injury])
   const row: Row = { days: 0, daysWithRehab: 0, plansWithNoRehabAtAll: 0, plans: 0, byName: new Map() }
@@ -121,8 +160,38 @@ report('KNEE injury (10 movements marked: 0 warm-up tier, 7 isolation, 3 compoun
 report('HIP injury (4 marked: 3 activation primers written for this, plus Bird Dog)', sweep('hips'))
 report('LOWER BACK injury (3 marked, all tier3: Dead Bug, Side Plank, Bird Dog)', sweep('lower_back'))
 
-// The over-fire control. An uninjured trainee has no flagged joints, so this
-// must read 0 both before and after the fix — if the AFTER run moves this off
-// zero, the rehab slot is firing for people who never reported an injury.
-const none = sweep('__no_such_injury__')
-console.log(`\nCONTROL — no injury flagged: ${none.daysWithRehab}/${none.days} days (must be 0 before AND after)`)
+// THE OVER-FIRE CONTROL, REWRITTEN — the previous one could not fail, and I
+// quoted its zero as evidence that the rehab slot "does not over-fire".
+//
+// It ran sweep('__no_such_injury__'), which resolves to an EMPTY flagged-joint
+// set, and then counted movements indicated FOR THE FLAGGED JOINTS. With no
+// flagged joints nothing can match, so it read 0 whatever the plans contained
+// — including if the rehab slot had been firing on every single day. A
+// tautology printed as a measurement.
+//
+// What is actually true, and for a better reason than that sweep: the slot
+// cannot fire, because pickRehabMovement returns null on an empty joint set
+// before it looks at anything (exercise-plan.ts). test:rehab-prescribed
+// asserts that early return directly, where it can be broken and caught.
+//
+// What this prints now is the number that DOES vary and is worth watching:
+// how often an uninjured trainee meets one of these movements anyway, through
+// ordinary primer and accessory slots. That is by design — they are ordinary
+// movements that happen to carry a joint tag — so the figure is context, not
+// a pass mark. If it ever reached the injured rate of 100%, the guarantee
+// would be meaningless because everyone would already have it.
+//
+// PER JOINT, not "any joint". The guarantee is that a knee-injured trainee
+// meets a KNEE movement every day — so the honest comparison is what an
+// uninjured trainee gets for that same joint, not for any of the four. The
+// any-joint figure runs at 88%, which would have made the guarantee look
+// worth almost nothing; it is an artefact of pooling four joints.
+console.log(`\nCONTROL — uninjured trainee. No rehab slot fires: pickRehabMovement returns null on an`)
+console.log(`empty joint set before it looks at anything. What follows is what they meet ANYWAY,`)
+console.log(`through ordinary primer and accessory slots — by design, and the gap to 100% is what`)
+console.log(`the guarantee is actually buying an injured trainee.\n`)
+for (const [label, joint] of [['shoulder', 'shoulder'], ['knee', 'knee'], ['hip', 'hip'], ['lower back', 'lower_back_axial']] as const) {
+  const r = sweepAnyJoint(new Set([joint]))
+  const pct = 100 * r.daysWithRehab / r.days
+  console.log(`  ${label.padEnd(11)} uninjured ${String(r.daysWithRehab).padStart(3)}/${r.days} days (${pct.toFixed(1).padStart(5)}%)   injured 100%   guarantee adds ${(100 - pct).toFixed(1)} points`)
+}

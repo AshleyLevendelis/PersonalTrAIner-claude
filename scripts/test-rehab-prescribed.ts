@@ -30,6 +30,7 @@ import {
   generateExercisePlan, generateMesocycle, setRandomSource, resetRandomSource,
   getConstrainedPool, getFlaggedJoints, pickRehabMovement,
 } from '../src/lib/exercise-plan'
+import { readFileSync } from 'fs'
 import { getExerciseEntry, isIndicatedFor, EXERCISE_DATABASE } from '../src/lib/exercise-db'
 import { scorePlan } from '../src/lib/quality-score'
 import { seededRngFromKey } from '../src/lib/seeded-random'
@@ -367,6 +368,61 @@ console.log('\n7. The quality score knows a rehab warm-up is a legitimate second
   ])), 'k').dimensions.structure.deductions.map(d => d.rule)
   check('the exemption needs the INJURY, not just the tag — uninjured is still flagged',
     uninjured.includes('primer_not_first'), uninjured.join(', ') || '(nothing flagged)')
+}
+
+// ---------------------------------------------------------------------------
+console.log('\nTHE OVER-FIRE CONTROL, WHICH USED TO BE A TAUTOLOGY')
+// ---------------------------------------------------------------------------
+{
+  // A CORRECTION TO A NUMBER I REPORTED. report-rehab-coverage printed
+  // "CONTROL — no injury flagged: 0/576 days" and I quoted that zero as
+  // evidence the rehab slot does not fire for uninjured people. It was not
+  // evidence of anything: it ran the sweep with an EMPTY flagged-joint set
+  // and then counted movements indicated FOR THE FLAGGED JOINTS. Nothing can
+  // match an empty set, so it read 0 whatever the plans contained — it would
+  // have read 0 with the slot firing on every day of every plan.
+  //
+  // The property does hold, and for a better reason than that sweep:
+  // pickRehabMovement returns null on an empty joint set before it looks at
+  // the pool at all.
+  //
+  // WHAT EACH CHECK BELOW ACTUALLY CATCHES, measured rather than assumed,
+  // because the first version of this comment overclaimed:
+  //
+  //   delete the early return          only the SOURCE-SHAPE check fires.
+  //                                    The behavioural one still passes —
+  //                                    with no flagged joints the pool filter
+  //                                    matches nothing and null comes back
+  //                                    anyway, by a second mechanism. So on
+  //                                    that mutation the behavioural check is
+  //                                    close to the same tautology it
+  //                                    replaced, and saying otherwise would
+  //                                    have repeated the original mistake.
+  //   add a "return something rather   FOUR checks fire, this one among them.
+  //   than nothing" pool[0] fallback   That is the realistic refactor error,
+  //                                    and it is the one that would actually
+  //                                    put rehab in an uninjured plan.
+  //
+  // Both are kept: the shape check guards the guard, the behavioural check
+  // guards the outcome, and neither covers the other's mutation.
+  const pool = getConstrainedPool(buildProfile({ injuries: [] }), [])
+  check('the rehab slot cannot fire with no joints flagged',
+    pickRehabMovement(pool, new Set<string>(), new Set<string>()) === null)
+
+  // ...and it DOES fire when one is. Without this the check above is
+  // satisfiable by a function that always returns null, which would "pass"
+  // while removing rehab from everyone.
+  const kneeJoints = getFlaggedJoints(['knees'])
+  check('...and does fire when a joint IS flagged',
+    pickRehabMovement(pool, kneeJoints, new Set<string>()) !== null, [...kneeJoints])
+
+  // The empty-set guard must be the FIRST thing it does. If it moved below
+  // the pool scan, an empty set could still return a movement via a fallback
+  // branch and the check above would be luck rather than design.
+  const src = readFileSync(new URL('../src/lib/exercise-plan.ts', import.meta.url), 'utf8')
+  const body = /export function pickRehabMovement\([\s\S]{0,400}?\{([\s\S]{0,200})/.exec(src)?.[1] ?? ''
+  check('the empty-joint guard is the first statement in the function',
+    /^\s*(\/\/[^\n]*\n\s*)*if \(flaggedJoints\.size === 0\) return null/.test(body), body.slice(0, 120))
 }
 
 console.log(failures === 0 ? '\nAll rehab-prescription checks passed.\n' : `\n${failures} FAILED\n`)
