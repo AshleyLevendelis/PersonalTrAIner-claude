@@ -27,3 +27,4 @@ meal-quality-report.txt
 .tour-harness/*.png
 .onb-harness/dist/
 .onb-harness/*.png
+.tw-harness/dist/

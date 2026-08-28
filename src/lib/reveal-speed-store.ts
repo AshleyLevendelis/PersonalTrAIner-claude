@@ -9,7 +9,7 @@
 
 export type RevealSpeed = 'off' | 'slow' | 'normal' | 'fast'
 
-/** Normal is the new, slower default (~110ms/word) — see TypewriterMarkdown.tsx. */
+/** Normal is ~50ms/word, frame-aligned — see TypewriterMarkdown.tsx for the measurement that set it. */
 export const DEFAULT_REVEAL_SPEED: RevealSpeed = 'normal'
 
 const VALUES: RevealSpeed[] = ['off', 'slow', 'normal', 'fast']

@@ -29,18 +29,32 @@ import type { RevealSpeed } from '@/lib/reveal-speed-store'
 
 const WORD_RE = /\S+\s*/g
 /**
- * Per-speed {tick, pause} pairs, in ms — the pause is always ~3.45x the
- * tick (the original 190/55 ratio), so slowing/speeding up the base rate
- * keeps the same "thoughtful typing" rhythm rather than flattening it out
- * at one end. `fast` is the app's original (pre-user-request) default;
- * `normal`, the new default, is materially slower per the user's explicit
- * "roughly double it" request. `off` has no entry — it's handled as an
- * instant-reveal bypass, same code path as prefers-reduced-motion.
+ * Per-speed {tick, pause} pairs, in ms.
+ *
+ * RETUNED after measuring the reveal in a browser rather than reasoning about
+ * it. At the old `normal` (110/380), one 67-word coach message took **8.9
+ * seconds** end to end, and the four sentence-end pauses produced gaps of
+ * **491ms** against a 110ms median — so the reveal ran steady, steady,
+ * steady, STALL, four times a message. That stall was the "not smooth", not
+ * timer drift: measured min 110, median 110, p90 111.
+ *
+ * So the pause ratio came down hard, from ~3.45x the tick to ~1.6x. It is
+ * still a beat at a full stop — the rhythm the old ratio was reaching for —
+ * but a beat rather than a halt.
+ *
+ * `normal` lands near the app's ORIGINAL default (55ms). It had been doubled
+ * to 110 on an earlier "roughly double it" request; living with it, the same
+ * request came back the other way. Kept slightly above the original because
+ * the reveal is frame-aligned now, and steady 50ms reads calmer than jittery
+ * 55ms did.
+ *
+ * `off` has no entry — it is an instant-reveal bypass, same code path as
+ * prefers-reduced-motion.
  */
 const SPEED_TIMING: Record<Exclude<RevealSpeed, 'off'>, { tick: number; pause: number }> = {
-  fast: { tick: 55, pause: 190 },
-  normal: { tick: 110, pause: 380 },
-  slow: { tick: 165, pause: 570 },
+  fast: { tick: 28, pause: 45 },
+  normal: { tick: 50, pause: 80 },
+  slow: { tick: 95, pause: 150 },
 }
 const SENTENCE_END_RE = /[.!?]["')\]]?\s*$/
 
@@ -75,25 +89,59 @@ export function TypewriterMarkdown({
     }
     const timing = SPEED_TIMING[speed]
     const tokens = text.match(WORD_RE) ?? [text]
-    let i = 0
-    let cancelled = false
-    let timer: ReturnType<typeof setTimeout>
+
+    // WHEN each token is due, computed once up front, as an offset from the
+    // start. The whole schedule is decided before the first frame, so nothing
+    // downstream has to accumulate it.
+    const dueAt = new Array<number>(tokens.length)
+    let at = 0
+    for (let n = 0; n < tokens.length; n++) {
+      at += timing.tick
+      if (n > 0 && SENTENCE_END_RE.test(tokens[n - 1])) at += timing.pause
+      dueAt[n] = at
+    }
+
+    let raf = 0
+    let shown = 0
+    let acc = ''
+    const start = performance.now()
     setRevealed('')
 
-    const step = () => {
-      if (cancelled) return
-      i++
-      setRevealed(tokens.slice(0, i).join(''))
-      if (i >= tokens.length) {
+    // A FRAME LOOP AGAINST A CLOCK, not a chain of setTimeouts, and the
+    // difference is what makes it smooth on a real device.
+    //
+    // The old version scheduled each word from the moment the previous one
+    // rendered, so every late timer — and a phone mid-scroll has plenty —
+    // pushed the whole rest of the message further behind. Error accumulated
+    // and could never be recovered.
+    //
+    // Here the schedule is absolute: each frame asks "which words are due by
+    // now?" and shows all of them. A stalled frame catches up on the next one
+    // instead of falling permanently behind, and the reveal always finishes
+    // when it said it would. It also lands each update ON a frame, so the
+    // browser paints once per change rather than whenever a timer happened to
+    // fire between frames.
+    const frame = () => {
+      const elapsed = performance.now() - start
+      let next = shown
+      while (next < tokens.length && dueAt[next] <= elapsed) acc += tokens[next++]
+      // Only touch state when the visible text actually changed — at fast
+      // speeds several tokens land in one frame, and at slow ones most frames
+      // land none. Either way ReactMarkdown re-parses once per CHANGE rather
+      // than once per frame.
+      if (next !== shown) {
+        shown = next
+        setRevealed(acc)
+      }
+      if (shown >= tokens.length) {
         doneRef.current?.()
         return
       }
-      const delay = SENTENCE_END_RE.test(tokens[i - 1]) ? timing.tick + timing.pause : timing.tick
-      timer = setTimeout(step, delay)
+      raf = requestAnimationFrame(frame)
     }
-    timer = setTimeout(step, timing.tick)
+    raf = requestAnimationFrame(frame)
 
-    return () => { cancelled = true; clearTimeout(timer) }
+    return () => cancelAnimationFrame(raf)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [text, active, speed])
 
