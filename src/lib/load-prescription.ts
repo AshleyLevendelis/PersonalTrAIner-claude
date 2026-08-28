@@ -1038,6 +1038,34 @@ export function formatLoad(kg: number, labelMode: LoadLabelMode): string {
 }
 
 /**
+ * Split a formatLoad() string back into the parts a screen needs to lay out —
+ * the number big, its unit small.
+ *
+ * WHY THIS EXISTS RATHER THAN EACH SCREEN RE-DERIVING THE LABEL. formatLoad's
+ * output was already stored on every exercise as `suggested_load`, and only
+ * LoadChip read it: ExerciseLine and ExerciseRow re-rendered the raw
+ * `suggested_load_kg` with a hard-coded "kg" and lost the qualifier. Half of
+ * every plan is priced per hand (1126 of 2356 prescriptions measured), so
+ * half the weights the app showed were in a different unit from the one
+ * beside them, unmarked.
+ *
+ * The alternative was giving each screen the ExerciseEntry and having it call
+ * loadingMode/loadLabelMode itself. That is the shape that produced the
+ * original single-implement bug — three copies of one rule, and one of them
+ * wrong. Parsing our own output is only safe because this function sits
+ * directly beneath the function that writes it; move either and they drift.
+ * test:load-display round-trips all three shapes for that reason.
+ *
+ * Returns null for a display that is not a weight at all ('Bodyweight',
+ * 'Choose by feel') — those are sentences, not numbers with units.
+ */
+export function splitLoadDisplay(display: string): { approx: boolean; value: string; unit: string } | null {
+  const m = /^(~?)(\d+(?:\.\d+)?)kg(.*)$/.exec(display.trim())
+  if (!m) return null
+  return { approx: m[1] === '~', value: m[2], unit: `kg${m[3]}` }
+}
+
+/**
  * Builds the per-set display array. `topSetKg` is the same fully-adjusted
  * (standards-derived, RPE/reps-scaled) number used for starting_weight_kg —
  * ramping sets are lighter fractions of it, never a separately-derived

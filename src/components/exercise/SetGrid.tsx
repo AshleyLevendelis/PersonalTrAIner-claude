@@ -51,6 +51,23 @@ export interface SetGridProps {
   restTime?: string
   tier?: string
   suggestedLoadKg?: number | null
+  /**
+   * The unit the weight column is in — "kg per hand" for a dumbbell pair,
+   * "kg (single side)" for a one-sided lift, plain "kg" otherwise.
+   *
+   * Passed DOWN from the plan's own formatted string rather than re-derived
+   * here from the exercise name. Three copies of the per-side rule is what
+   * produced the original single-implement bug; this component already has
+   * two numbers it must not disagree with (the prescription above it and the
+   * value it stores), and a third derivation is where they would diverge.
+   *
+   * It matters more here than anywhere else on the screen: the column is not
+   * just telling someone a number, it is asking them for one. An unlabelled
+   * "14" invites a log of 28 from anyone who loaded two 14s and read the
+   * prescription as a total — and the set logs carry no unit of their own to
+   * catch it with.
+   */
+  loadUnitLabel?: string
   /** Per-set breakdown (ramping or straight) — indexed by set number - 1. Falls back to suggestedLoadKg for any set beyond this array. */
   perSetLoadKg?: (number | null)[]
   /** Flips the weight input's helper copy from "here's the default" to "log what you actually lifted." */
@@ -76,6 +93,7 @@ export function SetGrid({
   restTime,
   tier,
   suggestedLoadKg,
+  loadUnitLabel,
   perSetLoadKg,
   loadIsEstimate,
   onSetCompleted,
@@ -322,7 +340,12 @@ export function SetGrid({
     <div className="pb-3 pt-1 space-y-1">
       <div className="grid grid-cols-[auto_minmax(6rem,1fr)_auto_auto_auto_1fr_auto] gap-1.5 items-center text-xs text-muted-foreground font-medium px-1">
         <span className="w-5">#</span>
-        <span>{loadIsEstimate ? 'Log weight' : 'Weight'}</span>
+        <span>
+          {loadIsEstimate ? 'Log weight' : 'Weight'}
+          {loadUnitLabel && loadUnitLabel !== 'kg' && (
+            <span className="text-muted-foreground/70"> · {loadUnitLabel.replace(/^kg\s*/, '')}</span>
+          )}
+        </span>
         <span className="w-7"></span>
         <span className="w-7"></span>
         <span className="w-8"></span>

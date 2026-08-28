@@ -55,7 +55,15 @@ export function ExerciseLine({
   ) : (
     <span className="tabular-mono text-xs text-muted-foreground">
       {ex.sets}×{ex.reps}
-      {ex.suggested_load_kg != null ? ` · ${ex.suggested_load_kg}kg` : ''}
+      {/* ex.suggested_load, NOT a re-formatted suggested_load_kg. The string
+          is written by formatLoad when the plan is built and already carries
+          the unit — "~14kg per hand" for a dumbbell pair, "~42.5kg" for a
+          barbell. This line used to print `${suggested_load_kg}kg` for both,
+          so half of every plan (1126 of 2356 prescriptions) showed a
+          per-hand number in the same format as a total, directly beneath one.
+          Read down the list, a 14kg RDL looked like a third of a 42.5kg
+          squat; it is two-thirds. */}
+      {ex.suggested_load_kg != null ? ` · ${ex.suggested_load ?? `~${ex.suggested_load_kg}kg`}` : ''}
       {ex.suggested_assistance_kg != null ? ` · ${ex.assistance_ready_to_graduate ? 'no assist' : `${ex.suggested_assistance_kg}kg assist`}` : ''}
       {/* Signed, always. "+15kg" beside a pull-up is an instruction to add
           weight; "15kg" would read as the weight of the lift itself. */}

@@ -1,6 +1,10 @@
 # Half the weights in a plan are per-hand, and nothing says so
 
-**Status: PLAN ONLY. Nothing built.** Load prescription gets a plan before a
+**Status: BUILT, 28 Aug 2026.** Ashley said build it after choosing the
+wording. What follows is the plan as written; the build matched it, and the
+verified result is at the bottom.
+
+Originally: **PLAN ONLY. Nothing built.** Load prescription gets a plan before a
 build (CLAUDE.md), and one decision in here is Ashley's.
 
 Found by `npm run verify:screens` — the first walk of the real screens with
@@ -144,3 +148,43 @@ than diverge two surfaces from a third. Say if you want it dropped.
   `suggested_load_kg`). Worth checking after, separately — a coach saying
   "fourteen kilos" out loud has the same ambiguity, but it is a different
   surface with different wording constraints.
+
+
+---
+
+## BUILT — what actually shipped
+
+All three surfaces now read the same unit, verified in Chromium at 390px with
+the real components:
+
+| surface | before | after |
+|---|---|---|
+| collapsed line | `3×11-13 · 14kg` | `3×11-13 · ~14kg per hand` |
+| expanded number | `14` + `kg` | `14` + `kg per hand` |
+| logging column header | `Log weight` | `Log weight · per hand` |
+| a barbell lift, unchanged | `3×9-11 · 42.5kg` | `3×9-11 · ~42.5kg` |
+
+`splitLoadDisplay()` was added directly beneath `formatLoad()` — parsing this
+app's own output is only safe while the two sit together, which is why they
+do and why `test:load-display` round-trips all three shapes.
+
+`verify:screens` re-run after: no new overflow on any screen, which was the
+layout risk of a longer label.
+
+**The gate bites on five mutations**: reverting ExerciseLine (3 checks),
+hard-coding `kg` in ExerciseRow (1), SetGrid re-deriving the unit from the
+exercise name (1), the header dropping the label (1), and `formatLoad` losing
+the qualifier (1).
+
+**Two of my own mistakes while building, both worth keeping:**
+
+1. The gate's "no screen hand-rolls a kg string" check fired on **the comment
+   I had just written in ExerciseLine explaining the bug** — the third time in
+   one session a check of mine was satisfiable by its own documentation. It
+   strips comments now, block comments included, because the explanation lives
+   in a JSX `{/* … */}` whose middle lines start with neither `//` nor `*`.
+2. I reported the SetGrid header "isn't getting the prop" after reading
+   `<span>Weight</span>` from the page. There are **two** headers on screen and
+   a page-wide search returns the first, which belongs to a bodyweight
+   exercise and is correctly plain. Scoped to the expanded block, it read
+   `Log weight · per hand` all along.

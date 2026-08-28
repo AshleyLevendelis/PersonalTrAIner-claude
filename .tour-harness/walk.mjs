@@ -129,7 +129,7 @@ const AUDIT = `(() => {
   return JSON.stringify(out)
 })()`
 
-console.log('\\nWALKING THE REAL SCREENS AT 390x844, EFFECTS RUNNING\\n')
+console.log('\nWALKING THE REAL SCREENS AT 390x844, EFFECTS RUNNING\n')
 for (const tab of TABS) {
   await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off#/tab/${tab}` })
   await wait(2200)
@@ -161,6 +161,6 @@ for (const tab of TABS) {
   console.log('')
 }
 
-console.log(failures === 0 ? 'Every screen came back clean.\\n' : `${failures} findings above.\\n`)
+console.log(failures === 0 ? '\nNo hard failures. Read the observations and the screenshots.\n' : `\n${failures} hard failures above.\n`)
 chrome.kill(); server.close()
 process.exit(0)

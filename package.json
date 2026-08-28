@@ -60,6 +60,7 @@
     "test:onboarding-order": "tsx scripts/test-onboarding-order.ts",
     "test:onboarding-chips": "tsx scripts/test-onboarding-chips.ts",
     "test:reveal-timing": "tsx scripts/test-reveal-timing.ts",
+    "test:load-display": "tsx scripts/test-load-display.ts",
     "test:deploy-path": "tsx scripts/test-deploy-path.ts",
     "test:onboarding-conversational": "tsx scripts/test-onboarding-conversational.ts",
     "test:onboarding-style": "tsx scripts/test-onboarding-conversation-style.ts",

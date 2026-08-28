@@ -8,7 +8,7 @@ import { formatRampSets, formatCompletedSummary } from '@/lib/session-derive'
 import { RampStrip } from './RampStrip'
 import { LoadChip, TempoChip, loadSourceLabel, type LoadSource } from './LoadChip'
 import { ExerciseLine } from './ExerciseLine'
-import { isUnverifiedLoadSource } from '@/lib/load-prescription'
+import { isUnverifiedLoadSource, splitLoadDisplay } from '@/lib/load-prescription'
 import { AssistanceChip } from './AssistanceChip'
 import { AddedLoadChip } from './AddedLoadChip'
 import { CalibrationCue } from './CalibrationCue'
@@ -143,12 +143,19 @@ export function ExerciseRow({
         <>
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0 flex-1">
-              {ex.suggested_load_kg != null && (
-                <div className="flex items-end gap-2">
-                  <span className="tabular-mono ds-num-lg leading-none">{ex.suggested_load_kg}</span>
-                  <span className="text-xs text-text-tertiary pb-0.5">kg</span>
-                </div>
-              )}
+              {/* The unit comes from the plan's own formatted string, split
+                  into parts so the number can stay large and the unit small.
+                  Hard-coding "kg" here printed a per-hand number as though it
+                  were a total on half of all prescriptions. */}
+              {ex.suggested_load_kg != null && (() => {
+                const parts = ex.suggested_load ? splitLoadDisplay(ex.suggested_load) : null
+                return (
+                  <div className="flex items-end gap-2">
+                    <span className="tabular-mono ds-num-lg leading-none">{parts?.value ?? ex.suggested_load_kg}</span>
+                    <span className="text-xs text-text-tertiary pb-0.5">{parts?.unit ?? 'kg'}</span>
+                  </div>
+                )
+              })()}
               {ex.suggested_assistance_kg != null && (
                 <div className="flex items-end gap-2">
                   <span className="tabular-mono ds-num-lg leading-none">{ex.suggested_assistance_kg}</span>
@@ -240,6 +247,7 @@ export function ExerciseRow({
             restTime={ex.rest}
             tier={ex.tier}
             suggestedLoadKg={ex.suggested_load_kg}
+            loadUnitLabel={(ex.suggested_load ? splitLoadDisplay(ex.suggested_load) : null)?.unit}
             perSetLoadKg={ex.per_set_load?.map(s => s.load_kg)}
             loadIsEstimate={loadIsUnverified}
             onOpenPlateCalc={onOpenPlateCalc}
