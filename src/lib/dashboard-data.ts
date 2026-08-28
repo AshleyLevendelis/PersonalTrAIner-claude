@@ -19,6 +19,7 @@ import { getActiveGoals } from './memory-store'
 import { computeStreak, type StreakDayInput } from './streak'
 import { computeWeightTrend, type WeightTrendResult } from './weight-trend'
 import { selectCoachTip, type CoachTipContext } from './coach-tips'
+import { computeConsistency, type ConsistencyScore } from './consistency-score'
 import { getActiveMesocycleWeek } from './calculations'
 import { supabase } from './supabase'
 import type { UserProfile, MacroTargets, WorkoutDay, MesocycleWeek, ExerciseSetLog } from './types'
@@ -59,6 +60,8 @@ export interface DashboardData {
   session: TodaySession
   tomorrowLabel: string
   coachTip: string | null
+  /** Null when nothing measurable has happened yet this plan week — a 0% would read as a verdict rather than an absence. */
+  consistency: ConsistencyScore | null
   caloriesEaten: number
   caloriesTarget: number
   proteinEaten: number
@@ -231,17 +234,36 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
   }
   const streakResult = computeStreak(streakDays)
 
+  // DAYS BEFORE THE PLAN EXISTED ARE NOT PLAN WEEK 1.
+  //
+  // getActiveMesocycleWeek clamps with Math.max(0, elapsedDays), so every date
+  // earlier than planCreatedAt comes back as week 1. The lookback above is 35
+  // days, so on a plan created today all 35 landed in "this plan week" — and
+  // every aggregate below counted five weeks of history that predate the plan
+  // as though it were the current week. Caught by the consistency score
+  // reading "0/19 planned sessions" for a single week; it also made
+  // coach-tips' perfect_adherence able to announce "Every planned session
+  // this week, done — 19 for 19", and skewed session_pace's comparison.
+  //
+  // Related but not the same as the earlier "stop marking pre-plan days as
+  // missed" fix: that one taught the STREAK to ignore them, and these
+  // plan-week aggregates were never taught the same thing.
+  const planStartStr = planCreatedAt ? new Date(planCreatedAt).toISOString().slice(0, 10) : null
+  const sincePlanStart = (d: { date: string }) => planStartStr == null || d.date >= planStartStr
+
   // Session pace: distinct trained dates in the current plan week so far vs the same span last plan week.
-  const daysIntoCurrentWeek = streakDays.filter(d => d.planWeek === getActiveMesocycleWeek(planCreatedAt, now, totalWeeks)).length
   const currentPlanWeek = getActiveMesocycleWeek(planCreatedAt, now, totalWeeks)
-  const sessionsThisWeekSoFar = new Set(workingLogs.filter(l => streakDays.find(d => d.date === l.date && d.planWeek === currentPlanWeek)).map(l => l.date)).size
-    + cardioLogs.filter(c => streakDays.find(d => d.date === c.date && d.planWeek === currentPlanWeek)).length
+  const inCurrentPlanWeek = (d: { date: string; planWeek: number }) =>
+    d.planWeek === currentPlanWeek && sincePlanStart(d)
+  const daysIntoCurrentWeek = streakDays.filter(inCurrentPlanWeek).length
+  const sessionsThisWeekSoFar = new Set(workingLogs.filter(l => streakDays.find(d => d.date === l.date && inCurrentPlanWeek(d))).map(l => l.date)).size
+    + cardioLogs.filter(c => streakDays.find(d => d.date === c.date && inCurrentPlanWeek(d))).length
   const lastPlanWeek = currentPlanWeek - 1
-  const lastWeekDatesSameSpan = streakDays.filter(d => d.planWeek === lastPlanWeek).slice(0, daysIntoCurrentWeek).map(d => d.date)
+  const lastWeekDatesSameSpan = streakDays.filter(d => d.planWeek === lastPlanWeek && sincePlanStart(d)).slice(0, daysIntoCurrentWeek).map(d => d.date)
   const sessionsLastWeekSameSpan = new Set(workingLogs.filter(l => lastWeekDatesSameSpan.includes(l.date)).map(l => l.date)).size
 
-  const scheduledSoFarThisWeek = streakDays.filter(d => d.planWeek === currentPlanWeek && d.scheduled).length
-  const loggedOfScheduledSoFarThisWeek = streakDays.filter(d => d.planWeek === currentPlanWeek && d.scheduled && d.logged).length
+  const scheduledSoFarThisWeek = streakDays.filter(d => inCurrentPlanWeek(d) && d.scheduled).length
+  const loggedOfScheduledSoFarThisWeek = streakDays.filter(d => inCurrentPlanWeek(d) && d.scheduled && d.logged).length
 
   // Protein adherence: consecutive PRIOR days (not including in-progress
   // today) hitting >=95% of target. Bounded to at most 14 sequential
@@ -252,16 +274,32 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
   // requirement — "fetch once per mount, not on every render" — still
   // holds, since this whole function runs once per dashboard mount).
   const proteinTarget = macros?.protein ?? 0
-  let proteinStreak = 0
+  // Collect the days FIRST, then derive from them, rather than breaking out of
+  // the loop on the first miss. The streak still stops at the first miss (it
+  // is a streak) — but the consistency score needs to know how many days in
+  // the current plan week were hit, which a loop that exits early cannot say.
+  // Same fourteen fetches either way: no new reads, more answers.
+  const proteinDays: { date: string; hit: boolean }[] = []
   if (proteinTarget > 0) {
     for (let i = 1; i <= 14; i++) {
       const d = new Date(now.getTime() - i * 86_400_000)
       const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
       const dayLedger = await getTodayLedger(profileId, dateStr, macros!).catch(() => null)
-      if (!dayLedger || dayLedger.eaten.protein < proteinTarget * 0.95) break
-      proteinStreak++
+      proteinDays.push({ date: dateStr, hit: !!dayLedger && dayLedger.eaten.protein >= proteinTarget * 0.95 })
     }
   }
+  let proteinStreak = 0
+  for (const day of proteinDays) { if (!day.hit) break; proteinStreak++ }
+
+  // Consistency — sessions and protein over the CURRENT PLAN WEEK, which is
+  // the window the user is actually living in. Water is left out on purpose;
+  // see consistency-score.ts for why.
+  const weekDates = new Set(streakDays.filter(inCurrentPlanWeek).map(d => d.date))
+  const proteinDaysThisWeek = proteinDays.filter(d => weekDates.has(d.date))
+  const consistency = computeConsistency([
+    { label: 'planned sessions', done: loggedOfScheduledSoFarThisWeek, outOf: scheduledSoFarThisWeek },
+    { label: 'protein days', done: proteinDaysThisWeek.filter(d => d.hit).length, outOf: proteinDaysThisWeek.length },
+  ])
 
   // Known-lift progress since onboarding baseline.
   const knownLiftProgress = Object.entries(KNOWN_LIFT_FIELD)
@@ -283,6 +321,12 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
     loggedOfScheduledSoFarThisWeek,
     weightTrend: weightTrend ? { ratePerWeekKg: weightTrend.ratePerWeekKg ?? 0, towardGoal: weightTrend.onTrackForGoal } : null,
     recentPRs: recentPRs.map(p => ({ exerciseName: p.exerciseName, weightKg: p.weightKg })),
+    // Both already read above for the water tile — passed through rather than
+    // re-fetched. The hour is read HERE, not inside coach-tips, which is a
+    // pure function by design.
+    waterMl,
+    waterTargetMl,
+    hourOfDay: new Date().getHours(),
   }
   const coachTip = selectCoachTip(coachTipCtx)
 
@@ -316,6 +360,7 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
     session,
     tomorrowLabel,
     coachTip,
+    consistency,
     caloriesEaten: ledger.eaten.kcal,
     caloriesTarget: ledger.targets.calories,
     proteinEaten: ledger.eaten.protein,

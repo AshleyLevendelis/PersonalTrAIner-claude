@@ -79,7 +79,10 @@ const profile: UserProfile = {
   weekly_schedule: {}, dietary_preferences: [], concurrent_activities: [],
   exercise_exclusions: [] as unknown as never, macro_calculation_mode: 'STANDARD_STATIC',
   coaching_persona: 'supportive', recovery_capacity: 'moderate', conditioning_preference: 'tolerate',
-  created_at: new Date().toISOString(),
+  // NINE DAYS OLD, not today: a plan created today has no elapsed
+  // scheduled days, so the consistency score correctly shows nothing and the
+  // harness could never see it render.
+  created_at: new Date(Date.now() - 9 * 86400000).toISOString(),
 } as UserProfile
 
 // ALWAYS FROM THE MESOCYCLE, never generateExercisePlan directly —
@@ -101,7 +104,20 @@ const db: Db = {
     { id: 'm1', profile_id: PROFILE_ID, date: today, weight_kg: 80 },
     { id: 'm2', profile_id: PROFILE_ID, date: '2026-08-21', weight_kg: 80.6 },
   ],
-  water_logs: [], exercise_set_logs: [], workout_sessions: [], cardio_logs: [],
+  water_logs: [],
+  // Two logged sessions inside the current plan week, so consistency has
+  // something real to count.
+  // Column names matter: getRecentLogs filters on user_id / is_warmup and
+  // orders by completed_at, not the names I reached for first.
+  // 2 days back: the plan started 9 days ago so that date is inside the
+  // CURRENT plan week, and it falls on one of the four available weekdays.
+  // (1 and 3 days back are neither, which is why the first fixture read 0/1.)
+  exercise_set_logs: [1].map((back, i) => ({
+    id: `l${i}`, user_id: PROFILE_ID, exercise_name: 'Barbell Squats', set_number: 1,
+    weight_kg: 60, reps_completed: 8, is_bodyweight: false, is_warmup: false,
+    completed_at: new Date(Date.now() - (back + 1) * 86400000).toISOString(),
+    date: new Date(Date.now() - (back + 1) * 86400000).toISOString().slice(0, 10),
+  })), workout_sessions: [], cardio_logs: [],
   // A logged step count so the new ring renders — without one the row is
   // still the input, which is a different state.
   daily_steps: [{ id: 's1', profile_id: PROFILE_ID, date: today, steps: 7400 }], meal_events: [], meal_plan_picks: [], meal_plan_slots: [],

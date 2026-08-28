@@ -311,6 +311,80 @@ async function main() {
       /CALORIE_TILE_RING_CIRC \* Math\.min\(1, steps\.steps \/ stepsTarget\)/.test(dash))
   }
 
+  console.log('\n[3b] the home screen asks for ONE weight, not two')
+  {
+    // Ashley: "Collapse Set goal weight into a setting modal, and keep only
+    // the quick weight logger visible to reduce scrolling." Two weight inputs
+    // stacked meant the second read as part of the first, and the page ran to
+    // 1212px — one and a half phone screens. Measured after: 1178px.
+    //
+    // The pixels are the smaller half. The point is that a goal weight is set
+    // once and the logger is used daily, so only one of them earns permanent
+    // space on the screen someone opens every morning.
+    const dash = fs.readFileSync('src/components/Dashboard.tsx', 'utf-8')
+    check('the dashboard no longer embeds the goal-weight form',
+      !/<GoalWeightSetter/.test(dash))
+    // No link back, either: measured, removing the input saved 44px and a
+    // link to it cost 24, so the page came out a pixel TALLER than it began.
+    // The goal setter is reachable from the gear and from chat; it does not
+    // need a permanent row on the home screen too.
+    check('...and does not spend a row on a link back to it', !/Set a goal weight/.test(dash))
+
+    // The form has to EXIST somewhere or the feature is simply gone — the
+    // Goals section listed a goal weight once set, with nowhere to set one.
+    const prof = fs.readFileSync('src/components/ProfileScreen.tsx', 'utf-8')
+    check('the profile screen owns the goal-weight form now', /<GoalWeightSetter/.test(prof))
+
+    // A goal weight stores where you started and progress is measured from
+    // it. `?? 0` would have written a starting weight of zero for anyone with
+    // no weigh-in and no stated weight — the fabricated-measurement shape the
+    // assumed-body work exists to prevent.
+    check('it never invents a baseline when there is no weight to use',
+      !/baselineKg=\{latestWeightKg \?\? 0\}/.test(prof) &&
+      /Log a weigh-in first/.test(prof))
+  }
+
+  console.log('\n[3c] the steps row has a target to draw a ring against')
+  {
+    // Ashley: "replace the plain text box/button for Steps with a visual
+    // progress bar or ring matching the calorie indicator style." A ring
+    // needs a denominator and there was none — steps-store.ts is manual entry
+    // with no target anywhere in the app.
+    //
+    // Derived from the activity level already on file rather than asked for,
+    // which is exactly how the calorie target works (BMR/TDEE, shown as
+    // "0 OF 3040 KCAL"). Not a new kind of claim, the existing one applied to
+    // a second number.
+    const { stepsTargetFor } = await import('../src/lib/steps-target')
+    check('every activity level has a target', [
+      'sedentary', 'light', 'moderate', 'active', 'very_active',
+    ].every(a => stepsTargetFor(a as never) > 0))
+
+    // Ordered, and ordered the SAME WAY as the calorie multipliers these
+    // levels already drive. A step target that called a sedentary user more
+    // active than a very active one would contradict their own calories.
+    const ordered = ['sedentary', 'light', 'moderate', 'active', 'very_active']
+      .map(a => stepsTargetFor(a as never))
+    check(`targets rise with activity (${ordered.join(' < ')})`,
+      ordered.every((v, i) => i === 0 || v > ordered[i - 1]), ordered)
+
+    // very_active is in the type but NOT offered at onboarding, so it is the
+    // one that silently falls through a Record if anyone forgets it — tsc
+    // caught exactly that while this was being written.
+    check('very_active is covered, though onboarding never offers it',
+      stepsTargetFor('very_active' as never) > stepsTargetFor('active' as never))
+
+    // An unknown/missing level must not produce 0 — a ring against a zero
+    // denominator is a divide-by-zero on screen.
+    check('a missing activity level still yields a usable target',
+      stepsTargetFor(undefined) > 0 && stepsTargetFor(null) > 0)
+
+    const dash = fs.readFileSync('src/components/Dashboard.tsx', 'utf-8')
+    check('the steps row draws a ring', /stepsTargetFor\(profile\.activity_level\)/.test(dash))
+    check('...using the same ring geometry as the calorie tile',
+      /CALORIE_TILE_RING_CIRC \* Math\.min\(1, steps\.steps \/ stepsTarget\)/.test(dash))
+  }
+
   console.log('\n[4] dashboard-data.ts: calories-in is a direct passthrough from getTodayLedger, never recomputed')
 
   const dashSrc = fs.readFileSync('src/lib/dashboard-data.ts', 'utf-8')
@@ -412,6 +486,91 @@ async function main() {
   check('a same-day duplicate weigh-in (a correction) uses the LAST entry, not both averaged in', dupResult?.rollingAvgKg === 80 && dupResult?.sampleCount === 1, dupResult)
 
   // ---- Summary -------------------------------------------------------------
+
+
+  console.log('\n[3a] days before the plan existed are not plan week 1')
+  {
+    // A REAL BUG, PRE-EXISTING, found by the consistency score reading
+    // "0/19 planned sessions" for a single week.
+    //
+    // getActiveMesocycleWeek clamps with Math.max(0, elapsedDays), so every
+    // date earlier than planCreatedAt comes back as week 1. dashboard-data
+    // looks back 35 days — so on a plan created today, all 35 landed in "this
+    // plan week", and every plan-week aggregate counted five weeks of history
+    // that predate the plan.
+    //
+    // It was not only the new score: coach-tips' perfect_adherence could
+    // announce "Every planned session this week, done — 19 for 19", and
+    // session_pace compared against a window that never existed. Related to
+    // the earlier "stop marking pre-plan days as missed" fix, which taught
+    // the STREAK to ignore them and left these aggregates behind.
+    const everyDayPlan = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']
+      .map(day => ({ day, focus: 'Full Body', is_scheduled: true,
+        exercises: [{ name: 'Barbell Squats', sets: 3, reps: '8-10', rest: '90s', substitution: '' }] }))
+    const t = '2026-01-15'
+    const nowT = new Date(`${t}T12:00:00`)
+    const fresh = await loadDashboardData({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      profile: profile as any, macros, exercisePlan: everyDayPlan as any, mesocycle: [],
+      // The plan was created TODAY. Nothing before today can belong to it.
+      planCreatedAt: `${t}T00:00:00.000Z`,
+      todayLogs: [], liveWeek: 1, dayName: 'Thursday', todayStr: t, now: nowT,
+    })
+    // Every one of the 35 lookback days is "scheduled" in this fixture, so
+    // before the fix this read 34. A plan made today has had no elapsed
+    // scheduled days at all.
+    const planned = fresh.consistency?.components.find(c => c.label === 'planned sessions')
+    check('a plan created today counts no elapsed scheduled days',
+      planned == null || planned.outOf <= 1, planned)
+
+    // And with no components carrying data, the score is ABSENT rather than
+    // 0% — a zero on day one would read as a verdict on someone who has not
+    // had a chance to do anything yet.
+    check('...so the score shows nothing rather than 0%',
+      fresh.consistency === null || (planned?.outOf ?? 0) > 0, fresh.consistency)
+  }
+
+  console.log('\n[3d] consistency is named for what it measures')
+  {
+    const { computeConsistency } = await import('../src/lib/consistency-score')
+
+    // Ashley asked for a readiness score "combining workout consistency,
+    // sleep/rest days, and nutrition compliance". The app has NEVER asked how
+    // anyone slept — recovery_capacity is one onboarding answer that never
+    // changes — so a readiness score would be two-thirds measured and
+    // one-third invented, and the invented third is what makes it readiness.
+    // Her call, when the choice was put to her: build it from what is real
+    // and name it honestly.
+    const src = fs.readFileSync('src/lib/consistency-score.ts', 'utf-8')
+    check('the module does not claim to measure readiness or recovery',
+      !/export .*(readiness|recovery)/i.test(src))
+    const dash = fs.readFileSync('src/components/Dashboard.tsx', 'utf-8')
+    check('the dashboard labels it Consistency', /Consistency:/.test(dash))
+    check('...and shows what it counted, not a bare number',
+      /components\.map\(c => `\$\{c\.done\}\/\$\{c\.outOf\}/.test(dash))
+
+    // Averaging RATIOS, not raw counts: 3/3 sessions and 1/6 protein days
+    // must not let the sessions drown out the protein.
+    const mixed = computeConsistency([
+      { label: 'planned sessions', done: 3, outOf: 3 },
+      { label: 'protein days', done: 1, outOf: 6 },
+    ])
+    check(`ratios are averaged, not counts (${mixed?.percent}%)`, mixed?.percent === 58, mixed)
+
+    // Nothing measurable yet -> null, never 0%.
+    check('no components means no score, not zero',
+      computeConsistency([{ label: 'planned sessions', done: 0, outOf: 0 }]) === null)
+
+    // A component with no data is dropped rather than counted as a zero —
+    // otherwise a user with no protein target would be marked down for it.
+    const partial = computeConsistency([
+      { label: 'planned sessions', done: 2, outOf: 2 },
+      { label: 'protein days', done: 0, outOf: 0 },
+    ])
+    check('a component with no data is dropped, not scored as zero',
+      partial?.percent === 100 && partial.components.length === 1, partial)
+  }
+
   if (failures > 0) {
     console.error(`\n${failures} dashboard check(s) FAILED.`)
     process.exit(1)

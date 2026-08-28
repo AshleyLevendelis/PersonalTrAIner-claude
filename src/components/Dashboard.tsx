@@ -432,6 +432,24 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
 
         <p className="mt-3 text-xs text-muted-foreground">Streak: {data.streak} day{data.streak === 1 ? '' : 's'} on plan</p>
 
+        {/* CONSISTENCY, NOT READINESS, and the components are shown for the
+            same reason the name is careful: a lone percentage invites being
+            read as a verdict on the person. Spelling out what it counted
+            keeps it a summary of things they did, which is all it is.
+
+            Absent entirely when nothing measurable has happened this plan
+            week — a 0% on a Monday with nothing scheduled yet would read as
+            "you have been terrible", which is the opposite of true. */}
+        {data.consistency && (
+          <div className="mt-2 flex items-baseline gap-2">
+            <span className="text-xs text-muted-foreground">Consistency:</span>
+            <span className="tabular-mono text-xs font-semibold text-primary">{data.consistency.percent}%</span>
+            <span className="text-[11px] text-muted-foreground">
+              {data.consistency.components.map(c => `${c.done}/${c.outOf} ${c.label}`).join(' · ')}
+            </span>
+          </div>
+        )}
+
         {/* 6. What's left today — needs-you amber, marked by a pulsing dot
             rather than a bordered banner. */}
         {data.whatsLeftLine && (

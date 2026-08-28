@@ -33,6 +33,17 @@ export interface CoachTipContext {
   weightTrend: { ratePerWeekKg: number; towardGoal: boolean | null } | null
   /** PRs set within the last 7 days, from the PR cache. */
   recentPRs: { exerciseName: string; weightKg: number }[]
+  /**
+   * Water so far today and the day's target, plus the LOCAL hour — the only
+   * time-of-day-sensitive rule here, and the reason the hour is passed in
+   * rather than read: this file is a pure function and `new Date()` inside it
+   * would make the same context produce different answers at different times,
+   * which is untestable and unseeded.
+   */
+  waterMl: number
+  waterTargetMl: number
+  /** 0-23, local. */
+  hourOfDay: number
 }
 
 interface Rule {
@@ -84,6 +95,49 @@ const RULES: Rule[] = [
       if (ctx.recentPRs.length === 0) return null
       const pr = ctx.recentPRs[0]
       return `New PR this week: ${pr.exerciseName} at ${pr.weightKg}kg.`
+    },
+  },
+  {
+    // ASHLEY'S OWN EXAMPLE: "You're 1,200 ml behind on water target for 12 PM."
+    // It is arithmetic on a target the app set and a log the user made, so it
+    // is a thing the app genuinely knows — unlike the energy/readiness line
+    // beside it in the same request, which would have needed sleep data that
+    // is never collected.
+    //
+    // PRO-RATA AGAINST A WAKING DAY, not the whole 24 hours: nobody drinks
+    // at 3am, so measuring against midnight would call everyone behind every
+    // morning. 08:00-22:00 is the window; before it starts there is nothing
+    // to be behind on.
+    //
+    // The 60% threshold and the 250ml floor exist so this stays a nudge. Off
+    // pace by a mouthful at 8:05 is not an observation worth spending the
+    // day's one line on, and a rule that fires constantly is the "generic
+    // wellness filler" this file's header rules out in a different costume.
+    //
+    // It joins the same seeded rotation as everything else rather than
+    // jumping the queue. Being behind on water does not outrank a new PR,
+    // and a rule that always won would be a daily nag.
+    key: 'water_pace',
+    evaluate: ctx => {
+      const START = 8, END = 22
+      // EVERY INPUT CHECKED FOR BEING A NUMBER AT ALL, not just for its value.
+      // Written as `ctx.waterTargetMl <= 0`, this rule ran on a context that
+      // carried no water fields — `undefined <= 0` is false, so it fell
+      // through to the arithmetic and produced "You're about NaNml behind on
+      // water for this time of day." A NaN in a sentence shown to a user, from
+      // a rule whose entire job is to say only true things. Caught by the
+      // existing coach-tip gate ("zero supporting data anywhere -> null"),
+      // which is precisely what that check is for.
+      const { waterMl, waterTargetMl, hourOfDay } = ctx
+      if (![waterMl, waterTargetMl, hourOfDay].every(n => typeof n === 'number' && Number.isFinite(n))) return null
+      if (waterTargetMl <= 0) return null
+      if (hourOfDay < START + 2 || hourOfDay > END) return null
+      const elapsed = Math.min(hourOfDay - START, END - START)
+      const expected = waterTargetMl * (elapsed / (END - START))
+      if (waterMl >= expected * 0.6) return null
+      const behind = Math.round((expected - waterMl) / 50) * 50
+      if (behind < 250) return null
+      return `You're about ${behind}ml behind on water for this time of day.`
     },
   },
   {
