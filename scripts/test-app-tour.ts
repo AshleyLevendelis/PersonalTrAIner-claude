@@ -246,5 +246,71 @@ console.log('\n5. The behaviour the copy depends on is still wired')
   }
 }
 
+// ---------------------------------------------------------------------------
+console.log('\nTHE SET STOP\'S PROMISE HAS TO BE KEEPABLE')
+// ---------------------------------------------------------------------------
+{
+  // FOUND BY DRIVING THE REAL TOUR AGAINST THE REAL SCREENS (verify:tour-real),
+  // and invisible to every check above, which reason about the tour's own
+  // wiring rather than about whether the app can do what the tour says.
+  //
+  // The set stop tells the user to tap the ✓ and says "Leave the fields blank
+  // and I'll take the prescribed numbers." The weight column had a prescribed
+  // fallback; the reps column did not — it fell back to '' and the save was
+  // refused with "Enter reps to log this set". The reps box was meanwhile
+  // suggesting "0", the one value the save explicitly rejects.
+  //
+  // It could only ever bite on week 1, and week 1 is the ONLY week the tour
+  // runs in: `tourArmed` is set at exactly one call site, the moment
+  // onboarding succeeds. Ghost values come from last week, so the tour and
+  // the missing fallback were guaranteed to meet.
+  const grid = readFileSync(join(ROOT, 'src/components/exercise/SetGrid.tsx'), 'utf8')
+  const setStep = TOUR_STEPS.find(s => s.key === SET_STEP_KEY)!
+
+  const promisesBlank = /blank/i.test(setStep.copy)
+  check('the set stop still promises blank fields work', promisesBlank, setStep.copy)
+
+  if (promisesBlank) {
+    check('...and reps has a prescribed fallback to make that true',
+      /const defaultRepsFor = \(\)/.test(grid) &&
+      /input\.reps \|\| \(ghost \? String\(ghost\.reps_completed\) : defaultRepsFor\(\)\)/.test(grid))
+    check('...and the reps box no longer suggests the value the save refuses',
+      !/placeholder=\{ghost \? String\(ghost\.reps_completed\) : '0'\}/.test(grid))
+  }
+
+  // THE GUARD THAT MUST NOT BE REOPENED. A weight-only tap committing "0
+  // reps" as a done set fed the dot ladder, the progress bar and the
+  // progression engine a set that never happened. The fallback supplies a
+  // real target where one exists; it must not become a licence to log zero.
+  //
+  // MATCHED AS THE CONDITION, NOT AS THE PHRASE. Written first as
+  // /reps <= 0/, it went green against a mutation that deleted the guard —
+  // because the phrase also appears in the comment I had just written above
+  // the fallback explaining the guard. A check that a comment can satisfy is
+  // a check on the documentation.
+  check('a zero/absent rep count still refuses to log',
+    /if \(!Number\.isFinite\(reps\) \|\| reps <= 0\) \{/.test(grid) &&
+    /Enter reps to log this set/.test(grid))
+
+  // BOTTOM of the range, never the top — the number drives next week's load,
+  // so erring high hands someone heavier weights off a set the app invented.
+  // The regex is read out of the source rather than restated, then run
+  // against the shapes the generator actually emits.
+  const src = /const defaultRepsFor = \(\): string => \/(.+?)\/\.exec/.exec(grid)?.[1]
+  check('the fallback parses a number out of the prescription', !!src, src)
+  if (src) {
+    const re = new RegExp(src)
+    const cases: [string, string][] = [
+      ['9-11', '9'], ['8', '8'], ['11-13', '11'], ['18-23', '18'],
+      ['33-48s', '33'], ['30-45s', '30'], ['40m', '40'],
+    ]
+    const wrong = cases.filter(([input, want]) => (re.exec(input)?.[0] ?? '') !== want)
+    check(`it takes the BOTTOM of every prescription shape (${cases.length} checked)`,
+      wrong.length === 0, wrong)
+    check('a prescription with no number falls through to the refusal',
+      (re.exec('')?.[0] ?? '') === '' && (re.exec('AMRAP')?.[0] ?? '') === '')
+  }
+}
+
 console.log(failures === 0 ? '\nAll app-tour checks passed.\n' : `\n${failures} FAILED\n`)
 process.exit(failures === 0 ? 0 : 1)

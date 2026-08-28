@@ -150,19 +150,51 @@ export function SetGrid({
     return suggestedLoadKg != null ? String(suggestedLoadKg) : '0'
   }
 
+  /**
+   * What a blank reps box logs — the BOTTOM of the prescribed range.
+   *
+   * The weight column has had a prescribed fallback for a while; reps did
+   * not, and the asymmetry only ever bit on the ONE session where it is
+   * guaranteed to bite. Ghost values come from last week, so week 1 has
+   * none — and the app tour, which runs immediately after onboarding and
+   * therefore only ever on week 1, says in as many words: "Leave the fields
+   * blank and I'll take the prescribed numbers." Tapping the ✓ exactly as
+   * instructed answered "Enter reps to log this set", and the reps box was
+   * suggesting "0" — the single value handleSaveSet refuses. Found by
+   * driving the real tour against the real screens (verify:tour-real).
+   *
+   * BOTTOM of the range, not the top, on Ashley's ruling: the app must never
+   * record more work than someone actually did. The number feeds the
+   * progression engine, so erring high would hand them heavier weights next
+   * week off the back of a set it invented.
+   *
+   * First integer, which is the bottom for every shape the generator emits —
+   * "9-11" -> 9, "8" -> 8, "33-48s" -> 33, "40m" -> 40 (time and distance
+   * prescriptions log in their own unit through this same column).
+   *
+   * Empty when there is no number to take. That is deliberate: the
+   * "reps <= 0 never logs a completed set" guard below still has to fire for
+   * a prescription that genuinely carries no target, which is the gap it was
+   * written to close.
+   */
+  const defaultRepsFor = (): string => /\d+/.exec(prescribedReps ?? '')?.[0] ?? ''
+
   const handleSaveSet = (setNumber: number) => {
     if (!profileId) return
     const input = inputFor(setNumber)
     const ghost = ghostFor(setNumber)
 
     // Reps: typed -> ghost (repeat-last-week's tap-the-check convenience) ->
-    // reject with a visible row error. Reps of 0 (or nothing to fall back
-    // on) is never a valid "completed" signal, no matter what weight is
-    // present — closes the gap where a weight-only tap silently committed
-    // "0 reps" as a done set (it fed the dot ladder, progress bar, and
-    // progression engine a set that never happened), and the gap where an
-    // empty-reps tap did nothing with zero feedback.
-    const repsStr = input.reps || (ghost ? String(ghost.reps_completed) : '')
+    // the PRESCRIBED bottom of the range -> reject with a visible row error.
+    // Reps of 0 (or nothing to fall back on) is never a valid "completed"
+    // signal, no matter what weight is present — closes the gap where a
+    // weight-only tap silently committed "0 reps" as a done set (it fed the
+    // dot ladder, progress bar, and progression engine a set that never
+    // happened), and the gap where an empty-reps tap did nothing with zero
+    // feedback. The prescribed step is NEW and does not reopen either: it
+    // supplies a real target where one exists, and falls through to the same
+    // refusal where one does not. See defaultRepsFor.
+    const repsStr = input.reps || (ghost ? String(ghost.reps_completed) : defaultRepsFor())
     const reps = repsStr ? parseInt(repsStr, 10) : NaN
     if (!Number.isFinite(reps) || reps <= 0) {
       setRowErrors(prev => ({ ...prev, [setNumber]: 'Enter reps to log this set' }))
@@ -353,7 +385,9 @@ export function SetGrid({
               min="0"
               max={MAX_REPS}
               step="1"
-              placeholder={ghost ? String(ghost.reps_completed) : '0'}
+              /* Never '0' as a fallback: that suggested the exact value the
+                 save refuses, on the one session where the fallback applies. */
+              placeholder={ghost ? String(ghost.reps_completed) : defaultRepsFor()}
               value={input.reps}
               onChange={e => updateInput(setNumber, 'reps', e.target.value)}
               onFocus={scrollRowIntoView}
