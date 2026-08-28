@@ -102,7 +102,9 @@ const db: Db = {
     { id: 'm2', profile_id: PROFILE_ID, date: '2026-08-21', weight_kg: 80.6 },
   ],
   water_logs: [], exercise_set_logs: [], workout_sessions: [], cardio_logs: [],
-  daily_steps: [], meal_events: [], meal_plan_picks: [], meal_plan_slots: [],
+  // A logged step count so the new ring renders — without one the row is
+  // still the input, which is a different state.
+  daily_steps: [{ id: 's1', profile_id: PROFILE_ID, date: today, steps: 7400 }], meal_events: [], meal_plan_picks: [], meal_plan_slots: [],
   favorite_meals: [], grocery_items: [], load_suggestions: [], pending_actions: [],
   plan_adaptations: [], user_facts: [], user_context_facts: [], user_goals: [],
   chat_messages: [], exercise_plans: [], mesocycle_weeks: [],
@@ -155,11 +157,7 @@ function Harness() {
         {activeTab === 'dashboard' && (
           <Dashboard profile={profile} macros={macros} exercisePlan={exercisePlan}
             mesocycle={mesocycle} planCreatedAt={profile.created_at}
-            /* App.tsx passes this. Without it the "Set a goal weight" link
-               never renders and the harness measures a state no user is in —
-               which is exactly how the first before/after here read 1261px
-               twice and looked like the change had done nothing. */
-            onOpenGoals={noop} />
+/>
         )}
         {activeTab === 'nutrition' && (
           <NutritionDisplay profile={profile} macros={macros} exercisePlan={exercisePlan}

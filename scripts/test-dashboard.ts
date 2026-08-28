@@ -250,7 +250,11 @@ async function main() {
     const dash = fs.readFileSync('src/components/Dashboard.tsx', 'utf-8')
     check('the dashboard no longer embeds the goal-weight form',
       !/<GoalWeightSetter/.test(dash))
-    check('...and routes to the profile screen instead', /onOpenGoals/.test(dash))
+    // No link back, either: measured, removing the input saved 44px and a
+    // link to it cost 24, so the page came out a pixel TALLER than it began.
+    // The goal setter is reachable from the gear and from chat; it does not
+    // need a permanent row on the home screen too.
+    check('...and does not spend a row on a link back to it', !/Set a goal weight/.test(dash))
 
     // The form has to EXIST somewhere or the feature is simply gone — the
     // Goals section listed a goal weight once set, with nowhere to set one.
@@ -264,6 +268,47 @@ async function main() {
     check('it never invents a baseline when there is no weight to use',
       !/baselineKg=\{latestWeightKg \?\? 0\}/.test(prof) &&
       /Log a weigh-in first/.test(prof))
+  }
+
+  console.log('\n[3c] the steps row has a target to draw a ring against')
+  {
+    // Ashley: "replace the plain text box/button for Steps with a visual
+    // progress bar or ring matching the calorie indicator style." A ring
+    // needs a denominator and there was none — steps-store.ts is manual entry
+    // with no target anywhere in the app.
+    //
+    // Derived from the activity level already on file rather than asked for,
+    // which is exactly how the calorie target works (BMR/TDEE, shown as
+    // "0 OF 3040 KCAL"). Not a new kind of claim, the existing one applied to
+    // a second number.
+    const { stepsTargetFor } = await import('../src/lib/steps-target')
+    check('every activity level has a target', [
+      'sedentary', 'light', 'moderate', 'active', 'very_active',
+    ].every(a => stepsTargetFor(a as never) > 0))
+
+    // Ordered, and ordered the SAME WAY as the calorie multipliers these
+    // levels already drive. A step target that called a sedentary user more
+    // active than a very active one would contradict their own calories.
+    const ordered = ['sedentary', 'light', 'moderate', 'active', 'very_active']
+      .map(a => stepsTargetFor(a as never))
+    check(`targets rise with activity (${ordered.join(' < ')})`,
+      ordered.every((v, i) => i === 0 || v > ordered[i - 1]), ordered)
+
+    // very_active is in the type but NOT offered at onboarding, so it is the
+    // one that silently falls through a Record if anyone forgets it — tsc
+    // caught exactly that while this was being written.
+    check('very_active is covered, though onboarding never offers it',
+      stepsTargetFor('very_active' as never) > stepsTargetFor('active' as never))
+
+    // An unknown/missing level must not produce 0 — a ring against a zero
+    // denominator is a divide-by-zero on screen.
+    check('a missing activity level still yields a usable target',
+      stepsTargetFor(undefined) > 0 && stepsTargetFor(null) > 0)
+
+    const dash = fs.readFileSync('src/components/Dashboard.tsx', 'utf-8')
+    check('the steps row draws a ring', /stepsTargetFor\(profile\.activity_level\)/.test(dash))
+    check('...using the same ring geometry as the calorie tile',
+      /CALORIE_TILE_RING_CIRC \* Math\.min\(1, steps\.steps \/ stepsTarget\)/.test(dash))
   }
 
   console.log('\n[4] dashboard-data.ts: calories-in is a direct passthrough from getTodayLedger, never recomputed')

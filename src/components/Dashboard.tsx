@@ -11,6 +11,7 @@ import { useActiveSession } from '@/hooks/useActiveSession'
 import { getAppNow } from '@/lib/dev-clock'
 import { tabHash } from '@/lib/app-route'
 import { loadDashboardData, type DashboardData } from '@/lib/dashboard-data'
+import { stepsTargetFor } from '@/lib/steps-target'
 import { getStepsForDate, logStepsManual, type DailyStepsRow } from '@/lib/steps-store'
 import { WeighInCard } from '@/components/WeighInCard'
 import type { UserProfile, MacroTargets, WorkoutDay, MesocycleWeek } from '@/lib/types'
@@ -23,8 +24,6 @@ interface DashboardProps {
   planCreatedAt?: string
   /** Fired after a weigh-in is logged here so App.tsx recomputes living targets + latestWeightKg — same callback chat's log_weight already uses. */
   onWeightLogged?: () => void | Promise<void>
-  /** Opens the profile screen at its Goals section — where setting a goal weight lives now. Same pattern NutritionDisplay uses to route to the dietary section. */
-  onOpenGoals?: () => void
 }
 
 // Tab-restructure handoff — Dashboard.tsx no longer owns the macro ring
@@ -91,7 +90,8 @@ function WeighInTrendChart({ series, goalKg }: { series: { date: string; kg: num
 }
 
 
-export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreatedAt, onWeightLogged, onOpenGoals }: DashboardProps) {
+export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreatedAt, onWeightLogged }: DashboardProps) {
+  const stepsTarget = stepsTargetFor(profile.activity_level)
   const activeSession = useActiveSession()
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -304,7 +304,30 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
           <div className="flex items-baseline justify-between py-3" style={{ borderTop: '1px solid var(--hairline)' }}>
             <span className="text-[13px] text-text-tertiary">Steps</span>
             {steps ? (
-              <span className="tabular-mono text-[13px]">{steps.steps.toLocaleString()}</span>
+              /* A RING, matching the calorie tile — Ashley: "replace the plain
+                 text box/button for Steps with a visual progress bar or ring
+                 matching the calorie indicator style". Same radius, same
+                 stroke, same rotate(-90) start, so the two read as one system
+                 rather than two people's work.
+
+                 The target is DERIVED from the activity level already on file
+                 (steps-target.ts), exactly as the calorie target is derived
+                 from BMR and TDEE. It is not a new kind of claim for this app
+                 to make — it is the existing one applied to a second number. */
+              <div className="flex items-center gap-2">
+                <svg viewBox="0 0 34 34" className="size-[26px] shrink-0" aria-hidden>
+                  <circle cx="17" cy="17" r={CALORIE_TILE_RING_R} fill="none" stroke="var(--surface-raised)" strokeWidth="4" />
+                  <circle
+                    cx="17" cy="17" r={CALORIE_TILE_RING_R} fill="none" stroke="var(--primary)" strokeWidth="4" strokeLinecap="round"
+                    strokeDasharray={`${CALORIE_TILE_RING_CIRC * Math.min(1, steps.steps / stepsTarget)} ${CALORIE_TILE_RING_CIRC}`}
+                    transform="rotate(-90 17 17)"
+                  />
+                </svg>
+                <span className="tabular-mono text-[13px]">{steps.steps.toLocaleString()}</span>
+                <span className="text-[10px] uppercase tracking-[.12em] text-muted-foreground">
+                  of {stepsTarget.toLocaleString()}
+                </span>
+              </div>
             ) : (
               <div className="flex items-center gap-2">
                 <input
@@ -352,23 +375,22 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
                     })()}
                   </span>
                 )}
-                {/* ON A ROW THAT ALREADY EXISTS, opposite the weigh-in count.
-                    As a row of its own it cost 32px and saved almost nothing
-                    over the input it replaced — measured 1297px -> 1261px.
-                    The caption row has spare width and the delta only appears
-                    once there are two weigh-ins, so the two never collide. */}
-                {data.weightGoalKg == null && profile.id && onOpenGoals && data.weightSeries.length <= 1 && (
-                  <button
-                    type="button"
-                    onClick={onOpenGoals}
-                    className="text-[11px] font-medium text-primary"
-                  >
-                    Set a goal weight ›
-                  </button>
-                )}
+
               </div>
             </>
           )}
+          {/* NO LINK HERE, and that is the point of the change rather than
+              an omission. Ashley asked to "collapse Set goal weight into a
+              setting modal, and keep only the quick weight logger visible to
+              reduce scrolling" — and measurement is what settled it: removing
+              the input row saved 44px, and a link back to it cost 24 of them,
+              so the page came out one pixel TALLER than it started (1289 ->
+              1290). The instruction was already the right answer.
+
+              Setting a goal weight lives in the profile screen's Goals
+              section, reachable from the gear, and the coach can set one in
+              chat. Two routes, neither of them a permanent row on the screen
+              someone opens every morning. */}
           {profile.id && (
             <div className="mt-3">
               <WeighInCard profileId={profile.id} onWeightLogged={handleWeighInChanged} />
