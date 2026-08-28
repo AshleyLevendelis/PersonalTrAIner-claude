@@ -25,6 +25,7 @@ import { substituteForInjury, substituteForEquipment, assessAdaptation, countSlo
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { useSpeechToText } from '@/hooks/useSpeechToText'
 import { useViewportInset } from '@/hooks/useViewportInset'
+import { keepsComposerFocus, refocusComposer } from '@/lib/composer-focus'
 import { TAB_BAR_HEIGHT_PX } from '@/components/BottomTabBar'
 import { useBottomDockHeight } from '@/hooks/useBottomDockHeight'
 import { cn } from '@/lib/utils'
@@ -165,6 +166,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
   // composer now rides above the tab bar via the exact same fixed-position
   // + keyboard-inset pattern BottomDock already uses.
   const { insetPx: composerInsetPx, isKeyboardOpen: composerKeyboardOpen } = useViewportInset()
+  const composerRef = useRef<HTMLTextAreaElement>(null)
 
   // Keyed by an in-memory resolverId, not persisted: holds the full
   // entries/groups for a log_workout turn that hit a BLOCKING ambiguity, so
@@ -2188,6 +2190,10 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       sendMessage()
+      // On a phone this key is the IME's "Go" action, whose default is to put
+      // the keyboard away. See composer-focus.ts — same defect the onboarding
+      // composer was measured failing.
+      refocusComposer(composerRef.current)
     }
   }
 
@@ -2608,7 +2614,14 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
           <Trash2 className="size-3.5" />
         </Button>
         <div
-          className="flex-1 overflow-y-auto p-4 pb-24 overscroll-contain"
+          // min-h-0: a flex item defaults to min-height:auto and refuses to
+          // shrink below its content, so `flex-1 overflow-y-auto` grows the box
+          // instead of scrolling inside it. Measured doing exactly that on the
+          // onboarding composer (875px of canvas in an 844px viewport,
+          // scrollHeight === clientHeight, every scrollTo a no-op). Added here
+          // by parity — this screen was NOT measured, because the tour
+          // harness's chat tab is a stub rather than the real component.
+          className="flex-1 min-h-0 overflow-y-auto p-4 pb-24 overscroll-contain"
           ref={scrollRef}
           onScroll={handleScroll}
         >
@@ -2820,6 +2833,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     >
       <div className="flex items-end gap-2.5 rounded-[20px] bg-[color:var(--surface-raised)] py-1.5 pl-4 pr-1.5">
         <Textarea
+          ref={composerRef}
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
@@ -2832,6 +2846,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
             type="button"
             variant={speech.isListening ? 'destructive' : 'ghost'}
             size="icon"
+            {...keepsComposerFocus}
             onClick={handleMicClick}
             onPointerDown={() => {
               // Long-press (700ms) toggles the on-screen voice-debug trace —
@@ -2857,7 +2872,10 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
             <Mic className="size-4" />
           </Button>
         )}
-        <Button data-chat-send onClick={sendMessage} disabled={!input.trim() || isLoading} size="icon" className="hit-slop-44 shrink-0 rounded-full glow-mint-box">
+        {/* keepsComposerFocus: tapping send used to leave focus on <body> —
+            measured on the onboarding composer, identical shape here — which
+            is a phone putting the keyboard away between every message. */}
+        <Button data-chat-send {...keepsComposerFocus} onClick={() => { sendMessage(); refocusComposer(composerRef.current) }} disabled={!input.trim() || isLoading} size="icon" className="hit-slop-44 shrink-0 rounded-full glow-mint-box">
           <Send className="size-4" />
         </Button>
       </div>

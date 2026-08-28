@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { Dumbbell, Send, Check } from 'lucide-react'
 import { useViewportInset } from '@/hooks/useViewportInset'
+import { keepsComposerFocus, refocusComposer } from '@/lib/composer-focus'
 import { SlotChipsCard } from './SlotChipsCard'
 import { SlotNumericCard } from './SlotNumericCard'
 import {
@@ -471,6 +472,7 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
   const [busy, setBusy] = useState(false)
   const [reviewOpen, setReviewOpen] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
   const contentRef = useRef<HTMLDivElement>(null)
   const isNearBottomRef = useRef(true)
   // Read here rather than down in the render block: BOTH the composer offset
@@ -1256,7 +1258,14 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
     : { bottom: 'env(safe-area-inset-bottom)' }
 
   return (
-    <div className="min-h-[100dvh] flex flex-col ob-canvas">
+    /* h-, NOT min-h-. With min-height the column is free to grow past the
+       viewport, and it did: measured at 390x844 the canvas was 875px tall and
+       the "scroll container" below reported scrollHeight === clientHeight ===
+       799 — nothing to scroll. Every scrollTo in the auto-scroll block was a
+       no-op, and what actually moved was the PAGE, which nothing here
+       controls and which parks the newest message under the fixed composer.
+       overflow-hidden keeps that page-level scroll from coming back. */
+    <div className="h-[100dvh] overflow-hidden flex flex-col ob-canvas">
       {/* v2 COACH HEADER. The conversation now has someone at the top of it:
           an avatar with a slow pulse, a name, and what it is currently doing.
           This is also what let the per-message COACH label go — identity is
@@ -1305,7 +1314,11 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
       <div
         ref={scrollRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto px-4 pb-28"
+        /* min-h-0 is load-bearing, not tidying. A flex item defaults to
+           min-height:auto, which refuses to shrink below its content — so
+           `flex-1 overflow-y-auto` alone grows the box instead of scrolling
+           inside it, which is exactly what was measured. */
+        className="flex-1 min-h-0 overflow-y-auto px-4 pb-28"
         style={isKeyboardOpen ? { paddingBottom: insetPx + 112 } : undefined}
       >
         <div ref={contentRef} className="max-w-md w-full mx-auto flex flex-col gap-[22px]">
@@ -1485,13 +1498,20 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
       >
         <div className="max-w-md w-full mx-auto flex items-center gap-2.5">
           <Input
+            ref={inputRef}
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => {
               if (e.key === 'Enter' && input.trim() && !busy) {
+                // preventDefault stops the browser's own Enter handling. On a
+                // phone that key is the IME's "Go" action, whose default is to
+                // dismiss the keyboard — the exact thing this composer must not
+                // do between two questions.
+                e.preventDefault()
                 const text = input
                 setInput('')
                 void sendMessage(text)
+                refocusComposer(inputRef.current)
               }
             }}
             placeholder={pendingHint}
@@ -1526,10 +1546,17 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
                 : 'bg-[color:color-mix(in_oklab,var(--border)_50%,transparent)] text-muted-foreground hover:bg-[color:color-mix(in_oklab,var(--border)_50%,transparent)]'
             }`}
             disabled={!canSend}
+            // Tapping this used to leave document.activeElement on <body> —
+            // measured, not guessed (npm run verify:keyboard) — because a tap
+            // focuses the button and emptying the box disables it in the same
+            // tick, so not even the button keeps it. On a phone that is the
+            // keyboard closing between every question.
+            {...keepsComposerFocus}
             onClick={() => {
               const text = input
               setInput('')
               void sendMessage(text)
+              refocusComposer(inputRef.current)
             }}
           >
             <Send className="size-[22px]" />

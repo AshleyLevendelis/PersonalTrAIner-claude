@@ -128,7 +128,14 @@ console.log('\n4. The typing indicator is someone typing, not a spinner')
 
 console.log('\n5. v2 — the composer')
 {
-  const composer = ui.slice(ui.indexOf('ob-composer-fade'), ui.indexOf('ob-composer-fade') + 3400)
+  // To the END OF THE FILE, not a fixed character count. This was
+  // `+ 3400`, and adding five lines of comment inside the composer pushed
+  // `size-[22px]` outside the window and turned a passing check red with the
+  // markup unchanged — a gate that fails on comment length is measuring the
+  // wrong thing. The composer is the last element in the component, so
+  // end-of-file is its real boundary; the review card that check 135 must not
+  // see sits ABOVE it, so this stays correctly scoped.
+  const composer = ui.slice(ui.indexOf('ob-composer-fade'))
   check('it sits on a fade-up of the canvas, not a hard rule', /ob-composer-fade/.test(ui))
   // Scoped to the composer: the review card legitimately still uses that
   // border on its own paragraphs, and an unscoped check flagged those.

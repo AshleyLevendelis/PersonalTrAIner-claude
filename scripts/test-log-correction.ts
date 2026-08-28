@@ -202,12 +202,41 @@ console.log('\n6. The coach is GIVEN the prescribed weight, so it never has to a
   // "@" clause leaves it free to say it again.
   check('the prompt names the "@" clause as the prescribed weight',
     /includes the PRESCRIBED WEIGHT for every movement/.test(fnSrc))
-  check('...forbids the sentence that was actually said to a user',
-    /NEVER tell the user you don't have their prescribed weights/.test(fnSrc))
+  // Both sentences the coach actually said, quoted verbatim in the prompt, so
+  // the ban names the thing rather than paraphrasing it.
+  check('...forbids the first sentence actually said to a user',
+    fnSrc.includes(`"I don't have your prescribed weights"`))
+  check('...and the second one',
+    fnSrc.includes(`"I can't look up what was prescribed"`))
+  check('...as a ban, not a suggestion', /must never say otherwise/.test(fnSrc))
   check('...teaches per-hand as each hand, not a total',
     /14kg in EACH hand/.test(fnSrc))
   check('...and does not let quoting a prescription become logging it',
-    /never yours to log as done/.test(fnSrc))
+    /never yours to LOG as done/.test(fnSrc))
+  // The pointer used to read "the never-invent rule BELOW". That rule is ~137
+  // lines ABOVE this text in the same prompt string, so the one sentence
+  // separating "quote a prescription" from "log a prescription" sent the model
+  // looking the wrong way. Asserted as a position, not as wording, so it
+  // cannot go stale if either block moves.
+  const inventAt = fnSrc.indexOf('NEVER INVENT REPS OR SETS EITHER')
+  const quoteAt = fnSrc.indexOf('never yours to LOG as done')
+  check('the never-invent rule really does come earlier in the prompt', inventAt !== -1 && inventAt < quoteAt, { inventAt, quoteAt })
+  check('...and the carve-out points backwards, not forwards',
+    /never-invent rule stated earlier in this prompt/.test(fnSrc))
+
+  // An unconditional "you HAVE the weights" is false whenever the plan is
+  // empty — buildCoachExerciseSummary({ days: [] }) returns '' — and the
+  // summary only ever carries the ACTIVE week, while the question that started
+  // all of this was about a PAST one. Claiming data you were not given is the
+  // same failure as denying data you were, pointing the other way.
+  check('an empty plan is not something the coach may claim to have',
+    /if the section above is EMPTY/i.test(fnSrc))
+  check('...and the coach is told this is the active week only',
+    /THIS WEEK ONLY/.test(fnSrc))
+  check('...so it cannot substitute this week for an earlier block',
+    /do not substitute this week's number/.test(fnSrc))
+  check('buildCoachExerciseSummary really does return nothing for an empty plan (the state the rule covers)',
+    buildCoachExerciseSummary({ days: [] }) === '')
 }
 
 if (failures > 0) { console.error(`\n${failures} check(s) failed`); process.exit(1) }
