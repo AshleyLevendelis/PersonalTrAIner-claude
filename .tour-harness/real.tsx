@@ -181,7 +181,11 @@ function Harness() {
       </main>
 
       <BottomTabBar activeTab={activeTab} onTabChange={t => { window.location.hash = tabHash(t as Tab) }} />
-      {ready && <AppTour profileId={PROFILE_ID} armed />}
+      {/* ?tour=off walks the screens on their own — the scrim covers most of
+          the page, so a layout pass has to be able to take it away. */}
+      {ready && new URLSearchParams(location.search).get('tour') !== 'off' && (
+        <AppTour profileId={PROFILE_ID} armed />
+      )}
     </div>
     </BottomDockHeightProvider>
     </TimersProvider>
