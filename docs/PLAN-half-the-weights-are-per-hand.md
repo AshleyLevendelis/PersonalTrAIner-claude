@@ -107,8 +107,18 @@ All of them fit. Exercise names longer than ~113px already push the meta onto
 its own line (Banded Terminal Knee Extension does today), so the long forms
 degrade the same way the current one does.
 
-**This is the decision that is Ashley's**, and it is a wording question, not a
-technical one — every option above is equally cheap.
+**DECIDED — Ashley, 28 Aug 2026: `14kg per hand`.** The longest of the six and
+it still fits with 48px to spare. Chosen over `2×14kg` (two `×` signs on a line
+that already reads `3×11-13` for sets×reps), `14kg each` ("each" could be read
+as each set), and `14kg/hand` (reads as shorthand, not as a coach).
+
+It is also the wording the app already generates internally, so nothing new is
+being invented — see `formatLoad` above.
+
+**One detail to settle at build time, not worth a question of its own:** the
+shipped string is `~14kg per hand`, with a tilde meaning "about". `LoadChip`
+already displays it that way today, so the plan is to keep the tilde rather
+than diverge two surfaces from a third. Say if you want it dropped.
 
 ## Proposed build, once the wording is chosen
 
