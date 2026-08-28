@@ -31,7 +31,7 @@ These apply to every session in this repo. They exist so they stop being restate
 
 - Commit, never push, unless explicitly told to push.
 - Do not trust or report "N commits ahead of origin" without verifying against origin — that line has been wrong repeatedly.
-- Frontend ships via push → Vercel. `chat-gemini` is a Supabase edge function needing its own separate deploy. Note which is needed.
+- Frontend ships via push → Vercel. The Supabase edge functions (`chat-gemini`, `generate-meals`, `macro-calibration`, `onboarding-chat`) each need their own separate deploy: `npm run deploy:functions:prod -- <name>`, which asks for the `yes-production` phrase and names the target on the deploy itself. Note which is needed.
 
 ## Database
 

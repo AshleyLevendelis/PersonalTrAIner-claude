@@ -724,7 +724,7 @@ production.** What is actually true:
 |---|---|---|
 | `.env.local` | `vswuurrtbzbrgubddefv` | **TEST** — added 12 Aug, the day after the split, so local dev writes somewhere safe |
 | `.env` | `aoksyzjrrikvuhxatljy` | a third, older project — not TEST and not production |
-| CLI ambient link | `vswuurrtbzbrgubddefv` | **TEST**, by design (`db-link-test.sh`) |
+| CLI ambient link | `vswuurrtbzbrgubddefv` | **TEST**, by design (`npm run db:link-test`) |
 | PRODUCTION | `sdkhuczcfnqqimdgfiks` | reachable only via `npm run db:link-prod` |
 
 So a bare `npx supabase functions deploy <fn>` deploys to **TEST**. It
@@ -774,26 +774,60 @@ against existing data).
 
 ### 7.3 Edge functions
 
-`supabase/functions/{chat-gemini,generate-meals,macro-calibration}` —
-Deno, deployed independently of the frontend build:
+`supabase/functions/{chat-gemini,generate-meals,macro-calibration,onboarding-chat}`
+— Deno, deployed independently of the frontend build. One command per target:
 
 ```bash
-npx supabase functions deploy <function-name>
+npm run deploy:functions:test                     # all four -> TEST
+npm run deploy:functions:prod                     # all four -> PRODUCTION
+npm run deploy:functions:prod -- onboarding-chat  # just one -> PRODUCTION
 ```
 
-**That command deploys to TEST**, because the CLI's ambient link is TEST
-(§7.1). Production takes three commands and the middle one is the same as
-above:
+The prod form asks for the `yes-production` phrase, links, deploys with
+`--project-ref` naming the target on the deploy call itself, and relinks to
+TEST on the way out — including when it fails partway.
 
-```bash
+**REPLACED 28 Aug 2026, after the same deploy went to the wrong project
+twice.** This section used to prescribe three commands:
+
+```
 npm run db:link-prod                              # type yes-production
 npx supabase functions deploy <function-name>     # now targets production
 npm run db:link-test                              # back to the safe default
 ```
 
-`db-link-prod.sh` names `functions deploy` explicitly as one of the commands
-the link governs, so this is the sanctioned path rather than a `--project-ref`
-flag — the confirmation phrase is the point.
+and argued that the link, not a `--project-ref` flag, was the sanctioned path
+because "the confirmation phrase is the point". The phrase was never the
+weakness. **The two-step was**: nothing connects step 1 to step 2, so when
+step 1 fails, step 2 still runs — against whatever was linked before, and it
+prints a success line either way.
+
+That is not hypothetical; it is the entire history of this function:
+
+| | what happened | where it landed |
+|---|---|---|
+| 1st | §7.1 said the ambient link was PRODUCTION. It is TEST. A bare deploy was run. | TEST |
+| 2nd | `npm run db:link-prod` was `bash scripts/db-link-prod.sh`, and Ashley's shell is Windows PowerShell, where `bash` is not on PATH. It printed `'bash' is not recognized`, the link never happened, and the deploy ran anyway. | TEST |
+
+Both look identical from the terminal: a confident `Deployed Functions on
+project …` line naming the wrong ref. Reading that line is still worth doing,
+but "read carefully" had already failed twice as a control, so the fix is
+mechanical — link and deploy are now one command, and the deploy names its own
+target so it cannot be misaimed by ambient state at all.
+
+**All of `scripts/db-*.sh` are now `.mjs`.** Node is a hard dependency of this
+repo; bash was an assumption about the developer's shell, and it was false for
+the only person who needs to reach production. `npm run test:deploy-path` holds
+that (no npm script may shell out to bash), plus the confirmation phrase, the
+relink-to-TEST guarantee, and the fact that only one file names the production
+ref. The git hook in `.githooks/` is deliberately still bash — git runs hooks
+itself, with the bash that Git for Windows ships.
+
+One translation detail the gate exists to protect: bash's `trap … EXIT` fires
+on every exit path, and its obvious Node equivalent, `try/finally`, **does
+not** — `process.exit()` skips finally blocks. A script that bailed out
+mid-production-leg would have left the CLI pointed at the live project. The
+relink is registered with `process.on('exit')` for that reason.
 
 Docker-not-running produces a harmless warning; the deploy still succeeds
 (asset upload, not a local build). **A local edit to an edge function has
