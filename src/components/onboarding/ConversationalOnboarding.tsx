@@ -179,6 +179,40 @@ function normalizeSlotKey(rawKey: string): string {
  * (returns undefined) on anything short of an exact match; ambiguous free
  * text still goes to the model, same as always.
  */
+/**
+ * WHICH LIFT DID THEY ACTUALLY NAME?
+ *
+ * Reported live: the coach asked for "squat, bench, and deadlift" in one
+ * sentence, Ashley typed "100, 150", and the app recorded Squat 100 and Bench
+ * 150 — the mapping inferred from the order the QUESTION happened to list
+ * them in. Nobody said 100 was a squat.
+ *
+ * That is not a cosmetic slip. These three slots set `load_source:
+ * 'known_weight'`, the most-trusted basis in the app: it outranks the
+ * population estimate and skips the "starting light" hedge entirely. So a
+ * mis-assigned number becomes a CONFIDENT wrong load for a whole mesocycle.
+ *
+ * The existing never-invent rules govern VALUES ("a number you supplied is
+ * indistinguishable from a number they reported the moment it is written").
+ * This is one level up — the ASSIGNMENT of a stated value to a field was
+ * invented, and nothing covered it. The prompt now forbids it; this is the
+ * backstop, because a prompt is advisory and this writes the load basis.
+ */
+const LIFT_SLOT_WORDS: Partial<Record<SlotKey, RegExp>> = {
+  knownSquatKg: /\bsquat/i,
+  knownBenchKg: /\bbench|\bpress\b/i,
+  knownDeadliftKg: /\bdead\s?lift|\bdeads?\b/i,
+}
+
+/** True when this turn would write a lift weight the user never tied to that lift. */
+function isUnnamedLiftWrite(key: SlotKey, userText: string, liftWritesThisTurn: number): boolean {
+  const namer = LIFT_SLOT_WORDS[key]
+  if (!namer) return false
+  if (namer.test(userText)) return false // they said the word — that is stated, not inferred
+  // One lift asked, one number given, nothing else pending: unambiguous.
+  return liftWritesThisTurn > 1
+}
+
 function tryExactLabelMatch(def: SlotDef, raw: string, labelOnly = false): unknown {
   const trimmed = raw.trim()
   if (!trimmed || !def.options) return undefined
@@ -667,7 +701,12 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
     }
   }
 
-  const executeActions = (ws: WorkingState, actions: Array<{ name: string; args: Record<string, unknown> }>) => {
+  const executeActions = (
+    ws: WorkingState,
+    actions: Array<{ name: string; args: Record<string, unknown> }>,
+    /** What the user actually typed this turn — the unnamed-lift guard needs to know which lifts they named, not which the question listed. */
+    userText: string,
+  ) => {
     // Caught by re-running the audit's personas against the deployed fixes:
     // the prompt says "one present_slot per turn" but the model still
     // sometimes calls it twice. The FIRST call correctly attaches to the
@@ -695,6 +734,24 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
         // via knowsWorkingLifts after the plan no longer called for it.
         if (!isSlotApplicable(def, ws.values)) {
           console.warn('onboarding: set_slot for no-longer-applicable slot', key)
+          continue
+        }
+        // THE UNNAMED-LIFT GUARD. Refuse to spread bare numbers across lifts
+        // the user never named; show the labelled group card instead, where
+        // the field says which lift it is and the mapping cannot be guessed.
+        // Ashley's ruling: "show all three labelled boxes."
+        const liftWritesThisTurn = actions.filter(
+          a => a.name === 'set_slot' &&
+            !!LIFT_SLOT_WORDS[normalizeSlotKey(String(a.args.slot_key ?? '')) as SlotKey],
+        ).length
+        if (isUnnamedLiftWrite(key, userText, liftWritesThisTurn)) {
+          if (!ws.newMessages.some(m => m.slotCard === 'knownSquatKg')) {
+            ws.newMessages.push({
+              role: 'assistant',
+              content: "Before I write those down — which is which? Fill in whichever you know:",
+              slotCard: 'knownSquatKg',
+            })
+          }
           continue
         }
         const coerced = coerceSlotValue(def, String(action.args.value ?? ''))
@@ -950,7 +1007,7 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
         responseWs.newMessages.push({ role: 'assistant', content: result.reply.trim() })
       }
       if (Array.isArray(result.actions) && result.actions.length > 0) {
-        executeActions(responseWs, result.actions)
+        executeActions(responseWs, result.actions, trimmed)
       }
       // Dead-air guard: a turn of bare tool calls (receipts only, no text,
       // no chip card, review not opening) would stall the conversation —

@@ -1,6 +1,20 @@
 # "100, 150" became Squat 100 and Bench 150, and nobody asked
 
-**Status: PLAN ONLY. Not built.** Load prescription gets a plan before a build
+**Status: BUILT.** Ashley's ruling: *"show all three labelled boxes."*
+
+**The card already existed.** `NUMERIC_GROUPS` has had
+`['knownSquatKg','knownBenchKg','knownDeadliftKg']` all along, and
+`SlotNumericCard` renders the whole group with each field labelled. So this was
+never a missing feature — the model simply bypassed it, asking in prose and
+recording two `set_slot` calls off its own reading of the order. The fix routes
+through the card that was already there.
+
+**Which layer did it: the model.** Established before writing anything, as the
+plan required. The client's typed-answer path (`tryExactLabelMatch`) has
+branches for `single` and `multi` only — it never records a typed numeric at
+all, so it cannot have been the one that assigned those numbers.
+
+~~PLAN ONLY. Not built.~~ Load prescription gets a plan before a build
 (CLAUDE.md), and starting weights are load prescription.
 
 ## What happened
@@ -93,3 +107,30 @@ underlying problem rather than adding a confirmation turn to paper over it.
   against a three-lift question records **nothing** and asks.
 - The existing `test:log-correction` rules extended: they forbid inventing a
   value; they should also forbid inventing which field a value belongs to.
+
+
+---
+
+## What was built
+
+**Two layers, because a prompt is advisory and this writes the load basis.**
+
+1. **The prompt** (`onboarding-chat`) — the actual cause. It now forbids
+   guessing which lift a bare number belongs to, names the measured incident,
+   says to call `present_slot` for `knownSquatKg` so all three labelled boxes
+   render at once, and draws the line: a NAMED lift ("squat 100, bench 150") is
+   stated and gets recorded; bare numbers record nothing and get asked about.
+
+2. **A client guard** in `executeActions` — the backstop. A `set_slot` for a
+   lift slot is refused when the turn writes more than one lift and the user's
+   own text never named it; the labelled group card is shown instead. It reads
+   what the USER typed, never the question, which is the whole distinction the
+   bug turned on.
+
+Exercised directly: `"100, 150"` refuses on both squat and bench;
+`"squat 100, bench 150"` allows both; a single lift with a single number
+allows; `age` is untouched. Four mutations bite.
+
+**Needs `npm run deploy:functions:prod -- onboarding-chat`** for the prompt
+half. The client guard ships with the Vercel push and is the half that cannot
+be talked out of.

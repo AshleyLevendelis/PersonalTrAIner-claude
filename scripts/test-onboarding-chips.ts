@@ -414,5 +414,46 @@ console.log('\n8. Every question the composer can describe actually has somethin
   check('asksSlot survives the draft round-trip', /asksSlot/.test(mapper), mapper.slice(0, 200))
 }
 
+console.log('\n9. A lift weight is never assigned to a lift the user did not name')
+{
+  // ROOT INCIDENT. The coach asked for "squat, bench, and deadlift" in one
+  // sentence; Ashley typed "100, 150"; the app recorded Squat 100 and Bench
+  // 150 — the mapping taken from the order the QUESTION listed them in.
+  //
+  // Why this is not cosmetic: those three slots set load_source
+  // 'known_weight', the most-trusted basis in the app. It outranks the
+  // population estimate and skips the "starting light" hedge, so a number on
+  // the wrong lift becomes a CONFIDENT wrong weight for a whole block. The
+  // never-invent rules already in both prompts govern VALUES; this is the
+  // assignment of a value to a field, one level up, and nothing covered it.
+  //
+  // Ashley's ruling: show all three labelled boxes. That card already
+  // existed — NUMERIC_GROUPS has had the lift trio all along — so the fix is
+  // to route through it rather than to build it.
+  const ui = readFileSync(join(ROOT, 'src/components/onboarding/ConversationalOnboarding.tsx'), 'utf8')
+  const fn = readFileSync(join(ROOT, 'supabase/functions/onboarding-chat/index.ts'), 'utf8')
+
+  check('the three lifts are still one grouped card',
+    /\['knownSquatKg', 'knownBenchKg', 'knownDeadliftKg'\]/.test(
+      readFileSync(join(ROOT, 'src/lib/onboarding-slots.ts'), 'utf8')))
+
+  // The client guard. A prompt is advisory; this writes the load basis, so
+  // the refusal lives where the model cannot talk it out of happening.
+  check('the client refuses an unnamed multi-lift write', /isUnnamedLiftWrite/.test(ui))
+  check('...and knows the words for each lift', /LIFT_SLOT_WORDS/.test(ui))
+  check('...and shows the labelled group instead of recording',
+    /slotCard: 'knownSquatKg'/.test(ui))
+  check('...using what the USER typed, not what the question listed',
+    /isUnnamedLiftWrite\(key, userText/.test(ui))
+
+  // The prompt half — the actual cause.
+  check('the prompt forbids guessing which lift a bare number is',
+    /NEVER GUESS WHICH LIFT A BARE NUMBER BELONGS TO/.test(fn))
+  check('...and says a NAMED lift is stated, not inferred',
+    /that is stated, not inferred/.test(fn))
+  check('...and points at the grouped card by name',
+    /present_slot with slot_key "knownSquatKg"/.test(fn))
+}
+
 console.log(failures === 0 ? '\nAll onboarding-chip checks passed.\n' : `\n${failures} FAILED\n`)
 process.exit(failures === 0 ? 0 : 1)
