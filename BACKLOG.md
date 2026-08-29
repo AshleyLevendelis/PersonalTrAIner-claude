@@ -126,7 +126,7 @@ Newest first. One line each.
 
 - [x] MEASURED: her week-1 heaviest drops from a **152.5 kg deadlift to a 97.5 kg squat**, and `isCalibrationWeek` flips **true** — while a trustworthy profile still skips calibration and still anchors at 137.5 kg, so the feature is not broken for everyone. Five mutations bite; reverting the calibration guard reproduces **exactly 152.5 kg**, the number from the screenshot.
 
-- [ ] **STILL NO WAY TO CORRECT A STATED LIFT IN THE PROFILE SCREEN.** There is no squat/bench/deadlift row in `ProfileScreen.tsx` — the only route is chat, via `record_goal` → `fact-compiler.ts` → the same columns. Indirect and undiscoverable. Ashley's own profile still carries bench 150 / deadlift 150 until she tells the coach otherwise.
+- [x] ~~**STILL NO WAY TO CORRECT A STATED LIFT IN THE PROFILE SCREEN.** The only route is chat, via `record_goal` → `fact-compiler.ts` → the same columns.~~ **That description was wrong when written** — the 30 Aug audit proved `compileKnownLiftOverrides` had zero callers, so the chat route did not exist either and a stated lift was uncorrectable by any means. Wired 30 Aug; the goal route now genuinely works. What remains is discoverability, tracked in the newer entry at the top, not a dead end.
 
 - [x] **"THE TOUR NEEDS UPDATING SINCE WE CHANGED THE APP LAYOUT."** Ashley, and she was right — `test:app-tour` had just passed. §1–2 check every spotlight **target** still exists, which they did; nothing could see that three steps were describing a screen that no longer existed. *"Calories and water"* over a row of **three** tiles; a Nutrition step that never mentioned the steps row that had just moved onto it; a settings step listing everything behind the gear except the two things the gear had gained.
 
