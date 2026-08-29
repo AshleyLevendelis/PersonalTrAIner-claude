@@ -32,6 +32,33 @@ export interface CompletableMessage extends DraftMessage {
 }
 
 /**
+ * The same sweep, for a caller holding the WHOLE transcript rather than one
+ * turn's new messages.
+ *
+ * THE HALF THE FIRST VERSION MISSED. Two independent paths open the review:
+ * the model calling complete_onboarding (handled in the response handler,
+ * which already has just this turn's messages), and the client's own safety
+ * net — an effect that fires the moment readyToGenerate flips, whether or not
+ * the model ever called anything. That net exists because the conversation
+ * once went silent on the final answer with no way forward, so it can never
+ * be removed; it simply had no sweep of its own, and Ashley photographed the
+ * result a second time.
+ *
+ * Only the trailing turn is swept. Running the sweep over the full history
+ * would rewrite questions the user already answered ten turns ago, turning a
+ * finished conversation into a wall of identical closing lines — so the
+ * boundary is the last user message, and everything before it is untouched.
+ */
+export function closeOutTrailingQuestions<T extends CompletableMessage>(messages: T[]): T[] {
+  let lastUser = -1
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role === 'user') { lastUser = i; break }
+  }
+  const head = messages.slice(0, lastUser + 1)
+  return [...head, ...closeOutOpenQuestions(messages.slice(lastUser + 1))]
+}
+
+/**
  * Strip every open question from the turn that opens the review.
  *
  * Returns a NEW array; inputs are not mutated, so a caller can diff before

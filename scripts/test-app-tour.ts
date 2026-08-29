@@ -357,6 +357,36 @@ console.log('\n6. Skip actually skips')
   check('...the settings menu offers it', /Replay the tour/.test(menu) && /onReplayTour/.test(menu))
   check('...and App.tsx wires the two together',
     /onReplayTour=\{replayAppTour\}/.test(app) && /replayAppTour/.test(app))
+
+  // THE PROMISE THE BEHAVIOUR CHANGE LEFT BEHIND. The opener said "Skip
+  // anytime; I'll keep your place" — true when Skip parked the tour, false
+  // the moment Skip started ending it. Nothing failed: the copy and the
+  // behaviour live in different files and no check joined them, so the app
+  // went on making a promise it had just stopped keeping. VISION.md's rule
+  // is "never claims a capability it doesn't have", and this is the cheapest
+  // possible way to break it — by fixing a bug.
+  // Read from TOUR_STEPS itself, never from the file's text. The first
+  // version of this check grepped the source and went red on its OWN comment,
+  // which happens to quote the retired promise — the same "a check satisfied
+  // by its own comment" failure this repo keeps producing. The copy a user
+  // reads is data; check the data.
+  const allCopy = TOUR_STEPS.map(t => `${t.title ?? ''} ${t.copy ?? ''} ${t.teaser ?? ''}`).join(' ')
+  check('no stop promises to keep your place after Skip',
+    !/keep your place/i.test(allCopy), /.{0,50}keep your place.{0,20}/i.exec(allCopy)?.[0])
+  check('...and the opener says where the tour lives instead',
+    /settings menu/i.test(allCopy))
+  check('...with copy to read at all (sanity check on this check)', allCopy.length > 200, allCopy.length)
+
+  const steps = readFileSync(join(ROOT, 'src/lib/app-tour-steps.ts'), 'utf8')
+
+  // Found while fixing the copy: app-tour-steps.ts held TWO step arrays, an
+  // unexported `STEPS` and the live `TOUR_STEPS`, byte-identical at 2,411
+  // characters. Nothing referenced the first. Editing it — the obvious one,
+  // being first in the file — would have changed precisely nothing on screen
+  // while reading as a fix. Deleted; this stops it coming back.
+  const stepArrays = (steps.match(/TourStep\[\] = \[/g) ?? []).length
+  check('there is exactly ONE step array, not a live one and a dead twin',
+    stepArrays === 1, `${stepArrays} arrays`)
 }
 
 console.log(failures === 0 ? '\nAll app-tour checks passed.\n' : `\n${failures} FAILED\n`)

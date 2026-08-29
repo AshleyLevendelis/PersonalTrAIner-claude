@@ -31,7 +31,7 @@ import {
   type SlotDef,
 } from '@/lib/onboarding-slots'
 import { measureParserFor } from '@/lib/body-units'
-import { closeOutOpenQuestions, COMPLETE_MESSAGE } from '@/lib/onboarding-completion'
+import { closeOutOpenQuestions, closeOutTrailingQuestions, COMPLETE_MESSAGE } from '@/lib/onboarding-completion'
 import {
   loadOnboardingDraft,
   saveOnboardingDraft,
@@ -674,11 +674,18 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
   useEffect(() => {
     if (busy || reviewOpen) return
     if (!readyToGenerate) return
-    setMessages(prev =>
-      prev.some(m => m.content === COMPLETE_MESSAGE)
-        ? prev
-        : [...prev, { role: 'assistant', content: COMPLETE_MESSAGE }],
-    )
+    setMessages(prev => {
+      // Sweep FIRST, then append. This net opens the review without the model
+      // having called anything, so a question it asked on the way past is
+      // still sitting there — the second of the two paths, and the one
+      // Ashley photographed after the first was fixed. Trailing turn only:
+      // sweeping the whole history would rewrite questions she answered ten
+      // turns ago.
+      const swept = closeOutTrailingQuestions(prev)
+      return swept.some(m => m.content === COMPLETE_MESSAGE)
+        ? swept
+        : [...swept, { role: 'assistant', content: COMPLETE_MESSAGE }]
+    })
     setReviewOpen(true)
   }, [values, confirmed, busy, reviewOpen])
 

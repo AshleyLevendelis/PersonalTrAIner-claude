@@ -27,7 +27,7 @@ import { readFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { buildSlotCatalog, NEVER_BLOCKING_SLOTS, initialSlotValues } from '../src/lib/onboarding-slots'
-import { closeOutOpenQuestions, COMPLETE_MESSAGE } from '../src/lib/onboarding-completion'
+import { closeOutOpenQuestions, closeOutTrailingQuestions, COMPLETE_MESSAGE } from '../src/lib/onboarding-completion'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const fn = readFileSync(join(root, 'supabase/functions/onboarding-chat/index.ts'), 'utf8')
@@ -95,6 +95,43 @@ check('a turn with no question is passed through untouched',
 check('user turns are never rewritten even when they ask something',
   closeOutOpenQuestions([{ role: 'user' as const, content: 'why do you need that?' }])[0].content === 'why do you need that?')
 
+console.log('\n[3b] BOTH paths that open the review, not just one\n')
+// THE HALF THE FIRST FIX MISSED, and Ashley photographed it again. The review
+// opens by two independent routes:
+//   1. the model calls complete_onboarding  — swept in the response handler
+//   2. the client's own safety net fires when readyToGenerate flips, whether
+//      or not the model called anything — which had no sweep at all
+// Route 2 exists because the conversation once went silent on the final
+// answer with no way forward, so it can never be removed. It holds the whole
+// transcript rather than one turn's messages, which is why it needs its own
+// entry point: sweeping the full history would rewrite questions answered ten
+// turns ago into a wall of identical closing lines.
+{
+  const history = [
+    { role: 'assistant' as const, content: 'What should I call you?' },
+    { role: 'user' as const, content: 'Ashley' },
+    { role: 'assistant' as const, content: 'Anything you would rather I left out?' },
+    { role: 'user' as const, content: 'Marmite' },
+    { role: 'assistant' as const, content: 'Marmite is banned, noted! How much time do you want to spend cooking?' },
+    { role: 'assistant' as const, content: 'Foods to avoid — Marmite', isReceipt: true },
+  ]
+  const swept = closeOutTrailingQuestions(history)
+  check('the trailing question is closed out', swept[4].content === COMPLETE_MESSAGE, swept[4].content)
+  check('an EARLIER question is left exactly as it was',
+    swept[0].content === 'What should I call you?' && swept[2].content === 'Anything you would rather I left out?',
+    [swept[0].content, swept[2].content])
+  check('user turns are untouched', swept[1].content === 'Ashley' && swept[3].content === 'Marmite')
+  check('the receipt survives', swept[5].isReceipt === true && swept[5].content === 'Foods to avoid — Marmite')
+  check('nothing is lost or duplicated', swept.length === history.length, `${swept.length} vs ${history.length}`)
+  check('the closing line appears exactly once',
+    swept.filter(m => m.content === COMPLETE_MESSAGE).length === 1)
+
+  // A transcript with no user turn at all (the scripted opener, before anyone
+  // has typed) must still sweep rather than index off the end.
+  const openerOnly = closeOutTrailingQuestions([{ role: 'assistant' as const, content: 'Quick question?' }])
+  check('a transcript with no user turn yet still sweeps', openerOnly[0].content === COMPLETE_MESSAGE)
+}
+
 console.log('\n[4] ...and the app actually calls it\n')
 // Static, and deliberately so. [3] proves the function is correct, which is
 // worth nothing if nothing invokes it — a gate that passes against dead code
@@ -105,6 +142,13 @@ check('the component imports the sweep', /closeOutOpenQuestions/.test(comp))
 check('...and runs it when the review opens',
   /openReview\)\s*\{[\s\S]{0,200}?closeOutOpenQuestions\(/.test(comp))
 check('the closing line has ONE definition', !/const COMPLETE_MESSAGE\s*=/.test(comp))
+// BOTH call sites, named separately. [3] and [3b] prove the two functions are
+// correct; correctness of a sweep nothing invokes on the path that actually
+// fired is exactly the shape of the first fix's failure.
+check('...and the client safety-net effect sweeps too',
+  /if \(!readyToGenerate\) return[\s\S]{0,600}?closeOutTrailingQuestions\(/.test(comp))
+check('...sweeping BEFORE it appends the closing line, not after',
+  /closeOutTrailingQuestions\(prev\)[\s\S]{0,300}?COMPLETE_MESSAGE/.test(comp))
 
 if (failures > 0) { console.error(`\n${failures} check(s) failed\n`); process.exit(1) }
 console.log('\nThe review never opens beside an unanswered question.\n')

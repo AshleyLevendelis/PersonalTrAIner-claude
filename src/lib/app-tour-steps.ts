@@ -46,61 +46,19 @@ export interface TourStep {
  *    is the app's first promise to a new user, so the honesty rule that
  *    governs first-run-intro.ts governs this too.
  */
-const STEPS: TourStep[] = [
-  {
-    key: 'welcome', tab: 'dashboard', target: null,
-    title: 'Quick tour?',
-    copy: "Your plan's built and ready. Give me a minute — I'll show you where everything lives. Skip anytime; I'll keep your place.",
-  },
-  {
-    key: 'hero', tab: 'dashboard', target: 'hero',
-    copy: "Home answers one question — what's next. Today's session sits up top; Start session walks you through every set.",
-  },
-  {
-    key: 'tiles', tab: 'dashboard', target: 'tiles',
-    copy: 'Calories and water at a glance. Nothing logs from here — a tap hands you to Nutrition, which owns those numbers.',
-  },
-  {
-    key: 'nutrition', tab: 'nutrition', target: 'rings',
-    nav: 'navNutrition', tapHint: 'Tap Nutrition', teaser: 'Next stop — where your food lives.',
-    copy: 'Everything you eat and drink lives here. The rings are your day — calories, protein, carbs, fat, water — and +250 / +500 log water in one tap.',
-  },
-  {
-    key: 'meals', tab: 'nutrition', target: 'meals',
-    copy: 'Your meals for the day. Open one to log it, swap it, or regenerate it — every kcal here feeds the rings above.',
-  },
-  {
-    key: 'exercise', tab: 'exercise', target: 'extoday',
-    nav: 'navExercise', tapHint: 'Tap Exercise', teaser: 'Now the training side.',
-    copy: 'Your program lives here — the week at a glance, the phase you’re in, my notes on it. Today’s session sits right below.',
-  },
-  {
-    key: 'set', tab: 'exercise', target: 'setrow', gate: true,
-    tapHint: 'Tap the ✓ to log the set', teaser: 'Your turn — log a set.',
-    copy: "Logged — that easy. Leave the fields blank and I'll take the prescribed numbers; your rest timer starts on its own.",
-  },
-  {
-    key: 'tools', tab: 'tools', target: 'toolsall',
-    nav: 'navTools', tapHint: 'Tap Tools', teaser: 'Two doors left.',
-    copy: 'Timers and your grocery list. The list builds itself from your meal plan — nothing to type.',
-  },
-  {
-    key: 'settings', tab: 'tools', target: 'settings',
-    copy: 'Everything I know about you sits behind the gear — profile, preferences, injuries. All of it editable. New plan lives there too.',
-  },
-  {
-    key: 'chat', tab: 'chat', target: null, last: true,
-    nav: 'chatfab', tapHint: 'Tap the chat button', teaser: 'Last stop — the important one.',
-    copy: "And this is where we talk. Anything you'd tell a coach — a heavy day, a food you hate, a sore shoulder — just say it. I'll take it from here.",
-  },
-]
 
 
 export const TOUR_STEPS: TourStep[] = [
   {
     key: 'welcome', tab: 'dashboard', target: null,
     title: 'Quick tour?',
-    copy: "Your plan's built and ready. Give me a minute — I'll show you where everything lives. Skip anytime; I'll keep your place.",
+    // "I'll keep your place" was TRUE and is not any more, which is the kind
+    // of thing a behaviour change quietly leaves behind. Skip used to park the
+    // tour and leave an undismissable "Resume the tour" pill; it now ends it
+    // for good, so the promise had to change with it. The replacement names
+    // where the tour actually lives afterwards, because a permanent Skip is
+    // only fair if you can see the way back before you take it.
+    copy: "Your plan's built and ready. Give me a minute — I'll show you where everything lives. Skip anytime; it's in the settings menu whenever you want it.",
   },
   {
     key: 'hero', tab: 'dashboard', target: 'hero',

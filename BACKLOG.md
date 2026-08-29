@@ -2,6 +2,14 @@
 
 Newest first. One line each.
 
+- [x] **THE QUESTION-BESIDE-THE-BUTTON FIX ONLY COVERED ONE OF TWO PATHS, AND ASHLEY PHOTOGRAPHED THE OTHER.** The review opens by two independent routes: the model calling `complete_onboarding` (swept) and **the client's own safety net**, an effect that fires the moment `readyToGenerate` flips whether or not the model called anything (**not swept**). That net exists because the conversation once went silent on the final answer with no way forward, so it can never be removed — it simply had no sweep of its own. Same *"built in two halves"* defect this repo keeps producing.
+
+- [x] IT NEEDED ITS OWN ENTRY POINT, not a second call to the same function: the net holds the **whole transcript**, and sweeping that would rewrite questions answered ten turns ago into a wall of identical closing lines. `closeOutTrailingQuestions` cuts at the last user message and sweeps only the tail. Gated with a six-message transcript that proves the trailing question closes, the two earlier ones don't, receipts survive, and nothing is lost or duplicated — plus the no-user-turn-yet edge case.
+
+- [x] **"SKIP ANYTIME; I'LL KEEP YOUR PLACE."** True until the previous commit, false the moment Skip started ending the tour — a promise broken **by fixing a bug**, in the app's own voice, against VISION.md's *"never claims a capability it doesn't have"*. Copy and behaviour live in different files and no check joined them. Now reads *"it's in the settings menu whenever you want it"*, and a gate reads `TOUR_STEPS` as **data** rather than grepping the source — the first version went red on its **own comment**, which quotes the retired promise.
+
+- [x] AND THE COPY LIVED IN A DEAD TWIN. `app-tour-steps.ts` held **two byte-identical 2,411-character step arrays** — an unexported `STEPS` and the live `TOUR_STEPS`. Nothing referenced the first, and being first in the file it is the one you would naturally edit: the fix would have read as done and changed **nothing on screen**. Deleted, with a gate asserting exactly one array survives. Four mutations bite across both files.
+
 - [x] **"THE SKIP TOUR DOESN'T ACTUALLY SKIP IT."** Ashley, with screenshots. `skip()` wrote the current step and moved to `'skipped'` — which renders the *"Resume the tour · 1 of 10"* pill — and the **only** route to `'done'` was reaching the last of ten stops. So nothing a person could do would dismiss it, and the pill sat over the Weigh-in row **covering the number**. Skip now does exactly what finishing does.
 
 - [x] AND THE PERMANENCE IS ONLY SAFE BECAUSE OF THE SECOND HALF. Nothing anywhere in the app could restart a finished tour — no Settings row, no reset, nothing reading `fitplan_tour_v1` except the tour itself — so Skip-means-gone would have meant **one mistaken tap destroys it forever**. Ashley's ruling was gone-with-a-way-back: a **Replay the tour** row now sits in the settings menu. Both halves are gated together, deliberately.
