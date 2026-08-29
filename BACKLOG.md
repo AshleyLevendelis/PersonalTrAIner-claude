@@ -2,6 +2,30 @@
 
 Newest first. One line each.
 
+- [x] **COMPREHENSIVE AUDIT, AND ALL FIVE FINDINGS FIXED.** Ashley: *"cover all angles, no stone unturned."* Method that found them: list every exported function with **no production caller** — 86, mostly benign, and every one of the real defects came out of that list. **Four of the five were the same shape**: something written, shown back to the user, and read by nothing. Three of my first four probes were wrong (bad accessors, a non-existent exercise name) and returned false all-clears; fixed the probes before trusting a single result.
+
+- [x] **A MEAL SWAP COULD SERVE BACK A FOOD YOU HAD JUST BANNED** — the worst of the five. The pool is frozen at generation time and the swap path had **no dislike or dietary check of any kind**. Measured on Ashley's own case: ban almond butter, ask to swap breakfast, get **"Almond Butter Oats"**. Now filtered before rotation, and **both** channels are checked — a stated dislike and an allergy tagged into `dietary_preferences` by `detectAllergenTags` arrive by different routes and never overlap, so checking dislikes alone would have left the allergen half open. Both matchers are the app's existing ones; a named request cannot override a restriction; an emptied pool offers new options instead of dead-ending.
+
+- [x] **"I CAN'T TRAIN MONDAYS" NEVER REACHED THE PLAN.** `compileTrainingDayOverrides` produced the right answer in isolation and had **zero callers**, so a generated plan still scheduled Monday. Its doc comment named the consumer by file and line. The consumer never called it.
+
+- [x] **AND A LIFT STATED AS A GOAL NEVER REACHED LOAD PRESCRIPTION** — same shape, `compileKnownLiftOverrides`, zero callers. Which left **onboarding as the only writer of `known_*_kg`** and therefore no way at all to correct a stated lift. **This corrects what I told Ashley** in the "what's outstanding" report, where I said chat via `record_goal` was the route: it wasn't. I read that function's doc comment — which names its consumer by line number — and believed it instead of checking for callers, the exact error `compileSoftExercisePreferences` already records against itself.
+
+- [x] BOTH WIRED ON THE **PROFILE ITSELF** rather than at each generation call site: the two producers (App's first-plan build, and `plan-adaptations`' rebuilds reached via `pending-action-executor` and `weight-basis-offer`) all take that profile, so one correction covers every path and cannot be missed by a new one. Equality-guarded, since it writes into the state it derives from.
+
+- [x] **THE PROFILE SCREEN CONTRADICTED THE MORNING'S OWN FIX** — fallout from my change earlier the same day. It still labelled a softly-worded food dislike *"biases suggestions — nothing removed"*, false once every food dislike became a filter, and the "foods you won't eat" editor still filtered to hard, so a ban was enforced while missing from the list of what is banned. Both now read polarity.
+
+- [x] AND WIDENING THAT LIST INTRODUCED A DUPLICATE RENDER, **caught by the gate within a minute**: the de-duplication that keeps hard dislikes out of the generic group still excluded only hard ones, so a soft row rendered twice. The exclusion has to match the list it de-duplicates against.
+
+- [x] **A FAILED CARDIO LOG WAS INVISIBLE AND UNRECOVERABLE.** The store marks a log failed after its retries and keeps it — and `getPendingCardioFailures`, `retryFailedCardioLog`, `discardFailedCardioLog` and the merge function that would display it **all had no caller**. New `FailedCardioNotice` on the Exercise tab: no new logic, just the missing surface for logic already written and already correct.
+
+- [x] NEW GATE `test:audit-fixes`, **seven mutations bite** — each reproducing one original defect exactly, including unmounting the cardio notice and rotating the unfiltered meal pool. §6 asserts the **class** rather than the instances: every export of `fact-compiler.ts` (9) and `cardio-log-store.ts` (6) must have a production caller, so this shape cannot return silently.
+
+- [x] 19 related gates pass, `test:audit` 13,967/0 unchanged, `tsc -b` and build clean.
+
+- [ ] **STILL NO DIRECT WAY TO EDIT A STATED LIFT IN THE PROFILE SCREEN.** The goal route now works, so a lift IS correctable — but only by stating a goal in chat, which is indirect and undiscoverable. Squat/bench/deadlift rows in `ProfileScreen.tsx` remain the real fix and are not built.
+
+- [ ] **VERIFIED BY CONSTRUCTION, NOT IN THE LIVE APP.** No conversation has been run against any of this — `*.supabase.co` is unreachable from the sandbox. The swap filter, the cardio notice and the profile-screen copy all want one real pass on Ashley's machine.
+
 - [x] **"IT STILL DIDN'T REMOVE THE ALMOND BUTTER OR OFFER AN ALTERNATIVE."** Ashley, testing the fix. Different wording, different branch: yesterday's *"I dont want almond butter in my food choices. Remove it"* filed a **ban**; today's *"I don't like almond butter"* filed **"not keen on"** — and the today's-plan warning and the swap offer are both gated on hardness, so it said nothing.
 
 - [x] **AND THE MILD LEVEL DID NOTHING AT ALL.** There is a compiler for hard food dislikes, one for soft food **likes**, one for soft **exercise** dislikes — and **none anywhere for a soft food dislike**. It was written to the database, shown in the memory screen, and read by nothing, under a receipt promising *"biases suggestions"*. Exactly the defect `compileSoftExercisePreferences` already records against itself: *"This claim was untrue for a while: the consumer it names did not exist."*

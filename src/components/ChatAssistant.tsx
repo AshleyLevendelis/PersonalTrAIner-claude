@@ -19,6 +19,7 @@ import { pickAccountabilityCheckIn } from '@/lib/accountability'
 import { executeExerciseSwap, executeMealSwap, executeMealAddition, undoMealAddition, undoExerciseSwap, executeInjuryAdaptation, executeLastingInjury, executeInjuryRecovered, executeEquipmentAdaptation, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type LastingInjuryPayload, type InjuryRecoveredPayload, type EquipmentAdaptationPayload } from '@/lib/pending-action-executor'
 import { buildMealAdditionProposal, type MealAdditionPayload } from '@/lib/meal-addition'
 import { buildMealSwapProposal } from '@/lib/meal-swap-proposal'
+import { compileFoodDislikes } from '@/lib/fact-compiler'
 import type { SwapScope } from '@/lib/mesocycle-edit'
 import { createPlanAdaptation } from '@/lib/plan-adaptations-store'
 import { updateProfileField } from '@/lib/profile-store'
@@ -1860,6 +1861,13 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
           rawArgs: result.proposal.rawArgs,
           profileId: profile.id,
           alreadySeen: mealOptionsSeenRef.current[result.proposal.rawArgs.meal_slot as MealSlotName] ?? [],
+          // The saved pool was filtered by the restrictions that existed when
+          // it was generated, and is never rebuilt when a new one is recorded
+          // — so the swap re-checks them. Compiled from the same memoryFacts
+          // with the same compiler App uses, rather than passed down as a
+          // prop, so the two can't drift.
+          dislikedFoods: compileFoodDislikes(memoryFacts),
+          dietaryPreferences: profile.dietary_preferences ?? [],
         })
         if (swap.ok) {
           built = { scopeKey: swap.scopeKey, preconditions: swap.preconditions, payload: swap.payload as unknown as Record<string, unknown>, diff: swap.diff }

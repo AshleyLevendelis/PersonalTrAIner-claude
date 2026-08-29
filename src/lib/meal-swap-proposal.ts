@@ -16,6 +16,8 @@
 // ---------------------------------------------------------------------------
 
 import { getPools, nextPoolOption, type MealSlotName } from './meal-store'
+import { containsPhrase } from './meal-ingredients'
+import { validateMealAgainstDiet } from './diet-rules'
 import type { PoolOption } from './meal-generation'
 import type { ProposalDiff } from './pending-actions-store'
 
@@ -50,6 +52,58 @@ export interface BuildMealSwapInput {
    * and gets the offer instead of a fifth look at the same five meals.
    */
   alreadySeen?: string[]
+  /**
+   * Every food they have said they will not eat (compileFoodDislikes — which
+   * since 30 Aug 2026 is EVERY food dislike, at either hardness).
+   */
+  dislikedFoods?: string[]
+  /** Their dietary restrictions, including allergies disclosed in chat. */
+  dietaryPreferences?: string[]
+}
+
+/**
+ * WHY THE SWAP RE-CHECKS SOMETHING GENERATION ALREADY CHECKED.
+ *
+ * The pool is built once, at generation, against the restrictions that
+ * existed THEN — and it is not rebuilt when a new one is recorded. The
+ * receipt says so in as many words: a dislike is "excluded starting your next
+ * meal regenerate, doesn't touch today's plan".
+ *
+ * So the pool outlives the rules it was filtered by, and until the 30 Aug 2026
+ * audit this path had no restriction check of any kind. Measured, with
+ * Ashley's own case: ban almond butter, ask to swap breakfast, and the app
+ * offered "Almond Butter Oats" — the exact thing she had just banned, one tap
+ * from her plate.
+ *
+ * BOTH channels have to be re-checked, because a restriction can arrive down
+ * either and they do not overlap:
+ *   - a stated dislike lands in the dislike list;
+ *   - an ALLERGY disclosed in chat is tagged into dietary_preferences by
+ *     detectAllergenTags and never appears in the dislike list at all.
+ * Checking only dislikes would have left the allergen half of this hole open,
+ * which is the half that can hurt someone.
+ *
+ * Both matchers are the app's existing ones — containsPhrase (shared with the
+ * coach's own "is X in my breakfast?" reader) and validateMealAgainstDiet
+ * (shared with generation and with propose_meal_addition). A third copy of
+ * either rule is precisely how this codebase produces these bugs.
+ */
+function optionBlockedBy(
+  option: PoolOption,
+  dislikedFoods: string[],
+  dietaryPreferences: string[],
+): string | null {
+  const names = option.ingredients.map(i => i.name)
+  const disliked = dislikedFoods.find(f => containsPhrase(option.name, names, f))
+  if (disliked) return disliked
+  if (dietaryPreferences.length > 0) {
+    const verdict = validateMealAgainstDiet(option.ingredients, dietaryPreferences)
+    if (!verdict.ok) {
+      const first = verdict.violations[0]
+      return first ? `${first.ingredient} (${first.preference})` : 'your dietary restrictions'
+    }
+  }
+  return null
 }
 
 export async function buildMealSwapProposal(input: BuildMealSwapInput): Promise<MealSwapProposalResult> {
@@ -64,10 +118,34 @@ export async function buildMealSwapProposal(input: BuildMealSwapInput): Promise<
 
   const currentName = byName(options, input.rawArgs.old_item)?.name ?? String(input.rawArgs.old_item ?? '').trim()
 
+  const disliked = input.dislikedFoods ?? []
+  const prefs = input.dietaryPreferences ?? []
+  const allowed = options.filter(o => optionBlockedBy(o, disliked, prefs) === null)
+
   // An explicitly named target still wins — that is the user picking, not the
-  // app rotating, and it must never be quietly overridden.
+  // app rotating, and it must never be quietly overridden. It does NOT win
+  // over a restriction, though: naming a meal is not consent to be served
+  // something they have told us they cannot eat, and saying why is more use
+  // than silently rotating past it.
   const requested = input.rawArgs.new_item ? byName(options, input.rawArgs.new_item) : undefined
-  const chosen = requested ?? nextPoolOption(options, currentName || undefined)
+  if (requested) {
+    const clash = optionBlockedBy(requested, disliked, prefs)
+    if (clash) {
+      return { ok: false, reason: `${requested.name} has ${clash} in it, and you've told me to keep that out. Want me to find you something else for ${slot}?`, exhausted: { slot, poolSize: allowed.length } }
+    }
+  }
+
+  // Nothing left once their own restrictions are applied. Not a dead end —
+  // the same offer the exhausted-pool case makes, for the same reason.
+  if (!requested && allowed.length === 0) {
+    return {
+      ok: false,
+      reason: `Everything I've got saved for ${slot} has something in it you've asked me to avoid. Want me to go and find you some new options?`,
+      exhausted: { slot, poolSize: 0 },
+    }
+  }
+
+  const chosen = requested ?? nextPoolOption(allowed, currentName || undefined)
 
   if (!chosen) {
     return {
@@ -84,8 +162,8 @@ export async function buildMealSwapProposal(input: BuildMealSwapInput): Promise<
   if (!requested && seen.has(chosen.name.toLowerCase())) {
     return {
       ok: false,
-      reason: `That's all ${options.length} ${slot} option${options.length === 1 ? '' : 's'} I've got for you — you've seen the lot. Want me to go and find some new ones?`,
-      exhausted: { slot, poolSize: options.length },
+      reason: `That's all ${allowed.length} ${slot} option${allowed.length === 1 ? '' : 's'} I've got for you — you've seen the lot. Want me to go and find some new ones?`,
+      exhausted: { slot, poolSize: allowed.length },
     }
   }
 

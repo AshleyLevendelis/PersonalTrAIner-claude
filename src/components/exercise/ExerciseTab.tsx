@@ -1,3 +1,4 @@
+import { FailedCardioNotice } from '@/components/exercise/FailedCardioNotice'
 import { useState } from 'react'
 import { useAppRoute, programHash } from '@/lib/app-route'
 import { useActiveSession } from '@/hooks/useActiveSession'
@@ -133,6 +134,9 @@ export function ExerciseTab({
 
   return (
     <>
+      {/* A cardio log that failed to sync used to be invisible and
+          unrecoverable — the store's retry/discard functions had no caller. */}
+      <FailedCardioNotice />
       <TodayPanel
         plan={plan}
         mesocycle={mesocycle}

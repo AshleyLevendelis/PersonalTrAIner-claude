@@ -46,10 +46,22 @@ export function ingredientNamesOf(item: Meal): string[] {
  * function's to quietly paper over.
  */
 export function itemContains(item: Meal, phrase: string): boolean {
+  return containsPhrase(item.name, ingredientNamesOf(item), phrase)
+}
+
+/**
+ * The matcher itself, over a name and a list of ingredient names.
+ *
+ * Split out so the meal SWAP can use the identical rule against a PoolOption
+ * (whose ingredients are objects, not strings) without keeping a second copy.
+ * The audit found the swap path with no dislike check at all; giving it its
+ * own matcher would have been the same mistake one layer along.
+ */
+export function containsPhrase(name: string, ingredientNames: string[], phrase: string): boolean {
   const needle = phrase.trim().toLowerCase()
   if (!needle) return false
-  return item.name.toLowerCase().includes(needle)
-    || ingredientNamesOf(item).some(i => i.toLowerCase().includes(needle))
+  return name.toLowerCase().includes(needle)
+    || ingredientNames.some(i => i.toLowerCase().includes(needle))
 }
 
 /** The meal slots on this plan that contain `phrase`, in plan order. */

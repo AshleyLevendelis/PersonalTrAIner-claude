@@ -241,6 +241,13 @@ function EffectLine({ text }: { text: string }) {
 function factEffect(fact: UserFactRow): string {
   if (fact.kind === 'food_preference' || fact.kind === 'exercise_preference') {
     const n = fact.resolved_refs?.length ?? 0
+    // A FOOD DISLIKE IS ALWAYS A BAN NOW (Ashley's ruling, 30 Aug 2026), so
+    // this reads polarity rather than hardness for food. It still read
+    // hardness after that change shipped, which meant a softly-worded dislike
+    // was being enforced as a filter while this screen told the user it
+    // "biases suggestions — nothing removed" — the same false-effect claim
+    // that ruling existed to remove, pointing the other way.
+    if (fact.kind === 'food_preference' && fact.polarity === 'dislike') return 'excluded from your meals'
     if (fact.hardness === 'hard') {
       return fact.kind === 'exercise_preference' ? `excludes ${n} exercise${n === 1 ? '' : 's'}` : 'excluded from your meals'
     }
@@ -332,7 +339,10 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
   // by "I hate marmite" in chat — both call the same createFact shape, so
   // both land as one row here. Excluded from the generic FOOD PREFERENCES
   // card group below (via `grouped`) so nothing renders twice.
-  const hardFoodDislikes = facts.filter(f => f.kind === 'food_preference' && f.polarity === 'dislike' && f.hardness === 'hard')
+  // Every food dislike, not only the hard-worded ones. Filtering to 'hard'
+  // left a softly-filed ban enforced but ABSENT from the list of what is
+  // banned, so the two halves of this screen disagreed about the same row.
+  const hardFoodDislikes = facts.filter(f => f.kind === 'food_preference' && f.polarity === 'dislike')
   const hardFoodDislikeValues = hardFoodDislikes.map(f => f.resolved_refs?.[0] ?? f.display_text)
 
   const saveDislikedFoods = async (next: string[]) => {
@@ -354,7 +364,10 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
   const grouped = (['food_preference', 'exercise_preference', 'timing_rule', 'hard_constraint'] as const)
     .map(kind => ({
       kind,
-      items: facts.filter(f => f.kind === kind && !(kind === 'food_preference' && f.polarity === 'dislike' && f.hardness === 'hard')),
+      // Must exclude exactly what hardFoodDislikes now INCLUDES, or a softly
+      // filed dislike renders twice — once in the "won't eat" list and again
+      // here. Caught by the gate the moment that list widened.
+      items: facts.filter(f => f.kind === kind && !(kind === 'food_preference' && f.polarity === 'dislike')),
     }))
     .filter(g => g.items.length > 0)
 

@@ -45,7 +45,7 @@ import { getRevealSpeed, saveRevealSpeed, DEFAULT_REVEAL_SPEED, type RevealSpeed
 import { InsightBanner } from '@/components/ui/insight-banner'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { getActiveFacts, getActiveGoals, getActiveContextFacts, createFact, createContextFact, createGoal, type UserFactRow, type UserGoalRow, type UserContextFactRow } from '@/lib/memory-store'
-import { compileExerciseExclusions, compileFoodDislikes, compileTimingRules, compileSoftExercisePreferences, compileSoftFoodPreferences, resolveFoodTarget, resolveExerciseTarget } from '@/lib/fact-compiler'
+import { compileExerciseExclusions, compileFoodDislikes, compileTimingRules, compileSoftExercisePreferences, compileSoftFoodPreferences, compileTrainingDayOverrides, compileKnownLiftOverrides, resolveFoodTarget, resolveExerciseTarget } from '@/lib/fact-compiler'
 import { getAllItems as getAllGroceryItems, flushPending as flushGroceryPending, type GroceryItemRow } from '@/lib/grocery-store'
 import { flushPending as flushSetLogPending } from '@/lib/set-log-store'
 import { flushPending as flushWaterPending } from '@/lib/water-store'
@@ -127,6 +127,37 @@ function App() {
   // down, because the assembled day is derived on this line and a const
   // declared later would be a use-before-define.
   const compiledSoftFoodPreferences = compileSoftFoodPreferences(memoryFacts)
+
+  // THE TWO COMPILERS THAT WERE WRITTEN, DOCUMENTED, AND NEVER CALLED.
+  //
+  // Found by the 30 Aug 2026 audit, both proven by running them: they produce
+  // the right answer in isolation and had ZERO production callers, so
+  //   - "I can't train Mondays" was recorded, shown back in the profile, and
+  //     the generated plan still scheduled Monday; and
+  //   - a lift stated as a goal never reached load prescription, which left
+  //     onboarding as the ONLY writer of known_squat/bench/deadlift_kg and
+  //     therefore no way at all to correct a stated lift afterwards.
+  // Both doc comments named their consumer by file and line. Neither consumer
+  // existed. That is the third instance of this exact shape in this codebase.
+  //
+  // Corrected HERE, on the profile itself, rather than at each generation
+  // call site: the two producers (App's own first-plan build and
+  // plan-adaptations' rebuilds, reached via pending-action-executor and
+  // weight-basis-offer) all take this profile, so fixing the object fixes
+  // every path at once and cannot be missed by a new one.
+  //
+  // The equality guard is what stops this fighting itself — it writes into
+  // the same state it derives from, so without it every render would set
+  // state again.
+  useEffect(() => {
+    if (!profile) return
+    const corrected: UserProfile = {
+      ...profile,
+      ...compileKnownLiftOverrides(memoryGoals),
+      training_days: compileTrainingDayOverrides(memoryFacts, profile.training_days ?? []),
+    }
+    if (JSON.stringify(corrected) !== JSON.stringify(profile)) setProfile(corrected)
+  }, [profile, memoryFacts, memoryGoals])
   // assembleDay is pure — deriving today's picks from pools+targets on every
   // render (rather than storing them) means a pool refresh or a target
   // change (a new weigh-in) can never leave a stale assembled day on screen.
