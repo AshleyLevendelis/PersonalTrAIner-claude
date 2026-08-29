@@ -66,12 +66,19 @@ export const TOUR_STEPS: TourStep[] = [
   },
   {
     key: 'tiles', tab: 'dashboard', target: 'tiles',
-    copy: 'Calories and water at a glance. Nothing logs from here — a tap hands you to Nutrition, which owns those numbers.',
+    // THREE tiles now, not two — steps joined them when steps moved to
+    // Nutrition. The old copy named two of the three, which reads as a
+    // mistake to anyone looking at the row while it is spotlighted.
+    copy: 'Calories, water and steps at a glance. Nothing logs from here — a tap hands you to Nutrition, which owns all three.',
   },
   {
     key: 'nutrition', tab: 'nutrition', target: 'rings',
     nav: 'navNutrition', tapHint: 'Tap Nutrition', teaser: 'Next stop — where your food lives.',
-    copy: 'Everything you eat and drink lives here. The rings are your day — calories, protein, carbs, fat, water — and +250 / +500 log water in one tap.',
+    // Steps MOVED here, and this is the one place the tour can say so. Their
+    // target comes from the same activity level as the calorie target, which
+    // is exactly why they share a tab — worth one clause, since anyone who
+    // used the old Home logger will otherwise go looking for it.
+    copy: 'Everything you eat and drink lives here — plus your steps, which share a target with your calories. The rings are your day, and +250 / +500 log water in one tap.',
   },
   {
     key: 'meals', tab: 'nutrition', target: 'meals',
@@ -94,7 +101,10 @@ export const TOUR_STEPS: TourStep[] = [
   },
   {
     key: 'settings', tab: 'tools', target: 'settings',
-    copy: 'Everything I know about you sits behind the gear — profile, preferences, injuries. All of it editable. New plan lives there too.',
+    // Names the two things the gear gained, and closes the loop the welcome
+    // step opens: it now promises the tour is "in the settings menu", so the
+    // step that shows the settings menu has to point at it.
+    copy: 'Everything I know about you sits behind the gear — profile, preferences, injuries, all of it editable. How the app looks lives there too, and so does this tour if you ever want it again.',
   },
   {
     key: 'chat', tab: 'chat', target: null, last: true,

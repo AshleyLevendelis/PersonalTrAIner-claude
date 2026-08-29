@@ -2,6 +2,12 @@
 
 Newest first. One line each.
 
+- [x] **"THE TOUR NEEDS UPDATING SINCE WE CHANGED THE APP LAYOUT."** Ashley, and she was right — `test:app-tour` had just passed. §1–2 check every spotlight **target** still exists, which they did; nothing could see that three steps were describing a screen that no longer existed. *"Calories and water"* over a row of **three** tiles; a Nutrition step that never mentioned the steps row that had just moved onto it; a settings step listing everything behind the gear except the two things the gear had gained.
+
+- [x] AND ONE LOOSE END I HAD TIED BADLY MYSELF: the welcome step now promises the tour is *"in the settings menu"*, and the settings step never pointed at it. A promise that dead-ends one screen later.
+
+- [x] EACH CLAIM IS NOW TIED TO THE SOURCE FACT IT DEPENDS ON — not *"the copy says steps"* but *"the copy says steps **if** the tile renders steps"*. So the check fails when the app changes, which is the only moment it matters. Read from `TOUR_STEPS` as **data**, never by grepping the file: two copy checks in this repo have already gone red on their own explanatory comments. Four mutations bite, one per claim.
+
 - [x] **PACKAGES 1 + 2 — HOME RESTRUCTURED, AND ONE FACT NOW HAS ONE OWNER.** Home's order is what's next → morning check-in → progress: date + streak chip, week-strip label, strip, hero, coach bubble, progress, three tiles, weigh-in. Gone: the duplicate `Streak: N days`, the bottom phase line, the standalone consistency line, `6 weigh-ins` (kept at **one**, where the app must admit the trend isn't real), the tomorrow line, and the second `Nutrition ›`.
 
 - [x] **THE SESSION AT A GLANCE, from data that was already there and never shown.** `Prone Y-T Raises · Trap Bar Deadlift · Chest Dips · +3 more` became `6 exercises · ~52 min · trap bar from 92.5 kg`. The minutes come from **the same `estimateDaySeconds` the plan's time cap and `test:audit` use**, so Home cannot disagree with the plan it is describing.

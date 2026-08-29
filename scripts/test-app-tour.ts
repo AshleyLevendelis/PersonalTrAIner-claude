@@ -389,5 +389,56 @@ console.log('\n6. Skip actually skips')
     stepArrays === 1, `${stepArrays} arrays`)
 }
 
+// ---------------------------------------------------------------------------
+console.log('\n7. The copy still describes the app it is pointing at')
+// ---------------------------------------------------------------------------
+// Ashley, after the Home restructure shipped: "i think the tour needs updating
+// since we changed the app layout." She was right, and §1-2 could not see it.
+// Those check that every spotlight TARGET exists — which it did. Three steps
+// were meanwhile describing a screen that no longer existed: "calories and
+// water" over a row of three tiles, a Nutrition step that never mentioned the
+// steps row that had just moved onto it, and a settings step listing
+// everything behind the gear except the two things the gear had gained.
+//
+// A tour is the app's first description of itself. Being out of date is not a
+// cosmetic problem there; it is the app telling a new user something false
+// about where their things are.
+//
+// So each claim is tied to the source fact it depends on. Not "the copy says
+// steps" in isolation — "the copy says steps IF the tile renders steps".
+{
+  const steps = readFileSync(join(ROOT, 'src/lib/app-tour-steps.ts'), 'utf8')
+  const dash = readFileSync(join(ROOT, 'src/components/Dashboard.tsx'), 'utf8')
+  const nutri = readFileSync(join(ROOT, 'src/components/NutritionDisplay.tsx'), 'utf8')
+  const prof = readFileSync(join(ROOT, 'src/components/ProfileScreen.tsx'), 'utf8')
+  const copyOf = (key: string) => TOUR_STEPS.find(t => t.key === key)?.copy ?? ''
+
+  // Read from TOUR_STEPS as DATA, never by grepping the file — the last two
+  // copy checks in this repo went red on their own explanatory comments.
+  const tiles = copyOf('tiles')
+  check('the tiles step has copy to read (sanity check on this check)', tiles.length > 20)
+  const homeHasStepsTile = /steps\?\.steps/.test(dash)
+  check('Home renders a steps tile (the fact the copy depends on)', homeHasStepsTile)
+  check('...so the tiles step names steps, not just calories and water',
+    !homeHasStepsTile || /steps/i.test(tiles), tiles)
+
+  const nutritionLogsSteps = /logStepsManual/.test(nutri)
+  check('Nutrition owns step logging (the fact the copy depends on)', nutritionLogsSteps)
+  check('...so the Nutrition step tells you steps live there',
+    !nutritionLogsSteps || /steps/i.test(copyOf('nutrition')), copyOf('nutrition'))
+
+  const gearHasAppearance = /<AppearanceSection/.test(prof)
+  check('the gear carries Appearance (the fact the copy depends on)', gearHasAppearance)
+  check('...so the settings step mentions how the app looks',
+    !gearHasAppearance || /how the app looks|appearance|theme/i.test(copyOf('settings')), copyOf('settings'))
+
+  // The welcome step now promises a way back to the tour. Whichever step shows
+  // the settings menu has to actually point at it, or that promise dead-ends.
+  const promisesSettings = /settings menu/i.test(copyOf('welcome'))
+  check('the welcome step promises the tour is in settings', promisesSettings)
+  check('...and the settings step closes that loop',
+    !promisesSettings || /tour/i.test(copyOf('settings')), copyOf('settings'))
+}
+
 console.log(failures === 0 ? '\nAll app-tour checks passed.\n' : `\n${failures} FAILED\n`)
 process.exit(failures === 0 ? 0 : 1)
