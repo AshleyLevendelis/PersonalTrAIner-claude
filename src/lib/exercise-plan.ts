@@ -2409,8 +2409,25 @@ function assignSetsRepsFromConfig(
 ): { sets: number; reps: string; rest: string; restSeconds: number } {
   // Primers are not scaled — a 5-rep activation drill is a 5-rep activation
   // drill regardless of how long you have been training.
+  //
+  // NOT SCALED IS NOT THE SAME AS NOT MEASURED, and this branch used to
+  // conflate them: it returned before the prescription_type dispatch below,
+  // so EVERY primer got "5" reps whatever its unit. That was invisible for as
+  // long as all 25 primers in the catalogue were rep-based. The first two
+  // time-based ones — Isometric Grip Squeeze and Single-Leg Balance Hold,
+  // added for wrist/elbow and ankle rehab — came out prescribed "2 x 5" for a
+  // movement you hold, which test:audit caught 1,459 times.
+  //
+  // So the unit comes from the same choke point every other tier uses, while
+  // the no-scaling rule keeps its sets and rest. Provably inert for every
+  // pre-existing exercise: fixedUnitPrescription returns null for
+  // prescription_type 'reps', which all 25 older primers are, so this cannot
+  // move a single existing prescription.
   if (entry.mechanics_tier === 'primer') {
-    return { sets: 2, reps: '5', rest: '30s', restSeconds: 30 }
+    const fixed = fixedUnitPrescription(entry, sessionDurationPreference)
+    return fixed
+      ? { ...fixed, sets: 2, rest: '30s', restSeconds: 30 }
+      : { sets: 2, reps: '5', rest: '30s', restSeconds: 30 }
   }
 
   // A beginner never drops below 2 working sets — one set is not a stimulus.
@@ -3647,7 +3664,14 @@ function enforceFatigueCostRestFloor(days: WorkoutDay[]): void {
 // measures the day exactly as scored (estimateDaySeconds, unit-formula-
 // identical) and trims accessory/isolation sets — main lifts last, same
 // hierarchy as stageTimeCap and enforceSetHierarchy — until it fits.
-function enforceDayDurationBudget(day: WorkoutDay, budgetSeconds: number): WorkoutDay {
+function enforceDayDurationBudget(
+  day: WorkoutDay,
+  budgetSeconds: number,
+  // Ashley's ruling, 29 Aug 2026, on the one trade-off ankle/wrist/elbow
+  // rehab introduced: "shorten the rehab set when a session would overrun."
+  // Empty for an uninjured trainee, which makes every branch below inert.
+  flaggedJoints: Set<string> = new Set(),
+): WorkoutDay {
   if (day.exercises.length === 0) return day
   let exercises = day.exercises
   let guard = 0
@@ -3657,17 +3681,34 @@ function enforceDayDurationBudget(day: WorkoutDay, budgetSeconds: number): Worko
       .map((ex, i) => {
         const entry = findEntry(ex.name)
         const role = entry ? getVolumeRole(entry) : null
-        const floor = role ? getRoleSetFloor(role) : 2
-        return { i, sets: ex.sets, entry, role, floor }
+        // THE GUARANTEE IS PRESENCE, NOT VOLUME. Rehab is a required slot and
+        // a primer, so it was doubly untouchable here: primers are excluded
+        // from trimming outright, and the slot cannot be dropped. Measured
+        // consequence — a wrist-injured trainee on bodyweight/30-45/
+        // bodybuilding ran 43min against a 37min budget, because the one
+        // extra movement had no give in it. One set of a rehab drill still
+        // carries the rehab, so its floor is 1 where everything else is 2.
+        const isRehab = !!entry && entry.mechanics_tier === 'primer' && isIndicatedFor(entry, flaggedJoints)
+        const floor = isRehab ? 1 : role ? getRoleSetFloor(role) : 2
+        return { i, sets: ex.sets, entry, role, floor, isRehab }
       })
-      .filter(t => t.entry && t.entry.mechanics_tier !== 'primer' && t.sets > t.floor)
+      // The ordinary warm-up primer stays untouchable; the rehab one does not.
+      .filter(t => t.entry && (t.entry.mechanics_tier !== 'primer' || t.isRehab) && t.sets > t.floor)
     if (trimmable.length === 0) break
     // Accessories/isolation trim first; main lift AND conditioning rounds
     // are protected until nothing else is left to give — "accessories/core
     // trim to fit what remains, never the conditioning" (Part 4).
     const protectedRoles = new Set(['main', 'conditioning'])
-    const nonProtected = trimmable.filter(t => !t.role || !protectedRoles.has(t.role))
-    const candidates = nonProtected.length > 0 ? nonProtected : trimmable
+    // Three tiers, not two: accessories give first, then the rehab set, and
+    // only then the main lift and conditioning. Trimming someone's squat to
+    // preserve two sets of wrist circles would be the wrong way round.
+    //
+    // Provably inert without an injury: with no flagged joints nothing is
+    // isRehab, so `accessories` equals the old `nonProtected`, `rehabOnly` is
+    // empty, and this collapses to exactly the previous expression.
+    const accessories = trimmable.filter(t => !t.isRehab && (!t.role || !protectedRoles.has(t.role)))
+    const rehabOnly = trimmable.filter(t => t.isRehab)
+    const candidates = accessories.length > 0 ? accessories : rehabOnly.length > 0 ? rehabOnly : trimmable
     candidates.sort((a, b) => b.sets - a.sets)
     const target = candidates[0].i
     exercises = exercises.map((ex, i) => (i === target ? { ...ex, sets: ex.sets - 1 } : ex))
@@ -4186,7 +4227,7 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
   assignConditioningNotes(days, profile, policy)
   enforceLoadCoherence(days)
 
-  const budgetedDays = days.map(d => enforceDayDurationBudget(d, totalBudgetSeconds))
+  const budgetedDays = days.map(d => enforceDayDurationBudget(d, totalBudgetSeconds, getFlaggedJoints(profile.injuries ?? [])))
   // Last step, after every rest-modifying stage (style assignment,
   // stageTimeCap's per-day trimming, this duration-budget pass) — the
   // periodized mesocycle inherits this base plan's warmup/rest fields

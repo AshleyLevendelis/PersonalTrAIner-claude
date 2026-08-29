@@ -292,10 +292,25 @@ console.log('\n3. Rehab placements survive untouched')
   // the hip, Dead Bug / Side Plank / Bird Dog tagged for the back — and this
   // line went red as designed and was updated deliberately.
   //
-  // FOUR STILL HAVE NOTHING: ankle, elbow, wrist and neck. Ashley's call, and
-  // a content decision rather than a mechanical one — see BACKLOG.
-  check(`joints that have rehab at all: ${REHAB_JOINTS.join(', ')} — ankle, elbow, wrist and neck still have none`,
-    JSON.stringify(REHAB_JOINTS) === JSON.stringify(['hip', 'knee', 'lower_back_axial', 'shoulder']), REHAB_JOINTS.join(', '))
+  // It then did it a SECOND time, on 29 Aug 2026, when ankles, wrists and
+  // elbows were filled — nine primer-tier entries, bands and isometrics and
+  // mobility only, nothing bearing weight on the injured joint.
+  //
+  // ONE STILL HAS NOTHING: the neck, and it is now the only one, deliberately.
+  // Ashley ruled it out of scope because "my neck bothers me" spans a stiff
+  // desk neck and a nerve problem that must not be loaded, and the app cannot
+  // tell which — so it says so rather than prescribing, per VISION.md's
+  // "never claims a capability it doesn't have".
+  //
+  // That changes what a red here MEANS, and the standing instruction above no
+  // longer covers every case. Adding an eighth joint to this list is only the
+  // right fix for a joint Ashley has put in scope. If `neck` appears, the fix
+  // is NOT to add it here — it is that somebody started prescribing neck work
+  // against an explicit ruling, and that needs her.
+  check(`joints that have rehab at all: ${REHAB_JOINTS.join(', ')} — only the neck still has none, deliberately`,
+    JSON.stringify(REHAB_JOINTS) === JSON.stringify(['ankle', 'elbow', 'hip', 'knee', 'lower_back_axial', 'shoulder', 'wrist']), REHAB_JOINTS.join(', '))
+  check('...and the neck is not among them',
+    !REHAB_JOINTS.includes('neck'), REHAB_JOINTS.join(', '))
 }
 
 // ---------------------------------------------------------------------------

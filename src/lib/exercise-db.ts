@@ -3060,6 +3060,242 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     unilateral: false,
     avg_duration_seconds: 28,
   },
+  // -------------------------------------------------------------------------
+  // ANKLE, WRIST AND ELBOW REHAB.
+  //
+  // Ashley's scope ruling, 29 Aug 2026: ankles, wrists and elbows get
+  // prescribed work; the neck deliberately does not. Measured before this
+  // existed: a trainee with bad wrists lost 21 of 149 exercises and got back
+  // nothing, on 0 of 576 training days. Ankles 13 removed, elbows 10, all
+  // three at zero. VISION.md already required otherwise -- "an injury should
+  // produce a plan that actively rehabilitates it, not one that merely avoids
+  // the joint" -- so this was a standard already set, not a new idea.
+  //
+  // Every entry here is primer tier because pickRehabMovement prefers primers
+  // where any exist, and the durations sit inside one 1.25x band so all of
+  // them rotate. The knee set shows what happens otherwise: Seated Short-Arc
+  // Quad Set was uniquely the cheapest and won 576 of 576 sessions.
+  //
+  // NOTHING HERE BEARS WEIGHT ON THE INJURED JOINT, and that is a safety
+  // decision rather than a stylistic one. isContraindicatedFor returns false
+  // whenever isIndicatedFor is true, so marking a movement indicated FORCES
+  // it past the contraindication filter -- the one filter protecting these
+  // people. A loaded calf raise (already contraindicated for ankles) or a
+  // hands-on-the-floor wrist drill would therefore be delivered to exactly
+  // the trainee it is wrong for. Bands, isometrics and mobility only.
+  //
+  // Wrist and elbow rehab genuinely overlap in practice, so two entries carry
+  // both tags rather than being duplicated under two names.
+  //
+  // Bodyweight-tier coverage is deliberate for all three joints. Without it
+  // the guarantee would hold in a full gym and fail silently at home
+  // (verified per tier: 144/144 plans at full_gym, home_gym, minimalist AND
+  // bodyweight, rather than inferred from the pooled figure).
+  //
+  // NO primer_pattern_affinity, UNLIKE the hip and shoulder entries above,
+  // and the omission is measured rather than stylistic. Affinity is what
+  // makes a primer eligible for the ORDINARY warm-up slot, and giving these
+  // the obvious sets (lower-body for ankles, upper-body for wrists and
+  // elbows) put one of them on 40.1% of an UNINJURED trainee's training days
+  // — 231 of 576. Nobody asked for everyone's warm-up to change; the ask was
+  // that injured people stop getting nothing. Without affinity they are
+  // reachable only by pickRehabMovement, which filters on indicated_joints
+  // and tier and never consults affinity, so the guarantee is untouched:
+  // still 576/576 days and 0/144 plans, with the healthy leak now 0 of 576.
+  //
+  // The Clamshell comment below calls an affinity-less primer "dead weight
+  // everywhere else". That is exactly right and exactly what is wanted here:
+  // these are remedial work for a named injury, not general preparation.
+  //
+  // The cost is one extra movement per session for the injured, because the
+  // rehab pick can no longer double as the warm-up. Measured at 7.58 / 7.77 /
+  // 7.60 exercises per day for ankles / wrists / elbows against a healthy
+  // 6.81 — the same place knees (7.58), hips (7.77) and the lower back (7.56)
+  // already sit, so this is the established shape and not a new one.
+  // -------------------------------------------------------------------------
+  {
+    name: 'Ankle Alphabet',
+    id: 'ankle-alphabet',
+    movement_pattern: 'activation',
+    mechanics_tier: 'primer',
+    prescription_type: 'reps',
+    angle_vector: 'rotational',
+    primary_muscles: ['tibialis anterior', 'peroneals', 'ankle stabilisers'],
+    equipment: ['bodyweight'],
+    joint_stress: 'low',
+    form_cues: ['Sit with the foot off the floor', 'Draw each letter with your big toe', 'Move from the ankle, not the knee', 'Stop short of anything sharp'],
+    coach_note_swap: 'Takes the ankle through its range in every direction without putting bodyweight on it.',
+    loads_joints: ['ankle'],
+    contraindicated_joints: [],
+    indicated_joints: ['ankle'],
+    style_tags: ['functional', 'hybrid', 'bodybuilding'],
+    substitution_group: 'conditioning',
+    unilateral: true,
+    avg_duration_seconds: 30,
+  },
+  {
+    name: 'Banded Ankle Dorsiflexion',
+    id: 'banded-ankle-dorsiflexion',
+    movement_pattern: 'activation',
+    mechanics_tier: 'primer',
+    prescription_type: 'reps',
+    angle_vector: 'vertical',
+    primary_muscles: ['tibialis anterior'],
+    equipment: ['bodyweight', 'resistance band'],
+    equipment_alternatives: true,
+    joint_stress: 'low',
+    form_cues: ['Band or a towel looped round the forefoot', 'Pull the toes back toward the shin', 'Let it back down slowly', 'Keep the heel still'],
+    coach_note_swap: 'Strengthens the front of the shin, which is what usually gives out after an ankle goes over.',
+    loads_joints: ['ankle'],
+    contraindicated_joints: [],
+    indicated_joints: ['ankle'],
+    style_tags: ['functional', 'hybrid', 'bodybuilding'],
+    substitution_group: 'conditioning',
+    unilateral: true,
+    avg_duration_seconds: 28,
+  },
+  {
+    name: 'Single-Leg Balance Hold',
+    id: 'single-leg-balance-hold',
+    movement_pattern: 'activation',
+    mechanics_tier: 'primer',
+    prescription_type: 'time',
+    angle_vector: 'none',
+    primary_muscles: ['ankle stabilisers', 'peroneals', 'glute medius'],
+    equipment: ['bodyweight'],
+    joint_stress: 'low',
+    form_cues: ['Stand on one foot near something you can touch', 'Soft knee, weight through the whole foot', 'Let the ankle do the correcting', 'Progress by looking away, not by adding load'],
+    coach_note_swap: 'Retrains the balance reflex an ankle loses after a sprain, which is the part that stops it happening again.',
+    loads_joints: ['ankle'],
+    contraindicated_joints: [],
+    indicated_joints: ['ankle'],
+    style_tags: ['functional', 'hybrid'],
+    substitution_group: 'conditioning',
+    unilateral: true,
+    avg_duration_seconds: 30,
+  },
+  {
+    name: 'Wrist Circles',
+    id: 'wrist-circles',
+    movement_pattern: 'activation',
+    mechanics_tier: 'primer',
+    prescription_type: 'reps',
+    angle_vector: 'rotational',
+    primary_muscles: ['wrist flexors', 'wrist extensors'],
+    equipment: ['bodyweight'],
+    joint_stress: 'low',
+    form_cues: ['Arms out, hands relaxed into a loose fist', 'Circle slowly one way, then the other', 'Move only the wrist', 'No weight through the hands at any point'],
+    coach_note_swap: 'Warms the wrist through its full range with nothing pressing through it.',
+    loads_joints: ['wrist'],
+    contraindicated_joints: [],
+    indicated_joints: ['wrist'],
+    style_tags: ['functional', 'hybrid', 'bodybuilding'],
+    substitution_group: 'conditioning',
+    unilateral: false,
+    avg_duration_seconds: 25,
+  },
+  {
+    name: 'Banded Wrist Extension',
+    id: 'banded-wrist-extension',
+    movement_pattern: 'activation',
+    mechanics_tier: 'primer',
+    prescription_type: 'reps',
+    angle_vector: 'vertical',
+    primary_muscles: ['wrist extensors', 'forearm extensors'],
+    equipment: ['resistance band'],
+    joint_stress: 'low',
+    form_cues: ['Forearm resting on your thigh, palm down', 'Band under the hand', 'Lift the back of the hand toward you', 'Lower it slower than you raised it'],
+    coach_note_swap: 'Builds the extensors on the back of the forearm, the side that usually complains first.',
+    loads_joints: ['wrist'],
+    contraindicated_joints: [],
+    indicated_joints: ['wrist'],
+    style_tags: ['functional', 'hybrid', 'bodybuilding'],
+    substitution_group: 'conditioning',
+    unilateral: true,
+    avg_duration_seconds: 28,
+  },
+  {
+    name: 'Banded Wrist Flexion',
+    id: 'banded-wrist-flexion',
+    movement_pattern: 'activation',
+    mechanics_tier: 'primer',
+    prescription_type: 'reps',
+    angle_vector: 'vertical',
+    primary_muscles: ['wrist flexors', 'forearm flexors'],
+    equipment: ['resistance band'],
+    joint_stress: 'low',
+    form_cues: ['Forearm on your thigh, palm up', 'Band under the hand', 'Curl the hand toward you', 'Control the way back down'],
+    coach_note_swap: 'The other half of the forearm, trained alongside the extensors so the wrist ends up balanced.',
+    loads_joints: ['wrist'],
+    contraindicated_joints: [],
+    indicated_joints: ['wrist'],
+    style_tags: ['functional', 'hybrid', 'bodybuilding'],
+    substitution_group: 'conditioning',
+    unilateral: true,
+    avg_duration_seconds: 28,
+  },
+  {
+    name: 'Isometric Grip Squeeze',
+    id: 'isometric-grip-squeeze',
+    movement_pattern: 'activation',
+    mechanics_tier: 'primer',
+    prescription_type: 'time',
+    angle_vector: 'none',
+    primary_muscles: ['forearm flexors', 'grip'],
+    equipment: ['bodyweight'],
+    joint_stress: 'low',
+    form_cues: ['Squeeze a rolled towel, a ball, or just your own fist', 'Build to a firm squeeze, not a maximal one', 'Hold it, breathing normally', 'Wrist stays straight throughout'],
+    coach_note_swap: 'An isometric squeeze loads the forearm and elbow tendons without moving either joint, which is usually the first thing that stops hurting.',
+    loads_joints: ['wrist', 'elbow'],
+    contraindicated_joints: [],
+    indicated_joints: ['wrist', 'elbow'],
+    style_tags: ['functional', 'hybrid', 'bodybuilding'],
+    substitution_group: 'conditioning',
+    unilateral: false,
+    avg_duration_seconds: 25,
+  },
+  {
+    name: 'Eccentric Wrist Extension',
+    id: 'eccentric-wrist-extension',
+    movement_pattern: 'activation',
+    mechanics_tier: 'primer',
+    prescription_type: 'reps',
+    angle_vector: 'vertical',
+    primary_muscles: ['wrist extensors', 'common extensor tendon'],
+    equipment: ['bodyweight', 'dumbbell', 'resistance band'],
+    equipment_alternatives: true,
+    joint_stress: 'low',
+    form_cues: ['Forearm supported, palm down, something light in the hand', 'Help it up with the other hand', 'Lower it on its own over three slow seconds', 'Light enough that the lowering stays smooth'],
+    coach_note_swap: 'The slow lowering is the part that rebuilds a tennis-elbow tendon. Going up is not the point.',
+    loads_joints: ['elbow', 'wrist'],
+    contraindicated_joints: [],
+    indicated_joints: ['elbow', 'wrist'],
+    style_tags: ['functional', 'hybrid', 'bodybuilding'],
+    substitution_group: 'conditioning',
+    unilateral: true,
+    avg_duration_seconds: 30,
+  },
+  {
+    name: 'Forearm Pronation-Supination',
+    id: 'forearm-pronation-supination',
+    movement_pattern: 'activation',
+    mechanics_tier: 'primer',
+    prescription_type: 'reps',
+    angle_vector: 'rotational',
+    primary_muscles: ['pronator teres', 'supinator', 'forearm rotators'],
+    equipment: ['bodyweight', 'dumbbell'],
+    equipment_alternatives: true,
+    joint_stress: 'low',
+    form_cues: ['Elbow tucked at your side, bent to a right angle', 'Turn the palm up, then down', 'Keep the elbow still, the forearm rotates and the arm does not', 'A light hammer or an empty hand both work'],
+    coach_note_swap: 'Rotation is the range a sore elbow loses first and nothing else in a session trains it.',
+    loads_joints: ['elbow'],
+    contraindicated_joints: [],
+    indicated_joints: ['elbow'],
+    style_tags: ['functional', 'hybrid', 'bodybuilding'],
+    substitution_group: 'conditioning',
+    unilateral: true,
+    avg_duration_seconds: 28,
+  },
   {
     // -----------------------------------------------------------------------
     // HIP REHAB. Four entries written rather than tagged, and the reason is

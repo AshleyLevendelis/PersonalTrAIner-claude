@@ -160,6 +160,22 @@ report('KNEE injury (10 movements marked: 0 warm-up tier, 7 isolation, 3 compoun
 report('HIP injury (4 marked: 3 activation primers written for this, plus Bird Dog)', sweep('hips'))
 report('LOWER BACK injury (3 marked, all tier3: Dead Bug, Side Plank, Bird Dog)', sweep('lower_back'))
 
+// Added when ankles, wrists and elbows got rehab of their own (Ashley's scope
+// ruling: those three, not the neck). All three read 0/576 BEFORE that work,
+// with 144/144 plans containing none, and they are the headline it has to
+// move. Kept in the same script as the four that already worked so all seven
+// numbers come off one sweep rather than a second tool that could drift.
+report('ANKLE injury (3 marked: Ankle Alphabet, Banded Dorsiflexion, Single-Leg Balance)', sweep('ankles'))
+report('WRIST injury (5 marked: circles, banded flexion/extension, grip squeeze, eccentric extension)', sweep('wrists'))
+report('ELBOW injury (3 marked: grip squeeze, eccentric wrist extension, pronation-supination)', sweep('elbows'))
+
+// THE SCOPE LINE, MEASURED RATHER THAN STATED. The neck deliberately gets no
+// prescribed work — "my neck bothers me" spans a stiff desk neck to a nerve
+// problem that should not be loaded, and the app cannot tell which. Printing
+// its zero here is what stops that decision quietly eroding: if a later
+// change starts prescribing neck work, this line moves off 0 and says so.
+report('NECK injury (0 marked, deliberately — Ashley ruled the neck out of scope)', sweep('neck'))
+
 // THE OVER-FIRE CONTROL, REWRITTEN — the previous one could not fail, and I
 // quoted its zero as evidence that the rehab slot "does not over-fire".
 //

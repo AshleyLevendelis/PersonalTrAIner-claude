@@ -46,7 +46,18 @@ import type { UserProfile, WorkoutDay } from '../src/lib/types'
  * time. The four still absent (ankle, elbow, wrist, neck) belong here the day
  * they get any indicated work.
  */
-const REHAB_INJURIES = ['shoulders', 'knees', 'hips', 'lower_back'] as const
+// Ankles, wrists and elbows joined on 29 Aug 2026 (Ashley's scope ruling).
+// Every section below loops this list, so they are covered by all of them at
+// once rather than by whichever ones somebody remembered to extend.
+const REHAB_INJURIES = ['shoulders', 'knees', 'hips', 'lower_back', 'ankles', 'wrists', 'elbows'] as const
+/** Ruled OUT of scope, and checked as explicitly as the ones that are in. */
+const NOT_PRESCRIBED = ['neck'] as const
+/** The nine entries added for ankles/wrists/elbows, by name. */
+const NEW_REHAB_MOVEMENTS = [
+  'Ankle Alphabet', 'Banded Ankle Dorsiflexion', 'Single-Leg Balance Hold',
+  'Wrist Circles', 'Banded Wrist Extension', 'Banded Wrist Flexion',
+  'Isometric Grip Squeeze', 'Eccentric Wrist Extension', 'Forearm Pronation-Supination',
+] as const
 
 let failures = 0
 const check = (name: string, ok: boolean, detail = '') => {
@@ -225,8 +236,93 @@ console.log('\n4. The over-fire check — nothing fires for an uninjured trainee
   // behind it, so this now asserts the interesting half — a joint the app
   // knows about but cannot treat must return null rather than reach for
   // something approximate. Move it on the day ankles gets rehab.
-  check('a mapped joint with no rehab content is not a licence to invent some',
-    pickRehabMovement(pool, getFlaggedJoints(['ankles']), new Set()) === null)
+  //
+  // THAT DAY CAME (29 Aug 2026) and this went red a second time, correctly,
+  // for the same reason it went red when hips was treated. The neck is the
+  // last mapped joint with nothing behind it — and unlike ankles and hips it
+  // is empty BY DECISION, not by omission: Ashley ruled the neck out of scope
+  // because "my neck bothers me" spans a stiff desk neck and a nerve problem
+  // that must not be loaded, and the app cannot tell which.
+  //
+  // So this check has changed meaning, and there is no next joint to move it
+  // to. It is now the assertion that the scope line HOLDS. If it ever goes
+  // red again, the honest response is not to swap the code again — it is that
+  // somebody has started prescribing neck work, and that needs Ashley, not an
+  // edit here.
+  for (const injury of NOT_PRESCRIBED) {
+    check(`${injury}: a mapped joint ruled out of scope gets nothing invented for it`,
+      pickRehabMovement(pool, getFlaggedJoints([injury]), new Set()) === null)
+  }
+
+  // AND THE UNINJURED PLAN ITSELF MUST NOT MOVE — found by measuring, not by
+  // reasoning. The nine ankle/wrist/elbow entries were first written with the
+  // obvious primer_pattern_affinity (lower-body for ankles, upper-body for
+  // wrists and elbows), which made them eligible for the ORDINARY warm-up
+  // slot and put one of them on 231 of 576 healthy training days — 40.1%.
+  // Nobody asked for everyone's warm-up to change; the ask was that injured
+  // people stop getting nothing back. Dropping the affinity took it to 0/576
+  // while leaving the guarantee at 576/576, because pickRehabMovement filters
+  // on indicated_joints and tier and never consults affinity.
+  //
+  // This asserts the 0, so re-adding an affinity line to any of the nine
+  // turns it red rather than quietly reshaping every healthy user's session.
+  {
+    const newSet = new Set<string>(NEW_REHAB_MOVEMENTS)
+    let healthyDays = 0, leaked = 0
+    for (const style of STYLES) {
+      for (const equipment_access of EQUIP) {
+        const plan = gen(buildProfile({ training_style: style, equipment_access }), `leak:${style}:${equipment_access}`)
+        for (const day of plan) {
+          if (day.exercises.length === 0) continue
+          healthyDays++
+          if (day.exercises.some(e => newSet.has(e.name))) leaked++
+        }
+      }
+    }
+    check('an uninjured trainee never meets the ankle/wrist/elbow rehab set',
+      leaked === 0, `${leaked}/${healthyDays} days`)
+    // 3 styles x 4 equipment tiers x 4 training days = 48. Written as the
+    // arithmetic rather than a round number, because the round number I first
+    // guessed (>50) was wrong and this check caught it — which is the only
+    // reason a sanity check on a zero-assertion is worth having: "0 leaked"
+    // is equally true of a loop that ran no plans at all. At the 40.1% the
+    // affinity version measured, 48 days would show ~19.
+    check('...and there were healthy days to check (sanity check on this check)',
+      healthyDays >= STYLES.length * EQUIP.length * 4, `${healthyDays}`)
+  }
+
+  // THE TRIM NEVER REACHES ZERO — Ashley's ruling, 29 Aug 2026: "shorten the
+  // rehab set when a session would overrun." enforceDayDurationBudget may now
+  // take a rehab primer from 2 sets to 1, which it can do to nothing else in
+  // the warm-up. The guarantee it must not cross is presence: a session that
+  // is over budget still carries the rehab, just less of it.
+  //
+  // Exercised on the exact configuration that overran before the change —
+  // bodyweight / 30-45 / bodybuilding — because that is where the trim
+  // actually fires. A looser profile would pass without ever running it.
+  for (const injury of ['wrists', 'ankles', 'elbows']) {
+    const flagged = getFlaggedJoints([injury])
+    let daysChecked = 0, zeroSets = 0, missingEntirely = 0
+    for (const split of ['upper_lower', 'push_pull_legs', 'full_body', 'ai_recommendation'] as const) {
+      const plan = gen(buildProfile({
+        injuries: [injury], equipment_access: 'bodyweight', training_style: 'bodybuilding',
+        session_duration_preference: '30-45', workout_split_preference: split,
+      }), `trim:${injury}:${split}`)
+      for (const day of plan) {
+        if (day.exercises.length === 0) continue
+        daysChecked++
+        const rehab = day.exercises.filter(ex => {
+          const e = getExerciseEntry(ex.name)
+          return !!e && isIndicatedFor(e, flagged)
+        })
+        if (rehab.length === 0) { missingEntirely++; continue }
+        if (rehab.some(r => r.sets < 1)) zeroSets++
+      }
+    }
+    check(`${injury}: the budget trim never removes the rehab movement`, missingEntirely === 0, `${missingEntirely}/${daysChecked} days`)
+    check(`${injury}: ...and never takes it below one set`, zeroSets === 0, `${zeroSets}/${daysChecked} days`)
+    check(`${injury}: ...on the tight config where the trim actually fires`, daysChecked > 0, `${daysChecked} days`)
+  }
 
   // The real regression risk of the style-filter change: for someone who
   // reported no injury, the new joints argument is an empty set, so the pool
