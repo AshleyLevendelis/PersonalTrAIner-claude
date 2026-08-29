@@ -1,7 +1,3 @@
-import { estimateDaySeconds } from '@/lib/session-duration'
-import { Field, FieldCta } from '@/components/field/Field'
-import { ink } from '@/lib/field-ink'
-import { buildExerciseField } from '@/lib/exercise-field'
 import { useEffect, useState } from 'react'
 import { Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -242,30 +238,10 @@ export function TodayPanel({
     ? workout.exercises.reduce((s, ex) => s + setsFor(ex.id ?? getExerciseId(ex.name), ex.name).length, 0)
     : 0
 
-  // "Home states the day; Exercise states the session" (handoff v2 §4).
-  const exerciseField = buildExerciseField({
-    sessionName: workout?.focus ?? null,
-    setsLogged: totalSetsLogged,
-    setsPlanned: totalSetsPlanned,
-    // The same estimator the time cap and the constraint audit use, so the
-    // field cannot disagree with the plan about how long a session takes.
-    estimatedMinutes: workout && !isRestDay && !isActiveRecovery
-      ? Math.round(estimateDaySeconds(workout) / 60)
-      : null,
-    weekNumber: liveWeek,
-    totalWeeks,
-    isRestDay: isRestDay || isActiveRecovery,
-  })
-
   return (
     <div className="space-y-3">
-      {/* THE FIELD (handoff v2 §4). The week strip moves INSIDE it and stays a
-          navigator — 32px, tappable — where Home's stays a 26px flat record on
-          canvas. The two are deliberately different. */}
-      <Field arcs={exerciseField.arcs} ringPlacement="ambient">
-        <WeekContextRow
-          variant="field"
-          days={weekTrain.days}
+      <WeekContextRow
+        days={weekTrain.days}
         todayName={todayName}
         onSelectDay={d => setPeekDay(d)}
         weekNumber={liveWeek}
@@ -279,37 +255,7 @@ export function TodayPanel({
         onOpenProgram={onOpenProgram}
         onAddUnplannedWork={!isRestDay && !isActiveRecovery && !peekWorkout ? () => setUnplannedWorkOpen(true) : undefined}
         onOpenSessionHistory={onOpenSessionHistory}
-        />
-
-        {exerciseField.sessionName && (
-          <>
-            <p className="mt-3 text-[38px] font-bold leading-none">{exerciseField.sessionName}</p>
-            <div className="mt-2 flex items-baseline gap-3">
-              <span className="tabular-mono text-[13px] font-bold tracking-wide">
-                {exerciseField.setsLogged} / {exerciseField.setsPlanned} SETS
-              </span>
-              {exerciseField.minutesLeft != null && (
-                <span className="text-[13px]" style={{ color: ink('text') }}>
-                  ~{exerciseField.minutesLeft} min left
-                </span>
-              )}
-            </div>
-            {/* 5px bar: ink on ink .20, both from the ladder. */}
-            <div className="mt-3 h-[5px] w-full overflow-hidden rounded-full" style={{ background: ink('barTrack') }}>
-              <div
-                className="h-full rounded-full"
-                style={{ width: `${exerciseField.progress * 100}%`, background: 'var(--field-ink)' }}
-              />
-            </div>
-          </>
-        )}
-
-        {exerciseField.ctaLabel && (
-          <div className="mt-4">
-            <FieldCta onClick={startSession}>{exerciseField.ctaLabel}</FieldCta>
-          </div>
-        )}
-      </Field>
+      />
 
       {peekWorkout ? (
         peekWorkout.exercises.length === 0 ? (

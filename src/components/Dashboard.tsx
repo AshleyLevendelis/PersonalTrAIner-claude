@@ -5,9 +5,6 @@
 // no new visual language invented here.
 // ---------------------------------------------------------------------------
 
-import { Field, FieldLabel, FieldChip, FieldCta, FieldListRow } from '@/components/field/Field'
-import { ink } from '@/lib/field-ink'
-import { buildHomeField } from '@/lib/home-field'
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { useActiveSession } from '@/hooks/useActiveSession'
@@ -251,10 +248,6 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
     },
   ]
 
-  // "The count is derived from the list, never hardcoded" (handoff v2 §2) —
-  // so it is computed here from real ledger data, not written into the markup.
-  const homeField = buildHomeField(data)
-
   return (
     // Density pass 3a "Borderless": no cards. Sections separate by the
     // uppercase micro-label + generous whitespace; the hero and the numbers
@@ -274,48 +267,22 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
       <div className="grain-overlay" aria-hidden />
 
       <div className="relative">
-        {/* 1. THE FIELD — "what's left today" (handoff v2 §2).
-            Replaces the old date + streak header AND the coach bubble's
-            what's-left line. The handoff moved that line here for a contrast
-            reason worth keeping visible: "Never put --role-warn text on a
-            field. Amber on mint is unreadable, and status colour doesn't bend
-            for a background." */}
-        <Field arcs={homeField.arcs} ringPlacement="ambient">
-          <FieldLabel
-            trailing={<FieldChip>{data.streak} day{data.streak === 1 ? '' : 's'}</FieldChip>}
+        {/* 1. DATE + STREAK. The day name only — the week number moved to the
+            strip label below, which is now the one place on Home it appears.
+            The streak is a chip rather than a 26px number over an 8.5px
+            label: at that size the label was unreadable and the number read
+            as the page's headline, which it is not. */}
+        <div className="flex items-start justify-between gap-3">
+          <span className="pt-1 ds-label">{data.dayName}</span>
+          <span
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1"
+            style={{ background: 'var(--surface-raised)' }}
           >
-            {data.dayName}
-            {data.phase ? ` · Week ${data.phase.weekNumber} of ${data.phase.totalWeeks}` : ''}
-          </FieldLabel>
-
-          {homeField.empty ? (
-            /* §8 step 3: a rest day with everything logged is an EMPTY state,
-               never "0 things left". */
-            <p className="mt-4 text-[15px] font-semibold" style={{ color: ink('text') }}>
-              Nothing left today — you're on top of it.
-            </p>
-          ) : (
-            <>
-              <div className="mt-3 flex items-baseline gap-2">
-                <span className="tabular-mono text-[64px] leading-none font-bold">{homeField.count}</span>
-                <span className="text-[14px] font-semibold leading-tight" style={{ color: ink('textSmall') }}>
-                  thing{homeField.count === 1 ? '' : 's'} left<br />today
-                </span>
-              </div>
-              <div className="mt-4">
-                {homeField.rows.map((r, i) => (
-                  <FieldListRow key={r.key} swatch={r.swatch} label={r.label} figure={r.figure} first={i === 0} />
-                ))}
-              </div>
-            </>
-          )}
-
-          {homeField.ctaLabel && (
-            <div className="mt-4">
-              <FieldCta onClick={() => { window.location.hash = '#exercise' }}>{homeField.ctaLabel}</FieldCta>
-            </div>
-          )}
-        </Field>
+            <span aria-hidden className={`inline-block size-[5px] rounded-full ${data.streak > 0 ? 'bg-primary' : 'bg-[color:var(--text-dim)]'}`} />
+            <span className="tabular-mono text-[13px] font-semibold">{data.streak}</span>
+            <span className="text-[11px] text-muted-foreground">day{data.streak === 1 ? '' : 's'} streak</span>
+          </span>
+        </div>
 
         {/* 2 + 3. WEEK STRIP, with a label above it. Seven glyphs as the first
             thing on the page read as a date picker; naming them is what makes

@@ -56,13 +56,6 @@ import type { ExerciseEntry } from '@/lib/exercise-db'
 const STORAGE_KEY = 'fitplan_profile_id'
 const LAST_TAB_KEY = 'fitplan_last_tab'
 
-/**
- * The tabs that own a daily fact, and therefore carry a field (handoff v2 §1).
- * Tools is deliberately absent: "Tools owns nothing, so it has no field — the
- * absence is the point, and it makes the ownership rule visible."
- */
-const TABS_WITH_FIELD = new Set(['dashboard', 'nutrition', 'exercise'])
-
 function App() {
   const { hash, route } = useAppRoute()
   // `program`/`train` are sub-routes of the exercise tab (LAYOUT-DESIGN.md
@@ -1892,16 +1885,7 @@ function App() {
       <div
         data-tour="settings"
         className="fixed right-3 z-40"
-        style={{
-          top: 'calc(0.625rem + env(safe-area-inset-top))',
-          // THE GEAR SITS ON THE FIELD NOW. Handoff v2 §1 makes the field
-          // full-bleed to the top of the tab, and this control is fixed app
-          // chrome rendered once for every tab — so on the three tabs that own
-          // a daily fact it lands on a light accent band, where its normal
-          // light-on-dark colour is unreadable. Field ink is the same value
-          // every other mark on that band already uses.
-          color: TABS_WITH_FIELD.has(activeTab) ? 'var(--field-ink)' : undefined,
-        }}
+        style={{ top: 'calc(0.625rem + env(safe-area-inset-top))' }}
       >
         <ProfileMenu
           onOpenProfile={() => { setProfileInfoSection(undefined); setProfileInfoOpen(true) }}
@@ -1920,19 +1904,7 @@ function App() {
         <OfflineStatusIndicator />
       </div>
 
-      {/* THE FIELD MEETS THE TOP — but only when there is nothing above it.
-          A field tab drops the page's top padding so the band starts at the
-          top of the scroll area (handoff v2 §1: "it meets the status bar").
-          When an adaptation banner is showing, the padding stays: the banner
-          is the first thing and the field follows it. Deciding this HERE
-          rather than with a blind negative margin on the field is what stops
-          the band being dragged over that banner. */}
-      {/* Top padding is a STYLE, not a class, and <main className> stays one
-          static string on one line — test:composer-focus copies that string
-          into its browser harness verbatim, and a copy that drifts is worse
-          than no copy. The bottom padding that gate actually measures against
-          is untouched. */}
-      <main className="max-w-6xl mx-auto px-4 pb-28 space-y-6" style={{ paddingTop: TABS_WITH_FIELD.has(activeTab) && adaptationMessages.length === 0 ? 0 : 48 }}>
+      <main className="max-w-6xl mx-auto px-4 pt-12 pb-28 space-y-6">
         {adaptationMessages.length > 0 && (
           <div className="space-y-2">
             {adaptationMessages.map((msg, i) => (

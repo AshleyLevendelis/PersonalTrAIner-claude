@@ -2,6 +2,16 @@
 
 Newest first. One line each.
 
+- [x] **DESIGN HANDOFF v2 REVERTED — Ashley: "I don't like the recent changes we've made to the UI."** Home, Nutrition and Exercise are back exactly as they were before the colour field: no band, no derived "what's left" list, no inline five-ring meter, and the week strip back on canvas in its card. Restored file-by-file from `87f0e93`, the last pre-handoff commit, rather than by a blind range revert.
+
+- [x] **ONE THING DELIBERATELY KEPT: the round-timer bug fix.** `computeRoundState` ran for `rounds × (work + rest)`, so every 6 × 40/20 session took **6:00 and ended by sitting through a rest after the final round** — the honest length is 5:40. That is a real defect found *while* doing the handoff, not part of it, and re-introducing a known bug to tidy a revert would be the wrong trade. `test:round-timer` and its four mutations came with it.
+
+- [x] EVERYTHING ELSE FROM THE HANDOFF IS GONE: `Field`/`FieldRing`, `field-ink`, the three per-tab field models, the `--field`/`--field-warn`/`--field-destructive` token sets, the `.ds-field` cross-fade, the week strip's `variant`, the gear's field-ink treatment, `<main>`'s conditional padding, and the four field gates. Verified: **zero references to any of it survive** anywhere in `src/` or `scripts/`.
+
+- [x] The pre-handoff `<main>` and its harness copy are back in step, so `test:composer-focus` passes without the workaround the handoff needed. 14 gates re-run green including audit-fixes, food-dislike-is-a-ban and coach-sees-ingredients — **none of the safety work from earlier in the session was touched**.
+
+- [ ] **THE HANDOFF IS NOT DELETED, JUST NOT APPLIED.** Every commit is still in history (`a054319` through `4fe2b86`), so any part of it — the auto-adjusted field colours, the derived "what's left" count, the inline meter — can be brought back individually if a piece of it turns out to be wanted. Pass C was never started.
+
 - [x] **PASS B FOUND A LIVE BUG BEFORE IT BUILT ANYTHING.** `computeRoundState` ran for `rounds × (work + rest)`, so **every 6 × 40/20 session took 6:00 and ended by sitting through a rest with nothing left to recover for**. The honest length is **5:40**. Handoff §6 build note 3 states it plainly — *"Six rounds means six work intervals and five rests"* — and `test:timers` passed throughout, which is why it survived.
 
 - [x] **AND I ALMOST SHIPPED A SECOND COPY OF THE TIMER.** I had written a whole new engine before checking, and the app already had one — deadline-anchored on `startedAtIso`, with `playTimerCue` already doing distinct tones and vibration per transition. Both of the handoff's first two build notes were **already satisfied**. My duplicate is deleted; the real engine is fixed instead. That is the exact defect class this session has spent all day removing, caught one step before committing it.

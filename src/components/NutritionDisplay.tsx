@@ -1,7 +1,3 @@
-import { Field, FieldLabel } from '@/components/field/Field'
-import { FieldRing } from '@/components/field/FieldRing'
-import { ink } from '@/lib/field-ink'
-import { buildNutritionField } from '@/lib/nutrition-field'
 import { useEffect, useRef, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -27,14 +23,62 @@ const WATER_QUICK_ADD_ML = [250, 500]
 // of one hue fading in opacity: water lives on the same tab as the ring
 // meter now, so it earns its own visual identity (--chart-3, matching the
 // water row/quick-adds below) rather than borrowing the mint accent.
+// Calories keeps the hero-number treatment (not a legend row); the other
+// three rings + water get a legend row each — four rows, not five, matching
+// the design reference's own rendered screen (its prose says "five legend
+// rows" but the reference screen itself shows four: water/protein/carbs/fat).
+const NUTRITION_RINGS = [
+  { key: 'water', r: 50, strokeWidth: 3, color: 'var(--chart-3)' },
+  { key: 'calories', r: 40, strokeWidth: 8, color: 'var(--primary)' },
+  { key: 'protein', r: 30, strokeWidth: 5, color: 'var(--role-ai)' },
+  { key: 'carbs', r: 22, strokeWidth: 5, color: 'var(--role-warn)' },
+  { key: 'fat', r: 14, strokeWidth: 5, color: 'var(--text-tertiary)' },
+] as const
+const NUTRITION_RING_CIRC: Record<string, number> = Object.fromEntries(NUTRITION_RINGS.map(r => [r.key, 2 * Math.PI * r.r]))
+
+// ---------------------------------------------------------------------------
+// Water-target sparkle
+// ---------------------------------------------------------------------------
+// Three stars placed ON the water ring's own arc (r=50, centre 56,56) rather
+// than scattered around the meter, so the effect reads as "this ring
+// completed" and not "something happened near the rings". Angles are measured
+// the same way the ring fills — from 12 o'clock, clockwise — and spread across
+// the upper arc where the ring isn't overlapped by the legend column.
+//
+// The stagger is deliberately long (~1.45s between plays, ~4s total): three
+// quick pops in succession reads as a loading state, three slow ones read as
+// a small celebration and then stop.
 // The calorie tile's ring geometry, kept identical so the steps ring and the
 // calorie ring read as one system rather than two people's work.
 const STEP_RING_R = 14
 const STEP_RING_CIRC = 2 * Math.PI * STEP_RING_R
 
+const WATER_RING_R = 50
+const SPARKLES = [
+  { angleDeg: 312, size: 9, delayMs: 0 },
+  { angleDeg: 28, size: 6.5, delayMs: 1450 },
+  // Not pushed further clockwise than this: at ~3 o'clock the star's own
+  // drop-shadow reaches the 112-wide viewBox edge and gets clipped by the
+  // svg's default overflow, which reads as a rendering glitch rather than a
+  // sparkle. Verified numerically — bbox stays ~14px clear here.
+  { angleDeg: 140, size: 7.5, delayMs: 2900 },
+] as const
 /** How long after the crossing the nodes are torn out — last delay + one play + a frame of slack. */
+const SPARKLE_TEARDOWN_MS = 4100
 
 /** Four-point star as a path, centred on (cx, cy). Concave control points at 38% give the pinched arms a "sparkle" reads as; a plain rotated square does not. */
+function starPath(cx: number, cy: number, size: number): string {
+  const o = size / 2
+  const i = o * 0.38
+  return [
+    `M ${cx} ${cy - o}`,
+    `Q ${cx + i} ${cy - i} ${cx + o} ${cy}`,
+    `Q ${cx + i} ${cy + i} ${cx} ${cy + o}`,
+    `Q ${cx - i} ${cy + i} ${cx - o} ${cy}`,
+    `Q ${cx - i} ${cy - i} ${cx} ${cy - o}`,
+    'Z',
+  ].join(' ')
+}
 
 export interface NutritionDisplayProps {
   profile: UserProfile
@@ -166,17 +210,27 @@ export function NutritionDisplay({
   // mount would turn a reward into wallpaper. Ref, not state: seeding it must
   // not itself cause a render.
   const wasWaterComplete = useRef<boolean | null>(null)
+  const [waterJustCompleted, setWaterJustCompleted] = useState(false)
+  const waterComplete = waterTarget > 0 && todayWaterMl >= waterTarget
 
+  useEffect(() => {
+    const previous = wasWaterComplete.current
+    wasWaterComplete.current = waterComplete
+    if (previous !== false || !waterComplete) return
+    setWaterJustCompleted(true)
+    const timer = setTimeout(() => setWaterJustCompleted(false), SPARKLE_TEARDOWN_MS)
+    // Clearing on unmount matters: leaving the timer live would call
+    // setState on a gone component if the trainee switches tabs mid-sparkle.
+    return () => clearTimeout(timer)
+  }, [waterComplete])
 
-  const nutritionField = buildNutritionField({
-    caloriesEaten: eaten.kcal, caloriesTarget: macros?.calories ?? 0,
-    proteinEaten: eaten.protein, proteinTarget: macros?.protein ?? 0,
-    carbsEaten: eaten.carbs, carbsTarget: macros?.carbs ?? 0,
-    fatEaten: eaten.fat, fatTarget: macros?.fat ?? 0,
-    waterMl: todayWaterMl, waterTargetMl: waterTarget,
-    hasTargets: macros != null,
-  })
-
+  const ringValues: Record<string, { eaten: number; target: number }> = {
+    water: { eaten: todayWaterMl, target: waterTarget },
+    calories: { eaten: eaten.kcal, target: macros?.calories ?? 0 },
+    protein: { eaten: eaten.protein, target: macros?.protein ?? 0 },
+    carbs: { eaten: eaten.carbs, target: macros?.carbs ?? 0 },
+    fat: { eaten: eaten.fat, target: macros?.fat ?? 0 },
+  }
 
   return (
     <div className="space-y-6">
@@ -184,48 +238,78 @@ export function NutritionDisplay({
           unit — its copy names both, and water is the only quick-add the tour
           promises ("+250 / +500 log water in one tap"). */}
       <div data-tour="rings">
-        {/* THE FIELD (handoff v2 §3). The ring is INLINE at 130px here,
-            not ambient, "because it's an instrument you read" — on Home and
-            Exercise it is atmosphere that happens to be true; here it is the
-            point. No action in the field: meal logging lives on the canvas.
+        <p className="ds-label">Nutrition · {dayName}</p>
 
-            REMOVED WITH THE OLD 112px METER: the water-completion sparkle.
-            The handoff's field has no such flourish and porting it would push
-            a one-tab celebration into the shared ring component. Flagged in
-            BACKLOG rather than deleted quietly — it was a deliberate delight
-            and it is Ashley's to ask back. */}
-        <Field ringPlacement="inline">
-          <FieldLabel>Nutrition · {dayName}</FieldLabel>
-          <div className="mt-3 flex items-center gap-[18px]">
-            <FieldRing arcs={nutritionField.arcs} placement="inline" size={130} />
-            <div className="flex min-w-0 flex-1 flex-col gap-3">
-              <div>
-                <p className="tabular-mono text-[44px] leading-none font-bold">
-                  {nutritionField.kcal ? nutritionField.kcal.eaten : '—'}
-                </p>
-                <p className="mt-1 text-[11px] font-bold" style={{ color: ink('textSmall') }}>
-                  {nutritionField.kcal
-                    ? <>of <span className="tabular-mono">{nutritionField.kcal.target}</span> kcal</>
-                    : 'add your weight for a target'}
-                </p>
-              </div>
-              {/* The 2x2 macro grid. "The letters are load-bearing" — colour
-                  alone failed and ink alone failed; colour + letter works, so
-                  the letter is never decorative and never dropped. */}
-              <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
-                {nutritionField.cells.map(c => (
-                  <div key={c.key} className="flex items-baseline gap-1.5">
-                    <span aria-hidden className="size-[9px] shrink-0 rounded-[3px]" style={{ background: c.swatch }} />
-                    <span className="text-[11px] font-bold" style={{ color: ink('textSmall') }}>{c.letter}</span>
-                    <span className="tabular-mono text-[12.5px] font-semibold">
-                      {c.eaten}<span style={{ color: ink('textSmall') }}>/{c.target}</span>
+        <div className="mt-3.5 flex items-center gap-[18px]">
+          <svg width="112" height="112" viewBox="0 0 112 112" className="shrink-0">
+            {NUTRITION_RINGS.map(r => (
+              <circle key={`track-${r.key}`} cx="56" cy="56" r={r.r} fill="none" stroke="var(--surface-raised)" strokeWidth={r.strokeWidth} />
+            ))}
+            {NUTRITION_RINGS.map(r => {
+              const { eaten: e, target: t } = ringValues[r.key]
+              const circ = NUTRITION_RING_CIRC[r.key]
+              const frac = t > 0 ? Math.min(1, e / t) : 0
+              return (
+                <circle
+                  key={`fill-${r.key}`}
+                  cx="56" cy="56" r={r.r} fill="none" strokeWidth={r.strokeWidth} strokeLinecap="round"
+                  stroke={r.color}
+                  strokeDasharray={`${circ * frac} ${circ}`}
+                  transform="rotate(-90 56 56)"
+                  className={r.key === 'calories' ? 'glow-icon' : undefined}
+                  style={{ transition: 'stroke-dasharray 400ms ease' }}
+                />
+              )
+            })}
+            {waterJustCompleted && SPARKLES.map(s => {
+              // -90 puts 0deg at 12 o'clock, matching the ring fill's own
+              // rotate(-90) so an angle here means the same thing it does there.
+              const rad = ((s.angleDeg - 90) * Math.PI) / 180
+              return (
+                <path
+                  key={`sparkle-${s.angleDeg}`}
+                  className="ds-sparkle"
+                  d={starPath(56 + WATER_RING_R * Math.cos(rad), 56 + WATER_RING_R * Math.sin(rad), s.size)}
+                  fill="var(--chart-3)"
+                  style={{
+                    animationDelay: `${s.delayMs}ms`,
+                    filter: 'drop-shadow(0 0 3px var(--chart-3))',
+                  }}
+                />
+              )
+            })}
+          </svg>
+          <div className="flex min-w-0 flex-1 flex-col gap-3">
+            <div>
+              <p className="ds-num-mega tabular-mono text-[#E4FCF4] glow-mint-lg">{macros ? Math.round(eaten.kcal) : '—'}</p>
+              <p className="mt-1 text-[10.5px] uppercase tracking-[.16em] text-muted-foreground">
+                {macros
+                  ? <>kcal · of <span className="tabular-mono">{Math.round(macros.calories)}</span></>
+                  : 'kcal · add your weight for a target'}
+              </p>
+            </div>
+            <div className="flex flex-col gap-[6px]">
+              {([
+                { key: 'water', label: 'Water', unit: 'ml' },
+                { key: 'protein', label: 'Protein', unit: 'g' },
+                { key: 'carbs', label: 'Carbs', unit: 'g' },
+                { key: 'fat', label: 'Fat', unit: 'g' },
+              ] as const).map(row => {
+                const ring = NUTRITION_RINGS.find(r => r.key === row.key)!
+                const { eaten: e, target: t } = ringValues[row.key]
+                return (
+                  <div key={row.key} className="flex items-baseline gap-[9px]">
+                    <span className="h-[9px] w-[9px] shrink-0 rounded-[3px]" style={{ background: ring.color }} />
+                    <span className="flex-1 text-[10px] uppercase tracking-[.16em] text-muted-foreground">{row.label}</span>
+                    <span className="tabular-mono text-[12.5px]">
+                      {Math.round(e)}<span className="text-muted-foreground"> / {Math.round(t)}{row.unit}</span>
                     </span>
                   </div>
-                ))}
-              </div>
+                )
+              })}
             </div>
           </div>
-        </Field>
+        </div>
 
         {/* Water logging row — moved off Dashboard.tsx. Quick-adds and the
             progress bar use --chart-3 (blue) to match the water ring above,
