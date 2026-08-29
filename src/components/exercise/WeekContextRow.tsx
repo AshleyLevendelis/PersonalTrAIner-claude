@@ -1,3 +1,4 @@
+import { ink } from '@/lib/field-ink'
 import { useState } from 'react'
 import { ChevronDown, MoreVertical, ListPlus, History } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -47,6 +48,7 @@ export function WeekContextRow({
   onOpenProgram,
   onAddUnplannedWork,
   onOpenSessionHistory,
+  variant = 'canvas',
 }: {
   days: TrainingWeekDay[]
   todayName: string
@@ -63,7 +65,20 @@ export function WeekContextRow({
   onOpenProgram?: () => void
   onAddUnplannedWork?: () => void
   onOpenSessionHistory?: () => void
+  /**
+   * 'field' moves this strip INTO Exercise's field (handoff v2 §4): no card,
+   * 32px cells on ink .12, today bordered 1.5px solid ink, and every glyph
+   * SOLID ink. That last one is not a detail — §8 step 1 singles it out:
+   * "Small glyphs on the Exercise week strip must be solid ink — that one has
+   * regressed twice." It is gated in test:exercise-field for that reason.
+   *
+   * Home's strip stays 'canvas' and stays different on purpose: "Home's is a
+   * record: 26px, flat, on canvas, not interactive. Exercise's is a
+   * navigator: 32px, in the field, tappable."
+   */
+  variant?: 'canvas' | 'field'
 }) {
+  const onField = variant === 'field'
   const [expanded, setExpanded] = useState(false)
   const phaseToken = isCalibrationWeek ? 'Calibration' : isDeload ? 'Deload week' : phaseLabel
 
@@ -75,11 +90,16 @@ export function WeekContextRow({
   if (estimatedMinutes != null) headerParts.push(`~${estimatedMinutes} min`)
 
   return (
-    <div data-tour="extoday" className="rounded-2xl p-3.5" style={{ background: 'var(--surface-raised)' }}>
+    <div
+      data-tour="extoday"
+      className={onField ? '' : 'rounded-2xl p-3.5'}
+      style={onField ? undefined : { background: 'var(--surface-raised)' }}
+    >
       <div className="flex items-center justify-between gap-3">
         <button
           type="button"
-          className="min-w-0 flex-1 text-left text-[12.5px] text-foreground"
+          className={`min-w-0 flex-1 text-left text-[12.5px] ${onField ? 'font-semibold' : 'text-foreground'}`}
+          style={onField ? { color: ink('text') } : undefined}
           onClick={onOpenProgram}
         >
           {headerParts.join(' · ')}
@@ -136,21 +156,35 @@ export function WeekContextRow({
               key={d.date}
               type="button"
               onClick={() => { if (!isToday) onSelectDay(d.dayName) }}
-              className="hit-slop-day flex flex-col items-center gap-1 rounded-[9px] px-1.5 py-1"
-              style={isToday ? { background: 'rgba(var(--glow-rgb),.14)', border: '1px solid rgba(var(--glow-rgb),.4)' } : undefined}
+              className="hit-slop-day flex flex-col items-center justify-center gap-1 rounded-[9px] px-1.5 py-1"
+              style={
+                onField
+                  ? {
+                      width: 32, height: 32,
+                      background: ink('cellFill'),
+                      border: isToday ? '1.5px solid var(--field-ink)' : '1.5px solid transparent',
+                    }
+                  : isToday ? { background: 'rgba(var(--glow-rgb),.14)', border: '1px solid rgba(var(--glow-rgb),.4)' } : undefined
+              }
               // This used to interpolate the raw state, so a screen reader
               // announced "Monday: before_plan" — an identifier, not English.
               // The same defect STATE_LABEL was written to fix, still live
               // here because that fix went into the copy nothing renders.
               aria-label={`${d.dayName}: ${STATE_LABEL[d.state]}`}
             >
-              <span className={`text-[9px] uppercase tracking-[.08em] ${isToday ? 'font-semibold text-primary' : 'text-muted-foreground'}`}>
+              <span
+                className={`text-[9px] uppercase tracking-[.08em] ${onField ? 'font-semibold' : isToday ? 'font-semibold text-primary' : 'text-muted-foreground'}`}
+                style={onField ? { color: 'var(--field-ink)' } : undefined}
+              >
                 {SHORT_DAY[d.dayName] ?? d.dayName.slice(0, 1)}
               </span>
-              {isToday && d.state === 'due' ? (
+              {isToday && d.state === 'due' && !onField ? (
                 <span aria-hidden className="size-[7px] rounded-full bg-primary glow-dot" />
               ) : (
-                <span className={`text-[12px] leading-none ${isToday ? 'text-primary glow-mint' : 'text-muted-foreground'}`}>
+                <span
+                  className={`text-[12px] leading-none ${onField ? '' : isToday ? 'text-primary glow-mint' : 'text-muted-foreground'}`}
+                  style={onField ? { color: 'var(--field-ink)' } : undefined}
+                >
                   {GLYPH[d.state]}
                 </span>
               )}
@@ -159,7 +193,7 @@ export function WeekContextRow({
         })}
       </div>
 
-      {onOpenProgram && (
+      {onOpenProgram && !onField && (
         <button type="button" className="mt-3 text-[11.5px] font-semibold text-primary" onClick={onOpenProgram}>
           See the whole program ›
         </button>

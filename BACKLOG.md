@@ -2,6 +2,24 @@
 
 Newest first. One line each.
 
+- [x] **PASS A COMPLETE: Exercise's field, and the week strip moves into it.** `Wk 3/16 · B1 Hypertrophy` with the ⋮ menu on its row, the strip **inside** the field at 32px on ink .12 with today bordered 1.5px solid ink and **still tappable**, `Push & Press` at 38px, `4 / 18 SETS`, `~40 min left`, the 5px bar, and the Continue CTA. Home ✅ Nutrition ✅ Exercise ✅ Tools deliberately none.
+
+- [x] **ONE STRIP, TWO SKINS — NOT A THIRD STRIP.** `WeekContextRow` gained a `variant`; Home's stays a 26px flat canvas **record**, Exercise's becomes the 32px in-field **navigator**. Adding a separate field strip would have recreated the dead-duplicate-strip defect this session already deleted once.
+
+- [x] **THE GLYPH REGRESSION THE HANDOFF NAMES TWICE IS GATED.** §8 step 1: *"Small glyphs on the Exercise week strip must be solid ink — that one has regressed twice."* Both the day letter and the state glyph are asserted solid, and the mutation that drops it turns the gate red.
+
+- [x] **BOTH ARCS ARE INK, AND THE GATE FORBIDS EITHER BECOMING A COLOUR** — sets solid at r92/w9, program at the documented **.32** rung, r76/w6. The handoff's reason is structural, not aesthetic: *"'sets' and 'program progress' are the only facts in the app with no assigned colour"*, so giving one a hue would imply a meaning the colour system does not carry.
+
+- [x] §4's THREE NEW ALPHAS BECAME **LADDER CONSTANTS** rather than inline literals — `cellFill .12`, `barTrack .20`, `secondaryArc .32` — per §7's *"documented constants, not per-component literals"*.
+
+- [x] TIME LEFT IS **DERIVED FROM SETS REMAINING**, using the same `estimateDaySeconds` the time cap and the constraint audit use, so the field can never disagree with the plan about session length. Logged sets are clamped to planned, so an over-logged session fills the bar rather than overflowing it.
+
+- [x] AND *"HOME AND EXERCISE MUST NOT READ AS THE SAME SCREEN"* IS NOW A CHECK, not a hope: Exercise states the session at 38px, Home never does, Home names it exactly once inside its first list row, and the two strips are asserted to use different variants. **Six mutations bite**, including one that makes Home shout the session name too.
+
+- [ ] **PASS B (timer states) and PASS C (Daylight verification + token cleanup) remain.** The handoff is explicit the three passes must not be combined. Pass B's known problem is already recorded: the handoff's own red state measures **5.77 solid / 4.06 at .78** against its required 7 / 4.5, so `--destructive` needs the same auto-adjust the field got.
+
+- [ ] **NOTHING IN PASS A HAS BEEN SEEN ON A REAL SCREEN.** All three fields are verified by construction and by measurement, never in a browser — `*.supabase.co` is unreachable from the sandbox. §8's own verification list (contrast tool on every field, Home vs Exercise side by side, the four session states, the meter against the ledger) wants a pass on Ashley's machine.
+
 - [x] **PASS A CONTINUED: Nutrition's field.** The five-ring meter now sits **inline at 130px inside the field** — "because it's an instrument you read", where Home's and Exercise's rings are atmosphere that happens to be true. `1240` at 44px over `of 2480 kcal`, then the 2×2 grid `P 88/160 · C 126/280 · F 35/69 · W 1250/2000`. **No action in the field**; meal logging stays on the canvas.
 
 - [x] THE ARC MAPPING WAS **READ OFF THE PROTOTYPE, NOT INFERRED.** §3 lists five radius/width pairs but never says which fact is which; the prototype settles it — water r50/w4, kcal r40/w9, protein r30/w6, carbs r22/w6, fat r14/w6 — and confirms kcal is the headline, because **r40 is the one arc with no keyline behind it**.

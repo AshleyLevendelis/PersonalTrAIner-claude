@@ -92,6 +92,7 @@
     "test:field-contrast": "tsx scripts/test-field-contrast.ts",
     "test:home-field": "tsx scripts/test-home-field.ts",
     "test:nutrition-field": "tsx scripts/test-nutrition-field.ts",
+    "test:exercise-field": "tsx scripts/test-exercise-field.ts",
     "test:activity-streak": "tsx scripts/test-activity-streak.ts",
     "test:starting-out": "tsx scripts/test-starting-out.ts",
     "test:tempo-prescription": "tsx scripts/test-tempo-prescription.ts",

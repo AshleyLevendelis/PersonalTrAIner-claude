@@ -29,6 +29,17 @@ export const FIELD_INK = {
   ringTrack: 0.17,
   /** The 3px rim behind a coloured arc that lets a light hue survive the field. */
   keyline: 0.55,
+  /** Week-strip cell fill on Exercise's field (§4). */
+  cellFill: 0.12,
+  /** The unfilled part of Exercise's 5px session progress bar (§4). */
+  barTrack: 0.20,
+  /**
+   * A SECOND ink arc — Exercise's program progress (§4). Both its arcs are
+   * ink "because 'sets' and 'program progress' are the only facts in the app
+   * with no assigned colour", so this rung is what keeps them distinguishable
+   * without inventing a colour for one of them.
+   */
+  secondaryArc: 0.32,
 } as const
 
 export type FieldInkStep = keyof typeof FIELD_INK
