@@ -68,6 +68,51 @@ for (const [state, what, expected] of CASES) {
   if (!ok) bad++
   console.log(`  ${ok ? '✓' : '✗'} ${what}\n      on screen: ${expected}\n      composer:  ${ph}`)
 }
+
+// ---------------------------------------------------------------------------
+// THE UNIT CONVERSION, END TO END, THROUGH THE REAL FIELD.
+//
+// The parser has its own table gate. This asks the question that gate cannot:
+// can the INPUT even hold "5'10"? It could not — the field was type="number",
+// which discards the apostrophe and the letters, so every unit test passed
+// while the field they feed could not receive a single one of those strings.
+// ---------------------------------------------------------------------------
+await send('Page.navigate', { url: `http://127.0.0.1:${port}/?state=bodygroup` })
+await wait(1800)
+const conv = await ev(`(async () => {
+  const setVal = (el, v) => {
+    const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype
+    Object.getOwnPropertyDescriptor(proto, 'value').set.call(el, v)
+    el.dispatchEvent(new Event('input', { bubbles: true }))
+  }
+  const height = document.querySelector('#slot-heightCm')
+  const weight = document.querySelector('#slot-weightKg')
+  if (!height || !weight) return JSON.stringify({ error: 'fields not found' })
+  const typed = { heightType: height.getAttribute('type'), weightType: weight.getAttribute('type') }
+  setVal(height, "5'10")
+  setVal(weight, '13st 2')
+  await new Promise(r => setTimeout(r, 60))
+  const held = { height: height.value, weight: weight.value }
+  const save = [...document.querySelectorAll('button')].find(b => b.textContent.trim() === 'Save')
+  if (save) save.click()
+  await new Promise(r => setTimeout(r, 600))
+  return JSON.stringify({ ...typed, held, body: document.body.innerText.slice(0, 1200) })
+})()`)
+const c = JSON.parse(conv)
+const say = (label, ok, extra) => {
+  if (ok) console.log('  \u2713 ' + label)
+  else { bad++; console.log('  \u2717 ' + label + (extra !== undefined ? ' \u2014 ' + JSON.stringify(extra).slice(0, 200) : '')) }
+}
+console.log('\n  the height/weight fields accept a unit expression:')
+say('height is not type="number" (a number input cannot hold an apostrophe)', c.heightType === 'text', c.heightType)
+say('weight is not type="number"', c.weightType === 'text', c.weightType)
+say(`the field actually held "5'10"`, c.held && c.held.height === "5'10", c.held)
+say('the field actually held "13st 2"', c.held && c.held.weight === '13st 2', c.held)
+say('178cm was stored and read back', /178/.test(c.body || ''), (c.body || '').slice(0, 300))
+say('83.5kg was stored and read back', /83\.5/.test(c.body || ''), (c.body || '').slice(0, 300))
+say(`the receipt says where 178 came from`, /from 5'10/.test(c.body || ''), (c.body || '').slice(0, 400))
+say('...and where 83.5 came from', /from 13st 2lb/.test(c.body || ''), (c.body || '').slice(0, 400))
+
 console.log(bad === 0 ? '\n  composer matches the question on screen in all cases.\n' : `\n  ${bad} MISMATCHED\n`)
 chrome.kill(); server.close()
 process.exit(bad === 0 ? 0 : 1)

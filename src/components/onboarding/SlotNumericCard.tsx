@@ -38,13 +38,37 @@ import {
  * grouped cards put three fields under one question, so only one of them
  * could ever have taken its unit from the sentence above.
  */
+import { measureParserFor } from '@/lib/body-units'
+
 const UNIT: Record<string, string | undefined> = {
   age: 'years',
-  heightCm: 'cm',
-  weightKg: 'kg',
+  heightCm: 'cm or 5\'10',
+  weightKg: 'kg or 13st',
   knownSquatKg: 'kg',
   knownBenchKg: 'kg',
   knownDeadliftKg: 'kg',
+}
+
+/**
+ * The two fields that accept another unit, and MUST therefore not be
+ * `type="number"`.
+ *
+ * A number input physically cannot hold `5'10"` or `13st` — the browser
+ * discards the apostrophe and the letters — so accepting feet and stone in
+ * body-units.ts would have been dead code on the card, which is the main way
+ * anyone answers this. Caught by reading the input, not by testing the parser:
+ * every unit test passed while the field it feeds could not have received a
+ * single one of those strings.
+ *
+ * These two get `type="text"` with a numeric-ish keypad hint. The app's own
+ * bounds still apply after conversion, so nothing is loosened — only the
+ * browser's character filter, which was the thing in the way.
+ */
+const ACCEPTS_UNITS = new Set(['heightCm', 'weightKg'])
+
+const PLACEHOLDER: Record<string, string> = {
+  heightCm: "178 or 5'10",
+  weightKg: '87 or 13st 2',
 }
 
 export function SlotNumericCard({
@@ -87,7 +111,15 @@ export function SlotNumericCard({
   const isOk = (d: (typeof fields)[number]) => {
     const raw = rawOf(d.key).trim()
     if (raw === '') return !isSlotRequired(d, values)
-    return d.validate(raw)
+    // VALIDATE WHAT WILL BE STORED, NOT WHAT WAS TYPED. `validate` is
+    // isNumberIn(100, 250) against the raw string, so it rejected "5'10"
+    // outright — the card said "Give a number between 100 and 250" and the
+    // converter downstream never saw it. Third layer in the way of the same
+    // feature, after type="number" and the label; only driving the real field
+    // found any of them, because the parser's own tests all passed throughout.
+    const measure = measureParserFor(d.key)
+    const parsed = measure?.(raw)
+    return d.validate(parsed ? String(parsed.value) : raw)
   }
   const allOk = fields.every(isOk)
   // Every field on this card can be refused, so the card can offer a refusal.
@@ -115,13 +147,13 @@ export function SlotNumericCard({
               id={`slot-${d.key}`}
               // Numeric keypad on a phone, and the browser's own guard rails
               // agree with the slot definition's bounds.
-              type="number"
-              inputMode="numeric"
-              min={d.min}
-              max={d.max}
+              type={ACCEPTS_UNITS.has(d.key) ? 'text' : 'number'}
+              inputMode={ACCEPTS_UNITS.has(d.key) ? 'text' : 'numeric'}
+              min={ACCEPTS_UNITS.has(d.key) ? undefined : d.min}
+              max={ACCEPTS_UNITS.has(d.key) ? undefined : d.max}
               value={rawOf(d.key)}
               disabled={busy}
-              placeholder={d.min != null ? `${d.min}–${d.max}` : ''}
+              placeholder={PLACEHOLDER[d.key] ?? (d.min != null ? `${d.min}–${d.max}` : '')}
               onChange={e => setDraft(prev => ({ ...prev, [d.key]: e.target.value }))}
               className={`h-11 ${bad ? 'border-destructive' : ''}`}
             />

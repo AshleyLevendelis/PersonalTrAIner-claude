@@ -2,6 +2,14 @@
 
 Newest first. One line each.
 
+- [x] **FEET AND STONE ARE ACCEPTED NOW, AND THE APP SAYS WHAT IT STORED.** Ashley's ruling. `5'10` → **178cm**, `13st 2` → **83.5kg**, with the receipt reading `(from 5'10")` — because a silent conversion is only safe if the result is visible next to what was typed, while it can still be corrected. Formats: `178`, `178cm`, `1.78m`, `5'10"`, `5ft10`, `5 foot 10`, `70in`; `87kg`, `180lb`, `13st`, `13 stone 2`.
+
+- [x] A CONVERSION IS ONLY EVER APPLIED WHEN THE INPUT NAMES ITS UNIT. A bare `70` stays 70 and fails the 100–250 bound exactly as before — guessing whether it meant centimetres or inches would be **the same offence as the `100, 150` lift mix-up this session started with**, one field over. `5'13"` and `13st 15lb` are refused rather than silently rolled into `6'1"` and `14st 1lb`.
+
+- [x] **THE PLAN PREDICTED NONE OF THE THREE THINGS ACTUALLY IN THE WAY.** Writing the parser and its 40-case table proved nothing about whether anyone could use it: **(1)** the field was `type="number"`, which physically discards an apostrophe, so `5'10` could never have reached the converter; **(2)** the card's own `isOk` validated the RAW string against `isNumberIn(100,250)` and rejected it with "Give a number between 100 and 250" before the converter was consulted; **(3)** the label still said `cm`, so nothing told anyone the other form was allowed. **Every unit test passed the whole time.** Only driving the real field in Chromium found any of it.
+
+- [x] WHY IT WAS WORTH THE CARE: `height_cm` and `weight_kg` feed `resolveBodyMetrics` → `computeBMR` → `computeStaticTDEE` (every macro target) **and** the standards table that sets starting loads. A misread height is a wrong calorie target and a wrong weight on the bar — and unlike a *missing* metric, which `load_source: 'assumed_body'` hedges every load against, **nothing hedges a wrong one**. Four mutations bite: promoting a bare number, dropping the read-back, restoring `type="number"` (8 red), and validating the raw string again (4 red).
+
 - [x] **THE COMPOSER SAID "YOUR AGE…" UNDER A CARD ASKING THREE THINGS — WITH THE AGE ALREADY FILLED IN.** A grouped numeric card (age / height / weight) put its FIRST member's hint in the box, and the first member is the likeliest to be the one already answered. The hint now names what is still **outstanding**, in the card's own order, and narrows as boxes are filled: with 37 entered it reads *"height and weight…"*.
 
 - [x] AND THE FIX GENERALISED, which the harness caught rather than me: the squat/bench/deadlift card is a group too, so its fixture's expected *"Your squat, in kg…"* **moved** to *"squat, bench and deadlift…"*. Naming one lift under a card showing three boxes was the same defect one screen over. Six composer states are now covered.

@@ -30,6 +30,7 @@ import {
   type SlotKey,
   type SlotDef,
 } from '@/lib/onboarding-slots'
+import { measureParserFor } from '@/lib/body-units'
 import {
   loadOnboardingDraft,
   saveOnboardingDraft,
@@ -150,7 +151,28 @@ function coerceSlotValue(def: SlotDef, raw: string): unknown {
   }
   if (def.key === 'knowsWorkingLifts' || def.key === 'includeSnacks') return raw.trim() === 'true'
   if (def.key === 'mealsPerDay') return Number(raw)
+  // FEET AND STONE, INTO THE cm AND kg THE APP STORES. Ashley's ruling:
+  // accept both and convert, rather than making someone go and look up their
+  // height in centimetres. This is the one funnel every path goes through —
+  // the labelled card, the model's set_slot, and the typed-text backstop — so
+  // the conversion cannot be applied on one route and missed on another.
+  //
+  // A conversion happens ONLY when the input names its unit. A bare 70 stays
+  // 70 and fails the 100-250 bound, exactly as it always did: guessing whether
+  // it meant centimetres or inches would be the same offence as the lift-weight
+  // mix-up this session started with. See body-units.ts.
+  const measure = measureParserFor(def.key)
+  if (measure) {
+    const parsed = measure(raw)
+    if (parsed) return String(parsed.value)
+  }
   return raw.trim()
+}
+
+/** The "(from 5'10\")" a receipt owes when a value was converted. Empty when they typed the app's own unit and there is nothing to read back. */
+function conversionNoteFor(def: SlotDef, raw: string): string | undefined {
+  const measure = measureParserFor(def.key)
+  return measure ? measure(raw)?.from : undefined
 }
 
 /**
@@ -421,6 +443,8 @@ function applySlot(
   coerced: unknown,
   prior: OnboardingSlotValues,
   showReceipt = true,
+  /** Set when the value was converted from another unit — the receipt must show BOTH, so a wrong conversion is wrong on screen next to what they typed. */
+  conversionNote?: string,
 ): boolean {
   const def = getSlotDef(key)
   if (!def || !def.validate(coerced)) return false
@@ -433,7 +457,8 @@ function applySlot(
       // Short noun, not the question — "Equipment — Home Gym" reads as the
       // coach noting something down; the full question read as a form field.
       role: 'assistant',
-      content: `${RECEIPT_PREFIX}${def.shortLabel} — ${displayValueFor(def, ws.values)}`,
+      content: `${RECEIPT_PREFIX}${def.shortLabel} — ${displayValueFor(def, ws.values)}`
+        + (conversionNote ? ` (from ${conversionNote})` : ''),
       isReceipt: true,
     })
   }
@@ -764,7 +789,7 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
         // receipt (caught live: typing "Hybrid" against a pending style card
         // committed instantly, then the model's response echoed the same
         // set_slot and printed "✓ Style — Hybrid" a second time).
-        if (!applySlot(ws, key, coerced, ws.values)) {
+        if (!applySlot(ws, key, coerced, ws.values, true, conversionNoteFor(def, String(action.args.value ?? '')))) {
           // Fail LOUD: the mapped value didn't validate — never store it,
           // re-ask with the real chips instead.
           ws.newMessages.push({
@@ -1191,7 +1216,11 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
       if (!def) continue
       // false: they typed the value into a labelled field — nothing was
       // mapped, so no confirmation line is owed (see applySlot).
-      if (applySlot(ws, key, coerceSlotValue(def, raw), values, false)) {
+      // A converted value DOES owe a receipt even though they typed into a
+      // labelled field: they typed 5'10" and the app stored 178, and that
+      // substitution must be visible at the moment it can still be corrected.
+      const note = conversionNoteFor(def, raw)
+      if (applySlot(ws, key, coerceSlotValue(def, raw), values, !!note, note)) {
         saved.push(`${def.shortLabel.toLowerCase()} ${raw}`)
       }
     }
