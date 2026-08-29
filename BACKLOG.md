@@ -2,6 +2,18 @@
 
 Newest first. One line each.
 
+- [x] **635 FORM CUES, WRITTEN, SHIPPED IN EVERY BUNDLE, AND NEVER ONCE SHOWN TO ANYONE.** Ashley: *"there's nowhere in the app to see an exercise."* All **158** catalogue entries carry `form_cues` (~4 each) and all 158 carry `coach_note_swap` — and `form_cues` had **zero readers in the entire repo**: not the UI, not a prompt, not a test. The only route to "how does this go?" was chat typing a **YouTube search-results URL** that leaves the app and needs signal in a gym.
+
+- [x] **"How to do it" now opens from the ⋮ menu**, in today's session and the peek, one shared dialog on the `ExerciseHistoryDialog` precedent. Cues numbered, the rationale that previously appeared only on *other* exercises, muscles, equipment, joint load — joints through `jointListDisplay`, never the raw tag. Plus one honest line: cues are a reminder, not coaching, and anything that hurts is a reason to stop.
+
+- [x] AND SEARCHING THE CATALOGUE NO LONGER TELLS YOU **LESS** THAN BROWSING IT. `SwapDialog`'s ranked candidates carried a coaching sentence; its free-search results carried two taxonomy badges and nothing — on the surface where you are *least* likely to know the movement. Now both.
+
+- [x] **A DEFECT I SHIPPED LAST NIGHT, FOUND WHILE EXPLORING THIS.** `exercise/WeekStrip.tsx` **is dead code — no importers.** `d517738` extracted `week-glyphs.ts` so Home and Exercise could not drift and wired it into **the dead file**; the strip users see (`WeekContextRow.tsx`) kept a private `GLYPH` copy. `test-tab-ownership` asserted *"Exercise's strip IS interactive"* against a component nothing renders — **a gate passing on dead code**, the exact failure the M5 mutation was written to catch, reached from a direction nothing checked.
+
+- [x] IT WAS HIDING A LIVE ACCESSIBILITY BUG TOO: `WeekContextRow`'s `aria-label` interpolated the **raw state**, so a screen reader announced *"Monday: before_plan"* — an identifier. `STATE_LABEL` was written to fix exactly that, and the fix went into the copy nobody renders. Both files deleted, the live strip re-pointed, and the gate now **requires every strip file it speaks for to be imported by something**.
+
+- [x] FOUR MUTATIONS BITE — and two of them only after the mutation caught **my own checks** being wrong: one matched the same prop names in a *destructuring* rather than the *forwarding* that makes the menu appear; another passed on `{false && (…)}` because the string was still present in unreachable markup. Both were character-window regexes; the fix was to slice the real function body instead of guessing a distance, which I had got wrong three times.
+
 - [x] **DAYLIGHT'S ACCENT DARKENED TO `#008C72` — Ashley's ruling.** `#00A88A` measured **2.74:1** against its own canvas, under the 3:1 floor the same design brief introduced, so the new theme's first act was warning about its own colour. `#008C72` measures **3.82:1**; the deep step moves to `#00705B` so the CTA gradient keeps its depth instead of going flat.
 
 - [x] **AND MINT'S DARK STEP WITH IT — beyond the letter of the instruction, flagged here because it was.** That value was *also* `#00A88A`, so choosing the Mint chip on Daylight re-created the exact warning the theme fix had just cleared, one tap away. Same colour, same failure, and it only applies to light canvases — of which Daylight is the only one. **All 30 combinations now clear the floor**, up from 28.

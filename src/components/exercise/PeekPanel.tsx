@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { ArrowRightLeft, Ban, MoreVertical, X } from 'lucide-react'
+import { ArrowRightLeft, BookOpen, Ban, MoreVertical, X } from 'lucide-react'
 import { formatRampSets, groupExercises, mainLiftGroupIndex, type ExerciseGroup } from '@/lib/session-derive'
 import { RampStrip } from './RampStrip'
 import { LoadChip, type LoadSource } from './LoadChip'
@@ -37,12 +37,15 @@ export function PeekPanel({
   onExit,
   onSwap,
   onBan,
+  onOpenDetail,
   banBusyName,
 }: {
   workout: WorkoutDay
   onExit: () => void
   onSwap: (exIndex: number, exerciseName: string) => void
   onBan: (exerciseName: string) => void | Promise<void>
+  /** Same technique panel the day view opens — one dialog, two entry points. */
+  onOpenDetail?: (exerciseName: string) => void
   banBusyName: string | null
 }) {
   const [explainedKey, setExplainedKey] = useState<string | null>(null)
@@ -79,6 +82,12 @@ export function PeekPanel({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                {onOpenDetail && (
+                  <DropdownMenuItem onClick={() => onOpenDetail(ex.name)}>
+                    <BookOpen className="size-3.5" />
+                    How to do it
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem onClick={() => onSwap(exIndex, ex.name)}>
                   <ArrowRightLeft className="size-3.5" />
                   Swap exercise

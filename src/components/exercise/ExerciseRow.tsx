@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { Ban, History, MoreVertical, Info } from 'lucide-react'
+import { Ban, History, MoreVertical, BookOpen, Info } from 'lucide-react'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { getExerciseId } from '@/lib/exercise-db'
 import { formatRampSets, formatCompletedSummary } from '@/lib/session-derive'
@@ -42,6 +42,8 @@ export interface ExerciseRowProps {
   expanded: boolean
   onToggleExpanded: () => void
   onOpenHistory?: (exerciseId: string, exerciseName: string) => void
+  /** Opens the technique panel — see ExerciseDetailDialog. */
+  onOpenDetail?: (exerciseName: string) => void
 }
 
 export function ExerciseRow({
@@ -60,6 +62,7 @@ export function ExerciseRow({
   expanded,
   onToggleExpanded,
   onOpenHistory,
+  onOpenDetail,
 }: ExerciseRowProps) {
   const { setsFor, requestedSetFocus, clearSetFocusRequest } = useActiveSession()
   const exerciseId = ex.id ?? getExerciseId(ex.name)
@@ -225,6 +228,16 @@ export function ExerciseRow({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                {/* FIRST in the menu, above History. Someone opening this is
+                    more often asking "how does this go?" mid-set than "what
+                    did I lift last time?" — and until now the app had no
+                    answer to the first question at all. */}
+                {onOpenDetail && (
+                  <DropdownMenuItem onClick={() => onOpenDetail(ex.name)}>
+                    <BookOpen className="size-3.5" />
+                    How to do it
+                  </DropdownMenuItem>
+                )}
                 {onOpenHistory && (
                   <DropdownMenuItem onClick={() => onOpenHistory(exerciseId, ex.name)}>
                     <History className="size-3.5" />

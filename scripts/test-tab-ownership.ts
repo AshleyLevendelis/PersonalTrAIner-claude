@@ -11,6 +11,7 @@
  * computing it its own way, drift silently and are found by a user.
  */
 import { readFileSync } from 'fs'
+import { execSync } from 'child_process'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 
@@ -19,7 +20,13 @@ const read = (p: string) => readFileSync(join(ROOT, p), 'utf8')
 const home = read('src/components/Dashboard.tsx')
 const nutrition = read('src/components/NutritionDisplay.tsx')
 const homeStrip = read('src/components/HomeWeekStrip.tsx')
-const exStrip = read('src/components/exercise/WeekStrip.tsx')
+// THE LIVE Exercise strip. This read WeekStrip.tsx until 30 Aug, which is
+// dead code no file imports — so every assertion below was passing against a
+// component nobody renders. Exactly the failure the M5 mutation in
+// test-no-question-beside-generate was written to catch, reached from a
+// direction nothing checked: not a deleted call site, but a call site that
+// never existed.
+const exStrip = read('src/components/exercise/WeekContextRow.tsx')
 const glyphs = read('src/lib/week-glyphs.ts')
 const arch = read('docs/VISION-ARCHITECTURE.md')
 
@@ -53,6 +60,21 @@ check("Home's strip is not interactive — no handler", !/onClick/.test(homeStri
 check('...and not a button', !/<button/.test(homeStrip))
 check("Exercise's strip IS interactive", /onClick/.test(exStrip) && /<button/.test(exStrip))
 check('Home cells are 26px, Exercise is not', /h-\[26px\]/.test(homeStrip) && !/h-\[26px\]/.test(exStrip))
+check('the spoken label is English, not the raw state',
+  /STATE_LABEL\[d\.state\]/.test(exStrip) && !/\$\{d\.state\}/.test(exStrip))
+
+// A COMPONENT NOTHING IMPORTS PROVES NOTHING. The checks above read a file and
+// assert what it renders; that is worthless if no screen mounts it. Verified
+// for every strip this gate speaks for, so a future extraction cannot be wired
+// into a copy again.
+for (const rel of ['src/components/exercise/WeekContextRow.tsx', 'src/components/HomeWeekStrip.tsx']) {
+  const base = rel.split('/').pop()!.replace('.tsx', '')
+  const importers = execSync(
+    `grep -rl "from '[^']*${base}'" src/ --include=*.tsx --include=*.ts || true`,
+    { cwd: ROOT, encoding: 'utf8' },
+  ).split('\n').filter(l => l.trim() && !l.endsWith(rel))
+  check(`${base} is actually imported by something`, importers.length > 0, importers)
+}
 
 console.log('\n4. Water is one colour everywhere — status never follows the accent\n')
 check('Home draws water in --chart-3, not the mint accent', /--chart-3/.test(home))

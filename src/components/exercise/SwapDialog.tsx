@@ -188,6 +188,14 @@ export function SwapDialog({
                               <Badge variant="secondary" className="text-xs">{exercise.movement_pattern.replace(/_/g, ' ')}</Badge>
                               <Badge variant="secondary" className="text-xs">{exercise.mechanics_tier.replace(/_/g, ' ')}</Badge>
                             </div>
+                            {/* THE NOTE THE RANKED LIST HAS AND THIS ONE DID NOT.
+                                Searching the catalogue told you strictly less
+                                than browsing it: two taxonomy badges and no
+                                coaching sentence at all, on the surface where
+                                you are least likely to know the movement. */}
+                            {exercise.coach_note_swap && (
+                              <p className="text-xs leading-[1.45] text-muted-foreground">{exercise.coach_note_swap}</p>
+                            )}
                             {warnings.map((w, i) => (
                               <p key={i} className="text-xs text-[color:var(--role-warn-text)] mt-1 flex items-start gap-1">
                                 <ShieldAlert className="size-3 mt-0.5 shrink-0" />

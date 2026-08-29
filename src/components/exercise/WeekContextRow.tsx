@@ -3,6 +3,7 @@ import { ChevronDown, MoreVertical, ListPlus, History } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import type { TrainingWeekDay } from '@/hooks/useTrainingWeek'
+import { GLYPH, STATE_LABEL } from '@/lib/week-glyphs'
 
 // ---------------------------------------------------------------------------
 // Turn 5 — merges what were three separate rows (WeekStrip, ContextLine,
@@ -18,23 +19,13 @@ import type { TrainingWeekDay } from '@/hooks/useTrainingWeek'
 // verbatim (same expand-state shape), just triggered from this row instead.
 // ---------------------------------------------------------------------------
 
-const GLYPH: Record<TrainingWeekDay['state'], string> = {
-  done: '✓',
-  partial: '◐',
-  due: '●',
-  missed: '○',
-  rest: '–',
-  recovery: '~',
-  // A training day that fell before this plan existed. Deliberately the
-  // faintest mark in the set: it is not a rest day (the plan didn't choose
-  // it) and emphatically not a missed one (nothing was ever owed).
-  before_plan: '·',
-  // Lifting deliberately swapped for something else, announced at the time.
-  // Distinct from every mark above because it is the only one that says work
-  // HAPPENED but not this work — an arrow, not an absence.
-  swapped: '⇄',
-}
-
+// GLYPH and STATE_LABEL come from the shared vocabulary. They used to be a
+// private copy here, while the extraction that was supposed to prevent exactly
+// that drift (week-glyphs.ts) was wired into WeekStrip.tsx — a file nothing
+// imports. So the marks Home and Exercise show were never actually shared, and
+// the gate asserting they were read the dead file. Deleted; this reads the one
+// source. SHORT_DAY stays local: single letters here, three on Home, which is
+// presentation and legitimately differs.
 const SHORT_DAY: Record<string, string> = {
   Monday: 'M', Tuesday: 'T', Wednesday: 'W', Thursday: 'T',
   Friday: 'F', Saturday: 'S', Sunday: 'S',
@@ -147,7 +138,11 @@ export function WeekContextRow({
               onClick={() => { if (!isToday) onSelectDay(d.dayName) }}
               className="hit-slop-day flex flex-col items-center gap-1 rounded-[9px] px-1.5 py-1"
               style={isToday ? { background: 'rgba(var(--glow-rgb),.14)', border: '1px solid rgba(var(--glow-rgb),.4)' } : undefined}
-              aria-label={`${d.dayName}: ${d.state}`}
+              // This used to interpolate the raw state, so a screen reader
+              // announced "Monday: before_plan" — an identifier, not English.
+              // The same defect STATE_LABEL was written to fix, still live
+              // here because that fix went into the copy nothing renders.
+              aria-label={`${d.dayName}: ${STATE_LABEL[d.state]}`}
             >
               <span className={`text-[9px] uppercase tracking-[.08em] ${isToday ? 'font-semibold text-primary' : 'text-muted-foreground'}`}>
                 {SHORT_DAY[d.dayName] ?? d.dayName.slice(0, 1)}

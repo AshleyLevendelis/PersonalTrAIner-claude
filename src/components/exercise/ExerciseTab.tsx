@@ -8,6 +8,7 @@ import { isDevAccount } from '@/lib/dev-clock'
 import { TodayPanel } from './TodayPanel'
 import { SwapDialog, type SwapTarget } from './SwapDialog'
 import { ExerciseHistoryDialog } from './ExerciseHistoryDialog'
+import { ExerciseDetailDialog } from './ExerciseDetailDialog'
 import { SessionHistoryDialog } from './SessionHistoryDialog'
 import type { ExerciseEntry } from '@/lib/exercise-db'
 import type { SwapScope } from '@/lib/mesocycle-edit'
@@ -66,6 +67,9 @@ export function ExerciseTab({
   const [plateCalcOpen, setPlateCalcOpen] = useState(false)
   const [plateCalcWeight, setPlateCalcWeight] = useState(0)
   const [historyTarget, setHistoryTarget] = useState<{ exerciseId: string; exerciseName: string } | null>(null)
+  // One instance, two entry points (day view and peek), same target-state
+  // shape as swapTarget/historyTarget above.
+  const [detailTarget, setDetailTarget] = useState<string | null>(null)
   const [sessionHistoryOpen, setSessionHistoryOpen] = useState(false)
 
   const handleOpenPlateCalc = (weightKg: number) => {
@@ -111,6 +115,11 @@ export function ExerciseTab({
           onBanExercise={onBanExercise}
           onOpenHistory={(id, name) => setHistoryTarget({ exerciseId: id, exerciseName: name })}
         />
+        <ExerciseDetailDialog
+          open={!!detailTarget}
+          onOpenChange={open => { if (!open) setDetailTarget(null) }}
+          exerciseName={detailTarget}
+        />
         <ExerciseHistoryDialog
           open={!!historyTarget}
           onOpenChange={open => { if (!open) setHistoryTarget(null) }}
@@ -137,6 +146,7 @@ export function ExerciseTab({
         onBanExercise={onBanExercise}
         onOpenPlateCalc={handleOpenPlateCalc}
         onOpenHistory={(id, name) => setHistoryTarget({ exerciseId: id, exerciseName: name })}
+          onOpenDetail={(name: string) => setDetailTarget(name)}
         onOpenSessionHistory={() => setSessionHistoryOpen(true)}
       />
       <SwapDialog

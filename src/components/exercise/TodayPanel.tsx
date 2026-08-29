@@ -50,6 +50,7 @@ export function TodayPanel({
   onBanExercise,
   onOpenPlateCalc,
   onOpenHistory,
+  onOpenDetail,
   onOpenSessionHistory,
 }: {
   plan: WorkoutDay[]
@@ -65,6 +66,8 @@ export function TodayPanel({
   onBanExercise: (exerciseName: string) => void | Promise<void>
   onOpenPlateCalc: (weightKg: number) => void
   onOpenHistory?: (exerciseId: string, exerciseName: string) => void
+  /** Opens the technique panel — threaded to both ExerciseRow and PeekPanel. */
+  onOpenDetail?: (exerciseName: string) => void
   onOpenSessionHistory?: () => void
 }) {
   const { date: today, dayName: todayName, liveWeek, startRest, setsFor, logs, status, startSession, finishSession } = useActiveSession()
@@ -266,6 +269,7 @@ export function TodayPanel({
             onExit={() => setPeekDay(null)}
             onSwap={(exIndex, name) => peekDay && onOpenSwap(peekDay, exIndex, name)}
             onBan={handleBan}
+            onOpenDetail={onOpenDetail}
             banBusyName={banBusy}
           />
         )
@@ -369,6 +373,7 @@ export function TodayPanel({
             onOpenSwap={onOpenSwap}
             onOpenPlateCalc={onOpenPlateCalc}
             onOpenHistory={onOpenHistory}
+            onOpenDetail={onOpenDetail}
             banBusy={banBusy}
             onBan={handleBan}
             onSetCompleted={(exerciseName, setNumber, _weight, _reps, restStr, sets) => {
@@ -407,6 +412,7 @@ function ExerciseList({
   onOpenSwap,
   onOpenPlateCalc,
   onOpenHistory,
+  onOpenDetail,
   banBusy,
   onBan,
   onSetCompleted,
@@ -420,6 +426,7 @@ function ExerciseList({
   onOpenSwap: (dayName: string, exIndex: number, exerciseName: string) => void
   onOpenPlateCalc: (weightKg: number) => void
   onOpenHistory?: (exerciseId: string, exerciseName: string) => void
+  onOpenDetail?: (exerciseName: string) => void
   banBusy: string | null
   onBan: (name: string) => void
   onSetCompleted: (exerciseName: string, setNumber: number, weight: number, reps: number, rest: string, sets: number, prescribedReps: string, tier?: string) => void
@@ -481,6 +488,7 @@ function ExerciseList({
       showCalibrationCue: calibrationAnchorIndex === exIndex,
       onOpenPlateCalc,
       onOpenHistory,
+      onOpenDetail,
       onSwap: () => onOpenSwap(dayName, exIndex, ex.name),
       onBan: () => onBan(ex.name),
       banBusy: banBusy === ex.name,

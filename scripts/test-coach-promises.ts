@@ -99,7 +99,10 @@ console.log('\n4. The app can render what the tool writes')
   // their spoken labels live in src/lib/week-glyphs.ts, imported by both. A
   // mark that meant one thing on Home and another on Exercise would be worse
   // than having no strip on Home at all.
-  for (const rel of ['src/lib/week-glyphs.ts', 'src/components/exercise/WeekContextRow.tsx']) {
+  // ONE definer, and it is the shared module. The strips import; they no longer
+  // carry a copy, so looking for the literal in them is looking in the wrong
+  // place — the check below asserts the import instead.
+  for (const rel of ['src/lib/week-glyphs.ts']) {
     const src = readFileSync(join(ROOT, rel), 'utf8')
     check(`${rel} has a glyph for it`, /swapped:\s*'/.test(src))
   }
@@ -107,7 +110,10 @@ console.log('\n4. The app can render what the tool writes')
   check('the screen-reader label is English, not the identifier',
     /swapped:\s*'swapped for another activity'/.test(glyphs))
   // ...and that BOTH strips read that one module rather than a local copy.
-  for (const rel of ['src/components/exercise/WeekStrip.tsx', 'src/components/HomeWeekStrip.tsx']) {
+  // WeekStrip.tsx was deleted — it was dead code no file imported, and the
+  // shared-vocabulary extraction had been wired into it rather than into the
+  // strip users see. WeekContextRow.tsx is the live one.
+  for (const rel of ['src/components/exercise/WeekContextRow.tsx', 'src/components/HomeWeekStrip.tsx']) {
     const src = readFileSync(join(ROOT, rel), 'utf8')
     check(`${rel} imports the shared vocabulary rather than redefining it`,
       /from '@\/lib\/week-glyphs'/.test(src) && !/const GLYPH\s*[:=]/.test(src))
