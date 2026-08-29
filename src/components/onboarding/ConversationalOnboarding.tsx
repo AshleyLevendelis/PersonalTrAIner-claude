@@ -116,7 +116,13 @@ const RESUME_BANNER = "Welcome back — picking up right where we left off. Say 
 function toDraftMessages(messages: ChatMsg[]): DraftMessage[] {
   return messages
     .filter(m => m.content.trim().length > 0 && m.content !== RESUME_BANNER)
-    .map(({ role, content, slotCard, slotCardResolved, slotCardEditing }) => ({ role, content, slotCard, slotCardResolved, slotCardEditing }))
+    // asksSlot RIDES ALONG. It was missing from this list, so a turn that
+    // asked about a slot WITHOUT a card — the scripted opener's "what should
+    // I call you?" is the built-in one — lost that fact on every reload, and
+    // the composer's "what is on screen" lookup went blind. The DraftMessage
+    // type has always declared the field; only this mapper dropped it.
+    .map(({ role, content, slotCard, slotCardResolved, slotCardEditing, asksSlot }) =>
+      ({ role, content, slotCard, slotCardResolved, slotCardEditing, asksSlot }))
 }
 
 const COMPLETE_MESSAGE = "That's everything I need. Here's what I've got — have a look, and if it's right I'll build your plan."
@@ -1248,9 +1254,42 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
     const asked = [...messages].reverse().find(
       m => (m.slotCard && !m.slotCardResolved) || (m.asksSlot && !confirmed.has(m.asksSlot)),
     )
-    const key = (asked?.slotCard && !asked.slotCardResolved ? asked.slotCard : asked?.asksSlot)
-      ?? openSlotsInOrder(confirmed, values)[0]
-    return (key ? getSlotDef(key as SlotKey)?.inputHint : undefined) ?? 'Say anything…'
+    const key = asked?.slotCard && !asked.slotCardResolved ? asked.slotCard : asked?.asksSlot
+    if (key) return getSlotDef(key as SlotKey)?.inputHint ?? 'Say anything…'
+
+    // THE FALLBACK IS A GUESS, SO IT MUST NOT OVERRIDE A QUESTION ON SCREEN.
+    //
+    // Reported live, third time this placeholder has said the wrong thing:
+    // the coach asked "what are your current working weights for your squat,
+    // bench, and deadlift?" and the composer read "Which days?". The coach
+    // had asked freehand — no chip card, no asksSlot — so `asked` found
+    // nothing and the canonical-next-slot fallback ran. That fallback cannot
+    // see the lift slots at all (they are requiredIf-conditional, and
+    // openSlotsInOrder surfaces neither branch until the condition resolves),
+    // so it skipped past them and landed on trainingDays.
+    //
+    // The fallback is still right when nothing is pending — after an answered
+    // card, the next canonical question genuinely IS what comes next. It is
+    // only wrong when the coach has just asked something we could not map: a
+    // guess then contradicts a question the user can read directly above the
+    // box. "Say anything…" is true in that state; naming a different question
+    // is not.
+    // NOT simply "the last assistant message": on resume the app appends a
+    // RESUME_BANNER ("Welcome back — picking up right where we left off"),
+    // and receipts ("✓ Name — Ashley") are assistant lines too. Neither is a
+    // question, and letting either stand in for one hid the real question
+    // behind it — which is exactly how the first version of this fix passed
+    // live and failed in the harness.
+    const lastCoachLine = [...messages].reverse().find(
+      m => m.role === 'assistant' && !m.isReceipt && m.content !== RESUME_BANNER,
+    )
+    const askedSomethingUnmapped = !!lastCoachLine
+      && !lastCoachLine.slotCard && !lastCoachLine.asksSlot
+      && lastCoachLine.content.includes('?')
+    if (askedSomethingUnmapped) return 'Say anything…'
+
+    const next = openSlotsInOrder(confirmed, values)[0]
+    return (next ? getSlotDef(next as SlotKey)?.inputHint : undefined) ?? 'Say anything…'
   })()
 
   const composerBottomStyle = isKeyboardOpen

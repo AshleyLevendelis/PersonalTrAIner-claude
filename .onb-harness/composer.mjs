@@ -30,14 +30,29 @@ const CASES = [
   ['fresh',    'the opener, which asks for a name',        'Your name…'],
   ['card',     'a live chip card for training style',      'How do you like to train?'],
   ['resolved', 'card answered, nothing else on screen',    'Which days?'],
+  // The coach asked freehand — no card, no asksSlot. A guess here contradicts
+  // a question the user can read directly above the box, so the only honest
+  // placeholder is the neutral one. Reported live as "Which days?" under a
+  // question about squat, bench and deadlift.
+  ['freehand', 'a question the app cannot map to a slot',  'Say anything…'],
+  // ...and when that same question DOES carry its card, the composer names it.
+  // All three lift slots shipped with no inputHint at all, so even a correctly
+  // identified slot fell through to the neutral text.
+  ['liftcard', 'the squat question, with its card',        'Your squat, in kg…'],
 ]
 let bad = 0
 for (const [state, what, expected] of CASES) {
   await send('Page.navigate', { url: `http://127.0.0.1:${port}/?state=${state}` }); await wait(1600)
   const got = await ev(`(() => {
-    const i = document.querySelector('input[placeholder], textarea[placeholder]')
+    // THE COMPOSER SPECIFICALLY, not "the first input with a placeholder".
+    // A numeric slot card renders its own field ABOVE the composer, so the
+    // loose selector read the card's placeholder ("1-500") and called it the
+    // composer's — a harness reporting confidently on the wrong element.
+    const composer = document.querySelector('.ob-composer-fade')
+    const i = composer && composer.querySelector('input[placeholder], textarea[placeholder]')
     return JSON.stringify({ ph: i?.placeholder ?? '(no composer found)',
-      body: document.body.innerText.slice(0, 300), err: window.__err ?? null })
+      body: document.body.innerText.slice(0, 300), err: window.__err ?? null,
+      composerFound: !!composer })
   })()`)
   const parsed = JSON.parse(got); const ph = parsed.ph
   if (process.env.DEBUG) console.log('      BODY:', JSON.stringify(parsed.body), '\n      ERR:', parsed.err)

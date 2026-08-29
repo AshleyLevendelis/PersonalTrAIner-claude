@@ -372,5 +372,47 @@ console.log('\nEVERY QUESTION WITH A LIST OFFERS IT')
   }
 }
 
+console.log('\n8. Every question the composer can describe actually has something to say')
+{
+  // THIRD TIME THE PLACEHOLDER SAID THE WRONG THING. The live report: the
+  // coach asked "what are your current working weights for your squat, bench,
+  // and deadlift?" and the box read "Which days?".
+  //
+  // Two independent faults. This is the first: SIX of 27 slots shipped with no
+  // inputHint at all — all three lift questions, plus snacks, cuisines and
+  // breakfast. Even when the app correctly worked out which slot was on
+  // screen, there was nothing to show, so it fell through to the generic text
+  // and, for an unmapped question, to a guess.
+  const noHint = ONBOARDING_SLOTS.filter(s => !s.inputHint).map(s => s.key)
+  check('every slot has an inputHint', noHint.length === 0, noHint)
+  check('...and there are slots to check (sanity check on this gate)', ONBOARDING_SLOTS.length > 20, ONBOARDING_SLOTS.length)
+
+  // A hint that restates the whole question is no better than none — it has to
+  // read as something to type INTO a box, and it has to fit one.
+  const tooLong = ONBOARDING_SLOTS.filter(s => (s.inputHint ?? '').length > 32).map(s => `${s.key}: ${s.inputHint}`)
+  check('no hint is longer than the box can show', tooLong.length === 0, tooLong)
+
+  // The second fault: the fallback is a GUESS at what was asked, and it used
+  // to override a question the user could read directly above the box.
+  const ui = readFileSync(join(ROOT, 'src/components/onboarding/ConversationalOnboarding.tsx'), 'utf8')
+  const hintBlock = ui.slice(ui.indexOf('const pendingHint'))
+  check('an unmapped question falls back to the neutral hint, never a guess',
+    /askedSomethingUnmapped/.test(ui) && /if \(askedSomethingUnmapped\) return 'Say anything…'/.test(ui))
+  check('...and the resume banner cannot stand in for the question behind it',
+    /m\.content !== RESUME_BANNER/.test(hintBlock))
+
+  // asksSlot is what tells the composer about a question asked WITHOUT a card.
+  // It was declared on DraftMessage and read by the hint logic, but dropped by
+  // the draft mapper — so it survived exactly until the first reload.
+  // COMMENTS STRIPPED. The first version of this check was satisfied by the
+  // comment sitting beside the mapper, which mentions asksSlot by name — the
+  // fourth time in this repo a check has passed on prose ABOUT the thing it
+  // is looking for rather than the thing itself.
+  const mapper = ui.slice(ui.indexOf('function toDraftMessages'), ui.indexOf('const COMPLETE_MESSAGE'))
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .split('\n').filter(l => !/^\s*\/\//.test(l)).join('\n')
+  check('asksSlot survives the draft round-trip', /asksSlot/.test(mapper), mapper.slice(0, 200))
+}
+
 console.log(failures === 0 ? '\nAll onboarding-chip checks passed.\n' : `\n${failures} FAILED\n`)
 process.exit(failures === 0 ? 0 : 1)

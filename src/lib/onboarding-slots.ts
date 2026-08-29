@@ -622,9 +622,12 @@ export const ONBOARDING_SLOTS: SlotDef[] = [
   { key: 'injuries', question: 'Anything that bothers you when you train — something you avoid or work around?', inputHint: 'Anything that bothers you?', shortLabel: 'Niggles', control: 'multi', required: false, options: INJURY_OPTIONS, destination: 'column', validate: isSubsetOf(INJURY_OPTIONS) },
   { key: 'knowsWorkingLifts', question: 'Do you know your working lifts (squat, bench, deadlift)?', inputHint: 'Do you know your numbers?', shortLabel: 'Working lifts', control: 'single', required: true, requiredIf: willBeLiftingBarbells, options: KNOWS_LIFTS_OPTIONS, destination: 'column', validate: v => v === true || v === false || v === 'true' || v === 'false' },
   // Only meaningful once someone has said they DO know their numbers.
-  { key: 'knownSquatKg', question: 'Squat working weight (kg)?', shortLabel: 'Squat', control: 'numeric', required: false, requiredIf: knowsTheirLifts, min: 1, max: 500, destination: 'column', validate: isNumberIn(1, 500) },
-  { key: 'knownBenchKg', question: 'Bench working weight (kg)?', shortLabel: 'Bench', control: 'numeric', required: false, requiredIf: knowsTheirLifts, min: 1, max: 400, destination: 'column', validate: isNumberIn(1, 400) },
-  { key: 'knownDeadliftKg', question: 'Deadlift working weight (kg)?', shortLabel: 'Deadlift', control: 'numeric', required: false, requiredIf: knowsTheirLifts, min: 1, max: 500, destination: 'column', validate: isNumberIn(1, 500) },
+  { key: 'knownSquatKg', question: 'Squat working weight (kg)?',
+    inputHint: 'Your squat, in kg…', shortLabel: 'Squat', control: 'numeric', required: false, requiredIf: knowsTheirLifts, min: 1, max: 500, destination: 'column', validate: isNumberIn(1, 500) },
+  { key: 'knownBenchKg', question: 'Bench working weight (kg)?',
+    inputHint: 'Your bench, in kg…', shortLabel: 'Bench', control: 'numeric', required: false, requiredIf: knowsTheirLifts, min: 1, max: 400, destination: 'column', validate: isNumberIn(1, 400) },
+  { key: 'knownDeadliftKg', question: 'Deadlift working weight (kg)?',
+    inputHint: 'Your deadlift, in kg…', shortLabel: 'Deadlift', control: 'numeric', required: false, requiredIf: knowsTheirLifts, min: 1, max: 500, destination: 'column', validate: isNumberIn(1, 500) },
   { key: 'trainingDays', question: 'Which days can you actually train?', inputHint: 'Which days?', shortLabel: 'Training days', control: 'multi', required: true, options: DAY_OPTIONS, destination: 'column', validate: v => isSubsetOf(DAY_OPTIONS)(v) && Array.isArray(v) && v.length > 0 },
   { key: 'sessionDuration', question: 'How long can your sessions usually run?', inputHint: 'How long have you got?', shortLabel: 'Session length', control: 'single', required: true, options: DURATION_OPTIONS, destination: 'column', validate: isOneOf(DURATION_OPTIONS) },
   { key: 'trainingStyle', question: "What's your training style?", inputHint: 'How do you like to train?', shortLabel: 'Style', control: 'single', required: true, options: STYLE_OPTIONS, destination: 'column', validate: isOneOf(STYLE_OPTIONS) },
@@ -674,7 +677,8 @@ export const ONBOARDING_SLOTS: SlotDef[] = [
   { key: 'dietaryPreferences', question: 'Any dietary preferences or restrictions?', inputHint: 'Vegan, gluten-free, an allergy…', shortLabel: 'Diet', control: 'multi', required: false, options: DIETARY_OPTIONS, destination: 'column', validate: isSubsetOf(DIETARY_OPTIONS) },
   { key: 'dislikedFoods', question: 'Anything else you\'d rather I left out?', inputHint: 'Foods to leave out…', shortLabel: 'Foods to avoid', control: 'text', required: false, destination: 'user_facts', validate: v => typeof v === 'string' },
   { key: 'cookingTime', question: 'How much time do you want to spend cooking?', inputHint: 'How long do you want to cook?', shortLabel: 'Cooking time', control: 'single', required: false, options: COOKING_TIME_OPTIONS, destination: 'column', validate: isOneOf(COOKING_TIME_OPTIONS) },
-  { key: 'includeSnacks', question: 'Snacks too, or meals only?', shortLabel: 'Snacks', control: 'single', required: false, options: SNACKS_OPTIONS, destination: 'column', validate: v => v === true || v === false || v === 'true' || v === 'false' },
+  { key: 'includeSnacks', question: 'Snacks too, or meals only?',
+    inputHint: 'Snacks or not?', shortLabel: 'Snacks', control: 'single', required: false, options: SNACKS_OPTIONS, destination: 'column', validate: v => v === true || v === false || v === 'true' || v === 'false' },
   // Last, and NEVER PROACTIVELY ASKED — both are in NEVER_BLOCKING_SLOTS, so
   // trackedSlots filters them out of the questioning list entirely. They stay
   // in this array so the model still has them in its catalogue and can record
@@ -685,8 +689,10 @@ export const ONBOARDING_SLOTS: SlotDef[] = [
   // not having checked that they were already demoted and already not being
   // asked. Deleting them removed the recording path this file's own comment
   // (below, on NEVER_BLOCKING_SLOTS) warns about, and the slot gate caught it.
-  { key: 'favoriteCuisines', question: 'Any favourite cuisines?', shortLabel: 'Cuisines', control: 'multi', required: false, options: FAVORITE_CUISINE_OPTIONS, destination: 'column', validate: isSubsetOf(FAVORITE_CUISINE_OPTIONS) },
-  { key: 'breakfastStyle', question: "What's breakfast usually like for you?", shortLabel: 'Breakfast', control: 'single', required: false, options: BREAKFAST_STYLE_OPTIONS, destination: 'column', validate: isOneOf(BREAKFAST_STYLE_OPTIONS) },
+  { key: 'favoriteCuisines', question: 'Any favourite cuisines?',
+    inputHint: 'Any cuisines you love…', shortLabel: 'Cuisines', control: 'multi', required: false, options: FAVORITE_CUISINE_OPTIONS, destination: 'column', validate: isSubsetOf(FAVORITE_CUISINE_OPTIONS) },
+  { key: 'breakfastStyle', question: "What's breakfast usually like for you?",
+    inputHint: 'How you do breakfast…', shortLabel: 'Breakfast', control: 'single', required: false, options: BREAKFAST_STYLE_OPTIONS, destination: 'column', validate: isOneOf(BREAKFAST_STYLE_OPTIONS) },
 ]
 
 export function getSlotDef(key: string): SlotDef | undefined {

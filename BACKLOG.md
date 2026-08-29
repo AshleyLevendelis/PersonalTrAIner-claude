@@ -2,6 +2,18 @@
 
 Newest first. One line each.
 
+- [x] **THE COMPOSER SAID "WHICH DAYS?" UNDER A QUESTION ABOUT SQUAT, BENCH AND DEADLIFT** — the third time this placeholder has described a different question than the one on screen. **Two independent faults**, either of which alone would have caused it.
+
+- [x] **FAULT 1: SIX OF 27 SLOTS SHIPPED WITH NO `inputHint` AT ALL** — all three lift questions, plus snacks, cuisines and breakfast. So even when the app worked out correctly which question was live, it had nothing to show and fell through. Now every slot has one, and a gate fails if a seventh appears (or if a hint grows too long for the box).
+
+- [x] **FAULT 2: THE FALLBACK IS A GUESS, AND IT WAS OVERRIDING A QUESTION ON SCREEN.** When no slot could be identified, the composer named "the canonical next open slot" — and that helper **cannot see the lift slots at all** (they are `requiredIf`-conditional), so it skipped them and landed on `trainingDays`. The guess is still right when nothing is pending — after an answered card the next canonical question genuinely is next — but when the coach has just asked something unmappable, **"Say anything…" is true and naming a different question is not**.
+
+- [x] AND A THIRD BUG FOUND WHILE FIXING THOSE: **`asksSlot` never survived a reload.** `toDraftMessages` mapped five fields and silently dropped it, so a question asked WITHOUT a card — the opener's "what should I call you?" is the built-in one — lost that fact on every refresh and the composer went blind. The `DraftMessage` type had always declared the field; only the mapper dropped it.
+
+- [x] MY FIRST FIX PASSED LIVE AND FAILED IN THE HARNESS, which is the useful direction. On resume the app appends a **RESUME_BANNER** ("Welcome back — picking up right where we left off"), so "the last assistant message" was the banner, not the question behind it. Receipts are assistant lines too. Both are now skipped when looking for what was asked.
+
+- [x] AND THE HARNESS WAS READING THE WRONG BOX: `input[placeholder]` matched the **numeric card's own field**, which renders ABOVE the composer, so it reported `1–500` as the composer's placeholder. It targets `.ob-composer-fade` now. Two new fixtures cover exactly Ashley's case (a freehand question) and its opposite (the same question WITH its card). **A fourth check was satisfied by its own comment** — the mapper check matched the prose beside it — so comments are stripped before that one runs. Five mutations bite.
+
 - [x] **"NEW PLAN" DROPPED STRAIGHT ONTO THE REVIEW CARD WITH EVERY OLD ANSWER FILLED IN.** Reported live: tapping reset went to "Generate My Plan" — age, height, weight, sex, meals, all still there — instead of a fresh conversation. `handleReset` wiped the profile and six caches but **not `fitplan_onboarding_draft`**, which is a single GLOBAL key rather than a per-profile one. The next run restored a draft with every slot confirmed, so `readyToGenerate` was true on mount and the review opened immediately. Completion already cleared the draft; **reset was the only path that didn't**.
 
 - [x] SO THE FIX IS A LIST, NOT A LINE. The bug isn't "we forgot this key", it's that **nothing said which keys a reset owns**. `test:reset-clears-draft` now classifies **every global localStorage key in `src/`** as cleared-or-deliberately-kept with a stated reason, and a new global key fails the gate until someone decides which it is. Offline queues (set-log, water, cardio, grocery, meal-event) are kept on purpose — each entry carries its own profile id and can still sync, and dropping them would silently delete logged work.

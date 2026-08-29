@@ -54,6 +54,42 @@ if (state === 'resolved') {
   )))
 }
 
+if (state === 'freehand') {
+  // ASHLEY'S CASE, third time this placeholder said the wrong thing. The coach
+  // asks for the three lift weights in prose — no chip card, no asksSlot — so
+  // the "what is on screen" finder gets nothing and the canonical-next-slot
+  // fallback used to run. That fallback cannot see the lift slots (they are
+  // requiredIf-conditional), so it skipped them and answered "Which days?"
+  // under a question about squat, bench and deadlift.
+  localStorage.setItem('fitplan_onboarding_draft', JSON.stringify(draft(
+    [
+      { role: 'assistant', content: 'Hi — what should I call you?', asksSlot: 'displayName' },
+      { role: 'user', content: 'Ashley' },
+      { role: 'assistant', content: 'Do you know your working weights?', slotCard: 'knowsWorkingLifts', slotCardResolved: true },
+      { role: 'user', content: 'I know my numbers' },
+      { role: 'assistant', content: "Since you know your numbers, let's get those logged — what are your current working weights for your squat, bench, and deadlift?" },
+    ],
+    { displayName: 'Ashley', fitnessGoal: 'fat_loss', trainingExperience: 'intermediate',
+      activityLevel: 'moderate', equipment: 'full_gym', injuries: [], knowsWorkingLifts: true },
+    ['displayName', 'fitnessGoal', 'trainingExperience', 'activityLevel', 'equipment', 'injuries', 'knowsWorkingLifts'],
+  )))
+}
+
+if (state === 'liftcard') {
+  // The same question WITH a card attached: the composer must now name that
+  // slot rather than fall back to anything.
+  localStorage.setItem('fitplan_onboarding_draft', JSON.stringify(draft(
+    [
+      { role: 'assistant', content: 'Hi — what should I call you?', asksSlot: 'displayName' },
+      { role: 'user', content: 'Ashley' },
+      { role: 'assistant', content: 'What is your squat working weight?', slotCard: 'knownSquatKg' },
+    ],
+    { displayName: 'Ashley', fitnessGoal: 'fat_loss', trainingExperience: 'intermediate',
+      activityLevel: 'moderate', equipment: 'full_gym', injuries: [], knowsWorkingLifts: true },
+    ['displayName', 'fitnessGoal', 'trainingExperience', 'activityLevel', 'equipment', 'injuries', 'knowsWorkingLifts'],
+  )))
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode><ConversationalOnboarding onComplete={() => {}} /></StrictMode>,
 )
