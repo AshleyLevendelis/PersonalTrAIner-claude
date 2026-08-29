@@ -77,10 +77,31 @@ export function compileSoftExercisePreferences(facts: UserFactRow[]): { liked: s
   }
 }
 
-/** Hard food dislikes → the existing `dislikedFoods` hard filter (meal-generation.ts verifyProposal). */
+/**
+ * Food dislikes → the `dislikedFoods` hard filter (meal-generation.ts's
+ * verifyProposal). EVERY food dislike, at either hardness.
+ *
+ * It used to read hard ones only, and the soft ones went nowhere: there is a
+ * compiler for hard food dislikes, one for soft food LIKES, and one for soft
+ * EXERCISE dislikes — and none, anywhere, for a soft food dislike. So "not
+ * keen on almond butter" was written to the database, shown back in the memory
+ * screen, and read by nothing, under a receipt promising it would "bias
+ * suggestions". Exactly the defect compileSoftExercisePreferences records
+ * against itself two functions below: a claim naming a consumer that does not
+ * exist.
+ *
+ * Ashley's ruling, 30 Aug 2026, offered the alternative of building that
+ * missing bias: "treat it as don't serve it." Nobody names a food they dislike
+ * hoping to still be served it.
+ *
+ * Reading BOTH hardnesses rather than only fixing new writes is deliberate:
+ * it repairs the rows already sitting in production — hers among them —
+ * without a migration, and it means a stray soft write from any other path can
+ * never again be silently inert.
+ */
 export function compileFoodDislikes(facts: UserFactRow[]): string[] {
-  const hard = preferenceFacts(facts, 'food_preference', 'dislike', 'hard')
-  return [...new Set(hard.flatMap(f => f.resolved_refs ?? []))]
+  const disliked = facts.filter(f => f.kind === 'food_preference' && f.polarity === 'dislike')
+  return [...new Set(disliked.flatMap(f => f.resolved_refs ?? []))]
 }
 
 /** Soft food likes → a scoring bias hook (meal-generation.ts's candidate ranking); no consumer wired to bias yet, so this is exported for a future ranking pass rather than silently dropped. */

@@ -1426,7 +1426,26 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
 
       if (kind === 'food_preference' || kind === 'exercise_preference') {
         const polarity = (args.polarity === 'like' ? 'like' : 'dislike') as 'like' | 'dislike'
-        const hardness = (args.hardness === 'hard' ? 'hard' : 'soft') as 'hard' | 'soft'
+        // A FOOD DISLIKE IS ALWAYS A BAN — Ashley's ruling, 30 Aug 2026:
+        // "treat it as don't serve it."
+        //
+        // The model is told to default hardness to soft unless the wording is
+        // absolute, which is defensible for exercise and wrong for food.
+        // Ashley said "I don't like almond butter" and got a soft row: no
+        // filtering, no warning that today's breakfast still had it, no swap
+        // offer — and a receipt promising it would "bias suggestions" when a
+        // soft FOOD DISLIKE had no reader anywhere in the app at all. She then
+        // regenerated, the meal changed, and it looked fixed. It wasn't; the
+        // almond butter could come back on the next regenerate.
+        //
+        // Forced HERE, in the client, not by asking the model to always send
+        // 'hard'. A prompt is advisory and needs a deploy to change; this is
+        // the half that cannot be talked out of. Nobody says they dislike a
+        // food hoping to still be served it.
+        const hardness: 'hard' | 'soft' =
+          kind === 'food_preference' && polarity === 'dislike'
+            ? 'hard'
+            : args.hardness === 'hard' ? 'hard' : 'soft'
         const targetPhrase = String(args.target_phrase || '').trim()
         if (!targetPhrase) return { text: "What should I remember that about, specifically?" }
 
@@ -1458,7 +1477,11 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
           ? `excludes ${resolution.resolvedRefs.length} exercise${resolution.resolvedRefs.length === 1 ? '' : 's'} from your plan`
           : hardness === 'hard' ? "recorded — excluded starting your next meal regenerate, doesn't touch today's plan" : 'recorded — biases suggestions, nothing removed'
         const rows: ChatReceiptView['rows'] = [{ label: displayText, detail: effect }]
-        if (kind === 'food_preference' && hardness === 'hard' && polarity === 'dislike') {
+        // NOT gated on hardness. Whatever level the app filed it at, if the
+        // plan in front of them still contains the thing they just said they
+        // did not want, saying so is true and costs nothing — and gating it
+        // was exactly why Ashley's second attempt said nothing at all.
+        if (kind === 'food_preference' && polarity === 'dislike') {
           // Same reader as the coach's own context (meal-ingredients.ts).
           // This scan was RIGHT when the model was wrong, and the two being
           // separate copies of the rule is how they came to disagree.

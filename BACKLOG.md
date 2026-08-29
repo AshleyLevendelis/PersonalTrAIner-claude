@@ -2,6 +2,24 @@
 
 Newest first. One line each.
 
+- [x] **"IT STILL DIDN'T REMOVE THE ALMOND BUTTER OR OFFER AN ALTERNATIVE."** Ashley, testing the fix. Different wording, different branch: yesterday's *"I dont want almond butter in my food choices. Remove it"* filed a **ban**; today's *"I don't like almond butter"* filed **"not keen on"** — and the today's-plan warning and the swap offer are both gated on hardness, so it said nothing.
+
+- [x] **AND THE MILD LEVEL DID NOTHING AT ALL.** There is a compiler for hard food dislikes, one for soft food **likes**, one for soft **exercise** dislikes — and **none anywhere for a soft food dislike**. It was written to the database, shown in the memory screen, and read by nothing, under a receipt promising *"biases suggestions"*. Exactly the defect `compileSoftExercisePreferences` already records against itself: *"This claim was untrue for a while: the consumer it names did not exist."*
+
+- [x] **SO HER REGENERATE WAS COINCIDENCE, NOT ENFORCEMENT** — she reported the meal being replaced as the fix working, and it wasn't. Regeneration picks new meals anyway; the almond butter could have come back on the next one. She was told this before anything was built.
+
+- [x] **ASHLEY'S RULING: "treat it as don't serve it."** Offered the alternative of building the missing bias, she chose to delete the distinction for food. Every food dislike is now a filter, at either hardness. *Nobody names a food they dislike hoping to still be served it.*
+
+- [x] FIXED IN THE **COMPILER**, NOT ONLY ON NEW WRITES — so the rows already sitting in production start working with **no migration and nothing to re-type**, hers among them. Also forced hard in the **client** rather than by asking the model to send `hard`: a prompt is advisory and needs a deploy, and this repo has been caught relying on model compliance before. The prompt is updated to match so its replies describe what actually happened, but the client is the guarantee.
+
+- [x] AND THE WARNING THAT STAYED SILENT NO LONGER DEPENDS ON HARDNESS AT ALL. If the plan in front of you still contains what you just said you don't want, saying so is true whatever level it was filed at.
+
+- [x] NEW GATE `test:food-dislike-is-a-ban`, 24 checks, **six mutations bite** — including one that re-inerts Ashley's exact row and two that catch the compiler over-reaching into liked foods or exercise dislikes. §1 is her real row, not a fixture shape.
+
+- [x] ONE OF MY OWN CHECKS WAS WRONG AND THE MUTATION FOUND IT: a positional assertion keyed on `const displayText`, of which that component has **five**, matched the first one **40 lines above the code under test**. Now sliced to the real `record_fact` branch — the same fix this session already had to adopt three times for guessed character windows.
+
+- [ ] **NEEDS `npm run deploy:functions:prod -- chat-gemini` AGAIN** for the prompt half. The enforcement ships with the Vercel push and holds without it; the deploy only stops the coach *describing* a soft filing that can no longer happen.
+
 - [x] **"IT CONFIRMED IT REMOVED IT BUT IT WAS STILL IN MY MEAL."** Ashley asked for almond butter to go and was told *"Looking at your plan for today, none of your scheduled meals actually contain almond butter, so you're all set."* Her breakfast held **13g of it**. Not a lookup that went wrong — **one that could not happen**: `mealSummary` gave the coach dish names and macros only, so it saw `Greek Yoghurt Berry Crunch Bowl (584 kcal…)` and answered anyway.
 
 - [x] **THE APP KNEW, AND HAD SAID SO ONE MESSAGE EARLIER.** The memory receipt scanned the same `mealPlan` across `item.ingredients` and printed *"Today's Breakfast — still has it"*. The dish name contains no "almond butter", so that row can only have matched the ingredients array — **live proof the data was populated**, one function away from what the coach was handed. The transcript has the app right and the model wrong about the same fact, two messages apart.

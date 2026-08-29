@@ -744,7 +744,7 @@ const toolDeclarations = [
         hardness: {
           type: "string",
           enum: ["hard", "soft"],
-          description: "'hard' = an absolute exclusion ('I can't eat shellfish', 'never give me lunges'). 'soft' = a lean, not a ban ('I prefer chicken to fish', 'not a fan of burpees but I'll do them'). Default to soft unless the user's wording is absolute.",
+          description: "'hard' = an absolute exclusion ('I can't eat shellfish', 'never give me lunges'). 'soft' = a lean, not a ban ('I prefer chicken to fish', 'not a fan of burpees but I'll do them'). Default to soft unless the user's wording is absolute — EXCEPT for a food they dislike, which is ALWAYS hard however mildly they put it. 'I don't like almond butter' is a ban: nobody names a food they dislike hoping to still be served it. The app enforces this itself and will override a soft value here, so sending one only makes your reply describe something different from what happened. This exception is for food DISLIKES only — a food they like, and every exercise preference, still take the default.",
         },
         target_phrase: { type: "string", description: "The food or exercise name as the user said it." },
         timing_subject: { type: "string", description: "Required for kind=timing_rule — the food/item the rule is about." },
