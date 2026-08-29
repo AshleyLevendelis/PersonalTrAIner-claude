@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react'
 import ReactMarkdown from 'react-markdown'
+import { buildCoachMealSummary, mealsContaining } from '@/lib/meal-ingredients'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -675,9 +676,10 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       pendingLoadSuggestions,
     })
 
-    const mealSummary = mealPlan
-      .map(m => `${m.meal}: ${m.items.map(i => `${i.name} (${i.calories} kcal, P:${i.protein}g C:${i.carbs}g F:${i.fat}g)`).join(', ')}`)
-      .join('\n')
+    // Ingredients included — see meal-ingredients.ts. Without them the coach
+    // told Ashley "none of your scheduled meals actually contain almond
+    // butter" while her breakfast held 13g of it.
+    const mealSummary = buildCoachMealSummary(mealPlan)
 
     const favoritesSummary = favorites.length > 0
       ? favorites.map(f => `- ${f.name} (${f.meal_slot}, used ${f.times_used}x)`).join('\n')
@@ -1457,11 +1459,11 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
           : hardness === 'hard' ? "recorded — excluded starting your next meal regenerate, doesn't touch today's plan" : 'recorded — biases suggestions, nothing removed'
         const rows: ChatReceiptView['rows'] = [{ label: displayText, detail: effect }]
         if (kind === 'food_preference' && hardness === 'hard' && polarity === 'dislike') {
-          const needle = targetPhrase.trim().toLowerCase()
-          const stillPresent = mealPlan.filter(m =>
-            m.items.some(i => i.name.toLowerCase().includes(needle) || (i.ingredients ?? []).some(ing => ing.toLowerCase().includes(needle)))
-          )
-          if (needle && stillPresent.length > 0) {
+          // Same reader as the coach's own context (meal-ingredients.ts).
+          // This scan was RIGHT when the model was wrong, and the two being
+          // separate copies of the rule is how they came to disagree.
+          const stillPresent = mealsContaining(mealPlan, targetPhrase)
+          if (stillPresent.length > 0) {
             rows.push({
               label: `Today's ${stillPresent.map(m => m.meal).join(', ')}`,
               detail: 'still has it — swap from the Nutrition tab if you don\'t want it today',

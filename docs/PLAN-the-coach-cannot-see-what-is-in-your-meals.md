@@ -1,7 +1,7 @@
 # The coach cannot see what is in your meals
 
-**Status: plan only. Not built.** Dietary enforcement gets a plan before a
-build (CLAUDE.md), even when the fix looks obvious — and this one does.
+**Status: BUILT**, 30 Aug 2026, on Ashley's "build it". Plan kept as written;
+the one deviation is recorded at the end.
 
 ## What Ashley hit
 
@@ -140,3 +140,13 @@ Two halves, and they are independent:
 Worth stating plainly: shipping (1) alone still leaves a model that has never
 been told the list is authoritative. (1) removes the blindness; (3) removes
 the licence to guess. The honest order is both, together.
+
+
+## What changed from this plan while building it
+
+`test:coach-rules-sync` failed on the first attempt, correctly: `ALLERGEN_HONESTY_BLOCK`
+is duplicated verbatim into `_shared/coach-rules.ts` and read by **onboarding-chat**
+as well, and the plan's §3 wording named `propose_meal_swap` — a tool that coach
+does not have. Split rather than forced: the generic honesty half goes to both
+copies, the swap instruction only to `chat-gemini`. Never tell a model about a
+button it cannot press. Gated in both directions.

@@ -86,6 +86,7 @@
     "test:chat-actions": "tsx scripts/test-chat-actions.ts",
     "test:onboarding-slots": "tsx scripts/test-onboarding-slots.ts",
     "test:onboarding-corrections": "tsx scripts/test-onboarding-corrections.ts",
+    "test:coach-sees-ingredients": "tsx scripts/test-coach-sees-ingredients.ts",
     "test:activity-streak": "tsx scripts/test-activity-streak.ts",
     "test:starting-out": "tsx scripts/test-starting-out.ts",
     "test:tempo-prescription": "tsx scripts/test-tempo-prescription.ts",

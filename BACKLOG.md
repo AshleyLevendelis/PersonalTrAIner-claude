@@ -2,6 +2,26 @@
 
 Newest first. One line each.
 
+- [x] **"IT CONFIRMED IT REMOVED IT BUT IT WAS STILL IN MY MEAL."** Ashley asked for almond butter to go and was told *"Looking at your plan for today, none of your scheduled meals actually contain almond butter, so you're all set."* Her breakfast held **13g of it**. Not a lookup that went wrong — **one that could not happen**: `mealSummary` gave the coach dish names and macros only, so it saw `Greek Yoghurt Berry Crunch Bowl (584 kcal…)` and answered anyway.
+
+- [x] **THE APP KNEW, AND HAD SAID SO ONE MESSAGE EARLIER.** The memory receipt scanned the same `mealPlan` across `item.ingredients` and printed *"Today's Breakfast — still has it"*. The dish name contains no "almond butter", so that row can only have matched the ingredients array — **live proof the data was populated**, one function away from what the coach was handed. The transcript has the app right and the model wrong about the same fact, two messages apart.
+
+- [x] **SO THE FIX IS ONE READER, NOT ONE MORE FIELD.** New `src/lib/meal-ingredients.ts`: the scan that decides a meal *contains* something and the text that tells the coach what a meal contains are now the same function. Two copies of that rule is exactly how they diverged. §3 of the gate asserts they cannot — every phrase `mealsContaining` finds must appear in `buildCoachMealSummary`'s output, over every ingredient on the plan rather than a sample.
+
+- [x] TRUNCATION IS **ANNOUNCED** (`+N more not listed`) and a dish with no breakdown says *"ingredients not recorded for this dish"* rather than rendering an empty bracket. A shortened list read as complete, or a blank one read as "contains nothing", would reproduce this exact bug one layer along — a model reasoning confidently from a partial view it believed was total.
+
+- [x] **THE HONESTY RULE ALREADY FORBADE THAT SENTENCE — FOR ALLERGENS ONLY.** `ALLERGEN_HONESTY_BLOCK` says never state or imply a meal "is X-free" or "won't contain" X, and it is written about the eight tagged categories. Almond butter arrived as a **preference**, so nothing covered it and the model produced a textbook "is X-free" claim. Extended: never state a food is **absent** except by reading a list actually given, within that list's stated limits. Stating the **action** ("I've filtered that out") is still allowed — that is a thing the app did.
+
+- [x] AND A STRUCTURAL RULE FOUND WHILE WIRING IT, CAUGHT BY `test:coach-rules-sync` DOING ITS JOB: that block is duplicated verbatim into `_shared/coach-rules.ts` and read by **onboarding-chat**, which has no meal plan and no `propose_meal_swap`. The generic honesty half goes to both; **the swap instruction goes only where the tool exists**, or the rule becomes a promise of a button that isn't there. Gated both ways.
+
+- [x] ASHLEY'S FIRST COMPLAINT — *"it didn't even offer to remove it from my meal"* — is the same root cause and is now answered: the coach offers the swap through the existing confirm-card rather than telling her to go to the Nutrition tab herself. New gate `test:coach-sees-ingredients`, 30 checks, **seven mutations bite**, M1 reproducing the original blind summary exactly.
+
+- [x] VERIFIED IN PASSING AND LEFT ALONE: the *other* promise was true. `verifyProposal` (`meal-generation.ts:297`) hard-filters candidates whose ingredient names contain the disliked phrase, so "excluded starting your next meal regenerate" is real. Only the claim about **today** was false.
+
+- [ ] **NEEDS `npm run deploy:functions:prod -- chat-gemini`.** The client half — the coach being able to see the ingredient at all — ships with the Vercel push. Both prompt halves are inert until that deploy, which was **already outstanding for two other rules**. Shipping the client half alone removes the blindness but leaves the licence to guess.
+
+- [ ] **SYNONYMS ARE STILL LITERAL.** "almond butter" will not find "almond paste", and `mealsContaining` is deliberately not cleverer than the generator's own filter — a dislike the generator would act on must be one the app reports, and vice versa. The limit is stated in the coach's honesty rules rather than papered over. Widening it is its own decision.
+
 - [x] **"IF YOU MAKE A WRONG SELECTION AND THEN SEND THE RIGHT ANSWER AFTER IT, IT MESSES WITH THE NEXT QUESTION AND THE NEXT QUICK REPLY."** Ashley. Three faults chained, plus a fourth reachable from the same move. `present_slot` was refused for **any** already-answered slot — right for "stop re-asking what you know", wrong for the one re-ask that matters, so a corrected question came back with the coach saying *"which one is you?"* and **nothing to tap**.
 
 - [x] IT WAS ALSO DECIDED **MID-LOOP, AGAINST A TURN THAT HADN'T FINISHED HAPPENING.** Actions arrive in whatever order the model emitted them, so a `present_slot` listed before its own `set_slot` was judged before the correction it belonged to had been applied, and the message meant to host the chips might not have been pushed yet. Now collected during the loop and resolved after it — the same reasoning the review check in the same file already used, applied one level down.
