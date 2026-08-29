@@ -2,6 +2,22 @@
 
 Newest first. One line each.
 
+- [x] **PASS B FOUND A LIVE BUG BEFORE IT BUILT ANYTHING.** `computeRoundState` ran for `rounds × (work + rest)`, so **every 6 × 40/20 session took 6:00 and ended by sitting through a rest with nothing left to recover for**. The honest length is **5:40**. Handoff §6 build note 3 states it plainly — *"Six rounds means six work intervals and five rests"* — and `test:timers` passed throughout, which is why it survived.
+
+- [x] **AND I ALMOST SHIPPED A SECOND COPY OF THE TIMER.** I had written a whole new engine before checking, and the app already had one — deadline-anchored on `startedAtIso`, with `playTimerCue` already doing distinct tones and vibration per transition. Both of the handoff's first two build notes were **already satisfied**. My duplicate is deleted; the real engine is fixed instead. That is the exact defect class this session has spent all day removing, caught one step before committing it.
+
+- [x] I ALSO OVERWROTE `timer-cues.ts` OUTRIGHT with `cat >` without reading it first, destroying a working module two components import. Caught by the typecheck within seconds and restored from git — but the lesson is the same one: **read the file before replacing it**, and this session now has two instances.
+
+- [x] **TIMER-STATE TOKENS, MEASURED NOT ASSUMED.** Resting (`--role-warn` + `#3A1E00`) passes the ladder untouched at **8.72 / 6.67 / 5.24** — shipped exactly as designed. Complete/overdue does **not**: the handoff's `#FF5C7A` + `#40000E` measures **5.77 solid and 4.06 at .78** against its own required 7 and 4.5. Lightened **two points** to `#FF6682` + `#1C0207` → **7.04 / 6.04 / 5.06**; the same red to look at, and legible.
+
+- [x] THE FIELD NOW TAKES A **STATE** that re-points `--field`/`--field-ink` locally, so the ladder, the ring and the inverted CTA all follow into amber or red without knowing a timer exists. Cross-fades 400ms, and **cuts instead under `prefers-reduced-motion`**, which the handoff asks for explicitly.
+
+- [x] `totalRoundSeconds` (derived, never stated), `roundPips` and `intervalProgress` added to the real engine — *"the ring is the current interval only ... overall progress is the pips' job"*. **Four mutations bite**, including one that restores the trailing rest exactly as it shipped.
+
+- [ ] **PASS B'S UI IS NOT BUILT.** The engine, tokens and field states are in; what remains is rendering them — the running round timer (eyebrow, 68px clock, pips, Pause/Next) and the in-session rest timer (15b/15c), plus Tools gaining a field only while a clock runs. Nothing in Tools or the session looks any different yet.
+
+- [ ] **PASS C NOT STARTED.**
+
 - [x] **"THE CHANGES HAVEN'T APPLIED TO ALL THE PAGES."** Ashley, with four screenshots. **Two separate things, and only one was a bug.** `main` was already at `abf9115` with all three fields merged — the photos are of the previous build (`a054319`, foundation + Home only), taken while Vercel was still building. Home having a band and Nutrition/Exercise not is exactly what that commit looks like.
 
 - [x] **BUT HOME'S FIELD WAS GENUINELY WRONG, AND THE SCREENSHOT IS WHY I SAW IT.** It rendered as an **inset rounded card floating below the settings gear** — because I gave it a bottom radius and left it inside `<main>`'s `px-4 pt-12`. §1 says *"a full-bleed band ... square top corners (it meets the status bar)"*, and the prototype settles it: its field is the first child of the phone frame with **no radius of its own**. Now `borderRadius: 0` with −16px side margins and −48px top, cancelling the page gutter exactly.

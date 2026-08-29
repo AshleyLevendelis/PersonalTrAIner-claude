@@ -328,6 +328,20 @@
    * the reference design renders exactly as drawn on the default theme. */
   --field: var(--theme-field);
   --field-ink: var(--theme-field-ink);
+  /* TIMER STATES (handoff v2 §6). Theme-independent, because --role-warn and
+   * --destructive are: "Every colour is a token you already ship, used with
+   * the meaning it already has."
+   *
+   * Resting is the handoff's values untouched — measured 8.72 / 6.67 / 5.24,
+   * clear of the ladder. Complete/overdue is NOT: #FF5C7A with #40000E
+   * measures 5.77 solid and 4.06 at .78, against the 7 and 4.5 the same
+   * document requires. Lightened two points, the same auto-adjust Ashley
+   * ruled for the field itself; at 7.04 / 6.04 / 5.06 it reads as the same
+   * red and is actually legible on. */
+  --field-warn: var(--role-warn);
+  --field-warn-ink: #3A1E00;
+  --field-destructive: #FF6682;
+  --field-destructive-ink: #1C0207;
   --primary-foreground: #08281F;
   --ring: var(--theme-primary);
   --chart-1: var(--theme-primary);
@@ -712,3 +726,10 @@
     opacity: 0;
   }
 }
+
+/* The field cross-fades between timer states (handoff v2 §6, "Field
+   cross-fades 400ms"). Under prefers-reduced-motion it cuts instead — the
+   handoff asks for that explicitly, and a 400ms wash of colour is exactly the
+   kind of transition that setting exists to stop. */
+.ds-field { transition: background-color 400ms ease, color 400ms ease; }
+@media (prefers-reduced-motion: reduce) { .ds-field { transition: none; } }

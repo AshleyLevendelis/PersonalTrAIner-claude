@@ -16,17 +16,43 @@ import { FieldRing, type FieldArc } from './FieldRing'
 // handoff's own hexes are the Nightshift values of tokens.
 // ---------------------------------------------------------------------------
 
-export function Field({ arcs, ringPlacement = 'ambient', children }: {
+/**
+ * The field's state (handoff v2 §6). "The field already shows the state of a
+ * session, so during rest it BECOMES the countdown — no new surface."
+ *
+ * Each state re-points --field and --field-ink locally, so everything drawn on
+ * the field — the ladder, the ring, the inverted CTA — follows without any of
+ * them knowing a timer exists.
+ */
+export type FieldState = 'default' | 'resting' | 'alert'
+
+const STATE_VARS: Record<FieldState, { bg: string; ink: string }> = {
+  default: { bg: 'var(--field)', ink: 'var(--field-ink)' },
+  resting: { bg: 'var(--field-warn)', ink: 'var(--field-warn-ink)' },
+  // Complete AND overdue. The handoff flags the collision itself: red means
+  // "finished" for a round timer and "off-plan" for an overrun rest. Ashley
+  // asked for red at the end, so both keep it; if completion ever reads as
+  // failure after a good circuit, this is the one line to change.
+  alert: { bg: 'var(--field-destructive)', ink: 'var(--field-destructive-ink)' },
+}
+
+export function Field({ arcs, ringPlacement = 'ambient', state = 'default', children }: {
   arcs?: FieldArc[]
   ringPlacement?: 'ambient' | 'inline'
+  state?: FieldState
   children: ReactNode
 }) {
+  const vars = STATE_VARS[state]
   return (
     <div
-      className="relative overflow-hidden"
+      className="relative overflow-hidden ds-field"
       style={{
-        background: 'var(--field)',
-        color: 'var(--field-ink)',
+        // Re-pointed rather than overridden, so ink('...') and the ring keep
+        // working unchanged inside any state.
+        ['--field' as string]: vars.bg,
+        ['--field-ink' as string]: vars.ink,
+        background: vars.bg,
+        color: vars.ink,
         padding: '22px 22px 24px',
         // NO RADIUS, AND IT BREAKS OUT OF THE PAGE GUTTER.
         //

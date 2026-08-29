@@ -55,8 +55,16 @@ export function computeRoundState(config: RoundConfig, roundStartedAtIso: string
   const cycleMs = workMs + config.restSeconds * 1000
   const elapsed = Math.max(0, now - start)
 
-  if (elapsed >= config.rounds * cycleMs) {
-    return { currentRound: config.rounds, currentPhase: 'rest', phaseRemainingMs: 0, isComplete: true }
+  // THE FINAL REST DOES NOT EXIST (design handoff v2 §6, build note 3):
+  // "Six rounds means six work intervals and five rests."
+  //
+  // This used to run for rounds x (work + rest), so a 6 x 40/20 session took
+  // 6:00 and ended by sitting through a rest with nothing left to recover
+  // for. The honest duration is 5:40, and the handoff makes the same point
+  // about the total it is derived from: never rounds x (work + rest).
+  const totalMs = config.rounds * workMs + Math.max(0, config.rounds - 1) * config.restSeconds * 1000
+  if (elapsed >= totalMs) {
+    return { currentRound: config.rounds, currentPhase: 'work', phaseRemainingMs: 0, isComplete: true }
   }
 
   const round = Math.floor(elapsed / cycleMs) + 1
@@ -64,6 +72,42 @@ export function computeRoundState(config: RoundConfig, roundStartedAtIso: string
   const phase: RoundPhase = inCycle < workMs ? 'work' : 'rest'
   const phaseRemainingMs = phase === 'work' ? workMs - inCycle : cycleMs - inCycle
   return { currentRound: round, currentPhase: phase, phaseRemainingMs, isComplete: false }
+}
+
+/**
+ * The run's DERIVED length: ROUNDS x WORK + (ROUNDS - 1) x REST.
+ *
+ * The handoff asks for this explicitly — "Derive the total, never state it" —
+ * because the obvious arithmetic overstates every session by one rest.
+ */
+export function totalRoundSeconds(config: RoundConfig): number {
+  const rounds = Math.max(0, config.rounds)
+  return rounds * config.workSeconds + Math.max(0, rounds - 1) * config.restSeconds
+}
+
+/**
+ * One pip per round (design handoff v2 §6).
+ *
+ * "The ring is the current interval only ... Overall progress is the pips'
+ * job — one graphic, one meaning." So the ring reads phaseRemainingMs and
+ * these read the round, and neither tries to say both.
+ */
+export function roundPips(state: RoundState, config: RoundConfig): ('done' | 'current' | 'upcoming')[] {
+  const out: ('done' | 'current' | 'upcoming')[] = []
+  for (let r = 1; r <= Math.max(0, config.rounds); r++) {
+    if (state.isComplete || r < state.currentRound) out.push('done')
+    else if (r === state.currentRound) out.push('current')
+    else out.push('upcoming')
+  }
+  return out
+}
+
+/** 0..1 through the CURRENT interval — what the ring draws, and nothing else. */
+export function intervalProgress(state: RoundState, config: RoundConfig): number {
+  if (state.isComplete) return 1
+  const span = (state.currentPhase === 'work' ? config.workSeconds : config.restSeconds) * 1000
+  if (span <= 0) return 0
+  return Math.min(1, Math.max(0, 1 - state.phaseRemainingMs / span))
 }
 
 /**
