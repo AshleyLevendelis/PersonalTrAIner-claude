@@ -113,6 +113,7 @@
     "verify:tour-real": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/drive-real.mjs",
     "verify:composer": "vite build --config .onb-harness/vite.config.ts && node .onb-harness/composer.mjs",
     "verify:keyboard": "vite build --config .onb-harness/vite.config.ts && node .onb-harness/keyboard.mjs",
+    "verify:onboarding-walk": "vite build --config .onb-harness/vite.config.ts && node .onb-harness/walk-questions.mjs",
     "verify:chat-shell": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/chat-shell.mjs",
     "verify:tap-targets": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/tap-targets.mjs",
     "verify:reveal": "vite build --config .tw-harness/vite.config.ts && node .tw-harness/measure.mjs",

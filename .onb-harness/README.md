@@ -61,3 +61,36 @@ One fixture of mine was wrong before the component was: the third case
 originally left `fitnessGoal` unanswered and then expected "Which days?".
 "Tell me your goal…" was the correct answer to the question the fixture
 actually asked.
+
+## The whole-flow walker (`npm run verify:onboarding-walk`)
+
+Every onboarding bug found on 28–29 Aug was found by Ashley, on her phone, one
+screenshot at a time: the composer naming the wrong question, "100, 150"
+landing on lifts nobody named, a grouped card labelled with its first field, a
+card that could not hold 5'10, "New Plan" restoring the answers it was supposed
+to clear. Every one of them was reachable by anyone who opened the app. She
+should not be the thing that finds them.
+
+This walks all 27 questions at 390×844 with the real components and asks four
+things of each: can it be answered, can every control be hit, is anything
+leaking a placeholder value, does the page scroll sideways.
+
+### The one thing to understand before reading a failure
+
+"Can it be answered" is not the same question for every slot, and its first
+version got this wrong — it demanded a rendered control from all 27 and
+reported three false failures. `displayName`, `dislikedExercises` and
+`dislikedFoods` are `control: 'text'`, and a text slot renders **no card by
+design**: `ConversationalOnboarding` sets `slotCard: undefined` for it in four
+places, because the control is the shared composer at the foot of the screen.
+
+So the check is split by control, and the free-text half is aimed at what
+actually breaks for those slots. The only thing telling a user which question
+the composer is answering is its placeholder — which is the exact bug Ashley
+photographed. A text slot with a blank or duplicated `inputHint` is therefore
+the same defect as a chips slot with no chips: the question is on screen with
+no working way to answer it.
+
+Mutations proven to turn it red: blanking `displayName`'s hint (1 check),
+pointing `dislikedFoods` at another slot's hint (1 check), and emptying
+`fitnessGoal`'s options (1 check). Each bit only its own assertion.

@@ -26,7 +26,13 @@ function Harness() {
         {intro.map((m, i) => <Bubble key={i}>{m.content}</Bubble>)}
       </div>
       {ONBOARDING_SLOTS.map((def: any, i: number) => (
-        <div key={def.key} data-q={def.key} className="space-y-2 border-t border-[color:var(--hairline)] p-4">
+        <div
+          key={def.key}
+          data-q={def.key}
+          data-control={def.control}
+          data-hint={def.inputHint ?? ''}
+          className="space-y-2 border-t border-[color:var(--hairline)] p-4"
+        >
           <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
             {i + 1} · {def.key} · {def.required ? 'required' : def.requiredIf ? 'conditional' : 'optional'}
           </p>
