@@ -136,7 +136,14 @@ console.log('\n4. The field is full-bleed, and square where it meets the top')
   // knows both which tab is showing and whether a banner is.
   check('the field does NOT pull itself up with a margin', !/marginTop: -/.test(field))
   check('the page drops its top padding on a field tab',
-    /TABS_WITH_FIELD\.has\(activeTab\) && adaptationMessages\.length === 0 \? 'pt-0' : 'pt-12'/.test(app))
+    /paddingTop: TABS_WITH_FIELD\.has\(activeTab\) && adaptationMessages\.length === 0 \? 0 : 48/.test(app))
+  // It is a style rather than a class so <main>'s className stays the static
+  // string test:composer-focus copies into its harness.
+  // A static double-quoted string on the same line as <main> — that exact
+  // shape is what test:composer-focus greps to copy into its harness, and a
+  // template literal or a line break silently breaks it.
+  check('...without making <main>\'s className dynamic',
+    /<main className="max-w-6xl mx-auto px-4 pb-28 space-y-6"/.test(app))
   check('...and keeps it when a banner is above the field',
     /adaptationMessages\.length === 0/.test(app))
   // The fixed settings gear now lands on a light accent band.

@@ -104,7 +104,11 @@ function Harness() {
     <BottomDockHeightProvider>
       {/* VERBATIM from App.tsx: the outer shell and <main>. */}
       <div className="min-h-screen bg-background">
-        <main className="max-w-6xl mx-auto px-4 pt-12 pb-28 space-y-6">
+        {/* Kept verbatim with App.tsx (test:composer-focus pins them). The
+            top padding moved to a style there when the field became
+            full-bleed; the chat tab has no field, so 48px is what it renders
+            and what this harness must reproduce. */}
+        <main className="max-w-6xl mx-auto px-4 pb-28 space-y-6" style={{ paddingTop: 48 }}>
           <div className="space-y-6">
             <ChatAssistant
               profile={profile}

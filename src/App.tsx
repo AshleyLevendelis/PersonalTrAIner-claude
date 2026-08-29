@@ -1927,9 +1927,12 @@ function App() {
           is the first thing and the field follows it. Deciding this HERE
           rather than with a blind negative margin on the field is what stops
           the band being dragged over that banner. */}
-      <main className={`max-w-6xl mx-auto px-4 pb-28 space-y-6 ${
-        TABS_WITH_FIELD.has(activeTab) && adaptationMessages.length === 0 ? 'pt-0' : 'pt-12'
-      }`}>
+      {/* Top padding is a STYLE, not a class, and <main className> stays one
+          static string on one line — test:composer-focus copies that string
+          into its browser harness verbatim, and a copy that drifts is worse
+          than no copy. The bottom padding that gate actually measures against
+          is untouched. */}
+      <main className="max-w-6xl mx-auto px-4 pb-28 space-y-6" style={{ paddingTop: TABS_WITH_FIELD.has(activeTab) && adaptationMessages.length === 0 ? 0 : 48 }}>
         {adaptationMessages.length > 0 && (
           <div className="space-y-2">
             {adaptationMessages.map((msg, i) => (
