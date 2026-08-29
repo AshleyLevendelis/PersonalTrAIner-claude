@@ -126,11 +126,19 @@ console.log('\n4. The field is full-bleed, and square where it meets the top')
   const field = readFileSync(join(ROOT, 'src/components/field/Field.tsx'), 'utf8')
   check('no corner radius', /borderRadius: 0/.test(field))
   check('...and it breaks out of the page gutter', /marginLeft: -16/.test(field) && /marginRight: -16/.test(field))
-  check('...and out of the top padding, so it reaches the top', /marginTop: -48/.test(field))
-  // Those numbers only work while <main> keeps that padding.
   const app = readFileSync(join(ROOT, 'src/App.tsx'), 'utf8')
-  check('the page gutter is still px-4 pt-12, which those offsets cancel',
-    /<main className="max-w-6xl mx-auto px-4 pt-12/.test(app))
+  // The side offset only works while <main> keeps that gutter.
+  check('the page gutter is still px-4, which the -16 cancels',
+    /max-w-6xl mx-auto px-4 pb-28/.test(app))
+  // THE TOP IS NOT A NEGATIVE MARGIN, and that is deliberate. A blind -48
+  // would drag the band over the adaptation banners that render above the
+  // tabs, so App.tsx drops the padding instead - it is the only place that
+  // knows both which tab is showing and whether a banner is.
+  check('the field does NOT pull itself up with a margin', !/marginTop: -/.test(field))
+  check('the page drops its top padding on a field tab',
+    /TABS_WITH_FIELD\.has\(activeTab\) && adaptationMessages\.length === 0 \? 'pt-0' : 'pt-12'/.test(app))
+  check('...and keeps it when a banner is above the field',
+    /adaptationMessages\.length === 0/.test(app))
   // The fixed settings gear now lands on a light accent band.
   check('the settings gear takes field ink on the tabs that have one',
     /TABS_WITH_FIELD\.has\(activeTab\) \? 'var\(--field-ink\)'/.test(app))

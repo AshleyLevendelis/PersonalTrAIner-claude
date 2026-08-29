@@ -38,12 +38,15 @@ export function Field({ arcs, ringPlacement = 'ambient', children }: {
         // prototype settles it: its field is the first child of the phone
         // frame with no radius of its own, clipped by the frame.
         //
-        // -16px each side cancels <main>'s px-4; -48px top cancels its pt-12
-        // so the band actually reaches the top of the scroll area.
+        // -16px each side cancels <main>'s px-4, which always applies.
+        //
+        // The TOP is NOT handled here. A blind negative margin would drag the
+        // band over the adaptation banners that render above the tabs, so
+        // App.tsx drops the page's top padding instead — it is the only place
+        // that knows both which tab is showing and whether a banner is.
         borderRadius: 0,
         marginLeft: -16,
         marginRight: -16,
-        marginTop: -48,
       }}
     >
       {arcs && arcs.length > 0 && ringPlacement === 'ambient' && (

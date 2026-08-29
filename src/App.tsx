@@ -1920,7 +1920,16 @@ function App() {
         <OfflineStatusIndicator />
       </div>
 
-      <main className="max-w-6xl mx-auto px-4 pt-12 pb-28 space-y-6">
+      {/* THE FIELD MEETS THE TOP — but only when there is nothing above it.
+          A field tab drops the page's top padding so the band starts at the
+          top of the scroll area (handoff v2 §1: "it meets the status bar").
+          When an adaptation banner is showing, the padding stays: the banner
+          is the first thing and the field follows it. Deciding this HERE
+          rather than with a blind negative margin on the field is what stops
+          the band being dragged over that banner. */}
+      <main className={`max-w-6xl mx-auto px-4 pb-28 space-y-6 ${
+        TABS_WITH_FIELD.has(activeTab) && adaptationMessages.length === 0 ? 'pt-0' : 'pt-12'
+      }`}>
         {adaptationMessages.length > 0 && (
           <div className="space-y-2">
             {adaptationMessages.map((msg, i) => (
