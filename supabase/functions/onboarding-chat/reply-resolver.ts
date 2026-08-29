@@ -35,6 +35,9 @@ export interface SlotCatalogEntry {
   question: string;
   control: string;
   required: boolean;
+  /** True when this slot can never hold a plan up. See the client-side
+   *  SlotCatalogEntry in src/lib/onboarding-slots.ts for why it exists. */
+  neverBlocks?: boolean;
   values?: { value: string; label: string }[];
   min?: number;
   max?: number;

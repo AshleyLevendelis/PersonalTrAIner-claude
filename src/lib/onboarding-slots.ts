@@ -941,9 +941,22 @@ export interface SlotCatalogEntry {
   question: string
   control: SlotDef['control']
   required: boolean
-  values?: { value: string; label: string }[]
-  min?: number
-  max?: number
+  /**
+   * True when this slot can never hold a plan up — it is absent from
+   * `openSlotsInOrder`, so the app considers onboarding finished whether or
+   * not it was ever answered.
+   *
+   * THE BUG THIS EXISTS FOR. The catalog is introduced to the model as "the
+   * answers you need", and `required` was the only qualifier on it. Four
+   * slots (cookingTime, includeSnacks, favoriteCuisines, breakfastStyle) are
+   * deliberately demoted so they cannot delay anyone, and nothing said so.
+   * So the model, having recorded the last answer that DID block, reached for
+   * the next unanswered catalog entry and asked about cooking time in the
+   * same turn it called complete_onboarding — and Ashley got a question and a
+   * Generate button side by side. `required: false` did not cover it: age and
+   * injuries are also not required, and both must still be asked.
+   */
+  neverBlocks: boolean
 }
 
 /**
@@ -977,6 +990,7 @@ export function buildSlotCatalog(values: OnboardingSlotValues = initialSlotValue
       question: s.question,
       control: s.control,
       required: isSlotRequired(s, values),
+      neverBlocks: NEVER_BLOCKING_SLOTS.includes(s.key),
       values: offeredOptionsFor(s)?.map(o => ({ value: String(o.value), label: o.label })),
       min: s.min,
       max: s.max,

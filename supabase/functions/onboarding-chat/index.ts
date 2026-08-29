@@ -157,9 +157,16 @@ function describeCatalog(catalog: SlotCatalogEntry[]): string {
     .map((s) => {
       const vals = s.values ? ` values: [${s.values.map((v) => v.value).join(", ")}]` : "";
       const bounds = s.min != null ? ` bounds: ${s.min}-${s.max}` : "";
+      // BONUS is not a softer "optional". age and injuries are optional and
+      // must still be asked; a bonus slot is one the app has decided can
+      // never delay anyone, so it is absent from STILL UNKNOWN and cannot be
+      // the reason the conversation continues. Without this marker the model
+      // read the whole catalog as "answers you need" and asked a bonus
+      // question in the same turn it finished — see the BONUS SLOTS rule.
+      const grade = s.required ? ", required" : s.neverBlocks ? ", BONUS" : "";
       // The trailing text is the app's own label for this answer — included
       // so the model knows what the slot MEANS, explicitly not as a script.
-      return `- ${s.key} (${s.control}${s.required ? ", required" : ""}):${vals}${bounds} — means: "${s.question}"`;
+      return `- ${s.key} (${s.control}${grade}):${vals}${bounds} — means: "${s.question}"`;
     })
     .join("\n");
 }
@@ -233,6 +240,10 @@ ${describeCatalog(catalog)}
 
 ALREADY ANSWERED (never re-ask these — and refer back to them; that's what makes it feel like they're being listened to):
 ${filledLines || "- nothing yet"}
+
+BONUS SLOTS (marked BONUS above) — cookingTime, includeSnacks, favoriteCuisines and breakfastStyle shape the meal plan a little, and the app has decided none of them is worth holding someone at the door for. They are NOT in STILL UNKNOWN and they never will be. Raise one only if the conversation genuinely goes there ("I get in late and cook from scratch" → cookingTime, obviously). Never reach for one just because it is unanswered.
+
+FINISHING AND ASKING ARE MUTUALLY EXCLUSIVE. When STILL UNKNOWN is empty you are done — and that includes the turn whose own set_slot calls empty it, which is the case that went wrong. MEASURED LIVE: she typed "Marmite", you recorded it (the last blocking answer), and in the same turn you called complete_onboarding AND asked "how much time do you want to spend cooking?". The app opened the review, so she got a question and a Generate My Plan button side by side and could not tell whether she was finished. If you are calling complete_onboarding, your reply text is a one-line warm recap and contains NO question — bonus or otherwise. If you genuinely still need something, do not call complete_onboarding.
 
 STILL UNKNOWN — ${remaining.join(", ") || "none — wrap up"}
 This is a checklist for YOU, never a route to march. It is written in the app's own asking order — which is a considered order, not an arbitrary one — but reading it top to bottom is still the one thing that makes this feel like a form. Pick whatever comes next naturally from what they just said. Follow the thread of the conversation: if they mention their job, ask about their week; if they mention an old injury, go there. Answers can arrive in ANY order, including ones you never asked for — take them, tick them off, and never re-ask something already answered. When what you already know makes a question matter, say WHY in a short clause ("since you've only got three days, session length decides a lot — how long can you usually stay?"). The only ordering rule: don't leave required things until they're bored.

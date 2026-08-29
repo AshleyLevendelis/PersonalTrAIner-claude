@@ -31,6 +31,7 @@ import {
   type SlotDef,
 } from '@/lib/onboarding-slots'
 import { measureParserFor } from '@/lib/body-units'
+import { closeOutOpenQuestions, COMPLETE_MESSAGE } from '@/lib/onboarding-completion'
 import {
   loadOnboardingDraft,
   saveOnboardingDraft,
@@ -126,7 +127,6 @@ function toDraftMessages(messages: ChatMsg[]): DraftMessage[] {
       ({ role, content, slotCard, slotCardResolved, slotCardEditing, asksSlot }))
 }
 
-const COMPLETE_MESSAGE = "That's everything I need. Here's what I've got — have a look, and if it's right I'll build your plan."
 
 function displayValueFor(def: SlotDef, values: OnboardingSlotValues): string {
   const v = values[def.key]
@@ -1033,6 +1033,29 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
       }
       if (Array.isArray(result.actions) && result.actions.length > 0) {
         executeActions(responseWs, result.actions, trimmed)
+      }
+      // NEVER A LIVE QUESTION BESIDE THE GENERATE BUTTON.
+      //
+      // Ashley photographed the coach asking "how much time do you want to
+      // spend cooking?" directly above a Generate My Plan button, with no way
+      // to tell whether she was finished. Both halves were behaving as
+      // written: she had just answered dislikedFoods (the last slot that can
+      // block), so complete_onboarding was legitimately accepted and the
+      // review opened — while the model, reading the catalog as "the answers
+      // you need", spent its reply text on an unanswered bonus slot.
+      //
+      // The prompt now forbids finishing and asking in one turn, and the
+      // catalog marks bonus slots so there is nothing left to reach for. This
+      // is the half that does not depend on the model complying. Once the
+      // review is open the app HAS everything, so a question is not merely
+      // untidy — it is untrue, and the app's own line replaces it.
+      //
+      // Runs after executeActions, not inside the complete_onboarding branch:
+      // actions arrive in whatever order the model emitted them, so a
+      // present_slot AFTER complete_onboarding would have slipped past a
+      // check made mid-loop. Here the turn is fully assembled.
+      if (responseWs.openReview) {
+        responseWs.newMessages = closeOutOpenQuestions(responseWs.newMessages)
       }
       // Dead-air guard: a turn of bare tool calls (receipts only, no text,
       // no chip card, review not opening) would stall the conversation —

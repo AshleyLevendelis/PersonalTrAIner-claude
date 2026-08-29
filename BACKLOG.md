@@ -2,6 +2,14 @@
 
 Newest first. One line each.
 
+- [x] **A QUESTION AND A GENERATE BUTTON, SIDE BY SIDE.** Ashley: *"the questions should be finished by the time the generate plan button appears."* The coach asked *"how much time do you want to spend cooking?"* directly above **Generate My Plan**, so there was no way to tell whether onboarding was over. **Neither half was misbehaving** — that is why it needed a gate, not just a fix. She had answered `dislikedFoods`, the last slot that can block, so `complete_onboarding` was correctly accepted and the review correctly opened; the model meanwhile spent its reply text on `cookingTime`.
+
+- [x] THE CAUSE WAS A CATALOG THAT OVERSTATED ITSELF. The slot catalog is introduced to the model as *"the answers you need"*, and `required` was its only qualifier — but `required: false` does not mean *skippable*: **age and injuries are optional and must still be asked**. Four slots (`cookingTime`, `includeSnacks`, `favoriteCuisines`, `breakfastStyle`) were long ago demoted so they can never delay anyone, and **nothing told the model that**. They now carry `neverBlocks`, render as `BONUS`, and the prompt states that finishing and asking are mutually exclusive — naming the measured incident and the same-turn case that actually fired.
+
+- [x] AND A DETERMINISTIC HALF, because a prompt is advisory. `closeOutOpenQuestions` runs once the review opens and strips every question from that turn — the trailing one becomes the app's own closing line, a second is dropped rather than repeating it, and any chip card offered alongside is removed. **Ashley's ruling was the timing, not the slots**: the coach may still raise cooking time mid-conversation, never once the essentials are done. `test:no-question-beside-generate`, **six mutations biting** — including one proving the gate catches the sweep existing but never being called.
+
+- [ ] **NEEDS `npm run deploy:functions:prod -- onboarding-chat`** for the catalog marker and the prompt rule. The client sweep ships with the Vercel push and is the half that holds regardless.
+
 - [x] **FEET AND STONE ARE ACCEPTED NOW, AND THE APP SAYS WHAT IT STORED.** Ashley's ruling. `5'10` → **178cm**, `13st 2` → **83.5kg**, with the receipt reading `(from 5'10")` — because a silent conversion is only safe if the result is visible next to what was typed, while it can still be corrected. Formats: `178`, `178cm`, `1.78m`, `5'10"`, `5ft10`, `5 foot 10`, `70in`; `87kg`, `180lb`, `13st`, `13 stone 2`.
 
 - [x] A CONVERSION IS ONLY EVER APPLIED WHEN THE INPUT NAMES ITS UNIT. A bare `70` stays 70 and fails the 100–250 bound exactly as before — guessing whether it meant centimetres or inches would be **the same offence as the `100, 150` lift mix-up this session started with**, one field over. `5'13"` and `13st 15lb` are refused rather than silently rolled into `6'1"` and `14st 1lb`.
