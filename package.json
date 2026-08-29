@@ -89,6 +89,8 @@
     "test:coach-sees-ingredients": "tsx scripts/test-coach-sees-ingredients.ts",
     "test:food-dislike-is-a-ban": "tsx scripts/test-food-dislike-is-a-ban.ts",
     "test:audit-fixes": "tsx scripts/test-audit-fixes.ts",
+    "test:field-contrast": "tsx scripts/test-field-contrast.ts",
+    "test:home-field": "tsx scripts/test-home-field.ts",
     "test:activity-streak": "tsx scripts/test-activity-streak.ts",
     "test:starting-out": "tsx scripts/test-starting-out.ts",
     "test:tempo-prescription": "tsx scripts/test-tempo-prescription.ts",

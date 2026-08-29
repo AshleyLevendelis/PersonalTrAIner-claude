@@ -2,6 +2,28 @@
 
 Newest first. One line each.
 
+- [x] **HANDOFF v2 — THE COLOUR FIELD. Pass A begun: foundation + Home.** A full-bleed accent band at the top of any tab that owns a daily fact. Home, Nutrition and Exercise get one; **Tools does not, and the absence is the point** — it makes the ownership rule visible.
+
+- [x] **THE HANDOFF'S FIELD COLOUR DOES NOT WORK ON THIS APP, AND I MEASURED THAT BEFORE BUILDING.** It specifies `--field = --primary-2` with an ink alpha ladder *"measured, not guessed"*. Measured across all **15** theme × accent grounds this app can render: **11 cannot carry that ladder with ANY ink**, black or white included — worst 3.90:1 solid. The ladder was measured on mint, which is unusually forgiving; most other grounds are mid-lightness saturated colours where nothing sits readably on top. Same trap as the Daylight accent that warned about itself.
+
+- [x] **ASHLEY'S RULING: auto-adjust per theme.** `--field` is now the **same hue at the nearest lightness** that clears solid ≥7:1, .88 ≥5.5:1, .78 ≥4.5:1. Every one of the 15 solved. **Mint, lime and amber move by 0**, so the reference design renders exactly as drawn on the default theme; the largest shift is 13 points of lightness. A deviation from §7's *"no new value"* — flagged because it is one.
+
+- [x] THE LADDER IS NOW **CONSTANTS**, per §7, in `field-ink.ts` — and `test:field-contrast` re-measures all 15 grounds rather than trusting the arithmetic that produced them, because *"every contrast failure this design went through came from a hand-picked alpha"* is exactly a claim that should not be taken on trust.
+
+- [x] **HOME'S FIELD IS DERIVED, NOT WRITTEN.** `buildHomeField` returns rows and `count: rows.length` — the handoff's *"the count is derived from the list, never hardcoded"* is enforced by there being no way to pass one in. **Water is ring-only** because it has a tile further down the page, which is why the count is 2 and not 3. A rest day with everything logged gives a genuine empty state, never *"0 things left"*.
+
+- [x] AND IT RESPECTS THE ABSENCE DOCTRINE: a trainee who declined a body metric gets **no protein row and no protein arc**, rather than a row reading "of 0 g".
+
+- [x] **A CHECK OF MINE WAS BROKEN BY ITS OWN COMMENT AGAIN**, caught by the gate within a minute: `Field.tsx`'s doc says *"there is deliberately no `variant="none"`"*, which satisfied a check searching the raw file for that literal. Comments stripped. Fifth instance of this shape this session.
+
+- [x] Two new gates, **five mutations bite** — including one that reverts the field to the handoff's own `--primary-2` and one that makes water a row. `npm run build`, `tsc -b`, and dashboard/tab-ownership/appearance/app-tour all pass.
+
+- [ ] **PASS A IS NOT FINISHED: Nutrition and Exercise still have no field.** Nutrition needs the five-ring meter inline at 130px with P/C/F/W letters; Exercise needs its week strip moved into the field. Both specified in §3 and §4.
+
+- [ ] **PASS B (timer states) AND PASS C (Daylight + token cleanup) NOT STARTED.** The handoff says the three passes must not be combined.
+
+- [ ] **FOUND WHILE DOING THE TOKENS, FOR PASS B:** the handoff's own red state fails its own ladder — `--destructive` #FF5C7A with ink #40000E measures **5.77 solid and 4.06 at .78**, against required 7 and 4.5. Amber (resting) is fine at 8.72/5.24. The red ground needs the same auto-adjust treatment when Pass B builds it.
+
 - [x] **COMPREHENSIVE AUDIT, AND ALL FIVE FINDINGS FIXED.** Ashley: *"cover all angles, no stone unturned."* Method that found them: list every exported function with **no production caller** — 86, mostly benign, and every one of the real defects came out of that list. **Four of the five were the same shape**: something written, shown back to the user, and read by nothing. Three of my first four probes were wrong (bad accessors, a non-existent exercise name) and returned false all-clears; fixed the probes before trusting a single result.
 
 - [x] **A MEAL SWAP COULD SERVE BACK A FOOD YOU HAD JUST BANNED** — the worst of the five. The pool is frozen at generation time and the swap path had **no dislike or dietary check of any kind**. Measured on Ashley's own case: ban almond butter, ask to swap breakfast, get **"Almond Butter Oats"**. Now filtered before rotation, and **both** channels are checked — a stated dislike and an allergy tagged into `dietary_preferences` by `detectAllergenTags` arrive by different routes and never overlap, so checking dislikes alone would have left the allergen half open. Both matchers are the app's existing ones; a named request cannot override a restriction; an emptied pool offers new options instead of dead-ending.

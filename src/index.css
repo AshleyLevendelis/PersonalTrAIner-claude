@@ -124,6 +124,8 @@
   --grain-rgb: 245, 243, 255;
   --theme-primary: #5BE9C2;
   --theme-primary-2: #3ED3AA;
+  --theme-field: #3ED3AA;
+  --theme-field-ink: #08211A;
   --theme-glow-rgb: 91, 233, 194;
   /* The hero's ambient wash, as a token because it is the one value that has
    * to change on a light canvas — Dashboard.tsx used to hardcode the rgba. */
@@ -158,6 +160,8 @@
   --grain-rgb: 247, 239, 231;
   --theme-primary: #FF8A3D;
   --theme-primary-2: #E85F14;
+  --theme-field: #EF844A;
+  --theme-field-ink: #260F03;
   --theme-glow-rgb: 255, 138, 61;
 }
 
@@ -190,6 +194,8 @@
    * separates it. */
   --theme-primary: #C6F24E;
   --theme-primary-2: #8FBE1F;
+  --theme-field: #8FBE1F;
+  --theme-field-ink: #1A2306;
   --theme-glow-rgb: 198, 242, 78;
 }
 
@@ -220,6 +226,8 @@
   --grain-rgb: 241, 240, 245;
   --theme-primary: #B49BFF;
   --theme-primary-2: #7C5AE0;
+  --theme-field: #572BD7;
+  --theme-field-ink: #F6F5F9;
   --theme-glow-rgb: 155, 125, 245;
 }
 
@@ -261,6 +269,8 @@
    * depth instead of going flat. */
   --theme-primary: #008C72;
   --theme-primary-2: #00705B;
+  --theme-field: #00614F;
+  --theme-field-ink: #E7FDF9;
   --theme-glow-rgb: 0, 140, 114;
   /* .14, not .20: the same violet that reads as depth over a dark canvas
    * reads as a stain over paper. */
@@ -279,11 +289,11 @@
  * reason: #00A88A measured 2.74:1 on paper, so choosing the Mint chip on a
  * light canvas re-created the warning the theme fix had just cleared. Same
  * colour, same failure, one value apart. */
-[data-accent="mint"]   { --accent-bright: #5BE9C2; --accent-deep: #3ED3AA; --accent-dark: #008C72; --theme-glow-rgb: 91, 233, 194; }
-[data-accent="coral"]  { --accent-bright: #FF7A6B; --accent-deep: #E8493A; --accent-dark: #D1362A; --theme-glow-rgb: 255, 122, 107; }
-[data-accent="violet"] { --accent-bright: #B49BFF; --accent-deep: #7C5AE0; --accent-dark: #6541C8; --theme-glow-rgb: 155, 125, 245; }
-[data-accent="sky"]    { --accent-bright: #6FB7FF; --accent-deep: #2E7FE0; --accent-dark: #1D6FD0; --theme-glow-rgb: 111, 183, 255; }
-[data-accent="lime"]   { --accent-bright: #C6F24E; --accent-deep: #8FBE1F; --accent-dark: #5F8A00; --theme-glow-rgb: 198, 242, 78; }
+[data-accent="mint"]   { --accent-bright: #5BE9C2; --accent-deep: #3ED3AA; --accent-dark: #008C72; --theme-glow-rgb: 91, 233, 194;  --accent-field-deep: #3ED3AA; --accent-field-ink-deep: #08211A; --accent-field-dark: #00614F; --accent-field-ink-dark: #E7FDF9;}
+[data-accent="coral"]  { --accent-bright: #FF7A6B; --accent-deep: #E8493A; --accent-dark: #D1362A; --theme-glow-rgb: 255, 122, 107;  --accent-field-deep: #EF7E73; --accent-field-ink-deep: #250704; --accent-field-dark: #9C281F; --accent-field-ink-dark: #FCF3F2;}
+[data-accent="violet"] { --accent-bright: #B49BFF; --accent-deep: #7C5AE0; --accent-dark: #6541C8; --theme-glow-rgb: 155, 125, 245;  --accent-field-deep: #572BD7; --accent-field-ink-deep: #F6F5F9; --accent-field-dark: #5C37C0; --accent-field-ink-dark: #F6F5F9;}
+[data-accent="sky"]    { --accent-bright: #6FB7FF; --accent-deep: #2E7FE0; --accent-dark: #1D6FD0; --theme-glow-rgb: 111, 183, 255;  --accent-field-deep: #68A2E9; --accent-field-ink-deep: #051324; --accent-field-dark: #16549D; --accent-field-ink-dark: #F5F7F9;}
+[data-accent="lime"]   { --accent-bright: #C6F24E; --accent-deep: #8FBE1F; --accent-dark: #5F8A00; --theme-glow-rgb: 198, 242, 78;  --accent-field-deep: #8FBE1F; --accent-field-ink-deep: #1A2306; --accent-field-dark: #415F00; --accent-field-ink-dark: #F6FDE7;}
 
 /* ONE rule pair, keyed off the canvas being light — not one rule per theme x
  * accent. A light theme added later inherits the dark-step behaviour for
@@ -291,10 +301,14 @@
 [data-accent]:not([data-accent="theme"]) {
   --theme-primary: var(--accent-bright);
   --theme-primary-2: var(--accent-deep);
+  --theme-field: var(--accent-field-deep);
+  --theme-field-ink: var(--accent-field-ink-deep);
 }
 [data-canvas="light"][data-accent]:not([data-accent="theme"]) {
   --theme-primary: var(--accent-dark);
   --theme-primary-2: var(--accent-dark);
+  --theme-field: var(--accent-field-dark);
+  --theme-field-ink: var(--accent-field-ink-dark);
 }
 
 /* Resolves the accent axis (theme default or override) into the tokens the
@@ -304,6 +318,16 @@
 :root {
   --primary: var(--theme-primary);
   --primary-2: var(--theme-primary-2);
+  /* THE FIELD (handoff v2 §1). Deliberately NOT `--primary-2` itself, which
+   * the handoff proposed: measured across all 15 theme x accent grounds, 11
+   * could not carry the handoff's own ink ladder with ANY ink, black or white
+   * included — the ladder was measured on mint, which is unusually forgiving.
+   * Ashley's ruling, 30 Aug 2026: auto-adjust per theme. Each value below is
+   * the SAME HUE at the nearest lightness that clears solid >= 7:1, .88 >=
+   * 5.5:1 and .78 >= 4.5:1, so mint, lime and amber are unchanged (dL 0) and
+   * the reference design renders exactly as drawn on the default theme. */
+  --field: var(--theme-field);
+  --field-ink: var(--theme-field-ink);
   --primary-foreground: #08281F;
   --ring: var(--theme-primary);
   --chart-1: var(--theme-primary);
