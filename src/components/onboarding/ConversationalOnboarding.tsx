@@ -1331,7 +1331,31 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
       m => (m.slotCard && !m.slotCardResolved) || (m.asksSlot && !confirmed.has(m.asksSlot)),
     )
     const key = asked?.slotCard && !asked.slotCardResolved ? asked.slotCard : asked?.asksSlot
-    if (key) return getSlotDef(key as SlotKey)?.inputHint ?? 'Say anything…'
+    if (key) {
+      // A GROUPED CARD ASKS THREE THINGS, so naming one of them is wrong —
+      // and the first member is the likeliest to be the one already filled in.
+      // Reported live: age/height/weight on screen with 37 already entered,
+      // and the box read "Your age…".
+      //
+      // Name what is still OUTSTANDING, in the card's own order. Once two of
+      // the three are in, the hint narrows with them; when the last one is
+      // filled the card resolves and this branch stops running.
+      const group = numericGroupFor(key as SlotKey)
+      if (group.length > 1) {
+        const outstanding = group.filter(k => {
+          const v = values[k]
+          return v === null || v === undefined || v === ''
+        })
+        const names = (outstanding.length > 0 ? outstanding : group)
+          .map(k => getSlotDef(k)?.shortLabel?.toLowerCase())
+          .filter(Boolean) as string[]
+        if (names.length > 1) {
+          return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}…`
+        }
+        if (names.length === 1) return getSlotDef(outstanding[0] ?? group[0])?.inputHint ?? 'Say anything…'
+      }
+      return getSlotDef(key as SlotKey)?.inputHint ?? 'Say anything…'
+    }
 
     // THE FALLBACK IS A GUESS, SO IT MUST NOT OVERRIDE A QUESTION ON SCREEN.
     //

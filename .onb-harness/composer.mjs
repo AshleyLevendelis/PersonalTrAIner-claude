@@ -38,7 +38,15 @@ const CASES = [
   // ...and when that same question DOES carry its card, the composer names it.
   // All three lift slots shipped with no inputHint at all, so even a correctly
   // identified slot fell through to the neutral text.
-  ['liftcard', 'the squat question, with its card',        'Your squat, in kg…'],
+  // The lift trio is a grouped card too, so this expectation MOVED when the
+  // group fix landed: naming only the squat under a card showing three boxes
+  // was the same defect one screen over. The hint names all three, and
+  // narrows as they are filled in.
+  ['liftcard', 'the squat question, with its card',        'squat, bench and deadlift…'],
+  // A grouped card asks three things at once, so naming one is wrong — and
+  // the first member is the likeliest to be the one already answered. Live
+  // report: age already filled in at 37, box still reading "Your age…".
+  ['bodygroup', 'age/height/weight, with age already given', 'height and weight…'],
 ]
 let bad = 0
 for (const [state, what, expected] of CASES) {

@@ -2,6 +2,10 @@
 
 Newest first. One line each.
 
+- [x] **THE COMPOSER SAID "YOUR AGE…" UNDER A CARD ASKING THREE THINGS — WITH THE AGE ALREADY FILLED IN.** A grouped numeric card (age / height / weight) put its FIRST member's hint in the box, and the first member is the likeliest to be the one already answered. The hint now names what is still **outstanding**, in the card's own order, and narrows as boxes are filled: with 37 entered it reads *"height and weight…"*.
+
+- [x] AND THE FIX GENERALISED, which the harness caught rather than me: the squat/bench/deadlift card is a group too, so its fixture's expected *"Your squat, in kg…"* **moved** to *"squat, bench and deadlift…"*. Naming one lift under a card showing three boxes was the same defect one screen over. Six composer states are now covered.
+
 - [x] **A LIFT WEIGHT IS NEVER AGAIN ASSIGNED TO A LIFT THE USER DIDN'T NAME.** Ashley's ruling: *"show all three labelled boxes."* **And that card already existed** — `NUMERIC_GROUPS` has had the squat/bench/deadlift trio all along and `SlotNumericCard` renders the group with every field labelled. This was never a missing feature; the model bypassed it, asked in prose, and recorded two `set_slot` calls off the order **its own sentence** happened to use.
 
 - [x] **WHICH LAYER DID IT WAS ESTABLISHED BEFORE ANYTHING WAS WRITTEN**, as the plan required: the model. The client's typed-answer path (`tryExactLabelMatch`) has branches for `single` and `multi` only — it never records a typed numeric at all, so it could not have been the one. The last three bugs in this flow were each a different layer than the obvious one, which is why this is checked rather than assumed.

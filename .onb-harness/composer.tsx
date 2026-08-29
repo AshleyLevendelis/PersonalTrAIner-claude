@@ -90,6 +90,22 @@ if (state === 'liftcard') {
   )))
 }
 
+if (state === 'bodygroup') {
+  // ASHLEY'S CASE: the age/height/weight card on screen with age already
+  // filled, and the composer reading "Your age…" — naming one of three
+  // questions, and the one she had already answered.
+  localStorage.setItem('fitplan_onboarding_draft', JSON.stringify(draft(
+    [
+      { role: 'assistant', content: 'Hi — what should I call you?', asksSlot: 'displayName' },
+      { role: 'user', content: 'Ashley' },
+      { role: 'assistant', content: 'Could you tell me your age, height, and what you weigh right now?', slotCard: 'age' },
+    ],
+    { displayName: 'Ashley', fitnessGoal: 'fat_loss', trainingExperience: 'intermediate',
+      activityLevel: 'moderate', equipment: 'full_gym', injuries: [], age: 37 },
+    ['displayName', 'fitnessGoal', 'trainingExperience', 'activityLevel', 'equipment', 'injuries'],
+  )))
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode><ConversationalOnboarding onComplete={() => {}} /></StrictMode>,
 )
