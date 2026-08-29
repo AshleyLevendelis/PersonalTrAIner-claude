@@ -19,6 +19,7 @@ import { getGoalPolicy, restrictPhaseSequence, resolveConditioningFrequency, REC
 import { dayAnchorExercise, anchorScore } from './session-derive'
 import { isStartingOut, applyStartingOut, startingOutMinutes } from './starting-out'
 import { getDurationBudgetSeconds, getSessionMinimumSeconds, getSessionMaximumSeconds, getSteadyStateSeconds, DEFAULT_CARRY_DISTANCE_M, estimateDaySeconds, estimateSlotsSeconds, parseRestSeconds, SESSION_OVERHEAD_SECONDS } from './session-duration'
+import { implausibleLifts } from './lift-plausibility'
 
 // ---------------------------------------------------------------------------
 // Track definitions (unchanged — used for day-level focus selection)
@@ -5264,11 +5265,27 @@ export function generateMesocycle(
   // opted out of calibration. Absent (undefined) rather than an
   // all-undefined object so prescribeLoad's family lookup has nothing to
   // match against for a trainee who skipped the question entirely.
+  // A STATED LIFT THE APP'S OWN TABLE CALLS IMPOSSIBLE ANCHORS NOTHING.
+  //
+  // Ashley's live profile carried bench 150 kg and deadlift 150 kg at 86 kg
+  // bodyweight: the bench is 116% of the advanced one-rep-max estimate, and
+  // the pair's 1.00x ratio is below the 1.67x minimum anywhere in the
+  // standards table. Her Exercise tab then read "Trap Bar Deadlift 152.5 kg
+  // — YOU TOLD US", ramping to 140 x 1, off a number she never gave.
+  //
+  // Her ruling: ask once, and never skip calibration on it. This is the half
+  // that does not depend on anyone answering the question. A flagged lift is
+  // still RECORDED and still shown — it simply cannot be the thing a day-one
+  // load is built from, because "start conservative and prove it over a week"
+  // and "anchor to it immediately" are the same decision twice.
+  const flaggedLifts = new Set(
+    implausibleLifts(profile, resolveBodyBasis(profile).assumed).map(f => f.lift),
+  )
   const knownWorkingWeights: KnownWorkingWeights | undefined = profile.skip_calibration_week
     ? {
-        squat: profile.known_squat_kg,
-        bench: profile.known_bench_kg,
-        deadlift: profile.known_deadlift_kg,
+        squat: flaggedLifts.has('squat') ? undefined : profile.known_squat_kg,
+        bench: flaggedLifts.has('bench') ? undefined : profile.known_bench_kg,
+        deadlift: flaggedLifts.has('deadlift') ? undefined : profile.known_deadlift_kg,
       }
     : undefined
 
@@ -5297,8 +5314,16 @@ export function generateMesocycle(
   // for everything else.
   const hasAnyKnownLift = [profile.known_squat_kg, profile.known_bench_kg, profile.known_deadlift_kg]
     .some(v => v != null && v > 0)
+  //  3. A NUMBER NOBODY COULD LIFT IS NOT EVIDENCE OF ANYTHING. Skipping
+  //     calibration is the app saying "we already know what you can do";
+  //     it must not say that on the strength of a figure its own standards
+  //     table rules out. Calibration week already says the right thing —
+  //     "loads start deliberately light... next week builds from YOUR
+  //     numbers" — which is precisely proving the weight rather than
+  //     assuming it.
   const canSkipCalibration = profile.skip_calibration_week === true
     && hasAnyKnownLift
+    && flaggedLifts.size === 0
     && !resolveBodyBasis(profile).assumed
 
   // Persists ACROSS blocks (unlike blockBaselineKg/blockWeek3Kg below, which

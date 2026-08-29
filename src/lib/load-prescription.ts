@@ -214,9 +214,12 @@ export interface LoadPrescriptionOptions {
 // press and row are sized relative to bench using their typical published
 // ratios (OHP ~60-65% of bench, row ~100-110% of bench at every tier).
 
-type LiftFamily = 'squat' | 'bench' | 'deadlift' | 'overhead' | 'row'
+export type LiftFamily = 'squat' | 'bench' | 'deadlift' | 'overhead' | 'row'
 
-const STRENGTH_STANDARDS_1RM_PER_BW: Record<LiftFamily, Record<'male' | 'female', Record<TrainingExperience, number>>> = {
+// EXPORTED so lift-plausibility.ts can judge a stated weight against the
+// same numbers the app prescribes from. A second copy of the figures that
+// decide whether a load is safe is exactly the drift this repo keeps finding.
+export const STRENGTH_STANDARDS_1RM_PER_BW: Record<LiftFamily, Record<'male' | 'female', Record<TrainingExperience, number>>> = {
   squat: {
     male: { beginner: 0.75, novice: 1.25, intermediate: 1.5, advanced: 2.0 },
     female: { beginner: 0.5, novice: 0.75, intermediate: 1.0, advanced: 1.5 },

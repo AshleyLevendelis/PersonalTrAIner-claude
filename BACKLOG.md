@@ -2,6 +2,18 @@
 
 Newest first. One line each.
 
+- [x] **"I DIDN'T TELL THE APP I COULD DEADLIFT 150 BUT IT CLAIMS I DID."** Ashley's live Exercise tab: **Trap Bar Deadlift 152.5 kg**, labelled **YOU TOLD US**, ramping to 140×1. Her second point is the one that matters: *"150kg is a lot and someone who hasn't specified or shown they can lift that could injure themselves."*
+
+- [x] **THE APP ALREADY HELD THE PROOF AND NEVER LOOKED.** Against its own `STRENGTH_STANDARDS_1RM_PER_BW` for an 86 kg advanced male: the stated **bench of 150 kg is 116% of the advanced one-rep-max estimate** (129 kg) — a *working* weight above what it thinks a top-tier lifter's single max is. And the stated **deadlift ÷ bench = 1.00×** when the **lowest ratio anywhere in that table**, either sex and every level, is **1.67×**. The only validation was `isNumberIn(1, 500)`. The app has a typo guard for what weights you *own* and none for what you can *lift*.
+
+- [x] AND THE NUMBER WAS THEN TRUSTED ABOVE EVERYTHING: `load_source: 'known_weight'` outranks the estimate, skips the starting-light hedge, and skips the calibration week. **One unverified figure became a confident heavy prescription on day one.**
+
+- [x] **ASHLEY'S RULING: "ask once, and never skip calibration on it."** Both halves built. `lift-plausibility.ts` **imports** the standards rather than restating them, so the rule and the prescription can never disagree. Two narrow rules — above the **top-tier** 1RM ceiling (skipped when bodyweight was assumed, since a ratio against a guess proves nothing), and a deadlift under 1.25× bench (needs no bodyweight, so it still protects someone who declined it). **Zero false positives** across five plausible lifters including a bench specialist at 1.4×.
+
+- [x] MEASURED: her week-1 heaviest drops from a **152.5 kg deadlift to a 97.5 kg squat**, and `isCalibrationWeek` flips **true** — while a trustworthy profile still skips calibration and still anchors at 137.5 kg, so the feature is not broken for everyone. Five mutations bite; reverting the calibration guard reproduces **exactly 152.5 kg**, the number from the screenshot.
+
+- [ ] **STILL NO WAY TO CORRECT A STATED LIFT IN THE PROFILE SCREEN.** There is no squat/bench/deadlift row in `ProfileScreen.tsx` — the only route is chat, via `record_goal` → `fact-compiler.ts` → the same columns. Indirect and undiscoverable. Ashley's own profile still carries bench 150 / deadlift 150 until she tells the coach otherwise.
+
 - [x] **"THE TOUR NEEDS UPDATING SINCE WE CHANGED THE APP LAYOUT."** Ashley, and she was right — `test:app-tour` had just passed. §1–2 check every spotlight **target** still exists, which they did; nothing could see that three steps were describing a screen that no longer existed. *"Calories and water"* over a row of **three** tiles; a Nutrition step that never mentioned the steps row that had just moved onto it; a settings step listing everything behind the gear except the two things the gear had gained.
 
 - [x] AND ONE LOOSE END I HAD TIED BADLY MYSELF: the welcome step now promises the tour is *"in the settings menu"*, and the settings step never pointed at it. A promise that dead-ends one screen later.

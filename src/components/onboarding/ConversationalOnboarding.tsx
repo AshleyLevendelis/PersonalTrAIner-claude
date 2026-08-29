@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
-import { Dumbbell, Send, Check } from 'lucide-react'
+import { Dumbbell, Send, Check, AlertTriangle } from 'lucide-react'
 import { useViewportInset } from '@/hooks/useViewportInset'
 import { keepsComposerFocus, refocusComposer } from '@/lib/composer-focus'
 import { SlotChipsCard } from './SlotChipsCard'
@@ -31,6 +31,7 @@ import {
   type SlotDef,
 } from '@/lib/onboarding-slots'
 import { measureParserFor } from '@/lib/body-units'
+import { implausibleLifts } from '@/lib/lift-plausibility'
 import { closeOutOpenQuestions, closeOutTrailingQuestions, COMPLETE_MESSAGE } from '@/lib/onboarding-completion'
 import {
   loadOnboardingDraft,
@@ -597,6 +598,16 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
   // effect below already uses; the escape hatch existing on a looser one was
   // the gap.
   const readyToGenerate = missing.length === 0 && unconfirmedOptional.length === 0
+
+  // Judged from the SAME module the plan generator uses, so the warning and
+  // the behaviour can never disagree about which number is suspect.
+  const liftWarnings = useMemo(() => implausibleLifts({
+    known_squat_kg: values.knownSquatKg ? Number(values.knownSquatKg) : undefined,
+    known_bench_kg: values.knownBenchKg ? Number(values.knownBenchKg) : undefined,
+    known_deadlift_kg: values.knownDeadliftKg ? Number(values.knownDeadliftKg) : undefined,
+    weight_kg: values.weightKg ? Number(values.weightKg) : undefined,
+    gender: values.gender === 'female' ? 'female' : 'male',
+  } as Parameters<typeof implausibleLifts>[0]), [values])
 
   // Persist the draft after every state change — this is the whole
   // "a dropped connection never loses answered slots" guarantee.
@@ -1637,6 +1648,30 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
                   </button>
                 ))}
                 <p className="text-[11px] text-muted-foreground/70 pt-1">Tap anything above to change it.</p>
+                {/* ASK ONCE, HERE, because here is the only place both rules
+                    can run. The lift questions come BEFORE bodyweight in the
+                    slot order, so at the moment someone types a squat number
+                    the app cannot yet judge it against their body — only the
+                    deadlift/bench pair rule works that early. By the review
+                    everything is known and nothing has been generated yet, so
+                    this is the last cheap moment to catch a wrong number.
+
+                    A QUESTION, NOT A BLOCK. Ashley's ruling was "ask once,
+                    and never skip calibration on it" — the app says what
+                    looks wrong and leaves the answer to the person, because
+                    some people genuinely are strong. The half that does not
+                    depend on their answer is in exercise-plan.ts, where a
+                    flagged lift stops anchoring a day-one load. */}
+                {liftWarnings.map(w => (
+                  <p
+                    key={w.lift}
+                    className="mt-1 flex items-start gap-1.5 rounded-md p-2 text-[11.5px] leading-[1.45]"
+                    style={{ background: 'rgba(var(--role-warn-rgb, 245 158 11) / .10)', color: 'var(--role-warn-text)' }}
+                  >
+                    <AlertTriangle className="mt-[1px] size-3.5 shrink-0" aria-hidden />
+                    <span>{w.message} Tap it above if that&apos;s not right — if it is, I&apos;ll start you lighter for a week and build from what you actually log.</span>
+                  </p>
+                ))}
                 {/* Ashley's ruling: ask once more, at the point it matters.
                     Weight is optional and stays optional — this is not a
                     second attempt at the same question in the conversation,
