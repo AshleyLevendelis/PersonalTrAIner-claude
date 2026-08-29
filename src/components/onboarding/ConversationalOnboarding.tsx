@@ -479,6 +479,25 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
   const [reviewOpen, setReviewOpen] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  // A SLOW TURN MUST LOOK SLOW, NOT DEAD.
+  //
+  // Reported live: "the app got completely stuck and I had to refresh." It
+  // was not stuck — the request has a 45s abort and a finally that always
+  // clears busy — but three animated dots that never change for
+  // three-quarters of a minute is indistinguishable from frozen, and
+  // refreshing is the rational response. The bug is the absence of a signal,
+  // not the wait.
+  //
+  // Deliberately NOT a shorter abort: cutting off a reply that was going to
+  // arrive at 20s trades a cosmetic problem for a real one. This says the
+  // wait is known about, and leaves the reply time to land.
+  const [slowTurn, setSlowTurn] = useState(false)
+  useEffect(() => {
+    if (!busy) { setSlowTurn(false); return }
+    const t = window.setTimeout(() => setSlowTurn(true), 9000)
+    return () => window.clearTimeout(t)
+  }, [busy])
   const contentRef = useRef<HTMLDivElement>(null)
   const isNearBottomRef = useRef(true)
   // Read here rather than down in the render block: BOTH the composer offset
@@ -1423,10 +1442,17 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
               rendering glitch more than as someone typing. No label in v2 —
               the header already says who is composing. */}
           {busy && (
-            <div className="ob-message-in flex items-center gap-1.5 py-1.5" aria-live="polite" aria-label="Coach is typing">
-              <span className="ds-typing-dot" />
-              <span className="ds-typing-dot [animation-delay:150ms]" />
-              <span className="ds-typing-dot [animation-delay:300ms]" />
+            <div className="ob-message-in flex flex-col gap-1.5 py-1.5" aria-live="polite" aria-label="Coach is typing">
+              <div className="flex items-center gap-1.5">
+                <span className="ds-typing-dot" />
+                <span className="ds-typing-dot [animation-delay:150ms]" />
+                <span className="ds-typing-dot [animation-delay:300ms]" />
+              </div>
+              {slowTurn && (
+                <p className="text-[12.5px] text-muted-foreground">
+                  Still thinking — this one's taking a moment. Nothing's lost; it'll land or I'll say so.
+                </p>
+              )}
             </div>
           )}
 

@@ -2,6 +2,12 @@
 
 Newest first. One line each.
 
+- [x] **"THE APP GOT COMPLETELY STUCK AND I HAD TO REFRESH" — IT WASN'T STUCK, IT LOOKED STUCK.** The request has a 45s abort and a `finally` that always clears `busy`, so it does recover. But **three animated dots that never change for three-quarters of a minute is indistinguishable from frozen**, and refreshing is the rational response. After 9 seconds the coach now says so: *"Still thinking — this one's taking a moment. Nothing's lost; it'll land or I'll say so."* Deliberately NOT a shorter abort — cutting off a reply that would have arrived at 20s trades a cosmetic problem for a real one.
+
+- [ ] **`100, 150` BECAME SQUAT 100 AND BENCH 150, INFERRED FROM THE ORDER THE QUESTION LISTED THEM IN.** Ashley asked for exactly this to be a confirmation, not a presumption. It matters more than it looks: those slots set `load_source: 'known_weight'`, the app's **most-trusted** basis — it outranks the estimate and skips the starting-light hedge — so a mis-assigned number produces a **confident** wrong load for a whole mesocycle. Same family as "NEVER INVENT REPS OR SETS", one level up: those rules govern **values**, and here the **assignment of a value to a field** was invented, which no rule covers. `docs/PLAN-two-numbers-three-lifts.md` — **plan only, not built**; load prescription gets a plan first, and which layer decided it (model or client) is genuinely unknown.
+
+- [ ] **NO QUICK-REPLY BUTTONS ON THE QUESTION AFTER A CORRECTION** — most likely not a bug at all: the "call `present_slot` EVERY time you ask a question that has a set list of answers" rule is already in the repo (`17431e1`), so this is very probably the **undeployed `onboarding-chat`**. Needs `npm run deploy:functions:prod -- onboarding-chat` confirmed before spending anything on it.
+
 - [x] **THE COMPOSER SAID "WHICH DAYS?" UNDER A QUESTION ABOUT SQUAT, BENCH AND DEADLIFT** — the third time this placeholder has described a different question than the one on screen. **Two independent faults**, either of which alone would have caused it.
 
 - [x] **FAULT 1: SIX OF 27 SLOTS SHIPPED WITH NO `inputHint` AT ALL** — all three lift questions, plus snacks, cuisines and breakfast. So even when the app worked out correctly which question was live, it had nothing to show and fell through. Now every slot has one, and a gate fails if a seventh appears (or if a hint grows too long for the box).
