@@ -312,5 +312,52 @@ console.log('\nTHE SET STOP\'S PROMISE HAS TO BE KEEPABLE')
   }
 }
 
+// ---------------------------------------------------------------------------
+console.log('\n6. Skip actually skips')
+// ---------------------------------------------------------------------------
+// Ashley, with two screenshots: "the skip tour doesn't actually skip it. the
+// tour is still at the bottom of the app and won't go away until you fully
+// complete it." She was exactly right about the mechanism. skip() wrote the
+// current step number and moved to 'skipped', which renders the "Resume the
+// tour" pill — and the ONLY route to 'done' was reaching the last of ten
+// stops, so nothing a person could do would dismiss it. The pill also sat
+// over the weigh-in row, covering the number.
+//
+// Her ruling was Skip-means-gone WITH a way back, because at the time nothing
+// anywhere in the app could restart a finished tour: one mistaken tap would
+// have destroyed it permanently. The two halves are gated together here for
+// that reason — the permanence is only safe while the Replay row exists.
+{
+  const tour = readFileSync(join(ROOT, 'src/components/AppTour.tsx'), 'utf8')
+  const menu = readFileSync(join(ROOT, 'src/components/ProfileMenu.tsx'), 'utf8')
+  const app = readFileSync(join(ROOT, 'src/App.tsx'), 'utf8')
+
+  const skipBody = /const skip = useCallback\(\(\) => \{([\s\S]*?)\}, \[/.exec(tour)?.[1] ?? ''
+  check('skip() has a body to read (sanity check on this check)', skipBody.trim().length > 0)
+  check('skip() ends the tour rather than parking it',
+    /finish\(\)/.test(skipBody), skipBody.trim().slice(0, 120))
+  check("...and never re-enters the 'skipped' state that renders the pill",
+    !/status:\s*'skipped'/.test(skipBody), skipBody.trim().slice(0, 120))
+
+  // The pill is deliberately KEPT for the one case it is right for: the app
+  // was closed part-way through, so offering to pick up where you left off is
+  // useful rather than nagging. Asserting it still exists stops a later
+  // "simplify" from deleting the resume path along with the skip bug.
+  // Matched as the actual render BRANCH, not as two strings that happen to be
+  // in the file. The first version of this check grepped for `status ===
+  // 'skipped'` and `ResumePill` separately, and stayed green when the whole
+  // branch was replaced by `if (false)` — because that comparison also
+  // appears in the stepIndex expression higher up. A check that survives the
+  // deletion of the thing it checks is worth nothing.
+  check('the resume pill still exists for an interrupted tour',
+    /if \(state\.status === 'skipped'\) \{[\s\S]{0,400}?<ResumePill/.test(tour))
+
+  check('a replay trigger is exported', /export function replayAppTour/.test(tour))
+  check('...the tour listens for it', /TOUR_REPLAY_EVENT/.test(tour) && /addEventListener\(TOUR_REPLAY_EVENT/.test(tour))
+  check('...the settings menu offers it', /Replay the tour/.test(menu) && /onReplayTour/.test(menu))
+  check('...and App.tsx wires the two together',
+    /onReplayTour=\{replayAppTour\}/.test(app) && /replayAppTour/.test(app))
+}
+
 console.log(failures === 0 ? '\nAll app-tour checks passed.\n' : `\n${failures} FAILED\n`)
 process.exit(failures === 0 ? 0 : 1)

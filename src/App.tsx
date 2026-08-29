@@ -19,7 +19,7 @@ import { BottomDock } from '@/components/BottomDock'
 import { ActiveSessionProvider } from '@/hooks/useActiveSession'
 import { TimersProvider } from '@/hooks/useTimers'
 import { BottomDockHeightProvider } from '@/hooks/useBottomDockHeight'
-import { AppTour } from '@/components/AppTour'
+import { AppTour, replayAppTour } from '@/components/AppTour'
 import { isDevAccount, getSessionDateContext, getAppNow } from '@/lib/dev-clock'
 import { useAppRoute, tabHash, isTab, isKnownTabHash, type Tab } from '@/lib/app-route'
 
@@ -1858,6 +1858,7 @@ function App() {
       >
         <ProfileMenu
           onOpenProfile={() => { setProfileInfoSection(undefined); setProfileInfoOpen(true) }}
+          onReplayTour={replayAppTour}
           onNewPlan={() => {
             setActiveAdaptationsForReset([])
             if (profile?.id) getActiveAdaptations(profile.id).then(setActiveAdaptationsForReset).catch(console.error)

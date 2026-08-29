@@ -52,6 +52,20 @@ export type TourStatus =
 
 interface Rect { top: number; left: number; width: number; height: number }
 
+/**
+ * Ask the running AppTour to start again from the beginning.
+ *
+ * Exported for the "Replay the tour" row in the settings menu, which is what
+ * makes Skip safe to be permanent: before this existed, nothing anywhere in
+ * the app could restart a tour once it was over, so "gone for good" would
+ * have meant one mistaken tap lost it forever.
+ */
+export function replayAppTour(): void {
+  window.dispatchEvent(new CustomEvent(TOUR_REPLAY_EVENT))
+}
+
+const TOUR_REPLAY_EVENT = 'fitplan:replay-tour'
+
 function storageKey(profileId: string): string {
   return `fitplan_tour_v1:${profileId}`
 }
@@ -225,11 +239,37 @@ export function AppTour({ profileId, armed }: { profileId?: string; armed: boole
     setState({ status: 'idle' })
   }, [profileId])
 
+  // SKIP MEANS SKIP. It used to write the current step and drop to 'skipped',
+  // which renders the "Resume the tour" pill — and since the ONLY route to
+  // 'done' was finishing all ten stops, the pill could not be dismissed at
+  // all. Ashley: "the skip tour doesn't actually skip it. the tour is still
+  // at the bottom of the app and won't go away until you fully complete it."
+  // It also sat over the weigh-in row, hiding the number.
+  //
+  // So Skip now does exactly what finishing does. Her ruling was Skip-means-
+  // gone WITH a way back, so this is paired with the Replay row in the
+  // settings menu (replayAppTour below) — without that, an accidental tap
+  // would have destroyed the tour permanently, since nothing in the app
+  // could restart it.
   const skip = useCallback(() => {
     if (state.status !== 'active') return
-    if (profileId) writeStored(profileId, String(state.step))
-    setState({ status: 'skipped', step: state.step })
-  }, [state, profileId])
+    finish()
+  }, [state, finish])
+
+  // The way back, for someone who skipped and changed their mind. A window
+  // event rather than props threaded down from App.tsx: the trigger is a row
+  // in the settings dropdown, three components away, and the tour already
+  // owns all of its own state. Deliberately re-arms from step 0 and clears
+  // the set-stop exemption, so a replay is the tour as first shown.
+  useEffect(() => {
+    const onReplay = () => {
+      if (!profileId) return
+      setSetStepSkipped(false)
+      enterStep(0)
+    }
+    window.addEventListener(TOUR_REPLAY_EVENT, onReplay)
+    return () => window.removeEventListener(TOUR_REPLAY_EVENT, onReplay)
+  }, [profileId, enterStep])
 
   const back = useCallback(() => {
     if (state.status !== 'active' || state.step === 0) return

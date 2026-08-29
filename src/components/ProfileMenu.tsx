@@ -5,7 +5,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Settings, RotateCcw, UserCircle } from 'lucide-react'
+import { Settings, RotateCcw, UserCircle, Compass } from 'lucide-react'
 
 // ---------------------------------------------------------------------------
 // Houses the housekeeping actions ("Profile", "New Plan") the header used to
@@ -19,9 +19,11 @@ import { Settings, RotateCcw, UserCircle } from 'lucide-react'
 export function ProfileMenu({
   onOpenProfile,
   onNewPlan,
+  onReplayTour,
 }: {
   onOpenProfile: () => void
   onNewPlan: () => void
+  onReplayTour: () => void
 }) {
   return (
     <DropdownMenu>
@@ -34,6 +36,15 @@ export function ProfileMenu({
         <DropdownMenuItem onClick={onOpenProfile}>
           <UserCircle className="size-3.5" />
           Profile
+        </DropdownMenuItem>
+        {/* The way back from Skip. The tour's Skip button is permanent now —
+            it used to only pause, leaving an undismissable "Resume the tour"
+            pill over the weigh-in row — and permanence is only safe because
+            this row exists. Below New Plan: replaying a tour is rarer than
+            either action above it. */}
+        <DropdownMenuItem onClick={onReplayTour}>
+          <Compass className="size-3.5" />
+          Replay the tour
         </DropdownMenuItem>
         <DropdownMenuItem onClick={onNewPlan}>
           <RotateCcw className="size-3.5" />
