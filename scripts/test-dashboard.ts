@@ -347,10 +347,20 @@ async function main() {
     check('the settings row exists and shows the derived band as its placeholder',
       /Daily steps/.test(prof2) && /derivedStepsTargetFor\(profile\.activity_level\)/.test(prof2))
 
-    const dash = fs.readFileSync('src/components/Dashboard.tsx', 'utf-8')
-    check('the steps row draws a ring', /stepsTargetFor\(profile\)/.test(dash))
+    // THE RING MOVED TABS, and this check moved with it. Steps now live on
+    // Nutrition (VISION-ARCHITECTURE §5.1a: "Nutrition owns what you
+    // accumulate through the day"), because the step target is derived from
+    // the same activity_level as the calorie target and two numbers from one
+    // input belong on one screen. Home keeps a read-only tile with a bar —
+    // rings are Nutrition's language, so a Home tile can never be mistaken
+    // for the surface that owns the number.
+    const nutri = fs.readFileSync('src/components/NutritionDisplay.tsx', 'utf-8')
+    check('the steps row draws a ring, on Nutrition', /stepsTargetFor\(profile\)/.test(nutri))
     check('...using the same ring geometry as the calorie tile',
-      /CALORIE_TILE_RING_CIRC \* Math\.min\(1, steps\.steps \/ stepsTarget\)/.test(dash))
+      /STEP_RING_CIRC \* Math\.min\(1, stepTarget > 0 \? todaySteps \/ stepTarget : 0\)/.test(nutri))
+    const dash = fs.readFileSync('src/components/Dashboard.tsx', 'utf-8')
+    check('...and Home shows steps as a read-only tile, no ring of its own',
+      /steps\?\.steps/.test(dash) && !/STEP_RING_CIRC|CALORIE_TILE_RING_CIRC/.test(dash))
   }
 
   console.log('\n[3b] the home screen asks for ONE weight, not two')
@@ -438,10 +448,20 @@ async function main() {
     check('the ring reads the profile, so it cannot miss the override',
       /stepsTargetFor\(profile: Pick<UserProfile/.test(stSrc))
 
-    const dash = fs.readFileSync('src/components/Dashboard.tsx', 'utf-8')
-    check('the steps row draws a ring', /stepsTargetFor\(profile\)/.test(dash))
+    // THE RING MOVED TABS, and this check moved with it. Steps now live on
+    // Nutrition (VISION-ARCHITECTURE §5.1a: "Nutrition owns what you
+    // accumulate through the day"), because the step target is derived from
+    // the same activity_level as the calorie target and two numbers from one
+    // input belong on one screen. Home keeps a read-only tile with a bar —
+    // rings are Nutrition's language, so a Home tile can never be mistaken
+    // for the surface that owns the number.
+    const nutri = fs.readFileSync('src/components/NutritionDisplay.tsx', 'utf-8')
+    check('the steps row draws a ring, on Nutrition', /stepsTargetFor\(profile\)/.test(nutri))
     check('...using the same ring geometry as the calorie tile',
-      /CALORIE_TILE_RING_CIRC \* Math\.min\(1, steps\.steps \/ stepsTarget\)/.test(dash))
+      /STEP_RING_CIRC \* Math\.min\(1, stepTarget > 0 \? todaySteps \/ stepTarget : 0\)/.test(nutri))
+    const dash = fs.readFileSync('src/components/Dashboard.tsx', 'utf-8')
+    check('...and Home shows steps as a read-only tile, no ring of its own',
+      /steps\?\.steps/.test(dash) && !/STEP_RING_CIRC|CALORIE_TILE_RING_CIRC/.test(dash))
   }
 
   console.log('\n[4] dashboard-data.ts: calories-in is a direct passthrough from getTodayLedger, never recomputed')
@@ -604,9 +624,17 @@ async function main() {
     check('the module does not claim to measure readiness or recovery',
       !/export .*(readiness|recovery)/i.test(src))
     const dash = fs.readFileSync('src/components/Dashboard.tsx', 'utf-8')
-    check('the dashboard labels it Consistency', /Consistency:/.test(dash))
-    check('...and shows what it counted, not a bare number',
-      /components\.map\(c => `\$\{c\.done\}\/\$\{c\.outOf\}/.test(dash))
+    // THE LINE MOVED ONTO THE HEADING and the words changed with it. The
+    // standalone "Consistency: 86% · 2/2 sessions · 5/7 protein" sat BELOW
+    // the numbers it summarised and repeated fractions the week strip already
+    // showed. It now rides on the Progress heading as "86% consistent" —
+    // still named, still not called readiness, still not a bare figure.
+    check('the dashboard still NAMES it consistency, not readiness',
+      /<\/span> consistent/.test(dash) && !/readiness/i.test(dash))
+    check('...on the Progress heading rather than a line of its own',
+      /ds-label">Progress<[\s\S]{0,400}?consistency\.percent/.test(dash))
+    check('...and the unlabelled fractions beside it are gone',
+      !/components\.map\(c => `\$\{c\.done\}\/\$\{c\.outOf\}/.test(dash))
 
     // Averaging RATIOS, not raw counts: 3/3 sessions and 1/6 protein days
     // must not let the sessions drown out the protein.

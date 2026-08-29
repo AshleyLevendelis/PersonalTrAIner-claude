@@ -486,7 +486,47 @@ Existing profiles: nothing is re-asked. Their answers backfill as `source='onboa
 
 ### 5.1 The rule
 
-**The Dashboard owns no number.** Every element derives from an existing source. It is read-only by construction; every affordance either navigates or hands control to the action framework.
+**The Dashboard owns no number, with exactly one exception.** Every element
+derives from an existing source; every affordance either navigates or hands
+control to the action framework.
+
+The exception is the **weigh-in**, and it is deliberate rather than a leak.
+Home is where the weight trend lives — which is *why* the weigh-in moved here
+— and a log input that sits anywhere other than beside the chart it feeds
+makes someone cross a tab to answer a question the screen just asked them.
+Everything else on Home reads and points.
+
+### 5.1a Cross-tab ownership
+
+One fact, one owner. The rule, in full:
+
+> **Nutrition** owns what you accumulate through the day — food, water, steps.
+> **Exercise** owns the program and the session.
+> **Tools** owns nothing.
+> **Home** owns the progress facts — weight, streak, consistency, PRs — and
+> points at everything else.
+
+Two consequences worth stating, because both were violations before this rule
+existed:
+
+- **Steps live on Nutrition.** `steps-target.ts` had already decided it: the
+  step target is derived from the same `activity_level` that drives the
+  calorie target's PAL multipliers, deliberately, "so the step target and the
+  calorie target never disagree about who is more active". Two numbers from
+  one input belong on one tab. Home keeps a read-only tile.
+- **The week strip exists on two tabs as two different things.** Home's is the
+  RECORD — 26px cells, no handler, no cursor, no focus ring. Exercise's is the
+  NAVIGATOR — 38px, tap a day to peek, plus the phase line and the program
+  link. Same glyph vocabulary in both (`src/lib/week-glyphs.ts` is the single
+  source, so a mark cannot come to mean two things); only affordance and scale
+  differ.
+
+**Where two tabs show one fact, they must derive it from one value.** Home and
+Exercise read the same session status; Home's `whatsLeftLine` and Nutrition's
+rings read the same ledger. This is the failure class `PROJECT-LOG.md` already
+records as previously fixed — "Dashboard and the Exercise tab disagree
+about…" — and the rule above is what stops it recurring by construction rather
+than by vigilance.
 
 | Element | Derived from | Notes |
 |---|---|---|

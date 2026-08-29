@@ -1,4 +1,6 @@
 import type { TrainingWeekDay } from '@/hooks/useTrainingWeek'
+// Shared with Home's read-only strip — see src/lib/week-glyphs.ts.
+import { GLYPH, STATE_LABEL, SHORT_DAY } from '@/lib/week-glyphs'
 
 // ---------------------------------------------------------------------------
 // LAYOUT-DESIGN.md §1.3 — seven cells, always, today boxed. Marks only, no
@@ -7,44 +9,6 @@ import type { TrainingWeekDay } from '@/hooks/useTrainingWeek'
 // today's own boxed cell is a no-op (there's nothing to peek at — you're
 // already looking at it).
 // ---------------------------------------------------------------------------
-
-const GLYPH: Record<TrainingWeekDay['state'], string> = {
-  done: '✓',
-  partial: '◐',
-  due: '●',
-  missed: '○',
-  rest: '–',
-  recovery: '~',
-  // A training day that fell before this plan existed. Deliberately the
-  // faintest mark in the set: it is not a rest day (the plan didn't choose
-  // it) and emphatically not a missed one (nothing was ever owed).
-  before_plan: '·',
-  // Lifting deliberately swapped for something else, announced at the time.
-  // Distinct from every mark above because it is the only one that says work
-  // HAPPENED but not this work — an arrow, not an absence.
-  swapped: '⇄',
-}
-
-/**
- * Spoken form of each state. The aria-label used to interpolate the raw
- * state name, so a screen reader announced "partial" and would now announce
- * "before_plan" — identifiers, not English.
- */
-const STATE_LABEL: Record<TrainingWeekDay['state'], string> = {
-  done: 'done',
-  partial: 'partly done',
-  due: 'due',
-  missed: 'missed',
-  rest: 'rest day',
-  recovery: 'active recovery',
-  before_plan: 'before your plan started',
-  swapped: 'swapped for another activity',
-}
-
-const SHORT_DAY: Record<string, string> = {
-  Monday: 'Mon', Tuesday: 'Tue', Wednesday: 'Wed', Thursday: 'Thu',
-  Friday: 'Fri', Saturday: 'Sat', Sunday: 'Sun',
-}
 
 export function WeekStrip({
   days,

@@ -9,7 +9,6 @@
 // ---------------------------------------------------------------------------
 
 import { useEffect, useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -167,13 +166,16 @@ export function GroceryList({ profileId, mealPools, targets, softLikedFoods, ref
     .filter(g => g.items.length > 0)
 
   return (
-    <Card className="border-border/50 bg-card overflow-hidden">
-      <CardHeader className="pb-3">
+    // BORDERLESS, like every other surface in the app. Tools was the last tab
+    // still on bordered shadcn Cards, which is what made it read as somebody
+    // else's screen rather than this one's.
+    <div>
+      <div className="pb-3">
         <div className="flex items-center justify-between gap-2">
-          <CardTitle className="flex items-center gap-2 text-base font-semibold">
+          <span className="flex items-center gap-2 text-base font-semibold">
             <ShoppingCart className="size-4 text-primary" />
             Grocery List
-          </CardTitle>
+          </span>
           {items.some(i => i.checked) && (
             <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={handleClearChecked}>
               Clear checked
@@ -197,11 +199,16 @@ export function GroceryList({ profileId, mealPools, targets, softLikedFoods, ref
             Regenerate ({horizonDays}d)
           </Button>
         </div>
+        {/* WHERE THE LIST CAME FROM. Without this, a list that appears
+            pre-populated reads as guesswork rather than as your own meals. */}
+        <p className="pt-1 text-[11px] leading-[1.45] text-muted-foreground">
+          Built from the meals on your Nutrition tab, minus what you&apos;ve checked off.
+        </p>
         <p className="pt-1 text-xs text-muted-foreground/70">
           Ingredients are filtered, not verified. Check labels if you have an allergy.
         </p>
-      </CardHeader>
-      <CardContent className="space-y-3">
+      </div>
+      <div className="space-y-3">
         <div className="flex items-center gap-1.5">
           <Input
             value={quickAdd}
@@ -282,7 +289,7 @@ export function GroceryList({ profileId, mealPools, targets, softLikedFoods, ref
             ))}
           </div>
         ))}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }

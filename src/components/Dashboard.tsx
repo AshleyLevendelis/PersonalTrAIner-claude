@@ -12,9 +12,13 @@ import { getAppNow } from '@/lib/dev-clock'
 import { tabHash } from '@/lib/app-route'
 import { loadDashboardData, type DashboardData } from '@/lib/dashboard-data'
 import { stepsTargetFor } from '@/lib/steps-target'
-import { getStepsForDate, logStepsManual, type DailyStepsRow } from '@/lib/steps-store'
+import { getStepsForDate, type DailyStepsRow } from '@/lib/steps-store'
 import { WeighInCard } from '@/components/WeighInCard'
 import type { UserProfile, MacroTargets, WorkoutDay, MesocycleWeek } from '@/lib/types'
+import { MessageCircle } from 'lucide-react'
+import { useTrainingWeek } from '@/hooks/useTrainingWeek'
+import { HomeWeekStrip, HomeWeekStripLabels } from '@/components/HomeWeekStrip'
+import { setChatPrefill } from '@/lib/chat-prefill-store'
 
 interface DashboardProps {
   profile: UserProfile
@@ -31,8 +35,6 @@ interface DashboardProps {
 // section is now two read-only tiles that deep-link into Nutrition; the
 // small calorie-tile ring below is a single indicator ring, not the
 // multi-macro meter that used to live here.
-const CALORIE_TILE_RING_R = 14
-const CALORIE_TILE_RING_CIRC = 2 * Math.PI * CALORIE_TILE_RING_R
 
 /** Weigh-in trend — hand-authored SVG, no charting library (matches this
  * app's existing convention for the ring meters). x is spread evenly across
@@ -90,6 +92,57 @@ function WeighInTrendChart({ series, goalKg }: { series: { date: string; kg: num
 }
 
 
+/**
+ * "Barbell Bench Press" -> "bench". The glance line has one line of a phone's
+ * width to carry three facts; the catalogue's full names are written for a
+ * plan screen where there is room for them.
+ *
+ * Falls back to the full name rather than a truncation, so an unrecognised
+ * lift reads as itself instead of as "Kettlebell...".
+ */
+const LIFT_SHORT_NAME: Record<string, string> = {
+  'Barbell Bench Press': 'bench',
+  'Barbell Squats': 'squat',
+  'Deadlifts': 'deadlift',
+  'Trap Bar Deadlift': 'trap bar',
+  'Overhead Press': 'overhead press',
+  'Romanian Deadlift': 'RDL',
+  'Front Squat': 'front squat',
+  'Incline Barbell Press': 'incline bench',
+}
+function shortLiftName(name: string): string {
+  return LIFT_SHORT_NAME[name] ?? name.toLowerCase()
+}
+
+/**
+ * The two reply chips under a coach tip, keyed to the rule that produced it.
+ *
+ * Keyed rather than generic because "What changed?" under a protein-streak
+ * line asks something different from the same words under a stalled-lift
+ * line, and a chip that opens a conversation the coach cannot continue is
+ * worse than no chip. A rule with no sensible follow-up returns none, which
+ * is the expected outcome for most of them.
+ */
+const TIP_CHIPS: Record<string, { label: string; prefill: string }[]> = {
+  lift_progress: [
+    { label: 'What changed?', prefill: 'What changed to move that lift?' },
+    { label: 'Adjust today', prefill: "Can we adjust today's session?" },
+  ],
+  protein_streak: [
+    { label: 'What changed?', prefill: 'What have I been doing differently with protein?' },
+  ],
+  weight_trend: [
+    { label: 'What changed?', prefill: 'What is driving my weight trend right now?' },
+    { label: 'Adjust today', prefill: 'Should we adjust anything based on my weight trend?' },
+  ],
+  missed_sessions: [
+    { label: 'Adjust today', prefill: "I have missed some sessions - can we adjust the plan?" },
+  ],
+}
+function chipsForTip(key: string | null): { label: string; prefill: string }[] {
+  return key ? (TIP_CHIPS[key] ?? []) : []
+}
+
 export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreatedAt, onWeightLogged }: DashboardProps) {
   const stepsTarget = stepsTargetFor(profile)
   const activeSession = useActiveSession()
@@ -97,9 +150,10 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
   const [loading, setLoading] = useState(true)
 
   const [steps, setSteps] = useState<DailyStepsRow | null>(null)
-  const [stepsInput, setStepsInput] = useState('')
 
-  const [phaseExpanded, setPhaseExpanded] = useState(false)
+  // Home's copy of the week — the RECORD. Exercise's strip is the navigator
+  // and owns tap-to-peek; the two share only the glyph vocabulary.
+  const week = useTrainingWeek(profile.id, activeSession.date, exercisePlan ?? [], planCreatedAt)
 
   // Bumped after a weigh-in save (from WeighInCard here, or a goal-weight
   // set) so the effect below re-fetches — nothing else that changes when a
@@ -146,13 +200,53 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
     )
   }
 
-  const handleLogSteps = async () => {
-    const n = Number(stepsInput)
-    if (!profile.id || !Number.isFinite(n) || n < 0) return
-    const row = await logStepsManual(profile.id, activeSession.date, Math.round(n))
-    setSteps(row)
-    setStepsInput('')
+  // Steps are LOGGED on Nutrition now, not here. Home still reads the figure
+  // for its third tile — the read stays because the tile is a pointer, and a
+  // pointer with no number on it points at nothing.
+  // PROPOSAL 3, assembled here rather than inline so the three states read as
+  // one decision. Each part is dropped when its value is genuinely unknown
+  // rather than filled with a placeholder — an estimate we do not have is not
+  // "~0 min".
+  const glanceParts: string[] = []
+  if (data.session.status === 'in_progress') {
+    if (data.session.minutesLeft != null) glanceParts.push(`~${data.session.minutesLeft} min left`)
+    // DELIBERATE DEVIATION FROM THE HANDOFF. It specifies "bench 92.5 kg
+    // next"; the app knows the session's heaviest lift but NOT the running
+    // order, so "next" would be a claim it cannot support — the same class of
+    // invention as a fabricated weight. The number is shown without the word.
+    if (data.session.leadLift) glanceParts.push(`${shortLiftName(data.session.leadLift.name)} ${data.session.leadLift.kg} kg`)
+  } else {
+    glanceParts.push(`${data.session.exerciseCount} exercise${data.session.exerciseCount === 1 ? '' : 's'}`)
+    if (data.session.estimatedMinutes != null) glanceParts.push(`~${data.session.estimatedMinutes} min`)
+    if (data.session.leadLift) glanceParts.push(`${shortLiftName(data.session.leadLift.name)} from ${data.session.leadLift.kg} kg`)
   }
+  const sessionGlance = glanceParts.join(' · ')
+
+  const replyChips = chipsForTip(data.coachTipKey)
+
+  // Three tiles, one shape. Water is --chart-3 here exactly as it is on
+  // Nutrition: mint means "on track", and water is a fill, not a verdict.
+  const homeTiles: { value: string; label: string; sub: string; pct: number; tint?: string }[] = [
+    {
+      value: Math.round(data.caloriesEaten).toLocaleString(),
+      label: 'kcal',
+      sub: data.hasNutritionTargets ? `of ${Math.round(data.caloriesTarget).toLocaleString()}` : 'no target yet',
+      pct: data.hasNutritionTargets && data.caloriesTarget > 0 ? Math.min(1, data.caloriesEaten / data.caloriesTarget) : 0,
+    },
+    {
+      value: (data.waterMl / 1000).toFixed(1),
+      label: 'litres',
+      sub: `of ${(data.waterTargetMl / 1000).toFixed(1)}`,
+      pct: data.waterTargetMl > 0 ? Math.min(1, data.waterMl / data.waterTargetMl) : 0,
+      tint: 'var(--chart-3)',
+    },
+    {
+      value: (steps?.steps ?? 0).toLocaleString(),
+      label: 'steps',
+      sub: `of ${stepsTarget.toLocaleString()}`,
+      pct: stepsTarget > 0 ? Math.min(1, (steps?.steps ?? 0) / stepsTarget) : 0,
+    },
+  ]
 
   return (
     // Density pass 3a "Borderless": no cards. Sections separate by the
@@ -173,32 +267,47 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
       <div className="grain-overlay" aria-hidden />
 
       <div className="relative">
-        {/* 1. Day + streak — turn 4: streak is a number+label pair, not a
-            fire-emoji inline string. */}
-        <div className="flex items-start justify-between">
-          <span className="pt-1 ds-label">
-            {data.dayName}
-            {data.phase ? ` · Week ${data.phase.weekNumber} of ${data.phase.totalWeeks}` : ''}
-          </span>
-          <span className="flex flex-col items-end leading-none">
-            <span className={`text-[26px] font-bold tracking-[-.03em] ${data.streak > 0 ? 'text-primary glow-mint' : 'text-muted-foreground'}`}>
-              {data.streak}
-            </span>
-            <span className="mt-1 text-[9px] uppercase tracking-[.18em] text-muted-foreground">
-              day{data.streak === 1 ? '' : 's'} streak
-            </span>
+        {/* 1. DATE + STREAK. The day name only — the week number moved to the
+            strip label below, which is now the one place on Home it appears.
+            The streak is a chip rather than a 26px number over an 8.5px
+            label: at that size the label was unreadable and the number read
+            as the page's headline, which it is not. */}
+        <div className="flex items-start justify-between gap-3">
+          <span className="pt-1 ds-label">{data.dayName}</span>
+          <span
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1"
+            style={{ background: 'var(--surface-raised)' }}
+          >
+            <span aria-hidden className={`inline-block size-[5px] rounded-full ${data.streak > 0 ? 'bg-primary' : 'bg-[color:var(--text-dim)]'}`} />
+            <span className="tabular-mono text-[13px] font-semibold">{data.streak}</span>
+            <span className="text-[11px] text-muted-foreground">day{data.streak === 1 ? '' : 's'} streak</span>
           </span>
         </div>
 
-        {/* 2. Today's session — the hero. Borderless: it's the type scale, the
-            local glow blooms and the lit CTA that make this the focal unit. */}
-        {/* data-tour: the app tour spotlights this whole unit (focus + CTA +
-            tomorrow line) as "Home answers one question — what's next". */}
-        <div data-tour="hero" className="relative mt-4 pt-1">
+        {/* 2 + 3. WEEK STRIP, with a label above it. Seven glyphs as the first
+            thing on the page read as a date picker; naming them is what makes
+            them a record. This is Home's copy of the strip — read-only. The
+            interactive one lives on Exercise; see HomeWeekStrip. */}
+        {week.days.length > 0 && (
+          <div className="mt-4">
+            <p className="ds-label">
+              {data.phase ? `Week ${data.phase.weekNumber} of ${data.phase.totalWeeks} · ` : ''}
+              {week.sessionsDone} of {week.sessionsPlanned} session{week.sessionsPlanned === 1 ? '' : 's'} done
+            </p>
+            <div className="mt-2">
+              <HomeWeekStrip days={week.days} todayName={data.dayName} />
+              <HomeWeekStripLabels days={week.days} />
+            </div>
+          </div>
+        )}
+
+        {/* 4. HERO — focus, one glance line, CTA. No tomorrow line: Home
+            answers what is next TODAY, and tomorrow is on Exercise's strip. */}
+        <div data-tour="hero" className="relative mt-5 pt-1">
           <div
             aria-hidden
             className="pointer-events-none absolute -left-8 -top-10 size-[200px] rounded-full"
-            style={{ background: 'radial-gradient(circle, rgba(156,141,255,.30) 0%, rgba(156,141,255,0) 70%)' }}
+            style={{ background: 'radial-gradient(circle, var(--hero-wash) 0%, transparent 70%)' }}
           />
           {data.session.status === 'rest' ? (
             <div className="relative space-y-1">
@@ -210,13 +319,19 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
               <div>
                 <div className="flex items-baseline justify-between gap-3">
                   <span className="text-[25px] font-bold tracking-[-.02em] glow-text min-w-0 truncate">{data.session.focus}</span>
-                  <span className="shrink-0 text-[11px] text-muted-foreground">
-                    {data.session.status === 'not_started' ? 'Not started' : data.session.status === 'in_progress' ? `${data.session.setsLogged}/${data.session.setsPlanned} sets` : 'Done'}
-                  </span>
+                  {/* PROPOSAL 2 — the label goes in the NOT-STARTED case only,
+                      where the button already says it. It stays for the other
+                      two, because there it carries new information. */}
+                  {data.session.status !== 'not_started' && (
+                    <span className="shrink-0 text-[11px] text-muted-foreground">
+                      {data.session.status === 'in_progress' ? `${data.session.setsLogged} of ${data.session.setsPlanned} sets` : 'Done'}
+                    </span>
+                  )}
                 </div>
-                <p className="mt-1.5 text-[12.5px] text-muted-foreground truncate">
-                  {data.session.exerciseNames.slice(0, 3).join(' · ')}{data.session.exerciseNames.length > 3 ? ` · +${data.session.exerciseNames.length - 3} more` : ''}
-                </p>
+                {/* PROPOSAL 3 — the session at a glance, replacing three
+                    truncated names of six. Every figure was already in the
+                    plan; none of it was on screen. */}
+                <p className="mt-1.5 text-[12.5px] text-muted-foreground">{sessionGlance}</p>
               </div>
               {data.session.status !== 'done' && (
                 <Button
@@ -230,179 +345,61 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
               )}
             </div>
           )}
-          <p className="relative mt-2.5 text-xs text-muted-foreground">{data.tomorrowLabel}</p>
         </div>
 
-        {/* 3. Coach tip — AI voice. Borderless, the violet halo carries the tone. */}
-        {data.coachTip && (
+        {/* 5. COACH BUBBLE — the tip and what is still outstanding in ONE
+            block, because they are both the coach talking. The avatar does
+            the work the amber dot and the lightning emoji used to do
+            separately, and matches the avatar in chat so the voice is
+            recognisably the same one. */}
+        {(data.coachTip || data.whatsLeftLine) && (
           <div className="mt-5 flex items-start gap-2.5">
-            <span className="text-sm leading-[1.4] text-[color:var(--role-ai)] glow-violet">⚡</span>
-            <span className="text-[13px] leading-[1.5] text-[color:var(--role-ai-text)]">{data.coachTip}</span>
+            <span
+              aria-hidden
+              className="mt-[1px] flex size-[26px] shrink-0 items-center justify-center rounded-full"
+              style={{ background: 'linear-gradient(180deg, color-mix(in oklab, var(--primary) 84%, white), var(--primary-2))' }}
+            >
+              <MessageCircle className="size-3.5" style={{ color: 'var(--primary-foreground)' }} />
+            </span>
+            <div className="min-w-0 flex-1">
+              {data.coachTip && <p className="text-[14px] leading-[1.5]">{data.coachTip}</p>}
+              {data.whatsLeftLine && (
+                <p className={`text-[12.5px] leading-[1.5] text-[color:var(--role-warn-text)] ${data.coachTip ? 'mt-1' : ''}`}>
+                  {data.whatsLeftLine}
+                </p>
+              )}
+              {replyChips.length > 0 && (
+                <div className="mt-2.5 flex flex-wrap gap-2">
+                  {replyChips.map(chip => (
+                    <button
+                      key={chip.label}
+                      type="button"
+                      onClick={() => { setChatPrefill(chip.prefill); window.location.hash = tabHash('chat') }}
+                      className="inline-flex min-h-[34px] items-center rounded-full px-3 text-[12px]"
+                      style={{ background: 'var(--accent)' }}
+                    >
+                      {chip.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
-        {/* 4. Today — tab restructure: the ring meter and water logging move
-            to Nutrition (one owner per fact). What's left here is two
-            read-only tiles that deep-link into Nutrition — Home never
-            mutates nutrition state, it only shows where things stand and
-            hands off. */}
-        {/* data-tour wraps the LABEL and the tiles together — the tour's copy
-            is about the pair ("calories and water at a glance"), and a
-            spotlight that cut the label off would read as a mistake. */}
-        <div data-tour="tiles">
-        <p className="ds-label mt-8">Today</p>
-        <div className="mt-3.5 grid grid-cols-2 gap-2.5">
-          <button
-            type="button"
-            onClick={() => { window.location.hash = tabHash('nutrition') }}
-            className="flex flex-col items-start gap-2.5 rounded-2xl p-3.5 text-left"
-            style={{ background: 'var(--surface-raised)' }}
-          >
-            <svg width="34" height="34" viewBox="0 0 34 34" className="shrink-0">
-              <circle cx="17" cy="17" r={CALORIE_TILE_RING_R} fill="none" stroke="rgba(69,60,142,.9)" strokeWidth="4" />
-              {/* No ring at all without a target — a ring at 0% reads as "you
-                  have eaten nothing of your allowance", which is a claim we
-                  cannot make. */}
-              {data.hasNutritionTargets && (
-                <circle
-                  cx="17" cy="17" r={CALORIE_TILE_RING_R} fill="none" stroke="var(--primary)" strokeWidth="4" strokeLinecap="round"
-                  strokeDasharray={`${CALORIE_TILE_RING_CIRC * Math.min(1, data.caloriesTarget > 0 ? data.caloriesEaten / data.caloriesTarget : 0)} ${CALORIE_TILE_RING_CIRC}`}
-                  transform="rotate(-90 17 17)"
-                />
-              )}
-            </svg>
-            <div>
-              <p className="tabular-mono text-[19px] font-bold">{Math.round(data.caloriesEaten)}</p>
-              {/* "of 0 kcal" is the placeholder the absence doctrine forbids
-                  (MissingBodyMetricsNotice): a figure that looks deliberate
-                  and means nothing. Say what is missing instead. */}
-              <p className="text-[9px] uppercase tracking-[.14em] text-muted-foreground">
-                {data.hasNutritionTargets ? `of ${Math.round(data.caloriesTarget)} kcal` : 'kcal · no target yet'}
-              </p>
-            </div>
-            <span className="text-[11px] font-semibold text-primary">Nutrition ›</span>
-          </button>
-
-          <div
-            className="flex flex-col items-start gap-2.5 rounded-2xl p-3.5 text-left"
-            style={{ background: 'var(--surface-raised)' }}
-          >
-            <div>
-              <p className="tabular-mono text-[19px] font-bold">{data.waterMl} <span className="text-[13px] font-medium text-muted-foreground">ml</span></p>
-              <p className="text-[9px] uppercase tracking-[.14em] text-muted-foreground">of {data.waterTargetMl} water</p>
-            </div>
-            <div className="h-[2px] w-full rounded-full" style={{ background: 'var(--hairline)' }}>
-              <div className="h-[2px] rounded-full bg-primary glow-mint-box" style={{ width: `${data.waterTargetMl > 0 ? Math.min(100, (data.waterMl / data.waterTargetMl) * 100) : 0}%` }} />
-            </div>
-            <button type="button" onClick={() => { window.location.hash = tabHash('nutrition') }} className="hit-slop-44 text-[11px] font-semibold text-primary">Nutrition ›</button>
-          </div>
-        </div>
-        </div>
-
-        {/* Steps — unchanged; still logged here. */}
-        <div className="mt-5 flex flex-col">
-          <div className="flex items-baseline justify-between py-3" style={{ borderTop: '1px solid var(--hairline)' }}>
-            <span className="text-[13px] text-text-tertiary">Steps</span>
-            {steps ? (
-              /* A RING, matching the calorie tile — Ashley: "replace the plain
-                 text box/button for Steps with a visual progress bar or ring
-                 matching the calorie indicator style". Same radius, same
-                 stroke, same rotate(-90) start, so the two read as one system
-                 rather than two people's work.
-
-                 The target is DERIVED from the activity level already on file
-                 (steps-target.ts), exactly as the calorie target is derived
-                 from BMR and TDEE. It is not a new kind of claim for this app
-                 to make — it is the existing one applied to a second number. */
-              <div className="flex items-center gap-2">
-                <svg viewBox="0 0 34 34" className="size-[26px] shrink-0" aria-hidden>
-                  <circle cx="17" cy="17" r={CALORIE_TILE_RING_R} fill="none" stroke="var(--surface-raised)" strokeWidth="4" />
-                  <circle
-                    cx="17" cy="17" r={CALORIE_TILE_RING_R} fill="none" stroke="var(--primary)" strokeWidth="4" strokeLinecap="round"
-                    strokeDasharray={`${CALORIE_TILE_RING_CIRC * Math.min(1, steps.steps / stepsTarget)} ${CALORIE_TILE_RING_CIRC}`}
-                    transform="rotate(-90 17 17)"
-                  />
-                </svg>
-                <span className="tabular-mono text-[13px]">{steps.steps.toLocaleString()}</span>
-                <span className="text-[10px] uppercase tracking-[.12em] text-muted-foreground">
-                  of {stepsTarget.toLocaleString()}
-                </span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  placeholder="Steps"
-                  value={stepsInput}
-                  onChange={e => setStepsInput(e.target.value)}
-                  className="h-7 w-24 min-w-0 rounded-md bg-[color:var(--surface-raised)] px-2 text-xs"
-                />
-                <button className="shrink-0 text-xs font-semibold text-primary glow-mint" onClick={handleLogSteps}>Log</button>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Weigh-in — logging + history + trend graph all live here now
-            (moved from Nutrition's WeighInCard): a Fat Loss user tracking
-            progress looks at Home first, and the log input sits right next
-            to the trend it feeds instead of a plan-detail tab mirroring it
-            read-only. A goal weight, when set, draws as a line on the chart. */}
-        <div className="mt-5 pt-4" style={{ borderTop: '1px solid var(--hairline)' }}>
-          <div className="flex items-baseline justify-between">
-            <span className="text-[13px] text-text-tertiary">Weigh-in</span>
-            {data.weightSeries.length > 0 && (
-              <span className="text-[13px]">
-                <span className="tabular-mono font-semibold">{data.weightSeries[data.weightSeries.length - 1].kg.toFixed(1)} kg</span>
-                <span className="ml-1.5 text-muted-foreground">
-                  {data.weightSeries[data.weightSeries.length - 1].date === data.today ? 'today ✓' : data.weightSeries[data.weightSeries.length - 1].date}
-                </span>
-              </span>
-            )}
-          </div>
-          {data.weightSeries.length === 0 ? (
-            <p className="mt-3 text-xs text-muted-foreground">Log a weigh-in to see your trend here.</p>
-          ) : (
-            <>
-              <WeighInTrendChart series={data.weightSeries} goalKg={data.weightGoalKg} />
-              <div className="mt-1.5 flex items-baseline justify-between">
-                <span className="text-[10px] uppercase tracking-[.12em] text-muted-foreground">{data.weightSeries.length} weigh-in{data.weightSeries.length === 1 ? '' : 's'}</span>
-                {data.weightSeries.length > 1 && (
-                  <span className="text-[11px] font-semibold text-primary">
-                    {(() => {
-                      const delta = data.weightSeries[data.weightSeries.length - 1].kg - data.weightSeries[0].kg
-                      return `${delta > 0 ? '+' : ''}${delta.toFixed(1)} kg since week 1`
-                    })()}
-                  </span>
-                )}
-
-              </div>
-            </>
-          )}
-          {/* NO LINK HERE, and that is the point of the change rather than
-              an omission. Ashley asked to "collapse Set goal weight into a
-              setting modal, and keep only the quick weight logger visible to
-              reduce scrolling" — and measurement is what settled it: removing
-              the input row saved 44px, and a link back to it cost 24 of them,
-              so the page came out one pixel TALLER than it started (1289 ->
-              1290). The instruction was already the right answer.
-
-              Setting a goal weight lives in the profile screen's Goals
-              section, reachable from the gear, and the coach can set one in
-              chat. Two routes, neither of them a permanent row on the screen
-              someone opens every morning. */}
-          {profile.id && (
-            <div className="mt-3">
-              <WeighInCard profileId={profile.id} onWeightLogged={handleWeighInChanged} />
-            </div>
+        {/* 6. PROGRESS — the consistency figure rides on the heading rather
+            than sitting on its own line below the numbers it summarises. */}
+        <div className="mt-9 flex items-baseline justify-between gap-3">
+          <p className="ds-label">Progress</p>
+          {data.consistency && (
+            <span className="tabular-mono text-[11px] text-muted-foreground">
+              <span className="font-semibold text-primary">{data.consistency.percent}%</span> consistent
+            </span>
           )}
         </div>
-
-        {/* 5. Progress — the section rule is gone; the label does that work. */}
-        <p className="ds-label mt-9">Progress</p>
         {data.weightTrend ? (
           <div className="mt-3.5 flex flex-wrap items-baseline gap-x-2 gap-y-1">
-            <span className="ds-num-tile tabular-mono text-[#E4FCF4] glow-mint-lg">
+            <span className="ds-num-tile tabular-mono glow-mint-lg">
               {data.weightTrend.rollingAvgKg.toFixed(1)}<span className="text-[15px] font-medium text-muted-foreground [text-shadow:none]"> kg</span>
             </span>
             {data.weightTrend.ratePerWeekKg != null && (
@@ -412,11 +409,33 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
               </span>
             )}
             {data.weightTrend.sampleCount === 1 && (
-              <span className="text-[10px] text-muted-foreground/70">(1 weigh-in — trend firms up with more)</span>
+              <span className="text-[11px] text-muted-foreground/70">(1 weigh-in — trend firms up with more)</span>
             )}
           </div>
         ) : (
           <p className="mt-3.5 text-xs text-muted-foreground">Log a weigh-in to see your trend here.</p>
+        )}
+
+        {data.weightSeries.length > 0 && (
+          <>
+            <WeighInTrendChart series={data.weightSeries} goalKg={data.weightGoalKg} />
+            {/* PROPOSAL 7 — "6 weigh-ins" goes: the chart already shows six
+                dots. It STAYS at one, where the app has to admit the trend
+                is not real yet. */}
+            <div className="mt-1.5 flex items-baseline justify-between">
+              <span className="text-[11px] text-muted-foreground">
+                {data.weightSeries.length === 1 ? '1 weigh-in so far' : ''}
+              </span>
+              {data.weightSeries.length > 1 && (
+                <span className="text-[11px] font-semibold text-primary">
+                  {(() => {
+                    const delta = data.weightSeries[data.weightSeries.length - 1].kg - data.weightSeries[0].kg
+                    return `${delta > 0 ? '+' : ''}${delta.toFixed(1)} kg since week 1`
+                  })()}
+                </span>
+              )}
+            </div>
+          </>
         )}
 
         {data.recentPRs.length > 0 && (
@@ -430,50 +449,65 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
           </div>
         )}
 
-        <p className="mt-3 text-xs text-muted-foreground">Streak: {data.streak} day{data.streak === 1 ? '' : 's'} on plan</p>
-
-        {/* CONSISTENCY, NOT READINESS, and the components are shown for the
-            same reason the name is careful: a lone percentage invites being
-            read as a verdict on the person. Spelling out what it counted
-            keeps it a summary of things they did, which is all it is.
-
-            Absent entirely when nothing measurable has happened this plan
-            week — a 0% on a Monday with nothing scheduled yet would read as
-            "you have been terrible", which is the opposite of true. */}
-        {data.consistency && (
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-xs text-muted-foreground">Consistency:</span>
-            <span className="tabular-mono text-xs font-semibold text-primary">{data.consistency.percent}%</span>
-            <span className="text-[11px] text-muted-foreground">
-              {data.consistency.components.map(c => `${c.done}/${c.outOf} ${c.label}`).join(' · ')}
-            </span>
+        {/* 7. TODAY — three matching tiles, all of them POINTERS. One
+            behaviour, one link, no logging. The calorie ring left with the
+            logging: rings are Nutrition's language, so a tile can never be
+            mistaken for the surface that owns the number. */}
+        <div data-tour="tiles">
+          <div className="mt-8 flex items-baseline justify-between gap-3">
+            <p className="ds-label">Today</p>
+            <button
+              type="button"
+              onClick={() => { window.location.hash = tabHash('nutrition') }}
+              className="hit-slop-44 text-[11px] font-semibold text-primary"
+            >
+              Nutrition ›
+            </button>
           </div>
-        )}
-
-        {/* 6. What's left today — needs-you amber, marked by a pulsing dot
-            rather than a bordered banner. */}
-        {data.whatsLeftLine && (
-          <div className="mt-6 flex items-baseline gap-2">
-            <span aria-hidden className="size-1.5 shrink-0 self-center rounded-full bg-[color:var(--role-warn)] glow-warn-dot" />
-            <span className="text-[12.5px] text-[color:var(--role-warn-text)] glow-warn">{data.whatsLeftLine}</span>
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            {homeTiles.map(tile => (
+              <button
+                key={tile.label}
+                type="button"
+                onClick={() => { window.location.hash = tabHash('nutrition') }}
+                className="rounded-[14px] px-3 py-3 text-left"
+                style={{ background: 'var(--surface-raised)' }}
+              >
+                <p className="tabular-mono text-[18px] font-semibold" style={tile.tint ? { color: tile.tint } : undefined}>{tile.value}</p>
+                <p className="mt-0.5 text-[11px] leading-[1.25] text-muted-foreground">
+                  {tile.label}<br />{tile.sub}
+                </p>
+                <span className="mt-2 block h-[2px] w-full rounded-full" style={{ background: 'var(--hairline)' }}>
+                  <span
+                    className="block h-[2px] rounded-full"
+                    style={{ width: `${Math.round(tile.pct * 100)}%`, background: tile.tint ?? 'var(--primary)' }}
+                  />
+                </span>
+              </button>
+            ))}
           </div>
-        )}
+        </div>
 
-        {/* 7. Phase context */}
-        {data.phase && (
-          <button className="mt-6 block w-full text-left" onClick={() => setPhaseExpanded(e => !e)}>
-            <p className="text-xs text-muted-foreground">
-              Week {data.phase.weekNumber} of {data.phase.totalWeeks}
-              {data.phase.phaseLabel ? ` · ${data.phase.phaseLabel}` : ''}
-              {data.phase.isDeload ? ' (deload)' : ''}
-              {data.phase.isCalibrationWeek ? ' (calibration)' : ''}
-              <span className="ml-1 text-primary glow-mint">›</span>
-            </p>
-            {phaseExpanded && data.phase.phaseFocus && (
-              <p className="mt-1.5 text-xs text-muted-foreground">{data.phase.phaseFocus}</p>
+        {/* 8. WEIGH-IN — one hairline row, and the only thing Home logs. The
+            chart it feeds moved up into Progress, where the trend belongs. */}
+        <div className="mt-6 pt-4" style={{ borderTop: '1px solid var(--hairline)' }}>
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="text-[13px] text-text-tertiary">Weigh-in</span>
+            {data.weightSeries.length > 0 && (
+              <span className="text-[13px]">
+                <span className="tabular-mono font-semibold">{data.weightSeries[data.weightSeries.length - 1].kg.toFixed(1)} kg</span>
+                <span className="ml-1.5 text-muted-foreground">
+                  {data.weightSeries[data.weightSeries.length - 1].date === data.today ? 'today ✓' : data.weightSeries[data.weightSeries.length - 1].date}
+                </span>
+              </span>
             )}
-          </button>
-        )}
+          </div>
+          {profile.id && (
+            <div className="mt-3">
+              <WeighInCard profileId={profile.id} onWeightLogged={handleWeighInChanged} />
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

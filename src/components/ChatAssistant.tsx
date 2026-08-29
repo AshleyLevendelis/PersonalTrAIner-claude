@@ -48,6 +48,7 @@ import { ReceiptCard } from '@/components/chat/ReceiptCard'
 import { ClarificationCard } from '@/components/chat/ClarificationCard'
 import type { ChatMessage, UserProfile, MacroTargets, WorkoutDay, MealPlanDay, MesocycleWeek, PlanAction, ChatPendingActionView, ChatReceiptView, ChatClarificationView } from '@/lib/types'
 import { DEFAULT_REVEAL_SPEED, type RevealSpeed } from '@/lib/reveal-speed-store'
+import { takeChatPrefill } from '@/lib/chat-prefill-store'
 
 const ACTION_TAG_RE = /\[ACTION:\s*.*?\]/gi
 const QUICK_REPLIES_RE = /\[QUICK_REPLIES:\s*(.*?)\]/gi
@@ -298,7 +299,10 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       }
     ]
   })
-  const [input, setInput] = useState('')
+  // A question handed over from Home's coach chips. Read once on mount and
+  // cleared by the store, so it fills the box but never re-appears later.
+  // Filled, NOT sent: the user sees it before it becomes a message.
+  const [input, setInput] = useState(() => takeChatPrefill())
   // Voice input — captures the input text at the moment listening starts so
   // a live transcript appends after whatever the user already typed, rather
   // than each recognition event (which reports the FULL transcript so far,

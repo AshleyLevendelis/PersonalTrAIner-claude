@@ -94,13 +94,24 @@ console.log('\n4. The app can render what the tool writes')
   // forces them to cover the new state — but a missing entry would render an
   // empty cell or announce an identifier to a screen reader, so it is worth
   // saying out loud which files carry them.
-  for (const rel of ['src/components/exercise/WeekStrip.tsx', 'src/components/exercise/WeekContextRow.tsx']) {
+  // THE MAPS MOVED, and this check moved with them. The week strip now exists
+  // on two tabs — Home's record and Exercise's navigator — so the glyphs and
+  // their spoken labels live in src/lib/week-glyphs.ts, imported by both. A
+  // mark that meant one thing on Home and another on Exercise would be worse
+  // than having no strip on Home at all.
+  for (const rel of ['src/lib/week-glyphs.ts', 'src/components/exercise/WeekContextRow.tsx']) {
     const src = readFileSync(join(ROOT, rel), 'utf8')
     check(`${rel} has a glyph for it`, /swapped:\s*'/.test(src))
   }
-  const strip = readFileSync(join(ROOT, 'src/components/exercise/WeekStrip.tsx'), 'utf8')
+  const glyphs = readFileSync(join(ROOT, 'src/lib/week-glyphs.ts'), 'utf8')
   check('the screen-reader label is English, not the identifier',
-    /swapped:\s*'swapped for another activity'/.test(strip))
+    /swapped:\s*'swapped for another activity'/.test(glyphs))
+  // ...and that BOTH strips read that one module rather than a local copy.
+  for (const rel of ['src/components/exercise/WeekStrip.tsx', 'src/components/HomeWeekStrip.tsx']) {
+    const src = readFileSync(join(ROOT, rel), 'utf8')
+    check(`${rel} imports the shared vocabulary rather than redefining it`,
+      /from '@\/lib\/week-glyphs'/.test(src) && !/const GLYPH\s*[:=]/.test(src))
+  }
 }
 
 console.log('\n5. The migration exists and is additive')

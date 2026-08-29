@@ -166,10 +166,31 @@ function ordinal(n: number): string {
  * nothing) when no rule has anything true and specific to say — never a
  * generic fallback message.
  */
-export function selectCoachTip(ctx: CoachTipContext): string | null {
-  const eligible = RULES.map(r => r.evaluate(ctx)).filter((s): s is string => s !== null)
+/** The chosen tip AND which rule produced it. */
+export interface SelectedCoachTip {
+  key: string
+  text: string
+}
+
+/**
+ * The rules have always carried a `key`; selectCoachTip simply threw it away.
+ * Home's coach bubble needs it: the two reply chips under a tip have to be
+ * about THAT tip, and "what changed?" under a protein-streak line is a
+ * different question from the same words under a missed-session line. A rule
+ * with no sensible follow-up is expected to offer no chips at all, which is
+ * only expressible if the caller knows which rule fired.
+ */
+export function selectCoachTipWithKey(ctx: CoachTipContext): SelectedCoachTip | null {
+  const eligible = RULES
+    .map(r => ({ key: r.key, text: r.evaluate(ctx) }))
+    .filter((e): e is SelectedCoachTip => e.text !== null)
   if (eligible.length === 0) return null
+  // Same seed and same index arithmetic as before, over a list built in the
+  // same order — so which tip shows on a given day does not change.
   const rng = seededRngFromKey(`coach-tip:${ctx.today}`)
-  const index = Math.floor(rng() * eligible.length)
-  return eligible[index]
+  return eligible[Math.floor(rng() * eligible.length)]
+}
+
+export function selectCoachTip(ctx: CoachTipContext): string | null {
+  return selectCoachTipWithKey(ctx)?.text ?? null
 }

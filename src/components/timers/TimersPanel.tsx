@@ -36,10 +36,20 @@ export function TimersPanel({
 
   return (
     <Tabs value={timers.mode} onValueChange={v => timers.setMode(v as typeof timers.mode)}>
-      <TabsList className="grid grid-cols-3 w-full">
-        <TabsTrigger value="stopwatch">Stopwatch</TabsTrigger>
-        <TabsTrigger value="lap">Lap</TabsTrigger>
-        <TabsTrigger value="round">Round</TabsTrigger>
+      {/* A HAIRLINE UNDERLINE, not a filled 3-up. Tools was the last tab
+          still on bordered cards and a filled segmented control, which made
+          it read as a different app's screen. Underlined labels are the same
+          affordance at a fraction of the ink. */}
+      <TabsList className="grid w-full grid-cols-3 gap-0 rounded-none bg-transparent p-0" style={{ borderBottom: '1px solid var(--hairline)' }}>
+        {(['stopwatch', 'lap', 'round'] as const).map(mode => (
+          <TabsTrigger
+            key={mode}
+            value={mode}
+            className="rounded-none border-0 bg-transparent px-0 pb-2 text-[13px] capitalize shadow-none data-[state=active]:bg-transparent data-[state=active]:font-semibold data-[state=active]:text-[color:var(--primary)] data-[state=active]:shadow-[inset_0_-2px_0_0_var(--primary)]"
+          >
+            {mode}
+          </TabsTrigger>
+        ))}
       </TabsList>
       <TabsContent value="stopwatch">
         <StopwatchPanel />
@@ -54,11 +64,18 @@ export function TimersPanel({
   )
 }
 
+/**
+ * Two timers with no explanation is a support question. The rest timer inside
+ * a session is automatic and this one is not, and nothing on screen said so.
+ */
+const TIMER_SCOPE_NOTE = "Your rest timer runs itself inside a session — this is for everything else."
+
 function StopwatchPanel() {
   const timers = useTimers()
   return (
     <div className="flex flex-col items-center gap-4 py-4">
-      <div className="ds-num-hero tabular-mono">{formatMs(timers.elapsedMs, true)}</div>
+      <div className="tabular-mono text-[44px] font-bold leading-none tracking-[-.03em]">{formatMs(timers.elapsedMs, true)}</div>
+      <p className="max-w-[34ch] text-center text-[11px] leading-[1.45] text-muted-foreground">{TIMER_SCOPE_NOTE}</p>
       <div className="flex gap-2">
         {timers.running ? (
           <Button onClick={timers.stop}>Stop</Button>

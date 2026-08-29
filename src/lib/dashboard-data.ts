@@ -18,11 +18,12 @@ import { getPRCache } from './pr-engine'
 import { getActiveGoals } from './memory-store'
 import { computeStreak, type StreakDayInput } from './streak'
 import { computeWeightTrend, type WeightTrendResult } from './weight-trend'
-import { selectCoachTip, type CoachTipContext } from './coach-tips'
+import { selectCoachTipWithKey, type CoachTipContext } from './coach-tips'
 import { computeConsistency, type ConsistencyScore } from './consistency-score'
 import { getActiveMesocycleWeek } from './calculations'
 import { supabase } from './supabase'
 import type { UserProfile, MacroTargets, WorkoutDay, MesocycleWeek, ExerciseSetLog } from './types'
+import { estimateDaySeconds } from './session-duration'
 
 export type SessionStatus = 'rest' | 'not_started' | 'in_progress' | 'done'
 
@@ -32,6 +33,22 @@ export interface TodaySession {
   exerciseNames: string[]
   setsLogged: number
   setsPlanned: number
+  /**
+   * The session at a glance, replacing three truncated names of six.
+   *
+   * "Prone Y-T Raises · Trap Bar Deadlift · Chest Dips · +3 more" told you
+   * almost nothing you could act on: the names were clipped, the count was
+   * buried in "+3 more", and the two facts that decide whether you can train
+   * right now — how long it takes and what the top set is — were absent.
+   * Every value here was already in the plan; none of it was surfaced.
+   */
+  exerciseCount: number
+  /** Whole minutes, from the same estimator the time cap and the audit use. */
+  estimatedMinutes: number | null
+  /** Minutes still to go, once sets have been logged. Null before that. */
+  minutesLeft: number | null
+  /** The heaviest external load in the session, e.g. "bench from 92.5 kg". */
+  leadLift: { name: string; kg: number } | null
 }
 
 export interface PhaseContext {
@@ -60,6 +77,8 @@ export interface DashboardData {
   session: TodaySession
   tomorrowLabel: string
   coachTip: string | null
+  /** Which rule produced coachTip — drives the bubble's reply chips. */
+  coachTipKey: string | null
   /** Null when nothing measurable has happened yet this plan week — a 0% would read as a verdict rather than an absence. */
   consistency: ConsistencyScore | null
   caloriesEaten: number
@@ -164,8 +183,24 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
     explicitlyCompleted = !!data?.is_completed
   }
 
+  // The glance line's three facts, derived here rather than in the component:
+  // Dashboard.tsx renders, this file is the one aggregator. estimateDaySeconds
+  // is the SAME estimator the plan's time cap and test:audit use, so the
+  // number on Home cannot disagree with the number the plan was built to.
+  const estimatedMinutes = todayWorkoutDay && todayWorkoutDay.exercises.length > 0
+    ? Math.round(estimateDaySeconds(todayWorkoutDay) / 60)
+    : null
+  // The heaviest externally-loaded lift, which is what people actually want to
+  // know before deciding to go. Bodyweight and band work carry no kg and are
+  // skipped rather than reported as 0.
+  const leadLift = (todayWorkoutDay?.exercises ?? [])
+    .filter(e => typeof e.suggested_load_kg === 'number' && (e.suggested_load_kg ?? 0) > 0)
+    .sort((a, b) => (b.suggested_load_kg ?? 0) - (a.suggested_load_kg ?? 0))
+    .map(e => ({ name: e.name, kg: e.suggested_load_kg as number }))[0] ?? null
+
   const session: TodaySession = isRestDay
-    ? { status: 'rest', focus: null, exerciseNames: [], setsLogged: 0, setsPlanned: 0 }
+    ? { status: 'rest', focus: null, exerciseNames: [], setsLogged: 0, setsPlanned: 0,
+        exerciseCount: 0, estimatedMinutes: null, minutesLeft: null, leadLift: null }
     : {
         status: explicitlyCompleted || (setsPlanned > 0 && nonWarmupToday.length >= setsPlanned)
           ? 'done'
@@ -174,6 +209,14 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
         exerciseNames: todayWorkoutDay!.exercises.map(e => e.name),
         setsLogged: nonWarmupToday.length,
         setsPlanned,
+        exerciseCount: todayWorkoutDay!.exercises.length,
+        estimatedMinutes,
+        // Pro-rated by sets remaining rather than re-estimated: the estimator
+        // works on a whole day, and a part-finished day is not a smaller day.
+        minutesLeft: estimatedMinutes != null && setsPlanned > 0 && nonWarmupToday.length > 0
+          ? Math.max(0, Math.round(estimatedMinutes * (1 - Math.min(1, nonWarmupToday.length / setsPlanned))))
+          : null,
+        leadLift,
       }
 
   // ---- Nutrition ----------------------------------------------------------
@@ -328,7 +371,9 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
     waterTargetMl,
     hourOfDay: new Date().getHours(),
   }
-  const coachTip = selectCoachTip(coachTipCtx)
+  const selectedTip = selectCoachTipWithKey(coachTipCtx)
+  const coachTip = selectedTip?.text ?? null
+  const coachTipKey = selectedTip?.key ?? null
 
   // ---- What's left today (one line, omitted when nothing's outstanding) ---
   const gaps: string[] = []
@@ -360,6 +405,7 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
     session,
     tomorrowLabel,
     coachTip,
+    coachTipKey,
     consistency,
     caloriesEaten: ledger.eaten.kcal,
     caloriesTarget: ledger.targets.calories,

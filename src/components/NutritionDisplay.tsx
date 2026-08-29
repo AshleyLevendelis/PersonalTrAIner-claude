@@ -13,6 +13,8 @@ import type { MealSlotName } from '@/lib/meal-store'
 import type { PoolOption } from '@/lib/meal-generation'
 import { calculateWeeklySchedule, getMacroDerivation } from '@/lib/macro-calculator'
 import { MissingBodyMetricsNotice } from '@/components/MissingBodyMetricsNotice'
+import { getStepsForDate, logStepsManual, type DailyStepsRow } from '@/lib/steps-store'
+import { stepsTargetFor } from '@/lib/steps-target'
 
 const WATER_QUICK_ADD_ML = [250, 500]
 
@@ -46,6 +48,11 @@ const NUTRITION_RING_CIRC: Record<string, number> = Object.fromEntries(NUTRITION
 // The stagger is deliberately long (~1.45s between plays, ~4s total): three
 // quick pops in succession reads as a loading state, three slow ones read as
 // a small celebration and then stop.
+// The calorie tile's ring geometry, kept identical so the steps ring and the
+// calorie ring read as one system rather than two people's work.
+const STEP_RING_R = 14
+const STEP_RING_CIRC = 2 * Math.PI * STEP_RING_R
+
 const WATER_RING_R = 50
 const SPARKLES = [
   { angleDeg: 312, size: 9, delayMs: 0 },
@@ -140,6 +147,25 @@ export function NutritionDisplay({
   const [editingWaterTarget, setEditingWaterTarget] = useState(false)
   const [waterTargetInput, setWaterTargetInput] = useState(String(profile.water_target_ml ?? 2000))
   const [lastWaterLog, setLastWaterLog] = useState<WaterLogRow | null>(null)
+  // Steps moved here from Home — Nutrition owns what you accumulate through
+  // the day. The target is derived, not stored, by the same function Home
+  // used, so both tabs read one rule.
+  const [stepsRow, setStepsRow] = useState<DailyStepsRow | null>(null)
+  const [stepsInput, setStepsInput] = useState('')
+  const stepTarget = stepsTargetFor(profile)
+  const todaySteps = stepsRow?.steps ?? 0
+
+  useEffect(() => {
+    if (!profileId || !date) return
+    void getStepsForDate(profileId, date).then(setStepsRow).catch(() => setStepsRow(null))
+  }, [profileId, date])
+
+  const handleLogSteps = async () => {
+    const n = Number(stepsInput)
+    if (!profileId || !Number.isFinite(n) || n < 0) return
+    setStepsRow(await logStepsManual(profileId, date, Math.round(n)))
+    setStepsInput('')
+  }
 
   useEffect(() => {
     if (!profileId || !date || !macros) return
@@ -325,6 +351,48 @@ export function NutritionDisplay({
             }}
           />
         </div>
+
+        {/* STEPS — moved here from Home. steps-target.ts already decided this:
+            the step target is derived from the same activity_level that
+            drives the calorie target's PAL multipliers, deliberately, "so the
+            step target and the calorie target never disagree about who is
+            more active". Two numbers from one input belong on one tab, and
+            this is the tab that owns what you accumulate through the day.
+
+            Same row shape as Water above, and the ring is the calorie ring's
+            radius, stroke and rotate(-90) start so the two read as one system
+            rather than two people's work. */}
+        <div className="flex items-baseline justify-between pt-3.5 pb-1" style={{ borderTop: '1px solid var(--hairline)' }}>
+          <span className="text-[13px] text-text-tertiary">Steps</span>
+          <span className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
+            <svg viewBox="0 0 34 34" className="size-[24px] shrink-0" aria-hidden>
+              <circle cx="17" cy="17" r={STEP_RING_R} fill="none" stroke="var(--surface-raised)" strokeWidth="4" />
+              <circle
+                cx="17" cy="17" r={STEP_RING_R} fill="none" stroke="var(--primary)" strokeWidth="4" strokeLinecap="round"
+                strokeDasharray={`${STEP_RING_CIRC * Math.min(1, stepTarget > 0 ? todaySteps / stepTarget : 0)} ${STEP_RING_CIRC}`}
+                transform="rotate(-90 17 17)"
+              />
+            </svg>
+            <span className="tabular-mono text-[13px]">{todaySteps.toLocaleString()} / {stepTarget.toLocaleString()}</span>
+            <input
+              type="number"
+              placeholder="Log"
+              value={stepsInput}
+              onChange={e => setStepsInput(e.target.value)}
+              className="h-7 w-16 min-w-0 rounded-md bg-[color:var(--surface-raised)] px-2 text-xs"
+            />
+            <button className="hit-slop-44 text-xs font-semibold text-primary" onClick={handleLogSteps}>Log</button>
+          </span>
+        </div>
+        {/* NO INLINE TARGET EDITOR, deliberately. The handoff sketches an
+            "edit" affordance here, but daily_step_target is a profile column
+            with no setter in this path, and adding a second place to change
+            it is how two surfaces come to disagree about one number. The
+            override behaviour is unchanged, as the handoff also requires —
+            this line says where it lives instead. */}
+        <p className="text-[11px] leading-[1.4] text-muted-foreground">
+          Target from the activity level your calorie target uses — override it in your profile.
+        </p>
       </div>
 
       <MealPlan

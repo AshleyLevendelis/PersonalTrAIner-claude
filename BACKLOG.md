@@ -2,6 +2,20 @@
 
 Newest first. One line each.
 
+- [x] **PACKAGES 1 + 2 — HOME RESTRUCTURED, AND ONE FACT NOW HAS ONE OWNER.** Home's order is what's next → morning check-in → progress: date + streak chip, week-strip label, strip, hero, coach bubble, progress, three tiles, weigh-in. Gone: the duplicate `Streak: N days`, the bottom phase line, the standalone consistency line, `6 weigh-ins` (kept at **one**, where the app must admit the trend isn't real), the tomorrow line, and the second `Nutrition ›`.
+
+- [x] **THE SESSION AT A GLANCE, from data that was already there and never shown.** `Prone Y-T Raises · Trap Bar Deadlift · Chest Dips · +3 more` became `6 exercises · ~52 min · trap bar from 92.5 kg`. The minutes come from **the same `estimateDaySeconds` the plan's time cap and `test:audit` use**, so Home cannot disagree with the plan it is describing.
+
+- [ ] **DELIBERATE DEVIATION:** the handoff specifies `bench 92.5 kg **next**` in progress. The app knows the session's heaviest lift but **not the running order**, so "next" would be a claim it cannot support — the same class of invention as a fabricated weight. The figure ships without the word.
+
+- [x] **STEPS MOVED TO NUTRITION.** `steps-target.ts` had already decided it: the step target derives from the same `activity_level` as the calorie target's PAL multipliers, deliberately, so the two "never disagree about who is more active". Home keeps a read-only tile. **Second deviation:** the handoff sketches an inline `edit` for the target, but `daily_step_target` is a profile column with no setter on that path, and a second place to change one number is how two surfaces come to disagree — the row says where the override lives instead.
+
+- [x] **THE WEEK STRIP IS NOW TWO THINGS FROM ONE VOCABULARY.** Home's is the RECORD (26px, no handler, no cursor, not a button); Exercise's is the NAVIGATOR (38px, tap to peek). `src/lib/week-glyphs.ts` is the single source, so a mark cannot come to mean two things — gated in both directions, and `test:coach-promises` was re-pointed at the shared module rather than the file it used to live in.
+
+- [x] Coach bubble replaces the ⚡ caption: 26px avatar matching chat's, the tip and `whatsLeftLine` as one block, and reply chips **keyed to the rule that produced the tip** — `coach-tips.ts` always carried a `key`, `selectCoachTip` just threw it away. Chips **fill the composer and do not send**: a chip that fires a request the moment it is touched turns a suggestion into a command.
+
+- [x] Tools joined the visual system — hairline tab underline instead of a filled 3-up, grocery off bordered `Card`s, 44px stopwatch, and the two lines the tab was missing: *"Your rest timer runs itself inside a session"* and where the grocery list comes from. VISION-ARCHITECTURE gains **§5.1a** with the ownership rule, and §5.1's "owns no number" is amended to name the weigh-in exception rather than left broken. `test:tab-ownership`, four mutations biting.
+
 - [x] **PACKAGE 3 — APPEARANCE. THE BUG FIRST: there was no way back to your theme's own accent.** `AccentOverride` allowed `'theme'` and `DEFAULT_APPEARANCE.accent` **was** `'theme'`, but `ACCENT_OPTIONS` listed only the five hues — so tapping any accent was permanent short of clearing localStorage. A state the type allowed and no control could reach. **"Match theme"** is now the first chip, default-selected, its swatch showing the *current* theme's accent so it moves when the theme does.
 
 - [x] **DAYLIGHT — the first light canvas**, plus retuned Ember and Field. Field mattered most: its old `#D6DF6B` sat in the **same hue family as its own canvas**, so the one element that must read as "tap this" was the closest thing to the background. New accent set (mint/coral/violet/sky/lime) with stored values migrated — `orange→coral`, `yellowgreen→lime`, `blue→sky`, `purple→violet`, anything unreadable → `theme` rather than a guessed hue.
