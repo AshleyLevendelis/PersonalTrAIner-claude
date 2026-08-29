@@ -2,6 +2,16 @@
 
 Newest first. One line each.
 
+- [x] **"THE CHANGES HAVEN'T APPLIED TO ALL THE PAGES."** Ashley, with four screenshots. **Two separate things, and only one was a bug.** `main` was already at `abf9115` with all three fields merged — the photos are of the previous build (`a054319`, foundation + Home only), taken while Vercel was still building. Home having a band and Nutrition/Exercise not is exactly what that commit looks like.
+
+- [x] **BUT HOME'S FIELD WAS GENUINELY WRONG, AND THE SCREENSHOT IS WHY I SAW IT.** It rendered as an **inset rounded card floating below the settings gear** — because I gave it a bottom radius and left it inside `<main>`'s `px-4 pt-12`. §1 says *"a full-bleed band ... square top corners (it meets the status bar)"*, and the prototype settles it: its field is the first child of the phone frame with **no radius of its own**. Now `borderRadius: 0` with −16px side margins and −48px top, cancelling the page gutter exactly.
+
+- [x] AND THAT EXPOSED A SECOND ONE THE SPEC NEVER MENTIONS: the settings gear is **fixed app chrome rendered once for every tab**, so a full-bleed field puts a light icon on a light accent band. It now takes `--field-ink` on the three tabs that have a field — and `TABS_WITH_FIELD` deliberately excludes Tools, gated both ways.
+
+- [x] **THE GATE NOW HOLDS THE GEOMETRY, NOT JUST THE COLOUR.** It also pins `<main>`'s `px-4 pt-12`, because the −16/−48 offsets are only correct while that padding is what they cancel — a silent change there would put the band back in a box. **Four mutations bite**, including one that restores the exact rounded card Ashley photographed.
+
+- [ ] **THE AMBIENT RING MAY BE TOO HEAVY** — in the screenshot three thick arcs sweep across the whole band rather than reading as atmosphere bleeding off the top-right corner. The geometry is the handoff's (430px SVG, top −96, right −168), so this may be correct and simply unfamiliar. **Not changed without seeing it against the corrected full-bleed layout** — the inset card made the arcs sit further into the band than they will now.
+
 - [x] **PASS A COMPLETE: Exercise's field, and the week strip moves into it.** `Wk 3/16 · B1 Hypertrophy` with the ⋮ menu on its row, the strip **inside** the field at 32px on ink .12 with today bordered 1.5px solid ink and **still tappable**, `Push & Press` at 38px, `4 / 18 SETS`, `~40 min left`, the 5px bar, and the Continue CTA. Home ✅ Nutrition ✅ Exercise ✅ Tools deliberately none.
 
 - [x] **ONE STRIP, TWO SKINS — NOT A THIRD STRIP.** `WeekContextRow` gained a `variant`; Home's stays a 26px flat canvas **record**, Exercise's becomes the 32px in-field **navigator**. Adding a separate field strip would have recreated the dead-duplicate-strip defect this session already deleted once.

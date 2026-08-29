@@ -28,8 +28,22 @@ export function Field({ arcs, ringPlacement = 'ambient', children }: {
         background: 'var(--field)',
         color: 'var(--field-ink)',
         padding: '22px 22px 24px',
-        // Square top corners: it meets the status bar.
-        borderRadius: '0 0 var(--radius) var(--radius)',
+        // NO RADIUS, AND IT BREAKS OUT OF THE PAGE GUTTER.
+        //
+        // "A full-bleed band of accent colour at the top of a tab" with
+        // "square top corners (it meets the status bar)". The first build had
+        // a bottom radius and sat inside <main>'s px-4 pt-12, so it rendered
+        // as an inset rounded card floating below the settings gear — which
+        // read, correctly, as the design not having been applied. The
+        // prototype settles it: its field is the first child of the phone
+        // frame with no radius of its own, clipped by the frame.
+        //
+        // -16px each side cancels <main>'s px-4; -48px top cancels its pt-12
+        // so the band actually reaches the top of the scroll area.
+        borderRadius: 0,
+        marginLeft: -16,
+        marginRight: -16,
+        marginTop: -48,
       }}
     >
       {arcs && arcs.length > 0 && ringPlacement === 'ambient' && (

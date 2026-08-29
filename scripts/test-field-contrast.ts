@@ -116,7 +116,29 @@ console.log('\n3. The field means ownership — Tools must not have one')
     !/variant/.test(fieldSrc))
 }
 
-console.log('\n4. Arcs are computed from real values')
+console.log('\n4. The field is full-bleed, and square where it meets the top')
+{
+  // Reported live: the first build rendered as an inset rounded card floating
+  // below the settings gear, which read — correctly — as the design not having
+  // been applied at all. §1: "A full-bleed band ... square top corners (it
+  // meets the status bar)", and the prototype's own field is the first child
+  // of the phone frame with no radius of its own.
+  const field = readFileSync(join(ROOT, 'src/components/field/Field.tsx'), 'utf8')
+  check('no corner radius', /borderRadius: 0/.test(field))
+  check('...and it breaks out of the page gutter', /marginLeft: -16/.test(field) && /marginRight: -16/.test(field))
+  check('...and out of the top padding, so it reaches the top', /marginTop: -48/.test(field))
+  // Those numbers only work while <main> keeps that padding.
+  const app = readFileSync(join(ROOT, 'src/App.tsx'), 'utf8')
+  check('the page gutter is still px-4 pt-12, which those offsets cancel',
+    /<main className="max-w-6xl mx-auto px-4 pt-12/.test(app))
+  // The fixed settings gear now lands on a light accent band.
+  check('the settings gear takes field ink on the tabs that have one',
+    /TABS_WITH_FIELD\.has\(activeTab\) \? 'var\(--field-ink\)'/.test(app))
+  check("...and Tools is not in that set, because it has no field",
+    /const TABS_WITH_FIELD = new Set\(\['dashboard', 'nutrition', 'exercise'\]\)/.test(app))
+}
+
+console.log('\n5. Arcs are computed from real values')
 {
   const ring = readFileSync(join(ROOT, 'src/components/field/FieldRing.tsx'), 'utf8')
   check('the dasharray is derived from the value', /circumference \* v/.test(ring))
