@@ -2,6 +2,22 @@
 
 Newest first. One line each.
 
+- [x] **PASS A CONTINUED: Nutrition's field.** The five-ring meter now sits **inline at 130px inside the field** — "because it's an instrument you read", where Home's and Exercise's rings are atmosphere that happens to be true. `1240` at 44px over `of 2480 kcal`, then the 2×2 grid `P 88/160 · C 126/280 · F 35/69 · W 1250/2000`. **No action in the field**; meal logging stays on the canvas.
+
+- [x] THE ARC MAPPING WAS **READ OFF THE PROTOTYPE, NOT INFERRED.** §3 lists five radius/width pairs but never says which fact is which; the prototype settles it — water r50/w4, kcal r40/w9, protein r30/w6, carbs r22/w6, fat r14/w6 — and confirms kcal is the headline, because **r40 is the one arc with no keyline behind it**.
+
+- [x] **THE LETTERS ARE GATED, NOT JUST RENDERED.** The handoff's reasoning is that "colour alone failed (three of five hues were unreadable when darkened), and ink alone failed (five arcs in one hue are not a key)". So the gate asserts the key survives **with colour off**: every cell has a letter, all four are unique, and no two cells share a swatch.
+
+- [x] FAT USES `--text-tertiary`, WHICH IS THE PROTOTYPE'S OWN CHOICE AND WORTH RECORDING WHY: **`--chart-5` is declared identical to `--chart-3`** in index.css, so using it would have drawn fat and water in the same hue and broken the very key the letters exist to support. A duplicate in a five-colour chart palette is a latent bug for any future five-series chart — recorded rather than silently patched.
+
+- [x] AND THE ABSENCE DOCTRINE HOLDS: a trainee who declined a body metric gets **no kcal figure, no macro cells and no macro arcs** — but **water survives**, because a water target is one you set, not one derived from a bodyweight.
+
+- [x] **DEAD CODE REMOVED WITH IT, NOT LEFT BEHIND:** the old 112px meter's `NUTRITION_RINGS`, `NUTRITION_RING_CIRC` and `ringValues`, plus `waterComplete`, all became unreferenced the moment the field replaced them. Five mutations bite, including one that gives fat and water the same colour.
+
+- [ ] **THE WATER-COMPLETION SPARKLE IS GONE**, and it was a deliberate delight rather than an accident: three stars placed on the water ring's own arc when you hit target. The handoff's field has no such flourish and porting it would push a one-tab celebration into the shared ring component. **Flagged rather than deleted quietly — Ashley's to ask back.** The `.ds-sparkle` CSS remains in `index.css`, unused, so restoring it is small.
+
+- [ ] **PASS A STILL NOT FINISHED: Exercise has no field.** §4 — the week strip moves *into* the field at 32px and stays tappable, plus `Push & Press` at 38px, `4 / 18 SETS`, `~40 min left`, a 5px progress bar and the Continue CTA. Home and Nutrition are done.
+
 - [x] **HANDOFF v2 — THE COLOUR FIELD. Pass A begun: foundation + Home.** A full-bleed accent band at the top of any tab that owns a daily fact. Home, Nutrition and Exercise get one; **Tools does not, and the absence is the point** — it makes the ownership rule visible.
 
 - [x] **THE HANDOFF'S FIELD COLOUR DOES NOT WORK ON THIS APP, AND I MEASURED THAT BEFORE BUILDING.** It specifies `--field = --primary-2` with an ink alpha ladder *"measured, not guessed"*. Measured across all **15** theme × accent grounds this app can render: **11 cannot carry that ladder with ANY ink**, black or white included — worst 3.90:1 solid. The ladder was measured on mint, which is unusually forgiving; most other grounds are mid-lightness saturated colours where nothing sits readably on top. Same trap as the Daylight accent that warned about itself.
