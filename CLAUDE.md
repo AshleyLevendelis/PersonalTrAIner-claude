@@ -29,7 +29,8 @@ These apply to every session in this repo. They exist so they stop being restate
 
 ## Git and deploy
 
-- Commit, never push, unless explicitly told to push.
+- Push finished work to the session's designated working branch (e.g. `claude/…`) without asking. Ashley ruled on this 29 Aug 2026, choosing "push it, and stop asking me about pushes" over keeping the old ask-every-time rule, because the interruption cost more than it protected. This replaces the previous "commit, never push" default.
+- The relaxation is branch-scoped and stops there. `main` and anything that reaches live users still need Ashley to say so explicitly, every time: merging to `main`, any production deploy, any migration.
 - Do not trust or report "N commits ahead of origin" without verifying against origin — that line has been wrong repeatedly.
 - Frontend ships via push → Vercel. The Supabase edge functions (`chat-gemini`, `generate-meals`, `macro-calibration`, `onboarding-chat`) each need their own separate deploy: `npm run deploy:functions:prod -- <name>`, which asks for the `yes-production` phrase and names the target on the deploy itself. Note which is needed.
 
