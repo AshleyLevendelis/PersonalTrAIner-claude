@@ -255,16 +255,23 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
     // ambient radial washes sit behind everything (pointer-events-none) and
     // are what stop a fully borderless surface reading as flat.
     <div className="relative -mx-1 px-1">
+      {/* -12px, not inset-x-0: this sits inside <main>'s px-4 and a -mx-1
+          wrapper, so its padding box stops 12px short of the screen on each
+          side. inset-x-0 left a visibly textured panel with plain background
+          either side of it — the wash and the grain are meant to be the page,
+          not a rectangle on it. */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-x-0 -top-12 h-[420px]"
+        className="pointer-events-none absolute -top-12 h-[420px]"
         style={{
+          left: -12,
+          right: -12,
           background:
             'radial-gradient(120% 60% at 50% 0%, var(--hero-wash) 0%, transparent 60%), radial-gradient(90% 40% at 20% 42%, rgba(var(--glow-rgb),.10) 0%, transparent 70%)',
         }}
       />
       {/* Turn 4: a near-invisible grain texture over the whole hero surface. */}
-      <div className="grain-overlay" aria-hidden />
+      <div className="grain-overlay" aria-hidden style={{ left: -12, right: -12 }} />
 
       <div className="relative">
         {/* 1. DATE + STREAK. The day name only — the week number moved to the
@@ -318,7 +325,14 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
             <div className="relative space-y-4">
               <div>
                 <div className="flex items-baseline justify-between gap-3">
-                  <span className="text-[25px] font-bold tracking-[-.02em] glow-text min-w-0 truncate">{data.session.focus}</span>
+                  {/* NO glow-text HERE, deliberately. `truncate` sets
+                      overflow:hidden, which clips glow-text's 26px text-shadow
+                      flat at the element's box — so instead of a soft halo you
+                      get a hard-edged lighter RECTANGLE behind the session
+                      name, which is what Ashley photographed. The glow is
+                      emphasis; clipped, it is worse than none. Every other
+                      glow-text in the app is on non-truncating text. */}
+                  <span className="text-[25px] font-bold tracking-[-.02em] min-w-0 truncate">{data.session.focus}</span>
                   {/* PROPOSAL 2 — the label goes in the NOT-STARTED case only,
                       where the button already says it. It stays for the other
                       two, because there it carries new information. */}

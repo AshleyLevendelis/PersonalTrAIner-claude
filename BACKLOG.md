@@ -2,6 +2,12 @@
 
 Newest first. One line each.
 
+- [x] **TWO VISUAL DEFECTS ON HOME, BOTH PRE-EXISTING.** Ashley, on the post-revert screenshot: *"the visual effect doesn't quite extend to the edges so it looks off and also you can see an outline of a square behind text like the full body power."* Neither was caused by the revert — both are exactly as they stood at `87f0e93`, the state the revert restored.
+
+- [x] **The square behind "Full Body Power" was a glow clipped by its own box.** The session name carried `glow-text` (a 26px `text-shadow`) *and* Tailwind's `truncate` (`overflow: hidden`). Overflow clips the shadow flat at the element's edges, so the soft halo rendered as a hard-edged lighter **rectangle**. Dropped the glow from that one span; the truncation stays, because a long session name still has to clamp. It is the only element in `src/components/**` that combined the two, and `test:hero-surface` now scans every component's class strings so a future one fails instead of shipping.
+
+- [x] **The wash and grain stopped 12px short of each screen edge.** Both are absolutely positioned with `inset-x-0`, but they sit inside `<main>`'s `px-4` and a `-mx-1` wrapper, so "full width" meant the padding box, not the screen — a textured panel with plain background either side of it. Pulled both out to `left/right: -12px`. The gate pins the `px-4` and `-mx-1` the −12 cancels, so if either changes this fails rather than drifting silently.
+
 - [x] **DESIGN HANDOFF v2 REVERTED — Ashley: "I don't like the recent changes we've made to the UI."** Home, Nutrition and Exercise are back exactly as they were before the colour field: no band, no derived "what's left" list, no inline five-ring meter, and the week strip back on canvas in its card. Restored file-by-file from `87f0e93`, the last pre-handoff commit, rather than by a blind range revert.
 
 - [x] **ONE THING DELIBERATELY KEPT: the round-timer bug fix.** `computeRoundState` ran for `rounds × (work + rest)`, so every 6 × 40/20 session took **6:00 and ended by sitting through a rest after the final round** — the honest length is 5:40. That is a real defect found *while* doing the handoff, not part of it, and re-introducing a known bug to tidy a revert would be the wrong trade. `test:round-timer` and its four mutations came with it.
