@@ -20,9 +20,36 @@ const KEY = 'fitplan_appearance_v2'
 const LEGACY_KEY = 'fitplan_appearance_v1'
 
 export type GlowLevel = 'off' | 'subtle' | 'full'
-export type ThemeName = 'nightshift' | 'ember' | 'field' | 'graphite'
+export type ThemeName = 'nightshift' | 'ember' | 'field' | 'graphite' | 'daylight'
 /** 'theme' means "use the active theme's own default accent" — not an override. */
-export type AccentOverride = 'theme' | 'mint' | 'orange' | 'yellowgreen' | 'purple' | 'blue'
+export type AccentOverride = 'theme' | 'mint' | 'coral' | 'violet' | 'sky' | 'lime'
+
+/**
+ * Themes that paint on paper rather than on a dark canvas.
+ *
+ * A SET, not a `theme === 'daylight'` check, because two rules key off it —
+ * the accent's dark step and the glow clamp — and both must stay true for any
+ * light theme added later, not just this one.
+ */
+const LIGHT_THEMES: ReadonlySet<ThemeName> = new Set<ThemeName>(['daylight'])
+
+export function isLightTheme(theme: ThemeName): boolean {
+  return LIGHT_THEMES.has(theme)
+}
+
+/**
+ * The glow actually applied, which is not always the glow stored.
+ *
+ * A halo is a bloom of light; on paper it is a grey smudge. Picking Daylight
+ * therefore caps glow at 'subtle'. Deliberately resolved HERE rather than
+ * written back into the record: someone who chose Full and tries Daylight for
+ * an afternoon gets Full again the moment they switch back, because their
+ * preference was never overwritten — only overridden while it could not work.
+ */
+export function resolveGlow(record: AppearanceRecord): GlowLevel {
+  if (isLightTheme(record.theme) && record.glow === 'full') return 'subtle'
+  return record.glow
+}
 
 export interface AppearanceRecord {
   glow: GlowLevel
@@ -34,8 +61,32 @@ export interface AppearanceRecord {
 export const DEFAULT_APPEARANCE: AppearanceRecord = { glow: 'full', theme: 'nightshift', accent: 'theme' }
 
 const GLOW_VALUES: GlowLevel[] = ['off', 'subtle', 'full']
-const THEME_VALUES: ThemeName[] = ['nightshift', 'ember', 'field', 'graphite']
-const ACCENT_VALUES: AccentOverride[] = ['theme', 'mint', 'orange', 'yellowgreen', 'purple', 'blue']
+const THEME_VALUES: ThemeName[] = ['nightshift', 'ember', 'field', 'graphite', 'daylight']
+const ACCENT_VALUES: AccentOverride[] = ['theme', 'mint', 'coral', 'violet', 'sky', 'lime']
+
+/**
+ * The old accent set was four of the other themes' own accents plus blue — an
+ * axis that looked like five choices and offered one. The replacements are
+ * picked to work across all five canvases, so two names change meaning and
+ * two disappear.
+ *
+ * Anything unrecognised lands on 'theme' rather than a hue: a stored value we
+ * cannot read is not evidence the user wanted any particular colour, and
+ * 'theme' is the only option that is right by definition.
+ */
+const ACCENT_MIGRATIONS: Record<string, AccentOverride> = {
+  orange: 'coral',
+  yellowgreen: 'lime',
+  blue: 'sky',
+  purple: 'violet',
+  mint: 'mint',
+}
+
+function readAccent(raw: unknown): AccentOverride {
+  if (ACCENT_VALUES.includes(raw as AccentOverride)) return raw as AccentOverride
+  if (typeof raw === 'string' && raw in ACCENT_MIGRATIONS) return ACCENT_MIGRATIONS[raw]
+  return DEFAULT_APPEARANCE.accent
+}
 
 /** Pre-turn-9 shape, read once for migration. */
 interface LegacyAppearanceRecord {
@@ -78,7 +129,7 @@ export function getAppearance(): AppearanceRecord {
         return {
           glow: GLOW_VALUES.includes(rec.glow as GlowLevel) ? (rec.glow as GlowLevel) : DEFAULT_APPEARANCE.glow,
           theme: THEME_VALUES.includes(rec.theme as ThemeName) ? (rec.theme as ThemeName) : DEFAULT_APPEARANCE.theme,
-          accent: ACCENT_VALUES.includes(rec.accent as AccentOverride) ? (rec.accent as AccentOverride) : DEFAULT_APPEARANCE.accent,
+          accent: readAccent(rec.accent),
         }
       }
     }
@@ -109,7 +160,11 @@ export function saveAppearance(record: AppearanceRecord): void {
 export function applyAppearance(record: AppearanceRecord): void {
   if (typeof document === 'undefined') return
   const el = document.documentElement
-  el.setAttribute('data-glow', record.glow)
+  el.setAttribute('data-glow', resolveGlow(record))
   el.setAttribute('data-theme', record.theme)
   el.setAttribute('data-accent', record.accent)
+  // One flag, not a theme name, so index.css can resolve every accent to its
+  // dark step with a single rule pair instead of one per theme x accent.
+  if (isLightTheme(record.theme)) el.setAttribute('data-canvas', 'light')
+  else el.removeAttribute('data-canvas')
 }

@@ -125,65 +125,77 @@
   --theme-primary: #5BE9C2;
   --theme-primary-2: #3ED3AA;
   --theme-glow-rgb: 91, 233, 194;
+  /* The hero's ambient wash, as a token because it is the one value that has
+   * to change on a light canvas — Dashboard.tsx used to hardcode the rgba. */
+  --hero-wash: rgba(156, 141, 255, .20);
 }
 
-/* Theme: Ember — dark brown · orange. */
+/* Theme: Ember — warm dark · amber.
+ * RETUNED: #15100C was a muddy near-black-brown that read as a failed
+ * Graphite rather than a warm canvas. Warmed and lifted; the accent moves
+ * from a washed #FF9A54 to a fuller amber. */
 [data-theme="ember"] {
-  --background: #15100C;
-  --foreground: #F5EFE9;
-  --card: #241812;
-  --card-foreground: #F5EFE9;
-  --popover: #241812;
-  --popover-foreground: #F5EFE9;
-  --secondary: #382415;
-  --secondary-foreground: #F5EFE9;
-  --muted: #241812;
-  --muted-foreground: #B3A08F;
-  --accent: #382415;
-  --accent-foreground: #F5EFE9;
-  --border: #4A3826;
-  --input: #241812;
-  --text-tertiary: #D9C9B8;
-  --text-dim: #4A3826;
-  --surface-deep: #1C130D;
-  --surface-raised: rgba(74, 56, 38, .28);
-  --line-emphasis: #5C4830;
-  --hairline: rgba(245, 239, 233, .11);
-  --grain-rgb: 245, 239, 233;
-  --theme-primary: #FF9A54;
-  --theme-primary-2: #E8601A;
-  --theme-glow-rgb: 255, 122, 47;
+  --background: #171210;
+  --foreground: #F7EFE7;
+  --card: #261913;
+  --card-foreground: #F7EFE7;
+  --popover: #261913;
+  --popover-foreground: #F7EFE7;
+  --secondary: #3A2618;
+  --secondary-foreground: #F7EFE7;
+  --muted: #261913;
+  --muted-foreground: #B5A292;
+  --accent: #3A2618;
+  --accent-foreground: #F7EFE7;
+  --border: #5A3E28;
+  --input: #261913;
+  --text-tertiary: #DCC9B7;
+  --text-dim: #5A3E28;
+  --surface-deep: #1E1512;
+  --surface-raised: rgba(90, 62, 40, .32);
+  --line-emphasis: #6B4A30;
+  --hairline: rgba(247, 239, 231, .11);
+  --grain-rgb: 247, 239, 231;
+  --theme-primary: #FF8A3D;
+  --theme-primary-2: #E85F14;
+  --theme-glow-rgb: 255, 138, 61;
 }
 
 /* Theme: Field — khaki · military green. */
 [data-theme="field"] {
-  --background: #14170F;
-  --foreground: #F0F3E8;
-  --card: #212617;
-  --card-foreground: #F0F3E8;
-  --popover: #212617;
-  --popover-foreground: #F0F3E8;
-  --secondary: #2E3520;
-  --secondary-foreground: #F0F3E8;
-  --muted: #212617;
-  --muted-foreground: #A3AC8F;
-  --accent: #2E3520;
-  --accent-foreground: #F0F3E8;
-  --border: #3E4530;
-  --input: #212617;
-  --text-tertiary: #C9D1B5;
-  --text-dim: #3E4530;
-  --surface-deep: #191C12;
-  --surface-raised: rgba(62, 69, 48, .28);
-  --line-emphasis: #4E5738;
-  --hairline: rgba(240, 243, 232, .11);
-  --grain-rgb: 240, 243, 232;
-  --theme-primary: #D6DF6B;
-  --theme-primary-2: #A8B434;
-  --theme-glow-rgb: 199, 209, 74;
+  --background: #141810;
+  --foreground: #F1F4E9;
+  --card: #1F2618;
+  --card-foreground: #F1F4E9;
+  --popover: #1F2618;
+  --popover-foreground: #F1F4E9;
+  --secondary: #2C3422;
+  --secondary-foreground: #F1F4E9;
+  --muted: #1F2618;
+  --muted-foreground: #A6AF92;
+  --accent: #2C3422;
+  --accent-foreground: #F1F4E9;
+  --border: #465234;
+  --input: #1F2618;
+  --text-tertiary: #CBD3B7;
+  --text-dim: #465234;
+  --surface-deep: #1A1E14;
+  --surface-raised: rgba(70, 82, 52, .34);
+  --line-emphasis: #55643C;
+  --hairline: rgba(241, 244, 233, .11);
+  --grain-rgb: 241, 244, 233;
+  /* RETUNED, and this is the one that mattered: the old #D6DF6B sat in the
+   * same hue family as its own canvas, so the single element that must read
+   * as "tap this" was the one closest to the background. Higher-chroma lime
+   * separates it. */
+  --theme-primary: #C6F24E;
+  --theme-primary-2: #8FBE1F;
+  --theme-glow-rgb: 198, 242, 78;
 }
 
-/* Theme: Graphite — near-black · purple. */
+/* Theme: Graphite — near-black · violet. (Values keep; the SUBTITLE was
+ * wrong, saying "purple · grey" while the swatches showed near-black +
+ * violet. Corrected in ProfileScreen's theme card copy.) */
 [data-theme="graphite"] {
   --background: #121216;
   --foreground: #F1F0F5;
@@ -202,7 +214,7 @@
   --text-tertiary: #C4C1D2;
   --text-dim: #35333F;
   --surface-deep: #17171C;
-  --surface-raised: rgba(53, 51, 63, .28);
+  --surface-raised: rgba(53, 51, 63, .34);
   --line-emphasis: #444154;
   --hairline: rgba(241, 240, 245, .11);
   --grain-rgb: 241, 240, 245;
@@ -211,14 +223,68 @@
   --theme-glow-rgb: 155, 125, 245;
 }
 
+/* Theme: Daylight — paper · deep mint. THE FIRST LIGHT CANVAS.
+ * Every other theme is dark, which is fine indoors and useless in a sunlit
+ * gym or on a midday run. Derived by the same lightness/alpha relationships
+ * as Nightshift, inverted: the text tokens become the dark end, the surface
+ * tints stay violet-family so the app still reads as itself. */
+[data-theme="daylight"] {
+  --background: #F5F3FA;
+  --foreground: #1A1636;
+  --card: #FFFFFF;
+  --card-foreground: #1A1636;
+  --popover: #FFFFFF;
+  --popover-foreground: #1A1636;
+  --secondary: #E9E6F4;
+  --secondary-foreground: #1A1636;
+  --muted: #EFEDF7;
+  --muted-foreground: #6B6590;
+  --accent: #E9E6F4;
+  --accent-foreground: #1A1636;
+  --border: #D8D3E8;
+  --input: #FFFFFF;
+  --text-tertiary: #3F3868;
+  --text-dim: #A9A2C4;
+  --surface-deep: #ECE9F5;
+  --surface-raised: rgba(90, 80, 150, .10);
+  --line-emphasis: #C6BFDE;
+  --hairline: rgba(26, 22, 54, .13);
+  /* Inverted with the canvas: grain is a dark speckle on paper, not a light
+   * one, or the texture disappears entirely. */
+  --grain-rgb: 26, 22, 54;
+  --theme-primary: #00A88A;
+  --theme-primary-2: #008C72;
+  --theme-glow-rgb: 0, 168, 138;
+  /* .14, not .20: the same violet that reads as depth over a dark canvas
+   * reads as a stain over paper. */
+  --hero-wash: rgba(156, 141, 255, .14);
+}
+
 /* Accent override — replaces just the accent hue regardless of theme.
  * "theme" (the default) intentionally defines nothing here, so the
- * per-theme --theme-primary/-2/-glow-rgb set above simply shows through. */
-[data-accent="mint"] { --theme-primary: #7CF3D4; --theme-primary-2: #3ED3AA; --theme-glow-rgb: 91, 233, 194; }
-[data-accent="orange"] { --theme-primary: #FF9A54; --theme-primary-2: #E8601A; --theme-glow-rgb: 255, 122, 47; }
-[data-accent="yellowgreen"] { --theme-primary: #D6DF6B; --theme-primary-2: #A8B434; --theme-glow-rgb: 199, 209, 74; }
-[data-accent="purple"] { --theme-primary: #B49BFF; --theme-primary-2: #7C5AE0; --theme-glow-rgb: 155, 125, 245; }
-[data-accent="blue"] { --theme-primary: #8FC7FF; --theme-primary-2: #3B82F6; --theme-glow-rgb: 59, 130, 246; }
+ * per-theme --theme-primary/-2/-glow-rgb set above simply shows through.
+ * That pass-through is the whole mechanism behind the "Match theme" chip.
+ *
+ * Each accent declares three stops rather than two. The bright/deep pair is
+ * what a dark canvas uses; --accent-dark is the same hue taken down far
+ * enough to hold its own against paper, where the bright end washes out. */
+[data-accent="mint"]   { --accent-bright: #5BE9C2; --accent-deep: #3ED3AA; --accent-dark: #00A88A; --theme-glow-rgb: 91, 233, 194; }
+[data-accent="coral"]  { --accent-bright: #FF7A6B; --accent-deep: #E8493A; --accent-dark: #D1362A; --theme-glow-rgb: 255, 122, 107; }
+[data-accent="violet"] { --accent-bright: #B49BFF; --accent-deep: #7C5AE0; --accent-dark: #6541C8; --theme-glow-rgb: 155, 125, 245; }
+[data-accent="sky"]    { --accent-bright: #6FB7FF; --accent-deep: #2E7FE0; --accent-dark: #1D6FD0; --theme-glow-rgb: 111, 183, 255; }
+[data-accent="lime"]   { --accent-bright: #C6F24E; --accent-deep: #8FBE1F; --accent-dark: #5F8A00; --theme-glow-rgb: 198, 242, 78; }
+
+/* ONE rule pair, keyed off the canvas being light — not one rule per theme x
+ * accent. A light theme added later inherits the dark-step behaviour for
+ * every accent without a line of CSS, which is the point of the flag. */
+[data-accent]:not([data-accent="theme"]) {
+  --theme-primary: var(--accent-bright);
+  --theme-primary-2: var(--accent-deep);
+}
+[data-canvas="light"][data-accent]:not([data-accent="theme"]) {
+  --theme-primary: var(--accent-dark);
+  --theme-primary-2: var(--accent-dark);
+}
 
 /* Resolves the accent axis (theme default or override) into the tokens the
  * rest of the app actually reads — kept as a separate step from the

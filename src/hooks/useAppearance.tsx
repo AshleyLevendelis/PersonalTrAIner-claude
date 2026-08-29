@@ -3,6 +3,7 @@ import {
   getAppearance,
   saveAppearance,
   applyAppearance,
+  DEFAULT_APPEARANCE,
   type AppearanceRecord,
   type GlowLevel,
   type ThemeName,
@@ -24,7 +25,12 @@ interface AppearanceContextValue extends AppearanceRecord {
   setGlow: (glow: GlowLevel) => void
   setTheme: (theme: ThemeName) => void
   setAccent: (accent: AccentOverride) => void
+  /** Back to DEFAULT_APPEARANCE — 90 combinations needs one way out. */
+  reset: () => void
 }
+
+/** Exported so the settings sheet can take it as a prop and stay testable. */
+export type AppearanceController = AppearanceContextValue
 
 const AppearanceContext = createContext<AppearanceContextValue | null>(null)
 
@@ -44,6 +50,7 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
     setGlow: (glow: GlowLevel) => commit({ ...record, glow }),
     setTheme: (theme: ThemeName) => commit({ ...record, theme }),
     setAccent: (accent: AccentOverride) => commit({ ...record, accent }),
+    reset: () => commit({ ...DEFAULT_APPEARANCE }),
   }), [record, commit])
 
   return <AppearanceContext.Provider value={value}>{children}</AppearanceContext.Provider>

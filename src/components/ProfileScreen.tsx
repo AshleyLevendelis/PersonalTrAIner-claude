@@ -32,6 +32,7 @@ import { GoalWeightSetter } from '@/components/GoalWeightSetter'
 import { derivedStepsTargetFor } from '@/lib/steps-target'
 import { updateProfileField } from '@/lib/profile-store'
 import { useAppearance } from '@/hooks/useAppearance'
+import { AppearanceSection } from '@/components/AppearanceSection'
 import type { ThemeName, AccentOverride } from '@/lib/appearance-store'
 import type { RevealSpeed } from '@/lib/reveal-speed-store'
 import {
@@ -44,22 +45,9 @@ import type { UserProfile, TrainingDay, TrainingExperience, EquipmentAccess, Tra
 
 const GENDER_OPTIONS = [{ value: 'male', label: 'Male' }, { value: 'female', label: 'Female' }]
 
-// Turn 9 — swatch/gradient values lifted verbatim from the design doc's own
-// 9c Settings preview and 9d theme-comparison cards (project
-// 46c718f3-7619-4f0f-9016-7b75f2df1a78, "Density Pass.dc.html").
-const THEME_OPTIONS: { value: ThemeName; label: string; subtitle: string; swatches: [string, string, string, string] }[] = [
-  { value: 'nightshift', label: 'Nightshift', subtitle: 'deep violet · mint', swatches: ['#1A1636', '#241E4E', '#5BE9C2', '#9C8DFF'] },
-  { value: 'ember', label: 'Ember', subtitle: 'brown · orange', swatches: ['#15100C', '#241812', '#FF7A2F', '#D9A066'] },
-  { value: 'field', label: 'Field', subtitle: 'khaki · military', swatches: ['#14170F', '#212617', '#C7D14A', '#7FA98F'] },
-  { value: 'graphite', label: 'Graphite', subtitle: 'purple · grey', swatches: ['#121216', '#1D1D24', '#9B7DF5', '#C4B5FD'] },
-]
-const ACCENT_OPTIONS: { value: AccentOverride; label: string; from: string; to: string; glowRgb: string }[] = [
-  { value: 'mint', label: 'Mint', from: '#7CF3D4', to: '#3ED3AA', glowRgb: '91,233,194' },
-  { value: 'orange', label: 'Orange', from: '#FF9A54', to: '#E8601A', glowRgb: '255,122,47' },
-  { value: 'yellowgreen', label: 'Yellow-green', from: '#D6DF6B', to: '#A8B434', glowRgb: '199,209,74' },
-  { value: 'purple', label: 'Purple', from: '#B49BFF', to: '#7C5AE0', glowRgb: '155,125,245' },
-  { value: 'blue', label: 'Blue', from: '#8FC7FF', to: '#3B82F6', glowRgb: '59,130,246' },
-]
+// THEME/ACCENT tables moved to src/lib/appearance-palette.ts — the settings
+// sheet is no longer the only reader (the live preview needs them too), and
+// they now carry the light-canvas flag and the dark accent step.
 // The canonical day ordering now comes from the shared slot module rather
 // than a second hand-typed copy that could drift.
 const DAY_ORDER = DAYS_FULL
@@ -414,121 +402,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
           </InsightBanner>
         )}
 
-        {/* Appearance — design doc option 1f. Both axes apply instantly and
-            everywhere: glow is one intensity variable, canvas swaps the
-            surface ramp. No separate themes, nothing to reload. */}
-        <div className="space-y-2">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Appearance</h3>
-          <div className="space-y-4 rounded-md bg-[color:var(--surface-deep)] p-3">
-            <div>
-              <p className="text-sm font-medium">Glow effects</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">Halos on the action button, active states and key numbers</p>
-              <div className="mt-3 flex gap-[3px] rounded-xl bg-background p-[3px]">
-                {(['off', 'subtle', 'full'] as const).map(level => (
-                  <button
-                    key={level}
-                    type="button"
-                    aria-pressed={appearance.glow === level}
-                    onClick={() => appearance.setGlow(level)}
-                    className={`h-[38px] flex-1 rounded-[9px] text-[13px] capitalize transition-colors ${
-                      appearance.glow === level
-                        ? 'font-semibold text-[color:var(--primary-foreground)] glow-mint-box'
-                        : 'text-muted-foreground'
-                    }`}
-                    style={appearance.glow === level ? { background: 'linear-gradient(180deg, color-mix(in oklab, var(--primary) 84%, white), var(--primary-2))' } : undefined}
-                  >
-                    {level}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <p className="text-sm font-medium">Theme</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                Sets canvas, surfaces and text. Complete stays green and attention stays amber in every theme, so status never depends on your pick.
-              </p>
-              <div className="mt-3 flex flex-col">
-                {THEME_OPTIONS.map(opt => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    aria-pressed={appearance.theme === opt.value}
-                    onClick={() => appearance.setTheme(opt.value)}
-                    className="flex items-center gap-3.5 py-3.5"
-                    style={{ borderTop: '1px solid var(--hairline)' }}
-                  >
-                    <span className="flex shrink-0 gap-[5px]">
-                      {opt.swatches.map((c, i) => (
-                        <span key={i} className="size-[22px] rounded-[7px]" style={{ background: c }} />
-                      ))}
-                    </span>
-                    <span className="min-w-0 flex-1 text-left">
-                      <span className="block text-[15px] font-semibold">{opt.label}</span>
-                      <span className="block text-[11.5px] text-muted-foreground">{opt.subtitle}</span>
-                    </span>
-                    {appearance.theme === opt.value && (
-                      <span className="flex size-[22px] shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground glow-mint-box">
-                        <Check className="size-3" />
-                      </span>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <p className="text-sm font-medium">Action colour</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">Buttons, links and the chat key. Defaults to your theme — override it here.</p>
-              <div className="mt-3 flex items-center gap-2.5">
-                {ACCENT_OPTIONS.map(opt => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    aria-pressed={appearance.accent === opt.value}
-                    aria-label={`${opt.label} accent`}
-                    onClick={() => appearance.setAccent(opt.value)}
-                    className="size-[38px] shrink-0 rounded-xl"
-                    style={{
-                      background: `linear-gradient(180deg, ${opt.from}, ${opt.to})`,
-                      boxShadow: appearance.accent === opt.value ? `0 0 16px rgba(${opt.glowRgb},.6), inset 0 0 0 2px rgba(255,255,255,.85)` : undefined,
-                    }}
-                  />
-                ))}
-              </div>
-            </div>
-
-            <p className="text-[11.5px] leading-[1.5] text-muted-foreground/80">
-              Both apply instantly, everywhere. Theme sets canvas and surfaces; action colour is an independent override — no separate light/dark modes to manage.
-            </p>
-
-            <div>
-              <p className="text-sm font-medium">Chat reveal speed</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">How fast the coach's replies type out — Off shows them instantly</p>
-              <div className="mt-3 flex gap-[3px] rounded-xl bg-background p-[3px]">
-                {(['off', 'slow', 'normal', 'fast'] as const).map(level => (
-                  <button
-                    key={level}
-                    type="button"
-                    aria-pressed={revealSpeed === level}
-                    onClick={() => onRevealSpeedChange(level)}
-                    className={`h-[38px] flex-1 rounded-[9px] text-[13px] capitalize transition-colors ${
-                      revealSpeed === level
-                        ? 'font-semibold text-[color:var(--primary-foreground)] glow-mint-box'
-                        : 'text-muted-foreground'
-                    }`}
-                    style={revealSpeed === level ? { background: 'linear-gradient(180deg, color-mix(in oklab, var(--primary) 84%, white), var(--primary-2))' } : undefined}
-                  >
-                    {level}
-                  </button>
-                ))}
-              </div>
-              <p className="mt-2 text-[11.5px] leading-[1.5] text-muted-foreground/80">
-                Reduced-motion system settings always show replies instantly, regardless of this choice.
-              </p>
-            </div>
-          </div>
-        </div>
+        <AppearanceSection appearance={appearance} />
 
         <Separator />
 
@@ -782,6 +656,31 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
         {contextFacts.length > 0 && (
           <div ref={contextRef} className="space-y-2">
             <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tone &amp; context</h3>
+            <div>
+            <p className="text-sm font-medium">Chat reveal speed</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">How fast the coach's replies type out — Off shows them instantly</p>
+            <div className="mt-3 flex gap-[3px] rounded-xl bg-background p-[3px]">
+              {(['off', 'slow', 'normal', 'fast'] as const).map(level => (
+                <button
+                  key={level}
+                  type="button"
+                  aria-pressed={revealSpeed === level}
+                  onClick={() => onRevealSpeedChange(level)}
+                  className={`h-[38px] flex-1 rounded-[9px] text-[13px] capitalize transition-colors ${
+                    revealSpeed === level
+                      ? 'font-semibold text-[color:var(--primary-foreground)] glow-mint-box'
+                      : 'text-muted-foreground'
+                  }`}
+                  style={revealSpeed === level ? { background: 'linear-gradient(180deg, color-mix(in oklab, var(--primary) 84%, white), var(--primary-2))' } : undefined}
+                >
+                  {level}
+                </button>
+              ))}
+            </div>
+            <p className="mt-2 text-[11.5px] leading-[1.5] text-muted-foreground/80">
+              Reduced-motion system settings always show replies instantly, regardless of this choice.
+            </p>
+          </div>
             {contextFacts.map(c => (
               <div key={c.id} className="rounded-md border p-2.5 space-y-1">
                 {editingId === c.id ? (

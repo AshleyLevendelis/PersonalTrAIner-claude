@@ -166,7 +166,7 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
         className="pointer-events-none absolute inset-x-0 -top-12 h-[420px]"
         style={{
           background:
-            'radial-gradient(120% 60% at 50% 0%, rgba(156,141,255,.20) 0%, rgba(26,22,54,0) 60%), radial-gradient(90% 40% at 20% 42%, rgba(var(--glow-rgb),.10) 0%, rgba(26,22,54,0) 70%)',
+            'radial-gradient(120% 60% at 50% 0%, var(--hero-wash) 0%, transparent 60%), radial-gradient(90% 40% at 20% 42%, rgba(var(--glow-rgb),.10) 0%, transparent 70%)',
         }}
       />
       {/* Turn 4: a near-invisible grain texture over the whole hero surface. */}
