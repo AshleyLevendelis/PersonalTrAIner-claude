@@ -60,7 +60,7 @@ export const THEME_PREVIEWS: Record<ThemeName, ThemePreview> = {
     label: 'Daylight', subtitle: 'paper · deep mint',
     canvas: '#F5F3FA', surface: 'rgba(90,80,150,.10)',
     text: '#1A1636', muted: '#6B6590', hairline: 'rgba(26,22,54,.13)',
-    accent: '#00A88A', accent2: '#008C72', light: true,
+    accent: '#008C72', accent2: '#00705B', light: true,
   },
 }
 
@@ -76,7 +76,7 @@ export interface AccentPreview {
 
 export const ACCENT_PREVIEWS: Record<AccentOverride, AccentPreview> = {
   theme:  { label: 'Match theme', bright: null, deep: null, dark: null, glowRgb: null },
-  mint:   { label: 'Mint',   bright: '#5BE9C2', deep: '#3ED3AA', dark: '#00A88A', glowRgb: '91,233,194' },
+  mint:   { label: 'Mint',   bright: '#5BE9C2', deep: '#3ED3AA', dark: '#008C72', glowRgb: '91,233,194' },
   coral:  { label: 'Coral',  bright: '#FF7A6B', deep: '#E8493A', dark: '#D1362A', glowRgb: '255,122,107' },
   violet: { label: 'Violet', bright: '#B49BFF', deep: '#7C5AE0', dark: '#6541C8', glowRgb: '155,125,245' },
   sky:    { label: 'Sky',    bright: '#6FB7FF', deep: '#2E7FE0', dark: '#1D6FD0', glowRgb: '111,183,255' },

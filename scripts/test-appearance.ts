@@ -64,6 +64,14 @@ for (const name of THEME_ORDER) {
   // The canvas is the one value a wrong preview would misrepresent most.
   check(`  ...and its --background matches the preview (${p.canvas})`,
     new RegExp(`\\[data-theme="${name}"\\][\\s\\S]{0,900}?--background:\\s*${p.canvas};`, 'i').test(css), p.canvas)
+  // AND ITS ACCENT. Found by mutation: pinning only the canvas let index.css
+  // and the preview disagree about --theme-primary without a word, which is
+  // the exact drift this duplication was justified by a gate against — and
+  // the exact value Ashley's ruling just changed in two files at once. The
+  // preview would then paint a colour the app does not use, on the one screen
+  // whose entire job is showing you what you are choosing.
+  check(`  ...and its --theme-primary matches the preview (${p.accent})`,
+    new RegExp(`\\[data-theme="${name}"\\][\\s\\S]{0,1400}?--theme-primary:\\s*${p.accent};`, 'i').test(css), p.accent)
 }
 for (const a of ACCENT_ORDER) {
   if (a === 'theme') {
@@ -116,25 +124,34 @@ const fieldLime = contrastRatio(resolveAccentColor('field', 'lime'), THEME_PREVI
 check(`Field + Lime is comfortably ABOVE the floor, not below it (${fieldLime.toFixed(1)}:1)`,
   fieldLime > CONTRAST_FLOOR * 2, fieldLime)
 
-// WHERE IT ACTUALLY FIRES, swept rather than assumed. A guard nobody can
-// trigger is the tautological-control failure this repo keeps finding, so the
-// count is pinned: if it reaches 0 the guard has gone vacuous, and if it
-// climbs, a palette change has made something unreadable.
+// EVERY SHIPPED PAIR CLEARS THE FLOOR. This started as "some combination
+// trips it, and they are all Daylight" — a true statement about a palette
+// that shipped a theme warning about its own colour. Ashley's ruling darkened
+// Daylight's accent to #008C72, and mint's dark step with it for the same
+// reason, so the honest assertion is now the stronger one: nothing we ship
+// asks a person to find a button they cannot see.
 const under: string[] = []
 for (const th of THEME_ORDER) {
   for (const ac of ACCENT_ORDER) {
     const r = contrastRatio(resolveAccentColor(th, ac), THEME_PREVIEWS[th].canvas)
-    if (r < CONTRAST_FLOOR) under.push(`${th}+${ac} ${r.toFixed(1)}:1`)
+    if (r < CONTRAST_FLOOR) under.push(`${th}+${ac} ${r.toFixed(2)}:1`)
   }
 }
-console.log(`     under ${CONTRAST_FLOOR}:1 → ${under.join(', ') || '(none)'}`)
-check('the guard is reachable — some combination trips it', under.length > 0, under)
-check('...and it is not tripping across the board', under.length <= 4, under)
-// Both failing pairs are Daylight resolving to deep mint (#00A88A) on paper:
-// 'theme' and 'mint' are the same colour there. Recorded, not silently
-// "fixed" by editing a token the handoff specifies — see BACKLOG.
-check('the failures are Daylight-on-paper, the case the floor exists for',
-  under.every(u => u.startsWith('daylight+')), under)
+check(`all ${THEME_ORDER.length * ACCENT_ORDER.length} shipped combinations clear ${CONTRAST_FLOOR}:1`,
+  under.length === 0, under)
+
+// AND THE GUARD IS STILL REACHABLE — proven against a colour chosen to fail,
+// not by requiring the shipped palette to contain one. Those are different
+// claims, and conflating them is what made the first version of this check
+// go red the moment the palette got better. A dormant guard on a safe palette
+// is the goal; a guard that cannot fire at all is the defect.
+check('the guard still fires on a colour that genuinely fails',
+  contrastRatio('#00A88A', THEME_PREVIEWS.daylight.canvas) < CONTRAST_FLOOR,
+  contrastRatio('#00A88A', THEME_PREVIEWS.daylight.canvas))
+check('...and the value it used to ship with is exactly that colour',
+  Math.abs(contrastRatio('#00A88A', THEME_PREVIEWS.daylight.canvas) - 2.74) < 0.02)
+check('Daylight now clears it with room', contrastRatio(THEME_PREVIEWS.daylight.accent, THEME_PREVIEWS.daylight.canvas) > 3.5,
+  contrastRatio(THEME_PREVIEWS.daylight.accent, THEME_PREVIEWS.daylight.canvas).toFixed(2))
 
 check('the guard exists and is a warning, not a block',
   /CONTRAST_FLOOR/.test(sheet) && !/disabled=\{lowContrast/.test(sheet))

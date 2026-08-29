@@ -252,9 +252,16 @@
   /* Inverted with the canvas: grain is a dark speckle on paper, not a light
    * one, or the texture disappears entirely. */
   --grain-rgb: 26, 22, 54;
-  --theme-primary: #00A88A;
-  --theme-primary-2: #008C72;
-  --theme-glow-rgb: 0, 168, 138;
+  /* DARKENED ON ASHLEY'S RULING. The handoff specified #00A88A, and the
+   * contrast guard the same handoff asked for measured it at 2.74:1 against
+   * this canvas — under the 3:1 floor. So the new theme's first act was to
+   * warn about its own colour, which reads as a broken app rather than a
+   * careful one. #008C72 (its former deep step) measures 3.82:1 and clears
+   * it; the deep step moves down to match so the CTA gradient keeps its
+   * depth instead of going flat. */
+  --theme-primary: #008C72;
+  --theme-primary-2: #00705B;
+  --theme-glow-rgb: 0, 140, 114;
   /* .14, not .20: the same violet that reads as depth over a dark canvas
    * reads as a stain over paper. */
   --hero-wash: rgba(156, 141, 255, .14);
@@ -268,7 +275,11 @@
  * Each accent declares three stops rather than two. The bright/deep pair is
  * what a dark canvas uses; --accent-dark is the same hue taken down far
  * enough to hold its own against paper, where the bright end washes out. */
-[data-accent="mint"]   { --accent-bright: #5BE9C2; --accent-deep: #3ED3AA; --accent-dark: #00A88A; --theme-glow-rgb: 91, 233, 194; }
+/* mint's dark step darkened with Daylight's own accent, and for the same
+ * reason: #00A88A measured 2.74:1 on paper, so choosing the Mint chip on a
+ * light canvas re-created the warning the theme fix had just cleared. Same
+ * colour, same failure, one value apart. */
+[data-accent="mint"]   { --accent-bright: #5BE9C2; --accent-deep: #3ED3AA; --accent-dark: #008C72; --theme-glow-rgb: 91, 233, 194; }
 [data-accent="coral"]  { --accent-bright: #FF7A6B; --accent-deep: #E8493A; --accent-dark: #D1362A; --theme-glow-rgb: 255, 122, 107; }
 [data-accent="violet"] { --accent-bright: #B49BFF; --accent-deep: #7C5AE0; --accent-dark: #6541C8; --theme-glow-rgb: 155, 125, 245; }
 [data-accent="sky"]    { --accent-bright: #6FB7FF; --accent-deep: #2E7FE0; --accent-dark: #1D6FD0; --theme-glow-rgb: 111, 183, 255; }
