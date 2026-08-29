@@ -99,6 +99,16 @@ interface WorkingState {
   newMessages: ChatMsg[]
   openReview: boolean
   resolveCards: Set<string>
+  /**
+   * Slots this turn changed to a DIFFERENT value than they already held —
+   * i.e. the user corrected something. present_slot is refused for an
+   * answered slot (it stops the model re-asking what it already knows), and
+   * that refusal was also swallowing the one re-ask that is legitimate:
+   * "you picked Advanced, let's fix that — which one is you?". Ashley's
+   * ruling, 30 Aug 2026: show the buttons again, because tapping is how the
+   * wrong answer got in and it should be how it gets out.
+   */
+  corrected: Set<string>
 }
 
 const RECEIPT_PREFIX = '✓ '
@@ -449,7 +459,14 @@ function applySlot(
 ): boolean {
   const def = getSlotDef(key)
   if (!def || !def.validate(coerced)) return false
-  const alreadySame = JSON.stringify(prior[key]) === JSON.stringify(coerced) && ws.confirmed.has(key)
+  // Read BEFORE the write below, or every slot looks unchanged.
+  const wasAnswered = ws.confirmed.has(key)
+  const valueChanged = JSON.stringify(prior[key]) !== JSON.stringify(coerced)
+  const alreadySame = !valueChanged && wasAnswered
+  // Answered once, now answered differently: a correction, not a first
+  // answer. This is what re-opens present_slot for that one slot — see the
+  // note on WorkingState.corrected.
+  if (wasAnswered && valueChanged) ws.corrected.add(key)
   ws.values = { ...ws.values, [key]: coerced } as OnboardingSlotValues
   ws.confirmed = new Set(ws.confirmed).add(key)
   ws.resolveCards.add(key)
@@ -708,6 +725,7 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
     newMessages: [],
     openReview: false,
     resolveCards: new Set(),
+    corrected: new Set(),
   })
 
   const commitWorkingState = (ws: WorkingState) => {
@@ -761,6 +779,7 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
     // different situation and should just be dropped, not treated as dead
     // air a second time.
     let presentedThisTurn = false
+    const presentRequests: string[] = []
     for (const action of actions) {
       if (action.name === 'set_slot') {
         const key = normalizeSlotKey(String(action.args.slot_key ?? '')) as SlotKey
@@ -817,44 +836,16 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
           })
         }
       } else if (action.name === 'present_slot') {
-        const key = normalizeSlotKey(String(action.args.slot_key ?? ''))
-        const def = getSlotDef(key)
-        if (!def) {
-          console.warn('onboarding: present_slot with unknown slot_key', action.args.slot_key)
-          continue
-        }
-        if (ws.confirmed.has(key)) continue
-        if (!isSlotApplicable(def, ws.values)) continue
-        // One live card per question. The model can ask for the same chips on
-        // both legs of the round trip, and the second copy found the coach's
-        // message already taken, so it fell through to the raw-question
-        // fallback — the same question twice, the second time in form voice.
-        const alreadyLive = [...messages, ...ws.newMessages].some(
-          m => m.slotCard === key && !m.slotCardResolved && !ws.resolveCards.has(key),
-        )
-        if (alreadyLive) continue
-        // A second present_slot in the same turn is a prompt-compliance miss
-        // (see the comment above the loop), not a fresh instance of dead air
-        // — drop it rather than spawning a duplicate form-voice message.
-        if (presentedThisTurn) continue
-        presentedThisTurn = true
-        // Attach the chip card to the model's own turn when it produced text
-        // this round; otherwise render the slot's canonical question.
-        //
-        // Search BACKWARDS past confirmation lines rather than looking only at
-        // the last message. A turn that both records an answer and asks the
-        // next question emits [coach text, ✓ confirmation], so a last-only
-        // check found the confirmation, gave up, and printed the slot's raw
-        // form question underneath the coach's own words — the questionnaire
-        // voice reappearing directly below the conversational one.
-        const host = [...ws.newMessages]
-          .reverse()
-          .find(m => m.role === 'assistant' && !m.isReceipt && !m.slotCard && m.content.trim())
-        if (host) {
-          host.slotCard = key
-        } else {
-          ws.newMessages.push({ role: 'assistant', content: def.question, slotCard: key })
-        }
+        // DEFERRED to after the loop rather than handled here. Actions arrive
+        // in whatever order the model emitted them, and both of this one's
+        // decisions depend on the rest of the turn: whether the slot was
+        // corrected (a set_slot that may come later) and which message should
+        // host the chips (text that may not be pushed yet). Deciding mid-loop
+        // meant a present_slot listed before its own set_slot was judged
+        // against a turn that had not happened yet. Same reasoning as the
+        // post-loop review check in sendMessage: judge the turn once it is
+        // fully assembled.
+        presentRequests.push(String(action.args.slot_key ?? ''))
       } else if (action.name === 'decline_slot') {
         const key = normalizeSlotKey(String(action.args.slot_key ?? '')) as SlotKey
         const def = getSlotDef(key)
@@ -904,6 +895,59 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
         } else {
           ws.openReview = true
         }
+      }
+    }
+
+    // --- deferred present_slot, now that the turn is fully assembled -------
+    for (const rawKey of presentRequests) {
+      const key = normalizeSlotKey(rawKey)
+      const def = getSlotDef(key)
+      if (!def) {
+        console.warn('onboarding: present_slot with unknown slot_key', rawKey)
+        continue
+      }
+      // An answered slot is normally refused, so the model cannot re-ask what
+      // it already knows. The exception is a slot THIS TURN corrected: the
+      // user said the last answer was wrong, and Ashley's ruling is that they
+      // get the buttons back rather than having to describe the fix in prose.
+      // Reported by her: "if you make a wrong selection and then send the
+      // right answer after it, it messes with the next question and the next
+      // quick reply."
+      if (ws.confirmed.has(key) && !ws.corrected.has(key)) continue
+      if (!isSlotApplicable(def, ws.values)) continue
+      // One live card per question. The model can ask for the same chips on
+      // both legs of the round trip, and the second copy found the coach's
+      // message already taken, so it fell through to the raw-question
+      // fallback — the same question twice, the second time in form voice.
+      //
+      // A corrected slot's OLD card is resolved and so is not "live"; the
+      // check still stops a second card for the same correction.
+      const alreadyLive = [...messages, ...ws.newMessages].some(
+        m => m.slotCard === key && !m.slotCardResolved && !ws.resolveCards.has(key),
+      )
+      if (alreadyLive && !ws.corrected.has(key)) continue
+      if (ws.newMessages.some(m => m.slotCard === key)) continue
+      // A second present_slot in the same turn is a prompt-compliance miss,
+      // not a fresh instance of dead air — drop it rather than spawning a
+      // duplicate form-voice message.
+      if (presentedThisTurn) continue
+      presentedThisTurn = true
+      // Attach the chip card to the model's own turn when it produced text
+      // this round; otherwise render the slot's canonical question.
+      //
+      // Search BACKWARDS past confirmation lines rather than looking only at
+      // the last message. A turn that both records an answer and asks the
+      // next question emits [coach text, ✓ confirmation], so a last-only
+      // check found the confirmation, gave up, and printed the slot's raw
+      // form question underneath the coach's own words — the questionnaire
+      // voice reappearing directly below the conversational one.
+      const host = [...ws.newMessages]
+        .reverse()
+        .find(m => m.role === 'assistant' && !m.isReceipt && !m.slotCard && m.content.trim())
+      if (host) {
+        host.slotCard = key
+      } else {
+        ws.newMessages.push({ role: 'assistant', content: def.question, slotCard: key })
       }
     }
   }
@@ -1069,6 +1113,7 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
         newMessages: [],
         openReview: false,
         resolveCards: new Set(),
+    corrected: new Set(),
       }
       if (result.reply && result.reply.trim()) {
         responseWs.newMessages.push({ role: 'assistant', content: result.reply.trim() })
@@ -1420,11 +1465,46 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
 
      Falls back to "Say anything…", which stays honest when nothing specific
      is pending (the review, or a tangent). */
+  /**
+   * A card can stop applying while it is still on screen: correct an earlier
+   * answer and a later question can close behind it (say you're a beginner
+   * and the working-lifts question no longer applies to you). handleResolveSingle
+   * refuses the write in that state — correctly, it is a stale card — but the
+   * chips carried on LOOKING tappable and silently did nothing, which is the
+   * worst version of both. A control that cannot act must not be offered;
+   * SlotChipsCard renders nothing when resolved, so the dead grid goes away.
+   */
+  const cardStillApplies = (key: string) => {
+    const def = getSlotDef(key)
+    return !def || isSlotApplicable(def, values)
+  }
+
   const pendingHint = (() => {
-    const asked = [...messages].reverse().find(
-      m => (m.slotCard && !m.slotCardResolved) || (m.asksSlot && !confirmed.has(m.asksSlot)),
-    )
-    const key = asked?.slotCard && !asked.slotCardResolved ? asked.slotCard : asked?.asksSlot
+    // Indices, not just the message, because WHICH IS NEWER decides it.
+    // Fourth failure in this block, reported by Ashley: correct an answer and
+    // the coach's next question arrives with no card of its own, so this
+    // found an OLDER card still pending further up and named that question
+    // instead of the one she was looking at.
+    let askedIdx = -1
+    let coachQuestionIdx = -1
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const m = messages[i]
+      if (askedIdx < 0 && ((m.slotCard && !m.slotCardResolved) || (m.asksSlot && !confirmed.has(m.asksSlot)))) askedIdx = i
+      if (
+        coachQuestionIdx < 0 && m.role === 'assistant' && !m.isReceipt
+        && m.content !== RESUME_BANNER && m.content.includes('?')
+      ) coachQuestionIdx = i
+      if (askedIdx >= 0 && coachQuestionIdx >= 0) break
+    }
+    const asked = askedIdx >= 0 ? messages[askedIdx] : undefined
+    // The coach has asked something SINCE that card. Whatever the card says,
+    // it is not the question on screen, and naming it would contradict what
+    // she can read directly above the box — the same rule the fallback below
+    // already follows. "Say anything…" is true here; a stale question is not.
+    const staleCard = askedIdx >= 0 && coachQuestionIdx > askedIdx
+    const key = staleCard
+      ? undefined
+      : asked?.slotCard && !asked.slotCardResolved ? asked.slotCard : asked?.asksSlot
     if (key) {
       // A GROUPED CARD ASKS THREE THINGS, so naming one of them is wrong —
       // and the first member is the likeliest to be the one already filled in.
@@ -1591,7 +1671,7 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
                     slotKey={msg.slotCard}
                     values={values}
                     confirmed={confirmed}
-                    resolved={!!msg.slotCardResolved}
+                    resolved={!!msg.slotCardResolved || !cardStillApplies(msg.slotCard)}
                     busy={busy}
                     editing={!!msg.slotCardEditing}
                     onResolve={handleResolveNumeric}
@@ -1602,7 +1682,7 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
                   <SlotChipsCard
                     slotKey={msg.slotCard}
                     values={values}
-                    resolved={!!msg.slotCardResolved}
+                    resolved={!!msg.slotCardResolved || !cardStillApplies(msg.slotCard)}
                     busy={busy}
                     onToggleMulti={handleToggleMulti}
                     onResolveSingle={handleResolveSingle}
