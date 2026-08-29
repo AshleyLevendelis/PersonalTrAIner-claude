@@ -330,7 +330,7 @@ export interface OnboardingSlotValues {
   gender: 'male' | 'female' | null
   heightCm: string
   weightKg: string
-  /** null = unanswered; false = "I'm new / not sure" (calibration week); true = "I know my numbers" (known lifts below). */
+  /** null = unanswered OR never asked (beginners aren't); false = "Not sure" (calibration week); true = "I know my numbers" (known lifts below). */
   knowsWorkingLifts: boolean | null
   knownSquatKg: string
   knownBenchKg: string
@@ -498,12 +498,31 @@ export function isStartingFromNothing(values: OnboardingSlotValues): boolean {
  *
  * Two conditions, and BOTH answers must be in before the question can apply:
  *   1. They have barbell access at all.
- *   2. They aren't starting from nothing (isStartingFromNothing above).
+ *   2. They aren't a beginner.
+ *
+ * (2) IS ASHLEY'S RULING, 30 Aug 2026: "a beginner shouldn't be asked their
+ * numbers." It replaces the narrower isStartingFromNothing test that used to
+ * sit here — beginner AND sedentary — which this strictly subsumes, so that
+ * call is gone rather than left as a condition that can no longer decide
+ * anything. isStartingFromNothing itself stays: it has another caller (the
+ * doctor-note gate) and a drift check against isStartingOut().
+ *
+ * She was offered the narrower option of asking beginners anyway and telling
+ * them their week 1 would still be a calibration week, and chose not to ask
+ * at all. The reasoning that got there: a beginner's number is the one the
+ * app has already decided it will not prescribe off (generateMesocycle forces
+ * their calibration week regardless), so asking for it and then verifying it
+ * anyway is a question whose answer we half-distrust. Better to discover it
+ * in week 1 from what they actually log.
+ *
+ * activityLevel is still required before this can resolve. It no longer
+ * changes the answer, but the ordering the catalog note below describes
+ * depends on it being read here — keep activityLevel above knowsWorkingLifts.
  */
 function willBeLiftingBarbells(values: OnboardingSlotValues): boolean {
   if (values.equipment !== 'full_gym' && values.equipment !== 'home_gym') return false
   if (values.trainingExperience === null || values.activityLevel === null) return false
-  return !isStartingFromNothing(values)
+  return values.trainingExperience !== 'beginner'
 }
 
 const DAY_OPTIONS: SlotOption[] = DAYS_OF_WEEK.map(d => ({ value: d, icon: '📅', label: d }))
@@ -512,7 +531,11 @@ const GENDER_OPTIONS: SlotOption[] = [
   { value: 'female', icon: '♀️', label: 'Female' },
 ]
 const KNOWS_LIFTS_OPTIONS: SlotOption[] = [
-  { value: 'false', icon: '🌱', label: "I'm new / not sure", description: 'Start with a calibration week to find my numbers' },
+  // 🌱 was the icon here and is still the Beginner chip's icon — a seedling
+  // says "new" in pictures, which is the word Ashley asked this option to stop
+  // saying. Beginners no longer see this question at all, so the people
+  // reading it are experienced lifters who simply haven't tested lately.
+  { value: 'false', icon: '❓', label: 'Not sure', description: 'Start with a calibration week to find my numbers' },
   { value: 'true', icon: '🎯', label: 'I know my numbers', description: 'Enter my current working weights' },
 ]
 const SNACKS_OPTIONS: SlotOption[] = [

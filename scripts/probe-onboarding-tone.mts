@@ -96,7 +96,7 @@ async function say(text:string){
 const personaPath = process.argv[2]
 const outPath = process.argv[3]
 let personaName = 'default'
-let script = ["Ash","Fat Loss","Advanced","I'm new / not sure","Sun, Fri, Thu, Mon, Wed"]
+let script = ["Ash","Fat Loss","Advanced","Not sure","Sun, Fri, Thu, Mon, Wed"]
 if (personaPath) {
   const p = JSON.parse(fs.readFileSync(personaPath, 'utf8'))
   personaName = p.name ?? personaPath

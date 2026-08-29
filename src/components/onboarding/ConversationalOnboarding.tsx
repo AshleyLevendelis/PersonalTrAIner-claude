@@ -931,6 +931,13 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
     // the app can already be certain about.
     let ws = preRecorded
     let immediateCommit = !!preRecorded
+    // Did THIS message actually answer a question? Narrower than
+    // immediateCommit, which the allergen backstop below also sets for a
+    // reason that has nothing to do with the pending question. Only the three
+    // answer-recording paths set this: a control (tap/card/decline), the
+    // typed-exact-label backstop, and volunteered capture. Read by the stuck
+    // rescue near the bottom.
+    let answeredThisTurn = !!preRecorded
     if (!ws) {
       // Tier 1 — every still-unresolved card, most recent first. The model
       // can leave an older question's card pending while it asks a second
@@ -968,6 +975,7 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
         if (applySlot(candidate, pendingDef.key, matched, values)) {
           ws = candidate
           immediateCommit = true
+          answeredThisTurn = true
         }
         break
       }
@@ -982,6 +990,7 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
           if (applySlot(candidate, volunteered.def.key, volunteered.value, values)) {
             ws = candidate
             immediateCommit = true
+            answeredThisTurn = true
           }
         }
       }
@@ -1013,7 +1022,22 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
 
     // Captured before the round trip: the rescue below needs to know the
     // user said "I don't know" even after the model's reply has come back.
-    const userWasStuck = isStuckMessage(trimmed)
+    //
+    // ...unless this same message ALREADY answered a question. A chip label
+    // and the stuck vocabulary can be the same words: handleResolveSingle
+    // sends the tapped option's LABEL as the message text, so when Ashley
+    // renamed the working-lifts option to "Not sure" (30 Aug 2026) every tap
+    // on it started matching STUCK_SIGNAL's /^not sure$/ and got answered
+    // with "No problem — here are the options." — a rescue offered to someone
+    // who had just answered plainly. Typing it hit the same thing, via the
+    // exact-label backstop above.
+    //
+    // The answer was never lost (it commits before the send), so this was
+    // tone rather than data, but it is the exact failure STUCK_SIGNAL's own
+    // comment warns against: don't bury an answer they just gave under a chip
+    // grid. Keyed on "did we record an answer", not on "was it a tap", so a
+    // future label colliding with this vocabulary is covered too.
+    const userWasStuck = isStuckMessage(trimmed) && !answeredThisTurn
 
     const priorMessages = messages
     // User bubble first, THEN the tap's receipt — the transcript reads in

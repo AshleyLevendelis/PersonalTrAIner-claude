@@ -5321,9 +5321,18 @@ export function generateMesocycle(
   //     "loads start deliberately light... next week builds from YOUR
   //     numbers" — which is precisely proving the weight rather than
   //     assuming it.
+  //  4. A BEGINNER ALWAYS CALIBRATES. Ashley's ruling, 30 Aug 2026. Tapping
+  //     "I know my numbers" set skip_calibration_week regardless of
+  //     experience, so someone who had just described themselves as a
+  //     beginner could start heavy on a figure nobody had verified — and a
+  //     beginner is exactly who is least able to judge whether the number
+  //     they typed is right, and least able to absorb it if it is wrong.
+  //     Their numbers are still recorded and still anchor loads; what they no
+  //     longer do is buy a skipped week.
   const canSkipCalibration = profile.skip_calibration_week === true
     && hasAnyKnownLift
     && flaggedLifts.size === 0
+    && profile.training_experience !== 'beginner'
     && !resolveBodyBasis(profile).assumed
 
   // Persists ACROSS blocks (unlike blockBaselineKg/blockWeek3Kg below, which

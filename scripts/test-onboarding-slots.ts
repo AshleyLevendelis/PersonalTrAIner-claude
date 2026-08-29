@@ -27,6 +27,7 @@ import {
   INJURY_OPTIONS,
   DIETARY_OPTIONS,
   isStartingFromNothing,
+  isStuckMessage,
   detectAllergenTags,
   type OnboardingSlotValues,
   type SlotKey,
@@ -265,7 +266,56 @@ check('home gym → asked', isSlotApplicable(liftsDef, homeGymLifter))
 check('bodyweight only → never asked (no barbell in the plan)', !isSlotApplicable(liftsDef, bodyweight))
 check('bands/kettlebells only → never asked', !isSlotApplicable(liftsDef, bands))
 check('gym but starting from nothing → never asked (plan starts with walks)', !isSlotApplicable(liftsDef, startingFromNothing))
-check('gym beginner who is already active → asked', isSlotApplicable(liftsDef, activeBeginner))
+// Ashley, 30 Aug 2026: "a beginner shouldn't be asked their numbers." This
+// check asserted the OPPOSITE until then — an active beginner with a gym was
+// asked, because the gate only excluded beginner-AND-sedentary. Her reasoning
+// is that a beginner's stated number is the one the engine has already
+// decided it won't prescribe off (generateMesocycle forces their calibration
+// week regardless), so asking for it and then verifying it anyway is a
+// question whose answer we half-distrust.
+check('gym beginner who is already active → never asked either', !isSlotApplicable(liftsDef, activeBeginner))
+for (const exp of ['novice', 'intermediate', 'advanced'] as const) {
+  // The guard must close the question for beginners, not for everyone — the
+  // cheapest way for this ruling to go wrong is a gate that silently stops
+  // asking anybody, which nothing else here would catch.
+  check(`gym ${exp} → still asked`, isSlotApplicable(liftsDef, { ...gymLifter, trainingExperience: exp } as OnboardingSlotValues))
+}
+// Every combination, so the rule can't hold for the one activity level that
+// happens to be fixtured and fail for the rest.
+{
+  const activities = ['sedentary', 'light', 'moderate', 'active'] as const
+  const equipments = ['full_gym', 'home_gym', 'bodyweight', 'minimalist'] as const
+  const beginnerAsked: string[] = []
+  const nonBeginnerMissed: string[] = []
+  for (const equipment of equipments) {
+    for (const activityLevel of activities) {
+      const base = { ...gymLifter, equipment, activityLevel } as OnboardingSlotValues
+      if (isSlotApplicable(liftsDef, { ...base, trainingExperience: 'beginner' } as OnboardingSlotValues)) {
+        beginnerAsked.push(`${equipment}/${activityLevel}`)
+      }
+      const hasBarbell = equipment === 'full_gym' || equipment === 'home_gym'
+      if (hasBarbell && !isSlotApplicable(liftsDef, { ...base, trainingExperience: 'advanced' } as OnboardingSlotValues)) {
+        nonBeginnerMissed.push(`${equipment}/${activityLevel}`)
+      }
+    }
+  }
+  check('no beginner is asked, on any equipment × activity', beginnerAsked.length === 0, beginnerAsked)
+  check('...while every barbell-owning non-beginner still is', nonBeginnerMissed.length === 0, nonBeginnerMissed)
+
+  // The chip is only half of "asked". The model gets buildSlotCatalog and
+  // writes its own prose from it, so a question absent from the card but
+  // present in the catalog still gets asked — just conversationally, where
+  // no chip guard applies. Ashley's ruling has to hold on both surfaces.
+  const beginnerGym = { ...gymLifter, trainingExperience: 'beginner', activityLevel: 'moderate' } as OnboardingSlotValues
+  const keysFor = (v: OnboardingSlotValues) => buildSlotCatalog(v).map(e => e.key)
+  check(
+    "the model isn't even told the question exists for a beginner",
+    !keysFor(beginnerGym).includes('knowsWorkingLifts'),
+  )
+  check('...nor the three lift-weight questions behind it',
+    !keysFor(beginnerGym).some(k => k === 'knownSquatKg' || k === 'knownBenchKg' || k === 'knownDeadliftKg'))
+  check('...and is still told about it for an intermediate', keysFor(gymLifter).includes('knowsWorkingLifts'))
+}
 
 // An unanswered slot means "we don't know yet", never "assume yes" — this is
 // what stops the question arriving before the coach has learned enough.
@@ -290,11 +340,18 @@ const bwProfile = assembleProfile(bodyweightComplete)
 check('unasked → calibration week, never a bogus known weight', bwProfile.skip_calibration_week === false && bwProfile.known_squat_kg === undefined)
 
 console.log('\n13. That gate stays in step with what the engine actually prescribes')
-// willBeLiftingBarbells calls the shared isStartingFromNothing helper, which
-// is the values-based twin of isStartingOut's own profile-based check
-// (different input shape, same two questions, same answer). If one moves
-// without the other, people get asked about barbell weights for a plan made
-// of walks — so assert they agree.
+// This USED TO assert a biconditional — asked about lifts ⟺ engine prescribes
+// lifting — because willBeLiftingBarbells and isStartingOut read the same two
+// questions the same way. Ashley's 30 Aug 2026 ruling deliberately breaks the
+// ⟸ half: an active beginner gets a lifting plan and is still not asked. So
+// the direction worth keeping is the one that was ever about safety, and it
+// is asserted on its own rather than quietly weakened inside the old ===:
+//
+//   engine prescribes walks ⟹ never asked about barbell weights
+//
+// isStartingFromNothing still has to track isStartingOut (different input
+// shapes, same two questions) — it is what the doctor-note gate reads — so
+// that pairing is still asserted directly, just no longer via this gate.
 const asProfile = (v: OnboardingSlotValues): UserProfile =>
   ({ ...assembleProfile(fullValues()), training_experience: v.trainingExperience, activity_level: v.activityLevel } as UserProfile)
 for (const [label, v] of [
@@ -304,8 +361,17 @@ for (const [label, v] of [
 ] as const) {
   const engineSaysWalks = isStartingOut(asProfile(v))
   const weAsk = isSlotApplicable(liftsDef, v)
-  check(`${label}: asked about lifts ⟺ engine prescribes lifting`, weAsk === !engineSaysWalks, `ask=${weAsk} walks=${engineSaysWalks}`)
+  check(`${label}: a walks plan is never asked about barbell weights`, !(engineSaysWalks && weAsk), `ask=${weAsk} walks=${engineSaysWalks}`)
   check(`${label}: isStartingFromNothing matches isStartingOut`, isStartingFromNothing(v) === engineSaysWalks)
+}
+// The half the ruling replaced, stated as its own rule so it can't rot back:
+// being asked is now exactly "has a barbell, and isn't a beginner".
+for (const [label, v, expected] of [
+  ['sedentary beginner', startingFromNothing, false],
+  ['active beginner', activeBeginner, false],
+  ['intermediate', gymLifter, true],
+] as const) {
+  check(`${label}: asked ⟺ barbell access and not a beginner`, isSlotApplicable(liftsDef, v) === expected)
 }
 
 console.log('\n14. Order — the structural fix, not just the reading order')
@@ -509,6 +575,55 @@ console.log('\n16c. Every dietary preference the app offers is enforced in BOTH 
   // that no preference is silently dropped, whether it bans or leans.
   check('no preference is silently ignored by the meal generator', missing.length === 0, missing)
   check('...and there are enough to matter', DIETARY_PREFERENCES.length >= 12, DIETARY_PREFERENCES.length)
+}
+
+console.log('\n17. A chip label may share words with "I\'m stuck" — and must still answer')
+// Renaming the working-lifts option to "Not sure" (Ashley, 30 Aug 2026) made
+// a chip label EXACTLY match STUCK_SIGNAL's /^not sure$/. That matters
+// because handleResolveSingle sends the tapped option's LABEL as the message
+// text, so a tap on it read as "I don't know" and drew the rescue reply
+// "No problem — here are the options." — offered to someone who had just
+// answered plainly. Typing the same two words hit it via the exact-label
+// backstop.
+//
+// The label is not the bug and is NOT what this gate protects. Ashley chose
+// those words; the requirement is that the app handle the overlap. So this
+// section asserts the handling, and merely REPORTS the overlap.
+{
+  const colliding = ONBOARDING_SLOTS.flatMap(s =>
+    (s.options ?? []).filter(o => isStuckMessage(o.label)).map(o => `${s.key}:"${o.label}"`),
+  )
+  console.log(`  (chip labels that read as "I'm stuck": ${colliding.length ? colliding.join(', ') : 'none'})`)
+
+  // Comments stripped before matching. This gate family has been broken and
+  // silently satisfied by its own explanatory prose more than once this
+  // session; a rule about code should not be provable by a sentence about it.
+  const source = readFileSync(join(ROOT, 'src/components/onboarding/ConversationalOnboarding.tsx'), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/(^|[^:])\/\/.*$/gm, '$1')
+
+  check(
+    'the stuck rescue stands down when this message already answered something',
+    /const userWasStuck = isStuckMessage\(trimmed\) && !answeredThisTurn/.test(source),
+  )
+  check(
+    '...seeded from the control paths (a tap, a card, a decline)',
+    /let answeredThisTurn = !!preRecorded/.test(source),
+  )
+  // Two: the typed-exact-label backstop and volunteered capture. Without
+  // these, typing a colliding label is still rescued instead of answered.
+  check(
+    '...and set by both typed-capture paths, not just taps',
+    (source.match(/answeredThisTurn = true/g) ?? []).length >= 2,
+    (source.match(/answeredThisTurn = true/g) ?? []).length,
+  )
+  // The allergen backstop sets immediateCommit for an unrelated reason
+  // (a receipt it just pushed). If answeredThisTurn were the same variable,
+  // disclosing an allergy would suppress a genuine "I don't know".
+  check(
+    '...but is NOT the same flag as immediateCommit',
+    /let immediateCommit = !!preRecorded/.test(source) && /answeredThisTurn/.test(source),
+  )
 }
 
 console.log('\nAll onboarding-slot checks passed.')

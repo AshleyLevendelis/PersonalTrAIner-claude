@@ -99,6 +99,42 @@ check('...while a trustworthy number still anchors normally', saneMax > 100, san
 check('isImplausible agrees with implausibleLifts per lift',
   isImplausible(ashley, 'bench') && isImplausible(ashley, 'deadlift') && !isImplausible(ashley, 'squat'))
 
+console.log('\n3b. A beginner always calibrates, whatever they tapped\n')
+// Ashley's ruling, 30 Aug 2026: "a beginner should always get a calibration
+// week." skip_calibration_week was set from knowsWorkingLifts alone, so
+// someone who had just described themselves as a beginner could tap "I know
+// my numbers" and start heavy on a figure nobody had checked — and a beginner
+// is both least able to judge whether their number is right and least able to
+// absorb it if it is not. The numbers still anchor loads; they no longer buy
+// a skipped week.
+{
+  const withLifts = { known_squat_kg: 80, known_bench_kg: 60, known_deadlift_kg: 100, skip_calibration_week: true }
+  const byExperience = (['beginner', 'novice', 'intermediate', 'advanced'] as const)
+    .map(exp => ({ exp, cal: meso({ ...withLifts, training_experience: exp })[0].isCalibrationWeek }))
+  check('a beginner calibrates even having tapped "I know my numbers"',
+    byExperience.find(r => r.exp === 'beginner')?.cal === true, byExperience)
+  check('...and nobody else is forced into one by this rule',
+    byExperience.filter(r => r.exp !== 'beginner').every(r => r.cal === false), byExperience)
+  // The lifts must still be RECORDED — the ruling was about the skipped week,
+  // not about discarding what they told us.
+  const anchored = meso({ ...withLifts, training_experience: 'beginner' })
+  let heaviest = 0
+  for (const day of (anchored[0].days ?? [])) {
+    for (const ex of (day.exercises ?? []) as { suggested_load_kg?: number | null }[]) {
+      if (typeof ex.suggested_load_kg === 'number' && ex.suggested_load_kg > heaviest) heaviest = ex.suggested_load_kg
+    }
+  }
+  check('...and their stated numbers still anchor the loads', heaviest > 40, heaviest)
+}
+
+console.log('\n3c. The option no longer calls anyone new\n')
+// Ashley: "I dont like the 'Im new/ not sure' just say not sure." Someone with
+// a solid gym background who simply has not tested lately is not new, and the
+// question is only asking whether they know a number.
+const slots = readFileSync(join(ROOT, 'src/lib/onboarding-slots.ts'), 'utf8')
+check('the label is "Not sure"', /label: 'Not sure'/.test(slots))
+check("...and no longer says \"I'm new\"", !/I&apos;m new|I'm new \/ not sure/.test(slots))
+
 console.log('\n4. The rules read the app\'s own table, not a second copy\n')
 const mod = readFileSync(join(ROOT, 'src/lib/lift-plausibility.ts'), 'utf8')
 check('it imports the standards rather than restating them',
