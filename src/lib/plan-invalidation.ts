@@ -33,7 +33,7 @@ import { rebuildAgainstProfile } from './plan-adaptations'
  * would teach people to dismiss the dialog without reading it, and then the
  * one that matters gets dismissed too.
  */
-export const PLAN_INVALIDATING_FIELDS = ['injuries', 'equipment_access'] as const
+export const PLAN_INVALIDATING_FIELDS = ['injuries', 'equipment_access', 'training_days'] as const
 export type PlanInvalidatingField = typeof PLAN_INVALIDATING_FIELDS[number]
 
 export interface PlanInvalidation {
@@ -71,6 +71,25 @@ export function detectPlanInvalidation(
             'that work the area you just flagged. I can rebuild it from this week onwards to ' +
             'work around it. Everything you have already logged stays exactly as it is.',
         }
+      }
+    }
+  }
+
+  // The plan is built from the days marked available (exercise-plan.ts:4066),
+  // so dropping a day leaves sessions scheduled on a day they have just said
+  // they do not train. Same shape as the equipment case — added after the
+  // audit's own probe caught it missing from the first pass.
+  if ('training_days' in patch) {
+    const dayKey = (days: UserProfile['training_days'] | undefined) =>
+      (days ?? []).filter(d => d.available).map(d => d.day).sort().join('|')
+    if (dayKey(before.training_days) !== dayKey(patch.training_days)) {
+      return {
+        field: 'training_days',
+        title: 'Rebuild your plan around these days?',
+        detail:
+          'Your current plan was built around the days you had before, so it still puts sessions ' +
+          'on days you have just changed. I can rebuild it from this week onwards to fit the new ' +
+          'week. Everything you have already logged stays exactly as it is.',
       }
     }
   }

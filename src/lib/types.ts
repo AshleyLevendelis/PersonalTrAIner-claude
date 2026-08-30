@@ -531,7 +531,7 @@ export interface ChatPendingActionView {
 }
 
 export interface ChatReceiptView {
-  kind: 'log_workout' | 'propose_exercise_swap' | 'propose_meal_swap' | 'propose_injury_adaptation' | 'propose_injury_as_lasting' | 'propose_injury_recovered' | 'propose_equipment_adaptation' | 'memory_fact_saved' | 'memory_goal_saved' | 'memory_context_fact_saved' | 'display_name_saved' | 'grocery_item_added' | 'water_logged'
+  kind: 'log_workout' | 'propose_exercise_swap' | 'propose_meal_swap' | 'propose_injury_adaptation' | 'propose_injury_as_lasting' | 'propose_injury_recovered' | 'propose_equipment_adaptation' | 'propose_volume_change' | 'propose_schedule_change' | 'memory_fact_saved' | 'memory_goal_saved' | 'memory_context_fact_saved' | 'display_name_saved' | 'grocery_item_added' | 'water_logged'
   title: string
   rows: { label: string; detail: string; note?: string }[]
   summary?: string
@@ -568,31 +568,10 @@ export interface ChatMessage {
 // superseded by propose_meal_swap/propose_exercise_swap's pending-action
 // rail (ChatPendingActionView/ChatReceiptView above), not merely disabled.
 
-export interface AdjustVolumeAction {
-  type: 'adjust_volume'
-  day: string
-  adjustment: 'reduce_light' | 'reduce_half' | 'reduce_heavy' | 'increase_moderate' | 'increase_heavy'
-  reason: string
-}
-
 export interface BanExerciseAction {
   type: 'ban_exercise'
   exercise_name: string
   reason: string
-}
-
-export interface SchedulePatchItem {
-  day: string
-  action: 'ADD' | 'REMOVE' | 'MOVE'
-  block_name: string
-  exercises?: { name: string; sets: number; reps: string }[]
-}
-
-export interface UpdateScheduleAction {
-  type: 'update_workout_schedule'
-  schedule_patch: SchedulePatchItem[]
-  recalibrated_days?: string[]
-  adaptations?: string
 }
 
 export interface LogWorkoutSessionAction {
@@ -637,7 +616,11 @@ export interface SwapSessionForActivityAction {
   date?: string
 }
 
-export type PlanAction = AdjustVolumeAction | BanExerciseAction | UpdateScheduleAction | LogWorkoutSessionAction | LogWeightAction | LogWorkoutSetAction | SwapSessionForActivityAction
+// AdjustVolumeAction/UpdateScheduleAction are gone too (audit §2.4), one
+// round after replace_food/replace_exercise and for the same reason: both
+// are propose_volume_change / propose_schedule_change on the pending-action
+// rail now, which never routes through PlanAction.
+export type PlanAction = BanExerciseAction | LogWorkoutSessionAction | LogWeightAction | LogWorkoutSetAction | SwapSessionForActivityAction
 
 // ============================================================================
 // Daily Tracking Types (connects workout engine to nutrition/carb-cycling)

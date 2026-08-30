@@ -40,7 +40,7 @@ import { checkForConsistencyHold } from '@/lib/block-consistency'
 import { checkForLoadSuggestions, confirmLoadSuggestion, declineLoadSuggestion } from '@/lib/load-suggestions'
 import { checkForWeightBasisOffer, confirmWeightBasisOffer, declineWeightBasisOffer, planHasAssumedBodyLoads } from '@/lib/weight-basis-offer'
 import { getRevealSpeed, saveRevealSpeed, DEFAULT_REVEAL_SPEED, type RevealSpeed } from '@/lib/reveal-speed-store'
-import { ensureSignedIn, claimProfile, shouldAskForEmail, findOwnedProfileId } from '@/lib/auth'
+import { ensureSignedIn, claimProfile, shouldAskForEmail, findOwnedProfileId, describeSignInFailure } from '@/lib/auth'
 import { rebuildFromCurrentWeek, type PlanInvalidation } from '@/lib/plan-invalidation'
 import { SignInScreen } from '@/components/SignInScreen'
 
@@ -88,7 +88,7 @@ import { getAllItems as getAllGroceryItems, flushPending as flushGroceryPending,
 import { flushPending as flushSetLogPending } from '@/lib/set-log-store'
 import { flushPending as flushWaterPending } from '@/lib/water-store'
 import { flushPending as flushCardioPending } from '@/lib/cardio-log-store'
-import type { UserProfile, MacroTargets, WorkoutDay, PlanAction, SchedulePatchItem, MesocycleWeek } from '@/lib/types'
+import type { UserProfile, MacroTargets, WorkoutDay, PlanAction, MesocycleWeek } from '@/lib/types'
 import type { ExerciseEntry } from '@/lib/exercise-db'
 
 const STORAGE_KEY = 'fitplan_profile_id'
@@ -357,6 +357,43 @@ function App() {
     if (isKnownTabHash(hash)) return
     window.location.hash = tabHash('dashboard')
   }, [isRestoring, profile?.id, hash])
+
+  // MACROS FOLLOW THE BODY THEY WERE CALCULATED FROM — audit §2.1.
+  //
+  // Editing weight, age, height, sex, activity or goal on the Profile screen
+  // used to leave the calorie and protein targets exactly as they were until
+  // the next cold start. The old behaviour was documented in ProfileScreen as
+  // "live target recalculation off an arbitrary field edit is a separate
+  // feature", which is a defensible thing to decide and not what the app
+  // appears to do: it shows the new weight and the old targets on the same
+  // screen, and only the numbers on one of them are true.
+  //
+  // Deliberately the SAME call as restoreSession's, including the
+  // threshold-gated weight anchor — recomputing off the raw latest reading
+  // here would make an edit produce a different number than a reload does,
+  // which is a worse bug than the one being fixed.
+  //
+  // targetWeightAnchorKg is state, not a fresh lookup: the anchor only moves
+  // on a real trend, and re-querying it on every field edit would let a noisy
+  // weigh-in retune calories through the back door.
+  const macroInputs = profile
+    ? [profile.weight_kg, profile.age, profile.height_cm, profile.gender,
+       profile.activity_level, profile.fitness_goal, profile.macro_calculation_mode].join('|')
+    : null
+  const lastMacroInputsRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (isRestoring || !profile || macroInputs == null) return
+    // Skip the first pass — restoreSession has already computed these, and
+    // recomputing immediately would just be the same numbers again.
+    if (lastMacroInputsRef.current === null) { lastMacroInputsRef.current = macroInputs; return }
+    if (lastMacroInputsRef.current === macroInputs) return
+    lastMacroInputsRef.current = macroInputs
+    setMacros(computeTargets(profile, {
+      latestWeightKg: targetWeightAnchorKg ?? profile.weight_kg,
+      exercisePlan,
+    }))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [macroInputs, isRestoring])
 
   // Remember the last tab a user actually landed on, for the next cold start.
   useEffect(() => {
@@ -1239,140 +1276,18 @@ function App() {
     // categorically superseded by propose_meal_swap/propose_exercise_swap's
     // pending-action rail, which writes through meal-store/mesocycle-edit
     // directly rather than forwarding through this handler.
-    if (action.type === 'adjust_volume') {
-      setExercisePlan(prev =>
-        prev.map(day => {
-          if (day.day.toLowerCase() !== action.day.toLowerCase()) return day
-          return {
-            ...day,
-            exercises: day.exercises.map(ex => {
-              switch (action.adjustment) {
-                case 'reduce_light':
-                  return { ...ex, sets: Math.max(1, ex.sets - 1) }
-                case 'reduce_half':
-                  return { ...ex, sets: Math.max(1, Math.round(ex.sets / 2)) }
-                case 'reduce_heavy':
-                  return { ...ex, sets: Math.max(1, ex.sets - 2) }
-                case 'increase_moderate':
-                  return { ...ex, sets: ex.sets + 1 }
-                case 'increase_heavy':
-                  return { ...ex, sets: ex.sets + 2 }
-                default:
-                  return ex
-              }
-            }),
-          }
-        })
-      )
-    } else if (action.type === 'ban_exercise') {
+    // adjust_volume and update_workout_schedule are gone from PlanAction too,
+    // for the same reason and one round later (audit §2.4): they are now
+    // propose_volume_change / propose_schedule_change on the pending-action
+    // rail, which writes through mesocycle-persistence and profile-store.
+    // The branches that stood here mutated setExercisePlan and
+    // fitness_profiles.weekly_schedule — a flat fallback and a column the
+    // Exercise tab does not render from. That is precisely how one real
+    // profile ended up carrying three disagreeing schedules, so this is
+    // deleted rather than left unreachable: an unreachable second writer is
+    // one restored code path away from being the same bug again.
+    if (action.type === 'ban_exercise') {
       handleBanExercise(action.exercise_name)
-    } else if (action.type === 'update_workout_schedule') {
-      await handleScheduleUpdate(action.schedule_patch)
-    }
-  }
-
-  const handleScheduleUpdate = async (schedulePatch: SchedulePatchItem[]) => {
-    if (!profile?.id) return
-
-    // Build the new weekly_schedule from the patch operations
-    const newSchedule = { ...(profile.weekly_schedule || {}) }
-    for (const item of schedulePatch) {
-      if (item.action === 'REMOVE') {
-        newSchedule[item.day] = null
-      } else {
-        newSchedule[item.day] = item.block_name
-      }
-    }
-    setProfile(prev => prev ? { ...prev, weekly_schedule: newSchedule } : prev)
-
-    const normalizeBlock = (s: string) => s.toLowerCase().replace(/[^a-z]/g, '')
-
-    const currentDayMap = new Map<string, { focus: string; ids: string[] }>()
-    for (const day of exercisePlan) {
-      const ids = day.exercises.map(e => e.id).filter(Boolean) as string[]
-      currentDayMap.set(day.day, { focus: day.focus, ids })
-    }
-
-    for (const item of schedulePatch) {
-      const { day, action, block_name, exercises } = item
-
-      if (action === 'REMOVE') {
-        // Delete exercise rows for this day
-        const info = currentDayMap.get(day)
-        if (info && info.ids.length > 0) {
-          await supabase.from('exercise_plans').delete().in('id', info.ids)
-        }
-      } else if (action === 'ADD') {
-        // Insert new exercises for this day
-        if (exercises && exercises.length > 0) {
-          const rows = exercises.map(ex => ({
-            profile_id: profile.id,
-            day,
-            focus: block_name,
-            name: ex.name,
-            sets: ex.sets,
-            reps: ex.reps,
-            rest: '60-90s',
-          }))
-          await supabase.from('exercise_plans').insert(rows)
-        }
-      } else if (action === 'MOVE') {
-        // Clear existing exercises on the target day before moving
-        const targetInfo = currentDayMap.get(day)
-        if (targetInfo && targetInfo.ids.length > 0) {
-          await supabase.from('exercise_plans').delete().in('id', targetInfo.ids)
-        }
-
-        // Relocate source day's exercise rows to the target day
-        const normalizedBlock = normalizeBlock(block_name)
-        for (const [currentDay, info] of currentDayMap) {
-          if (normalizeBlock(info.focus) === normalizedBlock && currentDay !== day && info.ids.length > 0) {
-            await supabase.from('exercise_plans')
-              .update({ day, focus: block_name })
-              .in('id', info.ids)
-
-            // Mark the source day as rest unless another patch item fills it
-            const sourceHandledByOtherPatch = schedulePatch.some(
-              p => p.day === currentDay && p !== item && p.action !== 'REMOVE'
-            )
-            if (!sourceHandledByOtherPatch) {
-              newSchedule[currentDay] = null
-            }
-            break
-          }
-        }
-      }
-    }
-
-    // Refresh exercise plan from DB
-    const { data: exerciseRows } = await supabase
-      .from('exercise_plans')
-      .select('*')
-      .eq('profile_id', profile.id)
-
-    if (exerciseRows) {
-      const grouped = new Map<string, typeof exerciseRows>()
-      for (const row of exerciseRows) {
-        const existing = grouped.get(row.day) || []
-        existing.push(row)
-        grouped.set(row.day, existing)
-      }
-      const refreshed: WorkoutDay[] = []
-      for (const [day, exercises] of grouped) {
-        refreshed.push({
-          day,
-          focus: exercises[0].focus,
-          exercises: exercises.map(r => ({
-            id: r.id,
-            name: r.name,
-            sets: r.sets,
-            reps: r.reps,
-            rest: r.rest,
-            substitution: r.substitution || '',
-          })),
-        })
-      }
-      setExercisePlan(refreshed)
     }
   }
 
@@ -1985,18 +1900,22 @@ function App() {
   // everywhere and never says why. Nothing has been lost — the data is in the
   // database, this browser just could not prove who it is.
   if (authError) {
+    const signInFailure = describeSignInFailure(authError)
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="max-w-md w-full space-y-4 text-center">
           <h2 className="text-lg font-semibold">We couldn't sign you in</h2>
-          <p className="text-sm text-muted-foreground break-words">
-            Your plan is safe — this browser just couldn't reach the server to prove it's you,
-            so nothing can be loaded yet. Check your connection and try again.
-          </p>
+          {/* The message depends on WHAT failed. Blaming the connection for a
+              server setting sends someone to check their wifi over something
+              only a dashboard toggle can fix — and offers a Try again button
+              that cannot work however many times it is pressed. */}
+          <p className="text-sm text-muted-foreground break-words">{signInFailure.message}</p>
           <p className="text-xs text-muted-foreground break-words">{authError}</p>
-          <Button className="w-full" onClick={() => { setAuthError(null); setIsRestoring(true); void restoreSession() }}>
-            Try again
-          </Button>
+          {signInFailure.retryable && (
+            <Button className="w-full" onClick={() => { setAuthError(null); setIsRestoring(true); void restoreSession() }}>
+              Try again
+            </Button>
+          )}
         </div>
       </div>
     )
@@ -2072,27 +1991,22 @@ function App() {
         />
       )
     }
+    // Ashley's ruling was that nobody is walled behind a login, so sign-in is
+    // OFFERED beside onboarding rather than placed in front of it. It used to
+    // be rendered right here, as a second fixed layer at the bottom of the
+    // screen, specifically to avoid touching ConversationalOnboarding and the
+    // gates that pin it — and on a real phone it landed squarely on top of
+    // the name box, so the first control of the first screen could not be
+    // tapped at all. Onboarding now takes it as a prop and lays it out inside
+    // its own composer, where the browser guarantees they cannot overlap.
+    // Keeping a component untouched is not worth covering its only input.
     return (
-      <>
-        <Suspense fallback={<ScreenLoading />}>
-          <ConversationalOnboarding onComplete={handleOnboardingComplete} />
-        </Suspense>
-        {/* Offered BESIDE onboarding rather than in front of it — Ashley's
-            ruling was that nobody is walled behind a login. Rendered here
-            rather than inside ConversationalOnboarding so the conversation
-            itself, and the twenty-odd gates that pin it, are untouched. */}
-        <div
-          className="fixed inset-x-0 z-40 flex justify-center px-4"
-          style={{ bottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}
-        >
-          <button
-            onClick={() => setSignInOpen(true)}
-            className="rounded-full border bg-background/90 px-3 py-1.5 text-xs text-muted-foreground backdrop-blur min-h-[44px]"
-          >
-            Already have an account? Sign in
-          </button>
-        </div>
-      </>
+      <Suspense fallback={<ScreenLoading />}>
+        <ConversationalOnboarding
+          onComplete={handleOnboardingComplete}
+          onSignIn={() => setSignInOpen(true)}
+        />
+      </Suspense>
     )
   }
 

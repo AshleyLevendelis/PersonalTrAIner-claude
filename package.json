@@ -97,6 +97,8 @@
     "test:option-icons": "tsx scripts/test-option-icons.ts",
     "test:table-names": "tsx scripts/test-table-names.ts",
     "test:chat-actions": "tsx scripts/test-chat-actions.ts",
+    "test:coach-volume-schedule": "tsx scripts/test-coach-volume-schedule.ts",
+    "test:onboarding-reachable": "tsx scripts/test-onboarding-reachable.ts",
     "test:onboarding-slots": "tsx scripts/test-onboarding-slots.ts",
     "test:onboarding-corrections": "tsx scripts/test-onboarding-corrections.ts",
     "test:coach-sees-ingredients": "tsx scripts/test-coach-sees-ingredients.ts",
@@ -179,6 +181,7 @@
     "tailwindcss": "^4.1.8",
     "tsx": "^4.23.1",
     "typescript": "~5.8.3",
-    "vite": "^6.3.5"
+    "vite": "^6.3.5",
+    "playwright-core": "^1.62.1"
   }
 }

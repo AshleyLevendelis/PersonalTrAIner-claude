@@ -522,7 +522,23 @@ function isDeclined(key: SlotKey, values: OnboardingSlotValues, confirmed: Reado
   return confirmed.has(key) && (values[key] === null || values[key] === undefined)
 }
 
-export function ConversationalOnboarding({ onComplete }: { onComplete: (profile: UserProfile) => void }) {
+export function ConversationalOnboarding({ onComplete, onSignIn }: {
+  onComplete: (profile: UserProfile) => void
+  /**
+   * Opens the sign-in screen. Rendered INSIDE the composer's own fixed
+   * container (below), never as a second fixed layer over it.
+   *
+   * It was a second fixed layer, and it covered the name box completely on a
+   * real phone — the very first control of the very first screen, so a new
+   * user could not type anything at all. Both were `fixed` at the bottom at
+   * z-40; the later one in the DOM won and took the taps. The comment beside
+   * it claimed it was offered "BESIDE onboarding rather than in front of it",
+   * which is exactly what it was not. Laying the two out in one flex column
+   * makes the overlap impossible rather than merely unlikely: the browser
+   * cannot place two children of a column on top of each other.
+   */
+  onSignIn?: () => void
+}) {
   const [draftLoaded] = useState<OnboardingDraft | null>(() => loadOnboardingDraft())
   const [values, setValues] = useState<OnboardingSlotValues>(() => draftLoaded?.values ?? initialSlotValues())
   const [confirmed, setConfirmed] = useState<Set<string>>(() => new Set(draftLoaded?.confirmedSlots ?? []))
@@ -1566,6 +1582,11 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
     return (next ? getSlotDef(next as SlotKey)?.inputHint : undefined) ?? 'Say anything…'
   })()
 
+  // Has the person said anything yet? Drives whether the sign-in offer is
+  // shown above the box. Reads the transcript rather than a flag, so a
+  // resumed draft counts as "already started" without anything extra stored.
+  const hasSpoken = messages.some(m => m.role === 'user')
+
   const composerBottomStyle = isKeyboardOpen
     ? { bottom: insetPx }
     : { bottom: 'env(safe-area-inset-bottom)' }
@@ -1840,7 +1861,23 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
         className="ob-composer-fade fixed left-0 right-0 z-40 px-4 pt-6 pb-3"
         style={composerBottomStyle}
       >
-        <div className="max-w-md w-full mx-auto flex items-center gap-2.5">
+        <div className="max-w-md w-full mx-auto flex flex-col gap-2">
+        {/* Before the first thing they say, and not after — "are you new or
+            coming back?" is a question about the first ten seconds. Leaving it
+            above the box for all twelve questions is clutter in the one place
+            the screen has to stay quiet. hasSpoken is the honest test: a
+            resumed draft already has user turns, so somebody mid-onboarding
+            does not get asked again. */}
+        {onSignIn && !hasSpoken && (
+          <button
+            type="button"
+            onClick={onSignIn}
+            className="self-center rounded-full px-3 py-1.5 text-xs text-muted-foreground underline underline-offset-4 min-h-[44px]"
+          >
+            Already have an account? Sign in
+          </button>
+        )}
+        <div className="flex items-center gap-2.5">
           <Input
             ref={inputRef}
             value={input}
@@ -1905,6 +1942,7 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
           >
             <Send className="size-[22px]" />
           </Button>
+        </div>
         </div>
       </div>
     </div>
