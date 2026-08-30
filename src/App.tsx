@@ -1,11 +1,10 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, lazy, Suspense } from 'react'
 import { Tabs, TabsContent } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Loader2 } from 'lucide-react'
 import { ProfileMenu } from '@/components/ProfileMenu'
 import { ProfileScreen } from '@/components/ProfileScreen'
 import { BottomTabBar } from '@/components/BottomTabBar'
-import { ConversationalOnboarding } from '@/components/onboarding/ConversationalOnboarding'
 import { loadOnboardingDraft, clearOnboardingDraft } from '@/lib/onboarding-draft-store'
 import { NutritionDisplay } from '@/components/NutritionDisplay'
 import { ExerciseTab } from '@/components/exercise/ExerciseTab'
@@ -13,7 +12,6 @@ import { SLOT_LABEL as MEAL_SLOT_LABEL } from '@/components/MealPlan'
 import { Dashboard } from '@/components/Dashboard'
 import { ToolsTab } from '@/components/ToolsTab'
 import { ChatAssistant } from '@/components/ChatAssistant'
-import { DevTestPage } from '@/components/DevTestPage'
 import { OfflineStatusIndicator } from '@/components/OfflineStatusIndicator'
 import { BottomDock } from '@/components/BottomDock'
 import { ActiveSessionProvider } from '@/hooks/useActiveSession'
@@ -43,6 +41,42 @@ import { checkForLoadSuggestions, confirmLoadSuggestion, declineLoadSuggestion }
 import { checkForWeightBasisOffer, confirmWeightBasisOffer, declineWeightBasisOffer, planHasAssumedBodyLoads } from '@/lib/weight-basis-offer'
 import { getRevealSpeed, saveRevealSpeed, DEFAULT_REVEAL_SPEED, type RevealSpeed } from '@/lib/reveal-speed-store'
 import { ensureSignedIn, claimProfile, shouldAskForEmail, findOwnedProfileId } from '@/lib/auth'
+
+// ---------------------------------------------------------------------------
+// SPLIT OUT OF THE MAIN BUNDLE — audit §12, the 1.55 MB single chunk.
+//
+// Both of these were downloaded by every user on every load, and neither is
+// reachable on a normal one:
+//
+//   ConversationalOnboarding runs once, ever. Every returning user — which is
+//   every user after their first minute — paid for it on every visit.
+//
+//   DevTestPage is reachable only at #/dev-test and only for a dev account,
+//   and it drags in the constraint auditor and the quality scorer behind it.
+//   Shipping that to a person trying to look at their workout on mobile data
+//   is indefensible once it is this easy not to.
+//
+// React.lazy defers the DOWNLOAD to first render, so the cost moves to the
+// person who actually opens the screen. The Suspense fallback below is the
+// same spinner the restore path already shows, so the transition looks like
+// nothing new rather than like a second kind of loading.
+// ---------------------------------------------------------------------------
+const ConversationalOnboarding = lazy(() =>
+  import('@/components/onboarding/ConversationalOnboarding').then(m => ({ default: m.ConversationalOnboarding })))
+const DevTestPage = lazy(() =>
+  import('@/components/DevTestPage').then(m => ({ default: m.DevTestPage })))
+
+/** The one loading state this app has, reused so a lazy chunk never introduces a second. */
+function ScreenLoading() {
+  return (
+    <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="flex items-center gap-2 text-muted-foreground">
+        <Loader2 className="size-5 animate-spin" />
+        <span>Loading your plan...</span>
+      </div>
+    </div>
+  )
+}
 import { EmailPrompt } from '@/components/EmailPrompt'
 import { InsightBanner } from '@/components/ui/insight-banner'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
@@ -1913,12 +1947,14 @@ function App() {
     const canAccess = !profile || isDevAccount(profile)
     if (canAccess) {
       return (
-        <DevTestPage
-          profile={profile}
-          exercisePlan={exercisePlan}
-          mealPlan={mealPlan}
-          onBack={() => { window.location.hash = '' }}
-        />
+        <Suspense fallback={<ScreenLoading />}>
+          <DevTestPage
+            profile={profile}
+            exercisePlan={exercisePlan}
+            mealPlan={mealPlan}
+            onBack={() => { window.location.hash = '' }}
+          />
+        </Suspense>
       )
     }
   }
@@ -1964,7 +2000,7 @@ function App() {
     // One way in: the conversation. The step-by-step questionnaire and the
     // chooser that offered it were removed — see ConversationalOnboarding's
     // header note for what that means when the coach is unreachable.
-    return <ConversationalOnboarding onComplete={handleOnboardingComplete} />
+    return <Suspense fallback={<ScreenLoading />}><ConversationalOnboarding onComplete={handleOnboardingComplete} /></Suspense>
   }
 
   const totalWeeks = mesocycle.length > 0 ? mesocycle.length : 4

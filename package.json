@@ -39,6 +39,7 @@
     "test:schema-parity": "node scripts/test-schema-parity.mjs",
     "test:auth-and-rls": "tsx scripts/test-auth-and-rls.ts",
     "test:a11y": "tsx scripts/test-a11y.ts",
+    "test:bundle": "tsx scripts/test-bundle.ts",
     "test:rls-local": "node scripts/test-rls-local.mjs",
     "verify:rls": "tsx scripts/verify-rls-live.ts",
     "gen:rls-migration": "node scripts/generate-rls-migration.mjs",
