@@ -2085,7 +2085,7 @@ function App() {
           </TabsContent>
 
           <TabsContent value="tools">
-            <ToolsTab profileId={profile.id} mealPools={mealPools} targets={macros} softLikedFoods={compiledSoftFoodPreferences} />
+            <ToolsTab profileId={profile.id} mealPools={mealPools} targets={macros} softLikedFoods={compiledSoftFoodPreferences} todaysPicks={chosenMeals} />
           </TabsContent>
 
           <TabsContent value="chat" forceMount className="data-[state=inactive]:hidden">

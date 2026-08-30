@@ -627,13 +627,27 @@ function assembleHorizon(
   targets: MacroTargets,
   days: number,
   softLikedFoods: string[],
+  todaysPicks: Partial<Record<MealSlotName, PoolOption>>,
 ): { day: number; chosen: Partial<Record<MealSlotName, PoolOption>> }[] {
   const recentNames: Partial<Record<MealSlotName, string[]>> = {}
   const out: { day: number; chosen: Partial<Record<MealSlotName, PoolOption>> }[] = []
   for (let day = 0; day < days; day++) {
     const { chosen } = assembleDay(pools, targets, recentNames, softLikedFoods)
-    out.push({ day, chosen })
-    for (const [slot, option] of Object.entries(chosen) as [MealSlotName, PoolOption][]) {
+    // DAY 0 IS TODAY, AND TODAY IS ALREADY DECIDED (audit §5.1).
+    //
+    // This function re-derived every day from the pools, including today —
+    // so a meal the user had already swapped was ignored and the list
+    // shopped for the one they replaced. The comment on this module claimed
+    // the list "assembles the same days the Nutrition tab shows", which was
+    // true right up until the first swap.
+    //
+    // Only day 0 is overridden: days 1-6 genuinely are undecided, and
+    // assembleDay's own variety search is the right thing for them. The
+    // override also feeds recentNames below, so tomorrow does not simply
+    // repeat what was actually eaten today.
+    const dayChosen = day === 0 ? { ...chosen, ...todaysPicks } : chosen
+    out.push({ day, chosen: dayChosen })
+    for (const [slot, option] of Object.entries(dayChosen) as [MealSlotName, PoolOption][]) {
       const list = recentNames[slot] ?? []
       recentNames[slot] = [...list, option.name].slice(-3)
     }
@@ -664,6 +678,12 @@ export interface GenerateGroceryListInput {
    * the app never serves.
    */
   softLikedFoods?: string[]
+  /**
+   * What the user has ACTUALLY chosen for today, including any manual swap
+   * (audit §5.1). Without this the list re-derives today from the pools and
+   * shops for the meal they replaced.
+   */
+  todaysPicks?: Partial<Record<MealSlotName, PoolOption>>
 }
 
 export interface GenerateGroceryListResult {
@@ -686,7 +706,7 @@ export interface GenerateGroceryListResult {
  */
 export async function generateGroceryList(input: GenerateGroceryListInput): Promise<GenerateGroceryListResult> {
   const days = Math.max(1, Math.min(MAX_HORIZON_DAYS, input.days ?? DEFAULT_HORIZON_DAYS))
-  const horizon = assembleHorizon(input.mealPools, input.targets, days, input.softLikedFoods ?? [])
+  const horizon = assembleHorizon(input.mealPools, input.targets, days, input.softLikedFoods ?? [], input.todaysPicks ?? {})
 
   const aggregate = new Map<string, AggregatedIngredient>()
   for (const { day, chosen } of horizon) {

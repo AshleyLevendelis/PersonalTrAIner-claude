@@ -43,6 +43,22 @@ export interface ActiveSessionRecord {
    * session that was silently opened by logSet rather than an explicit
    * Start tap. */
   prSnapshotAtStart?: Record<string, PRRecord>
+  /**
+   * Weight/reps TYPED into a set row but not yet ticked, plus any extra set
+   * rows added by hand — keyed by `${exerciseId}:${setNumber}` and by
+   * exerciseId respectively (audit §6.3).
+   *
+   * These lived in component state only, so reloading the page, or leaving
+   * the app long enough for the browser to discard the tab, threw them away
+   * mid-session. Saved sets were always safe; this is the in-progress typing,
+   * which is exactly what someone loses when their phone locks between sets.
+   *
+   * Deliberately part of THIS record and not a second key, per this file's
+   * own rule: one localStorage key per profile, extended in place. Drafts are
+   * cleared per exercise as each set is logged, so this does not grow.
+   */
+  drafts?: Record<string, { weight: string; reps: string; isBodyweight: boolean }>
+  extraSets?: Record<string, number[]>
 }
 
 type RecordMap = Record<string /* date */, ActiveSessionRecord>

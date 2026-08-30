@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { useWakeLock } from '@/hooks/useWakeLock'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { useTrainingWeek } from '@/hooks/useTrainingWeek'
 import { useTimers } from '@/hooks/useTimers'
@@ -71,6 +72,13 @@ export function TodayPanel({
   onOpenSessionHistory?: () => void
 }) {
   const { date: today, dayName: todayName, liveWeek, startRest, setsFor, logs, status, startSession, finishSession } = useActiveSession()
+
+  // Audit §6.4 — hold the screen awake for as long as the session is
+  // actually running, and no longer. Before this the phone dimmed and locked
+  // on its normal schedule mid-set, so the user unlocked it between every
+  // set. Best-effort: silently does nothing where the browser doesn't
+  // support it (see useWakeLock).
+  useWakeLock(status === 'running')
   const timers = useTimers()
 
   const totalWeeks = mesocycle && mesocycle.length > 0 ? mesocycle.length : 4

@@ -134,7 +134,8 @@
     "test:proposal-expiry": "tsx scripts/test-proposal-expiry.ts",
     "test:local-dates": "tsx scripts/test-local-dates.ts",
     "test:silent-writes": "tsx scripts/test-silent-writes.ts",
-    "test:enforcement-gaps": "tsx scripts/test-enforcement-gaps.ts"
+    "test:enforcement-gaps": "tsx scripts/test-enforcement-gaps.ts",
+    "test:session-continuity": "tsx scripts/test-session-continuity.ts"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.4",

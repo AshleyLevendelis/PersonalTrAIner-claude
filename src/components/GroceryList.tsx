@@ -29,6 +29,8 @@ interface GroceryListProps {
   mealPools: Partial<Record<MealSlotName, PoolOption[]>>
   /** Soft food likes — must be the SAME value App.tsx passes to assembleDay, or the list is built from days the app never serves. */
   softLikedFoods: string[]
+  /** Today's actual picks, swaps included (audit §5.1) — without these the list shops for the meal the user replaced. */
+  todaysPicks?: Partial<Record<MealSlotName, PoolOption>>
   targets: MacroTargets | null
   /** Bumped externally (e.g. after a chat-added item) to force a reload without remounting. */
   refreshToken?: number
@@ -77,7 +79,7 @@ function formatShoppingQuantity(item: GroceryItemRow): { primary: string; exact:
   return { primary, exact }
 }
 
-export function GroceryList({ profileId, mealPools, targets, softLikedFoods, refreshToken }: GroceryListProps) {
+export function GroceryList({ profileId, mealPools, targets, softLikedFoods, todaysPicks, refreshToken }: GroceryListProps) {
   const [items, setItems] = useState<GroceryItemRow[]>([])
   const [loading, setLoading] = useState(false)
   const [generating, setGenerating] = useState(false)
@@ -107,7 +109,7 @@ export function GroceryList({ profileId, mealPools, targets, softLikedFoods, ref
       // generateGroceryList reads the current merged view then enqueues local
       // writes (it doesn't await the network) — reload picks up the merged
       // pending state immediately, no round-trip wait.
-      await generateGroceryList({ profileId, mealPools, targets, softLikedFoods, days: horizonDays })
+      await generateGroceryList({ profileId, mealPools, targets, softLikedFoods, days: horizonDays, todaysPicks })
       await reload()
     } finally {
       setGenerating(false)
