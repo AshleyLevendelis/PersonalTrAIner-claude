@@ -45,6 +45,8 @@
     "test:logged-reanchor": "tsx scripts/test-logged-reanchor.ts",
     "test:no-dead-code": "tsx scripts/test-no-dead-code.ts",
     "test:session-shortfall": "tsx scripts/test-session-shortfall.ts",
+    "test:timer-field": "tsx scripts/test-timer-field.ts",
+    "render:timer-field": "tsx scripts/render-timer-field.tsx",
     "test:rls-local": "node scripts/test-rls-local.mjs",
     "verify:rls": "tsx scripts/verify-rls-live.ts",
     "gen:rls-migration": "node scripts/generate-rls-migration.mjs",
