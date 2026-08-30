@@ -41,6 +41,7 @@ import { checkForLoadSuggestions, confirmLoadSuggestion, declineLoadSuggestion }
 import { checkForWeightBasisOffer, confirmWeightBasisOffer, declineWeightBasisOffer, planHasAssumedBodyLoads } from '@/lib/weight-basis-offer'
 import { getRevealSpeed, saveRevealSpeed, DEFAULT_REVEAL_SPEED, type RevealSpeed } from '@/lib/reveal-speed-store'
 import { ensureSignedIn, claimProfile, shouldAskForEmail, findOwnedProfileId } from '@/lib/auth'
+import { rebuildFromCurrentWeek, type PlanInvalidation } from '@/lib/plan-invalidation'
 
 // ---------------------------------------------------------------------------
 // SPLIT OUT OF THE MAIN BUNDLE — audit §12, the 1.55 MB single chunk.
@@ -266,6 +267,14 @@ function App() {
   // and every screen goes blank with no explanation at all.
   const [authError, setAuthError] = useState<string | null>(null)
   const [askForEmail, setAskForEmail] = useState(false)
+  /**
+   * A Profile edit that leaves the plan wrong (audit §2.1). Held as state
+   * rather than acted on, because the rule is ASK, NEVER SILENTLY — a rebuild
+   * rewrites the weeks ahead, and doing that as a side effect of a settings
+   * toggle would change somebody's training under them.
+   */
+  const [planInvalidation, setPlanInvalidation] = useState<PlanInvalidation | null>(null)
+  const [rebuilding, setRebuilding] = useState(false)
   const [generatingStatus, setGeneratingStatus] = useState('')
   const [exerciseExclusions, setExerciseExclusions] = useState<string[]>([])
   const [profileInfoOpen, setProfileInfoOpen] = useState(false)
@@ -1746,6 +1755,49 @@ function App() {
     }
   }
 
+  /**
+   * The user said yes to rebuilding around a change they just made.
+   *
+   * FORWARD ONLY. Past weeks hold logged sets — real work they actually did —
+   * so rewriting them would make their own history disagree with what they
+   * remember doing. rebuildFromCurrentWeek enforces that; this just supplies
+   * the week to start from.
+   */
+  const handleConfirmRebuild = async () => {
+    if (!profile?.id || rebuilding) return
+    setRebuilding(true)
+    try {
+      const currentWeek = getActiveMesocycleWeek(
+        mesocycleCreatedAt ?? profile.created_at, undefined, mesocycle.length || 4,
+      )
+      const result = await rebuildFromCurrentWeek(profile, effectiveExclusions, mesocycle, currentWeek)
+      if (!result.ok || !result.mesocycle) {
+        setWriteError(result.error ?? "Couldn't rebuild your plan just now — nothing has changed.")
+        return
+      }
+      const previous = mesocycle
+      setMesocycle(result.mesocycle)
+      try {
+        // Same reasoning as the ban path: this is an EDIT of the live plan,
+        // so the original creation time has to survive or live-week
+        // detection rewinds to week 1.
+        await saveMesocycle(profile.id, result.mesocycle, mesocycleCreatedAt ?? profile.created_at)
+      } catch (err) {
+        // The profile change itself already landed and is real. Only the plan
+        // rewrite failed, so say exactly that rather than implying the injury
+        // was not saved.
+        console.error('Persisting rebuild failed:', err)
+        setMesocycle(previous)
+        setWriteError("That change is saved, but your plan couldn't be rebuilt right now — reopen the app to try again.")
+        return
+      }
+      setLogsVersion(v => v + 1)
+    } finally {
+      setRebuilding(false)
+      setPlanInvalidation(null)
+    }
+  }
+
   const handleReset = async () => {
     setNewPlanResetting(true)
     try {
@@ -2325,11 +2377,32 @@ function App() {
         profile={profile}
         latestWeightKg={latestWeightKg}
         onProfileChanged={patch => setProfile(prev => prev ? { ...prev, ...patch } : prev)}
+        onPlanInvalidated={setPlanInvalidation}
         onMemoryChanged={() => { if (profile.id) return reloadMemory(profile.id) }}
         initialSection={profileInfoSection}
         revealSpeed={revealSpeed}
         onRevealSpeedChange={handleRevealSpeedChange}
       />
+      {/* ASK, NEVER SILENTLY (audit §2.1). A rebuild rewrites the weeks
+          ahead, so it happens on an explicit yes and nowhere else. Declining
+          leaves the plan exactly as it was — the profile change itself has
+          already been saved either way, so nothing is lost by saying no. */}
+      <Dialog open={planInvalidation !== null} onOpenChange={open => { if (!open && !rebuilding) setPlanInvalidation(null) }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{planInvalidation?.title}</DialogTitle>
+            <DialogDescription>{planInvalidation?.detail}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setPlanInvalidation(null)} disabled={rebuilding}>
+              Leave it as it is
+            </Button>
+            <Button onClick={handleConfirmRebuild} disabled={rebuilding}>
+              {rebuilding ? 'Rebuilding...' : 'Rebuild my plan'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <Dialog open={newPlanConfirmOpen} onOpenChange={open => { if (!newPlanResetting) setNewPlanConfirmOpen(open) }}>
         <DialogContent className="max-w-sm">
           <DialogHeader>

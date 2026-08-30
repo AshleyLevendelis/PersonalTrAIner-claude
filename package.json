@@ -41,6 +41,7 @@
     "test:a11y": "tsx scripts/test-a11y.ts",
     "test:bundle": "tsx scripts/test-bundle.ts",
     "test:ramp-arrived": "tsx scripts/test-ramp-arrived.ts",
+    "test:rebuild-offer": "tsx scripts/test-rebuild-offer.ts",
     "test:rls-local": "node scripts/test-rls-local.mjs",
     "verify:rls": "tsx scripts/verify-rls-live.ts",
     "gen:rls-migration": "node scripts/generate-rls-migration.mjs",

@@ -41,6 +41,7 @@ import {
   INJURY_OPTIONS, COOKING_TIME_OPTIONS, MEALS_PER_DAY_OPTIONS, DURATION_OPTIONS, BREAKFAST_STYLE_OPTIONS,
   DAYS_FULL, partitionInjuries,
 } from '@/lib/onboarding-slots'
+import { detectPlanInvalidation, type PlanInvalidation } from '@/lib/plan-invalidation'
 import type { UserProfile, TrainingDay, TrainingExperience, EquipmentAccess, TrainingStyle } from '@/lib/types'
 import { buildDataExport, downloadExport, summariseExport, deleteAllUserData } from '@/lib/user-data'
 
@@ -60,6 +61,15 @@ interface ProfileScreenProps {
   latestWeightKg?: number | null
   /** Fired after any profile-field edit — App.tsx merges the patch into its own profile state, no refetch needed. */
   onProfileChanged: (patch: Partial<UserProfile>) => void
+  /**
+   * Fired when the edit just made leaves the existing plan wrong — an injury
+   * added, or equipment changed (audit §2.1).
+   *
+   * This screen does NOT rebuild anything itself: App owns the mesocycle, and
+   * a rebuild rewrites the weeks ahead. It reports, App asks, and only an
+   * explicit confirm changes a plan.
+   */
+  onPlanInvalidated?: (invalidation: PlanInvalidation) => void
   /** Fired after any memory (goal/fact/context) edit/delete — same contract MemoryScreen had. */
   onMemoryChanged: () => void | Promise<void>
   /** Chat receipt deep-links land here, scrolled to the relevant memory section. 'dietary' — surfacing round — is where the meal-plan "unrecognised restriction" banner's "Open Profile" button lands. */
@@ -260,7 +270,7 @@ function factEffect(fact: UserFactRow): string {
   return 'recorded — not yet applied (takes effect on your next plan regeneration)'
 }
 
-export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onProfileChanged, onMemoryChanged, initialSection, revealSpeed, onRevealSpeedChange }: ProfileScreenProps) {
+export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onProfileChanged, onPlanInvalidated, onMemoryChanged, initialSection, revealSpeed, onRevealSpeedChange }: ProfileScreenProps) {
   const [facts, setFacts] = useState<UserFactRow[]>([])
   const [goals, setGoals] = useState<UserGoalRow[]>([])
   const [contextFacts, setContextFacts] = useState<UserContextFactRow[]>([])
@@ -481,8 +491,17 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
     const revertPatch = Object.fromEntries(
       Object.keys(patch).map(k => [k, profile[k as keyof UserProfile]])
     ) as Partial<UserProfile>
+    // Computed BEFORE the merge, against the profile as it was. Comparing the
+    // patch to an already-updated profile would find no change and offer
+    // nothing, which is how this fix would silently do nothing at all.
+    const invalidation = detectPlanInvalidation(profile, patch)
     onProfileChanged(patch)
-    updateProfileField(profileId, patch).catch(err => {
+    updateProfileField(profileId, patch).then(() => {
+      // Only once the write actually lands. Offering to rebuild around an
+      // injury whose save then failed would rebuild the plan around something
+      // the database does not know about.
+      if (invalidation) onPlanInvalidated?.(invalidation)
+    }).catch(err => {
       console.error('Profile field save failed — reverting', err)
       onProfileChanged(revertPatch)
       setSaveError("Couldn't save that change — it's been reverted. Check your connection and try again.")
