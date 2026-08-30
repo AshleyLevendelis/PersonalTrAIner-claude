@@ -27,8 +27,11 @@ Neither is wrong; quoting them together is:
 
 | | |
 |---|---|
-| **3.2%** | share of week-to-week TRANSITIONS that repeat. The rate. |
-| **61.7%** (audit) / **84.1%** (current) | share of PLANS containing at least one repeat, anywhere in sixteen weeks. |
+| **3.2%** | share of week-to-week TRANSITIONS that repeat. The rate. `report:frozen-weeks`. |
+| **61.7%** | share of PLANS containing at least one repeat, anywhere in sixteen weeks. `test:quality`, re-measured 30 Aug 2026 across 9,216 combinations — **exactly the audit's figure**, so that number is current, not stale. |
+
+(`report-frozen-weeks.ts`'s own header still quotes 84.1% for the plan-level
+figure. That one IS stale — the live run says 61.7%.)
 
 A sixteen-week plan has roughly forty transitions per exercise-slot, so "3% of
 transitions" and "most plans contain one" are the same fact stated twice. The
@@ -62,6 +65,33 @@ weight-basis offer, the calibration-week conservatism tiers).
 The bug is that it says nothing about it. The user sees week 9 and week 10
 print the same thing, is told they are in a progressive programme, and is
 given no reason and no way out.
+
+## What the chosen fix does and does not do
+
+Ashley's ruling, 30 Aug 2026: **ask for one real set.**
+
+**Built:** the app stops claiming a progression it has stopped making. The
+sentence beside a converged lift was still saying "this week goes up by one
+small step from last time" while the number sat still — the actual defect
+behind the repeated weeks, and a copy defect rather than an arithmetic one. It
+now says the estimate has run out, and asks for the one thing that changes it.
+Not one prescribed weight moved: verified across 6,860 prescriptions, 3,272 of
+them carrying a real load, byte-identical before and after.
+
+**NOT built, and it needs its own plan.** The second half of Ashley's option —
+a logged set re-anchoring the ramp so the weight climbs again — is a change to
+where load prescription takes its anchor from, and it collides with her own
+earlier standing ruling that the app never bumps load off logged performance
+without an explicit confirm ("a wrong bump means someone attempts a load they
+haven't earned"). Today the only feedback path is the block-review suggestion,
+which needs several sessions, covers main lifts only, and fires when someone
+BEATS the target — none of which is the converged case. Reconciling those two
+rulings is the next piece of work, not something to slip in quietly.
+
+**So the frozen-week rate does not move yet.** 61.7% of plans will still
+contain a repeat. What changed is that the person is told why, and told what
+to do about it, instead of watching a number sit still under a sentence
+promising it is climbing.
 
 ## The question for Ashley
 
