@@ -358,6 +358,43 @@ function App() {
     window.location.hash = tabHash('dashboard')
   }, [isRestoring, profile?.id, hash])
 
+  // MACROS FOLLOW THE BODY THEY WERE CALCULATED FROM — audit §2.1.
+  //
+  // Editing weight, age, height, sex, activity or goal on the Profile screen
+  // used to leave the calorie and protein targets exactly as they were until
+  // the next cold start. The old behaviour was documented in ProfileScreen as
+  // "live target recalculation off an arbitrary field edit is a separate
+  // feature", which is a defensible thing to decide and not what the app
+  // appears to do: it shows the new weight and the old targets on the same
+  // screen, and only the numbers on one of them are true.
+  //
+  // Deliberately the SAME call as restoreSession's, including the
+  // threshold-gated weight anchor — recomputing off the raw latest reading
+  // here would make an edit produce a different number than a reload does,
+  // which is a worse bug than the one being fixed.
+  //
+  // targetWeightAnchorKg is state, not a fresh lookup: the anchor only moves
+  // on a real trend, and re-querying it on every field edit would let a noisy
+  // weigh-in retune calories through the back door.
+  const macroInputs = profile
+    ? [profile.weight_kg, profile.age, profile.height_cm, profile.gender,
+       profile.activity_level, profile.fitness_goal, profile.macro_calculation_mode].join('|')
+    : null
+  const lastMacroInputsRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (isRestoring || !profile || macroInputs == null) return
+    // Skip the first pass — restoreSession has already computed these, and
+    // recomputing immediately would just be the same numbers again.
+    if (lastMacroInputsRef.current === null) { lastMacroInputsRef.current = macroInputs; return }
+    if (lastMacroInputsRef.current === macroInputs) return
+    lastMacroInputsRef.current = macroInputs
+    setMacros(computeTargets(profile, {
+      latestWeightKg: targetWeightAnchorKg ?? profile.weight_kg,
+      exercisePlan,
+    }))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [macroInputs, isRestoring])
+
   // Remember the last tab a user actually landed on, for the next cold start.
   useEffect(() => {
     if (route.kind !== 'tab') return

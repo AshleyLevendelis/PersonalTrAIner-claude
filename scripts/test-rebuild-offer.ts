@@ -92,8 +92,22 @@ console.log('\n2. And nothing else does')
   const removed = detectPlanInvalidation(base({ injuries: ['knees'] }), { injuries: [] })
   check('removing an injury does not', removed === null, removed)
 
-  check('the invalidating list is exactly the two fields that change exercise selection',
-    [...PLAN_INVALIDATING_FIELDS].sort().join(',') === 'equipment_access,injuries', PLAN_INVALIDATING_FIELDS)
+  // training_days joined this list after the audit's own diet-change probe
+  // caught it missing: the plan is built from the days marked available, so
+  // dropping one leaves sessions scheduled on a day they no longer train.
+  check('the invalidating list is exactly the fields that change what the plan contains',
+    [...PLAN_INVALIDATING_FIELDS].sort().join(',') === 'equipment_access,injuries,training_days',
+    PLAN_INVALIDATING_FIELDS)
+
+  const daysChanged = detectPlanInvalidation(
+    base({ training_days: [{ day: 'Monday', available: true }, { day: 'Tuesday', available: true }] }),
+    { training_days: [{ day: 'Monday', available: true }] } as Partial<UserProfile>)
+  check('dropping a training day offers a rebuild', daysChanged?.field === 'training_days', daysChanged)
+  // Re-saving the same days in a different order must not nag.
+  const reordered = detectPlanInvalidation(
+    base({ training_days: [{ day: 'Monday', available: true }, { day: 'Tuesday', available: true }] }),
+    { training_days: [{ day: 'Tuesday', available: true }, { day: 'Monday', available: true }] } as Partial<UserProfile>)
+  check('...but re-saving the same days in another order does not', reordered === null, reordered)
 }
 
 console.log('\n3. A rebuild changes the weeks ahead and NOT the weeks behind')
