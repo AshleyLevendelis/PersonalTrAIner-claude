@@ -142,6 +142,19 @@ console.log('\n5. The counter store is the one table anon cannot touch')
   check('...and granted only to the service role the functions use',
     /GRANT EXECUTE ON FUNCTION increment_ai_usage\(text, text\) TO service_role/.test(sql))
   check('...and never to anon', !/GRANT EXECUTE ON FUNCTION increment_ai_usage[^;]*anon/.test(sql))
+
+  // REVOKE ... FROM PUBLIC READS AIRTIGHT AND IS NOT, on Supabase. Supabase
+  // hands anon and authenticated privileges on new objects in `public` via
+  // DEFAULT PRIVILEGES, and those land as DIRECT grants — which revoking from
+  // PUBLIC does not touch. Proven by running the migrations against a real
+  // PostgreSQL with that setup (scripts/test-rls-local.mjs), where anon could
+  // still call the counter and push any profile it named over its daily cap.
+  const hardened = readFileSync(
+    join(ROOT, 'supabase/migrations/20260830130000_close_the_usage_counter_to_anon.sql'), 'utf8')
+  check('the revoke names the roles that actually hold the grant',
+    /REVOKE ALL ON FUNCTION increment_ai_usage\(text, text\) FROM PUBLIC, anon, authenticated;/.test(hardened))
+  check('...and the service role keeps it, or the cap counts nothing at all',
+    /GRANT EXECUTE ON FUNCTION increment_ai_usage\(text, text\) TO service_role;/.test(hardened))
 }
 
 console.log('\n6. The two layers fail in the directions they were designed to')

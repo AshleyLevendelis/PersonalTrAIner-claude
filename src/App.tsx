@@ -42,6 +42,8 @@ import { checkForConsistencyHold } from '@/lib/block-consistency'
 import { checkForLoadSuggestions, confirmLoadSuggestion, declineLoadSuggestion } from '@/lib/load-suggestions'
 import { checkForWeightBasisOffer, confirmWeightBasisOffer, declineWeightBasisOffer, planHasAssumedBodyLoads } from '@/lib/weight-basis-offer'
 import { getRevealSpeed, saveRevealSpeed, DEFAULT_REVEAL_SPEED, type RevealSpeed } from '@/lib/reveal-speed-store'
+import { ensureSignedIn, claimProfile, shouldAskForEmail, findOwnedProfileId } from '@/lib/auth'
+import { EmailPrompt } from '@/components/EmailPrompt'
 import { InsightBanner } from '@/components/ui/insight-banner'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { getActiveFacts, getActiveGoals, getActiveContextFacts, createFact, createContextFact, createGoal, type UserFactRow, type UserGoalRow, type UserContextFactRow } from '@/lib/memory-store'
@@ -225,6 +227,11 @@ function App() {
    * exists to prevent. This one renders over the app instead.
    */
   const [unsavedProfileWarning, setUnsavedProfileWarning] = useState<string | null>(null)
+  // Sign-in state. `authError` is deliberately surfaced rather than logged:
+  // with row-level security on, a client that failed to sign in reads nothing
+  // and every screen goes blank with no explanation at all.
+  const [authError, setAuthError] = useState<string | null>(null)
+  const [askForEmail, setAskForEmail] = useState(false)
   const [generatingStatus, setGeneratingStatus] = useState('')
   const [exerciseExclusions, setExerciseExclusions] = useState<string[]>([])
   const [profileInfoOpen, setProfileInfoOpen] = useState(false)
@@ -309,16 +316,49 @@ function App() {
   }, [route])
 
   const restoreSession = async () => {
-    const storedId = localStorage.getItem(STORAGE_KEY)
-    if (!storedId) {
+    // SIGN IN BEFORE READING ANYTHING. Every table is scoped to auth.uid()
+    // now, so a client with no session reads zero rows — indistinguishable,
+    // from inside the app, from a person who has no profile yet. Getting this
+    // order wrong would silently send returning users back through onboarding.
+    const signIn = await ensureSignedIn()
+    if (signIn.error) {
+      setAuthError(signIn.error)
       setIsRestoring(false)
       return
     }
 
+    const storedId = localStorage.getItem(STORAGE_KEY)
+
+    // Claim before reading. A profile from before accounts existed has no
+    // owner, and an unowned row is readable by nobody — including the person
+    // whose row it is. claim_profile only touches rows still unowned, so this
+    // is a no-op for everyone else and safe to run on every load.
+    if (storedId) await claimProfile(storedId)
+
+    // Ask the database who this account owns rather than trusting
+    // localStorage alone: someone who signed in with an email on a new device
+    // has no stored id at all, and their profile is still theirs.
+    //
+    // ONLY FOR AN ACCOUNT WITH AN EMAIL, and that guard is doing real work.
+    // "New Plan" abandons the old profile by clearing the stored id while
+    // leaving the row — which this account still owns. Without the guard, the
+    // very next load would find that row and restore the plan the user had
+    // just chosen to replace. An anonymous session with no stored id has
+    // nothing legitimate to restore; an email session is the only way to
+    // arrive at a session that deliberately owns a profile you have no local
+    // record of.
+    const ownedId = storedId ?? (signIn.email ? await findOwnedProfileId() : null)
+    if (!ownedId) {
+      setIsRestoring(false)
+      void shouldAskForEmail().then(setAskForEmail)
+      return
+    }
+    if (ownedId !== storedId) localStorage.setItem(STORAGE_KEY, ownedId)
+
     const { data: profileRow } = await supabase
       .from('fitness_profiles')
       .select('*')
-      .eq('id', storedId)
+      .eq('id', ownedId)
       .maybeSingle()
 
     if (!profileRow) {
@@ -326,6 +366,11 @@ function App() {
       setIsRestoring(false)
       return
     }
+
+    // Ashley's ruling, 30 Aug 2026: existing users keep everything and are
+    // ASKED for an email next time they open the app, dismissibly — not
+    // walled behind a login screen mid-training-block.
+    void shouldAskForEmail().then(setAskForEmail)
 
     const restoredProfile: UserProfile = {
       id: profileRow.id,
@@ -413,9 +458,9 @@ function App() {
     setExerciseExclusions(restoredExclusions)
 
     const [restoredPools, { data: exerciseRows }, fullMesocycle] = await Promise.all([
-      getPools(storedId),
-      supabase.from('exercise_plans').select('*').eq('profile_id', storedId),
-      restoreMesocycle(storedId),
+      getPools(ownedId),
+      supabase.from('exercise_plans').select('*').eq('profile_id', ownedId),
+      restoreMesocycle(ownedId),
     ])
 
     let restoredExercises: WorkoutDay[] = []
@@ -791,9 +836,26 @@ function App() {
     const workout = planResult.plan
     const mesocycleData = generateMesocycle(enrichedProfile, workout, effectiveOnboardingExclusions)
 
+    // The insert policy requires owner_id = auth.uid(), so a profile cannot be
+    // created without a session and cannot be created owned by somebody else.
+    // Sign in here as well as in restoreSession: onboarding is reachable on a
+    // first load, and an unsigned insert would fail with a policy error the
+    // user could do nothing about.
+    const signIn = await ensureSignedIn()
+    if (signIn.error || !signIn.userId) {
+      // setupError, not authError: this is the onboarding screen's own error
+      // surface, which is where the person actually is when it happens.
+      setSetupError(
+        "We couldn't start your account, so there was nowhere to save your plan. " +
+        `Check your connection and try again — nothing was lost. (${signIn.error ?? 'no session'})`,
+      )
+      return
+    }
+
     const { data, error: insertError } = await supabase
       .from('fitness_profiles')
       .insert({
+        owner_id: signIn.userId,
         age: enrichedProfile.age,
         gender: enrichedProfile.gender,
         height_cm: enrichedProfile.height_cm,
@@ -1823,6 +1885,29 @@ function App() {
     )
   }
 
+  // Signing in failed. This has to be its own screen rather than a banner:
+  // with row-level security on, a client without a session reads zero rows,
+  // so the alternative is a fully-populated-looking app that is empty
+  // everywhere and never says why. Nothing has been lost — the data is in the
+  // database, this browser just could not prove who it is.
+  if (authError) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="max-w-md w-full space-y-4 text-center">
+          <h2 className="text-lg font-semibold">We couldn't sign you in</h2>
+          <p className="text-sm text-muted-foreground break-words">
+            Your plan is safe — this browser just couldn't reach the server to prove it's you,
+            so nothing can be loaded yet. Check your connection and try again.
+          </p>
+          <p className="text-xs text-muted-foreground break-words">{authError}</p>
+          <Button className="w-full" onClick={() => { setAuthError(null); setIsRestoring(true); void restoreSession() }}>
+            Try again
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
   // Dev-test route: accessible even before profile is loaded
   if (hash === '#/dev-test') {
     const canAccess = !profile || isDevAccount(profile)
@@ -1904,6 +1989,8 @@ function App() {
       {/* The plan exists in memory but not in the database. Says so once, in
           plain terms, and stays dismissible — the user can carry on, but
           they are never left believing it was saved. */}
+      {askForEmail && <EmailPrompt onClose={() => setAskForEmail(false)} />}
+
       {unsavedProfileWarning && (
         <div
           role="alert"
