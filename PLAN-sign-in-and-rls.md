@@ -165,6 +165,48 @@ But it leaves a real question that is Ashley's, not mine: **should "New Plan"
 delete the old one?** Today it keeps it forever, invisible. Logged in
 BACKLOG.md rather than decided here.
 
+## Checked against the live databases, 30 Aug 2026
+
+Read-only, both projects, after the build. Everything the plan assumed from
+the migration files is true of the real schemas — and two things are worth
+writing down rather than remembering.
+
+| | TEST | PRODUCTION |
+|---|---|---|
+| Latest applied migration | `20260828140000` | `20260828140000` |
+| Policies in `public` | 112 | 112 |
+| Profiles stored | 10 | **70** |
+| Chat messages stored | — | **407** |
+| Logged sets stored | — | **207** |
+| `owner_id` exists yet | no | no |
+| `ai_usage_daily` exists yet | no | no |
+
+**The exposure is not hypothetical.** 70 profiles, 407 chat messages and 207
+logged sets are sitting behind `USING (true)` right now, readable by anyone
+holding a key that ships in the app bundle.
+
+**Every live policy is `TO {anon, authenticated} USING (true)`, and there are
+no extra policies created by hand in the dashboard.** That was the one risk
+the generator could not see: a policy that exists in the database but in no
+migration file would survive the migration and keep the hole open. There are
+none. The drop list covers all 112.
+
+**`set_logs.user_id` really is `text` on production, and the table has 0
+rows.** Closing it costs nothing, and had the first draft shipped, the whole
+migration would have failed on apply.
+
+**Three migrations are pending, not one:** `20260830090000` (the usage
+counter), `20260830120000` (scoping), `20260830130000` (the counter's grants).
+
+**Supabase's own security advisor reports zero issues on production.** It
+checks that RLS is enabled, which it is — on every table, all of them with a
+policy that permits everything. Worth knowing that a clean dashboard was never
+evidence of anything here.
+
+**GoTrue supports anonymous sign-in** (the `is_anonymous` column is present on
+`auth.users`) and no anonymous user has ever been created. So step 0 below is
+a toggle, not an upgrade — but it is still a toggle nobody has flipped.
+
 ## Deploy, in order — and the order is not optional
 
 **0. TURN ON ANONYMOUS SIGN-INS IN THE SUPABASE DASHBOARD. Both projects.**
