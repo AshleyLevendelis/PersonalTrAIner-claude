@@ -137,7 +137,8 @@
     "test:enforcement-gaps": "tsx scripts/test-enforcement-gaps.ts",
     "test:session-continuity": "tsx scripts/test-session-continuity.ts",
     "test:installable": "tsx scripts/test-installable.ts",
-    "test:spend-cap": "tsx scripts/test-spend-cap.ts"
+    "test:spend-cap": "tsx scripts/test-spend-cap.ts",
+    "test:user-data": "tsx scripts/test-user-data.ts"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.4",

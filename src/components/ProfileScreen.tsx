@@ -42,6 +42,7 @@ import {
   DAYS_FULL, partitionInjuries,
 } from '@/lib/onboarding-slots'
 import type { UserProfile, TrainingDay, TrainingExperience, EquipmentAccess, TrainingStyle } from '@/lib/types'
+import { buildDataExport, downloadExport, summariseExport, deleteAllUserData } from '@/lib/user-data'
 
 const GENDER_OPTIONS = [{ value: 'male', label: 'Male' }, { value: 'female', label: 'Female' }]
 
@@ -422,6 +423,58 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
    * source of truth to keep in step.
    */
   const { codes: injuryCodes, unrecognised: unrecognisedInjuries } = partitionInjuries(profile.injuries ?? [])
+
+  // --- Your data (audit §1.4) -------------------------------------------
+  const [dataBusy, setDataBusy] = useState<'export' | 'delete' | null>(null)
+  const [exportNote, setExportNote] = useState<string | null>(null)
+  const [deleteArmed, setDeleteArmed] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState('')
+
+  const handleDownloadData = async () => {
+    if (!profileId) return
+    setDataBusy('export')
+    setExportNote(null)
+    try {
+      const exported = await buildDataExport(profileId)
+      downloadExport(exported)
+      const { total } = summariseExport(exported)
+      // An export that quietly omitted a table would be a lie about
+      // completeness, so a partial read says so rather than reporting a
+      // clean number.
+      setExportNote(exported.incomplete.length > 0
+        ? `Downloaded ${total} records. ${exported.incomplete.length} part${exported.incomplete.length === 1 ? '' : 's'} couldn't be read — they're listed inside the file.`
+        : `Downloaded ${total} records.`)
+    } catch (err) {
+      console.error('Data export failed:', err)
+      setExportNote("Couldn't gather your data — check your connection and try again.")
+    } finally {
+      setDataBusy(null)
+    }
+  }
+
+  const handleDeleteEverything = async () => {
+    if (!profileId || deleteConfirm.trim().toLowerCase() !== 'delete') return
+    setDataBusy('delete')
+    const result = await deleteAllUserData(profileId)
+    setDataBusy(null)
+    if (!result.ok) {
+      setSaveError(`Couldn't delete your data — ${result.error ?? 'try again'}.`)
+      return
+    }
+    // The rows are gone; the browser must not keep pointing at them. Reload
+    // rather than unwinding App's state by hand — every store, cache and
+    // queue is keyed by a profile that no longer exists, and a fresh load is
+    // the only state that is honestly consistent.
+    //
+    // No key-clearing here on purpose. restoreSession already handles "the
+    // stored id has no row": it removes the key and drops to onboarding. A
+    // second list of keys to clear, living beside handleReset's, is exactly
+    // the duplicated rule test:reset-clears-draft exists to prevent — and it
+    // would be the copy that goes stale first, because deletion is the path
+    // nobody exercises.
+    onOpenChange(false)
+    window.location.reload()
+  }
 
   const savePatch = (patch: Partial<UserProfile>) => {
     if (!profileId) return
@@ -806,6 +859,74 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
         {!loading && goals.length === 0 && grouped.length === 0 && contextFacts.length === 0 && (
           <p className="text-sm text-muted-foreground">Nothing recorded yet — state a preference, goal, or constraint in chat and it'll show up here.</p>
         )}
+
+        <Separator />
+
+        {/* Audit §1.4 — there was neither of these. "New Plan" cleared the
+            browser and started fresh without deleting a single row, so
+            everything from before it stayed in the database permanently,
+            unreachable. Both are obligations once there are users who aren't
+            Ashley, and both are far easier to build now than after someone
+            asks for them in writing. */}
+        <div className="space-y-2">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Your data</h3>
+          <div className="rounded-md border p-2.5 space-y-3 text-sm">
+            <div className="space-y-1.5">
+              <p className="text-[11px] leading-snug text-muted-foreground/70">
+                Everything the app has stored about you, as one file.
+              </p>
+              <Button size="sm" variant="outline" className="h-8 text-xs" onClick={handleDownloadData} disabled={dataBusy !== null}>
+                {dataBusy === 'export' ? 'Gathering…' : 'Download my data'}
+              </Button>
+              {exportNote && <p className="text-[11px] leading-snug text-muted-foreground">{exportNote}</p>}
+            </div>
+
+            <div className="space-y-1.5 pt-3" style={{ borderTop: '1px solid var(--hairline)' }}>
+              <p className="text-[11px] leading-snug text-muted-foreground/70">
+                Deleting removes your plan, your meals, every weigh-in and logged set, and your whole chat history. It cannot be undone, and there is no copy.
+              </p>
+              {!deleteArmed ? (
+                <Button
+                  size="sm" variant="outline"
+                  className="h-8 text-xs text-destructive border-destructive/40"
+                  onClick={() => { setDeleteArmed(true); setDeleteConfirm('') }}
+                >
+                  Delete everything
+                </Button>
+              ) : (
+                /* A typed confirmation, not a second tap. Arm-then-tap is
+                   right for deleting one remembered note; it is far too easy
+                   for the one action in this app that destroys everything and
+                   cannot be undone. */
+                <div className="space-y-2">
+                  <label className="block text-[11px] leading-snug">
+                    Type <span className="font-semibold">delete</span> to confirm.
+                    <Input
+                      value={deleteConfirm}
+                      onChange={e => setDeleteConfirm(e.target.value)}
+                      placeholder="delete"
+                      aria-label="Type delete to confirm"
+                      className="mt-1 h-8 text-sm"
+                    />
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      className="h-8 text-xs bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      disabled={deleteConfirm.trim().toLowerCase() !== 'delete' || dataBusy !== null}
+                      onClick={handleDeleteEverything}
+                    >
+                      {dataBusy === 'delete' ? 'Deleting…' : 'Delete everything, permanently'}
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setDeleteArmed(false)}>
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
   )
