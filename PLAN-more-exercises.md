@@ -162,6 +162,47 @@ a bad state that already existed.
 failing test. The underlying defect is a load-prescription bug and gets its own
 plan, per the standing rule, before anyone touches it.
 
+## A SECOND REGRESSION, measured after the fact by the quality scorer
+
+The full 9,216-profile sweep came back **11.47 / 12 against a baseline of
+11.51** — down 0.04, and all of it in one dimension:
+
+```
+                baseline   now
+Time fit          1.92     1.93
+Structure         1.97     1.97
+Progression       1.75     1.75
+Selection         1.90     1.87   <- the entire drop
+Goal alignment    1.96     1.96
+Primer fit        2.00     2.00
+
+Plans below the 7.2 floor: 0 / 9216 (unchanged)
+```
+
+The scorer names the cause directly, in its own worst-plan listings:
+
+```
+[worse_implement_than_available] "Backpack Lateral Raise" uses weighted
+backpack when this minimalist profile has a better-loading option for the
+same pattern and tier
+[worse_implement_than_available] "Band Lat Pulldown" uses resistance band
+when this minimalist profile has a better-loading option ...
+```
+
+**The ranking mechanism is not broken.** `EQUIPMENT_QUALITY` already rates
+`resistance band` and `weighted backpack` as `low`, below dumbbells and
+kettlebells. The problem is that adding low-ranked entries to a pattern
+enlarges the pool, and the preference is a weighting rather than a rule — so
+sometimes a backpack wins a slot from somebody who owns dumbbells.
+
+**This is the cost of the depth, stated rather than buried.** The same entries
+that close the bodyweight holes are, at minimalist, worse than what that person
+already owns. There is no content-only fix: equipment sets are per-tier and an
+entry cannot be scoped to one tier. Making a `low` implement never beat an
+available `high` one is a change to plan generation, which needs its own plan
+under the standing rule — and it is the same area as the frozen-weeks defect
+above, so both belong in one piece of work rather than two.
+
 ## Verification
 
 - `probe-swap-depth` re-run: the four holes close, with before/after in the
