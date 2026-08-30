@@ -44,6 +44,7 @@ export function WeekContextRow({
   phaseFocus,
   coachNote,
   estimatedMinutes,
+  shortfallNote,
   onOpenProgram,
   onAddUnplannedWork,
   onOpenSessionHistory,
@@ -60,6 +61,8 @@ export function WeekContextRow({
   phaseFocus?: string
   coachNote?: string
   estimatedMinutes?: number
+  /** Why today runs shorter than the length they asked for — see session-shortfall.ts. Absent when it does not. */
+  shortfallNote?: string
   onOpenProgram?: () => void
   onAddUnplannedWork?: () => void
   onOpenSessionHistory?: () => void
@@ -120,6 +123,14 @@ export function WeekContextRow({
           )}
         </div>
       </div>
+
+      {/* ALWAYS VISIBLE, not behind the expander. The "~35 min" beside a
+          request for 45-60 is right there in the header; the reason has to be
+          too, or somebody reads the number and concludes the app ignored what
+          they asked for. Audit §6.5. */}
+      {shortfallNote && (
+        <p className="mt-2 text-xs leading-[1.5] text-muted-foreground">{shortfallNote}</p>
+      )}
 
       {expanded && (phaseFocus || coachNote) && (
         <div className="mt-2.5 space-y-1.5">

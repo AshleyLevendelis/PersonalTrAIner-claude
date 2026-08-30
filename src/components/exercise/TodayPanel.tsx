@@ -9,6 +9,8 @@ import { getDoubleProgressionRecommendation, getAddedLoadProgression, type Doubl
 import { groupExercises, mainLiftGroupIndex, resolveCalibrationAnchorIndex, computeSessionSummary, type ExerciseGroup } from '@/lib/session-derive'
 import { computeSessionPRs } from '@/lib/pr-engine'
 import { getExerciseId } from '@/lib/exercise-db'
+import { estimateDaySeconds } from '@/lib/session-duration'
+import { describeSessionShortfall } from '@/lib/session-shortfall'
 import { getLocalDateString } from '@/lib/dev-clock'
 import { tabHash } from '@/lib/app-route'
 import { ceilingToAskFor, saveStatedCeiling, declineStatedCeilings } from '@/lib/load-ceiling-prompt'
@@ -246,6 +248,22 @@ export function TodayPanel({
     ? workout.exercises.reduce((s, ex) => s + setsFor(ex.id ?? getExerciseId(ex.name), ex.name).length, 0)
     : 0
 
+  // How long today actually is, and whether that is materially less than the
+  // length this person asked for (audit §6.5). `estimatedMinutes` was already
+  // a WeekContextRow prop and documented in its header — it had simply never
+  // been passed, so the "~52 min" chip it describes never rendered at all.
+  const sessionEstimate = (() => {
+    if (!workout || workout.exercises.length === 0) return { minutes: undefined, shortfall: null }
+    const seconds = estimateDaySeconds(workout)
+    return {
+      minutes: Math.round(seconds / 60),
+      shortfall: describeSessionShortfall(seconds, profile?.session_duration_preference, {
+        isDeload: currentMesoWeekObj?.is_deload,
+        lowRecovery: profile?.recovery_capacity === 'low',
+      }),
+    }
+  })()
+
   return (
     <div className="space-y-3">
       <WeekContextRow
@@ -260,6 +278,8 @@ export function TodayPanel({
         isCalibrationWeek={currentMesoWeekObj?.isCalibrationWeek}
         phaseFocus={currentMesoWeekObj?.phase_focus}
         coachNote={currentMesoWeekObj?.coach_note}
+        estimatedMinutes={sessionEstimate.minutes}
+        shortfallNote={sessionEstimate.shortfall?.note}
         onOpenProgram={onOpenProgram}
         onAddUnplannedWork={!isRestDay && !isActiveRecovery && !peekWorkout ? () => setUnplannedWorkOpen(true) : undefined}
         onOpenSessionHistory={onOpenSessionHistory}
