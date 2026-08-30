@@ -2054,6 +2054,7 @@ function App() {
               isGeneratingMeals={isGeneratingMeals}
               mealRegenerateError={mealRegenerateError}
               onDismissRegenerateError={() => setMealRegenerateError(null)}
+              avoidFoods={effectiveDislikedFoods}
               unrecognisedDietaryRestrictions={unrecognisedDietaryRestrictions}
               onFixDietaryRestrictions={() => { setProfileInfoSection('dietary'); setProfileInfoOpen(true) }}
               onSwapMealSlot={handleSwapMealSlot}

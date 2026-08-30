@@ -133,7 +133,8 @@
     "report:trim-magnitude": "tsx scripts/run-trim-magnitude-report.ts",
     "test:proposal-expiry": "tsx scripts/test-proposal-expiry.ts",
     "test:local-dates": "tsx scripts/test-local-dates.ts",
-    "test:silent-writes": "tsx scripts/test-silent-writes.ts"
+    "test:silent-writes": "tsx scripts/test-silent-writes.ts",
+    "test:enforcement-gaps": "tsx scripts/test-enforcement-gaps.ts"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.4",

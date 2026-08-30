@@ -31,6 +31,7 @@
 import { supabase, resolveEnv } from './supabase'
 import { computeMealMacros, type Macros100g } from './food-db'
 import { validateMealAgainstDiet } from './diet-rules'
+import { containsPhrase } from './meal-ingredients'
 import { parseIngredientLines, scaleToTarget, isWithinCalorieTolerance, meetsProteinFloor } from './portion-scaler'
 import type { MacroTargets, CookingTimePreference, BreakfastStyle } from './types'
 import { getPools, type MealSlotName } from './meal-store'
@@ -295,8 +296,15 @@ export function verifyProposal(
   // just because it shares a common word, but we don't try to be clever
   // about it either (e.g. "mushroom" disliked also rejects "mushroom soup").
   if (dislikedFoods.length > 0) {
-    const lowerNames = parsed.map(l => l.name.toLowerCase())
-    const hit = dislikedFoods.find(food => food.trim() && lowerNames.some(n => n.includes(food.trim().toLowerCase())))
+    // ONE matcher, shared with the coach's reader and the swap path.
+    // This was its own inline `n.includes(food)` — a third copy of the rule,
+    // and the one that decided what got GENERATED. When containsPhrase
+    // learned plurals and category words (audit §2.3) this copy would not
+    // have, so "no dairy" would have kept cheese out of a swap and let it
+    // straight into a freshly generated pool. Two copies of a filter is how
+    // the almond butter got through; three would have been worse.
+    const names = parsed.map(l => l.name)
+    const hit = dislikedFoods.find(food => food.trim() && containsPhrase(proposal.name, names, food))
     if (hit) {
       rejectLog.push(`[${slot}] "${proposal.name}": contains disliked food "${hit}"`)
       return null

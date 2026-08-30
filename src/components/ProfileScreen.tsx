@@ -39,7 +39,7 @@ import {
   EXPERIENCE_OPTIONS, EQUIPMENT_OPTIONS, STYLE_OPTIONS, RECOVERY_OPTIONS,
   CONDITIONING_PREF_OPTIONS, ACTIVITY_OPTIONS, DIETARY_OPTIONS, FAVORITE_CUISINE_OPTIONS,
   INJURY_OPTIONS, COOKING_TIME_OPTIONS, MEALS_PER_DAY_OPTIONS, DURATION_OPTIONS, BREAKFAST_STYLE_OPTIONS,
-  DAYS_FULL,
+  DAYS_FULL, partitionInjuries,
 } from '@/lib/onboarding-slots'
 import type { UserProfile, TrainingDay, TrainingExperience, EquipmentAccess, TrainingStyle } from '@/lib/types'
 
@@ -415,6 +415,14 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
   // patch back to the pre-edit values (read from `profile`, captured before
   // the optimistic apply) and surfaces a dismissible error, matching every
   // other confirm-action in this app.
+  /**
+   * Stored injuries, split into the ones the plan engine acts on and the ones
+   * it doesn't. Recomputed on every render from `profile.injuries` rather than
+   * held in state, so a save (or its revert) is reflected without a second
+   * source of truth to keep in step.
+   */
+  const { codes: injuryCodes, unrecognised: unrecognisedInjuries } = partitionInjuries(profile.injuries ?? [])
+
   const savePatch = (patch: Partial<UserProfile>) => {
     if (!profileId) return
     const revertPatch = Object.fromEntries(
@@ -502,15 +510,57 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
           </div>
         </div>
 
-        {/* Injuries */}
+        {/* Injuries — a picker, for the same reason the dietary restrictions
+            above are one. Audit §2.2: this was free text, and the plan engine
+            only understands eight exact codes, so twelve of fourteen ordinary
+            entries were stored, shown back, and changed nothing. "Lower back"
+            — the field's own placeholder — was one of them. */}
         <div className="space-y-2">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Injuries</h3>
-          <div className="rounded-md border p-2.5">
-            <EditableTagList
-              values={profile.injuries}
-              onSave={v => savePatch({ injuries: v })}
-              placeholder={`e.g. ${INJURY_OPTIONS[0]?.label ?? 'lower back'}`}
-            />
+          <div className="rounded-md border p-2.5 space-y-2.5 text-sm">
+            <p className="text-[11px] leading-snug text-muted-foreground/70">Areas to work around. Picking one changes which exercises your plan gives you.</p>
+            <ToggleGroup
+              type="multiple"
+              value={injuryCodes}
+              onValueChange={(next: string[]) => savePatch({ injuries: [...next, ...unrecognisedInjuries] })}
+              className="flex flex-wrap justify-start gap-1.5"
+            >
+              {INJURY_OPTIONS.map(o => (
+                <ToggleGroupItem
+                  key={o.value}
+                  value={o.value}
+                  className="h-8 rounded-full border px-2.5 text-[11px] data-[state=on]:border-primary data-[state=on]:text-primary"
+                >
+                  {o.icon} {o.label}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+            {unrecognisedInjuries.length > 0 && (
+              /* Kept, not deleted. These were typed when the field was free
+                 text; they never changed the plan, and quietly removing them
+                 would be the same silent discarding this fix is about. Said
+                 plainly, with a way to clear each one. */
+              <div className="space-y-1.5 pt-2" style={{ borderTop: '1px solid var(--hairline)' }}>
+                <p className="text-[11px] leading-snug text-muted-foreground/70">
+                  These are saved but don't change your plan — the app can only work around the areas above. Tell your coach in Chat about anything else.
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {unrecognisedInjuries.map((v: string) => (
+                    <span key={v} className="inline-flex items-center gap-1 rounded-full border border-dashed px-2.5 py-1 text-[11px] text-muted-foreground">
+                      {v}
+                      <button
+                        type="button"
+                        aria-label={`Remove ${v}`}
+                        className="hit-slop-44 text-muted-foreground hover:text-foreground"
+                        onClick={() => savePatch({ injuries: [...injuryCodes, ...unrecognisedInjuries.filter((u: string) => u !== v)] })}
+                      >
+                        <X className="size-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 

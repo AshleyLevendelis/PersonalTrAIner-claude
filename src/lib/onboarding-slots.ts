@@ -136,6 +136,53 @@ export const INJURY_OPTIONS: { value: string; icon: string; label: string }[] = 
   { value: 'elbows', icon: '🤜', label: 'Elbows' },
 ]
 
+/**
+ * Turns whatever is stored in `profile.injuries` into a code the plan engine
+ * actually acts on — or null, if there isn't one.
+ *
+ * WHY THIS EXISTS (audit §2.2). The Profile screen's injury field was free
+ * text, and getFlaggedJoints only understands the eight values above, exactly.
+ * Measured against fourteen realistic entries, twelve were stored, shown back
+ * to the user, and changed nothing — including "Lower back", which was the
+ * field's own placeholder text. Capitalisation alone was enough to lose one:
+ * "Knees" flagged nothing while "knees" flagged the knee.
+ *
+ * The field is a picker now, so nothing NEW can land unrecognised. This
+ * exists for what is already stored on real profiles: a value that maps is
+ * migrated silently (it always meant the right thing), and one that doesn't
+ * is kept and shown as not affecting the plan rather than deleted. Dropping
+ * it quietly would be the same defect pointed the other way.
+ *
+ * Matching is deliberately narrow — case, spacing and underscores only, plus
+ * the singular of each label. It is not a place to start guessing that
+ * "sciatica" means the lower back; that is a clinical judgement the app has
+ * no business making silently, and the coach is where someone describes an
+ * injury in their own words.
+ */
+export function normaliseInjuryCode(raw: string): string | null {
+  const key = raw.trim().toLowerCase().replace(/[\s-]+/g, '_')
+  if (!key) return null
+  for (const o of INJURY_OPTIONS) {
+    const code = o.value                                  // 'lower_back'
+    const label = o.label.toLowerCase().replace(/[\s-]+/g, '_')  // 'lower_back'
+    const singular = code.endsWith('s') ? code.slice(0, -1) : code
+    if (key === code || key === label || key === singular) return code
+  }
+  return null
+}
+
+/** Splits stored injuries into the ones the plan acts on and the ones it doesn't. */
+export function partitionInjuries(stored: string[]): { codes: string[]; unrecognised: string[] } {
+  const codes: string[] = []
+  const unrecognised: string[] = []
+  for (const raw of stored) {
+    const code = normaliseInjuryCode(raw)
+    if (code) { if (!codes.includes(code)) codes.push(code) }
+    else if (raw.trim()) unrecognised.push(raw.trim())
+  }
+  return { codes, unrecognised }
+}
+
 // Dietary-safety audit fix — values come from diet-rules.ts's
 // DIETARY_PREFERENCES (itself derived from FORBIDDEN_TAGS's keys), not
 // hand-typed here. This is what makes it structurally impossible for the

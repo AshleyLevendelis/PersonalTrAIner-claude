@@ -6,10 +6,12 @@ import {
   Loader2,
   Check,
   ChevronDown,
+  ShieldAlert,
 } from 'lucide-react'
 import { InsightBanner } from '@/components/ui/insight-banner'
 import type { MacroTargets } from '@/lib/types'
 import { getTodayLedger, logMealEaten, voidMealEvent, type MealSlotName, type MealEventRecord } from '@/lib/meal-store'
+import { checkMealAgainstRestrictions, type MealRestrictionVerdict } from '@/lib/meal-restriction-check'
 import type { PoolOption } from '@/lib/meal-generation'
 
 const SLOT_ORDER: MealSlotName[] = ['breakfast', 'lunch', 'dinner', 'snack']
@@ -44,6 +46,14 @@ interface MealPlanProps {
    */
   unrecognisedDietaryRestrictions?: string[] | null
   onFixDietaryRestrictions?: () => void
+  /**
+   * The CURRENT restrictions, re-checked against every meal shown (audit
+   * §2.1). Enforcement used to run only when a meal was created, so a
+   * restriction turned on afterwards changed nothing and the food stayed on
+   * screen unflagged, permanently.
+   */
+  dietaryPreferences?: string[]
+  avoidFoods?: string[]
   onSwapSlot: (slot: MealSlotName, chooseName: string) => Promise<void>
   onRegenerateSlot: (slot: MealSlotName) => Promise<void>
   onRegenerateAll: () => Promise<void>
@@ -60,7 +70,8 @@ interface MealPlanProps {
  */
 export function MealPlan({
   profileId, date, pools, chosen, totals, targets, isGenerating, regenerateError, onDismissRegenerateError,
-  unrecognisedDietaryRestrictions, onFixDietaryRestrictions, onSwapSlot, onRegenerateSlot, onRegenerateAll,
+  unrecognisedDietaryRestrictions, onFixDietaryRestrictions, dietaryPreferences = [], avoidFoods = [],
+  onSwapSlot, onRegenerateSlot, onRegenerateAll,
 }: MealPlanProps) {
   const activeSlots = SLOT_ORDER.filter(s => (pools[s]?.length ?? 0) > 0)
   // A slot generation requested and asked for (present as a key in `pools`,
@@ -68,6 +79,23 @@ export function MealPlan({
   // back with zero options must render honestly, never disappear — silently
   // dropping it lets the day's totals quietly absorb its calories elsewhere.
   const emptySlots = SLOT_ORDER.filter(s => s in pools && (pools[s]?.length ?? 0) === 0)
+  /**
+   * Audit §2.1, second half — the OFFER. A restriction turned on after these
+   * meals were generated invalidates some of them, and the app knew and said
+   * nothing. It says so now and offers to redo them.
+   *
+   * Never automatic, on the same reasoning as the weight-basis offer: a
+   * silent rebuild throws away a plan someone may be four days into and may
+   * already have shopped for. Ashley's ruling there was "ask rather than
+   * rebuild silently", and this is the same situation.
+   */
+  const restrictionBySlot: Partial<Record<MealSlotName, MealRestrictionVerdict>> = {}
+  for (const slot of SLOT_ORDER) {
+    const option = chosen[slot]
+    if (option) restrictionBySlot[slot] = checkMealAgainstRestrictions(option.name, option.ingredients, dietaryPreferences, avoidFoods)
+  }
+  const blockedSlots = SLOT_ORDER.filter(s => restrictionBySlot[s] && !restrictionBySlot[s]!.ok)
+
   const [expandedSlot, setExpandedSlot] = useState<MealSlotName | null>(null)
 
   // Which meals are already logged eaten today, keyed by slot — reuses
@@ -145,6 +173,24 @@ export function MealPlan({
   return (
     <div data-tour="meals" className="space-y-4">
       {unrecognisedBanner || errorBanner}
+      {blockedSlots.length > 0 && (
+        <InsightBanner tone="warning" className="items-start justify-between">
+          <span>
+            {blockedSlots.length === 1
+              ? `Your ${SLOT_LABEL[blockedSlots[0]].toLowerCase()} no longer fits your restrictions.`
+              : `${blockedSlots.length} of today's meals no longer fit your restrictions.`}
+            {' '}They were built before you changed them.
+          </span>
+          <button
+            type="button"
+            onClick={onRegenerateAll}
+            disabled={isGenerating}
+            className="shrink-0 text-xs font-semibold underline disabled:opacity-50"
+          >
+            {isGenerating ? 'Redoing…' : 'Redo them'}
+          </button>
+        </InsightBanner>
+      )}
       <div className="flex items-center justify-between">
         <span className="ds-label">Today's meals</span>
         <button
@@ -176,6 +222,7 @@ export function MealPlan({
             onSwap={onSwapSlot}
             onRegenerate={onRegenerateSlot}
             loggedEvent={loggedBySlot[slot]}
+            restriction={restrictionBySlot[slot] ?? null}
             onLog={async option => {
               if (!profileId) return
               logMealEaten(profileId, date, slot, option.name, {
@@ -288,6 +335,7 @@ function MealSlotRow({
   onSwap,
   onRegenerate,
   loggedEvent,
+  restriction,
   onLog,
   onUnlog,
 }: {
@@ -300,6 +348,8 @@ function MealSlotRow({
   onSwap: (slot: MealSlotName, chooseName: string) => Promise<void>
   onRegenerate: (slot: MealSlotName) => Promise<void>
   loggedEvent: MealEventRecord | undefined
+  /** Null when there is no meal to check; ok:true when it passes. */
+  restriction: MealRestrictionVerdict | null
   onLog: (option: PoolOption) => Promise<void>
   onUnlog: (clientId: string) => Promise<void>
 }) {
@@ -339,8 +389,15 @@ function MealSlotRow({
     }
   }
 
+  const blocked = restriction != null && !restriction.ok
+
   const handleLogToggle = async () => {
     if (!option) return
+    // A flagged meal cannot be logged as eaten. This is the half that makes
+    // the flag mean something: a warning you can tap straight past teaches
+    // the user the warning is decorative. Unlogging is always allowed —
+    // whatever is already recorded stays correctable.
+    if (blocked && !loggedEvent) return
     setBusy(true)
     try {
       if (loggedEvent) await onUnlog(loggedEvent.clientId)
@@ -421,15 +478,29 @@ function MealSlotRow({
             </div>
           )}
 
+          {blocked && restriction?.message && (
+            /* Above the buttons, not below: it explains why the one beside
+               it is greyed out, and a reason that arrives after the action
+               has already been refused is not an explanation. */
+            <p className="flex items-start gap-1.5 rounded-xl bg-[color:var(--role-warn-bg)] px-3 py-2 text-[11.5px] leading-snug text-[color:var(--role-warn-text)]">
+              <ShieldAlert className="mt-0.5 size-3.5 shrink-0" />
+              <span>
+                {restriction.message} Swap it, or regenerate this meal.
+              </span>
+            </p>
+          )}
+
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={handleLogToggle}
-              disabled={busy}
+              disabled={busy || (blocked && !loggedEvent)}
               className={
                 loggedEvent
                   ? 'flex min-h-[44px] items-center gap-1.5 rounded-xl bg-primary/15 px-3.5 text-xs font-semibold text-primary'
-                  : 'flex min-h-[44px] items-center gap-1.5 rounded-xl bg-primary px-3.5 text-xs font-semibold text-primary-foreground glow-mint-box'
+                  : blocked
+                    ? 'flex min-h-[44px] items-center gap-1.5 rounded-xl bg-[color:var(--surface-raised)] px-3.5 text-xs font-semibold text-muted-foreground'
+                    : 'flex min-h-[44px] items-center gap-1.5 rounded-xl bg-primary px-3.5 text-xs font-semibold text-primary-foreground glow-mint-box'
               }
             >
               {loggedEvent ? <><Check className="size-3.5" /> Logged</> : 'Log this meal'}
