@@ -1991,27 +1991,22 @@ function App() {
         />
       )
     }
+    // Ashley's ruling was that nobody is walled behind a login, so sign-in is
+    // OFFERED beside onboarding rather than placed in front of it. It used to
+    // be rendered right here, as a second fixed layer at the bottom of the
+    // screen, specifically to avoid touching ConversationalOnboarding and the
+    // gates that pin it — and on a real phone it landed squarely on top of
+    // the name box, so the first control of the first screen could not be
+    // tapped at all. Onboarding now takes it as a prop and lays it out inside
+    // its own composer, where the browser guarantees they cannot overlap.
+    // Keeping a component untouched is not worth covering its only input.
     return (
-      <>
-        <Suspense fallback={<ScreenLoading />}>
-          <ConversationalOnboarding onComplete={handleOnboardingComplete} />
-        </Suspense>
-        {/* Offered BESIDE onboarding rather than in front of it — Ashley's
-            ruling was that nobody is walled behind a login. Rendered here
-            rather than inside ConversationalOnboarding so the conversation
-            itself, and the twenty-odd gates that pin it, are untouched. */}
-        <div
-          className="fixed inset-x-0 z-40 flex justify-center px-4"
-          style={{ bottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}
-        >
-          <button
-            onClick={() => setSignInOpen(true)}
-            className="rounded-full border bg-background/90 px-3 py-1.5 text-xs text-muted-foreground backdrop-blur min-h-[44px]"
-          >
-            Already have an account? Sign in
-          </button>
-        </div>
-      </>
+      <Suspense fallback={<ScreenLoading />}>
+        <ConversationalOnboarding
+          onComplete={handleOnboardingComplete}
+          onSignIn={() => setSignInOpen(true)}
+        />
+      </Suspense>
     )
   }
 
