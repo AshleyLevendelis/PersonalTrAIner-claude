@@ -445,27 +445,31 @@ const toolDeclarations = [
     },
   },
   {
-    name: "adjust_volume",
+    name: "propose_volume_change",
     description:
-      "Adjust the total training volume (sets/reps) for a specific day's session. NOT SAFELY WIRED UP YET — calling this will decline with a message pointing the user at the in-app controls. Prefer discussing volume changes conversationally (what to do, why) and let the user apply it in the app, rather than calling this tool.",
+      "PROPOSES moving a day's set count up or down, from this week forward — this does NOT apply anything, the app shows a before/after card and the user taps Confirm. DIRECTION ONLY: you say lighter or heavier, the app decides by how much. It will not go below the floor that keeps an exercise worth doing, will not let an accessory outgrow the main lift it supports, will not push the session past the length the user asked for, and never touches a deload week. If a bound stops it, the card says so rather than silently doing less than it claimed.",
     parameters: {
       type: "object",
       properties: {
         day: {
           type: "string",
-          description: "The day of the week to adjust",
+          description: "The day of the week whose session should change (Monday ... Sunday).",
         },
-        adjustment: {
+        direction: {
           type: "string",
-          enum: ["reduce_light", "reduce_half", "reduce_heavy", "increase_moderate", "increase_heavy"],
-          description: "reduce_light: -1 set per exercise. reduce_half: halve each exercise's sets (for 'cut in half', 'only have 20 mins', major time constraints). reduce_heavy: -2 sets AND remove lowest-priority exercises. increase_moderate: +1 set per exercise. increase_heavy: +2 sets per exercise.",
+          enum: ["lighter", "heavier"],
+          description: "lighter = fewer sets (time pressure, fatigue, too much work). heavier = more sets (session feels easy, wants more). There is no magnitude parameter — do not try to express one, the app owns the size of the step.",
         },
         reason: {
           type: "string",
-          description: "Brief coaching explanation for why this adjustment is appropriate (e.g. 'Time constraint — maintaining intensity with reduced volume preserves stimulus')",
+          description: "One short sentence on what the user described (e.g. 'only has 30 minutes on Tuesdays') — shown on the card as the rationale.",
+        },
+        origin_verbatim_quote: {
+          type: "string",
+          description: "The exact substring of the user's CURRENT message asking for the change. Must be copied verbatim, not paraphrased.",
         },
       },
-      required: ["day", "adjustment", "reason"],
+      required: ["day", "direction", "origin_verbatim_quote"],
     },
   },
 
@@ -489,40 +493,27 @@ const toolDeclarations = [
     },
   },
   {
-    name: "update_workout_schedule",
+    name: "propose_schedule_change",
     description:
-      "NOT SAFELY WIRED UP YET — calling this will decline with a message pointing the user at the in-app controls. It used to write to a profile field the app doesn't actually render from, so schedule 'changes' looked applied in chat but never showed up on the Exercise tab. Prefer discussing schedule changes conversationally (what to do, why) and let the user apply it in the app.",
+      "PROPOSES changing WHICH DAYS the user trains on, then rebuilding the plan from the live week forward — this does NOT apply anything, the app shows a before/after card and the user taps Confirm. Send the COMPLETE set of days they want to train, not a patch: if they train Mon/Tue/Thu/Sat and want Thursday off, send Monday, Tuesday, Saturday. Weeks already underway or finished are never rewritten — anything they have logged stays exactly as it is.",
     parameters: {
       type: "object",
       properties: {
-        schedule_patch: {
+        training_days: {
           type: "array",
-          description: "Array of schedule operations. Each item specifies a day, an action, and the block/session name. For ADD with custom exercises, supply the exercises array.",
-          items: {
-            type: "object",
-            properties: {
-              day: { type: "string", description: "Day of the week: Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, or Sunday" },
-              action: { type: "string", enum: ["ADD", "REMOVE", "MOVE"], description: "ADD = new training day, REMOVE = drop a day (set to rest), MOVE = relocate existing session to this day" },
-              block_name: { type: "string", description: "Session focus name (e.g. 'Push & Press', 'Pull & Hinge', 'Muscle-Up Skill', 'Conditioning & Core', or any custom name). For REMOVE, use 'Rest'." },
-              exercises: {
-                type: "array",
-                description: "Optional. Provide explicit exercises when adding a custom/skill day. Omit for standard blocks or REMOVE actions.",
-                items: {
-                  type: "object",
-                  properties: {
-                    name: { type: "string", description: "Exercise name" },
-                    sets: { type: "number", description: "Number of sets" },
-                    reps: { type: "string", description: "Rep scheme (e.g. '8-10', '5', '30s')" },
-                  },
-                  required: ["name", "sets", "reps"],
-                },
-              },
-            },
-            required: ["day", "action", "block_name"],
-          },
+          description: "The COMPLETE list of days the user will train from now on, replacing whatever is there today. Full day names: Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday.",
+          items: { type: "string" },
+        },
+        reason: {
+          type: "string",
+          description: "One short sentence on what the user described (e.g. 'starting evening classes on Thursdays') — shown on the card as the rationale.",
+        },
+        origin_verbatim_quote: {
+          type: "string",
+          description: "The exact substring of the user's CURRENT message asking for the change. Must be copied verbatim, not paraphrased.",
         },
       },
-      required: ["schedule_patch"],
+      required: ["training_days", "origin_verbatim_quote"],
     },
   },
   {
@@ -1193,6 +1184,19 @@ When the user says they're away or at a different gym for a period ("hotel gym f
 - Once you know both, call propose_equipment_adaptation with equipment_tier + duration_days. Map to the nearest existing tier honestly (dumbbells only maps to minimalist, the closest fit — say so if it comes up, don't pretend it's an exact match).
 - It reverts automatically once the period ends — mention this once, not every turn.
 
+=== 3d. SESSION VOLUME (propose_volume_change) ===
+When the user wants a day's session to be more or less work ("Tuesdays are too much", "I only get 30 minutes on Wednesdays", "this feels easy now, give me more"):
+- Call propose_volume_change with the day and a DIRECTION — lighter or heavier. There is no magnitude to choose and you must not try to express one: never say "I'll halve it", "I'll take two sets off each exercise", or any specific number of sets. The app decides the size of the step against the floors, the role ceilings and the session's own time budget, and the card shows the user exactly what moved before they confirm.
+- It applies from THIS week forward, and skips deload weeks — a recovery week is already reduced on purpose. Say that plainly if it comes up.
+- If everything on that day is already at a limit, the card will say so rather than claiming a change. Do not promise a result you haven't seen.
+- §3's "trim a set to keep momentum" coaching is exactly this tool once they actually ask for it. Coach first, propose when they say yes.
+
+=== 3e. WHICH DAYS THEY TRAIN (propose_schedule_change) ===
+When the user wants to train on different days ("I can't do Thursdays anymore", "can we move to three days a week", "add Saturday"):
+- Call propose_schedule_change with training_days: the COMPLETE list of days they'll train from now on, not a patch. Work it out from the schedule shown below plus what they just said, and if you can't tell what the new full week looks like, ask before calling.
+- This rebuilds the plan from the live week forward. Weeks they've already logged are untouched — say so, it's the reassurance people want before tapping Confirm.
+- Changing how MANY days they train changes the split, not just the calendar: four days of work does not fit into three days unchanged. Say that honestly rather than implying the same plan just moves.
+
 === 4. TAG HYGIENE & QUICK REPLIES ===
 - Strict Placement: Place any system action or quick reply tag on its OWN DEDICATED LINE at the absolute bottom of your response.
 - Message-break tag ([BREAK]): the ONE tag that appears mid-response, on its own line, wherever you want the reply to split into a second sent message (§1). Maximum two [BREAK]s (three messages). Never put one immediately before a [QUICK_REPLIES] or [ACTION] line — those always belong at the very bottom, after the final message's text.
@@ -1203,7 +1207,7 @@ When the user says they're away or at a different gym for a period ("hotel gym f
   - Feel/effort check-ins: "how did that feel?" / "how's the shoulder holding up?" -> "Easy" | "About right" | "Hard" (adapt wording to what was actually asked)
   - A named choice between two or more specific things you just mentioned (exercises, meals, days) — the options ARE the names, e.g. asking whether they meant Front Squat or Back Squat -> "Front Squat" | "Back Squat"
   - Scope questions: "just today, or the rest of the block?" -> "Today only" | "Rest of block"
-  Do NOT add the tag when the question is genuinely open-ended — asks for a number, a description, a reason, or anything where the honest answer space isn't a short known set (e.g. "how much did you lift?", "what's been going on?"). When in doubt: if you could plausibly render the answer as 2-4 short buttons without stripping out anything the user might actually want to say, add it — free text is always still available underneath either way. Plan-mutation proposals (propose_exercise_swap, propose_meal_swap, propose_meal_addition, propose_injury_adaptation, propose_equipment_adaptation) already render their own Confirm/Not-now buttons via the card — never add a redundant [QUICK_REPLIES] tag to those turns. The one exception is the equipment-clarifying question itself (§3b) — that's asked BEFORE the tool call, not on the proposal turn, so it gets a normal [QUICK_REPLIES] tag.
+  Do NOT add the tag when the question is genuinely open-ended — asks for a number, a description, a reason, or anything where the honest answer space isn't a short known set (e.g. "how much did you lift?", "what's been going on?"). When in doubt: if you could plausibly render the answer as 2-4 short buttons without stripping out anything the user might actually want to say, add it — free text is always still available underneath either way. Plan-mutation proposals (propose_exercise_swap, propose_meal_swap, propose_meal_addition, propose_injury_adaptation, propose_equipment_adaptation, propose_volume_change, propose_schedule_change) already render their own Confirm/Not-now buttons via the card — never add a redundant [QUICK_REPLIES] tag to those turns. The one exception is the equipment-clarifying question itself (§3b) — that's asked BEFORE the tool call, not on the proposal turn, so it gets a normal [QUICK_REPLIES] tag.
 
 === FEW-SHOT EXAMPLES ===
 User: "Hey"
@@ -1282,7 +1286,6 @@ SESSION-WINDOW REASONING (do this comparison yourself, every turn): weigh the cu
 - When replacing exercises, ALWAYS select from the SAME movement pattern and similar mechanics tier unless the user's condition demands otherwise (e.g., pain = lower joint stress).
 - When calling propose_exercise_swap, put the reasoning in the "reason" field (movement pattern, why it preserves stimulus, trade-offs) — the app shows the user a confirm card with the exact before/after, so do NOT also ask "Shall I make this change?" in your own text; the card IS the confirmation step, asking again is redundant and the card can be confirmed without you being told.
 - For ban_exercise: Acknowledge the user's preference, confirm you've permanently removed it, and offer what you'll use instead in future cycles.
-- For adjust_volume: Briefly explain the reasoning behind the adjustment.
 - For ban_exercise: Provide confirmation and note the reason.
 - Reference the user's ACTUAL exercise plan below — never invent a generic split.
 - If asked why a specific exercise is in their plan: some entries in the exercise plan below carry a "[why: ...]" note — that's the real, specific reason the engine picked it over the next-best alternative. If the exercise you're asked about has one, use it directly. If it doesn't (most exercises won't — it was simply the best fit with nothing especially notable about the call), say so honestly: it was the best available option for that slot given their equipment/experience/goal, not a specific tradeoff worth spelling out. Never invent a specific reason for an exercise that has no "[why: ...]" note.
@@ -1385,12 +1388,12 @@ FAVORITE MEALS PRIORITIZATION:
 ${favoritesSection}
 
 FUNCTION CALL RULES (CRITICAL):
-- NEVER write tool names, parameter names, or enum values (like "reduce_half", "adjust_volume", "update_workout_schedule", "schedule_patch", "MOVE") in your visible text response. These exist only for native tool invocations. Your text must read like a human personal trainer — no code, no parameter labels, no function syntax.
+- NEVER write tool names, parameter names, or enum values (like "propose_volume_change", "propose_schedule_change", "training_days", "lighter", "heavier") in your visible text response. These exist only for native tool invocations. Your text must read like a human personal trainer — no code, no parameter labels, no function syntax.
 - Trigger propose_meal_swap or propose_exercise_swap when the user gives a DIRECT COMMAND to modify their plan. Command verbs include: "replace", "swap", "change", "switch", "use X instead". Both ALWAYS require origin_verbatim_quote — the exact substring of the CURRENT message that is the command; if the request is a question, a hypothetical, or a statement with no imperative verb (e.g. "I didn't train today", "should I switch to dumbbells?"), do NOT call the tool — answer in text instead.
 - Trigger propose_injury_adaptation / propose_equipment_adaptation per §3a/§3b once you have the required fields (affected_area or equipment_tier, plus duration_days) AND an imperative origin_verbatim_quote — a mention alone ("my shoulder's a bit sore") is not yet enough; wait until the exchange has established it's manageable and plan-relevant (injury) or you know both what's available and for how long (equipment).
 - Neither propose_meal_swap nor propose_exercise_swap applies anything itself — both show the user a confirm card. Put your reasoning in the "reason" field, not in a preceding question; do not say "Shall I make this change?" or claim the swap happened.
 - Exercise swaps default to scope: "today" (only applies to today's workout; the original exercise returns next time that day comes up). Only set scope: "permanent" when the user explicitly says they want a lasting change (e.g. "for the rest of the plan", "permanently", "I never want to do X", "always use Y instead").
-- PLAN CHANGES NOT YET SAFE TO EXECUTE: update_workout_schedule (adding/moving/removing training days) and adjust_volume (adjusting sets for a session) are not safely wired up yet — calling either will always decline. For any request along these lines (rescheduling, clearing a day, adding a skill session, cutting volume, extra sets, fatigue/time-constraint adjustments), do NOT call the tool. Instead, briefly describe what you'd suggest and why, then tell the user to make it themselves via the in-app controls (the schedule editor for schedule changes, the swap (⇄) button or set-count controls on the exercise for volume changes).
+- Trigger propose_volume_change / propose_schedule_change per §3d/§3e once the request is an actual imperative and you have the required fields, WITH an origin_verbatim_quote. Neither applies anything — both show a confirm card. "Should I drop to three days?" is a question, not a command: answer it in text.
 - Answer exercise form/technique questions ("How do I do X?", "What muscles does X work?") directly in your text response. Provide step-by-step form cues, target muscles, common mistakes, and coaching tips.
 - Trigger ban_exercise when the user says "I hate X", "never give me X", "remove X permanently", or explicitly flags an exercise to blacklist.
 - When a food LOGGING command is given (log_meal), execute it immediately. Scale portions to the meal slot budget above. Do NOT ask for macro details.
@@ -1625,19 +1628,30 @@ Keep this context in mind to ensure your greetings and questions naturally align
         );
       }
 
-      if (name === "update_workout_schedule") {
-        // Trace-report fix: this used to PATCH fitness_profiles.weekly_schedule
-        // directly, server-side, on every call — no confirmation gate, and the
-        // Exercise tab renders from mesocycle_weeks, which this never touched.
-        // Every "Schedule updated" reply was true of a field nothing displays,
-        // while silently diverging it from the schedule the user actually
-        // sees (confirmed live: a real profile ended up with three different,
-        // mutually disagreeing schedules — chat's claim, weekly_schedule, and
-        // the mesocycle). Declines honestly until a real propose-then-confirm
-        // rebuild through mesocycle-edit.ts lands (Phase B). No DB write, no action.
+      if (name === "propose_schedule_change") {
+        // Audit §2.4. This is the tool that used to PATCH
+        // fitness_profiles.weekly_schedule directly, server-side, on every
+        // call — no confirmation gate, and the Exercise tab renders from
+        // mesocycle_weeks, which it never touched. Every "Schedule updated"
+        // reply was true of a field nothing displays, while silently
+        // diverging it from the schedule the user actually sees (confirmed
+        // live: one real profile ended up with three different, mutually
+        // disagreeing schedules — chat's claim, weekly_schedule, and the
+        // mesocycle). It then declined on every call for several rounds.
+        //
+        // Now it PROPOSES, on the same rail as every other plan mutation,
+        // and lands somewhere the app actually reads: the client writes
+        // training_days and re-runs rebuildFromCurrentWeek, the same
+        // generation path the Profile screen's rebuild offer already uses.
+        // I1 holds — the server writes nothing and forwards raw args; the
+        // client resolves them against the live mesocycle and builds the diff.
         return new Response(
           JSON.stringify({
-            reply: "I can't safely make plan changes yet — that's coming in an update soon. For now, use the swap (⇄) button on the exercise itself.",
+            reply: "",
+            proposal: {
+              kind: "propose_schedule_change",
+              rawArgs: { training_days: args.training_days, reason: args.reason },
+            },
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
@@ -2053,15 +2067,26 @@ Keep this context in mind to ensure your greetings and questions naturally align
         );
       }
 
-      if (name === "adjust_volume") {
-        // Trace-report fix: this only ever mutated the client's flat
-        // exercisePlan/exercise_plans fallback state, never mesocycle_weeks —
-        // dead for any user with an active mesocycle (i.e. everyone
-        // post-C0). Declines honestly instead of claiming a change that
-        // never reached the Exercise tab.
+      if (name === "propose_volume_change") {
+        // Audit §2.4. The old adjust_volume only ever mutated the client's
+        // flat exercisePlan fallback state, never mesocycle_weeks — dead for
+        // any user with an active mesocycle — and it multiplied a day's sets
+        // by a MODEL-CHOSEN factor, respecting neither the set floor, the
+        // role ceiling, nor the session's own time budget. It declined on
+        // every call for several rounds rather than lie about applying.
+        //
+        // The magnitude is gone from the tool surface entirely: the model
+        // sends a DIRECTION and the client's adjustDayVolume decides the
+        // step inside the engine's existing bounds. A model-chosen 0.4x is a
+        // load prescription made by something with no view of the floors.
+        // I1: no server write, raw args forwarded, client builds the diff.
         return new Response(
           JSON.stringify({
-            reply: "I can't safely make plan changes yet — that's coming in an update soon. For now, use the swap (⇄) button on the exercise itself.",
+            reply: "",
+            proposal: {
+              kind: "propose_volume_change",
+              rawArgs: { day: args.day, direction: args.direction, reason: args.reason },
+            },
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );

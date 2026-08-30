@@ -12,6 +12,9 @@
 // guard against double-execution, that's the claim's job.
 // ---------------------------------------------------------------------------
 
+import { adjustDayVolume, describeVolumeChange, isVolumeAdjustable, type VolumeDirection } from './volume-adjust'
+import { rebuildFromCurrentWeek } from './plan-invalidation'
+import { updateProfileField } from './profile-store'
 import type { MesocycleWeek, UserProfile, EquipmentAccess } from './types'
 import { swapExerciseInMesocycle, type SwapScope } from './mesocycle-edit'
 import { saveMesocycle, saveMesocycleWeek } from './mesocycle-persistence'
@@ -20,7 +23,6 @@ import { swapPoolMeal, clearMealPick, getMealPicksForDate, type MealSlotName } f
 import { supabase } from './supabase'
 import type { MealAdditionPayload } from './meal-addition'
 import { substituteForInjury, substituteForEquipment, rebuildForInjury } from './plan-adaptations'
-import { updateProfileField } from './profile-store'
 import type { PendingActionReceipt } from './pending-actions-store'
 
 export interface ExerciseSwapPayload {
@@ -114,6 +116,27 @@ export async function undoExerciseSwap(
     if (week) await saveMesocycleWeek(profileId, week)
   } else {
     await saveMesocycle(profileId, preImage, mesocycleCreatedAt)
+  }
+}
+
+/**
+ * Restores a whole run of weeks from a pre-image — the undo behind
+ * propose_volume_change and propose_schedule_change.
+ *
+ * Both write several weeks at once, so the swap's two-shape undo (one week
+ * for 'today', the whole plan for 'permanent') doesn't fit. Deliberately
+ * writes ONLY weeks at or beyond fromWeek: the pre-image holds the earlier
+ * weeks too, and re-saving those would overwrite logged history with a copy
+ * of itself for no reason — a write that can only do harm if anything moved.
+ */
+export async function undoWeekRangeChange(
+  profileId: string,
+  preImage: MesocycleWeek[],
+  fromWeek: number,
+): Promise<void> {
+  for (const week of preImage) {
+    if (week.week_number < fromWeek) continue
+    await saveMesocycleWeek(profileId, week)
   }
 }
 
@@ -445,5 +468,133 @@ export async function executeEquipmentAdaptation(
     mesocycle: result.mesocycle,
     preImage,
     receipt: { landed: result.touchedSlots.map(s => `${s.dayName}: ${s.before} → ${s.after ?? '(removed)'}`), failed: [] },
+  }
+}
+
+// ---------------------------------------------------------------------------
+// VOLUME AND SCHEDULE — audit §2.4.
+//
+// Both of these rode a tool that was declared and then declined on every call
+// since it was written. They are on the pending-action rail now for the same
+// reason the swaps are: propose -> confirm -> execute -> receipt, with an
+// atomic claim so a double tap cannot apply twice and a pre_image so it can be
+// undone. The original versions executed directly, chose their own magnitude,
+// and could not be reversed.
+// ---------------------------------------------------------------------------
+
+export interface VolumeChangePayload {
+  dayName: string
+  direction: VolumeDirection
+  weekNumbers: number[]
+  reason?: string
+}
+
+/**
+ * Steps a day's volume, in every week from the live one forward.
+ *
+ * RE-COMPUTED AT CONFIRM, not applied from the diff shown at propose time —
+ * the same reasoning executeExerciseSwap already follows. The plan can change
+ * between the two, and applying a stale diff would write numbers that were
+ * true when the coach spoke and are not now.
+ *
+ * DELOAD WEEKS ARE SKIPPED. A recovery week is already reduced on purpose;
+ * stepping it again fights the plan rather than serving the request.
+ */
+export async function executeVolumeChange(
+  profile: UserProfile,
+  mesocycle: MesocycleWeek[],
+  payload: VolumeChangePayload,
+): Promise<AdaptationResult> {
+  const preImage = mesocycle
+  const landed: string[] = []
+  const failed: { op: string; error: string }[] = []
+
+  const next = mesocycle.map(week => {
+    if (!payload.weekNumbers.includes(week.week_number)) return week
+    if (!isVolumeAdjustable(week)) return week
+    const days = (week.days ?? []).map(day => {
+      if (day.day.toLowerCase() !== payload.dayName.toLowerCase()) return day
+      const result = adjustDayVolume(day, payload.direction, profile)
+      if (result.changed) landed.push(`Week ${week.week_number}: ${describeVolumeChange(result, day.day)}`)
+      return result.day
+    })
+    return { ...week, days }
+  })
+
+  if (landed.length === 0) {
+    failed.push({ op: 'volume', error: 'Every exercise on that day is already at its limit — nothing moved.' })
+  }
+
+  for (const week of next) {
+    if (!payload.weekNumbers.includes(week.week_number)) continue
+    try { if (profile.id) await saveMesocycleWeek(profile.id, week) }
+    catch { failed.push({ op: 'save', error: `Week ${week.week_number} didn't save` }) }
+  }
+
+  return {
+    mesocycle: next,
+    preImage,
+    receipt: { landed, failed },
+  }
+}
+
+export interface ScheduleChangePayload {
+  /** The days the user will train, replacing whatever was there. */
+  trainingDays: string[]
+  fromWeek: number
+  reason?: string
+}
+
+/**
+ * Changes which days are training days, then rebuilds from the live week.
+ *
+ * REUSES rebuildFromCurrentWeek — the same path the Profile screen's rebuild
+ * offer takes, which is already gated. Nothing new about how a plan is
+ * generated; this is only a new way to ask for one. Past weeks are untouched,
+ * because they hold work somebody actually did.
+ */
+export async function executeScheduleChange(
+  profile: UserProfile,
+  mesocycle: MesocycleWeek[],
+  exclusions: string[],
+  payload: ScheduleChangePayload,
+): Promise<AdaptationResult> {
+  const preImage = mesocycle
+  const wanted = new Set(payload.trainingDays.map(d => d.toLowerCase()))
+  const updated: UserProfile = {
+    ...profile,
+    training_days: (profile.training_days ?? []).map(d => ({ ...d, available: wanted.has(d.day.toLowerCase()) })),
+  }
+
+  const rebuild = await rebuildFromCurrentWeek(updated, exclusions, mesocycle, payload.fromWeek)
+  if (!rebuild.ok || !rebuild.mesocycle) {
+    return {
+      mesocycle,
+      preImage,
+      receipt: { landed: [], failed: [{ op: 'rebuild', error: rebuild.error ?? 'The plan could not be rebuilt.' }] },
+    }
+  }
+
+  const failed: { op: string; error: string }[] = []
+  if (profile.id) {
+    try { await updateProfileField(profile.id, { training_days: updated.training_days }) }
+    catch { failed.push({ op: 'save', error: "The new days didn't save" }) }
+    for (const week of rebuild.mesocycle) {
+      if (week.week_number < payload.fromWeek) continue
+      try { await saveMesocycleWeek(profile.id, week) }
+      catch { failed.push({ op: 'save', error: `Week ${week.week_number} didn't save` }) }
+    }
+  }
+
+  return {
+    mesocycle: rebuild.mesocycle,
+    preImage,
+    receipt: {
+      landed: failed.length === 0
+        ? [`Training days: ${payload.trainingDays.join(', ')}`,
+           `Rebuilt ${rebuild.weeksRebuilt} week${rebuild.weeksRebuilt === 1 ? '' : 's'} from week ${payload.fromWeek} on`]
+        : [],
+      failed,
+    },
   }
 }

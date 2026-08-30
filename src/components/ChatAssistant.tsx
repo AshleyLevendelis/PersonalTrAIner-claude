@@ -16,7 +16,8 @@ import { getExerciseEntry } from '@/lib/exercise-db'
 import { createPendingAction, claimPendingAction, declinePendingAction, markExecuting, resolvePendingAction, getPendingAction, expireOldPendingActions, isWithinUndoWindow, type PendingActionReceipt } from '@/lib/pending-actions-store'
 import { APPEND_PROPOSAL_KINDS, INTENT_PROPOSAL_VERB, buildIntentProposal } from '@/lib/intent-proposal'
 import { pickAccountabilityCheckIn } from '@/lib/accountability'
-import { executeExerciseSwap, executeMealSwap, executeMealAddition, undoMealAddition, undoExerciseSwap, executeInjuryAdaptation, executeLastingInjury, executeInjuryRecovered, executeEquipmentAdaptation, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type LastingInjuryPayload, type InjuryRecoveredPayload, type EquipmentAdaptationPayload } from '@/lib/pending-action-executor'
+import { executeExerciseSwap, executeMealSwap, executeMealAddition, undoMealAddition, undoExerciseSwap, executeInjuryAdaptation, executeLastingInjury, executeInjuryRecovered, executeEquipmentAdaptation, executeVolumeChange, executeScheduleChange, undoWeekRangeChange, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type LastingInjuryPayload, type InjuryRecoveredPayload, type EquipmentAdaptationPayload, type VolumeChangePayload, type ScheduleChangePayload } from '@/lib/pending-action-executor'
+import { adjustDayVolume, isVolumeAdjustable } from '@/lib/volume-adjust'
 import { buildMealAdditionProposal, type MealAdditionPayload } from '@/lib/meal-addition'
 import { buildMealSwapProposal } from '@/lib/meal-swap-proposal'
 import { compileFoodDislikes } from '@/lib/fact-compiler'
@@ -1071,6 +1072,8 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       const count = rows.length
       return `I can adjust ${count} exercise${count === 1 ? '' : 's'} across your plan:`
     }
+    if (pendingAction.kind === 'propose_volume_change') return "Here's the change to that session:"
+    if (pendingAction.kind === 'propose_schedule_change') return "Here's the new week:"
     const intentVerb = INTENT_PROPOSAL_VERB[pendingAction.kind]
     if (intentVerb) return `Want me to ${intentVerb} **${rows[0].after}**?`
     const headline = rows[0]
@@ -1362,6 +1365,136 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       preImage: mesocycle,
       diff: {
         rows,
+        implications,
+        rationale: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined,
+        reversible: true,
+      },
+    }
+  }
+
+  /**
+   * Audit §2.4 — builds propose_volume_change's diff against the LIVE plan.
+   *
+   * DIRECTION IN, MAGNITUDE OUT. The tool carries "lighter" or "heavier" and
+   * nothing else; adjustDayVolume decides the step against the engine's own
+   * floors, role ceilings and time budget. The preview here runs the REAL
+   * adjuster on the real week — not an estimate of what it might do — so the
+   * card's before/after is the change itself, and executeVolumeChange re-runs
+   * the same function at confirm time in case the plan moved in between.
+   *
+   * Returns null when the day isn't on the plan, or when nothing can move:
+   * "every exercise on Tuesday is already at its floor" is a real answer and
+   * belongs in text, not on a Confirm button that would do nothing.
+   */
+  const buildVolumeChangeProposal = (rawArgs: Record<string, unknown>): {
+    scopeKey: string
+    preconditions: Record<string, unknown>
+    payload: VolumeChangePayload
+    preImage: MesocycleWeek[]
+    diff: import('@/lib/pending-actions-store').ProposalDiff
+  } | null => {
+    const dayName = String(rawArgs.day ?? '').trim()
+    const direction = rawArgs.direction === 'lighter' || rawArgs.direction === 'heavier' ? rawArgs.direction : null
+    if (!dayName || !direction || mesocycle.length === 0) return null
+
+    const startWeek = activeSession.liveWeek
+    // Deload weeks are excluded from the SET the proposal carries, not just
+    // skipped at execute time — so the card never counts a week it won't touch.
+    const weekNumbers = mesocycle
+      .filter(w => w.week_number >= startWeek && isVolumeAdjustable(w))
+      .map(w => w.week_number)
+    if (weekNumbers.length === 0) return null
+
+    const liveWeek = mesocycle.find(w => w.week_number === startWeek)
+    const day = liveWeek?.days.find(d => d.day.toLowerCase() === dayName.toLowerCase())
+    if (!day) return null
+
+    const preview = adjustDayVolume(day, direction, profile)
+    if (!preview.changed) return null
+
+    const rows = [{
+      field: `${day.day} — total sets`,
+      before: String(preview.setsBefore),
+      after: String(preview.setsAfter),
+    }]
+    const implications: { severity: 'info' | 'warn'; text: string }[] = [
+      { severity: 'info', text: `Applies from week ${startWeek} on. Weeks you've already trained don't change.` },
+    ]
+    if (mesocycle.some(w => w.week_number >= startWeek && !isVolumeAdjustable(w))) {
+      implications.push({ severity: 'info', text: 'Your deload week is left alone — it\'s already lighter on purpose.' })
+    }
+    if (preview.blocked.length > 0) {
+      const n = preview.blocked.length
+      implications.push({ severity: 'warn', text: `${n} exercise${n === 1 ? '' : 's'} won\'t move — ${preview.blocked[0].reason}.` })
+    }
+
+    return {
+      scopeKey: `${profile.id}:propose_volume_change:${day.day}:${direction}:${startWeek}`,
+      preconditions: { dayName: day.day, direction, startWeek, setsBefore: preview.setsBefore },
+      payload: { dayName: day.day, direction, weekNumbers, reason: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined },
+      preImage: mesocycle,
+      diff: {
+        rows,
+        implications,
+        rationale: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined,
+        reversible: true,
+      },
+    }
+  }
+
+  /**
+   * Audit §2.4 — builds propose_schedule_change's diff.
+   *
+   * The card shows the days, not the exercises. A schedule change re-runs the
+   * whole generator from the live week forward, so the after-image of every
+   * slot doesn't exist until confirm — and putting a guessed one on the card
+   * would be exactly the fabrication buildExerciseSwapProposal's own comment
+   * refuses. What IS knowable and worth showing: which days, and how many
+   * weeks get rebuilt.
+   *
+   * Returns null on a no-op (the requested days are the days they already
+   * train) and on a request for zero days — "stop training entirely" is not a
+   * schedule change the coach should be able to propose.
+   */
+  const buildScheduleChangeProposal = (rawArgs: Record<string, unknown>): {
+    scopeKey: string
+    preconditions: Record<string, unknown>
+    payload: ScheduleChangePayload
+    preImage: MesocycleWeek[]
+    diff: import('@/lib/pending-actions-store').ProposalDiff
+  } | null => {
+    const raw = Array.isArray(rawArgs.training_days) ? rawArgs.training_days : []
+    const known = new Map((profile.training_days ?? []).map(d => [d.day.toLowerCase(), d.day]))
+    // Resolve against the profile's OWN day spelling rather than trusting the
+    // model's — an unrecognised day is dropped, and if that leaves nothing
+    // the proposal doesn't happen at all.
+    const wanted = [...new Set(raw.map(d => known.get(String(d).trim().toLowerCase())).filter((d): d is string => !!d))]
+    if (wanted.length === 0 || mesocycle.length === 0) return null
+
+    const before = (profile.training_days ?? []).filter(d => d.available).map(d => d.day)
+    if (before.length === wanted.length && before.every(d => wanted.includes(d))) return null
+
+    const startWeek = activeSession.liveWeek
+    const weeksAhead = mesocycle.filter(w => w.week_number >= startWeek).length
+    if (weeksAhead === 0) return null
+
+    const implications: { severity: 'info' | 'warn'; text: string }[] = [
+      { severity: 'info', text: `Rebuilds ${weeksAhead} week${weeksAhead === 1 ? '' : 's'} from week ${startWeek} on. Anything you've already logged stays exactly as it is.` },
+    ]
+    if (wanted.length !== before.length) {
+      implications.push({
+        severity: 'warn',
+        text: `Going from ${before.length} to ${wanted.length} day${wanted.length === 1 ? '' : 's'} changes the split — the same work doesn't just move, it gets rebalanced.`,
+      })
+    }
+
+    return {
+      scopeKey: `${profile.id}:propose_schedule_change:${wanted.slice().sort().join(',')}:${startWeek}`,
+      preconditions: { before, wanted, startWeek },
+      payload: { trainingDays: wanted, fromWeek: startWeek, reason: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined },
+      preImage: mesocycle,
+      diff: {
+        rows: [{ field: 'Training days', before: before.join(', ') || 'none', after: wanted.join(', ') }],
         implications,
         rationale: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined,
         reversible: true,
@@ -1954,6 +2087,14 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       } else if (result.proposal.kind === 'propose_equipment_adaptation' && result.proposal.rawArgs) {
         const adaptation = await buildEquipmentAdaptationProposal(result.proposal.rawArgs)
         if (adaptation) built = { scopeKey: adaptation.scopeKey, preconditions: adaptation.preconditions, payload: adaptation.payload as unknown as Record<string, unknown>, preImage: adaptation.preImage, diff: adaptation.diff }
+      } else if (result.proposal.kind === 'propose_volume_change' && result.proposal.rawArgs) {
+        const volume = buildVolumeChangeProposal(result.proposal.rawArgs)
+        if (volume) built = { scopeKey: volume.scopeKey, preconditions: volume.preconditions, payload: volume.payload as unknown as Record<string, unknown>, preImage: volume.preImage, diff: volume.diff }
+        else refusal = "There's no room to move that session — everything on it is already at a limit."
+      } else if (result.proposal.kind === 'propose_schedule_change' && result.proposal.rawArgs) {
+        const schedule = buildScheduleChangeProposal(result.proposal.rawArgs)
+        if (schedule) built = { scopeKey: schedule.scopeKey, preconditions: schedule.preconditions, payload: schedule.payload as unknown as Record<string, unknown>, preImage: schedule.preImage, diff: schedule.diff }
+        else refusal = "Those are already the days you're training — nothing to change."
       } else if (APPEND_PROPOSAL_KINDS.has(result.proposal.kind) && result.proposal.rawArgs) {
         // Structural fix: record_fact/record_goal/add_to_grocery_list/
         // check_off_grocery_item/log_water now arrive here too whenever
@@ -2494,6 +2635,33 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
           durationDays: payload.durationDays,
         })
       }
+    } else if (row.kind === 'propose_volume_change') {
+      const payload = row.payload as unknown as VolumeChangePayload
+      const result = await executeVolumeChange(profile, mesocycle, payload)
+      onMesocycleUpdated(result.mesocycle)
+      receipt = result.receipt
+      const ok = receipt.failed.length === 0
+      title = ok ? 'Volume adjusted' : "Couldn't adjust the volume"
+      rows = ok ? receipt.landed.map(line => { const [label, detail] = line.split(': '); return { label, detail } }) : []
+      undoToken = ok ? row.id : undefined
+      // No plan_adaptations row: this is a change to the plan itself, not a
+      // time-bounded override sitting on top of one, so there is nothing to
+      // expire. The 10-minute undo restores pre_image, same as a swap.
+    } else if (row.kind === 'propose_schedule_change') {
+      const payload = row.payload as unknown as ScheduleChangePayload
+      const result = await executeScheduleChange(profile, mesocycle, exerciseExclusions, payload)
+      onMesocycleUpdated(result.mesocycle)
+      // executeScheduleChange writes fitness_profiles.training_days itself —
+      // same lockstep reason executeLastingInjury's branch has: the executor
+      // is pure and returns what changed rather than reaching into App.tsx.
+      if (result.receipt.failed.length === 0) {
+        onProfileChanged({ training_days: (profile.training_days ?? []).map(d => ({ ...d, available: payload.trainingDays.some(w => w.toLowerCase() === d.day.toLowerCase()) })) })
+      }
+      receipt = result.receipt
+      const ok = receipt.failed.length === 0
+      title = ok ? 'Schedule updated' : "Couldn't change the schedule"
+      rows = ok ? receipt.landed.map(line => { const [label, detail] = line.split(': '); return { label, detail } }) : []
+      undoToken = ok ? row.id : undefined
     } else if (APPEND_PROPOSAL_KINDS.has(row.kind)) {
       // Structural fix: the confirm side of buildIntentProposal — reuses
       // the SAME resolveAndSaveMemory/Grocery/Water functions the direct
@@ -2613,6 +2781,27 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         if (!preImage || !planCreatedAt) return
         await undoExerciseSwap(profile.id, preImage, payload.weekNumber, payload.scope, planCreatedAt)
         onMesocycleUpdated(preImage)
+      } else if (row.kind === 'propose_volume_change' || row.kind === 'propose_schedule_change') {
+        // Both wrote a RUN of weeks, so undo restores the same run rather
+        // than the swap's single week. The starting week comes off the
+        // payload, not off today's live week — undoing tomorrow must put
+        // back what was there, not what is there now.
+        const preImage = row.pre_image as MesocycleWeek[] | null
+        if (!preImage) return
+        const fromWeek = row.kind === 'propose_volume_change'
+          ? Math.min(...(row.payload as unknown as VolumeChangePayload).weekNumbers)
+          : (row.payload as unknown as ScheduleChangePayload).fromWeek
+        await undoWeekRangeChange(profile.id, preImage, fromWeek)
+        onMesocycleUpdated(preImage)
+        if (row.kind === 'propose_schedule_change') {
+          // The schedule change also wrote training_days; leaving that
+          // behind would put the plan back while the profile still claimed
+          // the new week — the exact divergence §2.4 exists to close.
+          const before = (row.preconditions as { before?: string[] } | null)?.before ?? []
+          const restored = (profile.training_days ?? []).map(d => ({ ...d, available: before.some(b => b.toLowerCase() === d.day.toLowerCase()) }))
+          await updateProfileField(profile.id, { training_days: restored })
+          onProfileChanged({ training_days: restored })
+        }
       } else if (row.kind === 'propose_meal_swap') {
         const payload = row.payload as unknown as MealSwapPayload
         if (!payload.currentName) return

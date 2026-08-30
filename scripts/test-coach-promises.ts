@@ -157,7 +157,18 @@ console.log('\n6. The first-run starter chips only offer things that work')
     'Swap an exercise': 'propose_exercise_swap',
     "There's a food I won't eat": 'record_fact',
   }
-  const DECLINING_STUBS = ['adjust_volume', 'update_workout_schedule']
+  // The declining set is DERIVED from the function, not listed here. It was
+  // listed here, and §2.4 wired both of the tools on that list — so the list
+  // became a claim about the source that the source had stopped making, and
+  // the check guarding it went red for being right. A handler that declines
+  // says so in its own reply string; read that instead. The window is cut at
+  // the NEXT handler so one decliner cannot make its neighbour look like one.
+  const handlerAt = [...chat.matchAll(/if \(name === "([a-z_]+)"\)/g)]
+  const decliningStubs = handlerAt.filter((m, i) => {
+    const body = chat.slice(m.index!, handlerAt[i + 1]?.index ?? m.index! + 2000)
+    return /coming in an update soon/.test(body)
+  }).map(m => m[1])
+  check('something still declines, so this check has teeth', decliningStubs.length > 0, decliningStubs)
   const declared = new Set([...chat.matchAll(/^\s*name:\s*"([a-z_]+)",\s*$/gm)].map(m => m[1]))
   const executed = new Set([...chat.matchAll(/name\s*===\s*"([a-z_]+)"/g)].map(m => m[1]))
 
@@ -173,26 +184,33 @@ console.log('\n6. The first-run starter chips only offer things that work')
     }
     check(`chip "${chip}" -> ${tool} is declared`, declared.has(tool))
     check(`chip "${chip}" -> ${tool} has an executor`, executed.has(tool))
-    check(`chip "${chip}" -> ${tool} is not a declining stub`, !DECLINING_STUBS.includes(tool))
+    check(`chip "${chip}" -> ${tool} is not a declining stub`, !decliningStubs.includes(tool))
   }
 
   // (b) Vocabulary that would pull the model toward a stub whatever the chip
   // was written to mean. Deliberately narrow: "3 sets of squats" is a LOG and
   // works fine, so bare "sets" is not the trigger — a change verb next to it
   // is.
-  const PULLS_TOWARD_A_STUB: Array<[RegExp, string]> = [
-    [/\bre-?schedul/i, 'update_workout_schedule'],
-    [/\bschedule\b/i, 'update_workout_schedule'],
-    [/\brest day\b/i, 'update_workout_schedule'],
-    [/\bday off\b/i, 'update_workout_schedule'],
-    [/\b(add|drop|move|remove|clear|skip)\s+(a\s+|the\s+)?(training\s+|gym\s+)?day\b/i, 'update_workout_schedule'],
-    [/\bvolume\b/i, 'adjust_volume'],
-    [/\b(more|fewer|less|extra|cut|reduce|increase|add|drop)\s+\w*\s*\breps?\b/i, 'adjust_volume'],
-    [/\b(more|fewer|less|extra|cut|reduce|increase|add|drop)\s+\w*\s*\bsets?\b/i, 'adjust_volume'],
+  const PULLS_TOWARD: Array<[RegExp, string]> = [
+    [/\bre-?schedul/i, 'propose_schedule_change'],
+    [/\bschedule\b/i, 'propose_schedule_change'],
+    [/\brest day\b/i, 'propose_schedule_change'],
+    [/\bday off\b/i, 'propose_schedule_change'],
+    [/\b(add|drop|move|remove|clear|skip)\s+(a\s+|the\s+)?(training\s+|gym\s+)?day\b/i, 'propose_schedule_change'],
+    [/\bvolume\b/i, 'propose_volume_change'],
+    [/\b(more|fewer|less|extra|cut|reduce|increase|add|drop)\s+\w*\s*\breps?\b/i, 'propose_volume_change'],
+    [/\b(more|fewer|less|extra|cut|reduce|increase|add|drop)\s+\w*\s*\bsets?\b/i, 'propose_volume_change'],
+    [/\b(ban|never give me|blacklist)\b/i, 'ban_exercise'],
   ]
+  // The rule is unchanged — a chip must not invite a request the app then
+  // refuses. What changed is which tools refuse: volume and schedule now
+  // execute, so that vocabulary is no longer an overclaim, and the check
+  // says so by asking the derived set rather than by having those lines
+  // deleted (deleting them would have quietly retired the rule as well).
   for (const chip of chips) {
-    const hit = PULLS_TOWARD_A_STUB.find(([re]) => re.test(chip))
-    check(`chip "${chip}" avoids stub vocabulary`, hit === undefined, hit?.[1])
+    const hit = PULLS_TOWARD.find(([re]) => re.test(chip))
+    check(`chip "${chip}" doesn't invite a tool that declines`,
+      hit === undefined || !decliningStubs.includes(hit[1]), hit?.[1])
   }
 
   // The chips only render if they are on the LAST message — getQuickReplies-
@@ -263,13 +281,15 @@ console.log('\n6. The first-run starter chips only offer things that work')
   check('...and does not also hand-roll the chips beside it',
     !/quickReplies:\s*FIRST_RUN_QUICK_REPLIES/.test(ui))
 
-  // Why the restriction exists, asserted rather than assumed. When either of
-  // these stops declining, this check fails and points at CHIP_DESTINATION —
-  // which is the moment the chip set is free to widen.
-  for (const stub of DECLINING_STUBS) {
-    const at = chat.indexOf(`if (name === "${stub}")`)
-    check(`${stub} is still a stub that declines`,
-      at !== -1 && /can't safely make plan changes yet/.test(chat.slice(at, at + 1200)))
+  // Why the restriction exists, asserted rather than assumed — and now the
+  // other direction too. §2.4 moved volume and schedule OFF the declining
+  // list, so the gate has to state that as a fact about the source rather
+  // than let their absence pass silently: a re-disabled tool must fail here,
+  // not just stop being checked.
+  for (const wired of ['propose_volume_change', 'propose_schedule_change']) {
+    check(`${wired} is declared`, declared.has(wired))
+    check(`${wired} has a handler`, executed.has(wired))
+    check(`${wired} no longer declines`, !decliningStubs.includes(wired), decliningStubs)
   }
 }
 

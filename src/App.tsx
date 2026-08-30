@@ -88,7 +88,7 @@ import { getAllItems as getAllGroceryItems, flushPending as flushGroceryPending,
 import { flushPending as flushSetLogPending } from '@/lib/set-log-store'
 import { flushPending as flushWaterPending } from '@/lib/water-store'
 import { flushPending as flushCardioPending } from '@/lib/cardio-log-store'
-import type { UserProfile, MacroTargets, WorkoutDay, PlanAction, SchedulePatchItem, MesocycleWeek } from '@/lib/types'
+import type { UserProfile, MacroTargets, WorkoutDay, PlanAction, MesocycleWeek } from '@/lib/types'
 import type { ExerciseEntry } from '@/lib/exercise-db'
 
 const STORAGE_KEY = 'fitplan_profile_id'
@@ -1276,140 +1276,18 @@ function App() {
     // categorically superseded by propose_meal_swap/propose_exercise_swap's
     // pending-action rail, which writes through meal-store/mesocycle-edit
     // directly rather than forwarding through this handler.
-    if (action.type === 'adjust_volume') {
-      setExercisePlan(prev =>
-        prev.map(day => {
-          if (day.day.toLowerCase() !== action.day.toLowerCase()) return day
-          return {
-            ...day,
-            exercises: day.exercises.map(ex => {
-              switch (action.adjustment) {
-                case 'reduce_light':
-                  return { ...ex, sets: Math.max(1, ex.sets - 1) }
-                case 'reduce_half':
-                  return { ...ex, sets: Math.max(1, Math.round(ex.sets / 2)) }
-                case 'reduce_heavy':
-                  return { ...ex, sets: Math.max(1, ex.sets - 2) }
-                case 'increase_moderate':
-                  return { ...ex, sets: ex.sets + 1 }
-                case 'increase_heavy':
-                  return { ...ex, sets: ex.sets + 2 }
-                default:
-                  return ex
-              }
-            }),
-          }
-        })
-      )
-    } else if (action.type === 'ban_exercise') {
+    // adjust_volume and update_workout_schedule are gone from PlanAction too,
+    // for the same reason and one round later (audit §2.4): they are now
+    // propose_volume_change / propose_schedule_change on the pending-action
+    // rail, which writes through mesocycle-persistence and profile-store.
+    // The branches that stood here mutated setExercisePlan and
+    // fitness_profiles.weekly_schedule — a flat fallback and a column the
+    // Exercise tab does not render from. That is precisely how one real
+    // profile ended up carrying three disagreeing schedules, so this is
+    // deleted rather than left unreachable: an unreachable second writer is
+    // one restored code path away from being the same bug again.
+    if (action.type === 'ban_exercise') {
       handleBanExercise(action.exercise_name)
-    } else if (action.type === 'update_workout_schedule') {
-      await handleScheduleUpdate(action.schedule_patch)
-    }
-  }
-
-  const handleScheduleUpdate = async (schedulePatch: SchedulePatchItem[]) => {
-    if (!profile?.id) return
-
-    // Build the new weekly_schedule from the patch operations
-    const newSchedule = { ...(profile.weekly_schedule || {}) }
-    for (const item of schedulePatch) {
-      if (item.action === 'REMOVE') {
-        newSchedule[item.day] = null
-      } else {
-        newSchedule[item.day] = item.block_name
-      }
-    }
-    setProfile(prev => prev ? { ...prev, weekly_schedule: newSchedule } : prev)
-
-    const normalizeBlock = (s: string) => s.toLowerCase().replace(/[^a-z]/g, '')
-
-    const currentDayMap = new Map<string, { focus: string; ids: string[] }>()
-    for (const day of exercisePlan) {
-      const ids = day.exercises.map(e => e.id).filter(Boolean) as string[]
-      currentDayMap.set(day.day, { focus: day.focus, ids })
-    }
-
-    for (const item of schedulePatch) {
-      const { day, action, block_name, exercises } = item
-
-      if (action === 'REMOVE') {
-        // Delete exercise rows for this day
-        const info = currentDayMap.get(day)
-        if (info && info.ids.length > 0) {
-          await supabase.from('exercise_plans').delete().in('id', info.ids)
-        }
-      } else if (action === 'ADD') {
-        // Insert new exercises for this day
-        if (exercises && exercises.length > 0) {
-          const rows = exercises.map(ex => ({
-            profile_id: profile.id,
-            day,
-            focus: block_name,
-            name: ex.name,
-            sets: ex.sets,
-            reps: ex.reps,
-            rest: '60-90s',
-          }))
-          await supabase.from('exercise_plans').insert(rows)
-        }
-      } else if (action === 'MOVE') {
-        // Clear existing exercises on the target day before moving
-        const targetInfo = currentDayMap.get(day)
-        if (targetInfo && targetInfo.ids.length > 0) {
-          await supabase.from('exercise_plans').delete().in('id', targetInfo.ids)
-        }
-
-        // Relocate source day's exercise rows to the target day
-        const normalizedBlock = normalizeBlock(block_name)
-        for (const [currentDay, info] of currentDayMap) {
-          if (normalizeBlock(info.focus) === normalizedBlock && currentDay !== day && info.ids.length > 0) {
-            await supabase.from('exercise_plans')
-              .update({ day, focus: block_name })
-              .in('id', info.ids)
-
-            // Mark the source day as rest unless another patch item fills it
-            const sourceHandledByOtherPatch = schedulePatch.some(
-              p => p.day === currentDay && p !== item && p.action !== 'REMOVE'
-            )
-            if (!sourceHandledByOtherPatch) {
-              newSchedule[currentDay] = null
-            }
-            break
-          }
-        }
-      }
-    }
-
-    // Refresh exercise plan from DB
-    const { data: exerciseRows } = await supabase
-      .from('exercise_plans')
-      .select('*')
-      .eq('profile_id', profile.id)
-
-    if (exerciseRows) {
-      const grouped = new Map<string, typeof exerciseRows>()
-      for (const row of exerciseRows) {
-        const existing = grouped.get(row.day) || []
-        existing.push(row)
-        grouped.set(row.day, existing)
-      }
-      const refreshed: WorkoutDay[] = []
-      for (const [day, exercises] of grouped) {
-        refreshed.push({
-          day,
-          focus: exercises[0].focus,
-          exercises: exercises.map(r => ({
-            id: r.id,
-            name: r.name,
-            sets: r.sets,
-            reps: r.reps,
-            rest: r.rest,
-            substitution: r.substitution || '',
-          })),
-        })
-      }
-      setExercisePlan(refreshed)
     }
   }
 

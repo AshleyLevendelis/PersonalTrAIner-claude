@@ -165,31 +165,38 @@ console.log('\n3. The step model holds together')
 console.log('\n4. Nothing the tour promises is a capability the coach declines')
 // ---------------------------------------------------------------------------
 {
-  // Same rule as first-run-intro.ts's chips, same two stubs. The tour speaks
-  // in the app's own voice with no model in the loop, so there is nothing
-  // downstream to catch an overclaim — this is the only check between the
-  // copy and a new user's first impression.
+  // Same rule as first-run-intro.ts's chips. The tour speaks in the app's own
+  // voice with no model in the loop, so there is nothing downstream to catch
+  // an overclaim — this is the only check between the copy and a new user's
+  // first impression.
+  //
+  // The declining set is DERIVED from the function rather than named here.
+  // It used to be a hardcoded pair, and §2.4 wired both of them — so the
+  // list became a claim the source no longer made, and its own "does this
+  // still mean something" guard went red for being correct.
   const chat = readFileSync(join(ROOT, 'supabase/functions/chat-gemini/index.ts'), 'utf8')
-  const DECLINING_STUBS = ['adjust_volume', 'update_workout_schedule']
-  for (const stub of DECLINING_STUBS) {
-    const at = chat.indexOf(`if (name === "${stub}")`)
-    check(`${stub} is still a declining stub, so this check still means something`,
-      at !== -1 && /can't safely make plan changes yet/.test(chat.slice(at, at + 1200)))
-  }
+  const handlerAt = [...chat.matchAll(/if \(name === "([a-z_]+)"\)/g)]
+  const decliningStubs = handlerAt.filter((m, i) => {
+    const body = chat.slice(m.index!, handlerAt[i + 1]?.index ?? m.index! + 2000)
+    return /coming in an update soon/.test(body)
+  }).map(m => m[1])
+  check('something still declines, so this check has teeth', decliningStubs.length > 0, decliningStubs)
 
   // Vocabulary that would have the user ask for one of them. Narrower than the
   // chip screen: the tour DESCRIBES rather than puts words in the user's
   // mouth, so "every set" is fine — a change verb next to a plan noun is not.
   const OVERCLAIM: Array<[RegExp, string]> = [
-    [/\bre-?schedul/i, 'update_workout_schedule'],
-    [/\bchange your (training )?days?\b/i, 'update_workout_schedule'],
-    [/\bmove (a|your) (training )?day\b/i, 'update_workout_schedule'],
-    [/\b(add|drop|cut|reduce|increase)\s+(\w+\s+)?(sets?|reps?|volume)\b/i, 'adjust_volume'],
+    [/\bre-?schedul/i, 'propose_schedule_change'],
+    [/\bchange your (training )?days?\b/i, 'propose_schedule_change'],
+    [/\bmove (a|your) (training )?day\b/i, 'propose_schedule_change'],
+    [/\b(add|drop|cut|reduce|increase)\s+(\w+\s+)?(sets?|reps?|volume)\b/i, 'propose_volume_change'],
+    [/\b(ban|never give you|blacklist)\b/i, 'ban_exercise'],
   ]
   for (const s of TOUR_STEPS) {
     const text = [s.copy, s.teaser, s.tapHint, s.title].filter(Boolean).join(' ')
     const hit = OVERCLAIM.find(([re]) => re.test(text))
-    check(`${s.key}: promises nothing that lands on a stub`, hit === undefined, hit?.[1])
+    check(`${s.key}: promises nothing that lands on a decliner`,
+      hit === undefined || !decliningStubs.includes(hit[1]), hit?.[1])
   }
 }
 

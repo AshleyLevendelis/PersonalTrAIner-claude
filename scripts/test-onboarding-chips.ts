@@ -182,16 +182,26 @@ console.log('\n4. The opening messages')
   // Same honesty rule as first-run-intro's chips: the opener speaks in the
   // app's own voice with no model in the loop, so an overclaim has nothing
   // downstream to catch it.
+  // Derived, not listed: the pair this used to name were both wired up in
+  // §2.4, which would have left a hardcoded list asserting something the
+  // source had stopped saying.
   const chat = readFileSync(join(ROOT, 'supabase/functions/chat-gemini/index.ts'), 'utf8')
-  for (const stub of ['adjust_volume', 'update_workout_schedule']) {
-    const at = chat.indexOf(`if (name === "${stub}")`)
-    check(`${stub} is still a declining stub, so this check means something`,
-      at !== -1 && /can't safely make plan changes yet/.test(chat.slice(at, at + 1200)))
-  }
-  const OVERCLAIM = [/\bre-?schedul/i, /\bchange your (training )?days?\b/i, /\b(add|drop|cut)\s+(\w+\s+)?(sets?|reps?|volume)\b/i]
+  const handlerAt = [...chat.matchAll(/if \(name === "([a-z_]+)"\)/g)]
+  const decliningStubs = handlerAt.filter((m, i) => {
+    const body = chat.slice(m.index!, handlerAt[i + 1]?.index ?? m.index! + 2000)
+    return /coming in an update soon/.test(body)
+  }).map(m => m[1])
+  check('something still declines, so this check means something', decliningStubs.length > 0, decliningStubs)
+  const OVERCLAIM: Array<[RegExp, string]> = [
+    [/\bre-?schedul/i, 'propose_schedule_change'],
+    [/\bchange your (training )?days?\b/i, 'propose_schedule_change'],
+    [/\b(add|drop|cut)\s+(\w+\s+)?(sets?|reps?|volume)\b/i, 'propose_volume_change'],
+    [/\b(ban|never give you|blacklist)\b/i, 'ban_exercise'],
+  ]
   const text = intro.map(m => m.content).join(' ')
-  check('the opener promises nothing that lands on a stub',
-    !OVERCLAIM.some(re => re.test(text)), OVERCLAIM.filter(re => re.test(text)).map(String))
+  const overclaims = OVERCLAIM.filter(([re, tool]) => re.test(text) && decliningStubs.includes(tool))
+  check('the opener promises nothing that lands on a decliner',
+    overclaims.length === 0, overclaims.map(([, tool]) => tool))
 }
 
 // ---------------------------------------------------------------------------

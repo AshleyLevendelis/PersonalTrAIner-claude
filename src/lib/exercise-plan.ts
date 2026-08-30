@@ -2584,7 +2584,7 @@ function findEntry(name: string): ExerciseEntry | undefined {
 // with more sets than that day's main lift.
 
 /** 90+ min sessions are the one case a main lift is allowed past 5 sets — "dedicated long sessions" in the review's own language. */
-function getRoleSetCeiling(role: VolumeRole, isLongSession: boolean): number {
+export function getRoleSetCeiling(role: VolumeRole, isLongSession: boolean): number {
   switch (role) {
     case 'main': return isLongSession ? 6 : 5
     case 'accessory': return 4
@@ -2597,13 +2597,13 @@ function getRoleSetCeiling(role: VolumeRole, isLongSession: boolean): number {
   }
 }
 
-function getRoleSetFloor(role: VolumeRole): number {
+export function getRoleSetFloor(role: VolumeRole): number {
   if (role === 'main') return 3
   if (role === 'conditioning') return 4
   return 2
 }
 
-function clampToVolumeRole(sets: number, role: VolumeRole | null, isLongSession: boolean): number {
+export function clampToVolumeRole(sets: number, role: VolumeRole | null, isLongSession: boolean): number {
   if (!role) return sets
   return Math.min(getRoleSetCeiling(role, isLongSession), Math.max(getRoleSetFloor(role), sets))
 }
