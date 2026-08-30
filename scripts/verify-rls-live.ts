@@ -56,12 +56,64 @@ const argOf = (name: string): string | undefined => {
   return inline ? inline.slice(name.length + 3) : undefined
 }
 
-const url = argOf('url') || process.env.RLS_TARGET_URL || process.env.VITE_SUPABASE_URL
-const anonKey = argOf('anon-key') || process.env.RLS_TARGET_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY
+const PROD_REF_EARLY = 'sdkhuczcfnqqimdgfiks'
+const wantsProd = process.argv.includes('--prod')
+
+/**
+ * Strip what a paste picks up. Every one of these has actually arrived:
+ * angle brackets copied from an instruction's placeholder, quotes added by a
+ * shell, and trailing whitespace from a dashboard's copy button.
+ */
+const clean = (v: string | undefined): string | undefined => {
+  if (v === undefined) return undefined
+  const t = v.trim().replace(/^[<"']+|[>"']+$/g, '').trim()
+  return t.length ? t : undefined
+}
+
+/**
+ * AN EXPLICIT TARGET MUST NOT BORROW .env.local's KEY. That key belongs to
+ * TEST; pairing it with a production URL asks production to accept a stranger's
+ * credential. The reply is an auth error, which carries a PostgREST code, which
+ * this script used to count as "the database refused me" — and a refusal is a
+ * pass. So `--prod` would have printed PASSED for PRODUCTION on the strength of
+ * a key production has never heard of. Caught while testing the prompt, because
+ * the prompt did not appear when it should have.
+ */
+const explicitTarget = !!(clean(argOf('url')) || wantsProd)
+
+const url = clean(argOf('url')) || (wantsProd ? `https://${PROD_REF_EARLY}.supabase.co` : undefined)
+  || clean(process.env.RLS_TARGET_URL) || clean(process.env.VITE_SUPABASE_URL)
+
+let anonKey = clean(argOf('anon-key')) || clean(process.env.RLS_TARGET_ANON_KEY)
+
+/**
+ * ASK, rather than make somebody build a command line.
+ *
+ * The instruction to run this was given three times and failed three times on
+ * the same machine: once as bash syntax PowerShell cannot parse, then twice
+ * because the placeholder — PASTE_KEY_HERE, then <the real key> — was pasted
+ * literally, the second time hitting PowerShell's reserved `<`. The command
+ * line was the defect, not the person typing it. `--prod` needs nothing
+ * pasted at all except the key, and the key is asked for when it is needed.
+ */
+if (url && !anonKey && (explicitTarget || !clean(process.env.VITE_SUPABASE_ANON_KEY))) {
+  const readline = await import('readline/promises')
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
+  const ref = url.replace(/^https:\/\//, '').split('.')[0]
+  console.log(`\nReading ${ref === PROD_REF_EARLY ? 'PRODUCTION' : ref}.`)
+  console.log('Supabase dashboard > that project > Project Settings > API > the key')
+  console.log('labelled "anon" "public" (long, starts with eyJ). Not the service key.\n')
+  anonKey = clean(await rl.question('Paste it here and press Enter: '))
+  rl.close()
+}
+
+if (!explicitTarget) anonKey = anonKey || clean(process.env.VITE_SUPABASE_ANON_KEY)
+
 if (!url || !anonKey) {
-  console.error('No database to read. Either .env.local must carry')
-  console.error('VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY, or pass them directly:')
-  console.error('    npm run verify:rls -- --url https://<project>.supabase.co --anon-key <key>')
+  console.error('\nNo database to read, and no key given.')
+  console.error('Easiest way to check the live database:')
+  console.error('    npm run verify:rls -- --prod')
+  console.error('and paste the key when it asks.')
   process.exit(1)
 }
 
@@ -126,6 +178,12 @@ const leaks: { table: string; rows: number }[] = []
  */
 const isDatabaseAnswer = (error: { message?: string; code?: string }): boolean => {
   if (/fetch failed|ENOTFOUND|ECONNREFUSED|ECONNRESET|EAI_AGAIN|allowlist|getaddrinfo|network|socket hang up|timed? ?out|certificate/i.test(error.message ?? '')) return false
+  // A REJECTED KEY IS NOT A CLOSED TABLE. "Invalid API key" carries a code and
+  // so used to read as a refusal, i.e. a pass — meaning a typo in the key
+  // produced a clean bill of health for a database that never even considered
+  // the question. We have to be accepted as an anonymous caller before "it
+  // showed me nothing" means anything at all.
+  if (/invalid api key|jwt|unauthorized|invalid authentication|no api key/i.test(error.message ?? '')) return false
   return !!error.code
 }
 
@@ -190,9 +248,10 @@ if (!isProduction) {
   console.log(`dashboard for ${PROD_REF}, under Project Settings > API — the "anon"`)
   console.log('public key, NOT the service key):')
   console.log('')
-  console.log(`    npm run verify:rls -- --url https://${PROD_REF}.supabase.co --anon-key <paste it here>`)
+  console.log('    npm run verify:rls -- --prod')
   console.log('')
-  console.log('That line works the same in PowerShell, Command Prompt and a Mac terminal.')
+  console.log('It asks for the key; paste it when prompted. Nothing else to type, and it')
+  console.log('works the same in PowerShell, Command Prompt and a Mac terminal.')
 }
 
 // A green tick over an EMPTY database proves nothing at all, and after this
@@ -204,7 +263,7 @@ if (!serviceKey) {
   console.log('\nNOTE, AND IT MATTERS: zero rows is what a correctly closed database looks')
   console.log('like AND what an empty one looks like, and this run cannot distinguish them.')
   console.log('To settle it, re-run with the project\'s service key in the environment:')
-  console.log(`    npm run verify:rls -- --service-key <paste it here>${isProduction ? '' : ` --url https://${PROD_REF}.supabase.co --anon-key <paste it here>`}`)
+  console.log(`    npm run verify:rls${isProduction ? '' : ' -- --prod'} --service-key=THE_KEY`)
   console.log('which counts what is actually stored and compares.')
 } else {
   const service = createClient(url, serviceKey)
