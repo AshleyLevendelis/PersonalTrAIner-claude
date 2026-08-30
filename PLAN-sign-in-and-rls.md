@@ -181,9 +181,15 @@ writing down rather than remembering.
 | `owner_id` exists yet | no | no |
 | `ai_usage_daily` exists yet | no | no |
 
-**The exposure is not hypothetical.** 70 profiles, 407 chat messages and 207
-logged sets are sitting behind `USING (true)` right now, readable by anyone
-holding a key that ships in the app bundle.
+**The rows are real; the users are not.** 70 profiles, 407 chat messages and
+207 logged sets sit behind `USING (true)` right now, readable by anyone
+holding a key that ships in the app bundle — but Ashley confirmed on 30 Aug
+2026 that **nobody else is using the app yet; all of it is her own testing.**
+
+I had written this section as though third parties were exposed, which
+overstated the urgency. The hole is real and worth closing before anyone else
+arrives; it is not a live breach today, and the deploy order below is
+therefore a convenience question rather than an incident-response one.
 
 **Every live policy is `TO {anon, authenticated} USING (true)`, and there are
 no extra policies created by hand in the dashboard.** That was the one risk
@@ -208,6 +214,11 @@ evidence of anything here.
 a toggle, not an upgrade — but it is still a toggle nobody has flipped.
 
 ## Deploy, in order — and the order is not optional
+
+**Stakes, given there are no users yet:** getting this order wrong costs
+Ashley a broken test app until she finishes the remaining steps. It is not an
+outage. Do it in order anyway — it is two minutes either way — but nothing
+here needs to be treated as risky.
 
 **0. TURN ON ANONYMOUS SIGN-INS IN THE SUPABASE DASHBOARD. Both projects.**
 Authentication → Sign In / Providers → Anonymous Sign-Ins → enable. It is OFF
