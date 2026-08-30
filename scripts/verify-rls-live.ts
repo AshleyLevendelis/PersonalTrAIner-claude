@@ -35,14 +35,33 @@ if (fs.existsSync(envPath)) {
   }
 }
 
-// EXPLICIT TARGET WINS over .env.local, so production can be checked without
-// hand-editing the env file — which .env.local's own comment warns not to
-// commit, and which is a swap easy to forget to undo.
-const url = process.env.RLS_TARGET_URL || process.env.VITE_SUPABASE_URL
-const anonKey = process.env.RLS_TARGET_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY
+/**
+ * EXPLICIT TARGET WINS over .env.local, so production can be checked without
+ * hand-editing the env file — which .env.local's own comment warns not to
+ * commit, and which is a swap easy to forget to undo.
+ *
+ * FLAGS, NOT ENVIRONMENT VARIABLES, and that is the whole point. The first
+ * version of this took RLS_TARGET_URL=... in front of the command, which is
+ * bash syntax; Ashley runs PowerShell, where it fails with "is not recognized
+ * as a name of a cmdlet". A security check nobody can invoke is a security
+ * check nobody runs. process.argv parses identically on every shell, so there
+ * is one instruction to give and it is right everywhere.
+ *
+ * The env vars still work, because CI has no argv to give.
+ */
+const argOf = (name: string): string | undefined => {
+  const i = process.argv.indexOf(`--${name}`)
+  if (i !== -1 && process.argv[i + 1]) return process.argv[i + 1]
+  const inline = process.argv.find(a => a.startsWith(`--${name}=`))
+  return inline ? inline.slice(name.length + 3) : undefined
+}
+
+const url = argOf('url') || process.env.RLS_TARGET_URL || process.env.VITE_SUPABASE_URL
+const anonKey = argOf('anon-key') || process.env.RLS_TARGET_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY
 if (!url || !anonKey) {
-  console.error('Missing VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY (.env.local),')
-  console.error('and no RLS_TARGET_URL / RLS_TARGET_ANON_KEY given.')
+  console.error('No database to read. Either .env.local must carry')
+  console.error('VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY, or pass them directly:')
+  console.error('    npm run verify:rls -- --url https://<project>.supabase.co --anon-key <key>')
   process.exit(1)
 }
 
@@ -88,11 +107,36 @@ console.log('(this is exactly what someone holding the app\'s public key can do)
 let readable = 0
 let denied = 0
 let empty = 0
+let unreachable = 0
 const leaks: { table: string; rows: number }[] = []
+
+/**
+ * DID THE DATABASE ANSWER, OR DID WE NEVER REACH IT?
+ *
+ * This script used to count EVERY error as a pass — "a policy that denies
+ * rather than filters shows up as an error", which is true of a real refusal
+ * and false of a connection that never arrived. Pointed at production with an
+ * unreachable host, it printed "PASSED for PRODUCTION" over 28 consecutive
+ * transport failures. A wrong URL, a stale key, no internet, or the free tier
+ * auto-pausing after a quiet week would all have read as "your data is safe".
+ *
+ * PostgREST answers carry a `code`; fetch failures do not. Both are checked,
+ * because a future client version could attach a code to a transport error
+ * and the message patterns are the backstop.
+ */
+const isDatabaseAnswer = (error: { message?: string; code?: string }): boolean => {
+  if (/fetch failed|ENOTFOUND|ECONNREFUSED|ECONNRESET|EAI_AGAIN|allowlist|getaddrinfo|network|socket hang up|timed? ?out|certificate/i.test(error.message ?? '')) return false
+  return !!error.code
+}
 
 for (const table of USER_TABLES) {
   const { data, error, count } = await anon.from(table).select('*', { count: 'exact', head: false }).limit(1)
   if (error) {
+    if (!isDatabaseAnswer(error)) {
+      unreachable++
+      console.log(`  NO ANSWER ${table.padEnd(26)} ${error.message}`)
+      continue
+    }
     // A policy that denies rather than filters shows up as an error. Either
     // shape is a pass; what matters is that no row comes back.
     denied++
@@ -110,7 +154,26 @@ for (const table of USER_TABLES) {
   }
 }
 
-console.log(`\n${USER_TABLES.length} tables: ${empty} returned nothing, ${denied} refused outright, ${readable} handed over rows.`)
+console.log(`\n${USER_TABLES.length} tables: ${empty} returned nothing, ${denied} refused outright, ${readable} handed over rows, ${unreachable} never answered.`)
+
+// AN UNANSWERED TABLE IS NOT A LOCKED ONE. Checked BEFORE the leak check,
+// because a run that could not reach the database has not established
+// anything either way — including that nothing leaked.
+if (unreachable > 0) {
+  console.error(`\nINCONCLUSIVE — ${unreachable} of ${USER_TABLES.length} tables never answered, so this run proves nothing.`)
+  console.error('Nothing here says your data is safe, and nothing here says it is exposed.')
+  console.error('')
+  console.error('Usual causes, commonest first:')
+  console.error('  - the URL or the anon key is wrong, or has a stray character from pasting')
+  console.error('  - the project is PAUSED (free tier pauses after about a week of no traffic;')
+  console.error('    open it in the Supabase dashboard and press "Restore project")')
+  console.error('  - no internet, or a firewall in the way')
+  console.error('')
+  console.error('Fix the connection and run it again. This used to print PASSED here, over')
+  console.error('28 failed connections in a row, which is the wrong answer to give about a')
+  console.error('database nobody could reach.')
+  process.exit(1)
+}
 
 if (readable > 0) {
   console.error('\nFAILED — these tables are readable by anyone with the app\'s public key:')
@@ -124,21 +187,24 @@ if (!isProduction) {
   console.log('')
   console.log('THIS DOES NOT COVER YOUR LIVE DATA. To check the database real users are in,')
   console.log('point this at production explicitly (its URL and anon key are in the Supabase')
-  console.log(`dashboard for ${PROD_REF}, under Project Settings > API):`)
-  console.log('    RLS_TARGET_URL=... RLS_TARGET_ANON_KEY=... npm run verify:rls')
+  console.log(`dashboard for ${PROD_REF}, under Project Settings > API — the "anon"`)
+  console.log('public key, NOT the service key):')
+  console.log('')
+  console.log(`    npm run verify:rls -- --url https://${PROD_REF}.supabase.co --anon-key <paste it here>`)
+  console.log('')
+  console.log('That line works the same in PowerShell, Command Prompt and a Mac terminal.')
 }
 
 // A green tick over an EMPTY database proves nothing at all, and after this
 // migration the anon key cannot tell the two apart — it sees zero either way.
 // Only the service key can say whether there was anything there to hide, so
 // the verdict is conditional on having one, and says so when it does not.
-const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+const serviceKey = argOf('service-key') || process.env.SUPABASE_SERVICE_ROLE_KEY
 if (!serviceKey) {
   console.log('\nNOTE, AND IT MATTERS: zero rows is what a correctly closed database looks')
   console.log('like AND what an empty one looks like, and this run cannot distinguish them.')
   console.log('To settle it, re-run with the project\'s service key in the environment:')
-  console.log('    SUPABASE_SERVICE_ROLE_KEY=... npm run verify:rls')
-  console.log('(the same run can carry RLS_TARGET_URL/RLS_TARGET_ANON_KEY to aim at production.)')
+  console.log(`    npm run verify:rls -- --service-key <paste it here>${isProduction ? '' : ` --url https://${PROD_REF}.supabase.co --anon-key <paste it here>`}`)
   console.log('which counts what is actually stored and compares.')
 } else {
   const service = createClient(url, serviceKey)
