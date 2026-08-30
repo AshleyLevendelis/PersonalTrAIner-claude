@@ -13,7 +13,7 @@ import { getRecentLogs, formatLogsForAI, getRecentCardioLogs, formatCardioLogsFo
 import { saveChatCache, loadChatCache, clearChatCache } from '@/lib/chat-cache'
 import { swapPoolMeal, setMealPick, type MealSlotName } from '@/lib/meal-store'
 import { getExerciseEntry } from '@/lib/exercise-db'
-import { createPendingAction, claimPendingAction, declinePendingAction, markExecuting, resolvePendingAction, getPendingAction, isWithinUndoWindow, type PendingActionReceipt } from '@/lib/pending-actions-store'
+import { createPendingAction, claimPendingAction, declinePendingAction, markExecuting, resolvePendingAction, getPendingAction, expireOldPendingActions, isWithinUndoWindow, type PendingActionReceipt } from '@/lib/pending-actions-store'
 import { APPEND_PROPOSAL_KINDS, INTENT_PROPOSAL_VERB, buildIntentProposal } from '@/lib/intent-proposal'
 import { pickAccountabilityCheckIn } from '@/lib/accountability'
 import { executeExerciseSwap, executeMealSwap, executeMealAddition, undoMealAddition, undoExerciseSwap, executeInjuryAdaptation, executeLastingInjury, executeInjuryRecovered, executeEquipmentAdaptation, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type LastingInjuryPayload, type InjuryRecoveredPayload, type EquipmentAdaptationPayload } from '@/lib/pending-action-executor'
@@ -411,6 +411,14 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       loadFavorites()
       loadWorkoutLogs()
       loadChatHistory()
+      // The lazy sweep expireOldPendingActions was written for — its own doc
+      // comment says "call on chat mount / load", and nothing ever did, so
+      // proposals past their ten-minute window sat as `pending` in the
+      // database indefinitely. claimPendingAction checks the deadline itself,
+      // so this was never a correctness hole; it is hygiene, and it keeps the
+      // stored status matching what the card now shows. Best-effort: a failed
+      // sweep must not stop the chat loading.
+      void expireOldPendingActions(profile.id).catch(() => {})
     }
   }, [profile.id])
 
@@ -686,10 +694,23 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       ? favorites.map(f => `- ${f.name} (${f.meal_slot}, used ${f.times_used}x)`).join('\n')
       : ''
 
-    const now = new Date()
+    // getAppNow, not `new Date()` — everything else the coach is told about
+    // time already respects the dev clock, and this one call did not, so a
+    // QA session that time-travelled had the coach quietly living on the
+    // real calendar while the rest of the app moved.
+    const now = getAppNow(profile.id)
     const currentTimeFormatted = now.toLocaleDateString('en-US', { weekday: 'long' }) + ' ' +
       now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
-    const todayStr = now.toISOString().slice(0, 10)
+    // THE LOCAL CALENDAR DATE, from the same helper every write in this app
+    // uses. This was `now.toISOString().slice(0, 10)` — the UTC date —
+    // compared against workoutLogHistory, whose dates are all stamped local.
+    // The two disagree for part of every day in almost any timezone: in the
+    // UK in summer anything logged between midnight and 1am filed under
+    // yesterday; in New York the coach was already on tomorrow from 8pm and
+    // saw no training logged; in Sydney it was wrong for the first ten hours
+    // of every day. The visible symptom was the coach insisting you hadn't
+    // trained when you had, or congratulating you when you hadn't.
+    const todayStr = getSessionDateContext(profile.id).date
     const workoutLoggedToday = workoutLogHistory.includes(todayStr)
 
     const effectiveWeightKg = latestWeightKg != null && latestWeightKg > 0 ? latestWeightKg : profile.weight_kg
@@ -2276,12 +2297,36 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     if (!msg.pendingAction || !profile.id) return
     const claimResult = await claimPendingAction(msg.pendingAction.id, async () => true)
 
+    // EVERY non-claimed outcome has to change the card. This used to handle
+    // 'stale' alone and `return` on the rest, so a proposal older than the
+    // ten-minute window (outcome 'expired') or one whose row had gone
+    // ('not_found') left the card exactly as it was — still offering Confirm,
+    // no message, no error. The button did nothing, and kept doing nothing
+    // however many times it was pressed. Ten minutes is short enough that
+    // "read the message, get distracted, come back" reached it easily, and it
+    // survived a reload because the chat is restored from a local cache with
+    // the card still showing Confirm.
+    //
+    // 'not_found' maps to the same card state as 'expired': the two differ in
+    // cause, not in anything the user can do about it, and ProposalCard's
+    // copy covers both.
+    //
+    // 'already_resolved' is the one case where the card must NOT invent a
+    // reason — the row was resolved by some other tap and could have been
+    // applied, declined or failed. Re-reading it costs one query on a rare
+    // path and is the difference between showing what happened and guessing.
     if (claimResult.outcome !== 'claimed') {
-      setMessages(prev => prev.map((m, i) => {
-        if (i !== msgIndex || !m.pendingAction) return m
-        if (claimResult.outcome === 'stale') return { ...m, pendingAction: { ...m.pendingAction, status: 'stale' } }
-        return m
-      }))
+      let nextStatus: ChatPendingActionView['status'] =
+        claimResult.outcome === 'stale' ? 'stale' : 'expired'
+      if (claimResult.outcome === 'already_resolved') {
+        const current = await getPendingAction(msg.pendingAction.id).catch(() => null)
+        nextStatus = current?.status ?? 'expired'
+      }
+      setMessages(prev => prev.map((m, i) =>
+        i === msgIndex && m.pendingAction
+          ? { ...m, pendingAction: { ...m.pendingAction, status: nextStatus } }
+          : m
+      ))
       return
     }
 

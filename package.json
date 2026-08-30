@@ -130,7 +130,9 @@
     "verify:reveal": "vite build --config .tw-harness/vite.config.ts && node .tw-harness/measure.mjs",
     "report:frozen-weeks": "tsx scripts/report-frozen-weeks.ts",
     "report:rehab-coverage": "tsx scripts/report-rehab-coverage.ts",
-    "report:trim-magnitude": "tsx scripts/run-trim-magnitude-report.ts"
+    "report:trim-magnitude": "tsx scripts/run-trim-magnitude-report.ts",
+    "test:proposal-expiry": "tsx scripts/test-proposal-expiry.ts",
+    "test:local-dates": "tsx scripts/test-local-dates.ts"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.4",
