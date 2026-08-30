@@ -87,7 +87,7 @@ export function ReceiptCard({
                 <span className="font-medium">{row.label}</span>
                 <span className="text-muted-foreground">{row.detail}</span>
               </div>
-              {row.note && <p className="text-[10px] text-muted-foreground/80 pl-2">{row.note}</p>}
+              {row.note && <p className="text-[0.625rem] text-muted-foreground/80 pl-2">{row.note}</p>}
             </div>
           ))}
         </div>
@@ -95,12 +95,12 @@ export function ReceiptCard({
 
       {status === 'partial' && receipt && receipt.failed.length > 0 && (
         <div className="space-y-1 rounded-sm bg-[color:var(--role-warn-bg)] p-2">
-          <p className="text-[11px] text-[color:var(--role-warn-text)]">Didn't land:</p>
+          <p className="text-[0.6875rem] text-[color:var(--role-warn-text)]">Didn't land:</p>
           {receipt.failed.map((f, i) => (
-            <div key={i} className="flex items-center justify-between gap-2 text-[11px]">
+            <div key={i} className="flex items-center justify-between gap-2 text-[0.6875rem]">
               <span>{f.op} — {f.error}</span>
               {onRetryFailed && (
-                <Button size="sm" variant="ghost" className="h-5 px-1.5 text-[10px]" disabled={busy != null} onClick={() => handleRetry(f.op)}>
+                <Button size="sm" variant="ghost" className="h-5 px-1.5 text-[0.625rem]" disabled={busy != null} onClick={() => handleRetry(f.op)}>
                   {busy === f.op ? '…' : 'Retry'}
                 </Button>
               )}
@@ -114,25 +114,25 @@ export function ReceiptCard({
       )}
 
       <div className="flex items-center justify-between pt-0.5">
-        {summary && <p className="text-[10px] text-muted-foreground">{summary}</p>}
+        {summary && <p className="text-[0.625rem] text-muted-foreground">{summary}</p>}
         <div className="flex items-center gap-1 ml-auto">
           {onViewProfile && (
-            <Button size="sm" variant="ghost" className="h-6 text-[11px]" onClick={onViewProfile}>
+            <Button size="sm" variant="ghost" className="h-6 text-[0.6875rem]" onClick={onViewProfile}>
               View in profile
             </Button>
           )}
           {onViewGrocery && (
-            <Button size="sm" variant="ghost" className="h-6 text-[11px]" onClick={onViewGrocery}>
+            <Button size="sm" variant="ghost" className="h-6 text-[0.6875rem]" onClick={onViewGrocery}>
               View list
             </Button>
           )}
           {onViewDashboard && (
-            <Button size="sm" variant="ghost" className="h-6 text-[11px]" onClick={onViewDashboard}>
+            <Button size="sm" variant="ghost" className="h-6 text-[0.6875rem]" onClick={onViewDashboard}>
               View
             </Button>
           )}
           {undoAvailable && onUndo && (
-            <Button size="sm" variant="ghost" className="h-6 text-[11px]" disabled={busy != null} onClick={handleUndo}>
+            <Button size="sm" variant="ghost" className="h-6 text-[0.6875rem]" disabled={busy != null} onClick={handleUndo}>
               {busy === 'undo' ? 'Undoing…' : 'Undo'}
             </Button>
           )}

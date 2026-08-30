@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { useWakeLock } from '@/hooks/useWakeLock'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { useTrainingWeek } from '@/hooks/useTrainingWeek'
 import { useTimers } from '@/hooks/useTimers'
@@ -8,6 +9,8 @@ import { getDoubleProgressionRecommendation, getAddedLoadProgression, type Doubl
 import { groupExercises, mainLiftGroupIndex, resolveCalibrationAnchorIndex, computeSessionSummary, type ExerciseGroup } from '@/lib/session-derive'
 import { computeSessionPRs } from '@/lib/pr-engine'
 import { getExerciseId } from '@/lib/exercise-db'
+import { estimateDaySeconds } from '@/lib/session-duration'
+import { describeSessionShortfall } from '@/lib/session-shortfall'
 import { getLocalDateString } from '@/lib/dev-clock'
 import { tabHash } from '@/lib/app-route'
 import { ceilingToAskFor, saveStatedCeiling, declineStatedCeilings } from '@/lib/load-ceiling-prompt'
@@ -71,6 +74,13 @@ export function TodayPanel({
   onOpenSessionHistory?: () => void
 }) {
   const { date: today, dayName: todayName, liveWeek, startRest, setsFor, logs, status, startSession, finishSession } = useActiveSession()
+
+  // Audit §6.4 — hold the screen awake for as long as the session is
+  // actually running, and no longer. Before this the phone dimmed and locked
+  // on its normal schedule mid-set, so the user unlocked it between every
+  // set. Best-effort: silently does nothing where the browser doesn't
+  // support it (see useWakeLock).
+  useWakeLock(status === 'running')
   const timers = useTimers()
 
   const totalWeeks = mesocycle && mesocycle.length > 0 ? mesocycle.length : 4
@@ -238,6 +248,22 @@ export function TodayPanel({
     ? workout.exercises.reduce((s, ex) => s + setsFor(ex.id ?? getExerciseId(ex.name), ex.name).length, 0)
     : 0
 
+  // How long today actually is, and whether that is materially less than the
+  // length this person asked for (audit §6.5). `estimatedMinutes` was already
+  // a WeekContextRow prop and documented in its header — it had simply never
+  // been passed, so the "~52 min" chip it describes never rendered at all.
+  const sessionEstimate = (() => {
+    if (!workout || workout.exercises.length === 0) return { minutes: undefined, shortfall: null }
+    const seconds = estimateDaySeconds(workout)
+    return {
+      minutes: Math.round(seconds / 60),
+      shortfall: describeSessionShortfall(seconds, profile?.session_duration_preference, {
+        isDeload: currentMesoWeekObj?.is_deload,
+        lowRecovery: profile?.recovery_capacity === 'low',
+      }),
+    }
+  })()
+
   return (
     <div className="space-y-3">
       <WeekContextRow
@@ -252,6 +278,8 @@ export function TodayPanel({
         isCalibrationWeek={currentMesoWeekObj?.isCalibrationWeek}
         phaseFocus={currentMesoWeekObj?.phase_focus}
         coachNote={currentMesoWeekObj?.coach_note}
+        estimatedMinutes={sessionEstimate.minutes}
+        shortfallNote={sessionEstimate.shortfall?.note}
         onOpenProgram={onOpenProgram}
         onAddUnplannedWork={!isRestDay && !isActiveRecovery && !peekWorkout ? () => setUnplannedWorkOpen(true) : undefined}
         onOpenSessionHistory={onOpenSessionHistory}
@@ -297,19 +325,19 @@ export function TodayPanel({
               title. */}
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[10.5px] uppercase tracking-[.2em] text-primary glow-mint">
+              <span className="text-[0.65625rem] uppercase tracking-[.2em] text-primary glow-mint">
                 Today · {effectiveDayName}
               </span>
               {devOverrideDay && (
-                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-[color:var(--role-warn-border)] bg-[color:var(--role-warn-bg)] text-[color:var(--role-warn-text)]">
+                <span className="text-[0.625rem] font-mono px-1.5 py-0.5 rounded border border-[color:var(--role-warn-border)] bg-[color:var(--role-warn-bg)] text-[color:var(--role-warn-text)]">
                   DEV · {devOverrideDay}
                 </span>
               )}
               {borrowedDayName && (
-                <span className="text-[10px] text-muted-foreground italic">borrowed from {todayName}</span>
+                <span className="text-[0.625rem] text-muted-foreground italic">borrowed from {todayName}</span>
               )}
             </div>
-            <p className="mt-1.5 text-[36px] font-bold leading-[1.02] tracking-[-.035em] glow-text">{workout!.focus}</p>
+            <p className="mt-1.5 text-[2.25rem] font-bold leading-[1.02] tracking-[-.035em] glow-text">{workout!.focus}</p>
             <div className="mt-3.5 h-[2px] rounded-full" style={{ background: 'var(--hairline)' }}>
               <div
                 className="h-[2px] rounded-full bg-primary glow-mint-box"

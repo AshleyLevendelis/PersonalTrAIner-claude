@@ -45,6 +45,13 @@ const KEYS: Record<string, { clear: boolean; why: string }> = {
   fitplan_dev_mode: { clear: false, why: 'developer tooling, not user data' },
   fitplan_voice_debug: { clear: false, why: 'a debug toggle the user turned on deliberately' },
 
+  // "New Plan" replaces the training block. It does not un-say "not now" to
+  // the email prompt — that answer was about the ACCOUNT, which the new plan
+  // is built inside, not about the plan being replaced. Clearing it would
+  // re-ask somebody who declined two days ago simply because they rebuilt
+  // their week, which is exactly the nagging Ashley's ruling ruled out.
+  fitplan_email_prompt_dismissed_until: { clear: false, why: 'a "not now" about the account survives replacing the plan inside it' },
+
   // EVERY offline queue is kept, for one reason: each entry carries its own
   // profile id, so it can still sync for the profile that created it. Reset
   // already gives them a best-effort flush first. Dropping them would delete

@@ -1336,6 +1336,11 @@ export function prescribeLoad(
   const knownAnchor = knownFamily ? options.knownWorkingWeights?.[knownFamily] : undefined
   const fromKnownWeight = knownAnchor != null && knownAnchor > 0
 
+  // Set inside the unverified-ramp branch below, read by `basis` after it.
+  // Hoisted because those two are in different scopes and this is the only
+  // honest way to carry the fact between them.
+  let rampArrived = false
+
   // Hoisted for the same reason fromKnownWeight is: the forceStartingWeightKg
   // branch below short-circuits without re-deriving anything, but the number
   // it carries forward still traces back to a baseline built on an assumed
@@ -1417,7 +1422,15 @@ export function prescribeLoad(
       // post per-side-halving so the previous value and the step are in the
       // same units (per-hand for dumbbells, total otherwise) as what's
       // actually stored and displayed.
-      estimate = Math.min(options.unverifiedPreviousLoadingWeekKg + unverifiedRampStepKg(entry), estimate)
+      const stepped = options.unverifiedPreviousLoadingWeekKg + unverifiedRampStepKg(entry)
+      // WHEN THE STEP OVERSHOOTS, THE RAMP HAS ARRIVED and this weight stops
+      // moving for good — there is nothing left to move it toward. Recorded
+      // rather than inferred later, because only here is both side of the
+      // comparison in scope. See rampArrived's use in `basis` below: the
+      // number is right either way, but the SENTENCE that ships with it was
+      // claiming a step that no longer happens.
+      rampArrived = stepped >= estimate
+      estimate = Math.min(stepped, estimate)
     }
 
     rounded = roundToPlate(estimate, mode)
@@ -1487,7 +1500,22 @@ export function prescribeLoad(
       : options.isCalibrationWeek && !fromKnownWeight
         ? 'Loads start deliberately light — find the weight where the last rep feels like RPE 6, log it, and next week builds from YOUR numbers.'
         : options.unverifiedPreviousLoadingWeekKg != null && !fromKnownWeight
-          ? 'Still no logged number for this lift, so this week goes up by one small step from last time, capped by the standards estimate. Log it and let the effort target correct it.'
+          ? (rampArrived
+              // THE RAMP HAS ARRIVED AND THE WEIGHT WILL NOT MOVE AGAIN on
+              // its own. The sentence beneath this one — "this week goes up
+              // by one small step" — was still being printed here, week
+              // after week, while the number sat still: the app describing a
+              // progression it had stopped making. That is the actual defect
+              // behind audit §6.5's repeated weeks, and it is a copy defect,
+              // not an arithmetic one. The weight is right; going higher
+              // would mean inventing strength nobody has evidence for.
+              //
+              // Ashley's ruling, 30 Aug 2026, choosing this over climbing
+              // reps instead and over saying nothing: ASK FOR ONE REAL SET.
+              // So this says what is happening, why, and the one thing that
+              // changes it.
+              ? 'This is as far as the estimate goes — it has caught up with what the standards predict for you, so it holds here until there is something real to work from. Log a set and the number can start moving again.'
+              : 'Still no logged number for this lift, so this week goes up by one small step from last time, capped by the standards estimate. Log it and let the effort target correct it.')
           : fromKnownWeight
             ? 'Seeded from the working weight you reported for this lift. Let the effort target correct it if it has changed.'
             : isImprovisedLoadImplement(entry)

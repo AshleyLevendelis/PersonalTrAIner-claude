@@ -78,7 +78,7 @@ export function SessionSummaryDialog({
                 <div className="space-y-2.5">
                   {progressionLines.map(([name, rec]) => (
                     <div key={name}>
-                      <p className="text-[15px] font-semibold leading-tight">{name}</p>
+                      <p className="text-[0.9375rem] font-semibold leading-tight">{name}</p>
                       <p className={`text-sm mt-0.5 ${rec.didProgress ? 'text-primary glow-mint' : 'text-muted-foreground'}`}>{rec.note}</p>
                     </div>
                   ))}

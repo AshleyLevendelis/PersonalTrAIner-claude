@@ -23,17 +23,17 @@ export function AdditionalWorkSection({ plannedExercises }: { plannedExercises: 
 
   return (
     <div className="space-y-2">
-      <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Additional work</span>
+      <span className="text-[0.6875rem] font-semibold uppercase tracking-wide text-muted-foreground">Additional work</span>
       {items.map(item => {
         const completedSets = setsFor(item.exerciseId, item.name).length
         return (
           <div key={item.exerciseId} className="rounded-xl p-3 space-y-2 bg-[color:var(--surface-raised)]">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 min-w-0">
-                <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 bg-background">+</Badge>
+                <Badge variant="outline" className="text-[0.625rem] px-1.5 py-0.5 bg-background">+</Badge>
                 <span className="font-medium truncate">{item.name}</span>
                 {completedSets > 0 && (
-                  <Badge variant="secondary" className="text-[10px] font-mono">{completedSets} sets</Badge>
+                  <Badge variant="secondary" className="text-[0.625rem] font-mono">{completedSets} sets</Badge>
                 )}
               </div>
               {item.source === 'declared' && completedSets === 0 && (

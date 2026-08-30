@@ -55,88 +55,8 @@ export async function getNutritionTargets(profileId: string, startDate: string, 
   return data as DailyNutritionTarget[]
 }
 
-export async function upsertWorkoutSession(
-  session: Omit<WorkoutSession, 'id' | 'created_at' | 'updated_at'>,
-  exercises: Omit<WorkoutExerciseRow, 'id' | 'workout_session_id' | 'created_at' | 'updated_at'>[]
-) {
-  const { data: sessionData, error: sessionError } = await supabase
-    .from('workout_sessions')
-    .upsert(
-      { ...session, updated_at: new Date().toISOString() },
-      { onConflict: 'profile_id,date' }
-    )
-    .select()
-    .maybeSingle()
 
-  if (sessionError) throw sessionError
-  if (!sessionData) throw new Error('Failed to upsert workout session')
 
-  const { error: deleteError } = await supabase
-    .from('workout_exercises')
-    .delete()
-    .eq('workout_session_id', sessionData.id)
-
-  if (deleteError) throw deleteError
-
-  if (exercises.length > 0) {
-    const rows = exercises.map(ex => ({
-      ...ex,
-      workout_session_id: sessionData.id,
-    }))
-
-    const { error: insertError } = await supabase
-      .from('workout_exercises')
-      .insert(rows)
-
-    if (insertError) throw insertError
-  }
-
-  return sessionData
-}
-
-export async function getWorkoutSession(profileId: string, date: string) {
-  const { data: session, error: sessionError } = await supabase
-    .from('workout_sessions')
-    .select('*')
-    .eq('profile_id', profileId)
-    .eq('date', date)
-    .maybeSingle()
-
-  if (sessionError) throw sessionError
-  if (!session) return null
-
-  const { data: exercises, error: exError } = await supabase
-    .from('workout_exercises')
-    .select('*')
-    .eq('workout_session_id', session.id)
-    .order('execution_order', { ascending: true })
-
-  if (exError) throw exError
-
-  return { session: session as WorkoutSession, exercises: (exercises || []) as WorkoutExerciseRow[] }
-}
-
-export async function getWeeklyTracking(profileId: string, startDate: string, endDate: string) {
-  const [metrics, nutrition, sessions] = await Promise.all([
-    getDailyMetrics(profileId, startDate, endDate),
-    getNutritionTargets(profileId, startDate, endDate),
-    supabase
-      .from('workout_sessions')
-      .select('*')
-      .eq('profile_id', profileId)
-      .gte('date', startDate)
-      .lte('date', endDate)
-      .order('date', { ascending: true }),
-  ])
-
-  if (sessions.error) throw sessions.error
-
-  return {
-    metrics,
-    nutrition,
-    sessions: sessions.data as WorkoutSession[],
-  }
-}
 
 /**
  * Marks a session finished. Stamps finished_at, and — when the session knows
@@ -255,35 +175,6 @@ export async function getWeeklyDashboard(
   return days
 }
 
-export async function instantiateWorkoutSession(
-  profileId: string,
-  date: string,
-  splitType: string,
-  durationMinutes: number,
-  nutritionTargetId?: string
-): Promise<WorkoutSession> {
-  const session: Omit<WorkoutSession, 'id' | 'created_at' | 'updated_at'> = {
-    profile_id: profileId,
-    date,
-    split_type: splitType,
-    duration_minutes: durationMinutes,
-    is_completed: false,
-    nutrition_target_id: nutritionTargetId,
-  }
-
-  const { data, error } = await supabase
-    .from('workout_sessions')
-    .upsert(
-      { ...session, updated_at: new Date().toISOString() },
-      { onConflict: 'profile_id,date' }
-    )
-    .select()
-    .maybeSingle()
-
-  if (error) throw error
-  if (!data) throw new Error('Failed to instantiate workout session')
-  return data as WorkoutSession
-}
 
 // Set WRITES live exclusively in set-log-store.ts (C0 Part 3) — the legacy
 // upsertWorkoutLog/getLogsForDate pair is gone with the workout_logs table.
@@ -348,49 +239,7 @@ export function formatLogsForAI(logs: ExerciseSetLog[]): string {
   return lines.join('\n')
 }
 
-export async function insertCardioLog(
-  userId: string,
-  date: string,
-  activityName: string,
-  durationMinutes: number,
-  intensityRpe: number,
-  avgHeartRate?: number | null,
-  notes?: string | null,
-): Promise<CardioLog> {
-  const { data, error } = await supabase
-    .from('cardio_logs')
-    .insert({
-      user_id: userId,
-      date,
-      activity_name: activityName,
-      duration_minutes: durationMinutes,
-      intensity_rpe: intensityRpe,
-      avg_heart_rate: avgHeartRate || null,
-      notes: notes || null,
-      completed_at: new Date().toISOString(),
-    })
-    .select()
-    .maybeSingle()
 
-  if (error) throw error
-  if (!data) throw new Error('Failed to save cardio log')
-  return data as CardioLog
-}
-
-export async function getCardioLogsForDate(
-  userId: string,
-  date: string,
-): Promise<CardioLog[]> {
-  const { data, error } = await supabase
-    .from('cardio_logs')
-    .select('*')
-    .eq('user_id', userId)
-    .eq('date', date)
-    .order('completed_at', { ascending: false })
-
-  if (error) throw error
-  return (data || []) as CardioLog[]
-}
 
 export async function getRecentCardioLogs(
   userId: string,
@@ -435,68 +284,4 @@ export function formatCardioLogsForAI(logs: CardioLog[]): string {
   return lines.join('\n')
 }
 
-/**
- * Mark a day's lifting as deliberately swapped for something else, and record
- * what that something was.
- *
- * Exists because the coach used to say "I'll make sure today is marked as a
- * rest day for lifting" and had no tool that could. There is a lesson already
- * written down about this: `update_workout_schedule` is disabled precisely
- * because it "used to write to a profile field the app doesn't actually render
- * from, so schedule 'changes' looked applied in chat but never showed up on
- * the Exercise tab." So this writes ONLY where the Exercise tab already reads
- * — workout_sessions, which useTrainingWeek's classifyDay consults through
- * getWeeklyDashboard.
- *
- * Deliberately NOT upsertWorkoutSession: that helper deletes and reinserts the
- * day's workout_exercises, which would destroy the prescription for a day
- * someone merely said they were skipping — and destroy it irreversibly if they
- * changed their mind an hour later. Marking a swap must not touch the plan.
- */
-export async function markSessionSwapped(
-  profileId: string,
-  date: string,
-  activityName: string,
-): Promise<void> {
-  const { data: existing, error: readError } = await supabase
-    .from('workout_sessions')
-    .select('id')
-    .eq('profile_id', profileId)
-    .eq('date', date)
-    .maybeSingle()
-  if (readError) throw readError
 
-  if (existing) {
-    const { error } = await supabase
-      .from('workout_sessions')
-      .update({ swapped_for_activity: activityName, updated_at: new Date().toISOString() })
-      .eq('id', (existing as { id: string }).id)
-    if (error) throw error
-    return
-  }
-
-  // No row yet — the common case, since a session row is only created once
-  // the first set is saved. split_type and duration_minutes are NOT NULL, so
-  // they need values; 'swapped' names what this row is rather than borrowing
-  // a training split it never had, and 0 minutes is the honest lifting
-  // duration. What they actually did, and for how long, lives in cardio_logs.
-  const { error } = await supabase.from('workout_sessions').insert({
-    profile_id: profileId,
-    date,
-    split_type: 'swapped',
-    duration_minutes: 0,
-    is_completed: false,
-    swapped_for_activity: activityName,
-  })
-  if (error) throw error
-}
-
-/** Undo a swap — they changed their mind and trained after all. */
-export async function clearSessionSwap(profileId: string, date: string): Promise<void> {
-  const { error } = await supabase
-    .from('workout_sessions')
-    .update({ swapped_for_activity: null, updated_at: new Date().toISOString() })
-    .eq('profile_id', profileId)
-    .eq('date', date)
-  if (error) throw error
-}

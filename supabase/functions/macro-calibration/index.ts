@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { GEMINI_MODEL } from "../_shared/gemini.ts";
+import { checkSpendCap, CALIBRATION_CAP } from '../_shared/spend-cap.ts';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -223,7 +224,11 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const { ingredients, target, meal_name } = await req.json();
+    const { ingredients, target, meal_name, profile_id } = await req.json();
+
+    // Audit §1.3.
+    const cap = await checkSpendCap(req, CALIBRATION_CAP, corsHeaders, profile_id);
+    if (cap.response) return cap.response;
 
     if (!Array.isArray(ingredients) || ingredients.length === 0) {
       return new Response(

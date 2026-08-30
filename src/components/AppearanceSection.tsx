@@ -48,33 +48,33 @@ function HomePreview({ theme, accent, glow }: { theme: typeof THEME_ORDER[number
       aria-hidden="true"
     >
       <div className="flex items-center justify-between">
-        <span className="text-[10px] uppercase tracking-widest" style={{ color: t.muted }}>Wednesday</span>
-        <span className="inline-flex items-center gap-1 rounded-full px-2 py-[3px] text-[10px]" style={{ background: t.surface }}>
+        <span className="text-[0.625rem] uppercase tracking-widest" style={{ color: t.muted }}>Wednesday</span>
+        <span className="inline-flex items-center gap-1 rounded-full px-2 py-[3px] text-[0.625rem]" style={{ background: t.surface }}>
           <span className="inline-block size-[5px] rounded-full" style={{ background: a }} />
           <span style={{ color: t.text }}>12 day streak</span>
         </span>
       </div>
       <div className="mt-2 flex gap-[3px]">
         {['✓', '✓', '◐', '○', '–', '○', '·'].map((g, i) => (
-          <span key={i} className="flex h-[18px] flex-1 items-center justify-center rounded-[5px] text-[9px]"
+          <span key={i} className="flex h-[18px] flex-1 items-center justify-center rounded-[5px] text-[0.5625rem]"
             style={{ background: i < 3 ? t.surface : 'transparent', border: `1px solid ${i === 2 ? a : 'transparent'}`, color: t.muted }}>{g}</span>
         ))}
       </div>
-      <p className="mt-2.5 text-[15px] font-semibold" style={{ color: t.text }}>Full Body Power</p>
-      <p className="text-[11px]" style={{ color: t.muted }}>6 exercises · ~52 min</p>
-      <div className="mt-2 flex h-[30px] items-center justify-center rounded-[9px] text-[12px] font-semibold"
+      <p className="mt-2.5 text-[0.9375rem] font-semibold" style={{ color: t.text }}>Full Body Power</p>
+      <p className="text-[0.6875rem]" style={{ color: t.muted }}>6 exercises · ~52 min</p>
+      <div className="mt-2 flex h-[30px] items-center justify-center rounded-[9px] text-[0.75rem] font-semibold"
         style={{ background: a, color: t.light ? '#FFFFFF' : t.canvas, boxShadow: halo }}>
         Start session
       </div>
       <div className="mt-2.5 flex items-baseline gap-1.5">
-        <span className="text-[20px] font-semibold tabular-nums" style={{ color: t.text }}>86.0</span>
-        <span className="text-[10px]" style={{ color: t.muted }}>kg · −1.2 since week 1</span>
+        <span className="text-[1.25rem] font-semibold tabular-nums" style={{ color: t.text }}>86.0</span>
+        <span className="text-[0.625rem]" style={{ color: t.muted }}>kg · −1.2 since week 1</span>
       </div>
       <div className="mt-2 grid grid-cols-3 gap-1.5">
         {[['1,840', 'kcal'], ['1.4', 'litres'], ['5,720', 'steps']].map(([n, l], i) => (
           <div key={l} className="rounded-[9px] px-2 py-1.5" style={{ background: t.surface }}>
-            <p className="text-[12px] font-semibold tabular-nums" style={{ color: t.text }}>{n}</p>
-            <p className="text-[9px]" style={{ color: t.muted }}>{l}</p>
+            <p className="text-[0.75rem] font-semibold tabular-nums" style={{ color: t.text }}>{n}</p>
+            <p className="text-[0.5625rem]" style={{ color: t.muted }}>{l}</p>
             <div className="mt-1 h-[2px] rounded-full" style={{ background: t.hairline }}>
               {/* Water is --chart-3 everywhere and never moves with the accent:
                   status must not depend on a cosmetic choice. */}
@@ -105,7 +105,7 @@ export function AppearanceSection({ appearance }: { appearance: AppearanceContro
       <div className="space-y-4 rounded-md bg-[color:var(--surface-deep)] p-3">
 
         <div>
-          <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Preview</p>
+          <p className="text-[0.6875rem] uppercase tracking-wide text-muted-foreground">Preview</p>
           <div className="mt-2">
             <HomePreview theme={theme} accent={accent} glow={effectiveGlow} />
           </div>
@@ -139,7 +139,7 @@ export function AppearanceSection({ appearance }: { appearance: AppearanceContro
                   }}
                 >
                   <span className="flex items-center justify-between">
-                    <span className="text-[13px] font-semibold" style={{ color: p.text }}>{p.label}</span>
+                    <span className="text-[0.8125rem] font-semibold" style={{ color: p.text }}>{p.label}</span>
                     {active && (
                       <span className="flex size-[16px] items-center justify-center rounded-full" style={{ background: cardAccent }}>
                         <Check className="size-2.5" style={{ color: p.light ? '#FFFFFF' : p.canvas }} />
@@ -151,7 +151,7 @@ export function AppearanceSection({ appearance }: { appearance: AppearanceContro
                     <span className="h-[6px] flex-1 rounded-full" style={{ background: cardAccent }} />
                     <span className="size-[12px] rounded-[4px]" style={{ background: p.surface }} />
                   </span>
-                  <span className="mt-1.5 block text-[10px]" style={{ color: p.muted }}>{p.subtitle}</span>
+                  <span className="mt-1.5 block text-[0.625rem]" style={{ color: p.muted }}>{p.subtitle}</span>
                 </button>
               )
             })}
@@ -177,7 +177,7 @@ export function AppearanceSection({ appearance }: { appearance: AppearanceContro
                   type="button"
                   aria-pressed={active}
                   onClick={() => appearance.setAccent(value)}
-                  className="inline-flex min-h-[38px] items-center gap-2 rounded-full px-3 text-[12px]"
+                  className="inline-flex min-h-[38px] items-center gap-2 rounded-full px-3 text-[0.75rem]"
                   style={{
                     background: active ? `rgba(${glowRgb},.14)` : 'var(--surface-raised)',
                     border: `1px solid ${active ? `rgba(${glowRgb},.65)` : 'transparent'}`,
@@ -194,7 +194,7 @@ export function AppearanceSection({ appearance }: { appearance: AppearanceContro
         {/* CONTRAST GUARD — warn, never block. It is their app; the app's job
             is to say what it can see, not to overrule taste. */}
         {lowContrast && (
-          <p className="flex items-start gap-2 rounded-md p-2 text-[11.5px] leading-[1.5]"
+          <p className="flex items-start gap-2 rounded-md p-2 text-[0.71875rem] leading-[1.5]"
              style={{ background: 'rgba(var(--role-warn-rgb, 245 158 11) / .10)', color: 'var(--role-warn-text)' }}>
             <AlertTriangle className="mt-[1px] size-3.5 shrink-0" />
             <span>
@@ -219,7 +219,7 @@ export function AppearanceSection({ appearance }: { appearance: AppearanceContro
                   type="button"
                   aria-pressed={glow === level}
                   onClick={() => appearance.setGlow(level)}
-                  className={`h-[38px] flex-1 rounded-[9px] text-[13px] capitalize transition-colors ${
+                  className={`h-[38px] flex-1 rounded-[9px] text-[0.8125rem] capitalize transition-colors ${
                     glow === level ? 'font-semibold text-[color:var(--primary-foreground)]' : 'text-muted-foreground'
                   }`}
                   style={glow === level ? { background: 'linear-gradient(180deg, color-mix(in oklab, var(--primary) 84%, white), var(--primary-2))' } : undefined}
@@ -242,14 +242,14 @@ export function AppearanceSection({ appearance }: { appearance: AppearanceContro
         </div>
 
         <div className="flex items-center justify-between gap-3 border-t pt-3" style={{ borderColor: 'var(--hairline)' }}>
-          <p className="text-[11.5px] leading-[1.5] text-muted-foreground">
+          <p className="text-[0.71875rem] leading-[1.5] text-muted-foreground">
             {t.label} · {accent === 'theme' ? 'theme accent' : `${ACCENT_PREVIEWS[accent].label.toLowerCase()} accent`} · glow {effectiveGlow}
           </p>
           <button
             type="button"
             onClick={appearance.reset}
             disabled={isDefault}
-            className="inline-flex min-h-[38px] shrink-0 items-center gap-1.5 rounded-full px-3 text-[12px] text-muted-foreground disabled:opacity-40"
+            className="inline-flex min-h-[38px] shrink-0 items-center gap-1.5 rounded-full px-3 text-[0.75rem] text-muted-foreground disabled:opacity-40"
             style={{ background: 'var(--surface-raised)' }}
           >
             <RotateCcw className="size-3" />

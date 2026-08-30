@@ -100,7 +100,10 @@ export function SetGrid({
   onOpenPlateCalc,
   onFirstEverLog,
 }: SetGridProps) {
-  const { profileId, date: today, dayName, liveWeek, setsFor, ghosts, loadGhosts, logSet, deleteSet, refresh } = useActiveSession()
+  const {
+    profileId, date: today, dayName, liveWeek, setsFor, ghosts, loadGhosts, logSet, deleteSet, refresh,
+    setDraft, saveSetDraft, clearSetDrafts, extraSetsFor, setExtraSets,
+  } = useActiveSession()
 
   useEffect(() => {
     loadGhosts(exerciseId)
@@ -132,7 +135,13 @@ export function SetGrid({
   const ghostValues = ghosts(exerciseId)
   const loggedSetNumbers = existingLogs.map(l => l.set_number)
 
-  const [extraSetNumbers, setExtraSetNumbers] = useState<number[]>([])
+  // Audit §6.3 — extra rows and typed values both lived in component state
+  // only, so a reload (or the browser discarding a backgrounded tab, which
+  // is what a locked phone eventually becomes) threw them away mid-session.
+  // They live in the session record now, alongside the rest timer and the
+  // off-plan declarations, and are cleared per exercise as each set is
+  // logged.
+  const extraSetNumbers = extraSetsFor(exerciseId)
   const rowNumbers = computeSetRowNumbers(totalSets, loggedSetNumbers, extraSetNumbers)
 
   const [inputs, setInputs] = useState<Record<number, SetInputState>>({})
@@ -148,18 +157,28 @@ export function SetGrid({
     if (existing) {
       return { weight: String(existing.weight_kg), reps: String(existing.reps_completed), isBodyweight: existing.is_bodyweight }
     }
+    // A value typed before a reload — the record outlives this component.
+    // Checked AFTER a real logged set, which is always the truth if one
+    // exists, and before the empty default.
+    const draft = setDraft(exerciseId, setNumber)
+    if (draft) return draft
     return { weight: '', reps: '', isBodyweight: false }
   }
 
   const ghostFor = (setNumber: number) => ghostValues.find(g => g.set_number === setNumber)
 
   const updateInput = (setNumber: number, field: 'weight' | 'reps', value: string) => {
-    setInputs(prev => ({ ...prev, [setNumber]: { ...inputFor(setNumber), [field]: value } }))
-    if (rowErrors[setNumber]) setRowErrors(prev => { const next = { ...prev }; delete next[setNumber]; return next })
+    const next = { ...inputFor(setNumber), [field]: value }
+    setInputs(prev => ({ ...prev, [setNumber]: next }))
+    saveSetDraft(exerciseId, setNumber, next)
+    if (rowErrors[setNumber]) setRowErrors(prev => { const n = { ...prev }; delete n[setNumber]; return n })
   }
 
   const toggleBodyweight = (setNumber: number) => {
-    setInputs(prev => ({ ...prev, [setNumber]: { ...inputFor(setNumber), isBodyweight: !inputFor(setNumber).isBodyweight, weight: '' } }))
+    const current = inputFor(setNumber)
+    const next = { ...current, isBodyweight: !current.isBodyweight, weight: '' }
+    setInputs(prev => ({ ...prev, [setNumber]: next }))
+    saveSetDraft(exerciseId, setNumber, next)
   }
 
   const defaultWeightFor = (setNumber: number): string => {
@@ -282,6 +301,12 @@ export function SetGrid({
       addedLoadKg,
     })
 
+    // The typed value has become a real row. Leaving the draft behind would
+    // resurrect it over the logged set on the next reload — inputFor checks
+    // logged sets first, so it would not overwrite anything, but a stale
+    // draft on a later set number would reappear as if freshly typed.
+    clearSetDrafts(exerciseId)
+
     if (wasFirstEverLog) onFirstEverLog?.(exerciseName)
 
     // Both PR paths read the STORED weight, deliberately, so a weighted
@@ -329,7 +354,7 @@ export function SetGrid({
 
   const handleAddExtraSet = () => {
     const next = nextExtraSetNumber(totalSets, loggedSetNumbers, extraSetNumbers)
-    setExtraSetNumbers(prev => [...prev, next])
+    setExtraSets(exerciseId, [...extraSetNumbers, next])
   }
 
   const logColumnLabel = prescriptionType
@@ -396,7 +421,7 @@ export function SetGrid({
               <Button
                 variant={isBW ? 'default' : 'outline'}
                 size="sm"
-                className="h-7 w-7 text-[10px] font-bold px-0"
+                className="h-7 w-7 text-[0.625rem] font-bold px-0"
                 onClick={() => toggleBodyweight(setNumber)}
                 aria-label="Toggle bodyweight"
               >
@@ -418,7 +443,7 @@ export function SetGrid({
             />
             <div className="flex items-center gap-1">
               {isPRSet && prBadgeSet?.result && (
-                <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-primary/15 text-primary glow-mint whitespace-nowrap ${animatingPr ? 'animate-pulse scale-110' : ''} transition-transform`}>
+                <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[0.625rem] font-medium bg-primary/15 text-primary glow-mint whitespace-nowrap ${animatingPr ? 'animate-pulse scale-110' : ''} transition-transform`}>
                   <Trophy className="size-2.5" />
                   PR
                 </span>
@@ -441,6 +466,7 @@ export function SetGrid({
                 className={`size-7 shrink-0 ${isSaved ? 'text-primary' : 'text-[color:var(--primary-foreground)] glow-pulse'}`}
                 style={isSaved ? undefined : { background: 'linear-gradient(180deg, color-mix(in oklab, var(--primary) 84%, white), var(--primary-2))' }}
                 onClick={() => handleSaveSet(setNumber)}
+                aria-label={isSaved ? `Set ${setNumber} saved` : `Save set ${setNumber}`}
               >
                 <Check className="size-3.5" />
               </Button>
@@ -452,7 +478,7 @@ export function SetGrid({
             const armed = confirmDeleteSet === setNumber
             return (
               <div className="flex items-center justify-between gap-2 px-1 -mt-0.5">
-                <p className="text-[10px] text-primary">
+                <p className="text-[0.625rem] text-primary">
                   Set {setNumber}: {logged.is_bodyweight
                     ? `${logged.reps_completed} reps · Bodyweight`
                     : `${logged.reps_completed} reps @ ${logged.weight_kg}kg`} ✓
@@ -460,7 +486,7 @@ export function SetGrid({
                 <button
                   type="button"
                   onClick={() => handleDeleteSet(setNumber)}
-                  className={`flex shrink-0 items-center gap-1 text-[10px] ${armed ? 'font-medium text-destructive' : 'text-muted-foreground'}`}
+                  className={`flex shrink-0 items-center gap-1 text-[0.625rem] ${armed ? 'font-medium text-destructive' : 'text-muted-foreground'}`}
                   aria-label={armed ? `Confirm delete set ${setNumber}` : `Delete set ${setNumber}`}
                 >
                   <Trash2 className="size-2.5" />
@@ -470,7 +496,7 @@ export function SetGrid({
             )
           })()}
           {rowErrors[setNumber] && (
-            <p className="text-[10px] text-destructive px-1 -mt-0.5">{rowErrors[setNumber]}</p>
+            <p className="text-[0.625rem] text-destructive px-1 -mt-0.5">{rowErrors[setNumber]}</p>
           )}
           </React.Fragment>
         )

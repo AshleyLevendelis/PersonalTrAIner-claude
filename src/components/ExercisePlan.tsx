@@ -96,16 +96,16 @@ function PhaseBanner({ mesoWeek }: { mesoWeek?: MesocycleWeek }) {
             <span className="text-xs font-semibold">{mesoWeek.phase_label}</span>
           )}
           {mesoWeek.is_deload && (
-            <Badge variant="warning" className="text-[10px] px-1.5 py-0 h-4">
+            <Badge variant="warning" className="text-[0.625rem] px-1.5 py-0 h-4">
               Deload
             </Badge>
           )}
         </div>
         {mesoWeek.phase_focus && (
-          <p className="text-[11px] opacity-90">{mesoWeek.phase_focus}</p>
+          <p className="text-[0.6875rem] opacity-90">{mesoWeek.phase_focus}</p>
         )}
         {mesoWeek.coach_note && (
-          <p className="text-[11px] opacity-75 italic">{mesoWeek.coach_note}</p>
+          <p className="text-[0.6875rem] opacity-75 italic">{mesoWeek.coach_note}</p>
         )}
       </div>
     </InsightBanner>
@@ -120,10 +120,10 @@ function CalibrationBanner({ mesoWeek }: { mesoWeek?: MesocycleWeek }) {
       <Thermometer className="size-3.5 mt-0.5 shrink-0" />
       <div className="min-w-0 space-y-0.5">
         <span className="text-xs font-semibold">Week 1 — Calibration Week</span>
-        <p className="text-[11px] opacity-85">
+        <p className="text-[0.6875rem] opacity-85">
           Find the weight where your last rep feels like RPE 6. Log your session so week 2 scales from your actual performance.
         </p>
-        <p className="text-[11px] opacity-85">
+        <p className="text-[0.6875rem] opacity-85">
           The printed weights are conservative on purpose. If a set feels easy, keep adding weight until the last rep feels like RPE 6 — then log the weight you actually used. What you log becomes your plan.
         </p>
       </div>
@@ -148,7 +148,7 @@ function SessionDurationNote({
   const isLight = !isDeload && underBySeconds > 15 * 60
 
   return (
-    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+    <div className="flex items-center gap-1.5 text-[0.6875rem] text-muted-foreground">
       <Clock className="size-3 shrink-0" />
       <span>~{estMin} min estimated</span>
       {isDeload && <span className="italic">— deload week, deliberately lighter</span>}
@@ -258,14 +258,14 @@ function WarmupSection({ warmup, open, onToggle }: { warmup: WorkoutDay['warmup'
         <span className="flex items-center gap-2 text-xs font-medium text-foreground">
           <Thermometer className="size-3.5 text-primary" />
           Warm-Up
-          <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">~{totalMinutes} min</Badge>
+          <Badge variant="outline" className="text-[0.625rem] px-1.5 py-0 h-4">~{totalMinutes} min</Badge>
         </span>
         <ChevronDown className={`size-3.5 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
       </CollapsibleTrigger>
       <CollapsibleContent className="px-4 pb-3 space-y-3">
         {general.length > 0 && (
           <div className="space-y-1">
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">General</p>
+            <p className="text-[0.625rem] uppercase tracking-wider text-muted-foreground font-medium">General</p>
             {general.map((item, i) => (
               <div key={i} className="text-xs">
                 <span className="font-medium">{item.name}</span>
@@ -276,7 +276,7 @@ function WarmupSection({ warmup, open, onToggle }: { warmup: WorkoutDay['warmup'
         )}
         {mobility.length > 0 && (
           <div className="space-y-1">
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Mobility</p>
+            <p className="text-[0.625rem] uppercase tracking-wider text-muted-foreground font-medium">Mobility</p>
             {mobility.map((item, i) => (
               <div key={i} className="text-xs">
                 <span className="font-medium">{item.name}</span>
@@ -286,7 +286,7 @@ function WarmupSection({ warmup, open, onToggle }: { warmup: WorkoutDay['warmup'
           </div>
         )}
         {coachNote && (
-          <p className="text-[11px] text-muted-foreground/80 italic">{coachNote}</p>
+          <p className="text-[0.6875rem] text-muted-foreground/80 italic">{coachNote}</p>
         )}
       </CollapsibleContent>
     </Collapsible>
@@ -384,6 +384,7 @@ export function ExercisePlan({ plan, mesocycle, exclusions, softExercisePreferen
                 disabled={browseWeek <= 1}
                 onClick={() => setBrowseWeek(w => Math.max(1, w - 1))}
                 className="h-8 w-8 p-0"
+                aria-label="Previous week"
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
@@ -398,7 +399,7 @@ export function ExercisePlan({ plan, mesocycle, exclusions, softExercisePreferen
                       <button
                         key={b}
                         onClick={() => jumpToBlock(b)}
-                        className={`text-[10px] font-semibold leading-none px-1.5 py-0.5 rounded transition-colors ${
+                        className={`text-[0.625rem] font-semibold leading-none px-1.5 py-0.5 rounded transition-colors ${
                           b === currentMesoWeekObj?.block_number
                             ? 'bg-primary text-primary-foreground'
                             : 'bg-primary/10 text-muted-foreground hover:bg-primary/20'
@@ -429,6 +430,7 @@ export function ExercisePlan({ plan, mesocycle, exclusions, softExercisePreferen
                 disabled={browseWeek >= totalWeeks}
                 onClick={() => setBrowseWeek(w => Math.min(totalWeeks, w + 1))}
                 className="h-8 w-8 p-0"
+                aria-label="Next week"
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>
@@ -471,12 +473,12 @@ export function ExercisePlan({ plan, mesocycle, exclusions, softExercisePreferen
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-medium text-foreground">{workout.recommendedCardio.activity}</span>
-                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 shrink-0">
+                  <Badge variant="outline" className="text-[0.625rem] px-1.5 py-0 h-4 shrink-0">
                     {workout.recommendedCardio.timing === 'post_session' ? 'Post-Lift' :
                      workout.recommendedCardio.timing === 'independent_session' ? 'Separate Session' : 'Rest Day'}
                   </Badge>
                 </div>
-                <p className="text-[11px] text-muted-foreground mt-0.5">
+                <p className="text-[0.6875rem] text-muted-foreground mt-0.5">
                   {workout.recommendedCardio.duration} min @ RPE {workout.recommendedCardio.targetRpe} — {workout.recommendedCardio.reason}
                 </p>
               </div>
@@ -538,7 +540,7 @@ export function ExercisePlan({ plan, mesocycle, exclusions, softExercisePreferen
                     <TableRow className={hasSuperset ? 'bg-muted/30' : undefined}>
                       <TableCell className="w-10 pr-0">
                         {hasSuperset && (
-                          <Badge variant="outline" className="text-[10px] font-mono px-1.5 py-0.5 bg-background font-semibold">
+                          <Badge variant="outline" className="text-[0.625rem] font-mono px-1.5 py-0.5 bg-background font-semibold">
                             {ex.superset_label}
                           </Badge>
                         )}
@@ -557,7 +559,7 @@ export function ExercisePlan({ plan, mesocycle, exclusions, softExercisePreferen
                       <TableCell className="text-center">
                         <div className="flex flex-col items-center">
                           {isTimeBased(ex.reps, ex.prescription_type) && (
-                            <span className="text-[10px] uppercase tracking-wider text-muted-foreground leading-none mb-0.5">
+                            <span className="text-[0.625rem] uppercase tracking-wider text-muted-foreground leading-none mb-0.5">
                               {getRepsLabel(ex.reps, ex.prescription_type)}
                             </span>
                           )}

@@ -7,6 +7,7 @@ import {
   ALLERGEN_HONESTY_BLOCK,
 } from "../_shared/coach-rules.ts";
 import {
+import { checkSpendCap, ONBOARDING_CAP } from '../_shared/spend-cap.ts';
   callsOf,
   resolveReply,
   type GeminiLegResult,
@@ -178,6 +179,12 @@ Deno.serve(async (req: Request) => {
 
   try {
     const { message, history, state } = await req.json();
+
+    // Audit §1.3. No profile exists yet during onboarding, so this keys on
+    // the client IP — imperfect on shared networks, which is why this
+    // surface's limits are the loosest of the four.
+    const cap = await checkSpendCap(req, ONBOARDING_CAP, corsHeaders);
+    if (cap.response) return cap.response;
 
     if (!message || typeof message !== "string") {
       return new Response(JSON.stringify({ error: "message is required" }), {

@@ -52,7 +52,7 @@ export function SupersetShell({
       />
       <div className="space-y-2">
         {Array.from({ length: count }, (_, i) => renderMember(i, `${label}${i + 1}`))}
-        <p className="text-[10px] text-muted-foreground italic">alternate — no rest between</p>
+        <p className="text-[0.625rem] text-muted-foreground italic">alternate — no rest between</p>
       </div>
     </div>
   )

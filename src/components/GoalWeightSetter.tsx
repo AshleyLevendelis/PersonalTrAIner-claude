@@ -66,12 +66,12 @@ export function GoalWeightSetter({ profileId, baselineKg, onSet }: { profileId: 
         value={input}
         onChange={e => setInput(e.target.value)}
         onKeyDown={e => { if (e.key === 'Enter') handleSave() }}
-        className="h-7 min-w-0 flex-1 rounded-md bg-[color:var(--surface-raised)] px-2 text-[13px]"
+        className="h-7 min-w-0 flex-1 rounded-md bg-[color:var(--surface-raised)] px-2 text-[0.8125rem]"
       />
       <button
         onClick={handleSave}
         disabled={saving || !input}
-        className="shrink-0 text-[13px] font-semibold text-primary glow-mint disabled:opacity-40 disabled:[text-shadow:none]"
+        className="shrink-0 text-[0.8125rem] font-semibold text-primary glow-mint disabled:opacity-40 disabled:[text-shadow:none]"
       >
         {saving ? 'Saving…' : 'Set'}
       </button>

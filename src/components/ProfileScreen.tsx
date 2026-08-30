@@ -39,9 +39,11 @@ import {
   EXPERIENCE_OPTIONS, EQUIPMENT_OPTIONS, STYLE_OPTIONS, RECOVERY_OPTIONS,
   CONDITIONING_PREF_OPTIONS, ACTIVITY_OPTIONS, DIETARY_OPTIONS, FAVORITE_CUISINE_OPTIONS,
   INJURY_OPTIONS, COOKING_TIME_OPTIONS, MEALS_PER_DAY_OPTIONS, DURATION_OPTIONS, BREAKFAST_STYLE_OPTIONS,
-  DAYS_FULL,
+  DAYS_FULL, partitionInjuries,
 } from '@/lib/onboarding-slots'
+import { detectPlanInvalidation, type PlanInvalidation } from '@/lib/plan-invalidation'
 import type { UserProfile, TrainingDay, TrainingExperience, EquipmentAccess, TrainingStyle } from '@/lib/types'
+import { buildDataExport, downloadExport, summariseExport, deleteAllUserData } from '@/lib/user-data'
 
 const GENDER_OPTIONS = [{ value: 'male', label: 'Male' }, { value: 'female', label: 'Female' }]
 
@@ -59,6 +61,15 @@ interface ProfileScreenProps {
   latestWeightKg?: number | null
   /** Fired after any profile-field edit — App.tsx merges the patch into its own profile state, no refetch needed. */
   onProfileChanged: (patch: Partial<UserProfile>) => void
+  /**
+   * Fired when the edit just made leaves the existing plan wrong — an injury
+   * added, or equipment changed (audit §2.1).
+   *
+   * This screen does NOT rebuild anything itself: App owns the mesocycle, and
+   * a rebuild rewrites the weeks ahead. It reports, App asks, and only an
+   * explicit confirm changes a plan.
+   */
+  onPlanInvalidated?: (invalidation: PlanInvalidation) => void
   /** Fired after any memory (goal/fact/context) edit/delete — same contract MemoryScreen had. */
   onMemoryChanged: () => void | Promise<void>
   /** Chat receipt deep-links land here, scrolled to the relevant memory section. 'dietary' — surfacing round — is where the meal-plan "unrecognised restriction" banner's "Open Profile" button lands. */
@@ -179,7 +190,7 @@ function EditableTagList({
     <div className="space-y-1.5">
       <div className="flex flex-wrap gap-x-2.5 gap-y-2.5">
         {values.map(v => (
-          <Badge key={v} variant="secondary" className="text-[10px] gap-1 pr-1">
+          <Badge key={v} variant="secondary" className="text-[0.625rem] gap-1 pr-1">
             {v}
             <button type="button" onClick={() => remove(v)} aria-label={`Remove ${v}`} className="hit-slop-44"><X className="size-2.5" /></button>
           </Badge>
@@ -214,7 +225,7 @@ function TrainingDaysEditor({ days, onSave }: { days: TrainingDay[]; onSave: (ne
       className="flex-wrap"
     >
       {DAY_ORDER.map(day => (
-        <ToggleGroupItem key={day} value={day} className="text-[10px] px-2 h-7">{day.slice(0, 3)}</ToggleGroupItem>
+        <ToggleGroupItem key={day} value={day} className="text-[0.625rem] px-2 h-7">{day.slice(0, 3)}</ToggleGroupItem>
       ))}
     </ToggleGroup>
   )
@@ -231,11 +242,11 @@ const FACT_KIND_LABEL: Record<UserFactRow['kind'], string> = {
 
 function ProvenanceBadge({ source, createdAt }: { source: string; createdAt: string }) {
   const date = new Date(createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-  return <span className="text-[10px] text-muted-foreground">{source} · {date}</span>
+  return <span className="text-[0.625rem] text-muted-foreground">{source} · {date}</span>
 }
 
 function EffectLine({ text }: { text: string }) {
-  return <p className="text-[11px] text-muted-foreground italic mt-0.5">{text}</p>
+  return <p className="text-[0.6875rem] text-muted-foreground italic mt-0.5">{text}</p>
 }
 
 function factEffect(fact: UserFactRow): string {
@@ -259,7 +270,7 @@ function factEffect(fact: UserFactRow): string {
   return 'recorded — not yet applied (takes effect on your next plan regeneration)'
 }
 
-export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onProfileChanged, onMemoryChanged, initialSection, revealSpeed, onRevealSpeedChange }: ProfileScreenProps) {
+export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onProfileChanged, onPlanInvalidated, onMemoryChanged, initialSection, revealSpeed, onRevealSpeedChange }: ProfileScreenProps) {
   const [facts, setFacts] = useState<UserFactRow[]>([])
   const [goals, setGoals] = useState<UserGoalRow[]>([])
   const [contextFacts, setContextFacts] = useState<UserContextFactRow[]>([])
@@ -267,6 +278,8 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
   const [editValue, setEditValue] = useState('')
   const [loading, setLoading] = useState(false)
   const [armedDeleteKey, setArmedDeleteKey] = useState<string | null>(null)
+  /** One place this screen reports a write that didn't land — savePatch's revert, and the six memory edit/delete handlers below. Declared here with the rest of the state rather than beside its first user, because it now has six. */
+  const [saveError, setSaveError] = useState<string | null>(null)
   const armedDeleteTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const appearance = useAppearance()
@@ -303,22 +316,51 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
   const startEdit = (id: string, current: string) => { setEditingId(id); setEditValue(current) }
   const cancelEdit = () => { setEditingId(null); setEditValue('') }
 
-  const saveFactEdit = async (id: string) => {
-    await supabase.from('user_facts').update({ display_text: editValue }).eq('id', id)
+  /**
+   * Audit §3.4 — these three ignored the error the update returns. Supabase
+   * does not throw on a failed write; it hands back `{ error }`, which was
+   * dropped. reload() then refetched and the user's correction silently
+   * reverted on screen with no explanation. Not a lie, but this is the one
+   * place someone goes to fix what the coach believes about them, and
+   * "your edit vanished" is a bad thing to leave them guessing about.
+   */
+  const saveMemoryEdit = async (
+    table: 'user_facts' | 'user_goals' | 'user_context_facts',
+    id: string,
+    noun: string,
+  ) => {
+    const { error } = await supabase.from(table).update({ display_text: editValue }).eq('id', id)
+    if (error) {
+      console.error(`Editing ${noun} failed:`, error)
+      setSaveError(`Couldn't save that ${noun} — check your connection and try again.`)
+      return
+    }
+    setSaveError(null)
     cancelEdit(); await reload(); await onMemoryChanged()
   }
-  const saveGoalEdit = async (id: string) => {
-    await supabase.from('user_goals').update({ display_text: editValue }).eq('id', id)
-    cancelEdit(); await reload(); await onMemoryChanged()
-  }
-  const saveContextEdit = async (id: string) => {
-    await supabase.from('user_context_facts').update({ display_text: editValue }).eq('id', id)
-    cancelEdit(); await reload(); await onMemoryChanged()
-  }
+  const saveFactEdit = (id: string) => saveMemoryEdit('user_facts', id, 'note')
+  const saveGoalEdit = (id: string) => saveMemoryEdit('user_goals', id, 'goal')
+  const saveContextEdit = (id: string) => saveMemoryEdit('user_context_facts', id, 'note')
 
-  const deleteFact = async (id: string) => { await deleteFactPermanently(id); await reload(); await onMemoryChanged() }
-  const deleteGoal = async (id: string) => { await deleteGoalPermanently(id); await reload(); await onMemoryChanged() }
-  const deleteContext = async (id: string) => { await deleteContextFactPermanently(id); await reload(); await onMemoryChanged() }
+  /**
+   * The delete helpers DO throw (memory-store checks the error and rethrows),
+   * so these were failing loudly into an unhandled rejection — invisible to
+   * the user in exactly the same way. Same treatment: the row stays, and the
+   * screen says why.
+   */
+  const runDelete = async (fn: () => Promise<void>, noun: string) => {
+    try {
+      await fn()
+      setSaveError(null)
+      await reload(); await onMemoryChanged()
+    } catch (err) {
+      console.error(`Deleting ${noun} failed:`, err)
+      setSaveError(`Couldn't remove that ${noun} — check your connection and try again.`)
+    }
+  }
+  const deleteFact = (id: string) => runDelete(() => deleteFactPermanently(id), 'note')
+  const deleteGoal = (id: string) => runDelete(() => deleteGoalPermanently(id), 'goal')
+  const deleteContext = (id: string) => runDelete(() => deleteContextFactPermanently(id), 'note')
 
   /** Armed-then-confirm delete (no window.confirm — clashes with the app's
    * themed UI and is silently suppressible in PWA contexts). First tap arms
@@ -384,14 +426,82 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
   // patch back to the pre-edit values (read from `profile`, captured before
   // the optimistic apply) and surfaces a dismissible error, matching every
   // other confirm-action in this app.
-  const [saveError, setSaveError] = useState<string | null>(null)
+  /**
+   * Stored injuries, split into the ones the plan engine acts on and the ones
+   * it doesn't. Recomputed on every render from `profile.injuries` rather than
+   * held in state, so a save (or its revert) is reflected without a second
+   * source of truth to keep in step.
+   */
+  const { codes: injuryCodes, unrecognised: unrecognisedInjuries } = partitionInjuries(profile.injuries ?? [])
+
+  // --- Your data (audit §1.4) -------------------------------------------
+  const [dataBusy, setDataBusy] = useState<'export' | 'delete' | null>(null)
+  const [exportNote, setExportNote] = useState<string | null>(null)
+  const [deleteArmed, setDeleteArmed] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState('')
+
+  const handleDownloadData = async () => {
+    if (!profileId) return
+    setDataBusy('export')
+    setExportNote(null)
+    try {
+      const exported = await buildDataExport(profileId)
+      downloadExport(exported)
+      const { total } = summariseExport(exported)
+      // An export that quietly omitted a table would be a lie about
+      // completeness, so a partial read says so rather than reporting a
+      // clean number.
+      setExportNote(exported.incomplete.length > 0
+        ? `Downloaded ${total} records. ${exported.incomplete.length} part${exported.incomplete.length === 1 ? '' : 's'} couldn't be read — they're listed inside the file.`
+        : `Downloaded ${total} records.`)
+    } catch (err) {
+      console.error('Data export failed:', err)
+      setExportNote("Couldn't gather your data — check your connection and try again.")
+    } finally {
+      setDataBusy(null)
+    }
+  }
+
+  const handleDeleteEverything = async () => {
+    if (!profileId || deleteConfirm.trim().toLowerCase() !== 'delete') return
+    setDataBusy('delete')
+    const result = await deleteAllUserData(profileId)
+    setDataBusy(null)
+    if (!result.ok) {
+      setSaveError(`Couldn't delete your data — ${result.error ?? 'try again'}.`)
+      return
+    }
+    // The rows are gone; the browser must not keep pointing at them. Reload
+    // rather than unwinding App's state by hand — every store, cache and
+    // queue is keyed by a profile that no longer exists, and a fresh load is
+    // the only state that is honestly consistent.
+    //
+    // No key-clearing here on purpose. restoreSession already handles "the
+    // stored id has no row": it removes the key and drops to onboarding. A
+    // second list of keys to clear, living beside handleReset's, is exactly
+    // the duplicated rule test:reset-clears-draft exists to prevent — and it
+    // would be the copy that goes stale first, because deletion is the path
+    // nobody exercises.
+    onOpenChange(false)
+    window.location.reload()
+  }
+
   const savePatch = (patch: Partial<UserProfile>) => {
     if (!profileId) return
     const revertPatch = Object.fromEntries(
       Object.keys(patch).map(k => [k, profile[k as keyof UserProfile]])
     ) as Partial<UserProfile>
+    // Computed BEFORE the merge, against the profile as it was. Comparing the
+    // patch to an already-updated profile would find no change and offer
+    // nothing, which is how this fix would silently do nothing at all.
+    const invalidation = detectPlanInvalidation(profile, patch)
     onProfileChanged(patch)
-    updateProfileField(profileId, patch).catch(err => {
+    updateProfileField(profileId, patch).then(() => {
+      // Only once the write actually lands. Offering to rebuild around an
+      // injury whose save then failed would rebuild the plan around something
+      // the database does not know about.
+      if (invalidation) onPlanInvalidated?.(invalidation)
+    }).catch(err => {
       console.error('Profile field save failed — reverting', err)
       onProfileChanged(revertPatch)
       setSaveError("Couldn't save that change — it's been reverted. Check your connection and try again.")
@@ -472,15 +582,57 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
           </div>
         </div>
 
-        {/* Injuries */}
+        {/* Injuries — a picker, for the same reason the dietary restrictions
+            above are one. Audit §2.2: this was free text, and the plan engine
+            only understands eight exact codes, so twelve of fourteen ordinary
+            entries were stored, shown back, and changed nothing. "Lower back"
+            — the field's own placeholder — was one of them. */}
         <div className="space-y-2">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Injuries</h3>
-          <div className="rounded-md border p-2.5">
-            <EditableTagList
-              values={profile.injuries}
-              onSave={v => savePatch({ injuries: v })}
-              placeholder={`e.g. ${INJURY_OPTIONS[0]?.label ?? 'lower back'}`}
-            />
+          <div className="rounded-md border p-2.5 space-y-2.5 text-sm">
+            <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">Areas to work around. Picking one changes which exercises your plan gives you.</p>
+            <ToggleGroup
+              type="multiple"
+              value={injuryCodes}
+              onValueChange={(next: string[]) => savePatch({ injuries: [...next, ...unrecognisedInjuries] })}
+              className="flex flex-wrap justify-start gap-1.5"
+            >
+              {INJURY_OPTIONS.map(o => (
+                <ToggleGroupItem
+                  key={o.value}
+                  value={o.value}
+                  className="h-8 rounded-full border px-2.5 text-[0.6875rem] data-[state=on]:border-primary data-[state=on]:text-primary"
+                >
+                  {o.icon} {o.label}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+            {unrecognisedInjuries.length > 0 && (
+              /* Kept, not deleted. These were typed when the field was free
+                 text; they never changed the plan, and quietly removing them
+                 would be the same silent discarding this fix is about. Said
+                 plainly, with a way to clear each one. */
+              <div className="space-y-1.5 pt-2" style={{ borderTop: '1px solid var(--hairline)' }}>
+                <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">
+                  These are saved but don't change your plan — the app can only work around the areas above. Tell your coach in Chat about anything else.
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {unrecognisedInjuries.map((v: string) => (
+                    <span key={v} className="inline-flex items-center gap-1 rounded-full border border-dashed px-2.5 py-1 text-[0.6875rem] text-muted-foreground">
+                      {v}
+                      <button
+                        type="button"
+                        aria-label={`Remove ${v}`}
+                        className="hit-slop-44 text-muted-foreground hover:text-foreground"
+                        onClick={() => savePatch({ injuries: [...injuryCodes, ...unrecognisedInjuries.filter((u: string) => u !== v)] })}
+                      >
+                        <X className="size-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -496,7 +648,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                 word about tags or the food database. */}
             <div ref={dietaryRef} className="space-y-1.5">
               <span className="text-muted-foreground">Dietary restrictions</span>
-              <p className="text-[11px] leading-snug text-muted-foreground/70">Diets and allergies the app enforces when building your meals.</p>
+              <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">Diets and allergies the app enforces when building your meals.</p>
               <ToggleGroup
                 type="multiple"
                 value={profile.dietary_preferences}
@@ -507,7 +659,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                   <ToggleGroupItem
                     key={o.value}
                     value={o.value}
-                    className="h-8 rounded-full border px-2.5 text-[11px] data-[state=on]:border-primary data-[state=on]:text-primary"
+                    className="h-8 rounded-full border px-2.5 text-[0.6875rem] data-[state=on]:border-primary data-[state=on]:text-primary"
                   >
                     {o.icon} {o.label}
                   </ToggleGroupItem>
@@ -516,7 +668,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
             </div>
             <div className="space-y-1.5">
               <span className="text-muted-foreground">Foods to avoid</span>
-              <p className="text-[11px] leading-snug text-muted-foreground/70">Anything else you'd rather not see. Matched by name.</p>
+              <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">Anything else you'd rather not see. Matched by name.</p>
               <EditableTagList values={hardFoodDislikeValues} onSave={saveDislikedFoods} placeholder="e.g. mushrooms" />
             </div>
             {/* Honesty-copy round — applies to BOTH fields above (the
@@ -528,7 +680,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                 as belonging only to the ToggleGroup, at the same space-y-3 gap
                 as every other unrelated field in this card, which risked
                 being misread as "the avoid-list doesn't have this limitation." */}
-            <p className="pt-2 text-[11px] leading-snug text-muted-foreground/70" style={{ borderTop: '1px solid var(--hairline)' }}>
+            <p className="pt-2 text-[0.6875rem] leading-snug text-muted-foreground/70" style={{ borderTop: '1px solid var(--hairline)' }}>
               These filters check ingredients we recognise. We can't check brands,
               preparation, or cross-contamination. If you have a food allergy,
               always check ingredients yourself.
@@ -594,14 +746,14 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                   {editingId === g.id ? (
                     <div className="flex items-center gap-2.5">
                       <Input value={editValue} onChange={e => setEditValue(e.target.value)} className="h-7 text-sm" />
-                      <Button size="icon" variant="ghost" className="hit-slop-44 size-7" onClick={() => saveGoalEdit(g.id)}><Check className="size-3.5" /></Button>
-                      <Button size="icon" variant="ghost" className="hit-slop-44 size-7" onClick={cancelEdit}><X className="size-3.5" /></Button>
+                      <Button size="icon" variant="ghost" className="hit-slop-44 size-7" onClick={() => saveGoalEdit(g.id)} aria-label="Save this goal"><Check className="size-3.5" /></Button>
+                      <Button size="icon" variant="ghost" className="hit-slop-44 size-7" onClick={cancelEdit} aria-label="Cancel editing"><X className="size-3.5" /></Button>
                     </div>
                   ) : (
                     <div className="flex items-start justify-between gap-2">
                       <span className="text-sm font-medium">{g.display_text}</span>
                       <div className="flex items-center gap-2.5 shrink-0">
-                        <Button size="icon" variant="ghost" className="hit-slop-44 size-6" onClick={() => startEdit(g.id, g.display_text)}><Pencil className="size-3" /></Button>
+                        <Button size="icon" variant="ghost" className="hit-slop-44 size-6" onClick={() => startEdit(g.id, g.display_text)} aria-label={`Edit goal: ${g.display_text}`}><Pencil className="size-3" /></Button>
                         <Button
                           size="icon" variant="ghost"
                           className={armedDeleteKey === `goal:${g.id}` ? 'hit-slop-44 size-6 bg-destructive text-destructive-foreground' : 'hit-slop-44 size-6 text-destructive'}
@@ -614,7 +766,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                   {g.status === 'needs_baseline' && <EffectLine text="Waiting on a baseline before this can be tracked" />}
                   {g.trackable === 'directional' && <EffectLine text="Directional — biases your plan, never reported as a tracked percentage" />}
                   {g.trackable === 'measurable' && g.status === 'active' && (
-                    <div className="text-[11px] text-muted-foreground">
+                    <div className="text-[0.6875rem] text-muted-foreground">
                       {progress.current != null
                         ? `Current: ${progress.current} · Target: ${g.target_value} · ${progress.percent}% there`
                         : `Baseline: ${g.baseline_value} · Target: ${g.target_value} · current not yet known`}
@@ -638,15 +790,15 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                     {editingId === f.id ? (
                       <div className="flex items-center gap-2.5">
                         <Input value={editValue} onChange={e => setEditValue(e.target.value)} className="h-7 text-sm" />
-                        <Button size="icon" variant="ghost" className="hit-slop-44 size-7" onClick={() => saveFactEdit(f.id)}><Check className="size-3.5" /></Button>
-                        <Button size="icon" variant="ghost" className="hit-slop-44 size-7" onClick={cancelEdit}><X className="size-3.5" /></Button>
+                        <Button size="icon" variant="ghost" className="hit-slop-44 size-7" onClick={() => saveFactEdit(f.id)} aria-label="Save this note"><Check className="size-3.5" /></Button>
+                        <Button size="icon" variant="ghost" className="hit-slop-44 size-7" onClick={cancelEdit} aria-label="Cancel editing"><X className="size-3.5" /></Button>
                       </div>
                     ) : (
                       <div className="flex items-start justify-between gap-2">
                         <span className="text-sm font-medium">{f.display_text}</span>
                         <div className="flex items-center gap-2.5 shrink-0">
-                          {f.hardness && <Badge variant="outline" className="text-[9px] px-1 py-0">{f.hardness}</Badge>}
-                          <Button size="icon" variant="ghost" className="hit-slop-44 size-6" onClick={() => startEdit(f.id, f.display_text)}><Pencil className="size-3" /></Button>
+                          {f.hardness && <Badge variant="outline" className="text-[0.5625rem] px-1 py-0">{f.hardness}</Badge>}
+                          <Button size="icon" variant="ghost" className="hit-slop-44 size-6" onClick={() => startEdit(f.id, f.display_text)} aria-label={`Edit note: ${f.display_text}`}><Pencil className="size-3" /></Button>
                           <Button
                             size="icon" variant="ghost"
                             className={armedDeleteKey === `fact:${f.id}` ? 'hit-slop-44 size-6 bg-destructive text-destructive-foreground' : 'hit-slop-44 size-6 text-destructive'}
@@ -679,7 +831,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                   type="button"
                   aria-pressed={revealSpeed === level}
                   onClick={() => onRevealSpeedChange(level)}
-                  className={`h-[38px] flex-1 rounded-[9px] text-[13px] capitalize transition-colors ${
+                  className={`h-[38px] flex-1 rounded-[9px] text-[0.8125rem] capitalize transition-colors ${
                     revealSpeed === level
                       ? 'font-semibold text-[color:var(--primary-foreground)] glow-mint-box'
                       : 'text-muted-foreground'
@@ -690,7 +842,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                 </button>
               ))}
             </div>
-            <p className="mt-2 text-[11.5px] leading-[1.5] text-muted-foreground/80">
+            <p className="mt-2 text-[0.71875rem] leading-[1.5] text-muted-foreground/80">
               Reduced-motion system settings always show replies instantly, regardless of this choice.
             </p>
           </div>
@@ -699,14 +851,14 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                 {editingId === c.id ? (
                   <div className="flex items-center gap-2.5">
                     <Input value={editValue} onChange={e => setEditValue(e.target.value)} className="h-7 text-sm" />
-                    <Button size="icon" variant="ghost" className="hit-slop-44 size-7" onClick={() => saveContextEdit(c.id)}><Check className="size-3.5" /></Button>
-                    <Button size="icon" variant="ghost" className="hit-slop-44 size-7" onClick={cancelEdit}><X className="size-3.5" /></Button>
+                    <Button size="icon" variant="ghost" className="hit-slop-44 size-7" onClick={() => saveContextEdit(c.id)} aria-label="Save this note"><Check className="size-3.5" /></Button>
+                    <Button size="icon" variant="ghost" className="hit-slop-44 size-7" onClick={cancelEdit} aria-label="Cancel editing"><X className="size-3.5" /></Button>
                   </div>
                 ) : (
                   <div className="flex items-start justify-between gap-2">
                     <span className="text-sm font-medium">{c.display_text}</span>
                     <div className="flex items-center gap-2.5 shrink-0">
-                      <Button size="icon" variant="ghost" className="hit-slop-44 size-6" onClick={() => startEdit(c.id, c.display_text)}><Pencil className="size-3" /></Button>
+                      <Button size="icon" variant="ghost" className="hit-slop-44 size-6" onClick={() => startEdit(c.id, c.display_text)} aria-label={`Edit note: ${c.display_text}`}><Pencil className="size-3" /></Button>
                       <Button
                         size="icon" variant="ghost"
                         className={armedDeleteKey === `context:${c.id}` ? 'hit-slop-44 size-6 bg-destructive text-destructive-foreground' : 'hit-slop-44 size-6 text-destructive'}
@@ -726,6 +878,74 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
         {!loading && goals.length === 0 && grouped.length === 0 && contextFacts.length === 0 && (
           <p className="text-sm text-muted-foreground">Nothing recorded yet — state a preference, goal, or constraint in chat and it'll show up here.</p>
         )}
+
+        <Separator />
+
+        {/* Audit §1.4 — there was neither of these. "New Plan" cleared the
+            browser and started fresh without deleting a single row, so
+            everything from before it stayed in the database permanently,
+            unreachable. Both are obligations once there are users who aren't
+            Ashley, and both are far easier to build now than after someone
+            asks for them in writing. */}
+        <div className="space-y-2">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Your data</h3>
+          <div className="rounded-md border p-2.5 space-y-3 text-sm">
+            <div className="space-y-1.5">
+              <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">
+                Everything the app has stored about you, as one file.
+              </p>
+              <Button size="sm" variant="outline" className="h-8 text-xs" onClick={handleDownloadData} disabled={dataBusy !== null}>
+                {dataBusy === 'export' ? 'Gathering…' : 'Download my data'}
+              </Button>
+              {exportNote && <p className="text-[0.6875rem] leading-snug text-muted-foreground">{exportNote}</p>}
+            </div>
+
+            <div className="space-y-1.5 pt-3" style={{ borderTop: '1px solid var(--hairline)' }}>
+              <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">
+                Deleting removes your plan, your meals, every weigh-in and logged set, and your whole chat history. It cannot be undone, and there is no copy.
+              </p>
+              {!deleteArmed ? (
+                <Button
+                  size="sm" variant="outline"
+                  className="h-8 text-xs text-destructive border-destructive/40"
+                  onClick={() => { setDeleteArmed(true); setDeleteConfirm('') }}
+                >
+                  Delete everything
+                </Button>
+              ) : (
+                /* A typed confirmation, not a second tap. Arm-then-tap is
+                   right for deleting one remembered note; it is far too easy
+                   for the one action in this app that destroys everything and
+                   cannot be undone. */
+                <div className="space-y-2">
+                  <label className="block text-[0.6875rem] leading-snug">
+                    Type <span className="font-semibold">delete</span> to confirm.
+                    <Input
+                      value={deleteConfirm}
+                      onChange={e => setDeleteConfirm(e.target.value)}
+                      placeholder="delete"
+                      aria-label="Type delete to confirm"
+                      className="mt-1 h-8 text-sm"
+                    />
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      className="h-8 text-xs bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      disabled={deleteConfirm.trim().toLowerCase() !== 'delete' || dataBusy !== null}
+                      onClick={handleDeleteEverything}
+                    >
+                      {dataBusy === 'delete' ? 'Deleting…' : 'Delete everything, permanently'}
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setDeleteArmed(false)}>
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
   )

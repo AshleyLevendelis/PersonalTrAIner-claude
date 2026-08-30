@@ -17,6 +17,7 @@ import {
   roundPhaseIndex,
   type RoundConfig,
   type RoundPhase,
+  totalRoundSeconds,
 } from '@/lib/timer-engine'
 import {
   getTimerRecord,
@@ -27,6 +28,9 @@ import {
   type TimerMode,
   type LapEntry,
 } from '@/lib/timer-store'
+
+/** computeRoundState only ever uses (now - start), so a zero anchor plus an elapsed figure is exactly equivalent to a real one — and works identically whether the clock is running, paused or finished. */
+const EPOCH_ISO = new Date(0).toISOString()
 
 export interface TimersValue {
   mode: TimerMode
@@ -50,9 +54,16 @@ export interface TimersValue {
   reset: () => void
   lap: () => void
   startRound: (config: RoundConfig) => void
+  /** Round mode only — banks elapsed time and drops the anchor. `stop()` would erase the round, not pause it. */
+  pauseRound: () => void
+  /** Round mode only — re-anchors to `now - banked` so the schedule continues where it stopped. */
+  resumeRound: () => void
 }
 
 const TimersContext = createContext<TimersValue | null>(null)
+
+/** Render seam — lets the screenshot harness mount timer views in a chosen state without a provider or a clock. Not used by the app. */
+export const TimersContextForTests = TimersContext
 
 export function useTimers(): TimersValue {
   const ctx = useContext(TimersContext)
@@ -123,6 +134,31 @@ export function TimersProvider({ profileId, children }: { profileId: string | un
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profileId, persist, record])
 
+  /**
+   * Pause a running round, and resume it where it stopped.
+   *
+   * The round timer is deadline-anchored, so there was no pause: `stop()`
+   * clears startedAtIso, which for round mode is the single source of truth
+   * for round and phase — using it here would not pause the timer, it would
+   * erase it. These two move the ANCHOR instead, which is the only thing the
+   * derivation reads: pausing banks the elapsed time, resuming re-anchors to
+   * `now - banked` so the schedule continues from exactly where it stopped.
+   * computeRoundState is untouched.
+   */
+  const pauseRound = useCallback(() => {
+    if (!profileId || !record.startedAtIso || !record.running) return
+    const elapsed = getAppNow(profileId).getTime() - new Date(record.startedAtIso).getTime()
+    persist({ ...record, running: false, accumulatedMs: Math.max(0, elapsed), startedAtIso: null })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profileId, persist, record])
+
+  const resumeRound = useCallback(() => {
+    if (!profileId || record.running || !record.roundConfig) return
+    const anchor = getAppNow(profileId).getTime() - record.accumulatedMs
+    persist({ ...record, running: true, startedAtIso: new Date(anchor).toISOString() })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profileId, persist, record])
+
   const startRound = useCallback((config: RoundConfig) => {
     if (!profileId) return
     const now = getAppNow(profileId)
@@ -147,11 +183,32 @@ export function TimersProvider({ profileId, children }: { profileId: string | un
     return computeStopwatchElapsedMs(record.accumulatedMs, record.startedAtIso, record.running, getAppNow(profileId).getTime())
   }, [profileId, record.accumulatedMs, record.startedAtIso, record.running, tick])
 
+  /**
+   * Round/phase/remaining, derived from elapsed time — and DELIBERATELY not
+   * gated on `running` any more.
+   *
+   * It used to be, and that quietly destroyed the completion state. The cue
+   * effect below persists `running: false` the instant a round completes; on
+   * the very next render the old guard returned null, so `isRoundComplete`
+   * fell back to false and stayed there. The finished state existed for one
+   * render and was then unreachable — which is why TimersPanel's own "All
+   * rounds complete" line could never appear. Completion is a fact about
+   * elapsed time, not about whether a clock is still ticking.
+   *
+   * Elapsed comes from the anchor while running and from accumulatedMs while
+   * paused, so the same derivation serves both. computeRoundState only ever
+   * uses (now - start), so handing it epoch-zero and the elapsed figure is
+   * exactly equivalent to handing it a real anchor.
+   */
   const roundState = useMemo(() => {
-    if (!profileId || record.mode !== 'round' || !record.roundConfig || !record.startedAtIso || !record.running) return null
+    if (!profileId || record.mode !== 'round' || !record.roundConfig) return null
     void tick
-    return computeRoundState(record.roundConfig, record.startedAtIso, getAppNow(profileId).getTime())
-  }, [profileId, record.mode, record.roundConfig, record.startedAtIso, record.running, tick])
+    const elapsedMs = record.running && record.startedAtIso
+      ? getAppNow(profileId).getTime() - new Date(record.startedAtIso).getTime()
+      : record.accumulatedMs
+    if (elapsedMs <= 0 && !record.running) return null
+    return computeRoundState(record.roundConfig, EPOCH_ISO, Math.max(0, elapsedMs))
+  }, [profileId, record.mode, record.roundConfig, record.startedAtIso, record.running, record.accumulatedMs, tick])
 
   // Cues only — round/phase are pure derivations of the start anchor, so
   // nothing needs persisting per transition (the old per-transition persist
@@ -173,7 +230,10 @@ export function TimersProvider({ profileId, children }: { profileId: string | un
     const isFirstObservation = !prev || prev.anchor !== record.startedAtIso
     if (roundState.isComplete) {
       if (!isFirstObservation && index - prev!.index === 1 && !document.hidden) playTimerCue('round-complete')
-      persist({ ...record, running: false })
+      // accumulatedMs is what keeps the finished state alive: once running
+      // goes false the anchor is no longer consulted, so without this the
+      // completed round would vanish rather than hold the screen.
+      persist({ ...record, running: false, accumulatedMs: totalRoundSeconds(record.roundConfig!) * 1000 })
       return
     }
     if (isFirstObservation) return
@@ -208,6 +268,8 @@ export function TimersProvider({ profileId, children }: { profileId: string | un
     start,
     stop,
     reset,
+    pauseRound,
+    resumeRound,
     lap,
     startRound,
   }

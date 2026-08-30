@@ -79,25 +79,25 @@ export function WeighInCard({ profileId, onWeightLogged }: { profileId: string; 
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') handleSave() }}
-          className="h-7 min-w-0 flex-1 border-0 bg-transparent px-0 text-[13px] shadow-none focus-visible:ring-0"
+          className="h-7 min-w-0 flex-1 border-0 bg-transparent px-0 text-[0.8125rem] shadow-none focus-visible:ring-0"
         />
         <button
           onClick={handleSave}
           disabled={saving || !input}
-          className="shrink-0 text-[13px] font-semibold text-primary glow-mint disabled:opacity-40 disabled:[text-shadow:none]"
+          className="shrink-0 text-[0.8125rem] font-semibold text-primary glow-mint disabled:opacity-40 disabled:[text-shadow:none]"
         >
           {saving ? 'Saving…' : 'Save'}
         </button>
       </div>
       {error && <p className="text-xs text-destructive">{error}</p>}
-      <p className="text-[11px] text-muted-foreground/85">
+      <p className="text-[0.6875rem] text-muted-foreground/85">
         Targets recalculate from your latest weigh-in
         {sevenDayAvg != null ? ` · 7-day avg ${sevenDayAvg} kg` : ''}
       </p>
       {history.length > 0 && (
         <div className="space-y-1">
           {history.map(h => (
-            <div key={h.date} className="flex justify-between rounded-md px-0.5 text-[13px]">
+            <div key={h.date} className="flex justify-between rounded-md px-0.5 text-[0.8125rem]">
               <span className="text-muted-foreground">{h.date}</span>
               <span className="font-medium">{h.weight_kg} kg</span>
             </div>

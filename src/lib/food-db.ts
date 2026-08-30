@@ -43,11 +43,11 @@ export interface FoodTags {
   // mustard, sesame oil and sesame seeds sat in this very file as servable
   // ingredients with empty tag sets.
   //
-  // contains_lupin is declared with NO entry currently carrying it, and that
-  // is deliberate rather than the is_grain bug repeating: no lupin-containing
-  // food exists in this database, so a lupin allergy is already safe by
-  // absence. The tag exists so that the day lupin flour is added, the rule is
-  // already waiting for it instead of being remembered later.
+  // contains_lupin was declared before any entry carried it, on the reasoning
+  // that the rule should be waiting when lupin flour was added rather than
+  // remembered afterwards. Lupin flour HAS since been added and does carry
+  // the tag — this comment said otherwise for a while, which is the small
+  // rot that makes the next reader trust a stale claim over the data.
   contains_celery?: boolean
   contains_sesame?: boolean
   contains_mustard?: boolean

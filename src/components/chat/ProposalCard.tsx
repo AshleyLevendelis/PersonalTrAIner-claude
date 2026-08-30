@@ -28,6 +28,24 @@ export function ProposalCard({
   const isStale = status === 'stale'
   const isTerminal = status === 'done' || status === 'partial' || status === 'failed' || status === 'declined' || status === 'expired'
 
+  /**
+   * A card that can no longer be acted on has to SAY so. Terminal statuses
+   * used to render the rows and then nothing — the buttons simply vanished,
+   * with no line explaining why, which reads as the app losing the thread.
+   * The case that made this matter: proposals expire after ten minutes, and
+   * until this was fixed tapping Confirm on an expired one did nothing at
+   * all, silently. Now the tap sets the status and this is what it says.
+   *
+   * Worded from the user's side — what it means for them, and what to do
+   * next — rather than naming the state.
+   */
+  const terminalNote: string | null =
+    status === 'expired' ? "This one's timed out — ask me again and I'll suggest it fresh."
+    : status === 'declined' ? 'Left as it was.'
+    : status === 'failed' ? "This didn't go through — ask me again if you still want it."
+    : status === 'done' || status === 'partial' ? 'Already applied.'
+    : null
+
   const handleConfirm = async (explicitScope?: string) => {
     const useScope = explicitScope ?? scope
     setScope(useScope)
@@ -56,21 +74,21 @@ export function ProposalCard({
   return (
     <div className="mt-2 pl-3.5 border-l-2 border-[color:var(--role-ai-border)] text-sm space-y-2.5">
       <div className="space-y-2">
-        <span className="block text-[9.5px] font-semibold uppercase tracking-[0.18em] text-[color:var(--role-ai)]">
+        <span className="block text-[0.59375rem] font-semibold uppercase tracking-[0.18em] text-[color:var(--role-ai)]">
           Proposed change
         </span>
         {diff.rows.map((row, i) => (
           <div key={i} className="flex flex-col gap-0.5">
-            <span className="text-[10px] text-muted-foreground">{row.field}</span>
-            <span className="text-[13.5px] line-through text-muted-foreground/70">{row.before}</span>
-            <span className="text-[14.5px] font-semibold">{row.after}</span>
-            {row.note && <span className="text-[10px] text-muted-foreground/80">{row.note}</span>}
+            <span className="text-[0.625rem] text-muted-foreground">{row.field}</span>
+            <span className="text-[0.84375rem] line-through text-muted-foreground/70">{row.before}</span>
+            <span className="text-[0.90625rem] font-semibold">{row.after}</span>
+            {row.note && <span className="text-[0.625rem] text-muted-foreground/80">{row.note}</span>}
           </div>
         ))}
       </div>
 
       {diff.unchanged && diff.unchanged.length > 0 && (
-        <p className="text-[10px] text-muted-foreground/70">Unchanged: {diff.unchanged.join(', ')}</p>
+        <p className="text-[0.625rem] text-muted-foreground/70">Unchanged: {diff.unchanged.join(', ')}</p>
       )}
 
       {diff.implications?.map((imp, i) => (
@@ -84,7 +102,9 @@ export function ProposalCard({
 
       {isStale ? (
         <p className="text-xs text-[color:var(--role-warn)]">This changed since I proposed it — ask me again if you still want it.</p>
-      ) : isTerminal ? null : (
+      ) : isTerminal ? (
+        terminalNote && <p className="text-xs text-muted-foreground">{terminalNote}</p>
+      ) : (
         // Fix — confirmation-card stuck loop, Part 3: these stay the primary,
         // unambiguous way to answer, sized to the same min-h-[44px] touch
         // target as the model's own [QUICK_REPLIES] chips — tapping reads as

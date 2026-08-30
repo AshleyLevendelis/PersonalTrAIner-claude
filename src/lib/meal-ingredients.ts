@@ -1,4 +1,5 @@
 import type { Meal, MealPlanDay } from '@/lib/types'
+import { lookupIngredient, type FoodTags } from '@/lib/food-db'
 
 // ---------------------------------------------------------------------------
 // WHAT IS ACTUALLY IN TODAY'S MEALS — one reader, two callers.
@@ -49,6 +50,131 @@ export function itemContains(item: Meal, phrase: string): boolean {
   return containsPhrase(item.name, ingredientNamesOf(item), phrase)
 }
 
+// ---------------------------------------------------------------------------
+// WHAT "I DON'T WANT X" ACTUALLY HAS TO CATCH — audit §2.3
+//
+// The matcher below used to be one line: does this text appear inside that
+// text. Measured against the real 333-food database, that caught 10 of the
+// 122 foods a user plainly meant across eleven ordinary phrasings — 8%.
+//
+//   "dairy"      caught  0 of 30   (milk, cheese, yoghurt, butter, whey)
+//   "seafood"    caught  0 of 11
+//   "eggs"       caught  0 of  4   the database says "egg", singular
+//   "mushrooms"  caught  0 of  1   the database says "mushroom"
+//
+// That last one is the Profile field's OWN placeholder text.
+//
+// Three mechanisms now, in order of precision, and none of them replaces the
+// substring pass — nothing that matched before stops matching.
+// ---------------------------------------------------------------------------
+
+/**
+ * Category words, resolved through the food database's OWN allergen/content
+ * tags rather than through name matching.
+ *
+ * Deliberately NOT done with lookupIngredient: that resolver is built to find
+ * the single closest entry to an ingredient line, and asked for a category
+ * word it answers confidently and wrongly — "nuts" resolves to "cashews" and
+ * "gluten" to "tamari". Precise for its own job, useless for this one. The
+ * tags are already gated for parity between the two copies of the database
+ * (test:food-db-parity), so this rides on data that cannot silently drift.
+ */
+const CATEGORY_TAGS: Record<string, (t: FoodTags) => boolean> = {
+  dairy: t => !!t.contains_dairy,
+  nut: t => !!t.contains_nuts,
+  nuts: t => !!t.contains_nuts,
+  fish: t => !!t.contains_fish,
+  shellfish: t => !!t.contains_shellfish,
+  seafood: t => !!t.contains_fish || !!t.contains_shellfish,
+  egg: t => !!t.contains_egg,
+  eggs: t => !!t.contains_egg,
+  gluten: t => !!t.contains_gluten,
+  wheat: t => !!t.contains_gluten,
+  soy: t => !!t.contains_soy,
+  soya: t => !!t.contains_soy,
+  meat: t => !!t.contains_meat,
+  pork: t => !!t.contains_pork,
+  celery: t => !!t.contains_celery,
+  sesame: t => !!t.contains_sesame,
+  mustard: t => !!t.contains_mustard,
+  honey: t => !!t.contains_honey,
+  alcohol: t => !!t.contains_alcohol,
+}
+
+/**
+ * The few phrases with no tag behind them, expanded to the words people would
+ * have had to type instead.
+ *
+ * This is a VOCABULARY, not a second copy of the food database: each entry is
+ * a list of words to try, and every one of them is then matched by the same
+ * passes as anything the user typed directly. "Red meat" is here because the
+ * database has contains_meat and contains_pork but nothing distinguishing red
+ * from white — inventing that distinction by tagging 333 entries in two files
+ * is a different job, and guessing it from names inside the matcher would be
+ * exactly the second copy this module exists to prevent.
+ */
+const WORD_EXPANSIONS: Record<string, string[]> = {
+  'red meat': ['beef', 'lamb', 'pork', 'mutton', 'venison', 'veal', 'gammon', 'bacon', 'steak', 'mince'],
+  'spicy': ['chilli', 'chili', 'jalapeno', 'cayenne', 'sriracha', 'harissa', 'paprika', 'hot sauce'],
+  'spicy food': ['chilli', 'chili', 'jalapeno', 'cayenne', 'sriracha', 'harissa', 'paprika', 'hot sauce'],
+}
+
+/**
+ * Conservative singularisation, applied to BOTH sides so "eggs" finds "egg"
+ * and "mushrooms" finds "mushroom".
+ *
+ * Deliberately not food-db's own depluralizeToken, which only fires above
+ * four characters — "eggs" is exactly four, which is why the single most
+ * obvious case in the whole audit was also one of the ones that failed.
+ */
+function singularise(word: string): string {
+  if (word.length > 3 && word.endsWith('ies')) return word.slice(0, -3) + 'y'
+  if (word.length > 3 && word.endsWith('oes')) return word.slice(0, -2)
+  if (word.length > 3 && word.endsWith('s') && !word.endsWith('ss')) return word.slice(0, -1)
+  return word
+}
+
+const normaliseWords = (s: string) => s.toLowerCase().split(/\s+/).map(singularise).join(' ')
+
+/** Does `needle` appear in `haystack` as a whole word (or whole word run)? */
+function wordBoundaryContains(haystack: string, needle: string): boolean {
+  const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`).test(haystack)
+}
+
+/**
+ * Substring on the literal phrase, then a WORD-BOUNDARY match on the
+ * singularised one.
+ *
+ * The two passes are deliberately different strengths. The literal pass is
+ * the behaviour that already shipped, kept exactly so nothing that matched
+ * before stops matching ("chick" still finds chicken, "mushroom" still finds
+ * mushroom soup). The singularised pass is new, and loosening it the same way
+ * overshoots badly: "nuts" singularises to "nut", and a raw substring of
+ * "nut" is inside coconut and nutmeg — so turning on a nut avoidance would
+ * have excluded coconut milk. Caught by this fix's own gate before it
+ * shipped; whole words only.
+ *
+ * Foods that genuinely ARE nuts are caught by the tag pass instead, which is
+ * what tags are for.
+ */
+function plainlyContains(haystack: string, needle: string): boolean {
+  const h = haystack.toLowerCase()
+  if (h.includes(needle)) return true
+  const hs = normaliseWords(h)
+  const ns = normaliseWords(needle)
+  if (hs === h && ns === needle) return false // nothing new to try
+  return wordBoundaryContains(hs, ns)
+}
+
+/** lookupIngredient is O(database) per call and this runs per ingredient per dislike — memoised per session. */
+const tagCache = new Map<string, FoodTags | null>()
+function tagsFor(ingredientName: string): FoodTags | null {
+  const key = ingredientName.trim().toLowerCase()
+  if (!tagCache.has(key)) tagCache.set(key, lookupIngredient(key)?.tags ?? null)
+  return tagCache.get(key) ?? null
+}
+
 /**
  * The matcher itself, over a name and a list of ingredient names.
  *
@@ -56,12 +182,40 @@ export function itemContains(item: Meal, phrase: string): boolean {
  * (whose ingredients are objects, not strings) without keeping a second copy.
  * The audit found the swap path with no dislike check at all; giving it its
  * own matcher would have been the same mistake one layer along.
+ *
+ * STILL NOT a general synonym engine — "almond butter" will not find "almond
+ * paste", and that limit is stated in the coach's own honesty rules. What
+ * changed is that plurals and the handful of category words people actually
+ * type now work, which is the difference between a filter that mostly works
+ * and one that mostly doesn't.
+ *
+ * Widening is the correct direction to be wrong in — the same reasoning
+ * already written into ALLERGEN_SIGNAL: a missed disclosure is worse than a
+ * food someone could have eaten being left out. What it must NOT do is match
+ * more than the word means, which is why categories come from tags: "nuts"
+ * does not exclude nutmeg or coconut, neither of which is tagged as one.
  */
 export function containsPhrase(name: string, ingredientNames: string[], phrase: string): boolean {
   const needle = phrase.trim().toLowerCase()
   if (!needle) return false
-  return name.toLowerCase().includes(needle)
-    || ingredientNames.some(i => i.toLowerCase().includes(needle))
+
+  // 1. Plain and singularised substring, over the dish name and every
+  //    ingredient. This is the original behaviour plus plurals.
+  if (plainlyContains(name, needle)) return true
+  if (ingredientNames.some(i => plainlyContains(i, needle))) return true
+
+  // 2. A category word, answered from the food database's own tags.
+  const category = CATEGORY_TAGS[needle] ?? CATEGORY_TAGS[normaliseWords(needle)]
+  if (category && ingredientNames.some(i => { const t = tagsFor(i); return t != null && category(t) })) return true
+
+  // 3. A phrase with no tag behind it, expanded to words and re-run through
+  //    pass 1. Never recurses further: expansions contain plain food words.
+  const expansion = WORD_EXPANSIONS[needle] ?? WORD_EXPANSIONS[normaliseWords(needle)]
+  if (expansion && expansion.some(w =>
+    plainlyContains(name, w) || ingredientNames.some(i => plainlyContains(i, w))
+  )) return true
+
+  return false
 }
 
 /** The meal slots on this plan that contain `phrase`, in plan order. */

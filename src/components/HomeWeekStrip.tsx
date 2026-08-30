@@ -40,7 +40,7 @@ export function HomeWeekStrip({ days, todayName }: { days: TrainingWeekDay[]; to
             ) : (
               <span
                 aria-hidden
-                className={`leading-none ${isDone ? 'text-[12px] text-primary' : 'text-[11px] text-muted-foreground'}`}
+                className={`leading-none ${isDone ? 'text-[0.75rem] text-primary' : 'text-[0.6875rem] text-muted-foreground'}`}
               >
                 {GLYPH[d.state]}
               </span>
@@ -57,7 +57,7 @@ export function HomeWeekStripLabels({ days }: { days: TrainingWeekDay[] }) {
   return (
     <div className="mt-1 grid grid-cols-7 gap-1" aria-hidden>
       {days.map(d => (
-        <span key={d.date} className="text-center text-[10px] text-muted-foreground">
+        <span key={d.date} className="text-center text-[0.625rem] text-muted-foreground">
           {(SHORT_DAY[d.dayName] ?? d.dayName.slice(0, 3)).slice(0, 1)}
         </span>
       ))}

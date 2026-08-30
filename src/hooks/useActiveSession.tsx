@@ -101,6 +101,23 @@ export interface ActiveSessionValue extends ActiveSessionIdentity, RestState {
   declaredOffPlan: string[]
   declareOffPlan: (name: string) => void
   undeclareOffPlan: (name: string) => void
+  /**
+   * Typed-but-not-yet-logged set values, and hand-added set rows (audit
+   * §6.3). Kept here rather than in SetGrid's own state so they survive a
+   * reload or a backgrounded tab mid-session.
+   */
+  setDraft: (exerciseId: string, setNumber: number) => SetDraft | undefined
+  saveSetDraft: (exerciseId: string, setNumber: number, draft: SetDraft) => void
+  clearSetDrafts: (exerciseId: string) => void
+  extraSetsFor: (exerciseId: string) => number[]
+  setExtraSets: (exerciseId: string, setNumbers: number[]) => void
+}
+
+/** One set row's in-progress values, exactly as typed — strings, because "" and "0" are different things to a half-filled box. */
+export interface SetDraft {
+  weight: string
+  reps: string
+  isBodyweight: boolean
 }
 
 const ActiveSessionContext = createContext<ActiveSessionValue | null>(null)
@@ -262,19 +279,27 @@ export function ActiveSessionProvider({
     if (!identity.profileId || !identity.date) return
     const existing = getActiveSessionRecord(identity.profileId, identity.date)
     const now = getAppNow(identity.profileId).toISOString()
+    // SPREAD the existing record, don't re-enumerate its fields.
+    //
+    // This used to list the fields to carry forward by hand, and had already
+    // fallen behind: prSnapshotAtStart was missing from the list, so the PR
+    // baseline captured at startSession was wiped by the very next patch —
+    // starting a rest timer was enough. finishSession then read it back as
+    // {} and built the session summary by diffing today's lifts against no
+    // baseline at all.
+    //
+    // A hand-maintained carry-forward list is a rule that has to be updated
+    // every time the record grows, in a file whose own header says later
+    // phases will grow it. Spreading makes forgetting impossible, which is
+    // the only version of this that survives the next field.
     saveActiveSessionRecord({
+      ...(existing ?? {}),
       profileId: identity.profileId,
       date: identity.date,
       dayName: identity.dayName,
       liveWeek: identity.liveWeek,
       status: existing?.status ?? 'running',
       startedAtIso: existing?.startedAtIso ?? now,
-      finishedAtIso: existing?.finishedAtIso,
-      restEndsAt: existing?.restEndsAt,
-      restLabel: existing?.restLabel,
-      restTargetSetNumber: existing?.restTargetSetNumber,
-      restTotalMs: existing?.restTotalMs,
-      declaredOffPlan: existing?.declaredOffPlan,
       ...patch,
       lastActivityIso: now,
     })
@@ -370,6 +395,42 @@ export function ActiveSessionProvider({
       window.removeEventListener('pageshow', handler)
     }
   }, [identity.profileId, identity.date, resolveStaleSession])
+
+  // --- Set drafts (audit §6.3) ------------------------------------------
+  //
+  // Read straight from the record on every call rather than mirrored into
+  // React state: a draft changes on every keystroke, and a state mirror
+  // would re-render the whole session tree per character. The record is a
+  // synchronous localStorage read, which is cheap enough to do per row.
+  const draftKey = (exerciseId: string, setNumber: number) => `${exerciseId}:${setNumber}`
+
+  const currentRecord = useCallback(() => (
+    identity.profileId && identity.date ? getActiveSessionRecord(identity.profileId, identity.date) : null
+  ), [identity.profileId, identity.date])
+
+  const setDraft = useCallback((exerciseId: string, setNumber: number): SetDraft | undefined =>
+    currentRecord()?.drafts?.[draftKey(exerciseId, setNumber)], [currentRecord])
+
+  const saveSetDraft = useCallback((exerciseId: string, setNumber: number, draft: SetDraft) => {
+    const existing = currentRecord()?.drafts ?? {}
+    patchRecord({ drafts: { ...existing, [draftKey(exerciseId, setNumber)]: draft } })
+  }, [currentRecord, patchRecord])
+
+  /** Called once a set is logged — the typed value has become a real row, and keeping it would resurrect it on the next reload. */
+  const clearSetDrafts = useCallback((exerciseId: string) => {
+    const existing = currentRecord()?.drafts
+    if (!existing) return
+    const next = Object.fromEntries(Object.entries(existing).filter(([k]) => !k.startsWith(`${exerciseId}:`)))
+    patchRecord({ drafts: next })
+  }, [currentRecord, patchRecord])
+
+  const extraSetsFor = useCallback((exerciseId: string): number[] =>
+    currentRecord()?.extraSets?.[exerciseId] ?? [], [currentRecord])
+
+  const setExtraSets = useCallback((exerciseId: string, setNumbers: number[]) => {
+    const existing = currentRecord()?.extraSets ?? {}
+    patchRecord({ extraSets: { ...existing, [exerciseId]: setNumbers } })
+  }, [currentRecord, patchRecord])
 
   const persistDeclaredOffPlan = useCallback((names: string[]) => {
     patchRecord({ declaredOffPlan: names })
@@ -502,6 +563,11 @@ export function ActiveSessionProvider({
     ghosts,
     loadGhosts,
     declaredOffPlan,
+    setDraft,
+    saveSetDraft,
+    clearSetDrafts,
+    extraSetsFor,
+    setExtraSets,
     declareOffPlan,
     undeclareOffPlan,
   }

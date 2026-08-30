@@ -19,13 +19,13 @@ export function AssistanceChip({ ex }: { ex: Exercise }) {
   return (
     <div className="flex flex-col gap-0.5 mt-0.5">
       {ex.intensity && (
-        <span className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground">
+        <span className="inline-flex items-center gap-0.5 text-[0.625rem] text-muted-foreground">
           {ex.intensity}
         </span>
       )}
       <div className="flex items-center gap-1 flex-wrap">
         <span
-          className={`inline-flex items-center gap-0.5 rounded border px-1 py-0 text-[10px] leading-4 ${
+          className={`inline-flex items-center gap-0.5 rounded border px-1 py-0 text-[0.625rem] leading-4 ${
             readyToGraduate
               ? 'border-primary/40 bg-primary/10 text-primary font-medium'
               : 'border-muted-foreground/40 text-muted-foreground/70'
@@ -34,10 +34,10 @@ export function AssistanceChip({ ex }: { ex: Exercise }) {
           <LifeBuoy className="size-2.5" />
           {readyToGraduate ? 'Bodyweight (no assist)' : `${ex.suggested_assistance_kg}kg assist`}
         </span>
-        <span className="text-[9px] italic text-muted-foreground/60">less over time = stronger</span>
+        <span className="text-[0.5625rem] italic text-muted-foreground/60">less over time = stronger</span>
       </div>
       {readyToGraduate && (
-        <p className="text-[10px] text-primary/90 italic max-w-xs">
+        <p className="text-[0.625rem] text-primary/90 italic max-w-xs">
           You've hit full bodyweight range on the assisted rig — try the real, unassisted version next session.
         </p>
       )}

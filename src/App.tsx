@@ -1,11 +1,10 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, lazy, Suspense } from 'react'
 import { Tabs, TabsContent } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Loader2 } from 'lucide-react'
 import { ProfileMenu } from '@/components/ProfileMenu'
 import { ProfileScreen } from '@/components/ProfileScreen'
 import { BottomTabBar } from '@/components/BottomTabBar'
-import { ConversationalOnboarding } from '@/components/onboarding/ConversationalOnboarding'
 import { loadOnboardingDraft, clearOnboardingDraft } from '@/lib/onboarding-draft-store'
 import { NutritionDisplay } from '@/components/NutritionDisplay'
 import { ExerciseTab } from '@/components/exercise/ExerciseTab'
@@ -13,7 +12,6 @@ import { SLOT_LABEL as MEAL_SLOT_LABEL } from '@/components/MealPlan'
 import { Dashboard } from '@/components/Dashboard'
 import { ToolsTab } from '@/components/ToolsTab'
 import { ChatAssistant } from '@/components/ChatAssistant'
-import { DevTestPage } from '@/components/DevTestPage'
 import { OfflineStatusIndicator } from '@/components/OfflineStatusIndicator'
 import { BottomDock } from '@/components/BottomDock'
 import { ActiveSessionProvider } from '@/hooks/useActiveSession'
@@ -42,6 +40,46 @@ import { checkForConsistencyHold } from '@/lib/block-consistency'
 import { checkForLoadSuggestions, confirmLoadSuggestion, declineLoadSuggestion } from '@/lib/load-suggestions'
 import { checkForWeightBasisOffer, confirmWeightBasisOffer, declineWeightBasisOffer, planHasAssumedBodyLoads } from '@/lib/weight-basis-offer'
 import { getRevealSpeed, saveRevealSpeed, DEFAULT_REVEAL_SPEED, type RevealSpeed } from '@/lib/reveal-speed-store'
+import { ensureSignedIn, claimProfile, shouldAskForEmail, findOwnedProfileId } from '@/lib/auth'
+import { rebuildFromCurrentWeek, type PlanInvalidation } from '@/lib/plan-invalidation'
+import { SignInScreen } from '@/components/SignInScreen'
+
+// ---------------------------------------------------------------------------
+// SPLIT OUT OF THE MAIN BUNDLE — audit §12, the 1.55 MB single chunk.
+//
+// Both of these were downloaded by every user on every load, and neither is
+// reachable on a normal one:
+//
+//   ConversationalOnboarding runs once, ever. Every returning user — which is
+//   every user after their first minute — paid for it on every visit.
+//
+//   DevTestPage is reachable only at #/dev-test and only for a dev account,
+//   and it drags in the constraint auditor and the quality scorer behind it.
+//   Shipping that to a person trying to look at their workout on mobile data
+//   is indefensible once it is this easy not to.
+//
+// React.lazy defers the DOWNLOAD to first render, so the cost moves to the
+// person who actually opens the screen. The Suspense fallback below is the
+// same spinner the restore path already shows, so the transition looks like
+// nothing new rather than like a second kind of loading.
+// ---------------------------------------------------------------------------
+const ConversationalOnboarding = lazy(() =>
+  import('@/components/onboarding/ConversationalOnboarding').then(m => ({ default: m.ConversationalOnboarding })))
+const DevTestPage = lazy(() =>
+  import('@/components/DevTestPage').then(m => ({ default: m.DevTestPage })))
+
+/** The one loading state this app has, reused so a lazy chunk never introduces a second. */
+function ScreenLoading() {
+  return (
+    <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="flex items-center gap-2 text-muted-foreground">
+        <Loader2 className="size-5 animate-spin" />
+        <span>Loading your plan...</span>
+      </div>
+    </div>
+  )
+}
+import { EmailPrompt } from '@/components/EmailPrompt'
 import { InsightBanner } from '@/components/ui/insight-banner'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { getActiveFacts, getActiveGoals, getActiveContextFacts, createFact, createContextFact, createGoal, type UserFactRow, type UserGoalRow, type UserContextFactRow } from '@/lib/memory-store'
@@ -86,6 +124,24 @@ function App() {
   // re-ask forever, or (worse, for the weight-basis offer) look answered
   // while nothing had been decided.
   const [adaptationMessages, setAdaptationMessages] = useState<{ text: string; goalId?: string; loadSuggestionId?: string; weightBasisOfferId?: string }[]>([])
+  /**
+   * "That didn't save" — the one place a tap-driven mutation on this screen
+   * reports a write that failed.
+   *
+   * Audit §3.1/§3.2: swapping an exercise and banning one both updated the
+   * screen first and then sent the write, and a failed write went to
+   * console.error and nowhere else. The change sat there looking applied for
+   * the rest of the session and was gone on the next reload. The SAME swap
+   * made through the chat already did this correctly — it returns a receipt
+   * and the card says "Couldn't apply the swap" — so the app had one honest
+   * door and one dishonest one onto the same action.
+   *
+   * Deliberately its own state rather than another adaptationMessages entry:
+   * those are the coach's voice ("tone=ai"), and a failure is not a coaching
+   * insight. Kept as a single slot, not a queue — two failed writes in a row
+   * mean the connection is down, and saying so twice adds nothing.
+   */
+  const [writeError, setWriteError] = useState<string | null>(null)
   /** Which load_suggestions row a Confirm/Decline tap is currently in flight for — disables both buttons on that one banner only. */
   const [loadSuggestionBusy, setLoadSuggestionBusy] = useState<string | null>(null)
   /** When the CURRENT mesocycle was generated — anchors live-week detection (falls back to profile.created_at for legacy profiles without persisted weeks). */
@@ -207,6 +263,26 @@ function App() {
    * exists to prevent. This one renders over the app instead.
    */
   const [unsavedProfileWarning, setUnsavedProfileWarning] = useState<string | null>(null)
+  // Sign-in state. `authError` is deliberately surfaced rather than logged:
+  // with row-level security on, a client that failed to sign in reads nothing
+  // and every screen goes blank with no explanation at all.
+  const [authError, setAuthError] = useState<string | null>(null)
+  const [askForEmail, setAskForEmail] = useState(false)
+  /**
+   * A Profile edit that leaves the plan wrong (audit §2.1). Held as state
+   * rather than acted on, because the rule is ASK, NEVER SILENTLY — a rebuild
+   * rewrites the weeks ahead, and doing that as a side effect of a settings
+   * toggle would change somebody's training under them.
+   */
+  const [planInvalidation, setPlanInvalidation] = useState<PlanInvalidation | null>(null)
+  const [rebuilding, setRebuilding] = useState(false)
+  /**
+   * Offered instead of onboarding when this browser has no profile — the one
+   * moment somebody could be looking at a fresh app thinking "but I already
+   * have an account" (audit §1.2). Never a wall: declining starts a new plan
+   * exactly as before.
+   */
+  const [signInOpen, setSignInOpen] = useState(false)
   const [generatingStatus, setGeneratingStatus] = useState('')
   const [exerciseExclusions, setExerciseExclusions] = useState<string[]>([])
   const [profileInfoOpen, setProfileInfoOpen] = useState(false)
@@ -291,16 +367,49 @@ function App() {
   }, [route])
 
   const restoreSession = async () => {
-    const storedId = localStorage.getItem(STORAGE_KEY)
-    if (!storedId) {
+    // SIGN IN BEFORE READING ANYTHING. Every table is scoped to auth.uid()
+    // now, so a client with no session reads zero rows — indistinguishable,
+    // from inside the app, from a person who has no profile yet. Getting this
+    // order wrong would silently send returning users back through onboarding.
+    const signIn = await ensureSignedIn()
+    if (signIn.error) {
+      setAuthError(signIn.error)
       setIsRestoring(false)
       return
     }
 
+    const storedId = localStorage.getItem(STORAGE_KEY)
+
+    // Claim before reading. A profile from before accounts existed has no
+    // owner, and an unowned row is readable by nobody — including the person
+    // whose row it is. claim_profile only touches rows still unowned, so this
+    // is a no-op for everyone else and safe to run on every load.
+    if (storedId) await claimProfile(storedId)
+
+    // Ask the database who this account owns rather than trusting
+    // localStorage alone: someone who signed in with an email on a new device
+    // has no stored id at all, and their profile is still theirs.
+    //
+    // ONLY FOR AN ACCOUNT WITH AN EMAIL, and that guard is doing real work.
+    // "New Plan" abandons the old profile by clearing the stored id while
+    // leaving the row — which this account still owns. Without the guard, the
+    // very next load would find that row and restore the plan the user had
+    // just chosen to replace. An anonymous session with no stored id has
+    // nothing legitimate to restore; an email session is the only way to
+    // arrive at a session that deliberately owns a profile you have no local
+    // record of.
+    const ownedId = storedId ?? (signIn.email ? await findOwnedProfileId() : null)
+    if (!ownedId) {
+      setIsRestoring(false)
+      void shouldAskForEmail().then(setAskForEmail)
+      return
+    }
+    if (ownedId !== storedId) localStorage.setItem(STORAGE_KEY, ownedId)
+
     const { data: profileRow } = await supabase
       .from('fitness_profiles')
       .select('*')
-      .eq('id', storedId)
+      .eq('id', ownedId)
       .maybeSingle()
 
     if (!profileRow) {
@@ -308,6 +417,11 @@ function App() {
       setIsRestoring(false)
       return
     }
+
+    // Ashley's ruling, 30 Aug 2026: existing users keep everything and are
+    // ASKED for an email next time they open the app, dismissibly — not
+    // walled behind a login screen mid-training-block.
+    void shouldAskForEmail().then(setAskForEmail)
 
     const restoredProfile: UserProfile = {
       id: profileRow.id,
@@ -395,9 +509,9 @@ function App() {
     setExerciseExclusions(restoredExclusions)
 
     const [restoredPools, { data: exerciseRows }, fullMesocycle] = await Promise.all([
-      getPools(storedId),
-      supabase.from('exercise_plans').select('*').eq('profile_id', storedId),
-      restoreMesocycle(storedId),
+      getPools(ownedId),
+      supabase.from('exercise_plans').select('*').eq('profile_id', ownedId),
+      restoreMesocycle(ownedId),
     ])
 
     let restoredExercises: WorkoutDay[] = []
@@ -773,9 +887,26 @@ function App() {
     const workout = planResult.plan
     const mesocycleData = generateMesocycle(enrichedProfile, workout, effectiveOnboardingExclusions)
 
+    // The insert policy requires owner_id = auth.uid(), so a profile cannot be
+    // created without a session and cannot be created owned by somebody else.
+    // Sign in here as well as in restoreSession: onboarding is reachable on a
+    // first load, and an unsigned insert would fail with a policy error the
+    // user could do nothing about.
+    const signIn = await ensureSignedIn()
+    if (signIn.error || !signIn.userId) {
+      // setupError, not authError: this is the onboarding screen's own error
+      // surface, which is where the person actually is when it happens.
+      setSetupError(
+        "We couldn't start your account, so there was nowhere to save your plan. " +
+        `Check your connection and try again — nothing was lost. (${signIn.error ?? 'no session'})`,
+      )
+      return
+    }
+
     const { data, error: insertError } = await supabase
       .from('fitness_profiles')
       .insert({
+        owner_id: signIn.userId,
         age: enrichedProfile.age,
         gender: enrichedProfile.gender,
         height_cm: enrichedProfile.height_cm,
@@ -1524,17 +1655,30 @@ function App() {
     // read-modify-write of a shared array cell, so there's nothing left to
     // clobber and nothing to read fresh before appending to.
     if (compiledExerciseExclusions.includes(exerciseName)) return
-    await createFact({
-      profileId: profile.id,
-      kind: 'exercise_preference',
-      source: 'manual',
-      rawPhrase: exerciseName,
-      displayText: `won't eat/do ${exerciseName}`,
-      polarity: 'dislike',
-      hardness: 'hard',
-      resolvedRefs: [exerciseName],
-    })
-    await reloadMemory(profile.id)
+    // Audit §3.2 — this write had NO error handling at all. Offline it threw,
+    // the handler stopped here before changing anything, and the rejection
+    // went nowhere: no ban, no error, no visual change whatsoever. The user
+    // tapped "never show me this again" and the app simply ignored them,
+    // which is the worst of the three possible outcomes because it gives
+    // them nothing to react to.
+    try {
+      await createFact({
+        profileId: profile.id,
+        kind: 'exercise_preference',
+        source: 'manual',
+        rawPhrase: exerciseName,
+        displayText: `won't eat/do ${exerciseName}`,
+        polarity: 'dislike',
+        hardness: 'hard',
+        resolvedRefs: [exerciseName],
+      })
+      await reloadMemory(profile.id)
+    } catch (err) {
+      console.error('Recording the ban failed:', err)
+      setWriteError(`Couldn't save that — ${exerciseName} hasn't been removed. Check your connection and try again.`)
+      return
+    }
+    setWriteError(null)
     const updated = [...new Set([...compiledExerciseExclusions, exerciseName])]
 
     // Single source of truth is the mesocycle — exercisePlan (the flat,
@@ -1555,7 +1699,13 @@ function App() {
         // live-week detection to week 1.
         await saveMesocycle(profile.id, updatedMesocycle, mesocycleCreatedAt ?? profile.created_at)
       } catch (err) {
+        // The preference row above DID land, so the ban itself is real and
+        // survives — it is only this plan's rewrite that failed. Say exactly
+        // that rather than the generic "didn't save", which would send
+        // someone off to re-tap a button that already worked.
         console.error('Persisting ban failed:', err)
+        setMesocycle(mesocycle)
+        setWriteError(`${exerciseName} won't be picked again, but this plan couldn't be updated — reopen the app to retry.`)
       }
     }
   }
@@ -1601,8 +1751,58 @@ function App() {
       // a second earlier." Same scope_key prefix the chat swap proposal
       // uses (buildExerciseSwapProposal, ChatAssistant.tsx).
       await sweepStaleForTarget(profile.id, `${profile.id}:propose_exercise_swap:${dayName}:${exIndex}`)
+      setWriteError(null)
     } catch (err) {
+      // Audit §3.1 — this used to be console.error alone, so a swap that
+      // never reached the database looked identical to one that did until
+      // the next reload put the old exercise back. Put the screen back to
+      // the truth AND say so: a silent revert is its own small betrayal.
       console.error('Persisting swap failed:', err)
+      setMesocycle(mesocycle)
+      setWriteError("That swap didn't save — check your connection and try again.")
+    }
+  }
+
+  /**
+   * The user said yes to rebuilding around a change they just made.
+   *
+   * FORWARD ONLY. Past weeks hold logged sets — real work they actually did —
+   * so rewriting them would make their own history disagree with what they
+   * remember doing. rebuildFromCurrentWeek enforces that; this just supplies
+   * the week to start from.
+   */
+  const handleConfirmRebuild = async () => {
+    if (!profile?.id || rebuilding) return
+    setRebuilding(true)
+    try {
+      const currentWeek = getActiveMesocycleWeek(
+        mesocycleCreatedAt ?? profile.created_at, undefined, mesocycle.length || 4,
+      )
+      const result = await rebuildFromCurrentWeek(profile, effectiveExclusions, mesocycle, currentWeek)
+      if (!result.ok || !result.mesocycle) {
+        setWriteError(result.error ?? "Couldn't rebuild your plan just now — nothing has changed.")
+        return
+      }
+      const previous = mesocycle
+      setMesocycle(result.mesocycle)
+      try {
+        // Same reasoning as the ban path: this is an EDIT of the live plan,
+        // so the original creation time has to survive or live-week
+        // detection rewinds to week 1.
+        await saveMesocycle(profile.id, result.mesocycle, mesocycleCreatedAt ?? profile.created_at)
+      } catch (err) {
+        // The profile change itself already landed and is real. Only the plan
+        // rewrite failed, so say exactly that rather than implying the injury
+        // was not saved.
+        console.error('Persisting rebuild failed:', err)
+        setMesocycle(previous)
+        setWriteError("That change is saved, but your plan couldn't be rebuilt right now — reopen the app to try again.")
+        return
+      }
+      setLogsVersion(v => v + 1)
+    } finally {
+      setRebuilding(false)
+      setPlanInvalidation(null)
     }
   }
 
@@ -1779,17 +1979,42 @@ function App() {
     )
   }
 
+  // Signing in failed. This has to be its own screen rather than a banner:
+  // with row-level security on, a client without a session reads zero rows,
+  // so the alternative is a fully-populated-looking app that is empty
+  // everywhere and never says why. Nothing has been lost — the data is in the
+  // database, this browser just could not prove who it is.
+  if (authError) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="max-w-md w-full space-y-4 text-center">
+          <h2 className="text-lg font-semibold">We couldn't sign you in</h2>
+          <p className="text-sm text-muted-foreground break-words">
+            Your plan is safe — this browser just couldn't reach the server to prove it's you,
+            so nothing can be loaded yet. Check your connection and try again.
+          </p>
+          <p className="text-xs text-muted-foreground break-words">{authError}</p>
+          <Button className="w-full" onClick={() => { setAuthError(null); setIsRestoring(true); void restoreSession() }}>
+            Try again
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
   // Dev-test route: accessible even before profile is loaded
   if (hash === '#/dev-test') {
     const canAccess = !profile || isDevAccount(profile)
     if (canAccess) {
       return (
-        <DevTestPage
-          profile={profile}
-          exercisePlan={exercisePlan}
-          mealPlan={mealPlan}
-          onBack={() => { window.location.hash = '' }}
-        />
+        <Suspense fallback={<ScreenLoading />}>
+          <DevTestPage
+            profile={profile}
+            exercisePlan={exercisePlan}
+            mealPlan={mealPlan}
+            onBack={() => { window.location.hash = '' }}
+          />
+        </Suspense>
       )
     }
   }
@@ -1835,7 +2060,40 @@ function App() {
     // One way in: the conversation. The step-by-step questionnaire and the
     // chooser that offered it were removed — see ConversationalOnboarding's
     // header note for what that means when the coach is unreachable.
-    return <ConversationalOnboarding onComplete={handleOnboardingComplete} />
+    // The email prompt lets somebody attach an account; without this there was
+    // nowhere to USE it. Clear the browser and the app signed you in
+    // anonymously as somebody new, with the email stored and unreachable —
+    // promising a recovery it could not perform.
+    if (signInOpen) {
+      return (
+        <SignInScreen
+          onCancel={() => setSignInOpen(false)}
+          onSignedIn={() => { setSignInOpen(false); setIsRestoring(true); void restoreSession() }}
+        />
+      )
+    }
+    return (
+      <>
+        <Suspense fallback={<ScreenLoading />}>
+          <ConversationalOnboarding onComplete={handleOnboardingComplete} />
+        </Suspense>
+        {/* Offered BESIDE onboarding rather than in front of it — Ashley's
+            ruling was that nobody is walled behind a login. Rendered here
+            rather than inside ConversationalOnboarding so the conversation
+            itself, and the twenty-odd gates that pin it, are untouched. */}
+        <div
+          className="fixed inset-x-0 z-40 flex justify-center px-4"
+          style={{ bottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}
+        >
+          <button
+            onClick={() => setSignInOpen(true)}
+            className="rounded-full border bg-background/90 px-3 py-1.5 text-xs text-muted-foreground backdrop-blur min-h-[44px]"
+          >
+            Already have an account? Sign in
+          </button>
+        </div>
+      </>
+    )
   }
 
   const totalWeeks = mesocycle.length > 0 ? mesocycle.length : 4
@@ -1860,6 +2118,8 @@ function App() {
       {/* The plan exists in memory but not in the database. Says so once, in
           plain terms, and stays dismissible — the user can carry on, but
           they are never left believing it was saved. */}
+      {askForEmail && <EmailPrompt onClose={() => setAskForEmail(false)} />}
+
       {unsavedProfileWarning && (
         <div
           role="alert"
@@ -1869,7 +2129,7 @@ function App() {
           <div className="mx-auto max-w-md rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 backdrop-blur">
             <p className="text-xs text-foreground break-words">{unsavedProfileWarning}</p>
             <button
-              className="mt-1 text-[11px] font-medium underline text-muted-foreground min-h-[32px]"
+              className="mt-1 text-[0.6875rem] font-medium underline text-muted-foreground min-h-[32px]"
               onClick={() => setUnsavedProfileWarning(null)}
             >
               Dismiss
@@ -1905,6 +2165,18 @@ function App() {
       </div>
 
       <main className="max-w-6xl mx-auto px-4 pt-12 pb-28 space-y-6">
+        {writeError && (
+          <InsightBanner tone="warning" className="items-start justify-between">
+            <span>{writeError}</span>
+            <button
+              type="button"
+              onClick={() => setWriteError(null)}
+              className="shrink-0 text-xs font-semibold underline opacity-80 hover:opacity-100"
+            >
+              Dismiss
+            </button>
+          </InsightBanner>
+        )}
         {adaptationMessages.length > 0 && (
           <div className="space-y-2">
             {adaptationMessages.map((msg, i) => (
@@ -1998,6 +2270,7 @@ function App() {
               isGeneratingMeals={isGeneratingMeals}
               mealRegenerateError={mealRegenerateError}
               onDismissRegenerateError={() => setMealRegenerateError(null)}
+              avoidFoods={effectiveDislikedFoods}
               unrecognisedDietaryRestrictions={unrecognisedDietaryRestrictions}
               onFixDietaryRestrictions={() => { setProfileInfoSection('dietary'); setProfileInfoOpen(true) }}
               onSwapMealSlot={handleSwapMealSlot}
@@ -2028,7 +2301,7 @@ function App() {
           </TabsContent>
 
           <TabsContent value="tools">
-            <ToolsTab profileId={profile.id} mealPools={mealPools} targets={macros} softLikedFoods={compiledSoftFoodPreferences} />
+            <ToolsTab profileId={profile.id} mealPools={mealPools} targets={macros} softLikedFoods={compiledSoftFoodPreferences} todaysPicks={chosenMeals} />
           </TabsContent>
 
           <TabsContent value="chat" forceMount className="data-[state=inactive]:hidden">
@@ -2145,11 +2418,32 @@ function App() {
         profile={profile}
         latestWeightKg={latestWeightKg}
         onProfileChanged={patch => setProfile(prev => prev ? { ...prev, ...patch } : prev)}
+        onPlanInvalidated={setPlanInvalidation}
         onMemoryChanged={() => { if (profile.id) return reloadMemory(profile.id) }}
         initialSection={profileInfoSection}
         revealSpeed={revealSpeed}
         onRevealSpeedChange={handleRevealSpeedChange}
       />
+      {/* ASK, NEVER SILENTLY (audit §2.1). A rebuild rewrites the weeks
+          ahead, so it happens on an explicit yes and nowhere else. Declining
+          leaves the plan exactly as it was — the profile change itself has
+          already been saved either way, so nothing is lost by saying no. */}
+      <Dialog open={planInvalidation !== null} onOpenChange={open => { if (!open && !rebuilding) setPlanInvalidation(null) }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{planInvalidation?.title}</DialogTitle>
+            <DialogDescription>{planInvalidation?.detail}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setPlanInvalidation(null)} disabled={rebuilding}>
+              Leave it as it is
+            </Button>
+            <Button onClick={handleConfirmRebuild} disabled={rebuilding}>
+              {rebuilding ? 'Rebuilding...' : 'Rebuild my plan'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <Dialog open={newPlanConfirmOpen} onOpenChange={open => { if (!newPlanResetting) setNewPlanConfirmOpen(open) }}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
@@ -2162,7 +2456,7 @@ function App() {
             </DialogDescription>
           </DialogHeader>
           {activeAdaptationsForReset.length > 0 && (
-            <div className="space-y-1.5 rounded-lg bg-[color:var(--role-warn-bg)] px-3 py-2.5 text-[13px] text-[color:var(--role-warn-text)]">
+            <div className="space-y-1.5 rounded-lg bg-[color:var(--role-warn-bg)] px-3 py-2.5 text-[0.8125rem] text-[color:var(--role-warn-text)]">
               {activeAdaptationsForReset.map(a => (
                 <p key={a.id}>
                   You have an active {a.kind === 'injury' ? `${a.injury_code?.replace('_', ' ')} adaptation` : 'equipment adaptation'} running

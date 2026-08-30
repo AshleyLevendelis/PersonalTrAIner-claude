@@ -151,7 +151,16 @@ export async function getPendingAction(id: string): Promise<PendingActionRow | n
   return (data as PendingActionRow | null) ?? null
 }
 
-export type ClaimResult = { outcome: 'claimed'; row: PendingActionRow } | { outcome: 'stale' | 'not_found' | 'already_resolved' }
+/**
+ * `expired` is deliberately separate from `already_resolved` even though both
+ * mean "this can't be applied now". They are different things to say to a
+ * user — one is "you took too long", the other is "you already answered
+ * this" — and collapsing them was half of why the Confirm button did nothing:
+ * the caller had one branch for `stale` and no branch for anything else, so
+ * every other outcome fell through to a bare `return` and the card kept
+ * offering a button that could never work. See test:proposal-expiry.
+ */
+export type ClaimResult = { outcome: 'claimed'; row: PendingActionRow } | { outcome: 'stale' | 'not_found' | 'already_resolved' | 'expired' }
 
 /**
  * The confirm-exactly-once gate. A double-tap or a retried confirm both
@@ -170,7 +179,7 @@ export async function claimPendingAction(
   if (!row) return { outcome: 'not_found' }
   if (row.status === 'expired' || (row.status === 'pending' && new Date(row.expires_at) < new Date())) {
     await supabase.from('pending_actions').update({ status: 'expired' }).eq('id', id).eq('status', 'pending')
-    return { outcome: 'already_resolved' }
+    return { outcome: 'expired' }
   }
   if (row.status !== 'pending') return { outcome: 'already_resolved' }
 

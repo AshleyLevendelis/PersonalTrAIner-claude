@@ -40,7 +40,7 @@ export function ExerciseStrengthChart({ points }: { points: TrendPoint[] }) {
           <circle key={i} cx={c.x} cy={c.y} r={i === coords.length - 1 ? 3.5 : 2.5} fill="var(--primary)" className="glow-dot" />
         ))}
       </svg>
-      <div className="flex justify-between mt-1 text-[10px] text-muted-foreground">
+      <div className="flex justify-between mt-1 text-[0.625rem] text-muted-foreground">
         <span>{first.date}</span>
         {points.length > 2 && <span>{mid.date}</span>}
         <span>{last.date}</span>

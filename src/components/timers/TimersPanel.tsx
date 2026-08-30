@@ -45,7 +45,7 @@ export function TimersPanel({
           <TabsTrigger
             key={mode}
             value={mode}
-            className="rounded-none border-0 bg-transparent px-0 pb-2 text-[13px] capitalize shadow-none data-[state=active]:bg-transparent data-[state=active]:font-semibold data-[state=active]:text-[color:var(--primary)] data-[state=active]:shadow-[inset_0_-2px_0_0_var(--primary)]"
+            className="rounded-none border-0 bg-transparent px-0 pb-2 text-[0.8125rem] capitalize shadow-none data-[state=active]:bg-transparent data-[state=active]:font-semibold data-[state=active]:text-[color:var(--primary)] data-[state=active]:shadow-[inset_0_-2px_0_0_var(--primary)]"
           >
             {mode}
           </TabsTrigger>
@@ -74,8 +74,8 @@ function StopwatchPanel() {
   const timers = useTimers()
   return (
     <div className="flex flex-col items-center gap-4 py-4">
-      <div className="tabular-mono text-[44px] font-bold leading-none tracking-[-.03em]">{formatMs(timers.elapsedMs, true)}</div>
-      <p className="max-w-[34ch] text-center text-[11px] leading-[1.45] text-muted-foreground">{TIMER_SCOPE_NOTE}</p>
+      <div className="tabular-mono text-[2.75rem] font-bold leading-none tracking-[-.03em]">{formatMs(timers.elapsedMs, true)}</div>
+      <p className="max-w-[34ch] text-center text-[0.6875rem] leading-[1.45] text-muted-foreground">{TIMER_SCOPE_NOTE}</p>
       <div className="flex gap-2">
         {timers.running ? (
           <Button onClick={timers.stop}>Stop</Button>
@@ -144,25 +144,17 @@ function RoundPanel({ prefill }: { prefill: RoundConfig | null }) {
     timers.startRound(config)
   }
 
-  const isRunning = timers.running && timers.roundConfig
-
-  if (isRunning) {
-    return (
-      <div className="flex flex-col items-center gap-3 py-4">
-        <p className="ds-label">Round {timers.currentRound} of {timers.roundConfig!.rounds}</p>
-        <div
-          className={`ds-num-hero tabular-mono ${timers.currentPhase === 'work' ? 'text-primary' : 'text-[color:var(--role-warn)]'}`}
-        >
-          {formatMs(timers.phaseRemainingMs ?? 0)}
-        </div>
-        <p className={`text-sm font-medium ${timers.currentPhase === 'work' ? 'text-primary' : 'text-[color:var(--role-warn-text)]'}`}>
-          {timers.currentPhase === 'work' ? 'Work' : 'Rest'}
-        </p>
-        {timers.isRoundComplete && <p className="text-sm text-muted-foreground">All rounds complete</p>}
-        <Button variant="outline" onClick={timers.reset}>Stop</Button>
-      </div>
-    )
-  }
+  // NO RUNNING VIEW HERE ANY MORE. A live round is rendered by RoundField,
+  // which takes the whole Tools tab content area (design handoff 2a) — so
+  // this panel is reached only while there is no round to show, and it is
+  // purely the setup form.
+  //
+  // What was here read the phase from a text colour and nothing else, and its
+  // "All rounds complete" line was unreachable: the completion effect sets
+  // running false, which used to collapse the derived round state, so the
+  // branch unmounted on the very tick that line existed for. Both the cause
+  // and this duplicate are gone rather than left as a second copy of a view
+  // that can no longer render.
 
   return (
     <div className="flex flex-col gap-3 py-4">

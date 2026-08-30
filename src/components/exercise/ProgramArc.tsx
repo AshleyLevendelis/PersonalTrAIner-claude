@@ -96,28 +96,28 @@ export function ProgramArc({
                 </span>
                 <span className="truncate text-sm font-medium">{b.phaseLabel ?? `Block ${b.blockNumber}`}</span>
                 {b.status === 'current' && (
-                  <Badge className="h-4 shrink-0 px-1.5 py-0 text-[10px]">You&apos;re here</Badge>
+                  <Badge className="h-4 shrink-0 px-1.5 py-0 text-[0.625rem]">You&apos;re here</Badge>
                 )}
               </div>
               <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
             </div>
             {b.phaseFocus && <p className="mt-1 pl-9 text-xs text-muted-foreground">{b.phaseFocus}</p>}
             <div className="mt-1.5 flex flex-wrap items-center gap-1.5 pl-9">
-              <span className="text-[11px] text-muted-foreground">
+              <span className="text-[0.6875rem] text-muted-foreground">
                 Weeks {b.firstWeek}-{b.lastWeek}
               </span>
               {b.deloadWeek != null && (
-                <Badge variant="warning" className="h-4 px-1.5 py-0 text-[10px]">
+                <Badge variant="warning" className="h-4 px-1.5 py-0 text-[0.625rem]">
                   Deload
                 </Badge>
               )}
               {b.status === 'completed' && (
-                <Badge variant="success" className="h-4 px-1.5 py-0 text-[10px]">
+                <Badge variant="success" className="h-4 px-1.5 py-0 text-[0.625rem]">
                   Completed
                 </Badge>
               )}
               {b.status === 'future' && (
-                <Badge variant="outline" className="h-4 px-1.5 py-0 text-[10px] text-muted-foreground">
+                <Badge variant="outline" className="h-4 px-1.5 py-0 text-[0.625rem] text-muted-foreground">
                   Adjusts as you go
                 </Badge>
               )}

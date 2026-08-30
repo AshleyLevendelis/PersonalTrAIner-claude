@@ -21,6 +21,7 @@ import { computeWeightTrend, type WeightTrendResult } from './weight-trend'
 import { selectCoachTipWithKey, type CoachTipContext } from './coach-tips'
 import { computeConsistency, type ConsistencyScore } from './consistency-score'
 import { getActiveMesocycleWeek } from './calculations'
+import { getLocalDateString } from './dev-clock'
 import { supabase } from './supabase'
 import type { UserProfile, MacroTargets, WorkoutDay, MesocycleWeek, ExerciseSetLog } from './types'
 import { estimateDaySeconds } from './session-duration'
@@ -268,7 +269,13 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
   const streakDays: StreakDayInput[] = []
   for (let i = 34; i >= 0; i--) {
     const d = new Date(now.getTime() - i * 86_400_000)
-    const dateStr = d.toISOString().slice(0, 10) === todayStr ? todayStr : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    // One date convention, and it is the local calendar one every write in
+    // this app uses. This was a ternary comparing the UTC date against
+    // todayStr and falling back to a hand-rolled local format — which took
+    // the local branch in every case that could differ, so the UTC half
+    // decided nothing and only made the line hard to read. Same helper as
+    // set-log-store, so "the day the user says it is" means one thing.
+    const dateStr = getLocalDateString(d)
     const weekdayName = d.toLocaleDateString('en-US', { weekday: 'long' })
     const scheduled = scheduledWeekdays.has(weekdayName)
     const logged = loggedDates.has(dateStr)
@@ -291,7 +298,13 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
   // Related but not the same as the earlier "stop marking pre-plan days as
   // missed" fix: that one taught the STREAK to ignore them, and these
   // plan-week aggregates were never taught the same thing.
-  const planStartStr = planCreatedAt ? new Date(planCreatedAt).toISOString().slice(0, 10) : null
+  // planCreatedAt is a UTC timestamp; this is compared against local
+  // calendar dates, so it has to be converted to one. Reading the UTC date
+  // off it made the plan look a day older than it was for anyone west of
+  // UTC (and a day younger east of it) whenever the plan was created near
+  // a midnight — which pulled one extra day of pre-plan history into "this
+  // plan week", the exact class of mistake the comment above describes.
+  const planStartStr = planCreatedAt ? getLocalDateString(new Date(planCreatedAt)) : null
   const sincePlanStart = (d: { date: string }) => planStartStr == null || d.date >= planStartStr
 
   // Session pace: distinct trained dates in the current plan week so far vs the same span last plan week.

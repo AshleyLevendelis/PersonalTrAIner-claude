@@ -42,14 +42,14 @@ export function WarmupSection({
         <span className="flex items-center gap-2 text-xs font-medium text-foreground">
           <Thermometer className="size-3.5 text-primary" />
           Warm-up
-          <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">{moveCount} {moveCount === 1 ? 'move' : 'moves'} · ~{totalMinutes} min</Badge>
+          <Badge variant="outline" className="text-[0.625rem] px-1.5 py-0 h-4">{moveCount} {moveCount === 1 ? 'move' : 'moves'} · ~{totalMinutes} min</Badge>
         </span>
         <ChevronDown className={`size-3.5 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
       </CollapsibleTrigger>
       <CollapsibleContent className="px-3 pb-3 space-y-3">
         {general.length > 0 && (
           <div className="space-y-1">
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">General</p>
+            <p className="text-[0.625rem] uppercase tracking-wider text-muted-foreground font-medium">General</p>
             {general.map((item, i) => (
               <div key={i} className="text-xs">
                 <span className="font-medium">{item.name}</span>
@@ -60,7 +60,7 @@ export function WarmupSection({
         )}
         {mobility.length > 0 && (
           <div className="space-y-1">
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Mobility</p>
+            <p className="text-[0.625rem] uppercase tracking-wider text-muted-foreground font-medium">Mobility</p>
             {mobility.map((item, i) => (
               <div key={i} className="text-xs">
                 <span className="font-medium">{item.name}</span>
@@ -70,7 +70,7 @@ export function WarmupSection({
           </div>
         )}
         {coachNote && (
-          <p className="text-[11px] text-muted-foreground/80 italic">{coachNote}</p>
+          <p className="text-[0.6875rem] text-muted-foreground/80 italic">{coachNote}</p>
         )}
       </CollapsibleContent>
     </Collapsible>

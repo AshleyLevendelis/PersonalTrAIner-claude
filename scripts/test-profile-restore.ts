@@ -95,13 +95,29 @@ function consumersOf(col: string): string[] {
       const f = join(dir, e)
       if (statSync(f).isDirectory()) walk(f)
       else if (/\.(ts|tsx)$/.test(f) && !f.endsWith('App.tsx')) {
-        if (readFileSync(f, 'utf8').includes(col)) hits.push(f.replace(ROOT + '/', ''))
+        // COMMENTS STRIPPED FIRST. A column named only in prose about it is
+        // not a consumer, and counting one made this gate demand that
+        // owner_id be restored onto the client profile — a column auth.ts
+        // only ever discusses, never reads. Naming a thing is not using it.
+        if (stripComments(readFileSync(f, 'utf8')).includes(col)) hits.push(f.replace(ROOT + '/', ''))
       }
     }
   }
   walk(join(ROOT, 'src'))
   walk(join(ROOT, 'supabase/functions'))
   return hits
+}
+
+const stripComments = (s: string) =>
+  s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
+
+/**
+ * Columns that exist for the database's benefit and are never meant to reach
+ * the client profile. Listed so they are not reported as dead code either —
+ * "unused" and "used only by Postgres" are different answers.
+ */
+const SERVER_SIDE_ONLY: Record<string, string> = {
+  owner_id: 'the row\'s auth.users owner — read by RLS policies and claim_profile, never by the app',
 }
 
 const app = readFileSync(join(ROOT, 'src/App.tsx'), 'utf8')
@@ -127,8 +143,11 @@ console.log('\n1. Nothing the app reads is dropped on reload')
   // A column with NO consumer is a different problem and must not be silently
   // mapped: restoring dead weight makes it look load-bearing to the next
   // person. Listed, never failed.
-  const dead = dropped.filter(c => consumersOf(c).length === 0)
+  const dead = dropped.filter(c => consumersOf(c).length === 0 && !(c in SERVER_SIDE_ONLY))
   if (dead.length) console.log(`    · unrestored with no consumer at all (dead, decide separately): ${dead.join(', ')}`)
+  for (const [col, why] of Object.entries(SERVER_SIDE_ONLY)) {
+    if (dropped.includes(col)) console.log(`    · not restored on purpose: ${col} — ${why}`)
+  }
 }
 
 // ---------------------------------------------------------------------------

@@ -193,6 +193,47 @@ export function getDeadLetterCount(): number {
   return loadDeadLetter().length
 }
 
+// ---------------------------------------------------------------------------
+// Dead-letter surface (audit §3.5) — a count alone was not enough to build a
+// screen on, and nothing read even that. Same trio as set-log-store,
+// water-store and grocery-store.
+// ---------------------------------------------------------------------------
+
+/** Display-friendly summary of a meal event that permanently failed to sync. */
+export interface MealDeadLetterSummary {
+  clientId: string
+  label: string
+  date: string
+  errorMessage: string
+  failedAt: string
+}
+
+export function getDeadLetterItems(): MealDeadLetterSummary[] {
+  return loadDeadLetter().map(e => ({
+    clientId: e.clientId,
+    label: e.mealName || e.slot || 'Meal',
+    date: e.date,
+    // This queue stores the failed event itself rather than a wrapper with a
+    // reason, so there is no error string to show. Saying "wouldn't sync" is
+    // honest; inventing a cause would not be.
+    errorMessage: "Wouldn't sync",
+    failedAt: e.createdAt,
+  }))
+}
+
+export function retryDeadLetterItem(clientId: string): void {
+  const items = loadDeadLetter()
+  const item = items.find(e => e.clientId === clientId)
+  if (!item) return
+  saveDeadLetter(items.filter(e => e !== item))
+  savePending([...loadPending().filter(e => e.clientId !== clientId), { ...item, attempts: 0 }])
+  void flushPending()
+}
+
+export function discardDeadLetterItem(clientId: string): void {
+  saveDeadLetter(loadDeadLetter().filter(e => e.clientId !== clientId))
+}
+
 function sumMacros(events: MealEventRecord[]): MealMacros {
   return events.reduce(
     (acc, e) => ({

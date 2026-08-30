@@ -87,6 +87,23 @@
   --role-warn-border: rgba(255, 180, 84, .3);
   --role-warn-text: #FFD9A6;
 
+  /* ---------------------------------------------------------------------
+   * PHASE INKS — text and controls printed ON a flooded phase field.
+   *
+   * The round timer's field floods with the phase colour (mint work, amber
+   * rest, red finished). All three are LIGHT, so --foreground on top of them
+   * fails contrast badly — hence a dark, same-hue counterpart per phase.
+   *
+   * Deliberately theme-independent, for the same reason the phase colours
+   * are: what the timer is doing must not depend on which theme somebody
+   * picked. --primary DOES follow the accent axis, so "work" renders lime on
+   * the Lime accent — that is intended (work is "the app is go"), and the
+   * work ink stays dark enough for any accent step.
+   * ------------------------------------------------------------------- */
+  --phase-work-ink: #053026;
+  --phase-rest-ink: #3A2205;
+  --phase-done-ink: #4A0716;
+
   /* Glow axis — ONE unitless multiplier, consumed via calc() in both the
    * blur radius and the alpha of every halo, so strength 0 collapses each
    * one to nothing without a single conditional rule. The keyframe
@@ -395,34 +412,34 @@
 
   /* Headline numbers — Nightshift type scale. */
   .ds-num-hero {
-    font-size: 34px;
+    font-size: 2.125rem;
     font-weight: 700;
     letter-spacing: -0.03em;
     line-height: 1;
   }
   .ds-num-lg {
-    font-size: 32px;
+    font-size: 2rem;
     font-weight: 700;
     letter-spacing: -0.03em;
     line-height: 1;
   }
   /* Section micro-labels — Nightshift type scale. */
   .ds-label {
-    font-size: 11px;
+    font-size: 0.6875rem;
     text-transform: uppercase;
     letter-spacing: 0.14em;
     color: var(--muted-foreground);
   }
   /* Compact variant for the Exercise (today) screen's denser rows. */
   .ds-label-compact {
-    font-size: 9.5px;
+    font-size: 0.59375rem;
     text-transform: uppercase;
     letter-spacing: 0.12em;
     color: var(--muted-foreground);
   }
   /* Macro-tile number — one step down from .ds-num-hero, per 3a's grid. */
   .ds-num-tile {
-    font-size: 32px;
+    font-size: 2rem;
     font-weight: 700;
     letter-spacing: -0.03em;
     line-height: 1;
@@ -430,7 +447,7 @@
   /* Turn 4: the single dominant number on a screen (Dashboard's calories,
    * beside the ring meter) — a step up from .ds-num-hero. */
   .ds-num-mega {
-    font-size: 46px;
+    font-size: 2.875rem;
     font-weight: 700;
     letter-spacing: -0.04em;
     line-height: .92;

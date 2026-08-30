@@ -45,7 +45,7 @@ export function MissingBodyMetricsNotice({
     <Card className={className}>
       <CardContent className="p-4">
         <p className="text-sm font-medium">Food targets need your {listPhrase(missing)}</p>
-        <p className="mt-1 text-[13px] leading-normal text-muted-foreground">
+        <p className="mt-1 text-[0.8125rem] leading-normal text-muted-foreground">
           {/* Says what still works, because most of the app does — people
               should not think they have half an app.
 
@@ -69,7 +69,7 @@ export function MissingBodyMetricsNotice({
             Add {listPhrase(missing)}
           </Button>
         ) : (
-          <p className="mt-2 text-[13px] text-muted-foreground">
+          <p className="mt-2 text-[0.8125rem] text-muted-foreground">
             You can add {missing.length === 1 ? 'it' : 'them'} in Profile.
           </p>
         )}
@@ -86,7 +86,7 @@ export function MissingBodyMetricsLine({ profile }: { profile: UserProfile }) {
   const missing = missingBodyMetrics(profile)
   if (missing.length === 0) return null
   return (
-    <p className="text-[13px] text-muted-foreground">
+    <p className="text-[0.8125rem] text-muted-foreground">
       Targets need your {listPhrase(missing)} — add {missing.length === 1 ? 'it' : 'them'} in Profile.
     </p>
   )
