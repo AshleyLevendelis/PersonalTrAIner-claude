@@ -295,5 +295,30 @@ console.log('\n8. The migration is generated, and still matches the schema')
     /DROP POLICY IF EXISTS "anon_select_messages" ON chat_messages;/.test(migration))
 }
 
+console.log('\n9. An attached email can actually sign you back in')
+{
+  // The email prompt shipped first and on its own did NOTHING: it let
+  // somebody attach an account, and there was nowhere to use it. Clear the
+  // browser and the app signed you in anonymously as somebody new, with the
+  // email stored and unreachable — promising a recovery it could not perform.
+  const screen = stripComments(readFileSync(join(ROOT, 'src/components/SignInScreen.tsx'), 'utf8'))
+  check('there is a sign-in screen', screen.length > 0)
+  check('...that actually calls the sign-in path', /signInWithEmail\(email, password\)/.test(screen))
+  check('...and says what signing in gets you back',
+    /plan/.test(screen) && /logged/.test(screen))
+  // Supabase returns the same error for a wrong password and an unknown
+  // address. Passing that through verbatim is unhelpful.
+  check('...and turns the server\'s error into something a person can act on',
+    /don't match an account/.test(screen))
+
+  const app = stripComments(readFileSync(join(ROOT, 'src/App.tsx'), 'utf8'))
+  check('it is reachable at the moment it is needed — before onboarding',
+    /Already have an account\? Sign in/.test(app))
+  check('...and is NOT a wall in front of onboarding',
+    /onCancel=\{\(\) => setSignInOpen\(false\)\}/.test(app))
+  check('...with a successful sign-in restoring the session rather than onboarding',
+    /onSignedIn=\{\(\) => \{ setSignInOpen\(false\); setIsRestoring\(true\); void restoreSession\(\) \}\}/.test(app))
+}
+
 if (failures > 0) { console.error(`\n${failures} failure(s)`); process.exit(1) }
 console.log('\nAll auth and RLS client checks passed.')

@@ -42,6 +42,7 @@ import { checkForWeightBasisOffer, confirmWeightBasisOffer, declineWeightBasisOf
 import { getRevealSpeed, saveRevealSpeed, DEFAULT_REVEAL_SPEED, type RevealSpeed } from '@/lib/reveal-speed-store'
 import { ensureSignedIn, claimProfile, shouldAskForEmail, findOwnedProfileId } from '@/lib/auth'
 import { rebuildFromCurrentWeek, type PlanInvalidation } from '@/lib/plan-invalidation'
+import { SignInScreen } from '@/components/SignInScreen'
 
 // ---------------------------------------------------------------------------
 // SPLIT OUT OF THE MAIN BUNDLE — audit §12, the 1.55 MB single chunk.
@@ -275,6 +276,13 @@ function App() {
    */
   const [planInvalidation, setPlanInvalidation] = useState<PlanInvalidation | null>(null)
   const [rebuilding, setRebuilding] = useState(false)
+  /**
+   * Offered instead of onboarding when this browser has no profile — the one
+   * moment somebody could be looking at a fresh app thinking "but I already
+   * have an account" (audit §1.2). Never a wall: declining starts a new plan
+   * exactly as before.
+   */
+  const [signInOpen, setSignInOpen] = useState(false)
   const [generatingStatus, setGeneratingStatus] = useState('')
   const [exerciseExclusions, setExerciseExclusions] = useState<string[]>([])
   const [profileInfoOpen, setProfileInfoOpen] = useState(false)
@@ -2052,7 +2060,40 @@ function App() {
     // One way in: the conversation. The step-by-step questionnaire and the
     // chooser that offered it were removed — see ConversationalOnboarding's
     // header note for what that means when the coach is unreachable.
-    return <Suspense fallback={<ScreenLoading />}><ConversationalOnboarding onComplete={handleOnboardingComplete} /></Suspense>
+    // The email prompt lets somebody attach an account; without this there was
+    // nowhere to USE it. Clear the browser and the app signed you in
+    // anonymously as somebody new, with the email stored and unreachable —
+    // promising a recovery it could not perform.
+    if (signInOpen) {
+      return (
+        <SignInScreen
+          onCancel={() => setSignInOpen(false)}
+          onSignedIn={() => { setSignInOpen(false); setIsRestoring(true); void restoreSession() }}
+        />
+      )
+    }
+    return (
+      <>
+        <Suspense fallback={<ScreenLoading />}>
+          <ConversationalOnboarding onComplete={handleOnboardingComplete} />
+        </Suspense>
+        {/* Offered BESIDE onboarding rather than in front of it — Ashley's
+            ruling was that nobody is walled behind a login. Rendered here
+            rather than inside ConversationalOnboarding so the conversation
+            itself, and the twenty-odd gates that pin it, are untouched. */}
+        <div
+          className="fixed inset-x-0 z-40 flex justify-center px-4"
+          style={{ bottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}
+        >
+          <button
+            onClick={() => setSignInOpen(true)}
+            className="rounded-full border bg-background/90 px-3 py-1.5 text-xs text-muted-foreground backdrop-blur min-h-[44px]"
+          >
+            Already have an account? Sign in
+          </button>
+        </div>
+      </>
+    )
   }
 
   const totalWeeks = mesocycle.length > 0 ? mesocycle.length : 4
