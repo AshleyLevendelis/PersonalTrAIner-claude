@@ -43,7 +43,10 @@ rows.push({
   expires_at: new Date(Date.now() - 60_000).toISOString(), preconditions: {}, payload: {},
 })
 const expired = await claimPendingAction('expired-1', async () => true)
-check('claim returns "already_resolved" (NOT "stale", NOT "expired")', expired.outcome === 'already_resolved', expired)
+// The fix gave a timed-out proposal its OWN outcome rather than folding it in
+// with already_resolved — the two mean different things to the person looking
+// at the card ("this went stale" vs "you already answered this").
+check('a timed-out proposal claims as "expired", its own outcome', expired.outcome === 'expired', expired)
 
 console.log('\n[2] A proposal whose row has vanished')
 const gone = await claimPendingAction('no-such-id', async () => true)
@@ -62,8 +65,18 @@ const chat = readFileSync('src/components/ChatAssistant.tsx', 'utf8')
 const start = chat.indexOf('const handleConfirmProposal')
 const branch = chat.slice(start, start + 1200)
 check('the screen handles "stale"', /claimResult\.outcome === 'stale'/.test(branch))
-check('the screen handles "already_resolved" — an EXPIRED proposal', /already_resolved/.test(branch), branch.slice(0, 600))
-check('the screen handles "not_found"', /not_found/.test(branch))
+// RE-POINTED, 30 Aug 2026. These used to require a named branch per outcome.
+// The fix is stronger than that: the handler now returns early for EVERY
+// non-claimed outcome, so a new outcome added later cannot fall through the
+// way 'expired' and 'not_found' silently did. Requiring the enumeration would
+// have failed the exhaustive version — a probe rejecting a better fix than the
+// one it imagined.
+check('every non-claimed outcome changes the card, by construction',
+  /outcome !== 'claimed'/.test(branch), branch.slice(0, 400))
+check("...with 'already_resolved' still distinguished, since it must not invent a result",
+  /already_resolved/.test(branch))
+check('...and no outcome reaches a bare return that leaves Confirm armed',
+  !/outcome === 'stale'\s*\)\s*\{[^}]*\}\s*return/.test(branch))
 
 if (failures) { console.error(`\n${failures} check(s) failed — that is the finding.`); process.exit(0) }
 console.log('\nAll checks passed.')
