@@ -24,6 +24,11 @@ import { seededRngFromKey } from '../src/lib/seeded-random'
 import { EXERCISE_DATABASE, contraindicatedJoints, isIndicatedFor } from '../src/lib/exercise-db'
 import { INJURY_OPTIONS } from '../src/lib/onboarding-slots'
 import type { UserProfile, EquipmentAccess } from '../src/lib/types'
+import { readFileSync } from 'fs'
+import { join, dirname } from 'path'
+import { fileURLToPath } from 'url'
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 
 let failures = 0
 const check = (l: string, ok: boolean, extra?: unknown) => {
@@ -207,6 +212,45 @@ console.log('\n5. How MUCH each injury removes, frozen')
   check('no injury quietly started removing more or less', drift.length === 0, drift)
   check('...and every code is accounted for', Object.keys(AT_THE_FIX).length === CODES.length,
     { frozen: Object.keys(AT_THE_FIX).length, codes: CODES.length })
+}
+
+console.log('\n6. The COACH offers every area the plan engine can handle\n')
+{
+  // The same failure as a missing map entry, one layer out: an injury the
+  // app collects, stores and can act on, that the coach refuses to act on.
+  //
+  // This is what it looked like. Hips, ankles and elbows were wired into
+  // INJURED_JOINTS (they remove 11, 10 and 11 exercises — section 2 above
+  // measures it), and chat-gemini's two injury tools still enumerated five
+  // areas and still told the model "only these 5 have joint-conflict data".
+  // So a user said "my hip's been bothering me" and the coach answered that
+  // it couldn't adjust for that — a sentence that had been true once and had
+  // quietly stopped being true. It sat in a DEPLOYED edge function, where
+  // nothing in this repo's test suite was looking.
+  const chat = readFileSync(join(ROOT, 'supabase/functions/chat-gemini/index.ts'), 'utf8')
+  const enums = [...chat.matchAll(/affected_area:[\s\S]{0,120}?enum: \[([^\]]+)\]/g)]
+    .map(m => m[1].split(',').map(v => v.trim().replace(/^"|"$/g, '')))
+  check('all three injury tools declare an affected_area enum', enums.length === 3, enums.length)
+  for (const [i, list] of enums.entries()) {
+    const missing = CODES.filter(c => !list.includes(c))
+    const extra = list.filter(c => !CODES.includes(c))
+    check(`injury tool ${i + 1} offers exactly the codes the engine maps`,
+      missing.length === 0 && extra.length === 0, { missing, extra })
+  }
+  // The prose has to move with the enum, or the model is told one thing and
+  // handed another — which is how it went wrong the first time.
+  check('no surviving claim that only five areas are supported',
+    !/only these 5 have joint-conflict data/.test(chat))
+  // Parse the slash-separated list ITSELF, not "does this code appear
+  // somewhere on that line". The first version of this check did the latter
+  // and passed while the list said five, because the sentence explaining the
+  // old bug names hips, ankles and elbows a few words later — a check
+  // satisfied by its own explanation, which is the exact shape this codebase
+  // keeps producing.
+  const listed = /affected_area accepts ([a-z_/]+) on EITHER tool/.exec(chat)?.[1]?.split('/') ?? []
+  check('...and the system prompt lists exactly the same eight',
+    CODES.every(c => listed.includes(c)) && listed.length === CODES.length,
+    { listed, expected: CODES })
 }
 
 if (failures > 0) { console.error(`\n${failures} check(s) failed`); process.exit(1) }

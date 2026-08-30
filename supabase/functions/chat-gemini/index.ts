@@ -346,14 +346,14 @@ const toolDeclarations = [
   {
     name: "propose_injury_adaptation",
     description:
-      "PROPOSES a time-bounded plan adaptation for a MANAGEABLE, PLAN-RELEVANT injury (soreness/pain the user wants to ease off, not ordinary soreness and not something needing a professional — see the SCOPE section for that line). This does NOT apply anything — the app shows a card with every touched exercise's before/after and the user taps Confirm. Only call this once you know BOTH the affected area (one of the 5 mapped codes) AND how long to ease off for. Never call this for sharp/joint/one-sided/worsening pain — redirect to a professional instead, no tool call.",
+      "PROPOSES a time-bounded plan adaptation for a MANAGEABLE, PLAN-RELEVANT injury (soreness/pain the user wants to ease off, not ordinary soreness and not something needing a professional — see the SCOPE section for that line). This does NOT apply anything — the app shows a card with every touched exercise's before/after and the user taps Confirm. Only call this once you know BOTH the affected area (one of the eight mapped codes) AND how long to ease off for. Never call this for sharp/joint/one-sided/worsening pain — redirect to a professional instead, no tool call.",
     parameters: {
       type: "object",
       properties: {
         affected_area: {
           type: "string",
-          enum: ["lower_back", "knees", "shoulders", "neck", "wrists"],
-          description: "The body part to ease off — only these 5 have joint-conflict data; if the user describes pain elsewhere, do not call this tool, say plainly you can't auto-adjust for that area yet and offer a manual propose_exercise_swap instead.",
+          enum: ["lower_back", "knees", "shoulders", "neck", "wrists", "hips", "ankles", "elbows"],
+          description: "The body part to ease off — these eight are the areas the plan engine has joint-conflict data for (INJURED_JOINTS in exercise-plan.ts; test:injury-coverage proves each one measurably changes a plan). If the user describes pain somewhere else, do not call this tool: say plainly you can't auto-adjust for that area yet and offer a manual propose_exercise_swap instead.",
         },
         duration_days: {
           type: "number",
@@ -380,8 +380,8 @@ const toolDeclarations = [
       properties: {
         affected_area: {
           type: "string",
-          enum: ["lower_back", "knees", "shoulders", "neck", "wrists"],
-          description: "The body part — only these 5 have joint-conflict data; if the user describes pain elsewhere, do not call this tool, say plainly you can't auto-adjust for that area yet and offer a manual propose_exercise_swap instead.",
+          enum: ["lower_back", "knees", "shoulders", "neck", "wrists", "hips", "ankles", "elbows"],
+          description: "The body part — these eight are the areas the plan engine has joint-conflict data for. If the user describes pain somewhere else, do not call this tool: say plainly you can't auto-adjust for that area yet and offer a manual propose_exercise_swap instead.",
         },
         reason: {
           type: "string",
@@ -404,7 +404,7 @@ const toolDeclarations = [
       properties: {
         affected_area: {
           type: "string",
-          enum: ["lower_back", "knees", "shoulders", "neck", "wrists"],
+          enum: ["lower_back", "knees", "shoulders", "neck", "wrists", "hips", "ankles", "elbows"],
           description: "The body part that's recovered.",
         },
         origin_verbatim_quote: {
@@ -1173,7 +1173,7 @@ When the user says something hurts ("my shoulder's been aching since Tuesday", "
 - Before asking how long, listen for whether this reads as a passing niggle or something lasting — words like "chronic," "old injury," "never fully healed," "flares up," "I've done my [body part]," or no expected end in sight. If it's ambiguous, fold the check into the SAME next question rather than adding a turn: "How long do you want to ease off — a few days, a week or two, or is this something ongoing you'd like the plan to just work around from now on?"
   - Time-bounded answer (a few days, a week, two weeks) → propose_injury_adaptation with affected_area + duration_days, same as always. It's time-bounded and reverts automatically — mention this once ("it'll ease back to normal after that, or tell me anytime to end it early"), don't repeat it every turn.
   - Lasting/ongoing answer → propose_injury_as_lasting with affected_area + reason instead. This adjusts the current plan AND adds it to their injuries so future plans avoid it too — say so once, plainly, e.g. "I'll adjust your plan for this and add it to your injuries so it's accounted for going forward." Never call both tools for the same report.
-- affected_area only accepts lower_back/knees/shoulders/neck/wrists on EITHER tool — these are the only areas with joint-conflict data to filter against. If the user describes pain somewhere else, say plainly you can't auto-adjust the plan for that area yet, and offer a manual swap (propose_exercise_swap) for the specific exercise bothering them instead.
+- affected_area accepts lower_back/knees/shoulders/neck/wrists/hips/ankles/elbows on EITHER tool — these eight are the areas with joint-conflict data to filter against. (This list said five for a while after hips, ankles and elbows were wired up, so the coach refused three injuries the app could already handle. If you are ever unsure whether an area is supported, the enum on the tool is the truth.) If the user describes pain somewhere else, say plainly you can't auto-adjust the plan for that area yet, and offer a manual swap (propose_exercise_swap) for the specific exercise bothering them instead.
 
 === 3c. INJURY RECOVERY (propose_injury_recovered) ===
 When the user says a lasting injury has resolved ("my shoulder's fine now", "knee's back to normal", "I don't need to work around my back anymore"), call propose_injury_recovered with the affected_area. Say plainly what this does and doesn't do: it stops FUTURE plans from avoiding that area — it does NOT undo any exercise already swapped out for it, those stay as they are unless they ask for a manual swap back. If there's nothing currently listed for that area, the app will tell you rather than you having to check first.
