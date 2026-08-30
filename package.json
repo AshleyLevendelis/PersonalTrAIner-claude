@@ -136,6 +136,7 @@
     "verify:tap-targets": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/tap-targets.mjs",
     "verify:reveal": "vite build --config .tw-harness/vite.config.ts && node .tw-harness/measure.mjs",
     "report:frozen-weeks": "tsx scripts/report-frozen-weeks.ts",
+    "report:timefit-recovery": "tsx scripts/report-timefit-recovery.ts",
     "report:rehab-coverage": "tsx scripts/report-rehab-coverage.ts",
     "report:trim-magnitude": "tsx scripts/run-trim-magnitude-report.ts",
     "test:proposal-expiry": "tsx scripts/test-proposal-expiry.ts",
