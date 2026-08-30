@@ -86,6 +86,24 @@ function App() {
   // re-ask forever, or (worse, for the weight-basis offer) look answered
   // while nothing had been decided.
   const [adaptationMessages, setAdaptationMessages] = useState<{ text: string; goalId?: string; loadSuggestionId?: string; weightBasisOfferId?: string }[]>([])
+  /**
+   * "That didn't save" — the one place a tap-driven mutation on this screen
+   * reports a write that failed.
+   *
+   * Audit §3.1/§3.2: swapping an exercise and banning one both updated the
+   * screen first and then sent the write, and a failed write went to
+   * console.error and nowhere else. The change sat there looking applied for
+   * the rest of the session and was gone on the next reload. The SAME swap
+   * made through the chat already did this correctly — it returns a receipt
+   * and the card says "Couldn't apply the swap" — so the app had one honest
+   * door and one dishonest one onto the same action.
+   *
+   * Deliberately its own state rather than another adaptationMessages entry:
+   * those are the coach's voice ("tone=ai"), and a failure is not a coaching
+   * insight. Kept as a single slot, not a queue — two failed writes in a row
+   * mean the connection is down, and saying so twice adds nothing.
+   */
+  const [writeError, setWriteError] = useState<string | null>(null)
   /** Which load_suggestions row a Confirm/Decline tap is currently in flight for — disables both buttons on that one banner only. */
   const [loadSuggestionBusy, setLoadSuggestionBusy] = useState<string | null>(null)
   /** When the CURRENT mesocycle was generated — anchors live-week detection (falls back to profile.created_at for legacy profiles without persisted weeks). */
@@ -1524,17 +1542,30 @@ function App() {
     // read-modify-write of a shared array cell, so there's nothing left to
     // clobber and nothing to read fresh before appending to.
     if (compiledExerciseExclusions.includes(exerciseName)) return
-    await createFact({
-      profileId: profile.id,
-      kind: 'exercise_preference',
-      source: 'manual',
-      rawPhrase: exerciseName,
-      displayText: `won't eat/do ${exerciseName}`,
-      polarity: 'dislike',
-      hardness: 'hard',
-      resolvedRefs: [exerciseName],
-    })
-    await reloadMemory(profile.id)
+    // Audit §3.2 — this write had NO error handling at all. Offline it threw,
+    // the handler stopped here before changing anything, and the rejection
+    // went nowhere: no ban, no error, no visual change whatsoever. The user
+    // tapped "never show me this again" and the app simply ignored them,
+    // which is the worst of the three possible outcomes because it gives
+    // them nothing to react to.
+    try {
+      await createFact({
+        profileId: profile.id,
+        kind: 'exercise_preference',
+        source: 'manual',
+        rawPhrase: exerciseName,
+        displayText: `won't eat/do ${exerciseName}`,
+        polarity: 'dislike',
+        hardness: 'hard',
+        resolvedRefs: [exerciseName],
+      })
+      await reloadMemory(profile.id)
+    } catch (err) {
+      console.error('Recording the ban failed:', err)
+      setWriteError(`Couldn't save that — ${exerciseName} hasn't been removed. Check your connection and try again.`)
+      return
+    }
+    setWriteError(null)
     const updated = [...new Set([...compiledExerciseExclusions, exerciseName])]
 
     // Single source of truth is the mesocycle — exercisePlan (the flat,
@@ -1555,7 +1586,13 @@ function App() {
         // live-week detection to week 1.
         await saveMesocycle(profile.id, updatedMesocycle, mesocycleCreatedAt ?? profile.created_at)
       } catch (err) {
+        // The preference row above DID land, so the ban itself is real and
+        // survives — it is only this plan's rewrite that failed. Say exactly
+        // that rather than the generic "didn't save", which would send
+        // someone off to re-tap a button that already worked.
         console.error('Persisting ban failed:', err)
+        setMesocycle(mesocycle)
+        setWriteError(`${exerciseName} won't be picked again, but this plan couldn't be updated — reopen the app to retry.`)
       }
     }
   }
@@ -1601,8 +1638,15 @@ function App() {
       // a second earlier." Same scope_key prefix the chat swap proposal
       // uses (buildExerciseSwapProposal, ChatAssistant.tsx).
       await sweepStaleForTarget(profile.id, `${profile.id}:propose_exercise_swap:${dayName}:${exIndex}`)
+      setWriteError(null)
     } catch (err) {
+      // Audit §3.1 — this used to be console.error alone, so a swap that
+      // never reached the database looked identical to one that did until
+      // the next reload put the old exercise back. Put the screen back to
+      // the truth AND say so: a silent revert is its own small betrayal.
       console.error('Persisting swap failed:', err)
+      setMesocycle(mesocycle)
+      setWriteError("That swap didn't save — check your connection and try again.")
     }
   }
 
@@ -1905,6 +1949,18 @@ function App() {
       </div>
 
       <main className="max-w-6xl mx-auto px-4 pt-12 pb-28 space-y-6">
+        {writeError && (
+          <InsightBanner tone="warning" className="items-start justify-between">
+            <span>{writeError}</span>
+            <button
+              type="button"
+              onClick={() => setWriteError(null)}
+              className="shrink-0 text-xs font-semibold underline opacity-80 hover:opacity-100"
+            >
+              Dismiss
+            </button>
+          </InsightBanner>
+        )}
         {adaptationMessages.length > 0 && (
           <div className="space-y-2">
             {adaptationMessages.map((msg, i) => (

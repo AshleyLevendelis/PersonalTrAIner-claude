@@ -1,12 +1,29 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Zap, RefreshCw, CheckCircle2, AlertTriangle, X, RotateCcw, Trash2 } from 'lucide-react'
+import { subscribeSyncState, type SyncState } from '@/lib/set-log-store'
 import {
-  subscribeSyncState, getDeadLetterItems, retryDeadLetterItem, discardDeadLetterItem,
-  type SyncState, type DeadLetterSummary,
-} from '@/lib/set-log-store'
+  getAllFailedItems, retryFailedItem, discardFailedItem, subscribeAllQueues,
+  QUEUE_LABEL, type FailedItem,
+} from '@/lib/queue-health'
+
+// ---------------------------------------------------------------------------
+// Audit §3.5 — this used to read ONE of the five local-first queues.
+//
+// It subscribed to set-log-store and listed set-log-store's dead letters, so
+// water, grocery items, cardio logs and meal events could each exhaust their
+// retries and be dropped for good with no indicator anywhere in the app. The
+// badge said "3 sets failed to sync" while a week of water was quietly gone.
+//
+// It now reads all five through queue-health, which is a reader over the
+// stores rather than a second queue — each store still owns its own retry and
+// discard. set-log-store's subscribeSyncState stays the primary signal
+// because it is the only one carrying online/syncing/queued counts; the other
+// four are subscribed for repaints so a water failure updates the badge
+// without waiting for an unrelated set to be logged.
+// ---------------------------------------------------------------------------
 
 export function OfflineStatusIndicator() {
   const [state, setState] = useState<SyncState>({
@@ -17,10 +34,12 @@ export function OfflineStatusIndicator() {
   })
   const [showSyncSuccess, setShowSyncSuccess] = useState(false)
   const [reviewOpen, setReviewOpen] = useState(false)
-  const [deadLetterItems, setDeadLetterItems] = useState<DeadLetterSummary[]>([])
+  const [failedItems, setFailedItems] = useState<FailedItem[]>([])
+
+  const refreshFailures = useCallback(() => setFailedItems(getAllFailedItems()), [])
 
   useEffect(() => {
-    const unsub = subscribeSyncState((newState) => {
+    const unsubSync = subscribeSyncState((newState) => {
       setState(prev => {
         if (prev.queuedCount > 0 && newState.queuedCount === 0 && !newState.isSyncing && prev.isSyncing) {
           setShowSyncSuccess(true)
@@ -28,19 +47,24 @@ export function OfflineStatusIndicator() {
         }
         return newState
       })
-      setDeadLetterItems(getDeadLetterItems())
+      refreshFailures()
     })
-    return unsub
-  }, [])
+    const unsubOthers = subscribeAllQueues(refreshFailures)
+    // The other four queues can already hold failures from a previous
+    // session, and none of them fires on mount — without this read the badge
+    // stays hidden until something unrelated happens.
+    refreshFailures()
+    return () => { unsubSync(); unsubOthers() }
+  }, [refreshFailures])
 
-  const handleRetry = (clientId: string) => {
-    retryDeadLetterItem(clientId)
-    setDeadLetterItems(getDeadLetterItems())
+  const handleRetry = (item: FailedItem) => {
+    retryFailedItem(item)
+    refreshFailures()
   }
 
-  const handleDiscard = (clientId: string) => {
-    discardDeadLetterItem(clientId)
-    setDeadLetterItems(getDeadLetterItems())
+  const handleDiscard = (item: FailedItem) => {
+    discardFailedItem(item)
+    refreshFailures()
   }
 
   const reviewPanel = reviewOpen && (
@@ -50,36 +74,32 @@ export function OfflineStatusIndicator() {
           <div className="flex items-center justify-between">
             <span className="text-sm font-semibold flex items-center gap-1.5">
               <AlertTriangle className="size-3.5 text-red-500" />
-              Sets that failed to sync
+              Didn't save
             </span>
             <Button variant="ghost" size="icon" className="hit-slop-44 size-6" onClick={() => setReviewOpen(false)}>
               <X className="size-3.5" />
             </Button>
           </div>
-          {deadLetterItems.length === 0 ? (
+          {failedItems.length === 0 ? (
             <p className="text-xs text-muted-foreground py-2">Nothing pending — all clear.</p>
           ) : (
             <div className="space-y-2">
-              {deadLetterItems.map(item => (
-                <div key={item.clientId} className="rounded-md border border-red-200 dark:border-red-900/40 bg-red-50/50 dark:bg-red-950/20 p-2 space-y-1">
+              {failedItems.map(item => (
+                <div key={`${item.queue}:${item.clientId}`} className="rounded-md border border-red-200 dark:border-red-900/40 bg-red-50/50 dark:bg-red-950/20 p-2 space-y-1">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-medium truncate">
-                      {item.exerciseName} — set {item.setNumber}
-                    </span>
-                    <span className="text-[10px] text-muted-foreground shrink-0">{item.date}</span>
+                    <span className="text-xs font-medium truncate">{item.label}</span>
+                    {item.date && <span className="text-[10px] text-muted-foreground shrink-0">{item.date}</span>}
                   </div>
-                  {item.kind === 'upsert' && (
-                    <p className="text-[10px] text-muted-foreground">
-                      {item.weightKg}kg × {item.repsCompleted}
-                    </p>
-                  )}
+                  {/* Which queue it came from, because "500 ml" and "Chest Dips
+                      · set 3" in one list need saying apart. */}
+                  <p className="text-[10px] text-muted-foreground">{QUEUE_LABEL[item.queue]}</p>
                   <p className="text-[10px] text-red-700 dark:text-red-400">{item.errorMessage}</p>
                   <div className="flex gap-3 pt-0.5">
-                    <Button variant="outline" size="sm" className="hit-slop-44 h-6 text-[10px] px-2 gap-1" onClick={() => handleRetry(item.clientId)}>
+                    <Button variant="outline" size="sm" className="hit-slop-44 h-6 text-[10px] px-2 gap-1" onClick={() => handleRetry(item)}>
                       <RotateCcw className="size-2.5" />
                       Retry
                     </Button>
-                    <Button variant="outline" size="sm" className="hit-slop-44 h-6 text-[10px] px-2 gap-1 text-destructive hover:text-destructive" onClick={() => handleDiscard(item.clientId)}>
+                    <Button variant="outline" size="sm" className="hit-slop-44 h-6 text-[10px] px-2 gap-1 text-destructive hover:text-destructive" onClick={() => handleDiscard(item)}>
                       <Trash2 className="size-2.5" />
                       Discard
                     </Button>
@@ -110,17 +130,19 @@ export function OfflineStatusIndicator() {
     )
   }
 
-  if (state.deadLetterCount > 0) {
+  // Counted from every queue, not from set-log-store's own deadLetterCount —
+  // that number is the reason four fifths of the failures were invisible.
+  if (failedItems.length > 0) {
     return (
       <>
-        <button onClick={() => setReviewOpen(true)} aria-label="Review sets that failed to sync">
+        <button onClick={() => setReviewOpen(true)} aria-label="Review things that didn't save">
           <Badge
             variant="secondary"
             className="gap-1.5 bg-red-50 text-red-700 border-red-200 dark:bg-red-950/50 dark:text-red-300 dark:border-red-800 cursor-pointer hover:bg-red-100 dark:hover:bg-red-950/70"
           >
             <AlertTriangle className="h-3 w-3" />
             <span>
-              {state.deadLetterCount} set{state.deadLetterCount !== 1 ? 's' : ''} failed to sync — tap to review
+              {failedItems.length} thing{failedItems.length !== 1 ? 's' : ''} didn't save — tap to review
             </span>
           </Badge>
         </button>

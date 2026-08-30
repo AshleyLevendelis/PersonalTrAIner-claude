@@ -14,6 +14,7 @@ import type { PoolOption } from '@/lib/meal-generation'
 import { calculateWeeklySchedule, getMacroDerivation } from '@/lib/macro-calculator'
 import { MissingBodyMetricsNotice } from '@/components/MissingBodyMetricsNotice'
 import { getStepsForDate, logStepsManual, type DailyStepsRow } from '@/lib/steps-store'
+import { InsightBanner } from '@/components/ui/insight-banner'
 import { stepsTargetFor } from '@/lib/steps-target'
 
 const WATER_QUICK_ADD_ML = [250, 500]
@@ -160,11 +161,28 @@ export function NutritionDisplay({
     void getStepsForDate(profileId, date).then(setStepsRow).catch(() => setStepsRow(null))
   }, [profileId, date])
 
+  /**
+   * Audit §3.3 — this had no error handling. Offline, logStepsManual threw,
+   * the rejection went nowhere, and the number simply never saved with
+   * nothing said. The only clue was that the typed value stayed in the box,
+   * which reads as "nothing happened yet" rather than "that failed".
+   *
+   * The input is deliberately NOT cleared on failure: it is the user's
+   * number, and making them type it again would be the second small
+   * unkindness after losing it the first time.
+   */
+  const [entryError, setEntryError] = useState<string | null>(null)
   const handleLogSteps = async () => {
     const n = Number(stepsInput)
     if (!profileId || !Number.isFinite(n) || n < 0) return
-    setStepsRow(await logStepsManual(profileId, date, Math.round(n)))
-    setStepsInput('')
+    try {
+      setStepsRow(await logStepsManual(profileId, date, Math.round(n)))
+      setStepsInput('')
+      setEntryError(null)
+    } catch (err) {
+      console.error('Logging steps failed:', err)
+      setEntryError("Couldn't save your steps — check your connection and tap Log again.")
+    }
   }
 
   useEffect(() => {
@@ -198,9 +216,20 @@ export function NutritionDisplay({
   const handleSaveWaterTarget = async () => {
     const n = Number(waterTargetInput)
     if (!profileId || !Number.isFinite(n) || n <= 0) { setEditingWaterTarget(false); return }
+    const previous = waterTarget
     setWaterTarget(n)
     setEditingWaterTarget(false)
-    await setWaterTargetMl(profileId, n)
+    try {
+      await setWaterTargetMl(profileId, n)
+      setEntryError(null)
+    } catch (err) {
+      // Same shape as the steps entry above — optimistic on screen, but put
+      // back and said out loud when the write doesn't land, rather than
+      // leaving a target that looks set and is gone on the next load.
+      console.error('Saving the water target failed:', err)
+      setWaterTarget(previous)
+      setEntryError("Couldn't save that target — check your connection and try again.")
+    }
   }
 
   // Fires on the CROSSING, not on the state. `wasComplete` starts as null and
@@ -393,6 +422,18 @@ export function NutritionDisplay({
         <p className="text-[11px] leading-[1.4] text-muted-foreground">
           Target from the activity level your calorie target uses — override it in your profile.
         </p>
+        {entryError && (
+          <InsightBanner tone="warning" className="items-start justify-between">
+            <span>{entryError}</span>
+            <button
+              type="button"
+              onClick={() => setEntryError(null)}
+              className="shrink-0 text-xs font-semibold underline opacity-80 hover:opacity-100"
+            >
+              Dismiss
+            </button>
+          </InsightBanner>
+        )}
       </div>
 
       <MealPlan

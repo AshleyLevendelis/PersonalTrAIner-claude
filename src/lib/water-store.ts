@@ -86,6 +86,59 @@ export function subscribeWaterStore(fn: () => void): () => void {
   return () => { listeners = listeners.filter(l => l !== fn) }
 }
 
+// ---------------------------------------------------------------------------
+// Dead-letter surface (audit §3.5)
+//
+// This queue could exhaust its five attempts and drop a log permanently with
+// NOTHING shown anywhere in the app. Four of the five local-first queues were
+// in that state; only logged sets had a screen. The trio below mirrors
+// set-log-store's exactly so one indicator can read every queue through the
+// same shape, while each store still owns its own key and its own op format —
+// the alternative, an indicator that reached into five different localStorage
+// layouts itself, is five copies of a rule waiting to drift.
+// ---------------------------------------------------------------------------
+
+/** Display-friendly summary of a permanently-failed water op. */
+export interface WaterDeadLetterSummary {
+  clientId: string
+  label: string
+  date: string
+  reason: DeadLetterItem['reason']
+  errorMessage: string
+  failedAt: string
+}
+
+export function getDeadLetterItems(): WaterDeadLetterSummary[] {
+  return loadDeadLetter().map(i => ({
+    clientId: opId(i.op),
+    label: i.op.kind === 'upsert' ? `${i.op.log.amountMl} ml` : 'Removed log',
+    date: i.op.kind === 'upsert' ? i.op.log.date : '',
+    reason: i.reason,
+    errorMessage: i.errorMessage,
+    failedAt: i.failedAt,
+  }))
+}
+
+/** Re-queues a failed op with its attempt count zeroed, then kicks a flush. */
+export function retryDeadLetterItem(clientId: string): void {
+  const items = loadDeadLetter()
+  const item = items.find(i => opId(i.op) === clientId)
+  if (!item) return
+  saveDeadLetter(items.filter(i => i !== item))
+  const fresh: PendingOp = item.op.kind === 'upsert'
+    ? { kind: 'upsert', log: { ...item.op.log, attempts: 0 } }
+    : { kind: 'delete', del: { ...item.op.del, attempts: 0 } }
+  savePending([...loadPending().filter(o => opId(o) !== clientId), fresh])
+  notifyListeners()
+  void flushPending()
+}
+
+/** Permanently discards a failed op — the user chose not to retry it. */
+export function discardDeadLetterItem(clientId: string): void {
+  saveDeadLetter(loadDeadLetter().filter(i => opId(i.op) !== clientId))
+  notifyListeners()
+}
+
 function pendingLogToRow(log: PendingLog): WaterLogRow {
   return { id: log.id, profile_id: log.profileId, date: log.date, amount_ml: log.amountMl, source: log.source, client_id: log.id, created_at: log.createdAt }
 }

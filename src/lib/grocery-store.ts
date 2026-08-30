@@ -163,6 +163,51 @@ export function subscribeGroceryStore(fn: () => void): () => void {
 }
 
 // ---------------------------------------------------------------------------
+// Dead-letter surface (audit §3.5) — same trio as set-log-store and
+// water-store, so one indicator can read every queue through one shape while
+// each store keeps its own key and op format.
+// ---------------------------------------------------------------------------
+
+/** Display-friendly summary of a permanently-failed grocery op. */
+export interface GroceryDeadLetterSummary {
+  clientId: string
+  label: string
+  reason: DeadLetterItem['reason']
+  errorMessage: string
+  failedAt: string
+}
+
+export function getDeadLetterItems(): GroceryDeadLetterSummary[] {
+  return loadDeadLetter().map(i => ({
+    clientId: opId(i.op),
+    label: i.op.kind === 'upsert'
+      ? `${i.op.item.quantity}${i.op.item.unit} ${i.op.item.displayName}`.trim()
+      : 'Removed item',
+    reason: i.reason,
+    errorMessage: i.errorMessage,
+    failedAt: i.failedAt,
+  }))
+}
+
+export function retryDeadLetterItem(clientId: string): void {
+  const items = loadDeadLetter()
+  const item = items.find(i => opId(i.op) === clientId)
+  if (!item) return
+  saveDeadLetter(items.filter(i => i !== item))
+  const fresh: PendingOp = item.op.kind === 'upsert'
+    ? { kind: 'upsert', item: { ...item.op.item, attempts: 0 } }
+    : { kind: 'delete', del: { ...item.op.del, attempts: 0 } }
+  savePending([...loadPending().filter(o => opId(o) !== clientId), fresh])
+  notifyListeners()
+  void flushPending()
+}
+
+export function discardDeadLetterItem(clientId: string): void {
+  saveDeadLetter(loadDeadLetter().filter(i => opId(i.op) !== clientId))
+  notifyListeners()
+}
+
+// ---------------------------------------------------------------------------
 // food-db resolution + category mapping (shared by generation and by the
 // chat/manual add paths, so both land on the same canonical_key and merge)
 // ---------------------------------------------------------------------------

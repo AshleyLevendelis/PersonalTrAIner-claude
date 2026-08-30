@@ -267,6 +267,8 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
   const [editValue, setEditValue] = useState('')
   const [loading, setLoading] = useState(false)
   const [armedDeleteKey, setArmedDeleteKey] = useState<string | null>(null)
+  /** One place this screen reports a write that didn't land — savePatch's revert, and the six memory edit/delete handlers below. Declared here with the rest of the state rather than beside its first user, because it now has six. */
+  const [saveError, setSaveError] = useState<string | null>(null)
   const armedDeleteTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const appearance = useAppearance()
@@ -303,22 +305,51 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
   const startEdit = (id: string, current: string) => { setEditingId(id); setEditValue(current) }
   const cancelEdit = () => { setEditingId(null); setEditValue('') }
 
-  const saveFactEdit = async (id: string) => {
-    await supabase.from('user_facts').update({ display_text: editValue }).eq('id', id)
+  /**
+   * Audit §3.4 — these three ignored the error the update returns. Supabase
+   * does not throw on a failed write; it hands back `{ error }`, which was
+   * dropped. reload() then refetched and the user's correction silently
+   * reverted on screen with no explanation. Not a lie, but this is the one
+   * place someone goes to fix what the coach believes about them, and
+   * "your edit vanished" is a bad thing to leave them guessing about.
+   */
+  const saveMemoryEdit = async (
+    table: 'user_facts' | 'user_goals' | 'user_context_facts',
+    id: string,
+    noun: string,
+  ) => {
+    const { error } = await supabase.from(table).update({ display_text: editValue }).eq('id', id)
+    if (error) {
+      console.error(`Editing ${noun} failed:`, error)
+      setSaveError(`Couldn't save that ${noun} — check your connection and try again.`)
+      return
+    }
+    setSaveError(null)
     cancelEdit(); await reload(); await onMemoryChanged()
   }
-  const saveGoalEdit = async (id: string) => {
-    await supabase.from('user_goals').update({ display_text: editValue }).eq('id', id)
-    cancelEdit(); await reload(); await onMemoryChanged()
-  }
-  const saveContextEdit = async (id: string) => {
-    await supabase.from('user_context_facts').update({ display_text: editValue }).eq('id', id)
-    cancelEdit(); await reload(); await onMemoryChanged()
-  }
+  const saveFactEdit = (id: string) => saveMemoryEdit('user_facts', id, 'note')
+  const saveGoalEdit = (id: string) => saveMemoryEdit('user_goals', id, 'goal')
+  const saveContextEdit = (id: string) => saveMemoryEdit('user_context_facts', id, 'note')
 
-  const deleteFact = async (id: string) => { await deleteFactPermanently(id); await reload(); await onMemoryChanged() }
-  const deleteGoal = async (id: string) => { await deleteGoalPermanently(id); await reload(); await onMemoryChanged() }
-  const deleteContext = async (id: string) => { await deleteContextFactPermanently(id); await reload(); await onMemoryChanged() }
+  /**
+   * The delete helpers DO throw (memory-store checks the error and rethrows),
+   * so these were failing loudly into an unhandled rejection — invisible to
+   * the user in exactly the same way. Same treatment: the row stays, and the
+   * screen says why.
+   */
+  const runDelete = async (fn: () => Promise<void>, noun: string) => {
+    try {
+      await fn()
+      setSaveError(null)
+      await reload(); await onMemoryChanged()
+    } catch (err) {
+      console.error(`Deleting ${noun} failed:`, err)
+      setSaveError(`Couldn't remove that ${noun} — check your connection and try again.`)
+    }
+  }
+  const deleteFact = (id: string) => runDelete(() => deleteFactPermanently(id), 'note')
+  const deleteGoal = (id: string) => runDelete(() => deleteGoalPermanently(id), 'goal')
+  const deleteContext = (id: string) => runDelete(() => deleteContextFactPermanently(id), 'note')
 
   /** Armed-then-confirm delete (no window.confirm — clashes with the app's
    * themed UI and is silently suppressible in PWA contexts). First tap arms
@@ -384,7 +415,6 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
   // patch back to the pre-edit values (read from `profile`, captured before
   // the optimistic apply) and surfaces a dismissible error, matching every
   // other confirm-action in this app.
-  const [saveError, setSaveError] = useState<string | null>(null)
   const savePatch = (patch: Partial<UserProfile>) => {
     if (!profileId) return
     const revertPatch = Object.fromEntries(
