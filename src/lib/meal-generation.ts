@@ -132,6 +132,7 @@ async function requestProposals(
   favoriteCuisines: string[],
   dislikedFoods: string[],
   breakfastStyle: BreakfastStyle | undefined,
+  profileId: string,
 ): Promise<RawProposal[]> {
   const slots = (Object.entries(slotCounts) as [MealSlotName, number][])
     .filter(([, count]) => count > 0)
@@ -165,6 +166,10 @@ async function requestProposals(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
+        // Keys the per-caller side of the spend cap (audit §1.3). Without it
+        // every request from every user counts against one shared IP bucket,
+        // which would throttle a household or an office off one person's use.
+        profile_id: profileId,
         slots,
         dietary_preferences: dietaryPreferences,
         cooking_time_preference: cookingTimePreference,
@@ -489,6 +494,7 @@ export async function generateMealPools(params: {
         params.favoriteCuisines ?? [],
         params.dislikedFoods ?? [],
         params.breakfastStyle,
+        params.profileId,
       )
       generatorReached = true
     } catch (err) {

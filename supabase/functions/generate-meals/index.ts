@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { GEMINI_MODEL } from "../_shared/gemini.ts";
+import { checkSpendCap, MEALS_CAP } from '../_shared/spend-cap.ts';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -240,7 +241,12 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const { slots, dietary_preferences, cooking_time_preference, favorite_cuisines, disliked_foods, breakfast_style } = await req.json();
+    const { slots, dietary_preferences, cooking_time_preference, favorite_cuisines, disliked_foods, breakfast_style, profile_id } = await req.json();
+
+    // Audit §1.3. Generation is the most expensive call per request of the
+    // four, so it gets the tightest burst window.
+    const cap = await checkSpendCap(req, MEALS_CAP, corsHeaders, profile_id);
+    if (cap.response) return cap.response;
 
     if (!Array.isArray(slots) || slots.length === 0) {
       return new Response(

@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { GEMINI_MODEL } from "../_shared/gemini.ts";
 import { computeMealMacros, type MealIngredientLine } from "../_shared/food-db.ts";
 import { classifyImperative } from "../_shared/imperative-classifier.ts";
+import { checkSpendCap, CHAT_CAP } from "../_shared/spend-cap.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -1004,6 +1005,13 @@ Deno.serve(async (req: Request) => {
 
   try {
     const { message, history, context } = await req.json();
+
+    // Audit §1.3 — a ceiling before any model call. The profile id keys the
+    // per-caller counter; a request without one falls back to the client IP
+    // inside checkSpendCap. See _shared/spend-cap.ts for why the durable
+    // layer fails open and the in-memory one does not.
+    const cap = await checkSpendCap(req, CHAT_CAP, corsHeaders, context?.profile_id);
+    if (cap.response) return cap.response;
 
     if (!message || typeof message !== "string") {
       return new Response(
