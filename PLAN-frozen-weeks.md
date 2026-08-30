@@ -78,20 +78,39 @@ now says the estimate has run out, and asks for the one thing that changes it.
 Not one prescribed weight moved: verified across 6,860 prescriptions, 3,272 of
 them carrying a real load, byte-identical before and after.
 
-**NOT built, and it needs its own plan.** The second half of Ashley's option —
-a logged set re-anchoring the ramp so the weight climbs again — is a change to
-where load prescription takes its anchor from, and it collides with her own
-earlier standing ruling that the app never bumps load off logged performance
-without an explicit confirm ("a wrong bump means someone attempts a load they
-haven't earned"). Today the only feedback path is the block-review suggestion,
-which needs several sessions, covers main lifts only, and fires when someone
-BEATS the target — none of which is the converged case. Reconciling those two
-rulings is the next piece of work, not something to slip in quietly.
+**ALREADY BUILT, and I was wrong to say otherwise.** I reported the second
+half of Ashley's option — a logged set re-anchoring the weight — as not built.
+It is, and it has been for some time. `TodayPanel` asks
+`progression-engine.ts` for a recommendation from the last logged session for
+every loaded exercise on today's workout, OVERRIDES the plan's number with it,
+and labels the chip `logged` rather than `estimate`. Hit the top of the rep
+range on every set and the weight goes up one increment; fall short and it
+holds at what was actually lifted and says why.
 
-**So the frozen-week rate does not move yet.** 61.7% of plans will still
-contain a repeat. What changed is that the person is told why, and told what
-to do about it, instead of watching a number sit still under a sentence
-promising it is climbing.
+How I got it wrong: I traced the ramp through `load-prescription.ts`, found
+that a logged weight never re-enters the estimate path, and stopped there. I
+had not followed `TodayPanel`, which is where the override lives. Reading one
+module and generalising to the app is the error — the same shape as the
+comment-that-lies problem this codebase keeps finding. It is now pinned by
+`test:logged-reanchor`, executed against a stubbed database, with four
+mutations that each turn it red.
+
+So Ashley's ruling is fully delivered: a stuck lift says the estimate has run
+out and asks for a set, and logging one really does start the number moving
+again — on the screen people actually train on.
+
+**The frozen-week rate still does not move, and that is now a measurement
+question rather than a defect.** 61.7% of plans contain a repeated week — but
+`frozen_week` reads the STORED mesocycle, which is the printed forecast for
+weeks nobody has trained yet. What a training user sees on the day comes from
+`TodayPanel`, which re-anchors to their logged sets. Those are two different
+things, and the metric measures the one the user does not train from.
+
+Worth deciding later, but NOT quietly: whether the printed future weeks should
+also show logged-anchored numbers, or whether a forecast built on the estimate
+is the honest thing to print for a week nobody has reached yet. Changing it
+would change what `frozen_week` measures, so every number in this document
+would stop being comparable.
 
 ## The question for Ashley
 

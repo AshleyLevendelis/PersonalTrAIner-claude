@@ -42,6 +42,7 @@
     "test:bundle": "tsx scripts/test-bundle.ts",
     "test:ramp-arrived": "tsx scripts/test-ramp-arrived.ts",
     "test:rebuild-offer": "tsx scripts/test-rebuild-offer.ts",
+    "test:logged-reanchor": "tsx scripts/test-logged-reanchor.ts",
     "test:rls-local": "node scripts/test-rls-local.mjs",
     "verify:rls": "tsx scripts/verify-rls-live.ts",
     "gen:rls-migration": "node scripts/generate-rls-migration.mjs",
