@@ -295,7 +295,43 @@ console.log('\n8. The migration is generated, and still matches the schema')
     /DROP POLICY IF EXISTS "anon_select_messages" ON chat_messages;/.test(migration))
 }
 
-console.log('\n9. An attached email can actually sign you back in')
+console.log('\n9. A failed sign-in says what actually went wrong')
+{
+  // FOUND IN THE WILD, 30 Aug 2026. The screen said "this browser just
+  // couldn't reach the server ... check your connection and try again" for a
+  // failure that was neither: `Anonymous sign-ins are disabled`, returned
+  // perfectly promptly over a working 5G connection. The app blamed the
+  // phone's network for a server setting, and offered a Try again button
+  // that could never work however many times it was pressed.
+  const disabled = auth.describeSignInFailure('Anonymous sign-ins are disabled')
+  // Tests the INSTRUCTION, not the word. The copy does mention the connection
+  // — to rule it out — and an earlier version of this check failed on that,
+  // which would have pushed the fix back toward saying less rather than more.
+  check('a disabled server setting does not send them to check their connection',
+    !/check your connection/i.test(disabled.message), disabled.message)
+  check('...it rules the connection OUT rather than staying silent about it',
+    /nothing is wrong with your phone or your connection/i.test(disabled.message), disabled.message)
+  check('...and says it is a setting, not a fault on their end',
+    /switched off on the server/.test(disabled.message), disabled.message)
+  check('...and does NOT offer a retry that cannot work', disabled.retryable === false, disabled)
+
+  const offline = auth.describeSignInFailure('TypeError: Failed to fetch')
+  check('a real network failure DOES mention the connection', /connection/i.test(offline.message), offline.message)
+  check('...and offers a retry, because retrying is the fix', offline.retryable === true, offline)
+
+  const unknown = auth.describeSignInFailure('some unmapped server error')
+  check('an unrecognised failure still offers a retry rather than a dead end', unknown.retryable === true, unknown)
+  check('...without inventing a cause it does not know',
+    !/connection/i.test(unknown.message) && !/switched off/.test(unknown.message), unknown.message)
+
+  const app = stripComments(readFileSync(join(ROOT, 'src/App.tsx'), 'utf8'))
+  check('the screen uses the classified message, not one fixed sentence',
+    /\{signInFailure\.message\}/.test(app))
+  check('...and hides Try again when retrying cannot help',
+    /signInFailure\.retryable && \(/.test(app))
+}
+
+console.log('\n10. An attached email can actually sign you back in')
 {
   // The email prompt shipped first and on its own did NOTHING: it let
   // somebody attach an account, and there was nowhere to use it. Clear the

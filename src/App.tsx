@@ -40,7 +40,7 @@ import { checkForConsistencyHold } from '@/lib/block-consistency'
 import { checkForLoadSuggestions, confirmLoadSuggestion, declineLoadSuggestion } from '@/lib/load-suggestions'
 import { checkForWeightBasisOffer, confirmWeightBasisOffer, declineWeightBasisOffer, planHasAssumedBodyLoads } from '@/lib/weight-basis-offer'
 import { getRevealSpeed, saveRevealSpeed, DEFAULT_REVEAL_SPEED, type RevealSpeed } from '@/lib/reveal-speed-store'
-import { ensureSignedIn, claimProfile, shouldAskForEmail, findOwnedProfileId } from '@/lib/auth'
+import { ensureSignedIn, claimProfile, shouldAskForEmail, findOwnedProfileId, describeSignInFailure } from '@/lib/auth'
 import { rebuildFromCurrentWeek, type PlanInvalidation } from '@/lib/plan-invalidation'
 import { SignInScreen } from '@/components/SignInScreen'
 
@@ -1985,18 +1985,22 @@ function App() {
   // everywhere and never says why. Nothing has been lost — the data is in the
   // database, this browser just could not prove who it is.
   if (authError) {
+    const signInFailure = describeSignInFailure(authError)
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="max-w-md w-full space-y-4 text-center">
           <h2 className="text-lg font-semibold">We couldn't sign you in</h2>
-          <p className="text-sm text-muted-foreground break-words">
-            Your plan is safe — this browser just couldn't reach the server to prove it's you,
-            so nothing can be loaded yet. Check your connection and try again.
-          </p>
+          {/* The message depends on WHAT failed. Blaming the connection for a
+              server setting sends someone to check their wifi over something
+              only a dashboard toggle can fix — and offers a Try again button
+              that cannot work however many times it is pressed. */}
+          <p className="text-sm text-muted-foreground break-words">{signInFailure.message}</p>
           <p className="text-xs text-muted-foreground break-words">{authError}</p>
-          <Button className="w-full" onClick={() => { setAuthError(null); setIsRestoring(true); void restoreSession() }}>
-            Try again
-          </Button>
+          {signInFailure.retryable && (
+            <Button className="w-full" onClick={() => { setAuthError(null); setIsRestoring(true); void restoreSession() }}>
+              Try again
+            </Button>
+          )}
         </div>
       </div>
     )

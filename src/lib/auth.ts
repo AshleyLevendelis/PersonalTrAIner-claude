@@ -73,6 +73,62 @@ export async function ensureSignedIn(): Promise<SignInResult> {
   }
 }
 
+export interface SignInFailure {
+  /** What to tell the person, in terms of what they can do about it. */
+  message: string
+  /** False when retrying cannot possibly help — a server setting, not a bad moment. */
+  retryable: boolean
+}
+
+/**
+ * Turn a sign-in error into something true.
+ *
+ * WHY THIS EXISTS. The screen used to say "this browser just couldn't reach
+ * the server ... check your connection and try again" for EVERY failure. The
+ * first real one in the wild was `Anonymous sign-ins are disabled` — a server
+ * setting, reached perfectly well over a working 5G connection. So the app
+ * blamed the phone's network, and offered a Try again button that could never
+ * work no matter how many times it was pressed.
+ *
+ * That is the same defect this codebase keeps finding in other clothes: a
+ * confident sentence that is not about what actually happened. A connection
+ * problem and a configuration problem need different words because they need
+ * different actions from different people.
+ */
+export function describeSignInFailure(error: string): SignInFailure {
+  if (/anonymous sign-?ins? are disabled/i.test(error)) {
+    return {
+      retryable: false,
+      message:
+        'The app is set up to sign you in automatically, and that is switched off on the server. ' +
+        'Nothing is wrong with your phone or your connection, and trying again will not help until ' +
+        'it is turned on — Anonymous Sign-Ins, in the Supabase dashboard under Authentication.',
+    }
+  }
+  if (/signups? (are )?(not allowed|disabled)/i.test(error)) {
+    return {
+      retryable: false,
+      message:
+        'New accounts are switched off on the server, so the app cannot create the one it needs. ' +
+        'That is a setting, not a fault on your end.',
+    }
+  }
+  if (/failed to fetch|network|timeout|offline|econn/i.test(error)) {
+    return {
+      retryable: true,
+      message:
+        'Your plan is safe — this browser could not reach the server to prove it is you, so nothing ' +
+        'can be loaded yet. Check your connection and try again.',
+    }
+  }
+  return {
+    retryable: true,
+    message:
+      'Your plan is safe — the app could not confirm who you are, so nothing has been loaded yet. ' +
+      'The exact reason is below.',
+  }
+}
+
 /**
  * Attach the profile already in localStorage to the account that just signed in.
  *
