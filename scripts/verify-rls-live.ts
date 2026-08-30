@@ -35,12 +35,34 @@ if (fs.existsSync(envPath)) {
   }
 }
 
-const url = process.env.VITE_SUPABASE_URL
-const anonKey = process.env.VITE_SUPABASE_ANON_KEY
+// EXPLICIT TARGET WINS over .env.local, so production can be checked without
+// hand-editing the env file — which .env.local's own comment warns not to
+// commit, and which is a swap easy to forget to undo.
+const url = process.env.RLS_TARGET_URL || process.env.VITE_SUPABASE_URL
+const anonKey = process.env.RLS_TARGET_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY
 if (!url || !anonKey) {
-  console.error('Missing VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY (.env.local).')
+  console.error('Missing VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY (.env.local),')
+  console.error('and no RLS_TARGET_URL / RLS_TARGET_ANON_KEY given.')
   process.exit(1)
 }
+
+/**
+ * WHICH DATABASE DID THIS ACTUALLY READ?
+ *
+ * The script used to print the bare project ref and nothing else. Ashley ran
+ * it, got "PASSED — no user table gave up a single row", and the run had
+ * gone to TEST: .env.local points there by design, and the ref is a
+ * twenty-character string nobody is expected to recognise on sight. A
+ * security check whose reassuring line can describe the wrong database is
+ * worse than no check, because it stops the real one being run.
+ */
+const PROD_REF = 'sdkhuczcfnqqimdgfiks'
+const TEST_REF = 'vswuurrtbzbrgubddefv'
+const projectRef = url.replace(/^https:\/\//, '').split('.')[0]
+const projectName = projectRef === PROD_REF ? 'PRODUCTION'
+  : projectRef === TEST_REF ? 'TEST'
+  : 'an UNRECOGNISED project'
+const isProduction = projectRef === PROD_REF
 
 // Every table holding user data. Kept explicit rather than discovered, so a
 // table that stops being listed is a visible edit rather than a silent gap.
@@ -56,8 +78,11 @@ const USER_TABLES = [
 
 const anon = createClient(url, anonKey)
 
-const project = url.replace(/^https:\/\//, '').split('.')[0]
-console.log(`\nReading as an anonymous caller against ${project}`)
+console.log(`\nReading as an anonymous caller against ${projectName} (${projectRef})`)
+if (!isProduction) {
+  console.log('THIS IS NOT THE LIVE DATABASE. Whatever this run says, it says nothing')
+  console.log('about the data real people have in the app.')
+}
 console.log('(this is exactly what someone holding the app\'s public key can do)\n')
 
 let readable = 0
@@ -94,7 +119,14 @@ if (readable > 0) {
   process.exit(1)
 }
 
-console.log('\nPASSED — no user table gave up a single row without an account.')
+console.log(`\nPASSED for ${projectName} — no user table there gave up a single row without an account.`)
+if (!isProduction) {
+  console.log('')
+  console.log('THIS DOES NOT COVER YOUR LIVE DATA. To check the database real users are in,')
+  console.log('point this at production explicitly (its URL and anon key are in the Supabase')
+  console.log(`dashboard for ${PROD_REF}, under Project Settings > API):`)
+  console.log('    RLS_TARGET_URL=... RLS_TARGET_ANON_KEY=... npm run verify:rls')
+}
 
 // A green tick over an EMPTY database proves nothing at all, and after this
 // migration the anon key cannot tell the two apart — it sees zero either way.
@@ -106,6 +138,7 @@ if (!serviceKey) {
   console.log('like AND what an empty one looks like, and this run cannot distinguish them.')
   console.log('To settle it, re-run with the project\'s service key in the environment:')
   console.log('    SUPABASE_SERVICE_ROLE_KEY=... npm run verify:rls')
+  console.log('(the same run can carry RLS_TARGET_URL/RLS_TARGET_ANON_KEY to aim at production.)')
   console.log('which counts what is actually stored and compares.')
 } else {
   const service = createClient(url, serviceKey)
