@@ -1,6 +1,6 @@
 import type { MesocycleWeek, Exercise, UserProfile } from './types'
 import { getSmartReplacements, type ExerciseEntry } from './exercise-db'
-import { getConstrainedPool, mapMovementPattern, mapTier, deriveFatigueCost, fixedUnitPrescription } from './exercise-plan'
+import { getConstrainedPool, getFlaggedJoints, mapMovementPattern, mapTier, deriveFatigueCost, fixedUnitPrescription } from './exercise-plan'
 import { prescribeLoad, type LoadPrescription } from './load-prescription'
 // Dynamically imported inside recomputeLoad(), not statically here — importing
 // progression-engine.ts pulls in supabase.ts, which reads import.meta.env at
@@ -47,7 +47,11 @@ export function getReplacementCandidates(
   soft?: { liked: string[]; disliked: string[] },
 ): { exercise: ExerciseEntry; note: string }[] {
   const pool = getConstrainedPool(profile, exclusions)
-  const candidates = getSmartReplacements(exerciseName, pool, profile.training_experience || 'novice', exclusions)
+  // The flagged joints ride along for the NOTE only — getConstrainedPool has
+  // already done every bit of filtering. Without them a cross-training
+  // suggestion ("a squat, instead of your bench press") arrives unexplained.
+  const restingJoints = [...getFlaggedJoints(profile.injuries ?? [])]
+  const candidates = getSmartReplacements(exerciseName, pool, profile.training_experience || 'novice', exclusions, restingJoints)
   if (!soft || (soft.liked.length === 0 && soft.disliked.length === 0)) return candidates
   // Stable partition, never a filter: a disliked movement stays offered — it
   // is a lean, and someone who asks for a swap may still want it. Order is

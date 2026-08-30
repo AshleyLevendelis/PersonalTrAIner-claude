@@ -3821,6 +3821,538 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     // the ballistic hip-snap or the (excluded) march.
     primer_pattern_affinity: ['cardio'],
   },
+
+  // -------------------------------------------------------------------------
+  // AUDIT §6.2 — THE THIN-SWAP ADDITIONS, 30 Aug 2026.
+  //
+  // Aimed, not sprinkled. Measured first with scripts/probe-swap-depth.ts,
+  // which calls the same getReplacementCandidates the swap button calls:
+  // full_gym had 0 exercises with two-or-fewer alternatives, bodyweight had
+  // 45. Every entry below closes a hole that measurement named.
+  //
+  // EQUIPMENT IS THE WHOLE CONSTRAINT HERE. EQUIPMENT_SETS (exercise-plan.ts)
+  // gives bodyweight only 'bodyweight', 'pull-up bar' and 'weighted backpack';
+  // minimalist adds bands, kettlebells, dumbbells. An entry that closes a
+  // bodyweight gap with a dumbbell closes nothing at all, so each group below
+  // states which tier it is for and uses only what that tier owns.
+  //
+  // Backpack entries are deliberately over-represented: a weighted backpack is
+  // allowed at EVERY tier, so one entry lands in all four pools at once.
+  // -------------------------------------------------------------------------
+
+  // VERTICAL PULL — 6 entries had <=2 alternatives at home_gym AND minimalist,
+  // the worst non-bodyweight hole measured. Pull-Ups offered exactly 1 option
+  // at both, fewer than at bodyweight (4), which is backwards.
+  {
+    name: 'Band Lat Pulldown',
+    id: 'band-lat-pulldown',
+    movement_pattern: 'vertical_pull',
+    mechanics_tier: 'tier2_compound',
+    prescription_type: 'reps',
+    angle_vector: 'vertical',
+    primary_muscles: ['lats', 'rhomboids', 'biceps'],
+    equipment: ['resistance band'],
+    joint_stress: 'low',
+    form_cues: ['Anchor the band above a door or over a beam', 'Kneel far enough back that the band is already tight', 'Pull the elbows down to the ribs, not the hands to the chest', 'Let it stretch you back up slowly'],
+    coach_note_swap: 'The closest thing to a lat pulldown without a machine — and unlike a pull-up, you can pick the resistance.',
+    loads_joints: ['shoulder', 'elbow'],
+    style_tags: ['bodybuilding', 'functional', 'hybrid'],
+    substitution_group: 'vertical_pull',
+    unilateral: false,
+    avg_duration_seconds: 34,
+  },
+  {
+    name: 'Single-Arm Band Pulldown',
+    id: 'single-arm-band-pulldown',
+    movement_pattern: 'vertical_pull',
+    mechanics_tier: 'tier3_isolation',
+    prescription_type: 'reps',
+    angle_vector: 'vertical',
+    primary_muscles: ['lats'],
+    equipment: ['resistance band'],
+    joint_stress: 'low',
+    form_cues: ['Anchor the band high and hold it in one hand', 'Keep the arm fairly straight', 'Drive the elbow down and back toward the hip', 'One side at a time, matched reps'],
+    coach_note_swap: 'One side at a time, so the stronger lat cannot quietly do the work for both.',
+    loads_joints: ['shoulder'],
+    style_tags: ['bodybuilding', 'hybrid'],
+    substitution_group: 'lat_isolation',
+    unilateral: true,
+    avg_duration_seconds: 38,
+  },
+  {
+    name: 'Pull-Up Negatives',
+    id: 'pull-up-negatives',
+    movement_pattern: 'vertical_pull',
+    mechanics_tier: 'tier2_compound',
+    prescription_type: 'reps',
+    angle_vector: 'vertical',
+    primary_muscles: ['lats', 'biceps'],
+    equipment: ['pull-up bar'],
+    joint_stress: 'moderate',
+    form_cues: ['Jump or step to the top position, chin over the bar', 'Lower as slowly as you can — aim for five seconds', 'Stop the set when the lowering gets fast', 'Step back up, never drop'],
+    coach_note_swap: 'The lowering half of a pull-up, which is the half you are strongest in — this is how most people earn their first one.',
+    loads_joints: ['shoulder', 'elbow'],
+    style_tags: ['functional', 'hybrid'],
+    substitution_group: 'vertical_pull',
+    unilateral: false,
+    avg_duration_seconds: 40,
+  },
+  {
+    name: 'Scapular Pull-Ups',
+    id: 'scapular-pull-ups',
+    movement_pattern: 'vertical_pull',
+    mechanics_tier: 'tier3_isolation',
+    prescription_type: 'reps',
+    angle_vector: 'vertical',
+    primary_muscles: ['lats', 'rhomboids'],
+    equipment: ['pull-up bar'],
+    joint_stress: 'low',
+    form_cues: ['Hang at full stretch with straight arms', 'Pull the shoulder blades down without bending the elbows', 'The movement is small — a few centimetres', 'Hold a second at the top'],
+    coach_note_swap: 'Trains the first inch of a pull-up, which is the inch most people skip and then wonder why their shoulders ache.',
+    loads_joints: ['shoulder'],
+    style_tags: ['functional', 'hybrid'],
+    substitution_group: 'scapular_control',
+    unilateral: false,
+    avg_duration_seconds: 30,
+  },
+
+  // BODYWEIGHT CARDIO — 8 entries had <=2 alternatives at bodyweight, every
+  // one of them because the catalogue's conditioning is machines and ropes.
+  {
+    name: 'High Knees',
+    id: 'high-knees',
+    movement_pattern: 'cardio',
+    mechanics_tier: 'cardio',
+    prescription_type: 'intervals',
+    angle_vector: 'none',
+    primary_muscles: ['quads', 'hip flexors', 'calves'],
+    equipment: ['bodyweight'],
+    joint_stress: 'moderate',
+    form_cues: ['Run on the spot, driving the knees to hip height', 'Stay on the balls of the feet', 'Arms drive as if sprinting', 'Quick and light, not heavy and stamping'],
+    coach_note_swap: 'Sprint-like effort in one square metre, with nothing to buy.',
+    loads_joints: ['knee', 'ankle'],
+    style_tags: ['functional', 'combat', 'hybrid'],
+    substitution_group: 'conditioning',
+    unilateral: false,
+    avg_duration_seconds: 40,
+  },
+  {
+    name: 'Jumping Jacks',
+    id: 'jumping-jacks',
+    movement_pattern: 'cardio',
+    mechanics_tier: 'cardio',
+    prescription_type: 'intervals',
+    angle_vector: 'none',
+    primary_muscles: ['calves', 'shoulders', 'quads'],
+    equipment: ['bodyweight'],
+    joint_stress: 'moderate',
+    form_cues: ['Jump the feet wide as the arms go overhead', 'Land softly through the whole foot', 'Keep a steady rhythm you can hold', 'Step it out instead of jumping if the knees complain'],
+    coach_note_swap: 'The lowest-friction conditioning there is — no space, no kit, no skill.',
+    loads_joints: ['knee', 'ankle', 'shoulder'],
+    style_tags: ['functional', 'hybrid'],
+    substitution_group: 'conditioning',
+    unilateral: false,
+    avg_duration_seconds: 40,
+  },
+  {
+    name: 'Shadow Boxing',
+    id: 'shadow-boxing',
+    movement_pattern: 'cardio',
+    mechanics_tier: 'cardio',
+    prescription_type: 'intervals',
+    angle_vector: 'rotational',
+    primary_muscles: ['shoulders', 'core', 'calves'],
+    equipment: ['bodyweight'],
+    joint_stress: 'low',
+    form_cues: ['Stay light on the feet, hands up', 'Turn the hips into every punch', 'Breathe out on each shot', 'Keep moving between combinations'],
+    coach_note_swap: 'Genuine conditioning that is easy on the joints, and far less boring than running on the spot.',
+    loads_joints: ['shoulder'],
+    style_tags: ['combat', 'functional', 'hybrid'],
+    substitution_group: 'conditioning',
+    unilateral: false,
+    avg_duration_seconds: 60,
+  },
+  {
+    name: 'Bear Crawl',
+    id: 'bear-crawl',
+    movement_pattern: 'cardio',
+    mechanics_tier: 'cardio',
+    prescription_type: 'intervals',
+    angle_vector: 'none',
+    primary_muscles: ['shoulders', 'core', 'quads'],
+    equipment: ['bodyweight'],
+    joint_stress: 'moderate',
+    form_cues: ['Hands under shoulders, knees under hips and hovering', 'Move the opposite hand and foot together', 'Keep the hips low and still — no swaying', 'Short distances, then turn around'],
+    coach_note_swap: 'Conditioning that also asks the shoulders and trunk to hold position — harder than it looks in ten seconds.',
+    loads_joints: ['shoulder', 'wrist', 'knee'],
+    style_tags: ['functional', 'combat', 'hybrid'],
+    substitution_group: 'conditioning',
+    unilateral: false,
+    avg_duration_seconds: 45,
+  },
+  {
+    name: 'Skater Bounds',
+    id: 'skater-bounds',
+    movement_pattern: 'cardio',
+    mechanics_tier: 'cardio',
+    prescription_type: 'intervals',
+    angle_vector: 'lateral',
+    primary_muscles: ['glutes', 'quads', 'calves'],
+    equipment: ['bodyweight'],
+    joint_stress: 'moderate',
+    form_cues: ['Bound sideways from one foot to the other', 'Land softly and hold a beat before bounding back', 'Let the free leg swing behind you', 'Width before speed'],
+    coach_note_swap: 'Sideways conditioning, which almost nothing else in a home session trains.',
+    loads_joints: ['knee', 'ankle', 'hip'],
+    style_tags: ['functional', 'combat', 'hybrid'],
+    substitution_group: 'conditioning',
+    unilateral: true,
+    avg_duration_seconds: 40,
+  },
+
+  // BODYWEIGHT HAMSTRING — 7 entries had <=2 at bodyweight; every existing
+  // hamstring curl in the catalogue needs a machine, a band or a slider.
+  {
+    name: 'Prone Hamstring Curl (Bodyweight)',
+    id: 'prone-hamstring-curl-bodyweight',
+    movement_pattern: 'isolation_hamstring',
+    mechanics_tier: 'tier3_isolation',
+    prescription_type: 'reps',
+    angle_vector: 'none',
+    primary_muscles: ['hamstrings'],
+    equipment: ['bodyweight'],
+    joint_stress: 'low',
+    form_cues: ['Lie face down, legs straight', 'Curl one heel toward the backside, squeezing hard at the top', 'Fight the return down slowly', 'The tension comes from squeezing, not from speed'],
+    coach_note_swap: 'No machine and no band — the hamstring works against the effort you put into the squeeze.',
+    loads_joints: ['knee'],
+    style_tags: ['bodybuilding', 'functional'],
+    substitution_group: 'leg_curl',
+    unilateral: true,
+    avg_duration_seconds: 32,
+  },
+  {
+    name: 'Single-Leg Glute Bridge',
+    id: 'single-leg-glute-bridge',
+    movement_pattern: 'hip_hinge',
+    mechanics_tier: 'tier2_compound',
+    prescription_type: 'reps',
+    angle_vector: 'horizontal',
+    primary_muscles: ['glutes', 'hamstrings'],
+    equipment: ['bodyweight'],
+    joint_stress: 'low',
+    form_cues: ['Lie on your back, one foot planted, the other knee hugged in', 'Drive through the planted heel until the hips are level', 'Do not let the free hip drop', 'Lower under control, matched reps each side'],
+    coach_note_swap: 'One leg at a time turns an easy bridge into real work, with no load to add.',
+    loads_joints: ['hip', 'knee'],
+    style_tags: ['functional', 'bodybuilding', 'hybrid'],
+    substitution_group: 'hip_thrust',
+    unilateral: true,
+    avg_duration_seconds: 38,
+  },
+  {
+    name: 'Bodyweight Hip Hinge to Wall',
+    id: 'bodyweight-hip-hinge-to-wall',
+    movement_pattern: 'hip_hinge',
+    mechanics_tier: 'tier3_isolation',
+    prescription_type: 'reps',
+    angle_vector: 'horizontal',
+    primary_muscles: ['hamstrings', 'glutes'],
+    equipment: ['bodyweight'],
+    joint_stress: 'low',
+    form_cues: ['Stand a forearm from a wall, facing away', 'Push the hips back until they touch the wall', 'Keep the back flat and the shins upright', 'Stand tall by squeezing the glutes'],
+    coach_note_swap: 'Teaches the hinge itself, which is the movement most people get wrong before they ever add weight.',
+    loads_joints: ['hip'],
+    style_tags: ['functional', 'hybrid'],
+    substitution_group: 'hip_hinge',
+    unilateral: false,
+    avg_duration_seconds: 30,
+  },
+
+  // BODYWEIGHT QUAD AND CALF — 5 entries each had <=2 at bodyweight.
+  {
+    name: 'Reverse Nordic Curl',
+    id: 'reverse-nordic-curl',
+    movement_pattern: 'isolation_quad',
+    mechanics_tier: 'tier3_isolation',
+    prescription_type: 'reps',
+    angle_vector: 'none',
+    primary_muscles: ['quads'],
+    equipment: ['bodyweight'],
+    joint_stress: 'moderate',
+    form_cues: ['Kneel tall, squeeze the glutes so the hips stay open', 'Lean backwards slowly, only as far as you can control', 'Pull yourself upright with the thighs', 'Go nowhere near your limit on the first session'],
+    coach_note_swap: 'The hardest quad exercise that needs nothing at all — go short of your limit, it is very easy to overdo.',
+    loads_joints: ['knee'],
+    style_tags: ['bodybuilding', 'functional'],
+    // Gated WITH a regression, per CapabilityRequirement's contract: a novice
+    // who meets neither must still have somewhere to land, or the pattern just
+    // disappears for them. Wall Sit is the honest easier quad hold.
+    capability_requirement: { minExperience: 'intermediate', regression: 'Wall Sit' },
+    substitution_group: 'quad_isolation',
+    unilateral: false,
+    avg_duration_seconds: 36,
+  },
+  {
+    name: 'Wall Sit March',
+    id: 'wall-sit-march',
+    movement_pattern: 'isolation_quad',
+    mechanics_tier: 'tier3_isolation',
+    prescription_type: 'time',
+    angle_vector: 'none',
+    primary_muscles: ['quads'],
+    equipment: ['bodyweight'],
+    joint_stress: 'low',
+    form_cues: ['Sit against the wall, thighs parallel to the floor', 'Lift one foot a few centimetres, then the other', 'Keep the hips at the same height throughout', 'Slow and even, not a jog'],
+    coach_note_swap: 'A wall sit that keeps getting harder without adding a second of extra time.',
+    loads_joints: ['knee'],
+    style_tags: ['functional', 'bodybuilding'],
+    substitution_group: 'knee_isometric',
+    unilateral: false,
+    avg_duration_seconds: 45,
+  },
+  {
+    name: 'Single-Leg Calf Raise Hold',
+    id: 'single-leg-calf-raise-hold',
+    movement_pattern: 'isolation_calf',
+    mechanics_tier: 'tier3_isolation',
+    prescription_type: 'time',
+    angle_vector: 'vertical',
+    primary_muscles: ['calves'],
+    equipment: ['bodyweight'],
+    joint_stress: 'low',
+    form_cues: ['Rise onto one toe, fingertips on a wall for balance only', 'Hold at the very top, heel as high as it goes', 'Keep the knee straight', 'Come down slowly rather than dropping'],
+    coach_note_swap: 'Holding the top is where a calf raise actually bites — most people rush straight through it.',
+    loads_joints: ['ankle'],
+    style_tags: ['bodybuilding', 'functional'],
+    substitution_group: 'calf',
+    unilateral: true,
+    avg_duration_seconds: 40,
+  },
+  {
+    name: 'Bent-Knee Calf Raise (Bodyweight)',
+    id: 'bent-knee-calf-raise-bodyweight',
+    movement_pattern: 'isolation_calf',
+    mechanics_tier: 'tier3_isolation',
+    prescription_type: 'reps',
+    angle_vector: 'vertical',
+    primary_muscles: ['calves'],
+    equipment: ['bodyweight'],
+    joint_stress: 'low',
+    form_cues: ['Stand with the knees softly bent and keep them bent throughout', 'Push through the balls of the feet', 'Full range, pause at the top', 'Lower until the heels touch'],
+    coach_note_swap: 'The bent knee shifts the work to the soleus, the calf muscle a straight-leg raise mostly misses.',
+    loads_joints: ['ankle'],
+    style_tags: ['bodybuilding'],
+    substitution_group: 'calf',
+    unilateral: false,
+    avg_duration_seconds: 30,
+  },
+
+  // BODYWEIGHT PUSHING — horizontal_push had 3 entries at <=2, and Overhead
+  // Press had only 3 alternatives at bodyweight.
+  {
+    name: 'Knee Push-Ups',
+    id: 'knee-push-ups',
+    movement_pattern: 'horizontal_push',
+    mechanics_tier: 'tier2_compound',
+    prescription_type: 'reps',
+    angle_vector: 'horizontal',
+    primary_muscles: ['chest', 'triceps', 'shoulders'],
+    equipment: ['bodyweight'],
+    joint_stress: 'low',
+    form_cues: ['Knees down, but keep a straight line from knee to shoulder', 'Hands just wider than the chest', 'Lower until the chest is a fist from the floor', 'Do not let the hips sag or pike'],
+    coach_note_swap: 'A real push-up with less of your bodyweight on it — added to REGRESSION_VARIATIONS so it is never offered as a sideways step to someone already pressing full ones.',
+    loads_joints: ['shoulder', 'elbow', 'wrist'],
+    style_tags: ['functional', 'bodybuilding', 'hybrid'],
+    substitution_group: 'bench_press',
+    unilateral: false,
+    avg_duration_seconds: 30,
+  },
+  {
+    name: 'Wide Push-Ups',
+    id: 'wide-push-ups',
+    movement_pattern: 'horizontal_push',
+    mechanics_tier: 'tier2_compound',
+    prescription_type: 'reps',
+    angle_vector: 'horizontal',
+    primary_muscles: ['chest', 'shoulders'],
+    equipment: ['bodyweight'],
+    joint_stress: 'moderate',
+    form_cues: ['Hands noticeably wider than the shoulders', 'Elbows travel out at about forty-five degrees, not straight sideways', 'Chest leads on the way down', 'Stop the set when the hips start to sag'],
+    coach_note_swap: 'More chest, less triceps than a standard push-up — the closest bodyweight answer to a wide-grip bench.',
+    loads_joints: ['shoulder', 'elbow', 'wrist'],
+    style_tags: ['bodybuilding', 'functional'],
+    substitution_group: 'bench_press',
+    unilateral: false,
+    avg_duration_seconds: 32,
+  },
+  {
+    name: 'Pike Push-Ups',
+    id: 'pike-push-ups',
+    movement_pattern: 'vertical_push',
+    mechanics_tier: 'tier2_compound',
+    prescription_type: 'reps',
+    angle_vector: 'vertical',
+    primary_muscles: ['shoulders', 'triceps'],
+    equipment: ['bodyweight'],
+    joint_stress: 'moderate',
+    form_cues: ['Hands and feet down, hips high, body in an upside-down V', 'Lower the crown of the head toward the floor between the hands', 'Press back up without letting the hips drop', 'Raise the feet onto a step to make it harder'],
+    coach_note_swap: 'The only genuine overhead press available with no equipment at all.',
+    loads_joints: ['shoulder', 'elbow', 'wrist'],
+    style_tags: ['functional', 'bodybuilding', 'hybrid'],
+    substitution_group: 'overhead_press',
+    unilateral: false,
+    avg_duration_seconds: 34,
+  },
+  {
+    name: 'Chair Dips',
+    id: 'chair-dips',
+    movement_pattern: 'isolation_tricep',
+    mechanics_tier: 'tier3_isolation',
+    prescription_type: 'reps',
+    angle_vector: 'vertical',
+    primary_muscles: ['triceps'],
+    equipment: ['bodyweight'],
+    joint_stress: 'moderate',
+    form_cues: ['Hands on the edge of a solid chair behind you', 'Keep the back close to the chair the whole way down', 'Elbows point backwards, not out', 'Stop before the shoulders roll forward'],
+    coach_note_swap: 'Triceps work with nothing but a chair. Come out of it the moment the shoulders start rolling forward.',
+    loads_joints: ['elbow', 'shoulder'],
+    style_tags: ['bodybuilding', 'functional'],
+    substitution_group: 'tricep_extension',
+    unilateral: false,
+    avg_duration_seconds: 32,
+  },
+
+  // BODYWEIGHT LEGS — knee_dominant had 3 entries at <=2.
+  {
+    name: 'Tempo Air Squat',
+    id: 'tempo-air-squat',
+    movement_pattern: 'knee_dominant',
+    mechanics_tier: 'tier2_compound',
+    prescription_type: 'reps',
+    angle_vector: 'vertical',
+    primary_muscles: ['quads', 'glutes'],
+    equipment: ['bodyweight'],
+    joint_stress: 'low',
+    form_cues: ['Take four full seconds to lower', 'Pause a beat at the bottom without bouncing', 'Stand up at normal speed', 'Fewer reps than you think — the clock is the load'],
+    coach_note_swap: 'When there is no weight to add, time under tension is the load. Far harder than the rep count suggests.',
+    loads_joints: ['knee', 'hip'],
+    style_tags: ['functional', 'bodybuilding', 'hybrid'],
+    substitution_group: 'squat',
+    unilateral: false,
+    avg_duration_seconds: 45,
+  },
+  {
+    name: 'Cossack Squat (Bodyweight)',
+    id: 'cossack-squat-bodyweight',
+    movement_pattern: 'single_leg',
+    mechanics_tier: 'tier2_compound',
+    prescription_type: 'reps',
+    angle_vector: 'lateral',
+    primary_muscles: ['quads', 'glutes', 'adductors'],
+    equipment: ['bodyweight'],
+    joint_stress: 'moderate',
+    form_cues: ['Stand wide, shift the weight over one leg and sit down into it', 'The other leg stays straight with the toes up', 'Keep the heel of the working leg down', 'Push back to the middle, then swap'],
+    coach_note_swap: 'Sideways leg strength plus a genuine groin stretch — a direction almost nothing else in a home session trains.',
+    loads_joints: ['knee', 'hip', 'ankle'],
+    style_tags: ['functional', 'combat', 'hybrid'],
+    capability_requirement: { minExperience: 'intermediate', regression: 'Split Squat (Bodyweight)' },
+    substitution_group: 'single_leg',
+    unilateral: true,
+    avg_duration_seconds: 42,
+  },
+
+  // WEIGHTED BACKPACK — allowed at EVERY tier, so each of these lands in all
+  // four pools at once. isolation_shoulder had the only zero-alternative
+  // entries in the catalogue before this round; trap and bicep were at <=2
+  // across home_gym and minimalist both.
+  {
+    name: 'Backpack Lateral Raise',
+    id: 'backpack-lateral-raise',
+    movement_pattern: 'isolation_shoulder',
+    mechanics_tier: 'tier3_isolation',
+    prescription_type: 'reps',
+    angle_vector: 'lateral',
+    primary_muscles: ['lateral deltoid'],
+    equipment: ['weighted backpack'],
+    joint_stress: 'low',
+    form_cues: ['Hold the backpack by a strap in each hand, arms at your sides', 'Raise to shoulder height, no higher', 'Lead with the elbows, not the hands', 'Lower slowly — this is where the work is'],
+    coach_note_swap: 'A lateral raise needs very little weight, which is exactly what a backpack gives you.',
+    loads_joints: ['shoulder'],
+    style_tags: ['bodybuilding', 'functional'],
+    substitution_group: 'lateral_delt',
+    unilateral: false,
+    avg_duration_seconds: 30,
+  },
+  {
+    name: 'Backpack Shrug',
+    id: 'backpack-shrug',
+    movement_pattern: 'isolation_trap',
+    mechanics_tier: 'tier3_isolation',
+    prescription_type: 'reps',
+    angle_vector: 'vertical',
+    primary_muscles: ['traps'],
+    equipment: ['weighted backpack'],
+    joint_stress: 'low',
+    form_cues: ['Hold the pack in front of you by both straps', 'Lift the shoulders straight up toward the ears', 'No rolling — up and down only', 'Pause at the top, lower fully'],
+    coach_note_swap: 'Shrugs want load more than range, and a loaded pack supplies it at any equipment level.',
+    loads_joints: ['shoulder', 'neck'],
+    style_tags: ['bodybuilding'],
+    substitution_group: 'shrug',
+    unilateral: false,
+    avg_duration_seconds: 28,
+  },
+  {
+    name: 'Backpack Curl',
+    id: 'backpack-curl',
+    movement_pattern: 'isolation_bicep',
+    mechanics_tier: 'tier3_isolation',
+    prescription_type: 'reps',
+    angle_vector: 'vertical',
+    primary_muscles: ['biceps'],
+    equipment: ['weighted backpack'],
+    joint_stress: 'low',
+    form_cues: ['Hold the pack by the bottom or by both straps', 'Elbows pinned to your sides', 'Curl to the chest, squeeze, lower slowly', 'Do not swing the hips to help'],
+    coach_note_swap: 'Biceps do not care what the weight is attached to.',
+    loads_joints: ['elbow'],
+    style_tags: ['bodybuilding'],
+    substitution_group: 'bicep_curl',
+    unilateral: false,
+    avg_duration_seconds: 30,
+  },
+  {
+    name: 'Backpack Overhead Press',
+    id: 'backpack-overhead-press',
+    movement_pattern: 'vertical_push',
+    mechanics_tier: 'tier2_compound',
+    prescription_type: 'reps',
+    angle_vector: 'vertical',
+    primary_muscles: ['shoulders', 'triceps'],
+    equipment: ['weighted backpack'],
+    joint_stress: 'moderate',
+    form_cues: ['Hold the pack at chest height against the body', 'Press straight overhead, ribs down', 'Lock out with the pack over the middle of the head', 'Lower under control to the chest'],
+    coach_note_swap: 'A loadable overhead press for someone with no barbell and no dumbbells.',
+    loads_joints: ['shoulder', 'elbow'],
+    style_tags: ['functional', 'bodybuilding', 'hybrid'],
+    substitution_group: 'overhead_press',
+    unilateral: false,
+    avg_duration_seconds: 34,
+  },
+  {
+    name: 'Backpack Front Raise',
+    id: 'backpack-front-raise',
+    movement_pattern: 'isolation_shoulder',
+    mechanics_tier: 'tier3_isolation',
+    prescription_type: 'reps',
+    angle_vector: 'vertical',
+    primary_muscles: ['front deltoid'],
+    equipment: ['weighted backpack'],
+    joint_stress: 'low',
+    form_cues: ['Hold the pack in front of the thighs with both hands', 'Raise to eye level with straight arms', 'No leaning back to launch it', 'Lower all the way down each rep'],
+    coach_note_swap: 'Front-delt work at whatever weight the pack happens to be, which for a raise is usually enough.',
+    loads_joints: ['shoulder'],
+    style_tags: ['bodybuilding'],
+    substitution_group: 'front_delt',
+    unilateral: false,
+    avg_duration_seconds: 28,
+  },
+
 ]
 
 /**
@@ -3868,11 +4400,48 @@ export const NEAREST_PATTERN_FALLBACK: Partial<Record<MovementPattern, MovementP
   isolation_calf: ['knee_dominant'],
 }
 
+/**
+ * When an INJURY has emptied a movement's own pattern AND its nearest
+ * coaching equivalents, this is what is left to offer: substantial work that
+ * trains something else entirely.
+ *
+ * WHY A THIRD STAGE EXISTS AT ALL. NEAREST_PATTERN_FALLBACK pairs pushing
+ * with pushing and pulling with pulling, which is right when a pattern is
+ * thin — but useless when the reason it is empty is that the joint those
+ * patterns share is the injured one. A sore shoulder empties horizontal_push,
+ * and the fallback sends it to vertical_push, which the same injury has also
+ * emptied. Measured before this existed: a shoulder injury at bodyweight left
+ * 35 exercises with no suggestion at all — every press, every triceps
+ * movement, every raise — while the same injury with a full gym stranded
+ * none. The person training at home who has just hurt themselves was the one
+ * getting nothing.
+ *
+ * ASHLEY'S RULING, 30 Aug 2026, choosing between offering gentler pushing and
+ * swapping the work out: "swap in different work". The app never suggests
+ * loading a joint somebody has told us hurts, so the alternative to a press
+ * is not an easier press — it is legs, core or pulling, said plainly.
+ *
+ * Deliberately excludes activation (warm-up movements are not a session's
+ * work), cardio, and every isolation pattern: a small single-joint movement
+ * is not an honest stand-in for a compound slot, and offering one would be
+ * padding the list rather than answering the question.
+ */
+const CROSS_TRAINING_LAST_RESORT: MovementPattern[] = [
+  'knee_dominant', 'hip_hinge', 'single_leg', 'horizontal_pull', 'vertical_pull', 'core', 'carry',
+]
+
 export function getSmartReplacements(
   exerciseName: string,
   pool: ExerciseEntry[],
   experience: TrainingExperience,
   exclusions: string[] = [],
+  /**
+   * The joints this trainee has flagged as hurting, for the NOTE only —
+   * never for filtering, which `pool` has already done. Without it the
+   * cross-training offer would appear with no explanation, and "here is a
+   * squat instead of your bench press" is baffling unless the app says why.
+   */
+  restingJoints: string[] = [],
 ): { exercise: ExerciseEntry; note: string }[] {
   const current = EXERCISE_DATABASE.find(
     e => e.name.toLowerCase() === exerciseName.toLowerCase()
@@ -3939,6 +4508,20 @@ export function getSmartReplacements(
     if (fallback.length > 0) candidates = pool.filter(e => eligible(e, fallback))
   }
 
+  // THIRD STAGE — see CROSS_TRAINING_LAST_RESORT. Both stages above can come
+  // back empty together, because they are related patterns sharing a joint,
+  // and an injury takes the joint rather than the pattern. Crossing to
+  // different work is the only remaining honest answer; the alternative the
+  // app used to give was an empty list.
+  //
+  // Flagged so the note can say WHY. A cross-training suggestion presented
+  // like an ordinary swap reads as the app having lost the plot.
+  let isCrossTraining = false
+  if (candidates.length === 0) {
+    candidates = pool.filter(e => eligible(e, CROSS_TRAINING_LAST_RESORT))
+    isCrossTraining = candidates.length > 0
+  }
+
   const scored = candidates.map(candidate => {
     let score = 0
     if (candidate.mechanics_tier === current.mechanics_tier) score += 3
@@ -3952,6 +4535,27 @@ export function getSmartReplacements(
     let note = candidate.coach_note_swap || ''
     if (candidate.joint_stress === 'low' && current.joint_stress !== 'low') {
       note = `Lower joint stress alternative. ${note}`
+    }
+    if (isCrossTraining) {
+      // TWO REASONS LAND HERE AND THEY NEED DIFFERENT SENTENCES. An injury
+      // empties the pattern, and so does simply owning no equipment — a
+      // bodyweight trainee's Lateral Raises have no same-pattern and no
+      // vertical-push alternative either, with nothing sore anywhere.
+      //
+      // The first version of this said "this rests your sore shoulder" in
+      // both cases, which for the equipment case is the app inventing an
+      // injury the trainee never reported. Caught by reading the measured
+      // numbers rather than the intent: the five no-injury zeros closed too,
+      // and they had no business being explained by an injury.
+      const joints = [...new Set(restingJoints)]
+      const why = joints.length === 0
+        ? 'Different work — nothing in that movement fits the equipment you have, so this trains something else instead.'
+        : `Different work — this rests ${
+            joints.length === 1
+              ? `your ${joints[0].replace(/_/g, ' ')}`
+              : `your ${joints.slice(0, -1).map(j => j.replace(/_/g, ' ')).join(', ')} and ${joints[joints.length - 1].replace(/_/g, ' ')}`
+          } rather than training around it.`
+      note = `${why} ${note}`.trim()
     }
 
     return { exercise: candidate, score, note }

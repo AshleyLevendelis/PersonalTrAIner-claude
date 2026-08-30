@@ -345,6 +345,12 @@ const REGRESSION_VARIATIONS = new Set([
   'Bodyweight Good Morning',
   'Split Squat (Bodyweight)',
   'Step-Ups (Bodyweight)',
+  // §6.2's additions: the two that are genuinely EASIER versions of something
+  // already in the catalogue, rather than peers. Without these an intermediate
+  // asking to swap their push-ups would be offered knee push-ups as a
+  // sideways step, which is the regression this list exists to refuse.
+  'Knee Push-Ups',
+  'Pull-Up Negatives',
 ])
 
 export function isRegressionFor(name: string, experience: TrainingExperience): boolean {
