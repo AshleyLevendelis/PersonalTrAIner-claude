@@ -79,7 +79,7 @@ export function WeekContextRow({
       <div className="flex items-center justify-between gap-3">
         <button
           type="button"
-          className="min-w-0 flex-1 text-left text-[12.5px] text-foreground"
+          className="min-w-0 flex-1 text-left text-[0.78125rem] text-foreground"
           onClick={onOpenProgram}
         >
           {headerParts.join(' · ')}
@@ -144,13 +144,13 @@ export function WeekContextRow({
               // here because that fix went into the copy nothing renders.
               aria-label={`${d.dayName}: ${STATE_LABEL[d.state]}`}
             >
-              <span className={`text-[9px] uppercase tracking-[.08em] ${isToday ? 'font-semibold text-primary' : 'text-muted-foreground'}`}>
+              <span className={`text-[0.5625rem] uppercase tracking-[.08em] ${isToday ? 'font-semibold text-primary' : 'text-muted-foreground'}`}>
                 {SHORT_DAY[d.dayName] ?? d.dayName.slice(0, 1)}
               </span>
               {isToday && d.state === 'due' ? (
                 <span aria-hidden className="size-[7px] rounded-full bg-primary glow-dot" />
               ) : (
-                <span className={`text-[12px] leading-none ${isToday ? 'text-primary glow-mint' : 'text-muted-foreground'}`}>
+                <span className={`text-[0.75rem] leading-none ${isToday ? 'text-primary glow-mint' : 'text-muted-foreground'}`}>
                   {GLYPH[d.state]}
                 </span>
               )}
@@ -160,7 +160,7 @@ export function WeekContextRow({
       </div>
 
       {onOpenProgram && (
-        <button type="button" className="mt-3 text-[11.5px] font-semibold text-primary" onClick={onOpenProgram}>
+        <button type="button" className="mt-3 text-[0.71875rem] font-semibold text-primary" onClick={onOpenProgram}>
           See the whole program ›
         </button>
       )}

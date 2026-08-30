@@ -421,7 +421,7 @@ export function SetGrid({
               <Button
                 variant={isBW ? 'default' : 'outline'}
                 size="sm"
-                className="h-7 w-7 text-[10px] font-bold px-0"
+                className="h-7 w-7 text-[0.625rem] font-bold px-0"
                 onClick={() => toggleBodyweight(setNumber)}
                 aria-label="Toggle bodyweight"
               >
@@ -443,7 +443,7 @@ export function SetGrid({
             />
             <div className="flex items-center gap-1">
               {isPRSet && prBadgeSet?.result && (
-                <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-primary/15 text-primary glow-mint whitespace-nowrap ${animatingPr ? 'animate-pulse scale-110' : ''} transition-transform`}>
+                <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[0.625rem] font-medium bg-primary/15 text-primary glow-mint whitespace-nowrap ${animatingPr ? 'animate-pulse scale-110' : ''} transition-transform`}>
                   <Trophy className="size-2.5" />
                   PR
                 </span>
@@ -466,6 +466,7 @@ export function SetGrid({
                 className={`size-7 shrink-0 ${isSaved ? 'text-primary' : 'text-[color:var(--primary-foreground)] glow-pulse'}`}
                 style={isSaved ? undefined : { background: 'linear-gradient(180deg, color-mix(in oklab, var(--primary) 84%, white), var(--primary-2))' }}
                 onClick={() => handleSaveSet(setNumber)}
+                aria-label={isSaved ? `Set ${setNumber} saved` : `Save set ${setNumber}`}
               >
                 <Check className="size-3.5" />
               </Button>
@@ -477,7 +478,7 @@ export function SetGrid({
             const armed = confirmDeleteSet === setNumber
             return (
               <div className="flex items-center justify-between gap-2 px-1 -mt-0.5">
-                <p className="text-[10px] text-primary">
+                <p className="text-[0.625rem] text-primary">
                   Set {setNumber}: {logged.is_bodyweight
                     ? `${logged.reps_completed} reps · Bodyweight`
                     : `${logged.reps_completed} reps @ ${logged.weight_kg}kg`} ✓
@@ -485,7 +486,7 @@ export function SetGrid({
                 <button
                   type="button"
                   onClick={() => handleDeleteSet(setNumber)}
-                  className={`flex shrink-0 items-center gap-1 text-[10px] ${armed ? 'font-medium text-destructive' : 'text-muted-foreground'}`}
+                  className={`flex shrink-0 items-center gap-1 text-[0.625rem] ${armed ? 'font-medium text-destructive' : 'text-muted-foreground'}`}
                   aria-label={armed ? `Confirm delete set ${setNumber}` : `Delete set ${setNumber}`}
                 >
                   <Trash2 className="size-2.5" />
@@ -495,7 +496,7 @@ export function SetGrid({
             )
           })()}
           {rowErrors[setNumber] && (
-            <p className="text-[10px] text-destructive px-1 -mt-0.5">{rowErrors[setNumber]}</p>
+            <p className="text-[0.625rem] text-destructive px-1 -mt-0.5">{rowErrors[setNumber]}</p>
           )}
           </React.Fragment>
         )

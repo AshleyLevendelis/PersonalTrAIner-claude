@@ -88,7 +88,7 @@ export function TempoChip({ tempo }: { tempo: string | undefined }) {
   const described = describeTempo(tempo)
   if (!described) return null
   return (
-    <span className={`inline-flex items-center gap-0.5 rounded border px-1 py-0 text-[10px] leading-4 ${CONFIDENT_CHIP_CLASS}`}>
+    <span className={`inline-flex items-center gap-0.5 rounded border px-1 py-0 text-[0.625rem] leading-4 ${CONFIDENT_CHIP_CLASS}`}>
       <Timer className="size-2.5" />{described}
     </span>
   )
@@ -115,7 +115,7 @@ export function LoadChip({
   return (
     <div className="flex flex-col gap-0.5 mt-0.5">
       {ex.intensity && (
-        <span className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground">
+        <span className="inline-flex items-center gap-0.5 text-[0.625rem] text-muted-foreground">
           {ex.intensity}
         </span>
       )}
@@ -126,25 +126,25 @@ export function LoadChip({
             {ex.per_set_load.map(s => (
               <span
                 key={s.set_number}
-                className={`inline-flex items-center rounded border px-1 py-0 text-[10px] leading-4 ${loadChipClass(source)}`}
+                className={`inline-flex items-center rounded border px-1 py-0 text-[0.625rem] leading-4 ${loadChipClass(source)}`}
                 title={s.display}
               >
                 S{s.set_number}: {s.load_kg}kg
               </span>
             ))}
             {ex.per_set_load[0].display.includes('per hand') && (
-              <span className="text-[10px] text-muted-foreground/70">per hand</span>
+              <span className="text-[0.625rem] text-muted-foreground/70">per hand</span>
             )}
             {ex.per_set_load[0].display.includes('single side') && (
-              <span className="text-[10px] text-muted-foreground/70">single side</span>
+              <span className="text-[0.625rem] text-muted-foreground/70">single side</span>
             )}
           </>
         ) : ex.suggested_load && (
-          <span className={`inline-flex items-center gap-0.5 rounded border px-1 py-0 text-[10px] leading-4 ${loadChipClass(source)}`}>
+          <span className={`inline-flex items-center gap-0.5 rounded border px-1 py-0 text-[0.625rem] leading-4 ${loadChipClass(source)}`}>
             <Dumbbell className="size-2.5" />{ex.suggested_load}
           </span>
         )}
-        {label && <span className="text-[9px] italic text-muted-foreground/60">{label}</span>}
+        {label && <span className="text-[0.5625rem] italic text-muted-foreground/60">{label}</span>}
         {explainer && (
           <button
             type="button"
@@ -157,10 +157,10 @@ export function LoadChip({
         )}
       </div>
       {explained && explainer && (
-        <p className="text-[10px] text-muted-foreground/80 italic max-w-xs">{explainer}</p>
+        <p className="text-[0.625rem] text-muted-foreground/80 italic max-w-xs">{explainer}</p>
       )}
       {progressionNote && (
-        <span className={`text-[10px] italic ${progressionNote.didProgress ? 'text-primary' : 'text-muted-foreground/80'}`}>
+        <span className={`text-[0.625rem] italic ${progressionNote.didProgress ? 'text-primary' : 'text-muted-foreground/80'}`}>
           {progressionNote.note}
         </span>
       )}

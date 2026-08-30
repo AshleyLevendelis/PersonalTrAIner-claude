@@ -25,15 +25,15 @@ export function AddedLoadChip({ ex }: { ex: Exercise }) {
   return (
     <div className="flex flex-col gap-0.5 mt-0.5">
       {ex.intensity && (
-        <span className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground">
+        <span className="inline-flex items-center gap-0.5 text-[0.625rem] text-muted-foreground">
           {ex.intensity}
         </span>
       )}
       <div className="flex items-center gap-1 flex-wrap">
-        <span className="inline-flex items-center gap-0.5 rounded border px-1 py-0 text-[10px] leading-4 border-foreground/25 bg-foreground/5 text-foreground/90 font-medium">
+        <span className="inline-flex items-center gap-0.5 rounded border px-1 py-0 text-[0.625rem] leading-4 border-foreground/25 bg-foreground/5 text-foreground/90 font-medium">
           <Plus className="size-2.5" />{ex.suggested_added_load_kg}kg added
         </span>
-        <span className="text-[9px] italic text-muted-foreground/60">on top of bodyweight</span>
+        <span className="text-[0.5625rem] italic text-muted-foreground/60">on top of bodyweight</span>
         {ex.load_guidance && (
           <button
             type="button"
@@ -46,7 +46,7 @@ export function AddedLoadChip({ ex }: { ex: Exercise }) {
         )}
       </div>
       {explained && ex.load_guidance && (
-        <p className="text-[10px] text-muted-foreground/80 italic max-w-xs">{ex.load_guidance}</p>
+        <p className="text-[0.625rem] text-muted-foreground/80 italic max-w-xs">{ex.load_guidance}</p>
       )}
     </div>
   )

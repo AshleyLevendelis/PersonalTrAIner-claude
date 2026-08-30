@@ -96,7 +96,7 @@ export function MacroSplitCard({
                 type="button"
                 onClick={() => applyPreset(preset)}
                 aria-pressed={active}
-                className={`hit-slop-44 rounded-md border px-2 py-2 text-[11px] font-medium text-center transition-colors ${
+                className={`hit-slop-44 rounded-md border px-2 py-2 text-[0.6875rem] font-medium text-center transition-colors ${
                   active ? 'border-primary bg-primary/5 ring-1 ring-primary text-foreground' : 'border-border text-muted-foreground hover:border-muted-foreground/30'
                 }`}
               >
@@ -138,41 +138,41 @@ export function MacroSplitCard({
                 className="w-full accent-primary"
               />
             </label>
-            <p className="text-[10px] text-muted-foreground">Carbs always fill the remainder of your calorie target.</p>
+            <p className="text-[0.625rem] text-muted-foreground">Carbs always fill the remainder of your calorie target.</p>
           </div>
         )}
 
         <div className="grid grid-cols-3 gap-3 text-center">
           <div>
-            <p className="tabular-mono text-[15px] font-bold">{preview.protein}g</p>
-            <p className="text-[9px] uppercase tracking-wide text-muted-foreground">Protein · {pct(preview.protein * 4)}%</p>
+            <p className="tabular-mono text-[0.9375rem] font-bold">{preview.protein}g</p>
+            <p className="text-[0.5625rem] uppercase tracking-wide text-muted-foreground">Protein · {pct(preview.protein * 4)}%</p>
           </div>
           <div>
-            <p className="tabular-mono text-[15px] font-bold">{preview.carbs}g</p>
-            <p className="text-[9px] uppercase tracking-wide text-muted-foreground">Carbs · {pct(preview.carbs * 4)}%</p>
+            <p className="tabular-mono text-[0.9375rem] font-bold">{preview.carbs}g</p>
+            <p className="text-[0.5625rem] uppercase tracking-wide text-muted-foreground">Carbs · {pct(preview.carbs * 4)}%</p>
           </div>
           <div>
-            <p className="tabular-mono text-[15px] font-bold">{preview.fat}g</p>
-            <p className="text-[9px] uppercase tracking-wide text-muted-foreground">Fat · {pct(preview.fat * 9)}%</p>
+            <p className="tabular-mono text-[0.9375rem] font-bold">{preview.fat}g</p>
+            <p className="text-[0.5625rem] uppercase tracking-wide text-muted-foreground">Fat · {pct(preview.fat * 9)}%</p>
           </div>
         </div>
 
         {(preview.clampedCarbFloor || preview.clampedFatFloor) && (
-          <p className="text-[11px] text-[color:var(--role-warn-text)]">
+          <p className="text-[0.6875rem] text-[color:var(--role-warn-text)]">
             {preview.clampedFatFloor && 'Fat was raised to the 0.6g/kg floor — your requested percentage would have gone too low. '}
             {preview.clampedCarbFloor && 'Carbs were raised to the 50g floor — the remaining calories after protein and fat left less than that.'}
           </p>
         )}
 
         {preview.calories !== calorieTarget && (
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-[0.6875rem] text-muted-foreground">
             Lands at {preview.calories} kcal ({preview.calories > calorieTarget ? '+' : ''}{preview.calories - calorieTarget} vs your {calorieTarget} kcal target) because of the floor above.
           </p>
         )}
 
         {dirty && (
           <div className="flex items-center justify-between gap-2 rounded-md bg-[color:var(--role-ai-bg)] px-3 py-2">
-            <p className="text-[11px] text-[color:var(--role-ai-text)]">Your meals were generated for the old split.</p>
+            <p className="text-[0.6875rem] text-[color:var(--role-ai-text)]">Your meals were generated for the old split.</p>
             <Button size="sm" variant="outline" onClick={handleRegenerate} disabled={isGeneratingMeals} className="h-7 text-xs shrink-0">
               {isGeneratingMeals ? <Loader2 className="size-3 animate-spin mr-1" /> : <RefreshCw className="size-3 mr-1" />}
               Regenerate meals

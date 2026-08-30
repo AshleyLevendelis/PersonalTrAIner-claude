@@ -45,12 +45,29 @@ console.log('\n1. Every colour is a token, so all four themes still work')
     /--primary:\s*var\(--theme-primary\)/.test(css))
 }
 
+/**
+ * The rendered size of a `text-[...]` class, in px at the browser's 16px
+ * default root — so the design number stays readable here whichever unit the
+ * source uses.
+ *
+ * Sizes moved from px to rem for accessibility (audit §11): px ignores the
+ * reader's OS text-size setting, rem follows it. The DESIGN did not change —
+ * 19px is still 19px at default — so this gate keeps asserting 19, and stops
+ * asserting the spelling.
+ */
+function renderedPx(classes: string): number | null {
+  const m = /text-\[([0-9.]+)(px|rem)\]/.exec(classes)
+  if (!m) return null
+  return m[2] === 'rem' ? Number(m[1]) * 16 : Number(m[1])
+}
+
 console.log('\n2. The coach is not in a bubble')
 {
   const row = ui.slice(ui.indexOf('TEXT-ONLY CONVERSATION, v2.'), ui.indexOf('{msg.slotCard'))
   check('the coach line exists', row.length > 100)
-  const coach = /max-w-\[88%\] text-\[19px\]\/\[1\.6\] text-foreground \[text-wrap:pretty\]/.exec(row)
-  check('coach text is 19px / 1.6, foreground, pretty-wrapped', coach !== null)
+  const coach = /max-w-\[88%\] text-\[[0-9.]+(?:px|rem)\]\/\[1\.6\] text-foreground \[text-wrap:pretty\]/.exec(row)
+  check('coach text is 19px / 1.6, foreground, pretty-wrapped',
+    coach !== null && renderedPx(coach[0]) === 19, coach?.[0])
   // The actual regression to fear: someone "tidies up" by giving the coach a
   // surface again, and the design quietly reverts to a messaging UI.
   const coachClasses = coach ? coach[0] : ''
@@ -64,7 +81,9 @@ console.log('\n2. The coach is not in a bubble')
     /\.ob-user-bubble\s*\{[^}]*var\(--secondary\)/s.test(css))
   check('...with the mint hairline derived from the accent',
     /\.ob-user-bubble\s*\{[^}]*rgba\(var\(--glow-rgb\), \.18\)/s.test(css))
-  check('...at 17px / 1.5, one step down from the coach', /text-\[17px\]\/\[1\.5\]/.test(row))
+  const userSize = /text-\[[0-9.]+(?:px|rem)\]\/\[1\.5\]/.exec(row)
+  check('...at 17px / 1.5, one step down from the coach',
+    userSize !== null && renderedPx(userSize[0]) === 17, userSize?.[0])
   check('...with the asymmetric corner', /rounded-\[20px_20px_4px_20px\]/.test(row))
   check('...and capped at 80%', /max-w-\[80%\]/.test(row))
 }
@@ -144,7 +163,11 @@ console.log('\n5. v2 — the composer')
   check('...neutral at rest, mint on focus — so the accent means "you are here"',
     /\.ob-input\s*\{[^}]*border:\s*1\.5px solid var\(--border\)/s.test(css) &&
     /\.ob-input:focus\s*\{\s*border-color:\s*var\(--primary\)/.test(css))
-  check('...at 16px', /text-\[16px\]/.test(composer))
+  // 16px is not a taste choice: iOS Safari zooms the whole page when a focused
+  // input's text is smaller, so anything under it makes the composer jump.
+  const composerSize = /text-\[[0-9.]+(?:px|rem)\]/.exec(composer)
+  check('...at 16px, the size below which iOS zooms the page on focus',
+    composerSize !== null && renderedPx(composerSize[0]) === 16, composerSize?.[0])
 
   check('the send button is a 52px CIRCLE', /size-\[52px\]/.test(composer) && /rounded-full/.test(composer))
   check('...with a 22px icon', /size-\[22px\]/.test(composer))

@@ -87,7 +87,7 @@ export function OptionRow({
         <span className="block text-sm font-semibold text-foreground">{label}</span>
         {description && (
           <span className={cn(
-            'mt-0.5 block text-[11.5px] leading-[1.4]',
+            'mt-0.5 block text-[0.71875rem] leading-[1.4]',
             // The selected row's description brightens rather than staying
             // muted — on a tinted background muted-foreground loses contrast.
             selected ? 'text-[color:var(--text-tertiary)]' : 'text-muted-foreground',
@@ -118,7 +118,7 @@ export function OptionPill({
       onClick={onClick}
       {...a11y}
       className={cn(
-        'inline-flex min-h-[44px] items-center gap-1.5 rounded-full px-4 py-2.5 text-[13.5px] transition-colors duration-150',
+        'inline-flex min-h-[44px] items-center gap-1.5 rounded-full px-4 py-2.5 text-[0.84375rem] transition-colors duration-150',
         selected
           ? 'bg-primary font-semibold text-primary-foreground'
           : 'bg-[color:var(--surface-raised)] font-medium text-foreground hover:bg-[color:var(--accent)]',

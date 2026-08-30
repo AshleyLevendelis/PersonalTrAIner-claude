@@ -110,10 +110,10 @@ export function ExerciseLine({
       >
         <div className="flex items-center gap-2 max-w-full">
           {supersetLabel && (
-            <span className="shrink-0 font-mono text-[10px] font-semibold text-primary glow-mint">{supersetLabel}</span>
+            <span className="shrink-0 font-mono text-[0.625rem] font-semibold text-primary glow-mint">{supersetLabel}</span>
           )}
           <span
-            className={`truncate ${expanded ? 'text-[19px] font-semibold' : 'text-[15.5px] font-medium'} ${
+            className={`truncate ${expanded ? 'text-[1.1875rem] font-semibold' : 'text-[0.96875rem] font-medium'} ${
               allSetsLogged ? 'line-through text-muted-foreground' : ''
             } ${!expanded && loadIsUnverified ? 'border-b border-dotted border-muted-foreground/50' : ''}`}
           >

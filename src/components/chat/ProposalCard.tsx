@@ -74,21 +74,21 @@ export function ProposalCard({
   return (
     <div className="mt-2 pl-3.5 border-l-2 border-[color:var(--role-ai-border)] text-sm space-y-2.5">
       <div className="space-y-2">
-        <span className="block text-[9.5px] font-semibold uppercase tracking-[0.18em] text-[color:var(--role-ai)]">
+        <span className="block text-[0.59375rem] font-semibold uppercase tracking-[0.18em] text-[color:var(--role-ai)]">
           Proposed change
         </span>
         {diff.rows.map((row, i) => (
           <div key={i} className="flex flex-col gap-0.5">
-            <span className="text-[10px] text-muted-foreground">{row.field}</span>
-            <span className="text-[13.5px] line-through text-muted-foreground/70">{row.before}</span>
-            <span className="text-[14.5px] font-semibold">{row.after}</span>
-            {row.note && <span className="text-[10px] text-muted-foreground/80">{row.note}</span>}
+            <span className="text-[0.625rem] text-muted-foreground">{row.field}</span>
+            <span className="text-[0.84375rem] line-through text-muted-foreground/70">{row.before}</span>
+            <span className="text-[0.90625rem] font-semibold">{row.after}</span>
+            {row.note && <span className="text-[0.625rem] text-muted-foreground/80">{row.note}</span>}
           </div>
         ))}
       </div>
 
       {diff.unchanged && diff.unchanged.length > 0 && (
-        <p className="text-[10px] text-muted-foreground/70">Unchanged: {diff.unchanged.join(', ')}</p>
+        <p className="text-[0.625rem] text-muted-foreground/70">Unchanged: {diff.unchanged.join(', ')}</p>
       )}
 
       {diff.implications?.map((imp, i) => (

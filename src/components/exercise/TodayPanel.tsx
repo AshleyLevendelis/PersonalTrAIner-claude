@@ -305,19 +305,19 @@ export function TodayPanel({
               title. */}
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[10.5px] uppercase tracking-[.2em] text-primary glow-mint">
+              <span className="text-[0.65625rem] uppercase tracking-[.2em] text-primary glow-mint">
                 Today · {effectiveDayName}
               </span>
               {devOverrideDay && (
-                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-[color:var(--role-warn-border)] bg-[color:var(--role-warn-bg)] text-[color:var(--role-warn-text)]">
+                <span className="text-[0.625rem] font-mono px-1.5 py-0.5 rounded border border-[color:var(--role-warn-border)] bg-[color:var(--role-warn-bg)] text-[color:var(--role-warn-text)]">
                   DEV · {devOverrideDay}
                 </span>
               )}
               {borrowedDayName && (
-                <span className="text-[10px] text-muted-foreground italic">borrowed from {todayName}</span>
+                <span className="text-[0.625rem] text-muted-foreground italic">borrowed from {todayName}</span>
               )}
             </div>
-            <p className="mt-1.5 text-[36px] font-bold leading-[1.02] tracking-[-.035em] glow-text">{workout!.focus}</p>
+            <p className="mt-1.5 text-[2.25rem] font-bold leading-[1.02] tracking-[-.035em] glow-text">{workout!.focus}</p>
             <div className="mt-3.5 h-[2px] rounded-full" style={{ background: 'var(--hairline)' }}>
               <div
                 className="h-[2px] rounded-full bg-primary glow-mint-box"

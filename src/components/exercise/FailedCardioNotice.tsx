@@ -44,19 +44,19 @@ export function FailedCardioNotice() {
             {failures.length === 1 ? "One session didn't save" : `${failures.length} sessions didn't save`}
           </p>
           {/* Says what is true: it is still here, and it is not counted yet. */}
-          <p className="text-[11px] text-muted-foreground mt-0.5">
+          <p className="text-[0.6875rem] text-muted-foreground mt-0.5">
             Still saved on this device, but not in your history yet.
           </p>
           <ul className="mt-2 flex flex-col gap-2">
             {failures.map(f => (
               <li key={f.clientId ?? f.id} className="flex items-center gap-2">
-                <span className="min-w-0 flex-1 truncate text-[11px]">
+                <span className="min-w-0 flex-1 truncate text-[0.6875rem]">
                   {f.activity_name} · {f.duration_minutes} min · {f.date}
                 </span>
                 <button
                   type="button"
                   onClick={() => retryFailedCardioLog(f.clientId!)}
-                  className="hit-slop-44 inline-flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-[11px]"
+                  className="hit-slop-44 inline-flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-[0.6875rem]"
                   aria-label={`Try saving ${f.activity_name} again`}
                 >
                   <RotateCw className="size-2.5" aria-hidden /> Try again
@@ -64,7 +64,7 @@ export function FailedCardioNotice() {
                 <button
                   type="button"
                   onClick={() => discardFailedCardioLog(f.clientId!)}
-                  className="hit-slop-44 inline-flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-[11px] text-muted-foreground"
+                  className="hit-slop-44 inline-flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-[0.6875rem] text-muted-foreground"
                   aria-label={`Discard ${f.activity_name}`}
                 >
                   <X className="size-2.5" aria-hidden /> Discard

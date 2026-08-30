@@ -313,7 +313,7 @@ export function NutritionDisplay({
           <div className="flex min-w-0 flex-1 flex-col gap-3">
             <div>
               <p className="ds-num-mega tabular-mono text-[#E4FCF4] glow-mint-lg">{macros ? Math.round(eaten.kcal) : '—'}</p>
-              <p className="mt-1 text-[10.5px] uppercase tracking-[.16em] text-muted-foreground">
+              <p className="mt-1 text-[0.65625rem] uppercase tracking-[.16em] text-muted-foreground">
                 {macros
                   ? <>kcal · of <span className="tabular-mono">{Math.round(macros.calories)}</span></>
                   : 'kcal · add your weight for a target'}
@@ -331,8 +331,8 @@ export function NutritionDisplay({
                 return (
                   <div key={row.key} className="flex items-baseline gap-[9px]">
                     <span className="h-[9px] w-[9px] shrink-0 rounded-[3px]" style={{ background: ring.color }} />
-                    <span className="flex-1 text-[10px] uppercase tracking-[.16em] text-muted-foreground">{row.label}</span>
-                    <span className="tabular-mono text-[12.5px]">
+                    <span className="flex-1 text-[0.625rem] uppercase tracking-[.16em] text-muted-foreground">{row.label}</span>
+                    <span className="tabular-mono text-[0.78125rem]">
                       {Math.round(e)}<span className="text-muted-foreground"> / {Math.round(t)}{row.unit}</span>
                     </span>
                   </div>
@@ -348,7 +348,7 @@ export function NutritionDisplay({
             app where the mint "on-track" colour doesn't apply, since water
             isn't a macro target the split card governs. */}
         <div className="flex items-baseline justify-between pt-3.5 pb-2.5" style={{ borderTop: '1px solid var(--hairline)' }}>
-          <span className="text-[13px] text-text-tertiary">Water</span>
+          <span className="text-[0.8125rem] text-text-tertiary">Water</span>
           {editingWaterTarget ? (
             <div className="flex items-center gap-1">
               <input
@@ -357,11 +357,11 @@ export function NutritionDisplay({
                 onChange={e => setWaterTargetInput(e.target.value)}
                 className="h-7 w-16 min-w-0 rounded-md bg-[color:var(--surface-raised)] px-1.5 text-xs"
               />
-              <Button size="sm" variant="ghost" className="h-7 shrink-0 px-1.5 text-[10px]" onClick={handleSaveWaterTarget}>Save</Button>
+              <Button size="sm" variant="ghost" className="h-7 shrink-0 px-1.5 text-[0.625rem]" onClick={handleSaveWaterTarget}>Save</Button>
             </div>
           ) : (
             <span className="flex flex-wrap items-baseline justify-end gap-x-3 gap-y-1">
-              <span className="tabular-mono text-[13px]">{todayWaterMl} / {waterTarget} ml</span>
+              <span className="tabular-mono text-[0.8125rem]">{todayWaterMl} / {waterTarget} ml</span>
               {WATER_QUICK_ADD_ML.map(ml => (
                 <button key={ml} className="hit-slop-44 text-xs font-semibold" style={{ color: 'var(--chart-3)' }} onClick={() => handleAddWater(ml)}>+{ml}</button>
               ))}
@@ -394,7 +394,7 @@ export function NutritionDisplay({
             radius, stroke and rotate(-90) start so the two read as one system
             rather than two people's work. */}
         <div className="flex items-baseline justify-between pt-3.5 pb-1" style={{ borderTop: '1px solid var(--hairline)' }}>
-          <span className="text-[13px] text-text-tertiary">Steps</span>
+          <span className="text-[0.8125rem] text-text-tertiary">Steps</span>
           <span className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
             <svg viewBox="0 0 34 34" className="size-[24px] shrink-0" aria-hidden>
               <circle cx="17" cy="17" r={STEP_RING_R} fill="none" stroke="var(--surface-raised)" strokeWidth="4" />
@@ -404,7 +404,7 @@ export function NutritionDisplay({
                 transform="rotate(-90 17 17)"
               />
             </svg>
-            <span className="tabular-mono text-[13px]">{todaySteps.toLocaleString()} / {stepTarget.toLocaleString()}</span>
+            <span className="tabular-mono text-[0.8125rem]">{todaySteps.toLocaleString()} / {stepTarget.toLocaleString()}</span>
             <input
               type="number"
               placeholder="Log"
@@ -421,7 +421,7 @@ export function NutritionDisplay({
             it is how two surfaces come to disagree about one number. The
             override behaviour is unchanged, as the handoff also requires —
             this line says where it lives instead. */}
-        <p className="text-[11px] leading-[1.4] text-muted-foreground">
+        <p className="text-[0.6875rem] leading-[1.4] text-muted-foreground">
           Target from the activity level your calorie target uses — override it in your profile.
         </p>
         {entryError && (
@@ -474,23 +474,23 @@ export function NutritionDisplay({
         <CardContent className="pt-0">
           <div className="flex gap-3">
             <div className="flex-1 min-w-0">
-              <p className="tabular-mono text-[17px] font-bold tracking-[-.03em]">{derivation.bmr}</p>
-              <p className="mt-0.5 text-[8.5px] uppercase tracking-[.14em] text-muted-foreground">BMR</p>
+              <p className="tabular-mono text-[1.0625rem] font-bold tracking-[-.03em]">{derivation.bmr}</p>
+              <p className="mt-0.5 text-[0.53125rem] uppercase tracking-[.14em] text-muted-foreground">BMR</p>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="tabular-mono text-[17px] font-bold tracking-[-.03em]">{derivation.tdee}</p>
-              <p className="mt-0.5 text-[8.5px] uppercase tracking-[.14em] text-muted-foreground">TDEE</p>
+              <p className="tabular-mono text-[1.0625rem] font-bold tracking-[-.03em]">{derivation.tdee}</p>
+              <p className="mt-0.5 text-[0.53125rem] uppercase tracking-[.14em] text-muted-foreground">TDEE</p>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="tabular-mono text-[17px] font-bold tracking-[-.03em]">{derivation.surplusKcal > 0 ? '+' : ''}{derivation.surplusKcal}</p>
-              <p className="mt-0.5 text-[8.5px] uppercase tracking-[.14em] text-muted-foreground">{derivation.surplusLabel.split(' ')[0]}</p>
+              <p className="tabular-mono text-[1.0625rem] font-bold tracking-[-.03em]">{derivation.surplusKcal > 0 ? '+' : ''}{derivation.surplusKcal}</p>
+              <p className="mt-0.5 text-[0.53125rem] uppercase tracking-[.14em] text-muted-foreground">{derivation.surplusLabel.split(' ')[0]}</p>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="tabular-mono text-[17px] font-bold tracking-[-.03em] text-primary glow-mint">{derivation.target.calories}</p>
-              <p className="mt-0.5 text-[8.5px] uppercase tracking-[.14em] text-muted-foreground">Target</p>
+              <p className="tabular-mono text-[1.0625rem] font-bold tracking-[-.03em] text-primary glow-mint">{derivation.target.calories}</p>
+              <p className="mt-0.5 text-[0.53125rem] uppercase tracking-[.14em] text-muted-foreground">Target</p>
             </div>
           </div>
-          <p className="mt-2.5 text-[11px] leading-normal text-muted-foreground">
+          <p className="mt-2.5 text-[0.6875rem] leading-normal text-muted-foreground">
             {derivation.splitApplies
               ? `From ${effectiveProfile.weight_kg} kg, ${effectiveProfile.height_cm} cm, ${effectiveProfile.age} y · protein ${derivation.split.proteinPerKg.toFixed(1)} g/kg · fat ${Math.round(derivation.split.fatPercent * 100)}% · carbs the remainder.`
               : `From ${effectiveProfile.weight_kg} kg, ${effectiveProfile.height_cm} cm, ${effectiveProfile.age} y · a fixed 20% protein / 25% fat / 55% carb split for conditioning goals.`}
@@ -541,7 +541,7 @@ export function NutritionDisplay({
                   >
                     <div className="flex items-center gap-2">
                       <span className="font-medium capitalize w-20">{day.slice(0, 3)}</span>
-                      <Badge variant={d.dayType === 'training' ? 'warning' : 'outline'} className="text-[10px]">
+                      <Badge variant={d.dayType === 'training' ? 'warning' : 'outline'} className="text-[0.625rem]">
                         {d.dayType === 'training' ? 'Train' : 'Rest'}
                       </Badge>
                     </div>
@@ -599,7 +599,7 @@ export function NutritionDisplay({
                 </div>
                 <div>
                   <p className="font-medium text-xs text-foreground">Standard Static</p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">Same macros every day</p>
+                  <p className="text-[0.625rem] text-muted-foreground mt-0.5">Same macros every day</p>
                 </div>
               </div>
             </button>
@@ -620,7 +620,7 @@ export function NutritionDisplay({
                 </div>
                 <div>
                   <p className="font-medium text-xs text-foreground">Dynamic CSCS</p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">Carb-cycles by training day</p>
+                  <p className="text-[0.625rem] text-muted-foreground mt-0.5">Carb-cycles by training day</p>
                 </div>
               </div>
             </button>

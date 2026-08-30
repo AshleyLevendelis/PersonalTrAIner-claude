@@ -150,7 +150,7 @@ export function AddUnplannedWork({
                 key={preset.activity}
                 variant="outline"
                 size="sm"
-                className="h-7 text-[11px] justify-start px-2"
+                className="h-7 text-[0.6875rem] justify-start px-2"
                 onClick={() => { setActivity(preset.activity); setDuration(String(preset.duration)); setRpe(preset.rpe) }}
               >
                 {preset.label}
@@ -175,7 +175,7 @@ export function AddUnplannedWork({
             />
           </div>
           <div className="space-y-1.5">
-            <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+            <span className="text-[0.625rem] text-muted-foreground flex items-center gap-1">
               <Flame className="size-2.5" /> RPE {rpe}
             </span>
             <div className="flex gap-1">

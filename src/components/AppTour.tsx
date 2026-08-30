@@ -472,27 +472,27 @@ export function AppTour({ profileId, armed }: { profileId?: string; armed: boole
           >
             <MessageCircle className="size-3" />
           </span>
-          <span className="flex-1 text-[10px] uppercase tracking-[.16em] text-muted-foreground">
+          <span className="flex-1 text-[0.625rem] uppercase tracking-[.16em] text-muted-foreground">
             Coach · {displayIndex} of {totalSteps}
           </span>
           {!step.last && (
-            <button type="button" onClick={skip} className="p-1 text-[11px] text-muted-foreground underline">
+            <button type="button" onClick={skip} className="p-1 text-[0.6875rem] text-muted-foreground underline">
               Skip
             </button>
           )}
         </div>
 
         {step.title && stepIndex === 0 && (
-          <p className="mt-2.5 text-[17px] font-semibold tracking-[-.01em] text-foreground">{step.title}</p>
+          <p className="mt-2.5 text-[1.0625rem] font-semibold tracking-[-.01em] text-foreground">{step.title}</p>
         )}
-        <p className="mt-2 text-[13.5px] leading-[1.55] text-foreground">{body}</p>
+        <p className="mt-2 text-[0.84375rem] leading-[1.55] text-foreground">{body}</p>
 
         {tapPhase ? (
-          <p className="mb-1 mt-2.5 text-[12.5px] font-semibold text-primary glow-mint">→ {step.tapHint}</p>
+          <p className="mb-1 mt-2.5 text-[0.78125rem] font-semibold text-primary glow-mint">→ {step.tapHint}</p>
         ) : (
           <div className="mt-3 flex items-center gap-2.5">
             {stepIndex > 0 && (
-              <button type="button" onClick={back} className="px-1 py-1.5 text-[12.5px] text-muted-foreground">
+              <button type="button" onClick={back} className="px-1 py-1.5 text-[0.78125rem] text-muted-foreground">
                 Back
               </button>
             )}
@@ -513,7 +513,7 @@ export function AppTour({ profileId, armed }: { profileId?: string; armed: boole
             <button
               type="button"
               onClick={step.last ? finish : advance}
-              className="h-[34px] rounded-[10px] px-4 text-[12.5px] font-semibold text-primary-foreground glow-mint-box"
+              className="h-[34px] rounded-[10px] px-4 text-[0.78125rem] font-semibold text-primary-foreground glow-mint-box"
               style={{ background: 'var(--primary)' }}
             >
               {stepIndex === 0 ? 'Show me around' : step.last ? 'Finish' : 'Next'}
@@ -561,7 +561,7 @@ function ResumePill({
       <button
         type="button"
         onClick={onResume}
-        className="inline-flex h-[38px] items-center gap-2 rounded-full bg-card px-4 text-[12.5px] font-medium text-foreground"
+        className="inline-flex h-[38px] items-center gap-2 rounded-full bg-card px-4 text-[0.78125rem] font-medium text-foreground"
         style={{ border: '1px solid rgba(var(--glow-rgb), .4)', boxShadow: '0 8px 24px rgba(0,0,0,.45)' }}
       >
         <span className="glow-dot size-1.5 rounded-full bg-primary glow-mint-box" />

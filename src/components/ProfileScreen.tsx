@@ -180,7 +180,7 @@ function EditableTagList({
     <div className="space-y-1.5">
       <div className="flex flex-wrap gap-x-2.5 gap-y-2.5">
         {values.map(v => (
-          <Badge key={v} variant="secondary" className="text-[10px] gap-1 pr-1">
+          <Badge key={v} variant="secondary" className="text-[0.625rem] gap-1 pr-1">
             {v}
             <button type="button" onClick={() => remove(v)} aria-label={`Remove ${v}`} className="hit-slop-44"><X className="size-2.5" /></button>
           </Badge>
@@ -215,7 +215,7 @@ function TrainingDaysEditor({ days, onSave }: { days: TrainingDay[]; onSave: (ne
       className="flex-wrap"
     >
       {DAY_ORDER.map(day => (
-        <ToggleGroupItem key={day} value={day} className="text-[10px] px-2 h-7">{day.slice(0, 3)}</ToggleGroupItem>
+        <ToggleGroupItem key={day} value={day} className="text-[0.625rem] px-2 h-7">{day.slice(0, 3)}</ToggleGroupItem>
       ))}
     </ToggleGroup>
   )
@@ -232,11 +232,11 @@ const FACT_KIND_LABEL: Record<UserFactRow['kind'], string> = {
 
 function ProvenanceBadge({ source, createdAt }: { source: string; createdAt: string }) {
   const date = new Date(createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-  return <span className="text-[10px] text-muted-foreground">{source} · {date}</span>
+  return <span className="text-[0.625rem] text-muted-foreground">{source} · {date}</span>
 }
 
 function EffectLine({ text }: { text: string }) {
-  return <p className="text-[11px] text-muted-foreground italic mt-0.5">{text}</p>
+  return <p className="text-[0.6875rem] text-muted-foreground italic mt-0.5">{text}</p>
 }
 
 function factEffect(fact: UserFactRow): string {
@@ -571,7 +571,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
         <div className="space-y-2">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Injuries</h3>
           <div className="rounded-md border p-2.5 space-y-2.5 text-sm">
-            <p className="text-[11px] leading-snug text-muted-foreground/70">Areas to work around. Picking one changes which exercises your plan gives you.</p>
+            <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">Areas to work around. Picking one changes which exercises your plan gives you.</p>
             <ToggleGroup
               type="multiple"
               value={injuryCodes}
@@ -582,7 +582,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                 <ToggleGroupItem
                   key={o.value}
                   value={o.value}
-                  className="h-8 rounded-full border px-2.5 text-[11px] data-[state=on]:border-primary data-[state=on]:text-primary"
+                  className="h-8 rounded-full border px-2.5 text-[0.6875rem] data-[state=on]:border-primary data-[state=on]:text-primary"
                 >
                   {o.icon} {o.label}
                 </ToggleGroupItem>
@@ -594,12 +594,12 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                  would be the same silent discarding this fix is about. Said
                  plainly, with a way to clear each one. */
               <div className="space-y-1.5 pt-2" style={{ borderTop: '1px solid var(--hairline)' }}>
-                <p className="text-[11px] leading-snug text-muted-foreground/70">
+                <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">
                   These are saved but don't change your plan — the app can only work around the areas above. Tell your coach in Chat about anything else.
                 </p>
                 <div className="flex flex-wrap gap-1.5">
                   {unrecognisedInjuries.map((v: string) => (
-                    <span key={v} className="inline-flex items-center gap-1 rounded-full border border-dashed px-2.5 py-1 text-[11px] text-muted-foreground">
+                    <span key={v} className="inline-flex items-center gap-1 rounded-full border border-dashed px-2.5 py-1 text-[0.6875rem] text-muted-foreground">
                       {v}
                       <button
                         type="button"
@@ -629,7 +629,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                 word about tags or the food database. */}
             <div ref={dietaryRef} className="space-y-1.5">
               <span className="text-muted-foreground">Dietary restrictions</span>
-              <p className="text-[11px] leading-snug text-muted-foreground/70">Diets and allergies the app enforces when building your meals.</p>
+              <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">Diets and allergies the app enforces when building your meals.</p>
               <ToggleGroup
                 type="multiple"
                 value={profile.dietary_preferences}
@@ -640,7 +640,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                   <ToggleGroupItem
                     key={o.value}
                     value={o.value}
-                    className="h-8 rounded-full border px-2.5 text-[11px] data-[state=on]:border-primary data-[state=on]:text-primary"
+                    className="h-8 rounded-full border px-2.5 text-[0.6875rem] data-[state=on]:border-primary data-[state=on]:text-primary"
                   >
                     {o.icon} {o.label}
                   </ToggleGroupItem>
@@ -649,7 +649,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
             </div>
             <div className="space-y-1.5">
               <span className="text-muted-foreground">Foods to avoid</span>
-              <p className="text-[11px] leading-snug text-muted-foreground/70">Anything else you'd rather not see. Matched by name.</p>
+              <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">Anything else you'd rather not see. Matched by name.</p>
               <EditableTagList values={hardFoodDislikeValues} onSave={saveDislikedFoods} placeholder="e.g. mushrooms" />
             </div>
             {/* Honesty-copy round — applies to BOTH fields above (the
@@ -661,7 +661,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                 as belonging only to the ToggleGroup, at the same space-y-3 gap
                 as every other unrelated field in this card, which risked
                 being misread as "the avoid-list doesn't have this limitation." */}
-            <p className="pt-2 text-[11px] leading-snug text-muted-foreground/70" style={{ borderTop: '1px solid var(--hairline)' }}>
+            <p className="pt-2 text-[0.6875rem] leading-snug text-muted-foreground/70" style={{ borderTop: '1px solid var(--hairline)' }}>
               These filters check ingredients we recognise. We can't check brands,
               preparation, or cross-contamination. If you have a food allergy,
               always check ingredients yourself.
@@ -727,14 +727,14 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                   {editingId === g.id ? (
                     <div className="flex items-center gap-2.5">
                       <Input value={editValue} onChange={e => setEditValue(e.target.value)} className="h-7 text-sm" />
-                      <Button size="icon" variant="ghost" className="hit-slop-44 size-7" onClick={() => saveGoalEdit(g.id)}><Check className="size-3.5" /></Button>
-                      <Button size="icon" variant="ghost" className="hit-slop-44 size-7" onClick={cancelEdit}><X className="size-3.5" /></Button>
+                      <Button size="icon" variant="ghost" className="hit-slop-44 size-7" onClick={() => saveGoalEdit(g.id)} aria-label="Save this goal"><Check className="size-3.5" /></Button>
+                      <Button size="icon" variant="ghost" className="hit-slop-44 size-7" onClick={cancelEdit} aria-label="Cancel editing"><X className="size-3.5" /></Button>
                     </div>
                   ) : (
                     <div className="flex items-start justify-between gap-2">
                       <span className="text-sm font-medium">{g.display_text}</span>
                       <div className="flex items-center gap-2.5 shrink-0">
-                        <Button size="icon" variant="ghost" className="hit-slop-44 size-6" onClick={() => startEdit(g.id, g.display_text)}><Pencil className="size-3" /></Button>
+                        <Button size="icon" variant="ghost" className="hit-slop-44 size-6" onClick={() => startEdit(g.id, g.display_text)} aria-label={`Edit goal: ${g.display_text}`}><Pencil className="size-3" /></Button>
                         <Button
                           size="icon" variant="ghost"
                           className={armedDeleteKey === `goal:${g.id}` ? 'hit-slop-44 size-6 bg-destructive text-destructive-foreground' : 'hit-slop-44 size-6 text-destructive'}
@@ -747,7 +747,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                   {g.status === 'needs_baseline' && <EffectLine text="Waiting on a baseline before this can be tracked" />}
                   {g.trackable === 'directional' && <EffectLine text="Directional — biases your plan, never reported as a tracked percentage" />}
                   {g.trackable === 'measurable' && g.status === 'active' && (
-                    <div className="text-[11px] text-muted-foreground">
+                    <div className="text-[0.6875rem] text-muted-foreground">
                       {progress.current != null
                         ? `Current: ${progress.current} · Target: ${g.target_value} · ${progress.percent}% there`
                         : `Baseline: ${g.baseline_value} · Target: ${g.target_value} · current not yet known`}
@@ -771,15 +771,15 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                     {editingId === f.id ? (
                       <div className="flex items-center gap-2.5">
                         <Input value={editValue} onChange={e => setEditValue(e.target.value)} className="h-7 text-sm" />
-                        <Button size="icon" variant="ghost" className="hit-slop-44 size-7" onClick={() => saveFactEdit(f.id)}><Check className="size-3.5" /></Button>
-                        <Button size="icon" variant="ghost" className="hit-slop-44 size-7" onClick={cancelEdit}><X className="size-3.5" /></Button>
+                        <Button size="icon" variant="ghost" className="hit-slop-44 size-7" onClick={() => saveFactEdit(f.id)} aria-label="Save this note"><Check className="size-3.5" /></Button>
+                        <Button size="icon" variant="ghost" className="hit-slop-44 size-7" onClick={cancelEdit} aria-label="Cancel editing"><X className="size-3.5" /></Button>
                       </div>
                     ) : (
                       <div className="flex items-start justify-between gap-2">
                         <span className="text-sm font-medium">{f.display_text}</span>
                         <div className="flex items-center gap-2.5 shrink-0">
-                          {f.hardness && <Badge variant="outline" className="text-[9px] px-1 py-0">{f.hardness}</Badge>}
-                          <Button size="icon" variant="ghost" className="hit-slop-44 size-6" onClick={() => startEdit(f.id, f.display_text)}><Pencil className="size-3" /></Button>
+                          {f.hardness && <Badge variant="outline" className="text-[0.5625rem] px-1 py-0">{f.hardness}</Badge>}
+                          <Button size="icon" variant="ghost" className="hit-slop-44 size-6" onClick={() => startEdit(f.id, f.display_text)} aria-label={`Edit note: ${f.display_text}`}><Pencil className="size-3" /></Button>
                           <Button
                             size="icon" variant="ghost"
                             className={armedDeleteKey === `fact:${f.id}` ? 'hit-slop-44 size-6 bg-destructive text-destructive-foreground' : 'hit-slop-44 size-6 text-destructive'}
@@ -812,7 +812,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                   type="button"
                   aria-pressed={revealSpeed === level}
                   onClick={() => onRevealSpeedChange(level)}
-                  className={`h-[38px] flex-1 rounded-[9px] text-[13px] capitalize transition-colors ${
+                  className={`h-[38px] flex-1 rounded-[9px] text-[0.8125rem] capitalize transition-colors ${
                     revealSpeed === level
                       ? 'font-semibold text-[color:var(--primary-foreground)] glow-mint-box'
                       : 'text-muted-foreground'
@@ -823,7 +823,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                 </button>
               ))}
             </div>
-            <p className="mt-2 text-[11.5px] leading-[1.5] text-muted-foreground/80">
+            <p className="mt-2 text-[0.71875rem] leading-[1.5] text-muted-foreground/80">
               Reduced-motion system settings always show replies instantly, regardless of this choice.
             </p>
           </div>
@@ -832,14 +832,14 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                 {editingId === c.id ? (
                   <div className="flex items-center gap-2.5">
                     <Input value={editValue} onChange={e => setEditValue(e.target.value)} className="h-7 text-sm" />
-                    <Button size="icon" variant="ghost" className="hit-slop-44 size-7" onClick={() => saveContextEdit(c.id)}><Check className="size-3.5" /></Button>
-                    <Button size="icon" variant="ghost" className="hit-slop-44 size-7" onClick={cancelEdit}><X className="size-3.5" /></Button>
+                    <Button size="icon" variant="ghost" className="hit-slop-44 size-7" onClick={() => saveContextEdit(c.id)} aria-label="Save this note"><Check className="size-3.5" /></Button>
+                    <Button size="icon" variant="ghost" className="hit-slop-44 size-7" onClick={cancelEdit} aria-label="Cancel editing"><X className="size-3.5" /></Button>
                   </div>
                 ) : (
                   <div className="flex items-start justify-between gap-2">
                     <span className="text-sm font-medium">{c.display_text}</span>
                     <div className="flex items-center gap-2.5 shrink-0">
-                      <Button size="icon" variant="ghost" className="hit-slop-44 size-6" onClick={() => startEdit(c.id, c.display_text)}><Pencil className="size-3" /></Button>
+                      <Button size="icon" variant="ghost" className="hit-slop-44 size-6" onClick={() => startEdit(c.id, c.display_text)} aria-label={`Edit note: ${c.display_text}`}><Pencil className="size-3" /></Button>
                       <Button
                         size="icon" variant="ghost"
                         className={armedDeleteKey === `context:${c.id}` ? 'hit-slop-44 size-6 bg-destructive text-destructive-foreground' : 'hit-slop-44 size-6 text-destructive'}
@@ -872,17 +872,17 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
           <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Your data</h3>
           <div className="rounded-md border p-2.5 space-y-3 text-sm">
             <div className="space-y-1.5">
-              <p className="text-[11px] leading-snug text-muted-foreground/70">
+              <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">
                 Everything the app has stored about you, as one file.
               </p>
               <Button size="sm" variant="outline" className="h-8 text-xs" onClick={handleDownloadData} disabled={dataBusy !== null}>
                 {dataBusy === 'export' ? 'Gathering…' : 'Download my data'}
               </Button>
-              {exportNote && <p className="text-[11px] leading-snug text-muted-foreground">{exportNote}</p>}
+              {exportNote && <p className="text-[0.6875rem] leading-snug text-muted-foreground">{exportNote}</p>}
             </div>
 
             <div className="space-y-1.5 pt-3" style={{ borderTop: '1px solid var(--hairline)' }}>
-              <p className="text-[11px] leading-snug text-muted-foreground/70">
+              <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">
                 Deleting removes your plan, your meals, every weigh-in and logged set, and your whole chat history. It cannot be undone, and there is no copy.
               </p>
               {!deleteArmed ? (
@@ -899,7 +899,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                    for the one action in this app that destroys everything and
                    cannot be undone. */
                 <div className="space-y-2">
-                  <label className="block text-[11px] leading-snug">
+                  <label className="block text-[0.6875rem] leading-snug">
                     Type <span className="font-semibold">delete</span> to confirm.
                     <Input
                       value={deleteConfirm}

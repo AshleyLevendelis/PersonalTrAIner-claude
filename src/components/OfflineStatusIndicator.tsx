@@ -76,7 +76,7 @@ export function OfflineStatusIndicator() {
               <AlertTriangle className="size-3.5 text-red-500" />
               Didn't save
             </span>
-            <Button variant="ghost" size="icon" className="hit-slop-44 size-6" onClick={() => setReviewOpen(false)}>
+            <Button variant="ghost" size="icon" className="hit-slop-44 size-6" onClick={() => setReviewOpen(false)} aria-label="Close">
               <X className="size-3.5" />
             </Button>
           </div>
@@ -88,18 +88,18 @@ export function OfflineStatusIndicator() {
                 <div key={`${item.queue}:${item.clientId}`} className="rounded-md border border-red-200 dark:border-red-900/40 bg-red-50/50 dark:bg-red-950/20 p-2 space-y-1">
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-xs font-medium truncate">{item.label}</span>
-                    {item.date && <span className="text-[10px] text-muted-foreground shrink-0">{item.date}</span>}
+                    {item.date && <span className="text-[0.625rem] text-muted-foreground shrink-0">{item.date}</span>}
                   </div>
                   {/* Which queue it came from, because "500 ml" and "Chest Dips
                       · set 3" in one list need saying apart. */}
-                  <p className="text-[10px] text-muted-foreground">{QUEUE_LABEL[item.queue]}</p>
-                  <p className="text-[10px] text-red-700 dark:text-red-400">{item.errorMessage}</p>
+                  <p className="text-[0.625rem] text-muted-foreground">{QUEUE_LABEL[item.queue]}</p>
+                  <p className="text-[0.625rem] text-red-700 dark:text-red-400">{item.errorMessage}</p>
                   <div className="flex gap-3 pt-0.5">
-                    <Button variant="outline" size="sm" className="hit-slop-44 h-6 text-[10px] px-2 gap-1" onClick={() => handleRetry(item)}>
+                    <Button variant="outline" size="sm" className="hit-slop-44 h-6 text-[0.625rem] px-2 gap-1" onClick={() => handleRetry(item)}>
                       <RotateCcw className="size-2.5" />
                       Retry
                     </Button>
-                    <Button variant="outline" size="sm" className="hit-slop-44 h-6 text-[10px] px-2 gap-1 text-destructive hover:text-destructive" onClick={() => handleDiscard(item)}>
+                    <Button variant="outline" size="sm" className="hit-slop-44 h-6 text-[0.625rem] px-2 gap-1 text-destructive hover:text-destructive" onClick={() => handleDiscard(item)}>
                       <Trash2 className="size-2.5" />
                       Discard
                     </Button>

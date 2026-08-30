@@ -134,7 +134,7 @@ export function DevTestPage({ profile, exercisePlan, mealPlan, onBack }: DevTest
         <header className="sticky top-0 z-50 bg-background/95 backdrop-blur border-b">
           <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Button onClick={onBack} variant="ghost" size="sm">
+              <Button onClick={onBack} aria-label="Back" variant="ghost" size="sm">
                 <ArrowLeft className="size-4" />
               </Button>
               <div className="flex items-center gap-2">
@@ -230,7 +230,7 @@ export function DevTestPage({ profile, exercisePlan, mealPlan, onBack }: DevTest
       <header className="sticky top-0 z-50 bg-background/95 backdrop-blur border-b">
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Button onClick={onBack} variant="ghost" size="sm">
+            <Button onClick={onBack} aria-label="Back" variant="ghost" size="sm">
               <ArrowLeft className="size-4" />
             </Button>
             <div className="flex items-center gap-2">
@@ -560,7 +560,7 @@ function AuditCaseRow({ testCase }: { testCase: AuditTestCase }) {
         <div className="border-t px-3 py-2 space-y-1 bg-red-50/50 dark:bg-red-900/10">
           {testCase.failures.map((f, i) => (
             <div key={i} className="flex items-start gap-2">
-              <Badge variant="outline" className="text-[10px] shrink-0 mt-0.5">
+              <Badge variant="outline" className="text-[0.625rem] shrink-0 mt-0.5">
                 {f.check}
               </Badge>
               <span className="text-muted-foreground">

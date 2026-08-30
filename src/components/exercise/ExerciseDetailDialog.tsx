@@ -59,8 +59,8 @@ export function ExerciseDetailDialog({
               <p className="ds-label">How to do it</p>
               <ol className="mt-2 space-y-2">
                 {entry.form_cues.map((cue, i) => (
-                  <li key={cue} className="flex gap-2.5 text-[13.5px] leading-[1.5]">
-                    <span className="tabular-mono shrink-0 text-[11px] text-muted-foreground pt-[3px]">{i + 1}</span>
+                  <li key={cue} className="flex gap-2.5 text-[0.84375rem] leading-[1.5]">
+                    <span className="tabular-mono shrink-0 text-[0.6875rem] text-muted-foreground pt-[3px]">{i + 1}</span>
                     <span>{cue}</span>
                   </li>
                 ))}
@@ -70,36 +70,36 @@ export function ExerciseDetailDialog({
             {entry.coach_note_swap && (
               <div>
                 <p className="ds-label">Why it&apos;s in your plan</p>
-                <p className="mt-1.5 text-[13px] leading-[1.5] text-text-tertiary">{entry.coach_note_swap}</p>
+                <p className="mt-1.5 text-[0.8125rem] leading-[1.5] text-text-tertiary">{entry.coach_note_swap}</p>
               </div>
             )}
 
             <div className="space-y-2.5">
               <div className="flex items-baseline justify-between gap-3">
-                <span className="text-[12px] text-muted-foreground">Works</span>
-                <span className="text-right text-[12.5px]">{entry.primary_muscles.map(tidy).join(', ')}</span>
+                <span className="text-[0.75rem] text-muted-foreground">Works</span>
+                <span className="text-right text-[0.78125rem]">{entry.primary_muscles.map(tidy).join(', ')}</span>
               </div>
               <div className="flex items-baseline justify-between gap-3" style={{ borderTop: '1px solid var(--hairline)', paddingTop: '10px' }}>
-                <span className="text-[12px] text-muted-foreground">Needs</span>
-                <span className="text-right text-[12.5px]">{entry.equipment.map(tidy).join(entry.equipment_alternatives ? ' or ' : ' + ')}</span>
+                <span className="text-[0.75rem] text-muted-foreground">Needs</span>
+                <span className="text-right text-[0.78125rem]">{entry.equipment.map(tidy).join(entry.equipment_alternatives ? ' or ' : ' + ')}</span>
               </div>
               <div className="flex items-baseline justify-between gap-3" style={{ borderTop: '1px solid var(--hairline)', paddingTop: '10px' }}>
-                <span className="text-[12px] text-muted-foreground">Joint load</span>
-                <span className="text-right text-[12.5px]">{tidy(entry.joint_stress)}</span>
+                <span className="text-[0.75rem] text-muted-foreground">Joint load</span>
+                <span className="text-right text-[0.78125rem]">{tidy(entry.joint_stress)}</span>
               </div>
               {/* Through jointListDisplay, never the raw tag. That helper exists
                   because `lower_back_axial` is not a phrase — anyone with a bad
                   back once read "Loads your lower back axial". */}
               {(entry.indicated_joints?.length ?? 0) > 0 && (
                 <div className="flex items-baseline justify-between gap-3" style={{ borderTop: '1px solid var(--hairline)', paddingTop: '10px' }}>
-                  <span className="text-[12px] text-muted-foreground">Good for</span>
-                  <span className="text-right text-[12.5px] text-primary">{jointListDisplay(entry.indicated_joints ?? [])}</span>
+                  <span className="text-[0.75rem] text-muted-foreground">Good for</span>
+                  <span className="text-right text-[0.78125rem] text-primary">{jointListDisplay(entry.indicated_joints ?? [])}</span>
                 </div>
               )}
               {(entry.contraindicated_joints?.length ?? 0) > 0 && (
                 <div className="flex items-baseline justify-between gap-3" style={{ borderTop: '1px solid var(--hairline)', paddingTop: '10px' }}>
-                  <span className="text-[12px] text-muted-foreground">Avoid with</span>
-                  <span className="text-right text-[12.5px] text-[color:var(--role-warn-text)]">{jointListDisplay(entry.contraindicated_joints ?? [])}</span>
+                  <span className="text-[0.75rem] text-muted-foreground">Avoid with</span>
+                  <span className="text-right text-[0.78125rem] text-[color:var(--role-warn-text)]">{jointListDisplay(entry.contraindicated_joints ?? [])}</span>
                 </div>
               )}
             </div>
@@ -109,7 +109,7 @@ export function ExerciseDetailDialog({
                 have not. VISION.md: never claim a capability the app does not
                 have. Saying so costs one line and stops the panel reading as
                 more authority than it is. */}
-            <p className="text-[11.5px] leading-[1.5] text-muted-foreground" style={{ borderTop: '1px solid var(--hairline)', paddingTop: '12px' }}>
+            <p className="text-[0.71875rem] leading-[1.5] text-muted-foreground" style={{ borderTop: '1px solid var(--hairline)', paddingTop: '12px' }}>
               These are reminders, not coaching. If a movement is new to you, start light and
               get eyes on it. Anything that hurts is a reason to stop, not to push.
             </p>

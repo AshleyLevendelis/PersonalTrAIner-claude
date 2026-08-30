@@ -236,7 +236,7 @@ export function DevTestPanel({
                         key={d}
                         size="sm"
                         variant={overrideDay === d ? 'default' : 'outline'}
-                        className="h-7 text-[10px] px-1.5"
+                        className="h-7 text-[0.625rem] px-1.5"
                         onClick={() => onOverrideDayChange(overrideDay === d ? null : d)}
                       >
                         {d.slice(0, 2)}

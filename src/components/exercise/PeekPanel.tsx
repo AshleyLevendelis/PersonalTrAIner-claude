@@ -150,10 +150,10 @@ export function PeekPanel({
        * as a deliberate hierarchy — today first, this second. */}
       <div className="flex items-start justify-between gap-2.5 px-4 pt-3.5 pb-3 border-b">
         <div className="min-w-0">
-          <span className="text-[10.5px] uppercase tracking-[.2em] text-muted-foreground">
+          <span className="text-[0.65625rem] uppercase tracking-[.2em] text-muted-foreground">
             {workout.day}
           </span>
-          <p className="mt-1.5 text-[30px] font-bold leading-[1.05] tracking-[-.03em]">{workout.focus}</p>
+          <p className="mt-1.5 text-[1.875rem] font-bold leading-[1.05] tracking-[-.03em]">{workout.focus}</p>
         </div>
         <Button variant="ghost" size="icon" className="size-7 shrink-0" onClick={onExit} aria-label="Close">
           <X className="size-3.5" />

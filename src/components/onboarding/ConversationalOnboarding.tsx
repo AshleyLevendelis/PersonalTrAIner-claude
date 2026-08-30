@@ -1660,8 +1660,8 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
                 <div
                   className={
                     msg.role === 'user'
-                      ? 'ob-message-in ob-user-bubble ml-auto w-fit max-w-[80%] rounded-[20px_20px_4px_20px] px-[18px] py-3 text-[17px]/[1.5] text-foreground'
-                      : 'ob-message-in max-w-[88%] text-[19px]/[1.6] text-foreground [text-wrap:pretty]'
+                      ? 'ob-message-in ob-user-bubble ml-auto w-fit max-w-[80%] rounded-[20px_20px_4px_20px] px-[18px] py-3 text-[1.0625rem]/[1.5] text-foreground'
+                      : 'ob-message-in max-w-[88%] text-[1.1875rem]/[1.6] text-foreground [text-wrap:pretty]'
                   }
                 >
                   {msg.content}
@@ -1704,7 +1704,7 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
                 <span className="ds-typing-dot [animation-delay:300ms]" />
               </div>
               {slowTurn && (
-                <p className="text-[12.5px] text-muted-foreground">
+                <p className="text-[0.78125rem] text-muted-foreground">
                   Still thinking — this one's taking a moment. Nothing's lost; it'll land or I'll say so.
                 </p>
               )}
@@ -1751,7 +1751,7 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
                     </span>
                   </button>
                 ))}
-                <p className="text-[11px] text-muted-foreground/70 pt-1">Tap anything above to change it.</p>
+                <p className="text-[0.6875rem] text-muted-foreground/70 pt-1">Tap anything above to change it.</p>
                 {/* ASK ONCE, HERE, because here is the only place both rules
                     can run. The lift questions come BEFORE bodyweight in the
                     slot order, so at the moment someone types a squat number
@@ -1769,7 +1769,7 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
                 {liftWarnings.map(w => (
                   <p
                     key={w.lift}
-                    className="mt-1 flex items-start gap-1.5 rounded-md p-2 text-[11.5px] leading-[1.45]"
+                    className="mt-1 flex items-start gap-1.5 rounded-md p-2 text-[0.71875rem] leading-[1.45]"
                     style={{ background: 'rgba(var(--role-warn-rgb, 245 158 11) / .10)', color: 'var(--role-warn-text)' }}
                   >
                     <AlertTriangle className="mt-[1px] size-3.5 shrink-0" aria-hidden />
@@ -1875,7 +1875,7 @@ export function ConversationalOnboarding({ onComplete }: { onComplete: (profile:
             // v2: a filled pill with a neutral hairline that turns mint on
             // focus, rather than a permanently-accented outline. The accent
             // now marks the field you are IN, so it means something.
-            className={`ob-input h-auto rounded-full px-5 py-[15px] text-[16px] text-foreground placeholder:text-muted-foreground focus-visible:ring-0 ${busy ? 'opacity-60' : ''}`}
+            className={`ob-input h-auto rounded-full px-5 py-[15px] text-[1rem] text-foreground placeholder:text-muted-foreground focus-visible:ring-0 ${busy ? 'opacity-60' : ''}`}
           />
           <Button
             size="icon"

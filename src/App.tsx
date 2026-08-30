@@ -2000,7 +2000,7 @@ function App() {
           <div className="mx-auto max-w-md rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 backdrop-blur">
             <p className="text-xs text-foreground break-words">{unsavedProfileWarning}</p>
             <button
-              className="mt-1 text-[11px] font-medium underline text-muted-foreground min-h-[32px]"
+              className="mt-1 text-[0.6875rem] font-medium underline text-muted-foreground min-h-[32px]"
               onClick={() => setUnsavedProfileWarning(null)}
             >
               Dismiss
@@ -2306,7 +2306,7 @@ function App() {
             </DialogDescription>
           </DialogHeader>
           {activeAdaptationsForReset.length > 0 && (
-            <div className="space-y-1.5 rounded-lg bg-[color:var(--role-warn-bg)] px-3 py-2.5 text-[13px] text-[color:var(--role-warn-text)]">
+            <div className="space-y-1.5 rounded-lg bg-[color:var(--role-warn-bg)] px-3 py-2.5 text-[0.8125rem] text-[color:var(--role-warn-text)]">
               {activeAdaptationsForReset.map(a => (
                 <p key={a.id}>
                   You have an active {a.kind === 'injury' ? `${a.injury_code?.replace('_', ' ')} adaptation` : 'equipment adaptation'} running

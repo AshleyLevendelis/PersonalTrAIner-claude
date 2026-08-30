@@ -166,7 +166,7 @@ export function SlotChipsCard({
       )}
 
       {def.key === 'dietaryPreferences' && (
-        <p className="text-[11px] leading-snug text-muted-foreground/70">
+        <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">
           These filters check ingredients we recognise. We can't check brands,
           preparation, or cross-contamination. If you have a food allergy,
           always check ingredients yourself.
@@ -214,13 +214,13 @@ export function SlotChipsCard({
           // strip, where the answer is seven single letters — "Mon · Wed · Fri"
           // is the only place the choice is stated in words.
           <div className="mt-2.5 flex items-center justify-between gap-3">
-            <p className="min-w-0 flex-1 truncate text-[11.5px] text-muted-foreground">
+            <p className="min-w-0 flex-1 truncate text-[0.71875rem] text-muted-foreground">
               {selectedMulti.length > 0
                 ? options.filter(o => selectedMulti.includes(String(o.value))).map(o => o.label).join(' · ')
                 : ''}
             </p>
             <Button
-              className="h-[38px] shrink-0 rounded-[11px] px-[18px] text-[13px] font-semibold glow-mint-box"
+              className="h-[38px] shrink-0 rounded-[11px] px-[18px] text-[0.8125rem] font-semibold glow-mint-box"
               disabled={busy || (def.required && selectedMulti.length === 0)}
               onClick={() => onResolveMulti(def.key)}
             >

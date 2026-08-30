@@ -203,7 +203,7 @@ export function GroceryList({ profileId, mealPools, targets, softLikedFoods, tod
         </div>
         {/* WHERE THE LIST CAME FROM. Without this, a list that appears
             pre-populated reads as guesswork rather than as your own meals. */}
-        <p className="pt-1 text-[11px] leading-[1.45] text-muted-foreground">
+        <p className="pt-1 text-[0.6875rem] leading-[1.45] text-muted-foreground">
           Built from the meals on your Nutrition tab, minus what you&apos;ve checked off.
         </p>
         <p className="pt-1 text-xs text-muted-foreground/70">
@@ -253,8 +253,8 @@ export function GroceryList({ profileId, mealPools, targets, softLikedFoods, tod
                     <div className="flex items-center gap-1.5">
                       <Input value={editName} onChange={e => setEditName(e.target.value)} className="h-7 text-sm flex-1" />
                       <Input value={editQty} onChange={e => setEditQty(e.target.value)} className="h-7 text-sm w-16" inputMode="decimal" />
-                      <Button size="icon" variant="ghost" className="hit-slop-44 size-7" onClick={() => saveEdit(item.id)}><Check className="size-3.5" /></Button>
-                      <Button size="icon" variant="ghost" className="hit-slop-44 size-7" onClick={cancelEdit}><X className="size-3.5" /></Button>
+                      <Button size="icon" variant="ghost" className="hit-slop-44 size-7" onClick={() => saveEdit(item.id)} aria-label={`Save changes to ${item.display_name}`}><Check className="size-3.5" /></Button>
+                      <Button size="icon" variant="ghost" className="hit-slop-44 size-7" onClick={cancelEdit} aria-label="Cancel editing"><X className="size-3.5" /></Button>
                     </div>
                   ) : (
                     <div className={`flex items-center justify-between gap-2 ${item.checked ? 'line-through' : ''}`}>
@@ -263,18 +263,18 @@ export function GroceryList({ profileId, mealPools, targets, softLikedFoods, tod
                         {item.display_name}
                       </span>
                       {/* Fix 4.5 (ux-sweep): bare "check" told a shopper nothing about what to check or why. needs_review means the ingredient name didn't match anything in food-db, so its quantity/unit is a rough guess rather than a real lookup. */}
-                      {item.needs_review && <Badge variant="outline" className="text-[9px] px-1 py-0 shrink-0" title="Not matched to a known ingredient — quantity is a rough estimate">unmatched</Badge>}
+                      {item.needs_review && <Badge variant="outline" className="text-[0.5625rem] px-1 py-0 shrink-0" title="Not matched to a known ingredient — quantity is a rough estimate">unmatched</Badge>}
                     </div>
                   )}
 
                   {item.meal_refs.length > 0 && editingId !== item.id && (
-                    <button onClick={() => toggleRefs(item.id)} className="flex items-center gap-0.5 text-[10px] text-muted-foreground hover:text-foreground mt-0.5">
+                    <button onClick={() => toggleRefs(item.id)} className="flex items-center gap-0.5 text-[0.625rem] text-muted-foreground hover:text-foreground mt-0.5">
                       {expandedRefs.has(item.id) ? <ChevronUp className="size-2.5" /> : <ChevronDown className="size-2.5" />}
                       from {item.meal_refs.length} meal{item.meal_refs.length === 1 ? '' : 's'}
                     </button>
                   )}
                   {expandedRefs.has(item.id) && (
-                    <ul className="text-[10px] text-muted-foreground pl-3 border-l-2 border-border/50 mt-1 space-y-0.5">
+                    <ul className="text-[0.625rem] text-muted-foreground pl-3 border-l-2 border-border/50 mt-1 space-y-0.5">
                       <li>Exact: {formatShoppingQuantity(item).exact}</li>
                       {item.meal_refs.map((r, i) => <li key={i}>Day {r.day + 1} · {r.slot} · {r.mealName}</li>)}
                     </ul>
@@ -283,8 +283,8 @@ export function GroceryList({ profileId, mealPools, targets, softLikedFoods, tod
 
                 {editingId !== item.id && (
                   <div className="flex items-center gap-2.5 shrink-0">
-                    <Button size="icon" variant="ghost" className="hit-slop-44 size-6" onClick={() => startEdit(item)}><Pencil className="size-3" /></Button>
-                    <Button size="icon" variant="ghost" className="hit-slop-44 size-6 text-destructive" onClick={() => remove(item)}><Trash2 className="size-3" /></Button>
+                    <Button size="icon" variant="ghost" className="hit-slop-44 size-6" onClick={() => startEdit(item)} aria-label={`Edit ${item.display_name}`}><Pencil className="size-3" /></Button>
+                    <Button size="icon" variant="ghost" className="hit-slop-44 size-6 text-destructive" onClick={() => remove(item)} aria-label={`Remove ${item.display_name} from the list`}><Trash2 className="size-3" /></Button>
                   </div>
                 )}
               </div>

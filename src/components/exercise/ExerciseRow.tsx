@@ -139,7 +139,7 @@ export function ExerciseRow({
         loggedSummary={formatCompletedSummary(loggedSets)}
       />
       {expanded && completedSets > 0 && !allSetsLogged && (
-        <span className="font-mono text-[10px] text-muted-foreground">{completedSets}/{ex.sets} sets</span>
+        <span className="font-mono text-[0.625rem] text-muted-foreground">{completedSets}/{ex.sets} sets</span>
       )}
 
       {expanded && (
@@ -166,7 +166,7 @@ export function ExerciseRow({
                 </div>
               )}
               {ex.suggested_load_kg != null && loadSourceLabel(loadSource) && (
-                <p className="text-[10px] uppercase tracking-[.1em] text-muted-foreground">{loadSourceLabel(loadSource)}</p>
+                <p className="text-[0.625rem] uppercase tracking-[.1em] text-muted-foreground">{loadSourceLabel(loadSource)}</p>
               )}
               <div className="mt-1.5">
                 {/* A lift with no weight renders no LoadChip at all (see its
@@ -201,10 +201,10 @@ export function ExerciseRow({
                     className="inline-flex items-center gap-1 text-muted-foreground/60 hover:text-muted-foreground"
                   >
                     <Info className="size-2.5" />
-                    <span className="text-[9px] italic">why this exercise</span>
+                    <span className="text-[0.5625rem] italic">why this exercise</span>
                   </button>
                   {explainedPick && (
-                    <p className="mt-0.5 text-[10px] text-muted-foreground/80 italic max-w-xs">{ex.selection_note}</p>
+                    <p className="mt-0.5 text-[0.625rem] text-muted-foreground/80 italic max-w-xs">{ex.selection_note}</p>
                   )}
                 </div>
               )}

@@ -45,7 +45,7 @@ export function TimersPanel({
           <TabsTrigger
             key={mode}
             value={mode}
-            className="rounded-none border-0 bg-transparent px-0 pb-2 text-[13px] capitalize shadow-none data-[state=active]:bg-transparent data-[state=active]:font-semibold data-[state=active]:text-[color:var(--primary)] data-[state=active]:shadow-[inset_0_-2px_0_0_var(--primary)]"
+            className="rounded-none border-0 bg-transparent px-0 pb-2 text-[0.8125rem] capitalize shadow-none data-[state=active]:bg-transparent data-[state=active]:font-semibold data-[state=active]:text-[color:var(--primary)] data-[state=active]:shadow-[inset_0_-2px_0_0_var(--primary)]"
           >
             {mode}
           </TabsTrigger>
@@ -74,8 +74,8 @@ function StopwatchPanel() {
   const timers = useTimers()
   return (
     <div className="flex flex-col items-center gap-4 py-4">
-      <div className="tabular-mono text-[44px] font-bold leading-none tracking-[-.03em]">{formatMs(timers.elapsedMs, true)}</div>
-      <p className="max-w-[34ch] text-center text-[11px] leading-[1.45] text-muted-foreground">{TIMER_SCOPE_NOTE}</p>
+      <div className="tabular-mono text-[2.75rem] font-bold leading-none tracking-[-.03em]">{formatMs(timers.elapsedMs, true)}</div>
+      <p className="max-w-[34ch] text-center text-[0.6875rem] leading-[1.45] text-muted-foreground">{TIMER_SCOPE_NOTE}</p>
       <div className="flex gap-2">
         {timers.running ? (
           <Button onClick={timers.stop}>Stop</Button>

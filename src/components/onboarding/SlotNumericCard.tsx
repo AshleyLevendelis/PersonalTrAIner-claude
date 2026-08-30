@@ -158,7 +158,7 @@ export function SlotNumericCard({
               className={`h-11 ${bad ? 'border-destructive' : ''}`}
             />
             {bad && (
-              <p className="text-[11px] text-destructive">
+              <p className="text-[0.6875rem] text-destructive">
                 {rawOf(d.key).trim() === ''
                   ? `${d.shortLabel} is needed to build your plan.`
                   : `Give a number between ${d.min} and ${d.max}.`}
@@ -197,7 +197,7 @@ export function SlotNumericCard({
         Save
       </Button>
       {showErrors && allBlank && (
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-[0.6875rem] text-muted-foreground">
           {declinable
             ? 'Fill in what you can, or tap “Prefer not to say”.'
             : 'Fill these in to carry on.'}

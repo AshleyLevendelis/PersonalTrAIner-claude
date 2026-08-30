@@ -60,7 +60,7 @@ export function LoadCeilingPrompt({
     <Card className={className}>
       <CardContent className="p-3">
         <p className="text-sm font-medium">{question}</p>
-        <p className="mt-0.5 text-[12px] leading-normal text-muted-foreground">{hint}</p>
+        <p className="mt-0.5 text-[0.75rem] leading-normal text-muted-foreground">{hint}</p>
         <div className="mt-2 flex items-center gap-2">
           <Input
             type="number"
@@ -94,7 +94,7 @@ export function LoadCeilingPrompt({
         {/* Shown only once something has been typed, so an empty field is not
             greeted with an error the moment the card appears. */}
         {value !== '' && !valid && (
-          <p className="mt-1 text-[11px] text-muted-foreground">
+          <p className="mt-1 text-[0.6875rem] text-muted-foreground">
             Give a number between {LOAD_CEILING_MIN_KG} and {LOAD_CEILING_MAX_KG}kg.
           </p>
         )}

@@ -286,8 +286,8 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
             style={{ background: 'var(--surface-raised)' }}
           >
             <span aria-hidden className={`inline-block size-[5px] rounded-full ${data.streak > 0 ? 'bg-primary' : 'bg-[color:var(--text-dim)]'}`} />
-            <span className="tabular-mono text-[13px] font-semibold">{data.streak}</span>
-            <span className="text-[11px] text-muted-foreground">day{data.streak === 1 ? '' : 's'} streak</span>
+            <span className="tabular-mono text-[0.8125rem] font-semibold">{data.streak}</span>
+            <span className="text-[0.6875rem] text-muted-foreground">day{data.streak === 1 ? '' : 's'} streak</span>
           </span>
         </div>
 
@@ -318,8 +318,8 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
           />
           {data.session.status === 'rest' ? (
             <div className="relative space-y-1">
-              <p className="text-[25px] font-bold tracking-[-.02em] glow-text">Rest day</p>
-              <p className="text-[12.5px] text-muted-foreground">Nothing planned today — recovery is part of the program.</p>
+              <p className="text-[1.5625rem] font-bold tracking-[-.02em] glow-text">Rest day</p>
+              <p className="text-[0.78125rem] text-muted-foreground">Nothing planned today — recovery is part of the program.</p>
             </div>
           ) : (
             <div className="relative space-y-4">
@@ -332,12 +332,12 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
                       name, which is what Ashley photographed. The glow is
                       emphasis; clipped, it is worse than none. Every other
                       glow-text in the app is on non-truncating text. */}
-                  <span className="text-[25px] font-bold tracking-[-.02em] min-w-0 truncate">{data.session.focus}</span>
+                  <span className="text-[1.5625rem] font-bold tracking-[-.02em] min-w-0 truncate">{data.session.focus}</span>
                   {/* PROPOSAL 2 — the label goes in the NOT-STARTED case only,
                       where the button already says it. It stays for the other
                       two, because there it carries new information. */}
                   {data.session.status !== 'not_started' && (
-                    <span className="shrink-0 text-[11px] text-muted-foreground">
+                    <span className="shrink-0 text-[0.6875rem] text-muted-foreground">
                       {data.session.status === 'in_progress' ? `${data.session.setsLogged} of ${data.session.setsPlanned} sets` : 'Done'}
                     </span>
                   )}
@@ -345,7 +345,7 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
                 {/* PROPOSAL 3 — the session at a glance, replacing three
                     truncated names of six. Every figure was already in the
                     plan; none of it was on screen. */}
-                <p className="mt-1.5 text-[12.5px] text-muted-foreground">{sessionGlance}</p>
+                <p className="mt-1.5 text-[0.78125rem] text-muted-foreground">{sessionGlance}</p>
               </div>
               {data.session.status !== 'done' && (
                 <Button
@@ -376,9 +376,9 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
               <MessageCircle className="size-3.5" style={{ color: 'var(--primary-foreground)' }} />
             </span>
             <div className="min-w-0 flex-1">
-              {data.coachTip && <p className="text-[14px] leading-[1.5]">{data.coachTip}</p>}
+              {data.coachTip && <p className="text-[0.875rem] leading-[1.5]">{data.coachTip}</p>}
               {data.whatsLeftLine && (
-                <p className={`text-[12.5px] leading-[1.5] text-[color:var(--role-warn-text)] ${data.coachTip ? 'mt-1' : ''}`}>
+                <p className={`text-[0.78125rem] leading-[1.5] text-[color:var(--role-warn-text)] ${data.coachTip ? 'mt-1' : ''}`}>
                   {data.whatsLeftLine}
                 </p>
               )}
@@ -389,7 +389,7 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
                       key={chip.label}
                       type="button"
                       onClick={() => { setChatPrefill(chip.prefill); window.location.hash = tabHash('chat') }}
-                      className="inline-flex min-h-[34px] items-center rounded-full px-3 text-[12px]"
+                      className="inline-flex min-h-[34px] items-center rounded-full px-3 text-[0.75rem]"
                       style={{ background: 'var(--accent)' }}
                     >
                       {chip.label}
@@ -406,7 +406,7 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
         <div className="mt-9 flex items-baseline justify-between gap-3">
           <p className="ds-label">Progress</p>
           {data.consistency && (
-            <span className="tabular-mono text-[11px] text-muted-foreground">
+            <span className="tabular-mono text-[0.6875rem] text-muted-foreground">
               <span className="font-semibold text-primary">{data.consistency.percent}%</span> consistent
             </span>
           )}
@@ -414,16 +414,16 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
         {data.weightTrend ? (
           <div className="mt-3.5 flex flex-wrap items-baseline gap-x-2 gap-y-1">
             <span className="ds-num-tile tabular-mono glow-mint-lg">
-              {data.weightTrend.rollingAvgKg.toFixed(1)}<span className="text-[15px] font-medium text-muted-foreground [text-shadow:none]"> kg</span>
+              {data.weightTrend.rollingAvgKg.toFixed(1)}<span className="text-[0.9375rem] font-medium text-muted-foreground [text-shadow:none]"> kg</span>
             </span>
             {data.weightTrend.ratePerWeekKg != null && (
-              <span className={`text-[13px] ${data.weightTrend.ratePerWeekKg < 0 ? 'text-primary glow-mint' : 'text-muted-foreground'}`}>
+              <span className={`text-[0.8125rem] ${data.weightTrend.ratePerWeekKg < 0 ? 'text-primary glow-mint' : 'text-muted-foreground'}`}>
                 {data.weightTrend.ratePerWeekKg > 0 ? '+' : ''}{data.weightTrend.ratePerWeekKg.toFixed(1)} kg/wk
                 {data.weightTrend.onTrackForGoal === true ? ' · on track' : data.weightTrend.onTrackForGoal === false ? ' · slower than target' : ''}
               </span>
             )}
             {data.weightTrend.sampleCount === 1 && (
-              <span className="text-[11px] text-muted-foreground/70">(1 weigh-in — trend firms up with more)</span>
+              <span className="text-[0.6875rem] text-muted-foreground/70">(1 weigh-in — trend firms up with more)</span>
             )}
           </div>
         ) : (
@@ -437,11 +437,11 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
                 dots. It STAYS at one, where the app has to admit the trend
                 is not real yet. */}
             <div className="mt-1.5 flex items-baseline justify-between">
-              <span className="text-[11px] text-muted-foreground">
+              <span className="text-[0.6875rem] text-muted-foreground">
                 {data.weightSeries.length === 1 ? '1 weigh-in so far' : ''}
               </span>
               {data.weightSeries.length > 1 && (
-                <span className="text-[11px] font-semibold text-primary">
+                <span className="text-[0.6875rem] font-semibold text-primary">
                   {(() => {
                     const delta = data.weightSeries[data.weightSeries.length - 1].kg - data.weightSeries[0].kg
                     return `${delta > 0 ? '+' : ''}${delta.toFixed(1)} kg since week 1`
@@ -455,9 +455,9 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
         {data.recentPRs.length > 0 && (
           <div className="mt-3 space-y-1">
             {data.recentPRs.map(pr => (
-              <p key={pr.exerciseName} className="text-[13px]">
+              <p key={pr.exerciseName} className="text-[0.8125rem]">
                 {pr.exerciseName} <span className="font-semibold tabular-mono text-primary glow-mint">{pr.weightKg} kg</span>
-                <span className="text-[11px] text-muted-foreground"> — new PR</span>
+                <span className="text-[0.6875rem] text-muted-foreground"> — new PR</span>
               </p>
             ))}
           </div>
@@ -473,7 +473,7 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
             <button
               type="button"
               onClick={() => { window.location.hash = tabHash('nutrition') }}
-              className="hit-slop-44 text-[11px] font-semibold text-primary"
+              className="hit-slop-44 text-[0.6875rem] font-semibold text-primary"
             >
               Nutrition ›
             </button>
@@ -487,8 +487,8 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
                 className="rounded-[14px] px-3 py-3 text-left"
                 style={{ background: 'var(--surface-raised)' }}
               >
-                <p className="tabular-mono text-[18px] font-semibold" style={tile.tint ? { color: tile.tint } : undefined}>{tile.value}</p>
-                <p className="mt-0.5 text-[11px] leading-[1.25] text-muted-foreground">
+                <p className="tabular-mono text-[1.125rem] font-semibold" style={tile.tint ? { color: tile.tint } : undefined}>{tile.value}</p>
+                <p className="mt-0.5 text-[0.6875rem] leading-[1.25] text-muted-foreground">
                   {tile.label}<br />{tile.sub}
                 </p>
                 <span className="mt-2 block h-[2px] w-full rounded-full" style={{ background: 'var(--hairline)' }}>
@@ -506,9 +506,9 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
             chart it feeds moved up into Progress, where the trend belongs. */}
         <div className="mt-6 pt-4" style={{ borderTop: '1px solid var(--hairline)' }}>
           <div className="flex items-baseline justify-between gap-3">
-            <span className="text-[13px] text-text-tertiary">Weigh-in</span>
+            <span className="text-[0.8125rem] text-text-tertiary">Weigh-in</span>
             {data.weightSeries.length > 0 && (
-              <span className="text-[13px]">
+              <span className="text-[0.8125rem]">
                 <span className="tabular-mono font-semibold">{data.weightSeries[data.weightSeries.length - 1].kg.toFixed(1)} kg</span>
                 <span className="ml-1.5 text-muted-foreground">
                   {data.weightSeries[data.weightSeries.length - 1].date === data.today ? 'today ✓' : data.weightSeries[data.weightSeries.length - 1].date}

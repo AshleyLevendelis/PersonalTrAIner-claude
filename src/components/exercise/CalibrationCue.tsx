@@ -10,7 +10,7 @@ import { CornerDownRight } from 'lucide-react'
 
 export function CalibrationCue({ hasLoad }: { hasLoad: boolean }) {
   return (
-    <p className="flex items-start gap-1 text-[10px] text-[color:var(--role-warn-text)] mt-0.5">
+    <p className="flex items-start gap-1 text-[0.625rem] text-[color:var(--role-warn-text)] mt-0.5">
       <CornerDownRight className="size-2.5 mt-0.5 shrink-0" />
       <span>
         {hasLoad

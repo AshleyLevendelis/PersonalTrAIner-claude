@@ -16,7 +16,7 @@ export function RampStrip({ ramp }: { ramp: RampDisplay }) {
     return (
       <div className="flex items-center gap-1 mt-0.5 rounded border border-muted-foreground/30 bg-muted/30 px-1.5 py-1">
         <Thermometer className="size-2.5 text-muted-foreground shrink-0" />
-        <span className="text-[10px] text-muted-foreground">Build up in 3-4 lighter sets before set 1</span>
+        <span className="text-[0.625rem] text-muted-foreground">Build up in 3-4 lighter sets before set 1</span>
       </div>
     )
   }
@@ -29,17 +29,17 @@ export function RampStrip({ ramp }: { ramp: RampDisplay }) {
       <span className="ds-label-compact text-[color:var(--role-warn-text)]">Ramp:</span>
       {ramp.kind === 'kg'
         ? ramp.sets.map((s, i) => (
-            <span key={s.setNumber} className="text-[10px] text-[color:var(--role-warn-text)]">
+            <span key={s.setNumber} className="text-[0.625rem] text-[color:var(--role-warn-text)]">
               {i > 0 && <span className="text-[color:var(--role-warn)]">·</span>} {s.kg}kg×{s.reps}
             </span>
           ))
         : ramp.sets.map((s, i) => (
-            <span key={s.setNumber} className="text-[10px] text-[color:var(--role-warn-text)]">
+            <span key={s.setNumber} className="text-[0.625rem] text-[color:var(--role-warn-text)]">
               {i > 0 && <span className="text-[color:var(--role-warn)]">·</span>} ×{s.reps}
             </span>
           ))}
       {ramp.kind === 'bodyweight' && (
-        <span className="text-[9px] italic text-muted-foreground/60">→ bodyweight</span>
+        <span className="text-[0.5625rem] italic text-muted-foreground/60">→ bodyweight</span>
       )}
     </div>
   )

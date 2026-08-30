@@ -18,7 +18,7 @@ function InsightBanner({ tone, className, children, ...props }: InsightBannerPro
         // Density pass turn 3: borderless. The tone now reads from its tinted
         // fill and text colour alone; the glow-* class supplies the halo that
         // used to be a 1px border's job of saying "this is a distinct unit".
-        "flex gap-2.5 rounded-2xl px-4 py-3.5 text-[13.5px] leading-[1.45]",
+        "flex gap-2.5 rounded-2xl px-4 py-3.5 text-[0.84375rem] leading-[1.45]",
         tone === "ai" && "bg-[color:var(--role-ai-bg)] text-[color:var(--role-ai-text)]",
         tone === "warning" && "bg-[color:var(--role-warn-bg)] text-[color:var(--role-warn-text)]",
         className

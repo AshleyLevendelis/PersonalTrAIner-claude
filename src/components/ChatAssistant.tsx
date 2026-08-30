@@ -2989,33 +2989,33 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         {/* keepsComposerFocus: tapping send used to leave focus on <body> —
             measured on the onboarding composer, identical shape here — which
             is a phone putting the keyboard away between every message. */}
-        <Button data-chat-send {...keepsComposerFocus} onClick={() => { sendMessage(); refocusComposer(composerRef.current) }} disabled={!input.trim() || isLoading} size="icon" className="hit-slop-44 shrink-0 rounded-full glow-mint-box">
+        <Button data-chat-send {...keepsComposerFocus} onClick={() => { sendMessage(); refocusComposer(composerRef.current) }} disabled={!input.trim() || isLoading} size="icon" className="hit-slop-44 shrink-0 rounded-full glow-mint-box" aria-label="Send message">
           <Send className="size-4" />
         </Button>
       </div>
       {speech.permissionError && (
-        <p className="mt-1.5 text-[11px] text-muted-foreground">{speech.permissionError}</p>
+        <p className="mt-1.5 text-[0.6875rem] text-muted-foreground">{speech.permissionError}</p>
       )}
       {voiceDebugOn && (
         <div className="mt-2 rounded-xl bg-[color:var(--surface-deep)] p-2.5 space-y-1.5">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <span className="text-[0.625rem] font-semibold uppercase tracking-wide text-muted-foreground">
               Voice debug trace — hold mic to turn off
             </span>
             <div className="flex gap-2">
               <button
                 type="button"
-                className="text-[10px] text-primary glow-mint"
+                className="text-[0.625rem] text-primary glow-mint"
                 onClick={async () => {
                   try { await navigator.clipboard.writeText(voiceDebugLines.join('\n')) } catch { /* clipboard unavailable — lines are still on screen to copy manually */ }
                 }}
               >
                 Copy
               </button>
-              <button type="button" className="text-[10px] text-muted-foreground" onClick={() => setVoiceDebugLines([])}>Clear</button>
+              <button type="button" className="text-[0.625rem] text-muted-foreground" onClick={() => setVoiceDebugLines([])}>Clear</button>
             </div>
           </div>
-          <div className="max-h-40 overflow-y-auto font-mono text-[10px] leading-[1.4] text-muted-foreground">
+          <div className="max-h-40 overflow-y-auto font-mono text-[0.625rem] leading-[1.4] text-muted-foreground">
             {voiceDebugLines.length === 0
               ? <p className="italic">No events yet — tap the mic and speak.</p>
               : voiceDebugLines.map((l, i) => <p key={i} className="break-all">{l}</p>)}

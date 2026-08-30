@@ -117,7 +117,7 @@ function SideTabButton({
       }`}
     >
       <Icon className={`size-5 ${active ? 'glow-icon' : ''}`} />
-      <span className="text-[10px] font-medium">{label}</span>
+      <span className="text-[0.625rem] font-medium">{label}</span>
     </button>
   )
 }

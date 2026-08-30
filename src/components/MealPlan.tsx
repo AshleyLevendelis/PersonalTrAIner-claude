@@ -416,7 +416,7 @@ function MealSlotRow({
         <div className="flex items-baseline justify-between gap-3">
           {option ? (
             <>
-              <span className={expanded ? 'min-w-0 truncate text-[19px] font-semibold tracking-[-.02em]' : 'min-w-0 truncate text-[16.5px] font-medium'}>
+              <span className={expanded ? 'min-w-0 truncate text-[1.1875rem] font-semibold tracking-[-.02em]' : 'min-w-0 truncate text-[1.03125rem] font-medium'}>
                 {option.name}
               </span>
               {!expanded && (
@@ -473,7 +473,7 @@ function MealSlotRow({
           {option.tags.filter(t => t !== 'slot_appropriate').slice(0, 2).length > 0 && (
             <div className="flex flex-wrap gap-1.5">
               {option.tags.filter(t => t !== 'slot_appropriate').slice(0, 2).map(t => (
-                <span key={t} className="rounded-full bg-[color:var(--surface-raised)] px-2 py-0.5 text-[10px] text-muted-foreground">{t}</span>
+                <span key={t} className="rounded-full bg-[color:var(--surface-raised)] px-2 py-0.5 text-[0.625rem] text-muted-foreground">{t}</span>
               ))}
             </div>
           )}
@@ -482,7 +482,7 @@ function MealSlotRow({
             /* Above the buttons, not below: it explains why the one beside
                it is greyed out, and a reason that arrives after the action
                has already been refused is not an explanation. */
-            <p className="flex items-start gap-1.5 rounded-xl bg-[color:var(--role-warn-bg)] px-3 py-2 text-[11.5px] leading-snug text-[color:var(--role-warn-text)]">
+            <p className="flex items-start gap-1.5 rounded-xl bg-[color:var(--role-warn-bg)] px-3 py-2 text-[0.71875rem] leading-snug text-[color:var(--role-warn-text)]">
               <ShieldAlert className="mt-0.5 size-3.5 shrink-0" />
               <span>
                 {restriction.message} Swap it, or regenerate this meal.
@@ -534,9 +534,9 @@ function MealSlotRow({
                   >
                     <div className="min-w-0">
                       <p className="truncate text-xs font-medium">{alt.name}</p>
-                      <p className="tabular-mono text-[10.5px] text-muted-foreground">{Math.round(alt.macros.calories)} kcal · P {Math.round(alt.macros.protein)}g</p>
+                      <p className="tabular-mono text-[0.65625rem] text-muted-foreground">{Math.round(alt.macros.calories)} kcal · P {Math.round(alt.macros.protein)}g</p>
                     </div>
-                    <span className={`tabular-mono shrink-0 text-[10.5px] ${Math.abs(calDelta) < 20 ? 'text-muted-foreground' : calDelta > 0 ? 'text-[color:var(--role-warn)]' : 'text-primary'}`}>
+                    <span className={`tabular-mono shrink-0 text-[0.65625rem] ${Math.abs(calDelta) < 20 ? 'text-muted-foreground' : calDelta > 0 ? 'text-[color:var(--role-warn)]' : 'text-primary'}`}>
                       {calDelta > 0 ? '+' : ''}{calDelta} kcal, {proteinDelta > 0 ? '+' : ''}{proteinDelta}g P
                     </span>
                   </button>
