@@ -22,7 +22,7 @@
 import { readFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import { FIRST_RUN_QUICK_REPLIES, FIRST_RUN_QUICK_REPLIES_AHEAD, buildFirstRunIntro } from '../src/lib/first-run-intro'
+import { FIRST_RUN_QUICK_REPLIES, FIRST_RUN_QUICK_REPLIES_AHEAD, buildFirstRunIntro, planShapeFromMesocycle, type FirstRunPlanShape } from '../src/lib/first-run-intro'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(__dirname, '..')
@@ -280,6 +280,101 @@ console.log('\n6. The first-run starter chips only offer things that work')
     /setMessages\(buildFirstRunIntro\(/.test(ui))
   check('...and does not also hand-roll the chips beside it',
     !/quickReplies:\s*FIRST_RUN_QUICK_REPLIES/.test(ui))
+
+  // ---------------------------------------------------------------------
+  // THE PROGRAMME HAS A SHAPE, AND THE OPENER SAYS SO.
+  //
+  // Ashley, 31 Aug 2026: the opener named day one and nothing else, so
+  // someone who read it and closed the app never learned the plan HAS a
+  // shape. buildCoachPhaseBrief covers this the moment they SPEAK; this is
+  // the half that lands before they do.
+  //
+  // Every number in it is read off the mesocycle. The checks below are as
+  // much about what it must NOT say — no weeks, no blocks, no "steps up" —
+  // when the plan can't back the claim.
+  // ---------------------------------------------------------------------
+  const shaped = (shape: FirstRunPlanShape | null) =>
+    buildFirstRunIntro('Hey Ashley', { ...squat, when: 'today' }, shape)[0].content
+
+  const sixteen: FirstRunPlanShape = { totalWeeks: 16, blocks: 4, startsLight: false }
+  const withShape = shaped(sixteen)
+  check('the opener says how long the plan runs', /16 weeks/.test(withShape), withShape)
+  check('...and how many blocks it has', /4 blocks/.test(withShape), withShape)
+  check('...and that it gets harder', /getting harder/i.test(withShape), withShape)
+  check("...and promises to say when it changes", /I'll say when it changes/i.test(withShape), withShape)
+  check('day one still comes first — momentum leads, shape follows',
+    withShape.indexOf('Squat & Carry') < withShape.indexOf('16 weeks'), withShape)
+
+  // A calibration week is capped ON PURPOSE, so an unexplained easy week one
+  // reads as the app getting it wrong. This is the branch that has to speak.
+  const light = shaped({ totalWeeks: 16, blocks: 4, startsLight: true })
+  check('a calibration first week is named as light',
+    /week one's light/i.test(light), light)
+  check('...and says what it is for', /find your weights/i.test(light), light)
+  check('a normal first week is NOT called light',
+    !/light/i.test(withShape), withShape)
+
+  // NO PLAN, NO NUMBERS. The same rule the day-one half already follows.
+  const noShape = shaped(null)
+  check('no mesocycle invents no week count', !/\\d+ weeks/.test(noShape), noShape)
+  check('...and no block count', !/blocks/.test(noShape), noShape)
+  check('...and still says day one', /Squat & Carry/.test(noShape), noShape)
+  const oneWeek = shaped({ totalWeeks: 1, blocks: 1, startsLight: false })
+  check('a one-week plan describes no shape', !/\\d+ weeks/.test(oneWeek), oneWeek)
+
+  // Blocks are only mentioned when there is more than one, and "steps up as
+  // you go" is a claim about later blocks — it must not be made without them.
+  const oneBlock = shaped({ totalWeeks: 6, blocks: 1, startsLight: false })
+  check('a single-block plan claims no blocks', !/blocks/.test(oneBlock), oneBlock)
+  check('...and does not claim it steps up', !/getting harder/i.test(oneBlock), oneBlock)
+  check('...but still says how long it runs', /6 weeks/.test(oneBlock), oneBlock)
+
+  // STILL ONE MESSAGE. Ashley cut this from four to one; the shape sentence
+  // is appended to the opener, not added beside it.
+  check('adding the shape does not add a message',
+    buildFirstRunIntro('Hey Ashley', { ...squat, when: 'today' }, sixteen).length === 1)
+
+  // THE DERIVATION IS TESTED, NOT GREPPED FOR. The first version of this
+  // block searched ChatAssistant.tsx for `totalWeeks: mesocycle.length` and
+  // stayed GREEN when the function was mutated to a hardcoded 16 — because
+  // buildCoachPhaseBrief's own wiring, 400 lines away, contains that exact
+  // string. A second version scoped the search to the function and still
+  // passed a mutation that assigned `blocks = 4` while leaving the Set
+  // expression sitting unused beside it. Both are the same defect: a check
+  // satisfied by something other than the thing it is about. So the
+  // derivation moved into first-run-intro.ts as a pure function and is now
+  // run against real plans, where a wrong number is a wrong number.
+  const meso = (weeks: number, blocksIn: number, calibration: boolean) =>
+    Array.from({ length: weeks }, (_, i) => ({
+      week_number: i + 1,
+      block_number: Math.floor(i / Math.ceil(weeks / blocksIn)) + 1,
+      isCalibrationWeek: calibration && i === 0,
+    }))
+
+  const derived16 = planShapeFromMesocycle(meso(16, 4, true))
+  check('the week count is the plan\'s own length', derived16?.totalWeeks === 16, derived16)
+  check('the block count is the plan\'s own blocks', derived16?.blocks === 4, derived16)
+  check('a calibration week 1 is carried through', derived16?.startsLight === true, derived16)
+
+  const derived12 = planShapeFromMesocycle(meso(12, 3, false))
+  check('a different plan gives different numbers',
+    derived12?.totalWeeks === 12 && derived12?.blocks === 3, derived12)
+  check('...and a non-calibration week 1 is not called light',
+    derived12?.startsLight === false, derived12)
+  check('an empty mesocycle derives nothing at all',
+    planShapeFromMesocycle([]) === null)
+  check('an unnumbered plan still reads week one off array order',
+    planShapeFromMesocycle([{ isCalibrationWeek: true }, {}])?.startsLight === true)
+
+  // End to end: a real plan in, the right sentence out.
+  const endToEnd = buildFirstRunIntro('Hey Ashley', { ...squat, when: 'today' },
+    planShapeFromMesocycle(meso(12, 3, false)))[0].content
+  check('a 12-week plan says twelve weeks, not sixteen',
+    /12 weeks, 3 blocks/.test(endToEnd) && !/16/.test(endToEnd), endToEnd)
+
+  // ...and the component actually calls it, on the mesocycle it was handed.
+  check('ChatAssistant derives the shape from its own mesocycle prop',
+    /buildFirstRunIntro\(greetName\(\), firstRunSessionBrief\(\), planShapeFromMesocycle\(mesocycle\)\)/.test(ui))
 
   // Why the restriction exists, asserted rather than assumed — and now the
   // other direction too. §2.4 moved volume and schedule OFF the declining

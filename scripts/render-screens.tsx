@@ -153,6 +153,13 @@ function FirstRunChat() {
     focus: 'Squat & Carry',
     movements: 'Barbell Squats, Loaded Backpack Walk, Bulgarian Split Squat…',
     when: 'today',
+  }, {
+    // The worst case for length on a phone: the calibration-week branch is
+    // the longer of the two, so this screen answers the wall-of-text question
+    // about the sentence that could actually cause one.
+    totalWeeks: 16,
+    blocks: 4,
+    startsLight: true,
   })
   return (
     <div className="space-y-3 px-4 py-3">

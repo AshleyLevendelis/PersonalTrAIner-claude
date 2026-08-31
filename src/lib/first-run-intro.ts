@@ -71,6 +71,30 @@ export interface FirstRunMessage {
  * live here. Same split as the rest of this file, and it is what lets
  * `render:screens` show the real opener instead of a replica.
  */
+/**
+ * The SHAPE of the whole programme, for the one sentence that describes it.
+ *
+ * Ashley, on reading the opener: it names day one and nothing else, so
+ * someone who reads it and closes the app never learns the plan HAS a shape.
+ * The coach does explain it — buildCoachPhaseBrief's "plan is new" branch
+ * asks for a high-level walkthrough — but only once the user says something.
+ * This is the half that lands before they speak.
+ *
+ * Every field is read off the generated mesocycle, never assumed: a plan with
+ * no weeks in it produces no sentence rather than a confident "16 weeks".
+ * That is the same rule the day-one half already follows (`session: null`
+ * invents no session) and it exists because a number in the app's first line
+ * is the worst possible place for a guess to sit.
+ */
+export interface FirstRunPlanShape {
+  /** Weeks in the generated mesocycle. */
+  totalWeeks: number
+  /** Distinct block_numbers across those weeks. 0 or 1 = don't mention blocks. */
+  blocks: number
+  /** Week 1 is a calibration week — capped on purpose, and it has to be said. */
+  startsLight: boolean
+}
+
 export interface FirstRunSessionBrief {
   /** The session's focus, e.g. "Full Body Power". */
   focus: string
@@ -116,9 +140,55 @@ export interface FirstRunSessionBrief {
  * going?", asking a brand-new user how they are recovering from nothing. So
  * the opener branches on when day one actually is, and says so.
  */
+/**
+ * Read the shape off a generated mesocycle.
+ *
+ * Pure, and here rather than in ChatAssistant, so it can be tested against
+ * real plans instead of by grepping the component for the right string. The
+ * first version of its gate did exactly that and stayed green while the
+ * function was mutated to a hardcoded 16 — the string it searched for also
+ * appears in unrelated wiring 400 lines away.
+ */
+export function planShapeFromMesocycle(
+  mesocycle: { week_number?: number; block_number?: number; isCalibrationWeek?: boolean }[],
+): FirstRunPlanShape | null {
+  if (mesocycle.length === 0) return null
+  const blocks = new Set(
+    mesocycle.map(w => w.block_number).filter((n): n is number => typeof n === 'number'),
+  ).size
+  // week_number is 1-indexed, but fall back to array order rather than giving
+  // up on a plan whose numbering is missing — the calibration flag is the
+  // thing being read, and it sits on the first week either way.
+  const weekOne = mesocycle.find(w => w.week_number === 1) ?? mesocycle[0]
+  return {
+    totalWeeks: mesocycle.length,
+    blocks,
+    startsLight: weekOne?.isCalibrationWeek === true,
+  }
+}
+
+function planShapeSentence(shape: FirstRunPlanShape | null): string {
+  // A one-week "programme" has no shape worth describing, and a zero-week one
+  // is a broken plan — say nothing rather than something.
+  if (!shape || shape.totalWeeks < 2) return ''
+  const blocks = shape.blocks >= 2 ? `, ${shape.blocks} blocks` : ''
+  if (shape.startsLight) {
+    // Naming this is the whole reason the branch exists. A calibration week
+    // is deliberately capped, so it FEELS like the app got it wrong — and the
+    // person most likely to quit over an easy first week is the one who was
+    // never told it was on purpose.
+    return `${shape.totalWeeks} weeks${blocks}. Week one's light while we find your weights — I'll say when it steps up.`
+  }
+  // "Getting harder as you go" is a claim about later blocks, so it is only
+  // made when there ARE later blocks.
+  const climb = blocks ? ', getting harder as you go' : ''
+  return `${shape.totalWeeks} weeks${blocks}${climb} — I'll say when it changes.`
+}
+
 export function buildFirstRunIntro(
   greeting: string,
   session: FirstRunSessionBrief | null,
+  shape: FirstRunPlanShape | null = null,
 ): FirstRunMessage[] {
   const opener = (() => {
     if (!session) {
@@ -147,8 +217,13 @@ export function buildFirstRunIntro(
   // nothing else. With one message that is trivially true; it was not before,
   // and attaching them anywhere else was a silent no-op.
   const dayOneIsToday = session?.when === 'today' || session?.when === 'whenever'
+  // Day one first, the shape second — momentum is what Ashley asked the
+  // opener to lead with, and the programme's shape is context for it rather
+  // than the headline. Still one message, on her ruling: this was four, she
+  // cut it to one, and a second bubble here would quietly undo that.
+  const shapeLine = planShapeSentence(shape)
   return [{
-    content: opener,
+    content: shapeLine ? `${opener} ${shapeLine}` : opener,
     quickReplies: dayOneIsToday ? FIRST_RUN_QUICK_REPLIES : FIRST_RUN_QUICK_REPLIES_AHEAD,
   }]
 }

@@ -35,7 +35,7 @@ import { cn } from '@/lib/utils'
 import { parseWorkoutEntries, type ParsedSetGroup, type WorkoutEntryInput } from '@/lib/set-parse'
 import { executeLogWorkout } from '@/lib/nl-logging-executor'
 import { normalizeExternalUrl } from '@/lib/chat-links'
-import { buildFirstRunIntro, type FirstRunSessionBrief } from '@/lib/first-run-intro'
+import { buildFirstRunIntro, planShapeFromMesocycle, type FirstRunSessionBrief } from '@/lib/first-run-intro'
 import { buildCoachExerciseSummary, buildCoachPhaseBrief } from '@/lib/chat-plan-context'
 import { createFact, createGoal, createContextFact, retireFact, retireContextFact, abandonGoal, type UserFactRow, type UserGoalRow, type UserContextFactRow } from '@/lib/memory-store'
 import { resolveExerciseTarget, resolveFoodTarget } from '@/lib/fact-compiler'
@@ -486,7 +486,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       // this only turns them into ChatMsg rows. CHIPS SHOW RATHER THAN TELL,
       // which is what keeps the how-to-use-it half out of the prose.
       if (isFirstEverChat) {
-        setMessages(buildFirstRunIntro(greetName(), firstRunSessionBrief()).map(m => ({
+        setMessages(buildFirstRunIntro(greetName(), firstRunSessionBrief(), planShapeFromMesocycle(mesocycle)).map(m => ({
           role: 'assistant' as const,
           status: 'complete' as const,
           ...m,
