@@ -21,7 +21,7 @@ import { useTimers } from '@/hooks/useTimers'
 import { useViewportInset } from '@/hooks/useViewportInset'
 import { TAB_BAR_HEIGHT_PX } from '@/components/BottomTabBar'
 import { useBottomDockHeight } from '@/hooks/useBottomDockHeight'
-import { tabHash } from '@/lib/app-route'
+import { tabHash, useAppRoute } from '@/lib/app-route'
 import { getAppNow } from '@/lib/dev-clock'
 import { playTimerCue } from '@/lib/timer-cues'
 
@@ -42,6 +42,8 @@ export function BottomDock() {
   // underneath — see useBottomDockHeight for why this is measured, not a
   // constant. Attached to whichever branch renders; only one ever does.
   const { reportDockHeight } = useBottomDockHeight()
+  // Which tab is showing — the round field only holds the screen on Tools.
+  const { route } = useAppRoute()
   const dockRef = useRef<HTMLDivElement | null>(null)
 
   const hasRestForTick = !!restEndsAt && restRemainingMs != null
@@ -78,7 +80,16 @@ export function BottomDock() {
   }, [restEndsAt, restRemainingMs])
 
   const hasRest = hasRestForTick
-  const hasStandaloneTimer = !hasRest && timers.isActive
+  // NOT WHILE THE ROUND FIELD IS ON SCREEN. The chip exists so a timer you
+  // navigated away from is still findable; on the timer's own screen it
+  // repeats, in 12px, what the screen is already shouting in colour across
+  // the whole display — and it sat over the Pause button. `roundHoldsScreen`
+  // in ToolsTab is the same condition; this is its one other reader.
+  const roundFieldOnScreen =
+    timers.mode === 'round' && !!timers.roundConfig
+    && (timers.running || timers.isRoundComplete || timers.isActive)
+    && route.kind === 'tab' && route.tab === 'tools'
+  const hasStandaloneTimer = !hasRest && timers.isActive && !roundFieldOnScreen
   const dockVisible = hasRest || hasStandaloneTimer || hasSessionIndicator
 
   // Measure and publish, so the chat composer can offset above us. Observed

@@ -263,7 +263,11 @@ if (!serviceKey) {
   console.log('\nNOTE, AND IT MATTERS: zero rows is what a correctly closed database looks')
   console.log('like AND what an empty one looks like, and this run cannot distinguish them.')
   console.log('To settle it, re-run with the project\'s service key in the environment:')
-  console.log(`    npm run verify:rls${isProduction ? '' : ' -- --prod'} --service-key=THE_KEY`)
+  // EVERY flag goes after the `--`, always. Printed without it, npm swallows
+  // the flag as its own and the script never sees the key — so following this
+  // hint would silently reprint this same note. Fourth broken command handed
+  // over in this project; the separator is not optional and not conditional.
+  console.log(`    npm run verify:rls -- ${isProduction ? '--prod ' : ''}--service-key=THE_KEY`)
   console.log('which counts what is actually stored and compares.')
 } else {
   const service = createClient(url, serviceKey)

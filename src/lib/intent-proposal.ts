@@ -48,21 +48,48 @@ export function buildIntentProposal(kind: string, rawArgs: Record<string, unknow
   const quote = typeof rawArgs.origin_verbatim_quote === 'string' && rawArgs.origin_verbatim_quote
     ? rawArgs.origin_verbatim_quote
     : JSON.stringify(rawArgs)
+  /**
+   * THE FALLBACK IS THE USER'S OWN WORDS, never the word "that".
+   *
+   * Every branch below used to end in `|| 'that'`, and Ashley hit it live:
+   * she said "I cant train on tuesday", the model recorded it as a fact with
+   * no target_phrase (there is no food or exercise in that sentence), and the
+   * card read **"Want me to remember that?"** with a PROPOSED CHANGE row
+   * saying `Remember — that`. The app was offering to remember the word
+   * "that": a placeholder rendered as if it were the content, on a confirm
+   * button, which is the one place a placeholder must never reach.
+   *
+   * `quote` is the sentence she actually typed and is already computed above
+   * for the scope key. It is always more honest than a pronoun, and when even
+   * that is missing the caller is told to build no card at all rather than
+   * ask her to confirm a blank.
+   */
+  const spoken = typeof rawArgs.origin_verbatim_quote === 'string' && rawArgs.origin_verbatim_quote.trim()
+    ? rawArgs.origin_verbatim_quote.trim()
+    : ''
+  const firstOf = (...vals: unknown[]): string => {
+    for (const v of vals) {
+      const t = typeof v === 'string' ? v.trim() : ''
+      if (t) return t
+    }
+    return spoken
+  }
+
   let field = 'Do'
-  let after = 'that'
+  let after = spoken
   if (kind === 'record_fact') {
     field = 'Remember'
-    after = String(rawArgs.target_phrase || rawArgs.timing_subject || 'that')
+    after = firstOf(rawArgs.target_phrase, rawArgs.timing_subject)
   } else if (kind === 'record_goal') {
     field = 'Set goal'
-    after = String(rawArgs.description || rawArgs.metric_ref || 'that goal')
+    after = firstOf(rawArgs.description, rawArgs.metric_ref)
   } else if (kind === 'add_to_grocery_list') {
     field = 'Add to list'
     const items = Array.isArray(rawArgs.items) ? (rawArgs.items as { name?: string }[]).map(i => i.name).filter(Boolean).join(', ') : ''
-    after = items || 'that'
+    after = items || spoken
   } else if (kind === 'check_off_grocery_item') {
     field = 'Check off'
-    after = String(rawArgs.item_phrase || 'that')
+    after = firstOf(rawArgs.item_phrase)
   } else if (kind === 'log_water') {
     field = 'Log water'
     const amount = typeof rawArgs.amount_ml === 'number' && rawArgs.amount_ml > 0 ? Math.round(rawArgs.amount_ml) : 250
