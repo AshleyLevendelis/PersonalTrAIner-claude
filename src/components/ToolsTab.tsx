@@ -35,8 +35,15 @@ export function ToolsTab({ profileId, mealPools, targets, softLikedFoods, todays
   //
   // `isRoundComplete` holds the screen too, so the red finished state stays
   // until the user acts instead of vanishing the moment the clock stops.
+  // PAUSED COUNTS AS HOLDING THE SCREEN, and leaving it out was a real bug.
+  // pauseRound sets running:false, so a round that only required `running`
+  // made the entire full-bleed timer vanish the moment you tapped Pause,
+  // dropping you back to the setup form mid-workout. You pause to catch your
+  // breath, not to lose your place. `isActive` is true while there is
+  // accumulated time, which is exactly "started and not reset".
   const roundHoldsScreen =
-    timers.mode === 'round' && !!timers.roundConfig && (timers.running || timers.isRoundComplete)
+    timers.mode === 'round' && !!timers.roundConfig
+    && (timers.running || timers.isRoundComplete || timers.isActive)
 
   if (roundHoldsScreen) {
     // NO `relative` AND NO minHeight HERE. Both used to be, and together they
