@@ -100,35 +100,28 @@ console.log('\n3. TRAPDOOR: no other exercise in the database moved')
   // right response to a change you meant; the wrong response is loosening
   // the check so it stops noticing.
   const AT_THE_FIX: Record<string, string[]> = {
-    bench: ["Archer Push-Ups", "Barbell Bench Press", "Barbell Floor Press", "Chest Dips", "Chest Press Machine", "Deficit Push-Ups", "Dumbbell Bench Press", "Dumbbell Floor Press", "Incline Dumbbell Press", "Incline Machine Press", "Incline Push-Ups", "Neutral-Grip Dumbbell Press", "Push-Ups"],
-    carry: ["Farmer Squat Hold (Isometric Carry)", "Farmer's Walk", "Loaded Backpack Walk", "Suitcase Carry", "Trap Bar Carry"],
-    deadlift: ["Deadlifts", "Trap Bar Deadlift"],
+    bench: ["Archer Push-Ups","Barbell Bench Press","Barbell Floor Press","Chest Dips","Chest Press Machine","Deficit Push-Ups","Dumbbell Bench Press","Dumbbell Floor Press","Incline Dumbbell Press","Incline Machine Press","Incline Push-Ups","Knee Push-Ups","Neutral-Grip Dumbbell Press","Push-Ups","Wide Push-Ups"],
+    carry: ["Farmer Squat Hold (Isometric Carry)","Farmer's Walk","Loaded Backpack Walk","Suitcase Carry","Trap Bar Carry"],
+    deadlift: ["Deadlifts","Trap Bar Deadlift"],
     goblet_squat: ["Goblet Squats"],
-    hinge_accessory: ["Bodyweight Good Morning", "Glute Bridge", "Good Mornings", "Hip Thrust", "Romanian Deadlifts", "Single-Leg RDL (Bodyweight)"],
-    isolation_bicep: ["Band Curl", "Barbell Curls", "Cable Curls", "Dumbbell Curls", "Hammer Curls", "Incline Dumbbell Curls"],
-    isolation_calf: ["Calf Raises", "Calf Raises (Bodyweight)", "Seated Calf Raises", "Single-Leg Calf Raise (Bodyweight)", "Single-Leg Dumbbell Calf Raise"],
-    // isolation_chest carries Dead Bug, Plank, Side Plank, Pallof Press, Wall
-    // Sit and now Bird Dog, none of which is a chest movement. That is the
-    // switch's `default:` catching core work (load-prescription.ts:394), and
-    // it PREDATES this table. Verified inert rather than assumed so: every
-    // one of them prescribes "Bodyweight" with starting_weight_kg null, so
-    // the wrong category never becomes a wrong weight. Frozen honestly here —
-    // recorded as it is, not as it ought to be — and logged in BACKLOG.
-    isolation_chest: ["Bird Dog", "Cable Crossover", "Cable Flyes", "Cable Woodchops", "Dead Bug", "Dumbbell Flyes", "Face Pulls", "Pallof Press", "Pec Deck Machine", "Plank", "Rear Delt Flyes", "Reverse Pec Deck", "Russian Twist", "Side Plank", "Straight-Arm Pulldown", "Wall Sit"],
-    isolation_hamstring: ["Dumbbell Leg Curl", "Lying Leg Curl", "Nordic Hamstring Curl", "Seated Band Leg Curl", "Seated Leg Curl", "Single-Leg Sliding Leg Curl", "Sliding Leg Curl"],
-    isolation_quad: ["Banded Terminal Knee Extension", "Chair Leg Extension", "Leg Extensions", "Seated Short-Arc Quad Set", "Sissy Squat"],
-    isolation_shoulder: ["Band Lateral Raise", "Cable Lateral Raises", "Front Raises", "Lateral Raises", "Machine Lateral Raise"],
-    isolation_tricep: ["Band Tricep Kickback", "Band Tricep Pushdown", "Overhead Tricep Extension", "Skull Crushers", "Tricep Dips", "Tricep Pushdowns"],
-    kettlebell_swing: ["Kettlebell Swing (Heavy)", "Kettlebell Swings"],
-    leg_press: ["Hack Squat", "Leg Press"],
-    null: ["Ab Wheel Rollout", "Arm Circles", "Band Dislocates", "Band Face Pulls", "Band Pull-Aparts", "Battle Ropes", "Box Jumps", "Broad Jumps", "Burpees", "Clamshell", "Cycling Intervals", "Elliptical", "Hanging Leg Raises", "Jump Rope", "Lateral Step Touches", "Leg Swings", "Medicine Ball Slams", "Mountain Climbers", "Plyo Push-Ups", "Prone Y-T Raises", "Scapular Push-Ups", "Side-Lying Hip Abduction", "Standing Band Hip Abduction", "Treadmill Intervals", "Wall Slides", "Ankle Alphabet", "Banded Ankle Dorsiflexion", "Banded Wrist Extension", "Banded Wrist Flexion", "Eccentric Wrist Extension", "Forearm Pronation-Supination", "Isometric Grip Squeeze", "Single-Leg Balance Hold", "Wrist Circles"],
-    overhead: ["Arnold Press", "Band Shoulder Press", "Dumbbell Shoulder Press", "Landmine Press", "Overhead Press", "Shoulder Press Machine"],
+    hinge_accessory: ["Bodyweight Good Morning","Glute Bridge","Good Mornings","Hip Thrust","Romanian Deadlifts","Single-Leg Glute Bridge","Single-Leg RDL (Bodyweight)"],
+    isolation_bicep: ["Backpack Curl","Band Curl","Barbell Curls","Cable Curls","Dumbbell Curls","Hammer Curls","Incline Dumbbell Curls"],
+    isolation_calf: ["Bent-Knee Calf Raise (Bodyweight)","Calf Raises","Calf Raises (Bodyweight)","Seated Calf Raises","Single-Leg Calf Raise (Bodyweight)","Single-Leg Calf Raise Hold","Single-Leg Dumbbell Calf Raise"],
+    isolation_chest: ["Bird Dog","Bodyweight Hip Hinge to Wall","Cable Crossover","Cable Flyes","Cable Woodchops","Dead Bug","Dumbbell Flyes","Face Pulls","Pallof Press","Pec Deck Machine","Plank","Rear Delt Flyes","Reverse Pec Deck","Russian Twist","Scapular Pull-Ups","Side Plank","Single-Arm Band Pulldown","Straight-Arm Pulldown","Wall Sit"],
+    isolation_hamstring: ["Dumbbell Leg Curl","Lying Leg Curl","Nordic Hamstring Curl","Prone Hamstring Curl (Bodyweight)","Seated Band Leg Curl","Seated Leg Curl","Single-Leg Sliding Leg Curl","Sliding Leg Curl"],
+    isolation_quad: ["Banded Terminal Knee Extension","Chair Leg Extension","Leg Extensions","Reverse Nordic Curl","Seated Short-Arc Quad Set","Sissy Squat","Wall Sit March"],
+    isolation_shoulder: ["Backpack Front Raise","Backpack Lateral Raise","Band Lateral Raise","Cable Lateral Raises","Front Raises","Lateral Raises","Machine Lateral Raise"],
+    isolation_tricep: ["Band Tricep Kickback","Band Tricep Pushdown","Chair Dips","Overhead Tricep Extension","Skull Crushers","Tricep Dips","Tricep Pushdowns"],
+    kettlebell_swing: ["Kettlebell Swing (Heavy)","Kettlebell Swings"],
+    leg_press: ["Hack Squat","Leg Press"],
+    null: ["Ab Wheel Rollout","Ankle Alphabet","Arm Circles","Band Dislocates","Band Face Pulls","Band Pull-Aparts","Banded Ankle Dorsiflexion","Banded Wrist Extension","Banded Wrist Flexion","Battle Ropes","Bear Crawl","Box Jumps","Broad Jumps","Burpees","Clamshell","Cycling Intervals","Eccentric Wrist Extension","Elliptical","Forearm Pronation-Supination","Hanging Leg Raises","High Knees","Isometric Grip Squeeze","Jump Rope","Jumping Jacks","Lateral Step Touches","Leg Swings","Medicine Ball Slams","Mountain Climbers","Plyo Push-Ups","Prone Y-T Raises","Scapular Push-Ups","Shadow Boxing","Side-Lying Hip Abduction","Single-Leg Balance Hold","Skater Bounds","Standing Band Hip Abduction","Treadmill Intervals","Wall Slides","Wrist Circles"],
+    overhead: ["Arnold Press","Backpack Overhead Press","Band Shoulder Press","Dumbbell Shoulder Press","Landmine Press","Overhead Press","Pike Push-Ups","Shoulder Press Machine"],
     overhead_carry: ["Overhead Carry"],
-    pulldown: ["Close-Grip Lat Pulldown", "Kneeling Band Lat Pulldown", "Lat Pulldown"],
-    row: ["Backpack Row", "Barbell Rows", "Cable Rows", "Chest-Supported Row", "Chin-Ups", "Dumbbell Rows", "Inverted Row", "Neutral-Grip Seated Cable Row", "Pull-Ups", "Pull-Ups (Assisted)", "Rowing Machine", "Seated Cable Row", "Seated Machine Row", "T-Bar Rows", "Table Row", "Towel Row"],
-    shrug: ["Band Shrug", "Cable Shrug", "Dumbbell Shrugs", "Shrugs"],
-    single_leg_dumbbell: ["Bulgarian Split Squats", "Low Box Step-Up", "Split Squat (Bodyweight)", "Step-Down (Eccentric)", "Step-Ups", "Step-Ups (Bodyweight)", "Walking Lunges"],
-    squat: ["Air Squat", "Barbell Squats", "Bodyweight Squat Marches", "Box Squat (Bodyweight)", "Pistol Squat Progression", "Spanish Squat"],
+    pulldown: ["Band Lat Pulldown","Close-Grip Lat Pulldown","Kneeling Band Lat Pulldown","Lat Pulldown"],
+    row: ["Backpack Row","Barbell Rows","Cable Rows","Chest-Supported Row","Chin-Ups","Dumbbell Rows","Inverted Row","Neutral-Grip Seated Cable Row","Pull-Up Negatives","Pull-Ups","Pull-Ups (Assisted)","Rowing Machine","Seated Cable Row","Seated Machine Row","T-Bar Rows","Table Row","Towel Row"],
+    shrug: ["Backpack Shrug","Band Shrug","Cable Shrug","Dumbbell Shrugs","Shrugs"],
+    single_leg_dumbbell: ["Bulgarian Split Squats","Low Box Step-Up","Split Squat (Bodyweight)","Step-Down (Eccentric)","Step-Ups","Step-Ups (Bodyweight)","Walking Lunges"],
+    squat: ["Air Squat","Barbell Squats","Bodyweight Squat Marches","Box Squat (Bodyweight)","Cossack Squat (Bodyweight)","Pistol Squat Progression","Spanish Squat","Tempo Air Squat"],
   }
 
   const actual: Record<string, string[]> = {}
@@ -150,6 +143,62 @@ console.log('\n3. TRAPDOOR: no other exercise in the database moved')
   }
 
   check('no exercise changed category', moved.length === 0, moved.slice(0, 8))
+  // THE SNAPSHOT ALONE ONLY PROVES NOTHING MOVED. It was regenerated from the
+  // database on 31 Aug 2026 (158 -> 185 entries, stale since ~40 exercises
+  // were added), and a regenerated snapshot blesses whatever it finds —
+  // including anything already wrong. So this checks the one category that
+  // can be validated independently.
+  //
+  // isolation_chest is `categorize`'s DEFAULT for a tier-3 lift whose
+  // movement_pattern the switch has no case for. That default's own comment
+  // records it firing twice before ("trap work priced as a cable fly"). An
+  // exercise landing there without a chest muscle in it did not get chosen —
+  // it fell through.
+  const chestish = (m: string) => /chest|pec/i.test(m)
+  const notReallyChest = (actual.isolation_chest ?? [])
+    .filter(n => !(EXERCISE_DATABASE.find(e => e.name === n)?.primary_muscles ?? []).some(chestish))
+
+  // The three known fall-throughs, pinned BY NAME rather than by a count, so
+  // fixing one while another appears still fails. Their movement_patterns are
+  // CORRECT (hip_hinge, vertical_pull); the gap is that the isolation switch
+  // has no case for either. hip_hinge has an obvious home (isolation_hamstring
+  // exists); vertical_pull has none — there is no lat-isolation category — and
+  // inventing one sets a load anchor, which is Ashley's call, so these wait.
+  // Measured impact today: nil. All three are bodyweight or band and prescribe
+  // no load at all. It is the next LOADED exercise with those patterns that
+  // would be priced as a cable fly.
+  // FIFTEEN, not three. The first version of this check listed only the three
+  // exercises added in §6.2 and went red immediately with twelve more that had
+  // been sitting there — core work, rear-delt work and a lat pulldown, all
+  // priced off the bench press at 0.38. Six of them carry a real load:
+  //
+  //   Face Pulls (rear deltoid, rotator cuff)     27.5kg
+  //   Reverse Pec Deck (rear deltoid)             27.5kg
+  //   Straight-Arm Pulldown (lats)                27.5kg
+  //   Cable Woodchops (obliques)                  27.5kg
+  //   Russian Twist (obliques)                    27.5kg
+  //   Rear Delt Flyes (rear deltoid)              14kg per hand
+  //
+  // measured for a male intermediate, 80kg, full gym. The other nine are
+  // bodyweight and prescribe nothing, so they are latent rather than live.
+  //
+  // Two of the live ones are the reason this is logged loudly rather than
+  // filed: a 27.5kg Face Pull loads the rotator cuff off a PRESSING anchor,
+  // and a 27.5kg Russian Twist is a loaded spinal rotation. Neither number
+  // was chosen for those movements; both are a default nobody wrote for them.
+  const KNOWN_FALLTHROUGH = [
+    'Bird Dog', 'Bodyweight Hip Hinge to Wall', 'Cable Woodchops', 'Dead Bug',
+    'Face Pulls', 'Pallof Press', 'Plank', 'Rear Delt Flyes', 'Reverse Pec Deck',
+    'Russian Twist', 'Scapular Pull-Ups', 'Side Plank', 'Single-Arm Band Pulldown',
+    'Straight-Arm Pulldown', 'Wall Sit',
+  ]
+  check('no NEW exercise falls through to the isolation_chest default',
+    notReallyChest.every(n => KNOWN_FALLTHROUGH.includes(n)),
+    notReallyChest.filter(n => !KNOWN_FALLTHROUGH.includes(n)))
+  check('...and the known ones are still exactly those — remove them here as they are fixed',
+    KNOWN_FALLTHROUGH.every(n => notReallyChest.includes(n)),
+    KNOWN_FALLTHROUGH.filter(n => !notReallyChest.includes(n)))
+
   check('the snapshot covers the whole DB, so this has teeth',
     Object.values(AT_THE_FIX).reduce((a, b) => a + b.length, 0) === EXERCISE_DATABASE.length,
     { frozen: Object.values(AT_THE_FIX).reduce((a, b) => a + b.length, 0), db: EXERCISE_DATABASE.length })
