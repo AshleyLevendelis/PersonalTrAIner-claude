@@ -39,11 +39,14 @@ export function ToolsTab({ profileId, mealPools, targets, softLikedFoods, todays
     timers.mode === 'round' && !!timers.roundConfig && (timers.running || timers.isRoundComplete)
 
   if (roundHoldsScreen) {
-    // Positioned against the tab content area, with the dock's own height as
-    // the bottom inset — BottomTabBar stays visible and interactive, so the
-    // user can navigate away mid-round and the timer keeps running.
+    // NO `relative` AND NO minHeight HERE. Both used to be, and together they
+    // were the bug: they made this wrapper the containing block for
+    // RoundField's absolute positioning, so the full-bleed field became a
+    // 60vh card sitting in the page's padding. RoundField is `fixed` now and
+    // belongs to the viewport, so this wrapper must stay unpositioned or it
+    // will capture it again.
     return (
-      <div data-tour="toolsall" className="relative" style={{ minHeight: '60vh' }}>
+      <div data-tour="toolsall">
         <RoundField />
       </div>
     )

@@ -107,7 +107,18 @@ export function RoundField() {
       role="status"
       aria-live="polite"
       aria-label={`${roundLabel}. ${phase === 'done' ? 'Session complete' : phase === 'work' ? 'Work' : 'Rest'}. ${formatRemaining(remainingMs)} remaining.`}
-      className="absolute left-0 right-0 top-0 flex flex-col overflow-hidden"
+      // FIXED, NOT ABSOLUTE, and that is the whole difference between the
+      // design and what shipped. An absolutely-positioned element sizes to its
+      // nearest POSITIONED ancestor, and ToolsTab wrapped this in a
+      // `relative` box of minHeight 60vh — so the field filled 60% of the
+      // screen inside the page's own padding, as a card, instead of flooding
+      // the screen. The colour IS the signal in this design; a colour you have
+      // to be holding the phone to notice does not carry across a gym.
+      //
+      // z-30 sits under BottomTabBar's z-40, which together with the
+      // TAB_BAR_HEIGHT_PX inset is what keeps navigation visible AND tappable
+      // while a round runs.
+      className="fixed left-0 right-0 top-0 z-30 flex flex-col overflow-hidden"
       style={{ bottom: TAB_BAR_HEIGHT_PX, background: bg, padding: '3.5rem 1.5rem 1.625rem' }}
     >
       {/* Purely graphic, and hidden from assistive tech for that reason. */}

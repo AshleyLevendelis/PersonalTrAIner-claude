@@ -99,6 +99,7 @@
     "test:chat-actions": "tsx scripts/test-chat-actions.ts",
     "test:coach-volume-schedule": "tsx scripts/test-coach-volume-schedule.ts",
     "test:onboarding-reachable": "tsx scripts/test-onboarding-reachable.ts",
+    "test:timer-field-fills-screen": "tsx scripts/test-timer-field-fills-screen.ts",
     "probe:swap-depth": "tsx scripts/probe-swap-depth.ts",
     "probe:swap-delta": "tsx scripts/probe-swap-delta.ts",
     "test:onboarding-slots": "tsx scripts/test-onboarding-slots.ts",

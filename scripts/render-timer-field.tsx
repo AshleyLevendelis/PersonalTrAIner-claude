@@ -50,13 +50,28 @@ const states: [string, TimersValue][] = [
 import { readdirSync } from 'fs'
 const builtCss = readdirSync('dist/assets').find(f => f.endsWith('.css'))!
 const css = readFileSync('dist/assets/' + builtCss, 'utf8')
+// EACH PANEL IS AN IFRAME, and that is a correctness fix, not a style choice.
+// These panels used to be `position:relative` divs of a fixed size — which
+// handed RoundField exactly the positioned ancestor the real app never gives
+// it. The field is `position:absolute` no longer, but the lesson stands: a
+// preview that supplies a containing block the app does not have will show a
+// full-bleed design working when it does not. An iframe IS its own viewport,
+// so `fixed` resolves the same way it does on a phone and the picture cannot
+// flatter the code.
+const panelDoc = (v: TimersValue) => `<!doctype html><meta charset="utf-8"><style>${css}
+  html,body{margin:0;height:100%;background:#1A1636}</style>
+  <body>
+    <div style="padding:1.5rem">
+      <div data-tour="toolsall">${renderToStaticMarkup(<TimersContextForTests.Provider value={v}><RoundField /></TimersContextForTests.Provider>)}</div>
+    </div>
+    <nav style="position:fixed;left:0;right:0;bottom:0;height:64px;z-index:40;background:#221C48"></nav>
+  </body>`
+
 const panels = states.map(([name, v]) => `
   <figure style="margin:0">
     <figcaption style="color:#9A93C9;font:600 11px/1 system-ui;letter-spacing:.14em;text-transform:uppercase;margin-bottom:10px">${name}</figcaption>
-    <div style="width:390px;height:700px;position:relative;background:#1A1636;border-radius:28px;overflow:hidden">
-      ${renderToStaticMarkup(<TimersContextForTests.Provider value={v}><RoundField /></TimersContextForTests.Provider>)}
-      <nav style="position:absolute;left:0;right:0;bottom:0;height:64px;background:#221C48"></nav>
-    </div>
+    <iframe title="${name}" style="width:390px;height:700px;border:0;border-radius:28px;background:#1A1636"
+      srcdoc="${panelDoc(v).replace(/"/g, '&quot;')}"></iframe>
   </figure>`).join('')
 
 writeFileSync('/tmp/field.html', `<!doctype html><meta charset="utf-8"><style>${css}</style>
