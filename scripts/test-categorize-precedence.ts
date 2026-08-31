@@ -107,14 +107,16 @@ console.log('\n3. TRAPDOOR: no other exercise in the database moved')
     hinge_accessory: ["Bodyweight Good Morning","Glute Bridge","Good Mornings","Hip Thrust","Romanian Deadlifts","Single-Leg Glute Bridge","Single-Leg RDL (Bodyweight)"],
     isolation_bicep: ["Backpack Curl","Band Curl","Barbell Curls","Cable Curls","Dumbbell Curls","Hammer Curls","Incline Dumbbell Curls"],
     isolation_calf: ["Bent-Knee Calf Raise (Bodyweight)","Calf Raises","Calf Raises (Bodyweight)","Seated Calf Raises","Single-Leg Calf Raise (Bodyweight)","Single-Leg Calf Raise Hold","Single-Leg Dumbbell Calf Raise"],
-    isolation_chest: ["Bird Dog","Bodyweight Hip Hinge to Wall","Cable Crossover","Cable Flyes","Cable Woodchops","Dead Bug","Dumbbell Flyes","Face Pulls","Pallof Press","Pec Deck Machine","Plank","Rear Delt Flyes","Reverse Pec Deck","Russian Twist","Scapular Pull-Ups","Side Plank","Single-Arm Band Pulldown","Straight-Arm Pulldown","Wall Sit"],
-    isolation_hamstring: ["Dumbbell Leg Curl","Lying Leg Curl","Nordic Hamstring Curl","Prone Hamstring Curl (Bodyweight)","Seated Band Leg Curl","Seated Leg Curl","Single-Leg Sliding Leg Curl","Sliding Leg Curl"],
-    isolation_quad: ["Banded Terminal Knee Extension","Chair Leg Extension","Leg Extensions","Reverse Nordic Curl","Seated Short-Arc Quad Set","Sissy Squat","Wall Sit March"],
+    isolation_chest: ["Cable Crossover","Cable Flyes","Dumbbell Flyes","Pec Deck Machine"],
+    isolation_hamstring: ["Bodyweight Hip Hinge to Wall","Dumbbell Leg Curl","Lying Leg Curl","Nordic Hamstring Curl","Prone Hamstring Curl (Bodyweight)","Seated Band Leg Curl","Seated Leg Curl","Single-Leg Sliding Leg Curl","Sliding Leg Curl"],
+    isolation_lat: ["Scapular Pull-Ups","Single-Arm Band Pulldown","Straight-Arm Pulldown"],
+    isolation_quad: ["Banded Terminal Knee Extension","Chair Leg Extension","Leg Extensions","Reverse Nordic Curl","Seated Short-Arc Quad Set","Sissy Squat","Wall Sit","Wall Sit March"],
+    isolation_rear_delt: ["Face Pulls","Rear Delt Flyes","Reverse Pec Deck"],
     isolation_shoulder: ["Backpack Front Raise","Backpack Lateral Raise","Band Lateral Raise","Cable Lateral Raises","Front Raises","Lateral Raises","Machine Lateral Raise"],
     isolation_tricep: ["Band Tricep Kickback","Band Tricep Pushdown","Chair Dips","Overhead Tricep Extension","Skull Crushers","Tricep Dips","Tricep Pushdowns"],
     kettlebell_swing: ["Kettlebell Swing (Heavy)","Kettlebell Swings"],
     leg_press: ["Hack Squat","Leg Press"],
-    null: ["Ab Wheel Rollout","Ankle Alphabet","Arm Circles","Band Dislocates","Band Face Pulls","Band Pull-Aparts","Banded Ankle Dorsiflexion","Banded Wrist Extension","Banded Wrist Flexion","Battle Ropes","Bear Crawl","Box Jumps","Broad Jumps","Burpees","Clamshell","Cycling Intervals","Eccentric Wrist Extension","Elliptical","Forearm Pronation-Supination","Hanging Leg Raises","High Knees","Isometric Grip Squeeze","Jump Rope","Jumping Jacks","Lateral Step Touches","Leg Swings","Medicine Ball Slams","Mountain Climbers","Plyo Push-Ups","Prone Y-T Raises","Scapular Push-Ups","Shadow Boxing","Side-Lying Hip Abduction","Single-Leg Balance Hold","Skater Bounds","Standing Band Hip Abduction","Treadmill Intervals","Wall Slides","Wrist Circles"],
+    null: ["Ab Wheel Rollout","Ankle Alphabet","Arm Circles","Band Dislocates","Band Face Pulls","Band Pull-Aparts","Banded Ankle Dorsiflexion","Banded Wrist Extension","Banded Wrist Flexion","Battle Ropes","Bear Crawl","Bird Dog","Box Jumps","Broad Jumps","Burpees","Cable Woodchops","Clamshell","Cycling Intervals","Dead Bug","Eccentric Wrist Extension","Elliptical","Forearm Pronation-Supination","Hanging Leg Raises","High Knees","Isometric Grip Squeeze","Jump Rope","Jumping Jacks","Lateral Step Touches","Leg Swings","Medicine Ball Slams","Mountain Climbers","Pallof Press","Plank","Plyo Push-Ups","Prone Y-T Raises","Russian Twist","Scapular Push-Ups","Shadow Boxing","Side Plank","Side-Lying Hip Abduction","Single-Leg Balance Hold","Skater Bounds","Standing Band Hip Abduction","Treadmill Intervals","Wall Slides","Wrist Circles"],
     overhead: ["Arnold Press","Backpack Overhead Press","Band Shoulder Press","Dumbbell Shoulder Press","Landmine Press","Overhead Press","Pike Push-Ups","Shoulder Press Machine"],
     overhead_carry: ["Overhead Carry"],
     pulldown: ["Band Lat Pulldown","Close-Grip Lat Pulldown","Kneeling Band Lat Pulldown","Lat Pulldown"],
@@ -186,12 +188,18 @@ console.log('\n3. TRAPDOOR: no other exercise in the database moved')
   // filed: a 27.5kg Face Pull loads the rotator cuff off a PRESSING anchor,
   // and a 27.5kg Russian Twist is a loaded spinal rotation. Neither number
   // was chosen for those movements; both are a default nobody wrote for them.
-  const KNOWN_FALLTHROUGH = [
-    'Bird Dog', 'Bodyweight Hip Hinge to Wall', 'Cable Woodchops', 'Dead Bug',
-    'Face Pulls', 'Pallof Press', 'Plank', 'Rear Delt Flyes', 'Reverse Pec Deck',
-    'Russian Twist', 'Scapular Pull-Ups', 'Side Plank', 'Single-Arm Band Pulldown',
-    'Straight-Arm Pulldown', 'Wall Sit',
-  ]
+  // EMPTY, AND THAT IS THE POINT. This list held fifteen names for about an
+  // hour: the three added in §6.2 plus twelve this check found on its first
+  // run. Ashley's ruling was to fix all three groups properly rather than
+  // patch the two dangerous ones, so `categorize` now has cases for core,
+  // horizontal_pull, vertical_pull, hip_hinge and knee_dominant, and nothing
+  // falls to the isolation_chest default any more.
+  //
+  // Kept as an empty array rather than deleted, so the check above stays live:
+  // the next pattern without a case fails here by name instead of quietly
+  // being priced as a cable fly.
+  const KNOWN_FALLTHROUGH: string[] = []
+
   check('no NEW exercise falls through to the isolation_chest default',
     notReallyChest.every(n => KNOWN_FALLTHROUGH.includes(n)),
     notReallyChest.filter(n => !KNOWN_FALLTHROUGH.includes(n)))
