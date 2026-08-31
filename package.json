@@ -101,6 +101,7 @@
     "test:onboarding-reachable": "tsx scripts/test-onboarding-reachable.ts",
     "test:timer-field-fills-screen": "tsx scripts/test-timer-field-fills-screen.ts",
     "test:timer-intent-copy": "tsx scripts/test-timer-and-intent-copy.ts",
+    "test:coach-phase-brief": "tsx scripts/test-coach-phase-brief.ts",
     "probe:swap-depth": "tsx scripts/probe-swap-depth.ts",
     "probe:swap-delta": "tsx scripts/probe-swap-delta.ts",
     "test:onboarding-slots": "tsx scripts/test-onboarding-slots.ts",
