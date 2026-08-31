@@ -304,15 +304,54 @@ console.log('\n6. The first-run starter chips only offer things that work')
   // silent no-op, which is exactly the kind of half-landed feature that keeps
   // recurring here.
   const squat = { focus: 'Squat & Carry', movements: 'Barbell Squats, Loaded Backpack Walk…' }
-  const intro = buildFirstRunIntro('Hey Ashley', { ...squat, when: 'today' })
+  // WITH a plan shape, because that is what a real user has. Without one the
+  // structure message has nothing to say and folds into the welcome, which is
+  // correct behaviour and two messages — see buildFirstRunIntro's own note.
+  const fullShape: FirstRunPlanShape = { totalWeeks: 16, blocks: 4, startsLight: true }
+  const intro = buildFirstRunIntro('Hey Ashley', { ...squat, when: 'today' }, fullShape)
 
-  // ONE MESSAGE, on Ashley's ruling after seeing four on a real phone. The
-  // count is asserted because the pressure is always to add "just one more
-  // line" back, and four is where this started.
-  check('the opener is a single message', intro.length === 1, intro.length)
-  check('it carries the chips — the only message that can render them',
-    (intro[0].quickReplies?.length ?? 0) > 0, intro.map(m => m.quickReplies?.length ?? 0))
-  check('every intro message has words in it', intro.every(m => m.content.trim().length > 0))
+  // THREE MESSAGES, on Ashley's ruling of 31 Aug 2026 — and this check used to
+  // say ONE, on her ruling before that. Both are recorded because the reversal
+  // is the interesting part: she cut four to one after reading it on a real
+  // phone ("we dont need to say that much"), then later asked for a welcome
+  // that also covers how the plan is structured and that they can ask about
+  // anything in health and fitness. That does not fit in one bubble.
+  //
+  // Three of the four original messages stay cut regardless, and each for its
+  // own reason: the "I'm your coach" line (the header says it permanently),
+  // "talk to me like you'd talk to a person" (her objection, and the right
+  // one), and "nothing moves without your say-so" (already said in onboarding;
+  // twice made it a disclaimer). The count is still asserted because the
+  // pressure is always to add one more line, and four is where this started.
+  check('the opener is three messages', intro.length === 3, intro.length)
+  check('...and every one of them has words in it', intro.every(m => m.content.trim().length > 0))
+
+  // THE CHIPS ONLY RENDER ON THE LAST MESSAGE. getQuickRepliesForLastMessage
+  // reads messages[messages.length - 1].quickReplies and nothing else, so any
+  // attached above are a silent no-op. This was true by accident while the
+  // intro was one message; with three it is a real constraint again.
+  check('the last message carries the chips', (intro[intro.length - 1].quickReplies?.length ?? 0) > 0,
+    intro.map(m => m.quickReplies?.length ?? 0))
+  check('...and no earlier message pretends to',
+    intro.slice(0, -1).every(m => m.quickReplies === undefined),
+    intro.map(m => m.quickReplies?.length ?? 0))
+
+  // THE ONE CAPABILITY THE COPY MUST NOT OFFER. 23 of the coach's 24 tools
+  // act; log_meal is the exception and still replies that meal logging isn't
+  // live yet. The three-message welcome invites the user to ask about "food",
+  // which is honest — what they will and won't eat is handled, and a food
+  // dislike is one of the three chips. An invitation to LOG a meal is not: it
+  // would fail on the first thing a new user tried, which is the worst
+  // possible place for the app's one declining tool to surface.
+  const introCopy = intro.map(m => m.content).join(' ')
+  check('the welcome never invites a meal log',
+    !/log (a |your )?(meal|breakfast|lunch|dinner)|what you (ate|eat)|track your food/i.test(introCopy),
+    introCopy)
+  // ...and the reason that check can be trusted: log_meal really is still the
+  // declining one. If it ever starts working, this comment is the thing that
+  // says the copy may open up.
+  check('...because log_meal is still the tool that declines',
+    /log_meal[\s\S]{0,4000}(isn't live|not live)/i.test(chat))
 
   // THE WORDING SHE REJECTED, held so it cannot come back: "as far as the
   // user is concerned it is a person, so I dont like this wording." Naming
@@ -330,18 +369,26 @@ console.log('\n6. The first-run starter chips only offer things that work')
   // right now"; that is wrong for anyone whose first training day is not
   // today, and the code it replaced was worse there — a brand-new user with
   // no session today was asked "how's the recovery going?".
-  const today = buildFirstRunIntro('Hey Ashley', { ...squat, when: 'today' })[0].content
-  const later = buildFirstRunIntro('Hey Ashley', { ...squat, when: 'Monday' })[0].content
-  check('a session today is said to be today', /day one starts today/i.test(today), today)
+  // Day one moved to the LAST message when the intro became three. Reading
+  // [0] here went red for copy that was perfectly correct — the same
+  // wrong-place failure the sign-in gate hit today.
+  const lastContent = (when: string | null) => {
+    const msgs = buildFirstRunIntro('Hey Ashley', when === null ? null : { ...squat, when })
+    return msgs[msgs.length - 1].content
+  }
+  const today = lastContent('today')
+  const later = lastContent('Monday')
+  check('a session today is said to be today', /day one is today/i.test(today), today)
   check('a session later names the day instead', /day one is Monday/i.test(later), later)
   check('...and never claims it starts today', !/starts today/i.test(later), later)
-  check('the no-session fallback invents no session',
-    !/day one/i.test(buildFirstRunIntro('Hey Ashley', null)[0].content))
+  check('the no-session fallback invents no session', !/day one/i.test(lastContent(null)))
 
   // The chip has to agree with the sentence above it. "Talk me through today"
   // under "day one is Monday" is the app contradicting itself on one screen.
-  const chipsFor = (when: string | null) =>
-    buildFirstRunIntro('Hey Ashley', when === null ? null : { ...squat, when })[0].quickReplies ?? []
+  const chipsFor = (when: string | null) => {
+    const msgs = buildFirstRunIntro('Hey Ashley', when === null ? null : { ...squat, when })
+    return msgs[msgs.length - 1].quickReplies ?? []
+  }
   check('a session today offers "Talk me through today"',
     chipsFor('today').includes('Talk me through today'), chipsFor('today'))
   check('a session later offers "Talk me through day one" instead',
@@ -350,7 +397,8 @@ console.log('\n6. The first-run starter chips only offer things that work')
 
   // The ellipsis already ends the sentence; a full stop after it reads as a
   // typo, and it shipped that way ("Neutral-Grip Dumbbell Press….").
-  const truncated = buildFirstRunIntro('Hey Ashley', { focus: 'X', movements: 'A, B, C…', when: 'today' })[0].content
+  const truncatedMsgs = buildFirstRunIntro('Hey Ashley', { focus: 'X', movements: 'A, B, C…', when: 'today' })
+  const truncated = truncatedMsgs[truncatedMsgs.length - 1].content
   check('a truncated movement list is not followed by a full stop',
     !truncated.includes('….'), truncated)
   for (const c of [today, later]) {
@@ -378,24 +426,32 @@ console.log('\n6. The first-run starter chips only offer things that work')
   // much about what it must NOT say — no weeks, no blocks, no "steps up" —
   // when the plan can't back the claim.
   // ---------------------------------------------------------------------
+  // ALL the messages joined: the shape is now spread across the welcome (how
+  // long) and the structure message (what the blocks do), so reading [0]
+  // alone would miss half of what these checks are about.
   const shaped = (shape: FirstRunPlanShape | null) =>
-    buildFirstRunIntro('Hey Ashley', { ...squat, when: 'today' }, shape)[0].content
+    buildFirstRunIntro('Hey Ashley', { ...squat, when: 'today' }, shape).map(m => m.content).join(' ')
 
   const sixteen: FirstRunPlanShape = { totalWeeks: 16, blocks: 4, startsLight: false }
   const withShape = shaped(sixteen)
   check('the opener says how long the plan runs', /16 weeks/.test(withShape), withShape)
   check('...and how many blocks it has', /4 blocks/.test(withShape), withShape)
-  check('...and that it gets harder', /getting harder/i.test(withShape), withShape)
-  check("...and promises to say when it changes", /I'll say when it changes/i.test(withShape), withShape)
-  check('day one still comes first — momentum leads, shape follows',
-    withShape.indexOf('Squat & Carry') < withShape.indexOf('16 weeks'), withShape)
+  check('...and that the loads climb', /loads climb/i.test(withShape), withShape)
+  check("...and promises to say when it changes", /tell you each time it changes/i.test(withShape), withShape)
+  // THE ORDER FLIPPED, on Ashley's 31 Aug ruling, and this check flipped with
+  // it. It used to assert day one came FIRST — momentum leading, shape as
+  // context. The three-message welcome she asked for leads with what they now
+  // have and lands on day one, so the assertion is inverted rather than
+  // deleted: the ordering is still pinned, just to the order she now wants.
+  check('day one lands LAST, after the welcome and the shape',
+    withShape.indexOf('16 weeks') < withShape.indexOf('Squat & Carry'), withShape)
 
   // A calibration week is capped ON PURPOSE, so an unexplained easy week one
   // reads as the app getting it wrong. This is the branch that has to speak.
   const light = shaped({ totalWeeks: 16, blocks: 4, startsLight: true })
   check('a calibration first week is named as light',
-    /week one's light/i.test(light), light)
-  check('...and says what it is for', /find your weights/i.test(light), light)
+    /start light on purpose/i.test(light), light)
+  check('...and says what it is for', /find your working weights/i.test(light), light)
   check('a normal first week is NOT called light',
     !/light/i.test(withShape), withShape)
 
@@ -414,10 +470,15 @@ console.log('\n6. The first-run starter chips only offer things that work')
   check('...and does not claim it steps up', !/getting harder/i.test(oneBlock), oneBlock)
   check('...but still says how long it runs', /6 weeks/.test(oneBlock), oneBlock)
 
-  // STILL ONE MESSAGE. Ashley cut this from four to one; the shape sentence
-  // is appended to the opener, not added beside it.
-  check('adding the shape does not add a message',
-    buildFirstRunIntro('Hey Ashley', { ...squat, when: 'today' }, sixteen).length === 1)
+  // A DESCRIBABLE PLAN GETS THREE MESSAGES; ONE WITH NOTHING TO DESCRIBE GETS
+  // TWO. The structure message exists to say what the blocks do — with no
+  // blocks it has one clause left, which folds into the welcome rather than
+  // shipping as a lonely bubble between two full ones. Three is what Ashley
+  // chose for the plan she has, not a quota to pad out.
+  check('a plan with blocks gets three messages',
+    buildFirstRunIntro('Hey Ashley', { ...squat, when: 'today' }, sixteen).length === 3)
+  check('...and a plan with nothing to describe gets two, not a stub',
+    buildFirstRunIntro('Hey Ashley', { ...squat, when: 'today' }, null).length === 2)
 
   // THE DERIVATION IS TESTED, NOT GREPPED FOR. The first version of this
   // block searched ChatAssistant.tsx for `totalWeeks: mesocycle.length` and
@@ -453,9 +514,9 @@ console.log('\n6. The first-run starter chips only offer things that work')
 
   // End to end: a real plan in, the right sentence out.
   const endToEnd = buildFirstRunIntro('Hey Ashley', { ...squat, when: 'today' },
-    planShapeFromMesocycle(meso(12, 3, false)))[0].content
+    planShapeFromMesocycle(meso(12, 3, false))).map(m => m.content).join(' ')
   check('a 12-week plan says twelve weeks, not sixteen',
-    /12 weeks, 3 blocks/.test(endToEnd) && !/16/.test(endToEnd), endToEnd)
+    /12 weeks in 3 blocks/.test(endToEnd) && !/16/.test(endToEnd), endToEnd)
 
   // ...and the component actually calls it, on the mesocycle it was handed.
   check('ChatAssistant derives the shape from its own mesocycle prop',

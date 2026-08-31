@@ -1,6 +1,7 @@
 # The welcome message after onboarding — plan
 
-**Status: PLAN ONLY. Not built.** Ashley asked to plan it.
+**Status: BUILT, 31 Aug 2026.** Ashley approved the draft and chose three
+messages. Built as drafted; what the build added is recorded at the bottom.
 
 ## The brief
 
@@ -96,3 +97,49 @@ Merge 1 and 2. Shorter, closer to her original ruling, loses the beat between
   chips must sit on the LAST message or they silently do not render.
 - A new check: the copy claims nothing `log_meal`-shaped.
 - The "like a person" phrasing stays banned by the existing gate.
+
+
+---
+
+## What shipped, and the two things the draft did not anticipate
+
+Built as drafted — the three messages read on screen exactly as they read in
+the plan above. Measured with `render:screens` at 412px: three bubbles, and
+the chips still sit well above the fold.
+
+**A plan with nothing to describe gets TWO messages, not three.** The
+structure message exists to say what the blocks do. Strip the blocks — a short
+plan, or one that failed to generate — and every clause in it disappears
+except "I'll tell you each time it changes", which would have shipped as a
+lonely one-line bubble between two full ones. It folds into the welcome
+instead. Three is what Ashley chose for the plan she has, not a quota to pad
+out for a plan that has less to say.
+
+**`planShapeSentence` became dead and was deleted.** It was written this
+morning for the one-sentence version and had no caller once the shape moved
+into messages 1 and 2. `test:no-dead-code` would have caught it; better to not
+leave it there in the first place.
+
+## The gate had to be turned around, not just adjusted
+
+Three checks asserted the OLD ruling and would have gone red for correct copy:
+
+- `the opener is a single message` → now three, with both rulings recorded so
+  the reversal is legible rather than looking like drift.
+- `day one still comes first — momentum leads, shape follows` → **inverted.**
+  Day one now lands last. The ordering is still pinned, just to the order she
+  now wants.
+- Every day-one check read `intro[0].content`. Day one moved to the last
+  message, so they were reading the welcome and failing on copy that was
+  perfectly correct — the same wrong-place failure the sign-in gate hit
+  earlier today.
+
+Two checks were added: the chips must be on the last message and on **no
+earlier one** (attaching them above is a silent no-op, which was safe by
+accident while the intro was one message), and the copy must never invite a
+meal log, with a second check asserting `log_meal` really is still the tool
+that declines — so if it ever starts working, the copy is free to open up.
+
+Five mutations turn the gate red: chips on the first message, the structure
+message dropped, a meal-log invitation added, day one moved back to the front,
+and the calibration clause removed.

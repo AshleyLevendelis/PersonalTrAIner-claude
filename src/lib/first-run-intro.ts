@@ -167,65 +167,97 @@ export function planShapeFromMesocycle(
   }
 }
 
-function planShapeSentence(shape: FirstRunPlanShape | null): string {
-  // A one-week "programme" has no shape worth describing, and a zero-week one
-  // is a broken plan — say nothing rather than something.
-  if (!shape || shape.totalWeeks < 2) return ''
-  const blocks = shape.blocks >= 2 ? `, ${shape.blocks} blocks` : ''
-  if (shape.startsLight) {
-    // Naming this is the whole reason the branch exists. A calibration week
-    // is deliberately capped, so it FEELS like the app got it wrong — and the
-    // person most likely to quit over an easy first week is the one who was
-    // never told it was on purpose.
-    return `${shape.totalWeeks} weeks${blocks}. Week one's light while we find your weights — I'll say when it steps up.`
-  }
-  // "Getting harder as you go" is a claim about later blocks, so it is only
-  // made when there ARE later blocks.
-  const climb = blocks ? ', getting harder as you go' : ''
-  return `${shape.totalWeeks} weeks${blocks}${climb} — I'll say when it changes.`
-}
 
 export function buildFirstRunIntro(
   greeting: string,
   session: FirstRunSessionBrief | null,
   shape: FirstRunPlanShape | null = null,
 ): FirstRunMessage[] {
-  const opener = (() => {
-    if (!session) {
-      // No plan day to point at. Say the true thing rather than inventing a
-      // session — this is the branch a broken plan lands in, and a confident
-      // "day one starts now" there would be the app lying on its first line.
-      return `${greeting} — welcome aboard. Your plan's built and waiting. Have a look around, and tell me anything you need.`
-    }
+  // ---- 1. Welcome, and what they now have. ------------------------------
+  //
+  // The plan's size is the first concrete thing said, because it is the
+  // thing they just spent an onboarding earning and cannot see yet. Drops to
+  // a plain welcome when there is no mesocycle to describe — an invented
+  // "16 weeks" in the app's first line is the worst place for a guess.
+  const size = shape && shape.totalWeeks >= 2
+    ? `${shape.totalWeeks} weeks${shape.blocks >= 2 ? ` in ${shape.blocks} blocks` : ''}`
+    : ''
+  const welcome = size
+    ? `${greeting} — welcome aboard. Your plan's built: ${size}, and it's yours to change whenever it stops fitting.`
+    : `${greeting} — welcome aboard. Your plan's built, and it's yours to change whenever it stops fitting.`
+
+  // ---- 2. How it is structured, and how it begins. -----------------------
+  //
+  // Every clause here is a claim about THIS plan, so each one is gated on the
+  // plan actually having that shape. A single-block plan is not told its
+  // blocks have jobs; a plan with no deload is not promised an easier week.
+  // The calibration clause only appears for someone who is genuinely getting
+  // a capped first week — that is the one most worth saying, because an
+  // unexplained easy week reads as the app getting it wrong.
+  const structureParts: string[] = []
+  if (shape && shape.blocks >= 2) structureParts.push('Each block has a job.')
+  if (shape?.startsLight) {
+    structureParts.push("You'll start light on purpose while we find your working weights, then the loads climb, and every block ends with an easier week so the work actually sticks.")
+  } else if (shape && shape.blocks >= 2) {
+    structureParts.push('The loads climb through each one, and every block ends with an easier week so the work actually sticks.')
+  }
+  // THE PROMISE ON ITS OWN IS NOT A MESSAGE. When the plan has no blocks to
+  // describe — a short plan, or one that failed to generate — everything
+  // above is skipped and this line would ship as a lonely one-clause bubble
+  // between two full ones. It folds into the welcome instead, and the intro
+  // is two messages rather than three. Ashley chose three for the plan she
+  // has; three is not a quota to pad out for a plan that has less to say.
+  const hasStructure = structureParts.length > 0
+  structureParts.push("I'll tell you each time it changes — you won't have to go looking.")
+  const structure = structureParts.join(' ')
+
+  // ---- 3. Day one, and the open door. ------------------------------------
+  //
+  // Day one keeps all four branches it already had — today, past their usual
+  // hour, a named day ahead, and no session at all. Ashley's sketch was "day
+  // one starts right now", which is wrong for anyone whose first training day
+  // is not today, and the code this replaced was worse there: it asked a
+  // brand-new user how their recovery was going.
+  const dayOne = (() => {
+    if (!session) return "Your plan's waiting whenever you want a look."
     // The movements list already ends in an ellipsis when it was truncated,
     // and a full stop after one reads as a typo ("Dumbbell Press….").
     const stop = session.movements.endsWith('…') ? '' : '.'
     const brief = `${session.focus} — ${session.movements}${stop}`
-    if (session.when === 'today') {
-      return `${greeting} — welcome aboard. Day one starts today: ${brief} Give it a proper go and we'll build from there.`
-    }
-    if (session.when === 'whenever') {
-      // A training day, but past the hour they said they train. "Starts right
-      // now" would be pushing someone into a session at 10pm.
-      return `${greeting} — welcome aboard. Day one is ready when you are: ${brief} Tonight or tomorrow, your call.`
-    }
-    return `${greeting} — welcome aboard. Day one is ${session.when}: ${brief} Rest up and come in ready for it.`
+    if (session.when === 'today') return `Day one is today: ${brief}`
+    // A training day, but past the hour they said they train. "Starts right
+    // now" would be pushing someone into a session at 10pm.
+    if (session.when === 'whenever') return `Day one is ready when you are: ${brief}`
+    return `Day one is ${session.when}: ${brief}`
   })()
 
-  // The chips go on this message because it is the last one — getQuickReplies-
-  // ForLastMessage reads messages[messages.length - 1].quickReplies and
-  // nothing else. With one message that is trivially true; it was not before,
-  // and attaching them anywhere else was a silent no-op.
+  // THE OPEN DOOR, and the reason it is here rather than left to the tour.
+  // The tour's last step says almost exactly this — but the tour is skippable
+  // and says so in its own first step, so someone who skips gets none of it.
+  //
+  // DELIBERATELY NOT A FEATURE LIST. That was one of the messages Ashley cut,
+  // and the reasoning still holds: the tour demonstrates each capability on
+  // the real screen at the moment it makes sense, which a paragraph cannot.
+  // This names the KIND of thing worth saying, not the tools that handle it.
+  //
+  // "food" here means what they will and won't eat — never logging a meal.
+  // log_meal is the one coach tool that still declines, so an invitation to
+  // log one would fail on the first thing a new user tried.
+  const openDoor = "And anything you're wondering about — training, food, sleep, a niggle that won't shift — just ask."
+
+  // The chips go on the LAST message and only there — getQuickRepliesFor-
+  // LastMessage reads messages[messages.length - 1].quickReplies and nothing
+  // else, so attaching them anywhere above is a silent no-op. This was safe
+  // by accident while the intro was a single message; with three it is a real
+  // constraint again, which is why test:coach-promises pins it.
   const dayOneIsToday = session?.when === 'today' || session?.when === 'whenever'
-  // Day one first, the shape second — momentum is what Ashley asked the
-  // opener to lead with, and the programme's shape is context for it rather
-  // than the headline. Still one message, on her ruling: this was four, she
-  // cut it to one, and a second bubble here would quietly undo that.
-  const shapeLine = planShapeSentence(shape)
-  return [{
-    content: shapeLine ? `${opener} ${shapeLine}` : opener,
+  const last = {
+    content: `${dayOne} ${openDoor}`,
     quickReplies: dayOneIsToday ? FIRST_RUN_QUICK_REPLIES : FIRST_RUN_QUICK_REPLIES_AHEAD,
-  }]
+  }
+  return hasStructure
+    ? [{ content: welcome }, { content: structure }, last]
+    : [{ content: `${welcome} ${structure}` }, last]
 }
 
 // ---------------------------------------------------------------------------
