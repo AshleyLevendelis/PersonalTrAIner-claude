@@ -146,6 +146,26 @@ console.log('\n3b. Resting a day is a tool too, and an intention is not an appoi
   check('classifyDay reads it', hook.includes('deliberate_rest'))
 }
 
+console.log('\n3c. A problem you can fix is never filed as a note instead')
+{
+  // record_fact's kind list includes "hard_constraint", so "I can't train on
+  // Tuesdays" matches it on the words alone — and filing it only writes it
+  // down while the plan carries on prescribing Tuesday. Two tools competing
+  // for one sentence, with no rule saying which wins, is how the coach ends
+  // up offering to REMEMBER a problem it has a tool to FIX.
+  const memory = chat.slice(chat.indexOf('MEMORY & GOALS'), chat.indexOf('MEMORY & GOALS') + 4000)
+  check('the memory rules resolve availability in favour of the schedule tool',
+    /SCHEDULE CHANGE, NOT A MEMORY NOTE/.test(memory))
+  check('...naming propose_schedule_change as the answer',
+    /propose_schedule_change/.test(memory))
+  check('...and propose_rest_day for a single day',
+    /propose_rest_day/.test(memory))
+  // The escape hatch has to stay open, or a genuinely unschedulable life
+  // ("my shifts change every week") would have nowhere to go at all.
+  check('...while leaving room for a constraint no schedule can express',
+    /shifts change every week/.test(memory))
+}
+
 console.log('\n4. The app can render what the tool writes')
 {
   // The other half of the update_workout_schedule trap: a column written by
