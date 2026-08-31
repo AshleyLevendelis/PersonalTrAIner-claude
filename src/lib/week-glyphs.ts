@@ -27,6 +27,11 @@ export const GLYPH: Record<TrainingWeekDay['state'], string> = {
   // Distinct from every mark above because it is the only one that says work
   // HAPPENED but not this work — an arrow, not an absence.
   swapped: '⇄',
+  // A prescribed day rested on purpose. Shares the dash with 'rest' because
+  // to a glance both mean "no work here, and that's fine" — the difference
+  // between them is history, not status, and it is carried in the label the
+  // screen reader gets rather than in a mark nobody could tell apart.
+  rest_chosen: '–',
 }
 
 /**
@@ -43,6 +48,7 @@ export const STATE_LABEL: Record<TrainingWeekDay['state'], string> = {
   recovery: 'active recovery',
   before_plan: 'before your plan started',
   swapped: 'swapped for another activity',
+  rest_chosen: 'rest day you chose',
 }
 
 export const SHORT_DAY: Record<string, string> = {

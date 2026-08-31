@@ -517,6 +517,29 @@ const toolDeclarations = [
     },
   },
   {
+    name: "propose_rest_day",
+    description:
+      "PROPOSES recording a prescribed training day as a rest the user chose, so it stops counting as a missed session — this does NOT apply anything, the app shows a card and the user taps Confirm. Call this when they say they are not training a day and name NOTHING they are doing instead ('rest day today', 'taking today off', 'not training tomorrow, just resting'). If they name a replacement activity, that is swap_session_for_activity instead, not this — this tool records rest, and would throw away the activity. Do not call it for a day with no session prescribed (there is nothing to rest from), for a session they already logged, or when they are thinking out loud rather than telling you ('should I take today off?' is a question — answer it).",
+    parameters: {
+      type: "object",
+      properties: {
+        date: {
+          type: "string",
+          description: "The day being rested, as YYYY-MM-DD. Defaults to today when the user doesn't say otherwise.",
+        },
+        reason: {
+          type: "string",
+          description: "One short sentence on why, in their words, if they gave one (e.g. 'shoulder is sore', 'long day at work') — shown on the card. Omit rather than invent one.",
+        },
+        origin_verbatim_quote: {
+          type: "string",
+          description: "The exact substring of the user's CURRENT message saying they are resting. Must be copied verbatim, not paraphrased.",
+        },
+      },
+      required: ["origin_verbatim_quote"],
+    },
+  },
+  {
     name: "log_workout_session",
     description:
       "DEPRECATED for natural-language logging — prefer log_workout instead, which is the same natural-language path but with a clarification round-trip when the exercise name is ambiguous or unstated; this tool writes immediately with no chance to ask first. Only call this for the narrow case log_workout doesn't cover: explicit structured per-exercise data the user is reading off (sets_completed/reps_completed/weight_kg as separate numbers, not a natural-language description). If the message gives sets/reps/weight but names no exercise (e.g. 'I did 5x5 at 80kg'), do NOT call this tool with a guessed exercise_name — ask which exercise instead and wait for the answer.",
@@ -1207,7 +1230,7 @@ When the user wants to train on different days ("I can't do Thursdays anymore", 
   - Feel/effort check-ins: "how did that feel?" / "how's the shoulder holding up?" -> "Easy" | "About right" | "Hard" (adapt wording to what was actually asked)
   - A named choice between two or more specific things you just mentioned (exercises, meals, days) — the options ARE the names, e.g. asking whether they meant Front Squat or Back Squat -> "Front Squat" | "Back Squat"
   - Scope questions: "just today, or the rest of the block?" -> "Today only" | "Rest of block"
-  Do NOT add the tag when the question is genuinely open-ended — asks for a number, a description, a reason, or anything where the honest answer space isn't a short known set (e.g. "how much did you lift?", "what's been going on?"). When in doubt: if you could plausibly render the answer as 2-4 short buttons without stripping out anything the user might actually want to say, add it — free text is always still available underneath either way. Plan-mutation proposals (propose_exercise_swap, propose_meal_swap, propose_meal_addition, propose_injury_adaptation, propose_equipment_adaptation, propose_volume_change, propose_schedule_change) already render their own Confirm/Not-now buttons via the card — never add a redundant [QUICK_REPLIES] tag to those turns. The one exception is the equipment-clarifying question itself (§3b) — that's asked BEFORE the tool call, not on the proposal turn, so it gets a normal [QUICK_REPLIES] tag.
+  Do NOT add the tag when the question is genuinely open-ended — asks for a number, a description, a reason, or anything where the honest answer space isn't a short known set (e.g. "how much did you lift?", "what's been going on?"). When in doubt: if you could plausibly render the answer as 2-4 short buttons without stripping out anything the user might actually want to say, add it — free text is always still available underneath either way. Plan-mutation proposals (propose_exercise_swap, propose_meal_swap, propose_meal_addition, propose_injury_adaptation, propose_equipment_adaptation, propose_volume_change, propose_schedule_change, propose_rest_day) already render their own Confirm/Not-now buttons via the card — never add a redundant [QUICK_REPLIES] tag to those turns. The one exception is the equipment-clarifying question itself (§3b) — that's asked BEFORE the tool call, not on the proposal turn, so it gets a normal [QUICK_REPLIES] tag.
 
 === FEW-SHOT EXAMPLES ===
 User: "Hey"
@@ -1388,12 +1411,13 @@ FAVORITE MEALS PRIORITIZATION:
 ${favoritesSection}
 
 FUNCTION CALL RULES (CRITICAL):
-- NEVER write tool names, parameter names, or enum values (like "propose_volume_change", "propose_schedule_change", "training_days", "lighter", "heavier") in your visible text response. These exist only for native tool invocations. Your text must read like a human personal trainer — no code, no parameter labels, no function syntax.
+- NEVER write tool names, parameter names, or enum values (like "propose_volume_change", "propose_schedule_change", "propose_rest_day", "training_days", "lighter", "heavier") in your visible text response. These exist only for native tool invocations. Your text must read like a human personal trainer — no code, no parameter labels, no function syntax.
 - Trigger propose_meal_swap or propose_exercise_swap when the user gives a DIRECT COMMAND to modify their plan. Command verbs include: "replace", "swap", "change", "switch", "use X instead". Both ALWAYS require origin_verbatim_quote — the exact substring of the CURRENT message that is the command; if the request is a question, a hypothetical, or a statement with no imperative verb (e.g. "I didn't train today", "should I switch to dumbbells?"), do NOT call the tool — answer in text instead.
 - Trigger propose_injury_adaptation / propose_equipment_adaptation per §3a/§3b once you have the required fields (affected_area or equipment_tier, plus duration_days) AND an imperative origin_verbatim_quote — a mention alone ("my shoulder's a bit sore") is not yet enough; wait until the exchange has established it's manageable and plan-relevant (injury) or you know both what's available and for how long (equipment).
 - Neither propose_meal_swap nor propose_exercise_swap applies anything itself — both show the user a confirm card. Put your reasoning in the "reason" field, not in a preceding question; do not say "Shall I make this change?" or claim the swap happened.
 - Exercise swaps default to scope: "today" (only applies to today's workout; the original exercise returns next time that day comes up). Only set scope: "permanent" when the user explicitly says they want a lasting change (e.g. "for the rest of the plan", "permanently", "I never want to do X", "always use Y instead").
 - Trigger propose_volume_change / propose_schedule_change per §3d/§3e once the request is an actual imperative and you have the required fields, WITH an origin_verbatim_quote. Neither applies anything — both show a confirm card. "Should I drop to three days?" is a question, not a command: answer it in text.
+- Trigger propose_rest_day the same way when they tell you they are resting a training day and name nothing in its place. "Rest day today" is a statement of fact about their day, not a question — call the tool. "Should I rest today?" is a question: answer it.
 - Answer exercise form/technique questions ("How do I do X?", "What muscles does X work?") directly in your text response. Provide step-by-step form cues, target muscles, common mistakes, and coaching tips.
 - Trigger ban_exercise when the user says "I hate X", "never give me X", "remove X permanently", or explicitly flags an exercise to blacklist.
 - When a food LOGGING command is given (log_meal), execute it immediately. Scale portions to the meal slot budget above. Do NOT ask for macro details.
@@ -1543,8 +1567,10 @@ SESSION PLANNING RULES:
 NEVER CLAIM AN ACTION YOU DID NOT TAKE:
 1. Do not say a day has been marked, moved, rescheduled, skipped or set to rest unless you actually called a tool that does it. Saying "I'll make sure today is marked as a rest day" and then not calling one is a lie the user only discovers the next morning, when the day shows as missed.
 2. When the user says they are skipping their lifting for something else and names it, call swap_session_for_activity. That is the tool for exactly this, and it is the only thing that changes what the Exercise tab shows.
-3. When they want something you have no tool for — moving a session to another day, rewriting the week's schedule — say plainly that you cannot do it from chat and point them at the Exercise tab. An honest "I can't do that from here" is always better than a confident sentence that turns out to be false.
-4. Speak in the past tense about a change ONLY after the tool has run. Before that, say what you are about to do, not what you have done.
+3. When they say they are resting a training day and name nothing in its place — "rest day today", "taking today off" — call propose_rest_day. That is the tool for exactly this, and it is the only thing that stops the day showing as missed tomorrow. It shows a card; the user confirms it. Until they do, nothing has happened, so do not say it has.
+4. When they want something you have no tool for — moving a session to another day, rewriting the week's schedule — say plainly that you cannot do it from chat and point them at the Exercise tab. An honest "I can't do that from here" is always better than a confident sentence that turns out to be false.
+5. Speak in the past tense about a change ONLY after the tool has run. Before that, say what you are about to do, not what you have done.
+6. INTENTIONS ARE NOT APPOINTMENTS. Nothing in this app stores "I'll train tomorrow morning" — there is no tool for it and no screen that shows it. So never answer a stated intention with "locked in", "booked in", "got that scheduled", "I've put that down" or any phrasing that implies you wrote it somewhere. Acknowledge it as what it is — something they told you, which you will remember for this conversation — and leave it there. Measured live, 31 Aug 2026: "Got tomorrow morning locked in for your Push & Press session" was recorded in exactly no place.
 
 Always use the user's specific data when answering. Nutrition, supplements, and recovery questions are always within your scope — answer them directly. For anything genuinely off-topic, see §1e above (factual question vs. task request get different treatment).
 
@@ -1675,6 +1701,24 @@ Keep this context in mind to ensure your greetings and questions naturally align
             proposal: {
               kind: "propose_schedule_change",
               rawArgs: { training_days: args.training_days, reason: args.reason },
+            },
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (name === "propose_rest_day") {
+        // Proposal, not a write. Ashley's ruling, 31 Aug 2026: record a
+        // chosen rest day rather than letting it show as missed — "but
+        // confirm with the user first". So this returns raw args and the
+        // client resolves them against the live plan, same as every other
+        // plan mutation on this rail. I1 holds: the server writes nothing.
+        return new Response(
+          JSON.stringify({
+            reply: "",
+            proposal: {
+              kind: "propose_rest_day",
+              rawArgs: { date: args.date, reason: args.reason },
             },
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }

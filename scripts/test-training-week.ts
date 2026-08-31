@@ -111,9 +111,57 @@ console.log('\n6. A day swapped for something else is not a day you failed')
     classifyDay('Friday', '2026-08-28', TODAY, PLAN, swapped, undefined) === 'swapped')
 }
 
+console.log('\n6b. A rest day you chose is not a missed one')
+{
+  // The plainer half of the swap above, caught live on 31 Aug 2026. Ashley
+  // said "Rest day today"; the coach said "I will mark today as a rest day
+  // for you" and could not — swap_session_for_activity needs an activity,
+  // and resting is the answer with no activity in it. So the day would have
+  // shown MISSED the next morning, which is the app telling her off for a
+  // decision she made deliberately and announced at the time.
+  const rested = { session: { deliberate_rest: true }, workoutLogs: [] } as never
+  check('a past chosen rest day reads rest_chosen, not missed',
+    classifyDay('Monday', MON, TODAY, PLAN, rested, undefined) === 'rest_chosen')
+  check('...and it drops out of the tally rather than counting against you',
+    !countsTowardWeekTally('rest_chosen'))
+
+  // NOT collapsed into 'rest'. That state means the plan never asked for
+  // anything that day; this means it did and they chose not to. Collapsing
+  // them rewrites the plan's history into one where Monday was never a
+  // training day.
+  // Tuesday, which this plan doesn't contain at all — the state that means
+  // "nothing was ever asked of you here". Caught by this check failing on
+  // Sunday, which IS in the plan as a zero-exercise day and so classifies as
+  // 'recovery': three states that all look like a quiet day and mean three
+  // different things.
+  check("...and is distinct from a day the plan never prescribed",
+    classifyDay('Tuesday', '2026-08-18', TODAY, PLAN, undefined, undefined) === 'rest')
+  check("...and from a prescribed day with no work in it",
+    classifyDay('Sunday', '2026-08-16', TODAY, PLAN, undefined, undefined) === 'recovery')
+
+  // Logged work still outranks it, exactly as it outranks a swap.
+  const restedButTrained = { session: { deliberate_rest: true, is_completed: true }, workoutLogs: [] } as never
+  check('a rest day they trained anyway reads done, not rest_chosen',
+    classifyDay('Monday', MON, TODAY, PLAN, restedButTrained, undefined) === 'done')
+  const restedPartLogged = { session: { deliberate_rest: true }, workoutLogs: [{}] } as never
+  check('a rest day with sets logged reads partial, not rest_chosen',
+    classifyDay('Monday', MON, TODAY, PLAN, restedPartLogged, undefined) === 'partial')
+
+  // A swap and a rest are different facts and must not shadow each other.
+  const both = { session: { deliberate_rest: true, swapped_for_activity: 'Muay Thai' }, workoutLogs: [] } as never
+  check('a day that is both reads swapped — work happened, and that outranks rest',
+    classifyDay('Monday', MON, TODAY, PLAN, both, undefined) === 'swapped')
+
+  // The over-fire check, same as the swap's: absence alone is still missed.
+  check('an ordinary unlogged past day is still missed, not quietly rested',
+    classifyDay('Monday', MON, TODAY, PLAN, undefined, undefined) === 'missed')
+  check('a FUTURE day marked rested still reads rest_chosen, not due',
+    classifyDay('Friday', '2026-08-28', TODAY, PLAN, rested, undefined) === 'rest_chosen')
+}
+
 console.log('\n7. Tally predicate')
 const counted: DayGlyphState[] = ['done', 'partial', 'due', 'missed']
-const skipped: DayGlyphState[] = ['rest', 'recovery', 'before_plan', 'swapped']
+const skipped: DayGlyphState[] = ['rest', 'recovery', 'before_plan', 'swapped', 'rest_chosen']
 for (const s of counted) check(`'${s}' counts`, countsTowardWeekTally(s))
 for (const s of skipped) check(`'${s}' does not count`, !countsTowardWeekTally(s))
 
