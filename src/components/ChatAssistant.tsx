@@ -36,7 +36,7 @@ import { parseWorkoutEntries, type ParsedSetGroup, type WorkoutEntryInput } from
 import { executeLogWorkout } from '@/lib/nl-logging-executor'
 import { normalizeExternalUrl } from '@/lib/chat-links'
 import { buildFirstRunIntro, type FirstRunSessionBrief } from '@/lib/first-run-intro'
-import { buildCoachExerciseSummary } from '@/lib/chat-plan-context'
+import { buildCoachExerciseSummary, buildCoachPhaseBrief } from '@/lib/chat-plan-context'
 import { createFact, createGoal, createContextFact, retireFact, retireContextFact, abandonGoal, type UserFactRow, type UserGoalRow, type UserContextFactRow } from '@/lib/memory-store'
 import { resolveExerciseTarget, resolveFoodTarget } from '@/lib/fact-compiler'
 import { checkFactConflict, checkGoalConflict } from '@/lib/memory-reconcile'
@@ -686,6 +686,24 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       pendingLoadSuggestions,
     })
 
+    // WHERE THEY ARE, not just what this week holds. The plan has carried
+    // phase_label/block_number/is_deload all along and none of it reached the
+    // coach, so it could recite what "Intensification" means and had no idea
+    // the trainee was in it. lastChatAt is the newest message that already
+    // existed before this turn — the signal for "the week turned over since
+    // we last spoke".
+    const lastChatAt = [...messages]
+      .reverse()
+      .find(m => m.created_at)?.created_at ?? null
+    const phaseBrief = buildCoachPhaseBrief({
+      activeWeek,
+      totalWeeks: mesocycle.length > 0 ? mesocycle.length : 4,
+      week: activeMesoWeek,
+      planCreatedAt: planCreatedAt ?? profile.created_at ?? null,
+      now: getAppNow(profile.id),
+      lastChatAt,
+    })
+
     // Ingredients included — see meal-ingredients.ts. Without them the coach
     // told Ashley "none of your scheduled meals actually contain almond
     // butter" while her breakfast held 13g of it.
@@ -772,6 +790,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         .join('\n'),
       training_days_count: profile.training_days.filter(d => d.available).length,
       exercise_summary: exerciseSummary,
+      phase_brief: phaseBrief,
       meal_summary: mealSummary,
       favorites_summary: favoritesSummary,
       workout_log_history: workoutLogHistory,

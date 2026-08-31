@@ -153,3 +153,91 @@ export function buildCoachExerciseSummary({ days, coachNote, pendingLoadSuggesti
       ? `\nPending suggestion(s) waiting on the dashboard, not yet answered: ${pendingLoadSuggestions.join(' | ')}`
       : '')
 }
+
+// ---------------------------------------------------------------------------
+// WHERE THEY ARE IN THE PROGRAMME.
+//
+// The coach's prompt has always carried a textbook — what Anatomical
+// Adaptation, Hypertrophy Accumulation and Intensification each mean — and
+// was never told which of them was happening. Every week in the plan carries
+// phase_label, phase_focus, block_number, week_in_block, is_deload and
+// isCalibrationWeek; not one of them reached the chat. So it could explain
+// periodization in the abstract and could not say where the trainee stood in
+// it, which is why it only ever sounded knowledgeable when asked a direct
+// question.
+//
+// Ashley's ruling, 31 Aug 2026, on how forward the coach should be: "when a
+// plan is built give a quick high level of the weeks to come, then when
+// something changes." So this reports position AND the two moments worth
+// speaking up at — nothing else. A coach that narrates the phase every day
+// teaches people to skim the opening paragraph, which then hides the days it
+// mattered.
+// ---------------------------------------------------------------------------
+
+export interface PhaseBriefInput {
+  /** The week the trainee is actually in, 1-indexed. */
+  activeWeek: number
+  totalWeeks: number
+  week: {
+    phase_label?: string
+    phase_focus?: string
+    block_number?: number
+    week_in_block?: number
+    is_deload?: boolean
+    isCalibrationWeek?: boolean
+  } | undefined
+  /** When the plan was generated. */
+  planCreatedAt: string | null
+  now: Date
+  /** Timestamp of the most recent earlier message in this conversation, if any. */
+  lastChatAt: string | null
+}
+
+const DAY_MS = 86_400_000
+
+/**
+ * Returns the block of context describing the trainee's position, or '' when
+ * there is no plan to describe — never a guess and never a placeholder.
+ */
+export function buildCoachPhaseBrief({
+  activeWeek, totalWeeks, week, planCreatedAt, now, lastChatAt,
+}: PhaseBriefInput): string {
+  if (!week || !planCreatedAt || activeWeek < 1 || totalWeeks < 1) return ''
+
+  const lines: string[] = []
+  const phase = week.phase_label?.trim()
+  const position = `Week ${activeWeek} of ${totalWeeks}`
+  const block = week.block_number != null && week.week_in_block != null
+    ? ` — block ${week.block_number}, week ${week.week_in_block} of that block`
+    : ''
+  lines.push(`${position}${block}${phase ? ` — ${phase}` : ''}.`)
+  if (week.phase_focus?.trim()) lines.push(`What this phase is for: ${week.phase_focus.trim()}`)
+  if (week.is_deload) lines.push('THIS IS A DELOAD WEEK — reduced on purpose, for recovery. Say so if it comes up; do not let them read it as backsliding.')
+  if (week.isCalibrationWeek) lines.push('THIS IS A CALIBRATION WEEK — loads are deliberately capped so they can find their working weights.')
+
+  // MOMENT ONE: a plan they have not been walked through yet. Week 1 alone is
+  // not enough — someone can sit in week 1 for a fortnight if they train
+  // rarely — so the plan's own age has to agree.
+  const planAgeDays = (now.getTime() - new Date(planCreatedAt).getTime()) / DAY_MS
+  const planIsNew = activeWeek === 1 && planAgeDays >= 0 && planAgeDays <= 3
+
+  // MOMENT TWO: the week turned over since they last spoke to you. Computed
+  // from the plan's own start date rather than a stored flag, so it stays
+  // right after a rebuild and cannot drift out of sync with the plan.
+  const weekStart = new Date(planCreatedAt).getTime() + (activeWeek - 1) * 7 * DAY_MS
+  const weekJustChanged = !!lastChatAt && new Date(lastChatAt).getTime() < weekStart && activeWeek > 1
+
+  if (planIsNew) {
+    lines.push(
+      'SPEAK UP: this plan is new and they have not been walked through it. Somewhere in this reply, give a SHORT high-level shape of what is coming — how many weeks, what the blocks do, roughly when it gets harder and when it eases off. Three or four sentences, not a lecture, and not a week-by-week table.',
+    )
+  } else if (weekJustChanged) {
+    lines.push(
+      `SPEAK UP: the week has turned over since you last spoke${phase ? ` — they are now in ${phase}` : ''}. Say so briefly and name what actually changes for them this week. One or two sentences.`,
+    )
+  } else {
+    lines.push('Do NOT volunteer the phase this turn — nothing has changed since you last spoke. Use it if they ask, or if it genuinely explains something they raised.')
+  }
+
+  return lines.join('\n')
+}
