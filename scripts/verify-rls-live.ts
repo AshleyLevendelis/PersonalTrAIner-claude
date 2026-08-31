@@ -25,6 +25,16 @@
 import * as fs from 'fs'
 import * as path from 'path'
 import { createClient } from '@supabase/supabase-js'
+// The refs and their spoken names come from db-target.mjs, the one place the
+// live project is nameable — test:deploy-path §5 enforces that, and this file
+// broke it by re-declaring both refs THREE times while adding --prod. The
+// gate's own comment explains why refusal guards deliberately keep their own
+// copy: a guard that imports its definition of "safe" can be switched off
+// everywhere by one bad edit. That reasoning is about guards. These are
+// LABELS — what to call the database in a sentence — and for a label one
+// definition is strictly better than three that can drift apart.
+// @ts-expect-error - db-target.mjs is plain ESM with no type declarations
+import { PROD_REF, TEST_REF, nameOf } from './db-target.mjs'
 
 const envPath = path.join(process.cwd(), '.env.local')
 if (fs.existsSync(envPath)) {
@@ -56,7 +66,6 @@ const argOf = (name: string): string | undefined => {
   return inline ? inline.slice(name.length + 3) : undefined
 }
 
-const PROD_REF_EARLY = 'sdkhuczcfnqqimdgfiks'
 const wantsProd = process.argv.includes('--prod')
 
 /**
@@ -81,7 +90,7 @@ const clean = (v: string | undefined): string | undefined => {
  */
 const explicitTarget = !!(clean(argOf('url')) || wantsProd)
 
-const url = clean(argOf('url')) || (wantsProd ? `https://${PROD_REF_EARLY}.supabase.co` : undefined)
+const url = clean(argOf('url')) || (wantsProd ? `https://${PROD_REF}.supabase.co` : undefined)
   || clean(process.env.RLS_TARGET_URL) || clean(process.env.VITE_SUPABASE_URL)
 
 let anonKey = clean(argOf('anon-key')) || clean(process.env.RLS_TARGET_ANON_KEY)
@@ -100,7 +109,7 @@ if (url && !anonKey && (explicitTarget || !clean(process.env.VITE_SUPABASE_ANON_
   const readline = await import('readline/promises')
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
   const ref = url.replace(/^https:\/\//, '').split('.')[0]
-  console.log(`\nReading ${ref === PROD_REF_EARLY ? 'PRODUCTION' : ref}.`)
+  console.log(`\nReading ${ref === PROD_REF ? 'PRODUCTION' : ref}.`)
   console.log('Supabase dashboard > that project > Project Settings > API > the key')
   console.log('labelled "anon" "public" (long, starts with eyJ). Not the service key.\n')
   anonKey = clean(await rl.question('Paste it here and press Enter: '))
@@ -127,11 +136,12 @@ if (!url || !anonKey) {
  * security check whose reassuring line can describe the wrong database is
  * worse than no check, because it stops the real one being run.
  */
-const PROD_REF = 'sdkhuczcfnqqimdgfiks'
-const TEST_REF = 'vswuurrtbzbrgubddefv'
 const projectRef = url.replace(/^https:\/\//, '').split('.')[0]
-const projectName = projectRef === PROD_REF ? 'PRODUCTION'
-  : projectRef === TEST_REF ? 'TEST'
+// nameOf returns the ref itself for anything it doesn't recognise; say so in
+// words instead, because an unrecognised project is the case this whole
+// naming exists to make loud.
+const projectName = projectRef === PROD_REF || projectRef === TEST_REF
+  ? nameOf(projectRef)
   : 'an UNRECOGNISED project'
 const isProduction = projectRef === PROD_REF
 

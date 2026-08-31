@@ -531,7 +531,7 @@ export interface ChatPendingActionView {
 }
 
 export interface ChatReceiptView {
-  kind: 'log_workout' | 'propose_exercise_swap' | 'propose_meal_swap' | 'propose_injury_adaptation' | 'propose_injury_as_lasting' | 'propose_injury_recovered' | 'propose_equipment_adaptation' | 'propose_volume_change' | 'propose_schedule_change' | 'memory_fact_saved' | 'memory_goal_saved' | 'memory_context_fact_saved' | 'display_name_saved' | 'grocery_item_added' | 'water_logged'
+  kind: 'log_workout' | 'propose_exercise_swap' | 'propose_meal_swap' | 'propose_injury_adaptation' | 'propose_injury_as_lasting' | 'propose_injury_recovered' | 'propose_equipment_adaptation' | 'propose_volume_change' | 'propose_schedule_change' | 'propose_rest_day' | 'memory_fact_saved' | 'memory_goal_saved' | 'memory_context_fact_saved' | 'display_name_saved' | 'grocery_item_added' | 'water_logged'
   title: string
   rows: { label: string; detail: string; note?: string }[]
   summary?: string
@@ -696,6 +696,19 @@ export interface WorkoutSession {
    * instead goes to cardio_logs, not here — one fact, one home.
    */
   swapped_for_activity?: string | null
+  /**
+   * Set when the trainee chose to rest a prescribed training day and said so
+   * ("rest day today") — with nothing in its place. Distinct from
+   * swapped_for_activity above, which names what they did INSTEAD: this is
+   * the answer with no activity in it, and the two must not share a column
+   * because their marks say opposite things (work happened elsewhere, versus
+   * no work happened and that was the plan).
+   *
+   * Exists because the coach replied "I will mark today as a rest day for
+   * you" and had no tool that could — the same shape swapped_for_activity was
+   * added to fix, caught again on 31 Aug 2026 in its plainer form.
+   */
+  deliberate_rest?: boolean | null
 }
 
 export interface WorkoutExerciseRow {

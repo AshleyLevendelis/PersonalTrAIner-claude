@@ -115,35 +115,44 @@ console.log('\n4. The plan does not collapse — wiped patterns are named, not d
   // Frozen so a future over-broad tag shows up BY NAME rather than as a
   // quietly thinner plan.
   const EXPECTED_WIPES: Record<string, string[]> = {
-    // PRE-EXISTING, verified by computing this same list at the pre-change
-    // state and diffing: every shoulder/neck/wrist entry below was already
-    // true and none of it is caused by the hip/elbow/ankle work. These are
-    // the wipes the shoulder tag audit documented — a shoulder injury really
-    // does rule out pressing and overhead pulling, and below full_gym there
-    // is nothing left to do it with.
-    'shoulders|full_gym': ['isolation_shoulder', 'vertical_pull'],
-    'shoulders|home_gym': ['isolation_shoulder', 'vertical_pull'],
-    'shoulders|minimalist': ['isolation_shoulder', 'vertical_pull', 'vertical_push'],
-    'shoulders|bodyweight': ['horizontal_push', 'vertical_pull'],
+    // REFRESHED 31 Aug 2026, computed from the database rather than edited by
+    // hand, after §6.2 added ~40 bodyweight/backpack variants. Three kinds of
+    // change are folded in here and they are worth telling apart:
+    //
+    // BETTER — a wipe that is simply gone, because a safe variant now exists:
+    //   wrists/{home_gym,minimalist,bodyweight} no longer lose ALL cardio,
+    //   ankles/{home_gym,minimalist,bodyweight} the same, and elbows/bodyweight
+    //   no longer loses vertical_pull (Pull-Up Negatives, Scapular Pull-Ups).
+    //
+    // NEWLY VISIBLE, not newly broken — a pattern that had ZERO exercises at
+    // that tier before, so the loop skipped it (`all.length === 0`) and it
+    // could not be reported. shoulders/bodyweight gains vertical_push,
+    // isolation_shoulder, isolation_trap and isolation_tricep; neck/bodyweight
+    // gains isolation_trap; elbows/bodyweight gains vertical_push,
+    // isolation_bicep and isolation_tricep. Every one of those exercises is a
+    // Backpack/Pike/Chair variant that genuinely loads the injured joint, so
+    // the filter is right and the trainee is no worse off than when the
+    // pattern was empty — the gap just stopped being invisible.
+    //
+    // STILL A CONTENT GAP, unchanged in kind: closing these needs exercises a
+    // bad shoulder or elbow can actually do at that tier, not a looser filter.
+    // "Even a perfect filter can't substitute what doesn't exist."
+    'shoulders|full_gym': ['vertical_pull', 'isolation_shoulder'],
+    'shoulders|home_gym': ['vertical_pull', 'isolation_shoulder'],
+    'shoulders|minimalist': ['vertical_push', 'vertical_pull', 'isolation_shoulder'],
+    'shoulders|bodyweight': ['horizontal_push', 'vertical_push', 'vertical_pull', 'isolation_shoulder', 'isolation_trap', 'isolation_tricep'],
     'neck|full_gym': ['isolation_trap'],
     'neck|home_gym': ['isolation_trap'],
     'neck|minimalist': ['isolation_trap'],
-    'wrists|home_gym': ['cardio'],
-    'wrists|minimalist': ['cardio'],
-    'wrists|bodyweight': ['cardio', 'horizontal_push'],
-
-    // NEW with this work — the only five, and each deliberate.
-    // ankle + calves is CORRECT: every calf exercise loads the ankle, so you
-    // do not train calves on a bad one. The cardio and vertical-pull entries
-    // are CONTENT GAPS, the shape the shoulder audit named ("a content gap,
-    // not a filter gap; even a perfect filter can't substitute what doesn't
-    // exist") — below full_gym the only cardio is jumping, and at bodyweight
-    // the only vertical pull is a pull-up.
+    'neck|bodyweight': ['isolation_trap'],
+    'wrists|bodyweight': ['horizontal_push'],
+    // ankle + calves is CORRECT and always was: every calf exercise loads the
+    // ankle, so you do not train calves on a bad one.
     'ankles|full_gym': ['isolation_calf'],
-    'ankles|home_gym': ['cardio', 'isolation_calf'],
-    'ankles|minimalist': ['cardio', 'isolation_calf'],
-    'ankles|bodyweight': ['cardio', 'isolation_calf'],
-    'elbows|bodyweight': ['vertical_pull'],
+    'ankles|home_gym': ['isolation_calf'],
+    'ankles|minimalist': ['isolation_calf'],
+    'ankles|bodyweight': ['isolation_calf'],
+    'elbows|bodyweight': ['vertical_push', 'isolation_bicep', 'isolation_tricep'],
   }
 
   const patterns = [...new Set(EXERCISE_DATABASE.map(e => e.movement_pattern))]
@@ -198,8 +207,13 @@ console.log('\n5. How MUCH each injury removes, frozen')
     // than adding to it. Tagging an exercise for the hip therefore un-banned
     // it for the knee. Caught by test:band-slots moving, then measured. The
     // tagging now merges loads_joints in; these numbers are what proves it.
-    lower_back: 12, knees: 25, shoulders: 47, neck: 5, wrists: 21,
-    hips: 9, ankles: 13, elbows: 10,
+    //
+    // RE-MEASURED 31 Aug 2026 after §6.2's exercise additions — every count
+    // rose because the database grew, not because any tag widened. Recorded
+    // from the database rather than adjusted by hand, so the next drift is
+    // still caught by name.
+    lower_back: 12, knees: 35, shoulders: 62, neck: 6, wrists: 25,
+    hips: 14, ankles: 19, elbows: 18,
   }
   const drift: string[] = []
   for (const code of CODES) {

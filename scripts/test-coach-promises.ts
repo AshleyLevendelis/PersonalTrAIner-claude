@@ -19,7 +19,7 @@
  * across the src/lib boundary, so this is the next-best thing to "cannot
  * drift".
  */
-import { readFileSync } from 'fs'
+import { readFileSync, readdirSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { FIRST_RUN_QUICK_REPLIES, FIRST_RUN_QUICK_REPLIES_AHEAD, buildFirstRunIntro, planShapeFromMesocycle, type FirstRunPlanShape } from '../src/lib/first-run-intro'
@@ -79,6 +79,91 @@ console.log('\n3. The prompt forbids claiming an untaken action')
   check('...it names the tool to use instead', /swap_session_for_activity/.test(chat.slice(chat.indexOf('NEVER CLAIM AN ACTION'), chat.indexOf('NEVER CLAIM AN ACTION') + 1600)))
   check('...and tells it to say so plainly when it has no tool',
     /cannot do it from chat|can't do that from here/i.test(chat.slice(chat.indexOf('NEVER CLAIM AN ACTION'), chat.indexOf('NEVER CLAIM AN ACTION') + 1600)))
+}
+
+console.log('\n3b. Resting a day is a tool too, and an intention is not an appointment')
+{
+  // 31 Aug 2026, live: Ashley said "Rest day today" and the coach replied "I
+  // will mark today as a rest day for you". Nothing was marked — §2's tool
+  // needs an ACTIVITY, and resting is the answer with no activity in it. The
+  // honesty rule above already forbade that sentence in as many words; it had
+  // nothing to call, and a rule with no tool behind it is one the model routes
+  // around. So this section asserts the tool exists, not that the rule is
+  // louder.
+  check('propose_rest_day is declared', /name:\s*"propose_rest_day"/.test(chat))
+  check('...and has a handler', /name === "propose_rest_day"/.test(chat))
+
+  const body = chat.slice(chat.indexOf('name === "propose_rest_day"'), chat.indexOf('name === "log_workout_session"'))
+  check('...which PROPOSES rather than writing — Ashley asked to confirm first',
+    /proposal:[\s\S]{0,120}kind: "propose_rest_day"/.test(body), body.slice(0, 200))
+  check('...and the server writes nothing itself',
+    !body.includes('workout_sessions') && !body.includes('PATCH'), body.slice(0, 200))
+
+  const rule = chat.slice(chat.indexOf('NEVER CLAIM AN ACTION'), chat.indexOf('NEVER CLAIM AN ACTION') + 2600)
+  check('the honesty rule names propose_rest_day as the thing to call',
+    /propose_rest_day/.test(rule), rule.slice(0, 200))
+  check('...and says nothing has happened until the user confirms',
+    /Until they do, nothing has happened/i.test(rule))
+
+  // THE SECOND LIE IN THE SAME CONVERSATION. "Got tomorrow morning locked in
+  // for your Push & Press session" — nothing anywhere stores an intended
+  // training time, so that sentence was true of no field, no screen and no
+  // row. Distinct from the rest-day lie: this one has no tool to add, because
+  // there is nothing it would write to. The fix is the model not saying it.
+  check('the prompt forbids "locked in" and its family',
+    /INTENTIONS ARE NOT APPOINTMENTS/.test(chat))
+  for (const phrase of ['locked in', 'booked in', 'scheduled']) {
+    check(`...naming "${phrase}" specifically`, rule.includes(phrase), rule.slice(-400))
+  }
+
+  // ...and the client half. A proposal kind the server can emit but the
+  // client cannot build is a card that never appears — the model would call
+  // the tool, the user would see nothing, and the day would still show missed.
+  const chatUi = readFileSync(join(ROOT, 'src/components/ChatAssistant.tsx'), 'utf8')
+  check('the client builds the card', /buildRestDayProposal/.test(chatUi))
+  check('...dispatches the proposal to it',
+    /kind === 'propose_rest_day'[\s\S]{0,200}buildRestDayProposal/.test(chatUi))
+  check('...executes it on confirm',
+    /row\.kind === 'propose_rest_day'[\s\S]{0,200}executeRestDay/.test(chatUi))
+  check('...and can undo it', /undoRestDay/.test(chatUi))
+
+  // The write has to land where the week strip reads, same trap as §2.
+  const exec = readFileSync(join(ROOT, 'src/lib/pending-action-executor.ts'), 'utf8')
+  const tracking = readFileSync(join(ROOT, 'src/lib/daily-tracking.ts'), 'utf8')
+  check('the executor goes through setDeliberateRest', /executeRestDay[\s\S]{0,600}setDeliberateRest/.test(exec))
+  check('...which writes to workout_sessions — what the week strip reads',
+    /setDeliberateRest[\s\S]{0,1800}workout_sessions/.test(tracking))
+  check('...and reports a failed write rather than claiming success',
+    /setDeliberateRest[\s\S]{0,400}if \(!ok\)[\s\S]{0,200}failed:/.test(exec), 'executeRestDay')
+
+  // And the column exists. A client that reads a field no migration created
+  // is the same two-halves defect from the other end.
+  const migrations = readdirSync(join(ROOT, 'supabase/migrations'))
+    .filter(f => f.endsWith('.sql'))
+    .map(f => readFileSync(join(ROOT, 'supabase/migrations', f), 'utf8'))
+    .join('\n')
+  check('a migration adds deliberate_rest', /ADD COLUMN IF NOT EXISTS deliberate_rest/.test(migrations))
+  check('classifyDay reads it', hook.includes('deliberate_rest'))
+}
+
+console.log('\n3c. A problem you can fix is never filed as a note instead')
+{
+  // record_fact's kind list includes "hard_constraint", so "I can't train on
+  // Tuesdays" matches it on the words alone — and filing it only writes it
+  // down while the plan carries on prescribing Tuesday. Two tools competing
+  // for one sentence, with no rule saying which wins, is how the coach ends
+  // up offering to REMEMBER a problem it has a tool to FIX.
+  const memory = chat.slice(chat.indexOf('MEMORY & GOALS'), chat.indexOf('MEMORY & GOALS') + 4000)
+  check('the memory rules resolve availability in favour of the schedule tool',
+    /SCHEDULE CHANGE, NOT A MEMORY NOTE/.test(memory))
+  check('...naming propose_schedule_change as the answer',
+    /propose_schedule_change/.test(memory))
+  check('...and propose_rest_day for a single day',
+    /propose_rest_day/.test(memory))
+  // The escape hatch has to stay open, or a genuinely unschedulable life
+  // ("my shifts change every week") would have nowhere to go at all.
+  check('...while leaving room for a constraint no schedule can express',
+    /shifts change every week/.test(memory))
 }
 
 console.log('\n4. The app can render what the tool writes')

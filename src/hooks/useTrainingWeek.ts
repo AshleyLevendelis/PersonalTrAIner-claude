@@ -13,7 +13,7 @@ import { getWeeklyDashboard, type WeeklyDashboardDay } from '@/lib/daily-trackin
 import { getAppNow, getLocalDateString } from '@/lib/dev-clock'
 import type { WorkoutDay } from '@/lib/types'
 
-export type DayGlyphState = 'done' | 'partial' | 'due' | 'missed' | 'rest' | 'recovery' | 'before_plan' | 'swapped'
+export type DayGlyphState = 'done' | 'partial' | 'due' | 'missed' | 'rest' | 'recovery' | 'before_plan' | 'swapped' | 'rest_chosen'
 
 export interface TrainingWeekDay {
   date: string
@@ -58,7 +58,7 @@ function mondayOf(date: Date): Date {
  * it goes to cardio_logs and the streak already reads that table.
  */
 export function countsTowardWeekTally(state: DayGlyphState): boolean {
-  return state !== 'rest' && state !== 'recovery' && state !== 'before_plan' && state !== 'swapped'
+  return state !== 'rest' && state !== 'recovery' && state !== 'before_plan' && state !== 'swapped' && state !== 'rest_chosen'
 }
 
 export function classifyDay(
@@ -86,6 +86,18 @@ export function classifyDay(
   // holding. Ranked above the date judgement because a swap is exactly the
   // thing that stops a day being 'missed'.
   if (dashboardDay?.session?.swapped_for_activity) return 'swapped'
+
+  // Rested on purpose, and said so. Ranked here for the same two reasons the
+  // swap above is: logged work still outranks it (someone who declared a rest
+  // and then trained anyway has earned the 'done'), and it has to sit above
+  // the date judgement, because not being called 'missed' is the entire point.
+  //
+  // A SEPARATE STATE from 'rest', not the same one. 'rest' means the plan
+  // never asked for anything that day; this means it did and they chose not
+  // to. Collapsing them would quietly rewrite the plan's history into one
+  // where Monday was never a training day — which is the tidier calendar this
+  // file already refuses to draw two checks above.
+  if (dashboardDay?.session?.deliberate_rest) return 'rest_chosen'
 
   // Nothing was prescribed before the plan existed, so nothing was missed.
   // Without this, someone who finished onboarding on a Thursday opened the

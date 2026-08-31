@@ -16,7 +16,7 @@ import { getExerciseEntry } from '@/lib/exercise-db'
 import { createPendingAction, claimPendingAction, declinePendingAction, markExecuting, resolvePendingAction, getPendingAction, expireOldPendingActions, isWithinUndoWindow, type PendingActionReceipt } from '@/lib/pending-actions-store'
 import { APPEND_PROPOSAL_KINDS, INTENT_PROPOSAL_VERB, buildIntentProposal } from '@/lib/intent-proposal'
 import { pickAccountabilityCheckIn } from '@/lib/accountability'
-import { executeExerciseSwap, executeMealSwap, executeMealAddition, undoMealAddition, undoExerciseSwap, executeInjuryAdaptation, executeLastingInjury, executeInjuryRecovered, executeEquipmentAdaptation, executeVolumeChange, executeScheduleChange, undoWeekRangeChange, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type LastingInjuryPayload, type InjuryRecoveredPayload, type EquipmentAdaptationPayload, type VolumeChangePayload, type ScheduleChangePayload } from '@/lib/pending-action-executor'
+import { executeExerciseSwap, executeMealSwap, executeMealAddition, undoMealAddition, undoExerciseSwap, executeInjuryAdaptation, executeLastingInjury, executeInjuryRecovered, executeEquipmentAdaptation, executeVolumeChange, executeScheduleChange, executeRestDay, undoRestDay, undoWeekRangeChange, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type LastingInjuryPayload, type InjuryRecoveredPayload, type EquipmentAdaptationPayload, type VolumeChangePayload, type ScheduleChangePayload, type RestDayPayload } from '@/lib/pending-action-executor'
 import { adjustDayVolume, isVolumeAdjustable } from '@/lib/volume-adjust'
 import { buildMealAdditionProposal, type MealAdditionPayload } from '@/lib/meal-addition'
 import { buildMealSwapProposal } from '@/lib/meal-swap-proposal'
@@ -1093,6 +1093,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     }
     if (pendingAction.kind === 'propose_volume_change') return "Here's the change to that session:"
     if (pendingAction.kind === 'propose_schedule_change') return "Here's the new week:"
+    if (pendingAction.kind === 'propose_rest_day') return 'Want me to mark that as a rest day?'
     const intentVerb = INTENT_PROPOSAL_VERB[pendingAction.kind]
     if (intentVerb) return `Want me to ${intentVerb} **${rows[0].after}**?`
     const headline = rows[0]
@@ -1456,6 +1457,55 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         rows,
         implications,
         rationale: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined,
+        reversible: true,
+      },
+    }
+  }
+
+  /**
+   * Builds propose_rest_day's card.
+   *
+   * Resolves the date against the LIVE plan rather than trusting the model's
+   * args: returns null when that day has no session prescribed (there is
+   * nothing to rest from — 'rest' already), and null when the day is outside
+   * a sane window, so a mis-parsed date can't quietly mark some random day in
+   * March. Null means no card, and the caller says so in plain words instead.
+   */
+  const buildRestDayProposal = (rawArgs: Record<string, unknown>): {
+    scopeKey: string
+    preconditions: Record<string, unknown>
+    payload: RestDayPayload
+    diff: import('@/lib/pending-actions-store').ProposalDiff
+  } | null => {
+    const raw = typeof rawArgs.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(rawArgs.date)
+      ? rawArgs.date
+      : activeSession.date
+    // A week either side of today. Wider than any phrasing the tool is meant
+    // to handle ("today", "tomorrow"), narrow enough that a hallucinated year
+    // never lands.
+    const dayMs = 86_400_000
+    const delta = (new Date(`${raw}T00:00:00`).getTime() - new Date(`${activeSession.date}T00:00:00`).getTime()) / dayMs
+    if (!Number.isFinite(delta) || delta < -7 || delta > 7) return null
+
+    const dayName = new Date(`${raw}T00:00:00`).toLocaleDateString('en-US', { weekday: 'long' })
+    const session = exercisePlan.find(d => d.day === dayName)
+    // Nothing prescribed, or a day that is already active recovery. Resting a
+    // rest day is not a change, and a card offering one would be the app
+    // inventing work so it can offer to cancel it.
+    if (!session || session.exercises.length === 0) return null
+
+    const reason = typeof rawArgs.reason === 'string' && rawArgs.reason.trim() ? rawArgs.reason.trim() : undefined
+    return {
+      scopeKey: `${profile.id}:propose_rest_day:${raw}`,
+      preconditions: { date: raw, dayName },
+      payload: { date: raw, dayName, sessionFocus: session.focus, reason },
+      diff: {
+        rows: [{ field: dayName, before: session.focus, after: 'Rest day' }],
+        implications: [
+          { severity: 'info', text: "It won't count as a missed session, and it won't count against your week." },
+          { severity: 'info', text: 'The session itself stays on the plan — this marks the day, it does not delete the work.' },
+        ],
+        rationale: reason,
         reversible: true,
       },
     }
@@ -2114,6 +2164,10 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         const schedule = buildScheduleChangeProposal(result.proposal.rawArgs)
         if (schedule) built = { scopeKey: schedule.scopeKey, preconditions: schedule.preconditions, payload: schedule.payload as unknown as Record<string, unknown>, preImage: schedule.preImage, diff: schedule.diff }
         else refusal = "Those are already the days you're training — nothing to change."
+      } else if (result.proposal.kind === 'propose_rest_day' && result.proposal.rawArgs) {
+        const rest = buildRestDayProposal(result.proposal.rawArgs)
+        if (rest) built = { scopeKey: rest.scopeKey, preconditions: rest.preconditions, payload: rest.payload as unknown as Record<string, unknown>, diff: rest.diff }
+        else refusal = "There's no session on that day to rest from — it's already a rest day on your plan."
       } else if (APPEND_PROPOSAL_KINDS.has(result.proposal.kind) && result.proposal.rawArgs) {
         // Structural fix: record_fact/record_goal/add_to_grocery_list/
         // check_off_grocery_item/log_water now arrive here too whenever
@@ -2681,6 +2735,18 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       title = ok ? 'Schedule updated' : "Couldn't change the schedule"
       rows = ok ? receipt.landed.map(line => { const [label, detail] = line.split(': '); return { label, detail } }) : []
       undoToken = ok ? row.id : undefined
+    } else if (row.kind === 'propose_rest_day') {
+      const payload = row.payload as unknown as RestDayPayload
+      const result = await executeRestDay(profile, payload)
+      receipt = result.receipt
+      const ok = receipt.failed.length === 0
+      title = ok ? 'Rest day marked' : "Couldn't mark that rest day"
+      rows = ok ? receipt.landed.map(line => { const [label, detail] = line.split(': '); return { label, detail } }) : []
+      undoToken = ok ? row.id : undefined
+      // No mesocycle write and no pre_image: this marks a DAY, it does not
+      // touch the plan, so there is nothing to restore beyond clearing the
+      // flag — which is exactly what undoRestDay does.
+      onLogsUpdated?.()
     } else if (APPEND_PROPOSAL_KINDS.has(row.kind)) {
       // Structural fix: the confirm side of buildIntentProposal — reuses
       // the SAME resolveAndSaveMemory/Grocery/Water functions the direct
@@ -2821,6 +2887,9 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
           await updateProfileField(profile.id, { training_days: restored })
           onProfileChanged({ training_days: restored })
         }
+      } else if (row.kind === 'propose_rest_day') {
+        await undoRestDay(profile.id, row.payload as unknown as RestDayPayload)
+        onLogsUpdated?.()
       } else if (row.kind === 'propose_meal_swap') {
         const payload = row.payload as unknown as MealSwapPayload
         if (!payload.currentName) return

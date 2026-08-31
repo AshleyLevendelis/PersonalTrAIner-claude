@@ -21,6 +21,7 @@ import { saveMesocycle, saveMesocycleWeek } from './mesocycle-persistence'
 import { getExerciseEntry } from './exercise-db'
 import { swapPoolMeal, clearMealPick, getMealPicksForDate, type MealSlotName } from './meal-store'
 import { supabase } from './supabase'
+import { setDeliberateRest } from './daily-tracking'
 import type { MealAdditionPayload } from './meal-addition'
 import { substituteForInjury, substituteForEquipment, rebuildForInjury } from './plan-adaptations'
 import type { PendingActionReceipt } from './pending-actions-store'
@@ -597,4 +598,53 @@ export async function executeScheduleChange(
       failed,
     },
   }
+}
+
+// ---------------------------------------------------------------------------
+// RESTING A PRESCRIBED DAY — 31 Aug 2026.
+//
+// The plainer half of the swap this file already executes. "I'm doing Muay
+// Thai instead" had a tool; "rest day today" did not, so the coach answered
+// it with a sentence and no write, and the day showed as missed the next
+// morning. Ashley's ruling: record it, but confirm first — so it rides the
+// same propose -> confirm -> execute -> receipt rail as every other change
+// rather than writing the moment the model decides it heard one.
+// ---------------------------------------------------------------------------
+
+export interface RestDayPayload {
+  /** ISO date of the day being rested. */
+  date: string
+  /** The day's name, for the receipt — resolved by the caller, not re-derived here. */
+  dayName: string
+  /** What the session would have been, for the receipt. */
+  sessionFocus?: string
+  reason?: string
+}
+
+export interface RestDayResult {
+  receipt: PendingActionReceipt
+}
+
+export async function executeRestDay(
+  profile: UserProfile,
+  payload: RestDayPayload,
+): Promise<RestDayResult> {
+  if (!profile.id) {
+    return { receipt: { landed: [], failed: [{ op: 'save', error: 'No profile to save against' }] } }
+  }
+  const ok = await setDeliberateRest(profile.id, payload.date, true)
+  if (!ok) {
+    return { receipt: { landed: [], failed: [{ op: 'save', error: "Couldn't mark that day — try again in a moment" }] } }
+  }
+  return {
+    receipt: {
+      landed: [`${payload.dayName}: resting${payload.sessionFocus ? ` instead of ${payload.sessionFocus}` : ''}`],
+      failed: [],
+    },
+  }
+}
+
+/** Clears the flag. The day goes back to whatever it was — due, or missed. */
+export async function undoRestDay(profileId: string, payload: RestDayPayload): Promise<void> {
+  await setDeliberateRest(profileId, payload.date, false)
 }

@@ -88,6 +88,62 @@ export async function markSessionCompleted(sessionId: string, finishedAt: Date =
   if (error) throw error
 }
 
+/**
+ * Records — or clears — "I'm resting this prescribed training day".
+ *
+ * READ BEFORE WRITE rather than an upsert, for the reason
+ * swap_session_for_activity's handler states in the edge function:
+ * workout_sessions.split_type is NOT NULL with no default, so an upsert
+ * payload has to carry it, and would then overwrite a real session's split
+ * with a placeholder whenever the row already existed.
+ *
+ * Returns whether the write landed. A caller that says "marked as a rest
+ * day" on a false here would be repeating the exact lie this whole path
+ * exists to stop.
+ */
+export async function setDeliberateRest(
+  profileId: string,
+  date: string,
+  resting: boolean,
+): Promise<boolean> {
+  const { data: existing, error: readErr } = await supabase
+    .from('workout_sessions')
+    .select('id')
+    .eq('profile_id', profileId)
+    .eq('date', date)
+    .maybeSingle()
+  if (readErr) {
+    console.error('setDeliberateRest: reading the day failed', readErr)
+    return false
+  }
+
+  if (existing?.id) {
+    const { error } = await supabase
+      .from('workout_sessions')
+      .update({ deliberate_rest: resting, updated_at: new Date().toISOString() })
+      .eq('id', existing.id)
+    if (error) console.error('setDeliberateRest: update failed', error)
+    return !error
+  }
+
+  // Nothing to clear if there is no row — and creating one to say "not
+  // resting" would write a session that never existed.
+  if (!resting) return true
+
+  const { error } = await supabase.from('workout_sessions').insert({
+    profile_id: profileId,
+    date,
+    // Names what this row is rather than borrowing a training split it never
+    // had, exactly as the swap path does. 0 is the honest lifting duration.
+    split_type: 'rest',
+    duration_minutes: 0,
+    is_completed: false,
+    deliberate_rest: true,
+  })
+  if (error) console.error('setDeliberateRest: insert failed', error)
+  return !error
+}
+
 export interface WeeklyDashboardDay {
   date: string
   metric: DailyMetric | null

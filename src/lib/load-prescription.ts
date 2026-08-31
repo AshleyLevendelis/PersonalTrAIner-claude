@@ -301,6 +301,23 @@ const ISOLATION_FRACTION_OF_COMPOUND: Record<string, { parent: LiftFamily; fract
   isolation_quad: { parent: 'squat', fraction: 0.4 }, // leg extension — single-joint but quads are a large muscle group
   isolation_hamstring: { parent: 'deadlift', fraction: 0.3 }, // leg curl
   isolation_calf: { parent: 'squat', fraction: 0.65 }, // calves are strong relative to most isolation work
+  // REAR DELTS — same fraction as the side delt above, deliberately. The two
+  // heads are comparable in size and lever, and the per-side halving already
+  // separates the implements: a dumbbell rear-delt fly is per hand and lands
+  // on the same number as a lateral raise, while a cable face pull or a pec
+  // deck is a total and lands at roughly double. Before this they had no case
+  // in categorize's isolation switch at all and fell to its isolation_chest
+  // default — 0.38 of a BENCH PRESS. Measured: Face Pulls at 20/27.5/42.5kg
+  // for novice/intermediate/advanced, a pressing number attached to a
+  // rotator-cuff movement.
+  isolation_rear_delt: { parent: 'bench', fraction: 0.19 },
+  // LAT ISOLATION — straight-arm pulldowns and the like. Anchored to the ROW
+  // family rather than bench, which is the whole point: this work is limited
+  // by pulling strength, and pricing it off pressing strength is how a
+  // straight-arm pulldown ended up at a cable-fly weight. The fraction sits
+  // near the bicep's relationship to bench for the same reason — a long lever
+  // with the elbow locked out is a weak position, not a rowing position.
+  isolation_lat: { parent: 'row', fraction: 0.28 },
   carry: { parent: 'deadlift', fraction: 0.35 }, // farmer's/suitcase carry per hand — grip/bracing limited, not a true hinge 1RM
   // An overhead carry is a loaded static hold overhead — pressing-capacity
   // limited, not grip/hinge limited like a farmer's or suitcase carry. It
@@ -394,6 +411,26 @@ export function categorize(entry: ExerciseEntry): string | null {
       case 'isolation_quad': return 'isolation_quad'
       case 'isolation_hamstring': return 'isolation_hamstring'
       case 'isolation_calf': return 'isolation_calf'
+      // THE FIVE PATTERNS THAT USED TO FALL THROUGH. Each one landed on the
+      // default below and was priced as chest isolation — 0.38 of a bench
+      // press — because the switch had no case for it. Found by
+      // test:categorize-precedence's own data-derived check ("in
+      // isolation_chest with no chest muscle in it"), which named fifteen
+      // exercises; six of them carried a real load.
+      //
+      // CORE GETS NO ANCHOR, on purpose. Trunk rotation and anti-rotation
+      // strength is not predicted by any barbell lift, and inventing a
+      // fraction would be the same guess in a new place. Returning null means
+      // no weight is prescribed and the work progresses by reps and tempo —
+      // which is already how Plank, Dead Bug and Side Plank behave, so all
+      // seven core movements now behave alike. It also retires the number
+      // that prompted this: a 27.5kg Russian Twist, a loaded spinal rotation
+      // nobody chose.
+      case 'core': return null
+      case 'horizontal_pull': return 'isolation_rear_delt'
+      case 'vertical_pull': return 'isolation_lat'
+      case 'hip_hinge': return 'isolation_hamstring'
+      case 'knee_dominant': return 'isolation_quad'
       default: return 'isolation_chest' // Cable Flyes / Pec Deck: horizontal_push pattern, chest isolation in practice
     }
   }
