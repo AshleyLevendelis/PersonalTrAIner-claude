@@ -137,15 +137,78 @@ console.log('\n1. A rep bought must never cost weight')
       }
     }
   }
-  // Threshold is the HEAD baseline, not zero. Running this exact check against
-  // HEAD's engine produces the SAME 10 cases, all "Lateral Raises wk9->10:
-  // 12-17@6 -> 13-18@4" in shape: a reps-led lift crossing into a new block
-  // re-derives a lighter estimate while its reps climb. That is a real defect
-  // and a separate one — flagged in BACKLOG, not introduced here — so this
-  // guards against ADDING to it.
-  check(`no rep increase is paid for with a lighter weight (${increases} increases, ${offenders.length} bad, HEAD baseline 10)`,
-    offenders.length <= 10, offenders.slice(0, 3).join(' | '))
+  // ZERO, since 31 Aug 2026. This used to hold a HEAD baseline of 10 —
+  // "Lateral Raises wk9->10: 12-17@6 -> 13-18@4" and others of that shape,
+  // a reps-led lift whose weight followed its own falling standards estimate
+  // down as the block's reps climbed. A gate parked at a non-zero baseline
+  // only stops the defect GROWING, and this one grew to 11 before anyone
+  // looked. Ashley's ruling: within a block the weight never drops. So the
+  // threshold is 0 and the offenders list is the evidence, not a budget.
+  check(`no rep increase is paid for with a lighter weight (${increases} increases, ${offenders.length} bad, must be 0)`,
+    offenders.length === 0, offenders.slice(0, 3).join(' | '))
   check('...and rep increases actually happen, so the check has teeth', increases > 0, String(increases))
+
+  // THE FLOOR MUST NOT REACH THE DELOAD. Dropping the weight is what a deload
+  // is FOR, so the "never drops" rule is scoped to loading weeks — and the
+  // check above cannot see that, because transitions() skips every deload
+  // pair. Measured: mutating the floor to apply on deloads too left the whole
+  // gate green, which is a rule with no test behind it.
+  //
+  // THE COMPARISON IS THE IMMEDIATELY PRECEDING WEEK, not the last time the
+  // lift was seen. The first version of this check used last-seen and went red
+  // on "Seated Cable Row wk12: 40 -> 45" — a deload in block 3 against a
+  // sighting back in block 2, where the whole block was lighter. That is not a
+  // deload going up; it is two different blocks. A check that fires on a
+  // legitimate difference is worse than no check, because the next person
+  // reads past it.
+  let deloadDrops = 0
+  const deloadRises: string[] = []
+  for (const { profile, seed, label } of everyCombo()) {
+    const plan = meso(profile, seed)
+    for (let i = 1; i < plan.length; i++) {
+      const wk = plan[i]
+      if (!wk.is_deload) continue
+      const prevWeek = new Map<string, number>()
+      for (const day of plan[i - 1].days) {
+        for (const e of day.exercises) {
+          if (e.suggested_load_kg == null) continue
+          const already = prevWeek.get(e.name)
+          prevWeek.set(e.name, already == null ? e.suggested_load_kg : Math.min(already, e.suggested_load_kg))
+        }
+      }
+      for (const day of wk.days) {
+        for (const e of day.exercises) {
+          if (e.suggested_load_kg == null) continue
+          const prev = prevWeek.get(e.name)
+          if (prev == null) continue
+          if (e.suggested_load_kg < prev) deloadDrops++
+          if (e.suggested_load_kg > prev) deloadRises.push(`${label} ${e.name} wk${wk.week_number}: ${prev} -> ${e.suggested_load_kg}`)
+        }
+      }
+    }
+  }
+  check(`a deload still takes the weight down (${deloadDrops} drops)`, deloadDrops > 0, String(deloadDrops))
+
+  // TWO KNOWN OFFENDERS, PINNED BY NAME rather than by a count. This check is
+  // new (31 Aug 2026) and found these two on its first run — measured against
+  // the engine BOTH with and without the load floor, identically, so they are
+  // pre-existing and not caused by it. A deload that comes in HEAVIER than the
+  // week before it is a real defect: the week is supposed to be the easy one.
+  //
+  // Listed rather than counted deliberately. A budget of "at most 2" would let
+  // one of these be fixed while a different lift quietly broke, which is the
+  // exact failure §1 above spent eleven offenders learning. A new name here
+  // fails even though the total is unchanged. Logged in BACKLOG for a fix.
+  const KNOWN_DELOAD_RISES = [
+    'full_gym/full_body/intermediate Seated Cable Row wk12: 40 -> 45',
+    'minimalist/full_body/intermediate Dumbbell Floor Press wk16: 18 -> 20',
+  ]
+  const newRises = deloadRises.filter(r => !KNOWN_DELOAD_RISES.includes(r))
+  const fixedRises = KNOWN_DELOAD_RISES.filter(r => !deloadRises.includes(r))
+  check('...and no NEW deload comes in heavier than the week before it',
+    newRises.length === 0, newRises.slice(0, 3).join(' | '))
+  check('...with the two known ones still exactly as recorded — remove them here when fixed',
+    fixedRises.length === 0, fixedRises.join(' | '))
 }
 
 // ---------------------------------------------------------------------------

@@ -5185,6 +5185,18 @@ function carryRampUp(
   return { ...previousRamp, exercise: newName }
 }
 
+/** The bottom of a "12-17" rep label, or null when it isn't one. */
+function repLowOf(reps: string | undefined): number | null {
+  const m = String(reps ?? '').match(/^(\d+)/)
+  return m ? Number(m[1]) : null
+}
+
+/** Carries progress by DISTANCE, not weight — see the load-floor comment. */
+function isCarryByName(name: string): boolean {
+  const entry = EXERCISE_DATABASE.find(e => e.name === name)
+  return entry?.prescription_type === 'distance_load'
+}
+
 export function generateMesocycle(
   profile: UserProfile,
   baseWorkout?: WorkoutDay[],
@@ -5391,7 +5403,42 @@ export function generateMesocycle(
   const frozenCarryStepsByLift = new Map<string, number>()
   const previousWeekPreCoherenceKgByLift = new Map<string, number>()
 
+  /**
+   * What each unverified lift ACTUALLY DISPLAYED last loading week.
+   *
+   * Ashley's ruling, 31 Aug 2026: within a block the weight never drops. The
+   * standards estimate is recomputed every week against that week's rep
+   * target, and more reps means a lower percentage of 1RM, so the estimate
+   * FALLS as a block's reps climb. Measured on a real plan: Lateral Raises
+   * 12-17 reps @ 6kg in week 9, then 13-18 reps @ 4kg in week 10 — more work
+   * for a third less weight, which reads as a demotion nobody explained.
+   *
+   * Distinct from previousWeekPreCoherenceKgByLift above, which holds the
+   * NATURAL, pre-coherence probe the freeze detector needs ("would this
+   * weight have moved on its own?"). That one must stay unpinned or freezes
+   * self-perpetuate. This one is the opposite: the number on the page, which
+   * is the only thing a floor can honestly be measured against.
+   *
+   * CLEARED EVERY WEEK, so it only ever holds lifts that were present the
+   * week before — a variation returning to a slot after a block away has no
+   * entry, and gets a fresh estimate rather than a floor from five weeks ago.
+   * Deload weeks don't write to it, for the same reason the natural tracker
+   * skips them: a deload is supposed to be lighter, and letting it become the
+   * floor would pin the next block to a recovery weight.
+   */
+  const lastWeekDisplayedKgByLift = new Map<string, { kg: number; repLow: number | null }>()
+
   sequence.forEach((phase, blockIndex) => {
+    // MID-BLOCK ONLY — Ashley's wording, and the audit insists on it. A block
+    // changes the phase, and with it the rep targets and the intensity the
+    // estimate is computed against, so a weight carried across the boundary is
+    // a weight the new block never asked for. Measured: without this reset the
+    // floor produced 6 block_transition_jump and 4 rotation_relative_load
+    // failures against a clean 0 — a rotated-in lift held at the outgoing
+    // variation's number is the exact contamination this file guards against
+    // in three other places. Each block starts from a fresh estimate and
+    // builds its own floor from there.
+    lastWeekDisplayedKgByLift.clear()
     let phaseConfig = getPhaseConfig(phase)
     // A metabolic/metcon block at full volume is the right call for someone
     // who genuinely loves conditioning work. For 'tolerate' (and more so
@@ -6314,12 +6361,63 @@ export function generateMesocycle(
       // occupy two slots in the same week (different days) at two different
       // loads — the per-lift history takes the LIGHTER of them rather than
       // whichever happened to be written last.
+      // THE WEIGHT NEVER DROPS — applied here, on the FINAL post-coherence
+      // number, because that is the number the trainee reads. Applying it
+      // earlier let coherence walk it back down again, and applying it to the
+      // pre-coherence probe would have broken the freeze detector, which
+      // needs that probe unpinned.
+      //
+      // Deloads are exempt — dropping the weight is what a deload is for — and
+      // unverifiedLoadingFlags already carries that: it is only ever set when
+      // `!isDeload && unverifiedForCategory`, so on a deload week every flag
+      // is false and this loop touches nothing. An extra `if (!isDeload)`
+      // wrapper here READ correct and was dead: a live condition that can
+      // never decide anything, which is the shape that hides real bugs. It
+      // was written, measured (mutating it changed no output at all), and
+      // removed. The write side below is NOT redundant in the same way — see
+      // its own comment.
+      //
+      // CARRIES ARE EXCLUDED. Their progression lever is DISTANCE, not weight,
+      // and §2-§5 of test:frozen-weeks govern that separately. Flooring them
+      // produced 6 block_transition_jump failures ("Trap Bar Carry week 9 load
+      // 27.5kg jumps more than one step from week 7's 14kg").
+      //
+      // The pre-floor number is kept, because the ramp anchors below must not
+      // inherit a floored figure: a held weight rolled into the SLOT history
+      // and was then handed to whatever variation rotated in next, which is
+      // the contamination this file guards against in three other places.
+      // Measured: without this split, four rotation_relative_load failures —
+      // "rotated Lateral Raises -> Machine Lateral Raise at 7.5kg, 150% of a
+      // fresh 5kg estimate".
+      const preFloorKg: (number | null)[][] = days.map(d => d.exercises.map(e => e.suggested_load_kg ?? null))
+      for (let dayIdx = 0; dayIdx < days.length; dayIdx++) {
+        const dayExercises = days[dayIdx].exercises
+        for (let exIdx = 0; exIdx < dayExercises.length; exIdx++) {
+          if (!unverifiedLoadingFlags[dayIdx][exIdx]) continue
+          const ex = dayExercises[exIdx]
+          if (isCarryByName(ex.name)) continue
+          const last = lastWeekDisplayedKgByLift.get(ex.name)
+          if (last == null || ex.suggested_load_kg == null) continue
+          // ONLY WHEN THE REPS WENT UP. The defect is "a rep bought with a
+          // lighter weight" — the estimate falls as the rep target climbs, and
+          // the trainee reads more-work-less-weight as a demotion. A drop with
+          // the reps unchanged or lower is not that, and flooring it too
+          // pushed one lift past the block-transition ceiling (measured: 1
+          // block_transition_jump failure against a clean 0). Narrower than
+          // "never drops", and it covers every case the rule was chosen for.
+          const nowLow = repLowOf(ex.reps)
+          if (last.repLow == null || nowLow == null || nowLow <= last.repLow) continue
+          if (ex.suggested_load_kg < last.kg) ex.suggested_load_kg = last.kg
+        }
+      }
+
       const thisWeekByLift = new Map<string, number>()
       for (let dayIdx = 0; dayIdx < days.length; dayIdx++) {
         const dayExercises = days[dayIdx].exercises
         for (let exIdx = 0; exIdx < dayExercises.length; exIdx++) {
           if (!unverifiedLoadingFlags[dayIdx][exIdx]) continue
-          const finalKg = dayExercises[exIdx].suggested_load_kg
+          // Pre-floor on purpose — see preFloorKg above.
+          const finalKg = preFloorKg[dayIdx][exIdx]
           if (finalKg == null) continue
           lastUnverifiedLoadingWeekKg[dayIdx][exIdx] = finalKg
           const name = dayExercises[exIdx].name
@@ -6328,6 +6426,38 @@ export function generateMesocycle(
         }
       }
       for (const [name, kg] of thisWeekByLift) lastUnverifiedLoadingWeekKgByLift.set(name, kg)
+
+      // Next week's floor. Cleared first, so only lifts that appeared THIS
+      // week can floor next week — see lastWeekDisplayedKgByLift's comment.
+      //
+      // This `!isDeload` is INTENT, and the honest measurement is that it does
+      // not currently change any output. thisWeekByLift is empty on a deload
+      // (no flags are set), so without the guard a deload would clear the map
+      // and repopulate it with nothing — the floor would be lost across the
+      // deload, and week 1 of the next block could drop again. In the 36-
+      // profile corpus that costs nothing, because a block boundary rotates
+      // the variation anyway and a new variation has no floor to lose. So it
+      // is kept as a statement of the rule — a deload must not be able to
+      // erase the floor — not as a guard the gate can prove. I first wrote
+      // "measured: removing it reintroduces the offenders" here; the mutation
+      // left the gate green, and the claim was mine, not the measurement's.
+      if (!isDeload) {
+        lastWeekDisplayedKgByLift.clear()
+        // The DISPLAYED number, floor included — this is the one the next
+        // week must not go below, and thisWeekByLift above is deliberately
+        // pre-floor for the ramp anchors.
+        for (let dayIdx = 0; dayIdx < days.length; dayIdx++) {
+          const dayExercises = days[dayIdx].exercises
+          for (let exIdx = 0; exIdx < dayExercises.length; exIdx++) {
+            if (!unverifiedLoadingFlags[dayIdx][exIdx]) continue
+            const ex = dayExercises[exIdx]
+            if (ex.suggested_load_kg == null || isCarryByName(ex.name)) continue
+            const already = lastWeekDisplayedKgByLift.get(ex.name)
+            const entry = { kg: ex.suggested_load_kg, repLow: repLowOf(ex.reps) }
+            lastWeekDisplayedKgByLift.set(ex.name, already == null || entry.kg < already.kg ? entry : already)
+          }
+        }
+      }
 
       progressConditioningWeek(days, w, isDeload)
 

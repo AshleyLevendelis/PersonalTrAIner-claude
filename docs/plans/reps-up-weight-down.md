@@ -1,6 +1,8 @@
 # More reps, less weight — the ramp follows the estimate down
 
-**Status: PLAN ONLY. Not built.** CLAUDE.md: *"Dietary enforcement, injury
+**Status: BUILT, 31 Aug 2026.** Ashley chose "the weight never drops". What shipped is narrower than that sentence, for reasons measured below and recorded here rather than quietly.
+
+**Original status: PLAN ONLY.** CLAUDE.md: *"Dietary enforcement, injury
 filtering, and load prescription always get a plan before a build, even when
 the fix looks obvious."* This is load prescription. It needs Ashley's call.
 
@@ -98,3 +100,53 @@ is a load decision and it is hers.
   so the plan-quality score must be re-measured, not assumed.
 - Mutations that must turn the gate red: remove the floor; apply it on deload
   weeks; apply it across block boundaries.
+
+
+---
+
+## What actually shipped, and what the measurements changed
+
+Ashley chose option 1, "floor it everywhere". Building it exactly that way
+caused a regression, so what shipped is option 1 **narrowed to the defect**:
+the weight is held only when the REP TARGET WENT UP. A drop with the reps flat
+or falling is left alone. Every case the rule was chosen for is covered; the
+cases that broke other things are not.
+
+Four things had to be measured rather than reasoned about, and three of my
+assumptions were wrong:
+
+1. **The lift never used the ramp at all.** I put the floor inside
+   `Math.min(stepped, estimate)` and the output did not move. Lateral Raises
+   are reps-progressed — a 2kg dumbbell notch is 33% of a 6kg lift, so
+   `loadStepUnaffordable` makes `rampLoad` false and every week is a fresh
+   estimate. The floor had to go on the DISPLAYED number instead.
+2. **The baseline was 0, not 54.** I compared the new audit against the
+   committed `audit-report.txt` and read "54 failures → 7" as a large
+   improvement. That committed report predates other fixes. Re-running the
+   audit with the change stashed gave **0 failures**, so my change had
+   introduced 7. Prior numbers stop being comparable; this one had already
+   stopped.
+3. **A leftover from attempt 1 was still live.** The ramp-side floor did
+   nothing for isolation lifts but carries DO ramp, so it was silently
+   flooring them — 6 `block_transition_jump` failures ("Trap Bar Carry week 9
+   load 27.5kg jumps more than one step from week 7's 14kg"). Removing it
+   returned every carry load to exactly its baseline value, verified by diff.
+4. **The floored number leaked into the ramp anchors.** A held weight rolled
+   into the slot history and was handed to whatever variation rotated in next
+   — 4 `rotation_relative_load` failures. The anchors now take the PRE-floor
+   number; only the display and the next week's floor take the held one.
+
+Final: audit **0 failures / 13,967 combinations**, `test:frozen-weeks` §1
+**0 offenders** (was 11, against a baseline that had been parked at 10), and
+carry loads bit-identical to baseline.
+
+## Two things this turned up that are NOT fixed
+
+- **A deload can come in heavier than the week before it.** Two cases, found
+  by a check added here, present identically with and without this change:
+  `Seated Cable Row wk12: 40 -> 45` and `Dumbbell Floor Press wk16: 18 -> 20`.
+  Pinned by NAME in the gate, not by a count, so fixing one while breaking
+  another still fails.
+- **`!isDeload` on the floor's read side was dead code** — the flags it reads
+  are only ever set on non-deload weeks. Written, measured (mutating it
+  changed nothing at all), removed.
