@@ -348,8 +348,22 @@ console.log('\n10. An attached email can actually sign you back in')
     /don't match an account/.test(screen))
 
   const app = stripComments(readFileSync(join(ROOT, 'src/App.tsx'), 'utf8'))
+  // THE COPY MOVED, AND THIS CHECK MOVED WITH IT. The offer used to be
+  // rendered by App.tsx as a second fixed layer at the bottom of the screen,
+  // and on a real phone it landed on top of the name box — the first control
+  // of the first screen could not be tapped. It now lives inside
+  // ConversationalOnboarding's own composer, where the browser guarantees
+  // they cannot overlap. Grepping App.tsx for the words went red for a
+  // feature that works, which is the failure mode a source-text check has to
+  // avoid: so assert the words where they ARE, and assert the wiring that
+  // connects them back here, rather than either half alone.
+  const onboarding = stripComments(readFileSync(join(ROOT, 'src/components/onboarding/ConversationalOnboarding.tsx'), 'utf8'))
   check('it is reachable at the moment it is needed — before onboarding',
-    /Already have an account\? Sign in/.test(app))
+    /Already have an account\? Sign in/.test(onboarding))
+  check('...and App.tsx still hands onboarding the way to open it',
+    /onSignIn=\{\(\) => setSignInOpen\(true\)\}/.test(app))
+  check('...which onboarding actually wires to the button, not just accepts',
+    /onClick=\{onSignIn\}/.test(onboarding))
   check('...and is NOT a wall in front of onboarding',
     /onCancel=\{\(\) => setSignInOpen\(false\)\}/.test(app))
   check('...with a successful sign-in restoring the session rather than onboarding',
