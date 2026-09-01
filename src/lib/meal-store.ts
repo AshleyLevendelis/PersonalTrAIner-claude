@@ -422,8 +422,15 @@ export async function voidMealEvent(clientId: string): Promise<void> {
  * and the ledger counts every one of them. Undo that voided a single
  * client_id therefore left the remaining copies still counting, so a meal
  * logged twice went to "not logged" on screen while its calories stayed on
- * the day. Sequential rather than parallel: each void is its own compensating
- * write, and one failing must not take an unrelated one down with it.
+ * the day.
+ *
+ * Sequential for ordering and readability, NOT for isolation — awaiting in a
+ * loop propagates a throw exactly as Promise.all would, and claiming
+ * otherwise would be a comment asserting a property the code does not have.
+ * In practice neither half throws: voidMealEvent's supabase call RETURNS its
+ * error rather than raising, and the pending-queue write is synchronous. A
+ * partial failure would therefore show up as a copy still counting after an
+ * undo, which is what the ledger re-read in the caller would reveal.
  */
 export async function voidMealEvents(clientIds: string[]): Promise<void> {
   for (const id of clientIds) await voidMealEvent(id)

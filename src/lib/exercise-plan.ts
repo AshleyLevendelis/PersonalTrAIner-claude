@@ -2944,14 +2944,17 @@ function enforceLoadCoherence(days: WorkoutDay[]): void {
  * Runs over the FINISHED week, so day order stops mattering, and runs BEFORE
  * enforceLoadCoherence so the per-day safety ceilings still get the last word
  * — those legitimately differ by day (a unilateral accessory is bounded
- * against THAT day's main lift) and §2 exempts them by name.
+ * against THAT day's main lift). Note that after this pass, no ceiling
+ * actually fires on a same-prescription pair anywhere in the audit's grid:
+ * the gate's old exemption for that shape was covering for the day-order bug
+ * above, and has been deleted rather than loosened.
  *
  * EXPORTED FOR ITS DIRECTION TO BE PINNED. The sweep in
  * test:week-load-consistency §2 proves the two days AGREE; it cannot see
  * WHICH of them moved, and swapping Math.min for Math.max left every gate in
  * the repo green — test:audit's 17,423 combos included — while inverting the
  * one thing that matters here: a week that quietly asks for MORE than the
- * lift earned. §5 calls this directly.
+ * lift earned. That gate's §4 calls this directly with a two-day fixture.
  */
 export function enforceOneWeightPerPrescription(days: WorkoutDay[]): void {
   const byPrescription = new Map<string, { ex: Exercise; entry: ExerciseEntry }[]>()
