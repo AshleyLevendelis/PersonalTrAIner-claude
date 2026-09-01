@@ -58,8 +58,15 @@ function mainLiftLine(workout: WorkoutDay): { name: string; summary: string } | 
   const g = groups[idx]
   const ex = g ? (g.kind === 'single' ? g.ex : g.members[0]?.ex) : workout.exercises[0]
   if (!ex) return null
+  // THE PLAN'S OWN STRING, not a re-formatted number — the same rule
+  // ExerciseLine states and test:load-display enforces across every
+  // component. `loadingMode` prices anything dumbbell-capable PER HAND
+  // (measured at 47.8% of prescriptions), so `~14kg` on this line sat
+  // directly above `~14kg per hand` inside the expanded day and read as a
+  // third of a lift that is two-thirds of it. This line shipped in the
+  // browse redesign and was the gate's one offender.
   const load = ex.suggested_load_kg != null
-    ? ` · ~${ex.suggested_load_kg}kg`
+    ? ` · ${ex.suggested_load ?? `~${ex.suggested_load_kg}kg`}`
     : ex.suggested_load?.toLowerCase() === 'bodyweight' ? ' · bodyweight' : ''
   return { name: ex.name, summary: `${ex.sets}×${ex.reps}${load}` }
 }
