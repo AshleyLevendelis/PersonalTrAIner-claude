@@ -63,7 +63,7 @@ console.log('\n1. One component owns a read-only day')
 console.log('\n2. Both browse surfaces render through it')
 {
   const peek = read('src/components/exercise/PeekPanel.tsx')
-  const program = read('src/components/ExercisePlan.tsx')
+  const program = read('src/components/exercise/ProgramBrowse.tsx')
   check('the peek panel calls it', /<ReadOnlyDayList/.test(peek))
   check('the program view calls it', /<ReadOnlyDayList/.test(program))
 
