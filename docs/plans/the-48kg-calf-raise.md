@@ -111,6 +111,27 @@ kettlebell swing scale was settled.
 - Mutations: revert the category; anchor to squat again; drop the `unilateral`
   half of the match (which would drag the machine version down with it).
 
+## Confirmed again on a second, larger corpus
+
+Re-measured on the plan-quality sweep (9,216 profiles × 16 weeks, a different
+grid from both the audit and the table above): **88,046 clamp warnings, and
+100% of them are this one exercise.** No other entry in the catalogue reaches
+its implement ceiling anywhere in that corpus.
+
+That is a stronger result than the 240-cell table, and stronger than the
+audit's own figure (7,340 warnings across 24 exercises), because the quality
+grid's body weights sit in the ordinary range rather than reaching 120kg —
+so the honest top-corner clamps never fire, and only the structural one
+remains. Three corpora, three denominators, same conclusion, and the
+conclusion gets cleaner as the sample gets more ordinary.
+
+The gate itself passes throughout: **11.45 / 12 overall, 0 plans below the 7.2
+floor.** A prescription nobody can perform is not something a quality score
+measures — it scores structure, progression, time fit and selection, not
+whether 48kg in one hand on a step is a real instruction. Worth saying,
+because "the quality gate is green" is exactly the reassurance that would
+bury this.
+
 ## Scale note
 
 The backlog's "7,340 clamp warnings" is a count of *warnings logged during one
