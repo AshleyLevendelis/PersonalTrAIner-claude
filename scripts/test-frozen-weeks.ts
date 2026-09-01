@@ -199,16 +199,25 @@ console.log('\n1. A rep bought must never cost weight')
   // one of these be fixed while a different lift quietly broke, which is the
   // exact failure §1 above spent eleven offenders learning. A new name here
   // fails even though the total is unchanged. Logged in BACKLOG for a fix.
-  // ONE, DOWN FROM TWO — but displaced, not fixed. The full_gym entry
-  // ('full_gym/full_body/intermediate Seated Cable Row wk12: 40 -> 45')
-  // stopped reproducing on 1 Sep 2026 when the machine-floor batch added 15
-  // full_gym candidates and changed which exercises that seeded plan picks;
-  // the deload-rise mechanism itself is untouched and stays in BACKLOG. If
-  // it re-manifests under some future pool it lands in newRises above and
-  // fails by name, which is exactly this check working.
-  const KNOWN_DELOAD_RISES = [
-    'minimalist/full_body/intermediate Dumbbell Floor Press wk16: 18 -> 20',
-  ]
+  // NOW EMPTY, AND THAT IS A MEASUREMENT, NOT AN EDIT TO GET GREEN.
+  //
+  //   two    (31 Aug 2026, first run)
+  //   one    (1 Sep 2026) — 'full_gym/full_body/intermediate Seated Cable Row
+  //          wk12: 40 -> 45' stopped reproducing when the machine-floor batch
+  //          added 15 full_gym candidates and changed which exercises that
+  //          seeded plan picks. DISPLACED, not fixed.
+  //   zero   (1 Sep 2026) — 'minimalist/full_body/intermediate Dumbbell Floor
+  //          Press wk16: 18 -> 20' stopped reproducing when
+  //          enforceOneWeightPerPrescription landed. That one IS a fix and the
+  //          mechanism explains it: the lift held two weights in week 15, the
+  //          deload was built against one of them and this check compares
+  //          against the other (Math.min above). One weight per week per
+  //          prescription removes the disagreement the comparison was reading.
+  //
+  // The list stays here, empty, rather than being deleted with its checks: an
+  // empty pin is the strongest form of this gate — ANY deload rise now fails
+  // by name on the line above.
+  const KNOWN_DELOAD_RISES: string[] = []
   const newRises = deloadRises.filter(r => !KNOWN_DELOAD_RISES.includes(r))
   const fixedRises = KNOWN_DELOAD_RISES.filter(r => !deloadRises.includes(r))
   check('...and no NEW deload comes in heavier than the week before it',

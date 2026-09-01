@@ -2720,7 +2720,25 @@ function coherenceGroup(entry: ExerciseEntry): string | null {
   }
 }
 
-/** Overwrites an exercise's load fields in place to a new (plate-rounded) target — used only to pull an outlier DOWN toward coherence, never to invent a heavier number. Any set-by-set ramp collapses to a flat value at the new target; a load already being clamped down is not a candidate for a strength-phase ramp anyway. */
+/**
+ * Overwrites an exercise's load fields in place to a new (plate-rounded)
+ * target. THE ONLY SANCTIONED WAY TO CHANGE A PRESCRIBED WEIGHT after it is
+ * built: `suggested_load_kg`, `suggested_load` and `per_set_load` are three
+ * views of one number and every screen reads a different one, so they move
+ * together or they contradict each other. The rep-target floor below is the
+ * cautionary tale — it raised the number by hand and the app spent a release
+ * telling the coach 7.5kg for a lift it had prescribed at 8kg.
+ *
+ * Two callers, in opposite directions: the coherence clamp pulls an outlier
+ * DOWN toward its group, and the rep-target floor holds a weight UP when the
+ * rep target rose. It never invents a number of its own — both callers pass
+ * a figure already justified elsewhere.
+ *
+ * Any set-by-set ramp collapses to a flat value at the new target. Measured
+ * zero occurrences in the 19,724-exercise sweep for either caller: a load
+ * being clamped down is not a candidate for a strength-phase ramp, and a
+ * ramped load has never also been a floored one.
+ */
 function rebuildLoadForExercise(ex: Exercise, entry: ExerciseEntry, targetKg: number): void {
   const mode = loadingMode(entry)
   const rounded = roundToPlate(targetKg, mode)
@@ -2900,6 +2918,65 @@ function enforceLoadCoherence(days: WorkoutDay[]): void {
     const ceiling = min * SAME_MUSCLE_GROUP_MAX_RATIO
     for (const { ex, entry } of items) {
       if (ex.suggested_load_kg! > ceiling) rebuildLoadForExercise(ex, entry, ceiling)
+    }
+  }
+}
+
+/**
+ * ONE LIFT, ONE WEIGHT, IN A GIVEN WEEK — the half the per-slot memo cannot
+ * reach.
+ *
+ * `weightDecidedThisWeek` (in the weekly build loop) already claims this rule
+ * and states the tie-break: "the LOWER one wins: never tell someone to lift
+ * more than the lift has earned elsewhere in the same week." It only holds
+ * when the lower weight is prescribed FIRST. The memo is consulted while each
+ * slot is being built, so it can pull a later day DOWN to an earlier one, and
+ * has nothing to pull an earlier day down WITH — that day's object is already
+ * finished. When the higher weight comes first the rule silently does not
+ * apply.
+ *
+ * MEASURED, on the audit's own grid: Shoulder Press Machine, week 3,
+ * intermediate/100kg/full_gym — Monday 45kg, Wednesday 32.5kg, identical
+ * 3x11-13 @ RPE 6-7. Five cases in 1,536 lift-weeks, every one of them the
+ * same shape: the heavier day came first. test:week-load-consistency §2 has
+ * been red on these.
+ *
+ * Runs over the FINISHED week, so day order stops mattering, and runs BEFORE
+ * enforceLoadCoherence so the per-day safety ceilings still get the last word
+ * — those legitimately differ by day (a unilateral accessory is bounded
+ * against THAT day's main lift). Note that after this pass, no ceiling
+ * actually fires on a same-prescription pair anywhere in the audit's grid:
+ * the gate's old exemption for that shape was covering for the day-order bug
+ * above, and has been deleted rather than loosened.
+ *
+ * EXPORTED FOR ITS DIRECTION TO BE PINNED. The sweep in
+ * test:week-load-consistency §2 proves the two days AGREE; it cannot see
+ * WHICH of them moved, and swapping Math.min for Math.max left every gate in
+ * the repo green — test:audit's 17,423 combos included — while inverting the
+ * one thing that matters here: a week that quietly asks for MORE than the
+ * lift earned. That gate's §4 calls this directly with a two-day fixture.
+ */
+export function enforceOneWeightPerPrescription(days: WorkoutDay[]): void {
+  const byPrescription = new Map<string, { ex: Exercise; entry: ExerciseEntry }[]>()
+  for (const day of days) {
+    for (const ex of day.exercises) {
+      if (ex.suggested_load_kg == null) continue
+      const entry = findEntry(ex.name)
+      if (!entry) continue
+      // The same key the memo keys on, and the same one the gate groups by:
+      // two days with different set counts are different prescriptions and
+      // are allowed to differ.
+      const key = `${ex.name}|${ex.sets}|${ex.reps}|${ex.intensity}`
+      const bucket = byPrescription.get(key)
+      if (bucket) bucket.push({ ex, entry })
+      else byPrescription.set(key, [{ ex, entry }])
+    }
+  }
+  for (const items of byPrescription.values()) {
+    if (items.length < 2) continue
+    const min = Math.min(...items.map(i => i.ex.suggested_load_kg!))
+    for (const { ex, entry } of items) {
+      if (ex.suggested_load_kg! > min) rebuildLoadForExercise(ex, entry, min)
     }
   }
 }
@@ -6345,6 +6422,8 @@ export function generateMesocycle(
         return { ...day, exercises: isDeload ? exercises : enforceSetHierarchy(exercises) }
       })
 
+      // Before enforceLoadCoherence, deliberately — see its doc comment.
+      enforceOneWeightPerPrescription(days)
       enforceLoadCoherence(days)
 
       // Decided ONCE, here, and used by both the tempo pass below and the
@@ -6418,7 +6497,36 @@ export function generateMesocycle(
           // "never drops", and it covers every case the rule was chosen for.
           const nowLow = repLowOf(ex.reps)
           if (last.repLow == null || nowLow == null || nowLow <= last.repLow) continue
-          if (ex.suggested_load_kg < last.kg) ex.suggested_load_kg = last.kg
+          if (ex.suggested_load_kg >= last.kg) continue
+          // RELABEL, DON'T JUST RAISE THE NUMBER — and this is a regression
+          // this floor itself introduced. The first version assigned
+          // `suggested_load_kg` alone and left `suggested_load` (the display
+          // string every screen renders) and `per_set_load` sitting on the
+          // old, lower figure. So the plan held 8kg while the Exercise tab
+          // and the coach both said "~7.5kg": three fields, one weight, two
+          // answers. Measured over the 19,724-exercise coach sweep — 61
+          // loaded exercises disagreed with their own display string, and
+          // test:coach-plan-context named two of them (Backpack Curl,
+          // Lateral Raises) by lift.
+          //
+          // rebuildLoadForExercise is the one place that writes all three
+          // together, and going through it is the point: a fourth hand-rolled
+          // load update is how this happened. It plate-rounds, which is a
+          // no-op here (last.kg is already a DISPLAYED number for this same
+          // lift, so the same loading mode already rounded it), and it flats
+          // any per-set ramp — measured zero occurrences, because a ramped
+          // load has never also been a floored one in the sweep.
+          const entry = findEntry(ex.name)
+          // TYPE NARROWING, NOT A BEHAVIOURAL GUARD, and the honest
+          // measurement is that it never fires: 42 floor applications across
+          // the 19,724-exercise sweep, 0 of them without a catalogue entry —
+          // every flagged exercise came from the catalogue in the first
+          // place. rebuildLoadForExercise needs the entry for the loading
+          // mode and the label, so the branch has to exist; `continue` rather
+          // than a raise because raising a weight that cannot be relabelled
+          // would recreate the exact inconsistency this is fixing.
+          if (!entry) continue
+          rebuildLoadForExercise(ex, entry, last.kg)
         }
       }
 

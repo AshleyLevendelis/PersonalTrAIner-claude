@@ -6,8 +6,8 @@ import {
   SCOPE_SAFETY_RULES,
   ALLERGEN_HONESTY_BLOCK,
 } from "../_shared/coach-rules.ts";
+import { checkSpendCap, ONBOARDING_CAP } from "../_shared/spend-cap.ts";
 import {
-import { checkSpendCap, ONBOARDING_CAP } from '../_shared/spend-cap.ts';
   callsOf,
   resolveReply,
   type GeminiLegResult,

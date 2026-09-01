@@ -162,7 +162,14 @@ console.log('\n4. One matcher, and the screens actually use it')
 
   const plan = stripComments(readFileSync(join(ROOT, 'src/components/MealPlan.tsx'), 'utf8'))
   check('the meal list re-checks what it displays', /checkMealAgainstRestrictions\(/.test(plan))
-  check('a flagged meal cannot be logged as eaten', /disabled=\{busy \|\| \(blocked && !loggedEvent\)\}/.test(plan))
+  // EXACT ON PURPOSE — the two halves of this expression are the rule: a
+  // flagged meal cannot be logged, and unlogging one stays allowed
+  // (`&& !isLogged`, not a bare `blocked`), so whatever is already recorded
+  // is always correctable. Spelling changed 1 Sep 2026 when the row moved
+  // from one logged event per slot to all of them (`loggedEvent` ->
+  // `isLogged`); the behaviour is identical and this was re-pinned, not
+  // loosened.
+  check('a flagged meal cannot be logged as eaten', /disabled=\{busy \|\| \(blocked && !isLogged\)\}/.test(plan))
   check('...and the reason is rendered', /restriction\.message/.test(plan))
   check('the offer to redo is an offer, not an automatic rebuild',
     /blockedSlots\.length > 0 &&/.test(plan) && !/useEffect[\s\S]{0,200}onRegenerateAll\(\)/.test(plan))
