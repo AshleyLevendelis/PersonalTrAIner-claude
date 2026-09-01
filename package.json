@@ -78,6 +78,7 @@
     "test:deploy-path": "tsx scripts/test-deploy-path.ts",
     "test:exercise-detail": "tsx scripts/test-exercise-detail.ts",
     "test:lift-plausibility": "tsx scripts/test-lift-plausibility.ts",
+    "test:one-day-one-look": "tsx scripts/test-one-day-one-look.ts",
     "test:tab-ownership": "tsx scripts/test-tab-ownership.ts",
     "test:appearance": "tsx scripts/test-appearance.ts",
     "test:no-question-beside-generate": "tsx scripts/test-no-question-beside-generate.ts",

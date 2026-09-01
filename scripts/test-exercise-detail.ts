@@ -26,6 +26,8 @@ const read = (p: string) => readFileSync(join(ROOT, p), 'utf8')
 const panel = read('src/components/exercise/ExerciseDetailDialog.tsx')
 const row = read('src/components/exercise/ExerciseRow.tsx')
 const peek = read('src/components/exercise/PeekPanel.tsx')
+const dayList = read('src/components/exercise/ReadOnlyDayList.tsx')
+const program = read('src/components/ExercisePlan.tsx')
 const tab = read('src/components/exercise/ExerciseTab.tsx')
 const today = read('src/components/exercise/TodayPanel.tsx')
 const swap = read('src/components/exercise/SwapDialog.tsx')
@@ -74,7 +76,20 @@ check('a known lift resolves with cues', !!sample && sample.form_cues.length >= 
 console.log('\n3. It is reachable — from BOTH menus\n')
 check('ExerciseTab owns one instance', /<ExerciseDetailDialog/.test(tab) && /detailTarget/.test(tab))
 check("today's session menu opens it", /onOpenDetail\(ex\.name\)/.test(row) && /How to do it/.test(row))
-check("the peek menu opens it too", /onOpenDetail\(ex\.name\)/.test(peek) && /How to do it/.test(peek))
+// THE MENU MOVED, AND THIS CHECK MOVED WITH IT. It read PeekPanel, which no
+// longer draws its own menu — every browse surface renders through
+// ReadOnlyDayList now, so the peek's copy went with the table it was fixing.
+// Reading the old file went red for a feature that works, so assert the menu
+// where it lives AND the prop threading that reaches it, rather than either
+// half alone.
+check('the shared browse menu opens it', /onOpenDetail\(ex\.name\)/.test(dayList) && /How to do it/.test(dayList))
+check('...and the peek threads the prop into that menu',
+  /onOpenDetail=\{onOpenDetail\}/.test(peek))
+// The program view deliberately does NOT pass onOpenDetail today — it has no
+// dialog wired to it, and a menu item that opens nothing is worse than an
+// absent one. Asserted so its absence reads as a decision, not an omission.
+check('...while the program view offers history instead, not technique',
+  /onOpenHistory=\{onOpenHistory\}/.test(program) && !/onOpenDetail=/.test(program))
 // The prop has to survive the whole thread or the menu item never renders:
 // ExerciseTab -> TodayPanel -> ExerciseList -> rowProps -> ExerciseRow.
 // SLICED, not windowed. Two earlier versions of this check used a character

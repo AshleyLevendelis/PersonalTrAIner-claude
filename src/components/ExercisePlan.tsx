@@ -15,29 +15,26 @@
 // This file is retired entirely in P4, replaced by ProgramWeekList/Detail.
 // ---------------------------------------------------------------------------
 
-import type { PrescribedLoadSource } from '@/lib/load-prescription'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Separator } from '@/components/ui/separator'
 import { Input } from '@/components/ui/input'
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible'
-import { ArrowRightLeft, Ban, History, Zap, ShieldAlert, Heart, Activity, Clock, Flame, ChevronLeft, ChevronRight, ChevronDown, Calendar, Sparkles, Thermometer } from 'lucide-react'
-import React, { useState, useCallback } from 'react'
-import { getExerciseEntry, getExerciseId, searchExerciseCatalog } from '@/lib/exercise-db'
+import { ArrowRightLeft, Zap, ShieldAlert, Heart, Activity, Clock, Flame, ChevronLeft, ChevronRight, ChevronDown, Calendar, Sparkles, Thermometer } from 'lucide-react'
+import React, { useState } from 'react'
+import { getExerciseEntry, searchExerciseCatalog } from '@/lib/exercise-db'
 import { getExerciseCompatibilityWarnings } from '@/lib/exercise-plan'
 import { getReplacementCandidates, type SwapScope } from '@/lib/mesocycle-edit'
 import { useActiveSession } from '@/hooks/useActiveSession'
-import { formatRampSets, normalizeWarmup } from '@/lib/session-derive'
-import { RampStrip } from '@/components/exercise/RampStrip'
-import { LoadChip } from '@/components/exercise/LoadChip'
+import { normalizeWarmup } from '@/lib/session-derive'
 import { ProgramArc } from '@/components/exercise/ProgramArc'
 import { InsightBanner } from '@/components/ui/insight-banner'
 import type { ExerciseEntry } from '@/lib/exercise-db'
 import type { WorkoutDay, MesocycleWeek, UserProfile, SessionDuration } from '@/lib/types'
 import { estimateDaySeconds, getDurationBudgetSeconds } from '@/lib/session-duration'
+import { ReadOnlyDayList } from '@/components/exercise/ReadOnlyDayList'
 
 interface ExercisePlanProps {
   plan: WorkoutDay[]
@@ -58,31 +55,11 @@ interface ExercisePlanProps {
 
 const DAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
-function isTimeBased(reps: string, prescriptionType?: string): boolean {
-  if (prescriptionType) return prescriptionType !== 'reps'
-  return reps.includes('s') || reps.includes('min') || reps.includes('m')
-}
-
-// Browse surfaces show plan-derived loads and honest provenance only
-// (§2.2): whatever prescribeLoad persisted, never 'logged' (that requires
-// the live progression engine, which only runs for today's session in
-// TodayPanel). LoadChip's type is the full 4-state union; this component
-// simply never passes 'logged'.
-type LoadSource = PrescribedLoadSource
-
-function getRepsLabel(reps: string, prescriptionType?: string): string {
-  switch (prescriptionType) {
-    case 'time': return 'Hold'
-    case 'distance_load': return 'Distance'
-    case 'intervals': return 'Work'
-    case 'steady_state': return 'Duration'
-    case 'reps': return 'Reps'
-  }
-  if (reps.includes('min')) return 'Duration'
-  if (reps.endsWith('s')) return 'Time'
-  if (reps.endsWith('m')) return 'Distance'
-  return 'Reps'
-}
+// isTimeBased, getRepsLabel and the local LoadSource alias lived here to
+// serve the Reps column of a table that no longer exists — the rep label and
+// the load provenance are ExerciseLine's and ReadOnlyDayList's job now. Left
+// behind they would be three plausible-looking helpers that nothing calls,
+// which is how a second copy of a rule gets started.
 
 /** Week-level periodization context (phase, focus, coach note) — browse-only now; the session view compresses this into the context line (§1.2). */
 function PhaseBanner({ mesoWeek }: { mesoWeek?: MesocycleWeek }) {
@@ -312,16 +289,6 @@ export function ExercisePlan({ plan, mesocycle, exclusions, softExercisePreferen
   const [swapSearchQuery, setSwapSearchQuery] = useState('')
   const [banBusy, setBanBusy] = useState<string | null>(null)
   const [expandedWarmups, setExpandedWarmups] = useState<Set<string>>(new Set())
-  const [explainedLoadChips, setExplainedLoadChips] = useState<Set<string>>(new Set())
-  const toggleLoadExplainer = useCallback((key: string) => {
-    setExplainedLoadChips(prev => {
-      const next = new Set(prev)
-      if (next.has(key)) next.delete(key)
-      else next.add(key)
-      return next
-    })
-  }, [])
-
   const hasMesocycle = mesocycle && mesocycle.length > 0
   const activePlan = hasMesocycle
     ? mesocycle.find(w => w.week_number === browseWeek)?.days || plan
@@ -510,117 +477,46 @@ export function ExercisePlan({ plan, mesocycle, exclusions, softExercisePreferen
             open={expandedWarmups.has(dayName)}
             onToggle={() => toggleWarmup(dayName)}
           />
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-10"></TableHead>
-                  <TableHead>Exercise</TableHead>
-                  <TableHead className="text-center w-16">Sets</TableHead>
-                  <TableHead className="text-center w-20">Reps</TableHead>
-                  <TableHead className="text-center w-16">Rest</TableHead>
-                  <TableHead className="w-20"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {workout.exercises.map((ex, exIndex) => {
-                  const hasSuperset = !!ex.superset_label
-                  const exerciseKey = `${dayName}-${ex.name}`
-                  // Browse surfaces never see 'logged' provenance — that
-                  // requires the live progression engine, which only runs
-                  // for today's session (§2.2).
-                  const loadSource: LoadSource | undefined = ex.suggested_load_kg == null
-                    ? undefined
-                    : (ex.load_source ?? 'estimate')
-                  const loadExplained = explainedLoadChips.has(exerciseKey)
-                  const ramp = formatRampSets(ex)
-
-                  return (
-                  <React.Fragment key={exIndex}>
-                    <TableRow className={hasSuperset ? 'bg-muted/30' : undefined}>
-                      <TableCell className="w-10 pr-0">
-                        {hasSuperset && (
-                          <Badge variant="outline" className="text-[0.625rem] font-mono px-1.5 py-0.5 bg-background font-semibold">
-                            {ex.superset_label}
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <span className="font-medium">{ex.name}</span>
-                        {ramp && <RampStrip ramp={ramp} />}
-                        <LoadChip
-                          ex={ex}
-                          source={loadSource}
-                          explained={loadExplained}
-                          onToggleExplain={() => toggleLoadExplainer(exerciseKey)}
-                        />
-                      </TableCell>
-                      <TableCell className="text-center">{ex.sets}</TableCell>
-                      <TableCell className="text-center">
-                        <div className="flex flex-col items-center">
-                          {isTimeBased(ex.reps, ex.prescription_type) && (
-                            <span className="text-[0.625rem] uppercase tracking-wider text-muted-foreground leading-none mb-0.5">
-                              {getRepsLabel(ex.reps, ex.prescription_type)}
-                            </span>
-                          )}
-                          <span>{ex.reps}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {ex.rest === 'alternate' ? (
-                          <span className="text-xs text-muted-foreground italic">alt.</span>
-                        ) : ex.rest}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          {onOpenHistory && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="size-7"
-                              onClick={() => onOpenHistory(ex.id ?? getExerciseId(ex.name), ex.name)}
-                              aria-label="Exercise history"
-                            >
-                              <History className="size-3.5" />
-                            </Button>
-                          )}
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="size-7"
-                            onClick={() => { setPendingSwap(null); setShowAllReplacements(false); setSwapSearchQuery(''); setSwapDialog({ dayName, exIndex, exerciseName: ex.name }) }}
-                            aria-label="Swap exercise"
-                          >
-                            <ArrowRightLeft className="size-3.5" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="size-7 text-destructive hover:text-destructive"
-                            disabled={banBusy === ex.name}
-                            onClick={async () => {
-                              setBanBusy(ex.name)
-                              try {
-                                await onBanExercise(ex.name)
-                              } finally {
-                                setBanBusy(null)
-                              }
-                            }}
-                            aria-label="Ban exercise"
-                          >
-                            {banBusy === ex.name ? (
-                              <div className="size-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                            ) : (
-                              <Ban className="size-3.5" />
-                            )}
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  </React.Fragment>
-                )})}
-              </TableBody>
-            </Table>
+          {/* THE SAME LIST TODAY RENDERS, via the shared component.
+              *
+              * This was a <Table> — Exercise / Sets / Reps / Rest columns, a
+              * superset badge in a spacer cell, and three always-visible icon
+              * buttons per row. Ashley, 31 Aug 2026: "in exercise under see
+              * full program the app looks completely different to the
+              * exercise section. they should look the same as the main
+              * exercise section."
+              *
+              * The peek panel had exactly this problem and was fixed by
+              * sharing ExerciseLine — but sharing the row was the small half.
+              * A day rendered as a TABLE reads as a different app however
+              * well the row inside it matches. ReadOnlyDayList owns the whole
+              * day now, so this view and the peek cannot diverge again, and a
+              * fourth surface gets the same thing by calling it.
+              *
+              * The three icon buttons became one menu, the same one the peek
+              * uses, with history added to it — three targets per row on a
+              * phone was always a lot, and the swap/ban confirm dialogs below
+              * are untouched and still owned here. */}
+          <CardContent className="px-4 pb-2 pt-0">
+            <ReadOnlyDayList
+              workout={workout}
+              onSwap={(exIndex, exerciseName) => {
+                setPendingSwap(null)
+                setShowAllReplacements(false)
+                setSwapSearchQuery('')
+                setSwapDialog({ dayName, exIndex, exerciseName })
+              }}
+              onBan={async (exerciseName) => {
+                setBanBusy(exerciseName)
+                try {
+                  await onBanExercise(exerciseName)
+                } finally {
+                  setBanBusy(null)
+                }
+              }}
+              onOpenHistory={onOpenHistory}
+              banBusyName={banBusy}
+            />
           </CardContent>
         </Card>
       </React.Fragment>
