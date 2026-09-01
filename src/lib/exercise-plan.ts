@@ -4273,9 +4273,13 @@ function buildProgressionNote(
   loadless = false,
 ): string {
   if (isDeload) {
+    // Carries the "resist the urge to push" nudge as a trailing clause
+    // rather than a second sentence: it used to be the opening of a separate
+    // deload preamble that announced the same thing this sentence does, and
+    // splitting it back out would restore the duplication.
     return loadless
-      ? 'Deload week — volume steps back so you arrive at the next block recovered, not because progress stalled.'
-      : 'Deload week — load and volume both step back so you arrive at the next block recovered, not because progress stalled.'
+      ? 'Deload week — volume steps back so you arrive at the next block recovered, not because progress stalled; resist the urge to push.'
+      : 'Deload week — load and volume both step back so you arrive at the next block recovered, not because progress stalled; resist the urge to push.'
   }
   if (isCalibrationWeek) {
     return loadless
@@ -4286,7 +4290,7 @@ function buildProgressionNote(
   // regardless of what the goal would otherwise ramp.
   const rampsLoad = policy.progressionEmphasis === 'load' && !loadless
   if (weekInBlock === 1) {
-    if (rampsLoad) return 'Baseline week — this sets the working weight every later week in the block adds load on top of.'
+    if (rampsLoad) return 'Baseline week — this sets the working weight that every later week in the block adds load on top of.'
     return loadless
       ? 'Baseline week — this sets the rep target every later week in the block builds on.'
       : 'Baseline week — weight holds flat this block by design; this sets the rep target every later week builds on.'
@@ -6562,8 +6566,18 @@ export function generateMesocycle(
           const phaseNote = loadless ? phaseConfig.coach_note_loadless : phaseConfig.coach_note
           const goalNote = loadless ? policy.coachNoteLoadless : policy.coachNote
           return [
+            // A DELOAD SAYS IT ONCE. This used to open with its own "Deload
+            // week — volume is deliberately cut so you arrive at the next
+            // block recovered" and then append buildProgressionNote's
+            // "Deload week — load and volume both step back so you arrive at
+            // the next block recovered" — the same announcement, the same
+            // reason, twice in one paragraph. Found on screen (1 Sep 2026)
+            // once the browse redesign stopped burying coach_note in a
+            // small banner. The progression note is the one that survives:
+            // it distinguishes a loadless deload from a loaded one, which
+            // the preamble never did.
             isDeload
-              ? 'Deload week — volume is deliberately cut so you arrive at the next block recovered. Resist the urge to push.'
+              ? ''
               // The goal's own framing shows once per block, alongside the
               // phase's — repeating it every week would bury the phase-specific
               // note under the same paragraph four times over.
@@ -6571,7 +6585,7 @@ export function generateMesocycle(
                 ? `${phaseNote} ${goalNote}`
                 : phaseNote,
             buildProgressionNote(w, isDeload, isCalibrationWeek, policy, loadless),
-          ].join(' ')
+          ].filter(Boolean).join(' ')
         })(),
         label: isDeload
           ? `Week ${weekCounter} — ${phaseConfig.label}: Deload`

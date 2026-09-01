@@ -77,6 +77,7 @@
     "test:load-display": "tsx scripts/test-load-display.ts",
     "test:deploy-path": "tsx scripts/test-deploy-path.ts",
     "test:exercise-detail": "tsx scripts/test-exercise-detail.ts",
+    "test:week-note": "tsx scripts/test-week-note.ts",
     "test:lift-plausibility": "tsx scripts/test-lift-plausibility.ts",
     "test:custom-meal": "tsx scripts/test-custom-meal.ts",
     "test:one-day-one-look": "tsx scripts/test-one-day-one-look.ts",
