@@ -232,3 +232,28 @@ export async function getSessionHistory(userId: string, limit = 30): Promise<Ses
   )
   return entries
 }
+
+/**
+ * Which plan days have at least one logged working set, keyed
+ * `${week_number}|${day}` — the browse view's completion marks (design 5a).
+ * Read-only by construction: this is the "per-day boolean from the log
+ * store" §7.3 allows a browse surface, and the only completion signal it
+ * gets — never SetGrid, never the write facade. Legacy rows written before
+ * week_number/day landed on the table simply don't mark a day, which
+ * degrades to the pre-5a behaviour (no tick) rather than a wrong one.
+ */
+export async function getLoggedPlanDays(userId: string): Promise<Set<string>> {
+  const { data, error } = await supabase
+    .from('exercise_set_logs')
+    .select('week_number, day')
+    .eq('user_id', userId)
+    .eq('is_warmup', false)
+    .not('week_number', 'is', null)
+    .limit(5000)
+  if (error || !data) return new Set()
+  const keys = new Set<string>()
+  for (const r of data as { week_number: number | null; day: string | null }[]) {
+    if (r.week_number != null && r.day) keys.add(`${r.week_number}|${r.day}`)
+  }
+  return keys
+}

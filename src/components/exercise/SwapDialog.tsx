@@ -24,6 +24,13 @@ export interface SwapTarget {
   dayName: string
   exIndex: number
   exerciseName: string
+  /**
+   * Set only by the program view: the week being BROWSED when the swap was
+   * opened, so the edit lands on the week the trainee was looking at.
+   * Absent on today's rows and the peek — the caller falls back to the
+   * live week.
+   */
+  weekNumber?: number
 }
 
 export function SwapDialog({

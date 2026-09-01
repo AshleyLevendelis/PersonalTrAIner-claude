@@ -53,9 +53,9 @@ function grepFiles(pattern: RegExp): { file: string; line: number; text: string 
 function main() {
   console.log('[1] setCurrentWeek / setLiveWeek do not exist outside the hook')
   // The old currentWeek setState setter is gone entirely — replaced by
-  // browseWeek (view-local, ExercisePlan.tsx) and the hook's read-only
-  // liveWeek (D8: no component may move the live week). Neither name
-  // should ever reappear anywhere in src/.
+  // browseWeek (view-local, ProgramBrowse.tsx, née ExercisePlan.tsx) and
+  // the hook's read-only liveWeek (D8: no component may move the live
+  // week). Neither name should ever reappear anywhere in src/.
   const weekSetterHits = grepFiles(/\bset(CurrentWeek|LiveWeek)\b/)
   check('no setCurrentWeek/setLiveWeek anywhere in src/', weekSetterHits.length === 0, weekSetterHits)
 
@@ -66,7 +66,7 @@ function main() {
   // timestamp is fine; only the zero-arg "read the real wall clock" form
   // is the hazard dev-clock.ts's doc comment warns about.
   const sessionIdentityFiles = [
-    'src/components/ExercisePlan.tsx',
+    'src/components/exercise/ProgramBrowse.tsx',
     'src/components/BottomDock.tsx',
     'src/hooks/useActiveSession.tsx',
     'src/lib/app-route.ts',

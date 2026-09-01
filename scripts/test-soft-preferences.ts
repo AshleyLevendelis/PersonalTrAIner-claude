@@ -56,11 +56,15 @@ console.log('\n1. The compiler has a real consumer now')
   const app = readFileSync(join(ROOT, 'src/App.tsx'), 'utf8')
   check('App compiles them from memory', /compileSoftExercisePreferences\(memoryFacts\)/.test(app))
   check('...and passes them down', /softExercisePreferences=\{compiledSoftExercisePreferences\}/.test(app))
-  for (const rel of ['src/components/exercise/ExerciseTab.tsx', 'src/components/ExercisePlan.tsx', 'src/components/exercise/SwapDialog.tsx']) {
+  // ExercisePlan.tsx (which carried its own inline swap dialog) is deleted —
+  // design 5a's ProgramBrowse routes every swap through the ONE shared
+  // SwapDialog, so the chain is two files now, and the "actually asked"
+  // check anchors on the dialog that does the asking.
+  for (const rel of ['src/components/exercise/ExerciseTab.tsx', 'src/components/exercise/SwapDialog.tsx']) {
     check(`${rel.split('/').pop()} carries them through`, /softExercisePreferences/.test(readFileSync(join(ROOT, rel), 'utf8')))
   }
   check('the swap list is actually asked with them',
-    /getReplacementCandidates\([^)]*softExercisePreferences\)/.test(readFileSync(join(ROOT, 'src/components/ExercisePlan.tsx'), 'utf8')))
+    /getReplacementCandidates\([^)]*softExercisePreferences\)/.test(readFileSync(join(ROOT, 'src/components/exercise/SwapDialog.tsx'), 'utf8')))
 }
 
 console.log('\n2. It REORDERS and never REMOVES')
@@ -205,7 +209,9 @@ console.log('\n4. The FOOD half — soft likes now bias which day gets assembled
   // Wired, not merely accepted — the failure this whole file exists for.
   const app = readFileSync(join(ROOT, 'src/App.tsx'), 'utf8')
   check('App compiles food likes from memory', /compileSoftFoodPreferences\(memoryFacts\)/.test(app))
-  check('...and the assembled day is built with them', /assembleDay\(mealPools, macros, \{\}, compiledSoftFoodPreferences\)/.test(app))
+  // The fifth argument (pinnedMeals) arrived with the custom-meals build —
+  // soft food preferences still ride in position 4, which is what this pins.
+  check('...and the assembled day is built with them', /assembleDay\(mealPools, macros, \{\}, compiledSoftFoodPreferences, pinnedMeals\)/.test(app))
 
   // The shopping list assembles the SAME days the Nutrition tab shows.
   // Withhold the preferences from one and the two diverge — a list for meals

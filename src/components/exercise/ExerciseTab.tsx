@@ -2,7 +2,7 @@ import { FailedCardioNotice } from '@/components/exercise/FailedCardioNotice'
 import { useState } from 'react'
 import { useAppRoute, programHash } from '@/lib/app-route'
 import { useActiveSession } from '@/hooks/useActiveSession'
-import { ExercisePlan } from '@/components/ExercisePlan'
+import { ProgramBrowse } from './ProgramBrowse'
 import { PlateCalculator } from '@/components/PlateCalculator'
 import { DevTestPanel } from '@/components/DevTestPanel'
 import { isDevAccount } from '@/lib/dev-clock'
@@ -78,8 +78,10 @@ export function ExerciseTab({
     setPlateCalcOpen(true)
   }
 
+  // A swap opened from the program view carries the BROWSED week on its
+  // target; today's rows set no week and land on the live one.
   const handleConfirmSwap = async (exIndex: number, dayName: string, newExercise: ExerciseEntry, scope: SwapScope) => {
-    await onSwapExercise(liveWeek, dayName, exIndex, newExercise, scope)
+    await onSwapExercise(swapTarget?.weekNumber ?? liveWeek, dayName, exIndex, newExercise, scope)
   }
 
   if (isProgramView) {
@@ -101,20 +103,22 @@ export function ExerciseTab({
             onLogsSeeded={onLogsSeeded}
           />
         )}
-        <ExercisePlan
+        <ProgramBrowse
           plan={plan}
           mesocycle={mesocycle}
-          exclusions={exclusions}
-          softExercisePreferences={softExercisePreferences}
-          profile={profile}
           profileId={profileId}
-          planCreatedAt={planCreatedAt}
-          devOverrideWeek={devOverrideWeek}
-          devOverrideDay={devOverrideDay}
-          devBypassLocks={devBypassLocks}
-          onSwapExercise={onSwapExercise}
+          initialWeek={route.kind === 'program' ? route.week : undefined}
+          onOpenSwap={setSwapTarget}
           onBanExercise={onBanExercise}
           onOpenHistory={(id, name) => setHistoryTarget({ exerciseId: id, exerciseName: name })}
+        />
+        <SwapDialog
+          target={swapTarget}
+          onClose={() => setSwapTarget(null)}
+          profile={profile}
+          exclusions={exclusions}
+          softExercisePreferences={softExercisePreferences}
+          onConfirm={handleConfirmSwap}
         />
         <ExerciseDetailDialog
           open={!!detailTarget}
