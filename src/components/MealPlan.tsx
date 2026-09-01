@@ -7,6 +7,7 @@ import {
   Check,
   ChevronDown,
   ShieldAlert,
+  Plus,
 } from 'lucide-react'
 import { InsightBanner } from '@/components/ui/insight-banner'
 import type { MacroTargets } from '@/lib/types'
@@ -56,6 +57,7 @@ interface MealPlanProps {
   avoidFoods?: string[]
   onSwapSlot: (slot: MealSlotName, chooseName: string) => Promise<void>
   onRegenerateSlot: (slot: MealSlotName) => Promise<void>
+  onFindMoreOptions?: (slot: MealSlotName) => Promise<{ added: string[]; error?: string }>
   onRegenerateAll: () => Promise<void>
 }
 
@@ -71,7 +73,7 @@ interface MealPlanProps {
 export function MealPlan({
   profileId, date, pools, chosen, totals, targets, isGenerating, regenerateError, onDismissRegenerateError,
   unrecognisedDietaryRestrictions, onFixDietaryRestrictions, dietaryPreferences = [], avoidFoods = [],
-  onSwapSlot, onRegenerateSlot, onRegenerateAll,
+  onSwapSlot, onRegenerateSlot, onFindMoreOptions, onRegenerateAll,
 }: MealPlanProps) {
   const activeSlots = SLOT_ORDER.filter(s => (pools[s]?.length ?? 0) > 0)
   // A slot generation requested and asked for (present as a key in `pools`,
@@ -221,6 +223,8 @@ export function MealPlan({
             onToggle={() => setExpandedSlot(prev => (prev === slot ? null : slot))}
             onSwap={onSwapSlot}
             onRegenerate={onRegenerateSlot}
+            onFindMore={onFindMoreOptions}
+            checkAlternative={alt => checkMealAgainstRestrictions(alt.name, alt.ingredients, dietaryPreferences, avoidFoods)}
             loggedEvent={loggedBySlot[slot]}
             restriction={restrictionBySlot[slot] ?? null}
             onLog={async option => {
@@ -334,6 +338,8 @@ function MealSlotRow({
   onToggle,
   onSwap,
   onRegenerate,
+  onFindMore,
+  checkAlternative,
   loggedEvent,
   restriction,
   onLog,
@@ -347,6 +353,17 @@ function MealSlotRow({
   onToggle: () => void
   onSwap: (slot: MealSlotName, chooseName: string) => Promise<void>
   onRegenerate: (slot: MealSlotName) => Promise<void>
+  onFindMore?: (slot: MealSlotName) => Promise<{ added: string[]; error?: string }>
+  /**
+   * The swap panel's own restriction re-check. The CHOSEN meal has been
+   * re-checked on display since the almond-butter fix; the ALTERNATIVES
+   * offered beside it never were — a restriction recorded after generation
+   * could sit tappable in this very list (found by the meal-system
+   * investigation, 1 Sep 2026). A blocked option stays visible with the
+   * reason, disabled — silently hiding it would make the pool look thinner
+   * than it is for no stated cause.
+   */
+  checkAlternative: (alt: PoolOption) => MealRestrictionVerdict
   loggedEvent: MealEventRecord | undefined
   /** Null when there is no meal to check; ok:true when it passes. */
   restriction: MealRestrictionVerdict | null
@@ -355,6 +372,8 @@ function MealSlotRow({
 }) {
   const [busy, setBusy] = useState(false)
   const [swapOpen, setSwapOpen] = useState(false)
+  const [findingMore, setFindingMore] = useState(false)
+  const [findMoreNote, setFindMoreNote] = useState<string | null>(null)
   // Fix 4.3 (ux-sweep) — generateMealPools now rejects a same-named
   // proposal at the source, but a pool persisted before that fix can still
   // carry duplicate names; deduping here too means an already-onboarded
@@ -508,40 +527,72 @@ function MealSlotRow({
             <Button variant="ghost" size="sm" onClick={handleRegenerate} disabled={busy} className="h-8 px-2.5 text-xs" title="Regenerate this slot's pool">
               {busy ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
             </Button>
-            {otherOptions.length > 0 && (
+            {(otherOptions.length > 0 || onFindMore) && (
               <button
                 type="button"
                 onClick={() => setSwapOpen(prev => !prev)}
                 className="text-xs text-muted-foreground"
               >
-                Swap · {otherOptions.length} option{otherOptions.length === 1 ? '' : 's'}
+                {otherOptions.length > 0
+                  ? `Swap · ${otherOptions.length} option${otherOptions.length === 1 ? '' : 's'}`
+                  : 'More options'}
               </button>
             )}
           </div>
 
-          {swapOpen && otherOptions.length > 0 && (
+          {swapOpen && (
             <div className="flex flex-col gap-1">
               {otherOptions.map(alt => {
                 const calDelta = Math.round(alt.macros.calories - option.macros.calories)
                 const proteinDelta = Math.round(alt.macros.protein - option.macros.protein)
+                const verdict = checkAlternative(alt)
                 return (
                   <button
                     key={alt.name}
                     type="button"
                     onClick={() => handleChoose(alt.name)}
-                    disabled={busy}
-                    className="flex items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-[color:var(--surface-raised)]"
+                    disabled={busy || !verdict.ok}
+                    className={`flex items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left transition-colors ${verdict.ok ? 'hover:bg-[color:var(--surface-raised)]' : 'opacity-60'}`}
                   >
                     <div className="min-w-0">
                       <p className="truncate text-xs font-medium">{alt.name}</p>
-                      <p className="tabular-mono text-[0.65625rem] text-muted-foreground">{Math.round(alt.macros.calories)} kcal · P {Math.round(alt.macros.protein)}g</p>
+                      {verdict.ok ? (
+                        <p className="tabular-mono text-[0.65625rem] text-muted-foreground">{Math.round(alt.macros.calories)} kcal · P {Math.round(alt.macros.protein)}g</p>
+                      ) : (
+                        <p className="text-[0.65625rem] text-[color:var(--role-warn)]">{verdict.message ?? "Clashes with what you've said you avoid"}</p>
+                      )}
                     </div>
-                    <span className={`tabular-mono shrink-0 text-[0.65625rem] ${Math.abs(calDelta) < 20 ? 'text-muted-foreground' : calDelta > 0 ? 'text-[color:var(--role-warn)]' : 'text-primary'}`}>
-                      {calDelta > 0 ? '+' : ''}{calDelta} kcal, {proteinDelta > 0 ? '+' : ''}{proteinDelta}g P
-                    </span>
+                    {verdict.ok && (
+                      <span className={`tabular-mono shrink-0 text-[0.65625rem] ${Math.abs(calDelta) < 20 ? 'text-muted-foreground' : calDelta > 0 ? 'text-[color:var(--role-warn)]' : 'text-primary'}`}>
+                        {calDelta > 0 ? '+' : ''}{calDelta} kcal, {proteinDelta > 0 ? '+' : ''}{proteinDelta}g P
+                      </span>
+                    )}
                   </button>
                 )
               })}
+              {onFindMore && (
+                <button
+                  type="button"
+                  disabled={findingMore}
+                  onClick={async () => {
+                    setFindingMore(true)
+                    setFindMoreNote(null)
+                    try {
+                      const result = await onFindMore(slot)
+                      setFindMoreNote(result.error ?? (result.added.length > 0
+                        ? `Added ${result.added.length} new option${result.added.length === 1 ? '' : 's'}.`
+                        : 'Nothing new fitted your targets.'))
+                    } finally {
+                      setFindingMore(false)
+                    }
+                  }}
+                  className="flex min-h-[40px] items-center justify-center gap-1.5 rounded-xl border border-dashed border-[color:var(--hairline)] px-3 text-xs text-muted-foreground"
+                >
+                  {findingMore ? <Loader2 className="size-3.5 animate-spin" /> : <Plus className="size-3.5" />}
+                  {findingMore ? 'Finding more options…' : 'More options'}
+                </button>
+              )}
+              {findMoreNote && <p className="px-1 text-[0.65625rem] text-muted-foreground">{findMoreNote}</p>}
             </div>
           )}
         </div>

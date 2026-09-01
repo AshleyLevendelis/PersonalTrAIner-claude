@@ -137,6 +137,13 @@ console.log('\n4. The plan does not collapse — wiped patterns are named, not d
     // STILL A CONTENT GAP, unchanged in kind: closing these needs exercises a
     // bad shoulder or elbow can actually do at that tier, not a looser filter.
     // "Even a perfect filter can't substitute what doesn't exist."
+    //
+    // RE-VERIFIED 1 Sep 2026 after the machine-floor batch (+15 entries):
+    // recomputed from the database and identical to the table below — the
+    // new machines all load the joints their siblings load, so none of them
+    // un-wipes a pattern, and none lands as the first (and contraindicated)
+    // entry of an empty pattern x tier, which is the only way an ADDITION
+    // can create a new wipe.
     'shoulders|full_gym': ['vertical_pull', 'isolation_shoulder'],
     'shoulders|home_gym': ['vertical_pull', 'isolation_shoulder'],
     'shoulders|minimalist': ['vertical_push', 'vertical_pull', 'isolation_shoulder'],
@@ -212,8 +219,20 @@ console.log('\n5. How MUCH each injury removes, frozen')
     // rose because the database grew, not because any tag widened. Recorded
     // from the database rather than adjusted by hand, so the next drift is
     // still caught by name.
-    lower_back: 12, knees: 35, shoulders: 62, neck: 6, wrists: 25,
-    hips: 14, ankles: 19, elbows: 18,
+    //
+    // RE-MEASURED 1 Sep 2026 after the machine-floor batch (+15 entries).
+    // Every delta is accounted for BY NAME by new entries whose tags mirror
+    // their siblings — no pre-existing exercise moved:
+    //   lower_back 12->15  Landmine Row, Cable Pull-Through, Smith Machine Squat
+    //   knees      35->37  Smith Machine Squat, Belt Squat
+    //   shoulders  62->66  Smith Bench, Smith Shoulder Press, Dumbbell Pullover, Assisted Dip Machine
+    //   neck        6->7   Machine Shrug
+    //   wrists     25->28  the three smith lifts
+    //   hips       14->18  Cable Pull-Through, Hip Abduction/Adduction Machines, Smith Machine Squat
+    //   ankles     19      unchanged
+    //   elbows     18->21  both preacher curls, Assisted Dip Machine
+    lower_back: 15, knees: 37, shoulders: 66, neck: 7, wrists: 28,
+    hips: 18, ankles: 19, elbows: 21,
   }
   const drift: string[] = []
   for (const code of CODES) {

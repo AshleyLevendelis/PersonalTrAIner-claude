@@ -217,12 +217,20 @@ function App() {
   // assembleDay is pure — deriving today's picks from pools+targets on every
   // render (rather than storing them) means a pool refresh or a target
   // change (a new weigh-in) can never leave a stale assembled day on screen.
-  const assembledMeals = macros ? assembleDay(mealPools, macros, {}, compiledSoftFoodPreferences) : null
-  const chosenMeals: Partial<Record<MealSlotName, PoolOption>> = { ...assembledMeals?.chosen }
+  // Manual picks are PINNED INTO assembly rather than overlaid after it —
+  // the after-overlay meant the free slots were chosen as if the swap had
+  // never happened, so a swapped or custom meal drifted the day's totals
+  // and nothing compensated. Now the search fits the rest of the day around
+  // whatever the user pinned ("plan the rest of my meals" — Ashley, 1 Sep
+  // 2026). A pick naming an option that no longer exists in the pool simply
+  // doesn't pin, same as the old overlay's find-or-skip.
+  const pinnedMeals: Partial<Record<MealSlotName, PoolOption>> = {}
   for (const [slot, name] of Object.entries(manualMealPicks) as [MealSlotName, string][]) {
-    const override = mealPools[slot]?.find(o => o.name === name)
-    if (override) chosenMeals[slot] = override
+    const pick = mealPools[slot]?.find(o => o.name === name)
+    if (pick) pinnedMeals[slot] = pick
   }
+  const assembledMeals = macros ? assembleDay(mealPools, macros, {}, compiledSoftFoodPreferences, pinnedMeals) : null
+  const chosenMeals: Partial<Record<MealSlotName, PoolOption>> = { ...assembledMeals?.chosen }
   const mealTotals: MacroTargets = Object.values(chosenMeals).reduce(
     (acc, o) => ({
       calories: acc.calories + (o?.macros.calories ?? 0),
@@ -864,6 +872,52 @@ function App() {
         }
       })
   }
+
+  const handleFindMoreMealOptions = async (slot: MealSlotName): Promise<{ added: string[]; error?: string }> => {
+                // Ashley's ruling on running out of swaps: OFFER to find new
+                // ones, never do it unasked. This only runs on a confirmed
+                // card, and appendToExisting is what keeps the meals they
+                // already have — a plain regenerate would delete the pool and
+                // hand them five different meals instead of five more.
+                if (!profile?.id || !macros) return { added: [], error: "I need your body details before I can fit new meals to your targets." }
+                try {
+                  const result = await generateMealPools({
+                    profileId: profile.id,
+                    targets: macros,
+                    dietaryPreferences: profile.dietary_preferences,
+                    mealsPerDay: profile.meals_per_day,
+                    includeSnacks: profile.include_snacks,
+                    cookingTimePreference: profile.cooking_time_preference,
+                    favoriteCuisines: profile.favorite_cuisines,
+                    dislikedFoods: effectiveDislikedFoods,
+                    timingRules: compiledTimingRules,
+                    breakfastStyle: profile.breakfast_style,
+                    onlySlots: [slot],
+                    appendToExisting: true,
+                  })
+                  if (result.unrecognisedPreferences.length > 0) {
+                    setUnrecognisedDietaryRestrictions(result.unrecognisedPreferences)
+                    return { added: [], error: `I can't check meals against "${result.unrecognisedPreferences.join('", "')}" — that needs fixing in Profile first.` }
+                  }
+                  const added = result.accepted[slot] ?? []
+                  if (added.length === 0) {
+                    // Same distinction handleRegenerateMealSlot draws: the
+                    // generator running and finding nothing that fits is
+                    // deterministic advice, not "try again".
+                    return { added: [], error: result.generatorReached
+                      ? `I couldn't find any new ${slot} options that fit your targets — loosening a restriction or widening your calorie range would give me more to work with.`
+                      : `I couldn't reach the meal generator just then — try me again in a moment.` }
+                  }
+                  // Refresh the on-screen pool so the Meals tab shows them
+                  // immediately; the DB write already happened inside
+                  // generateMealPools.
+                  const pools = await getPools(profile.id)
+                  setMealPools(pools)
+                  return { added: added.map(o => o.name) }
+                } catch {
+                  return { added: [], error: `I couldn't reach the meal generator just then — try me again in a moment.` }
+                }
+              }
 
   const handleOnboardingComplete = async (userProfile: UserProfile) => {
     setIsGenerating(true)
@@ -2189,6 +2243,7 @@ function App() {
               onFixDietaryRestrictions={() => { setProfileInfoSection('dietary'); setProfileInfoOpen(true) }}
               onSwapMealSlot={handleSwapMealSlot}
               onRegenerateMealSlot={handleRegenerateMealSlot}
+              onFindMoreOptions={handleFindMoreMealOptions}
               onRegenerateAllMeals={handleRegenerateAllMeals}
             />
           </TabsContent>
@@ -2260,51 +2315,7 @@ function App() {
                 setManualMealPicks(prev => ({ ...prev, [slot]: chosenName }))
                 return true
               }}
-              onFindMoreMealOptions={async slot => {
-                // Ashley's ruling on running out of swaps: OFFER to find new
-                // ones, never do it unasked. This only runs on a confirmed
-                // card, and appendToExisting is what keeps the meals they
-                // already have — a plain regenerate would delete the pool and
-                // hand them five different meals instead of five more.
-                if (!profile?.id || !macros) return { added: [], error: "I need your body details before I can fit new meals to your targets." }
-                try {
-                  const result = await generateMealPools({
-                    profileId: profile.id,
-                    targets: macros,
-                    dietaryPreferences: profile.dietary_preferences,
-                    mealsPerDay: profile.meals_per_day,
-                    includeSnacks: profile.include_snacks,
-                    cookingTimePreference: profile.cooking_time_preference,
-                    favoriteCuisines: profile.favorite_cuisines,
-                    dislikedFoods: effectiveDislikedFoods,
-                    timingRules: compiledTimingRules,
-                    breakfastStyle: profile.breakfast_style,
-                    onlySlots: [slot],
-                    appendToExisting: true,
-                  })
-                  if (result.unrecognisedPreferences.length > 0) {
-                    setUnrecognisedDietaryRestrictions(result.unrecognisedPreferences)
-                    return { added: [], error: `I can't check meals against "${result.unrecognisedPreferences.join('", "')}" — that needs fixing in Profile first.` }
-                  }
-                  const added = result.accepted[slot] ?? []
-                  if (added.length === 0) {
-                    // Same distinction handleRegenerateMealSlot draws: the
-                    // generator running and finding nothing that fits is
-                    // deterministic advice, not "try again".
-                    return { added: [], error: result.generatorReached
-                      ? `I couldn't find any new ${slot} options that fit your targets — loosening a restriction or widening your calorie range would give me more to work with.`
-                      : `I couldn't reach the meal generator just then — try me again in a moment.` }
-                  }
-                  // Refresh the on-screen pool so the Meals tab shows them
-                  // immediately; the DB write already happened inside
-                  // generateMealPools.
-                  const pools = await getPools(profile.id)
-                  setMealPools(pools)
-                  return { added: added.map(o => o.name) }
-                } catch {
-                  return { added: [], error: `I couldn't reach the meal generator just then — try me again in a moment.` }
-                }
-              }}
+              onFindMoreMealOptions={handleFindMoreMealOptions}
               memoryFacts={memoryFacts}
               memoryGoals={memoryGoals}
               memoryContextFacts={memoryContextFacts}

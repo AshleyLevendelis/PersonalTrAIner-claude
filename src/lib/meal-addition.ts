@@ -62,13 +62,13 @@ export type MealAdditionResult =
   | { ok: true; scopeKey: string; preconditions: Record<string, unknown>; payload: MealAdditionPayload; diff: ProposalDiff }
   | { ok: false; reason: string }
 
-function normaliseSlot(value: unknown): MealSlotName | null {
+export function normaliseSlot(value: unknown): MealSlotName | null {
   const s = String(value ?? '').trim().toLowerCase()
   return (SLOTS as string[]).includes(s) ? (s as MealSlotName) : null
 }
 
 /** Ingredient lines as verifyProposal wants them — one string per line, blanks dropped. Accepts an array or a newline-separated block, because a model will produce either. */
-function normaliseIngredients(value: unknown): string[] {
+export function normaliseIngredients(value: unknown): string[] {
   const lines = Array.isArray(value)
     ? value.map(v => String(v ?? ''))
     : String(value ?? '').split('\n')
@@ -76,7 +76,7 @@ function normaliseIngredients(value: unknown): string[] {
 }
 
 /** YYYY-MM-DD or nothing. A malformed date silently becoming today would put the meal on the wrong day, so it is checked rather than coerced. */
-function normaliseDate(value: unknown, fallback: string): string {
+export function normaliseDate(value: unknown, fallback: string): string {
   const s = String(value ?? '').trim()
   return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : fallback
 }
@@ -89,7 +89,7 @@ function normaliseDate(value: unknown, fallback: string): string {
  * couldn't add that" with no cause is the reply this whole feature exists to
  * stop the app giving.
  */
-function explainRejection(log: string[], dishName: string, slot: MealSlotName): string {
+export function explainRejection(log: string[], dishName: string, slot: MealSlotName): string {
   const line = log[log.length - 1] ?? ''
 
   if (/diet violation/i.test(line)) {

@@ -161,9 +161,9 @@ export function SwapDialog({
         {!pendingSwap && (
           <div className="space-y-2 pt-1">
             <Separator />
-            <p className="text-xs font-medium text-muted-foreground pt-1">Or search any exercise</p>
+            <p className="text-xs font-medium text-muted-foreground pt-1">Machine busy? Search all exercises</p>
             <Input
-              placeholder="e.g. Decline Bench Press"
+              placeholder="e.g. Smith Machine Squat"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               className="h-8 text-sm"

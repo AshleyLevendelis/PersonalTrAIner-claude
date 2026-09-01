@@ -185,7 +185,14 @@ console.log('\n7. Finding new options ADDS, it never replaces')
   check('...loaded only when appending', /params\.appendToExisting\s*\n?\s*\? await getPools/.test(gen))
 
   const app = readFileSync(join(ROOT, 'src/App.tsx'), 'utf8')
-  check('the confirm path passes appendToExisting', /onFindMoreMealOptions[\s\S]{0,2000}appendToExisting: true/.test(app))
+  // The closure became a named function when the Meals panel gained its own
+  // "More options" button (1 Sep 2026) — chat and panel now share ONE
+  // handler, so this anchors on the function and on both call sites, not on
+  // prose adjacency that broke the moment the body moved.
+  check('the shared find-more handler passes appendToExisting',
+    /handleFindMoreMealOptions[\s\S]{0,2400}appendToExisting: true/.test(app))
+  check('...and the chat prop uses that handler', /onFindMoreMealOptions=\{handleFindMoreMealOptions\}/.test(app))
+  check('...and the Meals panel gets the same one, not a second copy', /onFindMoreOptions=\{handleFindMoreMealOptions\}/.test(app))
 }
 
 if (failures > 0) { console.error(`\n${failures} check(s) failed`); process.exit(1) }
