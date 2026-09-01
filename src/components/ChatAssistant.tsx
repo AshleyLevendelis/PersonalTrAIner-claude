@@ -261,10 +261,16 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     const now = new Date()
     const nameOfDay = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'long' })
     const sessionOn = (d: Date) => exercisePlan.find(x => x.day === nameOfDay(d))
-    const brief = (day: { focus: string; exercises: { name: string }[] }) => ({
+    // A walk day carries its whole prescription in plannedActivity and has
+    // no exercises to list, so mapping the (empty) exercise list produced
+    // "Day one is today: Walk — ." in the app's very first message.
+    const brief = (day: { focus: string; exercises: { name: string }[]; plannedActivity?: { duration?: number; targetRpe?: number } | null }) => ({
       focus: day.focus,
-      movements: day.exercises.map(e => e.name).slice(0, 3).join(', ')
-        + (day.exercises.length > 3 ? '…' : ''),
+      movements: day.exercises.length > 0
+        ? day.exercises.map(e => e.name).slice(0, 3).join(', ') + (day.exercises.length > 3 ? '…' : '')
+        : day.plannedActivity?.duration != null
+          ? `${day.plannedActivity.duration} minutes, easy pace`
+          : '',
     })
 
     const today = sessionOn(now)

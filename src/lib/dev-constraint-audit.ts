@@ -2,7 +2,7 @@ import { generateExercisePlan, generateMesocycle, getConstrainedPool, getFlagged
 import { seededRngFromKey } from './seeded-random'
 import { EXERCISE_DATABASE, meetsCapabilityRequirement, isContraindicatedFor, contraindicatedJoints } from './exercise-db'
 import type {
-  UserProfile, EquipmentAccess, TrainingStyle, SessionDuration,
+  UserProfile, EquipmentAccess, TrainingStyle, SessionDuration, ActivityLevel,
   WorkoutDay, ConstraintTrace, PlanResult, TrainingExperience, RecoveryCapacity, FitnessGoal,
 } from './types'
 import { getSkillDemand, isSkillAppropriate } from './experience-config'
@@ -104,6 +104,22 @@ export const ALL_INJURIES = ['lower_back', 'knees', 'shoulders', 'neck', 'wrists
 export const ALL_DURATIONS: SessionDuration[] = ['30-45', '45-60', '60-90', '90+']
 export const ALL_STYLES: TrainingStyle[] = ['functional', 'bodybuilding', 'combat', 'hybrid']
 export const ALL_EXPERIENCE: TrainingExperience[] = ['beginner', 'novice', 'intermediate', 'advanced']
+/**
+ * ACTIVITY LEVEL, SWEPT ONLY FOR BEGINNERS — and the "only" is measured, not
+ * assumed. `activity_level` reaches plan generation through exactly one
+ * place, isStartingOut (starting-out.ts): beginner AND sedentary means the
+ * plan is walks rather than sessions. Its other readers are all nutrition
+ * (macro-calculator, nutrition-targets, steps-target) and change no
+ * exercise. So sweeping it across the other three experience tiers would
+ * re-run thousands of identical plans and cover nothing new.
+ *
+ * IT WAS HARDCODED TO 'moderate' UNTIL 2 Sep 2026, which meant that of
+ * 13,967 audited combinations, NOT ONE was a walking plan — the entire
+ * prescription for the most deconditioned user the app accepts was outside
+ * the audit's reach because a single field never varied. Ashley found its
+ * defects by looking at her phone. That is what this dimension is for.
+ */
+const BEGINNER_ACTIVITY_LEVELS: ActivityLevel[] = ['moderate', 'sedentary']
 
 /** Empty + each single injury + a few realistic multi-injury combos — same set the constraint audit grid uses. */
 export function getInjuryCombinations(): string[][] {
@@ -199,6 +215,7 @@ function buildTestProfile(
   experience: TrainingExperience,
   weightKg: number = 80,
   gender: 'male' | 'female' = 'male',
+  activityLevel: ActivityLevel = 'moderate',
 ): UserProfile {
   return {
     id: 'audit-test',
@@ -206,7 +223,7 @@ function buildTestProfile(
     gender,
     height_cm: 178,
     weight_kg: weightKg,
-    activity_level: 'moderate',
+    activity_level: activityLevel,
     fitness_goal: 'hypertrophy',
     preferred_time: 'morning',
     bmr: 1800,
@@ -271,9 +288,10 @@ function runSingleAudit(
   experience: TrainingExperience,
   weightKg: number = 80,
   gender: 'male' | 'female' = 'male',
+  activityLevel: ActivityLevel = 'moderate',
 ): AuditTestCase {
-  const profile = buildTestProfile(equipment, injuries, duration, style, experience, weightKg, gender)
-  const comboLabel = `${equipment} / ${injuries.length > 0 ? injuries.join('+') : 'none'} / ${duration} / ${style} / ${experience} / ${weightKg}kg ${gender}`
+  const profile = buildTestProfile(equipment, injuries, duration, style, experience, weightKg, gender, activityLevel)
+  const comboLabel = `${equipment} / ${injuries.length > 0 ? injuries.join('+') : 'none'} / ${duration} / ${style} / ${experience} / ${weightKg}kg ${gender}${activityLevel === 'moderate' ? '' : ` / ${activityLevel}`}`
   const failures: AuditFailure[] = []
 
   let result: PlanResult
@@ -378,9 +396,29 @@ function runSingleAudit(
     }
   }
 
+  // AN ACTIVITY PLAN HAS NO MOVEMENT PATTERNS TO COVER, and the two checks
+  // below both ask which patterns the week contains. A starting-out plan is
+  // walks — no exercises on any day — so both fire on every one of them, for
+  // every equipment tier, style, duration and injury set: 3,456 failures the
+  // first time this shape was ever audited (2 Sep 2026).
+  //
+  // THEY ARE EXEMPTED, NOT SILENCED, and the difference matters. As RULE
+  // VIOLATIONS they are false: no rule says a walk must contain a squat.
+  // As a FINDING they are real and are recorded in BACKLOG — the app's plan
+  // for a deconditioned beginner contains none of the six movement patterns
+  // in any of its sixteen weeks, which is a coaching decision of Ashley's,
+  // not a constraint the generator broke. Keeping the audit red on it would
+  // bury every future genuine failure under 20% noise.
+  //
+  // Keyed on the plan having no exercises at all, so the moment a
+  // starting-out plan gains one, both checks apply to it again in full.
+  const isActivityOnlyPlan = plan.length > 0
+    && plan.every(d => d.exercises.length === 0)
+    && plan.some(d => d.plannedActivity)
+
   // CHECK 4: Style-required patterns present (at least once across the week)
   // NOTE: Some patterns may be relaxed for certain equipment/injury scenarios
-  let requiredPatterns = STYLE_REQUIRED_PATTERNS[style]
+  let requiredPatterns = isActivityOnlyPlan ? [] : STYLE_REQUIRED_PATTERNS[style]
   
   // Relax 'carry' requirement for bodyweight + limited equipment scenarios
   if (equipment === 'bodyweight' && requiredPatterns.includes('carry')) {
@@ -418,6 +456,11 @@ function runSingleAudit(
   // not a broken one.
   for (const day of plan) {
     if (day.focus === 'Active Recovery + Cardio') continue
+    // A day carrying a plannedActivity IS prescribed work — a starting-out
+    // walk with its minutes and target effort. Checked on the field rather
+    // than on the focus text, so this cannot be satisfied by a day that
+    // merely calls itself something.
+    if (day.plannedActivity) continue
     if (day.exercises.length === 0) {
       failures.push({
         check: 'empty_session',
@@ -611,7 +654,7 @@ function runSingleAudit(
         default: return null
       }
     }
-    const pool = getConstrainedPool(profile, [])
+    const pool = isActivityOnlyPlan ? [] : getConstrainedPool(profile, [])
     const present = new Set<CoveragePattern>()
     for (const ex of allExercises) {
       const entry = EXERCISE_DATABASE.find(e => e.name === ex.name)
@@ -1412,9 +1455,16 @@ export async function runFullConstraintAudit(
 
   const injuryCombinations = getInjuryCombinations()
 
+  // Beginners are swept at both activity levels (a sedentary beginner gets a
+  // walking plan); every other tier only at 'moderate', because activity
+  // level reaches nothing else in generation. See BEGINNER_ACTIVITY_LEVELS.
+  const levelsFor = (experience: TrainingExperience): ActivityLevel[] =>
+    experience === 'beginner' ? BEGINNER_ACTIVITY_LEVELS : ['moderate']
+
   const totalCombinations =
     ALL_EQUIPMENT.length * injuryCombinations.length * ALL_DURATIONS.length *
-    ALL_STYLES.length * ALL_EXPERIENCE.length * WEIGHT_GENDER_OPTIONS.length
+    ALL_STYLES.length * WEIGHT_GENDER_OPTIONS.length *
+    ALL_EXPERIENCE.reduce((n, e) => n + levelsFor(e).length, 0)
   const results: AuditTestCase[] = []
   let done = 0
 
@@ -1424,10 +1474,12 @@ export async function runFullConstraintAudit(
         for (const style of ALL_STYLES) {
           for (const experience of ALL_EXPERIENCE) {
             for (const { weightKg, gender } of WEIGHT_GENDER_OPTIONS) {
-              const testCase = runSingleAudit(equipment, injuries, duration, style, experience, weightKg, gender)
+             for (const activityLevel of levelsFor(experience)) {
+              const testCase = runSingleAudit(equipment, injuries, duration, style, experience, weightKg, gender, activityLevel)
               results.push(testCase)
               done++
               onProgress?.(done, totalCombinations)
+             }
             }
           }
         }

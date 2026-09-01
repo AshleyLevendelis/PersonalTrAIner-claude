@@ -6571,6 +6571,23 @@ export function generateMesocycle(
         is_deload: isDeload,
         isCalibrationWeek,
         coach_note: (() => {
+          // A WEEK OF ACTIVITIES HAS NO PHASE COACHING TO GIVE. Making the
+          // week loadless swapped "load goes up on the main lifts" for the
+          // weightless copy — an improvement, and still untrue: that copy
+          // talks about sets close to failure, quality reps and the hardest
+          // working sets of the block, none of which exist in a plan that is
+          // four walks and three rest days. The walk's own reason IS this
+          // week's coaching, and it is already written, already true, and
+          // already block-aware. Found by test:says-what-it-contains reading
+          // the STORED note rather than the one the browse screen renders —
+          // the screen had stopped showing this text, which would have hidden
+          // it from every check that only looks at a screen.
+          const activityOnly = days.length > 0
+            && days.every(d => d.exercises.length === 0)
+            && days.some(d => d.plannedActivity)
+          if (activityOnly) {
+            return days.find(d => d.plannedActivity)?.plannedActivity?.reason ?? ''
+          }
           // Decided once per week, from the week that was actually built —
           // see loadlessWeek above, shared with the tempo pass.
           const loadless = loadlessWeek
