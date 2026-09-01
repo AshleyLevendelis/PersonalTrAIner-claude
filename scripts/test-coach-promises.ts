@@ -534,6 +534,47 @@ console.log('\n6. The first-run starter chips only offer things that work')
   }
 }
 
+console.log('\nWANTING TO TRAIN IS NOT A SCHEDULE CHANGE\n')
+{
+  // MEASURED LIVE, 1 Sep 2026, from Ashley's screenshots. "I want to work
+  // out today" made the coach call propose_schedule_change, and the app
+  // rebuilt SIXTEEN WEEKS of her plan. Her follow-up — "not the schedule the
+  // workout what's the exercises I should be doing today" — called it AGAIN,
+  // and both times she was told "Those are already the days you're training
+  // — nothing to change", an answer to a question she never asked.
+  //
+  // The tool worked correctly at every step: the no-op guard fired, nothing
+  // was written twice, the confirm rail held. It was the wrong tool for the
+  // sentence, which no amount of guarding inside it can fix — so the checks
+  // are on the two places the model actually reads before choosing: the
+  // declaration, and §3e.
+  const decl = chat.slice(chat.indexOf('name: "propose_schedule_change"'), chat.indexOf('name: "propose_rest_day"'))
+  check('the tool declaration says it is only for a LASTING weekday change',
+    /LASTING change to which WEEKDAYS/i.test(decl))
+  check('...and names the sentences that are NOT one',
+    /work out today/i.test(decl) && /what should I do today/i.test(decl))
+  check('...and says what to do instead — answer in text, no tool call',
+    /in text, with no tool call/i.test(decl))
+
+  const section = chat.slice(chat.indexOf('=== 3e.'), chat.indexOf('=== 4.'))
+  check('§3e carries the same boundary', /NOT schedule changes/i.test(section))
+  check('...points at this week\'s schedule for the answer', /THIS WEEK'S SCHEDULE/i.test(section))
+  // The schedule sent to the coach describes non-lifting days too, so
+  // "there was nothing to tell her" is never the excuse — a walking plan is
+  // exactly the case that produced this.
+  check('...and says a day with no gym session still has an answer in it',
+    /walk with its minutes|no gym session/i.test(section))
+
+  // AND THE DEAD END ITSELF. If the tool is ever called by mistake again,
+  // the reply must not be a flat statement about days that reads as a
+  // non-sequitur to whatever was asked.
+  const ui = readFileSync(join(ROOT, 'src/components/ChatAssistant.tsx'), 'utf8')
+  check('a no-op schedule call no longer answers with a bare "nothing to change"',
+    !/refusal = "Those are already the days you're training — nothing to change\."/.test(ui))
+  check('...it names the days and admits it may have misread',
+    /If you were asking something else, like what today's session is/.test(ui))
+}
+
 if (failures > 0) {
   console.error(`\n${failures} check(s) failed`)
   process.exit(1)

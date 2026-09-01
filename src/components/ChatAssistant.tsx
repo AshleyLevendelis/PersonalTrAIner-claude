@@ -2189,7 +2189,20 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       } else if (result.proposal.kind === 'propose_schedule_change' && result.proposal.rawArgs) {
         const schedule = buildScheduleChangeProposal(result.proposal.rawArgs)
         if (schedule) built = { scopeKey: schedule.scopeKey, preconditions: schedule.preconditions, payload: schedule.payload as unknown as Record<string, unknown>, preImage: schedule.preImage, diff: schedule.diff }
-        else refusal = "Those are already the days you're training — nothing to change."
+        else {
+          // NOT A DEAD END. This used to be the whole reply whenever the
+          // model reached for this tool by mistake, so a user who asked
+          // "what's the exercises I should be doing today" was told, twice
+          // and word for word, that her training days were unchanged —
+          // an answer to a question she had not asked (measured live,
+          // 1 Sep 2026). The prompt now keeps the tool away from that
+          // question; this says the honest thing if it ever gets here
+          // anyway: what the days ARE, and that it may have misread.
+          const current = (profile.training_days ?? []).filter(d => d.available).map(d => d.day)
+          refusal = current.length > 0
+            ? `You're already training ${current.join(', ')} — nothing to change there. If you were asking something else, like what today's session is, say so and I'll answer that instead.`
+            : "Nothing to change there. If you were asking something else, like what today's session is, say so and I'll answer that instead."
+        }
       } else if (result.proposal.kind === 'propose_rest_day' && result.proposal.rawArgs) {
         const rest = buildRestDayProposal(result.proposal.rawArgs)
         if (rest) built = { scopeKey: rest.scopeKey, preconditions: rest.preconditions, payload: rest.payload as unknown as Record<string, unknown>, diff: rest.diff }
