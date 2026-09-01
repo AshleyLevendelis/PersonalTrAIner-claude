@@ -121,6 +121,22 @@ export const ALL_EXPERIENCE: TrainingExperience[] = ['beginner', 'novice', 'inte
  */
 const BEGINNER_ACTIVITY_LEVELS: ActivityLevel[] = ['moderate', 'sedentary']
 
+/**
+ * A "starting out" run needs THREE answers now, not one — the walking plan
+ * stopped being decided by activity level alone on 2 Sep 2026. It is
+ * beginner, sedentary, a goal that doesn't already say "I want to train",
+ * and an explicit "get moving first". Set together here, because setting
+ * only the activity level would have left this sweep generating ordinary
+ * lifting plans while still claiming to cover the walking branch — the
+ * exact silent-coverage-loss that made the branch invisible in the first
+ * place.
+ */
+function startingOutOverrides(activityLevel: ActivityLevel): Partial<UserProfile> {
+  return activityLevel === 'sedentary'
+    ? { activity_level: 'sedentary', fitness_goal: 'fat_loss', start_preference: 'move_more' }
+    : { activity_level: activityLevel }
+}
+
 /** Empty + each single injury + a few realistic multi-injury combos — same set the constraint audit grid uses. */
 export function getInjuryCombinations(): string[][] {
   return [
@@ -252,6 +268,11 @@ function buildTestProfile(
     recovery_capacity: 'moderate',
     conditioning_preference: 'tolerate',
     created_at: new Date().toISOString(),
+    // LAST, so it wins. Spread first and the literal activity_level and
+    // fitness_goal above would have overridden it, leaving this sweep
+    // generating ordinary lifting plans while still reporting that it
+    // covered the walking branch.
+    ...startingOutOverrides(activityLevel),
   } as UserProfile
 }
 

@@ -128,6 +128,16 @@ export interface UserProfile {
    */
   conditioning_preference: ConditioningPreference
   /**
+   * What a new-and-currently-inactive trainee said they actually WANT, when
+   * their goal did not already settle it — 'move_more' (walks, building up)
+   * or 'train' (real sessions from week one). Read only by isStartingOut().
+   *
+   * Absent for everyone else, and absent for anyone who was never asked:
+   * see the migration's note on why the null case keeps the walking plan
+   * rather than defaulting someone into loaded sessions.
+   */
+  start_preference?: StartPreference
+  /**
    * M0 nutrition inputs. weight_kg above is formally "onboarding weight,
    * immutable" — the live weight series lives in daily_metrics, and
    * nutrition-targets.ts prefers the latest weigh-in over this value.
@@ -192,6 +202,13 @@ export type BreakfastStyle = 'quick_cold' | 'cooked' | 'skip'
 export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'active' | 'very_active'
 /** No separate 'endurance' or 'maintain' value (differentiation-audit schema note) — see goal-policies.ts's file-level "Mapping note" for why: 'conditioning' already covers the endurance outcome, and 'functional' covers general-health/maintenance. */
 export type FitnessGoal = 'fat_loss' | 'hypertrophy' | 'functional' | 'conditioning'
+
+/**
+ * Whether someone starting from nothing wants to build up gently or start
+ * training properly. Asked ONLY when their goal leaves it open — see
+ * isStartingOut (starting-out.ts) for which goals settle it without asking.
+ */
+export type StartPreference = 'move_more' | 'train'
 export type EquipmentAccess = 'full_gym' | 'home_gym' | 'minimalist' | 'bodyweight'
 /**
  * Deliberately has no 'conditioning' value, even though FitnessGoal does

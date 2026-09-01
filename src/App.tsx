@@ -493,6 +493,10 @@ function App() {
       coaching_persona: profileRow.coaching_persona || 'supportive',
       recovery_capacity: profileRow.recovery_capacity || 'moderate',
       conditioning_preference: profileRow.conditioning_preference || 'tolerate',
+      // No `|| default` — absent means never asked, which isStartingOut
+      // reads as "keep the plan they have". A default here would answer for
+      // them (see the start_preference migration).
+      start_preference: profileRow.start_preference ?? undefined,
       meals_per_day: profileRow.meals_per_day ?? 3,
       include_snacks: profileRow.include_snacks ?? true,
       cooking_time_preference: profileRow.cooking_time_preference || 'moderate',
@@ -1016,6 +1020,7 @@ function App() {
         coaching_persona: enrichedProfile.coaching_persona,
         recovery_capacity: enrichedProfile.recovery_capacity,
         conditioning_preference: enrichedProfile.conditioning_preference,
+        start_preference: enrichedProfile.start_preference ?? null,
         meals_per_day: enrichedProfile.meals_per_day ?? 3,
         include_snacks: enrichedProfile.include_snacks ?? true,
         cooking_time_preference: enrichedProfile.cooking_time_preference ?? 'moderate',

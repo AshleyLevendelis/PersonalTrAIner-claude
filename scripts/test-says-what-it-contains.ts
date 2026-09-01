@@ -26,6 +26,8 @@ import { seededRngFromKey } from '../src/lib/seeded-random'
 import { weekNoteText } from '../src/lib/week-note'
 import { buildFirstRunIntro, planShapeFromMesocycle } from '../src/lib/first-run-intro'
 import { buildCoachExerciseSummary } from '../src/lib/chat-plan-context'
+import { isStartingOut } from '../src/lib/starting-out'
+import { needsStartPreferenceAnswer } from '../src/lib/onboarding-slots'
 import type { UserProfile, MesocycleWeek } from '../src/lib/types'
 
 let failures = 0
@@ -58,14 +60,68 @@ function planFor(o: Partial<UserProfile>, seed: string): MesocycleWeek[] {
   try { return generateMesocycle(p, generateExercisePlan(p).plan) } finally { resetRandomSource() }
 }
 
-const walking = planFor({}, 'says:walk')
+const walking = planFor({ start_preference: 'move_more' }, 'says:walk')
 const lifting = planFor({ training_experience: 'intermediate', activity_level: 'moderate', equipment_access: 'full_gym' }, 'says:lift')
 
 // A claim about weight or reps. Deliberately about INSTRUCTIONS, not the
 // bare words: "there is no weight to add" is true and allowed to say weight.
 const PROMISES_LOADING = /(working weights?|loads? climb|load goes up|find the weight|heavier weights|more weight than|reps? climb|rep target|sets? of)/i
 
-console.log('\n0. The fixture really is a plan with no lifting in it')
+console.log('\n0. WHO gets a walking plan is decided by what they WANT')
+{
+  // Ashley, 2 Sep 2026: "we need to capture what the user wants. is this
+  // someone who just wants to be a bit more active or someone who wants to
+  // start exercising in a gym with weights". Before this, the walking plan
+  // was chosen by beginner + sedentary and nothing else, so someone who had
+  // answered "full gym" and "muscle growth" got sixteen weeks of walking —
+  // their DESK JOB overriding the two answers that stated intent.
+  // The onboarding-side predicate is what actually governs whether the
+  // question appears, so it is the one asserted here.
+  const asked = (goal: string, activity = 'sedentary') => needsStartPreferenceAnswer({
+    trainingExperience: 'beginner', activityLevel: activity, fitnessGoal: goal,
+  } as never)
+  const gymAndMuscle = profile({ equipment_access: 'full_gym', fitness_goal: 'hypertrophy' })
+  check('someone who says "muscle growth" is never routed to walks, however sedentary',
+    !isStartingOut(gymAndMuscle))
+  check('...nor someone who says "functional strength — move better, lift heavier"',
+    !isStartingOut(profile({ fitness_goal: 'functional' })))
+  // ...and those two are never asked, because they have already said it.
+  check('...and neither is asked the question again', 
+    !asked('hypertrophy') && !asked('functional'))
+
+  // Fat loss and conditioning are true of a walker and a lifter alike, so
+  // those get asked, and the ANSWER decides.
+  const fatLoss = profile({ fitness_goal: 'fat_loss' })
+  check('a fat-loss beginner IS asked where they want to start', asked('fat_loss'))
+  check('...and "straight into training" gets them real sessions',
+    !isStartingOut({ ...fatLoss, start_preference: 'train' }))
+  check('...while "get moving first" gets them the walks',
+    isStartingOut({ ...fatLoss, start_preference: 'move_more' }))
+  // The conservative default: never asked means keep what they have.
+  check('an existing profile that was never asked keeps its walking plan',
+    isStartingOut(fatLoss))
+  // And nobody outside beginner+sedentary is touched at all.
+  check('an active beginner is neither asked nor sent walking',
+    !asked('fat_loss', 'moderate') && !isStartingOut(profile({ activity_level: 'moderate' })))
+}
+
+console.log('\n0c. The AUDIT still generates walking plans after the routing change')
+{
+  // The sweep was widened on 2 Sep to cover walking plans, and the SAME DAY
+  // the rule for producing one changed from a single field to three. An
+  // audit reporting 0 failures is worthless if the branch quietly stopped
+  // being built — which is exactly how this branch went unaudited for a
+  // fortnight. So: the audit's own sedentary arm, asserted to still be a
+  // walking plan.
+  const auditsSedentaryArm = profile({
+    activity_level: 'sedentary', fitness_goal: 'fat_loss', start_preference: 'move_more',
+    training_experience: 'beginner', equipment_access: 'full_gym',
+  })
+  check('the profile the audit builds for its sedentary arm is still a walking plan',
+    isStartingOut(auditsSedentaryArm))
+}
+
+console.log('\n0b. The fixture really is a plan with no lifting in it')
 {
   const exercises = walking.reduce((s, w) => s + w.days.reduce((n, d) => n + d.exercises.length, 0), 0)
   check(`the walking plan has no exercises at all (${exercises})`, exercises === 0, exercises)
