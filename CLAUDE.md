@@ -34,6 +34,29 @@ These apply to every session in this repo. They exist so they stop being restate
 - Do not trust or report "N commits ahead of origin" without verifying against origin — that line has been wrong repeatedly.
 - Frontend ships via push → Vercel. The Supabase edge functions (`chat-gemini`, `generate-meals`, `macro-calibration`, `onboarding-chat`) each need their own separate deploy: `npm run deploy:functions:prod -- <name>`, which asks for the `yes-production` phrase and names the target on the deploy itself. Note which is needed.
 
+## Handing work to Ashley's machine
+
+Ashley runs Claude Code in VS Code against her local clone. Her ruling, 1 Sep
+2026: **when something has to happen on her machine, hand her a
+copy-pasteable prompt for that session, not a list of commands.** Written
+after a production deploy reported success while shipping code three merges
+old — the commands were right and the context was missing.
+
+- Write the prompt for the local Claude Code to read, and make it carry the
+  WHY, not just the what. That session has none of this conversation: it does
+  not know what is broken, what was already tried, or what a given output
+  would mean. State the goal, the symptom, and what "done" looks like.
+- Say which steps that session **cannot** do. `db:push-both` and
+  `deploy:functions:prod` refuse when stdin is not a terminal (`db-target.mjs`
+  checks `isTTY`) — deliberately, so a wrong-target command costs a typed
+  phrase. Claude Code hard-fails on them. Give it the safe half (pull, verify,
+  read output back) and leave the typed confirmations to Ashley.
+- Tell it what to VERIFY, not just what to run. "Remote database is up to
+  date" and a named deploy target both print identically whether the work
+  happened or the file was absent from the checkout. Name the specific thing
+  that proves it worked.
+- Keep it in one fenced block she can copy without editing.
+
 ## Database
 
 - Two Supabase projects since 11 Aug 2026: TEST (`vswuurrtbzbrgubddefv`, the CLI's default link) and PRODUCTION (`sdkhuczcfnqqimdgfiks`, live users' data). Before that date, dev and prod shared one database with no scratch instance — that constraint no longer holds; don't rely on old notes that assume it does.
