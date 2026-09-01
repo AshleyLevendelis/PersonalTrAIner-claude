@@ -30,6 +30,13 @@ export type TrainingPhase =
 export interface PhaseConfig {
   phase: TrainingPhase
   label: string
+  /**
+   * The label with the qualifier dropped, for places a full phase name will
+   * not fit — the Full Program screen's four-across block rail, where
+   * "Anatomical Adaptation" and "Metabolic Conditioning" would both truncate
+   * to nothing useful on a phone. Never used where there is room for `label`.
+   */
+  shortLabel: string
   /** What this block is actually trying to achieve, shown to the user. */
   focus: string
   sets_multiplier: number
@@ -60,6 +67,7 @@ const PHASE_CONFIGS: Record<TrainingPhase, PhaseConfig> = {
   anatomical_adaptation: {
     phase: 'anatomical_adaptation',
     label: 'Anatomical Adaptation',
+    shortLabel: 'Adaptation',
     focus: 'Build a base — connective tissue, movement quality, work capacity',
     sets_multiplier: 0.8,
     rep_shift: 3,
@@ -73,6 +81,7 @@ const PHASE_CONFIGS: Record<TrainingPhase, PhaseConfig> = {
   hypertrophy: {
     phase: 'hypertrophy',
     label: 'Hypertrophy',
+    shortLabel: 'Hypertrophy',
     focus: 'Build muscle — moderate loads, higher volume, controlled tempo',
     sets_multiplier: 1.1,
     rep_shift: 0,
@@ -89,6 +98,7 @@ const PHASE_CONFIGS: Record<TrainingPhase, PhaseConfig> = {
   strength: {
     phase: 'strength',
     label: 'Maximal Strength',
+    shortLabel: 'Strength',
     focus: 'Move heavier loads — lower reps, longer rest, high intensity',
     sets_multiplier: 1.0,
     rep_shift: -3,
@@ -102,6 +112,7 @@ const PHASE_CONFIGS: Record<TrainingPhase, PhaseConfig> = {
   power: {
     phase: 'power',
     label: 'Power & Expression',
+    shortLabel: 'Power',
     focus: 'Express strength quickly — explosive intent, full recovery',
     sets_multiplier: 0.85,
     rep_shift: -4,
@@ -115,6 +126,7 @@ const PHASE_CONFIGS: Record<TrainingPhase, PhaseConfig> = {
   metabolic: {
     phase: 'metabolic',
     label: 'Metabolic Conditioning',
+    shortLabel: 'Conditioning',
     focus: 'Work capacity and conditioning — short rest, sustained output',
     sets_multiplier: 1.0,
     rep_shift: 4,
@@ -555,6 +567,30 @@ export interface PeriodizedWeek {
 
 export function getPhaseConfig(phase: TrainingPhase): PhaseConfig {
   return PHASE_CONFIGS[phase]
+}
+
+/**
+ * The short form of a phase name, looked up from the DISPLAY LABEL rather
+ * than the enum.
+ *
+ * That direction is forced, not sloppy. `phase_label` is persisted as a
+ * finished display string (`mesocycle-shape.ts` toRow/fromRow writes and reads
+ * the words, not the enum), so by the time a screen has a week in hand the
+ * enum is gone. Reversing through PHASE_CONFIGS keeps this map the single
+ * source of truth and needs no migration; the alternative — a second stored
+ * column — would be a schema change to hold a value already derivable.
+ *
+ * Returns the input UNCHANGED when nothing matches, so a phase renamed here
+ * without a plan rebuild shows its full name rather than a blank pill. The
+ * cost of the fallback is a slightly long label; the cost of the alternative
+ * is an empty one.
+ */
+export function shortPhaseLabel(label: string): string {
+  const trimmed = label.trim()
+  for (const config of Object.values(PHASE_CONFIGS)) {
+    if (config.label === trimmed) return config.shortLabel
+  }
+  return label
 }
 
 /** Shifts a rep range up or down while keeping its spread. */
