@@ -76,6 +76,7 @@
     "test:reveal-timing": "tsx scripts/test-reveal-timing.ts",
     "test:load-display": "tsx scripts/test-load-display.ts",
     "test:deploy-path": "tsx scripts/test-deploy-path.ts",
+    "test:functions-deployable": "tsx scripts/test-functions-deployable.ts",
     "test:exercise-detail": "tsx scripts/test-exercise-detail.ts",
     "test:says-what-it-contains": "tsx scripts/test-says-what-it-contains.ts",
     "test:week-note": "tsx scripts/test-week-note.ts",
