@@ -1,4 +1,5 @@
 import { DIETARY_PREFERENCES, type DietaryPreference } from '@/lib/diet-rules'
+import { GOALS_THAT_MEAN_TRAIN } from '@/lib/starting-out'
 import type {
   UserProfile,
   FitnessGoal,
@@ -10,6 +11,7 @@ import type {
   CoachingPersona,
   MacroCalculationMode,
   RecoveryCapacity,
+  StartPreference,
   ConditioningPreference,
   ActivityLevel,
   CookingTimePreference,
@@ -62,6 +64,18 @@ export const GOAL_OPTIONS: { value: FitnessGoal; icon: string; label: string; de
   { value: 'hypertrophy', icon: '💪', label: 'Muscle growth', description: 'Build size & strength' },
   { value: 'functional', icon: '⚡', label: 'Functional strength', description: 'Move better, lift heavier' },
   { value: 'conditioning', icon: '❤️', label: 'Conditioning', description: 'Cardio & endurance' },
+]
+
+/**
+ * Asked ONLY of someone new AND currently inactive whose GOAL doesn't
+ * already settle it — see needsStartPreference (starting-out.ts). Ashley's
+ * ruling, 2 Sep 2026: "we need to capture what the user wants… is this
+ * someone who just wants to be a bit more active or someone who wants to
+ * start exercising in a gym with weights", asked only when it can't tell.
+ */
+const START_PREFERENCE_OPTIONS: { value: StartPreference; icon: string; label: string; description: string }[] = [
+  { value: 'move_more', icon: '🚶', label: 'Get moving first', description: 'Walks and easy activity, building up week by week' },
+  { value: 'train', icon: '🏋️', label: 'Straight into training', description: 'Proper sessions from week one' },
 ]
 
 export const DAYS_OF_WEEK = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
@@ -367,6 +381,7 @@ export interface OnboardingSlotValues {
   trainingDays: string[]
   recoveryCapacity: RecoveryCapacity | null
   conditioningPreference: ConditioningPreference | null
+  startPreference: StartPreference | null
   sessionDuration: SessionDuration | null
   equipment: EquipmentAccess | null
   trainingStyle: TrainingStyle | null
@@ -405,6 +420,7 @@ export function initialSlotValues(): OnboardingSlotValues {
     trainingDays: [],
     recoveryCapacity: null,
     conditioningPreference: null,
+    startPreference: null,
     sessionDuration: null,
     equipment: null,
     trainingStyle: null,
@@ -532,6 +548,27 @@ function knowsTheirLifts(values: OnboardingSlotValues): boolean {
  */
 export function isStartingFromNothing(values: OnboardingSlotValues): boolean {
   return values.trainingExperience === 'beginner' && values.activityLevel === 'sedentary'
+}
+
+/**
+ * Should this person be asked what they actually want — walks, or training?
+ *
+ * Only where the app genuinely cannot tell. "Muscle growth — build size &
+ * strength" and "Functional strength — move better, lift heavier" both say
+ * it outright, so those go straight to training and are never asked; fat
+ * loss and conditioning are true of a walker and a lifter alike.
+ *
+ * The GOAL LIST is imported from starting-out.ts rather than restated —
+ * unlike isStartingFromNothing, which mirrors its profile-side twin because
+ * onboarding holds partial answers. A list of goals is the same list in both
+ * places, and two copies of it would be a drift waiting to happen: the
+ * question would stop being asked of someone the plan still routes to walks,
+ * or vice versa.
+ */
+export function needsStartPreferenceAnswer(values: OnboardingSlotValues): boolean {
+  return isStartingFromNothing(values)
+    && values.fitnessGoal != null
+    && !GOALS_THAT_MEAN_TRAIN.includes(values.fitnessGoal)
 }
 
 /**
@@ -679,6 +716,11 @@ export const ONBOARDING_SLOTS: SlotDef[] = [
   { key: 'trainingExperience', question: 'How much training have you done?', inputHint: 'Where are you at?', shortLabel: 'Experience', control: 'single', required: true, options: EXPERIENCE_OPTIONS, destination: 'column', validate: isOneOf(EXPERIENCE_OPTIONS) },
   { key: 'activityLevel', question: 'How active is your day-to-day, outside training?', inputHint: 'How active is your day?', shortLabel: 'Daily activity', control: 'single', required: true, options: ACTIVITY_OPTIONS, destination: 'column', validate: isOneOf(ACTIVITY_OPTIONS) },
   { key: 'equipment', question: 'What equipment do you have access to?', inputHint: 'Gym, home, or a mix?', shortLabel: 'Equipment', control: 'single', required: true, options: EQUIPMENT_OPTIONS, destination: 'column', validate: isOneOf(EQUIPMENT_OPTIONS) },
+  // AFTER equipment on purpose: it reads goal, experience and activity, all
+  // of which are asked above it, and it is the last thing needed before the
+  // plan's shape is decided. Conditional in the same way knowsWorkingLifts
+  // is — most people never see it.
+  { key: 'startPreference', question: 'Where do you want to start?', inputHint: 'Ease in, or straight in?', shortLabel: 'Starting point', control: 'single', required: true, requiredIf: needsStartPreferenceAnswer, options: START_PREFERENCE_OPTIONS, destination: 'column', validate: isOneOf(START_PREFERENCE_OPTIONS) },
   // MOVED FROM 16th TO 5th (Ashley's ruling). It is the only question whose
   // absence can hurt someone: every other unanswered slot costs accuracy,
   // this one costs safety. At 16th it sat behind the age/height/weight/sex
@@ -988,6 +1030,10 @@ export function assembleProfile(data: OnboardingSlotValues): UserProfile {
     training_style: data.trainingStyle!,
     training_experience: data.trainingExperience!,
     conditioning_preference: data.conditioningPreference!,
+    // Left UNDEFINED when the question never applied — the field means "what
+    // they told us when asked", and a value nobody was asked for would be an
+    // answer the app invented. isStartingOut reads it that way.
+    start_preference: data.startPreference ?? undefined,
     skip_calibration_week: data.knowsWorkingLifts === true,
     known_squat_kg: data.knowsWorkingLifts === true && data.knownSquatKg ? Number(data.knownSquatKg) : undefined,
     known_bench_kg: data.knowsWorkingLifts === true && data.knownBenchKg ? Number(data.knownBenchKg) : undefined,

@@ -5,6 +5,8 @@ import { useActiveSession } from '@/hooks/useActiveSession'
 import { estimateDaySeconds } from '@/lib/session-duration'
 import { groupExercises, mainLiftGroupIndex } from '@/lib/session-derive'
 import { getLoggedPlanDays } from '@/lib/exercise-history'
+import { weekNoteText } from '@/lib/week-note'
+import { weekDelta } from '@/lib/week-delta'
 import { ReadOnlyDayList } from './ReadOnlyDayList'
 import { WarmupSection } from './WarmupSection'
 import type { MesocycleWeek, WorkoutDay } from '@/lib/types'
@@ -85,7 +87,6 @@ export function ProgramBrowse({
   const [banBusy, setBanBusy] = useState<string | null>(null)
 
   const weekObj = hasMesocycle ? mesocycle.find(w => w.week_number === browseWeek) : undefined
-  const prevWeekObj = hasMesocycle ? mesocycle.find(w => w.week_number === browseWeek - 1) : undefined
   const days = weekObj?.days ?? plan
 
   // Completion is real data this view used to throw away. One read-only
@@ -109,9 +110,9 @@ export function ProgramBrowse({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [browseWeek, liveWeek, todayName, weekObj])
 
+  // Every day's bar is drawn against the week's biggest day, so the bars
+  // compare days WITHIN a week rather than across weeks.
   const maxSets = Math.max(1, ...DAY_ORDER.map(d => daySets(days.find(x => x.day === d))))
-  const weekSets = DAY_ORDER.reduce((s, d) => s + daySets(days.find(x => x.day === d)), 0)
-  const prevSets = prevWeekObj ? prevWeekObj.days.reduce((s, d) => s + daySets(d), 0) : null
 
   const blockCount = hasMesocycle ? Math.max(...mesocycle.map(w => w.block_number ?? 1)) : 1
   const blockWeeks = hasMesocycle
@@ -123,32 +124,12 @@ export function ProgramBrowse({
     [mesocycle, hasMesocycle],
   )
 
-  // Week note — rendered ONCE for the week, replacing the per-day banners.
-  // Calibration keeps its promise here: the conservative-loads instruction
-  // survives the redesign, it just stops repeating seven times.
-  const noteParts: string[] = []
-  if (weekObj?.is_deload) {
-    noteParts.push(weekObj.phase_focus
-      ?? 'Deload — volume drops so the last three weeks can land. Keep the weights, cut the sets.')
-  } else if (weekObj?.phase_focus) noteParts.push(weekObj.phase_focus)
-  if (weekObj?.isCalibrationWeek) {
-    noteParts.push('Calibration week — the printed weights are deliberately conservative. Find the weight where the last rep feels like RPE 6, and log what you actually used: what you log becomes your plan.')
-  }
-  if (weekObj?.coach_note) noteParts.push(weekObj.coach_note)
-
-  const deload = !!weekObj?.is_deload
-  const deltaChip = (() => {
-    if (!hasMesocycle || prevSets == null) return null
-    if (deload) {
-      const pct = prevSets > 0 ? Math.round((1 - weekSets / prevSets) * 100) : 0
-      return {
-        text: pct > 0 ? `Deload · ${pct}% fewer sets than W${browseWeek - 1}` : 'Deload · lighter on purpose',
-        warn: true,
-      }
-    }
-    const delta = weekSets - prevSets
-    return { text: `${delta >= 0 ? '+' : ''}${delta} sets vs last week`, warn: false }
-  })()
+  // Week note and delta chip — both trimmed to what this week actually is,
+  // in week-note.ts / week-delta.ts, where they can be tested against real
+  // generated plans rather than eyeballed on a screenshot. See those files
+  // for the defects that put them there.
+  const note = weekNoteText(weekObj)
+  const deltaChip = hasMesocycle && weekObj ? weekDelta(weekObj, mesocycle) : null
 
   return (
     <div className="flex flex-col px-1">
@@ -251,12 +232,12 @@ export function ProgramBrowse({
       </div>
 
       {/* Week note — once, not once per day */}
-      {noteParts.length > 0 && (
+      {note && (
         <p
           className="mt-3.5 text-[0.78125rem] leading-normal"
           style={{ color: 'color-mix(in srgb, var(--foreground) 76%, transparent)', borderLeft: '2px solid var(--primary)', paddingLeft: 11 }}
         >
-          {noteParts.join(' ')}
+          {note}
         </p>
       )}
 

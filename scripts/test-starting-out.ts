@@ -33,7 +33,11 @@ const ALL_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Satur
 function profileOf(over: Partial<UserProfile> = {}): UserProfile {
   return {
     age: 63, gender: 'female', height_cm: 165, weight_kg: 72,
-    activity_level: 'sedentary', fitness_goal: 'functional',
+    // fat_loss + an explicit "get moving first" is what a starting-out
+    // profile IS since 2 Sep 2026. It used to be beginner+sedentary alone,
+    // and the goal here was 'functional' — which now says "move better,
+    // lift heavier", i.e. they want to train.
+    activity_level: 'sedentary', fitness_goal: 'fat_loss', start_preference: 'move_more',
     training_days: ALL_DAYS.map(d => ({ day: d, available: CHOSEN_DAYS.includes(d) })),
     preferred_time: 'morning', dietary_preferences: [],
     session_duration_preference: '30-45', workout_split_preference: 'ai_recommendation',
@@ -48,7 +52,19 @@ function profileOf(over: Partial<UserProfile> = {}): UserProfile {
 console.log('starting-out gate\n')
 
 console.log('1. Who this applies to — read from answers they already give')
-check('beginner + sedentary → starting out', isStartingOut(profileOf()))
+check('beginner + sedentary + "get moving first" → starting out', isStartingOut(profileOf()))
+// WHAT THEY WANT, NOT WHAT THEIR JOB IS — Ashley's ruling, 2 Sep 2026, after
+// finding that someone who answered "full gym" and "muscle growth" got
+// sixteen weeks of walking because they had also ticked "Sedentary — desk
+// job". The goal decides where it can; the new question decides the rest.
+check('...but a goal of "muscle growth" means they said they want to train',
+  !isStartingOut(profileOf({ fitness_goal: 'hypertrophy' })))
+check('...and so does "functional strength — move better, lift heavier"',
+  !isStartingOut(profileOf({ fitness_goal: 'functional' })))
+check('...and an explicit "straight into training" beats a fat-loss goal',
+  !isStartingOut(profileOf({ start_preference: 'train' })))
+check('...while never having been asked keeps the walking plan they have',
+  isStartingOut(profileOf({ start_preference: undefined })))
 check('beginner but ACTIVE → normal plan (has real work capacity)', !isStartingOut(profileOf({ activity_level: 'active' })))
 check('sedentary but ADVANCED → normal plan (returning, not starting)', !isStartingOut(profileOf({ training_experience: 'advanced' })))
 check('sedentary + novice → normal plan', !isStartingOut(profileOf({ training_experience: 'novice' })))

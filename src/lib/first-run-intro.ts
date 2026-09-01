@@ -57,6 +57,22 @@ export const FIRST_RUN_QUICK_REPLIES = [
   "There's a food I won't eat",
 ]
 
+/**
+ * An activity-only plan has no exercises, so "Swap an exercise" offers a
+ * thing that does not exist in it — the same class of untruth as the
+ * working-weights sentence above, in a button. The other two still hold.
+ */
+const FIRST_RUN_QUICK_REPLIES_ACTIVITY = [
+  'Talk me through today',
+  'How long should it feel?',
+  "There's a food I won't eat",
+]
+const FIRST_RUN_QUICK_REPLIES_ACTIVITY_AHEAD = [
+  'Talk me through day one',
+  'How long should it feel?',
+  "There's a food I won't eat",
+]
+
 export interface FirstRunMessage {
   content: string
   quickReplies?: string[]
@@ -93,6 +109,17 @@ export interface FirstRunPlanShape {
   blocks: number
   /** Week 1 is a calibration week — capped on purpose, and it has to be said. */
   startsLight: boolean
+  /**
+   * The plan prescribes activities (walks) and no lifting at all — the
+   * starting-out prescription. Every sentence about working weights and
+   * climbing loads is false for it, and this is the app's FIRST message, so
+   * getting it wrong is the worst possible place to be wrong.
+   *
+   * MEASURED, 2 Sep 2026: a sedentary beginner's welcome read "You'll start
+   * light on purpose while we find your working weights, then the loads
+   * climb" above a sixteen-week plan containing no weights whatsoever.
+   */
+  activityOnly: boolean
 }
 
 export interface FirstRunSessionBrief {
@@ -150,7 +177,12 @@ export interface FirstRunSessionBrief {
  * appears in unrelated wiring 400 lines away.
  */
 export function planShapeFromMesocycle(
-  mesocycle: { week_number?: number; block_number?: number; isCalibrationWeek?: boolean }[],
+  mesocycle: {
+    week_number?: number
+    block_number?: number
+    isCalibrationWeek?: boolean
+    days?: { exercises?: unknown[]; plannedActivity?: unknown }[]
+  }[],
 ): FirstRunPlanShape | null {
   if (mesocycle.length === 0) return null
   const blocks = new Set(
@@ -160,10 +192,20 @@ export function planShapeFromMesocycle(
   // up on a plan whose numbering is missing — the calibration flag is the
   // thing being read, and it sits on the first week either way.
   const weekOne = mesocycle.find(w => w.week_number === 1) ?? mesocycle[0]
+  // Asked of the plan's OWN days: a week that schedules activities and no
+  // exercises anywhere is an activity plan, whoever it was built for. Read
+  // from the plan rather than from the profile for the same reason
+  // isLoadlessWeek is — the thing being described is what got generated.
+  const daysSeen = mesocycle.flatMap(w => w.days ?? [])
+  const activityOnly = daysSeen.length > 0
+    && daysSeen.every(d => (d.exercises?.length ?? 0) === 0)
+    && daysSeen.some(d => d.plannedActivity != null)
+
   return {
     totalWeeks: mesocycle.length,
     blocks,
     startsLight: weekOne?.isCalibrationWeek === true,
+    activityOnly,
   }
 }
 
@@ -196,7 +238,11 @@ export function buildFirstRunIntro(
   // unexplained easy week reads as the app getting it wrong.
   const structureParts: string[] = []
   if (shape && shape.blocks >= 2) structureParts.push('Each block has a job.')
-  if (shape?.startsLight) {
+  if (shape?.activityOnly) {
+    // No weights in this plan, so nothing about weights. What is actually
+    // true of it: the dose steps up a block at a time, at the same effort.
+    structureParts.push("It starts where you are and builds a little at a time — the same easy effort throughout, just a bit longer as the blocks go on.")
+  } else if (shape?.startsLight) {
     structureParts.push("You'll start light on purpose while we find your working weights, then the loads climb, and every block ends with an easier week so the work actually sticks.")
   } else if (shape && shape.blocks >= 2) {
     structureParts.push('The loads climb through each one, and every block ends with an easier week so the work actually sticks.')
@@ -222,8 +268,13 @@ export function buildFirstRunIntro(
     if (!session) return "Your plan's waiting whenever you want a look."
     // The movements list already ends in an ellipsis when it was truncated,
     // and a full stop after one reads as a typo ("Dumbbell Press….").
+    // A day with no exercise list — a walk — has no movements to name, and
+    // "Walk — ." was what shipped: a dangling dash and a full stop. The
+    // focus alone is the whole prescription there.
     const stop = session.movements.endsWith('…') ? '' : '.'
-    const brief = `${session.focus} — ${session.movements}${stop}`
+    const brief = session.movements.trim()
+      ? `${session.focus} — ${session.movements}${stop}`
+      : `${session.focus}${/[.!?…]$/.test(session.focus) ? '' : '.'}`
     if (session.when === 'today') return `Day one is today: ${brief}`
     // A training day, but past the hour they said they train. "Starts right
     // now" would be pushing someone into a session at 10pm.
@@ -253,7 +304,9 @@ export function buildFirstRunIntro(
   const dayOneIsToday = session?.when === 'today' || session?.when === 'whenever'
   const last = {
     content: `${dayOne} ${openDoor}`,
-    quickReplies: dayOneIsToday ? FIRST_RUN_QUICK_REPLIES : FIRST_RUN_QUICK_REPLIES_AHEAD,
+    quickReplies: shape?.activityOnly
+      ? (dayOneIsToday ? FIRST_RUN_QUICK_REPLIES_ACTIVITY : FIRST_RUN_QUICK_REPLIES_ACTIVITY_AHEAD)
+      : (dayOneIsToday ? FIRST_RUN_QUICK_REPLIES : FIRST_RUN_QUICK_REPLIES_AHEAD),
   }
   return hasStructure
     ? [{ content: welcome }, { content: structure }, last]

@@ -1,4 +1,4 @@
-import type { UserProfile, WorkoutDay, PlannedActivity } from '@/lib/types'
+import type { UserProfile, WorkoutDay, PlannedActivity, FitnessGoal } from '@/lib/types'
 
 // ---------------------------------------------------------------------------
 // "Starting out" — the coaching call that a given day should be a WALK rather
@@ -59,8 +59,32 @@ export const STARTING_OUT_PRESCRIPTION = {
  * Reads two questions they already answer. Nothing new is asked, and no
  * question exists whose only purpose is to route them.
  */
+/**
+ * Goals that ALREADY say the person wants to train. Both options describe
+ * lifting in their own onboarding text — "Build size & strength" and "Move
+ * better, lift heavier" — so re-asking would be the app not listening.
+ * Ashley's ruling, 2 Sep 2026: ask only when it can't tell.
+ */
+export const GOALS_THAT_MEAN_TRAIN: FitnessGoal[] = ['hypertrophy', 'functional']
+
 export function isStartingOut(profile: UserProfile): boolean {
-  return profile.training_experience === 'beginner' && profile.activity_level === 'sedentary'
+  // WHAT THEY WANT, NOT WHAT THEIR JOB IS. This used to be beginner AND
+  // sedentary and nothing else — so someone who answered "full gym",
+  // "muscle growth" and "beginner" was given sixteen weeks of walking and
+  // no exercises, because they had also ticked the activity question's
+  // "Sedentary — desk job, little movement outside training". That question
+  // exists to compute TDEE and its own description presupposes they train;
+  // it was overriding the two answers that stated intent. Measured 2 Sep
+  // 2026 on a generated plan: 0 exercises vs 16 for the same person who
+  // called their day-to-day "moderately active".
+  if (profile.training_experience !== 'beginner' || profile.activity_level !== 'sedentary') return false
+  // Goal settles it where it can.
+  if (GOALS_THAT_MEAN_TRAIN.includes(profile.fitness_goal)) return false
+  // Otherwise only an explicit "get moving first" routes to walks. Absent
+  // means never asked (a profile predating the question), and that keeps
+  // the plan it already has rather than being handed loaded sessions on a
+  // rebuild — see the migration's note.
+  return profile.start_preference !== 'train'
 }
 
 /** Minutes for a given four-week block (1-indexed), never above the cap. */
@@ -82,14 +106,28 @@ function reasonFor(blockNumber: number, minutes: number): string {
  * weekday, its place in the week, the fact that it's scheduled — and replaces
  * only what's prescribed in it.
  */
-export function toStartingOutDay(day: WorkoutDay, blockNumber = 1): WorkoutDay {
+/**
+ * The whole walk prescription for a block — minutes AND the sentence that
+ * explains them, which must move together.
+ *
+ * Exported because generateMesocycle re-prescribes each block's walks and was
+ * patching only `duration`, leaving block 1's "Starting where you are" text
+ * attached to a week-13 walk. Two callers each building the activity by hand
+ * is what let the two halves drift; there is now one builder and no way to
+ * update the number without the words.
+ */
+export function startingOutActivity(blockNumber: number): PlannedActivity {
   const minutes = startingOutMinutes(blockNumber)
-  const activity: PlannedActivity = {
+  return {
     activity: 'Walk',
     duration: minutes,
     targetRpe: STARTING_OUT_PRESCRIPTION.targetRpe,
     reason: reasonFor(blockNumber, minutes),
   }
+}
+
+export function toStartingOutDay(day: WorkoutDay, blockNumber = 1): WorkoutDay {
+  const activity = startingOutActivity(blockNumber)
   return {
     day: day.day,
     focus: 'Walk',

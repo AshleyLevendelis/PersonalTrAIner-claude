@@ -17,7 +17,7 @@ import {
 } from './periodization'
 import { getGoalPolicy, restrictPhaseSequence, resolveConditioningFrequency, RECOVERY_SET_MULTIPLIER, MAIN_LIFT_REST_FLOOR_SECONDS, type GoalPolicy } from './goal-policies'
 import { dayAnchorExercise, anchorScore } from './session-derive'
-import { isStartingOut, applyStartingOut, startingOutMinutes } from './starting-out'
+import { isStartingOut, applyStartingOut, startingOutActivity } from './starting-out'
 import { getDurationBudgetSeconds, getSessionMinimumSeconds, getSessionMaximumSeconds, getSteadyStateSeconds, DEFAULT_CARRY_DISTANCE_M, estimateDaySeconds, estimateSlotsSeconds, parseRestSeconds, SESSION_OVERHEAD_SECONDS } from './session-duration'
 import { implausibleLifts } from './lift-plausibility'
 
@@ -4273,9 +4273,13 @@ function buildProgressionNote(
   loadless = false,
 ): string {
   if (isDeload) {
+    // Carries the "resist the urge to push" nudge as a trailing clause
+    // rather than a second sentence: it used to be the opening of a separate
+    // deload preamble that announced the same thing this sentence does, and
+    // splitting it back out would restore the duplication.
     return loadless
-      ? 'Deload week — volume steps back so you arrive at the next block recovered, not because progress stalled.'
-      : 'Deload week — load and volume both step back so you arrive at the next block recovered, not because progress stalled.'
+      ? 'Deload week — volume steps back so you arrive at the next block recovered, not because progress stalled; resist the urge to push.'
+      : 'Deload week — load and volume both step back so you arrive at the next block recovered, not because progress stalled; resist the urge to push.'
   }
   if (isCalibrationWeek) {
     return loadless
@@ -4286,7 +4290,7 @@ function buildProgressionNote(
   // regardless of what the goal would otherwise ramp.
   const rampsLoad = policy.progressionEmphasis === 'load' && !loadless
   if (weekInBlock === 1) {
-    if (rampsLoad) return 'Baseline week — this sets the working weight every later week in the block adds load on top of.'
+    if (rampsLoad) return 'Baseline week — this sets the working weight that every later week in the block adds load on top of.'
     return loadless
       ? 'Baseline week — this sets the rep target every later week in the block builds on.'
       : 'Baseline week — weight holds flat this block by design; this sets the rep target every later week builds on.'
@@ -4336,7 +4340,14 @@ function isLoadlessWeek(days: WorkoutDay[]): boolean {
       if (ex.suggested_load_kg != null) loaded++
     }
   }
-  if (working === 0) return false
+  // NO WORKING SETS AT ALL IS THE MOST LOADLESS A WEEK CAN BE. This returned
+  // false — treating "nothing to measure" as "loaded" — which is exactly
+  // backwards for the one plan shape that has no exercises whatsoever: a
+  // starting-out walking week. That week was handed the LOADED progression
+  // copy, so a plan containing four walks and no lifts told the trainee
+  // "load goes up this week on the main lifts". Found on Ashley's screen,
+  // 1 Sep 2026.
+  if (working === 0) return true
   return loaded / working <= LOADLESS_WEEK_MAX_LOADED_SHARE
 }
 
@@ -6539,11 +6550,15 @@ export function generateMesocycle(
       // exercises, so every per-exercise loop no-ops) — this re-stamps each
       // day's walk with this week's minutes, which is the whole progression.
       if (isStartingOut(profile)) {
-        const minutes = startingOutMinutes(blockIndex + 1)
+        // The whole activity, not just its duration. This used to patch
+        // `duration` alone, so every block after the first carried block 1's
+        // "Starting where you are — turning up is the whole job for now"
+        // beside a number that had moved on twice. startingOutActivity keeps
+        // the minutes and the sentence explaining them together.
+        const activity = startingOutActivity(blockIndex + 1)
         for (let i = 0; i < days.length; i++) {
-          const activity = days[i].plannedActivity
-          if (!activity) continue
-          days[i] = { ...days[i], plannedActivity: { ...activity, duration: minutes } }
+          if (!days[i].plannedActivity) continue
+          days[i] = { ...days[i], plannedActivity: { ...activity } }
         }
       }
 
@@ -6556,14 +6571,41 @@ export function generateMesocycle(
         is_deload: isDeload,
         isCalibrationWeek,
         coach_note: (() => {
+          // A WEEK OF ACTIVITIES HAS NO PHASE COACHING TO GIVE. Making the
+          // week loadless swapped "load goes up on the main lifts" for the
+          // weightless copy — an improvement, and still untrue: that copy
+          // talks about sets close to failure, quality reps and the hardest
+          // working sets of the block, none of which exist in a plan that is
+          // four walks and three rest days. The walk's own reason IS this
+          // week's coaching, and it is already written, already true, and
+          // already block-aware. Found by test:says-what-it-contains reading
+          // the STORED note rather than the one the browse screen renders —
+          // the screen had stopped showing this text, which would have hidden
+          // it from every check that only looks at a screen.
+          const activityOnly = days.length > 0
+            && days.every(d => d.exercises.length === 0)
+            && days.some(d => d.plannedActivity)
+          if (activityOnly) {
+            return days.find(d => d.plannedActivity)?.plannedActivity?.reason ?? ''
+          }
           // Decided once per week, from the week that was actually built —
           // see loadlessWeek above, shared with the tempo pass.
           const loadless = loadlessWeek
           const phaseNote = loadless ? phaseConfig.coach_note_loadless : phaseConfig.coach_note
           const goalNote = loadless ? policy.coachNoteLoadless : policy.coachNote
           return [
+            // A DELOAD SAYS IT ONCE. This used to open with its own "Deload
+            // week — volume is deliberately cut so you arrive at the next
+            // block recovered" and then append buildProgressionNote's
+            // "Deload week — load and volume both step back so you arrive at
+            // the next block recovered" — the same announcement, the same
+            // reason, twice in one paragraph. Found on screen (1 Sep 2026)
+            // once the browse redesign stopped burying coach_note in a
+            // small banner. The progression note is the one that survives:
+            // it distinguishes a loadless deload from a loaded one, which
+            // the preamble never did.
             isDeload
-              ? 'Deload week — volume is deliberately cut so you arrive at the next block recovered. Resist the urge to push.'
+              ? ''
               // The goal's own framing shows once per block, alongside the
               // phase's — repeating it every week would bury the phase-specific
               // note under the same paragraph four times over.
@@ -6571,7 +6613,7 @@ export function generateMesocycle(
                 ? `${phaseNote} ${goalNote}`
                 : phaseNote,
             buildProgressionNote(w, isDeload, isCalibrationWeek, policy, loadless),
-          ].join(' ')
+          ].filter(Boolean).join(' ')
         })(),
         label: isDeload
           ? `Week ${weekCounter} — ${phaseConfig.label}: Deload`
