@@ -16,19 +16,25 @@ import type { MesocycleWeek, WorkoutDay } from '@/lib/types'
 // ---------------------------------------------------------------------------
 // PROGRAM BROWSE — design handoff 5a "Index", 1 Sep 2026. Replaces the
 // retired ExercisePlan.tsx (the "browse stand-in" its own header promised to
-// retire). One screen: a named block rail, a four-week sub-phase strip, a
-// week bar with a delta chip, the week's context rendered ONCE, and seven day
-// rows that expand in place.
+// retire). One screen: this week's ROLE as the heading, the block named
+// beneath it, a sixteen-week strip grouped into four named blocks, a week bar
+// with a delta chip, the week's context rendered ONCE, and seven day rows that
+// expand in place.
 //
-// The rail and the strip replaced a 16-week tick strip (1 Sep 2026). Ashley:
-// "each block still shows the same phase. 4 weeks all show hypertrophy rather
-// than going through each phase." The old strip could say where she was and
-// never what any of it was for — sixteen anonymous ticks under four letters,
-// with the phase name repeating for four weeks in the largest type on the
-// page. Same two rows of vertical space now carry four block names and four
-// week names.
+// THE HEADING WAS WRONG TWICE IN ONE DAY, in the same direction, and the
+// history is worth keeping because the second attempt looked like a fix.
+// Ashley: "each block still shows the same phase. 4 weeks all show
+// hypertrophy rather than going through each phase." It was the bare phase
+// name over sixteen anonymous ticks labelled B1-B4 — a strip that could say
+// where she was and never what any of it was for. The first fix made the
+// heading "Block 4: Hypertrophy" and split the strip into a block rail plus a
+// four-week sub-phase strip. That named things, and the heading STILL repeated
+// for four weeks, which was the actual complaint. Her own mockup settled it:
+// lead with the week. The heading is now Baseline / Building / Peak / Deload —
+// a different word every week — the block is named on the line under it, and
+// the sixteen ticks came back with the block names beneath them.
 //
-// The rail and strip are the only navigator — ProgramArc, the gradient pager
+// The strip is the only navigator — ProgramArc, the gradient pager
 // card, the B1–B4 pills and the week dots are all gone from this surface.
 //
 // READ-ONLY FOR LOGGING (§7.3): completion marks come from a one-shot,
@@ -186,121 +192,93 @@ export function ProgramBrowse({
         </button>
         <span className="ds-label">Full program</span>
       </div>
-      {/* "Block 1: Anatomical Adaptation" — Ashley's wording, verbatim. The
-          block NUMBER belongs in the title because the phase name alone is
-          what read as static: four weeks of one word, in the largest type on
-          the page, over a plan whose loads were climbing the whole time. */}
+      {/* LEAD WITH THE WEEK. Ashley's ruling, 1 Sep 2026, on a mockup she
+          drew: the biggest text on the page is what THIS WEEK is for, and the
+          block is named on the line beneath.
+          The heading has now been wrong twice in one day in the same
+          direction. It was the phase name alone — four weeks of "Hypertrophy"
+          over a plan whose loads were climbing — and her complaint was that
+          it never changed. The first fix made it "Block 4: Hypertrophy",
+          which still repeats for four weeks. This is the one that actually
+          answers her: Baseline, Building, Peak, Deload, a different word every
+          week. */}
       <p className="mt-2.5 text-[1.875rem] font-bold leading-[1.04] tracking-[-.035em]">
-        {hasMesocycle && weekObj?.phase_label
-          ? `Block ${currentBlockNumber}: ${weekObj.phase_label}`
+        {hasMesocycle && weekObj
+          ? weekRole(weekObj).label
           : weekObj?.phase_label ?? weekObj?.label ?? 'Your program'}
       </p>
       {hasMesocycle && (
+        /* THE PHASE NAME LIVES HERE NOW, at full length. Her mockup dropped it
+           from this line and left it only as a 10px label under the strip —
+           which would bury the very thing she asked to be able to see. There
+           is room on one line for all three facts; use it. */
         <p className="mt-1 text-[0.8125rem] text-muted-foreground">
-          Weeks {Math.min(...blockWeeks)}–{Math.max(...blockWeeks)} · Block {currentBlockNumber} of {blockCount}
+          Block {currentBlockNumber} of {blockCount}
+          {weekObj?.phase_label ? ` · ${weekObj.phase_label}` : ''}
+          {` · weeks ${Math.min(...blockWeeks)}–${Math.max(...blockWeeks)}`}
         </p>
       )}
 
-      {/* THE BLOCK RAIL. Replaces four letters — B1 B2 B3 B4 — with the four
-          block NAMES, which is the thing Ashley could not see: "why are 4
-          weeks anatomical adaptation, followed by four weeks of hypertrophy".
-          The old strip could show her where she was and never what any of it
-          was for. Short forms because "Metabolic Conditioning" four-across on
-          a phone truncates to nothing. */}
-      {hasMesocycle && blockCount > 1 && (
-        <div className="mt-4 flex gap-1">
+      {/* THE STRIP — sixteen weeks, grouped into four named blocks.
+          Restored from before the block rail, with two changes. The B1/B2/B3/B4
+          labels are the block NAMES now, which is what Ashley could not see
+          from the old version: it could say where she was and never what any
+          of it was for. And the ticks and their label are nested inside one
+          per-block column, so the name sits under its own four weeks BY
+          CONSTRUCTION — the previous version spread four labels across the row
+          with justify-between and hoped. */}
+      {hasMesocycle && (
+        <div className="mt-4 flex gap-[9px]">
           {blocks.map(b => {
-            const isCurrent = b.number === currentBlockNumber
-            const isPast = (b.weeks[b.weeks.length - 1]?.week_number ?? 0) < liveWeek
+            const isCurrentBlock = b.number === currentBlockNumber
             return (
-              <button
-                key={b.number}
-                aria-label={`Block ${b.number}, ${b.label}${isCurrent ? ', current block' : ''}`}
-                aria-current={isCurrent ? 'true' : undefined}
-                onClick={() => setBrowseWeek(b.weeks[0]?.week_number ?? 1)}
-                className="min-w-0 truncate border-0 cursor-pointer text-[0.625rem] uppercase tracking-[.08em] font-semibold px-1"
-                style={{
-                  flex: 1,
-                  height: 24,
-                  borderRadius: 6,
-                  background: isCurrent
-                    ? 'var(--primary)'
-                    : isPast
-                      ? 'color-mix(in srgb, var(--primary) 20%, transparent)'
-                      : 'transparent',
-                  color: isCurrent
-                    ? 'var(--primary-foreground)'
-                    : isPast
-                      ? 'var(--primary)'
-                      : 'var(--muted-foreground)',
-                  boxShadow: !isCurrent && !isPast ? 'inset 0 0 0 1px var(--border)' : undefined,
-                }}
-              >
-                {shortPhaseLabel(b.label)}
-              </button>
-            )
-          })}
-        </div>
-      )}
-
-      {/* THE WEEK STRIP — what this week is FOR, named. The four weeks of a
-          block always differed (her own block 1 ran 72.5 -> 77.5 -> 82.5kg
-          then deloaded to 57.5) and nothing at the top of the screen said so.
-          Every label here comes from weekRole, which takes its vocabulary
-          from the progression note already rendered further down the page —
-          the strip is a heading for a sentence that was already there, not a
-          second opinion about the week. */}
-      {hasMesocycle && currentBlock && (
-        <div className="mt-2 flex gap-1.5">
-          {currentBlock.weeks.map(w => {
-            const role = weekRole(w)
-            const isCurrent = w.week_number === browseWeek
-            const isDone = w.week_number < liveWeek
-            // THE DELOAD IS THE ONE WEEK THAT MEANS DO LESS. Three segments
-            // saying "more" and one saying "less" must not look identical —
-            // the delta chip below already spends --role-warn on exactly this
-            // ("Deload · 28% fewer sets than W3"), so the strip agrees with it
-            // rather than inventing a colour.
-            const nameColor = role.key === 'deload'
-              ? 'var(--role-warn)'
-              : isCurrent
-                ? 'var(--primary)'
-                : isDone
-                  ? 'var(--foreground)'
-                  : 'var(--muted-foreground)'
-            return (
-              <button
-                key={w.week_number}
-                aria-label={`Week ${w.week_number}, ${role.label}${isCurrent ? ', current week' : isDone ? ', done' : ', upcoming'}`}
-                aria-current={isCurrent ? 'true' : undefined}
-                onClick={() => setBrowseWeek(w.week_number)}
-                className="min-w-0 flex flex-col items-center justify-center gap-[2px] border-0 cursor-pointer py-1.5 px-1"
-                style={{
-                  flex: 1,
-                  minHeight: 52,
-                  borderRadius: 10,
-                  background: isCurrent
-                    ? 'color-mix(in srgb, var(--primary) 14%, transparent)'
-                    : isDone
-                      ? 'var(--surface-raised)'
-                      : 'transparent',
-                  boxShadow: `inset 0 0 0 1px ${isCurrent ? 'var(--primary)' : 'var(--hairline)'}`,
-                }}
-              >
-                <span className="text-[0.625rem] uppercase tracking-[.08em] text-muted-foreground">
-                  {isDone ? '✓ ' : ''}W{w.week_number}
-                </span>
-                {/* glow-mint is a TEXT-shadow, so it goes on the name and not
-                    on the button — on the button it would also light up the
-                    muted week number above it, which is the one part of this
-                    segment that should stay quiet. */}
-                <span
-                  className={`text-[0.75rem] font-semibold leading-tight truncate max-w-full ${isCurrent && role.key !== 'deload' ? 'glow-mint' : ''}`}
-                  style={{ color: nameColor }}
-                >
-                  {role.label}
-                </span>
-              </button>
+              <div key={b.number} className="min-w-0 flex flex-col" style={{ flex: b.weeks.length }}>
+                <div className="flex items-end gap-[3px] h-[22px]">
+                  {b.weeks.map(w => {
+                    const role = weekRole(w)
+                    const selected = w.week_number === browseWeek
+                    const isLive = w.week_number === liveWeek
+                    // THE DELOAD IS THE ONE WEEK THAT MEANS DO LESS, and it is
+                    // the piece of meaning most easily lost in a rewrite of
+                    // this strip. Short AND amber: the height alone was the
+                    // old signal and it survives a screenshot badly. The delta
+                    // chip below already spends --role-warn on exactly this
+                    // ("Deload · 28% fewer sets than W3"), so the strip agrees
+                    // with it rather than inventing a colour.
+                    const fill = role.key === 'deload'
+                      ? (selected ? 'var(--role-warn)' : 'color-mix(in srgb, var(--role-warn) 45%, transparent)')
+                      : selected
+                        ? 'var(--primary)'
+                        : w.week_number < liveWeek
+                          ? 'color-mix(in srgb, var(--primary) 34%, transparent)'
+                          : 'color-mix(in srgb, var(--border) 90%, transparent)'
+                    return (
+                      <button
+                        key={w.week_number}
+                        aria-label={`Week ${w.week_number}, ${role.label}${selected ? ', showing' : ''}`}
+                        aria-current={selected ? 'true' : undefined}
+                        onClick={() => setBrowseWeek(w.week_number)}
+                        className="border-0 p-0 cursor-pointer"
+                        style={{
+                          flex: 1,
+                          height: selected ? 22 : role.key === 'deload' ? 8 : 14,
+                          borderRadius: 2,
+                          background: fill,
+                          boxShadow: isLive && !selected ? 'inset 0 0 0 1px var(--primary)' : undefined,
+                        }}
+                      />
+                    )
+                  })}
+                </div>
+                {blockCount > 1 && (
+                  <span
+                    className={`mt-[7px] truncate text-center text-[0.625rem] uppercase tracking-[.1em] ${isCurrentBlock ? 'font-semibold' : 'text-muted-foreground/80'}`}
+                    style={isCurrentBlock ? { color: 'var(--primary)' } : undefined}
+                  >
+                    {shortPhaseLabel(b.label)}
+                  </span>
+                )}
+              </div>
             )
           })}
         </div>

@@ -195,7 +195,7 @@ console.log('\n4. Short phase names round-trip, and an unknown one is not swallo
     shortPhaseLabel('  Anatomical Adaptation  ') === 'Adaptation')
 }
 
-console.log('\n5. The screen is wired to it')
+console.log('\n5. The screen is wired to it, and leads with the week')
 {
   // COMMENTS STRIPPED. This file's own explanation names every symbol it
   // forbids, and a check its documentation can satisfy is the defect this
@@ -206,17 +206,30 @@ console.log('\n5. The screen is wired to it')
   check('the browse screen names weeks through weekRole', /weekRole\(/.test(src))
   check('...and keeps no week-name list of its own',
     !/'Baseline'|"Baseline"|'Building'|"Building"|'Peak'|"Peak"/.test(src))
-  check('the block rail shortens phase names through the shared map', /shortPhaseLabel\(/.test(src))
-  check('the title reads "Block N: <phase>"', /Block \$\{currentBlockNumber\}: \$\{weekObj\.phase_label\}/.test(src))
+  check('the block labels shorten phase names through the shared map', /shortPhaseLabel\(/.test(src))
 
-  // THE ONE PIECE OF MEANING THAT MUST NOT BE LOST. Three weeks that mean
-  // "more" and one that means "less" cannot look identical, and the app
-  // already spends --role-warn on exactly this distinction in the delta chip.
+  // THE HEADING LEADS WITH THE WEEK — Ashley's ruling after the first attempt
+  // named the block instead and still repeated for four weeks. Asserted on the
+  // 1.875rem heading specifically, because putting the role anywhere on the
+  // page is not the same as putting it where the complaint was.
+  const heading = src.slice(src.indexOf('text-[1.875rem]'), src.indexOf('text-[1.875rem]') + 320)
+  check('the heading exists to be checked (sanity check on this check)', heading.length > 100, heading.length)
+  check('the heading is the WEEK\'s role, not the block\'s name',
+    /weekRole\(weekObj\)\.label/.test(heading) && !/Block \$\{currentBlockNumber\}:/.test(heading))
+  // The phase name has to survive somewhere readable. Her mockup left it only
+  // as a 10px label under the strip; the line under the heading carries it.
+  check('...and the phase is named in full on the line beneath',
+    /Block \{currentBlockNumber\} of \{blockCount\}[\s\S]{0,160}weekObj\?\.phase_label/.test(src))
+
+  // THE ONE PIECE OF MEANING THAT MUST NOT BE LOST, and it has now survived
+  // two rewrites of this strip. Three weeks that mean "more" and one that
+  // means "less" cannot look identical, and the app already spends
+  // --role-warn on exactly this distinction in the delta chip.
   check('the deload week is coloured as a warning, not as the primary accent',
-    /role\.key === 'deload'\s*\n?\s*\?\s*'var\(--role-warn\)'/.test(src))
-  // A tick strip nobody can navigate with is a picture. Both rows move weeks.
-  check('both the rail and the strip are tappable', (src.match(/setBrowseWeek\(/g) ?? []).length >= 4)
-  check('every segment names itself for a screen reader', /aria-label=\{`Week \$\{w\.week_number\}, \$\{role\.label\}/.test(src))
+    /role\.key === 'deload'\s*\n?\s*\?\s*\(?selected \? 'var\(--role-warn\)'/.test(src))
+  // A strip nobody can navigate with is a picture.
+  check('the strip is tappable', /onClick=\{\(\) => setBrowseWeek\(w\.week_number\)\}/.test(src))
+  check('every tick names itself for a screen reader', /aria-label=\{`Week \$\{w\.week_number\}, \$\{role\.label\}/.test(src))
 }
 
 if (failures > 0) { console.error(`\n${failures} check(s) failed\n`); process.exit(1) }
