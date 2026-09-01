@@ -663,6 +663,20 @@ export interface ComputedMealMacros extends Macros100g {
 export function unitToGrams(entry: FoodEntry | null, unit: string, quantity: number): number {
   const u = unit.toLowerCase().trim()
   if (entry?.units && entry.units[u] != null) return entry.units[u] * quantity
+  // A BARE COUNT ("3 eggs", "2 bananas") parses as unit 'whole', and almost
+  // no entry names a 'whole' size — they name medium/large/small. Falling
+  // through to the treat-as-grams default turned "3 eggs" into THREE GRAMS
+  // of egg: 5 kcal, coverage 100%, nothing flagged — a confidently wrong
+  // number in the worst place for one. Found by test:custom-meal's very
+  // first fixture, which is exactly how a user states their own breakfast.
+  // A count of a food that knows its piece weight means pieces: medium
+  // first (the unmarked size), then the shopping unit's average. A food
+  // with neither keeps the old fail-through, where low coverage still
+  // surfaces the uncertainty.
+  if (u === 'whole' && entry) {
+    const piece = entry.units?.medium ?? entry.purchaseUnit?.avgGrams
+    if (piece != null) return piece * quantity
+  }
   if (DEFAULT_UNIT_GRAMS[u] != null) return DEFAULT_UNIT_GRAMS[u] * quantity
   // Unknown unit name (e.g. a stray "1 handful") — treat the quantity as grams
   // rather than throwing away the line; coverage will still reflect the

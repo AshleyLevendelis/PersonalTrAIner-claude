@@ -19,6 +19,7 @@ import { pickAccountabilityCheckIn } from '@/lib/accountability'
 import { executeExerciseSwap, executeMealSwap, executeMealAddition, undoMealAddition, undoExerciseSwap, executeInjuryAdaptation, executeLastingInjury, executeInjuryRecovered, executeEquipmentAdaptation, executeVolumeChange, executeScheduleChange, executeRestDay, undoRestDay, undoWeekRangeChange, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type LastingInjuryPayload, type InjuryRecoveredPayload, type EquipmentAdaptationPayload, type VolumeChangePayload, type ScheduleChangePayload, type RestDayPayload } from '@/lib/pending-action-executor'
 import { adjustDayVolume, isVolumeAdjustable } from '@/lib/volume-adjust'
 import { buildMealAdditionProposal, type MealAdditionPayload } from '@/lib/meal-addition'
+import { buildCustomMealProposal } from '@/lib/custom-meal'
 import { buildMealSwapProposal } from '@/lib/meal-swap-proposal'
 import { compileFoodDislikes } from '@/lib/fact-compiler'
 import type { SwapScope } from '@/lib/mesocycle-edit'
@@ -1084,6 +1085,9 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     // Not "swap X for Y" — nothing is being replaced, and the default
     // headline below would read the slot name as the thing being lost.
     if (pendingAction.kind === 'propose_meal_addition') return `I can add **${rows[0].after}** to your ${rows[0].before}:`
+    // The inverse promise of the addition headline: their food, their
+    // amounts, and the day bends around it rather than the other way.
+    if (pendingAction.kind === 'propose_custom_meal') return `Here's **${rows[0].after}**, exactly as you have it:`
     // The rationale IS the offer here ("that's all five I've got — want me to
     // find new ones?"), so repeating a headline above it would say it twice.
     if (pendingAction.kind === 'propose_meal_pool_refresh') return pendingAction.diff.rationale ?? 'Want me to find you some new options?'
@@ -2141,6 +2145,28 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
           if (addition.ok) built = { scopeKey: addition.scopeKey, preconditions: addition.preconditions, payload: addition.payload as unknown as Record<string, unknown>, diff: addition.diff }
           else refusal = addition.reason
         }
+      } else if (result.proposal.kind === 'propose_custom_meal' && result.proposal.rawArgs) {
+        // Same gate as an addition — verifyProposal, in keepPortions mode.
+        // The stated amounts are facts; what gets checked is whether the
+        // foods resolve, whether they clash with restrictions, and nothing
+        // about whether they fit a budget — the pinned-slot rebalance in
+        // assembleDay is what fits the day instead.
+        if (!macros) {
+          refusal = "I need your height, weight, age and sex before I can plan a day around a meal — you can add them in Profile."
+        } else {
+          const custom = buildCustomMealProposal({
+            rawArgs: result.proposal.rawArgs,
+            profileId: profile.id,
+            targets: macros,
+            mealsPerDay: profile.meals_per_day,
+            includeSnacks: profile.include_snacks,
+            dietaryPreferences: profile.dietary_preferences ?? [],
+            dislikedFoods: profile.disliked_foods ?? [],
+            todayDate: getSessionDateContext(profile.id).date,
+          })
+          if (custom.ok) built = { scopeKey: custom.scopeKey, preconditions: custom.preconditions, payload: custom.payload as unknown as Record<string, unknown>, diff: custom.diff }
+          else refusal = custom.reason
+        }
       } else if (result.proposal.kind === 'propose_exercise_swap' && result.proposal.rawArgs) {
         const swap = buildExerciseSwapProposal(result.proposal.rawArgs)
         if (swap) built = { scopeKey: swap.scopeKey, preconditions: swap.preconditions, payload: swap.payload as unknown as Record<string, unknown>, preImage: swap.preImage, diff: swap.diff }
@@ -2614,7 +2640,10 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       rows = ok ? result.added.map(n => ({ label: slot, detail: n })) : []
       // No undo: generating already cost a model call, and undoing would only
       // delete options the user can ignore for free.
-    } else if (row.kind === 'propose_meal_addition') {
+    } else if (row.kind === 'propose_meal_addition' || row.kind === 'propose_custom_meal') {
+      // ONE executor for both, on purpose: a custom meal IS an addition once
+      // verified — same pool insert, same pick, same rollback — the only
+      // difference was upstream, in how the option's portions were derived.
       const payload = row.payload as unknown as MealAdditionPayload
       const result = await executeMealAddition(profile.id, payload)
       receipt = result.receipt
@@ -2640,7 +2669,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
           ok = false
         }
       }
-      title = ok ? 'Added' : "Couldn't add the meal"
+      title = ok ? (row.kind === 'propose_custom_meal' ? 'Set as your meal' : 'Added') : "Couldn't add the meal"
       rows = ok ? [{ label: payload.slot, detail: `+ ${payload.option.name}` }] : []
       undoToken = ok ? row.id : undefined
     } else if (row.kind === 'propose_injury_adaptation') {
@@ -2895,7 +2924,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         if (!payload.currentName) return
         const persisted = await onMealSwapApplied(payload.slot, payload.currentName)
         if (!persisted) return // leave the Undo button in place so the user can retry
-      } else if (row.kind === 'propose_meal_addition') {
+      } else if (row.kind === 'propose_meal_addition' || row.kind === 'propose_custom_meal') {
         // Removes the option from the pool AND clears the pick, both — an
         // undo that only dropped the pick would leave the meal sitting in
         // the slot's options forever, which is not what "undo" said.

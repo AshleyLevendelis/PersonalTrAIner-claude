@@ -111,6 +111,8 @@ export interface NutritionDisplayProps {
   onFixDietaryRestrictions?: () => void
   onSwapMealSlot: (slot: MealSlotName, chooseName: string) => Promise<void>
   onRegenerateMealSlot: (slot: MealSlotName) => Promise<void>
+  /** "More options" in the swap panel — the same append-only generator the chat's pool-refresh offer uses. Ashley's depth ruling holds: it only ever runs when SHE taps it. */
+  onFindMoreOptions?: (slot: MealSlotName) => Promise<{ added: string[]; error?: string }>
   onRegenerateAllMeals: () => Promise<void>
 }
 
@@ -118,7 +120,7 @@ export function NutritionDisplay({
   profile, macros, exercisePlan = [], latestWeightKg, onMacroModeChange, onMacroSplitChange,
   profileId, date, pools, chosen, mealTotals, isGeneratingMeals, mealRegenerateError, onDismissRegenerateError, avoidFoods = [],
   unrecognisedDietaryRestrictions, onFixDietaryRestrictions,
-  onSwapMealSlot, onRegenerateMealSlot, onRegenerateAllMeals,
+  onSwapMealSlot, onRegenerateMealSlot, onFindMoreOptions, onRegenerateAllMeals,
 }: NutritionDisplayProps) {
   // Living targets (M0): BMR/TDEE were previously read from the frozen
   // fitness_profiles columns (computed once at onboarding); they're now
@@ -454,6 +456,7 @@ export function NutritionDisplay({
         avoidFoods={avoidFoods}
         onSwapSlot={onSwapMealSlot}
         onRegenerateSlot={onRegenerateMealSlot}
+        onFindMoreOptions={onFindMoreOptions}
         onRegenerateAll={onRegenerateAllMeals}
       />
 

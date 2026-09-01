@@ -281,6 +281,25 @@ export function verifyProposal(
    * dedupes for free by using one Set across the whole run.
    */
   unrecognisedOut?: Set<string>,
+  /**
+   * CUSTOM-MEAL MODE — the user's own stated portions are facts, not
+   * suggestions (Ashley, 1 Sep 2026: the app should ask how much of each
+   * food she's having and calculate, not decide for her). keepPortions
+   * skips exactly two stages: scaleToTarget, and the slot-budget calorie/
+   * protein bands — the day-level rebalance in assembleDay (pinned slots)
+   * is what fits the rest of the day around this meal instead.
+   *
+   * WHAT IT NEVER SKIPS, and the reason the mode lives INSIDE this function
+   * rather than beside it: ingredient resolution, the coverage floor, the
+   * dislike filter and validateMealAgainstDiet. A parallel "custom" path
+   * with its own subset of the checks is how the almond butter got through
+   * the swap path — one pipeline, one place to be wrong.
+   *
+   * checkSlotAppropriate is also skipped in this mode: it polices what the
+   * GENERATOR proposes for a slot, and the user's own usual breakfast is
+   * not the generator's business.
+   */
+  keepPortions = false,
 ): PoolOption | null {
   const parsed = parseIngredientLines(proposal.ingredients)
   if (parsed.length === 0) {
@@ -288,7 +307,7 @@ export function verifyProposal(
     return null
   }
 
-  const slotIssue = checkSlotAppropriate(proposal.name, proposal.prep, slot, parsed.length)
+  const slotIssue = keepPortions ? null : checkSlotAppropriate(proposal.name, proposal.prep, slot, parsed.length)
   if (slotIssue) {
     rejectLog.push(`[${slot}] "${proposal.name}": not slot-appropriate — ${slotIssue}`)
     return null
@@ -335,6 +354,19 @@ export function verifyProposal(
     }
     rejectLog.push(`[${slot}] "${proposal.name}": diet violation(s) — ${dietResult.violations.map(v => v.reason).join('; ')}`)
     return null
+  }
+
+  if (keepPortions) {
+    // As stated, exactly. The macros are computeMealMacros' answer for the
+    // user's own quantities — 3 eggs stay 3 eggs whatever the slot budget
+    // says. No post-scale re-checks either: nothing was scaled.
+    return {
+      slot,
+      name: proposal.name,
+      ingredients: parsed,
+      macros: macrosToTargets(computed),
+      tags: [proposal.cuisine, 'own recipe'].filter(Boolean),
+    }
   }
 
   const target100g: Macros100g = { kcal: budget.calories, protein: budget.protein, carbs: budget.carbs, fat: budget.fat }
@@ -756,10 +788,27 @@ export function assembleDay(
    * unaffected by this.
    */
   softLikedFoods: string[] = [],
+  /**
+   * PINNED SLOTS — the "plan the rest of my meals" half (Ashley, 1 Sep
+   * 2026). A pinned slot's option is the only candidate for that slot, so
+   * the cartesian search below optimises the FREE slots to land the whole
+   * day inside the same tolerance bands — the pin's macros count toward the
+   * day like any other meal, they just aren't negotiable.
+   *
+   * Until this existed, a manual pick was overlaid AFTER assembly
+   * (App.tsx), so the other slots were chosen as if the swap had never
+   * happened and the day's totals quietly drifted. That applied to every
+   * manual swap, not just custom meals — one model now, not two.
+   *
+   * The repair-scale below must never touch a pinned slot: a custom meal's
+   * quantities are the user's own stated facts, and "we adjusted your
+   * breakfast" is exactly what this feature promises not to do.
+   */
+  pinned: Partial<Record<MealSlotName, PoolOption>> = {},
 ): AssembledDay {
   const requestedSlots = Object.keys(pools) as MealSlotName[]
-  const slots = requestedSlots.filter(s => (pools[s]?.length ?? 0) > 0)
-  const missingSlots = requestedSlots.filter(s => (pools[s]?.length ?? 0) === 0)
+  const slots = requestedSlots.filter(s => (pools[s]?.length ?? 0) > 0 || pinned[s] != null)
+  const missingSlots = requestedSlots.filter(s => (pools[s]?.length ?? 0) === 0 && pinned[s] == null)
 
   if (slots.length === 0) {
     return { chosen: {}, totals: { calories: 0, protein: 0, carbs: 0, fat: 0 }, withinTolerance: false, alternatives: pools, missingSlots }
@@ -796,8 +845,10 @@ export function assembleDay(
       if (!state.best || score < state.best.score) state.best = { combo: { ...combo }, totals, score }
       return
     }
-    for (const option of pools[slots[index]]!) {
-      combo[slots[index]] = option
+    const slot = slots[index]
+    const candidates = pinned[slot] != null ? [pinned[slot]!] : pools[slot]!
+    for (const option of candidates) {
+      combo[slot] = option
       search(index + 1, combo)
     }
   }
@@ -820,7 +871,14 @@ export function assembleDay(
   // out-of-tolerance day instead.
   if (!withinTolerance && missingSlots.length === 0) {
     const entries = Object.entries(chosen) as [MealSlotName, PoolOption][]
-    const [largestSlot, largestOption] = entries.reduce((a, b) => (b[1].macros.calories > a[1].macros.calories ? b : a))
+    // Only unpinned slots are candidates for repair — see pinned's doc
+    // comment. A day that misses tolerance with every free slot already
+    // optimal ships as the honest miss rather than editing the user's meal.
+    const repairable = entries.filter(([s]) => pinned[s] == null)
+    if (repairable.length === 0) {
+      return { chosen, totals, withinTolerance, alternatives: pools, missingSlots }
+    }
+    const [largestSlot, largestOption] = repairable.reduce((a, b) => (b[1].macros.calories > a[1].macros.calories ? b : a))
 
     const othersTotal = sumOptionMacros(entries.filter(([s]) => s !== largestSlot).map(([, o]) => o))
     const neededForLargest: Macros100g = {

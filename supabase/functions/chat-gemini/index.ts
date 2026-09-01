@@ -309,6 +309,38 @@ const toolDeclarations = [
     },
   },
   {
+    name: "propose_custom_meal",
+    description:
+      "PROPOSES making the user's OWN stated foods, at their OWN stated amounts, one of their meals — this does NOT apply the change, they tap Confirm. Call this when the user says what they actually have or want to have ('I usually have eggs and greek yoghurt and fruit for breakfast', 'I'm having 200g of chicken and rice for lunch'). THE AMOUNTS ARE THEIRS: unlike propose_meal_addition, nothing gets re-portioned — the app calculates the macros for exactly what they stated and re-plans the REST of the day's meals around it. Because of that, EVERY food needs an amount. If any food is missing one, ask how much of each first ('How much of each — grams or counts like 3 eggs both work') and call the tool only once you have them. Never guess a quantity and never state macros in your reply; the card shows the app's own verified numbers. The app checks their foods against allergies and restrictions and will say so rather than confirming if something clashes. Use propose_meal_addition when they're asking for a DISH IDEA to be fitted to their targets; use this when they're telling you what they eat.",
+    parameters: {
+      type: "object",
+      properties: {
+        meal_slot: {
+          type: "string",
+          description: "Which meal this is: breakfast, lunch, dinner or snack.",
+        },
+        name: {
+          type: "string",
+          description: "A short name for it in the user's terms, e.g. 'My usual breakfast', 'Eggs, yoghurt & berries'. Omit and the app names it 'My <slot>'.",
+        },
+        food_lines: {
+          type: "array",
+          items: { type: "string" },
+          description: "One line per food WITH THE USER'S STATED AMOUNT, e.g. '3 eggs', '150g greek yoghurt', '100g blueberries', '1 banana'. Everyday food names — the app matches them against its food database and refuses rather than guessing if it can't resolve them. Do not add foods they didn't say, and do not adjust their amounts.",
+        },
+        date: {
+          type: "string",
+          description: "The date it should become their meal for, as YYYY-MM-DD. Omit for today.",
+        },
+        origin_verbatim_quote: {
+          type: "string",
+          description: "The exact substring of the user's CURRENT message stating what they're having. Must be copied verbatim, not paraphrased.",
+        },
+      },
+      required: ["meal_slot", "food_lines", "origin_verbatim_quote"],
+    },
+  },
+  {
     name: "propose_exercise_swap",
     description:
       "PROPOSES swapping an exercise in the user's workout plan for a biomechanically similar alternative — this does NOT apply the change. Call this when the user gives an explicit command to modify their plan (e.g. 'swap bench press for push-ups', 'replace squats with leg press') OR proposes a swap due to pain/fatigue that the user has confirmed. The app shows the user a card with the exact before/after and they tap Confirm themselves — do not describe the swap as already done, and do not ask for a SEPARATE confirmation in your own text (the card IS the confirmation step). origin_verbatim_quote must be the exact substring of the user's message that makes this an imperative request, not a paraphrase.",
@@ -1230,7 +1262,7 @@ When the user wants to train on different days ("I can't do Thursdays anymore", 
   - Feel/effort check-ins: "how did that feel?" / "how's the shoulder holding up?" -> "Easy" | "About right" | "Hard" (adapt wording to what was actually asked)
   - A named choice between two or more specific things you just mentioned (exercises, meals, days) — the options ARE the names, e.g. asking whether they meant Front Squat or Back Squat -> "Front Squat" | "Back Squat"
   - Scope questions: "just today, or the rest of the block?" -> "Today only" | "Rest of block"
-  Do NOT add the tag when the question is genuinely open-ended — asks for a number, a description, a reason, or anything where the honest answer space isn't a short known set (e.g. "how much did you lift?", "what's been going on?"). When in doubt: if you could plausibly render the answer as 2-4 short buttons without stripping out anything the user might actually want to say, add it — free text is always still available underneath either way. Plan-mutation proposals (propose_exercise_swap, propose_meal_swap, propose_meal_addition, propose_injury_adaptation, propose_equipment_adaptation, propose_volume_change, propose_schedule_change, propose_rest_day) already render their own Confirm/Not-now buttons via the card — never add a redundant [QUICK_REPLIES] tag to those turns. The one exception is the equipment-clarifying question itself (§3b) — that's asked BEFORE the tool call, not on the proposal turn, so it gets a normal [QUICK_REPLIES] tag.
+  Do NOT add the tag when the question is genuinely open-ended — asks for a number, a description, a reason, or anything where the honest answer space isn't a short known set (e.g. "how much did you lift?", "what's been going on?"). When in doubt: if you could plausibly render the answer as 2-4 short buttons without stripping out anything the user might actually want to say, add it — free text is always still available underneath either way. Plan-mutation proposals (propose_exercise_swap, propose_meal_swap, propose_meal_addition, propose_injury_adaptation, propose_equipment_adaptation, propose_volume_change, propose_schedule_change, propose_rest_day, propose_custom_meal) already render their own Confirm/Not-now buttons via the card — never add a redundant [QUICK_REPLIES] tag to those turns. The one exception is the equipment-clarifying question itself (§3b) — that's asked BEFORE the tool call, not on the proposal turn, so it gets a normal [QUICK_REPLIES] tag.
 
 === FEW-SHOT EXAMPLES ===
 User: "Hey"
@@ -1417,6 +1449,7 @@ FUNCTION CALL RULES (CRITICAL):
 - Neither propose_meal_swap nor propose_exercise_swap applies anything itself — both show the user a confirm card. Put your reasoning in the "reason" field, not in a preceding question; do not say "Shall I make this change?" or claim the swap happened.
 - Exercise swaps default to scope: "today" (only applies to today's workout; the original exercise returns next time that day comes up). Only set scope: "permanent" when the user explicitly says they want a lasting change (e.g. "for the rest of the plan", "permanently", "I never want to do X", "always use Y instead").
 - Trigger propose_volume_change / propose_schedule_change per §3d/§3e once the request is an actual imperative and you have the required fields, WITH an origin_verbatim_quote. Neither applies anything — both show a confirm card. "Should I drop to three days?" is a question, not a command: answer it in text.
+- Trigger propose_custom_meal when the user TELLS you what they eat or will eat ("I usually have eggs and greek yoghurt and fruit for breakfast"). The flow Ashley specified: if any stated food has no amount, ask how much of each — one question, not an interrogation — then call with their exact foods and amounts. Their portions are never adjusted; the app fits the rest of the day around the meal. "What should I have for breakfast?" is a question — answer it or use propose_meal_addition; this tool is for what they are actually having.
 - Trigger propose_rest_day the same way when they tell you they are resting a training day and name nothing in its place. "Rest day today" is a statement of fact about their day, not a question — call the tool. "Should I rest today?" is a question: answer it.
 - Answer exercise form/technique questions ("How do I do X?", "What muscles does X work?") directly in your text response. Provide step-by-step form cues, target muscles, common mistakes, and coaching tips.
 - Trigger ban_exercise when the user says "I hate X", "never give me X", "remove X permanently", or explicitly flags an exercise to blacklist.
@@ -1702,6 +1735,29 @@ Keep this context in mind to ensure your greetings and questions naturally align
             proposal: {
               kind: "propose_schedule_change",
               rawArgs: { training_days: args.training_days, reason: args.reason },
+            },
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (name === "propose_custom_meal") {
+        // Courier only, like every proposal: the client resolves the foods
+        // against the food DB, keeps the user's portions (verifyProposal's
+        // keepPortions mode), and shows the card. I1 holds — the server
+        // writes nothing and forwards raw args untouched.
+        return new Response(
+          JSON.stringify({
+            reply: "",
+            proposal: {
+              kind: "propose_custom_meal",
+              rawArgs: {
+                meal_slot: args.meal_slot,
+                name: args.name,
+                food_lines: args.food_lines,
+                date: args.date,
+                origin_verbatim_quote: args.origin_verbatim_quote,
+              },
             },
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
