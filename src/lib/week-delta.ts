@@ -118,6 +118,13 @@ export function weekDelta(
   const previous = before[0]
   const sets = weekSetTotal(week)
 
+  // NO SETS EITHER SIDE MEANS THERE IS NO SET STORY. A starting-out plan is
+  // walks, so its "deload" week prescribes exactly what the week before it
+  // did — the same 20-minute walk — and the chip still announced "Deload ·
+  // lighter on purpose", a reduction that never happened. Caught by the gate
+  // written for the note, on the same plan.
+  if (sets === 0 && weekSetTotal(previous) === 0) return null
+
   // A deload is measured against the week it is stepping down FROM, which is
   // always the one immediately before it.
   if (week.is_deload) {

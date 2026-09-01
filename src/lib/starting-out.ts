@@ -82,14 +82,28 @@ function reasonFor(blockNumber: number, minutes: number): string {
  * weekday, its place in the week, the fact that it's scheduled — and replaces
  * only what's prescribed in it.
  */
-export function toStartingOutDay(day: WorkoutDay, blockNumber = 1): WorkoutDay {
+/**
+ * The whole walk prescription for a block — minutes AND the sentence that
+ * explains them, which must move together.
+ *
+ * Exported because generateMesocycle re-prescribes each block's walks and was
+ * patching only `duration`, leaving block 1's "Starting where you are" text
+ * attached to a week-13 walk. Two callers each building the activity by hand
+ * is what let the two halves drift; there is now one builder and no way to
+ * update the number without the words.
+ */
+export function startingOutActivity(blockNumber: number): PlannedActivity {
   const minutes = startingOutMinutes(blockNumber)
-  const activity: PlannedActivity = {
+  return {
     activity: 'Walk',
     duration: minutes,
     targetRpe: STARTING_OUT_PRESCRIPTION.targetRpe,
     reason: reasonFor(blockNumber, minutes),
   }
+}
+
+export function toStartingOutDay(day: WorkoutDay, blockNumber = 1): WorkoutDay {
+  const activity = startingOutActivity(blockNumber)
   return {
     day: day.day,
     focus: 'Walk',

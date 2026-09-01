@@ -250,5 +250,59 @@ console.log('\n7. A plan ALREADY GENERATED still reads clean')
     /working weight every later week/.test(b), b)
 }
 
+console.log('\n8. A plan with no lifting in it is never described as lifting')
+{
+  // The starting-out plan — beginner AND sedentary — is walks: four of them
+  // and three rest days, and NO exercises anywhere in sixteen weeks. Ashley
+  // photographed week 2 of one (1 Sep 2026) reading "Load goes up this week
+  // on the main lifts — same rep target, more weight than last week" above
+  // a week of Walk / Rest / Walk / Walk / Walk / Rest / Rest.
+  const walking = planFor({ training_experience: 'beginner', activity_level: 'sedentary', equipment_access: 'bodyweight' }, 'wn:walk')
+  const exerciseCount = walking.reduce((s, w) => s + w.days.reduce((n, d) => n + d.exercises.length, 0), 0)
+  check(`the starting-out plan really does contain no exercises (${exerciseCount})`, exerciseCount === 0, exerciseCount)
+
+  // The vocabulary of work that is not in this plan. Each of these appeared
+  // on her screen.
+  const LIFTING = /\b(load|loads|weight|weights|heavier|lighter|rep|reps|set|sets|lift|lifts|RPE|tempo|deload)\b/i
+  const liars: string[] = []
+  for (const w of walking) {
+    const note = weekNoteText(w)
+    check(`W${w.week_number} says something`, note.length > 0, note)
+    if (LIFTING.test(note)) liars.push(`W${w.week_number}: ${note}`)
+    const chip = weekDelta(w, walking)
+    if (chip) liars.push(`W${w.week_number} chip: ${chip.text}`)
+  }
+  check('no walking week is described in lifting words, and none carries a sets chip',
+    liars.length === 0, liars.slice(0, 3))
+
+  // The walk's own explanation must track the block it is in. generateMesocycle
+  // used to re-prescribe each block's MINUTES while leaving block 1's
+  // "Starting where you are" sentence attached, so a week-13 walk explained
+  // itself as a first walk.
+  // AND THE STORED NOTE ITSELF, not just what this screen chooses to show.
+  // coach_note is persisted on the week and read by other surfaces, so a
+  // walking plan must not carry a LOAD INSTRUCTION in it either — the browse
+  // screen dropping the text would otherwise hide the defect rather than fix
+  // it. These are the exact instructions the loaded copy issues; the
+  // weightless copy says "there is no weight to add", which is true and
+  // deliberately still allowed to mention weight.
+  const LOAD_INSTRUCTION = /(load goes up|find the weight|the working weight|heavier weights|more weight than)/i
+  const instructed = walking
+    .filter(w => LOAD_INSTRUCTION.test(w.coach_note ?? ''))
+    .map(w => `W${w.week_number}: ${w.coach_note}`)
+  check('no walking week is told to add or find weight, on any surface',
+    instructed.length === 0, instructed.slice(0, 2))
+
+  const w1 = walking.find(w => w.week_number === 1)!
+  const w13 = walking.find(w => w.week_number === 13)!
+  const minutesOf = (w: typeof w1) => w.days.find(d => d.plannedActivity)?.plannedActivity?.duration
+  check(`the walk gets longer across blocks (${minutesOf(w1)} -> ${minutesOf(w13)} min)`,
+    (minutesOf(w13) ?? 0) > (minutesOf(w1) ?? 0), [minutesOf(w1), minutesOf(w13)])
+  check('...and the sentence explaining it moves too, rather than staying on block 1',
+    weekNoteText(w13) !== weekNoteText(w1), { w1: weekNoteText(w1), w13: weekNoteText(w13) })
+  check('...naming the minutes it actually prescribes',
+    weekNoteText(w13).includes(String(minutesOf(w13))), weekNoteText(w13))
+}
+
 console.log(failures === 0 ? '\nThe week note says one thing, once.\n' : `\n${failures} FAILED\n`)
 process.exit(failures === 0 ? 0 : 1)

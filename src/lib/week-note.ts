@@ -57,8 +57,30 @@ function terminate(text: string): string {
  * The paragraph shown above the week's days. Empty string when the week
  * carries no notes at all (a plan generated before these fields existed).
  */
-export function weekNoteText(week: Pick<MesocycleWeek, 'phase_focus' | 'coach_note'> | undefined): string {
+export function weekNoteText(week: Pick<MesocycleWeek, 'phase_focus' | 'coach_note' | 'days'> | undefined): string {
   if (!week) return ''
+
+  // A WEEK WITH NO EXERCISES IS NOT DESCRIBED IN LIFTING LANGUAGE. A
+  // starting-out plan is walks — four of them and three rest days, no sets
+  // anywhere in sixteen weeks — and it was being handed the phase's lifting
+  // copy verbatim: "Load goes up this week on the main lifts", "find the
+  // weight where the last rep feels like RPE 6, log it", under a heading
+  // reading "Build muscle — moderate loads, higher volume, controlled
+  // tempo". Every one of those describes work that is not in the plan.
+  // Ashley's screenshot, 1 Sep 2026.
+  //
+  // The walk's own reason is used instead — already written, already true,
+  // already the sentence shown on the day itself — rather than new copy
+  // invented here. Checked on the WEEK'S OWN DAYS rather than on the
+  // profile, for the same reason isLoadlessWeek does: the plan in front of
+  // the trainee is the thing being described.
+  const days = week.days ?? []
+  const trains = days.some(d => d.exercises.length > 0)
+  if (days.length > 0 && !trains) {
+    const activity = days.find(d => d.plannedActivity)?.plannedActivity
+    if (activity?.reason?.trim()) return terminate(activity.reason.trim())
+    return ''
+  }
   const kept: string[] = []
   const add = (sentence: string) => {
     const s = terminate(sentence)

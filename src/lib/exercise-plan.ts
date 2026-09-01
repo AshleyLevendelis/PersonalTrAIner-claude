@@ -17,7 +17,7 @@ import {
 } from './periodization'
 import { getGoalPolicy, restrictPhaseSequence, resolveConditioningFrequency, RECOVERY_SET_MULTIPLIER, MAIN_LIFT_REST_FLOOR_SECONDS, type GoalPolicy } from './goal-policies'
 import { dayAnchorExercise, anchorScore } from './session-derive'
-import { isStartingOut, applyStartingOut, startingOutMinutes } from './starting-out'
+import { isStartingOut, applyStartingOut, startingOutActivity } from './starting-out'
 import { getDurationBudgetSeconds, getSessionMinimumSeconds, getSessionMaximumSeconds, getSteadyStateSeconds, DEFAULT_CARRY_DISTANCE_M, estimateDaySeconds, estimateSlotsSeconds, parseRestSeconds, SESSION_OVERHEAD_SECONDS } from './session-duration'
 import { implausibleLifts } from './lift-plausibility'
 
@@ -4340,7 +4340,14 @@ function isLoadlessWeek(days: WorkoutDay[]): boolean {
       if (ex.suggested_load_kg != null) loaded++
     }
   }
-  if (working === 0) return false
+  // NO WORKING SETS AT ALL IS THE MOST LOADLESS A WEEK CAN BE. This returned
+  // false — treating "nothing to measure" as "loaded" — which is exactly
+  // backwards for the one plan shape that has no exercises whatsoever: a
+  // starting-out walking week. That week was handed the LOADED progression
+  // copy, so a plan containing four walks and no lifts told the trainee
+  // "load goes up this week on the main lifts". Found on Ashley's screen,
+  // 1 Sep 2026.
+  if (working === 0) return true
   return loaded / working <= LOADLESS_WEEK_MAX_LOADED_SHARE
 }
 
@@ -6543,11 +6550,15 @@ export function generateMesocycle(
       // exercises, so every per-exercise loop no-ops) — this re-stamps each
       // day's walk with this week's minutes, which is the whole progression.
       if (isStartingOut(profile)) {
-        const minutes = startingOutMinutes(blockIndex + 1)
+        // The whole activity, not just its duration. This used to patch
+        // `duration` alone, so every block after the first carried block 1's
+        // "Starting where you are — turning up is the whole job for now"
+        // beside a number that had moved on twice. startingOutActivity keeps
+        // the minutes and the sentence explaining them together.
+        const activity = startingOutActivity(blockIndex + 1)
         for (let i = 0; i < days.length; i++) {
-          const activity = days[i].plannedActivity
-          if (!activity) continue
-          days[i] = { ...days[i], plannedActivity: { ...activity, duration: minutes } }
+          if (!days[i].plannedActivity) continue
+          days[i] = { ...days[i], plannedActivity: { ...activity } }
         }
       }
 
