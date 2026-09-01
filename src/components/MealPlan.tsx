@@ -464,7 +464,13 @@ function MealSlotRow({
                       showed the meal's own calories with a tick beside it
                       while contributing twice that to the totals above — the
                       one place a user could have caught the discrepancy, and
-                      it agreed with the wrong figure. */}
+                      it agreed with the wrong figure.
+                      The events carry the macros as they were AT LOG TIME, so
+                      swapping the slot after logging leaves this number on the
+                      meal that was actually eaten while the name above shows
+                      the new pick. Considered and kept: what the day is
+                      carrying is the useful truth here, and unlogging and
+                      logging again corrects it in two taps. */}
                   <span className={`tabular-mono text-xs ${duplicated ? 'text-[color:var(--role-warn-text)]' : isLogged ? 'text-primary glow-mint' : 'text-muted-foreground'}`}>
                     {isLogged ? '✓ ' : ''}{Math.round(isLogged ? loggedKcal : option.macros.calories)} kcal
                     {duplicated ? ` ·×${loggedEvents.length}` : ''}
