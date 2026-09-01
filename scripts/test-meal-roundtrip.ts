@@ -36,6 +36,11 @@
  *  12. (surfacing round) unrecognisedPreferences propagates end-to-end
  *      through generateMealPools, not just verifyProposal's own Set param —
  *      the banner-path plumbing App.tsx/MealPlan.tsx read from
+ *  14. (1 Sep 2026) A meal logged TWICE is counted twice, shown as twice, and
+ *      undone in full. The ledger could always hold two 'confirmed' events
+ *      for one slot; MealPlan's per-slot map kept the last one, so the second
+ *      was invisible while `eaten` summed both, and the row's undo could only
+ *      void the copy it could see
  */
 
 // --- Environment shims (before importing any lib modules) -------------------
@@ -563,6 +568,94 @@ async function main() {
     // disturbed the pre-existing add path).
     check('mpd=3 still ADDS a snack when requested (unaffected by this fix)', computeSlotBudgets(targets, 3, true).snack != null)
     check('mpd=3 still has no snack when not requested', computeSlotBudgets(targets, 3, false).snack === undefined)
+  }
+
+  // -------------------------------------------------------------------------
+  console.log('\n[14] A meal logged twice is counted twice — and says so, and can be undone')
+  {
+    // THE HARM, NOT THE CAUSE. Two 'confirmed' events for one slot is a state
+    // the ledger has always been able to hold, and the append-only design
+    // means it must be: the events are the audit trail, and collapsing them
+    // at read time would be inventing history. What was wrong is what the
+    // screen did with it. MealPlan built its per-slot map with
+    // `next[e.slot] = e`, so the SECOND event replaced the first in the view
+    // while `eaten` kept summing both — the row showed one meal at 420 kcal
+    // and the totals ring above it carried 840, with nothing saying why. The
+    // undo beside that row voided only the copy it could see, so tapping it
+    // flipped the button back to "Log this meal" and left 420 kcal still
+    // counting on the day.
+    //
+    // Nothing here asserts that duplicates cannot occur; that is a separate
+    // question and the write-side window is closed in MealPlan (the busy flag
+    // now covers the ledger refresh, so the button is not live again while
+    // still reading "Log this meal"). This pins that when they DO occur, the
+    // app cannot count them silently.
+    const { logMealEaten, voidMealEvents, loggedEventsBySlot } = await import('../src/lib/meal-store')
+    const day = '2099-01-02' // its own isolated date, like [10]
+    const preTargets = computeTargets(baseProfile, { latestWeightKg: latest2 })
+    const macros = { kcal: 420, protein: 28, carbs: 55, fat: 10 }
+
+    logMealEaten(PROFILE_ID, day, 'breakfast', 'Oat Bowl', macros)
+    logMealEaten(PROFILE_ID, day, 'breakfast', 'Oat Bowl', macros)
+    await flushPending()
+
+    const twice = await getTodayLedger(PROFILE_ID, day, preTargets)
+    check('the ledger counts both — this is the state being handled, not prevented here',
+      twice.eaten.kcal === 840, twice.eaten)
+
+    const grouped = loggedEventsBySlot(twice.events)
+    check('the screen is given BOTH events for the slot, not the last one',
+      (grouped.breakfast ?? []).length === 2, (grouped.breakfast ?? []).length)
+    // The number the row prints beside its tick. Summed from the events, so
+    // it can only ever agree with the totals above it.
+    const shown = (grouped.breakfast ?? []).reduce((sum, e) => sum + (e.macros?.kcal ?? 0), 0)
+    check('...so the kcal it shows is the kcal the day is actually carrying',
+      shown === twice.eaten.kcal, { shown, eaten: twice.eaten.kcal })
+    check('...and oldest-first, so the row can name which log came first',
+      (grouped.breakfast ?? [])[0]?.createdAt <= (grouped.breakfast ?? [])[1]?.createdAt)
+
+    await voidMealEvents((grouped.breakfast ?? []).map(e => e.clientId))
+    const cleared = await getTodayLedger(PROFILE_ID, day, preTargets)
+    check('undo clears EVERY copy, so "not logged" means nothing is counting',
+      cleared.eaten.kcal === 0, cleared.eaten)
+    check('...and the slot is empty on screen too', (loggedEventsBySlot(cleared.events).breakfast ?? []).length === 0)
+
+    // A swap is a plan-state change, not a second helping (see swapPoolMeal).
+    // It counts in `eaten` and must NOT make the Log button read "Logged".
+    const { recordMealEvent } = await import('../src/lib/meal-store')
+    recordMealEvent({ profileId: PROFILE_ID, date: day, slot: 'lunch', eventType: 'swapped_in', mealName: 'Chicken Bowl', macros, source: 'manual' })
+    await flushPending()
+    const withSwap = await getTodayLedger(PROFILE_ID, day, preTargets)
+    check('a swapped_in event is not shown as a log the user made',
+      (loggedEventsBySlot(withSwap.events).lunch ?? []).length === 0, loggedEventsBySlot(withSwap.events).lunch)
+  }
+
+
+  // -------------------------------------------------------------------------
+  console.log('\n[15] The screen is wired to it — a correct store function nothing calls is the failure mode')
+  {
+    // [14] proves loggedEventsBySlot and voidMealEvents behave. It cannot see
+    // whether MealPlan USES them, and the defect was never in the store: it
+    // was one line of grouping written inline in the component. A gate that
+    // only exercised the library would have stayed green through the entire
+    // bug. Comments stripped, because this file's own explanation of the fix
+    // names every symbol it forbids.
+    const { readFileSync } = await import('fs')
+    const src = readFileSync(new URL('../src/components/MealPlan.tsx', import.meta.url), 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
+
+    check('the panel groups logged events through the shared helper', /loggedEventsBySlot\(/.test(src))
+    check('...and keeps no per-slot event map of its own', !/\[e\.slot\]\s*=\s*e\b/.test(src))
+    check('undo goes through the all-copies void, not the single-row one',
+      /voidMealEvents\(/.test(src) && !/\bvoidMealEvent\(/.test(src))
+    // The write-side window: the busy flag must cover the ledger refresh, or
+    // the button is live again while still reading "Log this meal".
+    check('logging awaits the refresh before the button is live again', /await reloadLogged\(\)/.test(src))
+    // What the user is actually told. Asserted on the number, not the prose:
+    // a duplicated row must print the summed kcal, which is the figure the
+    // totals above it are carrying.
+    check('a duplicated slot shows the kcal the day is really counting', /loggedKcal/.test(src))
+    check('...and says so in words', /Logged \{loggedEvents\.length\} times/.test(src))
   }
 
   // -------------------------------------------------------------------------

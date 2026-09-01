@@ -11,7 +11,7 @@ import {
 } from 'lucide-react'
 import { InsightBanner } from '@/components/ui/insight-banner'
 import type { MacroTargets } from '@/lib/types'
-import { getTodayLedger, logMealEaten, voidMealEvent, type MealSlotName, type MealEventRecord } from '@/lib/meal-store'
+import { getTodayLedger, logMealEaten, voidMealEvents, loggedEventsBySlot, type MealSlotName, type MealEventRecord } from '@/lib/meal-store'
 import { checkMealAgainstRestrictions, type MealRestrictionVerdict } from '@/lib/meal-restriction-check'
 import type { PoolOption } from '@/lib/meal-generation'
 
@@ -106,19 +106,29 @@ export function MealPlan({
   // confirm-action in this app. targets is only needed for getTodayLedger's
   // remaining-calc, which this screen doesn't use — totals (always present)
   // is a safe stand-in when targets hasn't loaded yet.
-  const [loggedBySlot, setLoggedBySlot] = useState<Partial<Record<MealSlotName, MealEventRecord>>>({})
-  const reloadLogged = () => {
-    if (!profileId || !date) return
-    getTodayLedger(profileId, date, targets ?? totals).then(ledger => {
-      const next: Partial<Record<MealSlotName, MealEventRecord>> = {}
-      for (const e of ledger.events) {
-        if (e.slot && (e.eventType === 'confirmed' || e.eventType === 'extra')) next[e.slot] = e
-      }
-      setLoggedBySlot(next)
-    }).catch(console.error)
+  //
+  // EVERY event for a slot, not the last one. This used to be a single
+  // record per slot built with `next[e.slot] = e`, which meant a slot logged
+  // twice showed one entry and hid the other — while the ledger's `eaten`
+  // sum, and so the totals ring above, counted both. The undo beside it could
+  // only void the copy it could see. loggedEventsBySlot owns the grouping now
+  // and keeps all of them; see its comment.
+  const [loggedBySlot, setLoggedBySlot] = useState<Partial<Record<MealSlotName, MealEventRecord[]>>>({})
+  // RETURNS ITS PROMISE, and that is a fix rather than tidiness. The log
+  // button's busy flag cleared as soon as logMealEaten had queued, while this
+  // refresh was still in flight — so for the length of one ledger round-trip
+  // the button was live again and still reading "Log this meal". A second tap
+  // in that window wrote a second event, which is how a slot came to hold two
+  // in the first place. Awaiting it means the button is not tappable again
+  // until the screen reflects the first tap.
+  const reloadLogged = (): Promise<void> => {
+    if (!profileId || !date) return Promise.resolve()
+    return getTodayLedger(profileId, date, targets ?? totals)
+      .then(ledger => { setLoggedBySlot(loggedEventsBySlot(ledger.events)) })
+      .catch(console.error)
   }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(reloadLogged, [profileId, date])
+  useEffect(() => { void reloadLogged() }, [profileId, date])
 
   const errorBanner = regenerateError && (
     <InsightBanner tone="warning" className="items-start justify-between">
@@ -225,18 +235,18 @@ export function MealPlan({
             onRegenerate={onRegenerateSlot}
             onFindMore={onFindMoreOptions}
             checkAlternative={alt => checkMealAgainstRestrictions(alt.name, alt.ingredients, dietaryPreferences, avoidFoods)}
-            loggedEvent={loggedBySlot[slot]}
+            loggedEvents={loggedBySlot[slot] ?? []}
             restriction={restrictionBySlot[slot] ?? null}
             onLog={async option => {
               if (!profileId) return
               logMealEaten(profileId, date, slot, option.name, {
                 kcal: option.macros.calories, protein: option.macros.protein, carbs: option.macros.carbs, fat: option.macros.fat,
               })
-              reloadLogged()
+              await reloadLogged()
             }}
-            onUnlog={async clientId => {
-              await voidMealEvent(clientId)
-              reloadLogged()
+            onUnlog={async clientIds => {
+              await voidMealEvents(clientIds)
+              await reloadLogged()
             }}
           />
         ))}
@@ -340,7 +350,7 @@ function MealSlotRow({
   onRegenerate,
   onFindMore,
   checkAlternative,
-  loggedEvent,
+  loggedEvents,
   restriction,
   onLog,
   onUnlog,
@@ -364,11 +374,12 @@ function MealSlotRow({
    * than it is for no stated cause.
    */
   checkAlternative: (alt: PoolOption) => MealRestrictionVerdict
-  loggedEvent: MealEventRecord | undefined
+  /** Every event logged against this slot today, oldest first. More than one means it was logged more than once and is being counted more than once. */
+  loggedEvents: MealEventRecord[]
   /** Null when there is no meal to check; ok:true when it passes. */
   restriction: MealRestrictionVerdict | null
   onLog: (option: PoolOption) => Promise<void>
-  onUnlog: (clientId: string) => Promise<void>
+  onUnlog: (clientIds: string[]) => Promise<void>
 }) {
   const [busy, setBusy] = useState(false)
   const [swapOpen, setSwapOpen] = useState(false)
@@ -410,16 +421,25 @@ function MealSlotRow({
 
   const blocked = restriction != null && !restriction.ok
 
+  const isLogged = loggedEvents.length > 0
+  // Logged more than once: the ledger counts every one of these, so this is
+  // the true contribution of this row to today's totals, not option.macros.
+  const duplicated = loggedEvents.length > 1
+  const loggedKcal = loggedEvents.reduce((sum, e) => sum + (e.macros?.kcal ?? 0), 0)
+
   const handleLogToggle = async () => {
     if (!option) return
     // A flagged meal cannot be logged as eaten. This is the half that makes
     // the flag mean something: a warning you can tap straight past teaches
     // the user the warning is decorative. Unlogging is always allowed —
     // whatever is already recorded stays correctable.
-    if (blocked && !loggedEvent) return
+    if (blocked && !isLogged) return
     setBusy(true)
     try {
-      if (loggedEvent) await onUnlog(loggedEvent.clientId)
+      // ALL of them. Undo here means "this meal is not logged", and leaving
+      // a second copy counting while the button flips back to "Log this
+      // meal" is the state that made the double-count invisible.
+      if (isLogged) await onUnlog(loggedEvents.map(e => e.clientId))
       else await onLog(option)
     } finally {
       setBusy(false)
@@ -440,8 +460,14 @@ function MealSlotRow({
               </span>
               {!expanded && (
                 <span className="flex shrink-0 items-center gap-1">
-                  <span className={`tabular-mono text-xs ${loggedEvent ? 'text-primary glow-mint' : 'text-muted-foreground'}`}>
-                    {loggedEvent ? '✓ ' : ''}{Math.round(option.macros.calories)} kcal
+                  {/* THE NUMBER THAT IS ACTUALLY COUNTING. A duplicated slot
+                      showed the meal's own calories with a tick beside it
+                      while contributing twice that to the totals above — the
+                      one place a user could have caught the discrepancy, and
+                      it agreed with the wrong figure. */}
+                  <span className={`tabular-mono text-xs ${duplicated ? 'text-[color:var(--role-warn-text)]' : isLogged ? 'text-primary glow-mint' : 'text-muted-foreground'}`}>
+                    {isLogged ? '✓ ' : ''}{Math.round(isLogged ? loggedKcal : option.macros.calories)} kcal
+                    {duplicated ? ` ·×${loggedEvents.length}` : ''}
                   </span>
                   <ChevronDown className="size-3.5 text-muted-foreground" />
                 </span>
@@ -509,20 +535,39 @@ function MealSlotRow({
             </p>
           )}
 
+          {duplicated && (
+            /* SAID OUT LOUD, in the number that is wrong. The totals ring at
+               the top of this screen has been counting this meal more than
+               once; until this said so, the only visible symptom was a day's
+               calories that didn't add up and no row admitting why. Sits
+               above the button, like the restriction banner, because it
+               explains what that button is about to do. */
+            <p className="flex items-start gap-1.5 rounded-xl bg-[color:var(--role-warn-bg)] px-3 py-2 text-[0.71875rem] leading-snug text-[color:var(--role-warn-text)]">
+              <ShieldAlert className="mt-0.5 size-3.5 shrink-0" />
+              <span>
+                Logged {loggedEvents.length} times, so today&apos;s totals are counting {Math.round(loggedKcal)} kcal
+                for it instead of {Math.round(option.macros.calories)}.
+                {' '}Clear {loggedEvents.length === 2 ? 'both' : 'them'} below, then log it once.
+              </span>
+            </p>
+          )}
+
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={handleLogToggle}
-              disabled={busy || (blocked && !loggedEvent)}
+              disabled={busy || (blocked && !isLogged)}
               className={
-                loggedEvent
+                isLogged
                   ? 'flex min-h-[44px] items-center gap-1.5 rounded-xl bg-primary/15 px-3.5 text-xs font-semibold text-primary'
                   : blocked
                     ? 'flex min-h-[44px] items-center gap-1.5 rounded-xl bg-[color:var(--surface-raised)] px-3.5 text-xs font-semibold text-muted-foreground'
                     : 'flex min-h-[44px] items-center gap-1.5 rounded-xl bg-primary px-3.5 text-xs font-semibold text-primary-foreground glow-mint-box'
               }
             >
-              {loggedEvent ? <><Check className="size-3.5" /> Logged</> : 'Log this meal'}
+              {isLogged
+                ? <><Check className="size-3.5" /> {duplicated ? `Clear ${loggedEvents.length} logs` : 'Logged'}</>
+                : 'Log this meal'}
             </button>
             <Button variant="ghost" size="sm" onClick={handleRegenerate} disabled={busy} className="h-8 px-2.5 text-xs" title="Regenerate this slot's pool">
               {busy ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}

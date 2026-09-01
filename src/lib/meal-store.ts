@@ -416,6 +416,52 @@ export async function voidMealEvent(clientId: string): Promise<void> {
 }
 
 /**
+ * Void EVERY event in a set — the undo for a slot, not for a row.
+ *
+ * A slot can hold more than one 'confirmed' event (see loggedEventsBySlot),
+ * and the ledger counts every one of them. Undo that voided a single
+ * client_id therefore left the remaining copies still counting, so a meal
+ * logged twice went to "not logged" on screen while its calories stayed on
+ * the day. Sequential rather than parallel: each void is its own compensating
+ * write, and one failing must not take an unrelated one down with it.
+ */
+export async function voidMealEvents(clientIds: string[]): Promise<void> {
+  for (const id of clientIds) await voidMealEvent(id)
+}
+
+/**
+ * Group logged events by slot, KEEPING EVERY ONE.
+ *
+ * WHY THIS IS A FUNCTION AND NOT A LOOP IN THE COMPONENT. MealPlan built this
+ * map inline as `next[e.slot] = e`, so a slot with two events showed the
+ * LAST one and the other became invisible — while getTodayLedger's `eaten`
+ * summed both. The screen said "Logged · 320 kcal" and the day's total
+ * carried 640, with nothing anywhere to explain the difference, and the
+ * per-row undo could only reach the copy it could see.
+ *
+ * The events kept are the ones the ledger counts as eaten, minus
+ * 'swapped_in' — a swap is a plan-state change, not a second helping (see
+ * swapPoolMeal's own note), and it is not something a slot's Log button
+ * recorded, so it must not turn that button into "Logged". Only 'confirmed'
+ * is ever written today (logMealEaten is the single writer), so in practice a
+ * slot with two entries is always a genuine double-log.
+ *
+ * Order is preserved from the ledger, which sorts by createdAt — so [0] is
+ * the first log of that slot and the array reads oldest-first.
+ */
+export function loggedEventsBySlot(events: MealEventRecord[]): Partial<Record<MealSlotName, MealEventRecord[]>> {
+  const bySlot: Partial<Record<MealSlotName, MealEventRecord[]>> = {}
+  for (const e of events) {
+    if (!e.slot) continue
+    if (e.eventType !== 'confirmed' && e.eventType !== 'extra') continue
+    const bucket = bySlot[e.slot]
+    if (bucket) bucket.push(e)
+    else bySlot[e.slot] = [e]
+  }
+  return bySlot
+}
+
+/**
  * Turn 7 gap: nothing ever called recordMealEvent — meal_events had a full
  * local-first writer (above) and an undo primitive (voidMealEvent) but no
  * UI/chat call site, so "log this meal" had no effect anywhere in the app.
