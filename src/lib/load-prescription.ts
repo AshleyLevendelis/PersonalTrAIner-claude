@@ -439,7 +439,11 @@ export function categorize(entry: ExerciseEntry): string | null {
   // single dumbbell/kettlebell held at the chest, not a barbell back squat,
   // and must not inherit the much heavier 'squat' standard.
   if (n.includes('goblet')) return 'goblet_squat'
-  if (n.includes('leg press') || n.includes('hack squat')) return 'leg_press'
+  // Belt squat belongs with the machine squats, not the barbell 'squat'
+  // match below that its name would otherwise hit: the load hangs from the
+  // hips off a stack or lever, so it takes leg-press-like loads with none of
+  // the axial compression the barbell standard prices in.
+  if (n.includes('leg press') || n.includes('hack squat') || n.includes('belt squat')) return 'leg_press'
   // SPECIFIC BEFORE GENERIC, and the order below IS the rule.
   //
   // These four used to sit AFTER the generic 'deadlift'/'squat' matches,

@@ -55,6 +55,7 @@ const SKILL_DEMAND: Record<string, SkillDemand> = {
   'Hack Squat': 'moderate',
   'Deficit Push-Ups': 'moderate',
   'Single-Leg RDL (Bodyweight)': 'moderate',
+  'Dumbbell Pullover': 'moderate',
 }
 
 export function getSkillDemand(exerciseName: string): SkillDemand {

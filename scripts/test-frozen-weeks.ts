@@ -199,15 +199,21 @@ console.log('\n1. A rep bought must never cost weight')
   // one of these be fixed while a different lift quietly broke, which is the
   // exact failure §1 above spent eleven offenders learning. A new name here
   // fails even though the total is unchanged. Logged in BACKLOG for a fix.
+  // ONE, DOWN FROM TWO — but displaced, not fixed. The full_gym entry
+  // ('full_gym/full_body/intermediate Seated Cable Row wk12: 40 -> 45')
+  // stopped reproducing on 1 Sep 2026 when the machine-floor batch added 15
+  // full_gym candidates and changed which exercises that seeded plan picks;
+  // the deload-rise mechanism itself is untouched and stays in BACKLOG. If
+  // it re-manifests under some future pool it lands in newRises above and
+  // fails by name, which is exactly this check working.
   const KNOWN_DELOAD_RISES = [
-    'full_gym/full_body/intermediate Seated Cable Row wk12: 40 -> 45',
     'minimalist/full_body/intermediate Dumbbell Floor Press wk16: 18 -> 20',
   ]
   const newRises = deloadRises.filter(r => !KNOWN_DELOAD_RISES.includes(r))
   const fixedRises = KNOWN_DELOAD_RISES.filter(r => !deloadRises.includes(r))
   check('...and no NEW deload comes in heavier than the week before it',
     newRises.length === 0, newRises.slice(0, 3).join(' | '))
-  check('...with the two known ones still exactly as recorded — remove them here when fixed',
+  check('...with the known ones still exactly as recorded — remove them here when fixed',
     fixedRises.length === 0, fixedRises.join(' | '))
 }
 

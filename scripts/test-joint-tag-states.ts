@@ -101,11 +101,18 @@ console.log('\n[5b] The lower back was reviewed: the two paths diverge by exactl
   // So the OLD path must gain exactly those three while the NEW path holds
   // still. If viaNew moves, a back-injured trainee's options changed and this
   // is a regression, not a review.
+  //
+  // MOVED 12 -> 15 on 1 Sep 2026, deliberately: the machine-floor batch
+  // added Smith Machine Squat, Landmine Row and Cable Pull-Through, each
+  // mirroring its free-weight sibling's lower_back_axial tags (Barbell
+  // Squats, T-Bar Rows, Romanian Deadlifts). All three load the joint in
+  // BOTH paths, so the old-vs-new divergence stays exactly the three rehab
+  // movements.
   const j = getFlaggedJoints(['lower_back'])
   const viaNew = EXERCISE_DATABASE.filter(e => isContraindicatedFor(e, j))
   const viaOld = EXERCISE_DATABASE.filter(e => e.loads_joints.some(x => j.has(x)))
   const REHAB = ['Dead Bug', 'Side Plank', 'Bird Dog']
-  check(`what a bad back excludes did NOT move (${viaNew.length})`, viaNew.length === 12, { viaNew: viaNew.length })
+  check(`what a bad back excludes did NOT move (${viaNew.length})`, viaNew.length === 15, { viaNew: viaNew.length })
   check('...and none of the rehab movements is among the exclusions',
     REHAB.every(n => !viaNew.some(e => e.name === n)),
     viaNew.filter(e => REHAB.includes(e.name)).map(e => e.name).join(', '))

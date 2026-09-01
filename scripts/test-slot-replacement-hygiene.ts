@@ -17,7 +17,7 @@
  * adaptation, so covering it covers all four.
  */
 import { applyReplacement } from '../src/lib/mesocycle-edit'
-import { EXERCISE_DATABASE } from '../src/lib/exercise-db'
+import { EXERCISE_DATABASE, searchExerciseCatalog } from '../src/lib/exercise-db'
 import { prescribeLoad } from '../src/lib/load-prescription'
 import type { Exercise, UserProfile } from '../src/lib/types'
 
@@ -113,4 +113,25 @@ console.log('\n[5] Primer guard still holds (regression 1 above)')
 }
 
 if (failures > 0) { console.error(`\n${failures} check(s) FAILED.`); process.exit(1) }
+console.log('\n[6] The swap search offers only live entries')
+{
+  // A retired entry stays in the DB so history keeps resolving, and
+  // getConstrainedPool already filters it out of NEW plans — but
+  // searchExerciseCatalog (the free-search box in both swap dialogs) was
+  // reading the raw array, so the one path built for "record what I
+  // actually did" was also the one path still offering a retired movement.
+  // Derived from the DB, not a name list: every retired entry, whatever is
+  // retired in future, must be unfindable by its own exact name.
+  const retired = EXERCISE_DATABASE.filter(e => e.retired)
+  check('there is at least one retired entry, so this has teeth', retired.length >= 1, retired.length)
+  for (const e of retired) {
+    check(`search cannot surface retired "${e.name}"`,
+      !searchExerciseCatalog(e.name).some(r => r.name === e.name))
+  }
+  // The skip must be the reason, not query luck: the same query that names
+  // the retired row still returns its live replacement.
+  check('the query still finds the live sibling (Seated Cable Row)',
+    searchExerciseCatalog('cable row').some(r => r.name === 'Seated Cable Row'))
+}
+
 console.log('\nAll slot-replacement hygiene checks passed.')

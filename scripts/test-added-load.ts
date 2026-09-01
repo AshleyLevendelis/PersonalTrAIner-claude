@@ -227,19 +227,39 @@ console.log('\n4. The weight holds all block — one lever, not two')
   // still fails if no lift carries added weight at all — so it cannot pass
   // by the feature silently disappearing, which is the failure the original
   // was really guarding against.
+  // PER (LIFT, BLOCK), not per lift across the whole plan. This check's
+  // second incarnation demanded ≥2 rep brackets from every added-load lift
+  // anywhere in the plan, and went red on 1 Sep 2026 for the same incidental
+  // coupling its own comment above records from the LAST catalogue change:
+  // the machine-floor batch shifted seeded selection so Tricep Dips landed
+  // in just one phase — one rep bracket, nothing broken, nothing climbing
+  // because nothing spans weeks. The invariant is "inside a block the
+  // weight holds and reps are the lever", so a lift is only obligated to
+  // climb where it OCCUPIES ≥2 weeks of one block; a single-appearance
+  // accessory has no lever to move. The vacuity guard below still demands
+  // that some lift actually demonstrates the climb, so the feature cannot
+  // pass by disappearing.
   const weeks = plan({ equipment_access: 'full_gym', training_experience: 'advanced' }, 'ag:full_gym:advanced:hypertrophy:upper_lower')
-  const repsByLift = new Map<string, Set<string>>()
+  const byLiftBlock = new Map<string, { weeks: Set<number>; reps: Set<string> }>()
   for (const wk of weeks) for (const d of wk.days) for (const e of d.exercises) {
     if (e.suggested_added_load_kg == null) continue
-    if (!repsByLift.has(e.name)) repsByLift.set(e.name, new Set())
-    repsByLift.get(e.name)!.add(String(e.reps))
+    const key = `${e.name} [block ${wk.block_number ?? Math.ceil(wk.week_number / 4)}]`
+    if (!byLiftBlock.has(key)) byLiftBlock.set(key, { weeks: new Set(), reps: new Set() })
+    byLiftBlock.get(key)!.weeks.add(wk.week_number)
+    byLiftBlock.get(key)!.reps.add(String(e.reps))
   }
-  check(`some lift actually carries added weight here (${repsByLift.size} found)`,
-    repsByLift.size > 0, String(repsByLift.size))
-  const flat = [...repsByLift.entries()].filter(([, reps]) => reps.size <= 1).map(([n]) => n)
-  const summary = [...repsByLift.entries()].map(([n, r]) => `${n}: ${[...r].join('/')}`).join(', ')
+  check(`some lift actually carries added weight here (${byLiftBlock.size} lift-blocks found)`,
+    byLiftBlock.size > 0, String(byLiftBlock.size))
+  // A lift occupying ≥2 weeks of one block MUST show ≥2 rep brackets there
+  // — same weight, reps moving is the whole design. One-week appearances
+  // have no lever to move and are exempt.
+  const spanning = [...byLiftBlock.entries()].filter(([, v]) => v.weeks.size >= 2)
+  const flat = spanning.filter(([, v]) => v.reps.size <= 1).map(([n]) => n)
+  check(`at least one added-load lift spans multiple weeks of a block (${spanning.length} do)`,
+    spanning.length > 0, String(spanning.length))
+  const summary = spanning.map(([n, v]) => `${n}: ${[...v.reps].join('/')}`).join(', ')
   check(`reps still climb under the constant weight (${summary || 'none seen'})`,
-    repsByLift.size > 0 && flat.length === 0, flat.join(', '))
+    byLiftBlock.size > 0 && flat.length === 0, flat.join(', '))
 }
 
 // ---------------------------------------------------------------------------

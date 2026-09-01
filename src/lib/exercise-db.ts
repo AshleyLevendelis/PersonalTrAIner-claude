@@ -261,6 +261,37 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     avg_duration_seconds: 40,
   },
   {
+    // MACHINE FLOOR (1 Sep 2026): busy-machine substitutes for a standard
+    // commercial gym, added on Ashley's report of using whatever machine was
+    // free and having nowhere to record it. Joint tags mirror the named
+    // free-weight sibling and deviate only where the implement genuinely
+    // differs — each deviation is commented at the field. Every entry is
+    // gym-only by equipment (no home tier lists these implements), which is
+    // also what keeps them out of the thin home-tier pools whose duration
+    // budgets are tightest (see the depth-cost note above the preacher
+    // curls).
+    //
+    // Guided bar, same joints as Barbell Bench Press — the bar path is
+    // fixed, not the load. Tier 2: the smith version is the machine
+    // regression of the free lift, like every other machine press here.
+    name: 'Smith Machine Bench Press',
+    id: 'smith-machine-bench-press',
+    movement_pattern: 'horizontal_push',
+    mechanics_tier: 'tier2_compound',
+    prescription_type: 'reps',
+    angle_vector: 'horizontal',
+    primary_muscles: ['chest', 'anterior deltoid', 'triceps'],
+    equipment: ['smith machine', 'bench'],
+    joint_stress: 'moderate',
+    form_cues: ['Set the bench so the bar meets mid-chest', 'Retract shoulder blades', 'Rotate the bar to unhook', 'Press straight up along the rails'],
+    coach_note_swap: 'Barbell bench pattern on a guided bar — no spotter needed.',
+    loads_joints: ['shoulder', 'wrist'],
+    style_tags: ['bodybuilding', 'hybrid'],
+    substitution_group: 'bench_press',
+    unilateral: false,
+    avg_duration_seconds: 35,
+  },
+  {
     name: 'Dumbbell Bench Press',
     id: 'dumbbell-bench-press',
     movement_pattern: 'horizontal_push',
@@ -767,6 +798,29 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     avg_duration_seconds: 35,
   },
   {
+    // MACHINE FLOOR: joint tags mirror T-Bar Rows exactly — same hinged
+    // torso, same static grip hold. Equipment pair mirrors it too: a
+    // landmine attachment or a barbell wedged in a corner, either works.
+    name: 'Landmine Row',
+    id: 'landmine-row',
+    movement_pattern: 'horizontal_pull',
+    mechanics_tier: 'tier2_compound',
+    prescription_type: 'reps',
+    angle_vector: 'diagonal',
+    primary_muscles: ['lats', 'rhomboids', 'rear deltoid', 'biceps'],
+    equipment: ['t-bar', 'barbell'],
+    equipment_alternatives: true,
+    joint_stress: 'moderate',
+    form_cues: ['Stand beside the bar, hinge forward', 'Grip behind the collar with one or both hands', 'Pull to the hip', 'Keep the lower back set'],
+    coach_note_swap: 'Row off the landmine — the T-bar pattern when the T-bar station is taken.',
+    loads_joints: ['lower_back_axial', 'wrist'],
+    contraindicated_joints: ['lower_back_axial'],
+    style_tags: ['bodybuilding', 'functional', 'combat', 'hybrid'],
+    substitution_group: 'row',
+    unilateral: false,
+    avg_duration_seconds: 35,
+  },
+  {
     name: 'Inverted Row',
     id: 'inverted-row',
     movement_pattern: 'horizontal_pull',
@@ -1086,6 +1140,29 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     unilateral: false,
     avg_duration_seconds: 28,
   },
+  {
+    // MACHINE FLOOR: the classic dumbbell stand-in when the cable stack is
+    // taken — same lat-isolation role as Straight-Arm Pulldown, same
+    // shoulder-only joint picture. joint_stress steps UP from the sibling's
+    // 'low' on purpose: the loaded stretch at the bottom is a deep overhead
+    // shoulder position the standing pulldown never reaches.
+    name: 'Dumbbell Pullover',
+    id: 'dumbbell-pullover',
+    movement_pattern: 'vertical_pull',
+    mechanics_tier: 'tier3_isolation',
+    prescription_type: 'reps',
+    angle_vector: 'horizontal',
+    primary_muscles: ['lats', 'chest', 'serratus anterior'],
+    equipment: ['dumbbell', 'bench'],
+    joint_stress: 'moderate',
+    form_cues: ['Lie across or along the bench', 'Both hands under one dumbbell', 'Lower behind the head with slightly bent elbows', 'Pull back over the chest with the lats', 'Ribs down — do not arch to gain range'],
+    coach_note_swap: 'Deep lat stretch with just a dumbbell and a bench.',
+    loads_joints: ['shoulder'],
+    style_tags: ['bodybuilding', 'hybrid'],
+    substitution_group: 'lat_isolation',
+    unilateral: false,
+    avg_duration_seconds: 30,
+  },
 
   // VERTICAL PUSH
   {
@@ -1120,6 +1197,33 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     coach_note_swap: 'Freer path than barbell — better for shoulders with mobility limitations.',
     loads_joints: ['shoulder'],
     style_tags: ['bodybuilding', 'functional', 'combat', 'hybrid'],
+    substitution_group: 'overhead_press',
+    unilateral: false,
+    avg_duration_seconds: 35,
+  },
+  {
+    // MACHINE FLOOR: written as the SEATED smith press, which is how the
+    // machine is actually set up for shoulders. Joint tags therefore mirror
+    // Dumbbell Shoulder Press (shoulder only) rather than the standing
+    // barbell Overhead Press — the back pad takes the axial load and the
+    // fixed bar never travels past the face, so lower_back_axial and neck
+    // both drop; wrist stays because the grip is locked to the bar's fixed
+    // path. 'shoulder press' in the name is load-bearing: it anchors
+    // categorize() to the overhead standard, not bench (see Landmine Press's
+    // note in load-prescription.ts).
+    name: 'Smith Machine Shoulder Press',
+    id: 'smith-machine-shoulder-press',
+    movement_pattern: 'vertical_push',
+    mechanics_tier: 'tier2_compound',
+    prescription_type: 'reps',
+    angle_vector: 'vertical',
+    primary_muscles: ['anterior deltoid', 'lateral deltoid', 'triceps'],
+    equipment: ['smith machine', 'bench'],
+    joint_stress: 'moderate',
+    form_cues: ['Set an upright bench under the bar', 'Bar starts at chin height', 'Press straight up along the rails', 'Lower to the chin, not the chest'],
+    coach_note_swap: 'Guided overhead pressing when the shoulder press machine is taken.',
+    loads_joints: ['shoulder', 'wrist'],
+    style_tags: ['bodybuilding', 'hybrid'],
     substitution_group: 'overhead_press',
     unilateral: false,
     avg_duration_seconds: 35,
@@ -1235,6 +1339,26 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     joint_stress: 'low',
     form_cues: ['Arms at sides', 'Shrug straight up', 'Hold briefly', 'Control descent'],
     coach_note_swap: 'Neutral grip reduces wrist strain compared to barbell shrugs.',
+    loads_joints: ['neck'],
+    style_tags: ['bodybuilding', 'functional', 'hybrid'],
+    substitution_group: 'shrug',
+    unilateral: false,
+    avg_duration_seconds: 28,
+  },
+  {
+    // MACHINE FLOOR: joint tags mirror Dumbbell Shrugs — neutral machine
+    // handles, so the wrist relaxation holds and neck stays the whole story.
+    name: 'Machine Shrug',
+    id: 'machine-shrug',
+    movement_pattern: 'isolation_trap',
+    mechanics_tier: 'tier3_isolation',
+    prescription_type: 'reps',
+    angle_vector: 'vertical',
+    primary_muscles: ['upper trapezius'],
+    equipment: ['machine'],
+    joint_stress: 'low',
+    form_cues: ['Stand tall in the machine', 'Shrug straight up', 'Hold at the top', 'No shoulder rolling'],
+    coach_note_swap: 'Shrugs off a stack when the dumbbell rack is picked clean.',
     loads_joints: ['neck'],
     style_tags: ['bodybuilding', 'functional', 'hybrid'],
     substitution_group: 'shrug',
@@ -1496,6 +1620,33 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     substitution_group: 'hip_hinge',
     unilateral: false,
     avg_duration_seconds: 38,
+  },
+  {
+    // MACHINE FLOOR: the cable hinge when the barbell or the RDL station is
+    // taken. Joint tags mirror Romanian Deadlifts MINUS wrist on both lists
+    // — a rope held between the legs is a slack grip, not the static
+    // loaded hold that keeps wrist on the RDL. Tier 3 on purpose: this is
+    // programmed as a light glute finisher (12-15 reps), and the isolation
+    // tier is also what prices it at the leg-curl fraction of a deadlift
+    // instead of hinge_accessory's 0.55 — a pull-through at 55% of a
+    // deadlift is not a weight anyone does the movement with.
+    name: 'Cable Pull-Through',
+    id: 'cable-pull-through',
+    movement_pattern: 'hip_hinge',
+    mechanics_tier: 'tier3_isolation',
+    prescription_type: 'reps',
+    angle_vector: 'diagonal',
+    primary_muscles: ['glutes', 'hamstrings', 'erectors'],
+    equipment: ['cable machine'],
+    joint_stress: 'low',
+    form_cues: ['Face away, rope between the legs', 'Walk out until the stack lifts', 'Push hips back, soft knees', 'Stand tall by squeezing the glutes — do not pull with the arms'],
+    coach_note_swap: 'Teaches the hinge with the load pulling from behind — very hard to do wrong.',
+    loads_joints: ['lower_back_axial'],
+    contraindicated_joints: ['hip', 'lower_back_axial'],
+    style_tags: ['bodybuilding', 'functional', 'hybrid'],
+    substitution_group: 'hip_hinge',
+    unilateral: false,
+    avg_duration_seconds: 30,
   },
   {
     name: 'Good Mornings',
@@ -1791,6 +1942,98 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     unilateral: false,
     avg_duration_seconds: 32,
   },
+  {
+    // MACHINE FLOOR: joint tags mirror Hip Thrust exactly — same movement,
+    // the pad and lever replace the barbell-and-bench setup.
+    name: 'Machine Hip Thrust',
+    id: 'machine-hip-thrust',
+    movement_pattern: 'hip_hinge',
+    mechanics_tier: 'tier2_compound',
+    prescription_type: 'reps',
+    angle_vector: 'horizontal',
+    primary_muscles: ['glutes', 'hamstrings'],
+    equipment: ['hip thrust machine'],
+    joint_stress: 'low',
+    form_cues: ['Back on the pad, belt or lever over the hips', 'Feet flat, shins vertical at the top', 'Drive through the heels', 'Squeeze at the top, ribs down'],
+    coach_note_swap: 'The hip thrust without loading plates onto a bar across your lap.',
+    loads_joints: ['hip'],
+    contraindicated_joints: [],
+    style_tags: ['bodybuilding', 'functional', 'hybrid'],
+    substitution_group: 'hip_thrust',
+    unilateral: false,
+    avg_duration_seconds: 30,
+  },
+  {
+    // MACHINE FLOOR: standing single-leg hip extension — glute work in the
+    // Hip Thrust family, so it carries Hip Thrust's joint verdict (hip
+    // participates, safe to keep) rather than a hinge's spine tags: the
+    // torso rests on the machine's chest pad, nothing is on the back.
+    name: 'Glute Kickback Machine',
+    id: 'glute-kickback-machine',
+    movement_pattern: 'hip_hinge',
+    mechanics_tier: 'tier3_isolation',
+    prescription_type: 'reps',
+    angle_vector: 'diagonal',
+    primary_muscles: ['glutes', 'hamstrings'],
+    equipment: ['glute kickback machine'],
+    joint_stress: 'low',
+    form_cues: ['Chest on the pad, foot on the platform', 'Drive the platform back and up', 'Squeeze the glute at full extension', 'Do not arch the lower back for extra range'],
+    coach_note_swap: 'One-leg glute work when the hip thrust setup is taken.',
+    loads_joints: ['hip'],
+    contraindicated_joints: [],
+    style_tags: ['bodybuilding', 'hybrid'],
+    substitution_group: 'hip_thrust',
+    unilateral: true,
+    avg_duration_seconds: 32,
+  },
+  {
+    // MACHINE FLOOR: the loaded version of the three band/bodyweight
+    // abduction primers. DELIBERATE tag deviation from those siblings, in
+    // the conservative direction: they mark the hip contraindicated-empty
+    // and rehab-indicated, because a physio genuinely prescribes band
+    // abduction FOR a hip. A weighted stack is not that prescription — so
+    // no indicated_joints, and contraindicated is left to default to
+    // loads_joints, which keeps this machine away from an injured hip while
+    // the primers remain available for it.
+    name: 'Hip Abduction Machine',
+    id: 'hip-abduction-machine',
+    movement_pattern: 'hip_hinge',
+    mechanics_tier: 'tier3_isolation',
+    prescription_type: 'reps',
+    angle_vector: 'lateral',
+    primary_muscles: ['glute medius', 'glute minimus'],
+    equipment: ['hip abduction machine'],
+    joint_stress: 'low',
+    form_cues: ['Sit tall, back against the pad', 'Knees against the outer pads', 'Push out under control', 'Pause at the widest point, return slowly'],
+    coach_note_swap: 'Loads the lateral glutes far past what a band can.',
+    loads_joints: ['hip'],
+    style_tags: ['bodybuilding', 'hybrid'],
+    substitution_group: 'hip_abduction',
+    unilateral: false,
+    avg_duration_seconds: 30,
+  },
+  {
+    // MACHINE FLOOR: first adductor entry in the catalogue — no sibling to
+    // mirror, so the tags take the conservative default (hip loaded, hip
+    // excluded when injured; loaded adduction is exactly what aggravates a
+    // groin strain).
+    name: 'Hip Adduction Machine',
+    id: 'hip-adduction-machine',
+    movement_pattern: 'hip_hinge',
+    mechanics_tier: 'tier3_isolation',
+    prescription_type: 'reps',
+    angle_vector: 'lateral',
+    primary_muscles: ['adductors'],
+    equipment: ['hip adduction machine'],
+    joint_stress: 'low',
+    form_cues: ['Sit tall, knees against the inner pads', 'Squeeze together under control', 'Pause at full closure', 'Open back out slowly — no slamming'],
+    coach_note_swap: 'The only direct adductor work in the gym — groin strength for squats and sport.',
+    loads_joints: ['hip'],
+    style_tags: ['bodybuilding', 'hybrid'],
+    substitution_group: 'hip_adduction',
+    unilateral: false,
+    avg_duration_seconds: 30,
+  },
 
   // KNEE DOMINANT
   {
@@ -1811,6 +2054,31 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     substitution_group: 'squat',
     unilateral: false,
     avg_duration_seconds: 42,
+  },
+  {
+    // MACHINE FLOOR: joint tags mirror Barbell Squats EXACTLY, including
+    // the full contraindicated list — the bar path is guided but the bar is
+    // still on the back, so the axial compression that matters for an
+    // injured spine/hip/knee is unchanged. joint_stress drops to
+    // 'moderate' (matching Hack Squat, the other guided squat) because the
+    // rails remove the balance and bar-path demands, not the load.
+    name: 'Smith Machine Squat',
+    id: 'smith-machine-squat',
+    movement_pattern: 'knee_dominant',
+    contraindicated_joints: ['hip', 'knee', 'lower_back_axial', 'wrist'],
+    mechanics_tier: 'tier2_compound',
+    prescription_type: 'reps',
+    angle_vector: 'vertical',
+    primary_muscles: ['quadriceps', 'glutes', 'hamstrings', 'core'],
+    equipment: ['smith machine'],
+    joint_stress: 'moderate',
+    form_cues: ['Bar on upper traps, feet slightly forward of the bar', 'Rotate to unhook', 'Sit straight down along the rails', 'Depth to parallel', 'Drive up through the heels'],
+    coach_note_swap: 'Squat pattern on rails — the rack is busy, this is not.',
+    loads_joints: ['lower_back_axial', 'knee', 'wrist'],
+    style_tags: ['bodybuilding', 'hybrid'],
+    substitution_group: 'squat',
+    unilateral: false,
+    avg_duration_seconds: 40,
   },
   {
     name: 'Leg Press',
@@ -1862,6 +2130,28 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     joint_stress: 'moderate',
     form_cues: ['Shoulder pads secure', 'Feet lower on platform for quad emphasis', 'Full depth', 'Drive through heels'],
     coach_note_swap: 'Machine-guided squat that isolates quads with back support.',
+    loads_joints: ['knee'],
+    style_tags: ['bodybuilding', 'hybrid'],
+    substitution_group: 'squat',
+    unilateral: false,
+    avg_duration_seconds: 35,
+  },
+  {
+    // MACHINE FLOOR: joint tags mirror Leg Press — knee work with the load
+    // hung from the hips, zero axial compression, which is the whole reason
+    // this machine exists. Priced as leg_press in categorize() (name rule
+    // there), not as a barbell squat.
+    name: 'Belt Squat',
+    id: 'belt-squat',
+    movement_pattern: 'knee_dominant',
+    mechanics_tier: 'tier2_compound',
+    prescription_type: 'reps',
+    angle_vector: 'vertical',
+    primary_muscles: ['quadriceps', 'glutes'],
+    equipment: ['belt squat machine'],
+    joint_stress: 'moderate',
+    form_cues: ['Belt around the hips, stand on the platform', 'Release the handles', 'Squat to parallel with an upright torso', 'Drive up through the whole foot'],
+    coach_note_swap: 'Heavy squatting with nothing on the spine — the leg press alternative that keeps you standing.',
     loads_joints: ['knee'],
     style_tags: ['bodybuilding', 'hybrid'],
     substitution_group: 'squat',
@@ -2582,27 +2872,78 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     avg_duration_seconds: 30,
   },
 
-  // NO PREACHER CURL, and the reason is a constraint on every future
-  // catalogue addition, not a fact about preacher curls.
+  // DEPTH IS NOT FREE — the constraint on every future catalogue addition.
   //
-  // One was written and pulled back out: it put 3 of 13,967 audit
-  // combinations over the duration tolerance, all of them the same
-  // "Back & Biceps" day on a 30-45 minute bodybuilding split, landing at
-  // exactly the +15% boundary. Traced rather than guessed — that day went
-  // from FIVE exercises to SEVEN, gaining a second bicep movement alongside
-  // Barbell Curls. Adding a candidate does not merely change which exercise
-  // is picked; a deeper pool lets the day-filler fit one more distinct
-  // movement, and on a short session that is the difference between fitting
-  // and not.
+  // An earlier preacher curl was written and pulled back out: it put 3 of
+  // 13,967 audit combinations over the duration tolerance, all of them the
+  // same "Back & Biceps" day on a 30-45 minute bodybuilding split, landing
+  // at exactly the +15% boundary. Traced rather than guessed — that day
+  // went from FIVE exercises to SEVEN, gaining a second bicep movement
+  // alongside Barbell Curls. Adding a candidate does not merely change
+  // which exercise is picked; a deeper pool lets the day-filler fit one
+  // more distinct movement, and on a short session that is the difference
+  // between fitting and not.
   //
-  // So depth is not free, and it is least free where the pattern is ALREADY
-  // deep: isolation_bicep had six entries and no swap problem at all. The
-  // additions that earn their duration cost are the ones in thin patterns
-  // (vertical_push had five movements and no machine) or the ones a trainee
-  // physically cannot substitute for (a flat chest press machine). Any
-  // future entry in an already-deep pattern must be measured against
-  // test:audit before it is assumed harmless.
+  // Depth is least free where the pattern is ALREADY deep: isolation_bicep
+  // had six entries and no swap problem at all. The additions that earn
+  // their duration cost are the ones in thin patterns or the ones a trainee
+  // physically cannot substitute for. Any entry added to an already-deep
+  // pattern must be measured against test:audit before it is assumed
+  // harmless.
   //
+  // The two preacher entries below (machine-floor batch, 1 Sep 2026) exist
+  // under exactly that rule: both require gym-only implements ('preacher
+  // bench' / 'machine'), so unlike the pulled entry they never reach the
+  // thin home-tier pools where the day-filler's budget is tightest, and the
+  // audit was re-run at the addition and held at 0 failures. If a future
+  // audit run flags them, the fix is removing an entry, not widening the
+  // tolerance.
+  {
+    // Joint picture vs Barbell Curls: the pad pins the upper arm and the
+    // curl bottoms out under full tension, which is the preacher's known
+    // elbow complaint — elbow stays contraindicated. The EZ bar's
+    // half-supinated grip is the wrist relief the straight bar lacks, so
+    // unlike Barbell Curls the wrist drops from both lists.
+    name: 'Preacher Curl (EZ bar)',
+    id: 'preacher-curl-ez-bar',
+    movement_pattern: 'isolation_bicep',
+    contraindicated_joints: ['elbow'],
+    mechanics_tier: 'tier3_isolation',
+    prescription_type: 'reps',
+    angle_vector: 'vertical',
+    primary_muscles: ['biceps brachii'],
+    equipment: ['EZ bar', 'preacher bench'],
+    joint_stress: 'low',
+    form_cues: ['Armpits over the top of the pad', 'Curl without lifting the elbows off the pad', 'Lower until arms are almost straight', 'No bounce at the bottom'],
+    coach_note_swap: 'The pad removes all swing — the strictest curl in the gym.',
+    loads_joints: ['elbow'],
+    style_tags: ['bodybuilding', 'hybrid'],
+    substitution_group: 'bicep_curl',
+    unilateral: false,
+    avg_duration_seconds: 30,
+  },
+  {
+    // Same joint reasoning as the EZ-bar version above; the stack's neutral
+    // handles spare the wrist the same way.
+    name: 'Machine Preacher Curl',
+    id: 'machine-preacher-curl',
+    movement_pattern: 'isolation_bicep',
+    contraindicated_joints: ['elbow'],
+    mechanics_tier: 'tier3_isolation',
+    prescription_type: 'reps',
+    angle_vector: 'vertical',
+    primary_muscles: ['biceps brachii'],
+    equipment: ['machine'],
+    joint_stress: 'low',
+    form_cues: ['Adjust the seat so armpits sit over the pad', 'Full stretch at the bottom of the stack', 'Curl to full squeeze', 'Control the negative'],
+    coach_note_swap: 'Preacher strictness off a pin-loaded stack.',
+    loads_joints: ['elbow'],
+    style_tags: ['bodybuilding', 'hybrid'],
+    substitution_group: 'bicep_curl',
+    unilateral: false,
+    avg_duration_seconds: 28,
+  },
+
   // TRICEPS
   {
     name: 'Tricep Dips',
@@ -2625,6 +2966,34 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     substitution_group: 'dip',
     unilateral: false,
     avg_duration_seconds: 35,
+  },
+  {
+    // MACHINE FLOOR: dip geometry with a counterweight under the knees —
+    // joint tags mirror Tricep Dips (the shoulder-extension-under-load
+    // position is what's contraindicated, and assistance changes the load,
+    // not the geometry), while joint_stress drops to 'low' the same way
+    // Pull-Ups (Assisted) sits below Pull-Ups. Same physical machine as the
+    // assisted pull-up, hence the shared equipment string. No
+    // capability_requirement: the counterweight IS the sub-novice path, so
+    // gating it would defeat the machine.
+    name: 'Assisted Dip Machine',
+    id: 'assisted-dip-machine',
+    movement_pattern: 'isolation_tricep',
+    contraindicated_joints: ['elbow', 'shoulder'],
+    mechanics_tier: 'tier2_compound',
+    prescription_type: 'reps',
+    angle_vector: 'vertical',
+    primary_muscles: ['triceps', 'chest', 'anterior deltoid'],
+    equipment: ['assisted pull-up machine'],
+    joint_stress: 'low',
+    form_cues: ['Knees on the platform', 'Upright torso, elbows close', 'Lower to a 90-degree elbow', 'Press to lockout'],
+    coach_note_swap: 'Full dips before you have full dips — the counterweight makes up the difference.',
+    loads_joints: ['shoulder'],
+    style_tags: ['bodybuilding', 'functional', 'hybrid'],
+    substitution_group: 'dip',
+    unilateral: false,
+    avg_duration_seconds: 32,
+    assistance: { unit: 'kg' },
   },
   {
     name: 'Tricep Pushdowns',
@@ -4673,6 +5042,11 @@ export function searchExerciseCatalog(query: string, limit = 20): ExerciseEntry[
   const startsWith: ExerciseEntry[] = []
   const contains: ExerciseEntry[] = []
   for (const ex of EXERCISE_DATABASE) {
+    // Retired entries stay in the DB so history keeps resolving (see
+    // `retired`'s doc comment), but they must not be SELECTABLE — this
+    // search feeds the swap dialogs, which was the one path that still
+    // offered them.
+    if (ex.retired) continue
     const name = ex.name.toLowerCase()
     if (name.startsWith(q)) startsWith.push(ex)
     else if (name.includes(q)) contains.push(ex)
