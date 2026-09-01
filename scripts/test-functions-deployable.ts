@@ -37,7 +37,7 @@
 
 import ts from 'typescript'
 import { readFileSync, readdirSync, statSync, existsSync } from 'fs'
-import { join, dirname, resolve } from 'path'
+import { join, dirname, resolve, relative, sep } from 'path'
 import { fileURLToPath } from 'url'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -59,7 +59,16 @@ const walk = (dir: string) => {
 }
 walk(FUNCTIONS)
 files.sort()
-const rel = (p: string) => p.replace(FUNCTIONS + '/', '')
+// PLATFORM-CORRECT, and this line is the reason the gate exists twice over.
+// Its first version was `p.replace(FUNCTIONS + '/', '')` — a hardcoded forward
+// slash. On Ashley's Windows machine `join` produces backslashes, so the
+// prefix never matched, `rel()` returned the full path, and §1's
+// `startsWith('_shared/')` went RED against a completely correct repo, in the
+// same run where the deploy it was guarding succeeded. A check that fires on
+// a legitimate difference is worse than no check: the next person reads past
+// it. `relative()` does the stripping; the split/join normalises separators so
+// every comparison and every reported path reads the same on both platforms.
+const rel = (p: string) => relative(FUNCTIONS, p).split(sep).join('/')
 
 console.log('\n1. The sweep sees the real functions')
 {
@@ -71,7 +80,8 @@ console.log('\n1. The sweep sees the real functions')
   check(`all four deployed functions are in the sweep (${files.length} .ts files total)`, missing.length === 0, missing)
   // _shared is bundled INTO each function, so a syntax error there breaks
   // every one of them at once. It has to be in scope.
-  check('...and the shared modules they bundle', files.some(f => rel(f).startsWith('_shared/')))
+  const shared = files.filter(f => rel(f).startsWith('_shared/'))
+  check(`...and the ${shared.length} shared modules they bundle`, shared.length > 0, files.map(rel))
 }
 
 console.log('\n2. Every file parses — the check the deployer runs first')
