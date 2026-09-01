@@ -1,13 +1,7 @@
-import { useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { ArrowRightLeft, BookOpen, Ban, MoreVertical, X } from 'lucide-react'
-import { formatRampSets, groupExercises, mainLiftGroupIndex, type ExerciseGroup } from '@/lib/session-derive'
-import { RampStrip } from './RampStrip'
-import { LoadChip, type LoadSource } from './LoadChip'
-import { ExerciseLine, SectionLabel, sectionLabelFor } from './ExerciseLine'
-import { SupersetShell } from './SupersetGroup'
-import type { Exercise, WorkoutDay } from '@/lib/types'
+import { X } from 'lucide-react'
+import { ReadOnlyDayList } from './ReadOnlyDayList'
+import type { WorkoutDay } from '@/lib/types'
 
 // ---------------------------------------------------------------------------
 // LAYOUT-DESIGN.md §2.2 — one other day's content, in place, one tap, one
@@ -26,10 +20,16 @@ import type { Exercise, WorkoutDay } from '@/lib/types'
 // lines with a tier label and a mono "3×6-8 · 42.5kg" summary. Same data,
 // same app, two visual languages, and nothing about being read-only required
 // the difference: it was markup duplication, not a real constraint. The
-// collapsed line and the tier label now come from ExerciseLine, shared with
-// today's rows so they cannot drift apart again. What stays different is
-// only what genuinely differs — no set grid, no logged-set state, no
-// calibration cue, no plate calculator.
+// collapsed line and the tier label came from ExerciseLine, shared with
+// today's rows so they could not drift apart again.
+//
+// THAT PROMISE HELD HERE AND MISSED THE THIRD SCREEN. Sharing the ROW was
+// only ever half of it: the program view was still a data table with
+// Exercise / Sets / Reps / Rest columns, because nothing shared the DAY. So
+// the whole list moved to ReadOnlyDayList (31 Aug 2026) and this panel is now
+// a header and a call to it. What stays different is only what genuinely
+// differs — no set grid, no logged-set state, no calibration cue, no plate
+// calculator.
 // ---------------------------------------------------------------------------
 
 export function PeekPanel({
@@ -48,82 +48,6 @@ export function PeekPanel({
   onOpenDetail?: (exerciseName: string) => void
   banBusyName: string | null
 }) {
-  const [explainedKey, setExplainedKey] = useState<string | null>(null)
-  const [expandedKey, setExpandedKey] = useState<string | null>(null)
-
-  const groups = groupExercises(workout.exercises)
-  // Via the shared helper, which falls back to the day's hardest standalone
-  // movement when the day has no tier-1 at all — 37.5% of generated days, and
-  // every one of them on bodyweight or minimalist. Both screens had their own
-  // copy of the tier-1 findIndex; that duplication is the same shape that let
-  // this panel's superset chrome drift until a screenshot caught it.
-  const firstMainLiftGroupIndex = mainLiftGroupIndex(groups, workout.exercises)
-
-  const loadSourceFor = (ex: Exercise): LoadSource | undefined =>
-    ex.suggested_load_kg == null ? undefined : (ex.load_source ?? 'estimate')
-
-  const renderRow = (ex: Exercise, exIndex: number, supersetLabel?: string) => {
-    const key = `${exIndex}:${ex.name}`
-    const expanded = expandedKey === key
-    const ramp = formatRampSets(ex)
-    return (
-      <div key={key} className="space-y-2">
-        <ExerciseLine
-          ex={ex}
-          supersetLabel={supersetLabel}
-          loadSource={loadSourceFor(ex)}
-          expanded={expanded}
-          onToggleExpanded={() => setExpandedKey(prev => (prev === key ? null : key))}
-          trailing={
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="size-7 shrink-0" aria-label="Exercise options">
-                  <MoreVertical className="size-3.5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {onOpenDetail && (
-                  <DropdownMenuItem onClick={() => onOpenDetail(ex.name)}>
-                    <BookOpen className="size-3.5" />
-                    How to do it
-                  </DropdownMenuItem>
-                )}
-                <DropdownMenuItem onClick={() => onSwap(exIndex, ex.name)}>
-                  <ArrowRightLeft className="size-3.5" />
-                  Swap exercise
-                </DropdownMenuItem>
-                <DropdownMenuItem variant="destructive" disabled={banBusyName === ex.name} onClick={() => onBan(ex.name)}>
-                  <Ban className="size-3.5" />
-                  {banBusyName === ex.name ? 'Removing…' : 'Never show this again'}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          }
-        />
-        {expanded && (
-          <div className="space-y-1.5">
-            {/* The ramp ladder is why a peeked day is worth opening at all —
-                it is the safety-relevant half of the prescription, and it
-                stays exactly as it was, just behind one tap now instead of
-                always on screen. */}
-            {ramp && <RampStrip ramp={ramp} />}
-            <LoadChip
-              ex={ex}
-              source={loadSourceFor(ex)}
-              explained={explainedKey === key}
-              onToggleExplain={() => setExplainedKey(prev => (prev === key ? null : key))}
-            />
-          </div>
-        )}
-      </div>
-    )
-  }
-
-  const isGroupExpanded = (g: ExerciseGroup) =>
-    g.kind === 'single'
-      ? expandedKey === `${g.exIndex}:${g.ex.name}`
-      : g.members.some(m => expandedKey === `${m.exIndex}:${m.ex.name}`)
-
   return (
     <div className="rounded-xl bg-card">
       {/* THE SAME HERO AS TODAY, and deliberately so.
@@ -159,39 +83,14 @@ export function PeekPanel({
           <X className="size-3.5" />
         </Button>
       </div>
-      {/* Same list chrome as today's ExerciseList: hairline-separated rows in
-          one column, not gap-separated cards. */}
-      <div className="flex flex-col px-4 pb-2">
-        {groups.map((g, i) => (
-          <div
-            key={i}
-            className="flex flex-col gap-2.5 py-3"
-            style={i > 0 ? { borderTop: '1px solid var(--hairline)' } : undefined}
-          >
-            <SectionLabel
-              text={sectionLabelFor(g, i === firstMainLiftGroupIndex)}
-              expanded={isGroupExpanded(g)}
-            />
-            {/* Via the SAME shell today's supersets use. This used to map the
-                members into two bare rows both badged with the group letter
-                — no rail, no A1/A2, and no "alternate — no rest between".
-                That last one is an instruction, not decoration: a peeked day
-                was showing the two exercises without saying they alternate.
-                The header comment above promises these two surfaces cannot
-                drift because ExerciseLine is shared; that was true of the row
-                and false of everything around it. */}
-            {g.kind === 'single'
-              ? renderRow(g.ex, g.exIndex)
-              : (
-                <SupersetShell
-                  label={g.label}
-                  count={g.members.length}
-                  renderMember={(i, memberLabel) => renderRow(g.members[i].ex, g.members[i].exIndex, memberLabel)}
-                />
-              )}
-          </div>
-        ))}
-      </div>
+      <ReadOnlyDayList
+        workout={workout}
+        onSwap={onSwap}
+        onBan={onBan}
+        onOpenDetail={onOpenDetail}
+        banBusyName={banBusyName}
+        className="px-4 pb-2"
+      />
     </div>
   )
 }
