@@ -91,6 +91,23 @@ export interface LoadPrescription {
    * exercise). The last entry always equals starting_weight_kg.
    */
   per_set: PerSetLoad[] | null
+  /**
+   * What, if anything, is holding this number where it is — so a week that
+   * repeats can be told apart BY CAUSE. The scorer still counts a held bar as
+   * a held bar (Ashley's ruling); this is so the measurement can say whether
+   * the app already knows why.
+   *   'implement'  clamped by the improvised-implement safety ceiling
+   *   'floor'      the estimate sat below the equipment floor (bar only,
+   *                lightest pair) and was rounded UP to it
+   *   'ceiling'    the unverified ramp has caught up with the standards
+   *                estimate and Math.min holds it there — the state the
+   *                `basis` sentence describes as "this is as far as the
+   *                estimate goes"
+   *   null         nothing is holding it
+   * The binding one wins when several apply (an implement cap or a floor is
+   * the number on the screen whatever the ramp did).
+   */
+  hold: 'implement' | 'floor' | 'ceiling' | null
 }
 
 /**
@@ -1344,6 +1361,7 @@ export function prescribeLoad(
       basis: 'Progress by adding reps or slowing the tempo before adding load.',
       load_source: 'estimate',
       per_set: null,
+    hold: null,
     }
   }
 
@@ -1355,6 +1373,7 @@ export function prescribeLoad(
       basis: 'Pick a load that matches the target effort and note what you used.',
       load_source: 'estimate',
       per_set: null,
+    hold: null,
     }
   }
 
@@ -1381,6 +1400,8 @@ export function prescribeLoad(
   // Hoisted because those two are in different scopes and this is the only
   // honest way to carry the fact between them.
   let rampArrived = false
+  let floorHeld = false
+  let implementHeld = false
 
   // Hoisted for the same reason fromKnownWeight is: the forceStartingWeightKg
   // branch below short-circuits without re-deriving anything, but the number
@@ -1474,6 +1495,10 @@ export function prescribeLoad(
       estimate = Math.min(stepped, estimate)
     }
 
+    // Recorded, not inferred later: only here is the pre-rounding estimate in
+    // scope. A number rounded UP to the bar or the lightest pair is held by
+    // the equipment, not by anything about the trainee.
+    floorHeld = estimate < LOADING_FLOOR_KG[mode]
     rounded = roundToPlate(estimate, mode)
   }
 
@@ -1516,7 +1541,9 @@ export function prescribeLoad(
     // 40kg still gets the experience-scaled figure.
     const strapLimit = IMPROVISED_IMPLEMENT_CEILING_KG[profile.training_experience || 'novice']
     const statedBag = statedCeilingKg(entry, profile)
+    const beforeImplementCap = rounded
     rounded = Math.min(rounded, statedBag == null ? strapLimit : Math.min(strapLimit, statedBag))
+    implementHeld = rounded < beforeImplementCap
   }
 
   // Only compounds in a strength/power phase ramp; hypertrophy-phase work and
@@ -1607,6 +1634,7 @@ export function prescribeLoad(
     basis,
     load_source: fromKnownWeight ? 'known_weight' : bodyAssumed ? 'assumed_body' : 'estimate',
     per_set,
+    hold: implementHeld ? 'implement' : floorHeld ? 'floor' : rampArrived ? 'ceiling' : null,
   }
 }
 

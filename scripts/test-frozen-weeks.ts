@@ -495,5 +495,80 @@ console.log('\n6. Tagged loaded with nothing to lift still progresses by reps')
     frozen.length === 0, frozen.slice(0, 3).join(' | '))
 }
 
+// ---------------------------------------------------------------------------
+console.log('\n7. A held bar is held for a reason the plan can name — and never for want of trying')
+// ---------------------------------------------------------------------------
+{
+  // The barbell-main trace (docs/plans/when-the-bar-cannot-go-up.md): every
+  // frozen barbell main lift in the 9,216-plan grid had the ramp at the
+  // standards ceiling (correct) and the rep bump failing to take over. Two of
+  // its four buckets are decisions (the experience floor under a negative
+  // phase shift), one is the cap working (designed), and one — intermediates
+  // in a Power block, 8.8% — was the bump asking for the same size every
+  // week because the streak only grows on success, never reaching the size
+  // that would have moved the range. The fix escalates within the week.
+  //
+  // (a) NO SILENT FREEZE. Every loaded, non-carry pair with the same kg and
+  //     the same reps two loading weeks running must carry the generator's
+  //     own reason on week B: the bar is at the ceiling AND the bump was
+  //     capped, could not move the range, or was refused by the band. A pair
+  //     with no reason is a mechanism this section does not know about, and
+  //     is named rather than budgeted.
+  const unexplained: string[] = []
+  let explained = 0
+  const reasons = new Map<string, number>()
+  for (const { profile, seed, label } of everyCombo()) {
+    for (const { exA, exB, weekA, weekB } of transitions(meso(profile, seed))) {
+      const pt = (exA as { prescription_type?: string }).prescription_type
+      if (exA.tier === 'tier_0_primer' || pt === 'steady_state') continue
+      if (exA.suggested_load_kg == null || exA.suggested_load_kg !== exB.suggested_load_kg || exA.reps !== exB.reps) continue
+      if (getExerciseEntry(exA.name)?.movement_pattern === 'carry') continue
+      // A reason is: the generator recorded WHAT holds the weight (ceiling,
+      // implement cap, equipment floor, matched to a sibling slot) or WHY the
+      // rep bump did not move the reps (capped, range fixed, band, matched).
+      // 'bought' with unchanged reps and no hold is the one combination that
+      // means nothing recorded explains the pair.
+      const bumpReason = exB.rep_bump && exB.rep_bump !== 'bought' ? exB.rep_bump : null
+      const reason = exB.load_hold || bumpReason ? `${exB.load_hold ?? '-'}/${exB.rep_bump ?? '-'}` : null
+      if (reason) { explained++; reasons.set(reason, (reasons.get(reason) ?? 0) + 1) }
+      else unexplained.push(`${label} ${exA.name} w${weekA}->w${weekB} ${exA.reps} @ ${exA.suggested_load_kg}kg hold=${exB.load_hold ?? '-'} bump=${exB.rep_bump ?? '-'}`)
+    }
+  }
+  console.log(`      ${explained} held pairs explained (${[...reasons.entries()].map(([k, v]) => `${k} ${v}`).join(', ')}); ${unexplained.length} unexplained`)
+  check('held pairs exist to be explained, so the check has teeth', explained > 0, String(explained))
+  check('every held loaded pair carries the generator\'s own reason — no silent freeze', unexplained.length === 0, unexplained.slice(0, 4).join(' | '))
+
+  // (b) THE ESCALATION BUCKET IS EMPTY. Power blocks exist only under the
+  //     functional goal for intermediates and up. Before: an intermediate's
+  //     6-8 under Power's -4 is 4-6; +1 and +2 are still 4-6; the bump asked
+  //     for +1 every week and never tried +3. After: the smallest size that
+  //     moves the range is taken, so 'range_fixed' can only mean that even
+  //     +3 cannot move it — and for an intermediate in Power it always can.
+  let powerMainSlots = 0
+  const stuckInPower: string[] = []
+  for (const equipment_access of EQUIP) {
+    for (const workout_split_preference of SPLITS) {
+      for (const training_experience of ['intermediate', 'advanced'] as const) {
+        const plan = meso(
+          buildProfile({ fitness_goal: 'functional', equipment_access, workout_split_preference, training_experience }),
+          `frozen7:${equipment_access}:${workout_split_preference}:${training_experience}`,
+        )
+        for (const { exA, exB, weekA, weekB } of transitions(plan)) {
+          if (exA.tier !== 'tier_1_primary' || exA.suggested_load_kg == null) continue
+          const weekB_ = plan.find(w => w.week_number === weekB)
+          if (weekB_?.phase_label !== 'Power & Expression') continue
+          powerMainSlots++
+          if (exB.rep_bump === 'range_fixed' && training_experience === 'intermediate') {
+            stuckInPower.push(`${equipment_access}/${workout_split_preference} ${exA.name} w${weekA}->w${weekB} ${exA.reps}`)
+          }
+        }
+      }
+    }
+  }
+  check(`Power blocks with loaded main lifts exist in the sweep (${powerMainSlots} transitions)`, powerMainSlots > 0, String(powerMainSlots))
+  check(`an intermediate's Power main lift is never left frozen for want of a larger bump (${stuckInPower.length})`,
+    stuckInPower.length === 0, stuckInPower.slice(0, 3).join(' | '))
+}
+
 console.log(failures === 0 ? '\nAll frozen-week checks passed.\n' : `\n${failures} FAILED\n`)
 process.exit(failures === 0 ? 0 : 1)

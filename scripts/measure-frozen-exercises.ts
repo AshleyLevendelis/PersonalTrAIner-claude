@@ -93,7 +93,7 @@ function generateAllCombinations(): Combination[] {
 }
 
 // --- the frozen_week rule, mirrored from quality-score.ts ------------------
-interface FrozenPair { name: string; reps: string; kg: number | null; weekA: number; weekB: number }
+interface FrozenPair { name: string; reps: string; kg: number | null; weekA: number; weekB: number; hold?: string; bump?: string }
 export function frozenPairs(mesocycle: MesocycleWeek[]): FrozenPair[] {
   const out: FrozenPair[] = []
   for (let block = 1; block <= 4; block++) {
@@ -109,7 +109,7 @@ export function frozenPairs(mesocycle: MesocycleWeek[]): FrozenPair[] {
           if (!exB || exB.name !== exA.name) return
           if (exA.tier === 'tier_0_primer' || exA.prescription_type === 'steady_state') return
           const loadFrozen = exA.suggested_load_kg == null ? exB.suggested_load_kg == null : exA.suggested_load_kg === exB.suggested_load_kg
-          if (loadFrozen && exA.reps === exB.reps) out.push({ name: exA.name, reps: exA.reps, kg: exA.suggested_load_kg ?? null, weekA: wa.week_number, weekB: wb.week_number })
+          if (loadFrozen && exA.reps === exB.reps) out.push({ name: exA.name, reps: exA.reps, kg: exA.suggested_load_kg ?? null, weekA: wa.week_number, weekB: wb.week_number, hold: exB.load_hold, bump: exB.rep_bump })
         })
       }
     }
@@ -117,12 +117,22 @@ export function frozenPairs(mesocycle: MesocycleWeek[]): FrozenPair[] {
   return out
 }
 
-type Cause = 'tagged_loaded_no_kg' | 'bodyweight_no_kg' | 'loaded_kg_frozen' | 'unknown_exercise'
+// The loaded class is split by what the generator itself recorded on week B
+// (Exercise.load_hold / rep_bump) — `loaded:<hold>/<bump>`. A bar held at the
+// standards ceiling with the rep bump at its cap is held BY DESIGN; one where
+// no permitted bump can change the rep range is a floor decision (Ashley's);
+// a band decline is a safety refusal; 'matched' is the one-target/one-weight
+// per-lift rules pinning a slot to its sibling; a carry at its distance cap
+// is its own thing.
+type Cause = string
 const byName = new Map(EXERCISE_DATABASE.map(e => [e.name, e]))
 export function causeOf(p: FrozenPair): Cause {
   const entry = byName.get(p.name)
   if (!entry) return 'unknown_exercise'
-  if (p.kg != null) return 'loaded_kg_frozen'
+  if (p.kg != null) {
+    if (entry.movement_pattern === 'carry') return 'loaded_carry'
+    return `loaded:${p.hold ?? 'nohold'}/${p.bump ?? '-'}`
+  }
   if (isExternallyLoaded(entry) && categorize(entry) == null) return 'tagged_loaded_no_kg'
   return 'bodyweight_no_kg'
 }
@@ -177,16 +187,16 @@ sampled.forEach((combo, i) => {
 const pct = (n: number, d: number) => d === 0 ? '–' : `${(100 * n / d).toFixed(1)}%`
 console.log(`\n${'='.repeat(78)}\n1. How many plans carry a frozen exercise (of ${sampled.length})\n${'='.repeat(78)}`)
 console.log(`  plans with at least one frozen pair: ${plansWithAny} (${pct(plansWithAny, sampled.length)});  frozen pairs in total: ${totalPairs}`)
-for (const c of ['tagged_loaded_no_kg', 'bodyweight_no_kg', 'loaded_kg_frozen', 'unknown_exercise']) {
+for (const c of [...new Set([...plansByCause.keys(), ...pairsByCause.keys()])].sort((a, b) => (pairsByCause.get(b) ?? 0) - (pairsByCause.get(a) ?? 0))) {
   const pl = plansByCause.get(c) ?? 0, pr = pairsByCause.get(c) ?? 0
   if (pl === 0 && pr === 0) continue
-  console.log(`  ${c.padEnd(22)} plans ${String(pl).padStart(5)} (${pct(pl, sampled.length).padStart(5)})   pairs ${String(pr).padStart(6)} (${pct(pr, totalPairs)} of all frozen pairs)`)
+  console.log(`  ${c.padEnd(30)} plans ${String(pl).padStart(5)} (${pct(pl, sampled.length).padStart(5)})   pairs ${String(pr).padStart(6)} (${pct(pr, totalPairs)} of all frozen pairs)`)
 }
 
 console.log(`\n${'='.repeat(78)}\n2. By goal — which goals' plans carry each cause\n${'='.repeat(78)}`)
 const perGoal = sampled.length / ALL_GOALS.length
 for (const g of ALL_GOALS) {
-  const parts = ['tagged_loaded_no_kg', 'bodyweight_no_kg', 'loaded_kg_frozen'].map(c => `${c} ${pct(plansByGoalCause.get(`${g}|${c}`) ?? 0, perGoal)}`)
+  const parts = ['tagged_loaded_no_kg', 'bodyweight_no_kg', 'loaded_carry', 'loaded:ceiling/range_fixed', 'loaded:ceiling/capped', 'loaded:matched/-'].map(c => `${c} ${pct(plansByGoalCause.get(`${g}|${c}`) ?? 0, perGoal)}`)
   console.log(`  ${g.padEnd(13)} ${parts.join('   ')}`)
 }
 
