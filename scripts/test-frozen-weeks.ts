@@ -31,7 +31,8 @@
 // ---------------------------------------------------------------------------
 
 import { generateExercisePlan, generateMesocycle, setRandomSource, resetRandomSource } from '../src/lib/exercise-plan'
-import { getExerciseEntry } from '../src/lib/exercise-db'
+import { getExerciseEntry, EXERCISE_DATABASE } from '../src/lib/exercise-db'
+import { categorize, isExternallyLoaded } from '../src/lib/load-prescription'
 import { readFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
@@ -408,6 +409,13 @@ console.log('\n5. The measured improvement holds')
   // AFTER:  264 of 5,767 (4.6%), 126 loaded non-carry. Thresholds sit clear of
   // the measured figures so ordinary drift doesn't fail a build, but a
   // regression toward the old behaviour would.
+  //
+  // 2 Sep 2026, the tagged-loaded-but-anchorless fix (§6): 329 of 5,555
+  // (5.9%) before it — a hair under the 6.0% bar, which is how it hid — and
+  // 159 of 5,555 (2.9%) after, same 36 plans, same denominator. Loaded
+  // non-carry (95) and carries (38) did not move, as they should not have:
+  // the fix touches only exercises that never had a kg. The rate bar is
+  // ratcheted to 4.0% so reverting §6's fix fails here too, not only there.
   let total = 0, frozen = 0, loadedFrozen = 0, carryFrozen = 0
   for (const { profile, seed } of everyCombo()) {
     for (const { exA, exB } of transitions(meso(profile, seed))) {
@@ -425,7 +433,7 @@ console.log('\n5. The measured improvement holds')
   }
   const rate = frozen / total * 100
   console.log(`      ${frozen}/${total} frozen (${rate.toFixed(1)}%) — ${loadedFrozen} loaded non-carry, ${carryFrozen} carries`)
-  check('the frozen rate stays well below the 9.0% it started at', rate < 6.0, `${rate.toFixed(1)}%`)
+  check('the frozen rate stays well below the 9.0% it started at (bar 4.0% since 2 Sep 2026)', rate < 4.0, `${rate.toFixed(1)}%`)
   check('loaded non-carry freezes stay far below the 380 they started at', loadedFrozen < 180, String(loadedFrozen))
   // This assertion also changed meaning with the carry work. It used to read
   // "carries are still frozen — the exclusion is real, not accidental",
@@ -436,6 +444,55 @@ console.log('\n5. The measured improvement holds')
   // so neither a regression NOR a silent walk past the cap passes.
   check(`carries roughly halved and stopped at the cap (${carryFrozen}, was 100)`,
     carryFrozen < 70 && carryFrozen > 20, String(carryFrozen))
+}
+
+// ---------------------------------------------------------------------------
+console.log('\n6. Tagged loaded with nothing to lift still progresses by reps')
+// ---------------------------------------------------------------------------
+{
+  // Russian Twist was 120 of the 216 frozen-week lines test:quality printed
+  // on 2 Sep 2026. Its equipment tag (medicine ball) says "loaded", so the
+  // generator excluded it from the rep ramp; its movement pattern (core) has
+  // no load anchor BY DESIGN, so no weight was ever prescribed either. Nothing
+  // to add, and nothing else allowed to move. docs/plans/tagged-loaded-but-
+  // nothing-to-lift.md.
+  //
+  // THE SET IS DERIVED FROM THE CATALOGUE, NOT NAMED. A future exercise with
+  // the same shape is covered the day it is added, and the day categorize()
+  // learns to anchor core work this section empties itself rather than
+  // asserting something about a list that no longer describes anything.
+  const loadedButAnchorless = new Set(
+    EXERCISE_DATABASE.filter(e => isExternallyLoaded(e) && categorize(e) == null && e.mechanics_tier !== 'primer').map(e => e.name),
+  )
+  console.log(`      from the catalogue: ${[...loadedButAnchorless].join(', ') || '(none)'}`)
+  // The two load-emphasis goals are where this froze — a reps-emphasis goal
+  // ramped these all along. Every style, because core work is selected by
+  // style (combat requires it). Splits do not change the answer.
+  let seen = 0
+  const frozen: string[] = []
+  for (const fitness_goal of ['hypertrophy', 'fat_loss'] as const) {
+    for (const training_style of ['combat', 'functional', 'hybrid', 'bodybuilding'] as const) {
+      for (const equipment_access of EQUIP) {
+        for (const training_experience of EXP) {
+          const plan = meso(
+            buildProfile({ fitness_goal, training_style, equipment_access, training_experience }),
+            `frozen6:${fitness_goal}:${training_style}:${equipment_access}:${training_experience}`,
+          )
+          for (const { exA, exB, weekA, weekB } of transitions(plan)) {
+            if (!loadedButAnchorless.has(exA.name)) continue
+            seen++
+            if (exA.reps === exB.reps && exA.suggested_load_kg == null && exB.suggested_load_kg == null) {
+              frozen.push(`${exA.name} w${weekA}->w${weekB} ${exA.reps} (${fitness_goal}/${training_style}/${equipment_access}/${training_experience})`)
+            }
+          }
+        }
+      }
+    }
+  }
+  check('the catalogue still has exercises of this shape (sanity check on this section)', loadedButAnchorless.size > 0, String(loadedButAnchorless.size))
+  check(`they appear in the sweep, so the check has teeth (${seen} loading transitions)`, seen > 0, String(seen))
+  check(`none is ever frozen — with no weight to add, the reps move every loading week (${frozen.length} frozen)`,
+    frozen.length === 0, frozen.slice(0, 3).join(' | '))
 }
 
 console.log(failures === 0 ? '\nAll frozen-week checks passed.\n' : `\n${failures} FAILED\n`)

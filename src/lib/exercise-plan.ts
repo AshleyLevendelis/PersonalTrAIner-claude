@@ -5881,7 +5881,18 @@ export function generateMesocycle(
           // only by an RPE label (a direct LLM coach review finding: "same
           // bar, same reps, 'now it's harder' is not a plan"). Only 'load'
           // emphasis holds reps flat, since load itself is that goal's lever.
-          const isBodyweight = !!dbEntry && !isPrimer && !isExternallyLoaded(dbEntry)
+          //
+          // BOTH halves of the first sentence, not one. For months this tested
+          // only the equipment tag, so an exercise tagged loaded whose pattern
+          // categorize() deliberately gives no anchor (core: a medicine-ball
+          // Russian Twist, Cable Woodchops) was treated as a weight exercise
+          // with no weight — no kg to step, and excluded from the rep ramp
+          // because its tag said the bar was the lever. Under a load-emphasis
+          // goal that left it with NOTHING that could move: 404 of 404 such
+          // loading transitions frozen in test-frozen-weeks §6, and 39% of
+          // every frozen pair across the 9,216-plan quality grid.
+          // docs/plans/tagged-loaded-but-nothing-to-lift.md.
+          const isBodyweight = !!dbEntry && !isPrimer && (!isExternallyLoaded(dbEntry) || category == null)
           // A loaded carry's "reps" field is a fixed distance ('40m') —
           // shiftReps deliberately never touches it (distance is the wrong
           // lever for a carry). For a 'reps'/'maintain'-emphasis goal that

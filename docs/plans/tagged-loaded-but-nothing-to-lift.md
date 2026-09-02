@@ -114,9 +114,46 @@ and cross-checked against `scorePlan` on every 101st plan (mismatches must be
 0 or the report describes a rule the gate does not apply).
 `scripts/measure-frozen-exercises.ts`.
 
-**BEFORE** — filled in from the run below.
+**BEFORE** (9,216 plans, mirror 0 mismatches on 92 cross-checked):
 
-**AFTER** — filled in after the change.
+| | plans | frozen pairs |
+|---|---|---|
+| any frozen exercise | **6,283 (68.2%)** | 83,056 |
+| tagged loaded, no load anchor (Russian Twist 21,362 · Cable Woodchops 11,148) | 1,763 (19.1%) | 32,510 (**39.1%** of all frozen pairs) |
+| bodyweight, reps did not move (Pull-Ups 3,372 · Chin-Ups 2,820 · Glute Bridge 1,263 · …) | 2,888 (31.3%) | 18,101 (21.8%) |
+| loaded, kg and reps both frozen (Loaded Backpack Walk 9,557 · Backpack Row 4,636 · Barbell Bench Press 2,314 · …) | 4,990 (54.1%) | 32,445 (39.1%) |
+
+By goal, the tagged-loaded cause appears in 38% of hypertrophy plans and 38%
+of fat-loss plans and in **0%** of conditioning and functional plans — exactly
+the load-emphasis split the mechanism predicts.
+
+The gate's own 36-plan grid (`test-frozen-weeks` §5): 329 of 5,555
+transitions frozen (5.9%) — a hair under its 6.0% bar, which is how this
+hid. §6 on the unfixed code: 404 of 404 such transitions frozen.
+
+**AFTER** (same grid, same seeds, mirror 0 mismatches on 92 cross-checked):
+
+| | plans | frozen pairs |
+|---|---|---|
+| any frozen exercise | **5,787 (62.8%)**, was 6,283 | **50,546**, was 83,056 (−39.1%) |
+| tagged loaded, no load anchor | **0**, was 1,763 | **0**, was 32,510 |
+| bodyweight, reps did not move | 2,888 — unchanged to the pair | 18,101 — unchanged |
+| loaded, kg and reps both frozen | 4,990 — unchanged to the pair | 32,445 — unchanged |
+
+The two untouched classes being identical to the pair is the proof the
+change reached exactly the two exercises it named and nothing else. Russian
+Twist and Cable Woodchops no longer appear in the frozen list at all. The
+gate's 36-plan grid: 329 → 159 of 5,555 (5.9% → 2.9%), loaded non-carry (95)
+and carries (38) unchanged. `test:audit` 17,423 / 0 after the change; `test:quality` 11.47 / 12 (was
+11.45), 0 below the 7.2 floor, its own frozen-week tally 5,787 plans —
+the same number as above, reached independently.
+
+**Scale note.** "Plans with a frozen exercise" is a different measure from
+the gate's "frozen transitions" (a plan counts once however many pairs it
+holds); the two are not comparable to each other, and neither is comparable
+to the backlog's older *61.7%*, which predates several fixes and a wider
+catalogue. The remaining 62.8% is now entirely the two residual causes named
+above, both of which are prescription decisions.
 
 ## Gate
 
