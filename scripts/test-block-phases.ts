@@ -173,9 +173,12 @@ console.log('\n3. The strip and the paragraph say the same thing about a week')
     mismatches.length === 0, mismatches.slice(0, 5))
 }
 
+// Every phase key, shared by §4 (short-label round-trip) and §6 (floors read
+// off the configs). Hoisted so both sections read the same list.
+const PHASES: TrainingPhase[] = ['anatomical_adaptation', 'hypertrophy', 'strength', 'power', 'metabolic']
+
 console.log('\n4. Short phase names round-trip, and an unknown one is not swallowed')
 {
-  const PHASES: TrainingPhase[] = ['anatomical_adaptation', 'hypertrophy', 'strength', 'power', 'metabolic']
   const bad: unknown[] = []
   for (const phase of PHASES) {
     const config = getPhaseConfig(phase)
@@ -233,18 +236,26 @@ console.log('\n5. The screen is wired to it, and leads with the week')
 }
 
 if (failures > 0) { console.error(`\n${failures} check(s) failed\n`); process.exit(1) }
-console.log('\n6. A Hypertrophy block never asks a main lift for fewer than six reps')
+console.log('\n6. A block that sets a main-lift rep floor never asks a main lift for fewer')
 {
   // Ashley, 2 Sep 2026, shown "Deadlifts 3x3-5" under a Hypertrophy heading
   // that promises moderate loads and higher volume: "Lift it to at least 6
-  // reps." docs/plans/six-reps-in-a-hypertrophy-block.md. The two sources of
-  // a 3-5 main lift were combat style (bases its main lifts there) and the
-  // fat-loss goal (pulls main lifts two reps heavier), so the sweep is built
-  // from exactly those, at every experience tier — a sweep of bodybuilding
-  // hypertrophy plans would pass with the floor deleted.
+  // reps." Then, shown 7-9 under Metabolic Conditioning: "Lift to at least
+  // 10 reps." docs/plans/six-reps-in-a-hypertrophy-block.md. THE FLOORS ARE
+  // READ OFF THE PHASE CONFIGS, not typed here, so the next ruling of this
+  // shape is covered the moment its config carries a floor — and a floor
+  // that quietly vanished from a config would empty this section's teeth
+  // rather than pass it (the sanity check below insists at least one phase
+  // sets one).
+  //
+  // The two sources of a too-low main lift were combat style (bases its main
+  // lifts at 3-5) and the fat-loss goal (pulls main lifts two reps heavier),
+  // so the sweep is built from exactly those, at every experience tier, over
+  // every goal that reaches a floored phase — a sweep of bodybuilding
+  // hypertrophy plans would pass with the floors deleted.
   const sweep: [string, MesocycleWeek[]][] = [...PLANS]
   for (const training_style of ['combat', 'functional', 'hybrid', 'bodybuilding'] as const) {
-    for (const fitness_goal of ['hypertrophy', 'fat_loss', 'functional'] as const) {
+    for (const fitness_goal of ['hypertrophy', 'fat_loss', 'functional', 'conditioning'] as const) {
       for (const training_experience of ['beginner', 'novice', 'intermediate', 'advanced'] as const) {
         sweep.push([`${training_style}/${fitness_goal}/${training_experience}`,
           planFor({ training_style, fitness_goal, training_experience }, `bp6:${training_style}:${fitness_goal}:${training_experience}`)])
@@ -252,9 +263,26 @@ console.log('\n6. A Hypertrophy block never asks a main lift for fewer than six 
     }
   }
   const low = (reps: string): number | null => { const m = reps.match(/^(\d+)/); return m ? Number(m[1]) : null }
-  let hypertrophyMainLifts = 0, hypertrophyDeloadMainLifts = 0, strengthMainLiftsBelowSix = 0, strengthMainLifts = 0
+  const flooredPhases = PHASES
+    .map(p => getPhaseConfig(p))
+    .filter(c => c.main_lift_rep_floor != null)
+    .map(c => ({ label: c.label, floor: c.main_lift_rep_floor! }))
+  const floorFor = new Map(flooredPhases.map(f => [f.label, f.floor]))
+  check(`at least one phase sets a main-lift rep floor (sanity check on this section): ${flooredPhases.map(f => `${f.label} ${f.floor}`).join(', ')}`,
+    flooredPhases.length > 0)
+  // HER RULINGS ARE PINNED BY NAME, not derived. Reading the floors off the
+  // configs is what makes the NEXT ruling covered automatically — but it also
+  // means deleting a floor would quietly delete its check. Found by mutation:
+  // with the metabolic floor removed, everything above still passed. The two
+  // rulings she has actually made are therefore asserted as facts; a change
+  // to either is a change to a decision, and must be made here on purpose.
+  check("Ashley's rulings are still in the configs — Hypertrophy at least 6, Metabolic Conditioning at least 10",
+    floorFor.get('Hypertrophy') === 6 && floorFor.get('Metabolic Conditioning') === 10, [...floorFor.entries()])
+
+  const slots = new Map<string, number>(), deloadSlots = new Map<string, number>()
   const under: string[] = []
-  // week-in-block 1 and 2 reps of every loadless main lift in a hypertrophy
+  let strengthMainLiftsBelowSix = 0, strengthMainLifts = 0
+  // week-in-block 1 and 2 reps of every loadless main lift in a floored
   // block, keyed by plan/block/day/slot — for the floor-is-a-floor check.
   const loadlessWeek1: Map<string, string> = new Map(), loadlessWeek2: Map<string, string> = new Map()
   for (const [label, plan] of sweep) {
@@ -264,20 +292,22 @@ console.log('\n6. A Hypertrophy block never asks a main lift for fewer than six 
           if (ex.tier !== 'tier_1_primary') return
           const lo = low(ex.reps)
           if (lo == null) return
-          if (w.phase_label === 'Hypertrophy') {
-            hypertrophyMainLifts++
-            if (w.is_deload) hypertrophyDeloadMainLifts++
-            if (lo < 6) under.push(`${label} w${w.week_number} ${d.day} ${ex.name} ${ex.reps}`)
-            // Beginners excluded ON PURPOSE: their experience floor (8) sits
-            // above the phase floor (6) and swallows the ramp exactly as it
-            // did before the floor existed — a pre-existing behaviour queued
-            // as its own question, not something this section rules on.
+          const phase = w.phase_label ?? ''
+          const floor = floorFor.get(phase)
+          if (floor != null) {
+            slots.set(phase, (slots.get(phase) ?? 0) + 1)
+            if (w.is_deload) deloadSlots.set(phase, (deloadSlots.get(phase) ?? 0) + 1)
+            if (lo < floor) under.push(`${label} w${w.week_number} ${d.day} ${ex.name} ${ex.reps} (${phase}, floor ${floor})`)
+            // Beginners excluded ON PURPOSE from the freeze check: their
+            // experience floor (8) can sit above a phase floor and swallows
+            // the ramp exactly as it did before any phase floor existed — a
+            // pre-existing behaviour queued as its own question.
             if (ex.suggested_load_kg == null && !w.is_deload && !/beginner/.test(label)) {
               const key = `${label}|b${w.block_number}|${d.day}|${slot}|${ex.name}`
               if (w.week_in_block === 1) loadlessWeek1.set(key, ex.reps)
               if (w.week_in_block === 2) loadlessWeek2.set(key, ex.reps)
             }
-          } else if (w.phase_label === 'Maximal Strength') {
+          } else if (phase === 'Maximal Strength') {
             strengthMainLifts++
             if (lo < 6) strengthMainLiftsBelowSix++
           }
@@ -285,23 +315,26 @@ console.log('\n6. A Hypertrophy block never asks a main lift for fewer than six 
       }
     }
   }
-  console.log(`      ${sweep.length} plans; ${hypertrophyMainLifts} hypertrophy main-lift slots (${hypertrophyDeloadMainLifts} on deload weeks); ${strengthMainLifts} strength main-lift slots, ${strengthMainLiftsBelowSix} below six`)
-  check('the sweep has hypertrophy main lifts to judge, deload weeks included (sanity check on this section)',
-    hypertrophyMainLifts > 100 && hypertrophyDeloadMainLifts > 0, [hypertrophyMainLifts, hypertrophyDeloadMainLifts])
-  check(`every main lift in every Hypertrophy week starts at 6 reps or more (${under.length} under)`, under.length === 0, under.slice(0, 4))
-  // THE LEAK CHECK. The floor lives on the hypertrophy phase config alone. If
-  // it were applied regardless of phase, Maximal Strength — whose whole point
-  // is fewer, heavier reps — would lose every 3-5 and 4-6 it has. So the same
+  for (const { label, floor } of flooredPhases) {
+    console.log(`      ${label}: floor ${floor}, ${slots.get(label) ?? 0} main-lift slots (${deloadSlots.get(label) ?? 0} on deload weeks)`)
+    check(`${label} has main-lift slots to judge, deload weeks included (sanity check)`,
+      (slots.get(label) ?? 0) > 100 && (deloadSlots.get(label) ?? 0) > 0, [slots.get(label), deloadSlots.get(label)])
+  }
+  console.log(`      ${sweep.length} plans; ${strengthMainLifts} strength main-lift slots, ${strengthMainLiftsBelowSix} below six`)
+  check(`every main lift in every floored week starts at its phase's floor or more (${under.length} under)`, under.length === 0, under.slice(0, 4))
+  // THE LEAK CHECK. Each floor lives on its own phase config. If a floor were
+  // applied regardless of phase, Maximal Strength — whose whole point is
+  // fewer, heavier reps — would lose every 3-5 and 4-6 it has. So the same
   // sweep must still show strength main lifts below six.
-  check('...and Maximal Strength still asks main lifts for fewer than six, so the floor has not leaked into a phase that goes heavy',
+  check('...and Maximal Strength still asks main lifts for fewer than six, so no floor has leaked into a phase that goes heavy',
     strengthMainLiftsBelowSix > 0, strengthMainLiftsBelowSix)
-  // A FLOOR IS A MINIMUM, NOT A VALUE. The day the floor landed, test:quality's
-  // frozen-week count rose by 511 plans: a loadless main lift (pull-ups) lifted
-  // from 4-6 to 6-8 had its weekly +1 rep ramp clamped straight back to 6-8,
-  // so weeks 1, 2 and 3 read identically. The floor is now a constant lift
-  // added before the ramp, so loadless main lifts under it (which ramp reps by
-  // design — no weight to add) must have moved between week 1 and week 2 of a
-  // hypertrophy block.
+  // A FLOOR IS A MINIMUM, NOT A VALUE. The day the first floor landed,
+  // test:quality's frozen-week count rose by 511 plans: a loadless main lift
+  // (pull-ups) lifted from 4-6 to 6-8 had its weekly +1 rep ramp clamped
+  // straight back to 6-8, so weeks 1, 2 and 3 read identically. A floor is
+  // now a constant lift added before the ramp, so loadless main lifts under
+  // any floor (which ramp reps by design — no weight to add) must have moved
+  // between week 1 and week 2 of the block.
   const stuck: string[] = []
   let compared = 0
   for (const [key, w1] of loadlessWeek1) {
@@ -310,8 +343,8 @@ console.log('\n6. A Hypertrophy block never asks a main lift for fewer than six 
     compared++
     if (w1 === w2) stuck.push(`${key} ${w1} -> ${w2}`)
   }
-  check(`loadless main lifts exist under the floor to compare (${compared} week-1/week-2 pairs)`, compared > 0, compared)
-  check(`...and the floor does not freeze them — reps still climb from week 1 to week 2 (${stuck.length} stuck)`,
+  check(`loadless main lifts exist under a floor to compare (${compared} week-1/week-2 pairs)`, compared > 0, compared)
+  check(`...and the floors do not freeze them — reps still climb from week 1 to week 2 (${stuck.length} stuck)`,
     stuck.length === 0, stuck.slice(0, 3))
 }
 

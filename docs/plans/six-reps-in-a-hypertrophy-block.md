@@ -133,3 +133,26 @@ Conditioning block's 7-9 main lifts (1,246 plans, 13.5%) — the next question.
 1,496 hypertrophy main-lift slots, 0 under six; strength still 340 of 564
 below six. Mutations: floor deleted → 486 under; floor on every phase →
 strength 0 below six. `test:quality` after both fixes: Overall average: 11.48 / 12 (was 11.47 after item 3, 11.45 before it); Plans below the 7.2 floor: 0 / 9216; its own frozen-week tally 5471 plans (59.4%), the same number the measurement above reached independently. Frozen exercises across the grid after both fixes: plans with any frozen exercise **5,787 → 5,471 (62.8% → 59.4%)** — down, not up, so the floor as shipped costs nothing on frozen weeks — frozen pairs 50,546 → 47,784; the bodyweight class 18,101 → 15,942 (Pull-Ups 3,372 → 2,199 and Chin-Ups 2,820 → 1,834, novices under the floor now ramping; what remains of it is the beginner floor), the loaded class 32,445 → 31,842 (Barbell Bench Press 2,314 → 1,910). For comparison, the withdrawn two-step variant measured 4,138 plans (44.9%) with the bodyweight class at 0 — that is the size of the queued beginner-floor question.
+
+
+## The second ruling: Metabolic Conditioning, at least 10
+
+Asked the same day, the same shape one block over: in a Metabolic
+Conditioning block ("short rest, sustained output") the main lift ran 7-9 in
+1,246 plans (13.5%), from the same two sources. Four options — lift to at
+least 10 (recommended), lift to at least 12, keep 7-9 and reword the heading,
+leave it. **She chose "lift to at least 10."** Decision log: asked, answered.
+
+Built as `main_lift_rep_floor: 10` on the metabolic phase config — the same
+constant-lift mechanism, so 7-9 runs 10-12 → 11-13 → 12-14 and the bump
+climbs above that. The gate's §6 now reads the floors off the phase configs
+rather than naming Hypertrophy, sweeps the conditioning goal too, and keeps
+the leak check (Maximal Strength must still go below six). **And it pins the
+two rulings by name** — found by mutation: with the floors derived from the
+configs alone, deleting the metabolic floor deleted its own check and the
+section stayed green. Her rulings are facts, asserted as such; a change to
+either is a change to a decision and has to be made in the gate on purpose.
+Mutations: metabolic floor deleted → red on the pin; a floor of 10 on
+Maximal Strength → red on the leak check.
+
+Measured under her rule (bottom below 10): **11,672 of 36,060 Metabolic Conditioning main-lift slots (32.4%) started below 10 before, in 1,246 plans (13.5%); after, 0 and 0.** The block's main lifts now read 12-14 (31%), 10-12 (28%), 11-13 (11%). Maximal Strength main lifts are identical before and after (4-6 24.1%, 3-5 20.0%, 6-8 18.1%, 8-10 18.1%): the floor did not leak. Two plans show a Strength main lift at 9-11 in both runs — that is item 1's rep bump buying reps on a capped bar (6-8 + 3), her earlier ruling, not this one. Frozen weeks are identical to the pair before and after (5,467 plans, 41,092 pairs): the floored metabolic main lifts still ramp and bump. `test:audit` 17,423 / 0. `test:quality`: Overall average: 11.48 / 12 (11.48 before); Plans below the 7.2 floor: 0 / 9216; its own frozen-week tally 5467 plans (59.3%), matching the measurement

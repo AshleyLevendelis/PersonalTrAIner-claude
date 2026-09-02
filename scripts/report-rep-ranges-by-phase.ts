@@ -21,7 +21,7 @@
 //
 //   Hypertrophy  "moderate loads, higher volume"   -> a bottom below 6 is outside (her rule)
 //   Strength     "lower reps ... high intensity"   -> a bottom above 8 is outside
-//   Metabolic    "short rest, sustained output"    -> a top below 12 is outside
+//   Metabolic    "short rest, sustained output"    -> a bottom below 10 is outside (her rule)
 //
 // Adaptation and power make no rep promise in their focus text, so they are
 // tabulated and never flagged. Deload weeks are excluded from the flags:
@@ -114,14 +114,18 @@ function judge(phaseLabel: string, low: number, high: number): Verdict {
     // BOTTOM. Counts before and after that change are not comparable.
     case 'Hypertrophy': return low < 6 ? 'outside' : 'inside'
     case 'Maximal Strength': return low > 8 ? 'outside' : 'inside'
-    case 'Metabolic Conditioning': return high < 12 ? 'outside' : 'inside'
+    // Ashley's second ruling, 2 Sep 2026: "Lift to at least 10 reps." The
+    // first version read the focus text as "the top must reach 12"; hers is
+    // a floor on the BOTTOM at 10. Counts under the two rules are not
+    // comparable (7-9 was outside under both; 9-10 and 9-11 only under hers).
+    case 'Metabolic Conditioning': return low < 10 ? 'outside' : 'inside'
     default: return 'unjudged'
   }
 }
 const PROMISE: Record<string, string> = {
   'Hypertrophy': 'bottom of range must be at least 6 (Ashley, 2 Sep 2026)',
   'Maximal Strength': 'bottom of range must not exceed 8',
-  'Metabolic Conditioning': 'top of range must reach 12',
+  'Metabolic Conditioning': 'bottom of range must be at least 10 (Ashley, 2 Sep 2026)',
 }
 
 function parseReps(reps: string): { low: number; high: number } | null {

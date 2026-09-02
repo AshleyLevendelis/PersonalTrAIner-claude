@@ -146,6 +146,14 @@ const PHASE_CONFIGS: Record<TrainingPhase, PhaseConfig> = {
     focus: 'Work capacity and conditioning — short rest, sustained output',
     sets_multiplier: 1.0,
     rep_shift: 4,
+    // Ashley's second ruling on this, 2 Sep 2026, shown that a Metabolic
+    // Conditioning block — "short rest, sustained output" — ran its main lift
+    // at 7-9 in 1,246 of 9,216 plans (combat style's 3-5 base and the
+    // fat-loss goal's -2, +4 for the phase): "Lift to at least 10 reps."
+    // Applied exactly as the hypertrophy floor is: a constant lift on the
+    // main lift's range, measured before the ramp and the bump, so 7-9 runs
+    // 10-12 -> 11-13 -> 12-14 and the weeks still differ.
+    main_lift_rep_floor: 10,
     rest_adjust_seconds: -20,
     target_rpe: 7.5,
     coach_note:
