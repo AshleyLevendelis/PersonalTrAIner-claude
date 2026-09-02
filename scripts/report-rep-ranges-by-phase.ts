@@ -19,7 +19,7 @@
 // (phase, tier, rep range) across every non-deload week, and flags any slot
 // whose whole range sits OUTSIDE what the phase's own focus text promises:
 //
-//   Hypertrophy  "moderate loads, higher volume"   -> a top below 6 is outside
+//   Hypertrophy  "moderate loads, higher volume"   -> a bottom below 6 is outside (her rule)
 //   Strength     "lower reps ... high intensity"   -> a bottom above 8 is outside
 //   Metabolic    "short rest, sustained output"    -> a top below 12 is outside
 //
@@ -108,14 +108,18 @@ function generateAllCombinations(): Combination[] {
 type Verdict = 'inside' | 'outside' | 'unjudged'
 function judge(phaseLabel: string, low: number, high: number): Verdict {
   switch (phaseLabel) {
-    case 'Hypertrophy': return high < 6 ? 'outside' : 'inside'
+    // Ashley's ruling, 2 Sep 2026: "Lift it to at least 6 reps." The first
+    // version of this rule read the phase's focus text as "the top of the
+    // range must reach 6", which let 4-6 through; hers is a floor on the
+    // BOTTOM. Counts before and after that change are not comparable.
+    case 'Hypertrophy': return low < 6 ? 'outside' : 'inside'
     case 'Maximal Strength': return low > 8 ? 'outside' : 'inside'
     case 'Metabolic Conditioning': return high < 12 ? 'outside' : 'inside'
     default: return 'unjudged'
   }
 }
 const PROMISE: Record<string, string> = {
-  'Hypertrophy': 'top of range must reach 6',
+  'Hypertrophy': 'bottom of range must be at least 6 (Ashley, 2 Sep 2026)',
   'Maximal Strength': 'bottom of range must not exceed 8',
   'Metabolic Conditioning': 'top of range must reach 12',
 }

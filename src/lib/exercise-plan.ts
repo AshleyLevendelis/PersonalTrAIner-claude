@@ -5924,6 +5924,16 @@ export function generateMesocycle(
           // "reps not weight" identity belongs, so only the true main lift
           // is exempted from policy below.
           const isMainCompound = !!dbEntry && dbEntry.mechanics_tier === 'tier1_compound'
+          // The rep floor every shift below clamps to: the experience floor,
+          // raised to the phase's main-lift floor when this IS the main lift
+          // (hypertrophy: 6 — Ashley's ruling of 2 Sep 2026 on "Deadlifts
+          // 3x3-5" under a heading promising moderate loads and higher volume;
+          // see main_lift_rep_floor in periodization.ts). ONE value, used by
+          // all three shiftReps calls in this iteration. The frozen-load rep
+          // bump re-derives its range from the same base, and if it clamped to
+          // a lower floor than the week's own reps did, it could hand back
+          // 4-6 as the "bumped" version of 6-8 and replace it.
+          const repFloor = Math.max(expConfig.min_reps, isMainCompound ? (phaseConfig.main_lift_rep_floor ?? 0) : 0)
           const rampLoadCandidate = !isBodyweight && (policy.progressionEmphasis === 'load' || isCarry || isMainCompound)
 
           // A percentage-sized step snapped to the loading mode's real
@@ -5948,7 +5958,30 @@ export function generateMesocycle(
           }
           const rampLoad = rampLoadCandidate && !loadStepUnaffordable
           const rampReps = (isBodyweight || loadStepUnaffordable || ((policy.progressionEmphasis === 'reps' || policy.progressionEmphasis === 'maintain') && !isMainCompound)) && !isCarry
-          const repShift = isDeload
+          // HOW FAR THE PHASE'S WORKING RANGE MUST BE LIFTED TO REACH THE
+          // MAIN-LIFT FLOOR — measured against the raw base, added to the
+          // shift BEFORE the weekly ramp and the frozen-load bump. The first
+          // version of the floor was a plain clamp on the final range, and it
+          // froze the very lifts it lifted: a 4-6 base under a floor of 6 read
+          // 6-8 in week 1, 4-6 + 1 = 5-7 clamped to 6-8 in week 2, 6-8 in
+          // week 3 — test:quality's frozen-week tally rose by 511 plans the
+          // day it landed. A constant lift instead of a clamp means the ramp
+          // and the bump climb from 6-8 to 7-9 to 8-10 as designed.
+          //
+          // DELIBERATELY NOT THE EXPERIENCE FLOOR. A beginner's floor of 8
+          // under a strength block's -3 swallows the same ramp the same way,
+          // and has for months. Lifting that too was tried and measured: the
+          // frozen-week count fell further, and a beginner's "Maximal
+          // Strength" main lift climbed 8-10 -> 10-12 -> 11-13 across the
+          // block, putting 17.5% of strength main lifts outside that phase's
+          // own promise. That is a prescription trade-off, queued for Ashley;
+          // this lift is scoped to the ruling she actually made. With no
+          // main-lift floor set, floorLift is 0 and every line below is
+          // exactly what it was.
+          const rawBaseLow = Number(/^(\d+)/.exec(baseReps)?.[1] ?? NaN)
+          const mainLiftFloor = isMainCompound ? (phaseConfig.main_lift_rep_floor ?? 0) : 0
+          const floorLift = Number.isFinite(rawBaseLow) ? Math.max(0, mainLiftFloor - (rawBaseLow + phaseConfig.rep_shift)) : 0
+          const repShift = (isDeload
             ? (deloadAtFloor
                 // Weight held flat (can't drop further) — reps carry the
                 // recovery reduction instead of the usual +2 "back off"
@@ -5957,7 +5990,7 @@ export function generateMesocycle(
                 // outright rather than just holding flat.
                 ? (deloadNeedsRepCut ? phaseConfig.rep_shift - 2 : phaseConfig.rep_shift)
                 : phaseConfig.rep_shift + 2)
-            : phaseConfig.rep_shift + (rampReps ? w - 1 : 0)
+            : phaseConfig.rep_shift + (rampReps ? w - 1 : 0)) + floorLift
           const restShift = isDeload ? 0 : phaseConfig.rest_adjust_seconds
 
           // Interval and steady-state cardio don't go through the reps-
@@ -5979,13 +6012,13 @@ export function generateMesocycle(
           if (dbEntry?.prescription_type === 'intervals') {
             const workBase = parseIntervalSeconds(baseReps)
             const restBase = parseIntervalSeconds(ex.rest)
-            reps = workBase != null ? `${stepIntervalSeconds(workBase, w, isDeload)}s` : shiftReps(baseReps, repShift, expConfig.min_reps)
+            reps = workBase != null ? `${stepIntervalSeconds(workBase, w, isDeload)}s` : shiftReps(baseReps, repShift, repFloor)
             restForWeek = restBase != null ? `${stepIntervalSeconds(restBase, w, isDeload)}s` : adjustRest(ex.rest, restShift)
           } else if (dbEntry?.prescription_type === 'steady_state') {
             reps = baseReps
             restForWeek = ex.rest
           } else {
-            reps = shiftReps(baseReps, repShift, expConfig.min_reps)
+            reps = shiftReps(baseReps, repShift, repFloor)
             restForWeek = adjustRest(ex.rest, restShift)
           }
 
@@ -6181,7 +6214,7 @@ export function generateMesocycle(
               // holding the same lift, so both slots show the same target.
               const alreadyDecided = frozenBumpDecidedThisWeek.get(dbEntry.name)
               const bump = alreadyDecided ?? Math.min((frozenLoadStreakByLift.get(dbEntry.name) ?? 0) + 1, MAX_FROZEN_LOAD_REP_BUMP)
-              const bumpedReps = shiftReps(baseReps, repShift + bump, expConfig.min_reps)
+              const bumpedReps = shiftReps(baseReps, repShift + bump, repFloor)
               // The pinned weight has to satisfy the same divergence backstop
               // every other forced weight does — a held number that sits too
               // far above a fresh estimate for the exercise actually in this

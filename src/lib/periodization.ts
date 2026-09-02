@@ -42,6 +42,21 @@ export interface PhaseConfig {
   sets_multiplier: number
   /** Shift applied to the base rep range: negative = heavier/lower reps. */
   rep_shift: number
+  /**
+   * A floor under the MAIN LIFT's rep range in this phase, applied after
+   * rep_shift on top of the experience floor. Only hypertrophy sets one.
+   *
+   * Ashley, 2 Sep 2026, shown "Deadlifts 3x3-5" under a Hypertrophy heading
+   * promising "moderate loads, higher volume" — asked whether a main lift in
+   * a Hypertrophy block should ever run 3-5 (combat style bases its main
+   * lifts there; the fat-loss goal pulls them two reps heavier), she chose
+   * "lift it to at least 6 reps" over keeping 3-5 and rewording the heading.
+   * A floor on the BOTTOM of the range, spread preserved: 3-5 and 4-6 both
+   * become 6-8; 6-8 is untouched. Load follows — prescribeLoad estimates
+   * lighter for more reps — which is the phase's promise, not a side effect.
+   * Strength and power leave this unset and still go heavy.
+   */
+  main_lift_rep_floor?: number
   rest_adjust_seconds: number
   /** Upper bound before the experience cap is applied. */
   target_rpe: number
@@ -85,6 +100,7 @@ const PHASE_CONFIGS: Record<TrainingPhase, PhaseConfig> = {
     focus: 'Build muscle — moderate loads, higher volume, controlled tempo',
     sets_multiplier: 1.1,
     rep_shift: 0,
+    main_lift_rep_floor: 6,
     rest_adjust_seconds: 0,
     target_rpe: 8,
     coach_note:
