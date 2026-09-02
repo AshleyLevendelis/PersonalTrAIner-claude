@@ -52,7 +52,9 @@ import { ReceiptCard } from '@/components/chat/ReceiptCard'
 import { ClarificationCard } from '@/components/chat/ClarificationCard'
 import type { ChatMessage, UserProfile, MacroTargets, WorkoutDay, MealPlanDay, MesocycleWeek, PlanAction, ChatPendingActionView, ChatReceiptView, ChatClarificationView } from '@/lib/types'
 import { DEFAULT_REVEAL_SPEED, type RevealSpeed } from '@/lib/reveal-speed-store'
+import { FEEL_SCALE, type SessionFeel } from '@/lib/types'
 import { takeChatPrefill } from '@/lib/chat-prefill-store'
+import { loadFeelContext, buildFeelBrief, feelRun, recordSessionFeel, type FeelContext } from '@/lib/session-feel'
 
 const ACTION_TAG_RE = /\[ACTION:\s*.*?\]/gi
 const QUICK_REPLIES_RE = /\[QUICK_REPLIES:\s*(.*?)\]/gi
@@ -454,6 +456,25 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSession.ready, activeSession.date, activeSession.logs.length, profile.id])
 
+  // How recent sessions FELT — the affect signal (see session-feel.ts for why
+  // it exists and Ashley's 2 Sep 2026 ruling that the coach asks for it in
+  // chat rather than a button on the summary dialog). Loaded the same way
+  // proactiveData is, and for the same reason: it is a database read, so it
+  // cannot happen inside buildContext's synchronous body.
+  //
+  // Re-runs when the session date or the logged-set count changes, so
+  // finishing a workout makes the unreviewed-session line appear without a
+  // remount, and answering the question makes it disappear.
+  const [feelContext, setFeelContext] = useState<FeelContext | null>(null)
+  useEffect(() => {
+    if (!activeSession.ready || !profile.id) return
+    let cancelled = false
+    loadFeelContext(profile.id, activeSession.date)
+      .then(c => { if (!cancelled) setFeelContext(c) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [activeSession.ready, activeSession.date, activeSession.logs.length, profile.id])
+
   // One-shot finalization of the synchronous fallback greeting once we know
   // (a) whether this is a genuinely first-ever conversation (no prior
   // chat_messages rows — see isFirstEverChat, set by loadChatHistory) and,
@@ -798,6 +819,12 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       training_days_count: profile.training_days.filter(d => d.available).length,
       exercise_summary: exerciseSummary,
       phase_brief: phaseBrief,
+      // Empty string when there is nothing to say — which is also what stops
+      // the coach asking twice: once record_session_feel writes `felt`, the
+      // session is no longer "awaiting" and this line is gone from the brief.
+      feel_brief: feelContext
+        ? buildFeelBrief(feelContext.awaiting, feelContext.run)
+        : buildFeelBrief(null, feelRun([])),
       meal_summary: mealSummary,
       favorites_summary: favoritesSummary,
       workout_log_history: workoutLogHistory,
@@ -985,6 +1012,11 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     groceryIntent?: { tool: 'add_to_grocery_list' | 'check_off_grocery_item'; rawArgs: Record<string, unknown> }
     // Same I1/IMMEDIATE shape again, for water_logs.
     waterIntent?: { tool: 'log_water'; rawArgs: Record<string, unknown> }
+    // How a finished session felt (session-feel.ts). Same I1 shape once more:
+    // the edge function validates the quote, the bucket and the date, and the
+    // client writes — onto an existing row only, so an answer can never
+    // conjure a workout that did not happen.
+    feelIntent?: { tool: 'record_session_feel'; rawArgs: Record<string, unknown> }
   }
 
   const callGemini = async (userMessage: string): Promise<ChatApiResponse> => {
@@ -1043,6 +1075,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       // every memory save silently fell through to the offer/action path
       // instead. groceryIntent follows the identical shape.
       memoryIntent: data.memoryIntent, groceryIntent: data.groceryIntent, waterIntent: data.waterIntent,
+      feelIntent: data.feelIntent,
     }
   }
 
@@ -1958,6 +1991,41 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
   }
 
   /**
+   * Writes how a finished session felt (see session-feel.ts). Mirrors
+   * resolveAndSaveWater's shape — validated server-side, written here.
+   *
+   * NO RECEIPT CARD, deliberately. Every other IMMEDIATE write in this file
+   * renders one because it changed something the user would otherwise have to
+   * go and find. This changes nothing: it records an answer they just gave in
+   * conversation, and popping a card up to confirm "you said it was rough"
+   * would turn a coach asking how you are into a form you filled in. The
+   * coach's own reply is the acknowledgement.
+   */
+  const resolveAndSaveFeel = async (intent: { tool: 'record_session_feel'; rawArgs: Record<string, unknown> }, replyText: string): Promise<{ text: string }> => {
+    const args = intent.rawArgs
+    const profileId = profile.id
+    if (!profileId) return { text: replyText }
+
+    const felt = String(args.felt || '') as SessionFeel
+    const date = String(args.date || '')
+    const note = typeof args.felt_note === 'string' ? args.felt_note : null
+    if (!FEEL_SCALE.includes(felt) || !date) return { text: replyText }
+
+    const ok = await recordSessionFeel(profileId, date, felt, note)
+    // A failed write must not be reported as a success — but it also must not
+    // derail the conversation with an error about a bookkeeping column the
+    // user never asked about. The reply stands; the record just isn't there,
+    // and the unreviewed-session line will still be in the next brief, so the
+    // coach can ask again rather than the answer vanishing silently.
+    if (!ok) console.error('resolveAndSaveFeel: the write did not land for', date)
+    else {
+      const fresh = await loadFeelContext(profileId, activeSession.date).catch(() => null)
+      if (fresh) setFeelContext(fresh)
+    }
+    return { text: replyText }
+  }
+
+  /**
    * @param correctsPrevious  The user is FIXING what was just logged, not
    *   adding to it. Replaces the named exercises' sets for the day instead of
    *   appending. See the executor's comment: "No 3x10 deadlifts" previously
@@ -2260,6 +2328,9 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     }
     if (result.waterIntent) {
       return resolveAndSaveWater(result.waterIntent)
+    }
+    if (result.feelIntent) {
+      return resolveAndSaveFeel(result.feelIntent, result.reply ?? '')
     }
     if (result.offer) {
       // D3: a non-imperative statement downgraded to a suggestion chip —

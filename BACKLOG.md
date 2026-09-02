@@ -2,6 +2,26 @@
 
 Newest first. One line each.
 
+- [x] The coach never asked how a session FELT — the strongest adherence
+  signal there is, and the app had no way to see it (2 Sep 2026). From the
+  research document Ashley shared ("The Coach's Decision Stack"): affect
+  DURING exercise predicts whether someone comes back, better than attendance
+  or load, both of which only move after a person has already started leaving.
+  Ashley's ruling on the shape: the coach asks in CHAT, not via a button —
+  "the app is centered around the chat." Built as `felt`/`felt_note` on
+  workout_sessions, `record_session_feel` in chat-gemini (gated on a verbatim
+  quote, forwarding an intent — the server writes nothing), prompt section 1e,
+  and `src/lib/session-feel.ts` for the decision logic. A run of rough
+  sessions makes the coach OFFER a volume reduction via the existing
+  propose_volume_change; nothing changes without a confirm. Gate
+  `test:session-feel`, 40 checks, five mutations red. Plan doc:
+  docs/plans/how-did-that-feel.md.
+  NOT VERIFIED LIVE — the whole path runs through a model and this sandbox
+  cannot reach Supabase. Needs a TEST run: finish a session, open chat,
+  confirm it asks once, answer in prose, confirm the bucket and the words land
+  in the row, confirm it does not ask again. Needs the migration
+  (`npm run db:push-both`) and a `chat-gemini` deploy before it does anything.
+
 - [x] **THE COACH QUOTED A WEIGHT THE PLAN DID NOT PRESCRIBE — AND IT WAS MY OWN REGRESSION, HOURS OLD.** `test:coach-plan-context` went red with `Backpack Curl … value 8 … sentAs " @ ~7.5kg"`. A prescribed weight is **three fields** — `suggested_load_kg` (the number the audit reads), `suggested_load` (the string every screen and the coach's prompt read) and `per_set_load` (the set grid you tick off) — and the rep-target load floor I built the same day raised the NUMBER by hand and left the other two on the old figure. So the plan held 8kg while the Exercise tab and the coach both said ~7.5kg: not a rounding difference, two different answers to "what am I lifting today?". **61 loaded exercises across a 19,724-exercise sweep → 0.** 42 floor applications produced those 61 — the weekly rebuild's carry-forward fallback propagates a stale label into later weeks. Fixed by routing the floor through `rebuildLoadForExercise`, the one function that writes all three together; its doc comment claimed it only ever pulled loads DOWN, which stopped being true the moment the floor called it, so that was corrected too.
 - [x] **"ONE LIFT, ONE WEIGHT, IN A GIVEN WEEK" WAS A COMMENT, NOT A RULE.** `weightDecidedThisWeek` states it and states the tie-break — *"the LOWER one wins: never tell someone to lift more than the lift has earned elsewhere in the same week"* — but it is consulted while each slot is being BUILT, so it can pull a later day down to an earlier one and has nothing to pull an earlier day down *with*. **When the heavier day came first, the rule silently did not apply.** Measured on the audit's own grid: `Shoulder Press Machine` week 3, intermediate/100kg/full_gym — Monday **45kg**, Wednesday **32.5kg**, identical 3×11-13 @ RPE 6-7. `enforceOneWeightPerPrescription` now settles the finished week before the per-day safety ceilings run. **92 divergences → 0**, `test:audit` unchanged at 17,423 / 0.
 - [x] **AND THAT GATE'S OWN EXEMPTION HAD BEEN COVERING FOR IT.** `test:week-load-consistency` §2 waved through 87 of those 92 as legitimate per-day safety ceilings and ratcheted the rest at 96. If a ceiling had really been diverging them it would have diverged them again after the equalisation — it did not, so the exemption was matching the right SHAPE for the wrong reason. Both the exemption and the ratchet are deleted rather than loosened. **The 202 → 96 → 0 history is not one curve**: the first two were counted with the exemption applied, this one without.
