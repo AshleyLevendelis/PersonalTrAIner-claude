@@ -108,6 +108,34 @@ export interface GoalPolicy {
    * MAIN_LIFT_REST_FLOOR_SECONDS below, which applies to every main lift
    * including bodyweight ones — see that constant for why the
    * "it's about a bar, not a tier" scoping stops at 60 seconds.
+   *
+   * SET ON EVERY GOAL SINCE 2 Sep 2026, and the reason it is 120 rather than
+   * 60. From the research document Ashley shared: the benefit of resting is
+   * banked by roughly two minutes on a heavy compound, and rest on the
+   * primary lift is on its never-cut list. That claim is one I would bet on
+   * independently of the document — short rests cost real work, and the loss
+   * lands on the hardest lift of the day, the one the whole session is built
+   * around.
+   *
+   * MEASURED before asking her, across the 9,216-plan grid: 147,897 of
+   * 182,847 main-lift slots (80.9%) rested under two minutes — 90s was the
+   * single most common value (24.9%), then 60s (17.0%) and 75s (13.5%). The
+   * trimmer reached a tier-1 main lift 14,764 times and landed 4,269 of
+   * those on the old 60s floor. The COST, measured by running the whole grid
+   * with a 120s floor: mean exercises per session 7.57 -> 7.46, about one
+   * exercise fewer every nine sessions.
+   *
+   * Put to her with those numbers and four options. She chose "two minutes,
+   * but conditioning keeps its short rest" — so CONDITIONING_POLICY keeps the
+   * 90 her earlier ruling set ("the session still conditions, the part with a
+   * bar on your back does not") and the other three goals move to 120.
+   *
+   * SCOPED BY GOAL, NOT BY PHASE, and that is a limit worth naming: a
+   * hypertrophy trainee's Metabolic Conditioning BLOCK now rests two minutes
+   * on its loaded main lift, even though that block's own focus text promises
+   * "short rest, sustained output". Her ruling named conditioning, her
+   * earlier ruling was goal-scoped, and this one is implemented the same way
+   * rather than widened on my own judgement. Flagged for her, not decided.
    */
   minLoadedMainLiftRestSeconds?: number
   /**
@@ -136,6 +164,10 @@ export interface GoalPolicy {
 }
 
 const HYPERTROPHY_POLICY: GoalPolicy = {
+  // Ashley's ruling, 2 Sep 2026: two minutes on a loaded main lift. See
+  // minLoadedMainLiftRestSeconds' doc comment for the measurement it was
+  // decided on and for why conditioning keeps 90.
+  minLoadedMainLiftRestSeconds: 120,
   goal: 'hypertrophy',
   label: 'Muscle Growth',
   setVolumeMultiplier: 1.0,
@@ -156,6 +188,10 @@ const HYPERTROPHY_POLICY: GoalPolicy = {
 }
 
 const FAT_LOSS_POLICY: GoalPolicy = {
+  // Ashley's ruling, 2 Sep 2026: two minutes on a loaded main lift. See
+  // minLoadedMainLiftRestSeconds' doc comment for the measurement it was
+  // decided on and for why conditioning keeps 90.
+  minLoadedMainLiftRestSeconds: 120,
   goal: 'fat_loss',
   label: 'Fat Loss',
   // ~10-15% below the hypertrophy baseline — a calorie deficit blunts
@@ -212,6 +248,10 @@ const CONDITIONING_POLICY: GoalPolicy = {
 }
 
 const FUNCTIONAL_POLICY: GoalPolicy = {
+  // Ashley's ruling, 2 Sep 2026: two minutes on a loaded main lift. See
+  // minLoadedMainLiftRestSeconds' doc comment for the measurement it was
+  // decided on and for why conditioning keeps 90.
+  minLoadedMainLiftRestSeconds: 120,
   goal: 'functional',
   label: 'General Health / Maintenance',
   setVolumeMultiplier: 0.9,

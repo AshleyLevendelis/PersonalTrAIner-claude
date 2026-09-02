@@ -5175,3 +5175,65 @@ export function getVolumeRole(entry: ExerciseEntry): VolumeRole | null {
     default: return 'isolation'
   }
 }
+
+// ---------------------------------------------------------------------------
+// Muscle groups, for counting weekly volume per muscle
+// ---------------------------------------------------------------------------
+
+/**
+ * `primary_muscles` carries 62 distinct strings written by different hands,
+ * many of them synonyms ('quads' and 'quadriceps', 'glutes' and 'glute max',
+ * 'traps' and 'upper trapezius'). Counting them raw splits one muscle's
+ * volume across three buckets and makes every plan look under-dosed.
+ *
+ * ERECTORS ARE NOT 'back'. Folding them in was the first cut of this map and
+ * it inflated back's weekly set count by roughly a third: every deadlift, RDL
+ * and good morning was counted as back volume alongside the rows and
+ * pulldowns, which is not what anyone means by "sets for back".
+ *
+ * Anything that is not a trainable muscle group — 'grip', 'full body',
+ * 'cardiovascular system', and 'hip flexors' (the glutes' antagonist, not
+ * something anyone doses to a weekly target) — is deliberately absent, so a
+ * set is attributed to the muscles it trains and not to every string listed.
+ */
+const MUSCLE_GROUP_BY_NAME: Record<string, string> = {
+  chest: 'chest', 'upper chest': 'chest', 'lower chest': 'chest',
+  lats: 'back', 'upper back': 'back', rhomboids: 'back', 'teres major': 'back',
+  traps: 'back', 'mid traps': 'back', 'upper traps': 'back', 'upper trapezius': 'back',
+  'lower trapezius': 'back',
+  'erector spinae': 'erectors', erectors: 'erectors',
+  shoulders: 'shoulders', 'anterior deltoid': 'shoulders', 'front deltoid': 'shoulders',
+  'lateral deltoid': 'shoulders', 'rear deltoid': 'shoulders', 'rotator cuff': 'shoulders',
+  'external rotators': 'shoulders', 'serratus anterior': 'shoulders',
+  biceps: 'biceps', 'biceps brachii': 'biceps', 'biceps brachii (long head)': 'biceps',
+  brachioradialis: 'biceps',
+  triceps: 'triceps', 'triceps (long head)': 'triceps',
+  quads: 'quads', quadriceps: 'quads', legs: 'quads',
+  hamstrings: 'hamstrings',
+  glutes: 'glutes', 'glute max': 'glutes', 'glute medius': 'glutes', 'glute minimus': 'glutes',
+  adductors: 'glutes', 'tensor fasciae latae': 'glutes',
+  calves: 'calves', gastrocnemius: 'calves', soleus: 'calves',
+  'tibialis anterior': 'calves', peroneals: 'calves', 'ankle stabilisers': 'calves',
+  core: 'core', 'rectus abdominis': 'core', obliques: 'core',
+  'transverse abdominis': 'core', 'quadratus lumborum': 'core',
+}
+
+export const MUSCLE_GROUPS = [
+  'chest', 'back', 'erectors', 'shoulders', 'biceps', 'triceps',
+  'quads', 'hamstrings', 'glutes', 'calves', 'core',
+] as const
+export type MuscleGroup = (typeof MUSCLE_GROUPS)[number]
+
+/**
+ * The muscle groups one exercise trains, de-duplicated. A bench press returns
+ * chest, shoulders and triceps — one set of it is a set for each of them,
+ * which is how weekly per-muscle volume is normally counted.
+ */
+export function muscleGroupsOf(entry: ExerciseEntry): MuscleGroup[] {
+  const groups = new Set<MuscleGroup>()
+  for (const m of entry.primary_muscles ?? []) {
+    const g = MUSCLE_GROUP_BY_NAME[m.toLowerCase()]
+    if (g) groups.add(g as MuscleGroup)
+  }
+  return [...groups]
+}

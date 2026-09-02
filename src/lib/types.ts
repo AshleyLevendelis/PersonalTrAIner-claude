@@ -755,7 +755,36 @@ export interface WorkoutSession {
    * added to fix, caught again on 31 Aug 2026 in its plainer form.
    */
   deliberate_rest?: boolean | null
+  /**
+   * How the session felt, in the trainee's own answer to the coach asking.
+   * The document Ashley shared ("The Coach's Decision Stack") rates affect
+   * DURING exercise as the strongest predictor of whether someone comes back
+   * — stronger than any programming variable — and the app had no way to
+   * capture it: attendance and load both move only after someone has already
+   * begun leaving.
+   *
+   * Absent means NEVER ASKED. Not "fine", not "declined to say". The coach's
+   * context line keys on that absence, so absence is also what stops the
+   * question being asked twice.
+   */
+  felt?: SessionFeel | null
+  /**
+   * What they actually said, verbatim, alongside the bucket — "brutal but
+   * good" and "just miserable" are the same `felt` and not the same sentence.
+   * Kept for the same reason record_fact keeps a note beside its structured
+   * field, and it is the half that makes the coach's next reply worth reading.
+   */
+  felt_note?: string | null
 }
+
+/**
+ * The four buckets, mirrored by a CHECK constraint in
+ * 20260902140000_add_session_feel.sql. Ordered easy -> rough deliberately:
+ * `FEEL_SCALE.indexOf` is how session-feel.ts compares two answers without a
+ * second lookup table.
+ */
+export type SessionFeel = 'easy' | 'good' | 'hard' | 'rough'
+export const FEEL_SCALE: SessionFeel[] = ['easy', 'good', 'hard', 'rough']
 
 export interface WorkoutExerciseRow {
   id?: string

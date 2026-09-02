@@ -4,7 +4,7 @@ import type {
   FatigueCost, MesocycleMovementPattern, EquipmentAccess, TrainingStyle,
   ConstraintTrace, ConstraintTraceEntry, PlanResult, TrainingExperience,
 } from './types'
-import { EXERCISE_DATABASE, getMovementFamily, getVolumeRole, meetsCapabilityRequirement, getExerciseId, contraindicatedJoints, isContraindicatedFor, isIndicatedFor, isBandEquipped, jointListDisplay, NEAREST_PATTERN_FALLBACK, type ExerciseEntry, type MovementPattern, type AngleVector, type VolumeRole } from './exercise-db'
+import { EXERCISE_DATABASE, getMovementFamily, getVolumeRole, muscleGroupsOf, meetsCapabilityRequirement, getExerciseId, contraindicatedJoints, isContraindicatedFor, isIndicatedFor, isBandEquipped, jointListDisplay, NEAREST_PATTERN_FALLBACK, type ExerciseEntry, type MovementPattern, type AngleVector, type VolumeRole, type MuscleGroup } from './exercise-db'
 import {
   getExperienceConfig, getSkillDemand, isSkillAppropriate, applyRepFloor,
   type ExperienceConfig,
@@ -3634,6 +3634,182 @@ function enforceWeeklyPatternBalance(days: WorkoutDay[]): void {
       continue
     }
     logWeeklyBalanceDecision(`push:${pushSets} pull:${pullSets} sets is outside the 1:1-1:1.5 band but no adjustable accessory/isolation slot remains`)
+    break
+  }
+
+  // -------------------------------------------------------------------
+  // CHEST AGAINST BACK — Ashley's ruling, 2 Sep 2026.
+  //
+  // The pass above balances PATTERNS (push sets vs pull sets) and gets that
+  // right. But a push set is split across chest, shoulders and triceps, while
+  // a pull set concentrates on back and biceps — and back picks up more on
+  // top, from rows and pulldowns on its own day plus warm-up pulls and
+  // deadlift-adjacent work elsewhere. So push:pull can sit perfectly inside
+  // its band while the MUSCLES underneath are lopsided.
+  //
+  // Measured across the 9,216-plan grid before this existed: chest averaged
+  // 8.2 hard sets a week against back's 12.2, and chest was under ten sets in
+  // 72.1% of weeks against back's 43.7%. Confirmed on a live week rather than
+  // trusted from the aggregate — an intermediate full-gym bodybuilding week
+  // ran 14 chest sets against 22 back sets, the same ~2:3 the sweep showed,
+  // so it is a real distribution and not an artefact of the muscle mapping.
+  //
+  // BAND OF 1.25, TIGHTER THAN THE 1.5 ABOVE, and that is a choice worth
+  // naming. The push:pull band is deliberately pull-biased for shoulder
+  // health and posture. There is no equivalent reason for BACK to out-set
+  // CHEST — they are antagonists, and the "2:1 pull:push" version of that
+  // idea is exactly what the research document Ashley shared flags as
+  // invented. So this pair is held closer to even.
+  //
+  // IT MUST NOT UNDO THE PASS ABOVE. Every nudge here moves push:pull toward
+  // 1:1 (bumping chest adds a push set; trimming back removes a pull set), so
+  // the only way it can break that band is by overshooting into push > pull.
+  // Each candidate nudge is checked against that before it is taken, which is
+  // why the two passes cooperate instead of fighting over the same slots.
+  const MUSCLE_BAND = 1.25
+
+  function muscleSetTotal(group: MuscleGroup): number {
+    let total = 0
+    for (const day of trainingDays) {
+      for (const ex of day.exercises) {
+        const entry = findEntry(ex.name)
+        if (entry && muscleGroupsOf(entry).includes(group)) total += ex.sets
+      }
+    }
+    return total
+  }
+
+  /** Same slot rules as findAdjustable: accessories and isolation only, role
+   *  ceilings and floors respected, never inverting the day's main lift. */
+  function findAdjustableForMuscle(group: MuscleGroup, direction: 'up' | 'down'): Exercise | null {
+    for (const day of trainingDays) {
+      const dayMainSets = Math.max(
+        0,
+        ...day.exercises
+          .map(ex => (findEntry(ex.name) ? getVolumeRole(findEntry(ex.name)!) : null) === 'main' ? ex.sets : -1)
+      )
+      for (const ex of day.exercises) {
+        const entry = findEntry(ex.name)
+        if (!entry || !muscleGroupsOf(entry).includes(group)) continue
+        const role = getVolumeRole(entry)
+        if (role !== 'accessory' && role !== 'isolation') continue
+        const ceiling = getRoleSetCeiling(role, false)
+        const floor = getRoleSetFloor(role)
+        if (direction === 'up' && ex.sets < ceiling && (dayMainSets === 0 || ex.sets + 1 <= dayMainSets)) return ex
+        if (direction === 'down' && ex.sets > floor) return ex
+      }
+    }
+    return null
+  }
+
+  /**
+   * A shoulder slot that does NOT also train chest — the source for a
+   * within-push transfer. Bench and dip variants train both, so trimming one
+   * to feed chest would take a chest set away to give a chest set back.
+   */
+  function findShoulderOnlyTrim(): Exercise | null {
+    for (const day of trainingDays) {
+      for (const ex of day.exercises) {
+        const entry = findEntry(ex.name)
+        if (!entry) continue
+        const groups = muscleGroupsOf(entry)
+        if (!groups.includes('shoulders') || groups.includes('chest')) continue
+        const role = getVolumeRole(entry)
+        if (role !== 'accessory' && role !== 'isolation') continue
+        if (ex.sets > getRoleSetFloor(role)) return ex
+      }
+    }
+    return null
+  }
+
+  /**
+   * How far OUTSIDE the push:pull band a week sits — 0 when inside it.
+   *
+   * A plain in-band test is not usable as the guard here, because some weeks
+   * arrive already out of band: enforceWeeklyPatternBalance gives up when no
+   * adjustable slot remains, and says so in its own log line. Requiring
+   * in-band would freeze this pass entirely on exactly those weeks. So the
+   * rule is the weaker, correct one — a nudge may not make the ratio WORSE
+   * than it found it.
+   */
+  function bandPenalty(push: number, pull: number): number {
+    if (push <= 0 || pull <= 0) return 0
+    if (push > pull) return push - pull
+    if (pull > push * 1.5) return pull - push * 1.5
+    return 0
+  }
+
+  /** The push/pull side one exercise's sets count toward, or null. */
+  function balanceSideOf(ex: Exercise): 'push' | 'pull' | null {
+    const entry = findEntry(ex.name)
+    if (!entry) return null
+    const c = classifyForBalance(entry.movement_pattern)
+    return c === 'push' || c === 'pull' ? c : null
+  }
+
+  /** Push/pull totals after applying `deltas` (sets added per exercise). */
+  function totalsAfter(deltas: { ex: Exercise; delta: number }[]): { push: number; pull: number } {
+    let push = patternSetTotal('push')
+    let pull = patternSetTotal('pull')
+    for (const { ex, delta } of deltas) {
+      const side = balanceSideOf(ex)
+      if (side === 'push') push += delta
+      if (side === 'pull') pull += delta
+    }
+    return { push, pull }
+  }
+
+  for (let i = 0; i < MAX_ADJUSTMENTS; i++) {
+    const chestSets = muscleSetTotal('chest')
+    const backSets = muscleSetTotal('back')
+    if (chestSets === 0 || backSets === 0) break
+    if (backSets <= chestSets * MUSCLE_BAND) break
+
+    const before = bandPenalty(patternSetTotal('push'), patternSetTotal('pull'))
+    const allowed = (deltas: { ex: Exercise; delta: number }[]) => {
+      const { push, pull } = totalsAfter(deltas)
+      return bandPenalty(push, pull) <= before
+    }
+
+    const bumpTarget = findAdjustableForMuscle('chest', 'up')
+
+    // FIRST PREFERENCE: move a set from a shoulder slot to a chest slot.
+    // Shoulders carry the largest surplus of any group these same sessions
+    // train — measured across the grid, 15.3 hard sets a week against chest's
+    // 8.4 — so it is the right place to take one from.
+    //
+    // NOT ASSUMED TO BE PUSH-NEUTRAL, which is what the first version of this
+    // got wrong. "Trains the shoulders" is a MUSCLE fact and the push:pull
+    // band is a PATTERN fact, and they do not line up: Barbell Rows and Face
+    // Pulls train rear delts on a horizontal_pull, and every lateral raise is
+    // isolation_shoulder, which counts toward neither side. Donating from one
+    // of those while adding a chest push swings the ratio by up to two sets
+    // instead of zero. Measured, the unguarded version took weeks outside the
+    // push:pull band from 42 to 114 — this pass making worse the very thing it
+    // sits next to. Every candidate is now costed through bandPenalty, and the
+    // measured cost is back to 42, i.e. nothing.
+    if (bumpTarget) {
+      const donor = findShoulderOnlyTrim()
+      if (donor && donor !== bumpTarget && allowed([{ ex: bumpTarget, delta: 1 }, { ex: donor, delta: -1 }])) {
+        donor.sets -= 1
+        bumpTarget.sets += 1
+        logWeeklyBalanceDecision(`chest:${chestSets} back:${backSets} sets — moved a set from "${donor.name}" (${donor.sets}) to "${bumpTarget.name}" (${bumpTarget.sets})`)
+        continue
+      }
+    }
+
+    if (bumpTarget && allowed([{ ex: bumpTarget, delta: 1 }])) {
+      bumpTarget.sets += 1
+      logWeeklyBalanceDecision(`chest:${chestSets} back:${backSets} sets — bumped "${bumpTarget.name}" to ${bumpTarget.sets} sets`)
+      continue
+    }
+    const trimTarget = findAdjustableForMuscle('back', 'down')
+    if (trimTarget && allowed([{ ex: trimTarget, delta: -1 }])) {
+      trimTarget.sets -= 1
+      logWeeklyBalanceDecision(`chest:${chestSets} back:${backSets} sets — trimmed "${trimTarget.name}" to ${trimTarget.sets} sets`)
+      continue
+    }
+    logWeeklyBalanceDecision(`chest:${chestSets} back:${backSets} sets is outside the 1:${MUSCLE_BAND} band but no nudge is available that leaves push:pull no worse`)
     break
   }
 

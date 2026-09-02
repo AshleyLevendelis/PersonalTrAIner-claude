@@ -1,12 +1,12 @@
 import type { UserProfile, MesocycleWeek, WorkoutDay, Exercise } from './types'
 import { EXERCISE_DATABASE, getMovementFamily, getVolumeRole, isIndicatedFor, type ExerciseEntry } from './exercise-db'
 import { getConstrainedPool, generateMesocycle, primerPatternsForTrack, getAffinityPrimerPool, getFlaggedJoints, CARDIO_RESERVED_SHARE, bestEquipmentRank, EQUIPMENT_QUALITY_TIERS, isEquipmentQualityExempt } from './exercise-plan'
-import { getGoalPolicy, resolveConditioningFrequency, RECOVERY_SET_MULTIPLIER } from './goal-policies'
+import { getGoalPolicy, resolveConditioningFrequency, RECOVERY_SET_MULTIPLIER, MAIN_LIFT_REST_FLOOR_SECONDS } from './goal-policies'
 import { EXPERIENCE_RPE_CEILING } from './periodization'
 import { setRandomSource, resetRandomSource } from './exercise-plan'
 import { seededRngFromKey } from './seeded-random'
 import { DURATION_BUDGET_SECONDS, getSessionMinimumSeconds, getSessionMaximumSeconds, estimateDaySeconds, estimateSlotsSeconds, parseRestSeconds } from './session-duration'
-import { getEquipmentFloorKg, labelModeForEntry } from './load-prescription'
+import { getEquipmentFloorKg, labelModeForEntry, isExternallyLoaded } from './load-prescription'
 
 // ---------------------------------------------------------------------------
 // PLAN QUALITY SCORING
@@ -323,13 +323,33 @@ function scoreStructure(mesocycle: MesocycleWeek[], profile: UserProfile): Dimen
       }
     }
 
+    // THE CHECK DRAWS THE SAME LINE THE RULE DOES. It used to hardcode 60,
+    // which was correct while the generator's only main-lift floor was 60.
+    // Since Ashley's 2 Sep 2026 ruling a LOADED main lift's floor is the
+    // goal's own minLoadedMainLiftRestSeconds (120, or 90 for conditioning),
+    // and a check still drawing 60 would have gone on passing plans the rule
+    // now forbids — the precise disagreement between rule and check that
+    // MAIN_LIFT_REST_FLOOR_SECONDS' own doc comment was written to end.
+    //
+    // Bodyweight main lifts keep the flat 60: her earlier ruling is that the
+    // higher floor is a density rule about a bar, and a chin-up is not one.
+    //
+    // METRIC CHANGE, stated because prior scores stop being comparable:
+    // main_lift_short_rest can now fire on a loaded main lift resting between
+    // 60 and 120 seconds, which it never could before.
     const main = day.exercises[mainIdx]
-    if (main && (main.rest === 'alternate' || parseInt(main.rest, 10) < 60)) {
-      violatedRules.add('main_lift_short_rest')
-      deductions.push({
-        rule: 'main_lift_short_rest', day: day.day, weekNumber: 1,
-        detail: `Main lift "${main.name}" rest is "${main.rest}", not a full rest period`,
-      })
+    if (main) {
+      const mainEntry = dbEntry(main.name)
+      const mainFloor = mainEntry && isExternallyLoaded(mainEntry)
+        ? Math.max(MAIN_LIFT_REST_FLOOR_SECONDS, getGoalPolicy(profile.fitness_goal).minLoadedMainLiftRestSeconds ?? MAIN_LIFT_REST_FLOOR_SECONDS)
+        : MAIN_LIFT_REST_FLOOR_SECONDS
+      if (main.rest === 'alternate' || parseInt(main.rest, 10) < mainFloor) {
+        violatedRules.add('main_lift_short_rest')
+        deductions.push({
+          rule: 'main_lift_short_rest', day: day.day, weekNumber: 1,
+          detail: `Main lift "${main.name}" rest is "${main.rest}", below this goal's floor of ${mainFloor}s`,
+        })
+      }
     }
 
     // Set-count hierarchy: main >= any accessory/isolation that day. The

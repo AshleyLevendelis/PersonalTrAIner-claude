@@ -42,9 +42,21 @@ const SIDE_TABS: { tab: Tab; label: string; icon: typeof LayoutDashboard }[] = [
 export function BottomTabBar({
   activeTab,
   onTabChange,
+  chatAttention = false,
 }: {
   activeTab: Tab
   onTabChange: (tab: string) => void
+  /**
+   * The coach has something that wants an answer — an unreviewed session, a
+   * missed day (coach-opener.ts, `attention`). Draws one small dot on the
+   * chat button and nothing else: no count, no pulse, no colour change on
+   * the button itself. It is a nudge, not a demand, and it goes away the
+   * moment the chat is opened, whether or not they answer.
+   *
+   * Deliberately NOT lit for "today is a training day" — that is every other
+   * day, and a dot that is always on is a dot nobody sees.
+   */
+  chatAttention?: boolean
 }) {
   const { isKeyboardOpen } = useViewportInset()
   if (isKeyboardOpen) return null
@@ -74,14 +86,23 @@ export function BottomTabBar({
             type="button"
             data-tour={TOUR_KEY.chat}
             onClick={() => onTabChange('chat')}
-            aria-label="Chat"
+            aria-label={chatAttention ? 'Chat — the coach has something for you' : 'Chat'}
             aria-current={activeTab === 'chat' ? 'page' : undefined}
-            className={`-mt-6 flex size-14 shrink-0 items-center justify-center rounded-full text-primary-foreground transition-shadow glow-mint-box ${
+            className={`relative -mt-6 flex size-14 shrink-0 items-center justify-center rounded-full text-primary-foreground transition-shadow glow-mint-box ${
               activeTab === 'chat' ? 'ring-2 ring-primary/40 ring-offset-2 ring-offset-[color:var(--surface-deep)]' : ''
             }`}
             style={{ background: 'linear-gradient(180deg, color-mix(in oklab, var(--primary) 84%, white), var(--primary-2))' }}
           >
             <MessageCircle className="size-6" />
+            {chatAttention && (
+              <span
+                data-testid="chat-attention-dot"
+                aria-hidden="true"
+                className="absolute -right-0.5 -top-0.5 size-3 rounded-full bg-[color:var(--background)] p-[2px]"
+              >
+                <span className="block size-full rounded-full bg-amber-400" />
+              </span>
+            )}
           </button>
         </div>
 

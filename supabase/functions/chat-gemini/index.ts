@@ -854,6 +854,34 @@ const toolDeclarations = [
     },
   },
   {
+    name: "record_session_feel",
+    description:
+      "Records how a finished training session FELT for the user, in their own words. Call this ONLY when the UNREVIEWED SESSION line appears in your context (it names the session that has not been asked about) AND the user has just answered a question about how it went. The answer is usually prose, not a rating — 'brutal but good', 'honestly awful', 'easy day', 'fine' — so map it to the closest bucket and keep their exact words in felt_note. Do NOT call this for a session that is not the one named in that line, do NOT call it for how they feel right now in general (that is record_context_fact), and never guess a bucket from silence or from a change of subject: if they did not answer, do not record anything.",
+    parameters: {
+      type: "object",
+      properties: {
+        origin_verbatim_quote: {
+          type: "string",
+          description: "The exact substring of the user's current message giving their answer. Must be a literal quote, not a paraphrase.",
+        },
+        date: {
+          type: "string",
+          description: "The session date being reviewed, YYYY-MM-DD. Must be the date named in the UNREVIEWED SESSION context line.",
+        },
+        felt: {
+          type: "string",
+          enum: ["easy", "good", "hard", "rough"],
+          description: "The closest bucket. 'easy' = comfortable, had more in the tank. 'good' = hard but satisfying, the normal target. 'hard' = a real struggle to finish. 'rough' = miserable, hated it, or finished on willpower alone. 'brutal but good' is 'good' — the bucket is how they FELT about it, not how heavy it was.",
+        },
+        felt_note: {
+          type: "string",
+          description: "Their answer in their own words, trimmed to the relevant sentence. This is what makes the record worth reading later.",
+        },
+      },
+      required: ["origin_verbatim_quote", "date", "felt", "felt_note"],
+    },
+  },
+  {
     name: "add_to_grocery_list",
     description:
       "Adds one or more items to the user's grocery list (VISION-ARCHITECTURE.md §5.4). IMMEDIATE, append-only — call this the moment the user instructs an add ('add eggs to my list', 'add milk and bread'). Do NOT call this for a mere statement that something is running low ('we're out of eggs') without an instruction to add it — that gets an offer instead, gated the same way record_fact is.",
@@ -1207,6 +1235,37 @@ Work it in ONCE, in your own words, warmly — a coach who noticed, not an app t
 - Never shame a miss. Acknowledge and move forward: "no drama" / "happens" / "let's get the next one" — then the useful part.
 - If a strong week or a real win is what's noted, say it plainly and briefly. Don't gush.
 - You may re-word it, but you may NOT change the underlying number or fact, and you may NOT invent an additional one.` : `No accountability check-in is available this conversation — the data doesn't support a specific, true observation right now. Do NOT invent one. Never say "keep up the good work", "stay consistent", "don't forget to hydrate" or any other generic encouragement as a substitute. Silence is correct here.`}
+
+=== 1e. HOW THE LAST SESSION FELT ===
+Whether a session felt good or awful WHILE IT WAS HAPPENING is the best early
+warning there is that someone is drifting toward quitting — better than
+attendance, better than what they lifted, both of which only move after they
+have already started to go. The app cannot see it. You are the only way it
+gets asked, which is why this is your job and not a button on a screen.
+
+- ASK ONLY when an UNREVIEWED SESSION line appears above. It names the one
+  session that has not been asked about. No line = nothing to ask; do not
+  invent a session, and do not ask about one they already answered for.
+- ONE question, in your own words, woven into a normal reply — "how did
+  Tuesday actually feel?" — not a form, not a rating request, and never a
+  scale from 1 to 10. You want the sentence, not the score.
+- Ask it EARLY in the conversation if you are going to, and only once. If they
+  ignore it, answer something else, or change the subject: drop it for good.
+  Chasing an answer is how you teach someone to stop answering honestly.
+- When they DO answer, call record_session_feel with their exact words in
+  felt_note and the closest bucket in felt. Nothing is recorded until you call
+  it — saying "noted" without the call is the same lie as claiming a rest day
+  was marked when no tool was called.
+- Do not editorialise the answer back at them. "Rough" gets acknowledged, not
+  argued with, and not immediately problem-solved unless they ask.
+- A HARD session is not a bad session. Hard is usually the target; the bucket
+  records how they FELT about it, not how heavy it was. Do not treat 'hard' as
+  something to fix.
+- If the HOW RECENT SESSIONS FELT line says the run is worth naming, say it
+  out loud once and OFFER to reduce the volume via propose_volume_change. An
+  offer, not a change — it does nothing until they confirm it. Never quietly
+  adjust anything because of how someone said they felt, and never make the
+  offer sound like a verdict on them.
 
 === 2. WORKOUT & MEAL LOOKUPS (READ-ONLY) ===
 - Workout Schedule ("What are we doing Friday?"): Inspect the schedule context. Give a 1-2 sentence summary of the session focus first. Only list full exercise sets/reps if explicitly requested.
@@ -1562,6 +1621,7 @@ new, then speak up when something changes. So:
   if asked, and never guess a week number or a phase name. The same
   never-invent rule as everywhere else in this prompt.
 ${context.phase_brief}
+${context.feel_brief}
 
 CURRENT MEAL PLAN — WITH INGREDIENTS. Each dish lists what it contains after "contains:". THIS IS THE ONLY INGREDIENT DATA YOU HAVE, and it is authoritative for what is on their plan today: a dish's list IS its ingredients, so "is X in my breakfast?" is a question you can answer by reading, not by inferring from the dish name.
 Read it before answering ANY question about what a meal contains, including a request to remove something. A real reply — "Looking at your plan for today, none of your scheduled meals actually contain almond butter, so you're all set" — was sent to a user whose breakfast held 13g of almond butter, because this section did not carry ingredients then and the dish was called "Greek Yoghurt Berry Crunch Bowl". Do not answer from the dish name.
@@ -2419,6 +2479,37 @@ Keep this context in mind to ensure your greetings and questions naturally align
           JSON.stringify({
             reply: "",
             memoryIntent: { tool: name, rawArgs: args },
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (name === "record_session_feel") {
+        // Same I1 shape as memoryIntent: the server does not write
+        // workout_sessions here, it forwards validated args and the client's
+        // recordSessionFeel writes onto the EXISTING row (it refuses to
+        // insert, so a feeling can never invent a workout).
+        //
+        // Gated on a real verbatim quote for the same reason set_display_name
+        // is: without it, a coach that asked "how did that go?" and got
+        // silence or a change of subject could still record an answer, and an
+        // invented affect reading is worse than none — it is the one signal
+        // here that is meant to be the user's own.
+        const quote = String(args.origin_verbatim_quote || "").trim();
+        const felt = String(args.felt || "").trim();
+        const date = String(args.date || "").trim();
+        const validFelt = ["easy", "good", "hard", "rough"].includes(felt);
+        const validDate = /^\d{4}-\d{2}-\d{2}$/.test(date);
+        if (!quote || !validFelt || !validDate || !message.toLowerCase().includes(quote.toLowerCase())) {
+          return new Response(
+            JSON.stringify({ reply: textPart?.text || "" }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        return new Response(
+          JSON.stringify({
+            reply: textPart?.text || "",
+            feelIntent: { tool: name, rawArgs: args },
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );

@@ -2,6 +2,99 @@
 
 Newest first. One line each.
 
+- [x] The coach could only speak when someone opened the chat tab (2 Sep 2026).
+  From reviewing a generic chat blueprint (Gemini's) against this codebase:
+  about half of it already existed here, its notifications idea rested on a
+  browser API that does not exist, and the real gap was that nothing brought
+  a person TO the coach. Ashley: "build it with your recommendations." Built,
+  all client-side (no deploy, no migration): (1) coach-opener.ts picks the
+  first bubble from real state, one thing only — unreviewed session > missed
+  yesterday > today's session > rest day with a preview of the next session
+  and its lead lift; "missed" comes from the week strip's own states so chat
+  and strip cannot disagree. (2) Chips keyed to the kind and SENT on tap,
+  none under the feel question (her ruling), and no "move it to tomorrow"
+  chip because the only schedule tool is permanent — a one-off reschedule is
+  a NAMED GAP. (3) A dot on the chat tab for exactly the two kinds that want
+  an answer, cleared on open, re-armed only on a new condition. The model side
+  gets the missed-yesterday fact via the accountability check-in, ranked
+  below a stalled mid-session and above everything else; the prompt's
+  existing no-drama rule and propose_rest_day(date) handle it. Gate
+  test:coach-opener, 50 checks, six mutations. Plan doc:
+  docs/plans/one-thing-first.md.
+  NOT BUILT, on purpose: push notifications (after the in-app version proves
+  itself), a daily soreness scale, rest-day carb cuts, the two-rough trigger,
+  rest-day mobility content (needs a content ruling).
+  NOT VERIFIED IN A BROWSER from here: the dot rendering and the chip tap
+  path. The gate proves the wiring and the decision logic; a live check is
+  in the handover.
+
+- [x] Chest got 8 hard sets a week where back got 12 (2 Sep 2026). Third item
+  from the research document Ashley shared, and the first thing to come out of
+  counting sets per muscle — something the app had never done. The existing
+  balancer balances PATTERNS (push sets vs pull sets) and does it right, but a
+  push set splits across chest/shoulders/triceps while a pull set concentrates
+  on back/biceps, so push:pull sits in band while the muscles underneath are
+  lopsided. Verified on a live week (14 chest sets vs 22 back) before trusting
+  the aggregate. She chose "even out chest against back". Built as a second
+  pass in enforceWeeklyPatternBalance aiming at a 1.25 band, preferring to move
+  a set from shoulders (the biggest surplus, 15.3/wk) to chest. muscleGroupsOf
+  now lives in exercise-db.ts so the generator and the report script cannot
+  drift; erectors are their own group, not back. Measured: chest 7.9 -> 8.6
+  mean, weeks under 10 75.1% -> 69.2%, back:chest 2.00 -> 1.72, push:pull
+  weeks out of band 42 -> 42 (unchanged). Gate test:muscle-balance, four
+  mutations red. Plan doc: docs/plans/chest-against-back.md.
+  COST, stated: test:quality 11.54 -> 11.51 (0 below floor). Time fit and goal
+  alignment each gave up a little because added sets cost minutes. Unlike the
+  other two changes today this one is not free.
+  NAMED RESIDUAL: it reaches 1.72, not the 1.25 it aims at. Chest often has
+  only one or two adjustable accessory slots and once each is at its role
+  ceiling the only move left is adding a whole chest EXERCISE, which post-
+  periodization needs a rebuild the code deliberately does not do. Separate
+  change, not a budget.
+
+- [x] Four in five main lifts rested under two minutes (2 Sep 2026). Second
+  item taken from the research document Ashley shared: short rests cost real
+  work, and the loss lands on the hardest lift of the day. Measured across the
+  9,216-plan grid before asking her: 147,897 of 182,847 main-lift slots (80.9%)
+  under 120s, most commonly 90s / 60s / 75s; the trimmer reached a tier-1 main
+  lift 14,764 times and landed 4,269 of them on the old 60s floor. Cost, also
+  measured before asking (whole grid re-swept at 120s): mean exercises per
+  session 7.57 -> 7.46, about one fewer every nine sessions. She chose "two
+  minutes, but conditioning keeps its short rest", so minLoadedMainLiftRestSeconds
+  is now 120 on hypertrophy/fat_loss/functional and stays 90 on conditioning —
+  a value change, not a new mechanism, because that field already WAS this rule.
+  quality-score's main_lift_short_rest moved off its hardcoded 60 to the goal's
+  own floor, and now fires 0 times across the grid. test:audit 17,423 / 0;
+  test:quality 11.54 / 12 (unchanged), 0 below the floor. Gate
+  test:block-rest-sizing §6 pins her ruling BY NAME plus an end-to-end
+  assertion; three mutations red. Plan doc: docs/plans/two-minutes-on-the-big-lift.md.
+  METRIC CHANGE: main_lift_short_rest can now fire between 60 and 120s on a
+  loaded main lift, so its prior counts are not comparable.
+  FLAGGED FOR ASHLEY, NOT DECIDED: her ruling is goal-scoped, so a hypertrophy
+  trainee's Metabolic Conditioning BLOCK now rests two minutes on its loaded
+  main lift despite that block promising "short rest, sustained output". One
+  line to change if she wants the exception widened to the phase.
+
+- [x] The coach never asked how a session FELT — the strongest adherence
+  signal there is, and the app had no way to see it (2 Sep 2026). From the
+  research document Ashley shared ("The Coach's Decision Stack"): affect
+  DURING exercise predicts whether someone comes back, better than attendance
+  or load, both of which only move after a person has already started leaving.
+  Ashley's ruling on the shape: the coach asks in CHAT, not via a button —
+  "the app is centered around the chat." Built as `felt`/`felt_note` on
+  workout_sessions, `record_session_feel` in chat-gemini (gated on a verbatim
+  quote, forwarding an intent — the server writes nothing), prompt section 1e,
+  and `src/lib/session-feel.ts` for the decision logic. A run of rough
+  sessions makes the coach OFFER a volume reduction via the existing
+  propose_volume_change; nothing changes without a confirm. Gate
+  `test:session-feel`, 40 checks, five mutations red. Plan doc:
+  docs/plans/how-did-that-feel.md.
+  NOT VERIFIED LIVE — the whole path runs through a model and this sandbox
+  cannot reach Supabase. Needs a TEST run: finish a session, open chat,
+  confirm it asks once, answer in prose, confirm the bucket and the words land
+  in the row, confirm it does not ask again. Needs the migration
+  (`npm run db:push-both`) and a `chat-gemini` deploy before it does anything.
+
 - [x] **THE COACH QUOTED A WEIGHT THE PLAN DID NOT PRESCRIBE — AND IT WAS MY OWN REGRESSION, HOURS OLD.** `test:coach-plan-context` went red with `Backpack Curl … value 8 … sentAs " @ ~7.5kg"`. A prescribed weight is **three fields** — `suggested_load_kg` (the number the audit reads), `suggested_load` (the string every screen and the coach's prompt read) and `per_set_load` (the set grid you tick off) — and the rep-target load floor I built the same day raised the NUMBER by hand and left the other two on the old figure. So the plan held 8kg while the Exercise tab and the coach both said ~7.5kg: not a rounding difference, two different answers to "what am I lifting today?". **61 loaded exercises across a 19,724-exercise sweep → 0.** 42 floor applications produced those 61 — the weekly rebuild's carry-forward fallback propagates a stale label into later weeks. Fixed by routing the floor through `rebuildLoadForExercise`, the one function that writes all three together; its doc comment claimed it only ever pulled loads DOWN, which stopped being true the moment the floor called it, so that was corrected too.
 - [x] **"ONE LIFT, ONE WEIGHT, IN A GIVEN WEEK" WAS A COMMENT, NOT A RULE.** `weightDecidedThisWeek` states it and states the tie-break — *"the LOWER one wins: never tell someone to lift more than the lift has earned elsewhere in the same week"* — but it is consulted while each slot is being BUILT, so it can pull a later day down to an earlier one and has nothing to pull an earlier day down *with*. **When the heavier day came first, the rule silently did not apply.** Measured on the audit's own grid: `Shoulder Press Machine` week 3, intermediate/100kg/full_gym — Monday **45kg**, Wednesday **32.5kg**, identical 3×11-13 @ RPE 6-7. `enforceOneWeightPerPrescription` now settles the finished week before the per-day safety ceilings run. **92 divergences → 0**, `test:audit` unchanged at 17,423 / 0.
 - [x] **AND THAT GATE'S OWN EXEMPTION HAD BEEN COVERING FOR IT.** `test:week-load-consistency` §2 waved through 87 of those 92 as legitimate per-day safety ceilings and ratcheted the rest at 96. If a ceiling had really been diverging them it would have diverged them again after the equalisation — it did not, so the exemption was matching the right SHAPE for the wrong reason. Both the exemption and the ratchet are deleted rather than loosened. **The 202 → 96 → 0 history is not one curve**: the first two were counted with the exemption applied, this one without.
