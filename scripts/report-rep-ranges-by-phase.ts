@@ -217,7 +217,7 @@ sampled.forEach((combo, i) => {
 
 // --- report ----------------------------------------------------------------
 const pct = (n: number, d: number) => d === 0 ? '–' : `${(100 * n / d).toFixed(1)}%`
-const PHASE_ORDER = ['Anatomical Adaptation', 'Hypertrophy', 'Maximal Strength', 'Power & Expression', 'Metabolic Conditioning']
+const PHASE_ORDER = ['Anatomical Adaptation', 'Hypertrophy', 'Maximal Strength', 'Consolidation', 'Power & Expression', 'Metabolic Conditioning']
 const TIER_ORDER = ['main lift', 'secondary', 'isolation', 'primer', 'finisher', 'untiered']
 
 console.log(`\n${'='.repeat(78)}\n1. What each phase actually prescribes, by tier (non-deload weeks; slots = one exercise on one day)\n${'='.repeat(78)}`)

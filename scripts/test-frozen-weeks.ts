@@ -416,6 +416,13 @@ console.log('\n5. The measured improvement holds')
   // non-carry (95) and carries (38) did not move, as they should not have:
   // the fix touches only exercises that never had a kg. The rate bar is
   // ratcheted to 4.0% so reverting §6's fix fails here too, not only there.
+  //
+  // Later the same day: 144 (2.6%) after the rep bump learned to escalate
+  // (§7), and 110 of 5,555 (2.0%) once the ramp and the bump climb from the
+  // clamped range rather than vanishing into the floor (Ashley: "reps climb
+  // when the weight cannot" — docs/plans/consolidation-and-the-capped-bar.md).
+  // Loaded non-carry 95 → 80 → 72; carries 38 throughout. Bar left at 4.0%:
+  // the two named mutations already fail well inside it.
   let total = 0, frozen = 0, loadedFrozen = 0, carryFrozen = 0
   for (const { profile, seed } of everyCombo()) {
     for (const { exA, exB } of transitions(meso(profile, seed))) {

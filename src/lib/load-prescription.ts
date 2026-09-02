@@ -1550,7 +1550,7 @@ export function prescribeLoad(
   // any accessory/isolation exercise (any phase) is a straight, flat weight
   // across all sets.
   const isCompoundTier = entry.mechanics_tier === 'tier1_compound' || entry.mechanics_tier === 'tier2_compound'
-  const ramping = isCompoundTier && (options.phase === 'strength' || options.phase === 'power')
+  const ramping = isCompoundTier && (options.phase === 'strength' || options.phase === 'power' || options.phase === 'consolidation')
   const per_set = buildPerSetLoads(rounded, options.sets ?? 1, mode, labelMode, ramping)
 
   const basis = options.forceStartingWeightKg != null
@@ -1841,7 +1841,10 @@ const ADDED_LOAD_BODYWEIGHT_FRACTION: Record<TrainingExperience, number> = {
  * within-block lever. One lever at a time, the same rule loadStepUnaffordable
  * follows, and the same rule the tempo prescription follows one file over.
  */
-const ADDED_LOAD_PHASES: ReadonlySet<string> = new Set(['strength', 'power'])
+// 'consolidation' is a beginner's third block — strength's config under a
+// true name (periodization.ts). It keys here exactly as strength does so the
+// rename changes nothing about how the bar is loaded.
+const ADDED_LOAD_PHASES: ReadonlySet<string> = new Set(['strength', 'power', 'consolidation'])
 
 /**
  * A guard, not a scale. A heavy block should not be prescribing twelve reps,

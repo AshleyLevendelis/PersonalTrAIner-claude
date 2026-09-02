@@ -5978,30 +5978,21 @@ export function generateMesocycle(
           }
           const rampLoad = rampLoadCandidate && !loadStepUnaffordable
           const rampReps = (isBodyweight || loadStepUnaffordable || ((policy.progressionEmphasis === 'reps' || policy.progressionEmphasis === 'maintain') && !isMainCompound)) && !isCarry
-          // HOW FAR THE PHASE'S WORKING RANGE MUST BE LIFTED TO REACH THE
-          // MAIN-LIFT FLOOR — measured against the raw base, added to the
-          // shift BEFORE the weekly ramp and the frozen-load bump. The first
-          // version of the floor was a plain clamp on the final range, and it
-          // froze the very lifts it lifted: a 4-6 base under a floor of 6 read
-          // 6-8 in week 1, 4-6 + 1 = 5-7 clamped to 6-8 in week 2, 6-8 in
-          // week 3 — test:quality's frozen-week tally rose by 511 plans the
-          // day it landed. A constant lift instead of a clamp means the ramp
-          // and the bump climb from 6-8 to 7-9 to 8-10 as designed.
-          //
-          // DELIBERATELY NOT THE EXPERIENCE FLOOR. A beginner's floor of 8
-          // under a strength block's -3 swallows the same ramp the same way,
-          // and has for months. Lifting that too was tried and measured: the
-          // frozen-week count fell further, and a beginner's "Maximal
-          // Strength" main lift climbed 8-10 -> 10-12 -> 11-13 across the
-          // block, putting 17.5% of strength main lifts outside that phase's
-          // own promise. That is a prescription trade-off, queued for Ashley;
-          // this lift is scoped to the ruling she actually made. With no
-          // main-lift floor set, floorLift is 0 and every line below is
-          // exactly what it was.
-          const rawBaseLow = Number(/^(\d+)/.exec(baseReps)?.[1] ?? NaN)
-          const mainLiftFloor = isMainCompound ? (phaseConfig.main_lift_rep_floor ?? 0) : 0
-          const floorLift = Number.isFinite(rawBaseLow) ? Math.max(0, mainLiftFloor - (rawBaseLow + phaseConfig.rep_shift)) : 0
-          const repShift = (isDeload
+          // THE PHASE'S RANGE FIRST, THEN THE RAMP CLIMBS FROM IT — and the
+          // frozen-load bump, further down, climbs from the week's own range.
+          // A floor (the experience floor, or a phase's main-lift floor) is
+          // a MINIMUM, not a value: applying one combined shift and clamping
+          // once looked the same and was the same whenever no floor bound,
+          // but the moment one did, the clamp swallowed the ramp — a beginner's
+          // 8-10 under a strength block's -3 read 8-10 in weeks 1, 2 and 3;
+          // a novice's capped bar could never buy a rep. Ashley's ruling,
+          // 2 Sep 2026, with the cost stated (a beginner's third block reads
+          // 8-10 up to 11-13, a novice's capped-bar weeks up to 9-11): reps
+          // climb when the weight cannot. This is her earlier "buy a rep with
+          // the week" applied where the arithmetic had been blocking it; the
+          // beginner's block is renamed alongside so the heading stays true.
+          // docs/plans/consolidation-and-the-capped-bar.md.
+          const phaseRepShift = isDeload
             ? (deloadAtFloor
                 // Weight held flat (can't drop further) — reps carry the
                 // recovery reduction instead of the usual +2 "back off"
@@ -6010,7 +6001,10 @@ export function generateMesocycle(
                 // outright rather than just holding flat.
                 ? (deloadNeedsRepCut ? phaseConfig.rep_shift - 2 : phaseConfig.rep_shift)
                 : phaseConfig.rep_shift + 2)
-            : phaseConfig.rep_shift + (rampReps ? w - 1 : 0)) + floorLift
+            : phaseConfig.rep_shift
+          const rampSteps = !isDeload && rampReps ? w - 1 : 0
+          const repShift = phaseRepShift + rampSteps
+          const phaseReps = shiftReps(baseReps, phaseRepShift, repFloor)
           const restShift = isDeload ? 0 : phaseConfig.rest_adjust_seconds
 
           // Interval and steady-state cardio don't go through the reps-
@@ -6032,13 +6026,13 @@ export function generateMesocycle(
           if (dbEntry?.prescription_type === 'intervals') {
             const workBase = parseIntervalSeconds(baseReps)
             const restBase = parseIntervalSeconds(ex.rest)
-            reps = workBase != null ? `${stepIntervalSeconds(workBase, w, isDeload)}s` : shiftReps(baseReps, repShift, repFloor)
+            reps = workBase != null ? `${stepIntervalSeconds(workBase, w, isDeload)}s` : shiftReps(phaseReps, rampSteps, repFloor)
             restForWeek = restBase != null ? `${stepIntervalSeconds(restBase, w, isDeload)}s` : adjustRest(ex.rest, restShift)
           } else if (dbEntry?.prescription_type === 'steady_state') {
             reps = baseReps
             restForWeek = ex.rest
           } else {
-            reps = shiftReps(baseReps, repShift, repFloor)
+            reps = shiftReps(phaseReps, rampSteps, repFloor)
             restForWeek = adjustRest(ex.rest, restShift)
           }
 
@@ -6236,7 +6230,7 @@ export function generateMesocycle(
               const alreadyDecided = frozenBumpDecidedThisWeek.get(dbEntry.name)
               const streak = frozenLoadStreakByLift.get(dbEntry.name) ?? 0
               let bump = alreadyDecided ?? Math.min(streak + 1, MAX_FROZEN_LOAD_REP_BUMP)
-              let bumpedReps = shiftReps(baseReps, repShift + bump, repFloor)
+              let bumpedReps = shiftReps(reps, bump, repFloor)
               // ESCALATE WITHIN THE WEEK. shiftReps clamps to the rep floor, so
               // in a negative-shift phase a small bump can land on exactly the
               // range already shown (an intermediate's 6-8 under Power's -4 is
@@ -6253,7 +6247,7 @@ export function generateMesocycle(
               if (alreadyDecided == null) {
                 while (bumpedReps === reps && bump < MAX_FROZEN_LOAD_REP_BUMP) {
                   bump++
-                  bumpedReps = shiftReps(baseReps, repShift + bump, repFloor)
+                  bumpedReps = shiftReps(reps, bump, repFloor)
                 }
               }
               const rangeCanMove = bumpedReps !== reps

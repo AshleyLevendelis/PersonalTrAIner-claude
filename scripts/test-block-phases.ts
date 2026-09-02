@@ -175,7 +175,7 @@ console.log('\n3. The strip and the paragraph say the same thing about a week')
 
 // Every phase key, shared by §4 (short-label round-trip) and §6 (floors read
 // off the configs). Hoisted so both sections read the same list.
-const PHASES: TrainingPhase[] = ['anatomical_adaptation', 'hypertrophy', 'strength', 'power', 'metabolic']
+const PHASES: TrainingPhase[] = ['anatomical_adaptation', 'hypertrophy', 'strength', 'power', 'metabolic', 'consolidation']
 
 console.log('\n4. Short phase names round-trip, and an unknown one is not swallowed')
 {
@@ -298,11 +298,11 @@ console.log('\n6. A block that sets a main-lift rep floor never asks a main lift
             slots.set(phase, (slots.get(phase) ?? 0) + 1)
             if (w.is_deload) deloadSlots.set(phase, (deloadSlots.get(phase) ?? 0) + 1)
             if (lo < floor) under.push(`${label} w${w.week_number} ${d.day} ${ex.name} ${ex.reps} (${phase}, floor ${floor})`)
-            // Beginners excluded ON PURPOSE from the freeze check: their
-            // experience floor (8) can sit above a phase floor and swallows
-            // the ramp exactly as it did before any phase floor existed — a
-            // pre-existing behaviour queued as its own question.
-            if (ex.suggested_load_kg == null && !w.is_deload && !/beginner/.test(label)) {
+            // Beginners INCLUDED since 2 Sep 2026 (Ashley: reps climb when the
+            // weight cannot): the experience floor is a minimum too, and the
+            // ramp now climbs from it. They were excluded while it swallowed
+            // the ramp; that exclusion hid the thing this now pins.
+            if (ex.suggested_load_kg == null && !w.is_deload) {
               const key = `${label}|b${w.block_number}|${d.day}|${slot}|${ex.name}`
               if (w.week_in_block === 1) loadlessWeek1.set(key, ex.reps)
               if (w.week_in_block === 2) loadlessWeek2.set(key, ex.reps)
@@ -346,6 +346,47 @@ console.log('\n6. A block that sets a main-lift rep floor never asks a main lift
   check(`loadless main lifts exist under a floor to compare (${compared} week-1/week-2 pairs)`, compared > 0, compared)
   check(`...and the floors do not freeze them — reps still climb from week 1 to week 2 (${stuck.length} stuck)`,
     stuck.length === 0, stuck.slice(0, 3))
+}
+
+// ---------------------------------------------------------------------------
+console.log("\n7. A beginner's third block is Consolidation — and nobody else ever sees it")
+// ---------------------------------------------------------------------------
+{
+  // Ashley, 2 Sep 2026: a beginner's third block read "Maximal Strength" over
+  // 8-10, the same reps as their Hypertrophy block. Rename it ('consolidation',
+  // a real phase key, strength's dosing under a true name) and let reps climb.
+  // docs/plans/consolidation-and-the-capped-bar.md. The phase is kept out of
+  // the dedupe pool and the bodyweight set on purpose, so it must never appear
+  // on anyone but a beginner — and a beginner must never see the two headings
+  // that promise heavy work they are not given.
+  let beginnerThirds = 0
+  const wrongThird: string[] = [], heavyHeadingOnBeginner: string[] = [], leakedToOthers: string[] = []
+  for (const equipment_access of ['full_gym', 'home_gym', 'minimalist', 'bodyweight'] as const) {
+    for (const fitness_goal of ['hypertrophy', 'fat_loss', 'functional', 'conditioning'] as const) {
+      for (const training_experience of ['beginner', 'novice', 'intermediate', 'advanced'] as const) {
+        const label = `${equipment_access}/${fitness_goal}/${training_experience}`
+        const plan = planFor({ equipment_access, fitness_goal, training_experience }, `bp7:${label}`)
+        const third = plan.find(w => w.block_number === 3)?.phase_label ?? '(none)'
+        if (training_experience === 'beginner') {
+          beginnerThirds++
+          // The two goals whose beginner sequence reaches the phase, on
+          // equipment that allows it. Fat loss goes metabolic; conditioning
+          // keeps its own sequence; a bodyweight beginner keeps today's block 3.
+          const expectsConsolidation = (fitness_goal === 'hypertrophy' || fitness_goal === 'functional') && equipment_access !== 'bodyweight'
+          if (expectsConsolidation && third !== 'Consolidation') wrongThird.push(`${label}: block 3 is ${third}`)
+          for (const w of plan) {
+            if (w.phase_label === 'Maximal Strength' || w.phase_label === 'Power & Expression') heavyHeadingOnBeginner.push(`${label} w${w.week_number} ${w.phase_label}`)
+          }
+        } else {
+          for (const w of plan) if (w.phase_label === 'Consolidation') leakedToOthers.push(`${label} w${w.week_number}`)
+        }
+      }
+    }
+  }
+  check(`beginner plans were generated to judge (${beginnerThirds})`, beginnerThirds > 0, beginnerThirds)
+  check(`a beginner's third block is Consolidation wherever the sequence reaches it (${wrongThird.length} wrong)`, wrongThird.length === 0, wrongThird.slice(0, 4))
+  check(`no beginner week is headed Maximal Strength or Power & Expression (${heavyHeadingOnBeginner.length})`, heavyHeadingOnBeginner.length === 0, heavyHeadingOnBeginner.slice(0, 3))
+  check(`no novice, intermediate or advanced plan ever shows Consolidation (${leakedToOthers.length})`, leakedToOthers.length === 0, leakedToOthers.slice(0, 3))
 }
 
 console.log('\nFour weeks, four names, and the strip agrees with the prose.\n')

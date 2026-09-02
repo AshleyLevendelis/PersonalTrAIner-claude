@@ -142,7 +142,7 @@ const HYPERTROPHY_POLICY: GoalPolicy = {
   conditioningFrequencyPerWeek: 1,
   mainRotationWeeks: 4,
   accessoryRotationWeeks: 2,
-  allowedPhases: ['anatomical_adaptation', 'hypertrophy', 'strength', 'power'],
+  allowedPhases: ['anatomical_adaptation', 'hypertrophy', 'strength', 'power', 'consolidation'],
   progressionEmphasis: 'load',
   coachNote: 'Volume drives growth here — the program is built around moderate-rep working sets taken close to failure, with load climbing week to week within each block.',
   coachNoteLoadless: 'Volume drives growth here — the program is built around moderate-rep working sets taken close to failure, with the work climbing week to week within each block through reps and harder variations.',
@@ -220,7 +220,7 @@ const FUNCTIONAL_POLICY: GoalPolicy = {
   // Faster accessory rotation than every other goal — variety over strict
   // overload. (Main lifts still hold for the block; see mainRotationWeeks.)
   accessoryRotationWeeks: 1,
-  allowedPhases: ['anatomical_adaptation', 'hypertrophy', 'strength', 'power'],
+  allowedPhases: ['anatomical_adaptation', 'hypertrophy', 'strength', 'power', 'consolidation'],
   progressionEmphasis: 'maintain',
   coachNote: 'This program favors variety and movement quality over chasing a number on the bar — exercises rotate faster, and the aim is consistent, sustainable training rather than maximal overload.',
   coachNoteLoadless: 'This program favors variety and movement quality over chasing a number — exercises rotate faster, and the aim is consistent, sustainable training rather than maximal overload.',
@@ -281,6 +281,8 @@ export function getGoalPolicy(goal: FitnessGoal): GoalPolicy {
 const PHASE_FALLBACK: Record<TrainingPhase, TrainingPhase[]> = {
   power: ['strength', 'hypertrophy', 'anatomical_adaptation'],
   strength: ['hypertrophy', 'anatomical_adaptation'],
+  // A beginner's third block (periodization.ts) — falls the same way strength does.
+  consolidation: ['hypertrophy', 'anatomical_adaptation'],
   metabolic: ['hypertrophy', 'anatomical_adaptation'],
   hypertrophy: ['anatomical_adaptation'],
   anatomical_adaptation: [],
