@@ -6,9 +6,34 @@
  * required/protected exercises survive, and that a day already within
  * budget is left untouched.
  */
-import { sizeBlockToRestBudget } from '../src/lib/exercise-plan'
-import { getGoalPolicy } from '../src/lib/goal-policies'
-import type { WorkoutDay, Exercise } from '../src/lib/types'
+import { sizeBlockToRestBudget, generateMesocycle, setRandomSource, resetRandomSource } from '../src/lib/exercise-plan'
+import { getGoalPolicy, MAIN_LIFT_REST_FLOOR_SECONDS } from '../src/lib/goal-policies'
+import { seededRngFromKey } from '../src/lib/seeded-random'
+import { EXERCISE_DATABASE } from '../src/lib/exercise-db'
+import { isExternallyLoaded } from '../src/lib/load-prescription'
+import type {
+  WorkoutDay, Exercise, UserProfile, FitnessGoal, TrainingExperience, SessionDuration,
+} from '../src/lib/types'
+
+/** A full-gym bodybuilding profile, varied only by the three axes §6 sweeps. */
+function restFloorProfile(goal: FitnessGoal, experience: TrainingExperience, duration: SessionDuration): UserProfile {
+  return {
+    age: 30, gender: 'male', height_cm: 178, weight_kg: 80, activity_level: 'moderate',
+    fitness_goal: goal, preferred_time: 'morning', bmr: 1800, tdee: 2500,
+    equipment_access: 'full_gym', injuries: [], training_style: 'bodybuilding',
+    training_experience: experience, session_duration_preference: duration,
+    workout_split_preference: 'ai_recommendation',
+    training_days: [
+      { day: 'Monday', available: true }, { day: 'Tuesday', available: true },
+      { day: 'Wednesday', available: false }, { day: 'Thursday', available: true },
+      { day: 'Friday', available: true }, { day: 'Saturday', available: false },
+      { day: 'Sunday', available: false },
+    ],
+    weekly_schedule: {}, dietary_preferences: [], concurrent_activities: [], exercise_exclusions: [],
+    macro_calculation_mode: 'STANDARD_STATIC', coaching_persona: 'supportive',
+    recovery_capacity: 'moderate', conditioning_preference: 'tolerate',
+  } as UserProfile
+}
 
 let failures = 0
 function check(label: string, condition: boolean, extra?: unknown) {
@@ -86,6 +111,72 @@ function main() {
   const cardioSurvivor = cardioResult[0].exercises.find(e => e.name === 'Cycling Intervals')
   check('cardio exercise survives even under an impossible budget', !!cardioSurvivor)
   check('cardio sets unchanged', cardioSurvivor?.sets === 6, cardioSurvivor?.sets)
+
+  console.log('[6] two minutes on a loaded main lift — Ashley, 2 Sep 2026')
+  // HER RULING IS PINNED BY NAME, not derived from the configs. This is the
+  // lesson from the metabolic rep floor earlier the same day: a check that
+  // reads its expected value out of the config it is checking deletes itself
+  // when the config changes, and stays green while doing it. A change to
+  // either number below is a change to a decision Ashley made, and has to be
+  // made here on purpose.
+  check('hypertrophy: loaded main lifts rest at least 2 minutes',
+    getGoalPolicy('hypertrophy').minLoadedMainLiftRestSeconds === 120,
+    getGoalPolicy('hypertrophy').minLoadedMainLiftRestSeconds)
+  check('fat loss: the same',
+    getGoalPolicy('fat_loss').minLoadedMainLiftRestSeconds === 120,
+    getGoalPolicy('fat_loss').minLoadedMainLiftRestSeconds)
+  check('functional: the same',
+    getGoalPolicy('functional').minLoadedMainLiftRestSeconds === 120,
+    getGoalPolicy('functional').minLoadedMainLiftRestSeconds)
+  // The exception, and the reason it exists: "the session still conditions,
+  // the part with a bar on your back does not". She kept it when choosing the
+  // two-minute floor for everything else.
+  check('conditioning keeps the 90s her earlier ruling set',
+    getGoalPolicy('conditioning').minLoadedMainLiftRestSeconds === 90,
+    getGoalPolicy('conditioning').minLoadedMainLiftRestSeconds)
+
+  // AND THE FLOOR HAS TO HOLD IN A REAL PLAN, which is the half that bites.
+  // The first version of this check squeezed sizeBlockToRestBudget with an
+  // impossible budget and asserted the rest came down — it does not: that
+  // function removes exercises and leaves a main lift's rest alone, so the
+  // check was testing the wrong subject and its conditioning case failed for
+  // a reason that had nothing to do with the floor. Rewritten to assert the
+  // OUTCOME across generated plans, where the floor is actually applied
+  // (selection-time prescription, the budget trim, and the post-trim anchor
+  // pass all have to agree for this to pass).
+  {
+    const byName = new Map(EXERCISE_DATABASE.map(e => [e.name, e]))
+    const realLog = console.log, realDebug = console.debug
+    let checked = 0, below = 0
+    let lowest: { goal: string; name: string; rest: number; floor: number } | null = null
+    for (const goal of ['hypertrophy', 'fat_loss', 'conditioning', 'functional'] as FitnessGoal[]) {
+      const floor = Math.max(MAIN_LIFT_REST_FLOOR_SECONDS, getGoalPolicy(goal).minLoadedMainLiftRestSeconds ?? MAIN_LIFT_REST_FLOOR_SECONDS)
+      for (const experience of ['beginner', 'novice', 'intermediate', 'advanced'] as TrainingExperience[]) {
+        for (const duration of ['30-45', '45-60', '60-90'] as SessionDuration[]) {
+          setRandomSource(seededRngFromKey(`${goal}|${experience}|${duration}`))
+          console.log = () => {}; console.debug = () => {}
+          let meso
+          try { meso = generateMesocycle(restFloorProfile(goal, experience, duration)) }
+          finally { console.log = realLog; console.debug = realDebug }
+          resetRandomSource()
+          for (const week of meso) for (const day of week.days) for (const e of day.exercises) {
+            if (e.tier !== 'tier_1_primary') continue
+            const entry = byName.get(e.name)
+            if (!entry || !isExternallyLoaded(entry)) continue
+            const rest = parseInt(String(e.rest), 10)
+            if (!Number.isFinite(rest)) continue
+            checked++
+            if (rest < floor) {
+              below++
+              if (!lowest || rest < lowest.rest) lowest = { goal, name: e.name, rest, floor }
+            }
+          }
+        }
+      }
+    }
+    check('the sweep found loaded main lifts to check (sanity check on this check)', checked > 1000, checked)
+    check('every loaded main lift in a generated plan rests at least its goal floor', below === 0, lowest ?? below)
+  }
 
   console.log(`\n${failures === 0 ? 'PASS' : 'FAIL'} — ${failures} failure(s)`)
   process.exit(failures === 0 ? 0 : 1)

@@ -2,6 +2,29 @@
 
 Newest first. One line each.
 
+- [x] Four in five main lifts rested under two minutes (2 Sep 2026). Second
+  item taken from the research document Ashley shared: short rests cost real
+  work, and the loss lands on the hardest lift of the day. Measured across the
+  9,216-plan grid before asking her: 147,897 of 182,847 main-lift slots (80.9%)
+  under 120s, most commonly 90s / 60s / 75s; the trimmer reached a tier-1 main
+  lift 14,764 times and landed 4,269 of them on the old 60s floor. Cost, also
+  measured before asking (whole grid re-swept at 120s): mean exercises per
+  session 7.57 -> 7.46, about one fewer every nine sessions. She chose "two
+  minutes, but conditioning keeps its short rest", so minLoadedMainLiftRestSeconds
+  is now 120 on hypertrophy/fat_loss/functional and stays 90 on conditioning —
+  a value change, not a new mechanism, because that field already WAS this rule.
+  quality-score's main_lift_short_rest moved off its hardcoded 60 to the goal's
+  own floor, and now fires 0 times across the grid. test:audit 17,423 / 0;
+  test:quality 11.54 / 12 (unchanged), 0 below the floor. Gate
+  test:block-rest-sizing §6 pins her ruling BY NAME plus an end-to-end
+  assertion; three mutations red. Plan doc: docs/plans/two-minutes-on-the-big-lift.md.
+  METRIC CHANGE: main_lift_short_rest can now fire between 60 and 120s on a
+  loaded main lift, so its prior counts are not comparable.
+  FLAGGED FOR ASHLEY, NOT DECIDED: her ruling is goal-scoped, so a hypertrophy
+  trainee's Metabolic Conditioning BLOCK now rests two minutes on its loaded
+  main lift despite that block promising "short rest, sustained output". One
+  line to change if she wants the exception widened to the phase.
+
 - [x] The coach never asked how a session FELT — the strongest adherence
   signal there is, and the app had no way to see it (2 Sep 2026). From the
   research document Ashley shared ("The Coach's Decision Stack"): affect

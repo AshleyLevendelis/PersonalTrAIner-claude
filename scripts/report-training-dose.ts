@@ -195,6 +195,11 @@ let trimmedDays = 0, trimmedMainRest = 0, secondsCutTotal = 0
 const trimmedMainNames = new Map<string, number>()
 const trimmedMainRestTo = new Map<number, number>()
 let weeksSeen = 0, deloadWeeks = 0
+// 4. what a session actually contains — the currency any rest-floor change is
+// paid in. Raising the floor inside a fixed time budget cannot add minutes, so
+// it comes out of exercises; this is what makes that cost visible.
+let dayCount = 0, exerciseCount = 0, mainLiftDays = 0
+const exercisesPerDay = new Map<number, number>()
 
 const start = performance.now()
 sampled.forEach((combo, i) => {
@@ -242,6 +247,12 @@ sampled.forEach((combo, i) => {
     if (week.is_deload) { deloadWeeks++; continue }
     const weekSets = new Map<string, number>()
     for (const day of week.days) {
+      if (day.exercises.length > 0) {
+        dayCount++
+        exerciseCount += day.exercises.length
+        bumpNum(exercisesPerDay, day.exercises.length)
+        if (day.exercises.some(e => e.tier === 'tier_1_primary')) mainLiftDays++
+      }
       for (const ex of day.exercises) {
         if (ex.prescription_type && ex.prescription_type !== 'reps') continue
         if (ex.tier === 'tier_1_primary') {
@@ -313,5 +324,15 @@ if (trimmedMainRest > 0) {
   console.log('\n  landing rest:')
   for (const r of [...trimmedMainRestTo.keys()].sort((a, b) => a - b)) console.log(`    ${String(r).padStart(4)}s  ${trimmedMainRestTo.get(r)}`)
 }
+console.log(`\n${'='.repeat(78)}\n4. What a session contains (the currency a rest-floor change is paid in)\n${'='.repeat(78)}`)
+console.log(`Training days with at least one exercise: ${dayCount}`)
+console.log(`  mean exercises per day: ${(exerciseCount / Math.max(1, dayCount)).toFixed(2)}`)
+console.log(`  days carrying a tier-1 main lift: ${mainLiftDays} (${pct(mainLiftDays, dayCount)})`)
+console.log('  distribution:')
+for (const n of [...exercisesPerDay.keys()].sort((a, b) => a - b)) {
+  const d = exercisesPerDay.get(n)!
+  console.log(`    ${String(n).padStart(3)} exercises  ${String(d).padStart(7)}  ${pct(d, dayCount).padStart(6)}`)
+}
+
 console.log(`\nWeeks seen: ${weeksSeen} (${deloadWeeks} deload, excluded from section 1)`)
 console.log(`\nDone in ${Math.round((performance.now() - start) / 1000)}s.`)
