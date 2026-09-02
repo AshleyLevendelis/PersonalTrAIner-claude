@@ -71,6 +71,7 @@
     "test:interval-prescription": "tsx scripts/test-interval-prescription.ts",
     "test:cardio-share-score": "tsx scripts/test-cardio-share-score.ts",
     "test:block-rest-sizing": "tsx scripts/test-block-rest-sizing.ts",
+    "test:muscle-balance": "tsx scripts/test-muscle-balance.ts",
     "test:onboarding-order": "tsx scripts/test-onboarding-order.ts",
     "test:onboarding-chips": "tsx scripts/test-onboarding-chips.ts",
     "test:reveal-timing": "tsx scripts/test-reveal-timing.ts",

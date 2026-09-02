@@ -34,7 +34,7 @@
 // ---------------------------------------------------------------------------
 import { generateMesocycle, setRandomSource, resetRandomSource } from '../src/lib/exercise-plan'
 import { seededRngFromKey } from '../src/lib/seeded-random'
-import { EXERCISE_DATABASE } from '../src/lib/exercise-db'
+import { EXERCISE_DATABASE, muscleGroupsOf, MUSCLE_GROUPS } from '../src/lib/exercise-db'
 import {
   ALL_EQUIPMENT, ALL_DURATIONS, ALL_STYLES, ALL_EXPERIENCE, getInjuryCombinations,
 } from '../src/lib/dev-constraint-audit'
@@ -104,58 +104,25 @@ function generateAllCombinations(): Combination[] {
   return combos
 }
 
-// --- muscle names -> the groups a trainee would recognise ------------------
-// EXERCISE_DATABASE carries 62 distinct primary_muscles strings, many of them
-// synonyms written by different hands ('quads' and 'quadriceps', 'glutes' and
-// 'glute max', 'traps' and 'upper trapezius'). Counting them raw would split
-// one muscle's volume across three buckets and make every plan look
-// under-dosed. Anything that is not a trainable muscle group — 'grip',
-// 'cardiovascular system', 'full body' — maps to null and is not counted:
-// a set is attributed to the muscles it trains, not to every string listed.
-const MUSCLE_GROUP: Record<string, string> = {
-  chest: 'chest', 'upper chest': 'chest', 'lower chest': 'chest',
-  lats: 'back', 'upper back': 'back', rhomboids: 'back', 'teres major': 'back',
-  traps: 'back', 'mid traps': 'back', 'upper traps': 'back', 'upper trapezius': 'back',
-  'lower trapezius': 'back',
-  // Erectors get their OWN group rather than folding into 'back'. Folding
-  // them in was the first cut of this mapping and it inflated back's mean by
-  // roughly a third: every deadlift, RDL and good morning in the plan was
-  // being counted as back volume alongside the rows and pulldowns, which is
-  // not what a sets-per-muscle figure means when someone says "back".
-  'erector spinae': 'erectors', erectors: 'erectors',
-  shoulders: 'shoulders', 'anterior deltoid': 'shoulders', 'front deltoid': 'shoulders',
-  'lateral deltoid': 'shoulders', 'rear deltoid': 'shoulders', 'rotator cuff': 'shoulders',
-  'external rotators': 'shoulders', 'serratus anterior': 'shoulders',
-  biceps: 'biceps', 'biceps brachii': 'biceps', 'biceps brachii (long head)': 'biceps',
-  brachioradialis: 'biceps',
-  triceps: 'triceps', 'triceps (long head)': 'triceps',
-  quads: 'quads', quadriceps: 'quads', legs: 'quads',
-  hamstrings: 'hamstrings',
-  glutes: 'glutes', 'glute max': 'glutes', 'glute medius': 'glutes', 'glute minimus': 'glutes',
-  adductors: 'glutes', 'tensor fasciae latae': 'glutes',
-  // 'hip flexors' deliberately unmapped: they are the glutes' antagonist, not
-  // a group anyone doses to a weekly set target.
-  calves: 'calves', gastrocnemius: 'calves', soleus: 'calves',
-  'tibialis anterior': 'calves', peroneals: 'calves', 'ankle stabilisers': 'calves',
-  core: 'core', 'rectus abdominis': 'core', obliques: 'core',
-  'transverse abdominis': 'core', 'quadratus lumborum': 'core',
-}
-const GROUP_ORDER = ['chest', 'back', 'erectors', 'shoulders', 'biceps', 'triceps', 'quads', 'hamstrings', 'glutes', 'calves', 'core']
+// --- muscle groups ------------------------------------------------------
+// The map used to live here. It now lives in exercise-db.ts as
+// muscleGroupsOf, because the generator's own chest:back balance pass needs
+// exactly the same answer — two copies would have drifted the moment either
+// side gained a synonym, and this report would then have been measuring a
+// different question from the one the generator was deciding.
 // The document's figure, and the reason it is quoted rather than adopted: the
 // dose-response curve is real, the number 10 is a line drawn through a
 // scatter. It is the reporting threshold here and nothing more.
 const TARGET_SETS = 10
 
+/** Reported in the order MUSCLE_GROUPS declares, so the table and the
+ *  generator's own grouping can never disagree about what exists. */
+const GROUP_ORDER: readonly string[] = MUSCLE_GROUPS
+
 const entryByName = new Map(EXERCISE_DATABASE.map(e => [e.name, e]))
 function groupsFor(name: string): string[] {
   const entry = entryByName.get(name)
-  if (!entry) return []
-  const groups = new Set<string>()
-  for (const m of entry.primary_muscles ?? []) {
-    const g = MUSCLE_GROUP[m.toLowerCase()]
-    if (g) groups.add(g)
-  }
-  return [...groups]
+  return entry ? muscleGroupsOf(entry) : []
 }
 
 /** resolveTargetRpe emits `RPE <low>-<high>`; deloads emit "RPE 5-6 — deload…". */

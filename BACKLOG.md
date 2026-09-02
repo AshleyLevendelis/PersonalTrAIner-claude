@@ -2,6 +2,30 @@
 
 Newest first. One line each.
 
+- [x] Chest got 8 hard sets a week where back got 12 (2 Sep 2026). Third item
+  from the research document Ashley shared, and the first thing to come out of
+  counting sets per muscle — something the app had never done. The existing
+  balancer balances PATTERNS (push sets vs pull sets) and does it right, but a
+  push set splits across chest/shoulders/triceps while a pull set concentrates
+  on back/biceps, so push:pull sits in band while the muscles underneath are
+  lopsided. Verified on a live week (14 chest sets vs 22 back) before trusting
+  the aggregate. She chose "even out chest against back". Built as a second
+  pass in enforceWeeklyPatternBalance aiming at a 1.25 band, preferring to move
+  a set from shoulders (the biggest surplus, 15.3/wk) to chest. muscleGroupsOf
+  now lives in exercise-db.ts so the generator and the report script cannot
+  drift; erectors are their own group, not back. Measured: chest 7.9 -> 8.6
+  mean, weeks under 10 75.1% -> 69.2%, back:chest 2.00 -> 1.72, push:pull
+  weeks out of band 42 -> 42 (unchanged). Gate test:muscle-balance, four
+  mutations red. Plan doc: docs/plans/chest-against-back.md.
+  COST, stated: test:quality 11.54 -> 11.51 (0 below floor). Time fit and goal
+  alignment each gave up a little because added sets cost minutes. Unlike the
+  other two changes today this one is not free.
+  NAMED RESIDUAL: it reaches 1.72, not the 1.25 it aims at. Chest often has
+  only one or two adjustable accessory slots and once each is at its role
+  ceiling the only move left is adding a whole chest EXERCISE, which post-
+  periodization needs a rebuild the code deliberately does not do. Separate
+  change, not a budget.
+
 - [x] Four in five main lifts rested under two minutes (2 Sep 2026). Second
   item taken from the research document Ashley shared: short rests cost real
   work, and the loss lands on the hardest lift of the day. Measured across the
