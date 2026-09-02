@@ -28,3 +28,14 @@ meal-quality-report.txt
 .onb-harness/dist/
 .onb-harness/*.png
 .tw-harness/dist/
+
+# Environment files — NEVER committed. Both .env and .env.local were tracked
+# until 1 Sep 2026: .env.local pointed at TEST, and .env at a third, older
+# project and carried a test user's PASSWORD. Nothing read that password; it
+# sat in the repository and its history regardless. Local dev keeps its own
+# .env.local (copy .env.example); production is configured on Vercel and
+# never in a file, so the deployed app can never inherit a database from
+# whatever happened to be checked out.
+.env
+.env.*
+!.env.example
