@@ -307,6 +307,35 @@ export interface Exercise {
    */
   load_source?: 'estimate' | 'known_weight' | 'assumed_body'
   /**
+   * What is holding this week's weight where it is, when something is —
+   * LoadPrescription.hold as computed for this slot's NATURAL prescription
+   * (before any rep bump re-prescribed it), plus one the generator adds
+   * afterwards:
+   *   'ceiling'    the unverified ramp reached the standards estimate
+   *   'implement'  the improvised-implement safety cap
+   *   'floor'      rounded up to the bar / the lightest pair
+   *   'matched'    lowered by enforceOneWeightPerPrescription to match the
+   *                same lift's other slot this week
+   * The load_guidance sentence says the first three in words; this is the
+   * same fact in a form a measurement can read. Absent otherwise.
+   */
+  load_hold?: 'ceiling' | 'implement' | 'floor' | 'matched'
+  /**
+   * What the frozen-load rep bump did this week, when it ran at all (the
+   * weight did not move from last week and the lift is eligible):
+   *   'bought'       a rep was added on top of the phase's range
+   *   'capped'       already MAX_FROZEN_LOAD_REP_BUMP reps above it — held by design
+   *   'range_fixed'  no permitted bump size can change this rep range (the
+   *                  experience floor under a negative phase shift) — the
+   *                  lever is mechanically absent, a prescription decision
+   *   'band'         declined by the 25% divergence backstop
+   *   'matched'      whatever the bump did, the rep target was then set to
+   *                  the one this lift already shows at this weight this
+   *                  week (one target per lift per week)
+   * Absent when the bump was not in question (weight moved, deload, carry…).
+   */
+  rep_bump?: 'bought' | 'capped' | 'range_fixed' | 'band' | 'matched'
+  /**
    * Per-set load breakdown for externally-loaded work — the last entry is
    * always the top/working set (same value as suggested_load_kg). Ramps
    * progressively across sets for compounds in strength/power phases;

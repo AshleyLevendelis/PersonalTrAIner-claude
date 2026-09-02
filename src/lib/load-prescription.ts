@@ -91,6 +91,23 @@ export interface LoadPrescription {
    * exercise). The last entry always equals starting_weight_kg.
    */
   per_set: PerSetLoad[] | null
+  /**
+   * What, if anything, is holding this number where it is — so a week that
+   * repeats can be told apart BY CAUSE. The scorer still counts a held bar as
+   * a held bar (Ashley's ruling); this is so the measurement can say whether
+   * the app already knows why.
+   *   'implement'  clamped by the improvised-implement safety ceiling
+   *   'floor'      the estimate sat below the equipment floor (bar only,
+   *                lightest pair) and was rounded UP to it
+   *   'ceiling'    the unverified ramp has caught up with the standards
+   *                estimate and Math.min holds it there — the state the
+   *                `basis` sentence describes as "this is as far as the
+   *                estimate goes"
+   *   null         nothing is holding it
+   * The binding one wins when several apply (an implement cap or a floor is
+   * the number on the screen whatever the ramp did).
+   */
+  hold: 'implement' | 'floor' | 'ceiling' | null
 }
 
 /**
@@ -1344,6 +1361,7 @@ export function prescribeLoad(
       basis: 'Progress by adding reps or slowing the tempo before adding load.',
       load_source: 'estimate',
       per_set: null,
+    hold: null,
     }
   }
 
@@ -1355,6 +1373,7 @@ export function prescribeLoad(
       basis: 'Pick a load that matches the target effort and note what you used.',
       load_source: 'estimate',
       per_set: null,
+    hold: null,
     }
   }
 
@@ -1381,6 +1400,8 @@ export function prescribeLoad(
   // Hoisted because those two are in different scopes and this is the only
   // honest way to carry the fact between them.
   let rampArrived = false
+  let floorHeld = false
+  let implementHeld = false
 
   // Hoisted for the same reason fromKnownWeight is: the forceStartingWeightKg
   // branch below short-circuits without re-deriving anything, but the number
@@ -1474,6 +1495,10 @@ export function prescribeLoad(
       estimate = Math.min(stepped, estimate)
     }
 
+    // Recorded, not inferred later: only here is the pre-rounding estimate in
+    // scope. A number rounded UP to the bar or the lightest pair is held by
+    // the equipment, not by anything about the trainee.
+    floorHeld = estimate < LOADING_FLOOR_KG[mode]
     rounded = roundToPlate(estimate, mode)
   }
 
@@ -1516,14 +1541,16 @@ export function prescribeLoad(
     // 40kg still gets the experience-scaled figure.
     const strapLimit = IMPROVISED_IMPLEMENT_CEILING_KG[profile.training_experience || 'novice']
     const statedBag = statedCeilingKg(entry, profile)
+    const beforeImplementCap = rounded
     rounded = Math.min(rounded, statedBag == null ? strapLimit : Math.min(strapLimit, statedBag))
+    implementHeld = rounded < beforeImplementCap
   }
 
   // Only compounds in a strength/power phase ramp; hypertrophy-phase work and
   // any accessory/isolation exercise (any phase) is a straight, flat weight
   // across all sets.
   const isCompoundTier = entry.mechanics_tier === 'tier1_compound' || entry.mechanics_tier === 'tier2_compound'
-  const ramping = isCompoundTier && (options.phase === 'strength' || options.phase === 'power')
+  const ramping = isCompoundTier && (options.phase === 'strength' || options.phase === 'power' || options.phase === 'consolidation')
   const per_set = buildPerSetLoads(rounded, options.sets ?? 1, mode, labelMode, ramping)
 
   const basis = options.forceStartingWeightKg != null
@@ -1607,6 +1634,7 @@ export function prescribeLoad(
     basis,
     load_source: fromKnownWeight ? 'known_weight' : bodyAssumed ? 'assumed_body' : 'estimate',
     per_set,
+    hold: implementHeld ? 'implement' : floorHeld ? 'floor' : rampArrived ? 'ceiling' : null,
   }
 }
 
@@ -1813,7 +1841,10 @@ const ADDED_LOAD_BODYWEIGHT_FRACTION: Record<TrainingExperience, number> = {
  * within-block lever. One lever at a time, the same rule loadStepUnaffordable
  * follows, and the same rule the tempo prescription follows one file over.
  */
-const ADDED_LOAD_PHASES: ReadonlySet<string> = new Set(['strength', 'power'])
+// 'consolidation' is a beginner's third block — strength's config under a
+// true name (periodization.ts). It keys here exactly as strength does so the
+// rename changes nothing about how the bar is loaded.
+const ADDED_LOAD_PHASES: ReadonlySet<string> = new Set(['strength', 'power', 'consolidation'])
 
 /**
  * A guard, not a scale. A heavy block should not be prescribing twelve reps,

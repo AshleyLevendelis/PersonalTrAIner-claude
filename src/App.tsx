@@ -39,6 +39,7 @@ import { checkForBlockReview } from '@/lib/block-review'
 import { checkForConsistencyHold } from '@/lib/block-consistency'
 import { checkForLoadSuggestions, confirmLoadSuggestion, declineLoadSuggestion } from '@/lib/load-suggestions'
 import { checkForWeightBasisOffer, confirmWeightBasisOffer, declineWeightBasisOffer, planHasAssumedBodyLoads } from '@/lib/weight-basis-offer'
+import { checkForBeatTargetOffer, confirmBeatTargetOffer, declineBeatTargetOffer } from '@/lib/beat-target-offer'
 import { getRevealSpeed, saveRevealSpeed, DEFAULT_REVEAL_SPEED, type RevealSpeed } from '@/lib/reveal-speed-store'
 import { ensureSignedIn, claimProfile, shouldAskForEmail, findOwnedProfileId, describeSignInFailure } from '@/lib/auth'
 import { rebuildFromCurrentWeek, type PlanInvalidation } from '@/lib/plan-invalidation'
@@ -123,7 +124,7 @@ function App() {
   // may be dismissed — a dismiss that didn't record an answer would silently
   // re-ask forever, or (worse, for the weight-basis offer) look answered
   // while nothing had been decided.
-  const [adaptationMessages, setAdaptationMessages] = useState<{ text: string; goalId?: string; loadSuggestionId?: string; weightBasisOfferId?: string }[]>([])
+  const [adaptationMessages, setAdaptationMessages] = useState<{ text: string; goalId?: string; loadSuggestionId?: string; weightBasisOfferId?: string; loadCatchupId?: string }[]>([])
   /**
    * "That didn't save" — the one place a tap-driven mutation on this screen
    * reports a write that failed.
@@ -859,6 +860,21 @@ function App() {
         .then(weightBasisOffer => {
           if (weightBasisOffer) {
             setAdaptationMessages(prev => [...prev, { text: weightBasisOffer.text, weightBasisOfferId: weightBasisOffer.id }])
+          }
+          // The accelerator, last in the block-boundary chain: the two holds
+          // above may both have patched the plan, and this must read the plan
+          // as they left it rather than as it was on load. See
+          // beat-target-offer.ts for why this one asks and they do not.
+          return checkForBeatTargetOffer({
+            profileId: restoredProfile.id!,
+            mesocycle: workingMesocycle,
+            planCreatedAt: blockCheckPlanCreatedAt,
+            now: blockCheckNow,
+          })
+        })
+        .then(catchup => {
+          if (catchup) {
+            setAdaptationMessages(prev => [...prev, { text: catchup.text, loadCatchupId: catchup.id }])
           }
         })
         .catch(console.error)
@@ -1608,6 +1624,35 @@ function App() {
     }
   }
 
+  const handleLoadCatchupConfirm = async (id: string) => {
+    if (!profile?.id) return
+    setLoadSuggestionBusy(id)
+    try {
+      const patched = await confirmBeatTargetOffer({ offerId: id, mesocycle, profile, profileId: profile.id })
+      // null means it did NOT patch — already answered elsewhere, or the plan
+      // moved under the offer and the precondition refused it. Same rule as
+      // the weight-basis path: never post a success receipt for a write that
+      // did not happen. The card goes either way, because a stale offer that
+      // stays on screen is one the user can only tap fruitlessly.
+      if (patched) {
+        setMesocycle(patched)
+      }
+      setAdaptationMessages(prev => prev.filter(m => m.loadCatchupId !== id))
+    } finally {
+      setLoadSuggestionBusy(null)
+    }
+  }
+
+  const handleLoadCatchupDecline = async (id: string) => {
+    setLoadSuggestionBusy(id)
+    try {
+      await declineBeatTargetOffer(id)
+      setAdaptationMessages(prev => prev.filter(m => m.loadCatchupId !== id))
+    } finally {
+      setLoadSuggestionBusy(null)
+    }
+  }
+
   const handleWeightBasisDecline = async (id: string) => {
     setLoadSuggestionBusy(id)
     try {
@@ -2172,6 +2217,28 @@ function App() {
                       className="text-xs underline opacity-70 hover:opacity-100 disabled:opacity-50"
                     >
                       Keep as is
+                    </button>
+                  </div>
+                ) : msg.loadCatchupId ? (
+                  <div className="flex shrink-0 items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => void handleLoadCatchupConfirm(msg.loadCatchupId!)}
+                      disabled={loadSuggestionBusy === msg.loadCatchupId}
+                      className="text-xs font-semibold underline opacity-90 hover:opacity-100 disabled:opacity-50"
+                    >
+                      {loadSuggestionBusy === msg.loadCatchupId ? 'Updating…' : 'Yes, use my weights'}
+                    </button>
+                    {/* "Keep the plan" rather than "Dismiss": declining is a
+                        real answer that is remembered for this block, and the
+                        label has to say which way it goes. */}
+                    <button
+                      type="button"
+                      onClick={() => void handleLoadCatchupDecline(msg.loadCatchupId!)}
+                      disabled={loadSuggestionBusy === msg.loadCatchupId}
+                      className="text-xs underline opacity-70 hover:opacity-100 disabled:opacity-50"
+                    >
+                      Keep the plan
                     </button>
                   </div>
                 ) : msg.weightBasisOfferId ? (

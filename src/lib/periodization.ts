@@ -26,6 +26,8 @@ export type TrainingPhase =
   | 'strength'
   | 'power'
   | 'metabolic'
+  // A beginner's third block only — see PHASE_CONFIGS.consolidation.
+  | 'consolidation'
 
 export interface PhaseConfig {
   phase: TrainingPhase
@@ -42,6 +44,21 @@ export interface PhaseConfig {
   sets_multiplier: number
   /** Shift applied to the base rep range: negative = heavier/lower reps. */
   rep_shift: number
+  /**
+   * A floor under the MAIN LIFT's rep range in this phase, applied after
+   * rep_shift on top of the experience floor. Only hypertrophy sets one.
+   *
+   * Ashley, 2 Sep 2026, shown "Deadlifts 3x3-5" under a Hypertrophy heading
+   * promising "moderate loads, higher volume" — asked whether a main lift in
+   * a Hypertrophy block should ever run 3-5 (combat style bases its main
+   * lifts there; the fat-loss goal pulls them two reps heavier), she chose
+   * "lift it to at least 6 reps" over keeping 3-5 and rewording the heading.
+   * A floor on the BOTTOM of the range, spread preserved: 3-5 and 4-6 both
+   * become 6-8; 6-8 is untouched. Load follows — prescribeLoad estimates
+   * lighter for more reps — which is the phase's promise, not a side effect.
+   * Strength and power leave this unset and still go heavy.
+   */
+  main_lift_rep_floor?: number
   rest_adjust_seconds: number
   /** Upper bound before the experience cap is applied. */
   target_rpe: number
@@ -85,6 +102,7 @@ const PHASE_CONFIGS: Record<TrainingPhase, PhaseConfig> = {
     focus: 'Build muscle — moderate loads, higher volume, controlled tempo',
     sets_multiplier: 1.1,
     rep_shift: 0,
+    main_lift_rep_floor: 6,
     rest_adjust_seconds: 0,
     target_rpe: 8,
     coach_note:
@@ -109,6 +127,39 @@ const PHASE_CONFIGS: Record<TrainingPhase, PhaseConfig> = {
     coach_note_loadless:
       'Fewer reps, taken harder. With no weight to add, the difficulty comes from how you move: about three seconds lowering, a pause at the bottom, no bounce. Rest fully between sets — cutting rest here undermines the whole point of the phase.',
   },
+  // A BEGINNER'S THIRD BLOCK, UNDER A TRUE NAME. Beginners were handed the
+  // 'strength' phase for block 3 and its label — "Maximal Strength" — on the
+  // reasoning that "only the label and rep range differ". The rep range did
+  // not differ either: a beginner's rep floor is 8, so strength's -3 was
+  // inert and the block ran 8-10, the same as their Hypertrophy block, under
+  // a heading promising maximal strength. Ashley's ruling, 2 Sep 2026:
+  // rename it, and let reps climb above the floor when the weight cannot.
+  //
+  // Everything that DOSES the block is strength's, on purpose — rest +45s
+  // (change it and every beginner plan's exercise count moves through the
+  // rest budget), target RPE 8.5 (the beginner ceiling of 7 still applies),
+  // rep_shift -3 (still inert for a beginner; identical in intent if the
+  // phase were ever handed to anyone else, which the sequence and the
+  // dedupe pool are built so it cannot be), strength's tempo, strength's
+  // set-ramping and added-load keys in load-prescription.ts. What changes
+  // is the name, the words, and — from the two-step rep shift in
+  // exercise-plan.ts — that the weekly ramp and the rep bump now climb
+  // above the floor instead of vanishing into it.
+  // docs/plans/consolidation-and-the-capped-bar.md.
+  consolidation: {
+    phase: 'consolidation',
+    label: 'Consolidation',
+    shortLabel: 'Consolidation',
+    focus: 'Make it solid — the same lifts with more intent, longer rests, every rep the same shape',
+    sets_multiplier: 1.0,
+    rep_shift: -3,
+    rest_adjust_seconds: 45,
+    target_rpe: 8.5,
+    coach_note:
+      'Same lifts, more intent. Rest fully between sets and make every rep look like the last one — this block is where the patterns you built become solid under load, and where reps climb when the weight holds.',
+    coach_note_loadless:
+      'Same movements, taken with more intent. With no weight to add, the difficulty comes from how you move: about three seconds lowering, a pause at the bottom, no bounce, and one more rep than last week. Rest fully between sets.',
+  },
   power: {
     phase: 'power',
     label: 'Power & Expression',
@@ -130,6 +181,14 @@ const PHASE_CONFIGS: Record<TrainingPhase, PhaseConfig> = {
     focus: 'Work capacity and conditioning — short rest, sustained output',
     sets_multiplier: 1.0,
     rep_shift: 4,
+    // Ashley's second ruling on this, 2 Sep 2026, shown that a Metabolic
+    // Conditioning block — "short rest, sustained output" — ran its main lift
+    // at 7-9 in 1,246 of 9,216 plans (combat style's 3-5 base and the
+    // fat-loss goal's -2, +4 for the phase): "Lift to at least 10 reps."
+    // Applied exactly as the hypertrophy floor is: a constant lift on the
+    // main lift's range, measured before the ramp and the bump, so 7-9 runs
+    // 10-12 -> 11-13 -> 12-14 and the weeks still differ.
+    main_lift_rep_floor: 10,
     rest_adjust_seconds: -20,
     target_rpe: 7.5,
     coach_note:
@@ -187,12 +246,14 @@ export function getPhaseSequence(
     // hypertrophy/hypertrophy run that dedupeAdjacentPhases then "fixed" by
     // reintroducing anatomical_adaptation at block 3 — reproducing, one
     // step removed, the exact "Block 3 repeats Anatomical Adaptation"
-    // defect a review round kept citing. 'strength' is beginner-safe here:
-    // resolveTargetRpe independently caps intensity at RPE 7 for beginners
-    // regardless of the phase's own target, so a "Maximal Strength"-labeled
-    // block for a beginner is still dosed at the same ceiling every other
-    // phase already respects — only the label and rep range differ.
-    return ['anatomical_adaptation', 'hypertrophy', goal === 'fat_loss' ? 'metabolic' : 'strength', 'hypertrophy']
+    // defect a review round kept citing. The third block used to be
+    // 'strength' on the reasoning that resolveTargetRpe caps a beginner at
+    // RPE 7 anyway, so "only the label and rep range differ" — but the rep
+    // range did not differ either (a beginner's floor of 8 made the -3
+    // inert), which left a block reading 8-10 under "Maximal Strength".
+    // Since 2 Sep 2026 (Ashley) it is 'consolidation': strength's dosing
+    // under a true name — see PHASE_CONFIGS.consolidation.
+    return ['anatomical_adaptation', 'hypertrophy', goal === 'fat_loss' ? 'metabolic' : 'consolidation', 'hypertrophy']
   }
   if (experience === 'novice') {
     // Novices can handle a strength block, but not true power work yet.
@@ -508,6 +569,7 @@ const PHASE_TEMPO: Record<TrainingPhase, Tempo | null> = {
   anatomical_adaptation: { eccentric: 2, pause: 0, concentric: 1 },
   hypertrophy: { eccentric: 3, pause: 0, concentric: 1 },
   strength: { eccentric: 4, pause: 1, concentric: 1 },
+  consolidation: { eccentric: 4, pause: 1, concentric: 1 },
   power: null,
   metabolic: null,
 }

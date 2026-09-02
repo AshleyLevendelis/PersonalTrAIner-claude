@@ -31,7 +31,8 @@
 // ---------------------------------------------------------------------------
 
 import { generateExercisePlan, generateMesocycle, setRandomSource, resetRandomSource } from '../src/lib/exercise-plan'
-import { getExerciseEntry } from '../src/lib/exercise-db'
+import { getExerciseEntry, EXERCISE_DATABASE } from '../src/lib/exercise-db'
+import { categorize, isExternallyLoaded } from '../src/lib/load-prescription'
 import { readFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
@@ -408,6 +409,20 @@ console.log('\n5. The measured improvement holds')
   // AFTER:  264 of 5,767 (4.6%), 126 loaded non-carry. Thresholds sit clear of
   // the measured figures so ordinary drift doesn't fail a build, but a
   // regression toward the old behaviour would.
+  //
+  // 2 Sep 2026, the tagged-loaded-but-anchorless fix (§6): 329 of 5,555
+  // (5.9%) before it — a hair under the 6.0% bar, which is how it hid — and
+  // 159 of 5,555 (2.9%) after, same 36 plans, same denominator. Loaded
+  // non-carry (95) and carries (38) did not move, as they should not have:
+  // the fix touches only exercises that never had a kg. The rate bar is
+  // ratcheted to 4.0% so reverting §6's fix fails here too, not only there.
+  //
+  // Later the same day: 144 (2.6%) after the rep bump learned to escalate
+  // (§7), and 110 of 5,555 (2.0%) once the ramp and the bump climb from the
+  // clamped range rather than vanishing into the floor (Ashley: "reps climb
+  // when the weight cannot" — docs/plans/consolidation-and-the-capped-bar.md).
+  // Loaded non-carry 95 → 80 → 72; carries 38 throughout. Bar left at 4.0%:
+  // the two named mutations already fail well inside it.
   let total = 0, frozen = 0, loadedFrozen = 0, carryFrozen = 0
   for (const { profile, seed } of everyCombo()) {
     for (const { exA, exB } of transitions(meso(profile, seed))) {
@@ -425,7 +440,7 @@ console.log('\n5. The measured improvement holds')
   }
   const rate = frozen / total * 100
   console.log(`      ${frozen}/${total} frozen (${rate.toFixed(1)}%) — ${loadedFrozen} loaded non-carry, ${carryFrozen} carries`)
-  check('the frozen rate stays well below the 9.0% it started at', rate < 6.0, `${rate.toFixed(1)}%`)
+  check('the frozen rate stays well below the 9.0% it started at (bar 4.0% since 2 Sep 2026)', rate < 4.0, `${rate.toFixed(1)}%`)
   check('loaded non-carry freezes stay far below the 380 they started at', loadedFrozen < 180, String(loadedFrozen))
   // This assertion also changed meaning with the carry work. It used to read
   // "carries are still frozen — the exclusion is real, not accidental",
@@ -436,6 +451,130 @@ console.log('\n5. The measured improvement holds')
   // so neither a regression NOR a silent walk past the cap passes.
   check(`carries roughly halved and stopped at the cap (${carryFrozen}, was 100)`,
     carryFrozen < 70 && carryFrozen > 20, String(carryFrozen))
+}
+
+// ---------------------------------------------------------------------------
+console.log('\n6. Tagged loaded with nothing to lift still progresses by reps')
+// ---------------------------------------------------------------------------
+{
+  // Russian Twist was 120 of the 216 frozen-week lines test:quality printed
+  // on 2 Sep 2026. Its equipment tag (medicine ball) says "loaded", so the
+  // generator excluded it from the rep ramp; its movement pattern (core) has
+  // no load anchor BY DESIGN, so no weight was ever prescribed either. Nothing
+  // to add, and nothing else allowed to move. docs/plans/tagged-loaded-but-
+  // nothing-to-lift.md.
+  //
+  // THE SET IS DERIVED FROM THE CATALOGUE, NOT NAMED. A future exercise with
+  // the same shape is covered the day it is added, and the day categorize()
+  // learns to anchor core work this section empties itself rather than
+  // asserting something about a list that no longer describes anything.
+  const loadedButAnchorless = new Set(
+    EXERCISE_DATABASE.filter(e => isExternallyLoaded(e) && categorize(e) == null && e.mechanics_tier !== 'primer').map(e => e.name),
+  )
+  console.log(`      from the catalogue: ${[...loadedButAnchorless].join(', ') || '(none)'}`)
+  // The two load-emphasis goals are where this froze — a reps-emphasis goal
+  // ramped these all along. Every style, because core work is selected by
+  // style (combat requires it). Splits do not change the answer.
+  let seen = 0
+  const frozen: string[] = []
+  for (const fitness_goal of ['hypertrophy', 'fat_loss'] as const) {
+    for (const training_style of ['combat', 'functional', 'hybrid', 'bodybuilding'] as const) {
+      for (const equipment_access of EQUIP) {
+        for (const training_experience of EXP) {
+          const plan = meso(
+            buildProfile({ fitness_goal, training_style, equipment_access, training_experience }),
+            `frozen6:${fitness_goal}:${training_style}:${equipment_access}:${training_experience}`,
+          )
+          for (const { exA, exB, weekA, weekB } of transitions(plan)) {
+            if (!loadedButAnchorless.has(exA.name)) continue
+            seen++
+            if (exA.reps === exB.reps && exA.suggested_load_kg == null && exB.suggested_load_kg == null) {
+              frozen.push(`${exA.name} w${weekA}->w${weekB} ${exA.reps} (${fitness_goal}/${training_style}/${equipment_access}/${training_experience})`)
+            }
+          }
+        }
+      }
+    }
+  }
+  check('the catalogue still has exercises of this shape (sanity check on this section)', loadedButAnchorless.size > 0, String(loadedButAnchorless.size))
+  check(`they appear in the sweep, so the check has teeth (${seen} loading transitions)`, seen > 0, String(seen))
+  check(`none is ever frozen — with no weight to add, the reps move every loading week (${frozen.length} frozen)`,
+    frozen.length === 0, frozen.slice(0, 3).join(' | '))
+}
+
+// ---------------------------------------------------------------------------
+console.log('\n7. A held bar is held for a reason the plan can name — and never for want of trying')
+// ---------------------------------------------------------------------------
+{
+  // The barbell-main trace (docs/plans/when-the-bar-cannot-go-up.md): every
+  // frozen barbell main lift in the 9,216-plan grid had the ramp at the
+  // standards ceiling (correct) and the rep bump failing to take over. Two of
+  // its four buckets are decisions (the experience floor under a negative
+  // phase shift), one is the cap working (designed), and one — intermediates
+  // in a Power block, 8.8% — was the bump asking for the same size every
+  // week because the streak only grows on success, never reaching the size
+  // that would have moved the range. The fix escalates within the week.
+  //
+  // (a) NO SILENT FREEZE. Every loaded, non-carry pair with the same kg and
+  //     the same reps two loading weeks running must carry the generator's
+  //     own reason on week B: the bar is at the ceiling AND the bump was
+  //     capped, could not move the range, or was refused by the band. A pair
+  //     with no reason is a mechanism this section does not know about, and
+  //     is named rather than budgeted.
+  const unexplained: string[] = []
+  let explained = 0
+  const reasons = new Map<string, number>()
+  for (const { profile, seed, label } of everyCombo()) {
+    for (const { exA, exB, weekA, weekB } of transitions(meso(profile, seed))) {
+      const pt = (exA as { prescription_type?: string }).prescription_type
+      if (exA.tier === 'tier_0_primer' || pt === 'steady_state') continue
+      if (exA.suggested_load_kg == null || exA.suggested_load_kg !== exB.suggested_load_kg || exA.reps !== exB.reps) continue
+      if (getExerciseEntry(exA.name)?.movement_pattern === 'carry') continue
+      // A reason is: the generator recorded WHAT holds the weight (ceiling,
+      // implement cap, equipment floor, matched to a sibling slot) or WHY the
+      // rep bump did not move the reps (capped, range fixed, band, matched).
+      // 'bought' with unchanged reps and no hold is the one combination that
+      // means nothing recorded explains the pair.
+      const bumpReason = exB.rep_bump && exB.rep_bump !== 'bought' ? exB.rep_bump : null
+      const reason = exB.load_hold || bumpReason ? `${exB.load_hold ?? '-'}/${exB.rep_bump ?? '-'}` : null
+      if (reason) { explained++; reasons.set(reason, (reasons.get(reason) ?? 0) + 1) }
+      else unexplained.push(`${label} ${exA.name} w${weekA}->w${weekB} ${exA.reps} @ ${exA.suggested_load_kg}kg hold=${exB.load_hold ?? '-'} bump=${exB.rep_bump ?? '-'}`)
+    }
+  }
+  console.log(`      ${explained} held pairs explained (${[...reasons.entries()].map(([k, v]) => `${k} ${v}`).join(', ')}); ${unexplained.length} unexplained`)
+  check('held pairs exist to be explained, so the check has teeth', explained > 0, String(explained))
+  check('every held loaded pair carries the generator\'s own reason — no silent freeze', unexplained.length === 0, unexplained.slice(0, 4).join(' | '))
+
+  // (b) THE ESCALATION BUCKET IS EMPTY. Power blocks exist only under the
+  //     functional goal for intermediates and up. Before: an intermediate's
+  //     6-8 under Power's -4 is 4-6; +1 and +2 are still 4-6; the bump asked
+  //     for +1 every week and never tried +3. After: the smallest size that
+  //     moves the range is taken, so 'range_fixed' can only mean that even
+  //     +3 cannot move it — and for an intermediate in Power it always can.
+  let powerMainSlots = 0
+  const stuckInPower: string[] = []
+  for (const equipment_access of EQUIP) {
+    for (const workout_split_preference of SPLITS) {
+      for (const training_experience of ['intermediate', 'advanced'] as const) {
+        const plan = meso(
+          buildProfile({ fitness_goal: 'functional', equipment_access, workout_split_preference, training_experience }),
+          `frozen7:${equipment_access}:${workout_split_preference}:${training_experience}`,
+        )
+        for (const { exA, exB, weekA, weekB } of transitions(plan)) {
+          if (exA.tier !== 'tier_1_primary' || exA.suggested_load_kg == null) continue
+          const weekB_ = plan.find(w => w.week_number === weekB)
+          if (weekB_?.phase_label !== 'Power & Expression') continue
+          powerMainSlots++
+          if (exB.rep_bump === 'range_fixed' && training_experience === 'intermediate') {
+            stuckInPower.push(`${equipment_access}/${workout_split_preference} ${exA.name} w${weekA}->w${weekB} ${exA.reps}`)
+          }
+        }
+      }
+    }
+  }
+  check(`Power blocks with loaded main lifts exist in the sweep (${powerMainSlots} transitions)`, powerMainSlots > 0, String(powerMainSlots))
+  check(`an intermediate's Power main lift is never left frozen for want of a larger bump (${stuckInPower.length})`,
+    stuckInPower.length === 0, stuckInPower.slice(0, 3).join(' | '))
 }
 
 console.log(failures === 0 ? '\nAll frozen-week checks passed.\n' : `\n${failures} FAILED\n`)

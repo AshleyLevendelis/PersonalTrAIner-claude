@@ -165,7 +165,7 @@ console.log('\n4. Every phase and every goal has a loadless voice')
   // Structural. tsc already requires the fields; this checks they SAY
   // something safe, including for the two phases a bodyweight trainee cannot
   // currently reach.
-  const phases: TrainingPhase[] = ['anatomical_adaptation', 'hypertrophy', 'strength', 'power', 'metabolic']
+  const phases: TrainingPhase[] = ['anatomical_adaptation', 'hypertrophy', 'strength', 'power', 'metabolic', 'consolidation']
   for (const p of phases) {
     const hits = offending(getPhaseConfig(p).coach_note_loadless)
     check(`phase "${p}" loadless note is weight-free`, hits.length === 0, hits.join(', '))

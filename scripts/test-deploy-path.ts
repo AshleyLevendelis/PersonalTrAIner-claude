@@ -20,6 +20,7 @@
 // ---------------------------------------------------------------------------
 
 import { readFileSync, existsSync, readdirSync } from 'fs'
+import { execSync } from 'child_process'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 
@@ -179,6 +180,27 @@ console.log('\n5. Nothing else names the production project')
   check('PROD_REF is the production project', lib.includes(`PROD_REF = '${PROD_REF}'`))
   check('TEST_REF is the test project', lib.includes(`TEST_REF = '${TEST_REF}'`))
   check('the two are not the same project', PROD_REF !== TEST_REF)
+}
+
+console.log('\n6. No environment file is tracked, and the example carries no values')
+{
+  // Both .env and .env.local were committed until 1 Sep 2026 — .env.local was
+  // TEST, .env was a THIRD, older project and carried a test user's password.
+  // The risk was never the anon keys (public by design); it was that a
+  // checked-out file could decide which database a build talked to, and that
+  // a password lived in history. This asks git, not the filesystem: the files
+  // are meant to exist locally and be ignored, so `existsSync` would prove
+  // nothing.
+  const tracked = execSync('git ls-files', { cwd: ROOT, encoding: 'utf8' })
+    .split('\n')
+    .filter(f => /^\.env(\.|$)/.test(f))
+  check('the only tracked env file is the example', tracked.length === 1 && tracked[0] === '.env.example', tracked)
+  const example = existsSync(join(ROOT, '.env.example')) ? readFileSync(join(ROOT, '.env.example'), 'utf8') : ''
+  check('.env.example exists', example.length > 0)
+  const valued = example.split('\n').filter(l => /^[A-Z_]+=.+/.test(l))
+  check('...and every key in it is empty — a template, not a leak', valued.length === 0, valued)
+  check('...and it names both keys the app needs',
+    /^VITE_SUPABASE_URL=/m.test(example) && /^VITE_SUPABASE_ANON_KEY=/m.test(example))
 }
 
 console.log(failures === 0 ? '\nAll deploy-path checks passed.\n' : `\n${failures} FAILED\n`)

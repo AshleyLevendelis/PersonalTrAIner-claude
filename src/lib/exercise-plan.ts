@@ -2976,7 +2976,12 @@ export function enforceOneWeightPerPrescription(days: WorkoutDay[]): void {
     if (items.length < 2) continue
     const min = Math.min(...items.map(i => i.ex.suggested_load_kg!))
     for (const { ex, entry } of items) {
-      if (ex.suggested_load_kg! > min) rebuildLoadForExercise(ex, entry, min)
+      if (ex.suggested_load_kg! > min) {
+        rebuildLoadForExercise(ex, entry, min)
+        // Recorded so a week that repeats because of THIS rule can be told
+        // apart from one the ramp or the bump decided.
+        ex.load_hold = 'matched'
+      }
     }
   }
 }
@@ -5719,6 +5724,9 @@ export function generateMesocycle(
       // costs one legitimate case and catches everything else.
       const weightDecidedThisWeek = new Map<string, number>()
       const frozenBumpDecidedThisWeek = new Map<string, number>()
+      // ...and what that decision WAS, so a second slot of the same lift
+      // reports the same outcome rather than 'bought' for a bump it copied.
+      const frozenBumpOutcomeThisWeek = new Map<string, NonNullable<Exercise['rep_bump']>>()
       // The reps a lift SHOWS are decided once per lift per week.
       //
       // Not the same thing as memoising the bump size, which was already done
@@ -5881,7 +5889,30 @@ export function generateMesocycle(
           // only by an RPE label (a direct LLM coach review finding: "same
           // bar, same reps, 'now it's harder' is not a plan"). Only 'load'
           // emphasis holds reps flat, since load itself is that goal's lever.
-          const isBodyweight = !!dbEntry && !isPrimer && !isExternallyLoaded(dbEntry)
+          //
+          // BOTH halves of the first sentence, not one. For months this tested
+          // only the equipment tag, so an exercise tagged loaded whose pattern
+          // categorize() deliberately gives no anchor (core: a medicine-ball
+          // Russian Twist, Cable Woodchops) was treated as a weight exercise
+          // with no weight — no kg to step, and excluded from the rep ramp
+          // because its tag said the bar was the lever. Under a load-emphasis
+          // goal that left it with NOTHING that could move: 404 of 404 such
+          // loading transitions frozen in test-frozen-weeks §6, and 39% of
+          // every frozen pair across the 9,216-plan quality grid.
+          // docs/plans/tagged-loaded-but-nothing-to-lift.md.
+          const isBodyweight = !!dbEntry && !isPrimer && (!isExternallyLoaded(dbEntry) || category == null)
+          // What the frozen-load rep bump decided this week, written onto the
+          // exercise so a frozen pair can be told apart by cause (see
+          // Exercise.rep_bump). Declared here, at the slot's scope, because
+          // the bump block that sets it and the assignment that reads it are
+          // different branches of it.
+          let repBump: Exercise['rep_bump']
+          // The hold on this slot's NATURAL prescription. Captured before the
+          // bump block, because buying a rep re-prescribes through the forced
+          // path and that prescription reports no hold of its own — which is
+          // how a bar pinned at the standards ceiling was being labelled as
+          // held by nothing on every week the bump succeeded.
+          let naturalHold: Exercise['load_hold']
           // A loaded carry's "reps" field is a fixed distance ('40m') —
           // shiftReps deliberately never touches it (distance is the wrong
           // lever for a carry). For a 'reps'/'maintain'-emphasis goal that
@@ -5913,6 +5944,16 @@ export function generateMesocycle(
           // "reps not weight" identity belongs, so only the true main lift
           // is exempted from policy below.
           const isMainCompound = !!dbEntry && dbEntry.mechanics_tier === 'tier1_compound'
+          // The rep floor every shift below clamps to: the experience floor,
+          // raised to the phase's main-lift floor when this IS the main lift
+          // (hypertrophy: 6 — Ashley's ruling of 2 Sep 2026 on "Deadlifts
+          // 3x3-5" under a heading promising moderate loads and higher volume;
+          // see main_lift_rep_floor in periodization.ts). ONE value, used by
+          // all three shiftReps calls in this iteration. The frozen-load rep
+          // bump re-derives its range from the same base, and if it clamped to
+          // a lower floor than the week's own reps did, it could hand back
+          // 4-6 as the "bumped" version of 6-8 and replace it.
+          const repFloor = Math.max(expConfig.min_reps, isMainCompound ? (phaseConfig.main_lift_rep_floor ?? 0) : 0)
           const rampLoadCandidate = !isBodyweight && (policy.progressionEmphasis === 'load' || isCarry || isMainCompound)
 
           // A percentage-sized step snapped to the loading mode's real
@@ -5937,7 +5978,21 @@ export function generateMesocycle(
           }
           const rampLoad = rampLoadCandidate && !loadStepUnaffordable
           const rampReps = (isBodyweight || loadStepUnaffordable || ((policy.progressionEmphasis === 'reps' || policy.progressionEmphasis === 'maintain') && !isMainCompound)) && !isCarry
-          const repShift = isDeload
+          // THE PHASE'S RANGE FIRST, THEN THE RAMP CLIMBS FROM IT — and the
+          // frozen-load bump, further down, climbs from the week's own range.
+          // A floor (the experience floor, or a phase's main-lift floor) is
+          // a MINIMUM, not a value: applying one combined shift and clamping
+          // once looked the same and was the same whenever no floor bound,
+          // but the moment one did, the clamp swallowed the ramp — a beginner's
+          // 8-10 under a strength block's -3 read 8-10 in weeks 1, 2 and 3;
+          // a novice's capped bar could never buy a rep. Ashley's ruling,
+          // 2 Sep 2026, with the cost stated (a beginner's third block reads
+          // 8-10 up to 11-13, a novice's capped-bar weeks up to 9-11): reps
+          // climb when the weight cannot. This is her earlier "buy a rep with
+          // the week" applied where the arithmetic had been blocking it; the
+          // beginner's block is renamed alongside so the heading stays true.
+          // docs/plans/consolidation-and-the-capped-bar.md.
+          const phaseRepShift = isDeload
             ? (deloadAtFloor
                 // Weight held flat (can't drop further) — reps carry the
                 // recovery reduction instead of the usual +2 "back off"
@@ -5946,7 +6001,10 @@ export function generateMesocycle(
                 // outright rather than just holding flat.
                 ? (deloadNeedsRepCut ? phaseConfig.rep_shift - 2 : phaseConfig.rep_shift)
                 : phaseConfig.rep_shift + 2)
-            : phaseConfig.rep_shift + (rampReps ? w - 1 : 0)
+            : phaseConfig.rep_shift
+          const rampSteps = !isDeload && rampReps ? w - 1 : 0
+          const repShift = phaseRepShift + rampSteps
+          const phaseReps = shiftReps(baseReps, phaseRepShift, repFloor)
           const restShift = isDeload ? 0 : phaseConfig.rest_adjust_seconds
 
           // Interval and steady-state cardio don't go through the reps-
@@ -5968,13 +6026,13 @@ export function generateMesocycle(
           if (dbEntry?.prescription_type === 'intervals') {
             const workBase = parseIntervalSeconds(baseReps)
             const restBase = parseIntervalSeconds(ex.rest)
-            reps = workBase != null ? `${stepIntervalSeconds(workBase, w, isDeload)}s` : shiftReps(baseReps, repShift, expConfig.min_reps)
+            reps = workBase != null ? `${stepIntervalSeconds(workBase, w, isDeload)}s` : shiftReps(phaseReps, rampSteps, repFloor)
             restForWeek = restBase != null ? `${stepIntervalSeconds(restBase, w, isDeload)}s` : adjustRest(ex.rest, restShift)
           } else if (dbEntry?.prescription_type === 'steady_state') {
             reps = baseReps
             restForWeek = ex.rest
           } else {
-            reps = shiftReps(baseReps, repShift, expConfig.min_reps)
+            reps = shiftReps(phaseReps, rampSteps, repFloor)
             restForWeek = adjustRest(ex.rest, restShift)
           }
 
@@ -6153,6 +6211,7 @@ export function generateMesocycle(
             // would make a lift look like it had dropped rather than frozen.
             // Base reps every time, whatever we have added on top.
             const naturalKg = load.starting_weight_kg
+            naturalHold = load.hold ?? undefined
             if (naturalKg != null) {
               const already = thisWeekPreCoherenceKg.get(dbEntry.name)
               // One lift can hold two slots in a week at two loads; take the
@@ -6169,8 +6228,30 @@ export function generateMesocycle(
               // Decided once per lift per week, then reused by any other slot
               // holding the same lift, so both slots show the same target.
               const alreadyDecided = frozenBumpDecidedThisWeek.get(dbEntry.name)
-              const bump = alreadyDecided ?? Math.min((frozenLoadStreakByLift.get(dbEntry.name) ?? 0) + 1, MAX_FROZEN_LOAD_REP_BUMP)
-              const bumpedReps = shiftReps(baseReps, repShift + bump, expConfig.min_reps)
+              const streak = frozenLoadStreakByLift.get(dbEntry.name) ?? 0
+              let bump = alreadyDecided ?? Math.min(streak + 1, MAX_FROZEN_LOAD_REP_BUMP)
+              let bumpedReps = shiftReps(reps, bump, repFloor)
+              // ESCALATE WITHIN THE WEEK. shiftReps clamps to the rep floor, so
+              // in a negative-shift phase a small bump can land on exactly the
+              // range already shown (an intermediate's 6-8 under Power's -4 is
+              // 4-6; +1 and +2 are still 4-6; +3 is 5-7). The first version
+              // took the streak's next size, saw no change, declined — and
+              // because the streak only advances on success, it asked for the
+              // same size every week and never reached the one that would
+              // have moved. Measured: 8.8% of every frozen barbell main lift
+              // in the 9,216-plan grid, all intermediates in Power blocks.
+              // Take the smallest permitted size that changes the range; the
+              // cap keeps its meaning (at most three reps above the phase's
+              // own range). If none does, the lever is mechanically absent
+              // for this lift in this phase, which is recorded, not hidden.
+              if (alreadyDecided == null) {
+                while (bumpedReps === reps && bump < MAX_FROZEN_LOAD_REP_BUMP) {
+                  bump++
+                  bumpedReps = shiftReps(reps, bump, repFloor)
+                }
+              }
+              const rangeCanMove = bumpedReps !== reps
+              const atCap = alreadyDecided == null && streak >= MAX_FROZEN_LOAD_REP_BUMP
               // The pinned weight has to satisfy the same divergence backstop
               // every other forced weight does — a held number that sits too
               // far above a fresh estimate for the exercise actually in this
@@ -6201,13 +6282,22 @@ export function generateMesocycle(
               // a week. Not introduced by the catalogue additions that
               // surfaced three more of them; the mechanism predates both.
               const alreadyBought = alreadyDecided != null
-              const pinnedReference = alreadyBought || bumpedReps === reps ? null : prescribeLoad(dbEntry, profile, {
+              const pinnedReference = alreadyBought || !rangeCanMove ? null : prescribeLoad(dbEntry, profile, {
                 targetRpeLabel: intensity, isFirstBlock: blockIndex === 0, sets, phase,
                 isCalibrationWeek, knownWorkingWeights, repRangeLabel: bumpedReps, loadIsProgressing: rampLoad,
               })
               const pinWithinBand = alreadyBought || (pinnedReference != null
                 && (pinnedReference.starting_weight_kg == null
                   || previousNaturalKg <= pinnedReference.starting_weight_kg * 1.25))
+              // Three ways to leave this block without a new rep, and they are
+              // not the same thing: the range could not move (no permitted
+              // size changes it — a floor question, Ashley's), the bump is at
+              // its cap (held by design), or the band refused the pin (a real
+              // safety decline). Named so the measurement can count them apart.
+              repBump = alreadyBought
+                ? (frozenBumpOutcomeThisWeek.get(dbEntry.name) ?? 'bought')
+                : !rangeCanMove ? 'range_fixed' : atCap ? 'capped' : pinWithinBand ? 'bought' : 'band'
+              if (!alreadyBought) frozenBumpOutcomeThisWeek.set(dbEntry.name, repBump)
               if (pinWithinBand) {
                 reps = bumpedReps
                 // Advanced ONLY when the rep is actually bought. Recording the
@@ -6277,7 +6367,7 @@ export function generateMesocycle(
             // cannot change a single weight — it only stops the same lift on
             // two days of one week disagreeing about what to aim for.
             const shownAlready = repsShownThisWeek.get(dbEntry.name)
-            if (shownAlready != null && shownAlready !== reps) reps = shownAlready
+            if (shownAlready != null && shownAlready !== reps) { reps = shownAlready; repBump = 'matched' }
             else if (shownAlready == null) repsShownThisWeek.set(dbEntry.name, reps)
 
             if (w === 1) {
@@ -6376,6 +6466,10 @@ export function generateMesocycle(
             suggested_load_kg: load ? load.starting_weight_kg : ex.suggested_load_kg,
             load_source: load ? load.load_source : ex.load_source,
             per_set_load: load ? load.per_set : (ex.per_set_load ?? null),
+            // Diagnostics for the frozen-week measurement — set fresh every
+            // week (never carried through the ...ex spread from last week).
+            load_hold: load ? naturalHold : ex.load_hold,
+            rep_bump: repBump,
             // THE FALLBACK USED TO BE A BARE `ex.suggested_assistance_kg`, and
             // it leaked across a rotation. This slot's identity can CHANGE
             // week to week; `ex` is what was here before. Swap Pull-Ups

@@ -24,7 +24,9 @@
 // ---------------------------------------------------------------------------
 import fs from 'fs'
 
-fs.readFileSync('.env.local', 'utf8').split('\n').forEach(l => {
+// Same existsSync guard as the other four env-reading scripts: a missing file
+// should produce the message below, not an ENOENT stack trace.
+if (fs.existsSync('.env.local')) fs.readFileSync('.env.local', 'utf8').split('\n').forEach(l => {
   const i = l.indexOf('=')
   if (i > 0) process.env[l.slice(0, i).trim()] = l.slice(i + 1).trim()
 })
