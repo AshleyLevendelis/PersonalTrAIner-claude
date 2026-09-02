@@ -36,6 +36,13 @@ export interface AccountabilityInput {
   daysSinceWeighIn: number | null
   /** True when today has a scheduled session and nothing has been logged for it yet. */
   sessionDueUnlogged: boolean
+  /**
+   * Yesterday's session, when it was scheduled and nothing was logged,
+   * swapped or rested on purpose — from the week strip's own 'missed' state
+   * (coach-opener.ts, missedYesterdayFrom), so this can never disagree with
+   * the strip. Null on every other kind of yesterday.
+   */
+  missedYesterday?: { dayName: string; focus: string } | null
   /** Sets logged today, when a session is part-done (used for the stall case). */
   setsLoggedToday: number
   setsPlannedToday: number
@@ -60,7 +67,7 @@ export function pickAccountabilityCheckIn(input: AccountabilityInput): string | 
   const {
     hour, proteinEaten, proteinTarget, caloriesEaten, caloriesTarget,
     waterMl, waterTargetMl, streak, daysSinceWeighIn, sessionDueUnlogged,
-    setsLoggedToday, setsPlannedToday, onTrackForGoal,
+    setsLoggedToday, setsPlannedToday, onTrackForGoal, missedYesterday,
   } = input
 
   // 1. A session that's part-done and stopped. The most actionable thing
@@ -69,12 +76,24 @@ export function pickAccountabilityCheckIn(input: AccountabilityInput): string | 
     return `They're part-way through today's session — ${setsLoggedToday} of ${setsPlannedToday} sets logged, and it's stalled there.`
   }
 
-  // 2. Today's session scheduled and untouched, late enough that it matters.
+  // 2. Yesterday was scheduled and nothing happened — not logged, not
+  //    swapped, not rested on purpose. Ranked above today's own unlogged
+  //    session because it is the more actionable of the two: it changes what
+  //    they do today (run it, or let it go), where "today's is still
+  //    unlogged" only becomes a fact worth saying in the evening. The prompt's
+  //    own rule for a miss applies — acknowledge, no drama, then the useful
+  //    part — and the tools to act on it (propose_rest_day for a date,
+  //    or simply training today) already exist.
+  if (missedYesterday) {
+    return `Yesterday's ${missedYesterday.focus} (${missedYesterday.dayName}) was scheduled and nothing was logged — they did not say they rested or swapped it either.`
+  }
+
+  // 3. Today's session scheduled and untouched, late enough that it matters.
   if (sessionDueUnlogged && hour >= EVENING_HOUR) {
     return `Today's session is scheduled and still unlogged.`
   }
 
-  // 3. A genuinely strong run, acknowledged plainly. Sits above the
+  // 4. A genuinely strong run, acknowledged plainly. Sits above the
   //    shortfalls deliberately — a consistent person shouldn't only ever
   //    hear about what's missing. The streak IS the "strong week" signal;
   //    there's no separate sessions-done-this-week source wired into chat,
@@ -84,31 +103,31 @@ export function pickAccountabilityCheckIn(input: AccountabilityInput): string | 
     return `They're on a ${streak}-day streak.`
   }
 
-  // 4. Protein — the macro that actually changes outcomes, so it outranks calories.
+  // 5. Protein — the macro that actually changes outcomes, so it outranks calories.
   if (hour >= EVENING_HOUR && proteinTarget > 0 && proteinEaten < proteinTarget * SHORTFALL_FRACTION) {
     const short = Math.round(proteinTarget - proteinEaten)
     return `They're ${short}g short of their protein target for today.`
   }
 
-  // 5. Drifting away from a stated goal. Only fires when weight-trend.ts has
+  // 6. Drifting away from a stated goal. Only fires when weight-trend.ts has
   //    enough weigh-ins to have computed a real direction.
   if (onTrackForGoal === false) {
     return `Their weight trend is currently moving away from their stated goal.`
   }
 
-  // 6. Calories materially under, evening only.
+  // 7. Calories materially under, evening only.
   if (hour >= EVENING_HOUR && caloriesTarget > 0 && caloriesEaten < caloriesTarget * SHORTFALL_FRACTION) {
     const short = Math.round(caloriesTarget - caloriesEaten)
     return `They're about ${short} kcal under target for today.`
   }
 
-  // 7. Water, evening only.
+  // 8. Water, evening only.
   if (hour >= EVENING_HOUR && waterTargetMl > 0 && waterMl < waterTargetMl * SHORTFALL_FRACTION) {
     const shortMl = Math.round(waterTargetMl - waterMl)
     return `They're ${shortMl}ml short on water today.`
   }
 
-  // 8. Stale weigh-in — lowest priority: it limits what the app can tell
+  // 9. Stale weigh-in — lowest priority: it limits what the app can tell
   //    them, but it doesn't change today.
   if (daysSinceWeighIn != null && daysSinceWeighIn >= STALE_WEIGH_IN_DAYS) {
     return `It's been ${daysSinceWeighIn} days since their last weigh-in.`

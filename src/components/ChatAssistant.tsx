@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Send, CheckCircle2, ArrowDown, RotateCcw, AlertCircle, Trash2, Mic, MessageCircle } from 'lucide-react'
 import { calculateCalories, getActiveMesocycleWeek } from '@/lib/calculations'
 import { computeBMR, computeStaticTDEE, resolveBodyMetrics } from '@/lib/macro-calculator'
-import { getAppNow, getSessionDateContext } from '@/lib/dev-clock'
+import { getAppNow, getSessionDateContext, getLocalDateString } from '@/lib/dev-clock'
 import { supabase } from '@/lib/supabase'
 import { getRecentLogs, formatLogsForAI, getRecentCardioLogs, formatCardioLogsForAI } from '@/lib/daily-tracking'
 import { saveChatCache, loadChatCache, clearChatCache } from '@/lib/chat-cache'
@@ -55,6 +55,8 @@ import { DEFAULT_REVEAL_SPEED, type RevealSpeed } from '@/lib/reveal-speed-store
 import { FEEL_SCALE, type SessionFeel } from '@/lib/types'
 import { takeChatPrefill } from '@/lib/chat-prefill-store'
 import { loadFeelContext, buildFeelBrief, feelRun, recordSessionFeel, type FeelContext } from '@/lib/session-feel'
+import { useTrainingWeek } from '@/hooks/useTrainingWeek'
+import { pickOpener, missedYesterdayFrom, type Opener } from '@/lib/coach-opener'
 
 const ACTION_TAG_RE = /\[ACTION:\s*.*?\]/gi
 const QUICK_REPLIES_RE = /\[QUICK_REPLIES:\s*(.*?)\]/gi
@@ -155,13 +157,35 @@ interface ChatAssistantProps {
   onWaterChanged?: () => void | Promise<void>
   /** Deep-link target for a water receipt's "View" button — navigates to the Dashboard tab. */
   onOpenDashboard?: () => void
+  /**
+   * Fired whenever "the coach has something that wants an answer" changes —
+   * an unreviewed session, a missed day (coach-opener.ts, `attention`).
+   * App.tsx turns it into the dot on the chat tab. Reported from here rather
+   * than computed in App.tsx because this component is force-mounted and
+   * already holds every input; a second copy of the rule upstream would be
+   * a second thing to drift.
+   */
+  onAttentionChange?: (has: boolean) => void
   /** User's chat typewriter-reveal-speed preference (Settings → Profile). Defaults to 'normal' if omitted. */
   revealSpeed?: RevealSpeed
   /** Vision Step 6 — any pending "start heavier next block?" suggestions currently showing on the dashboard banner, so the coach can discuss one if asked directly. Confirming/declining still only happens via the banner's own buttons, not from here (see load-suggestions.ts's own doc comment on why chat-driven confirm is out of scope for this pass). */
   pendingLoadSuggestions?: string[]
 }
 
-export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onProfileChanged, onMealSwapApplied, onFindMoreMealOptions, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenProfile, groceryItems, onGroceryChanged, onOpenGrocery, onWaterChanged, onOpenDashboard, revealSpeed = DEFAULT_REVEAL_SPEED, pendingLoadSuggestions }: ChatAssistantProps) {
+/**
+ * The hour past which "today's session" reads as done rather than upcoming,
+ * per preferred_time. Shared by the synchronous fallback greeting and the
+ * composed opener (coach-opener.ts) so the two can never disagree about
+ * whether a session is behind them.
+ */
+const SESSION_PASSED_CUTOFF: Record<string, number> = {
+  morning: 13, midday: 16, evening: 21, night: 23, varies: 22,
+}
+function sessionCutoffHour(preferredTime: string | undefined): number {
+  return SESSION_PASSED_CUTOFF[preferredTime || 'morning'] || 22
+}
+
+export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onProfileChanged, onMealSwapApplied, onFindMoreMealOptions, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenProfile, groceryItems, onGroceryChanged, onOpenGrocery, onWaterChanged, onOpenDashboard, onAttentionChange, revealSpeed = DEFAULT_REVEAL_SPEED, pendingLoadSuggestions }: ChatAssistantProps) {
   // NL logging (§3) writes through the SAME frozen session identity +
   // logSet facade SetGrid.tsx uses — never saveSet directly (see
   // nl-logging-executor.ts's own doc comment).
@@ -228,15 +252,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     const hour = now.getHours()
     const dayName = now.toLocaleDateString('en-US', { weekday: 'long' })
     const todaySession = exercisePlan.find(d => d.day === dayName)
-    const trainingTime = profile.preferred_time || 'morning'
-    const sessionPassedCutoff: Record<string, number> = {
-      morning: 13,
-      midday: 16,
-      evening: 21,
-      night: 23,
-      varies: 22,
-    }
-    const cutoff = sessionPassedCutoff[trainingTime] || 22
+    const cutoff = sessionCutoffHour(profile.preferred_time)
 
     if (todaySession) {
       const movements = todaySession.exercises.map(e => e.name).slice(0, 3).join(', ')
@@ -475,6 +491,64 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     return () => { cancelled = true }
   }, [activeSession.ready, activeSession.date, activeSession.logs.length, profile.id])
 
+  // THE OPENER'S INPUTS. Everything below feeds coach-opener.ts, which picks
+  // the one thing the first bubble says. The live week's days come from the
+  // same resolution buildContext uses further down; the week strip's own day
+  // states supply "was yesterday missed", so the chat can never disagree with
+  // the strip about that.
+  const openerWeek = getActiveMesocycleWeek(planCreatedAt ?? profile.created_at, getAppNow(profile.id), mesocycle.length > 0 ? mesocycle.length : 4)
+  const liveWeekDays = mesocycle.find(w => w.week_number === openerWeek)?.days ?? exercisePlan
+  // Safe to hand a fresh array each render: the hook refetches on profile and
+  // date only and uses the plan synchronously for classification.
+  const trainingWeek = useTrainingWeek(profile.id, activeSession.date, liveWeekDays, planCreatedAt ?? profile.created_at)
+  const yesterdayDate = (() => {
+    const d = new Date(`${activeSession.date}T12:00:00`)
+    d.setDate(d.getDate() - 1)
+    return getLocalDateString(d)
+  })()
+  const missedYesterday = trainingWeek.loading
+    ? null
+    : missedYesterdayFrom(trainingWeek.days, yesterdayDate, liveWeekDays)
+
+  const composeOpener = (): Opener => {
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+    const todayPlan = liveWeekDays.find(d => d.day === activeSession.dayName && d.exercises.length > 0)
+    const movementsOf = (d: WorkoutDay) => d.exercises.map(e => e.name).slice(0, 3).join(', ') + (d.exercises.length > 3 ? '...' : '')
+    // The next scheduled session after today, up to six days out — named
+    // "tomorrow" when it is, otherwise by its day.
+    let tomorrowSession: Opener extends never ? never : { dayName: string; focus: string; lead: string | null } | null = null
+    const base = new Date(`${activeSession.date}T12:00:00`)
+    for (let ahead = 1; ahead <= 6 && !tomorrowSession; ahead++) {
+      const d = new Date(base); d.setDate(d.getDate() + ahead)
+      const name = dayNames[d.getDay()]
+      const day = liveWeekDays.find(x => x.day === name && x.exercises.length > 0)
+      if (day) {
+        const lead = day.exercises.find(e => e.tier === 'tier_1_primary')?.name ?? day.exercises[0]?.name ?? null
+        tomorrowSession = { dayName: ahead === 1 ? 'tomorrow' : name, focus: day.focus, lead }
+      }
+    }
+    return pickOpener({
+      hour: getAppNow(profile.id).getHours(),
+      cutoffHour: sessionCutoffHour(profile.preferred_time),
+      awaitingFeel: feelContext?.awaiting
+        ? { date: feelContext.awaiting.date, day: feelContext.awaiting.day, isToday: feelContext.awaiting.date === activeSession.date }
+        : null,
+      missedYesterday,
+      todaySession: todayPlan ? { focus: todayPlan.focus, movements: movementsOf(todayPlan) } : null,
+      todayLogged: activeSession.logs.length > 0,
+      tomorrowSession,
+    })
+  }
+
+  // The dot on the chat tab. Defined here as the same two kinds the opener
+  // marks `attention: true`, and asserted equal to that in
+  // test-coach-opener.ts so the tab and the bubble cannot disagree.
+  const hasAttention = !!feelContext?.awaiting || !!missedYesterday
+  useEffect(() => {
+    onAttentionChange?.(hasAttention)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasAttention])
+
   // One-shot finalization of the synchronous fallback greeting once we know
   // (a) whether this is a genuinely first-ever conversation (no prior
   // chat_messages rows — see isFirstEverChat, set by loadChatHistory) and,
@@ -522,16 +596,35 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         return
       }
 
-      if (scheduleLine !== buildInitialGreeting()) {
-        setMessages([{ role: 'assistant', content: scheduleLine, status: 'complete' }])
-      }
+      // RETURNING USER — the one thing worth saying first (coach-opener.ts),
+      // composed from real state rather than the calendar alone: an
+      // unreviewed session outranks a missed day outranks today's session
+      // outranks a rest day. The PR line, when there is one, still leads.
+      // Chips are keyed to the kind and are SENT on tap, so each is a
+      // complete sentence; the how-did-it-feel kind carries none, per
+      // Ashley's ruling that the answer there should be a sentence, not a tap.
+      const opener = composeOpener()
+      const detailLine = `${opener.text.charAt(0).toUpperCase()}${opener.text.slice(1)}`
+      const content = recentPR
+        ? `${greetName()} — nice PR on ${recentPR.exerciseName} at ${recentPR.weightKg}kg. ${detailLine}`
+        : `${greetName()} — ${opener.text}`
+      void scheduleLine
+      setMessages([{
+        role: 'assistant',
+        content,
+        status: 'complete',
+        quickReplies: opener.chips.length > 0 ? opener.chips : undefined,
+      }])
     }
 
-    if (proactiveData) { finalize(); return }
+    // Wait for what the opener reads — the dashboard aggregate, the feel
+    // context and the week strip's states — but never hang on them: a
+    // missed detail is fine, a stuck opener is not.
+    if (proactiveData && feelContext && !trainingWeek.loading) { finalize(); return }
     const t = setTimeout(finalize, 2500)
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [historyLoaded, isFirstEverChat, proactiveData, messages])
+  }, [historyLoaded, isFirstEverChat, proactiveData, feelContext, trainingWeek.loading, messages])
 
   // Synchronous write-through mirror (see chat-cache.ts) — fires on every
   // messages change, so the cache is never behind what's rendered on screen
@@ -874,6 +967,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       streak: proactiveData.streak,
       daysSinceWeighIn,
       sessionDueUnlogged: proactiveData.session.setsPlanned > 0 && proactiveData.session.setsLogged === 0,
+      missedYesterday,
       setsLoggedToday: proactiveData.session.setsLogged,
       setsPlannedToday: proactiveData.session.setsPlanned,
       onTrackForGoal: proactiveData.weightTrend?.onTrackForGoal ?? null,

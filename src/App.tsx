@@ -108,6 +108,14 @@ function App() {
   /** The weight that actually drives computeTargets — a threshold-gated 7-day average (getEffectiveTargetWeightKg), not the raw latest reading. Kept separate from latestWeightKg so a noisy day-to-day swing never retunes calories on its own; only a real trend move does. Null until the first target computation resolves it. */
   const [targetWeightAnchorKg, setTargetWeightAnchorKg] = useState<number | null>(null)
   const [exercisePlan, setExercisePlan] = useState<WorkoutDay[]>([])
+  // The dot on the chat tab. ChatAssistant (force-mounted, so live before
+  // the tab is ever opened) reports whether the coach has something that
+  // wants an answer; `attentionSeen` makes the dot a nudge rather than a
+  // demand — it clears the moment the chat is opened, whether or not they
+  // answer, and re-arms only when the underlying condition goes away and
+  // a new one arrives. See coach-opener.ts for what counts.
+  const [chatAttention, setChatAttention] = useState(false)
+  const [attentionSeen, setAttentionSeen] = useState(false)
   const [mesocycle, setMesocycle] = useState<MesocycleWeek[]>([])
   // Client-authored dismissible notices — never model prose, same
   // convention as every other receipt in this app. Four sources feed this
@@ -2119,6 +2127,11 @@ function App() {
     if (isTab(tab)) window.location.hash = tabHash(tab)
   }
 
+  useEffect(() => {
+    if (!chatAttention) { setAttentionSeen(false); return }
+    if (activeTab === 'chat') setAttentionSeen(true)
+  }, [chatAttention, activeTab])
+
   return (
     <ActiveSessionProvider
       profileId={profile.id}
@@ -2399,12 +2412,13 @@ function App() {
               onOpenDashboard={() => { window.location.hash = tabHash('dashboard') }}
               revealSpeed={revealSpeed}
               pendingLoadSuggestions={adaptationMessages.filter(m => m.loadSuggestionId).map(m => m.text)}
+              onAttentionChange={setChatAttention}
             />
           </TabsContent>
         </Tabs>
       </main>
       <BottomDock />
-      <BottomTabBar activeTab={activeTab} onTabChange={handleTabChange} />
+      <BottomTabBar activeTab={activeTab} onTabChange={handleTabChange} chatAttention={chatAttention && !attentionSeen && activeTab !== 'chat'} />
       {/* Sibling of <main>, like BottomDock, so it overlays every tab AND the
           tab bar — the tour's nav stops spotlight the real tab buttons, which
           it could not reach from inside a tab's own subtree. */}

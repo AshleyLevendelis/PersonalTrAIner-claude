@@ -2,6 +2,32 @@
 
 Newest first. One line each.
 
+- [x] The coach could only speak when someone opened the chat tab (2 Sep 2026).
+  From reviewing a generic chat blueprint (Gemini's) against this codebase:
+  about half of it already existed here, its notifications idea rested on a
+  browser API that does not exist, and the real gap was that nothing brought
+  a person TO the coach. Ashley: "build it with your recommendations." Built,
+  all client-side (no deploy, no migration): (1) coach-opener.ts picks the
+  first bubble from real state, one thing only — unreviewed session > missed
+  yesterday > today's session > rest day with a preview of the next session
+  and its lead lift; "missed" comes from the week strip's own states so chat
+  and strip cannot disagree. (2) Chips keyed to the kind and SENT on tap,
+  none under the feel question (her ruling), and no "move it to tomorrow"
+  chip because the only schedule tool is permanent — a one-off reschedule is
+  a NAMED GAP. (3) A dot on the chat tab for exactly the two kinds that want
+  an answer, cleared on open, re-armed only on a new condition. The model side
+  gets the missed-yesterday fact via the accountability check-in, ranked
+  below a stalled mid-session and above everything else; the prompt's
+  existing no-drama rule and propose_rest_day(date) handle it. Gate
+  test:coach-opener, 50 checks, six mutations. Plan doc:
+  docs/plans/one-thing-first.md.
+  NOT BUILT, on purpose: push notifications (after the in-app version proves
+  itself), a daily soreness scale, rest-day carb cuts, the two-rough trigger,
+  rest-day mobility content (needs a content ruling).
+  NOT VERIFIED IN A BROWSER from here: the dot rendering and the chip tap
+  path. The gate proves the wiring and the decision logic; a live check is
+  in the handover.
+
 - [x] Chest got 8 hard sets a week where back got 12 (2 Sep 2026). Third item
   from the research document Ashley shared, and the first thing to come out of
   counting sets per muscle — something the app had never done. The existing

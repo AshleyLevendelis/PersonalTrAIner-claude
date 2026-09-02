@@ -84,6 +84,7 @@
     "test:block-phases": "tsx scripts/test-block-phases.ts",
     "test:beat-target": "tsx scripts/test-beat-target-offer.ts",
     "test:session-feel": "tsx scripts/test-session-feel.ts",
+    "test:coach-opener": "tsx scripts/test-coach-opener.ts",
     "test:lift-plausibility": "tsx scripts/test-lift-plausibility.ts",
     "test:custom-meal": "tsx scripts/test-custom-meal.ts",
     "test:one-day-one-look": "tsx scripts/test-one-day-one-look.ts",
