@@ -29,10 +29,13 @@ export function SessionSummaryDialog({
   open,
   onOpenChange,
   data,
+  nothingLogged = false,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   data: SessionSummaryData | null
+  /** Finish was tapped with no working set logged — the day was left open (useActiveSession.finishSession). */
+  nothingLogged?: boolean
 }) {
   const progressionLines = (data?.progressions ?? []).filter((entry): entry is readonly [string, { note: string; didProgress: boolean }] => entry[1] != null)
 
@@ -40,8 +43,14 @@ export function SessionSummaryDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-sm max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Session complete</DialogTitle>
+          <DialogTitle>{nothingLogged ? 'Nothing logged' : 'Session complete'}</DialogTitle>
         </DialogHeader>
+        {nothingLogged && (
+          <p className="text-sm leading-[1.5] text-muted-foreground">
+            No sets were logged, so this didn't count as a session and the day stays open.
+            Log at least one set and tap Finish again once you've trained.
+          </p>
+        )}
         {data && (
           <div className="space-y-5">
             <div className="grid grid-cols-3 gap-2 text-center">

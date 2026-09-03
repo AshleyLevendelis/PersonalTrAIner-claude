@@ -62,14 +62,14 @@ export const TOUR_STEPS: TourStep[] = [
   },
   {
     key: 'hero', tab: 'dashboard', target: 'hero',
-    copy: "Home answers one question — what's next. Today's session sits up top; Start session walks you through every set.",
+    copy: "Home answers one question — what's next. Today's session sits up top, and Start session hands you to Exercise, where every set gets logged. Home shows; it never logs.",
   },
   {
     key: 'tiles', tab: 'dashboard', target: 'tiles',
     // THREE tiles now, not two — steps joined them when steps moved to
     // Nutrition. The old copy named two of the three, which reads as a
     // mistake to anyone looking at the row while it is spotlighted.
-    copy: 'Calories, water and steps at a glance. Nothing logs from here — a tap hands you to Nutrition, which owns all three.',
+    copy: 'Calories, water and steps at a glance — a read-out, not a form. Meals, water and steps are all logged in Nutrition; tap any tile and it takes you there.',
   },
   {
     key: 'nutrition', tab: 'nutrition', target: 'rings',

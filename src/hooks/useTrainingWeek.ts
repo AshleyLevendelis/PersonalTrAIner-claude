@@ -76,7 +76,15 @@ export function classifyDay(
   // Logged work outranks every date judgement below. If they trained that
   // day it counts, even if it predates the plan — anything else would erase
   // real work to make a tidier calendar.
-  if (dashboardDay?.session?.is_completed) return 'done'
+  //
+  // WORK, not a flag. A session row can carry is_completed with nothing in
+  // it — Start and Finish four seconds apart, a look at the screen (Ashley's
+  // Thursday, 3 Sep 2026) — and until this check asked for the sets, that
+  // read as a tick the trainee could not remove: a chosen rest day ranked
+  // below it. Finish no longer completes an empty session, and the rows that
+  // already exist stop counting here.
+  const loggedWork = !!dashboardDay && (dashboardDay.workoutLogs.length > 0 || (dashboardDay.cardioLogs?.length ?? 0) > 0)
+  if (dashboardDay?.session?.is_completed && loggedWork) return 'done'
   if (dashboardDay && dashboardDay.workoutLogs.length > 0) return 'partial'
 
   // Deliberately swapped for something else, and said so at the time. Ranked

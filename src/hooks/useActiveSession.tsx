@@ -73,6 +73,13 @@ export interface FinishSessionResult {
   startedAtIso: string
   finishedAtIso: string
   prSnapshotAtStart: Record<string, PRRecord>
+  /**
+   * True when Finish was tapped with no working set logged. The session was
+   * NOT marked completed on the server — see finishSession — so the day
+   * stays open, and TodayPanel says so instead of showing a summary of
+   * nothing.
+   */
+  nothingLogged?: boolean
 }
 
 export interface ActiveSessionValue extends ActiveSessionIdentity, RestState {
@@ -343,6 +350,19 @@ export function ActiveSessionProvider({
     const record = getActiveSessionRecord(identity.profileId, identity.date)
     const finishedAtIso = getAppNow(identity.profileId).toISOString()
     const startedAt = record?.startedAtIso ?? finishedAtIso
+    // NOTHING LOGGED, NOTHING COMPLETED. Ashley's Thursday, 3 Sep 2026: Start
+    // and Finish four seconds apart with no set between them — a look at the
+    // screen, not a workout — and the day was marked done. The coach then
+    // asked how it felt, the strip showed a tick, and marking it a rest day
+    // could not undo any of it because a completed session outranks a chosen
+    // rest. A session is the sets in it; with none, Finish closes the local
+    // session and leaves the day exactly as it was.
+    const workingSets = (await getSetsForDate(identity.profileId, identity.date)).filter(s => !s.is_warmup)
+    if (workingSets.length === 0) {
+      patchRecord({ status: 'finished', finishedAtIso })
+      setStatus('finished')
+      return { startedAtIso: startedAt, finishedAtIso, prSnapshotAtStart: record?.prSnapshotAtStart ?? {}, nothingLogged: true }
+    }
     try {
       const sessionId = await ensureSessionSynced(identity.profileId, identity.date, 'training')
       await markSessionCompleted(sessionId) // real "now" — the explicit tap IS the finish moment
@@ -364,13 +384,19 @@ export function ActiveSessionProvider({
     const record = getMostRecentActiveSessionRecord(profileId)
     const nowIso = getAppNow(profileId).toISOString()
     if (!record || !isSessionStale(record, nowIso, todayDate)) return
-    try {
-      const sessionId = await ensureSessionSynced(profileId, record.date, 'training')
-      // NOT "now" — now could be hours later than when the user actually
-      // stopped; lastActivityIso is the best-known real finish moment.
-      await markSessionCompleted(sessionId, new Date(record.lastActivityIso))
-    } catch (e) {
-      console.error(e)
+    // Same rule as an explicit Finish: a session that was opened and then
+    // abandoned with nothing logged is closed locally and never marked
+    // completed on the server.
+    const hadWork = (await getSetsForDate(profileId, record.date)).some(s => !s.is_warmup)
+    if (hadWork) {
+      try {
+        const sessionId = await ensureSessionSynced(profileId, record.date, 'training')
+        // NOT "now" — now could be hours later than when the user actually
+        // stopped; lastActivityIso is the best-known real finish moment.
+        await markSessionCompleted(sessionId, new Date(record.lastActivityIso))
+      } catch (e) {
+        console.error(e)
+      }
     }
     saveActiveSessionRecord({ ...record, status: 'finished', finishedAtIso: record.lastActivityIso })
     if (record.date === todayDate) setStatus('finished')

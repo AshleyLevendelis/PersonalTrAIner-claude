@@ -100,10 +100,19 @@ export function TodayPanel({
   const [unplannedWorkOpen, setUnplannedWorkOpen] = useState(false)
   const [summaryOpen, setSummaryOpen] = useState(false)
   const [summaryData, setSummaryData] = useState<SessionSummaryData | null>(null)
+  const [summaryNothingLogged, setSummaryNothingLogged] = useState(false)
 
   const handleFinish = async () => {
     const result = await finishSession()
     if (!result || !workout) return
+    if (result.nothingLogged) {
+      // No summary to compute — the point is to say the day did not close.
+      setSummaryData(null)
+      setSummaryNothingLogged(true)
+      setSummaryOpen(true)
+      return
+    }
+    setSummaryNothingLogged(false)
     const plannedExercises = workout.exercises.map(ex => ({ id: ex.id, name: ex.name, sets: ex.sets }))
     const summary = computeSessionSummary(logs, plannedExercises, result.startedAtIso, result.finishedAtIso)
     const prs = computeSessionPRs(result.prSnapshotAtStart, logs)
@@ -350,7 +359,7 @@ export function TodayPanel({
               <Button size="sm" className="mt-3" onClick={handleFinish}>Finish session</Button>
             )}
           </div>
-          <SessionSummaryDialog open={summaryOpen} onOpenChange={setSummaryOpen} data={summaryData} />
+          <SessionSummaryDialog open={summaryOpen} onOpenChange={setSummaryOpen} data={summaryData} nothingLogged={summaryNothingLogged} />
           {/* WHAT CAN YOU ACTUALLY LOAD — asked at first use, not in
               onboarding (Ashley's call: someone who has never trained cannot
               answer it, and onboarding is where people drop out). Rendered
