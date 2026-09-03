@@ -191,7 +191,7 @@ red.
 This shipped in PR #15 as well, and it is the third thing that merge left
 broken. Which is the finding underneath all three.
 
-## 6. THE ONE THING NOT FIXED HERE, AND WHY: the injury rebuild got worse
+## 6. The injury rebuild got worse — put to Ashley, decided, pinned
 
 `test:injury-rebuild` is red, and it is not this audit's doing. Bisected:
 
@@ -214,18 +214,44 @@ main-lift rest ruling meeting the session-duration trimmer: longer rest per set
 leaves less room under the time cap, and the trimmer cuts exercises to keep the
 cap's promise. Both halves are correct. They are in tension.
 
-**Not fixed, deliberately, on two standing rules.** CLAUDE.md: *"Dietary
-enforcement, injury filtering, and load prescription always get a plan before a
-build, even when the fix looks obvious"*, and *"stop and wait… anything in the
-allergen or safety path."* This is injury filtering AND load prescription, and
-the resolution is a coaching trade-off rather than something with a right
-answer. It goes to Ashley as one question.
+**Put to Ashley rather than fixed**, on two standing rules — CLAUDE.md's
+*"injury filtering… always get a plan before a build, even when the fix looks
+obvious"* and *"stop and wait… anything in the safety path"*. This is injury
+filtering AND load prescription, and the resolution is a coaching trade-off
+rather than something with a right answer.
 
-Worth stating plainly in her favour: the rebuilt plan is still **safe and not
-gutted** — the gate's own neighbouring checks pass (no contraindicated movement
-anywhere, at least one shoulder-indicated movement programmed, 94.6% of slots
-kept, well inside the 80% floor). What was lost is the rebuild's *margin over
-substitution*, not its safety.
+**She answered "decide for me", so this is my call, recorded as mine:
+FULL REST WINS.** Rest is the half that keeps a rep from failing under load,
+and it matters most on a plan that exists precisely because someone is already
+hurt. The rebuild pays for it in size. Nothing about the app's behaviour
+changes; what changes is the gate, which was asserting the wrong thing.
+
+The rebuilt plan is still **safe and not gutted** — every neighbouring check
+passes: nothing contraindicated anywhere, at least one shoulder-indicated
+movement programmed, 94.6% of slots kept against an 80% floor, 410 of 424
+shared slots holding a different exercise from substitution, and exercises
+substitution can never reach. **The rebuild's advantage was never the slot
+count**; it is that it programmes AROUND the injury. So:
+
+- `rebuild beats what substitution would have left` (strictly greater) becomes
+  **`rebuild is not materially smaller than substitution`** — it may fall a
+  little behind paying for the rest and no further. Measured today: 424 of 432,
+  **98.1%**, against a 95% bar.
+- and a **new** check closes the door the loosening would otherwise open. The
+  cheapest way to win the count back is to exempt a rebuild from the rest floor
+  — exactly the trade that was declined — so the gate now asserts the floor
+  holds INSIDE the rebuilt plan: every loaded main lift in it rests at least as
+  long as its goal allows. **32 loaded main lifts, 0 short of 120s.** This
+  section comes out stronger than the line it replaces, not weaker.
+
+Mutations: the loaded floor made inert (`mainLiftRestFloor` returning the flat
+60) → **26 of 32 short, red**; the floor raised to 180s without checking its
+cost → rebuild 392 of 420, ratio 0.933, **red**. One mutation did NOT fire and
+is recorded rather than dressed up: dropping the floor argument passed into
+`trimWeekRestForBudget` left the count and the rest untouched, because on this
+profile the main lift's rest is set at prescription time by `mainLiftRestFloor`
+and the trimmer never reaches it. That check stands as a guard, not as
+something this mutation proved.
 
 ## The one thing not fixed, and why
 

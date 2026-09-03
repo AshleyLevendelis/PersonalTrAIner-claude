@@ -10,6 +10,9 @@
  */
 import { generateExercisePlan, generateMesocycle, getFlaggedJoints, setRandomSource, resetRandomSource } from '../src/lib/exercise-plan'
 import { seededRngFromKey } from '../src/lib/seeded-random'
+import { getGoalPolicy } from '../src/lib/goal-policies'
+import { getExerciseEntry } from '../src/lib/exercise-db'
+import { isExternallyLoaded } from '../src/lib/load-prescription'
 
 // ---------------------------------------------------------------------------
 // SEEDED, because this gate was not and its verdict moved on its own.
@@ -129,7 +132,62 @@ async function main() {
   const survivingAfterSub = slotsBefore - verdict.dropped
   console.log(`     original=${slotsBefore}  after pointwise substitution=${survivingAfterSub}  after rebuild=${slotsAfter}`)
   check('rebuild keeps a comparable number of slots', slotsAfter >= slotsBefore * 0.8, { slotsBefore, slotsAfter })
-  check('rebuild beats what substitution would have left', slotsAfter > survivingAfterSub, { slotsAfter, survivingAfterSub })
+  // ASHLEY'S RULING, 3 Sep 2026 — asked, and she said "decide for me", so
+  // this is my call, recorded as such.
+  //
+  // This check used to read `slotsAfter > survivingAfterSub`, and it was TRUE
+  // until PR #15: a shoulder rebuild produced 452 slots of 452, sixteen more
+  // than pointwise substitution would have left. That PR gave every
+  // non-conditioning goal a two-minute floor on the loaded main lift, and
+  // longer rest per set leaves less room under the time cap, so the duration
+  // trimmer cuts exercises to keep the cap's promise. The same rebuild became
+  // 424 of 448 — eight BELOW substitution — and this line went red on the
+  // merge, unread, for a day. Bisected to those three lines in
+  // goal-policies.ts: removing only them at that commit restores 452 / 452.
+  //
+  // Two correct rules in tension, and the resolution is a coaching call:
+  // FULL REST WINS. Rest is the half that keeps a rep from failing under
+  // load, and it matters most on a plan that exists because someone is
+  // already hurt. The rebuild pays for it in size.
+  //
+  // So the assertion moves to what the rebuild is actually FOR. Its advantage
+  // over substitution was never the slot count — it is that it programmes
+  // AROUND the injury (the checks below: nothing contraindicated anywhere, a
+  // movement indicated for the joint, 410 of 424 shared slots holding a
+  // different exercise, and exercises substitution can never reach). What the
+  // count still has to prove is that the rebuild did not get GUTTED paying
+  // for the rest: it may fall a little behind substitution and no further.
+  // Measured today: 424 of 432, 98.1%.
+  check('rebuild is not materially smaller than substitution', slotsAfter >= survivingAfterSub * 0.95,
+    { slotsAfter, survivingAfterSub, ratio: +(slotsAfter / survivingAfterSub).toFixed(3) })
+
+  // AND THE OTHER HALF OF HER RULING, which the loosening above would
+  // otherwise leave unguarded. The cheapest way to make the count check pass
+  // again is to exempt a rebuild from the rest floor — which is exactly the
+  // trade she declined. So assert the floor holds INSIDE the rebuilt plan:
+  // every loaded main lift in it rests at least as long as its goal allows.
+  // This check is new, and it is why this section comes out stronger than the
+  // line it replaces rather than weaker.
+  {
+    const floor = getGoalPolicy(profile.fitness_goal).minLoadedMainLiftRestSeconds ?? 60
+    let loaded = 0
+    let short = 0
+    for (const w of rebuilt) {
+      for (const d of w.days) {
+        const main = d.exercises.find(e => e.tier === 'tier_1_primary')
+        if (!main) continue
+        const entry = getExerciseEntry(main.name)
+        if (!entry || !isExternallyLoaded(entry)) continue
+        const seconds = parseInt(String(main.rest), 10)
+        if (!Number.isFinite(seconds)) continue
+        loaded++
+        if (seconds < floor) short++
+      }
+    }
+    check(`the rebuilt plan still honours the ${floor}s main-lift rest floor (${short} of ${loaded} short)`,
+      short === 0, { short, loaded, floor })
+    check('...and it has loaded main lifts to check', loaded > 0, loaded)
+  }
 
   console.log('\n[4] The rebuilt plan is actually safe for the injury')
   const shoulder = getFlaggedJoints(['shoulders'])
