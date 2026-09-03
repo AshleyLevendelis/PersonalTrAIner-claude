@@ -165,5 +165,45 @@ console.log('\n6. The model-side check-in ranks a missed yesterday where it belo
   check('nothing changes when yesterday was fine', pickAccountabilityCheckIn(quiet) === null)
 }
 
+console.log('\n7. No React hook is called after App.tsx\'s early return')
+{
+  // THE BUG THIS SECTION EXISTS FOR, and it reached production.
+  //
+  // The attention effect in §4 was written under handleTabChange, a few lines
+  // before the JSX — which is ~70 lines AFTER `if (!profile) {`. On the first
+  // render profile is null, App returns early, and the effect never runs; once
+  // the profile resolves the render goes past the return and it does. One more
+  // hook than the previous render is precisely what React forbids. It threw
+  // "Rendered more hooks than during the previous render", unmounted the tree,
+  // and every user got a black screen on load.
+  //
+  // Nothing caught it: tsc and the bundler do not check hook ordering, §4 above
+  // asserts the effect's CONTENT rather than its POSITION, and no gate renders
+  // App. Ashley found it on her phone after the merge.
+  //
+  // Asserted over the WHOLE FILE rather than over the one effect, because the
+  // defect is positional and any future hook can repeat it.
+  const app = readFileSync(join(ROOT, 'src/App.tsx'), 'utf8')
+  const returnIdx = app.indexOf('\n  if (!profile) {')
+  check('the early return exists to measure against (sanity check on this check)', returnIdx > 0, returnIdx)
+
+  const after = app.slice(returnIdx)
+  // Only calls at component-body indentation (two spaces) count. A hook inside
+  // a nested component, a callback or a JSX prop is a different scope and is
+  // not a rules-of-hooks violation of THIS component.
+  const offenders = [...after.matchAll(/^  (?:const .*= )?(useState|useEffect|useRef|useCallback|useMemo|useLayoutEffect|useReducer|useContext)\(/gm)]
+    .map(m => ({
+      hook: m[1],
+      line: app.slice(0, returnIdx + (m.index ?? 0)).split('\n').length,
+    }))
+  check('no hook is called after it — a hook below an early return is a black screen on load',
+    offenders.length === 0, offenders)
+
+  // And the effect that caused it is where it belongs: above the return, and
+  // beside the state it drives.
+  const effectIdx = app.indexOf('if (!chatAttention) { setAttentionSeen(false); return }')
+  check('the attention effect is above the early return', effectIdx > 0 && effectIdx < returnIdx, { effectIdx, returnIdx })
+}
+
 if (failures > 0) { console.error(`\n${failures} check(s) failed\n`); process.exit(1) }
 console.log('\nOne thing said first, no chips under the question that wants a sentence, and the dot means it.\n')

@@ -116,6 +116,20 @@ function App() {
   // a new one arrives. See coach-opener.ts for what counts.
   const [chatAttention, setChatAttention] = useState(false)
   const [attentionSeen, setAttentionSeen] = useState(false)
+  // MUST STAY ABOVE THE `if (!profile)` EARLY RETURN BELOW. This effect was
+  // written under handleTabChange, a few lines before the JSX and ~70 lines
+  // AFTER that return — so on the first render (profile still null) it never
+  // ran, and on the render after the profile resolved it did. One more hook
+  // than the previous render is exactly what React forbids: it threw
+  // "Rendered more hooks than during the previous render", unmounted the
+  // tree, and every user got a black screen. Shipped to production in #15
+  // and caught by Ashley on her phone, not by any gate — typecheck and the
+  // bundler do not check hook order and nothing in the suite renders App.
+  // test:coach-opener now asserts no hook call appears after that return.
+  useEffect(() => {
+    if (!chatAttention) { setAttentionSeen(false); return }
+    if (activeTab === 'chat') setAttentionSeen(true)
+  }, [chatAttention, activeTab])
   const [mesocycle, setMesocycle] = useState<MesocycleWeek[]>([])
   // Client-authored dismissible notices — never model prose, same
   // convention as every other receipt in this app. Four sources feed this
@@ -2126,11 +2140,6 @@ function App() {
   const handleTabChange = (tab: string) => {
     if (isTab(tab)) window.location.hash = tabHash(tab)
   }
-
-  useEffect(() => {
-    if (!chatAttention) { setAttentionSeen(false); return }
-    if (activeTab === 'chat') setAttentionSeen(true)
-  }, [chatAttention, activeTab])
 
   return (
     <ActiveSessionProvider
