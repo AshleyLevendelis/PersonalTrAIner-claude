@@ -49,6 +49,7 @@ const app = stripComments(readFileSync(join(ROOT, 'src/App.tsx'), 'utf8'))
 const nutrition = stripComments(readFileSync(join(ROOT, 'src/components/NutritionDisplay.tsx'), 'utf8'))
 const profile = stripComments(readFileSync(join(ROOT, 'src/components/ProfileScreen.tsx'), 'utf8'))
 const indicator = stripComments(readFileSync(join(ROOT, 'src/components/OfflineStatusIndicator.tsx'), 'utf8'))
+const chat = stripComments(readFileSync(join(ROOT, 'src/components/ChatAssistant.tsx'), 'utf8'))
 
 console.log('\n1. Swapping an exercise')
 {
@@ -166,6 +167,42 @@ console.log('\n6. The dead-letter round trip actually works — behavioural')
   mem.set('fitplan_water_deadletter_v1', JSON.stringify(seeded))
   water.discardDeadLetterItem('w-1')
   check('discard removes it for good', water.getDeadLetterItems().length === 0)
+}
+
+console.log('\n7. Chat message persistence -- four writes that used to vanish into .then()')
+{
+  // Found in a follow-up sweep, 3 Sep 2026 -- not part of the original
+  // audit's five, but the identical shape: a write fires, the promise
+  // resolves or rejects, and NOTHING reads which one happened. `.then()`
+  // with no argument discards the result outright; it is not even an
+  // unhandled-rejection warning, because .then() with zero arguments never
+  // rejects itself.
+  //
+  // Every one of these four is fire-and-forget by design -- the screen has
+  // already moved on by the time the write lands, and there is no undo to
+  // offer. So the bar here is lower than the swap/ban/log family above (no
+  // setWriteError banner is owed for a background persistence detail), but
+  // the floor from the rest of this file still applies: a failure has to be
+  // TRACEABLE, not silent. A `.then()` with no argument fails that on its
+  // own -- it cannot even be told apart from success by reading the code.
+  for (const [label, decl] of [
+    ['persistUserMessage', 'const persistUserMessage'],
+    ['finalizePlaceholder', 'const finalizePlaceholder'],
+    ['retryMessage', 'const retryMessage'],
+    ['handleClearChat', 'const handleClearChat'],
+  ] as const) {
+    const body = handlerBody(chat, decl)
+    check(`${label} exists`, body.length > 0)
+    check(`${label}: a failed write is at least logged, not discarded`,
+      /\.then\(\(\{\s*error\s*\}\)\s*=>\s*\{[\s\S]*?console\.error\(/.test(body), body.slice(0, 200))
+  }
+
+  // The one with a stated promise a silent failure would break outright.
+  // Regressing this to a bare `.then()` should not read as "acceptable" just
+  // because the OTHER three checks above still pass on unrelated matches.
+  const clearChatBody = handlerBody(chat, 'const handleClearChat')
+  check('handleClearChat: the comment\'s own promise ("reload doesn\'t resurrect") is backed by a real check on the delete',
+    /delete\(\)[\s\S]*?\.then\(\(\{\s*error\s*\}\)\s*=>/.test(clearChatBody))
 }
 
 if (failures > 0) { console.error(`\n${failures} failure(s)`); process.exit(1) }
