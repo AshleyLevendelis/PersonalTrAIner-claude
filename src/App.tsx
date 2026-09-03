@@ -26,7 +26,7 @@ import { computeBMR, computeStaticTDEE, resolveBodyMetrics } from '@/lib/macro-c
 import { computeTargets, getLatestWeightKg, getEffectiveTargetWeightKg, snapshotTargetsIfChanged } from '@/lib/nutrition-targets'
 import { describeGoalProximity, isGoalProximityDismissed, dismissGoalProximity } from '@/lib/goal-proximity'
 import { upsertDailyMetric } from '@/lib/daily-tracking'
-import { generateExercisePlan, generateMesocycle } from '@/lib/exercise-plan'
+import { generateExercisePlan, generateMesocycle, MESOCYCLE_WEEK_LABELS } from '@/lib/exercise-plan'
 import { getPools, swapPoolMeal, getMealPicksForDate, setMealPick, clearMealPick, clearAllMealPicksForDate, type MealSlotName } from '@/lib/meal-store'
 import { generateMealPools, assembleDay, chosenToMealPlanDays, type PoolOption } from '@/lib/meal-generation'
 import { supabase } from '@/lib/supabase'
@@ -608,12 +608,10 @@ function App() {
       // never got written past 1).
       const hasWeekData = exerciseRows.some(r => r.week_number && r.week_number > 0)
       if (hasWeekData) {
-        const weekLabels = [
-          'Week 1 — Anatomical Adaptation',
-          'Week 2 — Hypertrophy Accumulation',
-          'Week 3 — Intensification',
-          'Week 4 — Deload / Active Recovery',
-        ]
+        // The same four strings used to be written out again here. One list,
+        // one place: a second literal copy of a label set is how two screens
+        // start disagreeing about what week 3 is called.
+        const weekLabels = MESOCYCLE_WEEK_LABELS
         const byWeek = new Map<number, Map<string, typeof exerciseRows>>()
         for (const row of exerciseRows) {
           const wk = row.week_number || 1

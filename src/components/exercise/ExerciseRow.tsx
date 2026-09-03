@@ -192,6 +192,23 @@ export function ExerciseRow({
               <p className="mt-2 text-xs text-text-tertiary">
                 {ex.sets} working sets · {completedSets} logged
               </p>
+              {/* REST, as a number you can read before you have trained.
+                  Until now ex.rest reached this component only as
+                  restTime={ex.rest} into SetGrid, where its one job is to
+                  start the timer AFTER a set is logged — so the prescription
+                  itself was on no screen anywhere in the app. Ashley's 3 Sep
+                  2026 ruling (two minutes on a loaded main lift, conditioning
+                  keeps 90s) could not be read before doing the work.
+                  Same line, same words, same place as the browse row in
+                  ReadOnlyDayList — test:one-day-one-look §4b now holds the
+                  two together, and requires a TEXT node here rather than a
+                  prop, because the prop is exactly what was already true
+                  while the number stayed invisible. */}
+              {ex.rest && (
+                <p className="text-[0.625rem] text-muted-foreground">
+                  Rest <span className="tabular-mono">{ex.rest === 'alternate' ? 'alternate — no rest between' : ex.rest}</span>
+                </p>
+              )}
               {ex.selection_note && (
                 <div className="mt-1.5">
                   <button

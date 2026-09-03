@@ -180,10 +180,36 @@ console.log('\n3. Conditioning keeps its density everywhere else')
   check(`...and they land in the 60-90s band, not at the 90s loaded floor (${inBand} of ${c.bodyweight})`,
     c.bodyweight === 0 || inBand > 0, `${inBand}/${c.bodyweight}`)
 
-  // And the floor must not have leaked into goals that never asked for it.
+  // Ashley ruled on this line twice, a day apart, and the second ruling
+  // inverted what this loop used to assert.
+  //
+  //   2 Sep 2026 — conditioning ALONE gets a loaded-main-lift floor (90s),
+  //   because it was the only goal ever going under 60. Everyone else was
+  //   left alone, and this loop asserted exactly that: "no other goal has a
+  //   floor of its own".
+  //
+  //   3 Sep 2026 — two minutes on a loaded main lift for every other goal,
+  //   measured off 80.9% of main-lift slots resting under 120s. Conditioning
+  //   keeps its short rest, which is the same asymmetry as before.
+  //
+  // The second ruling shipped in PR #15 and left this loop RED — five failing
+  // checks, merged to main, and found the next day by a whole-app audit
+  // rather than by anyone reading the gate's output. Worth saying plainly,
+  // because the gate did its job and the merge did not.
+  //
+  // The check was never wrong about the INTENT — conditioning must not be
+  // dragged up to everyone else's rest — only about the incidental fact that
+  // everyone else had no floor at all. So it asserts the intent now. The
+  // numbers are hardcoded on purpose: this is where a ruling is pinned, and
+  // changing one should cost a conversation rather than pass silently.
+  const conditioningFloor = getGoalPolicy('conditioning').minLoadedMainLiftRestSeconds
+  check(`conditioning's loaded floor is still 90s (${conditioningFloor}s)`,
+    conditioningFloor === 90, conditioningFloor)
   for (const goal of GOALS) {
     if (goal === 'conditioning') continue
-    check(`${goal} has no floor of its own`, getGoalPolicy(goal).minLoadedMainLiftRestSeconds === undefined)
+    const floor = getGoalPolicy(goal).minLoadedMainLiftRestSeconds
+    check(`${goal} carries the two-minute floor, above conditioning's (${floor}s)`,
+      floor === 120 && conditioningFloor != null && floor > conditioningFloor, floor)
   }
 }
 

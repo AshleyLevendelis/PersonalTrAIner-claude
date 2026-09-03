@@ -4699,68 +4699,19 @@ const MESOCYCLE_WEEK_LABELS = [
   'Week 4 — Deload / Active Recovery',
 ]
 
-interface MesocycleVolumeModifier {
-  setsMultiplier: number
-  repsAdjust: (baseReps: string) => string
-  restAdjust: (baseRest: string) => string
-  rpeNote: string
-}
-
-function getMesocycleModifier(weekNumber: number, goal: FitnessGoal): MesocycleVolumeModifier {
-  if (weekNumber === 1) {
-    return {
-      setsMultiplier: 0.75,
-      repsAdjust: (r) => bumpReps(r, 2),
-      restAdjust: (r) => r,
-      rpeNote: 'RPE 6-7 — Focus on form and tempo',
-    }
-  }
-  if (weekNumber === 2) {
-    return {
-      setsMultiplier: 1.0,
-      repsAdjust: (r) => r,
-      restAdjust: (r) => r,
-      rpeNote: 'RPE 7-8 — Working sets at moderate intensity',
-    }
-  }
-  if (weekNumber === 3) {
-    const isStrength = goal === 'hypertrophy'
-    return {
-      setsMultiplier: isStrength ? 1.15 : 1.0,
-      repsAdjust: (r) => isStrength ? bumpReps(r, -1) : bumpReps(r, 1),
-      restAdjust: (r) => isStrength ? addRestSeconds(r, 15) : r,
-      rpeNote: 'RPE 8-9 — Peak overload week',
-    }
-  }
-  return {
-    setsMultiplier: 0.5,
-    repsAdjust: (r) => bumpReps(r, 2),
-    restAdjust: (r) => r,
-    rpeNote: 'RPE 5-6 — Deload: recover, maintain movement quality',
-  }
-}
-
-function bumpReps(reps: string, delta: number): string {
-  const rangeMatch = reps.match(/^(\d+)\s*-\s*(\d+)$/)
-  if (rangeMatch) {
-    const lo = Math.max(1, parseInt(rangeMatch[1]) + delta)
-    const hi = Math.max(lo, parseInt(rangeMatch[2]) + delta)
-    return `${lo}-${hi}`
-  }
-  const singleMatch = reps.match(/^(\d+)$/)
-  if (singleMatch) {
-    return String(Math.max(1, parseInt(singleMatch[1]) + delta))
-  }
-  return reps
-}
-
-function addRestSeconds(rest: string, seconds: number): string {
-  const match = rest.match(/^(\d+)\s*s?$/)
-  if (match) {
-    return `${parseInt(match[1]) + seconds}s`
-  }
-  return rest
-}
+// The four-week volume-modifier system that used to live here —
+// MesocycleVolumeModifier / getMesocycleModifier / bumpReps / addRestSeconds
+// / applyWeekModifiers, with per-week setsMultiplier, repsAdjust, restAdjust
+// and RPE notes — was deleted on 3 Sep 2026. Nothing had called any of it for
+// a long time; periodization.ts owns phases, and the real per-week volume and
+// intensity work happens there and in the block sizing below.
+//
+// It is named here rather than silently removed because a reader who
+// remembers it should know it went on purpose, not by accident, and because
+// its RPE strings ("RPE 8-9 — Peak overload week") looked exactly like live
+// coaching output while reaching no user at all. test:no-dead-code §4 now
+// catches this shape — a module-private function nothing calls — which is why
+// this sat in the middle of the generation engine unnoticed.
 
 export function mapMovementPattern(pattern: MovementPattern): MesocycleMovementPattern {
   const mapping: Record<string, MesocycleMovementPattern> = {
@@ -4816,24 +4767,6 @@ export function deriveFatigueCost(entry: ExerciseEntry): FatigueCost {
   if (entry.mechanics_tier === 'tier1_compound') return 'high'
   if (entry.mechanics_tier === 'tier2_compound') return 'moderate'
   return 'low'
-}
-
-function applyWeekModifiers(
-  baseDay: WorkoutDay,
-  weekNumber: number,
-  goal: FitnessGoal
-): WorkoutDay {
-  const mod = getMesocycleModifier(weekNumber, goal)
-  const exercises: Exercise[] = baseDay.exercises.map((ex) => {
-    const adjustedSets = Math.max(1, Math.round(ex.sets * mod.setsMultiplier))
-    const adjustedReps = mod.repsAdjust(ex.reps)
-    const adjustedRest = mod.restAdjust(ex.rest)
-    return { ...ex, sets: adjustedSets, reps: adjustedReps, rest: adjustedRest }
-  })
-  const condNote = baseDay.conditioning_note
-    ? `${baseDay.conditioning_note} | ${mod.rpeNote}`
-    : mod.rpeNote
-  return { ...baseDay, exercises, conditioning_note: condNote }
 }
 
 // ---------------------------------------------------------------------------
