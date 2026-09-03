@@ -2313,6 +2313,7 @@ function App() {
               mesocycle={mesocycle}
               planCreatedAt={mesocycleCreatedAt ?? profile.created_at}
               onWeightLogged={handleWeightLogged}
+              logsVersion={logsVersion}
             />
           </TabsContent>
 
@@ -2407,6 +2408,25 @@ function App() {
                   return false
                 }
                 setManualMealPicks(prev => ({ ...prev, [slot]: chosenName }))
+                // RE-READ THE POOL. A chat meal ADDITION inserts a brand-new
+                // option into meal_plan_slots, and mealPools was only ever
+                // refilled on load, generation, regenerate or reset — never
+                // here. So the pick pointed at a meal this component did not
+                // have (see the `mealPools[slot]?.find(...)` lookup above),
+                // it resolved to undefined, and the slot went on rendering
+                // the old dinner. Ashley, 3 Sep 2026: the coach said "Added"
+                // and the Nutrition tab did not change. The row HAD been
+                // written — only a full reload would have shown it.
+                //
+                // Re-reading rather than splicing the option in from the
+                // payload keeps one source of truth: what renders is exactly
+                // what was stored, and cannot drift from it. Harmless for a
+                // plain swap, where the pool is unchanged.
+                try {
+                  setMealPools(await getPools(profile.id))
+                } catch (err) {
+                  console.error('onMealSwapApplied: pool re-read failed — the write landed, the screen may lag until reload', err)
+                }
                 return true
               }}
               onFindMoreMealOptions={handleFindMoreMealOptions}

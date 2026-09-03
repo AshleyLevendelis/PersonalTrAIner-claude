@@ -280,6 +280,66 @@ async function main() {
       idxOfLabel > 0 && !/&&\s*\(?\s*$/.test(before), before.slice(-160))
   }
 
+  console.log('\nA write from the chat reaches the screen')
+  {
+    // TWO REPORTS FROM ASHLEY'S PHONE, 3 Sep 2026, one shape: the coach
+    // printed a receipt, the database write LANDED, and the screen never
+    // moved. The receipt framework guarantees the app never claims a write it
+    // did not make. It does not guarantee anyone ever SEES the result — and
+    // that gap is what produced both reports.
+    //
+    // (a) Rest day. useTrainingWeek's refresh keyed on [profileId,
+    // sessionDate] only, so a rest day marked from the chat sat in
+    // workout_sessions while the strip kept its stale glyph.
+    const hook = fs.readFileSync('src/hooks/useTrainingWeek.ts', 'utf-8')
+    check('the week hook takes a refresh token', /refreshToken\?: number/.test(hook))
+    const deps = hook.match(/\}, \[profileId, sessionDate[^\]]*\]\)/)?.[0] ?? ''
+    check('...and it is in the refresh callback deps, or the token does nothing',
+      /refreshToken/.test(deps), deps)
+
+    const dash = fs.readFileSync('src/components/Dashboard.tsx', 'utf-8')
+    check('Dashboard passes one through to the hook',
+      /useTrainingWeek\([^)]*logsVersion\)/.test(dash), dash.match(/useTrainingWeek\([^)]*\)/)?.[0])
+    const app = fs.readFileSync('src/App.tsx', 'utf-8')
+    check('...and App feeds it the counter its chat writes bump',
+      /logsVersion=\{logsVersion\}/.test(app))
+
+    // (b) Meal addition. mealPools was refilled on load/generate/regenerate/
+    // reset but never after a chat addition, so the pick pointed at a meal the
+    // component did not have and the slot rendered its old dinner.
+    const swapHandler = app.slice(app.indexOf('onMealSwapApplied={async'), app.indexOf('onFindMoreMealOptions='))
+    check('the chat meal handler exists to be checked (sanity check on this check)', swapHandler.length > 300, swapHandler.length)
+    check('...and it re-reads the pool, so an added meal can actually render',
+      /setMealPools\(await getPools\(profile\.id\)\)/.test(swapHandler))
+
+    // (c) Her ruling: a meal she asked for by name survives a regeneration.
+    // persistPools is the ONLY place the slot's rows are deleted, so both
+    // regenerate buttons inherit this.
+    const store = fs.readFileSync('src/lib/meal-store.ts', 'utf-8')
+    check('there is a marker for a meal the user asked for', /USER_REQUESTED_TAG = 'user-requested'/.test(store))
+    const exec = fs.readFileSync('src/lib/pending-action-executor.ts', 'utf-8')
+    check('...a chat-added meal carries it', /USER_REQUESTED_TAG\]/.test(exec))
+    const gen = fs.readFileSync('src/lib/meal-generation.ts', 'utf-8')
+    const persist = gen.slice(gen.indexOf('async function persistPools'), gen.indexOf('// DAY ASSEMBLY'))
+    check('persistPools exists to be checked (sanity check on this check)', persist.length > 400, persist.length)
+    check('...and reads the marked rows BEFORE deleting the slot',
+      persist.indexOf('USER_REQUESTED_TAG') < persist.indexOf(".delete()") && persist.includes('USER_REQUESTED_TAG'),
+      { marker: persist.indexOf('USER_REQUESTED_TAG'), del: persist.indexOf('.delete()') })
+    // THE INSERT ITSELF, not the declaration. The first version tested
+    // /keptRows/ over the whole function and passed with `...keptRows`
+    // stripped from the insert call — the variable was still declared just
+    // above, doing nothing. Same shape as a check satisfied by its own
+    // comment: presence is not use.
+    check('...and re-inserts them after the fresh options',
+      /\.insert\(\[\.\.\.rows, \.\.\.keptRows\]\)/.test(persist),
+      persist.match(/\.insert\([^)]*\)/g))
+
+    // (d) A meal name you cannot read is one you cannot choose.
+    const meal = fs.readFileSync('src/components/MealPlan.tsx', 'utf-8')
+    check('the meal name is not hard-truncated to one line',
+      !/expanded \? 'min-w-0 truncate/.test(meal))
+  }
+
   if (failures > 0) {
     console.error(`\n${failures} dashboard check(s) FAILED.`)
     process.exit(1)

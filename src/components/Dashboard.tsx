@@ -28,6 +28,8 @@ interface DashboardProps {
   planCreatedAt?: string
   /** Fired after a weigh-in is logged here so App.tsx recomputes living targets + latestWeightKg — same callback chat's log_weight already uses. */
   onWeightLogged?: () => void | Promise<void>
+  /** App's logsVersion — bumped when the chat writes a rest day or a session, so the week strip re-reads instead of showing a stale glyph. */
+  logsVersion?: number
 }
 
 // Tab-restructure handoff — Dashboard.tsx no longer owns the macro ring
@@ -143,7 +145,7 @@ function chipsForTip(key: string | null): { label: string; prefill: string }[] {
   return key ? (TIP_CHIPS[key] ?? []) : []
 }
 
-export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreatedAt, onWeightLogged }: DashboardProps) {
+export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreatedAt, onWeightLogged, logsVersion }: DashboardProps) {
   const stepsTarget = stepsTargetFor(profile)
   const activeSession = useActiveSession()
   const [data, setData] = useState<DashboardData | null>(null)
@@ -153,7 +155,7 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
 
   // Home's copy of the week — the RECORD. Exercise's strip is the navigator
   // and owns tap-to-peek; the two share only the glyph vocabulary.
-  const week = useTrainingWeek(profile.id, activeSession.date, exercisePlan ?? [], planCreatedAt)
+  const week = useTrainingWeek(profile.id, activeSession.date, exercisePlan ?? [], planCreatedAt, logsVersion)
 
   // Bumped after a weigh-in save (from WeighInCard here, or a goal-weight
   // set) so the effect below re-fetches — nothing else that changes when a

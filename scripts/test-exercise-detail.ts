@@ -119,5 +119,39 @@ check('free-search results carry the coaching note',
   /\{exercise\.coach_note_swap && \(/.test(swap))
 check('...and the ranked list still has its own', /\{note\}/.test(swap))
 
+// ---------------------------------------------------------------------------
+// THE DIALOG HAS TO BE RENDERED IN BOTH BRANCHES — this is a DEAD CONTROL check.
+//
+// ExerciseTab returns from two places: the Full Program branch and the session
+// branch. The Full Program one rendered <ExerciseDetailDialog>; the session
+// one passed onOpenDetail to TodayPanel (so the "How to do it" item appeared
+// and set detailTarget) and rendered no dialog at all. State set, nothing
+// listening. Ashley found it on her phone, 3 Sep 2026, mid-session — the one
+// place a form cue is most wanted.
+//
+// The existing checks above all confirm the PANEL's content is right. None of
+// them could see that on one of two screens the panel is never mounted. So
+// this asserts the wiring: every branch that can SET detailTarget must also
+// RENDER something that reads it.
+// ---------------------------------------------------------------------------
+{
+  // PER BRANCH, not a file-wide count. The first version of this check
+  // compared totals — "as many dialogs as setters" — and passed with the
+  // session branch's dialog deleted, because the Full Program branch still
+  // had one and only the session branch sets detailTarget. It counted the
+  // right things in the wrong scope. Found by mutation, not by reading it.
+  const split = tab.lastIndexOf('\n  return (')
+  check('ExerciseTab still has two return branches (sanity check on this check)', split > 0, split)
+  const branches = { program: tab.slice(0, split), session: tab.slice(split) }
+  for (const [name, body] of Object.entries(branches)) {
+    if (!/setDetailTarget\(name\)/.test(body)) continue
+    check(`the ${name} branch sets detailTarget AND renders the dialog`,
+      /<ExerciseDetailDialog\s+open=\{!!detailTarget\}/.test(body))
+  }
+  // At least one branch must actually do it, or the loop above is vacuous.
+  check('...and at least one branch was checked', /setDetailTarget\(name\)/.test(tab))
+}
+
+
 if (failures > 0) { console.error(`\n${failures} check(s) failed\n`); process.exit(1) }
 console.log('\n635 cues, finally with a reader.\n')

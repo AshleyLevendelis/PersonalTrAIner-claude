@@ -19,7 +19,7 @@ import type { MesocycleWeek, UserProfile, EquipmentAccess } from './types'
 import { swapExerciseInMesocycle, type SwapScope } from './mesocycle-edit'
 import { saveMesocycle, saveMesocycleWeek } from './mesocycle-persistence'
 import { getExerciseEntry } from './exercise-db'
-import { swapPoolMeal, clearMealPick, getMealPicksForDate, type MealSlotName } from './meal-store'
+import { swapPoolMeal, clearMealPick, getMealPicksForDate, USER_REQUESTED_TAG, type MealSlotName } from './meal-store'
 import { supabase } from './supabase'
 import { setDeliberateRest } from './daily-tracking'
 import type { MealAdditionPayload } from './meal-addition'
@@ -216,7 +216,9 @@ export async function executeMealAddition(
     name: option.name,
     ingredients: option.ingredients,
     macros: { kcal: option.macros.calories, protein: option.macros.protein, carbs: option.macros.carbs, fat: option.macros.fat },
-    tags: option.tags,
+    // Tagged as the user's own request so a later regeneration keeps it —
+    // see USER_REQUESTED_TAG and Ashley's ruling in meal-store.ts.
+    tags: [...(option.tags ?? []), USER_REQUESTED_TAG],
   })
   if (insertError) {
     return { receipt: { landed: [], failed: [{ op: 'propose_meal_addition', error: "Couldn't save the meal to your plan" }] }, poolIndex: null }

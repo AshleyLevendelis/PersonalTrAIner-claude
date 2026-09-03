@@ -455,7 +455,17 @@ function MealSlotRow({
         <div className="flex items-baseline justify-between gap-3">
           {option ? (
             <>
-              <span className={expanded ? 'min-w-0 truncate text-[1.1875rem] font-semibold tracking-[-.02em]' : 'min-w-0 truncate text-[1.03125rem] font-medium'}>
+              {/* NOT `truncate` — reported by Ashley, 3 Sep 2026: "Steak with
+                  New Potatoes and Asparagus" showed as a clipped single line
+                  with no way to read the rest. `truncate` was on BOTH states,
+                  so expanding the card did not reveal it either.
+                  Expanded: wrap in full, since the card is already the thing
+                  the user opened to read. Collapsed: two lines via
+                  line-clamp-2 rather than one hard cut, which fits every meal
+                  name in the pool while keeping the row compact. `min-w-0`
+                  stays either way — without it the flex row refuses to shrink
+                  and the macros beside it get pushed off. */}
+              <span className={expanded ? 'min-w-0 text-[1.1875rem] font-semibold tracking-[-.02em]' : 'min-w-0 line-clamp-2 text-[1.03125rem] font-medium'}>
                 {option.name}
               </span>
               {!expanded && (
@@ -606,7 +616,10 @@ function MealSlotRow({
                     className={`flex items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left transition-colors ${verdict.ok ? 'hover:bg-[color:var(--surface-raised)]' : 'opacity-60'}`}
                   >
                     <div className="min-w-0">
-                      <p className="truncate text-xs font-medium">{alt.name}</p>
+                      {/* Same fix as the slot name above: two lines, not one
+                          clipped one. An alternative you cannot read is one
+                          you cannot choose. */}
+                      <p className="line-clamp-2 text-xs font-medium">{alt.name}</p>
                       {verdict.ok ? (
                         <p className="tabular-mono text-[0.65625rem] text-muted-foreground">{Math.round(alt.macros.calories)} kcal · P {Math.round(alt.macros.protein)}g</p>
                       ) : (

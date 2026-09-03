@@ -2,6 +2,40 @@
 
 Newest first. One line each.
 
+- [x] **FOUR FROM ASHLEY'S PHONE (3 Sep 2026), and two of them were writes
+  that landed with no visible consequence.** (1) "How to do it" was a dead
+  control on the session screen: ExerciseTab renders ExerciseDetailDialog in
+  its Full Program branch only, while the session branch passed onOpenDetail
+  and set detailTarget with nothing listening. (2) Meal names were `truncate`d
+  to one line in BOTH the collapsed and expanded states, so opening the card
+  did not reveal them; now wrap when expanded, two-line clamp when collapsed.
+  (3) A rest day marked from chat wrote to workout_sessions correctly, but
+  useTrainingWeek keyed its refresh on [profileId, sessionDate] and nothing
+  re-ran it — logsVersion went only to ActiveSessionProvider. Added a
+  refreshToken param, threaded App -> Dashboard -> hook. (4) A chat-added meal
+  was inserted correctly, but mealPools was only refilled on load/generate/
+  regenerate/reset, so the pick pointed at a meal the component did not hold
+  and the slot rendered its old dinner; the handler now re-reads via getPools.
+  Then "Regenerate all" deleted it — her ruling: meals she asked for survive.
+  Chat additions carry USER_REQUESTED_TAG and persistPools reads them out
+  before its delete and re-appends after, fixed in that one function so both
+  regenerate buttons inherit it.
+  THE LESSON: the receipt framework guarantees the app never claims a write it
+  did not make, and it held — both receipts were honest. It does NOT guarantee
+  the user ever sees the result, and that gap produced two of the four
+  reports. Indistinguishable from a lie at the user's end.
+  THREE CHECKS WERE WRONG FIRST, all found by running mutations rather than
+  reading the checks: counting dialogs file-wide passed with the session
+  branch's deleted (right things, wrong scope); testing /keptRows/ over
+  persistPools passed with `...keptRows` stripped from the insert (presence is
+  not use); and .contains('tags', …) — correct against Postgres — crashed
+  every meal gate because the test harness's Supabase mock has no such method,
+  so it was replaced with a JS filter needing only .select().eq().
+  NOT VERIFIED FROM HERE: all four are render/refresh behaviour and the
+  sandbox cannot reach Supabase. test:meal-quality fails, verified identical
+  on a stashed clean tree (pools={} — needs a live generation call);
+  pre-existing, not caused here. Plan doc: docs/plans/four-from-her-phone.md.
+
 - [x] The headline weight looked broken because it never said it was an
   average (3 Sep 2026). Ashley logged 85kg and saw 86.0, logged 85kg again and
   saw 85.7, and reported the weight display as wrong. The maths was right: the
