@@ -2,6 +2,34 @@
 
 Newest first. One line each.
 
+- [x] **I SHIPPED A BLACK SCREEN TO PRODUCTION (2 Sep 2026).** The chat-tab
+  attention effect in #15 was written under handleTabChange — a few lines
+  before App.tsx's JSX, and ~70 lines AFTER its `if (!profile)` early return.
+  First render: profile is null, App returns early, the effect never runs.
+  Profile resolves: the render passes the return and it does. One more hook
+  than the previous render is precisely what React forbids — "Rendered more
+  hooks than during the previous render" unmounted the whole tree, and EVERY
+  user got a black screen on load, because every session starts with a null
+  profile. Fixed by relocating the effect beside its own two useState calls,
+  above the return.
+  WHY EVERY GATE STAYED GREEN, which is the part worth keeping: tsc and the
+  bundler do not check hook ordering; test:coach-opener asserted the effect's
+  CONTENT and not its POSITION; and nothing in the suite renders App. I wrote
+  "NOT VERIFIED IN A BROWSER from here" in this file's own entry for #15 and
+  merged anyway — the flag was pointing straight at this and I treated
+  "build passes, gates green" as enough for a change to the app's root
+  component. Ashley found it on her phone.
+  GUARD: test:coach-opener §7 now reads App.tsx and asserts NO hook call
+  (useState/useEffect/useRef/useCallback/useMemo/useLayoutEffect/useReducer/
+  useContext) appears after that early return — the class, not the instance.
+  Mutation: put the effect back where it broke production -> red, naming the
+  line. With every hook above the only early return the sequence is identical
+  on every render, which is a stronger guarantee than any single browser run.
+  LOCAL RENDER: the built app boots and React mounts (headless Chromium,
+  no hook error) but stops at the auth screen, since the sandbox cannot reach
+  Supabase — so it could NOT exercise the null-to-set profile transition.
+  Stated rather than dressed up as end-to-end proof.
+
 - [x] The coach could only speak when someone opened the chat tab (2 Sep 2026).
   From reviewing a generic chat blueprint (Gemini's) against this codebase:
   about half of it already existed here, its notifications idea rested on a
