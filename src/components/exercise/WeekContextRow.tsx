@@ -93,7 +93,8 @@ export function WeekContextRow({
               type="button"
               className="hit-slop-44 text-primary"
               onClick={() => setExpanded(v => !v)}
-              aria-label="Expand phase context"
+              aria-label={expanded ? "Hide the coach's notes on this week" : "Show the coach's notes on this week"}
+              aria-expanded={expanded}
             >
               <ChevronDown className={`size-3.5 transition-transform ${expanded ? 'rotate-180' : ''}`} />
             </button>
@@ -132,6 +133,25 @@ export function WeekContextRow({
         <p className="mt-2 text-xs leading-[1.5] text-muted-foreground">{shortfallNote}</p>
       )}
 
+      {/* THE NOTES ARE ON SCREEN, NOT ONLY BEHIND THE CHEVRON. The tour
+          promises "my notes on it" for this tab, and every week of every plan
+          carries one (mesocycle_weeks.coach_note) — but it rendered only once
+          the chevron was tapped, so a trainee who never tapped it saw the tab
+          the tour described as having notes with no notes on it (Ashley,
+          3 Sep 2026: "the notes section doesn't populate"). Collapsed, the
+          first line of the note shows and reads as the thing to tap;
+          expanded, the phase focus and the whole note. */}
+      {!expanded && coachNote && (
+        <button
+          type="button"
+          onClick={() => setExpanded(true)}
+          className="mt-2 w-full text-left text-xs leading-[1.5] line-clamp-1"
+          style={{ color: 'var(--role-ai-text)' }}
+          aria-label="Show the coach's notes on this week"
+        >
+          Coach: {coachNote}
+        </button>
+      )}
       {expanded && (phaseFocus || coachNote) && (
         <div className="mt-2.5 space-y-1.5">
           {phaseFocus && <p className="text-xs leading-[1.5] text-text-tertiary">{phaseFocus}</p>}

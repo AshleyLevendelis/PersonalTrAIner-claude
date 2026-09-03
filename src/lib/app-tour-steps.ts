@@ -87,7 +87,7 @@ export const TOUR_STEPS: TourStep[] = [
   {
     key: 'exercise', tab: 'exercise', target: 'extoday',
     nav: 'navExercise', tapHint: 'Tap Exercise', teaser: 'Now the training side.',
-    copy: 'Your program lives here — the week at a glance, the phase you’re in, my notes on it. Today’s session sits right below.',
+    copy: 'Your program lives here — the week at a glance, the phase you’re in, and my notes on the week right under the header (tap to read the whole thing). Today’s session sits right below.',
   },
   {
     key: 'set', tab: 'exercise', target: 'setrow', gate: true,

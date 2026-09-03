@@ -356,7 +356,18 @@ export function TodayPanel({
             {status !== 'running' ? (
               <Button size="sm" className="mt-3" onClick={startSession}>Start session</Button>
             ) : (
-              <Button size="sm" className="mt-3" onClick={handleFinish}>Finish session</Button>
+              <>
+                <Button size="sm" className="mt-3" onClick={handleFinish}>Finish session</Button>
+                {/* The line between a look and a workout, said before Finish
+                    is tapped rather than after: with nothing logged, Finish
+                    closes the screen and counts nothing (useActiveSession).
+                    Gone the moment a set lands. */}
+                {totalSetsLogged === 0 && (
+                  <p className="mt-2 text-xs leading-[1.5] text-muted-foreground">
+                    Nothing logged yet — finishing now closes this screen without counting a workout. Log a set and it counts.
+                  </p>
+                )}
+              </>
             )}
           </div>
           <SessionSummaryDialog open={summaryOpen} onOpenChange={setSummaryOpen} data={summaryData} nothingLogged={summaryNothingLogged} />
