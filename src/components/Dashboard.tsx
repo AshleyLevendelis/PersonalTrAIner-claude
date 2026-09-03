@@ -422,6 +422,26 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
                 {data.weightTrend.onTrackForGoal === true ? ' · on track' : data.weightTrend.onTrackForGoal === false ? ' · slower than target' : ''}
               </span>
             )}
+            {/* SAYS WHAT THE BIG NUMBER IS. Ashley, 3 Sep 2026, from her own
+                screen: she logged 85kg, saw 86.0, logged 85kg again and saw
+                85.7, and reported the display as broken. It was not — the
+                headline is the 7-day rolling average VISION-ARCHITECTURE.md
+                §5.4 requires ("never a raw daily reading as the headline"),
+                and her onboarding weight of 87 is one of the readings feeding
+                it: (87+85)/2 = 86.0, then (87+85+85)/3 = 85.7. Both numbers
+                she saw were exactly right.
+                What was wrong is that NOTHING SAID SO, while the Weigh-in row
+                a few centimetres below showed "85.0 kg today" — two different
+                numbers for her weight on one screen, neither explaining
+                itself. Reading that as a bug is the correct reading of what
+                was on screen.
+                Asked, with the alternative (show the raw reading instead) on
+                the table; she chose to keep the smoothing and label it.
+                Always rendered, never only on a thin sample: the confusion
+                does not go away once there are three weigh-ins, and the
+                sample caveat below is a SEPARATE thing (how much to trust it,
+                not what it is). */}
+            <span className="text-[0.6875rem] text-muted-foreground/70">7-day average</span>
             {data.weightTrend.sampleCount === 1 && (
               <span className="text-[0.6875rem] text-muted-foreground/70">(1 weigh-in — trend firms up with more)</span>
             )}

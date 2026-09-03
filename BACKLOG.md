@@ -2,6 +2,30 @@
 
 Newest first. One line each.
 
+- [x] The headline weight looked broken because it never said it was an
+  average (3 Sep 2026). Ashley logged 85kg and saw 86.0, logged 85kg again and
+  saw 85.7, and reported the weight display as wrong. The maths was right: the
+  headline is the 7-day rolling average VISION-ARCHITECTURE.md §5.4 requires
+  ("never a raw daily reading as the headline"), and her onboarding weight of
+  87 is one of the readings feeding it — (87+85)/2 = 86.0, then
+  (87+85+85)/3 = 85.7. Both figures she saw were exactly correct.
+  THE DEFECT WAS COMMUNICATION, not computation: a big unlabelled number with
+  "85.0 kg today" a few centimetres below it, two numbers for one weight and
+  neither explaining itself. Reading that as a bug is the right reading of
+  what was on screen. Asked with the alternative on the table (show the raw
+  reading as the headline instead, overriding the vision doc); she chose to
+  keep the smoothing and label it. Now renders "7-day average" beside the
+  number, always — not gated on sample count, since the confusion does not
+  resolve once a third weigh-in arrives.
+  MY OWN GATE FAILED FIRST, and it is the more useful half of this entry: the
+  check sliced the JSX block and tested it for /average/i, and the long
+  explanatory COMMENT I had just written above the label satisfied it. Both
+  mutations — label deleted, label hidden behind the thin-sample condition —
+  passed against a screen with no label at all. A check its own subject's
+  comment can satisfy is not a check. Rewritten to strip comments and match a
+  RENDERED text node between > and <; both mutations now red. Found only by
+  running the mutations, not by reading the check.
+
 - [x] **I SHIPPED A BLACK SCREEN TO PRODUCTION (2 Sep 2026).** The chat-tab
   attention effect in #15 was written under handleTabChange — a few lines
   before App.tsx's JSX, and ~70 lines AFTER its `if (!profile)` early return.
