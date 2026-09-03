@@ -41,6 +41,7 @@ import { checkForLoadSuggestions, confirmLoadSuggestion, declineLoadSuggestion }
 import { checkForWeightBasisOffer, confirmWeightBasisOffer, declineWeightBasisOffer, planHasAssumedBodyLoads } from '@/lib/weight-basis-offer'
 import { checkForBeatTargetOffer, confirmBeatTargetOffer, declineBeatTargetOffer } from '@/lib/beat-target-offer'
 import { getRevealSpeed, saveRevealSpeed, DEFAULT_REVEAL_SPEED, type RevealSpeed } from '@/lib/reveal-speed-store'
+import { getChatTimestamps, saveChatTimestamps, DEFAULT_CHAT_TIMESTAMPS } from '@/lib/chat-timestamps-store'
 import { ensureSignedIn, claimProfile, shouldAskForEmail, findOwnedProfileId, describeSignInFailure } from '@/lib/auth'
 import { rebuildFromCurrentWeek, type PlanInvalidation } from '@/lib/plan-invalidation'
 import { SignInScreen } from '@/components/SignInScreen'
@@ -330,6 +331,16 @@ function App() {
     if (!profile?.id) return
     setRevealSpeedState(speed)
     saveRevealSpeed(profile.id, speed)
+  }
+  // "Show times in chat" — same shape as reveal speed, same store convention
+  // (chat-timestamps-store.ts). Off by default; the chat's grouped-bubbles
+  // handoff (3 Sep 2026) added it as the one new setting.
+  const [chatTimestamps, setChatTimestampsState] = useState<boolean>(DEFAULT_CHAT_TIMESTAMPS)
+  useEffect(() => { setChatTimestampsState(getChatTimestamps(profile?.id)) }, [profile?.id])
+  const handleChatTimestampsChange = (on: boolean) => {
+    if (!profile?.id) return
+    setChatTimestampsState(on)
+    saveChatTimestamps(profile.id, on)
   }
   const reloadMemory = async (profileId: string) => {
     const [facts, goals, contextFacts] = await Promise.all([getActiveFacts(profileId), getActiveGoals(profileId), getActiveContextFacts(profileId)])
@@ -2180,21 +2191,27 @@ function App() {
           icons replace it — no shared bar, no vertical strip, each reachable
           in one tap. Positioned above <main> so they never depend on which
           tab is mounted. */}
-      <div
-        data-tour="settings"
-        className="fixed right-3 z-40"
-        style={{ top: 'calc(0.625rem + env(safe-area-inset-top))' }}
-      >
-        <ProfileMenu
-          onOpenProfile={() => { setProfileInfoSection(undefined); setProfileInfoOpen(true) }}
-          onReplayTour={replayAppTour}
-          onNewPlan={() => {
-            setActiveAdaptationsForReset([])
-            if (profile?.id) getActiveAdaptations(profile.id).then(setActiveAdaptationsForReset).catch(console.error)
-            setNewPlanConfirmOpen(true)
-          }}
-        />
-      </div>
+      {/* The chat tab carries this same menu in its own header (see
+          headerTrailing on <ChatAssistant>), so the floating gear steps
+          aside there rather than sitting on top of that header. The tour's
+          settings stop is on the Tools tab, where this still renders. */}
+      {activeTab !== 'chat' && (
+        <div
+          data-tour="settings"
+          className="fixed right-3 z-40"
+          style={{ top: 'calc(0.625rem + env(safe-area-inset-top))' }}
+        >
+          <ProfileMenu
+            onOpenProfile={() => { setProfileInfoSection(undefined); setProfileInfoOpen(true) }}
+            onReplayTour={replayAppTour}
+            onNewPlan={() => {
+              setActiveAdaptationsForReset([])
+              if (profile?.id) getActiveAdaptations(profile.id).then(setActiveAdaptationsForReset).catch(console.error)
+              setNewPlanConfirmOpen(true)
+            }}
+          />
+        </div>
+      )}
       <div
         className="fixed left-3 right-14 z-40 flex justify-start"
         style={{ top: 'calc(0.625rem + env(safe-area-inset-top))' }}
@@ -2440,6 +2457,18 @@ function App() {
               revealSpeed={revealSpeed}
               pendingLoadSuggestions={adaptationMessages.filter(m => m.loadSuggestionId).map(m => m.text)}
               onAttentionChange={setChatAttention}
+              showTimestamps={chatTimestamps}
+              headerTrailing={
+                <ProfileMenu
+                  onOpenProfile={() => { setProfileInfoSection(undefined); setProfileInfoOpen(true) }}
+                  onReplayTour={replayAppTour}
+                  onNewPlan={() => {
+                    setActiveAdaptationsForReset([])
+                    if (profile?.id) getActiveAdaptations(profile.id).then(setActiveAdaptationsForReset).catch(console.error)
+                    setNewPlanConfirmOpen(true)
+                  }}
+                />
+              }
             />
           </TabsContent>
         </Tabs>
@@ -2461,6 +2490,8 @@ function App() {
         initialSection={profileInfoSection}
         revealSpeed={revealSpeed}
         onRevealSpeedChange={handleRevealSpeedChange}
+        chatTimestamps={chatTimestamps}
+        onChatTimestampsChange={handleChatTimestampsChange}
       />
       {/* ASK, NEVER SILENTLY (audit §2.1). A rebuild rewrites the weeks
           ahead, so it happens on an explicit yes and nowhere else. Declining

@@ -77,6 +77,9 @@ interface ProfileScreenProps {
   /** Chat typewriter reveal-speed preference — see reveal-speed-store.ts. */
   revealSpeed: RevealSpeed
   onRevealSpeedChange: (speed: RevealSpeed) => void
+  /** "Show times in chat" — a 10px time under each run of the conversation. Off by default. */
+  chatTimestamps: boolean
+  onChatTimestampsChange: (on: boolean) => void
 }
 
 // ---- Shared small field-row components (scoped to this screen) -----------
@@ -270,7 +273,7 @@ function factEffect(fact: UserFactRow): string {
   return 'recorded — not yet applied (takes effect on your next plan regeneration)'
 }
 
-export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onProfileChanged, onPlanInvalidated, onMemoryChanged, initialSection, revealSpeed, onRevealSpeedChange }: ProfileScreenProps) {
+export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onProfileChanged, onPlanInvalidated, onMemoryChanged, initialSection, revealSpeed, onRevealSpeedChange, chatTimestamps, onChatTimestampsChange }: ProfileScreenProps) {
   const [facts, setFacts] = useState<UserFactRow[]>([])
   const [goals, setGoals] = useState<UserGoalRow[]>([])
   const [contextFacts, setContextFacts] = useState<UserContextFactRow[]>([])
@@ -614,7 +617,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                  plainly, with a way to clear each one. */
               <div className="space-y-1.5 pt-2" style={{ borderTop: '1px solid var(--hairline)' }}>
                 <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">
-                  These are saved but don't change your plan — the app can only work around the areas above. Tell your coach in Chat about anything else.
+                  These are saved but don't change your plan — the app can only work around the areas above. Tell your Personal TrAIner in Chat about anything else.
                 </p>
                 <div className="flex flex-wrap gap-1.5">
                   {unrecognisedInjuries.map((v: string) => (
@@ -823,7 +826,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
             <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tone &amp; context</h3>
             <div>
             <p className="text-sm font-medium">Chat reveal speed</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">How fast the coach's replies type out — Off shows them instantly</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">How fast your Personal TrAIner's replies type out — Off shows them instantly</p>
             <div className="mt-3 flex gap-[3px] rounded-xl bg-background p-[3px]">
               {(['off', 'slow', 'normal', 'fast'] as const).map(level => (
                 <button
@@ -845,6 +848,22 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
             <p className="mt-2 text-[0.71875rem] leading-[1.5] text-muted-foreground/80">
               Reduced-motion system settings always show replies instantly, regardless of this choice.
             </p>
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium">Show times in chat</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">A small time under each message</p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={chatTimestamps}
+              aria-label="Show times in chat"
+              onClick={() => onChatTimestampsChange(!chatTimestamps)}
+              className={`hit-slop-44 relative h-7 w-12 shrink-0 rounded-full transition-colors ${chatTimestamps ? 'bg-primary glow-mint-box' : 'bg-[color:var(--surface-raised)]'}`}
+            >
+              <span className={`absolute top-1 size-5 rounded-full bg-[color:var(--foreground)] transition-[left] ${chatTimestamps ? 'left-6' : 'left-1'}`} />
+            </button>
           </div>
             {contextFacts.map(c => (
               <div key={c.id} className="rounded-md border p-2.5 space-y-1">
@@ -868,7 +887,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                     </div>
                   </div>
                 )}
-                <EffectLine text="Shapes how the coach talks to you — never your plan" />
+                <EffectLine text="Shapes how your Personal TrAIner talks to you — never your plan" />
                 <ProvenanceBadge source={c.source} createdAt={c.created_at} />
               </div>
             ))}

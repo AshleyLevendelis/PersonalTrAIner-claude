@@ -1,10 +1,8 @@
-import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react'
-import ReactMarkdown from 'react-markdown'
+import { Fragment, useState, useRef, useEffect, useCallback, type ReactNode } from 'react'
 import { buildCoachMealSummary, mealsContaining } from '@/lib/meal-ingredients'
-import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import { Send, CheckCircle2, ArrowDown, RotateCcw, AlertCircle, Trash2, Mic, MessageCircle } from 'lucide-react'
+import { Send, CheckCircle2, ArrowDown, RotateCcw, AlertCircle, Trash2, Mic } from 'lucide-react'
 import { calculateCalories, getActiveMesocycleWeek } from '@/lib/calculations'
 import { computeBMR, computeStaticTDEE, resolveBodyMetrics } from '@/lib/macro-calculator'
 import { getAppNow, getSessionDateContext, getLocalDateString } from '@/lib/dev-clock'
@@ -50,6 +48,7 @@ import { ProposalCard } from '@/components/chat/ProposalCard'
 import { TypewriterMarkdown } from '@/components/chat/TypewriterMarkdown'
 import { ReceiptCard } from '@/components/chat/ReceiptCard'
 import { ClarificationCard } from '@/components/chat/ClarificationCard'
+import { groupRuns, splitMessageParts, bubblePos, bubbleRadiusClass, ASSISTANT_BUBBLE_CLASS, USER_BUBBLE_CLASS, CoachAvatar, TypingBubble, QuickReplyRail, messageDayKey, dayDividerLabel, timeLabel, type BubblePos, type MessageRun } from '@/components/chat/bubbles'
 import type { ChatMessage, UserProfile, MacroTargets, WorkoutDay, MealPlanDay, MesocycleWeek, PlanAction, ChatPendingActionView, ChatReceiptView, ChatClarificationView } from '@/lib/types'
 import { DEFAULT_REVEAL_SPEED, type RevealSpeed } from '@/lib/reveal-speed-store'
 import { FEEL_SCALE, type SessionFeel } from '@/lib/types'
@@ -63,23 +62,20 @@ const QUICK_REPLIES_RE = /\[QUICK_REPLIES:\s*(.*?)\]/gi
 const TRAILING_BRACKET_RE = /\[(?:ACTION|QUICK_REPLIES|BREAK)[^\]]*$/i
 const PAGE_SIZE = 20
 
-// Chat round 2, item 2 — the model splits a reply into consecutive sent
-// messages with a [BREAK] line. Collapsed here into a blank-line paragraph
-// break so each beat renders as its own visually separated block. NOTE this
-// is a paragraph split, not yet a genuinely separate chat bubble per part —
-// see the round-2 report for the remaining piece.
-const BREAK_TAG_RE = /^[ \t]*\[BREAK\][ \t]*$/gim
-
-function applyMessageBreaks(text: string): string {
-  return text.replace(BREAK_TAG_RE, '\n')
-}
-
+// The model splits a reply into consecutive sent messages with a [BREAK]
+// line. The tag STAYS in what these return — and so in what gets stored —
+// because the split now happens at render time (bubbles.tsx's
+// splitMessageParts), where each part becomes its own bubble in the run.
+// Collapsing it to a paragraph break here, as this used to, was exactly
+// what made consecutive messages run together on screen (design handoff,
+// 3 Sep 2026). Older stored replies, already collapsed, still render — as
+// one bubble with a paragraph gap, which is what they were.
 function stripTags(text: string): string {
-  return applyMessageBreaks(text).replace(ACTION_TAG_RE, '').replace(QUICK_REPLIES_RE, '').trim()
+  return text.replace(ACTION_TAG_RE, '').replace(QUICK_REPLIES_RE, '').trim()
 }
 
 function stripStreamingTags(text: string): string {
-  let cleaned = applyMessageBreaks(text).replace(ACTION_TAG_RE, '').replace(QUICK_REPLIES_RE, '')
+  let cleaned = text.replace(ACTION_TAG_RE, '').replace(QUICK_REPLIES_RE, '')
   cleaned = cleaned.replace(TRAILING_BRACKET_RE, '')
   cleaned = cleaned
     .split('\n')
@@ -170,6 +166,10 @@ interface ChatAssistantProps {
   revealSpeed?: RevealSpeed
   /** Vision Step 6 — any pending "start heavier next block?" suggestions currently showing on the dashboard banner, so the coach can discuss one if asked directly. Confirming/declining still only happens via the banner's own buttons, not from here (see load-suggestions.ts's own doc comment on why chat-driven confirm is out of scope for this pass). */
   pendingLoadSuggestions?: string[]
+  /** "Show times in chat" (Profile → settings, chat-timestamps-store.ts): a 10px time under each run. Off by default. */
+  showTimestamps?: boolean
+  /** Rendered at the right end of the chat's own header — App.tsx hands its settings menu in here rather than floating a gear over the header. */
+  headerTrailing?: ReactNode
 }
 
 /**
@@ -185,20 +185,19 @@ function sessionCutoffHour(preferredTime: string | undefined): number {
   return SESSION_PASSED_CUTOFF[preferredTime || 'morning'] || 22
 }
 
-export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onProfileChanged, onMealSwapApplied, onFindMoreMealOptions, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenProfile, groceryItems, onGroceryChanged, onOpenGrocery, onWaterChanged, onOpenDashboard, onAttentionChange, revealSpeed = DEFAULT_REVEAL_SPEED, pendingLoadSuggestions }: ChatAssistantProps) {
+export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onProfileChanged, onMealSwapApplied, onFindMoreMealOptions, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenProfile, groceryItems, onGroceryChanged, onOpenGrocery, onWaterChanged, onOpenDashboard, onAttentionChange, revealSpeed = DEFAULT_REVEAL_SPEED, pendingLoadSuggestions, showTimestamps = false, headerTrailing }: ChatAssistantProps) {
   // NL logging (§3) writes through the SAME frozen session identity +
   // logSet facade SetGrid.tsx uses — never saveSet directly (see
   // nl-logging-executor.ts's own doc comment).
   const activeSession = useActiveSession()
-  // Turn 6 composer fix: `sticky bottom-0` was inert inside CardContent's
-  // `overflow-hidden` (overflow:hidden ancestors don't give sticky anything
-  // to stick within — only overflow:auto/scroll do), and the Card's own
-  // fixed height never accounted for the independently-`fixed` tab bar. The
-  // composer now rides above the tab bar via the exact same fixed-position
-  // + keyboard-inset pattern BottomDock already uses.
+  // The keyboard inset sizes the whole chat column (see the render): with
+  // the tab bar hidden the column's bottom edge is the keyboard's top edge,
+  // via the same visualViewport measurement BottomDock rides. The composer
+  // is the column's last child, so it sits on the keyboard without being
+  // positioned at all — the fixed composer and its clearance maths went with
+  // the grouped-bubbles layout (3 Sep 2026).
   const { insetPx: composerInsetPx, isKeyboardOpen: composerKeyboardOpen } = useViewportInset()
   const composerRef = useRef<HTMLTextAreaElement>(null)
-  const composerBoxRef = useRef<HTMLDivElement>(null)
 
   // Keyed by an in-memory resolverId, not persisted: holds the full
   // entries/groups for a log_workout turn that hit a BLOCKING ambiguity, so
@@ -459,6 +458,50 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
   const [isFirstEverChat, setIsFirstEverChat] = useState<boolean | null>(null)
   /** The one message currently mid-typewriter-reveal — set only for a reply that JUST arrived from sendMessage, never for restored history/cache (see TypewriterMarkdown.tsx). */
   const [animatingMessageId, setAnimatingMessageId] = useState<string | null>(null)
+
+  // THE RUN REVEAL (grouped bubbles, 3 Sep 2026). animatingMessageId is the
+  // ONE message whose text is still typing out; these carry the bubble
+  // behaviour around it. `pendingRevealIds` are messages that have ALREADY
+  // arrived — the four first-run intro messages land in one setMessages —
+  // but are held back so they appear one bubble at a time, a typing bubble
+  // between; the next id is promoted when the current one finishes.
+  // `animatingPart` is the same idea inside one message: a reply the model
+  // split with [BREAK] reveals part by part, the typewriter active on the
+  // current part only, the ones after it not on screen yet. Keyed by message
+  // id so a new message never inherits the previous one's part index.
+  const [pendingRevealIds, setPendingRevealIds] = useState<string[]>([])
+  const pendingRevealRef = useRef<string[]>([])
+  pendingRevealRef.current = pendingRevealIds
+  const [animatingPart, setAnimatingPart] = useState<{ id: string; index: number } | null>(null)
+  const revealPartIndex = (id: string | undefined) => (id != null && animatingPart?.id === id ? animatingPart.index : 0)
+  const revealTimerRef = useRef<number | null>(null)
+  useEffect(() => () => { if (revealTimerRef.current) window.clearTimeout(revealTimerRef.current) }, [])
+
+  /**
+   * How long the typing bubble shows between two bubbles of one run: long
+   * enough to read as "another one coming", short enough not to feel like
+   * waiting. Skipped entirely when the reveal itself is off — instant text
+   * with a beat of dots between would be the worst of both.
+   */
+  const BETWEEN_BUBBLES_MS = 550
+  const handlePartDone = (msgId: string, partIndex: number, partCount: number) => {
+    const step = () => {
+      revealTimerRef.current = null
+      if (partIndex < partCount - 1) {
+        setAnimatingPart({ id: msgId, index: partIndex + 1 })
+        return
+      }
+      // Last part of this message: hand the reveal to the next held-back
+      // message, or finish. Guarded so a stale onDone (a message that was
+      // already superseded) cannot steal the reveal from a newer one.
+      const [next, ...rest] = pendingRevealRef.current
+      if (next !== undefined) setPendingRevealIds(rest)
+      setAnimatingMessageId(current => (current === msgId ? next ?? null : current))
+    }
+    const instant = revealSpeed === 'off' || (typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches)
+    if (instant) step()
+    else revealTimerRef.current = window.setTimeout(step, BETWEEN_BUBBLES_MS)
+  }
   useEffect(() => {
     if (!activeSession.ready || !profile.id || !macros) return
     let cancelled = false
@@ -588,11 +631,19 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       // this only turns them into ChatMsg rows. CHIPS SHOW RATHER THAN TELL,
       // which is what keeps the how-to-use-it half out of the prose.
       if (isFirstEverChat) {
-        setMessages(buildFirstRunIntro(greetName(), firstRunSessionBrief(), planShapeFromMesocycle(mesocycle)).map(m => ({
+        // ONE BUBBLE AT A TIME. All four messages exist from this moment, but
+        // only the first types out; the rest wait in pendingRevealIds and
+        // take their turn (handlePartDone), a typing bubble standing in for
+        // the next one — so the introduction is met, not read off a wall.
+        const intro = buildFirstRunIntro(greetName(), firstRunSessionBrief(), planShapeFromMesocycle(mesocycle)).map((m, i) => ({
           role: 'assistant' as const,
           status: 'complete' as const,
           ...m,
-        })))
+          id: `intro-${i + 1}`,
+        }))
+        setMessages(intro)
+        setAnimatingMessageId(intro[0]?.id ?? null)
+        setPendingRevealIds(intro.slice(1).map(m => m.id))
         return
       }
 
@@ -2626,7 +2677,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       // copy rather than surfacing "Failed to fetch" verbatim.
       const displayMessage = error.retryable
         ? (error.message || 'Something went wrong with the AI service. Tap "Retry" to try again.')
-        : 'Couldn\'t reach the coach — check your connection and tap "Retry".'
+        : 'Couldn\'t reach your Personal TrAIner — check your connection and tap "Retry".'
       responseText = isTimeout
         ? '_That request took too long to process. Tap "Retry" to try again._'
         : `_${displayMessage}_`
@@ -3180,79 +3231,237 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
 
   const { dockHeightPx } = useBottomDockHeight()
 
-  // Ride above BottomDock when it's showing, not underneath it. The dock is
-  // fixed to the same baseline as this composer and sits at z-50 against our
-  // z-40, so a running rest timer used to cover the input completely and a
-  // session chip clipped the placeholder — reported from a real gym session,
-  // where "ask the coach something mid-set" is exactly when the dock is up.
-  // dockHeightPx is measured by the dock itself (see useBottomDockHeight);
-  // it's 0 whenever the dock is hidden, so this collapses to the old value.
-  // The extra 12px matches the dock's own gap above the tab bar, keeping the
-  // two apart rather than flush.
+  // THE COLUMN. The chat is the one tab that is a conversation rather than a
+  // page, and it now fills the viewport: header, thread, chip rail, composer,
+  // top to bottom, in normal flow (design handoff "grouped bubbles,
+  // full-height layout", 3 Sep 2026). Pinned to the viewport rather than
+  // laid out inside <main>, so App.tsx's page padding never reaches it, and
+  // its bottom edge sits exactly on the tab bar — or, with the keyboard open
+  // and the tab bar gone, exactly on the keyboard, via the same
+  // visualViewport inset BottomDock rides. With the composer the LAST flex
+  // child the thread can never be under it: the fixed-height Card, the fixed
+  // composer and the measured clearance that used to reconcile the two are
+  // all gone.
+  //
+  // The dock (rest timer / session chip) is still a fixed sibling above the
+  // tab bar at z-50; the column keeps clear of it by padding, exactly as the
+  // old composer did ("ask the coach something mid-set" is when it's up).
   const dockGapPx = dockHeightPx > 0 ? dockHeightPx + 12 : 0
-  const composerBottomStyle = composerKeyboardOpen
-    // Keyboard open: the tab bar hides and the dock rides the keyboard inset
-    // too, so stack above it there as well.
-    ? { bottom: composerInsetPx + 16 + dockGapPx }
-    : { bottom: `calc(${TAB_BAR_HEIGHT_PX}px + env(safe-area-inset-bottom) + ${dockGapPx}px)` }
+  const columnStyle: React.CSSProperties = composerKeyboardOpen
+    ? { bottom: composerInsetPx, paddingBottom: dockGapPx }
+    : { bottom: `calc(${TAB_BAR_HEIGHT_PX}px + env(safe-area-inset-bottom))`, paddingBottom: dockGapPx }
 
-  // HOW MUCH OF THE THREAD THE COMPOSER IS SITTING ON, MEASURED.
-  //
-  // The Card is `h-[600px] max-h-[80dvh]` — a fixed box — while the composer
-  // is `position: fixed` to the VIEWPORT. With the keyboard shut they don't
-  // meet (measured at 390x844: card ends 648, composer starts 704). Open the
-  // keyboard and the composer rides UP into the card: composer top 416
-  // against a card bottom of 648, so it covers 232px of the message list and
-  // the newest message — at 512-552 — is entirely behind it. The scroller
-  // reserved a static `pb-24`, 96px, which never grew.
-  //
-  // That is the same defect reported on the onboarding composer, on the other
-  // screen. Onboarding grows its padding by `insetPx + 112` because its
-  // scroller ends at the viewport bottom; this one ends at the CARD's bottom,
-  // which sits an unknown distance above that (it depends on App.tsx's own
-  // page padding). So the overlap is measured rather than derived from a
-  // constant that would silently go stale the moment that padding changes.
-  //
-  // No feedback loop: padding is inside the border box, so growing it does
-  // not move the scroller's own getBoundingClientRect().bottom.
-  const [composerClearancePx, setComposerClearancePx] = useState(0)
-  useLayoutEffect(() => {
-    const sc = scrollRef.current, box = composerBoxRef.current
-    if (!sc || !box) return
-    const overlap = sc.getBoundingClientRect().bottom - box.getBoundingClientRect().top
-    setComposerClearancePx(overlap > 0 ? Math.round(overlap + 12) : 0)
-  }, [composerKeyboardOpen, composerInsetPx, dockHeightPx])
+  // The header names who this is and, under it, where they are — built from
+  // the same live week the opener reads, so the two cannot disagree. A day
+  // the trainee chose to rest is a rest day here too, not the session they
+  // skipped.
+  const todayDayState = trainingWeek.days.find(d => d.dayName === activeSession.dayName)?.state
+  const todayPlanForHeader = liveWeekDays.find(d => d.day === activeSession.dayName && d.exercises.length > 0)
+  const headerSubtitle = isLoading
+    ? 'Typing…'
+    : `Week ${openerWeek} · ${todayPlanForHeader && todayDayState !== 'rest_chosen' ? `${todayPlanForHeader.focus} today` : 'Rest day'}`
+
+  // RUNS. Consecutive TrAIner messages share one avatar; every message,
+  // every [BREAK]-separated part of one, and every card attached to one is
+  // its own bubble in the run. Computed from the list as it stands — nothing
+  // is stored differently.
+  const runs = groupRuns(messages)
+  const todayKey = activeSession.date
+  // Day dividers only once the thread actually spans days — a lone "Today"
+  // over a fresh conversation is a label with nothing to separate.
+  const showDayDividers = new Set(messages.map(messageDayKey).filter(Boolean)).size > 1
+  let lastDayKey: string | null = null
+
+  // Chips wait for the reveal to finish (buttons popping in mid-sentence
+  // read as broken) — and now also for every held-back bubble of the run to
+  // have landed, since the chips belong to the LAST of them.
+  const lastMsg = messages[messages.length - 1]
+  const lastStillRevealing = !!lastMsg && lastMsg.role === 'assistant' && lastMsg.id != null
+    && (lastMsg.id === animatingMessageId || pendingRevealIds.includes(lastMsg.id))
+  const railOptions = lastStillRevealing ? [] : getQuickRepliesForLastMessage()
+
+  type RunItem =
+    | { kind: 'text'; key: string; msgIndex: number; msg: ChatMessage; text: string; active: boolean; partIndex: number; partCount: number; retry?: 'failed' | 'interrupted' }
+    | { kind: 'typing'; key: string; label?: string }
+    | { kind: 'retry'; key: string; msgIndex: number }
+    | { kind: 'proposal' | 'receipt' | 'clarification'; key: string; msgIndex: number; msg: ChatMessage }
+
+  const buildRunItems = (run: MessageRun): RunItem[] => {
+    const items: RunItem[] = []
+    let heldBubbleShown = false
+    run.messages.forEach((msg, k) => {
+      const msgIndex = run.start + k
+      // Arrived, but not its turn yet: ONE typing bubble stands in for
+      // however many are waiting, so the next message visibly arrives.
+      if (msg.id != null && pendingRevealIds.includes(msg.id)) {
+        if (!heldBubbleShown) { items.push({ kind: 'typing', key: `${msgIndex}-held` }); heldBubbleShown = true }
+        return
+      }
+      if (isInterrupted(msg) && !msg.content) {
+        items.push({ kind: 'typing', key: `${msgIndex}-typing`, label: isRecalibrating ? 'Recalibrating your schedule…' : undefined })
+        if (!isLoading) items.push({ kind: 'retry', key: `${msgIndex}-retry`, msgIndex })
+        return
+      }
+      const parts = splitMessageParts(stripStreamingTags(msg.content))
+      const animating = msg.id != null && msg.id === animatingMessageId
+      // A [BREAK] reply reveals part by part: the current part types out, the
+      // ones before it are frozen, the ones after it are not on screen yet.
+      const shownCount = animating ? Math.min(parts.length, revealPartIndex(msg.id) + 1) : parts.length
+      parts.slice(0, shownCount).forEach((text, p) => {
+        const isLastShown = p === shownCount - 1
+        items.push({
+          kind: 'text', key: `${msgIndex}-${p}`, msgIndex, msg, text,
+          active: animating && isLastShown, partIndex: p, partCount: parts.length,
+          retry: isInterrupted(msg) && isLastShown ? (msg.status === 'failed' ? 'failed' : 'interrupted') : undefined,
+        })
+      })
+      if (animating && shownCount < parts.length) items.push({ kind: 'typing', key: `${msgIndex}-more` })
+      // Cards render the instant they arrive, whatever the text above them
+      // is doing — see TypewriterMarkdown.tsx's header.
+      if (msg.pendingAction && msg.status !== 'failed') items.push({ kind: 'proposal', key: `${msgIndex}-proposal`, msgIndex, msg })
+      if (msg.receipt && msg.status !== 'failed') items.push({ kind: 'receipt', key: `${msgIndex}-receipt`, msgIndex, msg })
+      if (msg.clarification && msg.status !== 'failed') items.push({ kind: 'clarification', key: `${msgIndex}-clarification`, msgIndex, msg })
+    })
+    return items
+  }
+
+  const retryLine = (msgIndex: number, status: ChatMessage['status']) => (
+    <button
+      type="button"
+      className="mt-2 flex items-center gap-1.5 text-xs text-[color:var(--role-warn)] hover:underline"
+      onClick={() => retryMessage(msgIndex)}
+      disabled={isLoading}
+    >
+      {status === 'failed' ? <AlertCircle className="size-3" /> : <RotateCcw className="size-3" />}
+      {status === 'failed' ? 'Response failed — tap to retry' : 'Response interrupted — tap to retry'}
+    </button>
+  )
+
+  const renderRunItem = (it: RunItem, pos: BubblePos) => {
+    const radius = bubbleRadiusClass(pos)
+    switch (it.kind) {
+      case 'typing':
+        return <TypingBubble key={it.key} pos={pos} label={it.label} />
+      case 'retry':
+        return (
+          <button
+            key={it.key}
+            type="button"
+            className={cn('chat-bubble-in flex items-center gap-1.5 bg-card px-3.5 py-2.5 text-xs text-[color:var(--role-warn)] hover:underline', radius)}
+            onClick={() => retryMessage(it.msgIndex)}
+          >
+            <RotateCcw className="size-3" />
+            Response interrupted — tap to retry
+          </button>
+        )
+      case 'text':
+        return (
+          <div key={it.key} className={cn('chat-bubble-in min-w-0', ASSISTANT_BUBBLE_CLASS, radius)}>
+            <TypewriterMarkdown
+              text={it.text}
+              active={it.active}
+              speed={revealSpeed}
+              components={markdownComponents}
+              onDone={() => { if (it.msg.id != null) handlePartDone(it.msg.id, it.partIndex, it.partCount) }}
+            />
+            {it.retry && retryLine(it.msgIndex, it.msg.status)}
+          </div>
+        )
+      case 'proposal':
+        return (
+          <ProposalCard
+            key={it.key}
+            className={radius}
+            pendingAction={it.msg.pendingAction!}
+            onConfirm={scope => handleConfirmProposal(it.msgIndex, scope)}
+            onReject={() => handleRejectProposal(it.msgIndex)}
+          />
+        )
+      case 'receipt': {
+        const receipt = it.msg.receipt!
+        return (
+          <ReceiptCard
+            key={it.key}
+            className={radius}
+            title={receipt.title}
+            rows={receipt.rows}
+            summary={receipt.summary}
+            status={receipt.status}
+            receipt={receipt.result}
+            undoAvailable={!!receipt.undoToken && isWithinUndoWindow(receipt.resolvedAt ?? null)}
+            onUndo={receipt.undoToken ? () => handleUndoReceipt(it.msgIndex) : undefined}
+            onViewProfile={
+              receipt.kind === 'memory_goal_saved' ? () => onOpenProfile?.('goals')
+              : receipt.kind === 'memory_fact_saved' ? () => onOpenProfile?.('facts')
+              : receipt.kind === 'memory_context_fact_saved' ? () => onOpenProfile?.('context')
+              : undefined
+            }
+            onViewGrocery={receipt.kind === 'grocery_item_added' ? onOpenGrocery : undefined}
+            onViewDashboard={receipt.kind === 'water_logged' ? onOpenDashboard : undefined}
+          />
+        )
+      }
+      case 'clarification': {
+        const clarification = it.msg.clarification!
+        return (
+          <ClarificationCard
+            key={it.key}
+            className={radius}
+            contextLines={clarification.contextLines}
+            prompt={clarification.prompt}
+            options={clarification.options}
+            onChoose={async value => {
+              if (navigator.vibrate) navigator.vibrate(10)
+              await handleClarificationChoice(it.msgIndex, value)
+            }}
+          />
+        )
+      }
+    }
+  }
 
   return (
-    <>
-    <Card className="flex flex-col h-[600px] max-h-[80dvh]">
-      <CardContent className="relative flex-1 flex flex-col p-0 overflow-hidden">
+    <div data-chat-tab className="fixed inset-x-0 top-0 z-30 flex flex-col bg-background" style={columnStyle}>
+      {/* HEADER — 64px: the TrAIner's mark, its name, where you are in the
+          plan; Clear chat and (from App.tsx) the settings menu on the right.
+          The lone floating trash icon this replaces was the tab's only
+          chrome. */}
+      <header
+        data-chat-header
+        className="mx-auto flex w-full max-w-6xl shrink-0 items-center gap-3 pl-4 pr-3"
+        style={{ minHeight: 64, paddingTop: 'calc(8px + env(safe-area-inset-top))' }}
+      >
+        <CoachAvatar size={32} />
+        <div className="flex min-w-0 flex-1 flex-col gap-px">
+          <span className="text-[0.9375rem] font-semibold leading-[18px]">Personal TrAIner</span>
+          <span className={cn('truncate text-[0.6875rem] leading-[14px]', isLoading ? 'text-primary' : 'text-muted-foreground')} aria-live="polite">
+            {headerSubtitle}
+          </span>
+        </div>
         <Button
           variant="ghost"
           size="icon-sm"
           onClick={handleClearChat}
           aria-label="Clear chat"
           title="Clear chat"
-          className="absolute top-2 right-2 z-10 bg-background/80 backdrop-blur-sm"
+          className="hit-slop-44 size-8 rounded-xl text-muted-foreground"
         >
           <Trash2 className="size-3.5" />
         </Button>
+        {headerTrailing}
+      </header>
+
+      {/* THREAD. min-h-0: a flex item defaults to min-height:auto and refuses
+          to shrink below its content, so `flex-1 overflow-y-auto` would grow
+          the box instead of scrolling inside it — measured doing exactly that
+          on the onboarding composer. */}
+      <div className="relative min-h-0 flex-1">
         <div
-          // min-h-0: a flex item defaults to min-height:auto and refuses to
-          // shrink below its content, so `flex-1 overflow-y-auto` grows the box
-          // instead of scrolling inside it. Measured doing exactly that on the
-          // onboarding composer (875px of canvas in an 844px viewport,
-          // scrollHeight === clientHeight, every scrollTo a no-op). Added here
-          // by parity — this screen was NOT measured, because the tour
-          // harness's chat tab is a stub rather than the real component.
-          className="flex-1 min-h-0 overflow-y-auto p-4 pb-24 overscroll-contain"
-          // pb-24 stays as the floor for the keyboard-shut case; this only
-          // ever ADDS the measured overlap on top of it.
-          style={composerClearancePx > 0 ? { paddingBottom: composerClearancePx } : undefined}
           ref={scrollRef}
           onScroll={handleScroll}
+          className="h-full overflow-y-auto overscroll-contain px-4 py-2"
         >
-          <div ref={contentRef} className="space-y-4">
+          <div ref={contentRef} className="mx-auto flex w-full max-w-6xl flex-col gap-5">
             {hasMoreMessages && (
               <div className="flex justify-center">
                 <button
@@ -3265,153 +3474,42 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
                 </button>
               </div>
             )}
-            {messages.map((msg, i) => {
-              const isLastAssistant = msg.role === 'assistant' && i === messages.length - 1
-              // Fix — quick-reply buttons must wait for the typewriter reveal
-              // to finish (buttons popping in mid-sentence read as broken).
-              // A message is still revealing exactly when its id equals
-              // animatingMessageId; restored/cached messages never carry
-              // that id in the first place, so they're never held back.
-              const stillRevealing = isLastAssistant && msg.id != null && msg.id === animatingMessageId
-              const quickReplies = isLastAssistant && !stillRevealing ? getQuickRepliesForLastMessage() : []
-              // Turn 6 ("Coach chat — borders out, input fixed"): the
-              // assistant no longer speaks from a bordered/tinted bubble —
-              // it's plain text on the canvas, identified by a small mint
-              // avatar mark instead. Only the user's own messages get a
-              // fill now (a tinted pill with a tail corner), matching the
-              // design doc's own bubble shape. Everything below the bubble
-              // (proposal/receipt/clarification/quick-replies) still
-              // belongs to this turn, so it gets the same left offset as
-              // the avatar column for assistant turns, keeping it aligned
-              // under the text rather than the avatar.
-              const bodyContent = msg.role === 'user' ? (
-                stripStreamingTags(msg.content)
-              ) : isInterrupted(msg) && !msg.content ? (
-                /* Pending placeholder — show loading dots */
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <div className="flex gap-1">
-                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce" />
-                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:150ms]" />
-                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:300ms]" />
-                  </div>
-                  {isRecalibrating ? (
-                    <span className="text-xs">Recalibrating your schedule...</span>
-                  ) : (
-                    <span className="text-xs">Thinking...</span>
-                  )}
-                </div>
-              ) : isInterrupted(msg) && msg.content ? (
-                /* Interrupted/failed with content — show content + retry */
-                <div>
-                  <ReactMarkdown components={markdownComponents}>
-                    {stripStreamingTags(msg.content)}
-                  </ReactMarkdown>
-                  <button
-                    className="mt-2 flex items-center gap-1.5 text-xs text-[color:var(--role-warn)] hover:underline"
-                    onClick={() => retryMessage(i)}
-                    disabled={isLoading}
-                  >
-                    {msg.status === 'failed' ? <AlertCircle className="size-3" /> : <RotateCcw className="size-3" />}
-                    {msg.status === 'failed' ? 'Response failed — tap to retry' : 'Response interrupted — tap to retry'}
-                  </button>
-                </div>
-              ) : (
-                <TypewriterMarkdown
-                  text={stripStreamingTags(msg.content)}
-                  active={msg.id != null && msg.id === animatingMessageId}
-                  speed={revealSpeed}
-                  components={markdownComponents}
-                  onDone={() => setAnimatingMessageId(prev => (prev === msg.id ? null : prev))}
-                />
-              )
+            {runs.map(run => {
+              const dayKey = messageDayKey(run.messages[0])
+              const divider = showDayDividers && dayKey && dayKey !== lastDayKey ? dayDividerLabel(dayKey, todayKey) : null
+              if (dayKey) lastDayKey = dayKey
+              const stamp = showTimestamps ? timeLabel(run.messages[run.messages.length - 1]) : null
+
+              if (run.role === 'user') {
+                const msg = run.messages[0]
+                return (
+                  <Fragment key={msg.id || `run-${run.start}`}>
+                    {divider && <DayDivider label={divider} />}
+                    <div className="flex flex-col items-end gap-1">
+                      <div className={cn('chat-bubble-in max-w-[86%]', USER_BUBBLE_CLASS)}>{stripStreamingTags(msg.content)}</div>
+                      {stamp && <span className="pr-1 text-[0.625rem] leading-[14px] text-muted-foreground">{stamp}</span>}
+                    </div>
+                  </Fragment>
+                )
+              }
+
+              const items = buildRunItems(run)
+              if (items.length === 0) return null
+              const hasCard = items.some(it => it.kind === 'proposal' || it.kind === 'receipt' || it.kind === 'clarification')
               return (
-                <div
-                  key={msg.id || `msg-${i}`}
-                  className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                >
-                  <div className="max-w-[80%]">
-                    {msg.role === 'user' ? (
-                      <div className="rounded-2xl rounded-br-md bg-[rgba(var(--glow-rgb),.14)] px-4 py-2.5 text-sm whitespace-pre-wrap text-foreground">
-                        {bodyContent}
-                      </div>
-                    ) : (
-                      <div className="flex items-start gap-2.5">
-                        <span
-                          className="flex size-[26px] shrink-0 items-center justify-center rounded-full text-[#08281F]"
-                          style={{ background: 'linear-gradient(180deg, color-mix(in oklab, var(--primary) 84%, white), var(--primary-2))', boxShadow: '0 0 18px rgba(var(--glow-rgb),.45)' }}
-                        >
-                          <MessageCircle className="size-3.5" strokeWidth={2.4} />
-                        </span>
-                        <div className="min-w-0 flex-1 pt-0.5 text-sm leading-relaxed text-foreground">
-                          {bodyContent}
-                        </div>
-                      </div>
-                    )}
-                    <div className={msg.role === 'assistant' ? 'pl-9' : undefined}>
-                    {msg.pendingAction && msg.status !== 'failed' && (
-                      <ProposalCard
-                        pendingAction={msg.pendingAction}
-                        onConfirm={scope => handleConfirmProposal(i, scope)}
-                        onReject={() => handleRejectProposal(i)}
-                      />
-                    )}
-                    {msg.receipt && msg.status !== 'failed' && (
-                      <ReceiptCard
-                        title={msg.receipt.title}
-                        rows={msg.receipt.rows}
-                        summary={msg.receipt.summary}
-                        status={msg.receipt.status}
-                        receipt={msg.receipt.result}
-                        undoAvailable={!!msg.receipt.undoToken && isWithinUndoWindow(msg.receipt.resolvedAt ?? null)}
-                        onUndo={msg.receipt.undoToken ? () => handleUndoReceipt(i) : undefined}
-                        onViewProfile={
-                          msg.receipt.kind === 'memory_goal_saved' ? () => onOpenProfile?.('goals')
-                          : msg.receipt.kind === 'memory_fact_saved' ? () => onOpenProfile?.('facts')
-                          : msg.receipt.kind === 'memory_context_fact_saved' ? () => onOpenProfile?.('context')
-                          : undefined
-                        }
-                        onViewGrocery={msg.receipt.kind === 'grocery_item_added' ? onOpenGrocery : undefined}
-                        onViewDashboard={msg.receipt.kind === 'water_logged' ? onOpenDashboard : undefined}
-                      />
-                    )}
-                    {msg.clarification && msg.status !== 'failed' && (
-                      <ClarificationCard
-                        contextLines={msg.clarification.contextLines}
-                        prompt={msg.clarification.prompt}
-                        options={msg.clarification.options}
-                        onChoose={async value => {
-                          if (navigator.vibrate) navigator.vibrate(10)
-                          await handleClarificationChoice(i, value)
-                        }}
-                      />
-                    )}
-                    {/* Retry button for interrupted messages without content */}
-                    {isInterrupted(msg) && !msg.content && !isLoading && (
-                      <button
-                        className="mt-2 flex items-center gap-1.5 text-xs text-[color:var(--role-warn)] hover:underline"
-                        onClick={() => retryMessage(i)}
-                      >
-                        <RotateCcw className="size-3" />
-                        Response interrupted — tap to retry
-                      </button>
-                    )}
-                    {quickReplies.length > 0 && (
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        {quickReplies.map(option => (
-                          <button
-                            key={option}
-                            type="button"
-                            onClick={() => handleQuickReply(option)}
-                            className="rounded-full bg-[color:var(--surface-raised)] px-3 py-2.5 text-xs font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground active:bg-accent/80 min-h-[44px]"
-                          >
-                            {option}
-                          </button>
-                        ))}
-                      </div>
-                    )}
+                <Fragment key={run.messages[0].id || `run-${run.start}`}>
+                  {divider && <DayDivider label={divider} />}
+                  {/* items-end: the avatar sits by the LAST bubble, where the
+                      tail is. A run with a card widens to 92% so the card's
+                      rows and buttons get the room. */}
+                  <div className="flex items-end gap-2.5">
+                    <CoachAvatar />
+                    <div className={cn('flex min-w-0 flex-col items-start gap-1', hasCard ? 'max-w-[92%]' : 'max-w-[86%]')}>
+                      {items.map((it, i) => renderRunItem(it, bubblePos(i, items.length)))}
+                      {stamp && <span className="pl-1 text-[0.625rem] leading-[14px] text-muted-foreground">{stamp}</span>}
                     </div>
                   </div>
-                </div>
+                </Fragment>
               )
             })}
             {!isLoading && lastFailedInput && (
@@ -3432,7 +3530,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
           </div>
         </div>
         {showScrollPill && (
-          <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-10">
+          <div className="absolute bottom-3 left-1/2 z-10 -translate-x-1/2">
             <button
               type="button"
               onClick={() => {
@@ -3447,96 +3545,110 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
             </button>
           </div>
         )}
-      </CardContent>
-    </Card>
-    {/* Turn 6: composer as a fixed-height pill (not three separate bordered
-        controls) — room for two lines before it grows past that, a visible
-        mint send target. Fixed (not sticky) and positioned exactly like
-        BottomDock rides above the tab bar / keyboard — see the comment by
-        useViewportInset's call above for why sticky never worked here. */}
-    <div
-      ref={composerBoxRef}
-      className="fixed left-0 right-0 z-40 mx-auto max-w-6xl px-4 bg-gradient-to-t from-[color:var(--background)] from-60% to-transparent pt-3 pb-3"
-      style={composerBottomStyle}
-    >
-      <div className="flex items-end gap-2.5 rounded-[20px] bg-[color:var(--surface-raised)] py-1.5 pl-4 pr-1.5">
-        <Textarea
-          ref={composerRef}
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder={speech.isListening ? 'Listening…' : 'Ask about your plan or request changes...'}
-          className="min-h-[40px] max-h-[88px] flex-1 resize-none border-0 bg-transparent px-0 py-2 shadow-none focus-visible:ring-0"
-          rows={1}
-        />
-        {speech.isSupported && (
-          <Button
-            type="button"
-            variant={speech.isListening ? 'destructive' : 'ghost'}
-            size="icon"
-            {...keepsComposerFocus}
-            onClick={handleMicClick}
-            onPointerDown={() => {
-              // Long-press (700ms) toggles the on-screen voice-debug trace —
-              // see the TEMPORARY diagnostic comment above voiceDebugOn.
-              // A press-and-hold that doesn't need devtools is the whole
-              // point: this has to be reachable on a phone in the field.
-              micLongPressTimerRef.current = window.setTimeout(() => {
-                micLongPressFiredRef.current = true
-                setVoiceDebugOn(prev => {
-                  const next = !prev
-                  localStorage.setItem('fitplan_voice_debug', next ? '1' : '0')
-                  if (!next) setVoiceDebugLines([])
-                  return next
-                })
-              }, 700)
-            }}
-            onPointerUp={() => { if (micLongPressTimerRef.current) window.clearTimeout(micLongPressTimerRef.current) }}
-            onPointerLeave={() => { if (micLongPressTimerRef.current) window.clearTimeout(micLongPressTimerRef.current) }}
-            aria-label={speech.isListening ? 'Stop voice input' : 'Start voice input'}
-            title={speech.isListening ? 'Stop voice input' : 'Start voice input (hold to toggle debug trace)'}
-            className={cn('hit-slop-44 shrink-0 rounded-full', speech.isListening && 'animate-pulse')}
-          >
-            <Mic className="size-4" />
-          </Button>
-        )}
-        {/* keepsComposerFocus: tapping send used to leave focus on <body> —
-            measured on the onboarding composer, identical shape here — which
-            is a phone putting the keyboard away between every message. */}
-        <Button data-chat-send {...keepsComposerFocus} onClick={() => { sendMessage(); refocusComposer(composerRef.current) }} disabled={!input.trim() || isLoading} size="icon" className="hit-slop-44 shrink-0 rounded-full glow-mint-box" aria-label="Send message">
-          <Send className="size-4" />
-        </Button>
       </div>
-      {speech.permissionError && (
-        <p className="mt-1.5 text-[0.6875rem] text-muted-foreground">{speech.permissionError}</p>
-      )}
-      {voiceDebugOn && (
-        <div className="mt-2 rounded-xl bg-[color:var(--surface-deep)] p-2.5 space-y-1.5">
-          <div className="flex items-center justify-between">
-            <span className="text-[0.625rem] font-semibold uppercase tracking-wide text-muted-foreground">
-              Voice debug trace — hold mic to turn off
-            </span>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                className="text-[0.625rem] text-primary glow-mint"
-                onClick={async () => {
-                  try { await navigator.clipboard.writeText(voiceDebugLines.join('\n')) } catch { /* clipboard unavailable — lines are still on screen to copy manually */ }
-                }}
-              >
-                Copy
-              </button>
-              <button type="button" className="text-[0.625rem] text-muted-foreground" onClick={() => setVoiceDebugLines([])}>Clear</button>
-            </div>
-          </div>
-          <div className="max-h-40 overflow-y-auto font-mono text-[0.625rem] leading-[1.4] text-muted-foreground">
-            {voiceDebugLines.length === 0
-              ? <p className="italic">No events yet — tap the mic and speak.</p>
-              : voiceDebugLines.map((l, i) => <p key={i} className="break-all">{l}</p>)}
-          </div>
+
+      {/* THE RAIL: the model's quick replies, or the first-run starter chips,
+          as one sideways-scrolling row above the composer. Unmounts when
+          there is nothing to offer, so the composer sits straight under the
+          thread. */}
+      {railOptions.length > 0 && (
+        <div className="mx-auto w-full max-w-6xl shrink-0">
+          <QuickReplyRail options={railOptions} onPick={handleQuickReply} disabled={isLoading} />
         </div>
       )}
+
+      {/* COMPOSER: the same pill, now the last child of the column — in
+          flow, on the tab bar, or on the keyboard once that hides the bar.
+          Nothing to measure and nothing to clear. */}
+      <div data-chat-composer className="mx-auto w-full max-w-6xl shrink-0 bg-background px-4 pt-2 pb-3">
+        <div className="flex items-end gap-2.5 rounded-[20px] bg-[color:var(--surface-raised)] py-1.5 pl-4 pr-1.5 transition-shadow focus-within:shadow-[0_0_0_1px_rgba(var(--glow-rgb),.35)]">
+          <Textarea
+            ref={composerRef}
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onFocus={() => scrollToBottom()}
+            placeholder={speech.isListening ? 'Listening…' : 'Message your Personal TrAIner…'}
+            className="min-h-[40px] max-h-[88px] flex-1 resize-none border-0 bg-transparent px-0 py-2 shadow-none focus-visible:ring-0"
+            rows={1}
+          />
+          {speech.isSupported && (
+            <Button
+              type="button"
+              variant={speech.isListening ? 'destructive' : 'ghost'}
+              size="icon"
+              {...keepsComposerFocus}
+              onClick={handleMicClick}
+              onPointerDown={() => {
+                // Long-press (700ms) toggles the on-screen voice-debug trace —
+                // see the TEMPORARY diagnostic comment above voiceDebugOn.
+                // A press-and-hold that doesn't need devtools is the whole
+                // point: this has to be reachable on a phone in the field.
+                micLongPressTimerRef.current = window.setTimeout(() => {
+                  micLongPressFiredRef.current = true
+                  setVoiceDebugOn(prev => {
+                    const next = !prev
+                    localStorage.setItem('fitplan_voice_debug', next ? '1' : '0')
+                    if (!next) setVoiceDebugLines([])
+                    return next
+                  })
+                }, 700)
+              }}
+              onPointerUp={() => { if (micLongPressTimerRef.current) window.clearTimeout(micLongPressTimerRef.current) }}
+              onPointerLeave={() => { if (micLongPressTimerRef.current) window.clearTimeout(micLongPressTimerRef.current) }}
+              aria-label={speech.isListening ? 'Stop voice input' : 'Start voice input'}
+              title={speech.isListening ? 'Stop voice input' : 'Start voice input (hold to toggle debug trace)'}
+              className={cn('hit-slop-44 shrink-0 rounded-full', speech.isListening && 'animate-pulse')}
+            >
+              <Mic className="size-4" />
+            </Button>
+          )}
+          {/* keepsComposerFocus: tapping send used to leave focus on <body> —
+              measured on the onboarding composer, identical shape here — which
+              is a phone putting the keyboard away between every message. */}
+          <Button data-chat-send {...keepsComposerFocus} onClick={() => { sendMessage(); refocusComposer(composerRef.current) }} disabled={!input.trim() || isLoading} size="icon" className="hit-slop-44 shrink-0 rounded-full glow-mint-box" aria-label="Send message">
+            <Send className="size-4" />
+          </Button>
+        </div>
+        {speech.permissionError && (
+          <p className="mt-1.5 text-[0.6875rem] text-muted-foreground">{speech.permissionError}</p>
+        )}
+        {voiceDebugOn && (
+          <div className="mt-2 rounded-xl bg-[color:var(--surface-deep)] p-2.5 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[0.625rem] font-semibold uppercase tracking-wide text-muted-foreground">
+                Voice debug trace — hold mic to turn off
+              </span>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  className="text-[0.625rem] text-primary glow-mint"
+                  onClick={async () => {
+                    try { await navigator.clipboard.writeText(voiceDebugLines.join('\n')) } catch { /* clipboard unavailable — lines are still on screen to copy manually */ }
+                  }}
+                >
+                  Copy
+                </button>
+                <button type="button" className="text-[0.625rem] text-muted-foreground" onClick={() => setVoiceDebugLines([])}>Clear</button>
+              </div>
+            </div>
+            <div className="max-h-40 overflow-y-auto font-mono text-[0.625rem] leading-[1.4] text-muted-foreground">
+              {voiceDebugLines.length === 0
+                ? <p className="italic">No events yet — tap the mic and speak.</p>
+                : voiceDebugLines.map((l, i) => <p key={i} className="break-all">{l}</p>)}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
-    </>
+  )
+}
+
+/** Centred day label between runs, once the thread spans more than one day. */
+function DayDivider({ label }: { label: string }) {
+  return (
+    <div className="flex justify-center">
+      <span className="text-[0.6875rem] uppercase leading-[14px] tracking-[.08em] text-muted-foreground">{label}</span>
+    </div>
   )
 }

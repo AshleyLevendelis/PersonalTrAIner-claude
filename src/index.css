@@ -410,6 +410,23 @@
     .ds-typing-dot { animation: none; opacity: .55; }
   }
 
+  /* Chat, grouped bubbles (3 Sep 2026 handoff). A bubble ARRIVES — 180ms
+   * rise-and-fade — and the typing indicator is three muted dots bouncing
+   * 4px in turn. Both stop under reduced motion; the dots stay visible so a
+   * reply that is being written never looks like nothing is happening. */
+  .chat-bubble-in { animation: chatBubbleIn 180ms cubic-bezier(.2, .8, .2, 1) both; }
+  .chat-typing-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 9999px;
+    background: color-mix(in oklab, var(--muted-foreground) 70%, transparent);
+    animation: chatTypingDot 1s ease-in-out infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .chat-bubble-in { animation: none; }
+    .chat-typing-dot { animation: none; opacity: .7; }
+  }
+
   /* Headline numbers — Nightshift type scale. */
   .ds-num-hero {
     font-size: 2.125rem;
@@ -599,6 +616,14 @@
 @keyframes dsTypingDot {
   0%, 60%, 100% { transform: translateY(0); opacity: .25; }
   30% { transform: translateY(-3px); opacity: 1; }
+}
+@keyframes chatBubbleIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes chatTypingDot {
+  0%, 60%, 100% { transform: translateY(0); }
+  30% { transform: translateY(-4px); }
 }
 @keyframes dsWarnPulse {
   0%, 100% { box-shadow: 0 0 calc(8px * var(--glow-strength)) rgba(255, 180, 84, calc(.7 * var(--glow-strength))); }

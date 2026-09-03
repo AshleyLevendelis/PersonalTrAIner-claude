@@ -410,7 +410,7 @@ console.log('\n6. The first-run starter chips only offer things that work')
   // builder being right is worthless if ChatAssistant hand-rolls the array
   // beside it — that is the two-halves defect this repo keeps hitting.
   check('ChatAssistant builds the intro from buildFirstRunIntro',
-    /setMessages\(buildFirstRunIntro\(/.test(ui))
+    /setMessages\(buildFirstRunIntro\(|const intro = buildFirstRunIntro\([\s\S]{0,600}?setMessages\(intro\)/.test(ui))
   check('...and does not also hand-roll the chips beside it',
     !/quickReplies:\s*FIRST_RUN_QUICK_REPLIES/.test(ui))
 

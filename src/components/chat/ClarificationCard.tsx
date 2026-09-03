@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { Button } from '@/components/ui/button'
 import { HelpCircle } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { CHIP_CLASS } from '@/components/chat/bubbles'
 
 // ---------------------------------------------------------------------------
 // VISION-ARCHITECTURE.md §3.4 — the CLARIFICATION state: something in a
@@ -10,6 +11,9 @@ import { HelpCircle } from 'lucide-react'
 // ProposalCard) — it's the parse asking for the one input it's missing.
 // Generic: renders whatever's already resolved as context, then a single
 // question with tap-to-choose options.
+//
+// Grouped-bubbles revamp (3 Sep 2026): a bubble in the TrAIner's run, the
+// options wearing the same chip the quick-reply rail uses.
 // ---------------------------------------------------------------------------
 
 export interface ClarificationOption {
@@ -22,12 +26,15 @@ export function ClarificationCard({
   prompt,
   options,
   onChoose,
+  className,
 }: {
   /** What's already parsed/resolved, shown as muted context above the question. */
   contextLines?: string[]
   prompt: string
   options: ClarificationOption[]
   onChoose: (value: string) => Promise<void>
+  /** The bubble radius for this card's position in its run (see bubbles.tsx). Defaults to a lone bubble. */
+  className?: string
 }) {
   const [busyValue, setBusyValue] = useState<string | null>(null)
   const [resolved, setResolved] = useState(false)
@@ -43,7 +50,10 @@ export function ClarificationCard({
   }
 
   return (
-    <div className="mt-2 pl-3.5 border-l-2 border-[color:var(--hairline)] text-sm space-y-2">
+    <div
+      data-chat-clarification
+      className={cn('flex w-full flex-col gap-2 bg-card px-3.5 py-3 text-sm shadow-[inset_3px_0_0_var(--primary)]', className ?? 'rounded-[18px]')}
+    >
       {contextLines && contextLines.length > 0 && (
         <div className="space-y-0.5">
           {contextLines.map((line, i) => (
@@ -51,22 +61,22 @@ export function ClarificationCard({
           ))}
         </div>
       )}
-      <p className="flex items-start gap-1.5 text-xs font-medium">
-        <HelpCircle className="size-3.5 mt-0.5 shrink-0 text-primary" />
-        {prompt}
+      <p className="flex items-start gap-2 text-xs font-semibold">
+        <HelpCircle className="mt-px size-3.5 shrink-0 text-primary" />
+        <span>{prompt}</span>
       </p>
       {!resolved && (
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-2 pt-0.5">
           {options.map(opt => (
-            <Button
+            <button
               key={opt.value}
-              variant="outline"
-              className="min-h-[44px] text-xs px-3.5"
+              type="button"
+              className={cn(CHIP_CLASS, 'min-h-[44px]')}
               disabled={busyValue != null}
               onClick={() => handleChoose(opt.value)}
             >
               {busyValue === opt.value ? '…' : opt.label}
-            </Button>
+            </button>
           ))}
         </div>
       )}

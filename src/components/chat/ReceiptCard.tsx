@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { Button } from '@/components/ui/button'
 import { CheckCircle2, AlertTriangle, XCircle } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import type { PendingActionReceipt } from '@/lib/pending-actions-store'
 
 // ---------------------------------------------------------------------------
@@ -8,6 +8,10 @@ import type { PendingActionReceipt } from '@/lib/pending-actions-store'
 // terminal states). Renders what actually happened — never a blanket
 // "Done!" when a partial failure means some ops didn't land. Used both for
 // natural-language logging's receipt and for a confirmed swap's result.
+//
+// Grouped-bubbles revamp (3 Sep 2026): the receipt is a bubble in the
+// TrAIner's run — same shell as ProposalCard (the mint inset edge), the
+// radius for its position supplied by the caller.
 // ---------------------------------------------------------------------------
 
 export interface ReceiptRow {
@@ -15,6 +19,8 @@ export interface ReceiptRow {
   detail: string
   note?: string
 }
+
+const FOOTER_BUTTON = 'h-7 shrink-0 rounded-md bg-transparent px-2 text-[0.6875rem] font-medium transition-colors hover:bg-[rgba(var(--glow-rgb),.08)] disabled:opacity-60'
 
 export function ReceiptCard({
   title,
@@ -28,6 +34,7 @@ export function ReceiptCard({
   onViewProfile,
   onViewGrocery,
   onViewDashboard,
+  className,
 }: {
   title: string
   rows: ReceiptRow[]
@@ -43,6 +50,8 @@ export function ReceiptCard({
   onViewGrocery?: () => void
   /** VISION-ARCHITECTURE.md §5.4 — present only for water_logged receipts, deep-links to the Dashboard tab. */
   onViewDashboard?: () => void
+  /** The bubble radius for this card's position in its run (see bubbles.tsx). Defaults to a lone bubble. */
+  className?: string
 }) {
   const [busy, setBusy] = useState<'undo' | string | null>(null)
 
@@ -67,42 +76,47 @@ export function ReceiptCard({
   }
 
   const icon = status === 'done'
-    ? <CheckCircle2 className="size-3.5 text-primary shrink-0" />
+    ? <CheckCircle2 className="size-3.5 shrink-0 text-primary" />
     : status === 'partial'
-      ? <AlertTriangle className="size-3.5 text-[color:var(--role-warn)] shrink-0" />
-      : <XCircle className="size-3.5 text-destructive shrink-0" />
+      ? <AlertTriangle className="size-3.5 shrink-0 text-[color:var(--role-warn)]" />
+      : <XCircle className="size-3.5 shrink-0 text-destructive" />
+
+  const hasFooter = !!summary || !!onViewProfile || !!onViewGrocery || !!onViewDashboard || (undoAvailable && !!onUndo)
 
   return (
-    <div className="mt-2 pl-3.5 border-l-2 border-[color:var(--hairline)] text-sm space-y-2">
-      <p className="flex items-center gap-1.5 text-xs font-medium">
+    <div
+      data-chat-receipt
+      className={cn('flex w-full flex-col gap-2 bg-card px-3.5 py-3 text-sm shadow-[inset_3px_0_0_var(--primary)]', className ?? 'rounded-[18px]')}
+    >
+      <p className="flex items-center gap-2 text-xs font-semibold">
         {icon}
-        {title}
+        <span>{title}</span>
       </p>
 
       {rows.length > 0 && (
-        <div className="space-y-1">
+        <div className="flex flex-col gap-1">
           {rows.map((row, i) => (
             <div key={i} className="text-xs">
-              <div className="flex items-baseline justify-between gap-2">
+              <div className="flex items-baseline justify-between gap-3">
                 <span className="font-medium">{row.label}</span>
-                <span className="text-muted-foreground">{row.detail}</span>
+                <span className="tabular-mono text-right text-muted-foreground">{row.detail}</span>
               </div>
-              {row.note && <p className="text-[0.625rem] text-muted-foreground/80 pl-2">{row.note}</p>}
+              {row.note && <p className="text-[0.625rem] text-muted-foreground/80">{row.note}</p>}
             </div>
           ))}
         </div>
       )}
 
       {status === 'partial' && receipt && receipt.failed.length > 0 && (
-        <div className="space-y-1 rounded-sm bg-[color:var(--role-warn-bg)] p-2">
+        <div className="space-y-1 rounded-lg bg-[color:var(--role-warn-bg)] p-2">
           <p className="text-[0.6875rem] text-[color:var(--role-warn-text)]">Didn't land:</p>
           {receipt.failed.map((f, i) => (
             <div key={i} className="flex items-center justify-between gap-2 text-[0.6875rem]">
               <span>{f.op} — {f.error}</span>
               {onRetryFailed && (
-                <Button size="sm" variant="ghost" className="h-5 px-1.5 text-[0.625rem]" disabled={busy != null} onClick={() => handleRetry(f.op)}>
+                <button type="button" className={cn(FOOTER_BUTTON, 'text-primary')} disabled={busy != null} onClick={() => handleRetry(f.op)}>
                   {busy === f.op ? '…' : 'Retry'}
-                </Button>
+                </button>
               )}
             </div>
           ))}
@@ -113,31 +127,33 @@ export function ReceiptCard({
         <p className="text-xs text-destructive">Nothing was applied — {receipt?.failed[0]?.error ?? 'the write failed'}.</p>
       )}
 
-      <div className="flex items-center justify-between pt-0.5">
-        {summary && <p className="text-[0.625rem] text-muted-foreground">{summary}</p>}
-        <div className="flex items-center gap-1 ml-auto">
-          {onViewProfile && (
-            <Button size="sm" variant="ghost" className="h-6 text-[0.6875rem]" onClick={onViewProfile}>
-              View in profile
-            </Button>
-          )}
-          {onViewGrocery && (
-            <Button size="sm" variant="ghost" className="h-6 text-[0.6875rem]" onClick={onViewGrocery}>
-              View list
-            </Button>
-          )}
-          {onViewDashboard && (
-            <Button size="sm" variant="ghost" className="h-6 text-[0.6875rem]" onClick={onViewDashboard}>
-              View
-            </Button>
-          )}
-          {undoAvailable && onUndo && (
-            <Button size="sm" variant="ghost" className="h-6 text-[0.6875rem]" disabled={busy != null} onClick={handleUndo}>
-              {busy === 'undo' ? 'Undoing…' : 'Undo'}
-            </Button>
-          )}
+      {hasFooter && (
+        <div className="flex items-center justify-between gap-3 pt-0.5">
+          {summary ? <p className="text-[0.625rem] text-muted-foreground">{summary}</p> : <span />}
+          <div className="flex shrink-0 items-center gap-1">
+            {onViewProfile && (
+              <button type="button" className={cn(FOOTER_BUTTON, 'text-[color:var(--text-tertiary)]')} onClick={onViewProfile}>
+                View in profile
+              </button>
+            )}
+            {onViewGrocery && (
+              <button type="button" className={cn(FOOTER_BUTTON, 'text-[color:var(--text-tertiary)]')} onClick={onViewGrocery}>
+                View list
+              </button>
+            )}
+            {onViewDashboard && (
+              <button type="button" className={cn(FOOTER_BUTTON, 'text-[color:var(--text-tertiary)]')} onClick={onViewDashboard}>
+                View
+              </button>
+            )}
+            {undoAvailable && onUndo && (
+              <button type="button" className={cn(FOOTER_BUTTON, 'text-primary')} disabled={busy != null} onClick={handleUndo}>
+                {busy === 'undo' ? 'Undoing…' : 'Undo'}
+              </button>
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }

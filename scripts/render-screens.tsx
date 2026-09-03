@@ -40,7 +40,7 @@
 // ---------------------------------------------------------------------------
 
 import React from 'react'
-import { MessageCircle, Send, Dumbbell } from 'lucide-react'
+import { Send, Dumbbell } from 'lucide-react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { execFileSync } from 'node:child_process'
 import { readFileSync, writeFileSync, mkdirSync, readdirSync, existsSync } from 'node:fs'
@@ -55,6 +55,8 @@ import { LoadCeilingPrompt } from '@/components/exercise/LoadCeilingPrompt'
 import { SlotChipsCard } from '@/components/onboarding/SlotChipsCard'
 import { buildOnboardingIntro } from '@/lib/first-run-intro'
 import { initialSlotValues, ONBOARDING_SLOTS } from '@/lib/onboarding-slots'
+import { cn } from '@/lib/utils'
+import { CoachAvatar, QuickReplyRail, ASSISTANT_BUBBLE_CLASS, bubbleRadiusClass, bubblePos } from '@/components/chat/bubbles'
 import { buildFirstRunIntro } from '@/lib/first-run-intro'
 import type { UserProfile, WorkoutDay, EquipmentAccess } from '@/lib/types'
 
@@ -136,10 +138,11 @@ function worstDay(days: WorkoutDay[]): WorkoutDay {
  * The first-run intro, at phone width.
  *
  * ChatAssistant itself cannot render here — it needs a live session, a
- * profile and a Supabase client, so it lands in `skipped`. The message-row
- * markup below is therefore a REPLICA of ChatAssistant's assistant turn
- * (avatar column, max-w-[80%], pl-9 offset, the quick-reply pill classes),
- * copied class-for-class.
+ * profile and a Supabase client, so it lands in `skipped`. The run below is
+ * therefore built from the SAME pieces ChatAssistant renders with
+ * (bubbles.tsx: the avatar, the per-position radii, the bubble and chip
+ * classes, the rail), so the chrome cannot drift class-for-class the way a
+ * hand copy did three times over.
  *
  * What is NOT a replica is the part that matters: the words and the chips
  * come from buildFirstRunIntro — the same function the app calls — so the
@@ -161,40 +164,24 @@ function FirstRunChat() {
     blocks: 4,
     startsLight: true,
   })
+  // One run: one avatar, one bubble per intro message, the chips in the rail
+  // under the thread exactly where the real tab puts them.
+  const chips = intro[intro.length - 1]?.quickReplies ?? []
   return (
-    <div className="space-y-3 px-4 py-3">
-      {intro.map((msg, i) => (
-        <div key={i} className="flex justify-start">
-          <div className="max-w-[80%]">
-            <div className="flex items-start gap-2.5">
-              <span
-                className="flex size-[26px] shrink-0 items-center justify-center rounded-full text-[#08281F]"
-                style={{ background: 'linear-gradient(180deg, color-mix(in oklab, var(--primary) 84%, white), var(--primary-2))', boxShadow: '0 0 18px rgba(var(--glow-rgb),.45)' }}
-              >
-                <MessageCircle className="size-3.5" strokeWidth={2.4} />
-              </span>
-              <div className="min-w-0 flex-1 pt-0.5 text-sm leading-relaxed text-foreground">
+    <div className="flex flex-col gap-2 py-2">
+      <div className="px-4">
+        <div className="flex items-end gap-2.5">
+          <CoachAvatar />
+          <div className="flex min-w-0 max-w-[86%] flex-col items-start gap-1">
+            {intro.map((msg, i) => (
+              <div key={i} className={cn(ASSISTANT_BUBBLE_CLASS, bubbleRadiusClass(bubblePos(i, intro.length)))}>
                 {msg.content}
               </div>
-            </div>
-            {msg.quickReplies && msg.quickReplies.length > 0 && (
-              <div className="pl-9">
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {msg.quickReplies.map(option => (
-                    <button
-                      key={option}
-                      type="button"
-                      className="rounded-full bg-[color:var(--surface-raised)] px-3 py-2.5 text-xs font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground active:bg-accent/80 min-h-[44px]"
-                    >
-                      {option}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
+            ))}
           </div>
         </div>
-      ))}
+      </div>
+      {chips.length > 0 && <QuickReplyRail options={chips} onPick={() => {}} />}
     </div>
   )
 }

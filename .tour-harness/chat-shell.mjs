@@ -7,11 +7,18 @@
 // in the REAL container App.tsx puts it in (.tour-harness/chat.tsx).
 //
 // WHAT IT FOUND, before anything was changed, at 390x844 with a 336px
-// keyboard: the Card is `h-[600px]` (48-648) while the composer is fixed to
-// the VIEWPORT. Keyboard shut they never meet (composer 704-780). Keyboard up
-// the composer rides to 416 — 232px INSIDE the card — and the newest message,
+// keyboard: the Card was `h-[600px]` (48-648) while the composer was fixed to
+// the VIEWPORT. Keyboard shut they never met (composer 704-780). Keyboard up
+// the composer rode to 416 — 232px INSIDE the card — and the newest message,
 // at 512-552, was entirely behind it. The scroller reserved a static 96px
 // that never grew.
+//
+// SINCE THE GROUPED-BUBBLES LAYOUT (3 Sep 2026) there is no card and no
+// fixed composer: the chat is one viewport-pinned column and the composer is
+// its last child, in flow. The question this harness asks is unchanged — is
+// the newest message ever under the composer? — but the mechanism it checks
+// is now "the thread ends above the composer" rather than "the thread padded
+// itself by the measured overlap".
 //
 // TWO HEADLESS FACTS THIS HARNESS DEPENDS ON, both learned the hard way:
 //   1. A headless page is NOT focused, so element.focus() sets activeElement
@@ -26,9 +33,11 @@
 import { createServer } from 'http'
 import { readFileSync, existsSync, statSync } from 'fs'
 import { join, extname } from 'path'
+import { tmpdir } from 'os'
+import { fileURLToPath } from 'url'
 import { spawn } from 'child_process'
 
-const DIST = new URL('./dist/', import.meta.url).pathname
+const DIST = fileURLToPath(new URL('./dist/', import.meta.url))
 const T = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' }
 const server = createServer((q, r) => {
   const p = q.url.split('?')[0].split('#')[0]
@@ -40,8 +49,10 @@ const server = createServer((q, r) => {
 await new Promise(r => server.listen(0, r))
 const port = server.address().port
 
-const chrome = spawn('/opt/pw-browsers/chromium',
-  ['--headless=new', '--remote-debugging-port=9365', '--no-sandbox', '--disable-gpu', 'about:blank'], { stdio: 'ignore' })
+// The sandbox's Chromium by default; CHROMIUM_PATH points at a local Chrome
+// on a developer machine (Windows: C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe).
+const chrome = spawn(process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium',
+  ['--headless=new', `--user-data-dir=${join(tmpdir(), 'chat-shell-chromium')}`, '--remote-debugging-port=9365', '--no-sandbox', '--disable-gpu', 'about:blank'], { stdio: 'ignore' })
 const wait = ms => new Promise(r => setTimeout(r, ms))
 let target
 for (let i = 0; i < 80; i++) {
@@ -91,7 +102,10 @@ function measure() {
     const s = getComputedStyle(e); return (s.overflowY === 'auto' || s.overflowY === 'scroll') && e.scrollHeight > 200
   })
   if (!scroller) return { error: 'no scrolling message list found' }
-  const composer = ta.closest('[class*="fixed"]')
+  // The composer is the column's last child, marked so this never has to
+  // guess from a class name (the column itself is the fixed element now).
+  const composer = ta.closest('[data-chat-composer]')
+  if (!composer) return { error: 'no [data-chat-composer] around the textarea' }
   scroller.scrollTo({ top: scroller.scrollHeight })
   const last = scroller.firstElementChild ? scroller.firstElementChild.lastElementChild : null
   const r = e => { if (!e) return null; const b = e.getBoundingClientRect(); return { top: Math.round(b.top), bottom: Math.round(b.bottom) } }
@@ -101,6 +115,9 @@ function measure() {
     composer: r(composer), lastMessage: r(last),
     // Positive means the composer is sitting ON TOP of the newest message.
     newestCoveredPx: last ? Math.round(last.getBoundingClientRect().bottom - composer.getBoundingClientRect().top) : null,
+    // Positive means the scroller's box extends under the composer — the
+    // structural guarantee the in-flow column makes.
+    scrollerUnderComposerPx: Math.round(scroller.getBoundingClientRect().bottom - composer.getBoundingClientRect().top),
     tabBarPresent: !!document.querySelector('[data-slot="tab-bar"], nav'),
   }
 }
@@ -113,9 +130,10 @@ check('the real ChatAssistant mounted (sanity check on the harness)', !shut.erro
 check('a seeded conversation actually overflows the card, so this is not an empty thread',
   shut.scrollable === true, shut)
 check('the newest message is not under the composer', shut.newestCoveredPx < 0, shut)
-console.log(`      composer ${shut.composer?.top}-${shut.composer?.bottom}, newest message ends ${shut.lastMessage?.bottom}, pad ${shut.padBottom}`)
+check('...because the thread ends where the composer begins, structurally', shut.scrollerUnderComposerPx <= 0, shut)
+console.log(`      composer ${shut.composer?.top}-${shut.composer?.bottom}, newest message ends ${shut.lastMessage?.bottom}, scroller ends ${shut.scrollerUnderComposerPx}px before the composer`)
 
-console.log('\n[2] Keyboard up — the state where the fixed composer rides into the fixed-height card')
+console.log('\n[2] Keyboard up — the tab bar goes, the column shrinks to the keyboard, the composer rides it')
 const forced = await call(forceKeyboard, 336)
 check('the app really believes a keyboard is open (else this whole section is vacuous)',
   forced.computedInset === 336 && forced.focused === 'TEXTAREA' && forced.spy.focusin > 0, forced)
@@ -124,9 +142,9 @@ const open = await call(measure)
 check('the tab bar gets out of the way', open.tabBarPresent === false, open.tabBarPresent)
 check('the composer rides above the keyboard', open.composer.bottom <= 844 - 336, open.composer)
 check('THE NEWEST MESSAGE IS STILL VISIBLE — the whole point', open.newestCoveredPx < 0, open)
-check('...because the thread reserved room for the composer rather than a fixed 96px',
-  parseInt(open.padBottom, 10) > 96, open.padBottom)
-console.log(`      composer ${open.composer.top}-${open.composer.bottom}, newest message ends ${open.lastMessage?.bottom}, pad ${open.padBottom}`)
+check('...because the thread still ends where the composer begins, with no clearance maths',
+  open.scrollerUnderComposerPx <= 0, open)
+console.log(`      composer ${open.composer.top}-${open.composer.bottom}, newest message ends ${open.lastMessage?.bottom}, scroller ends ${open.scrollerUnderComposerPx}px before the composer`)
 
 chrome.kill(); server.close()
 if (failures > 0) { console.error(`\n${failures} check(s) failed\n`); process.exit(1) }
