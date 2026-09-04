@@ -34,7 +34,7 @@ import { validateMealAgainstDiet } from './diet-rules'
 import { containsPhrase } from './meal-ingredients'
 import { parseIngredientLines, scaleToTarget, isWithinCalorieTolerance, meetsProteinFloor } from './portion-scaler'
 import type { MacroTargets, CookingTimePreference, BreakfastStyle } from './types'
-import { getPools, type MealSlotName } from './meal-store'
+import { getPools, USER_REQUESTED_TAG, type MealSlotName } from './meal-store'
 
 export const MIN_COVERAGE = 0.8
 export const DEFAULT_POOL_SIZE = 5
@@ -624,6 +624,31 @@ async function persistPools(profileId: string, accepted: Partial<Record<MealSlot
   for (const [slot, options] of Object.entries(accepted) as [MealSlotName, PoolOption[]][]) {
     if (options.length === 0) continue
 
+    // MEALS THE USER ASKED FOR SURVIVE THE DELETE. Read them out before
+    // wiping the slot and re-insert them after the new options.
+    //
+    // Ashley, 3 Sep 2026: she asked the coach for steak, it was added, then
+    // "Regenerate all" replaced the whole pool and the steak was gone. Her
+    // ruling: regeneration replaces what the APP suggested, not what she
+    // asked for by name. This is the one place the delete happens, so fixing
+    // it here means regenerate-all and regenerate-one-slot both honour that
+    // — rather than one button keeping her meals and the other not.
+    // Filtered in JS rather than with a .contains() array predicate. The
+    // first cut used .contains('tags', [...]) — correct against Postgres, but
+    // the test harness's Supabase mock has no such method, so every meal gate
+    // crashed and the quality sweep produced empty pools. A predicate the
+    // suite cannot execute is one the suite cannot check; reading the slot's
+    // rows and filtering here needs nothing beyond .select().eq(), which
+    // every path already relies on.
+    const { data: keepRows } = await supabase
+      .from('meal_plan_slots')
+      .select('name, ingredients, macros, tags')
+      .eq('profile_id', profileId)
+      .eq('slot', slot)
+    const keep = (keepRows ?? []).filter(
+      (row: { tags?: string[] | null }) => (row.tags ?? []).includes(USER_REQUESTED_TAG),
+    )
+
     await supabase.from('meal_plan_slots').delete().eq('profile_id', profileId).eq('slot', slot)
 
     const rows = options.map((opt, i) => ({
@@ -635,7 +660,19 @@ async function persistPools(profileId: string, accepted: Partial<Record<MealSlot
       macros: { kcal: opt.macros.calories, protein: opt.macros.protein, carbs: opt.macros.carbs, fat: opt.macros.fat },
       tags: opt.tags,
     }))
-    const { error } = await supabase.from('meal_plan_slots').insert(rows)
+    // Appended AFTER the fresh options, keeping pool_index contiguous. Their
+    // macros are re-inserted exactly as stored — a meal she chose is not
+    // re-costed or re-portioned behind her back.
+    const keptRows = keep.map((row, i) => ({
+      profile_id: profileId,
+      slot,
+      pool_index: options.length + i,
+      name: row.name,
+      ingredients: row.ingredients,
+      macros: row.macros,
+      tags: row.tags,
+    }))
+    const { error } = await supabase.from('meal_plan_slots').insert([...rows, ...keptRows])
     if (error) console.error(`Failed to persist pool for slot ${slot}:`, error)
   }
 }

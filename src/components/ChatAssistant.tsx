@@ -1173,7 +1173,12 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     }
   }
 
-  // Helper: persist user message to Supabase (fire-and-forget)
+  // Helper: persist user message to Supabase (fire-and-forget). The message
+  // is already showing on screen from local state, so a failed insert here
+  // is invisible in the moment -- it only surfaces later, as a message that
+  // vanishes from the transcript on the next reload. Logged so a genuine
+  // pattern (an RLS policy, a network run of bad luck) is traceable instead
+  // of silent, same convention as onMealSwapApplied's pool re-read.
   const persistUserMessage = (text: string) => {
     if (!profile.id) return
     supabase.from('chat_messages').insert({
@@ -1181,7 +1186,9 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       role: 'user',
       content: text,
       status: 'complete',
-    }).then()
+    }).then(({ error }) => {
+      if (error) console.error('persistUserMessage: insert failed -- this message will not survive a reload', error)
+    })
   }
 
   // Helper: insert placeholder for assistant response, returns its DB id
@@ -1200,14 +1207,19 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     return data?.id
   }
 
-  // Helper: update placeholder row with final content
+  // Helper: update placeholder row with final content. If this fails the
+  // placeholder row is stuck at status 'pending' with empty content forever
+  // -- a ghost "..." message that reappears every reload, because nothing
+  // else ever revisits this row. Logged for the same reason as above.
   const finalizePlaceholder = (placeholderId: string | undefined, content: string, status: 'complete' | 'failed', action?: PlanAction) => {
     if (!placeholderId || !profile.id) return
     supabase.from('chat_messages').update({
       content,
       status,
       action_data: action || null,
-    }).eq('id', placeholderId).then()
+    }).eq('id', placeholderId).then(({ error }) => {
+      if (error) console.error('finalizePlaceholder: update failed -- this placeholder will show as stuck pending on reload', error)
+    })
   }
 
   /** Client-authored copy for a proposal turn — D1 means the model's own text for this turn is never rendered, only this. */
@@ -2474,7 +2486,9 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     ))
 
     if (failedMsg.id && profile.id) {
-      supabase.from('chat_messages').update({ status: 'pending', content: '' }).eq('id', failedMsg.id).then()
+      supabase.from('chat_messages').update({ status: 'pending', content: '' }).eq('id', failedMsg.id).then(({ error }) => {
+        if (error) console.error('retryMessage: could not reset the failed row to pending -- it will still read as failed on reload even if the retry below succeeds', error)
+      })
     }
 
     try {
@@ -2665,7 +2679,17 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     setLastFailedInput(null)
     if (profile.id) {
       clearChatCache(profile.id)
-      supabase.from('chat_messages').delete().eq('profile_id', profile.id).then()
+      // The comment above promises "a reload doesn't resurrect the old
+      // conversation" -- a promise this .then() used to make no attempt to
+      // keep. A failed delete left every old row in place while the screen
+      // showed a fresh greeting, so the FIRST time anyone would learn the
+      // clear didn't take was reloading and watching the old conversation
+      // come back. Logged now; still fire-and-forget (the local reset
+      // already happened and there's no undo to offer), but at least
+      // traceable instead of a silent no-op.
+      supabase.from('chat_messages').delete().eq('profile_id', profile.id).then(({ error }) => {
+        if (error) console.error('handleClearChat: server-side delete failed -- old messages will reappear on the next reload', error)
+      })
     }
   }
 

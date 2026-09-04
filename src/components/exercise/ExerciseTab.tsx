@@ -154,7 +154,7 @@ export function ExerciseTab({
         onBanExercise={onBanExercise}
         onOpenPlateCalc={handleOpenPlateCalc}
         onOpenHistory={(id, name) => setHistoryTarget({ exerciseId: id, exerciseName: name })}
-          onOpenDetail={(name: string) => setDetailTarget(name)}
+        onOpenDetail={(name: string) => setDetailTarget(name)}
         onOpenSessionHistory={() => setSessionHistoryOpen(true)}
       />
       <SwapDialog
@@ -169,6 +169,20 @@ export function ExerciseTab({
         open={plateCalcOpen}
         onOpenChange={setPlateCalcOpen}
         initialWeight={plateCalcWeight}
+      />
+      {/* MUST BE RENDERED IN THIS BRANCH TOO. It used to live only in the
+          Full Program branch above, while this branch still passed
+          onOpenDetail to TodayPanel — so on the session screen the "How to do
+          it" menu item appeared, set detailTarget, and nothing was listening.
+          A dead control, reported by Ashley from her phone on 3 Sep 2026.
+          The two branches already duplicate SwapDialog and
+          ExerciseHistoryDialog; this follows that shape rather than
+          restructuring the file. test:exercise-detail now pins that BOTH
+          branches render it. */}
+      <ExerciseDetailDialog
+        open={!!detailTarget}
+        onOpenChange={open => { if (!open) setDetailTarget(null) }}
+        exerciseName={detailTarget}
       />
       <ExerciseHistoryDialog
         open={!!historyTarget}

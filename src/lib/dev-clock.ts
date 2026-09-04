@@ -94,8 +94,13 @@ export function setDevBypassLocks(userId: string, bypass: boolean): void {
 
 export function isDevAccount(profile: UserProfile | null): boolean {
   if (!profile) return false
-  const email = (profile as any).email || ''
-  if (email.includes('test.local') || email.includes('@dev.')) return true
+  // The email-domain check this used to have ("test.local" / "@dev.") read
+  // (profile as any).email -- UserProfile has never carried an email field,
+  // at the type level or the database's (no fitness_profiles.email column
+  // in any migration), so that branch could never once fire. The `as any`
+  // is what let it compile anyway. Removed rather than wired up: whether a
+  // profile should carry an email at all is a data-model question, not a
+  // one-line fix, and the working path below already covers dev access.
   try {
     return localStorage.getItem('fitplan_dev_mode') === 'true'
   } catch {

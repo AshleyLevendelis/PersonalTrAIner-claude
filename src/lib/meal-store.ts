@@ -303,6 +303,19 @@ export async function getTodayLedger(
 // ---------------------------------------------------------------------------
 
 /** Reads a profile's full stored pool, grouped by slot and ordered by pool_index. Empty object (not an error) when nothing has been generated yet. */
+/**
+ * Marks a pool option the USER explicitly asked for, rather than one the app
+ * suggested. Written by executeMealAddition; read by persistPools, which
+ * carries such options through a regeneration instead of deleting them.
+ *
+ * Ashley's ruling, 3 Sep 2026, after asking the coach for steak and then
+ * losing it to "Regenerate all": regeneration replaces the app's OWN
+ * suggestions; a meal she asked for by name survives. Her words for the
+ * alternative: a button called "regenerate" silently undoing a request she
+ * made two minutes earlier.
+ */
+export const USER_REQUESTED_TAG = 'user-requested'
+
 export async function getPools(profileId: string): Promise<Partial<Record<MealSlotName, PoolOption[]>>> {
   const { data, error } = await supabase
     .from('meal_plan_slots')

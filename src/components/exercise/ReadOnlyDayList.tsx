@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { ArrowRightLeft, BookOpen, Ban, History, MoreVertical } from 'lucide-react'
+import { ArrowRightLeft, BookOpen, Ban, History, Info, MoreVertical } from 'lucide-react'
 import { formatRampSets, groupExercises, mainLiftGroupIndex, type ExerciseGroup } from '@/lib/session-derive'
 import { getExerciseId } from '@/lib/exercise-db'
 import { RampStrip } from './RampStrip'
@@ -63,6 +63,22 @@ export function ReadOnlyDayList({
   className,
 }: ReadOnlyDayListProps) {
   const [explainedKey, setExplainedKey] = useState<string | null>(null)
+  // WHY THIS EXERCISE, on the browse surface too. Separate from explainedKey
+  // above, which explains the WEIGHT — two different questions, and a shared
+  // key would make opening one close the other.
+  //
+  // VISION.md calls the rationale "the clearest signal that a coach designed
+  // the session rather than a filter". It shipped on today's session rows
+  // (ExerciseRow) and never here, so the whole Full Program view — the one
+  // place you go to understand the SHAPE of the plan — showed none of it.
+  // Measured across a 64-plan sweep: 4,292 of 24,592 exercise slots (17.5%)
+  // carry a note, in 60 of the 64 plans. All of it was invisible while
+  // browsing.
+  //
+  // Exactly the asymmetry that made "How to do it" dead on the session
+  // screen, in the other direction — which is what this file's own header
+  // warns about: sharing the row was never enough.
+  const [explainedPickKey, setExplainedPickKey] = useState<string | null>(null)
   const [expandedKey, setExpandedKey] = useState<string | null>(null)
 
   const groups = groupExercises(workout.exercises)
@@ -133,6 +149,43 @@ export function ReadOnlyDayList({
               explained={explainedKey === key}
               onToggleExplain={() => setExplainedKey(prev => (prev === key ? null : key))}
             />
+            {/* REST, which no browse surface showed at all. ExerciseLine's
+                summary carries sets×reps · load · assist · tempo and stops
+                there, so the rest prescription existed only inside a live
+                session, as the timer's duration.
+                That is a real gap: this repo treats rest as safety-relevant
+                enough to have a hard floor per goal, and Ashley's 3 Sep 2026
+                ruling — two minutes on a loaded main lift, conditioning keeps
+                90 seconds — was invisible on the one screen where you would
+                go to check it. (The handover even told her to verify it on
+                the Full Program screen, which could not be done.)
+                In the expanded body rather than the summary line, for the
+                same reason the ramp ladder is: it is worth one tap, and the
+                collapsed row is already dense. */}
+            {ex.rest && (
+              <p className="text-[0.625rem] text-muted-foreground">
+                Rest <span className="tabular-mono">{ex.rest === 'alternate' ? 'alternate — no rest between' : ex.rest}</span>
+              </p>
+            )}
+            {/* Same control, same words and same behaviour as today's rows in
+                ExerciseRow.tsx — a note that reads one way on one screen and
+                another way on the next is the drift this file exists to stop. */}
+            {ex.selection_note && (
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setExplainedPickKey(prev => (prev === key ? null : key))}
+                  aria-label="Why this exercise"
+                  className="inline-flex items-center gap-1 text-muted-foreground/60 hover:text-muted-foreground"
+                >
+                  <Info className="size-2.5" />
+                  <span className="text-[0.5625rem] italic">why this exercise</span>
+                </button>
+                {explainedPickKey === key && (
+                  <p className="mt-0.5 text-[0.625rem] text-muted-foreground/80 italic max-w-xs">{ex.selection_note}</p>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>

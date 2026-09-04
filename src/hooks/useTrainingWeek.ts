@@ -127,6 +127,19 @@ export function useTrainingWeek(
    * first day either side of midnight.
    */
   planCreatedAt?: string,
+  /**
+   * Bumped by the caller when something OUTSIDE this hook has changed a day
+   * — today: App's logsVersion, which the chat's rest-day/session writes
+   * increment through onLogsUpdated.
+   *
+   * Without it the strip was write-blind. `refresh` keys on profile and date
+   * only, so a rest day marked from the chat landed in workout_sessions and
+   * the strip kept its stale glyph until a remount. Ashley reported exactly
+   * that on 3 Sep 2026: "I marked a day as rest but nothing was changed."
+   * The write HAD happened; the strip simply never re-read it. Same idiom
+   * ActiveSessionProvider already uses for the same reason.
+   */
+  refreshToken?: number,
 ): TrainingWeekResult {
   const [dashboard, setDashboard] = useState<WeeklyDashboardDay[]>([])
   const [loading, setLoading] = useState(false)
@@ -141,7 +154,11 @@ export function useTrainingWeek(
       .then(setDashboard)
       .catch(console.error)
       .finally(() => setLoading(false))
-  }, [profileId, sessionDate])
+    // refreshToken is intentionally a dependency and intentionally unused
+    // in the body — it exists to force this callback (and the effect below
+    // that runs it) to re-fire when a day changed underneath us.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profileId, sessionDate, refreshToken])
 
   useEffect(() => {
     refresh()

@@ -24,6 +24,7 @@
 // of one tap given in a bad mood is worse than one that asks.
 // ---------------------------------------------------------------------------
 import { supabase } from './supabase'
+import { getLocalDateString } from './dev-clock'
 import { FEEL_SCALE, type SessionFeel } from './types'
 
 export interface AnsweredSession {
@@ -170,7 +171,14 @@ export interface FeelContext {
 export async function loadFeelContext(profileId: string, todayDate: string): Promise<FeelContext> {
   const earliest = new Date(`${todayDate}T00:00:00`)
   earliest.setDate(earliest.getDate() - ASK_WITHIN_DAYS)
-  const earliestDate = earliest.toISOString().slice(0, 10)
+  // getLocalDateString, NOT toISOString().slice(0, 10) — which is what this
+  // shipped with, three lines under a comment warning about exactly it.
+  // `earliest` is a LOCAL midnight; slicing its UTC form moves it back a day
+  // for every trainee east of UTC, so ASK_WITHIN_DAYS silently became four
+  // days there and the coach asked about a session too old to remember
+  // honestly. Caught by test:local-dates §3 on 3 Sep 2026, after it had
+  // already merged.
+  const earliestDate = getLocalDateString(earliest)
 
   const [awaitingRes, answeredRes] = await Promise.all([
     supabase
