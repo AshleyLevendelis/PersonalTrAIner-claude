@@ -54,8 +54,12 @@ console.log('\n2. The guard must not over-fire — a real skip is still a skip')
 
 console.log('\n3. Logged work always wins over any date reasoning')
 {
-  const completed = { session: { is_completed: true }, workoutLogs: [] } as never
+  const completed = { session: { is_completed: true }, workoutLogs: [{ id: 'x' }] } as never
   const partial = { session: null, workoutLogs: [{ id: 'x' }] } as never
+  // A completed flag with nothing logged — Start and Finish with no set
+  // between — is not a session, and must not outrank a chosen rest day.
+  const emptyCompleted = { session: { is_completed: true }, workoutLogs: [] } as never
+  const emptyCompletedRest = { session: { is_completed: true, deliberate_rest: true }, workoutLogs: [] } as never
   // A session logged on a day that predates the plan is still real work. The
   // pre-plan check deliberately sits AFTER these, or the display would erase
   // what someone actually did to keep the calendar tidy.
@@ -64,6 +68,10 @@ console.log('\n3. Logged work always wins over any date reasoning')
   check('a part-logged pre-plan day reads partial, not before_plan',
     classifyDay('Monday', MON, TODAY, PLAN, partial, PLAN_START) === 'partial')
   check('and a completed day counts toward the tally', countsTowardWeekTally('done'))
+  check('a completed flag with nothing logged does not read done',
+    classifyDay('Monday', MON, TODAY, PLAN, emptyCompleted, PLAN_START) !== 'done')
+  check('...and a chosen rest day wins over it',
+    classifyDay('Monday', MON, TODAY, PLAN, emptyCompletedRest, PLAN_START) === 'rest_chosen')
 }
 
 console.log('\n4. Days at or after the plan start behave normally')
@@ -93,7 +101,7 @@ console.log('\n6. A day swapped for something else is not a day you failed')
   // Logged work still outranks everything, exactly as it outranks before_plan.
   // Someone who announced a swap and then trained anyway has earned the tick.
   const swappedButTrained = {
-    session: { swapped_for_activity: 'Muay Thai', is_completed: true }, workoutLogs: [],
+    session: { swapped_for_activity: 'Muay Thai', is_completed: true }, workoutLogs: [{ id: 'x' }],
   } as never
   check('a swapped day they trained anyway reads done, not swapped',
     classifyDay('Monday', MON, TODAY, PLAN, swappedButTrained, undefined) === 'done')
@@ -140,7 +148,7 @@ console.log('\n6b. A rest day you chose is not a missed one')
     classifyDay('Sunday', '2026-08-16', TODAY, PLAN, undefined, undefined) === 'recovery')
 
   // Logged work still outranks it, exactly as it outranks a swap.
-  const restedButTrained = { session: { deliberate_rest: true, is_completed: true }, workoutLogs: [] } as never
+  const restedButTrained = { session: { deliberate_rest: true, is_completed: true }, workoutLogs: [{ id: 'x' }] } as never
   check('a rest day they trained anyway reads done, not rest_chosen',
     classifyDay('Monday', MON, TODAY, PLAN, restedButTrained, undefined) === 'done')
   const restedPartLogged = { session: { deliberate_rest: true }, workoutLogs: [{}] } as never

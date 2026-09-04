@@ -151,7 +151,6 @@ export function NutritionDisplay({
   const [waterTarget, setWaterTarget] = useState(profile.water_target_ml ?? 2000)
   const [editingWaterTarget, setEditingWaterTarget] = useState(false)
   const [waterTargetInput, setWaterTargetInput] = useState(String(profile.water_target_ml ?? 2000))
-  const [lastWaterLog, setLastWaterLog] = useState<WaterLogRow | null>(null)
   // Steps moved here from Home — Nutrition owns what you accumulate through
   // the day. The target is derived, not stored, by the same function Home
   // used, so both tabs read one rule.
@@ -204,18 +203,23 @@ export function NutritionDisplay({
   useEffect(() => { setWaterTarget(profile.water_target_ml ?? 2000) }, [profile.water_target_ml])
 
   const todayWaterMl = waterLogs.filter(l => l.date === date).reduce((s, l) => s + l.amount_ml, 0)
+  // The most recent entry logged today, whichever tap or chat line made it,
+  // so an accidental +500 can be taken back after a reload too — not only in
+  // the seconds after the tap, which is all the old in-memory "last log"
+  // remembered. Undo removes exactly that row; tap it again for the one
+  // before. Ashley, 3 Sep 2026.
+  const todayWaterLogs = waterLogs.filter(l => l.date === date).sort((a, b) => a.created_at.localeCompare(b.created_at))
+  const lastWaterLog: WaterLogRow | null = todayWaterLogs.length > 0 ? todayWaterLogs[todayWaterLogs.length - 1] : null
 
   const handleAddWater = (amountMl: number) => {
     if (!profileId || !date) return
     const row = logWater({ profileId, date, amountMl, source: 'manual' })
     setWaterLogs(prev => [...prev, row])
-    setLastWaterLog(row)
   }
   const handleUndoWater = () => {
     if (!lastWaterLog) return
     undoWaterLog(lastWaterLog)
     setWaterLogs(prev => prev.filter(l => l.id !== lastWaterLog.id))
-    setLastWaterLog(null)
   }
   const handleSaveWaterTarget = async () => {
     const n = Number(waterTargetInput)
@@ -369,7 +373,14 @@ export function NutritionDisplay({
               ))}
               <button className="hit-slop-44 text-xs text-muted-foreground" onClick={() => { setWaterTargetInput(String(waterTarget)); setEditingWaterTarget(true) }}>edit</button>
               {lastWaterLog && (
-                <button className="hit-slop-44 text-xs text-muted-foreground" onClick={handleUndoWater}>undo</button>
+                <button
+                  className="hit-slop-44 text-xs text-muted-foreground"
+                  onClick={handleUndoWater}
+                  aria-label={`Remove the last water entry, ${lastWaterLog.amount_ml} ml`}
+                  title="Removes the most recent entry; tap again for the one before"
+                >
+                  undo +{lastWaterLog.amount_ml}
+                </button>
               )}
             </span>
           )}

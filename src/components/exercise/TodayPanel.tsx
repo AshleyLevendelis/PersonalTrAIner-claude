@@ -100,10 +100,19 @@ export function TodayPanel({
   const [unplannedWorkOpen, setUnplannedWorkOpen] = useState(false)
   const [summaryOpen, setSummaryOpen] = useState(false)
   const [summaryData, setSummaryData] = useState<SessionSummaryData | null>(null)
+  const [summaryNothingLogged, setSummaryNothingLogged] = useState(false)
 
   const handleFinish = async () => {
     const result = await finishSession()
     if (!result || !workout) return
+    if (result.nothingLogged) {
+      // No summary to compute — the point is to say the day did not close.
+      setSummaryData(null)
+      setSummaryNothingLogged(true)
+      setSummaryOpen(true)
+      return
+    }
+    setSummaryNothingLogged(false)
     const plannedExercises = workout.exercises.map(ex => ({ id: ex.id, name: ex.name, sets: ex.sets }))
     const summary = computeSessionSummary(logs, plannedExercises, result.startedAtIso, result.finishedAtIso)
     const prs = computeSessionPRs(result.prSnapshotAtStart, logs)
@@ -347,10 +356,21 @@ export function TodayPanel({
             {status !== 'running' ? (
               <Button size="sm" className="mt-3" onClick={startSession}>Start session</Button>
             ) : (
-              <Button size="sm" className="mt-3" onClick={handleFinish}>Finish session</Button>
+              <>
+                <Button size="sm" className="mt-3" onClick={handleFinish}>Finish session</Button>
+                {/* The line between a look and a workout, said before Finish
+                    is tapped rather than after: with nothing logged, Finish
+                    closes the screen and counts nothing (useActiveSession).
+                    Gone the moment a set lands. */}
+                {totalSetsLogged === 0 && (
+                  <p className="mt-2 text-xs leading-[1.5] text-muted-foreground">
+                    Nothing logged yet — finishing now closes this screen without counting a workout. Log a set and it counts.
+                  </p>
+                )}
+              </>
             )}
           </div>
-          <SessionSummaryDialog open={summaryOpen} onOpenChange={setSummaryOpen} data={summaryData} />
+          <SessionSummaryDialog open={summaryOpen} onOpenChange={setSummaryOpen} data={summaryData} nothingLogged={summaryNothingLogged} />
           {/* WHAT CAN YOU ACTUALLY LOAD — asked at first use, not in
               onboarding (Ashley's call: someone who has never trained cannot
               answer it, and onboarding is where people drop out). Rendered

@@ -203,7 +203,9 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
     ? { status: 'rest', focus: null, exerciseNames: [], setsLogged: 0, setsPlanned: 0,
         exerciseCount: 0, estimatedMinutes: null, minutesLeft: null, leadLift: null }
     : {
-        status: explicitlyCompleted || (setsPlanned > 0 && nonWarmupToday.length >= setsPlanned)
+        // A completed flag only counts with a set behind it — the same rule
+        // useTrainingWeek's classifyDay applies, for the same Thursday.
+        status: (explicitlyCompleted && nonWarmupToday.length > 0) || (setsPlanned > 0 && nonWarmupToday.length >= setsPlanned)
           ? 'done'
           : nonWarmupToday.length > 0 ? 'in_progress' : 'not_started',
         focus: todayWorkoutDay!.focus,

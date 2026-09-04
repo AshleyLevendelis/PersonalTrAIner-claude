@@ -20,6 +20,7 @@ import { executeExerciseSwap, executeMealSwap, executeMealAddition, undoMealAddi
 import { adjustDayVolume, isVolumeAdjustable } from '@/lib/volume-adjust'
 import { buildMealAdditionProposal, type MealAdditionPayload } from '@/lib/meal-addition'
 import { buildCustomMealProposal } from '@/lib/custom-meal'
+import { buildMealFoodAddProposal } from '@/lib/meal-food-add'
 import { buildMealSwapProposal } from '@/lib/meal-swap-proposal'
 import { compileFoodDislikes } from '@/lib/fact-compiler'
 import type { SwapScope } from '@/lib/mesocycle-edit'
@@ -1233,6 +1234,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     // The inverse promise of the addition headline: their food, their
     // amounts, and the day bends around it rather than the other way.
     if (pendingAction.kind === 'propose_custom_meal') return `Here's **${rows[0].after}**, exactly as you have it:`
+    if (pendingAction.kind === 'propose_meal_food_add') return `I can add **${rows[0].after}** to your ${rows[0].before}, at the amount you said:`
     // The rationale IS the offer here ("that's all five I've got — want me to
     // find new ones?"), so repeating a headline above it would say it twice.
     if (pendingAction.kind === 'propose_meal_pool_refresh') return pendingAction.diff.rationale ?? 'Want me to find you some new options?'
@@ -2325,6 +2327,36 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
           if (addition.ok) built = { scopeKey: addition.scopeKey, preconditions: addition.preconditions, payload: addition.payload as unknown as Record<string, unknown>, diff: addition.diff }
           else refusal = addition.reason
         }
+      } else if (result.proposal.kind === 'propose_meal_food_add' && result.proposal.rawArgs) {
+        // A food JOINING a meal already on the plan. Ashley, 3 Sep 2026:
+        // "add a banana to my breakfast" was routed to propose_meal_addition,
+        // treated as a whole new dish called "Banana", and refused for every
+        // food she tried. The meal currently in the slot — its own ingredient
+        // lines, as the coach's meal summary already carries them — plus the
+        // stated food go through verifyProposal in keepPortions mode, the same
+        // gate as a custom meal, and the confirmed option rides the same
+        // executor and undo. The day re-fits around it in assembleDay.
+        if (!macros) {
+          refusal = "I need your height, weight, age and sex before I can fit a day around a meal — you can add them in Profile."
+        } else {
+          const slotName = String(result.proposal.rawArgs.meal_slot ?? '').trim().toLowerCase()
+          const current = mealPlan.find(m => m.meal.toLowerCase() === slotName)?.items[0]
+          const foodAdd = buildMealFoodAddProposal({
+            rawArgs: result.proposal.rawArgs,
+            currentMeal: current
+              ? { name: current.name, ingredients: current.ingredients ?? [], macros: { calories: current.calories, protein: current.protein, carbs: current.carbs, fat: current.fat } }
+              : null,
+            profileId: profile.id,
+            targets: macros,
+            mealsPerDay: profile.meals_per_day,
+            includeSnacks: profile.include_snacks,
+            dietaryPreferences: profile.dietary_preferences ?? [],
+            dislikedFoods: profile.disliked_foods ?? [],
+            todayDate: getSessionDateContext(profile.id).date,
+          })
+          if (foodAdd.ok) built = { scopeKey: foodAdd.scopeKey, preconditions: foodAdd.preconditions, payload: foodAdd.payload as unknown as Record<string, unknown>, diff: foodAdd.diff }
+          else refusal = foodAdd.reason
+        }
       } else if (result.proposal.kind === 'propose_custom_meal' && result.proposal.rawArgs) {
         // Same gate as an addition — verifyProposal, in keepPortions mode.
         // The stated amounts are facts; what gets checked is whether the
@@ -2848,8 +2880,8 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       rows = ok ? result.added.map(n => ({ label: slot, detail: n })) : []
       // No undo: generating already cost a model call, and undoing would only
       // delete options the user can ignore for free.
-    } else if (row.kind === 'propose_meal_addition' || row.kind === 'propose_custom_meal') {
-      // ONE executor for both, on purpose: a custom meal IS an addition once
+    } else if (row.kind === 'propose_meal_addition' || row.kind === 'propose_custom_meal' || row.kind === 'propose_meal_food_add') {
+      // ONE executor for all three, on purpose: a custom meal IS an addition once
       // verified — same pool insert, same pick, same rollback — the only
       // difference was upstream, in how the option's portions were derived.
       const payload = row.payload as unknown as MealAdditionPayload
@@ -2877,7 +2909,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
           ok = false
         }
       }
-      title = ok ? (row.kind === 'propose_custom_meal' ? 'Set as your meal' : 'Added') : "Couldn't add the meal"
+      title = ok ? (row.kind === 'propose_custom_meal' ? 'Set as your meal' : row.kind === 'propose_meal_food_add' ? 'Added to your meal' : 'Added') : "Couldn't add the meal"
       rows = ok ? [{ label: payload.slot, detail: `+ ${payload.option.name}` }] : []
       undoToken = ok ? row.id : undefined
     } else if (row.kind === 'propose_injury_adaptation') {
@@ -3132,7 +3164,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         if (!payload.currentName) return
         const persisted = await onMealSwapApplied(payload.slot, payload.currentName)
         if (!persisted) return // leave the Undo button in place so the user can retry
-      } else if (row.kind === 'propose_meal_addition' || row.kind === 'propose_custom_meal') {
+      } else if (row.kind === 'propose_meal_addition' || row.kind === 'propose_custom_meal' || row.kind === 'propose_meal_food_add') {
         // Removes the option from the pool AND clears the pick, both — an
         // undo that only dropped the pick would leave the meal sitting in
         // the slot's options forever, which is not what "undo" said.

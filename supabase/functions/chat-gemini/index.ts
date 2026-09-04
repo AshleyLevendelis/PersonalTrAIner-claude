@@ -341,6 +341,34 @@ const toolDeclarations = [
     },
   },
   {
+    name: "propose_meal_food_add",
+    description:
+      "PROPOSES adding the user's OWN food(s), at their OWN stated amounts, INTO a meal that is already on today's plan — this does NOT apply the change, they tap Confirm. Call this for 'add a banana to my breakfast', 'put 100g of rice with my dinner', 'can I have an egg with my lunch': the meal stays exactly as it is and the food joins it. It is NOT a new dish (that is propose_meal_addition, which re-portions a dish to the slot) and NOT a replacement meal (that is propose_custom_meal). The app keeps the amount as stated, re-checks the whole meal against allergies, restrictions and dislikes, and re-plans the REST of the day around it. Every food needs an amount; if one is missing, ask how much first ('How much — grams or a count like 2 eggs both work') and call the tool only once you have it. Never guess a quantity and never state macros in your reply; the card shows the app's own verified numbers and will refuse rather than confirm if something clashes.",
+    parameters: {
+      type: "object",
+      properties: {
+        meal_slot: {
+          type: "string",
+          description: "Which of today's meals the food joins: breakfast, lunch, dinner or snack.",
+        },
+        food_lines: {
+          type: "array",
+          items: { type: "string" },
+          description: "One line per food WITH THE USER'S STATED AMOUNT, e.g. '1 banana', '100g cooked rice', '2 eggs'. Everyday food names — the app matches them against its food database and refuses rather than guessing if it can't resolve them. Do not add foods they didn't say, and do not adjust their amounts.",
+        },
+        date: {
+          type: "string",
+          description: "The date the meal is for, as YYYY-MM-DD. Omit for today.",
+        },
+        origin_verbatim_quote: {
+          type: "string",
+          description: "The exact substring of the user's CURRENT message asking for the food to be added. Must be copied verbatim, not paraphrased.",
+        },
+      },
+      required: ["meal_slot", "food_lines", "origin_verbatim_quote"],
+    },
+  },
+  {
     name: "propose_exercise_swap",
     description:
       "PROPOSES swapping an exercise in the user's workout plan for a biomechanically similar alternative — this does NOT apply the change. Call this when the user gives an explicit command to modify their plan (e.g. 'swap bench press for push-ups', 'replace squats with leg press') OR proposes a swap due to pain/fatigue that the user has confirmed. The app shows the user a card with the exact before/after and they tap Confirm themselves — do not describe the swap as already done, and do not ask for a SEPARATE confirmation in your own text (the card IS the confirmation step). origin_verbatim_quote must be the exact substring of the user's message that makes this an imperative request, not a paraphrase.",
@@ -1324,7 +1352,7 @@ When the user wants to train on different days ("I can't do Thursdays anymore", 
   - Feel/effort check-ins: "how did that feel?" / "how's the shoulder holding up?" -> "Easy" | "About right" | "Hard" (adapt wording to what was actually asked)
   - A named choice between two or more specific things you just mentioned (exercises, meals, days) — the options ARE the names, e.g. asking whether they meant Front Squat or Back Squat -> "Front Squat" | "Back Squat"
   - Scope questions: "just today, or the rest of the block?" -> "Today only" | "Rest of block"
-  Do NOT add the tag when the question is genuinely open-ended — asks for a number, a description, a reason, or anything where the honest answer space isn't a short known set (e.g. "how much did you lift?", "what's been going on?"). When in doubt: if you could plausibly render the answer as 2-4 short buttons without stripping out anything the user might actually want to say, add it — free text is always still available underneath either way. Plan-mutation proposals (propose_exercise_swap, propose_meal_swap, propose_meal_addition, propose_injury_adaptation, propose_equipment_adaptation, propose_volume_change, propose_schedule_change, propose_rest_day, propose_custom_meal) already render their own Confirm/Not-now buttons via the card — never add a redundant [QUICK_REPLIES] tag to those turns. The one exception is the equipment-clarifying question itself (§3b) — that's asked BEFORE the tool call, not on the proposal turn, so it gets a normal [QUICK_REPLIES] tag.
+  Do NOT add the tag when the question is genuinely open-ended — asks for a number, a description, a reason, or anything where the honest answer space isn't a short known set (e.g. "how much did you lift?", "what's been going on?"). When in doubt: if you could plausibly render the answer as 2-4 short buttons without stripping out anything the user might actually want to say, add it — free text is always still available underneath either way. Plan-mutation proposals (propose_exercise_swap, propose_meal_swap, propose_meal_addition, propose_injury_adaptation, propose_equipment_adaptation, propose_volume_change, propose_schedule_change, propose_rest_day, propose_custom_meal, propose_meal_food_add) already render their own Confirm/Not-now buttons via the card — never add a redundant [QUICK_REPLIES] tag to those turns. The one exception is the equipment-clarifying question itself (§3b) — that's asked BEFORE the tool call, not on the proposal turn, so it gets a normal [QUICK_REPLIES] tag.
 
 === FEW-SHOT EXAMPLES ===
 User: "Hey"
@@ -1460,6 +1488,7 @@ ${context.exercise_exclusions && context.exercise_exclusions.length > 0 ? `\nPER
 - propose_meal_swap does not take a macro field at all — the app computes the swap's macros itself from the verified pool, shown on the confirm card.
 - When someone asks to swap a meal AGAIN because they didn't like the alternative either, just call propose_meal_swap again — the app tracks what it has already shown them for that slot and, once they have been through the lot, offers to go and find new ones instead of re-serving the same list. Never tell them they have run out of options yourself; you can't see the pool.
 - ADDING A MEAL vs SWAPPING ONE. A swap changes which of their EXISTING options is picked; propose_meal_addition puts a NEW dish into the plan. "Add salmon to my dinners", "can I have overnight oats for breakfast", "put a curry in for Friday" are ADDITIONS — use propose_meal_addition. "Swap my lunch", "change breakfast to something else", "give me the other one" are SWAPS. If they name a dish that isn't already one of their options, it is an addition, not a swap.
+- A FOOD JOINING A MEAL IS NEITHER. "Add a banana to my breakfast", "put 100g of rice with my dinner", "can I have an egg with lunch" — the meal on the plan stays as it is and the food joins it: call propose_meal_food_add with the food and its amount. Do not route these to propose_meal_addition (that would try to portion "Banana" as a whole meal and refuse) or to propose_custom_meal (that replaces the meal). If no amount is stated, ask how much — one question — then call it.
 - When you call propose_meal_addition, give rough ingredient quantities and then say nothing about the numbers. The app re-measures every ingredient against its own food database, re-portions the dish to that slot's targets, and checks it against their allergies and dietary restrictions — it may refuse the dish outright. So never state its calories or macros, never say it has been added, and never promise it will fit.
 
 DYNAMIC QUANTITY SCALING (CRITICAL - MATHEMATICAL CONSTRAINT):
@@ -1817,6 +1846,29 @@ Keep this context in mind to ensure your greetings and questions naturally align
               rawArgs: {
                 meal_slot: args.meal_slot,
                 name: args.name,
+                food_lines: args.food_lines,
+                date: args.date,
+                origin_verbatim_quote: args.origin_verbatim_quote,
+              },
+            },
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (name === "propose_meal_food_add") {
+        // Courier only, exactly like propose_custom_meal: the client takes
+        // the meal currently in that slot, adds the stated food at the
+        // stated amount, runs the whole thing through verifyProposal in
+        // keepPortions mode, and shows the card. I1 holds — the server
+        // writes nothing and forwards raw args untouched.
+        return new Response(
+          JSON.stringify({
+            reply: "",
+            proposal: {
+              kind: "propose_meal_food_add",
+              rawArgs: {
+                meal_slot: args.meal_slot,
                 food_lines: args.food_lines,
                 date: args.date,
                 origin_verbatim_quote: args.origin_verbatim_quote,

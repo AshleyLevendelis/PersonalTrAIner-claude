@@ -87,6 +87,7 @@
     "test:coach-opener": "tsx scripts/test-coach-opener.ts",
     "test:lift-plausibility": "tsx scripts/test-lift-plausibility.ts",
     "test:custom-meal": "tsx scripts/test-custom-meal.ts",
+    "test:meal-food-add": "tsx scripts/test-meal-food-add.ts",
     "test:one-day-one-look": "tsx scripts/test-one-day-one-look.ts",
     "test:tab-ownership": "tsx scripts/test-tab-ownership.ts",
     "test:appearance": "tsx scripts/test-appearance.ts",
