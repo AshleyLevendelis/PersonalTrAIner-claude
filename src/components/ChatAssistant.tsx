@@ -161,6 +161,17 @@ interface ChatAssistantProps {
   onWaterChanged?: () => void | Promise<void>
   /** Re-read steps after a chat log, so the Exercise tab does not sit on a stale number. */
   onStepsChanged?: () => void | Promise<void>
+  /**
+   * Bumped by App whenever something the coach READS changed on another tab —
+   * a set logged, steps entered on the Exercise tab, water tapped in.
+   *
+   * THIS TAB NEVER UNMOUNTS. It is the only TabsContent with forceMount (App
+   * keeps the conversation alive across tab switches), so unlike Nutrition or
+   * Exercise it does not get a fresh mount and a fresh read when you come back
+   * to it. Everything it fetches for itself would otherwise be read once per
+   * session and quoted for the rest of the day.
+   */
+  dataVersion?: number
   /** Deep-link target for a steps receipt — steps live on Exercise. */
   onOpenExercise?: () => void
   /** Deep-link target for a water receipt's "View" button — navigates to the Dashboard tab. */
@@ -193,7 +204,7 @@ function sessionCutoffHour(preferredTime: string | undefined): number {
   return SESSION_PASSED_CUTOFF[preferredTime || 'morning'] || 22
 }
 
-export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onProfileChanged, onMealSwapApplied, onFindMoreMealOptions, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenProfile, groceryItems, onGroceryChanged, onOpenGrocery, onWaterChanged, onStepsChanged, onOpenExercise, onOpenDashboard, onAttentionChange, revealSpeed = DEFAULT_REVEAL_SPEED, pendingLoadSuggestions }: ChatAssistantProps) {
+export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onProfileChanged, onMealSwapApplied, onFindMoreMealOptions, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenProfile, groceryItems, onGroceryChanged, onOpenGrocery, onWaterChanged, onStepsChanged, onOpenExercise, onOpenDashboard, dataVersion = 0, onAttentionChange, revealSpeed = DEFAULT_REVEAL_SPEED, pendingLoadSuggestions }: ChatAssistantProps) {
   // NL logging (§3) writes through the SAME frozen session identity +
   // logSet facade SetGrid.tsx uses — never saveSet directly (see
   // nl-logging-executor.ts's own doc comment).
@@ -385,6 +396,14 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
   // here so the coach can SEE the number, which is what turns "another 3,000"
   // into the right total instead of a replace that wipes the day.
   const [todaySteps, setTodaySteps] = useState<number | null>(null)
+  /**
+   * Bumped after any write THIS tab makes. Same purpose as `dataVersion` from
+   * App, for the half App cannot see: the coach logging water and then quoting
+   * the pre-log total two sentences later, because the figure it quotes comes
+   * from proactiveData and nothing told proactiveData to look again.
+   */
+  const [ownWriteVersion, setOwnWriteVersion] = useState(0)
+  const bumpOwnWrites = () => setOwnWriteVersion(v => v + 1)
   const [workoutLogHistory, setWorkoutLogHistory] = useState('')
   const [cardioLogHistory, setCardioLogHistory] = useState('')
   const [quickRepliesDismissed, setQuickRepliesDismissed] = useState(false)
@@ -444,11 +463,26 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     if (nearBottom) setShowScrollPill(false)
   }, [checkIfNearBottom])
 
+  // THE DATA THE COACH READS FOR ITSELF, re-read whenever it changes.
+  //
+  // Split from the conversation load below on 5 Sep 2026. All four used to sit
+  // on [profile.id], which in a tab that never unmounts means "once, ever":
+  // log a set on Exercise, come back and ask what you lifted, and the answer
+  // came from whatever was true when the app started.
+  //
+  // loadChatHistory is deliberately NOT here — re-running it would refetch and
+  // re-render the conversation itself every time a set was logged.
   useEffect(() => {
     if (profile.id) {
       loadFavorites()
       loadWorkoutLogs()
       loadTodaySteps()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile.id, dataVersion, ownWriteVersion, activeSession.logs.length])
+
+  useEffect(() => {
+    if (profile.id) {
       loadChatHistory()
       // The lazy sweep expireOldPendingActions was written for — its own doc
       // comment says "call on chat mount / load", and nothing ever did, so
@@ -483,7 +517,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     }).then(d => { if (!cancelled) setProactiveData(d) }).catch(() => {})
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeSession.ready, activeSession.date, activeSession.logs.length, profile.id])
+  }, [activeSession.ready, activeSession.date, activeSession.logs.length, profile.id, dataVersion, ownWriteVersion])
 
   // How recent sessions FELT — the affect signal (see session-feel.ts for why
   // it exists and Ashley's 2 Sep 2026 ruling that the coach asks for it in
@@ -2158,6 +2192,9 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     const amountMl = typeof args.amount_ml === 'number' && args.amount_ml > 0 ? Math.round(args.amount_ml) : 250
     const row = logWater({ profileId, date: activeSession.date, amountMl, source: 'chat' })
     await onWaterChanged?.()
+    // The coach quotes waterMl off proactiveData; without this it would say
+    // the pre-log total in its very next sentence.
+    bumpOwnWrites()
 
     return {
       text: `Logged ${amountMl}ml of water.`,
@@ -2222,7 +2259,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       const previous = existing?.steps ?? null
       await logStepsManual(profileId, date, raw)
       await onStepsChanged?.()
-      await loadTodaySteps()
+      bumpOwnWrites()
 
       return {
         text: `Logged ${raw.toLocaleString()} steps.`,
@@ -3316,7 +3353,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         const { date, previous } = JSON.parse(receipt.undoToken) as { date: string; previous: number | null }
         await restoreStepsForDate(profile.id, date, previous)
         await onStepsChanged?.()
-        await loadTodaySteps()
+        bumpOwnWrites()
       } catch (err) {
         console.error('Undoing a chat steps log failed:', err)
       }
@@ -3328,6 +3365,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       if (!isWithinUndoWindow(receipt.resolvedAt ?? null)) return
       undoWaterLog({ id: receipt.undoToken, profile_id: profile.id } as Parameters<typeof undoWaterLog>[0])
       await onWaterChanged?.()
+      bumpOwnWrites()
     } else {
       const row = await getPendingAction(receipt.undoToken)
       if (!row || !isWithinUndoWindow(row.resolved_at)) return

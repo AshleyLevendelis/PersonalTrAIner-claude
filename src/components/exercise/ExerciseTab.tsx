@@ -31,6 +31,8 @@ interface ExerciseTabProps {
   profileId?: string
   /** Bumped when chat logs steps, so StepsRow re-reads. */
   stepsVersion?: number
+  /** Fired when steps are logged HERE, so the chat tab (which never unmounts) re-reads them. */
+  onStepsLogged?: () => void
   planCreatedAt?: string
   devOverrideWeek?: number | null
   devOverrideDay?: string | null
@@ -51,6 +53,7 @@ export function ExerciseTab({
   profile,
   profileId,
   stepsVersion,
+  onStepsLogged,
   planCreatedAt,
   devOverrideWeek,
   devOverrideDay,
@@ -153,6 +156,7 @@ export function ExerciseTab({
         profileId={profileId}
         planCreatedAt={planCreatedAt}
         stepsVersion={stepsVersion}
+        onStepsLogged={onStepsLogged}
         devOverrideDay={devOverrideDay}
         onOpenProgram={() => { window.location.hash = programHash(liveWeek) }}
         onOpenSwap={(dayName, exIndex, exerciseName) => setSwapTarget({ dayName, exIndex, exerciseName })}

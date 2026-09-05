@@ -379,6 +379,20 @@ function App() {
    * flagged in the plan, but very much the reason this line is not skipped.)
    */
   const [stepsVersion, setStepsVersion] = useState(0)
+  /**
+   * Everything the CHAT tab reads for itself, versioned.
+   *
+   * Chat is the only tab with forceMount — it stays alive across tab switches
+   * so the conversation survives — which means it never gets the fresh mount
+   * and fresh read every other tab gets for free. Without this it reads its
+   * workout history, favourites and step count once per session and quotes
+   * them for the rest of the day.
+   *
+   * Bumped from every source that changes one of those, including the ones
+   * that happen on OTHER tabs.
+   */
+  const [coachDataVersion, setCoachDataVersion] = useState(0)
+  const bumpCoachData = () => setCoachDataVersion(v => v + 1)
 
   useEffect(() => {
     restoreSession()
@@ -2355,6 +2369,7 @@ function App() {
           <TabsContent value="exercise">
             <ExerciseTab
               stepsVersion={stepsVersion}
+              onStepsLogged={bumpCoachData}
               plan={exercisePlan}
               mesocycle={mesocycle}
               exclusions={effectiveExclusions}
@@ -2389,7 +2404,7 @@ function App() {
               exerciseExclusions={effectiveExclusions}
               latestWeightKg={latestWeightKg}
               onPlanUpdate={handlePlanUpdate}
-              onLogsUpdated={() => setLogsVersion(v => v + 1)}
+              onLogsUpdated={() => { setLogsVersion(v => v + 1); bumpCoachData() }}
               onWeightLogged={handleWeightLogged}
               onMesocycleUpdated={setMesocycle}
               onProfileChanged={patch => setProfile(prev => prev ? { ...prev, ...patch } : prev)}
@@ -2449,7 +2464,15 @@ function App() {
               onGroceryChanged={() => { if (profile?.id) return reloadGrocery(profile.id) }}
               onOpenGrocery={() => { window.location.hash = tabHash('tools') }}
               onOpenDashboard={() => { window.location.hash = tabHash('dashboard') }}
-              onStepsChanged={() => setStepsVersion(v => v + 1)}
+              onStepsChanged={() => { setStepsVersion(v => v + 1); bumpCoachData() }}
+              // WIRED, not merely declared. This prop existed, was awaited in
+              // two places, and was passed by nobody — so it did nothing at
+              // all. Water is local-first, so the tabs that unmount re-read it
+              // correctly on their next mount; what was actually stale is the
+              // figure the COACH quotes, which comes from a dashboard read
+              // that had no reason to run again.
+              onWaterChanged={bumpCoachData}
+              dataVersion={coachDataVersion}
               onOpenExercise={() => { window.location.hash = tabHash('exercise') }}
               revealSpeed={revealSpeed}
               pendingLoadSuggestions={adaptationMessages.filter(m => m.loadSuggestionId).map(m => m.text)}

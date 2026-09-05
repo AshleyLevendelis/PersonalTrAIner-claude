@@ -36,6 +36,7 @@ export function StepsRow({
   profileId,
   date,
   refreshToken,
+  onLogged,
 }: {
   profile?: UserProfile
   profileId?: string
@@ -47,6 +48,12 @@ export function StepsRow({
    * records four instances of from Ashley's phone.
    */
   refreshToken?: number
+  /**
+   * Fired after a successful log. The chat tab never unmounts, so the coach
+   * would otherwise keep quoting the step count it read when the app started
+   * — this is the only way a number typed here reaches it.
+   */
+  onLogged?: () => void
 }) {
   const [stepsRow, setStepsRow] = useState<DailyStepsRow | null>(null)
   const [stepsInput, setStepsInput] = useState('')
@@ -77,6 +84,7 @@ export function StepsRow({
       setStepsRow(await logStepsManual(profileId, date, Math.round(n)))
       setStepsInput('')
       setEntryError(null)
+      onLogged?.()
     } catch (err) {
       console.error('Logging steps failed:', err)
       setEntryError("Couldn't save your steps — check your connection and tap Log again.")

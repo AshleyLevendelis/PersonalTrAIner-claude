@@ -2,6 +2,38 @@
 
 Newest first. One line each.
 
+- [x] **A WRITE NOW REACHES THE SCREEN THAT SHOWS IT — and I had the bug
+  backwards first.** Ashley: "fix the reload bug. also fix it for any other
+  items that need a refresh to update."
+  MY REPORTED DIAGNOSIS WAS WRONG. I said onWaterChanged being unpassed meant
+  "the Nutrition tab keeps showing the old number until you reload". Two things
+  make that false and both were readable at the time: water-store is
+  local-first so anything reading it fresh already sees the write (the prop's
+  OWN doc comment says exactly that, and I quoted the prop without reading its
+  comment), and every TabsContent except chat unmounts when inactive, so
+  returning to Nutrition is a fresh mount and a fresh read. I inferred
+  user-visible staleness from a dead prop without checking either.
+  THE REAL BUG IS THE OPPOSITE SHAPE. `chat` is the ONE tab with forceMount —
+  App keeps it alive so the conversation survives tab switches — so it is the
+  only surface that never gets a free re-read. Its self-fetched context
+  (favourites, 14 days of workout logs, today's steps) sat on [profile.id],
+  which in a component that never unmounts means ONCE PER SESSION. Log a set on
+  Exercise, come back and ask what you lifted, and the answer came from
+  app-start. Worse for water: the figure the coach quotes comes from
+  proactiveData, keyed on logs.length, so logging water in chat left the coach
+  quoting the pre-log total in its very next sentence.
+  FIXED IN TWO HALVES. Chat bumps its own version after every write it makes;
+  App keeps one coachDataVersion bumped by every source that changes what the
+  coach reads, including steps typed on the Exercise tab (threaded StepsRow ->
+  TodayPanel -> ExerciseTab -> App). loadChatHistory is deliberately split onto
+  its own effect — re-running it on every logged set would refetch the
+  conversation underneath the user.
+  New test:stale-after-write pins the class: exactly one tab is forceMounted
+  (a second one inherits the problem and goes red), no callback prop is
+  declared and left unpassed, the always-mounted tab's loaders are keyed on a
+  version, and StepsRow reports a log only after the write succeeded. Six
+  mutations bit, including the original unpassed prop.
+
 - [x] **THE COACH CAN LOG YOUR STEPS — behind a confirm card, on Ashley's
   ruling.** "build it so it can log them for you." One fork was hers: the app
   only ACTS on an instruction and OFFERS on a statement, and "I walked 9,000

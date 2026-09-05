@@ -168,6 +168,7 @@
     "report:trim-magnitude": "tsx scripts/run-trim-magnitude-report.ts",
     "test:proposal-expiry": "tsx scripts/test-proposal-expiry.ts",
     "test:local-dates": "tsx scripts/test-local-dates.ts",
+    "test:stale-after-write": "tsx scripts/test-stale-after-write.ts",
     "test:silent-writes": "tsx scripts/test-silent-writes.ts",
     "test:enforcement-gaps": "tsx scripts/test-enforcement-gaps.ts",
     "test:session-continuity": "tsx scripts/test-session-continuity.ts",
