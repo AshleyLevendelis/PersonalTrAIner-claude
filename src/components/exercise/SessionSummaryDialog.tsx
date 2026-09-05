@@ -30,12 +30,15 @@ export function SessionSummaryDialog({
   onOpenChange,
   data,
   nothingLogged = false,
+  serverCloseFailed = false,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   data: SessionSummaryData | null
   /** Finish was tapped with no working set logged — the day was left open (useActiveSession.finishSession). */
   nothingLogged?: boolean
+  /** The sets are saved but the session's completed stamp didn't reach the server. The app retries; this stops the dialog claiming it already worked. */
+  serverCloseFailed?: boolean
 }) {
   const progressionLines = (data?.progressions ?? []).filter((entry): entry is readonly [string, { note: string; didProgress: boolean }] => entry[1] != null)
 
@@ -43,8 +46,18 @@ export function SessionSummaryDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-sm max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{nothingLogged ? 'Nothing logged' : 'Session complete'}</DialogTitle>
+          <DialogTitle>{nothingLogged ? 'Nothing logged' : serverCloseFailed ? 'Session saved' : 'Session complete'}</DialogTitle>
         </DialogHeader>
+        {serverCloseFailed && !nothingLogged && (
+          // "Complete" is a claim about the record, and the record did not
+          // take it. The sets are genuinely safe — they have their own offline
+          // queue — so this says what IS true and what is still pending,
+          // rather than either a false tick or an alarm about lost work.
+          <p className="text-sm leading-[1.5] text-muted-foreground">
+            Your sets are saved. Finishing the session hasn&apos;t synced yet — the app will
+            keep trying, so there&apos;s nothing you need to do.
+          </p>
+        )}
         {nothingLogged && (
           <p className="text-sm leading-[1.5] text-muted-foreground">
             No sets were logged, so this didn't count as a session and the day stays open.

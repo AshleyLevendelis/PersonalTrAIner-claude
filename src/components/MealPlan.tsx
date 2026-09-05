@@ -130,6 +130,13 @@ export function MealPlan({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { void reloadLogged() }, [profileId, date])
 
+  /**
+   * Undo tapped, and the meal stayed logged. Local to this screen because it
+   * is about one tap, clears on the next attempt, and needs no plumbing
+   * through App — the same reasoning the steps row's own entryError uses.
+   */
+  const [unlogError, setUnlogError] = useState<string | null>(null)
+
   const errorBanner = regenerateError && (
     <InsightBanner tone="warning" className="items-start justify-between">
       <span>{regenerateError}</span>
@@ -185,6 +192,14 @@ export function MealPlan({
   return (
     <div data-tour="meals" className="space-y-4">
       {unrecognisedBanner || errorBanner}
+      {unlogError && (
+        <InsightBanner tone="warning" className="items-start justify-between">
+          <span>{unlogError}</span>
+          <button type="button" onClick={() => setUnlogError(null)} className="shrink-0 text-xs font-semibold underline">
+            Dismiss
+          </button>
+        </InsightBanner>
+      )}
       {blockedSlots.length > 0 && (
         <InsightBanner tone="warning" className="items-start justify-between">
           <span>
@@ -245,8 +260,12 @@ export function MealPlan({
               await reloadLogged()
             }}
             onUnlog={async clientIds => {
-              await voidMealEvents(clientIds)
+              const removed = await voidMealEvents(clientIds)
+              // The reload runs either way — it is what puts a failed undo's
+              // meal back on screen, and the message below is what explains
+              // why it came back instead of leaving the user to guess.
               await reloadLogged()
+              setUnlogError(removed ? null : "That meal is still logged — we couldn't reach the server. Try again in a moment.")
             }}
           />
         ))}

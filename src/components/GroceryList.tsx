@@ -79,6 +79,13 @@ function formatShoppingQuantity(item: GroceryItemRow): { primary: string; exact:
   return { primary, exact }
 }
 
+/**
+ * The largest quantity one shopping line will hold. Line items are stored in
+ * grams, so this is 100kg of a single ingredient — comfortably past any real
+ * shop, and squarely into slipped-decimal-point territory.
+ */
+const MAX_GROCERY_QUANTITY = 100_000
+
 export function GroceryList({ profileId, mealPools, targets, softLikedFoods, todaysPicks, refreshToken }: GroceryListProps) {
   const [items, setItems] = useState<GroceryItemRow[]>([])
   const [loading, setLoading] = useState(false)
@@ -88,6 +95,7 @@ export function GroceryList({ profileId, mealPools, targets, softLikedFoods, tod
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
   const [editQty, setEditQty] = useState('')
+  const [editError, setEditError] = useState<string | null>(null)
   const [expandedRefs, setExpandedRefs] = useState<Set<string>>(new Set())
 
   const reload = async () => {
@@ -129,12 +137,29 @@ export function GroceryList({ profileId, mealPools, targets, softLikedFoods, tod
     setEditName(item.display_name)
     setEditQty(String(item.quantity))
   }
-  const cancelEdit = () => { setEditingId(null); setEditName(''); setEditQty('') }
+  const cancelEdit = () => { setEditingId(null); setEditName(''); setEditQty(''); setEditError(null) }
+  /**
+   * A shopping quantity has to be a positive number.
+   *
+   * `Number.isFinite` was the only check, so 0 and -200 both passed: a line
+   * reading "-200 g chicken" is not a thing anyone can buy, and 0 is an item
+   * on your list you are meant to purchase none of — either way the list
+   * stops being a list you can shop from. The ceiling is the same kind of
+   * typo guard as the step and cardio ones: a line item is grams, and 100 kg
+   * of one ingredient is a slipped decimal point, not a shop.
+   */
   const saveEdit = (id: string) => {
     const current = items.find(i => i.id === id)
     if (!current) return
     const quantity = Number(editQty)
-    const row = editItemLocal(current, { displayName: editName.trim() || undefined, quantity: Number.isFinite(quantity) ? quantity : undefined })
+    if (!Number.isFinite(quantity) || quantity <= 0 || quantity > MAX_GROCERY_QUANTITY) {
+      // The editor stays open with the typed value in it, which is what says
+      // "not that number" without also throwing away the rest of the edit.
+      setEditError(`Quantity must be between 0 and ${MAX_GROCERY_QUANTITY.toLocaleString()}.`)
+      return
+    }
+    setEditError(null)
+    const row = editItemLocal(current, { displayName: editName.trim() || undefined, quantity })
     setItems(prev => prev.map(i => (i.id === id ? row : i)))
     cancelEdit()
   }
@@ -250,11 +275,14 @@ export function GroceryList({ profileId, mealPools, targets, softLikedFoods, tod
 
                 <div className="flex-1 min-w-0">
                   {editingId === item.id ? (
-                    <div className="flex items-center gap-1.5">
-                      <Input value={editName} onChange={e => setEditName(e.target.value)} className="h-7 text-sm flex-1" />
-                      <Input value={editQty} onChange={e => setEditQty(e.target.value)} className="h-7 text-sm w-16" inputMode="decimal" />
-                      <Button size="icon" variant="ghost" className="hit-slop-44 size-7" onClick={() => saveEdit(item.id)} aria-label={`Save changes to ${item.display_name}`}><Check className="size-3.5" /></Button>
-                      <Button size="icon" variant="ghost" className="hit-slop-44 size-7" onClick={cancelEdit} aria-label="Cancel editing"><X className="size-3.5" /></Button>
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-1.5">
+                        <Input value={editName} onChange={e => setEditName(e.target.value)} className="h-7 text-sm flex-1" />
+                        <Input value={editQty} onChange={e => setEditQty(e.target.value)} className="h-7 text-sm w-16" inputMode="decimal" />
+                        <Button size="icon" variant="ghost" className="hit-slop-44 size-7" onClick={() => saveEdit(item.id)} aria-label={`Save changes to ${item.display_name}`}><Check className="size-3.5" /></Button>
+                        <Button size="icon" variant="ghost" className="hit-slop-44 size-7" onClick={cancelEdit} aria-label="Cancel editing"><X className="size-3.5" /></Button>
+                      </div>
+                      {editError && <p className="text-[0.6875rem] leading-[1.4] text-[color:var(--role-warn-text)]">{editError}</p>}
                     </div>
                   ) : (
                     <div className={`flex items-center justify-between gap-2 ${item.checked ? 'line-through' : ''}`}>

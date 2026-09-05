@@ -98,11 +98,43 @@ function pendingToView(p: PendingCardioLog): CardioLogView {
 }
 
 /**
+ * The longest single cardio entry the app will store, in minutes — one day.
+ *
+ * Not a judgement about training: it is the point past which the number is
+ * certainly a typo rather than a session, and cardio minutes feed the weekly
+ * conditioning share and the day's activity, so a 90,000 stays in those
+ * numbers until somebody notices. Same shape as MAX_PLAUSIBLE_DAILY_STEPS.
+ */
+export const MAX_PLAUSIBLE_CARDIO_MINUTES = 24 * 60
+
+/** Is this a duration the app will store for one cardio entry? */
+export function isPlausibleCardioDuration(minutes: number): boolean {
+  return Number.isFinite(minutes) && minutes >= 1 && minutes <= MAX_PLAUSIBLE_CARDIO_MINUTES
+}
+
+/**
  * Local-first: writes to the pending queue synchronously and returns the
  * view immediately — the UI can show the logged activity before the network
  * round-trip even starts. Coalesces on clientId so a retry never duplicates.
+ *
+ * THE DURATION BOUND LIVES HERE, not only in the forms. Four writers reach
+ * this function — the rest-day card, unplanned work, the session finisher and
+ * the chat executor — and the two typed-entry forms each carried a `min="1"`
+ * attribute, which a browser treats as a hint and does not enforce: `-5`
+ * parsed, passed the `!!duration` check, and was stored as minus five minutes
+ * of cardio. A rule that matters at four call sites belongs at the one they
+ * share. Returns null rather than throwing: every caller already handles "no
+ * view came back" for its own reasons, and none of them wants a throw on a tap.
  */
-export function saveCardioLog(input: CardioLogInput): CardioLogView {
+export function saveCardioLog(input: CardioLogInput): CardioLogView | null {
+  if (!isPlausibleCardioDuration(input.durationMinutes)) {
+    console.error('Refusing to log an implausible cardio duration:', input.durationMinutes)
+    return null
+  }
+  return saveCardioLogUnchecked(input)
+}
+
+function saveCardioLogUnchecked(input: CardioLogInput): CardioLogView {
   const clientId = generateClientId()
   const pending: PendingCardioLog = {
     ...input,
@@ -183,8 +215,33 @@ function pruneAgedSynced(items: PendingCardioLog[]): PendingCardioLog[] {
 }
 
 let flushPromise: Promise<void> | null = null
+let retryTimer: ReturnType<typeof setTimeout> | null = null
+let consecutiveFailures = 0
+
+/**
+ * Backoff retry — the same shape water-store, grocery-store and set-log-store
+ * all use, and the one this queue was missing.
+ *
+ * Without it a cardio log that failed while ONLINE (a 5xx, a dropped request)
+ * sat 'pending' until the next `online` event or the next cardio log — which
+ * on a rest day might be days, and on a phone that never goes offline is
+ * never. It could not even reach the failed state the offline indicator
+ * exists to show, because reaching MAX_ATTEMPTS requires attempts nothing
+ * was making.
+ */
+function scheduleRetry(): void {
+  if (typeof window === 'undefined' || retryTimer) return
+  const delayMs = Math.min(60_000, 2_000 * 2 ** Math.min(consecutiveFailures, 5))
+  retryTimer = setTimeout(() => { retryTimer = null; void flushPending() }, delayMs)
+}
+
 export function flushPending(): Promise<void> {
   if (flushPromise) return flushPromise
+  // OFFLINE IS NOT A FAILED ATTEMPT. Every other queue in the app checks this
+  // and this one did not, so logging cardio in a basement gym burned an
+  // attempt per call against MAX_ATTEMPTS — the entry could be marked
+  // permanently failed before the phone had ever had a connection to try.
+  if (typeof navigator !== 'undefined' && !navigator.onLine) return Promise.resolve()
   flushPromise = doFlush().finally(() => { flushPromise = null })
   return flushPromise
 }
@@ -192,6 +249,14 @@ export function flushPending(): Promise<void> {
 async function doFlush(): Promise<void> {
   savePending(pruneAgedSynced(loadPending()))
   const items = loadPending()
+  try {
+    await syncPass(items)
+  } finally {
+    if (loadPending().some(i => i.status === 'pending')) scheduleRetry()
+  }
+}
+
+async function syncPass(items: PendingCardioLog[]): Promise<void> {
   for (const item of items.filter(i => i.status === 'pending')) {
     try {
       const { data, error } = await supabase.from('cardio_logs').insert({
@@ -221,6 +286,7 @@ async function doFlush(): Promise<void> {
         target.id = insertedId
         savePending(current)
       }
+      consecutiveFailures = 0
       notify()
     } catch (err) {
       const current = loadPending()
@@ -230,6 +296,7 @@ async function doFlush(): Promise<void> {
         target.errorMessage = err instanceof Error ? err.message : 'Sync failed'
         if (target.attempts >= MAX_ATTEMPTS) target.status = 'failed'
         savePending(current)
+        consecutiveFailures += 1
         notify()
       }
     }
@@ -265,5 +332,8 @@ export function getPendingCardioFailures(): CardioLogView[] {
 }
 
 if (typeof window !== 'undefined') {
-  window.addEventListener('online', () => void flushPending())
+  window.addEventListener('online', () => { consecutiveFailures = 0; void flushPending() })
+  // Going offline changes what the offline indicator should be showing even
+  // though the queue itself is unchanged — the same pairing water-store makes.
+  window.addEventListener('offline', () => notify())
 }

@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Heart, ChevronRight, Loader2 } from 'lucide-react'
 import { useActiveSession } from '@/hooks/useActiveSession'
-import { saveCardioLog, deleteCardioLog } from '@/lib/cardio-log-store'
+import { isPlausibleCardioDuration, MAX_PLAUSIBLE_CARDIO_MINUTES, saveCardioLog, deleteCardioLog } from '@/lib/cardio-log-store'
 import type { WorkoutDay, RecommendedCardio } from '@/lib/types'
 
 // ---------------------------------------------------------------------------
@@ -20,6 +20,7 @@ function ActivityLogEntry() {
   const [open, setOpen] = useState(false)
   const [activity, setActivity] = useState('')
   const [duration, setDuration] = useState('')
+  const [durationError, setDurationError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [loggedClientId, setLoggedClientId] = useState<string | null>(null)
   const [undoing, setUndoing] = useState(false)
@@ -62,38 +63,58 @@ function ActivityLogEntry() {
 
   const handleSave = () => {
     if (!profileId || !activity.trim() || !duration) return
+    // `min="1"` on the input is a hint the browser does not enforce: -5 typed
+    // here parsed, passed the truthiness check, and was stored as minus five
+    // minutes of cardio. The store refuses it now; this is what tells the
+    // person holding the phone, instead of a spinner that stops and no row.
+    const minutes = parseInt(duration, 10)
+    if (!isPlausibleCardioDuration(minutes)) {
+      setDurationError(`Enter between 1 and ${MAX_PLAUSIBLE_CARDIO_MINUTES} minutes.`)
+      return
+    }
+    setDurationError(null)
     setSaving(true)
     const view = saveCardioLog({
       userId: profileId,
       date,
       activityName: activity.trim(),
-      durationMinutes: parseInt(duration) || 0,
+      durationMinutes: minutes,
       intensityRpe: 4,
     })
     setSaving(false)
+    if (!view) {
+      setDurationError("That didn't save — check the number and try again.")
+      return
+    }
     setLoggedClientId(view.clientId ?? null)
   }
 
   return (
-    <div className="flex items-center gap-2">
-      <Input
-        placeholder="Activity"
-        value={activity}
-        onChange={e => setActivity(e.target.value)}
-        className="h-8 text-sm"
-        autoFocus
-      />
-      <Input
-        type="number"
-        min="1"
-        placeholder="Mins"
-        value={duration}
-        onChange={e => setDuration(e.target.value)}
-        className="h-8 text-sm w-20"
-      />
-      <Button size="sm" className="h-8 shrink-0" disabled={!activity.trim() || !duration || saving} onClick={handleSave}>
-        {saving ? <Loader2 className="size-3 animate-spin" /> : 'Save'}
-      </Button>
+    <div className="space-y-1.5">
+      <div className="flex items-center gap-2">
+        <Input
+          placeholder="Activity"
+          value={activity}
+          onChange={e => setActivity(e.target.value)}
+          className="h-8 text-sm"
+          autoFocus
+        />
+        <Input
+          type="number"
+          min="1"
+          max={MAX_PLAUSIBLE_CARDIO_MINUTES}
+          placeholder="Mins"
+          value={duration}
+          onChange={e => setDuration(e.target.value)}
+          className="h-8 text-sm w-20"
+        />
+        <Button size="sm" className="h-8 shrink-0" disabled={!activity.trim() || !duration || saving} onClick={handleSave}>
+          {saving ? <Loader2 className="size-3 animate-spin" /> : 'Save'}
+        </Button>
+      </div>
+      {durationError && (
+        <p className="text-[0.6875rem] leading-[1.4] text-[color:var(--role-warn-text)]">{durationError}</p>
+      )}
     </div>
   )
 }
@@ -233,6 +254,13 @@ function RecoveryFinisher({ cardio }: { cardio: RecommendedCardio }) {
       intensityRpe: cardio.targetRpe,
     })
     setSaving(false)
+    // The plan supplies this duration, so a refusal here means the plan holds
+    // an impossible one — nothing the user can correct from this row, but it
+    // must not leave the button reading "Logged" over a row that never wrote.
+    if (!view) {
+      console.error('Refused to log the prescribed recovery cardio:', cardio)
+      return
+    }
     setLoggedClientId(view.clientId ?? null)
   }
 

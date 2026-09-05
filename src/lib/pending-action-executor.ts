@@ -234,12 +234,61 @@ export async function executeMealAddition(
  * but the pick doesn't: a meal left in the pool after a receipt said
  * "Couldn't add it" is the same kind of quiet disagreement between what the
  * app claims and what it stored that this framework exists to prevent.
+ *
+ * ONE ROW, NOT EVERY ROW WITH THAT NAME. Until 5 Sep 2026 this deleted on
+ * (profile, slot, name), and nothing makes a name unique within a slot: ask
+ * the coach for a chicken curry when the generator had already put a chicken
+ * curry in your dinners, tap Undo, and BOTH disappear — the one you added and
+ * the one that was always there. `pool_index` is the actual identity of a pool
+ * entry, so undo uses it: the exact index when the caller still has it (the
+ * rollback path, which just received it from executeMealAddition), and
+ * otherwise the highest-indexed row of that name, which is the one an append
+ * created.
+ *
+ * Returns false if the pool row is still there afterwards, so the caller can
+ * leave the Undo button up rather than clearing it over a delete that didn't
+ * happen — the same choice the meal-swap undo above it makes.
  */
-export async function undoMealAddition(profileId: string, payload: MealAdditionPayload): Promise<void> {
+export async function undoMealAddition(
+  profileId: string,
+  payload: MealAdditionPayload,
+  poolIndex?: number | null,
+): Promise<boolean> {
   const { slot, date, option } = payload
-  await supabase.from('meal_plan_slots').delete().eq('profile_id', profileId).eq('slot', slot).eq('name', option.name)
+
+  let targetIndex = poolIndex ?? null
+  if (targetIndex === null) {
+    const { data, error } = await supabase
+      .from('meal_plan_slots')
+      .select('pool_index')
+      .eq('profile_id', profileId)
+      .eq('slot', slot)
+      .eq('name', option.name)
+      .order('pool_index', { ascending: false })
+      .limit(1)
+    if (error) return false
+    // Already gone (a second Undo tap, or the pool was regenerated under it).
+    // Nothing to remove is not a failure — fall through and clear the pick.
+    targetIndex = data?.[0]?.pool_index ?? null
+  }
+
+  if (targetIndex !== null) {
+    const { error } = await supabase
+      .from('meal_plan_slots')
+      .delete()
+      .eq('profile_id', profileId)
+      .eq('slot', slot)
+      .eq('pool_index', targetIndex)
+      // Belt as well as braces: an index that no longer holds the meal we
+      // added is somebody else's row, and deleting it would be the same
+      // mistake in a different column.
+      .eq('name', option.name)
+    if (error) return false
+  }
+
   const picks = await getMealPicksForDate(profileId, date)
   if (picks[slot] === option.name) await clearMealPick(profileId, date, slot)
+  return true
 }
 
 export interface InjuryAdaptationPayload {

@@ -14,7 +14,20 @@ import type { Exercise } from '@/lib/types'
 // un-declare); declared entries with zero logged sets can be removed.
 // ---------------------------------------------------------------------------
 
-export function AdditionalWorkSection({ plannedExercises }: { plannedExercises: Exercise[] }) {
+export function AdditionalWorkSection({
+  plannedExercises,
+  onOpenPlateCalc,
+}: {
+  plannedExercises: Exercise[]
+  /**
+   * Threaded in 5 Sep 2026. SetGrid draws a plate-calculator button beside
+   * every weight input, and this screen rendered SetGrid without a handler —
+   * so on the Additional Work rows the button was there, looked identical to
+   * the working one three rows up, and did nothing at all when tapped. Extra
+   * work is loaded work; there is no reason it should have a worse row.
+   */
+  onOpenPlateCalc?: (weightKg: number) => void
+}) {
   const { logs, declaredOffPlan, undeclareOffPlan, setsFor } = useActiveSession()
   const plannedIds = new Set(plannedExercises.map(ex => ex.id ?? getExerciseId(ex.name)))
   const items = computeOffPlanWork(declaredOffPlan, logs, plannedIds, getExerciseId)
@@ -54,6 +67,7 @@ export function AdditionalWorkSection({ plannedExercises }: { plannedExercises: 
               totalSets={3}
               prescribedReps="8-12"
               restTime="60s"
+              onOpenPlateCalc={onOpenPlateCalc}
             />
           </div>
         )

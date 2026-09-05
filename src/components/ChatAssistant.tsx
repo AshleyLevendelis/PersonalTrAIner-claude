@@ -36,7 +36,7 @@ import { TAB_BAR_HEIGHT_PX } from '@/components/BottomTabBar'
 import { useBottomDockHeight } from '@/hooks/useBottomDockHeight'
 import { cn } from '@/lib/utils'
 import { parseWorkoutEntries, type ParsedSetGroup, type WorkoutEntryInput } from '@/lib/set-parse'
-import { executeLogWorkout } from '@/lib/nl-logging-executor'
+import { executeLogWorkout, type ReplacedSetPreImage } from '@/lib/nl-logging-executor'
 import { normalizeExternalUrl } from '@/lib/chat-links'
 import { buildFirstRunIntro, planShapeFromMesocycle, type FirstRunSessionBrief } from '@/lib/first-run-intro'
 import { buildCoachExerciseSummary, buildCoachPhaseBrief } from '@/lib/chat-plan-context'
@@ -49,6 +49,7 @@ import { loadDashboardData, type DashboardData } from '@/lib/dashboard-data'
 import { getAllItems as getAllGroceryItems, addItemLocal, setCheckedLocal, undoAddLocal, type GroceryItemRow, type GroceryCategory } from '@/lib/grocery-store'
 import { logWater, undoLog as undoWaterLog, subscribeWaterStore } from '@/lib/water-store'
 import { subscribeCardioLogStore } from '@/lib/cardio-log-store'
+import { subscribeMealStore } from '@/lib/meal-store'
 import { getStepsForDate, logStepsManual, restoreStepsForDate, isPlausibleStepCount, MAX_PLAUSIBLE_DAILY_STEPS } from '@/lib/steps-store'
 import { buildCoachStepsSummary } from '@/lib/steps-context'
 import { ProposalCard } from '@/components/chat/ProposalCard'
@@ -420,15 +421,25 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
    * nothing in the chat tab was listening. Subscribing covers every writer
    * that exists now, every writer added later, the offline flush, and undo —
    * which a prop from App cannot, because App does not see those either.
+   *
+   * Meals joined them on 5 Sep 2026, once meal-store had a listener to
+   * subscribe to. It matters more here than anywhere: this is the tab that
+   * never unmounts, so "calories remaining" was frozen at whatever the day
+   * looked like when chat first read it — a user could log every meal and
+   * still be told they had the whole day's food left.
    */
   useEffect(() => {
     const bump = () => setOwnWriteVersion(v => v + 1)
-    const unsubs = [subscribeCardioLogStore(bump), subscribeWaterStore(bump)]
+    const unsubs = [subscribeCardioLogStore(bump), subscribeWaterStore(bump), subscribeMealStore(bump)]
     return () => unsubs.forEach(u => u())
   }, [])
   const [workoutLogHistory, setWorkoutLogHistory] = useState('')
   const [cardioLogHistory, setCardioLogHistory] = useState('')
   const [quickRepliesDismissed, setQuickRepliesDismissed] = useState(false)
+  /** Clear-chat's armed state — see handleClearChat for why this is not a window.confirm. */
+  const [clearArmed, setClearArmed] = useState(false)
+  const clearArmTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => () => { if (clearArmTimer.current) clearTimeout(clearArmTimer.current) }, [])
   const [showScrollPill, setShowScrollPill] = useState(false)
   const [hasMoreMessages, setHasMoreMessages] = useState(false)
   const [isLoadingOlder, setIsLoadingOlder] = useState(false)
@@ -2382,7 +2393,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         .filter(e => e.suggested_load_kg != null)
         .map(e => [e.name, e.suggested_load_kg as number] as const)
     )
-    const { rows, totalSets, loggedKeys, replacedSets } = executeLogWorkout(parsed.groups, {
+    const { rows, totalSets, loggedKeys, replacedSets, replacedLogs } = executeLogWorkout(parsed.groups, {
       profileId: activeSession.profileId ?? '',
       date: activeSession.date,
       weekNumber: activeSession.liveWeek,
@@ -2423,7 +2434,13 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         // Undo (C17) parses this back out to call deleteSet per natural key
         // — loggedKeys never leaves this module otherwise, so JSON-encode
         // it onto the one field the receipt view already carries.
-        undoToken: JSON.stringify(loggedKeys),
+        //
+        // BOTH HALVES, since 5 Sep 2026. A correction deletes what was there
+        // before writing its replacement, so undoing it means deleting the
+        // new sets AND writing the old ones back. Carrying only `logged` made
+        // Undo destroy both versions — see ReplacedSetPreImage. `replaced` is
+        // empty for an ordinary append, which is every non-correction turn.
+        undoToken: JSON.stringify({ logged: loggedKeys, replaced: replacedLogs }),
       },
     }
   }
@@ -2929,7 +2946,23 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
   // localStorage mirror, and the server rows (so a reload doesn't resurrect
   // the old conversation via loadChatHistory).
   const handleClearChat = () => {
-    if (!window.confirm('Clear this conversation? This cannot be undone.')) return
+    // ARMED-THEN-CONFIRM, NOT window.confirm.
+    //
+    // This repo documents the reason twice already (SetGrid's set delete,
+    // ProfileScreen's memory delete): an installed PWA can suppress
+    // window.confirm entirely, and a suppressed confirm here returned false —
+    // so on the one surface most likely to be installed, the Clear chat button
+    // did nothing at all, forever, with no way to tell. Two taps within three
+    // seconds is the pattern the rest of the app already uses for a delete
+    // with no undo, and it cannot be suppressed by anything.
+    if (!clearArmed) {
+      setClearArmed(true)
+      if (clearArmTimer.current) clearTimeout(clearArmTimer.current)
+      clearArmTimer.current = setTimeout(() => setClearArmed(false), 3000)
+      return
+    }
+    if (clearArmTimer.current) clearTimeout(clearArmTimer.current)
+    setClearArmed(false)
     setMessages([{ role: 'assistant', content: buildInitialGreeting(), status: 'complete' }])
     setHasMoreMessages(false)
     setQuickRepliesDismissed(false)
@@ -3128,8 +3161,10 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         }
         if (!picked) {
           // Roll the pool write back rather than leaving a meal in the plan
-          // that the receipt is about to say couldn't be added.
-          await undoMealAddition(profile.id, payload)
+          // that the receipt is about to say couldn't be added. The exact
+          // pool_index came back from the insert, so this removes the row it
+          // wrote and never a same-named meal that was already there.
+          await undoMealAddition(profile.id, payload, result.poolIndex)
           receipt = { landed: [], failed: [{ op: 'save', error: "The meal didn't save — try again" }] }
           ok = false
         }
@@ -3330,10 +3365,33 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
 
     if (receipt.kind === 'log_workout') {
       if (!isWithinUndoWindow(receipt.resolvedAt ?? null)) return
-      const keys: { exerciseId: string; setNumber: number }[] = JSON.parse(receipt.undoToken)
+      // TWO SHAPES, ON PURPOSE. Receipts written before 5 Sep 2026 carry a
+      // bare array of keys; current ones carry { logged, replaced }. Chat
+      // history is persisted, so a receipt from the old shape can still be
+      // inside its 10-minute window on the deploy that changes it — and an
+      // undo that throws leaves the sets in place while the button reports
+      // nothing at all. Read both, and treat an unparseable token as "no undo
+      // available" rather than as an exception on a tap.
+      let keys: { exerciseId: string; setNumber: number }[] = []
+      let replaced: ReplacedSetPreImage[] = []
+      try {
+        const token = JSON.parse(receipt.undoToken) as
+          | { exerciseId: string; setNumber: number }[]
+          | { logged?: { exerciseId: string; setNumber: number }[]; replaced?: ReplacedSetPreImage[] }
+        if (Array.isArray(token)) keys = token
+        else { keys = token.logged ?? []; replaced = token.replaced ?? [] }
+      } catch (err) {
+        console.error('Undoing a chat workout log failed to read its own token:', err)
+        return
+      }
+      // DELETE FIRST, THEN RESTORE — never the reverse. A correction usually
+      // reuses the same set numbers it freed (that is the whole point of
+      // clearing them), so restoring first and deleting second would delete
+      // the sets just put back.
       for (const key of keys) {
         activeSession.deleteSet({ userId: profile.id, date: activeSession.date, exerciseId: key.exerciseId, setNumber: key.setNumber })
       }
+      for (const pre of replaced) activeSession.logSet(pre)
       // deleteSet is the raw store function (unlike logSet, which already
       // calls refresh() after writing) — without this, the Exercise tab's
       // dot ladder, TodayPanel progress, dock chip, and dashboard aggregate
@@ -3357,7 +3415,13 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       // created} (one per item added this turn), since undoing a merge onto
       // an existing line means subtracting back out, not deleting the row.
       if (!isWithinUndoWindow(receipt.resolvedAt ?? null)) return
-      const entries: { id: string; addedQuantity: number; created: boolean }[] = JSON.parse(receipt.undoToken)
+      let entries: { id: string; addedQuantity: number; created: boolean }[]
+      try {
+        entries = JSON.parse(receipt.undoToken)
+      } catch (err) {
+        console.error('Undoing a chat grocery add failed to read its own token:', err)
+        return
+      }
       const current = await getAllGroceryItems(profile.id)
       for (const entry of entries) {
         const row = current.find(i => i.id === entry.id)
@@ -3442,7 +3506,12 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         // undo that only dropped the pick would leave the meal sitting in
         // the slot's options forever, which is not what "undo" said.
         const payload = row.payload as unknown as MealAdditionPayload
-        await undoMealAddition(profile.id, payload)
+        // No pool_index here — the pending_actions payload predates it — so
+        // undoMealAddition finds the appended row itself. If the delete
+        // doesn't land, keep the Undo button so the user can try again,
+        // exactly as the meal swap above does.
+        const removed = await undoMealAddition(profile.id, payload)
+        if (!removed) return
         // Nothing to restore as the on-screen pick: the slot had whatever
         // assembleDay chose before this, and clearing the pick is what makes
         // the Nutrition tab fall back to it. onMealSwapApplied can't express
@@ -3533,14 +3602,14 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     <Card className="flex flex-col h-[600px] max-h-[80dvh]">
       <CardContent className="relative flex-1 flex flex-col p-0 overflow-hidden">
         <Button
-          variant="ghost"
-          size="icon-sm"
+          variant={clearArmed ? 'destructive' : 'ghost'}
+          size={clearArmed ? 'sm' : 'icon-sm'}
           onClick={handleClearChat}
-          aria-label="Clear chat"
-          title="Clear chat"
+          aria-label={clearArmed ? 'Tap again to clear this conversation' : 'Clear chat'}
+          title={clearArmed ? 'Tap again to clear this conversation' : 'Clear chat'}
           className="absolute top-2 right-2 z-10 bg-background/80 backdrop-blur-sm"
         >
-          <Trash2 className="size-3.5" />
+          {clearArmed ? <span className="text-xs">Tap again to clear</span> : <Trash2 className="size-3.5" />}
         </Button>
         <div
           // min-h-0: a flex item defaults to min-height:auto and refuses to

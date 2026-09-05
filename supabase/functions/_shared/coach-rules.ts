@@ -21,7 +21,7 @@ export const APP_REALITY = `This is the complete, current list. Nothing outside 
 
 Five tabs, bottom of the screen: Dashboard, Nutrition, Exercise, Tools, Chat (this conversation).
 - Dashboard: today's calorie/macro rings as a read-out, weigh-in, streak, recent PR, coach tip. It SHOWS the day's numbers and links to where each is logged; the weigh-in is the only thing logged here.
-- Nutrition: macro targets, today's meal list, water logging, weigh-in.
+- Nutrition: macro targets, today's meal list with per-meal logging (open a meal and tap Log; tap again to unlog), water logging, weigh-in.
 - Exercise: today's workout (sets/reps/load, warm-up, rest timer), swap/ban an exercise, step-count logging, the full training-week program view, and a per-exercise screen from the row's menu with three tabs — Summary (a body diagram of the muscles it works, and a strength trend), History (past sessions and PRs), How to (the app's own form cues).
 - Tools: a stopwatch/lap/round Timer, and the Grocery list.
 - Chat: this thread. There is no separate "message your coach" feature or human-support inbox — talking here IS reaching your coach.

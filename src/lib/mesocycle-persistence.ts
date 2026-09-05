@@ -23,14 +23,44 @@ export { toRow, fromRow }
  */
 export async function saveMesocycle(profileId: string, weeks: MesocycleWeek[], preserveCreatedAt?: string): Promise<void> {
   if (weeks.length === 0) return
-  await supabase.from('mesocycle_weeks').delete().eq('profile_id', profileId)
-  const rows = weeks.map(week => (
-    preserveCreatedAt
-      ? { ...toRow(profileId, week), created_at: preserveCreatedAt }
-      : toRow(profileId, week)
-  ))
-  const { error } = await supabase.from('mesocycle_weeks').insert(rows)
+
+  // UPSERT FIRST, TRIM SECOND. This was `delete every row, then insert`, and
+  // between those two calls the trainee had NO PLAN IN THE DATABASE. A dropped
+  // connection, an RLS refusal or one bad row in there and their entire
+  // periodized mesocycle was gone — and the callers' own recovery line,
+  // "reopen the app to retry", is exactly when the loss became permanent:
+  // restoreMesocycle returns null and App falls back to the flat, non-
+  // periodized reconstruction, losing every swap, ban and adaptation.
+  //
+  // Five call sites reach this, including undoExerciseSwap — so tapping Undo
+  // could destroy the plan it was meant to restore.
+  //
+  // (profile_id, week_number) is unique — saveMesocycleWeek below already
+  // relies on it — so an upsert of every week is a complete replacement of
+  // the overlap, and the plan is never absent at any instant.
+  //
+  // created_at is now written EXPLICITLY in both directions. The old code got
+  // the new-plan case for free from the delete; an upsert would have left the
+  // previous plan's birth date in place and silently rewound the trainee to
+  // week 1 of a plan generated months ago.
+  const createdAt = preserveCreatedAt ?? new Date().toISOString()
+  const rows = weeks.map(week => ({ ...toRow(profileId, week), created_at: createdAt }))
+  const { error } = await supabase
+    .from('mesocycle_weeks')
+    .upsert(rows, { onConflict: 'profile_id,week_number' })
   if (error) throw error
+
+  // Only now, with the new plan safely stored, remove any weeks the old plan
+  // had and this one does not. A failure here leaves a few stale trailing
+  // weeks — visible, harmless and fixed by the next save — which is a far
+  // better worst case than no plan at all.
+  const highestWeek = weeks.reduce((max, w) => Math.max(max, w.week_number), 0)
+  const { error: trimError } = await supabase
+    .from('mesocycle_weeks')
+    .delete()
+    .eq('profile_id', profileId)
+    .gt('week_number', highestWeek)
+  if (trimError) console.error('Trimming stale mesocycle weeks failed (plan itself saved):', trimError)
 }
 
 export interface RestoredMesocycle {

@@ -21,7 +21,7 @@
 // ---------------------------------------------------------------------------
 
 import { useEffect, useState } from 'react'
-import { getStepsForDate, logStepsManual, type DailyStepsRow } from '@/lib/steps-store'
+import { getStepsForDate, logStepsManual, isPlausibleStepCount, MAX_PLAUSIBLE_DAILY_STEPS, type DailyStepsRow } from '@/lib/steps-store'
 import { stepsTargetFor } from '@/lib/steps-target'
 import type { UserProfile } from '@/lib/types'
 
@@ -80,8 +80,22 @@ export function StepsRow({
   const handleLogSteps = async () => {
     const n = Number(stepsInput)
     if (!profileId || !Number.isFinite(n) || n < 0) return
+    // THE SAME CEILING THE CHAT DOOR ALREADY APPLIES.
+    //
+    // isPlausibleStepCount was written for the chat door and sat thirty lines
+    // from this handler, unused by it — so a mistyped 900000 was rejected when
+    // the coach logged it and accepted when it was typed here. And this write
+    // REPLACES the day rather than adding to it, so the typo did not sit
+    // alongside a real number, it became the number, permanently. Rounding
+    // first because the input allows decimals and a plausibility check on
+    // 9000.4 should be a check on 9000.
+    const rounded = Math.round(n)
+    if (!isPlausibleStepCount(rounded)) {
+      setEntryError(`That's more steps than anyone walks in a day — the most this takes is ${MAX_PLAUSIBLE_DAILY_STEPS.toLocaleString()}.`)
+      return
+    }
     try {
-      setStepsRow(await logStepsManual(profileId, date, Math.round(n)))
+      setStepsRow(await logStepsManual(profileId, date, rounded))
       setStepsInput('')
       setEntryError(null)
       onLogged?.()
@@ -117,6 +131,8 @@ export function StepsRow({
             placeholder="Log"
             aria-label="Steps today"
             value={stepsInput}
+            min={0}
+            max={MAX_PLAUSIBLE_DAILY_STEPS}
             onChange={e => setStepsInput(e.target.value)}
             className="h-7 w-16 min-w-0 rounded-md bg-[color:var(--surface-raised)] px-2 text-xs"
           />

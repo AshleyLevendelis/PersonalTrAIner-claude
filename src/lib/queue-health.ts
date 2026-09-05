@@ -147,6 +147,9 @@ export function subscribeAllQueues(fn: () => void): () => void {
     waterStore.subscribeWaterStore(fn),
     groceryStore.subscribeGroceryStore(fn),
     cardioStore.subscribeCardioLogStore(fn),
+    // Added 5 Sep 2026, when meal-store finally grew one. Its absence here is
+    // why a dead-lettered meal was the one failure the badge never showed.
+    mealStore.subscribeMealStore(fn),
   ]
   return () => unsubs.forEach(u => u())
 }

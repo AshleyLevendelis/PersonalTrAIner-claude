@@ -38,7 +38,6 @@ export interface ExerciseRowProps {
   onBan: () => void | Promise<void>
   banBusy: boolean
   onSetCompleted?: SetGridProps['onSetCompleted']
-  onFirstEverLog?: SetGridProps['onFirstEverLog']
   expanded: boolean
   onToggleExpanded: () => void
   onOpenHistory?: (exerciseId: string, exerciseName: string) => void
@@ -58,7 +57,6 @@ export function ExerciseRow({
   onBan,
   banBusy,
   onSetCompleted,
-  onFirstEverLog,
   expanded,
   onToggleExpanded,
   onOpenHistory,
@@ -282,7 +280,6 @@ export function ExerciseRow({
             loadIsEstimate={loadIsUnverified}
             onOpenPlateCalc={onOpenPlateCalc}
             onSetCompleted={onSetCompleted}
-            onFirstEverLog={onFirstEverLog}
           />
         </>
       )}

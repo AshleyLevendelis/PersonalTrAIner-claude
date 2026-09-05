@@ -175,24 +175,55 @@ function EditableSelectField<T extends string | number>({
   )
 }
 
+/**
+ * THE TYPED WORD SURVIVES A FAILED SAVE.
+ *
+ * This renders the "Foods to avoid" list, among others, and until 5 Sep 2026
+ * `add` cleared the input before the save had even been awaited — `onSave`
+ * returned `void`, so a rejected write was an unhandled promise rejection and
+ * nothing else. Someone typing "shellfish" on a bad connection watched the box
+ * empty, saw no tag, saw no error, and had every reason to read that as the
+ * app having taken it. On this particular field that reading is dangerous.
+ *
+ * So the input is cleared only once the save resolves, the button is held
+ * while it is in flight (which also stops a double-tap writing twice), and a
+ * rejection leaves the word exactly where the user typed it. The caller is
+ * responsible for the message — see saveDislikedFoods and savePatch, which
+ * both put one in this screen's existing error banner.
+ */
 function EditableTagList({
   values, onSave, placeholder,
-}: { values: string[]; onSave: (next: string[]) => void; placeholder: string }) {
+}: { values: string[]; onSave: (next: string[]) => void | Promise<void>; placeholder: string }) {
   const [input, setInput] = useState('')
-  const add = () => {
+  const [saving, setSaving] = useState(false)
+  const add = async () => {
     const v = input.trim()
     if (!v || values.includes(v)) { setInput(''); return }
-    onSave([...values, v])
-    setInput('')
+    setSaving(true)
+    try {
+      await onSave([...values, v])
+      setInput('')
+    } catch {
+      // Left in the box on purpose. The caller has shown the error; retyping
+      // a word you already typed is the thing this avoids.
+    } finally {
+      setSaving(false)
+    }
   }
-  const remove = (v: string) => onSave(values.filter(x => x !== v))
+  const remove = async (v: string) => {
+    setSaving(true)
+    // Nothing to preserve on a removal — the tag stays visible because
+    // `values` only changes once the caller's reload confirms it did.
+    try { await onSave(values.filter(x => x !== v)) } catch { /* caller surfaces it */ }
+    finally { setSaving(false) }
+  }
   return (
     <div className="space-y-1.5">
       <div className="flex flex-wrap gap-x-2.5 gap-y-2.5">
         {values.map(v => (
           <Badge key={v} variant="secondary" className="text-[0.625rem] gap-1 pr-1">
             {v}
-            <button type="button" onClick={() => remove(v)} aria-label={`Remove ${v}`} className="hit-slop-44"><X className="size-2.5" /></button>
+            <button type="button" onClick={() => void remove(v)} disabled={saving} aria-label={`Remove ${v}`} className="hit-slop-44 disabled:opacity-50"><X className="size-2.5" /></button>
           </Badge>
         ))}
         {values.length === 0 && <span className="text-xs text-muted-foreground/70">None yet</span>}
@@ -201,11 +232,11 @@ function EditableTagList({
         <Input
           value={input}
           onChange={e => setInput(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter') add() }}
+          onKeyDown={e => { if (e.key === 'Enter') void add() }}
           placeholder={placeholder}
           className="h-7 text-xs flex-1 min-w-0"
         />
-        <Button size="icon" variant="outline" aria-label="Add" className="size-7 shrink-0" onClick={add} disabled={!input.trim()}>
+        <Button size="icon" variant="outline" aria-label="Add" className="size-7 shrink-0" onClick={() => void add()} disabled={!input.trim() || saving}>
           <Plus className="size-3.5" />
         </Button>
       </div>
@@ -387,18 +418,45 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
   const hardFoodDislikes = facts.filter(f => f.kind === 'food_preference' && f.polarity === 'dislike')
   const hardFoodDislikeValues = hardFoodDislikes.map(f => f.resolved_refs?.[0] ?? f.display_text)
 
+  /**
+   * SAFETY-ADJACENT, AND IT SAYS SO WHEN IT FAILS.
+   *
+   * This is the write behind "Foods to avoid". Every one of these calls can
+   * reject, and none of them was caught — so a failed add left no tag, no
+   * message, and an empty input box, which reads as success. Under CLAUDE.md
+   * this is dietary enforcement, and the one thing it must never do is let
+   * someone believe a food is excluded when the app has no record of it.
+   *
+   * The reload runs whether or not the writes landed, because Promise.all can
+   * fail with some of them already applied and the list has to show what is
+   * actually stored, not what was attempted. Then it rethrows, which is what
+   * keeps the typed word in the box for a retry.
+   */
   const saveDislikedFoods = async (next: string[]) => {
     if (!profileId) return
     const added = next.filter(v => !hardFoodDislikeValues.includes(v))
     const removed = hardFoodDislikes.filter(f => !next.includes(f.resolved_refs?.[0] ?? f.display_text))
-    await Promise.all([
-      ...added.map(v => createFact({
-        profileId, kind: 'food_preference', source: 'manual',
-        rawPhrase: v, displayText: `won't eat/do ${v}`,
-        polarity: 'dislike', hardness: 'hard', resolvedRefs: resolveFoodTarget(v),
-      })),
-      ...removed.map(f => deleteFactPermanently(f.id)),
-    ])
+    try {
+      await Promise.all([
+        ...added.map(v => createFact({
+          profileId, kind: 'food_preference', source: 'manual',
+          rawPhrase: v, displayText: `won't eat/do ${v}`,
+          polarity: 'dislike', hardness: 'hard', resolvedRefs: resolveFoodTarget(v),
+        })),
+        ...removed.map(f => deleteFactPermanently(f.id)),
+      ])
+    } catch (err) {
+      console.error('Saving foods to avoid failed:', err)
+      await reload().catch(() => {})
+      await Promise.resolve(onMemoryChanged()).catch(() => {})
+      setSaveError(
+        added.length > 0
+          ? "That wasn't saved, so it is NOT being avoided yet. Check your connection and add it again."
+          : "That wasn't removed — it's still being avoided. Check your connection and try again.",
+      )
+      throw err
+    }
+    setSaveError(null)
     await reload()
     await onMemoryChanged()
   }

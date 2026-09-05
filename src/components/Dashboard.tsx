@@ -163,6 +163,9 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
   // a chat-side log_weight only refreshes App.tsx's own latestWeightKg, not
   // this component's independently-fetched weightSeries/weightTrend/goal.
   const [weighInVersion, setWeighInVersion] = useState(0)
+  const [loadError, setLoadError] = useState(false)
+  /** Bumping this re-runs the load effect — the Retry button's whole mechanism. */
+  const [retryVersion, setRetryVersion] = useState(0)
 
   useEffect(() => {
     // Deliberately NOT gated on `macros`. computeTargets returns null for
@@ -180,10 +183,21 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
       todayLogs: activeSession.logs, liveWeek: activeSession.liveWeek,
       dayName: activeSession.dayName, todayStr: activeSession.date,
       now: getAppNow(profile.id),
-    }).then(d => { if (!cancelled) setData(d) }).finally(() => { if (!cancelled) setLoading(false) })
+    })
+      .then(d => { if (!cancelled) { setData(d); setLoadError(false) } })
+      // WITHOUT THIS, A FAILED LOAD IS INDISTINGUISHABLE FROM A SLOW ONE —
+      // forever. `finally` cleared `loading`, but `data` stayed null and the
+      // render guard below is `loading || !data`, so one rejected promise left
+      // the entire Home tab reading "Loading your day…" until the app was
+      // restarted, with the failure visible only in a console nobody opens.
+      .catch(err => {
+        console.error('Loading the dashboard failed:', err)
+        if (!cancelled) setLoadError(true)
+      })
+      .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeSession.ready, activeSession.date, activeSession.logs.length, profile.id, weighInVersion, macros])
+  }, [activeSession.ready, activeSession.date, activeSession.logs.length, profile.id, weighInVersion, macros, retryVersion])
 
   const handleWeighInChanged = async () => {
     setWeighInVersion(v => v + 1)
@@ -195,6 +209,18 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
     void getStepsForDate(profile.id, activeSession.date || '').then(setSteps).catch(() => setSteps(null))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile.id, activeSession.date])
+
+  if (!loading && loadError && !data) {
+    return (
+      <div className="flex flex-col items-center gap-3 rounded-xl bg-card py-12 text-center">
+        <p className="text-sm text-muted-foreground">Your day didn&apos;t load.</p>
+        <p className="px-6 text-xs text-muted-foreground/70">
+          Nothing is lost — anything you logged is still saved. This is just the summary.
+        </p>
+        <Button size="sm" variant="secondary" onClick={() => setRetryVersion(v => v + 1)}>Try again</Button>
+      </div>
+    )
+  }
 
   if (!activeSession.ready || loading || !data) {
     return (

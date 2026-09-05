@@ -74,8 +74,12 @@ export interface SetGridProps {
   loadIsEstimate?: boolean
   onSetCompleted?: (exerciseName: string, setNumber: number, weight: number, reps: number, rest: string, sets: number, prescribedReps: string, tier?: string) => void
   onOpenPlateCalc?: (weight: number) => void
-  /** Fired once, the first time ANY set is saved for an exercise with no prior logged history at all — the parent dedupes to a session-local one-time celebration. */
-  onFirstEverLog?: (exerciseName: string) => void
+  // REMOVED 5 Sep 2026: onFirstEverLog. It was declared here, forwarded by
+  // ExerciseRow, and fired on the right condition — and no parent anywhere in
+  // the app ever passed one, so the "one-time celebration" its doc comment
+  // described has never happened once. Deleting the chain rather than
+  // inventing the celebration: what that moment should actually show a
+  // trainee is a product decision, not a wiring gap to paper over.
 }
 
 function toSessionSets(logs: ExerciseSetLog[]): { setNumber: number; weight: number; reps: number }[] {
@@ -98,7 +102,6 @@ export function SetGrid({
   loadIsEstimate,
   onSetCompleted,
   onOpenPlateCalc,
-  onFirstEverLog,
 }: SetGridProps) {
   const {
     profileId, date: today, dayName, liveWeek, setsFor, ghosts, loadGhosts, logSet, deleteSet, refresh,
@@ -282,7 +285,6 @@ export function SetGrid({
 
     setInputs(prev => ({ ...prev, [setNumber]: { weight: isBodyweight ? '' : String(weight), reps: String(reps), isBodyweight } }))
 
-    const wasFirstEverLog = ghostValues.length === 0
 
     // Local-first: the set is persisted (and the check turns green) the
     // moment this returns — even in airplane mode.
@@ -306,8 +308,6 @@ export function SetGrid({
     // logged sets first, so it would not overwrite anything, but a stale
     // draft on a later set number would reappear as if freshly typed.
     clearSetDrafts(exerciseId)
-
-    if (wasFirstEverLog) onFirstEverLog?.(exerciseName)
 
     // Both PR paths read the STORED weight, deliberately, so a weighted
     // pull-up keeps exactly today's behaviour (bodyweight, PR by reps) rather
@@ -407,16 +407,23 @@ export function SetGrid({
               className={`h-7 border-0 bg-[color:var(--surface-raised)] text-sm shadow-none ${isSaved ? 'text-primary' : ''} ${isBW ? 'text-muted-foreground' : ''} ${rowErrors[setNumber] ? 'ring-1 ring-destructive' : ''}`}
               disabled={isBW}
             />
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              className="size-7 text-muted-foreground hover:text-foreground"
-              onClick={() => onOpenPlateCalc?.(parseFloat(input.weight || (ghost ? String(ghost.weight_kg) : '0')) || 0)}
-              disabled={isBW}
-              aria-label="Plate calculator"
-            >
-              <Dumbbell className="size-3.5" />
-            </Button>
+            {/* The `?.` used to make this button silently inert wherever the
+                prop was absent, which is how Additional Work came to have a
+                dead one. The handler is threaded there now — and the button
+                only renders where one exists, so the same gap cannot draw a
+                dead control again. */}
+            {onOpenPlateCalc && (
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                className="size-7 text-muted-foreground hover:text-foreground"
+                onClick={() => onOpenPlateCalc(parseFloat(input.weight || (ghost ? String(ghost.weight_kg) : '0')) || 0)}
+                disabled={isBW}
+                aria-label="Plate calculator"
+              >
+                <Dumbbell className="size-3.5" />
+              </Button>
+            )}
             {isBodyweightCapable && (
               <Button
                 variant={isBW ? 'default' : 'outline'}

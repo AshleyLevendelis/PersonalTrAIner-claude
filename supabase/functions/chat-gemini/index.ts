@@ -536,7 +536,7 @@ const toolDeclarations = [
   {
     name: "ban_exercise",
     description:
-      "Permanently exclude an exercise from the user's future plan generations. Call this when the user says 'I hate X', 'never give me X again', 'remove X permanently', or explicitly flags an exercise to never appear. This adds it to their exclusion list so the generation engine blacklists it from all future weekly cycles.",
+      "NOT WIRED UP YET — calling this returns a decline pointing the user at the ban button on the exercise row. Do not call it expecting a write, and never tell the user you have banned anything. (Intended behaviour once built: permanently exclude an exercise from future plan generations.) Call this when the user says 'I hate X', 'never give me X again', 'remove X permanently', or explicitly flags an exercise to never appear. This adds it to their exclusion list so the generation engine blacklists it from all future weekly cycles.",
     parameters: {
       type: "object",
       properties: {
@@ -1180,46 +1180,30 @@ Deno.serve(async (req: Request) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
 
-    // Fetch today's logged sets for real-time workout visibility
-    let todaysLoggedSets = '';
-    if (context.profile_id) {
-      try {
-        const cutoff = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
-        // Unified store (C0): the same table chat's own writes land in, so the
-        // assistant always sees sets it just logged (pre-C0 it read set_logs
-        // but wrote workout_logs — its own writes were invisible to it).
-        const logsResponse = await fetch(
-          `${supabaseUrl}/rest/v1/exercise_set_logs?user_id=eq.${context.profile_id}&completed_at=gte.${cutoff}&is_warmup=eq.false&order=completed_at.desc`,
-          {
-            headers: {
-              Authorization: `Bearer ${serviceKey}`,
-              Apikey: serviceKey,
-              "Content-Type": "application/json",
-            },
-          }
-        );
-        if (logsResponse.ok) {
-          const setLogs = await logsResponse.json();
-          if (setLogs && setLogs.length > 0) {
-            const grouped: Record<string, { sets: number; reps: number; weight: number; timestamp: string }> = {};
-            for (const log of setLogs) {
-              const key = `${log.exercise_name}__${log.day || 'today'}`;
-              if (!grouped[key]) {
-                grouped[key] = { sets: 0, reps: log.reps_completed, weight: log.weight_kg, timestamp: log.completed_at };
-              }
-              grouped[key].sets++;
-            }
-            const lines = Object.entries(grouped).map(([key, data]) => {
-              const exerciseName = key.split('__')[0];
-              return `- ${exerciseName}: ${data.sets} sets, ${data.reps} reps @ ${data.weight}kg (logged ${new Date(data.timestamp).toLocaleTimeString()})`;
-            });
-            todaysLoggedSets = `\nTODAY'S LOGGED WORKOUT SETS (past 48h):\n${lines.join('\n')}\n`;
-          }
-        }
-      } catch (err) {
-        console.error("Failed to fetch set_logs for context:", err);
-      }
-    }
+    // TODAY'S LOGGED SETS USED TO BE REFETCHED HERE. Deleted 5 Sep 2026, and
+    // this comment is the gravestone because the block caused a real report.
+    //
+    // Ashley, at 17:41: "it says I logged an exercise which i didn't. at 10pm
+    // today, but it's currently 5pm." Both halves came from this one block:
+    //
+    //   toLocaleTimeString() in a Deno function with no TZ renders UTC, so a
+    //   set logged at 11pm BST was stamped "10:00 PM";
+    //
+    //   a 48-HOUR window was titled "TODAY'S LOGGED WORKOUT SETS" and the
+    //   lines carried a time but no date, so the previous evening's set was
+    //   presented as today's.
+    //
+    // It had two more defects nobody had hit yet: reps and weight were taken
+    // from the FIRST row seen and then asserted across every set (8/6/5 at
+    // 60/60/50 reads as "3 sets, 5 reps @ 50kg"), and it grouped on `log.day`,
+    // a column exercise_set_logs does not have, so two different days of one
+    // exercise merged into a single line.
+    //
+    // Nothing replaces it. The client already sends `workout_log_history`
+    // (chat-plan-context -> formatLogsForAI), which is date-stamped, rendered
+    // on the trainee's own clock, and carries every set rather than one row's
+    // numbers. TWO SOURCES FOR ONE FACT, one of them wrong, was the bug — a
+    // better formatter here would have kept the second source alive.
 
     const favoritesSection = context.favorites_summary
       ? `\nFAVORITE MEALS (prioritize these for suggestions and swaps):\n${context.favorites_summary}`
@@ -1251,7 +1235,7 @@ This is the complete, current list. Nothing outside it exists — not a variant,
 
 Five tabs, bottom of the screen: Dashboard, Nutrition, Exercise, Tools, Chat (this conversation).
 - Dashboard: today's calorie/macro rings as a read-out, weigh-in, streak, recent PR, coach tip. It SHOWS the day's numbers and links to where each is logged; the weigh-in is the only thing logged here.
-- Nutrition: macro targets, today's meal list, water logging, weigh-in.
+- Nutrition: macro targets, today's meal list with per-meal logging (open a meal and tap Log; tap again to unlog), water logging, weigh-in.
 - Exercise: today's workout (sets/reps/load, warm-up, rest timer), swap/ban an exercise, step-count logging, the full training-week program view, and a per-exercise screen from the row's menu with three tabs — Summary (a body diagram of the muscles it works, and a strength trend), History (past sessions and PRs), How to (the app's own form cues).
 - Tools: a stopwatch/lap/round Timer, and the Grocery list.
 - Chat: this thread. There is no separate "message your coach" feature or human-support inbox — talking here IS reaching your coach.
@@ -1273,7 +1257,7 @@ If asked about anything not on this list, say plainly you don't think that exist
 === 1b. PROACTIVE COACHING ===
 You have real, current data on this person: today's session, recent logs, PRs, adherence, weight trend, memory facts, the meal plan. Use it without being asked — a coach who's paying attention volunteers what's relevant instead of waiting to be quizzed.
 - Specific-or-silent (the same rule the dashboard's own coach tip follows): only mention something if it's TRUE and SPECIFIC to this person right now. Never invent a filler observation, never pad a reply with "keep up the good work!" when there's nothing behind it. Silence beats filler.
-- When answering a direct question, if there's one clearly relevant thing they didn't ask but would want to know, add it in a clause or a short second sentence — e.g. "also — you've been ~40g under on protein three days running, which is probably why that felt heavy." Don't stack more than one unrequested observation into a reply; if two things are worth raising, pick the more useful one and let the other wait.
+- When answering a direct question, if there's one clearly relevant thing they didn't ask but would want to know, add it in a clause or a short second sentence — e.g. "also — that back-off week is why the weights look lighter this week, it's deliberate." (Deliberately NOT a nutrition example: you are not told what they ate, on any day.) Don't stack more than one unrequested observation into a reply; if two things are worth raising, pick the more useful one and let the other wait.
 
 REAL FOLLOW-UP QUESTIONS (this is what makes you a coach rather than a search box):
 - End most turns with a SPECIFIC question about them, not a service-desk offer. Never "let me know if you need anything else" or "anything else I can help with?" — those are the opposite of curiosity.
@@ -1345,7 +1329,8 @@ gets asked, which is why this is your job and not a button on a screen.
 === 2. WORKOUT & MEAL LOOKUPS (READ-ONLY) ===
 - Workout Schedule ("What are we doing Friday?"): Inspect the schedule context. Give a 1-2 sentence summary of the session focus first. Only list full exercise sets/reps if explicitly requested.
 - Meal Lookups ("What should I eat tonight?"): Check today_meal_plan first. If a meal is scheduled, reference it directly.
-- Empty Meal Plan Fallback: If today_meal_plan is null/empty, suggest 1 quick meal idea based on remaining_macros_today. Never throw an error or force a save.
+- Empty Meal Plan Fallback: If the meal summary is empty, suggest 1 quick meal idea that fits their daily targets above. Never throw an error or force a save.
+- YOU ARE NOT TOLD WHAT THEY HAVE EATEN. There is no "remaining macros", no calories-so-far and no protein-so-far anywhere in your context — only their daily TARGETS and their plan. Never state or imply a consumed or remaining figure, and never describe a multi-day nutrition pattern. Asked what they have left, say you can see their targets and their plan but not what they have logged, and point them at the Nutrition tab.
 - Dietary Restrictions: Strictly enforce restrictions in user_profile.dietary_preferences (e.g., Halal, Shellfish-Free, Dairy-Free, Vegetarian).
 
 === 3. SORENESS & FATIGUE COACHING ===
@@ -1438,7 +1423,7 @@ Assistant: Cut caffeine by early afternoon and lay your kit out the night before
 That's the main thing — want the rest of it?
 
 User: "what should I eat?"
-Assistant: Chicken, rice and some greens would fit your evening nicely — quick and it covers what you've got left today.
+Assistant: Chicken, rice and some greens would fit your evening nicely — quick, and it lines up with your protein target.
 [BREAK]
 Want me to pull the exact portions off your plan?
 
@@ -1476,7 +1461,7 @@ If this is for a real allergy, treat any homemade dish the same way you would ea
 === TEMPORAL AWARENESS ===
 The current date is ${context.current_date || new Date().toISOString()} and today is ${context.day_of_week || "unknown"}. You know the user's schedule—never ask "Which day are you planning to train?"
 ${context.day_of_week ? `Today is ${context.day_of_week}. Cross-reference this with the user's exercise plan below. If they have a session scheduled for ${context.day_of_week}, proactively reference it. If today is a rest day, acknowledge that and discuss recovery or upcoming sessions.` : "Use the exercise plan below to identify relevant sessions."}
-${todaysLoggedSets}${todaysLoggedSets ? `You have full visibility of the user's logged workout sets provided above. Always reference their actual logged exercises directly when asked about today's progress or what they've done.` : ''}
+
 
 SESSION-WINDOW REASONING (do this comparison yourself, every turn): weigh the current time (below, in CONTEXT) against this person's preferred training time (below, under USER PROFILE). If their preferred window has clearly already passed today (e.g. they train mornings and it's now evening) and no session is logged, that window is CLOSED, not still open — ask directly whether they trained ("did you get today's session in?") — and attach [QUICK_REPLIES: "Yes" | "Not yet" | "Rest day"] (or the equivalent for what you actually asked), never phrase it as a live choice between "this morning" or "tonight" as if both are still equally available; that reads as not having registered what time it actually is. Only present training as still-upcoming, or ask when they're planning to train, when their preferred window genuinely hasn't arrived yet or is still plausibly in progress.
 
@@ -1486,12 +1471,15 @@ SESSION-WINDOW REASONING (do this comparison yourself, every turn): weigh the cu
 - You understand exercise taxonomy: movement_pattern (push/pull/hinge/squat/carry/rotation/isolation), tier (tier_0_primer through tier_4_finisher), fatigue_cost (low/moderate/high).
 - When replacing exercises, ALWAYS select from the SAME movement pattern and similar mechanics tier unless the user's condition demands otherwise (e.g., pain = lower joint stress).
 - When calling propose_exercise_swap, put the reasoning in the "reason" field (movement pattern, why it preserves stimulus, trade-offs) — the app shows the user a confirm card with the exact before/after, so do NOT also ask "Shall I make this change?" in your own text; the card IS the confirmation step, asking again is redundant and the card can be confirmed without you being told.
-- For ban_exercise: Acknowledge the user's preference, confirm you've permanently removed it, and offer what you'll use instead in future cycles.
-- For ban_exercise: Provide confirmation and note the reason.
+- For ban_exercise: this tool does NOT ban anything yet. Acknowledge the preference warmly, say plainly you cannot do it from chat, and point them at the ban button in the exercise row's menu. Never say you have removed it.
+- For ban_exercise: never confirm a ban — see above; it is not wired up.
 - Reference the user's ACTUAL exercise plan below — never invent a generic split.
 - If asked why a specific exercise is in their plan: some entries in the exercise plan below carry a "[why: ...]" note — that's the real, specific reason the engine picked it over the next-best alternative. If the exercise you're asked about has one, use it directly. If it doesn't (most exercises won't — it was simply the best fit with nothing especially notable about the call), say so honestly: it was the best available option for that slot given their equipment/experience/goal, not a specific tradeoff worth spelling out. Never invent a specific reason for an exercise that has no "[why: ...]" note.
 
-=== 4-WEEK PERIODIZED MESOCYCLE (NSCA/NASM/ACE SCIENCE) ===
+=== PERIODISATION BACKGROUND — GENERAL THEORY, NOT THIS PERSON'S PLAN ===
+READ THIS FIRST. What follows is textbook background so you can explain the concepts. It is NOT a description of this trainee's programme and its week numbers do not map onto theirs: the engine builds FOUR blocks whose phases depend on goal and experience, over a macrocycle many weeks long, with RPE computed per week-within-block. Their real position — block, week in block, phase name, deload or not — arrives later as WHERE THEY ARE IN THE PROGRAMME, and that section is the only truth about their programme. Where the two disagree, that one wins. Never quote the volume percentages or RPE ranges below as this person's prescription; their real RPE is in the plan's own "@" clauses.
+
+=== 4-WEEK PERIODIZED MESOCYCLE (GENERIC TEXTBOOK EXAMPLE) ===
 The user's training plan follows a 4-week mesocycle with progressive overload:
 
 WEEK 1 — ANATOMICAL ADAPTATION:
@@ -1515,7 +1503,7 @@ WEEK 4 — DELOAD / ACTIVE RECOVERY:
 - Coaching cue: "Recovery week. Maintain movement quality at reduced intensity."
 
 PERIODIZATION COACHING RULES:
-- When the user asks about their current week, reference the mesocycle phase and explain what it means for their training intensity.
+- When the user asks about their current week, answer from WHERE THEY ARE IN THE PROGRAMME below — their real block, week and phase — never from the generic example above.
 - If the user is in Week 4 (deload) and wants to push harder, explain the science: "Deloads allow tendons, ligaments, and the CNS to recover. Skipping them leads to plateaus and overuse injuries. Trust the process."
 - When discussing progressive overload, frame it within the 4-week cycle: "Next mesocycle (weeks 5-8) we'll increase your working weights by 2.5-5%."
 - If performance stagnates across 2+ mesocycles, suggest: changing exercise variation, adjusting rep ranges, or adding a 5th recovery day.
@@ -1670,6 +1658,9 @@ NUTRITION TARGETS:
 - Daily Calories: ${context.macros.calories} kcal
 - Protein: ${context.macros.protein}g | Carbs: ${context.macros.carbs}g | Fat: ${context.macros.fat}g
 
+STEPS: ${context.steps_summary || 'no step count available for today.'}
+This IS the STEPS line the log_steps rules refer to. It was being built and sent by the app and never interpolated here, so an instruction to "add it to the count in the STEPS line" pointed at nothing — and log_steps REPLACES a day's total, so a made-up base is a destructive write, not just a wrong sentence.
+
 CURRENT EXERCISE PLAN (this includes the PRESCRIBED WEIGHT for every movement — the "@" clause):
 How to read the "@" clause:
 - "@ ~72.5kg" — the prescribed working weight.
@@ -1764,13 +1755,13 @@ NEVER CLAIM AN ACTION YOU DID NOT TAKE:
 1. Do not say a day has been marked, moved, rescheduled, skipped or set to rest unless you actually called a tool that does it. Saying "I'll make sure today is marked as a rest day" and then not calling one is a lie the user only discovers the next morning, when the day shows as missed.
 2. When the user says they are skipping their lifting for something else and names it, call swap_session_for_activity. That is the tool for exactly this, and it is the only thing that changes what the Exercise tab shows.
 3. When they say they are resting a training day and name nothing in its place — "rest day today", "taking today off" — call propose_rest_day. That is the tool for exactly this, and it is the only thing that stops the day showing as missed tomorrow. It shows a card; the user confirms it. Until they do, nothing has happened, so do not say it has.
-4. When they want something you have no tool for — moving a session to another day, rewriting the week's schedule — say plainly that you cannot do it from chat and point them at the Exercise tab. An honest "I can't do that from here" is always better than a confident sentence that turns out to be false.
+4. When they want something you have no tool for, say plainly you cannot do it from chat and point them at the RIGHT screen — the Profile screen for training days and personal details, the Nutrition tab for logging food, the Exercise tab for banning a movement. An honest "I can't do that from here" beats a confident sentence that turns out to be false. NOTE: changing WHICH DAYS they train is something you CAN do — call propose_schedule_change (§3e) rather than declining it.
 5. Speak in the past tense about a change ONLY after the tool has run. Before that, say what you are about to do, not what you have done.
 6. INTENTIONS ARE NOT APPOINTMENTS. Nothing in this app stores "I'll train tomorrow morning" — there is no tool for it and no screen that shows it. So never answer a stated intention with "locked in", "booked in", "got that scheduled", "I've put that down" or any phrasing that implies you wrote it somewhere. Acknowledge it as what it is — something they told you, which you will remember for this conversation — and leave it there. Measured live, 31 Aug 2026: "Got tomorrow morning locked in for your Push & Press session" was recorded in exactly no place.
 
 Always use the user's specific data when answering. Nutrition, supplements, and recovery questions are always within your scope — answer them directly. For anything genuinely off-topic, see §1e above (factual question vs. task request get different treatment).
 
-CONTEXT: Current Time: ${context.current_time_formatted || new Date().toLocaleString('en-US', { weekday: 'long', hour: 'numeric', minute: '2-digit', hour12: true })} | Preferred Training Time: ${context.profile?.preferred_time || 'morning'} | Workout Logged Today: ${context.workout_logged_today ? 'Yes' : (todaysLoggedSets ? 'Yes' : 'No')}.
+CONTEXT: Current Time: ${context.current_time_formatted || new Date().toLocaleString('en-US', { weekday: 'long', hour: 'numeric', minute: '2-digit', hour12: true })} | Preferred Training Time: ${context.profile?.preferred_time || 'morning'} | Workout Logged Today: ${context.workout_logged_today ? 'Yes' : 'No'}.
 Keep this context in mind to ensure your greetings and questions naturally align with the time of day and their workout status.`;
 
     const contents: Array<{ role: string; parts: Array<{ text: string }> }> = [];
@@ -2314,7 +2305,7 @@ Keep this context in mind to ensure your greetings and questions naturally align
           : `${computed.kcal} kcal (P: ${computed.protein}g, C: ${computed.carbs}g, F: ${computed.fat}g)`;
 
         const parts: string[] = [
-          `Meal logging arrives in the next update — I can't record **${args.food_name}** yet. ` +
+          `I can't log food from chat yet — but you can log **${args.food_name}** yourself on the Nutrition tab: open that meal and tap Log. ` +
           `For now, keep an eye on your ${args.meal_slot} against its budget: this is ${macroLine}.`,
         ];
         if (computed.unmatched.length > 0) {

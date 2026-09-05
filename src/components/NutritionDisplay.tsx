@@ -6,7 +6,7 @@ import { Calculator, Layers } from 'lucide-react'
 import { MealPlan } from '@/components/MealPlan'
 import { MacroSplitCard } from '@/components/MacroSplitCard'
 import { useActiveSession } from '@/hooks/useActiveSession'
-import { getTodayLedger } from '@/lib/meal-store'
+import { getTodayLedger, subscribeMealStore } from '@/lib/meal-store'
 import { getAllLogs as getAllWaterLogs, logWater, undoLog as undoWaterLog, setWaterTargetMl, type WaterLogRow } from '@/lib/water-store'
 import type { MacroTargets, UserProfile, WorkoutDay, MacroCalculationMode } from '@/lib/types'
 import type { MealSlotName } from '@/lib/meal-store'
@@ -152,11 +152,24 @@ export function NutritionDisplay({
    */
   const [entryError, setEntryError] = useState<string | null>(null)
 
+  /**
+   * THE RINGS FOLLOW THE MEAL LIST BELOW THEM.
+   *
+   * MealPlan renders inside this same tab and writes meal events through
+   * meal-store. Until 5 Sep 2026 that store published nothing, so tapping Log
+   * on a meal moved the row's own state and left the ring directly above it on
+   * the same screen showing the day's totals from before the meal — the two
+   * halves of one screen disagreeing about what had been eaten. `ledgerVersion`
+   * is the re-read trigger; the effect body is unchanged.
+   */
+  const [ledgerVersion, setLedgerVersion] = useState(0)
+  useEffect(() => subscribeMealStore(() => setLedgerVersion(v => v + 1)), [])
+
   useEffect(() => {
     if (!profileId || !date || !macros) return
     getTodayLedger(profileId, date, macros).then(l => setEaten(l.eaten)).catch(console.error)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profileId, date, macros, mealTotals])
+  }, [profileId, date, macros, mealTotals, ledgerVersion])
 
   useEffect(() => {
     if (!profileId) return

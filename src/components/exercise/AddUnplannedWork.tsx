@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Plus, X, Dumbbell, Activity, Clock, Flame, Loader2 } from 'lucide-react'
 import { useActiveSession } from '@/hooks/useActiveSession'
-import { saveCardioLog } from '@/lib/cardio-log-store'
+import { isPlausibleCardioDuration, MAX_PLAUSIBLE_CARDIO_MINUTES, saveCardioLog } from '@/lib/cardio-log-store'
 
 // ---------------------------------------------------------------------------
 // One entry point for off-plan lifts AND ad-hoc cardio (LAYOUT-DESIGN.md
@@ -46,6 +46,7 @@ export function AddUnplannedWork({
   const [liftName, setLiftName] = useState('')
   const [activity, setActivity] = useState('')
   const [duration, setDuration] = useState('')
+  const [durationError, setDurationError] = useState<string | null>(null)
   const [rpe, setRpe] = useState(6)
   const [saving, setSaving] = useState(false)
 
@@ -75,15 +76,26 @@ export function AddUnplannedWork({
 
   const handleSaveCardio = () => {
     if (!profileId || !activity.trim() || !duration) return
+    // Same unenforced `min="1"` as the rest-day card had — see its handler.
+    const minutes = parseInt(duration, 10)
+    if (!isPlausibleCardioDuration(minutes)) {
+      setDurationError(`Enter between 1 and ${MAX_PLAUSIBLE_CARDIO_MINUTES} minutes.`)
+      return
+    }
+    setDurationError(null)
     setSaving(true)
-    saveCardioLog({
+    const view = saveCardioLog({
       userId: profileId,
       date,
       activityName: activity.trim(),
-      durationMinutes: parseInt(duration) || 0,
+      durationMinutes: minutes,
       intensityRpe: rpe,
     })
     setSaving(false)
+    if (!view) {
+      setDurationError("That didn't save — check the number and try again.")
+      return
+    }
     onCardioLogged?.()
     reset()
   }

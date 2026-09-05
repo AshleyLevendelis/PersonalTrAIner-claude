@@ -590,6 +590,15 @@ export async function generateMealPools(params: {
   return { accepted, rejectionLog, shortfalls, unrecognisedPreferences: [...unrecognisedPreferences].sort(), generatorReached }
 }
 
+/** One stored pool row, as persistPools reads it back and may have to write it again unchanged. */
+interface PoolRowSnapshot {
+  pool_index: number
+  name: string
+  ingredients: unknown
+  macros: unknown
+  tags?: string[] | null
+}
+
 /**
  * Adds newly accepted options ON TOP of what the slot already holds, at the
  * next pool_index. The counterpart to persistPools, and deliberately a
@@ -619,7 +628,19 @@ async function appendPools(
   }
 }
 
-/** Replaces a profile's stored pool for each touched slot with the newly accepted options. */
+/**
+ * Replaces a profile's stored pool for each touched slot with the newly
+ * accepted options.
+ *
+ * DELETE-THEN-INSERT, WITH THE OLD POOL HELD IN HAND. There is no atomic
+ * "replace these rows" through PostgREST, so for a moment the slot has no
+ * meals in it at all — and until 5 Sep 2026 a failed insert left it that way,
+ * logged to a console nobody reads, with the Nutrition tab showing an empty
+ * dinner and no path back. Every step is checked now, and the ordering is
+ * chosen so each failure stops somewhere survivable: a read that fails deletes
+ * nothing, a delete that fails inserts nothing, and an insert that fails puts
+ * the old pool back exactly as it was.
+ */
 async function persistPools(profileId: string, accepted: Partial<Record<MealSlotName, PoolOption[]>>): Promise<void> {
   for (const [slot, options] of Object.entries(accepted) as [MealSlotName, PoolOption[]][]) {
     if (options.length === 0) continue
@@ -640,16 +661,29 @@ async function persistPools(profileId: string, accepted: Partial<Record<MealSlot
     // suite cannot execute is one the suite cannot check; reading the slot's
     // rows and filtering here needs nothing beyond .select().eq(), which
     // every path already relies on.
-    const { data: keepRows } = await supabase
+    const { data: keepRows, error: readError } = await supabase
       .from('meal_plan_slots')
-      .select('name, ingredients, macros, tags')
+      .select('pool_index, name, ingredients, macros, tags')
       .eq('profile_id', profileId)
       .eq('slot', slot)
-    const keep = (keepRows ?? []).filter(
-      (row: { tags?: string[] | null }) => (row.tags ?? []).includes(USER_REQUESTED_TAG),
-    )
+    // NOT a shrug-and-carry-on. This read is the only thing that knows which
+    // meals the user asked for by name, so proceeding without it would delete
+    // them — silently, and for the second time (see Ashley's steak above).
+    // Leaving the slot as it is costs a stale pool; carrying on costs meals.
+    if (readError) {
+      console.error(`Couldn't read the existing pool for slot ${slot} — leaving it untouched rather than replacing it blind:`, readError)
+      continue
+    }
+    const previous = (keepRows ?? []) as PoolRowSnapshot[]
+    const keep = previous.filter(row => (row.tags ?? []).includes(USER_REQUESTED_TAG))
 
-    await supabase.from('meal_plan_slots').delete().eq('profile_id', profileId).eq('slot', slot)
+    const { error: deleteError } = await supabase.from('meal_plan_slots').delete().eq('profile_id', profileId).eq('slot', slot)
+    if (deleteError) {
+      // The old pool is still there and still coherent. Inserting on top of
+      // it would collide on pool_index at best and double the slot at worst.
+      console.error(`Couldn't clear the old pool for slot ${slot} — keeping it rather than inserting alongside it:`, deleteError)
+      continue
+    }
 
     const rows = options.map((opt, i) => ({
       profile_id: profileId,
@@ -673,7 +707,25 @@ async function persistPools(profileId: string, accepted: Partial<Record<MealSlot
       tags: row.tags,
     }))
     const { error } = await supabase.from('meal_plan_slots').insert([...rows, ...keptRows])
-    if (error) console.error(`Failed to persist pool for slot ${slot}:`, error)
+    if (error) {
+      console.error(`Failed to persist pool for slot ${slot}:`, error)
+      // The delete already landed, so doing nothing here leaves the slot
+      // empty. Put back exactly what was there, pool_index included.
+      if (previous.length > 0) {
+        const { error: restoreError } = await supabase.from('meal_plan_slots').insert(
+          previous.map(row => ({
+            profile_id: profileId,
+            slot,
+            pool_index: row.pool_index,
+            name: row.name,
+            ingredients: row.ingredients,
+            macros: row.macros,
+            tags: row.tags,
+          })),
+        )
+        if (restoreError) console.error(`...and restoring the previous pool for slot ${slot} failed too:`, restoreError)
+      }
+    }
   }
 }
 

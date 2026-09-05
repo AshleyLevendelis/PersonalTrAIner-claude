@@ -25,13 +25,33 @@ const PLATE_WIDTHS: Record<number, string> = {
   1.25: 'w-6 h-10',
 }
 
+/**
+ * The heaviest target this will lay out, in kg.
+ *
+ * A number, because the loop below is unbounded and the input above it is a
+ * bare `type="number"`. Type 9000000 into it — a slip of the finger away from
+ * 90 — and calculatePlates pushes 25kg plates one at a time until it has built
+ * an array of 180,000 of them, then React tries to render every one as a
+ * coloured div. The tab locks up; on a phone it is killed. Nothing about that
+ * is the user's mistake to pay for.
+ *
+ * 500 kg is deliberately past any real barbell: the heaviest raw squat ever
+ * performed is around that, so this rejects typos without arguing with anyone
+ * loading a real bar. Same reasoning, and the same shape, as
+ * MAX_PLAUSIBLE_DAILY_STEPS.
+ */
+export const MAX_BARBELL_TARGET_KG = 500
+
+/** Per side, at 1.25kg increments, 500kg of target cannot need more than this. Structural belt to the ceiling's braces. */
+const MAX_PLATES_PER_SIDE = 64
+
 function calculatePlates(targetWeight: number, barWeight: number): number[] {
   const remainder = targetWeight - barWeight
   if (remainder <= 0) return []
   let perSide = remainder / 2
   const plates: number[] = []
   for (const plate of STANDARD_PLATES) {
-    while (perSide >= plate) {
+    while (perSide >= plate && plates.length < MAX_PLATES_PER_SIDE) {
       plates.push(plate)
       perSide -= plate
       perSide = Math.round(perSide * 100) / 100
@@ -52,8 +72,12 @@ export function PlateCalculator({ open, onOpenChange, initialWeight = 0 }: Plate
 
   const target = parseFloat(targetWeight) || 0
   const bar = parseFloat(barWeight) || 20
+  // Both ends, because the bar is an input too and a 9000kg bar makes the
+  // remainder negative rather than huge — wrong answer, not a hang, but still
+  // an answer to a question nobody asked.
+  const outOfRange = target > MAX_BARBELL_TARGET_KG || bar > MAX_BARBELL_TARGET_KG
 
-  const plates = useMemo(() => calculatePlates(target, bar), [target, bar])
+  const plates = useMemo(() => (outOfRange ? [] : calculatePlates(target, bar)), [target, bar, outOfRange])
   const perSideWeight = Math.max(0, (target - bar) / 2)
   const achievableWeight = bar + plates.reduce((sum, p) => sum + p, 0) * 2
   const hasRemainder = target > bar && achievableWeight < target
@@ -81,6 +105,7 @@ export function PlateCalculator({ open, onOpenChange, initialWeight = 0 }: Plate
               <Input
                 type="number"
                 min="0"
+                max={MAX_BARBELL_TARGET_KG}
                 step="0.5"
                 value={targetWeight}
                 onChange={e => setTargetWeight(e.target.value)}
@@ -93,6 +118,7 @@ export function PlateCalculator({ open, onOpenChange, initialWeight = 0 }: Plate
               <Input
                 type="number"
                 min="0"
+                max={MAX_BARBELL_TARGET_KG}
                 step="0.5"
                 value={barWeight}
                 onChange={e => setBarWeight(e.target.value)}
@@ -101,7 +127,11 @@ export function PlateCalculator({ open, onOpenChange, initialWeight = 0 }: Plate
             </div>
           </div>
 
-          {target <= bar ? (
+          {outOfRange ? (
+            <div className="py-6 text-center text-sm text-muted-foreground">
+              That&apos;s over {MAX_BARBELL_TARGET_KG}kg — check the number.
+            </div>
+          ) : target <= bar ? (
             <div className="text-center py-6 text-sm text-muted-foreground">
               {target <= 0 ? 'Enter a target weight above' : 'No plates needed — bar only'}
             </div>

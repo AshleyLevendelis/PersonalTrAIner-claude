@@ -1942,11 +1942,28 @@ function App() {
     const targets = computeTargets(updated, { latestWeightKg: targetWeightAnchorKg, exercisePlan })
     setMacros(targets)
     if (profile.id) {
-      snapshotTargetsIfChanged(profile.id, updated, targets, targetWeightAnchorKg)
-      await supabase
+      // REVERT ON FAILURE, AND SNAPSHOT ONLY AFTER IT LANDS. This is the same
+      // optimistic-apply the split handler below does, and until 5 Sep 2026 it
+      // was the only one of the two missing its second half: the update's
+      // error was destructured by nobody, so a failed write left every macro
+      // on screen showing the new mode, the coach quoting those numbers, and
+      // the database still on the old one — and a reload would silently put
+      // it all back with no explanation.
+      const previousMode = profile.macro_calculation_mode
+      const { error } = await supabase
         .from('fitness_profiles')
         .update({ macro_calculation_mode: mode })
         .eq('id', profile.id)
+      if (error) {
+        console.error('Macro mode save failed — reverting', error)
+        setProfile(prev => (prev ? { ...prev, macro_calculation_mode: previousMode } : prev))
+        setMacros(computeTargets({ ...updated, macro_calculation_mode: previousMode }, { latestWeightKg: targetWeightAnchorKg, exercisePlan }))
+        return
+      }
+      // After the write, never before: the snapshot is the historical record
+      // of what this person's targets WERE, and writing one for a mode change
+      // that failed puts a number in that history nothing ever showed them.
+      snapshotTargetsIfChanged(profile.id, updated, targets, targetWeightAnchorKg)
     }
   }
 
@@ -1962,14 +1979,19 @@ function App() {
     // anchor, no weight moved, no notice.
     const targets = computeTargets(updated, { latestWeightKg: targetWeightAnchorKg, exercisePlan })
     setMacros(targets)
-    snapshotTargetsIfChanged(profile.id, updated, targets, targetWeightAnchorKg)
     supabase.from('fitness_profiles').update(patch).eq('id', profile.id).then(({ error }) => {
       if (error) {
         console.error('Macro split save failed — reverting', error)
         setProfile(prev => (prev ? { ...prev, ...revertPatch } : prev))
         const revertedTargets = computeTargets({ ...updated, ...revertPatch }, { latestWeightKg: targetWeightAnchorKg, exercisePlan })
         setMacros(revertedTargets)
+        return
       }
+      // Moved below the write on 5 Sep 2026, same reason as the mode handler
+      // above: this snapshot is the target history, and a revert that leaves
+      // one behind records a target the user was shown for a second and never
+      // actually had. Both handlers now snapshot only what survived.
+      if (profile.id) snapshotTargetsIfChanged(profile.id, updated, targets, targetWeightAnchorKg)
     })
   }
 
@@ -2390,7 +2412,7 @@ function App() {
           </TabsContent>
 
           <TabsContent value="tools">
-            <ToolsTab profileId={profile.id} mealPools={mealPools} targets={macros} softLikedFoods={compiledSoftFoodPreferences} todaysPicks={chosenMeals} />
+            <ToolsTab profileId={profile.id} mealPools={mealPools} targets={macros} softLikedFoods={compiledSoftFoodPreferences} todaysPicks={chosenMeals} exercisePlan={exercisePlan} />
           </TabsContent>
 
           <TabsContent value="chat" forceMount className="data-[state=inactive]:hidden">

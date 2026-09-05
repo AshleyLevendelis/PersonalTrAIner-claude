@@ -108,10 +108,12 @@ export function TodayPanel({
   const [summaryOpen, setSummaryOpen] = useState(false)
   const [summaryData, setSummaryData] = useState<SessionSummaryData | null>(null)
   const [summaryNothingLogged, setSummaryNothingLogged] = useState(false)
+  const [summaryCloseFailed, setSummaryCloseFailed] = useState(false)
 
   const handleFinish = async () => {
     const result = await finishSession()
     if (!result || !workout) return
+    setSummaryCloseFailed(!!result.serverCloseFailed)
     if (result.nothingLogged) {
       // No summary to compute — the point is to say the day did not close.
       setSummaryData(null)
@@ -377,7 +379,7 @@ export function TodayPanel({
               </>
             )}
           </div>
-          <SessionSummaryDialog open={summaryOpen} onOpenChange={setSummaryOpen} data={summaryData} nothingLogged={summaryNothingLogged} />
+          <SessionSummaryDialog open={summaryOpen} onOpenChange={setSummaryOpen} data={summaryData} nothingLogged={summaryNothingLogged} serverCloseFailed={summaryCloseFailed} />
           {/* WHAT CAN YOU ACTUALLY LOAD — asked at first use, not in
               onboarding (Ashley's call: someone who has never trained cannot
               answer it, and onboarding is where people drop out). Rendered
@@ -445,7 +447,7 @@ export function TodayPanel({
               <FinisherRow cardio={workout!.recommendedCardio} />
             </>
           )}
-          <AdditionalWorkSection plannedExercises={workout!.exercises} />
+          <AdditionalWorkSection plannedExercises={workout!.exercises} onOpenPlateCalc={onOpenPlateCalc} />
           <AddUnplannedWork
             open={unplannedWorkOpen}
             onOpenChange={setUnplannedWorkOpen}
