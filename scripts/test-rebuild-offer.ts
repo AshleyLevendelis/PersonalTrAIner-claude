@@ -77,7 +77,9 @@ console.log('\n2. And nothing else does')
     ['an age', { age: 31 }],
     ['a weight', { weight_kg: 82 }],
     ['a dietary preference', { dietary_preferences: ['nut-free'] }],
-    ['a training goal', { fitness_goal: 'fat_loss' }],
+    // 'a training goal' was on this list until 5 Sep 2026. Removed on Ashley's
+    // ruling — the goal drives volume, rest, rep ranges and conditioning, so it
+    // is exactly the kind of change this dialog exists for. See §1 below.
   ]
   for (const [what, patch] of noise) {
     check(`changing ${what} does not`, detectPlanInvalidation(base(), patch) === null, patch)
@@ -102,7 +104,7 @@ console.log('\n2. And nothing else does')
   // chat tool for it; fixing only chat would have made chat the more honest
   // door, the opposite of parity.
   check('the invalidating list is exactly the fields that change what the plan contains',
-    [...PLAN_INVALIDATING_FIELDS].sort().join(',') === 'equipment_access,injuries,training_days,training_style',
+    [...PLAN_INVALIDATING_FIELDS].sort().join(',') === 'equipment_access,fitness_goal,injuries,training_days,training_style',
     PLAN_INVALIDATING_FIELDS)
 
   const daysChanged = detectPlanInvalidation(
@@ -125,6 +127,20 @@ console.log('\n2. And nothing else does')
     !!styleChanged && !/training_style|profile\./.test(styleChanged.detail), styleChanged?.detail)
   const sameStyle = detectPlanInvalidation(base(), { training_style: 'hybrid' })
   check('re-saving the same style does not', sameStyle === null, sameStyle)
+
+  // fitness_goal joined on 5 Sep 2026, on Ashley's ruling — it had been kept
+  // off deliberately (see §2's former noise entry). Measured from
+  // goal-policies.ts: set volume, rest multipliers and the main-lift rest
+  // floor, rep-range shift per tier, allowed phases, the split, conditioning.
+  const goalChanged = detectPlanInvalidation(base(), { fitness_goal: 'fat_loss' })
+  check('changing the goal offers a rebuild', goalChanged?.field === 'fitness_goal', goalChanged)
+  check('...and says what it changes, in plain terms',
+    !!goalChanged && /how much you do/.test(goalChanged.detail) && /rest/.test(goalChanged.detail) && /rep ranges/.test(goalChanged.detail) && /conditioning/.test(goalChanged.detail),
+    goalChanged?.detail)
+  check('...and promises logged work is untouched', !!goalChanged && /already logged stays exactly/.test(goalChanged.detail), goalChanged?.detail)
+  check('...without naming a database field', !!goalChanged && !/fitness_goal|profile\./.test(goalChanged.detail), goalChanged?.detail)
+  const sameGoal = detectPlanInvalidation(base(), { fitness_goal: 'hypertrophy' })
+  check('re-saving the same goal does not', sameGoal === null, sameGoal)
 }
 
 console.log('\n3. A rebuild changes the weeks ahead and NOT the weeks behind')

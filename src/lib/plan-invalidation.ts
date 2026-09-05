@@ -39,7 +39,15 @@ import { rebuildAgainstProfile } from './plan-adaptations'
 // without ever offering the rebuild — so the profile said "bodybuilding"
 // while the plan on screen stayed the "combat" one until the next full
 // regeneration. The same profile-disagrees-with-plan shape training_days had.
-export const PLAN_INVALIDATING_FIELDS = ['injuries', 'equipment_access', 'training_days', 'training_style'] as const
+// fitness_goal joined on 5 Sep 2026, on Ashley's ruling. It had been kept OFF
+// this list deliberately (test:rebuild-offer's own "nothing else does" section
+// named it) on the reasoning that the goal feeds macros, which recompute on
+// their own. That was half the picture: goal-policies.ts also sets the set
+// volume, the rest multipliers and the loaded main-lift rest floor, the
+// rep-range shift per tier, which phases are allowed, the split, and the
+// conditioning profile — more of the programme than style touches. Put to her
+// as a question; she chose to offer the rebuild, same as style.
+export const PLAN_INVALIDATING_FIELDS = ['injuries', 'equipment_access', 'training_days', 'training_style', 'fitness_goal'] as const
 export type PlanInvalidatingField = typeof PLAN_INVALIDATING_FIELDS[number]
 
 export interface PlanInvalidation {
@@ -119,6 +127,18 @@ export function detectPlanInvalidation(
         'Your current plan was built for the style you had before, so the exercises and rep ' +
         'ranges still follow it. I can rebuild it from this week onwards in the new style. ' +
         'Everything you have already logged stays exactly as it is.',
+    }
+  }
+
+  if ('fitness_goal' in patch && patch.fitness_goal !== before.fitness_goal) {
+    return {
+      field: 'fitness_goal',
+      title: 'Rebuild your plan for this goal?',
+      detail:
+        'Your current plan was built for the goal you had before, so how much you do, how long ' +
+        'you rest, the rep ranges and the conditioning all still follow it. I can rebuild it ' +
+        'from this week onwards for the new goal. Everything you have already logged stays ' +
+        'exactly as it is.',
     }
   }
 

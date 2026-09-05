@@ -86,13 +86,15 @@ walks `Object.keys` and keeps them; JSON drops them. A real Supabase wire drops
 them too. The test was measuring the mock, not the app. Rewritten to mirror
 production's save → load path with normalised comparison.
 
-## Flagged, not built
+## Flagged, then ruled on the same day
 
-`fitness_goal` sits on `test:rebuild-offer`'s **must-not-invalidate** list, yet
-the goal drives rest floors, phase rep floors and the conditioning profile.
-Changing goal in Settings has the same silent shape style had. It is Ashley's
-call — a rebuild dialog on every goal change is the "trains people to dismiss
-it" risk that list exists to avoid.
+`fitness_goal` sat on `test:rebuild-offer`'s **must-not-invalidate** list, yet
+the goal drives set volume, rest, the main-lift rest floor, rep ranges per
+tier, allowed phases, the split and the conditioning profile. Changing goal in
+Settings had the same silent shape style had. Put to Ashley as one question;
+**she chose to offer the rebuild, same as style.** Built as the Settings half
+only (commit follows this one); a chat tool for the goal is the natural next
+step and was not asked for.
 
 ## Needs Ashley's machine
 
