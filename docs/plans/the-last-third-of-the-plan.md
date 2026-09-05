@@ -153,7 +153,14 @@ training itself; it only stops the app implying something untrue.
 change, but it re-opens the exact rep-range drift that `MAX_FROZEN_LOAD_REP_BUMP`
 was introduced to close.
 
-**Recommendation: (c), then (a).** Because for the barbell case — the one on a
+### Ashley's ruling, 5 Sep 2026: **(c)**
+
+Asked in the conversation, one question, four options with a recommendation.
+She chose *"say it's at the ceiling, ask for one logged set"* — the
+recommendation. (a) "add a set" is therefore a separate later piece and is not
+authorised by this answer; (b) and (d) are declined.
+
+**Recommendation as put to her: (c), then (a).** Because for the barbell case — the one on a
 beginner's screen for a third of their plan — the lift is not really at a
 ceiling. It is at *a guess about a ceiling*, made by an app that has never seen
 this person lift anything. Presenting a guess as a wall, silently, is the same

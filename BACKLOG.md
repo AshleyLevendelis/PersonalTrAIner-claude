@@ -62,6 +62,26 @@ Newest first. One line each.
   that missed it — including a whole section that ran AFTER its own
   `process.exit`, so seven checks were decorative until moved.
 
+- [ ] **PLANNED, NOT BUILT: the last third of a plan, where nothing changes —
+  [docs/plans/the-last-third-of-the-plan.md](docs/plans/the-last-third-of-the-plan.md).**
+  **And a correction I owe the record:** I told Ashley this was "6 in 10 plans,
+  pull-ups stuck at 4-6 @ bodyweight" and quoted **61.7%**. That is the 29 Aug
+  figure and it has been worked three times since. Re-measured on the same
+  grid: **41.6% of plans, and bodyweight lifts are 0.0% of frozen pairs** — the
+  example I gave her does not exist any more. I recalled a headline out of this
+  file instead of running `measure-frozen-exercises.ts`, which sits in the repo
+  for exactly this. What remains is all loaded work: carries 43.6% of frozen
+  pairs, backpacks at their implement ceiling 25.1%, barbells at the strength
+  estimate 21.7%. Worst trace: a *beginner's* bench press reading
+  `3 x 11-13 @ 30kg` character-for-character from week 11 to week 15.
+  **Ashley's ruling: (c)** — mark the week honestly as "at your estimated
+  ceiling" and ask for one logged set, rather than adding sets, rotating the
+  lift, or letting the reps climb further. Build not yet authorised. One
+  hypothesis to confirm first, and it is mechanical: the carry distance ramp
+  may be keyed to the load BEFORE the one-weight-per-week levelling while the
+  card shows the load after it — the app checking one number and displaying
+  another, which may account for the largest bucket with no product change.
+
 - [ ] **`exercise_set_logs` has no `date` column, and five places derive one.**
   Every one of them derives it from a timestamp, which means UTC unless the
   deriver remembers otherwise, and they do not all remember. A real column
