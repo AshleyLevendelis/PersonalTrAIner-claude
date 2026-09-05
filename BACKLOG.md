@@ -2,6 +2,39 @@
 
 Newest first. One line each.
 
+- [x] **THE COACH COULD NOT SEE THE APP'S OWN FORM CUES — the third time this
+  exact hole has been patched.** Ashley, told about it: "fix it." `form_cues`
+  had EXACTLY ONE READER in the whole repo (the Exercise tab's How-to panel),
+  so chat answered technique from the model's general knowledge while the app
+  held its own answer one tap away. Precedents, both quoted in the new gate:
+  the coach saying "none of your scheduled meals actually contain almond
+  butter" about a breakfast holding 13g ("two readers of the same data, one
+  right and one blind"), and intensity/tempo withheld until someone noticed it
+  left the coach "unable to answer 'how hard should the push-ups be?' about a
+  number on the next screen". Fixed as a near-copy of meal-ingredients.ts —
+  cap, ANNOUNCED truncation, absence stated in words — appended to the
+  exercise_summary payload. Context injection rather than a tool because
+  chat-gemini makes one generateContent call with every tool branch terminal:
+  a lookup tool would be new mechanism plus a second billed call under a cap
+  that counts requests, not calls.
+  A SECOND DEFECT FOUND WHILE RESEARCHING, AND PART OF IT WAS MINE. APP_REALITY
+  — the coach's map of the app, prefaced "This is the complete, current list" —
+  still credited the Dashboard with water AND step logging. Water moved to
+  Nutrition weeks ago; steps moved to Exercise THIS MORNING in commit 1a01747.
+  So "where do I log my steps?" sent people to a tab with no logger, and my own
+  change made it wronger.
+  AND EVERY CHECK IN test:chat-app-reality WAS GREEN THROUGH ALL OF IT —
+  verified by running it before touching anything. It only asserted that each
+  tab was NAMED, while test:tab-ownership correctly asserted Home logs no
+  steps: two gates, two contradictory pictures of one app, both passing. §1b
+  now ties each capability claim to the code that provides it, the way
+  test-app-tour ties tour copy to the screen it describes.
+  Bound measured before choosing: one week is 26-30 exercises (~1,100 tokens),
+  the mesocycle 66, the catalogue 199 (~7,000). The week is what people ask
+  about mid-session and matches the food precedent's "today only". Six
+  mutations all bit, including appending the block unconditionally, which
+  correctly breaks test:log-correction's literal empty-plan contract.
+
 - [x] **YOU CAN SEE THE EXERCISE NOW — and Ashley had to ask twice.** Her
   earlier words sat quoted in two files the whole time: *"I want there to be
   exercise demonstrations in the app AND form cues."* The cues shipped; the
