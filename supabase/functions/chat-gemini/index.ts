@@ -577,6 +577,30 @@ const toolDeclarations = [
     },
   },
   {
+    name: "propose_style_change",
+    description:
+      "PROPOSES changing HOW the user trains — their training style (functional / bodybuilding / combat / hybrid) — then rebuilding the plan from the live week forward. This does NOT apply anything: the app shows a before/after card and the user taps Confirm. Weeks already underway or finished are never rewritten; anything logged stays exactly as it is. The style changes the exercises chosen AND the rep ranges, not just a label — say so. ONLY for a LASTING change to how they train. 'Make today harder', 'give me a bodybuilding session today', 'I want a different workout' are NOT style changes — nothing about them asks to retrain for the rest of the plan; answer those in text or with a swap, never with this.",
+    parameters: {
+      type: "object",
+      properties: {
+        training_style: {
+          type: "string",
+          enum: ["functional", "bodybuilding", "combat", "hybrid"],
+          description: "The style they want from now on. functional = athletic/explosive; bodybuilding = aesthetics/symmetry, higher reps; combat = fight-ready conditioning, heavy main lifts; hybrid = a balance of all three.",
+        },
+        reason: {
+          type: "string",
+          description: "One short sentence on what the user described (e.g. 'wants to focus on building size') — shown on the card as the rationale.",
+        },
+        origin_verbatim_quote: {
+          type: "string",
+          description: "The exact substring of the user's CURRENT message asking for the change. Must be copied verbatim, not paraphrased.",
+        },
+      },
+      required: ["training_style", "origin_verbatim_quote"],
+    },
+  },
+  {
     name: "propose_rest_day",
     description:
       "PROPOSES recording a prescribed training day as a rest the user chose, so it stops counting as a missed session — this does NOT apply anything, the app shows a card and the user taps Confirm. Call this when they say they are not training a day and name NOTHING they are doing instead ('rest day today', 'taking today off', 'not training tomorrow, just resting'). If they name a replacement activity, that is swap_session_for_activity instead, not this — this tool records rest, and would throw away the activity. Do not call it for a day with no session prescribed (there is nothing to rest from), for a session they already logged, or when they are thinking out loud rather than telling you ('should I take today off?' is a question — answer it).",
@@ -1342,6 +1366,15 @@ When the user wants to train on different days ("I can't do Thursdays anymore", 
 - WHAT TO DO INSTEAD, when they ask what to do today or say they want to train: read the day off THIS WEEK'S SCHEDULE below and tell them, in plain text, with NO tool call. That schedule lists every day, including the ones with no gym session — a walk with its minutes, a rest day, a conditioning note — so "there is nothing there to tell them" is never true. If today is a rest day and they want to train anyway, say what today is and let them decide; do not rewrite the week to accommodate a single day.
 - A tool that returns "nothing to change" was the wrong tool. If you call this and the answer comes back that those are already their training days, you have answered a question they did not ask — the fix is not to call it again.
 
+=== 3f. HOW THEY TRAIN (propose_style_change) ===
+When the user wants a LASTING change to how they train ("switch me to bodybuilding", "I want to train more like an athlete from now on", "can we make my whole programme hybrid"):
+- Call propose_style_change with training_style: one of functional, bodybuilding, combat, hybrid. Map what they said to the nearest one and say which you picked; if it genuinely isn't clear which of the four they mean, ask before calling.
+- This rebuilds the plan from the live week forward. Weeks they've already logged are untouched — say so, it's the reassurance people want before tapping Confirm.
+- A style change changes the EXERCISES and the REP RANGES, not just the name on the plan: combat runs heavy main lifts at 3-5, bodybuilding runs 6-8 and up. Say that honestly rather than implying the same sessions just get relabelled.
+- THIS TOOL IS FOR A LASTING CHANGE TO HOW THEY TRAIN, AND NOTHING ELSE. "Make today harder", "give me a bodybuilding-style session today", "I fancy something different this session", "I want a different workout" are NOT style changes — not one of them asks to retrain for the rest of the plan. The same lesson §3e learned live: a single day's wish is never a reason to rewrite sixteen weeks.
+- WHAT TO DO INSTEAD for a one-off: answer in text, or use propose_exercise_swap with scope "today" for the specific exercise they want different. If they say the current style isn't working for them at all, that is the moment to ask whether they want to change it for good.
+- A tool that returns "that's already your style" was the wrong tool. If you call this and the card says nothing changes, you answered a question they did not ask — the fix is not to call it again.
+
 === 4. TAG HYGIENE & QUICK REPLIES ===
 - Strict Placement: Place any system action or quick reply tag on its OWN DEDICATED LINE at the absolute bottom of your response.
 - Message-break tag ([BREAK]): the ONE tag that appears mid-response, on its own line, wherever you want the reply to split into a second sent message (§1). Maximum two [BREAK]s (three messages). Never put one immediately before a [QUICK_REPLIES] or [ACTION] line — those always belong at the very bottom, after the final message's text.
@@ -1534,12 +1567,12 @@ FAVORITE MEALS PRIORITIZATION:
 ${favoritesSection}
 
 FUNCTION CALL RULES (CRITICAL):
-- NEVER write tool names, parameter names, or enum values (like "propose_volume_change", "propose_schedule_change", "propose_rest_day", "training_days", "lighter", "heavier") in your visible text response. These exist only for native tool invocations. Your text must read like a human personal trainer — no code, no parameter labels, no function syntax.
+- NEVER write tool names, parameter names, or enum values (like "propose_volume_change", "propose_schedule_change", "propose_style_change", "propose_rest_day", "training_days", "training_style", "lighter", "heavier") in your visible text response. These exist only for native tool invocations. Your text must read like a human personal trainer — no code, no parameter labels, no function syntax.
 - Trigger propose_meal_swap or propose_exercise_swap when the user gives a DIRECT COMMAND to modify their plan. Command verbs include: "replace", "swap", "change", "switch", "use X instead". Both ALWAYS require origin_verbatim_quote — the exact substring of the CURRENT message that is the command; if the request is a question, a hypothetical, or a statement with no imperative verb (e.g. "I didn't train today", "should I switch to dumbbells?"), do NOT call the tool — answer in text instead.
 - Trigger propose_injury_adaptation / propose_equipment_adaptation per §3a/§3b once you have the required fields (affected_area or equipment_tier, plus duration_days) AND an imperative origin_verbatim_quote — a mention alone ("my shoulder's a bit sore") is not yet enough; wait until the exchange has established it's manageable and plan-relevant (injury) or you know both what's available and for how long (equipment).
 - Neither propose_meal_swap nor propose_exercise_swap applies anything itself — both show the user a confirm card. Put your reasoning in the "reason" field, not in a preceding question; do not say "Shall I make this change?" or claim the swap happened.
 - Exercise swaps default to scope: "today" (only applies to today's workout; the original exercise returns next time that day comes up). Only set scope: "permanent" when the user explicitly says they want a lasting change (e.g. "for the rest of the plan", "permanently", "I never want to do X", "always use Y instead").
-- Trigger propose_volume_change / propose_schedule_change per §3d/§3e once the request is an actual imperative and you have the required fields, WITH an origin_verbatim_quote. Neither applies anything — both show a confirm card. "Should I drop to three days?" is a question, not a command: answer it in text.
+- Trigger propose_volume_change / propose_schedule_change / propose_style_change per §3d/§3e/§3f once the request is an actual imperative and you have the required fields, WITH an origin_verbatim_quote. None applies anything — all three show a confirm card. "Should I drop to three days?" is a question, not a command: answer it in text.
 - Trigger propose_custom_meal when the user TELLS you what they eat or will eat ("I usually have eggs and greek yoghurt and fruit for breakfast"). The flow Ashley specified: if any stated food has no amount, ask how much of each — one question, not an interrogation — then call with their exact foods and amounts. Their portions are never adjusted; the app fits the rest of the day around the meal. "What should I have for breakfast?" is a question — answer it or use propose_meal_addition; this tool is for what they are actually having.
 - Trigger propose_rest_day the same way when they tell you they are resting a training day and name nothing in its place. "Rest day today" is a statement of fact about their day, not a question — call the tool. "Should I rest today?" is a question: answer it.
 - Answer exercise form/technique questions ("How do I do X?", "What muscles does X work?") directly in your text response. Provide step-by-step form cues, target muscles, common mistakes, and coaching tips.
@@ -1827,6 +1860,25 @@ Keep this context in mind to ensure your greetings and questions naturally align
             proposal: {
               kind: "propose_schedule_change",
               rawArgs: { training_days: args.training_days, reason: args.reason },
+            },
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (name === "propose_style_change") {
+        // Same rail as propose_schedule_change, for the same reason: a
+        // lasting profile change that the plan has to follow. I1 holds — the
+        // server writes nothing and forwards raw args; the client validates
+        // the style against the real option list, builds the before/after
+        // diff, and re-runs rebuildFromCurrentWeek, the identical generation
+        // path Settings' own rebuild offer takes (plan-invalidation.ts).
+        return new Response(
+          JSON.stringify({
+            reply: "",
+            proposal: {
+              kind: "propose_style_change",
+              rawArgs: { training_style: args.training_style, reason: args.reason },
             },
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }

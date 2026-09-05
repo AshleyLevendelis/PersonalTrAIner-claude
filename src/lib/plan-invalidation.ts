@@ -33,7 +33,13 @@ import { rebuildAgainstProfile } from './plan-adaptations'
  * would teach people to dismiss the dialog without reading it, and then the
  * one that matters gets dismissed too.
  */
-export const PLAN_INVALIDATING_FIELDS = ['injuries', 'equipment_access', 'training_days'] as const
+// training_style joined on 5 Sep 2026, found while building the chat tool for
+// it: generation reads the style in three places (the pool's style filter,
+// the base rep range per tier, STYLE_CONFIGS), and Settings saved the field
+// without ever offering the rebuild — so the profile said "bodybuilding"
+// while the plan on screen stayed the "combat" one until the next full
+// regeneration. The same profile-disagrees-with-plan shape training_days had.
+export const PLAN_INVALIDATING_FIELDS = ['injuries', 'equipment_access', 'training_days', 'training_style'] as const
 export type PlanInvalidatingField = typeof PLAN_INVALIDATING_FIELDS[number]
 
 export interface PlanInvalidation {
@@ -101,6 +107,17 @@ export function detectPlanInvalidation(
       detail:
         'Your current plan was built for what you had before, so it still asks for equipment ' +
         'you have just told me you do not have. I can rebuild it from this week onwards. ' +
+        'Everything you have already logged stays exactly as it is.',
+    }
+  }
+
+  if ('training_style' in patch && patch.training_style !== before.training_style) {
+    return {
+      field: 'training_style',
+      title: 'Rebuild your plan in this style?',
+      detail:
+        'Your current plan was built for the style you had before, so the exercises and rep ' +
+        'ranges still follow it. I can rebuild it from this week onwards in the new style. ' +
         'Everything you have already logged stays exactly as it is.',
     }
   }

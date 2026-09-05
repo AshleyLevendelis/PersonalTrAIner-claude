@@ -15,7 +15,7 @@
 import { adjustDayVolume, describeVolumeChange, isVolumeAdjustable, type VolumeDirection } from './volume-adjust'
 import { rebuildFromCurrentWeek } from './plan-invalidation'
 import { updateProfileField } from './profile-store'
-import type { MesocycleWeek, UserProfile, EquipmentAccess } from './types'
+import type { MesocycleWeek, UserProfile, EquipmentAccess, TrainingStyle } from './types'
 import { swapExerciseInMesocycle, type SwapScope } from './mesocycle-edit'
 import { saveMesocycle, saveMesocycleWeek } from './mesocycle-persistence'
 import { getExerciseEntry } from './exercise-db'
@@ -23,6 +23,7 @@ import { swapPoolMeal, clearMealPick, getMealPicksForDate, USER_REQUESTED_TAG, t
 import { supabase } from './supabase'
 import { setDeliberateRest } from './daily-tracking'
 import type { MealAdditionPayload } from './meal-addition'
+import { STYLE_OPTIONS } from './onboarding-slots'
 import { substituteForInjury, substituteForEquipment, rebuildForInjury } from './plan-adaptations'
 import type { PendingActionReceipt } from './pending-actions-store'
 
@@ -595,6 +596,72 @@ export async function executeScheduleChange(
     receipt: {
       landed: failed.length === 0
         ? [`Training days: ${payload.trainingDays.join(', ')}`,
+           `Rebuilt ${rebuild.weeksRebuilt} week${rebuild.weeksRebuilt === 1 ? '' : 's'} from week ${payload.fromWeek} on`]
+        : [],
+      failed,
+    },
+  }
+}
+
+// ---------------------------------------------------------------------------
+// CHANGING HOW THEY TRAIN — 5 Sep 2026.
+//
+// The first of the ten Profile settings the coach could not touch (VISION:
+// "Settings and chat are equal paths"), and the one that reshapes the whole
+// programme: exercise-plan.ts reads training_style for the pool's style
+// filter, the base rep range per tier, and STYLE_CONFIGS. Built as
+// executeScheduleChange with the field swapped, because it is the same
+// operation — a lasting profile change the plan has to follow, from the live
+// week forward, past weeks untouched — and the same generation path
+// Settings' rebuild offer already takes. Nothing new about how a plan is
+// built; only a new way to ask for one.
+// ---------------------------------------------------------------------------
+
+export interface StyleChangePayload {
+  /** The style they will train in from now on, replacing whatever was there. */
+  trainingStyle: TrainingStyle
+  fromWeek: number
+  reason?: string
+}
+
+export async function executeStyleChange(
+  profile: UserProfile,
+  mesocycle: MesocycleWeek[],
+  exclusions: string[],
+  payload: StyleChangePayload,
+): Promise<AdaptationResult> {
+  const preImage = mesocycle
+  const updated: UserProfile = { ...profile, training_style: payload.trainingStyle }
+
+  const rebuild = await rebuildFromCurrentWeek(updated, exclusions, mesocycle, payload.fromWeek)
+  if (!rebuild.ok || !rebuild.mesocycle) {
+    return {
+      mesocycle,
+      preImage,
+      receipt: { landed: [], failed: [{ op: 'rebuild', error: rebuild.error ?? 'The plan could not be rebuilt.' }] },
+    }
+  }
+
+  // Rebuild first, write second — the field only changes once there is a
+  // plan that matches it. Writing the style and then failing the rebuild
+  // would recreate the exact divergence this tool exists to close.
+  const failed: { op: string; error: string }[] = []
+  if (profile.id) {
+    try { await updateProfileField(profile.id, { training_style: payload.trainingStyle }) }
+    catch { failed.push({ op: 'save', error: "The new style didn't save" }) }
+    for (const week of rebuild.mesocycle) {
+      if (week.week_number < payload.fromWeek) continue
+      try { await saveMesocycleWeek(profile.id, week) }
+      catch { failed.push({ op: 'save', error: `Week ${week.week_number} didn't save` }) }
+    }
+  }
+
+  return {
+    mesocycle: rebuild.mesocycle,
+    preImage,
+    receipt: {
+      landed: failed.length === 0
+        ? [`Training style: ${STYLE_OPTIONS.find(o => o.value === payload.trainingStyle)?.label ?? payload.trainingStyle}`,
            `Rebuilt ${rebuild.weeksRebuilt} week${rebuild.weeksRebuilt === 1 ? '' : 's'} from week ${payload.fromWeek} on`]
         : [],
       failed,

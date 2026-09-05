@@ -98,7 +98,7 @@ export async function createPendingAction(input: CreatePendingActionInput): Prom
   // no snapshot to capture. Keying this off `kind` rather than the whole
   // 'plan_mutation' class avoids the earlier version wrongly demanding a
   // mesocycle-shaped pre_image from every propose_* kind.
-  const kindsRequiringPreImage = ['propose_exercise_swap', 'propose_injury_adaptation', 'propose_equipment_adaptation', 'propose_volume_change', 'propose_schedule_change']
+  const kindsRequiringPreImage = ['propose_exercise_swap', 'propose_injury_adaptation', 'propose_equipment_adaptation', 'propose_volume_change', 'propose_schedule_change', 'propose_style_change']
   if (kindsRequiringPreImage.includes(input.kind) && input.preImage === undefined) {
     throw new Error(`createPendingAction: pre_image is required for ${input.kind}`)
   }

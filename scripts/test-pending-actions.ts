@@ -193,6 +193,8 @@ async function main() {
   const { generateMesocycle } = await import('../src/lib/exercise-plan')
   const { swapExerciseInMesocycle } = await import('../src/lib/mesocycle-edit')
   const { saveMesocycleWeek, restoreMesocycle } = await import('../src/lib/mesocycle-persistence')
+  const { executeStyleChange, undoWeekRangeChange } = await import('../src/lib/pending-action-executor')
+  const { updateProfileField } = await import('../src/lib/profile-store')
   const { recordMealEvent, voidMealEvent, getTodayLedger } = await import('../src/lib/meal-store')
   const { computeTargets } = await import('../src/lib/nutrition-targets')
   type UserProfile = import('../src/lib/types').UserProfile
@@ -498,6 +500,92 @@ async function main() {
     JSON.stringify(afterUndoLedger.eaten) === JSON.stringify(beforeLedger.eaten), { before: beforeLedger.eaten, after: afterUndoLedger.eaten })
   check('the voided event is excluded from the events list entirely, not just zeroed',
     !afterUndoLedger.events.some(e => e.clientId === swapEvent.clientId), afterUndoLedger.events)
+
+  // ---- 6d. Style change: execute writes plan AND field; undo restores both --
+  console.log('\n[6d] style-change: execute rewrites only the live week forward and writes the field; undo puts both back')
+  {
+    // The first Profile setting the coach can change (5 Sep 2026). Two writes
+    // land on Confirm — the rebuilt weeks and fitness_profiles.training_style
+    // — and undo has to reverse BOTH, or the plan goes back while the profile
+    // still claims the new style: the written-but-never-read divergence
+    // update_workout_schedule died on, in the other direction. Double-tap
+    // safety is not repeated here; [2] proves it for every kind generically.
+    //
+    // PRODUCTION-SHAPED ON PURPOSE. The first draft generated a mesocycle,
+    // saved the raw objects, and compared against a JSON snapshot — and every
+    // week "differed" before anything ran. The generator writes explicit
+    // undefined-valued keys (selection_note: undefined, 3 sites); the in-memory
+    // mock stores objects by reference so those keys survive, a JSON snapshot
+    // drops them, and a real Supabase wire drops them too. So: save wire-clean
+    // rows, load them back the way App does, and compare NORMALISED forms.
+    // Anything else measures the mock, not the app.
+    const styleProfile: UserProfile = { ...mesoProfile, id: crypto.randomUUID(), training_style: 'bodybuilding' }
+    db.fitness_profiles = [{ id: styleProfile.id!, training_style: 'bodybuilding' }]
+    for (const w of generateMesocycle(styleProfile)) await saveMesocycleWeek(styleProfile.id!, JSON.parse(JSON.stringify(w)))
+    const styleMeso = (await restoreMesocycle(styleProfile.id!))!.weeks
+    const norm = (w: unknown) => stableStringify(JSON.parse(JSON.stringify(w ?? null)))
+    const styleSnapshot: typeof styleMeso = JSON.parse(JSON.stringify(styleMeso))
+    const fromWeek = 3
+    const snapWeek = (n: number) => norm(styleSnapshot.find(w => w.week_number === n))
+
+    // The store refuses this kind without a pre-image — undo depends on it.
+    let refused = false
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await createPendingAction({ profileId: styleProfile.id!, kind: 'propose_style_change', scopeKey: 'style:test', preconditions: {}, payload: {}, diff: { rows: [], implications: [], reversible: true } } as any)
+    } catch { refused = true }
+    check('createPendingAction refuses a style change with no pre-image', refused)
+
+    const result = await executeStyleChange(styleProfile, styleMeso, [], { trainingStyle: 'combat', fromWeek })
+    check('the rebuild succeeded', result.receipt.failed.length === 0, result.receipt)
+    check('the receipt names the new style in the user\'s words and the week it rebuilt from',
+      result.receipt.landed.some(l => /Combat \/ conditioning/.test(l)) && result.receipt.landed.some(l => l.includes(`from week ${fromWeek}`)),
+      result.receipt.landed)
+    check('the profile row carries the new style — written, and readable back',
+      db.fitness_profiles[0].training_style === 'combat', db.fitness_profiles[0])
+
+    const onDisk = (await restoreMesocycle(styleProfile.id!))!.weeks
+    const diskWeek = (n: number) => norm(onDisk.find(w => w.week_number === n))
+    check('weeks before the live week are untouched on disk', [1, 2].every(n => diskWeek(n) === snapWeek(n)),
+      [1, 2].filter(n => diskWeek(n) !== snapWeek(n)))
+    check('the live week forward actually changed — a different style is a different programme',
+      styleMeso.filter(w => w.week_number >= fromWeek).some(w => diskWeek(w.week_number) !== snapWeek(w.week_number)))
+    check('...and the in-memory result keeps the past weeks by identity, so nothing holding a reference is orphaned',
+      [1, 2].every(n => result.mesocycle.find(w => w.week_number === n) === styleMeso.find(w => w.week_number === n)))
+
+    // Undo, exactly as ChatAssistant's branch does it: the week range, then the field.
+    await undoWeekRangeChange(styleProfile.id!, styleSnapshot, fromWeek)
+    await updateProfileField(styleProfile.id!, { training_style: 'bodybuilding' })
+    const restoredMeso = (await restoreMesocycle(styleProfile.id!))!.weeks
+    check('undo restores every week to the pre-image, content-identical',
+      styleMeso.every(w => norm(restoredMeso.find(x => x.week_number === w.week_number)) === snapWeek(w.week_number)),
+      styleMeso.filter(w => norm(restoredMeso.find(x => x.week_number === w.week_number)) !== snapWeek(w.week_number)).map(w => w.week_number))
+    check('...and the profile field goes back too — the divergence closed in both directions',
+      db.fitness_profiles[0].training_style === 'bodybuilding', db.fitness_profiles[0])
+
+    // The two steps above are what ChatAssistant's undo branch has to do. The
+    // executor is exercised live; the UI branch is source-read here, comments
+    // stripped, because an undo that restored the weeks and forgot the field
+    // is exactly the half-undo this whole section exists to forbid.
+    {
+      // Dynamic, like every other import in this file; cwd is the repo root
+      // because the gate only ever runs through its npm script.
+      const { readFileSync } = await import('fs')
+      const { join } = await import('path')
+      const src = readFileSync(join(process.cwd(), 'src/components/ChatAssistant.tsx'), 'utf8')
+        .replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
+      // Anchor on the week-range UNDO branch first — the same
+      // `if (row.kind === 'propose_style_change')` text also opens the
+      // CONFIRM branch earlier in the file, and the first draft of this check
+      // matched that one and failed against correct code.
+      const undoRange = src.indexOf("row.kind === 'propose_volume_change' || row.kind === 'propose_schedule_change' || row.kind === 'propose_style_change'")
+      const k = undoRange >= 0 ? src.indexOf("if (row.kind === 'propose_style_change') {", undoRange) : -1
+      const undoBlock = k >= 0 ? src.slice(k, src.indexOf('\n        }\n', k)) : ''
+      check('ChatAssistant\'s undo branch for a style change restores training_style on the profile',
+        /updateProfileField\(profile\.id, \{ training_style: before/.test(undoBlock) && /onProfileChanged\(\{ training_style: before/.test(undoBlock),
+        undoBlock.slice(0, 160))
+    }
+  }
 
   // ---- Undo-window sanity ---------------------------------------------------
   console.log('\n[7] undo-window: only open within 10 minutes of resolution')

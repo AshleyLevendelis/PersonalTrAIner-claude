@@ -16,7 +16,8 @@ import { getExerciseEntry } from '@/lib/exercise-db'
 import { createPendingAction, claimPendingAction, declinePendingAction, markExecuting, resolvePendingAction, getPendingAction, expireOldPendingActions, isWithinUndoWindow, type PendingActionReceipt } from '@/lib/pending-actions-store'
 import { APPEND_PROPOSAL_KINDS, INTENT_PROPOSAL_VERB, buildIntentProposal } from '@/lib/intent-proposal'
 import { pickAccountabilityCheckIn } from '@/lib/accountability'
-import { executeExerciseSwap, executeMealSwap, executeMealAddition, undoMealAddition, undoExerciseSwap, executeInjuryAdaptation, executeLastingInjury, executeInjuryRecovered, executeEquipmentAdaptation, executeVolumeChange, executeScheduleChange, executeRestDay, undoRestDay, undoWeekRangeChange, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type LastingInjuryPayload, type InjuryRecoveredPayload, type EquipmentAdaptationPayload, type VolumeChangePayload, type ScheduleChangePayload, type RestDayPayload } from '@/lib/pending-action-executor'
+import { executeExerciseSwap, executeMealSwap, executeMealAddition, undoMealAddition, undoExerciseSwap, executeInjuryAdaptation, executeLastingInjury, executeInjuryRecovered, executeEquipmentAdaptation, executeVolumeChange, executeScheduleChange, executeStyleChange, executeRestDay, undoRestDay, undoWeekRangeChange, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type LastingInjuryPayload, type InjuryRecoveredPayload, type EquipmentAdaptationPayload, type VolumeChangePayload, type ScheduleChangePayload, type StyleChangePayload, type RestDayPayload } from '@/lib/pending-action-executor'
+import { STYLE_OPTIONS } from '@/lib/onboarding-slots'
 import { adjustDayVolume, isVolumeAdjustable } from '@/lib/volume-adjust'
 import { buildMealAdditionProposal, type MealAdditionPayload } from '@/lib/meal-addition'
 import { buildCustomMealProposal } from '@/lib/custom-meal'
@@ -51,7 +52,7 @@ import { ProposalCard } from '@/components/chat/ProposalCard'
 import { TypewriterMarkdown } from '@/components/chat/TypewriterMarkdown'
 import { ReceiptCard } from '@/components/chat/ReceiptCard'
 import { ClarificationCard } from '@/components/chat/ClarificationCard'
-import type { ChatMessage, UserProfile, MacroTargets, WorkoutDay, MealPlanDay, MesocycleWeek, PlanAction, ChatPendingActionView, ChatReceiptView, ChatClarificationView } from '@/lib/types'
+import type { ChatMessage, UserProfile, MacroTargets, WorkoutDay, MealPlanDay, MesocycleWeek, PlanAction, ChatPendingActionView, ChatReceiptView, ChatClarificationView, TrainingStyle } from '@/lib/types'
 import { DEFAULT_REVEAL_SPEED, type RevealSpeed } from '@/lib/reveal-speed-store'
 import { FEEL_SCALE, type SessionFeel } from '@/lib/types'
 import { takeChatPrefill } from '@/lib/chat-prefill-store'
@@ -1244,6 +1245,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     }
     if (pendingAction.kind === 'propose_volume_change') return "Here's the change to that session:"
     if (pendingAction.kind === 'propose_schedule_change') return "Here's the new week:"
+    if (pendingAction.kind === 'propose_style_change') return "Here's your plan in the new style:"
     if (pendingAction.kind === 'propose_rest_day') return 'Want me to mark that as a rest day?'
     const intentVerb = INTENT_PROPOSAL_VERB[pendingAction.kind]
     if (intentVerb) return `Want me to ${intentVerb} **${rows[0].after}**?`
@@ -1716,6 +1718,42 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       diff: {
         rows: [{ field: 'Training days', before: before.join(', ') || 'none', after: wanted.join(', ') }],
         implications,
+        rationale: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined,
+        reversible: true,
+      },
+    }
+  }
+
+  const buildStyleChangeProposal = (rawArgs: Record<string, unknown>): {
+    scopeKey: string
+    preconditions: Record<string, unknown>
+    payload: StyleChangePayload
+    preImage: MesocycleWeek[]
+    diff: import('@/lib/pending-actions-store').ProposalDiff
+  } | null => {
+    // Validate against the real option list, never the model's spelling —
+    // an unrecognised style is dropped and the proposal doesn't happen.
+    const wantedOpt = STYLE_OPTIONS.find(o => o.value === String(rawArgs.training_style ?? '').trim().toLowerCase())
+    if (!wantedOpt || mesocycle.length === 0) return null
+    const beforeValue = profile.training_style ?? 'hybrid'
+    if (wantedOpt.value === beforeValue) return null
+    const beforeOpt = STYLE_OPTIONS.find(o => o.value === beforeValue)
+
+    const startWeek = activeSession.liveWeek
+    const weeksAhead = mesocycle.filter(w => w.week_number >= startWeek).length
+    if (weeksAhead === 0) return null
+
+    return {
+      scopeKey: `${profile.id}:propose_style_change:${wantedOpt.value}:${startWeek}`,
+      preconditions: { before: beforeValue, wanted: wantedOpt.value, startWeek },
+      payload: { trainingStyle: wantedOpt.value, fromWeek: startWeek, reason: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined },
+      preImage: mesocycle,
+      diff: {
+        rows: [{ field: 'Training style', before: beforeOpt?.label ?? beforeValue, after: wantedOpt.label }],
+        implications: [
+          { severity: 'info', text: `Rebuilds ${weeksAhead} week${weeksAhead === 1 ? '' : 's'} from week ${startWeek} on. Anything you've already logged stays exactly as it is.` },
+          { severity: 'warn', text: 'The exercises and rep ranges change, not just the name — this is a different programme from here on.' },
+        ],
         rationale: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined,
         reversible: true,
       },
@@ -2415,6 +2453,15 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
             ? `You're already training ${current.join(', ')} — nothing to change there. If you were asking something else, like what today's session is, say so and I'll answer that instead.`
             : "Nothing to change there. If you were asking something else, like what today's session is, say so and I'll answer that instead."
         }
+      } else if (result.proposal.kind === 'propose_style_change' && result.proposal.rawArgs) {
+        const style = buildStyleChangeProposal(result.proposal.rawArgs)
+        if (style) built = { scopeKey: style.scopeKey, preconditions: style.preconditions, payload: style.payload as unknown as Record<string, unknown>, preImage: style.preImage, diff: style.diff }
+        else {
+          // Same honesty as the schedule branch: say what the style IS, and
+          // that a one-off session is a different request.
+          const current = STYLE_OPTIONS.find(o => o.value === (profile.training_style ?? 'hybrid'))?.label ?? 'this style'
+          refusal = `You're already training ${current} — nothing to change there. If you meant just today's session, say so and I'll sort that instead.`
+        }
       } else if (result.proposal.kind === 'propose_rest_day' && result.proposal.rawArgs) {
         const rest = buildRestDayProposal(result.proposal.rawArgs)
         if (rest) built = { scopeKey: rest.scopeKey, preconditions: rest.preconditions, payload: rest.payload as unknown as Record<string, unknown>, diff: rest.diff }
@@ -3004,6 +3051,18 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       title = ok ? 'Schedule updated' : "Couldn't change the schedule"
       rows = ok ? receipt.landed.map(line => { const [label, detail] = line.split(': '); return { label, detail } }) : []
       undoToken = ok ? row.id : undefined
+    } else if (row.kind === 'propose_style_change') {
+      const payload = row.payload as unknown as StyleChangePayload
+      const result = await executeStyleChange(profile, mesocycle, exerciseExclusions, payload)
+      onMesocycleUpdated(result.mesocycle)
+      // executeStyleChange writes fitness_profiles.training_style itself;
+      // mirror it into App state the same way the schedule branch does.
+      if (result.receipt.failed.length === 0) onProfileChanged({ training_style: payload.trainingStyle })
+      receipt = result.receipt
+      const ok = receipt.failed.length === 0
+      title = ok ? 'Style updated' : "Couldn't change the style"
+      rows = ok ? receipt.landed.map(line => { const [label, detail] = line.split(': '); return { label, detail } }) : []
+      undoToken = ok ? row.id : undefined
     } else if (row.kind === 'propose_rest_day') {
       const payload = row.payload as unknown as RestDayPayload
       const result = await executeRestDay(profile, payload)
@@ -3135,7 +3194,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         if (!preImage || !planCreatedAt) return
         await undoExerciseSwap(profile.id, preImage, payload.weekNumber, payload.scope, planCreatedAt)
         onMesocycleUpdated(preImage)
-      } else if (row.kind === 'propose_volume_change' || row.kind === 'propose_schedule_change') {
+      } else if (row.kind === 'propose_volume_change' || row.kind === 'propose_schedule_change' || row.kind === 'propose_style_change') {
         // Both wrote a RUN of weeks, so undo restores the same run rather
         // than the swap's single week. The starting week comes off the
         // payload, not off today's live week — undoing tomorrow must put
@@ -3144,7 +3203,9 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         if (!preImage) return
         const fromWeek = row.kind === 'propose_volume_change'
           ? Math.min(...(row.payload as unknown as VolumeChangePayload).weekNumbers)
-          : (row.payload as unknown as ScheduleChangePayload).fromWeek
+          : row.kind === 'propose_style_change'
+            ? (row.payload as unknown as StyleChangePayload).fromWeek
+            : (row.payload as unknown as ScheduleChangePayload).fromWeek
         await undoWeekRangeChange(profile.id, preImage, fromWeek)
         onMesocycleUpdated(preImage)
         if (row.kind === 'propose_schedule_change') {
@@ -3155,6 +3216,14 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
           const restored = (profile.training_days ?? []).map(d => ({ ...d, available: before.some(b => b.toLowerCase() === d.day.toLowerCase()) }))
           await updateProfileField(profile.id, { training_days: restored })
           onProfileChanged({ training_days: restored })
+        }
+        if (row.kind === 'propose_style_change') {
+          // Same divergence, same fix: the plan goes back, so the style must too.
+          const before = (row.preconditions as { before?: string } | null)?.before
+          if (before) {
+            await updateProfileField(profile.id, { training_style: before as TrainingStyle })
+            onProfileChanged({ training_style: before as TrainingStyle })
+          }
         }
       } else if (row.kind === 'propose_rest_day') {
         await undoRestDay(profile.id, row.payload as unknown as RestDayPayload)
