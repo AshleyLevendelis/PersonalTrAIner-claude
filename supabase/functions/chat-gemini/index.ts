@@ -993,6 +993,29 @@ const toolDeclarations = [
       required: ["origin_verbatim_quote"],
     },
   },
+  {
+    name: "log_steps",
+    description:
+      "Records a day's step count. ALWAYS shows the user a confirm card first — Ashley's ruling, 5 Sep 2026 — so unlike log_water this never writes on its own, and you must not describe it as done. Call it whenever the user states or instructs a step count ('I walked 9,000 steps today', 'log 12k steps', 'did about 5000 steps yesterday'). THE NUMBER IS THE DAY'S TOTAL, NOT AN INCREMENT: the app replaces that day's count with what you send. If they give you an increment ('another 3,000'), add it to the count in the STEPS line of their context and send the new TOTAL — sending 3,000 would wipe the rest of their day. If you have no count for that day and they only give an increment, ask what the total is rather than guessing.",
+    parameters: {
+      type: "object",
+      properties: {
+        origin_verbatim_quote: {
+          type: "string",
+          description: "The exact substring of the user's current message stating the step count. Must be a literal quote, not a paraphrase.",
+        },
+        steps: {
+          type: "number",
+          description: "The day's TOTAL step count, as a whole number. Convert the units they use ('12k' = 12000). There is no default — if they name no number, do not call this tool at all, ask instead.",
+        },
+        date: {
+          type: "string",
+          description: "ISO date (YYYY-MM-DD) the steps were walked. Omit for today.",
+        },
+      },
+      required: ["origin_verbatim_quote", "steps"],
+    },
+  },
 ];
 
 // Dietary-safety audit fix — this tag list must match diet-rules.ts's
@@ -1611,6 +1634,12 @@ ${context.grocery_list_summary ? `\nCURRENT GROCERY LIST:\n${context.grocery_lis
 WATER (VISION-ARCHITECTURE.md §5.3/§5.4):
 - Call log_water the moment the user instructs a log. A mere statement about intent or thirst without an instruction to log something now should get an offer instead, never a silent call.
 - Convert any unit the user gives to millilitres yourself before calling; omit amount_ml entirely only when the user names no amount or unit at all.
+
+STEPS:
+- Call log_steps whenever the user states or instructs a step count. Unlike water, this ALWAYS shows them a confirm card before anything is written, so never say you have logged it — say you have put it up for them to confirm, or just let the card speak.
+- THE NUMBER YOU SEND IS THE WHOLE DAY'S TOTAL, and it REPLACES whatever that day held. If they give an increment ("another 3,000"), add it to the count in the STEPS line of their context and send the total. Sending the increment would wipe the rest of their day.
+- If you have no count for that day and they give only an increment, ask what the total is. Do not guess, and do not send the increment as though it were the total.
+- There is no default step count. If they name no number, ask; do not call the tool.
 
 ${context.concurrent_activities && context.concurrent_activities.length > 0 ? `CONCURRENT ACTIVITIES (external training demands):\n${context.concurrent_activities.map((a: { name: string; intensity: number; days: string[]; movement_demands: string[] }) => `- ${a.name}: intensity ${Math.round(a.intensity * 100)}%, days: ${a.days.join(", ")}, demands: ${a.movement_demands.join(", ")}`).join("\n")}` : ""}
 
@@ -2646,6 +2675,41 @@ Keep this context in mind to ensure your greetings and questions naturally align
           JSON.stringify({
             reply: "",
             groceryIntent: { tool: name, rawArgs: args },
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (name === "log_steps") {
+        // ALWAYS A CARD, NEVER AN IMMEDIATE WRITE. Ashley's ruling, 5 Sep
+        // 2026, asked as a straight question: told that "I walked 9,000 steps
+        // today" reads as a statement rather than an instruction (so
+        // classifyImperative would refuse it), she chose the confirm card
+        // every time over widening what counts as a command.
+        //
+        // So there is deliberately no classifyImperative call and no
+        // stepsIntent channel here: the act-or-offer question is moot when
+        // the answer is always "offer". The client's confirm branch does the
+        // one write, through steps-store, after the user taps.
+        //
+        // The date is validated here rather than trusted, the same way
+        // record_session_feel validates its own — a malformed date would
+        // upsert a row on a day that does not exist in their week.
+        const rawDate = typeof args.date === "string" ? args.date : "";
+        const validDate = rawDate === "" || /^\d{4}-\d{2}-\d{2}$/.test(rawDate);
+        const steps = typeof args.steps === "number" ? args.steps : NaN;
+        if (!Number.isFinite(steps) || !validDate) {
+          // Nothing to propose. Let whatever the model already said stand
+          // rather than inventing a confirmation for a call we dropped.
+          return new Response(
+            JSON.stringify({ reply: textPart?.text || "" }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        return new Response(
+          JSON.stringify({
+            reply: "",
+            proposal: { kind: name, rawArgs: args },
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );

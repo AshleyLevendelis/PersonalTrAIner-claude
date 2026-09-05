@@ -48,6 +48,8 @@ import { getPRCache } from '@/lib/pr-engine'
 import { loadDashboardData, type DashboardData } from '@/lib/dashboard-data'
 import { getAllItems as getAllGroceryItems, addItemLocal, setCheckedLocal, undoAddLocal, type GroceryItemRow, type GroceryCategory } from '@/lib/grocery-store'
 import { logWater, undoLog as undoWaterLog } from '@/lib/water-store'
+import { getStepsForDate, logStepsManual, restoreStepsForDate, isPlausibleStepCount, MAX_PLAUSIBLE_DAILY_STEPS } from '@/lib/steps-store'
+import { buildCoachStepsSummary } from '@/lib/steps-context'
 import { ProposalCard } from '@/components/chat/ProposalCard'
 import { TypewriterMarkdown } from '@/components/chat/TypewriterMarkdown'
 import { ReceiptCard } from '@/components/chat/ReceiptCard'
@@ -157,6 +159,10 @@ interface ChatAssistantProps {
   onOpenGrocery?: () => void
   /** Fired after a chat water log so App.tsx/Dashboard can refresh their own local water state (same "caller reloads after" shape, though water-store's own local-first merge already reflects the write immediately for anything reading it fresh). */
   onWaterChanged?: () => void | Promise<void>
+  /** Re-read steps after a chat log, so the Exercise tab does not sit on a stale number. */
+  onStepsChanged?: () => void | Promise<void>
+  /** Deep-link target for a steps receipt — steps live on Exercise. */
+  onOpenExercise?: () => void
   /** Deep-link target for a water receipt's "View" button — navigates to the Dashboard tab. */
   onOpenDashboard?: () => void
   /**
@@ -187,7 +193,7 @@ function sessionCutoffHour(preferredTime: string | undefined): number {
   return SESSION_PASSED_CUTOFF[preferredTime || 'morning'] || 22
 }
 
-export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onProfileChanged, onMealSwapApplied, onFindMoreMealOptions, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenProfile, groceryItems, onGroceryChanged, onOpenGrocery, onWaterChanged, onOpenDashboard, onAttentionChange, revealSpeed = DEFAULT_REVEAL_SPEED, pendingLoadSuggestions }: ChatAssistantProps) {
+export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onProfileChanged, onMealSwapApplied, onFindMoreMealOptions, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenProfile, groceryItems, onGroceryChanged, onOpenGrocery, onWaterChanged, onStepsChanged, onOpenExercise, onOpenDashboard, onAttentionChange, revealSpeed = DEFAULT_REVEAL_SPEED, pendingLoadSuggestions }: ChatAssistantProps) {
   // NL logging (§3) writes through the SAME frozen session identity +
   // logSet facade SetGrid.tsx uses — never saveSet directly (see
   // nl-logging-executor.ts's own doc comment).
@@ -375,6 +381,10 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
   const [isRecalibrating, setIsRecalibrating] = useState(false)
   const [lastFailedInput, setLastFailedInput] = useState<string | null>(null)
   const [favorites, setFavorites] = useState<FavoriteMeal[]>([])
+  // READ-ONLY. StepsRow on the Exercise tab still owns the writing; this is
+  // here so the coach can SEE the number, which is what turns "another 3,000"
+  // into the right total instead of a replace that wipes the day.
+  const [todaySteps, setTodaySteps] = useState<number | null>(null)
   const [workoutLogHistory, setWorkoutLogHistory] = useState('')
   const [cardioLogHistory, setCardioLogHistory] = useState('')
   const [quickRepliesDismissed, setQuickRepliesDismissed] = useState(false)
@@ -438,6 +448,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     if (profile.id) {
       loadFavorites()
       loadWorkoutLogs()
+      loadTodaySteps()
       loadChatHistory()
       // The lazy sweep expireOldPendingActions was written for — its own doc
       // comment says "call on chat mount / load", and nothing ever did, so
@@ -729,6 +740,29 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     }
   }
 
+  /**
+   * Today's step count, for the coach's context only.
+   *
+   * Read here as well as on the Exercise tab, which is fine and is what Home
+   * already does: both go through getStepsForDate, so there is one source and
+   * no second rule. What must NOT happen is a second WRITER — StepsRow and
+   * the confirmed chat card both go through steps-store, and the gate pins it.
+   *
+   * Re-run after a chat log so the number the coach quotes next turn is the
+   * one it just wrote, rather than the one it read on mount.
+   */
+  const loadTodaySteps = async () => {
+    if (!profile.id) return
+    try {
+      const row = await getStepsForDate(profile.id, activeSession.date)
+      setTodaySteps(row?.steps ?? null)
+    } catch (err) {
+      // A failed READ is not a failed write and must not shout. The coach
+      // simply says nothing is logged yet, which is what it would say anyway.
+      console.error('Failed to load today\'s steps for the coach:', err)
+    }
+  }
+
   const loadFavorites = async () => {
     if (!profile.id) return
     const { data } = await supabase
@@ -803,6 +837,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     // literal right here, which is exactly how it went unnoticed that it
     // carried no prescribed weight while the Exercise tab showed that weight
     // on the next screen.
+    const stepsSummary = buildCoachStepsSummary(todaySteps, profile)
     const exerciseSummary = buildCoachExerciseSummary({
       days: activeWeekData,
       coachNote: activeMesoWeek?.coach_note,
@@ -913,6 +948,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         .join('\n'),
       training_days_count: profile.training_days.filter(d => d.available).length,
       exercise_summary: exerciseSummary,
+      steps_summary: stepsSummary,
       phase_brief: phaseBrief,
       // Empty string when there is nothing to say — which is also what stops
       // the coach asking twice: once record_session_feel writes `felt`, the
@@ -2137,6 +2173,89 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
   }
 
   /**
+   * The steps chat door — ALWAYS reached from a confirmed card, never directly.
+   *
+   * Ashley's ruling, 5 Sep 2026, asked as a straight question: told that
+   * "I walked 9,000 steps today" reads as a statement rather than an
+   * instruction, she chose the confirm card every time. So log_steps has no
+   * intent channel at all; the server always returns a proposal and this runs
+   * on Confirm.
+   *
+   * THREE WAYS THIS DIFFERS FROM WATER, all forced by the table rather than
+   * chosen:
+   *
+   *   daily_steps holds ONE ROW PER DAY and logStepsManual upserts, so this
+   *   REPLACES the day rather than appending to it. That is why the undo token
+   *   carries a pre-image (below) and why the card shows a before.
+   *
+   *   There is no safe default. Water falls back to 250ml; a missing step
+   *   count has no equivalent, so nothing is written and the coach is told to
+   *   ask instead.
+   *
+   *   steps-store is plain async with no offline queue (its own header says
+   *   so), so this await can reject where logWater cannot. It is wrapped, and
+   *   a failure returns a failed receipt rather than a cheerful sentence about
+   *   a write that did not happen.
+   */
+  const resolveAndSaveSteps = async (intent: { tool: 'log_steps'; rawArgs: Record<string, unknown> }): Promise<{ text: string; receipt?: ChatReceiptView }> => {
+    const args = intent.rawArgs
+    const profileId = profile.id
+    if (!profileId) return { text: "I can't log that yet — your profile hasn't finished setting up." }
+
+    const raw = typeof args.steps === 'number' ? Math.round(args.steps) : NaN
+    if (!isPlausibleStepCount(raw)) {
+      // A mistyped 900,000 would REPLACE the day with a number nobody walked,
+      // and the upsert makes that permanent rather than additive. Say what
+      // happened rather than writing it and hoping.
+      return { text: `That doesn't look like a day's step count — I can log anything up to ${MAX_PLAUSIBLE_DAILY_STEPS.toLocaleString()}. What was the real number?` }
+    }
+
+    // Local calendar date, never a UTC slice (test:local-dates pins this file).
+    const date = typeof args.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(args.date)
+      ? args.date
+      : activeSession.date
+
+    try {
+      // THE PRE-IMAGE, read before the write. Undo has to put back what was
+      // there, and after the upsert that number is gone.
+      const existing = await getStepsForDate(profileId, date)
+      const previous = existing?.steps ?? null
+      await logStepsManual(profileId, date, raw)
+      await onStepsChanged?.()
+      await loadTodaySteps()
+
+      return {
+        text: `Logged ${raw.toLocaleString()} steps.`,
+        receipt: {
+          kind: 'steps_logged',
+          title: 'Steps logged',
+          rows: [{
+            label: `${raw.toLocaleString()} steps`,
+            detail: previous === null ? 'recorded for today' : `replacing ${previous.toLocaleString()}`,
+          }],
+          status: 'done',
+          // Opaque string by contract, and grocery already packs JSON into it.
+          // A bare row id would not do here: undo must RESTORE, not delete.
+          undoToken: JSON.stringify({ date, previous }),
+          resolvedAt: new Date().toISOString(),
+        },
+      }
+    } catch (err) {
+      console.error('Logging steps from chat failed:', err)
+      return {
+        text: "That didn't save — check your connection and I'll try again.",
+        receipt: {
+          kind: 'steps_logged',
+          title: 'Steps not logged',
+          rows: [{ label: `${raw.toLocaleString()} steps`, detail: 'could not be saved' }],
+          status: 'failed',
+          resolvedAt: new Date().toISOString(),
+        },
+      }
+    }
+  }
+
+  /**
    * Writes how a finished session felt (see session-feel.ts). Mirrors
    * resolveAndSaveWater's shape — validated server-side, written here.
    *
@@ -2471,7 +2590,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         // check_off_grocery_item/log_water now arrive here too whenever
         // classifyImperative didn't confidently classify the request —
         // previously a bare offer with nothing to resolve on a later "yes".
-        built = buildIntentProposal(result.proposal.kind, result.proposal.rawArgs, profile.id)
+        built = buildIntentProposal(result.proposal.kind, result.proposal.rawArgs, profile.id, todaySteps)
       } else if (result.proposal.diff && result.proposal.payload && result.proposal.scopeKey) {
         built = { scopeKey: result.proposal.scopeKey, preconditions: result.proposal.preconditions ?? {}, payload: result.proposal.payload, preImage: result.proposal.preImage, diff: result.proposal.diff }
       }
@@ -3082,11 +3201,21 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       // second write path, just a deferred call to the existing one.
       const payload = row.payload as unknown as { tool: string; rawArgs: Record<string, unknown> }
       const intent = { tool: payload.tool, rawArgs: payload.rawArgs }
+      // EVERY KIND NAMED, NO UNGUARDED DEFAULT. This chain used to end in a
+      // bare `: resolveAndSaveWater(...)`, which was fine while water was the
+      // only remaining member and a trapdoor the moment it was not: adding
+      // log_steps to APPEND_PROPOSAL_KINDS without touching this line would
+      // have logged WATER when the user confirmed a steps card. Caught before
+      // it shipped; the gate now pins the routing per kind.
       const saveResult = row.kind === 'record_fact' || row.kind === 'record_goal'
         ? await resolveAndSaveMemory(intent as Parameters<typeof resolveAndSaveMemory>[0])
         : row.kind === 'add_to_grocery_list' || row.kind === 'check_off_grocery_item'
         ? await resolveAndSaveGrocery(intent as Parameters<typeof resolveAndSaveGrocery>[0])
-        : await resolveAndSaveWater(intent as Parameters<typeof resolveAndSaveWater>[0])
+        : row.kind === 'log_steps'
+        ? await resolveAndSaveSteps(intent as Parameters<typeof resolveAndSaveSteps>[0])
+        : row.kind === 'log_water'
+        ? await resolveAndSaveWater(intent as Parameters<typeof resolveAndSaveWater>[0])
+        : (() => { throw new Error(`No resolver wired for append proposal kind: ${row.kind}`) })()
 
       if (saveResult.receipt) {
         richReceipt = saveResult.receipt
@@ -3176,6 +3305,21 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         if (row) undoAddLocal(row, entry.addedQuantity, entry.created)
       }
       await onGroceryChanged?.()
+    } else if (receipt.kind === 'steps_logged') {
+      // RESTORE, NOT DELETE — the opposite of water's undo, and for a reason
+      // water's own comment spells out: it has no row to merge onto, this has
+      // exactly one per day. Deleting after a 6,240 -> 9,240 correction would
+      // throw away the 6,240 the user never touched.
+      if (!isWithinUndoWindow(receipt.resolvedAt ?? null)) return
+      if (!receipt.undoToken || !profile.id) return
+      try {
+        const { date, previous } = JSON.parse(receipt.undoToken) as { date: string; previous: number | null }
+        await restoreStepsForDate(profile.id, date, previous)
+        await onStepsChanged?.()
+        await loadTodaySteps()
+      } catch (err) {
+        console.error('Undoing a chat steps log failed:', err)
+      }
     } else if (receipt.kind === 'water_logged') {
       // undoToken is just the row id — a fresh log has nothing to merge
       // onto (unlike grocery's canonical_key coalescing), so undo is
@@ -3473,6 +3617,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
                         }
                         onViewGrocery={msg.receipt.kind === 'grocery_item_added' ? onOpenGrocery : undefined}
                         onViewDashboard={msg.receipt.kind === 'water_logged' ? onOpenDashboard : undefined}
+                        onViewExercise={msg.receipt.kind === 'steps_logged' ? onOpenExercise : undefined}
                       />
                     )}
                     {msg.clarification && msg.status !== 'failed' && (

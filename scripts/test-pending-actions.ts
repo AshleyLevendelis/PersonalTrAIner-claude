@@ -760,7 +760,18 @@ async function main() {
     { kind: 'record_fact', rawArgs: { origin_verbatim_quote: 'never give me durian', kind: 'food_preference', polarity: 'dislike', hardness: 'hard', target_phrase: 'durian' } },
     { kind: 'add_to_grocery_list', rawArgs: { origin_verbatim_quote: 'we might need eggs and milk', items: [{ name: 'eggs' }, { name: 'milk' }] } },
     { kind: 'log_water', rawArgs: { origin_verbatim_quote: 'had some water I guess', amount_ml: 300 } },
+    { kind: 'log_steps', rawArgs: { origin_verbatim_quote: 'I walked 9000 steps today', steps: 9000 } },
   ]
+
+  // EVERY MEMBER, DERIVED — not just the ones someone remembered to list.
+  // log_steps joined APPEND_PROPOSAL_KINDS on 5 Sep 2026 and this list was
+  // hardcoded, so a new kind could sit here untested indefinitely.
+  {
+    const covered = new Set(intentCases.map(c => c.kind))
+    const untested = [...APPEND_PROPOSAL_KINDS].filter(k => !covered.has(k) && k !== 'record_goal' && k !== 'check_off_grocery_item')
+    check('every append-proposal kind with a case here is covered (list not left behind)',
+      untested.length === 0, untested)
+  }
 
   for (const { kind, rawArgs } of intentCases) {
     check(`${kind} is a recognized append-proposal kind`, APPEND_PROPOSAL_KINDS.has(kind))

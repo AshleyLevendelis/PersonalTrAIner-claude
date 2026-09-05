@@ -101,6 +101,30 @@ console.log('\n3. Steps and the water target')
   check('the error is actually rendered somewhere', /\{entryError && \(/.test(nutrition))
 }
 
+console.log('\n3b. Logging steps from chat')
+{
+  // steps-store is plain async with NO offline queue (its own header says so),
+  // unlike water-store's local-first queue. So this await can genuinely reject
+  // where logWater cannot, and a rejection must not produce "Logged 9,000
+  // steps." — the exact shape of lie this whole file exists to stop.
+  const body = handlerBody(chat, 'const resolveAndSaveSteps')
+  check('the chat steps handler exists', body.length > 0)
+  check('the write is guarded', /try \{/.test(body) && /catch/.test(body))
+  check('...and a failure is reported, not swallowed', /status: 'failed'/.test(body))
+  check('...and it does not claim a log it did not make',
+    !/Logged \$\{[\s\S]{0,40}\} steps\./.test(body.slice(body.indexOf('} catch'))))
+  // An implausible number is refused BEFORE the write, not stored and regretted.
+  // PRESENCE FIRST, THEN ORDER. The first version compared indexOf positions
+  // alone, and -1 < anything: deleting the guard entirely left this GREEN.
+  // Found by running the mutation, not by reading the check.
+  const guardAt = body.indexOf('isPlausibleStepCount')
+  const writeAt = body.indexOf('logStepsManual')
+  check('the bound is applied at all (sanity check on this check)', guardAt !== -1 && writeAt !== -1,
+    { guardAt, writeAt })
+  check('an implausible count is refused before anything is written',
+    guardAt !== -1 && writeAt !== -1 && guardAt < writeAt, { guardAt, writeAt })
+}
+
 console.log('\n4. Editing and deleting what the app remembers')
 {
   check('the three edits go through one guarded helper', /const saveMemoryEdit = async/.test(profile))

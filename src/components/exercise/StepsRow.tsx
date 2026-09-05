@@ -35,10 +35,18 @@ export function StepsRow({
   profile,
   profileId,
   date,
+  refreshToken,
 }: {
   profile?: UserProfile
   profileId?: string
   date: string
+  /**
+   * Bumped by App when the coach logs steps from chat. Without it this row
+   * keeps whatever it read on mount, and a confirmed chat log would land in
+   * the database and nowhere the user can see — the failure BACKLOG already
+   * records four instances of from Ashley's phone.
+   */
+  refreshToken?: number
 }) {
   const [stepsRow, setStepsRow] = useState<DailyStepsRow | null>(null)
   const [stepsInput, setStepsInput] = useState('')
@@ -50,7 +58,7 @@ export function StepsRow({
   useEffect(() => {
     if (!profileId || !date) return
     void getStepsForDate(profileId, date).then(setStepsRow).catch(() => setStepsRow(null))
-  }, [profileId, date])
+  }, [profileId, date, refreshToken])
 
   /**
    * Audit §3.3 — this had no error handling. Offline, logStepsManual threw,

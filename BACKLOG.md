@@ -2,6 +2,39 @@
 
 Newest first. One line each.
 
+- [x] **THE COACH CAN LOG YOUR STEPS — behind a confirm card, on Ashley's
+  ruling.** "build it so it can log them for you." One fork was hers: the app
+  only ACTS on an instruction and OFFERS on a statement, and "I walked 9,000
+  steps today" has no imperative verb in it, so her own example sentence would
+  have logged nothing. Offered three options; she chose the confirm card every
+  time. That made it simpler than log_water — steps never take the immediate
+  path, so there is no intent channel at all.
+  THE COACH COULD NOT SEE STEPS EITHER, and that half had to ship with it:
+  daily_steps holds ONE ROW PER DAY and logStepsManual UPSERTS, so "I did
+  another 3,000" from a blind coach would REPLACE a 6,240 day with 3,000. The
+  context line plus a prompt rule ("add it to the count in the STEPS line and
+  send the total") is what stops it.
+  THREE DIVERGENCES FROM WATER, ALL FORCED BY THE TABLE: the card shows a
+  BEFORE (the only append-proposal that overwrites); undo RESTORES rather than
+  deletes, packing {date, previous} into the opaque token, and deletes the row
+  rather than writing 0 when there was nothing before (zero and "never logged"
+  are different facts); and a plausibility bound, because there is no safe
+  default the way water falls back to 250ml and a mistyped 900,000 would be
+  permanent.
+  A LANDMINE FOUND BEFORE IT SHIPPED. The confirm branch routed append
+  proposals through a ternary ending in a bare `: resolveAndSaveWater(...)`.
+  Adding log_steps to APPEND_PROPOSAL_KINDS without touching that line would
+  have LOGGED WATER when the user confirmed a steps card. Every kind is named
+  now and an unknown one throws.
+  onStepsChanged is WIRED, not just declared — because onWaterChanged is
+  declared, awaited twice, and passed by NOBODY (verified: zero assignments in
+  src/), so chat water logs don't refresh Nutrition today. Flagged, not fixed;
+  one line in App.tsx whenever she wants it.
+  Seven mutations bit. One exposed a weak check of mine: silent-writes'
+  "bound before write" compared indexOf positions and -1 < anything, so
+  deleting the guard left it GREEN. Presence asserted before order now.
+  No migration — a spoken count is still `source: 'manual'`.
+
 - [x] **THE COACH COULD NOT SEE THE APP'S OWN FORM CUES — the third time this
   exact hole has been patched.** Ashley, told about it: "fix it." `form_cues`
   had EXACTLY ONE READER in the whole repo (the Exercise tab's How-to panel),

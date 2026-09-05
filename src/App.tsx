@@ -368,6 +368,17 @@ function App() {
   const [devOverrideDay, setDevOverrideDay] = useState<string | null>(null)
   const [devBypassLocks, setDevBypassLocks] = useState(false)
   const [logsVersion, setLogsVersion] = useState(0)
+  /**
+   * Bumped when the coach logs steps from chat, so the Exercise tab's StepsRow
+   * re-reads instead of sitting on the number it loaded on mount.
+   *
+   * The same shape as logsVersion, and for the same reason it exists: a write
+   * that lands in the database and not on the screen is indistinguishable from
+   * one that failed. (onWaterChanged is declared on ChatAssistant and passed
+   * by NOBODY — chat water logs have this exact bug today. Not fixed here,
+   * flagged in the plan, but very much the reason this line is not skipped.)
+   */
+  const [stepsVersion, setStepsVersion] = useState(0)
 
   useEffect(() => {
     restoreSession()
@@ -2343,6 +2354,7 @@ function App() {
 
           <TabsContent value="exercise">
             <ExerciseTab
+              stepsVersion={stepsVersion}
               plan={exercisePlan}
               mesocycle={mesocycle}
               exclusions={effectiveExclusions}
@@ -2437,6 +2449,8 @@ function App() {
               onGroceryChanged={() => { if (profile?.id) return reloadGrocery(profile.id) }}
               onOpenGrocery={() => { window.location.hash = tabHash('tools') }}
               onOpenDashboard={() => { window.location.hash = tabHash('dashboard') }}
+              onStepsChanged={() => setStepsVersion(v => v + 1)}
+              onOpenExercise={() => { window.location.hash = tabHash('exercise') }}
               revealSpeed={revealSpeed}
               pendingLoadSuggestions={adaptationMessages.filter(m => m.loadSuggestionId).map(m => m.text)}
               onAttentionChange={setChatAttention}

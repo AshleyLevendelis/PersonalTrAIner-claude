@@ -577,7 +577,7 @@ export interface ChatPendingActionView {
 }
 
 export interface ChatReceiptView {
-  kind: 'log_workout' | 'propose_exercise_swap' | 'propose_meal_swap' | 'propose_custom_meal' | 'propose_meal_food_add' | 'propose_injury_adaptation' | 'propose_injury_as_lasting' | 'propose_injury_recovered' | 'propose_equipment_adaptation' | 'propose_volume_change' | 'propose_schedule_change' | 'propose_style_change' | 'propose_rest_day' | 'memory_fact_saved' | 'memory_goal_saved' | 'memory_context_fact_saved' | 'display_name_saved' | 'grocery_item_added' | 'water_logged'
+  kind: 'log_workout' | 'propose_exercise_swap' | 'propose_meal_swap' | 'propose_custom_meal' | 'propose_meal_food_add' | 'propose_injury_adaptation' | 'propose_injury_as_lasting' | 'propose_injury_recovered' | 'propose_equipment_adaptation' | 'propose_volume_change' | 'propose_schedule_change' | 'propose_style_change' | 'propose_rest_day' | 'memory_fact_saved' | 'memory_goal_saved' | 'memory_context_fact_saved' | 'display_name_saved' | 'grocery_item_added' | 'water_logged' | 'steps_logged'
   title: string
   rows: { label: string; detail: string; note?: string }[]
   summary?: string

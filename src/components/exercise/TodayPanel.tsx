@@ -48,6 +48,7 @@ export function TodayPanel({
   profile,
   profileId,
   planCreatedAt,
+  stepsVersion,
   devOverrideDay,
   onOpenProgram,
   onOpenSwap,
@@ -64,6 +65,8 @@ export function TodayPanel({
   profileId?: string
   /** When this plan came into being — days before it were never prescribed. */
   planCreatedAt?: string
+  /** Bumped when the coach logs steps from chat, so StepsRow re-reads rather than showing a stale count. */
+  stepsVersion?: number
   devOverrideDay?: string | null
   onOpenProgram: () => void
   onOpenSwap: (dayName: string, exIndex: number, exerciseName: string) => void
@@ -453,7 +456,7 @@ export function TodayPanel({
           whether today is a session, a rest day or active recovery, and a
           rest day is exactly when they are the only movement there is.
           Hidden while peeking at ANOTHER day, because the box logs today. */}
-      {!peekWorkout && <StepsRow profile={profile} profileId={profileId} date={today} />}
+      {!peekWorkout && <StepsRow profile={profile} profileId={profileId} date={today} refreshToken={stepsVersion} />}
     </div>
   )
 }

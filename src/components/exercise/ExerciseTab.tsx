@@ -29,6 +29,8 @@ interface ExerciseTabProps {
   softExercisePreferences?: { liked: string[]; disliked: string[] }
   profile?: UserProfile
   profileId?: string
+  /** Bumped when chat logs steps, so StepsRow re-reads. */
+  stepsVersion?: number
   planCreatedAt?: string
   devOverrideWeek?: number | null
   devOverrideDay?: string | null
@@ -48,6 +50,7 @@ export function ExerciseTab({
   softExercisePreferences,
   profile,
   profileId,
+  stepsVersion,
   planCreatedAt,
   devOverrideWeek,
   devOverrideDay,
@@ -149,6 +152,7 @@ export function ExerciseTab({
         profile={profile}
         profileId={profileId}
         planCreatedAt={planCreatedAt}
+        stepsVersion={stepsVersion}
         devOverrideDay={devOverrideDay}
         onOpenProgram={() => { window.location.hash = programHash(liveWeek) }}
         onOpenSwap={(dayName, exIndex, exerciseName) => setSwapTarget({ dayName, exIndex, exerciseName })}
