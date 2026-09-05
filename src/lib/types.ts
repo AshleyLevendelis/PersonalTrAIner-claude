@@ -336,6 +336,19 @@ export interface Exercise {
    */
   rep_bump?: 'bought' | 'capped' | 'range_fixed' | 'band' | 'matched'
   /**
+   * The carry twin of `rep_bump` — what the frozen-load DISTANCE ramp did
+   * this week, when it ran at all (a carry, weight unchanged from last
+   * loading week):
+   *   'walked'  the carry goes further this week than last
+   *   'capped'  already MAX_FROZEN_CARRY_DISTANCE_STEPS steps up — held by
+   *             design, and there is no lever left
+   * Absent when the ramp was not in question (not a carry, weight moved,
+   * deload). Added 5 Sep 2026: without it a carry parked at its distance cap
+   * was indistinguishable, to anything reading a plan, from one still
+   * progressing — and 490 of 4,892 carry slots in the sweep sit at the cap.
+   */
+  distance_bump?: 'walked' | 'capped'
+  /**
    * Per-set load breakdown for externally-loaded work — the last entry is
    * always the top/working set (same value as suggested_load_kg). Ramps
    * progressively across sets for compounds in strength/power phases;

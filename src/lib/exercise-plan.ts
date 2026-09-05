@@ -6016,6 +6016,8 @@ export function generateMesocycle(
           // the bump block that sets it and the assignment that reads it are
           // different branches of it.
           let repBump: Exercise['rep_bump']
+          /** The carry twin, same scope and same reason — see Exercise.distance_bump. */
+          let distanceBump: Exercise['distance_bump']
           // The hold on this slot's NATURAL prescription. Captured before the
           // bump block, because buying a rep re-prescribes through the forced
           // path and that prescription reports no hold of its own — which is
@@ -6463,6 +6465,11 @@ export function generateMesocycle(
               frozenCarryStepsByLift.set(dbEntry.name, steps)
               const baseM = parseInt(String(reps), 10)
               reps = `${baseM + steps * FROZEN_CARRY_DISTANCE_STEP_M}m`
+              // At the cap the distance stops moving too, and then the whole
+              // card repeats: same weight, same sets, same metres. Recorded so
+              // the screen and the coach can say so rather than presenting an
+              // identical week as progress.
+              distanceBump = steps >= MAX_FROZEN_CARRY_DISTANCE_STEPS ? 'capped' : 'walked'
             } else if (canBuyDistance && naturalKg != null && previousNaturalKg != null) {
               // The weight moved, so the distance resets — same reasoning as
               // the rep reset above. A carry that earned a heavier load should
@@ -6579,6 +6586,7 @@ export function generateMesocycle(
             // week (never carried through the ...ex spread from last week).
             load_hold: load ? naturalHold : ex.load_hold,
             rep_bump: repBump,
+            distance_bump: distanceBump,
             // THE FALLBACK USED TO BE A BARE `ex.suggested_assistance_kg`, and
             // it leaked across a rotation. This slot's identity can CHANGE
             // week to week; `ex` is what was here before. Swap Pull-Ups

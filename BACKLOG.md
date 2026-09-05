@@ -62,25 +62,56 @@ Newest first. One line each.
   that missed it — including a whole section that ran AFTER its own
   `process.exit`, so seven checks were decorative until moved.
 
-- [ ] **PLANNED, NOT BUILT: the last third of a plan, where nothing changes —
+- [x] **A WEEK THAT REPEATS ITSELF NOW SAYS SO — Ashley's ruling (c),
   [docs/plans/the-last-third-of-the-plan.md](docs/plans/the-last-third-of-the-plan.md).**
-  **And a correction I owe the record:** I told Ashley this was "6 in 10 plans,
-  pull-ups stuck at 4-6 @ bodyweight" and quoted **61.7%**. That is the 29 Aug
-  figure and it has been worked three times since. Re-measured on the same
-  grid: **41.6% of plans, and bodyweight lifts are 0.0% of frozen pairs** — the
+  Asked what the app should do when a lift genuinely cannot get heavier, she
+  chose: say so, and ask for one logged set — over adding a set, rotating the
+  exercise, or letting the reps climb.
+  **STEP 1 KILLED MY OWN HYPOTHESIS, and I had already called it "confirmed".**
+  I traced ONE plan, saw a carry repeat while the week's other days caught up,
+  and concluded the distance ramp was comparing the wrong two numbers. Swept:
+  of **672 frozen pairs, 671 are a genuinely stalled lift and exactly one is
+  that artifact** — the one I traced. Same error shape as the Clamshells
+  diagnosis: one plausible case, no sweep, a confident conclusion. The ramp is
+  also alive (1,118 of 4,892 carry slots above the 40m default), and the 490 at
+  55m are its cap — so carries freeze for the same reason as barbells and
+  backpacks: the ramp ran out. One story, no hidden mechanical fix.
+  **The honest sentence already existed** — load-prescription has written *"This
+  is as far as the estimate goes… Log a set and the number can start moving
+  again"* since 30 Aug, inside `load_guidance`, which the card renders ONLY
+  behind the ⓘ. Correct words, one tap away from nobody. So the fix was to make
+  a fact the app already knew visible without a tap.
+  Shipped: `Exercise.distance_bump` (the carry twin of `rep_bump`);
+  `progression-ceiling.ts` with one rule requiring BOTH that the weight cannot
+  move and that no other lever did (a held weight while reps climb is still
+  progressing, and labelling that would be its own lie); two wordings, because
+  a bar at an estimate and a full backpack are different claims; the label on
+  the card outside the ⓘ, dropped once logged provenance drives the weight; and
+  the same fact in the coach's context so the two cannot disagree.
+  `test:frozen-weeks` §8 — ten unit cases including six that must be FALSE,
+  both wordings, the render, the coach wiring, the generator's record, and an
+  end-to-end 37/37. Eight mutations, all caught; the end-to-end check's first
+  version swept the wrong profile and found zero cases, which its own sanity
+  check caught.
+  **Coverage 100% of every ceiling-held frozen pair** (carry 316/317,
+  implement 151/151, ceiling 129/129); the 76 skipped have no ceiling at all
+  and the label would be false on them.
+  **THE FROZEN COUNT DID NOT MOVE — 626 pairs, 41.6% of plans, byte-identical
+  before and after.** It was never going to: this is an honesty fix, and
+  reporting it as a reduction would be the small lie it exists to remove.
+  Needs `deploy:functions:prod -- chat-gemini` for the coach half.
+  STILL OPEN: adding a set when a lift is capped is option (a) and is
+  deliberately NOT covered by her answer — a separate piece.
+
+- [x] **A STALE NUMBER I QUOTED HER, corrected for the record.** Pitching the
+  work above I said it was "6 in 10 plans, pull-ups stuck at 4-6 @ bodyweight"
+  and quoted **61.7%**. That is the 29 Aug figure and it had been worked three
+  times since. Re-measured on the same grid before writing anything:
+  **41.6% of plans, and bodyweight lifts are 0.0% of frozen pairs** — the
   example I gave her does not exist any more. I recalled a headline out of this
   file instead of running `measure-frozen-exercises.ts`, which sits in the repo
-  for exactly this. What remains is all loaded work: carries 43.6% of frozen
-  pairs, backpacks at their implement ceiling 25.1%, barbells at the strength
-  estimate 21.7%. Worst trace: a *beginner's* bench press reading
-  `3 x 11-13 @ 30kg` character-for-character from week 11 to week 15.
-  **Ashley's ruling: (c)** — mark the week honestly as "at your estimated
-  ceiling" and ask for one logged set, rather than adding sets, rotating the
-  lift, or letting the reps climb further. Build not yet authorised. One
-  hypothesis to confirm first, and it is mechanical: the carry distance ramp
-  may be keyed to the load BEFORE the one-weight-per-week levelling while the
-  card shows the load after it — the app checking one number and displaying
-  another, which may account for the largest bucket with no product change.
+  for exactly this purpose. The problem was real; my description of it was a
+  month old.
 
 - [ ] **`exercise_set_logs` has no `date` column, and five places derive one.**
   Every one of them derives it from a timestamp, which means UTC unless the

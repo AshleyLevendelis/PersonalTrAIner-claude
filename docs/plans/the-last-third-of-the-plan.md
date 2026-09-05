@@ -174,6 +174,66 @@ never bumps load off logged performance without an explicit confirm.
 Reconciling those two is its own piece of work and is deliberately **not** in
 this plan.
 
+## BUILT, 5 Sep 2026 — and step 1 killed my own hypothesis
+
+**The carry hypothesis was WRONG, and I had already called it "confirmed".**
+I traced one plan, saw Monday's card repeat while the week's other three days
+caught up to it, and wrote *hypothesis confirmed* on the strength of that
+single case. Then I measured it across 250 plans: of **672 frozen pairs, 671
+are a genuinely stalled lift** and exactly **one** is the catch-up artifact I
+had generalised from. It was the one I traced. Same error shape as the
+Clamshells diagnosis — one plausible case, no sweep, a confident conclusion.
+
+The sweep also killed the second half of the guess. The carry distance ramp is
+not dead: it fires on **1,118 of 4,892 carry slots** (45m 365, 50m 263, 55m
+490). The 490 at 55m are the cap — `40 + 3 × 5` — which means carries are
+frozen for exactly the same reason as the barbells and the backpacks: **the
+ramp reached its cap and stopped.** One story, three implements, and no
+mechanical fix hiding underneath it.
+
+**And the honest sentence already existed.** `load-prescription.ts` has written
+it since 30 Aug 2026 — *"This is as far as the estimate goes… Log a set and the
+number can start moving again."* — and it ships inside `load_guidance`, which
+the card renders **only behind the ⓘ**. Correct words, written down, one tap
+away from nobody. So (c) turned out to be smaller than planned: not new copy,
+but making a fact the app already knew visible without a tap.
+
+What shipped:
+
+- `Exercise.distance_bump` (`'walked' | 'capped'`) — the carry twin of
+  `rep_bump`, so a carry parked at its distance cap is legible to anything
+  reading a plan. It was not, and 490 slots sit there.
+- `src/lib/progression-ceiling.ts` — one rule, one place:
+  `atPrescribedCeiling` requires BOTH that the weight cannot move
+  (`load_hold` 'ceiling'/'implement' — never 'floor' or 'matched') AND that no
+  other lever moved (`rep_bump` capped/range_fixed, or `distance_bump` capped).
+  A held weight while the reps still climb is a lift that IS progressing, and
+  labelling that would be its own lie.
+- Two wordings, because they are two different claims: *"at your estimate's
+  ceiling"* (a logged set moves it) and *"as heavy as this gets"* (nothing
+  moves a full backpack).
+- The label on the card, outside the ⓘ, suppressed once `logged` provenance is
+  driving the weight; and the same fact in the coach's per-exercise context so
+  the two surfaces cannot disagree.
+- `test:frozen-weeks` §8: ten unit cases including six that must come back
+  FALSE, both wordings, the render, the coach wiring, the generator's record,
+  and an end-to-end sweep asserting every ceiling-held repeated week is
+  labelled (37/37). Eight mutations, all caught. The first version of the
+  end-to-end check swept the wrong profile and found zero cases — its own
+  sanity check caught that rather than letting twelve green ticks sit on an
+  empty loop.
+
+**Coverage, measured:** the label fires on 1.1% of all slots and covers
+**100% of every frozen pair held by a real ceiling** (`loaded_carry` 316/317,
+`implement/capped` 151/151, `ceiling/capped` 129/129). The 76 it does not
+cover are `nohold`/`matched` — lifts with no ceiling at all, frozen for other
+reasons, where the label would be false. Abstaining there is correct.
+
+**The frozen count did not move, and was never going to.** Same script, same
+250-plan stride, before and after: 626 pairs, 41.6% of plans, byte-identical.
+This was an honesty fix. Reporting it as a reduction would have been the same
+kind of small lie it exists to remove.
+
 ## If she picks (c), what gets built
 
 1. **Confirm the carry hypothesis first** (above). If the distance ramp is

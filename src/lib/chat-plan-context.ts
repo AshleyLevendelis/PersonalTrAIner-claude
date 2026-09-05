@@ -29,6 +29,7 @@
 import type { Exercise, WorkoutDay } from './types'
 import { buildCoachTechniqueSummary } from './exercise-technique'
 import { describeTempo } from './periodization'
+import { ceilingNoteForCoach } from './progression-ceiling'
 
 /** True when the per-set loads are not all the same — a ramp, not a straight-across weight. */
 function isRamped(perSet: Exercise['per_set_load']): boolean {
@@ -110,6 +111,13 @@ export function describeExerciseForCoach(e: Exercise): string {
     + ')'
     + (e.selection_note ? ` [why: ${e.selection_note}]` : '')
     + (e.block_hold_note ? ` [note: ${e.block_hold_note}]` : '')
+    // THE COACH GETS THE SAME FACT THE CARD NOW SHOWS. Ashley's ruling,
+    // 5 Sep 2026. An identical week reached the coach with nothing attached to
+    // say it was identical, so it described a stalled lift as progression —
+    // and the trainee reading that had no way to know the app had simply run
+    // out of levers. Attached per exercise rather than as a week-level line
+    // because it is true of one lift, not the session.
+    + (ceilingNoteForCoach(e) ? ` [ceiling: ${ceilingNoteForCoach(e)}]` : '')
 }
 
 /**
