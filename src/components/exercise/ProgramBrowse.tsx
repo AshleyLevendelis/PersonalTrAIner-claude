@@ -56,6 +56,20 @@ interface ProgramBrowseProps {
   onOpenSwap: (target: { weekNumber: number; dayName: string; exIndex: number; exerciseName: string }) => void
   onBanExercise: (exerciseName: string) => void | Promise<void>
   onOpenHistory?: (exerciseId: string, exerciseName: string) => void
+  /**
+   * Opens the technique tab. THIS PROP DID NOT EXIST UNTIL 5 Sep 2026, and
+   * its absence was pinned by test:exercise-detail as a decision rather than
+   * an omission: the program view had no detail dialog wired to it, and "a
+   * menu item that opens nothing is worse than an absent one".
+   *
+   * That reason expired when the two dialogs merged. One dialog now serves
+   * technique AND history, the program view already opens it for history, so
+   * withholding the technique item would hide a tab the user can already
+   * reach by tapping the other item — on the one screen where you browse
+   * movements you have NOT yet performed, which is exactly where "how does
+   * this go?" gets asked.
+   */
+  onOpenDetail?: (exerciseName: string) => void
 }
 
 const DAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
@@ -96,6 +110,7 @@ export function ProgramBrowse({
   onOpenSwap,
   onBanExercise,
   onOpenHistory,
+  onOpenDetail,
 }: ProgramBrowseProps) {
   // The only session-identity values this browse surface needs: where paging
   // starts and which row is "today". No logs facade, no write path.
@@ -487,6 +502,7 @@ export function ProgramBrowse({
                       try { await onBanExercise(exerciseName) } finally { setBanBusy(null) }
                     }}
                     onOpenHistory={onOpenHistory}
+                    onOpenDetail={onOpenDetail}
                     banBusyName={banBusy}
                   />
                   <WarmupSection

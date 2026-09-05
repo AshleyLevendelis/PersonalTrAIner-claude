@@ -2,6 +2,44 @@
 
 Newest first. One line each.
 
+- [x] **YOU CAN SEE THE EXERCISE NOW — and Ashley had to ask twice.** Her
+  earlier words sat quoted in two files the whole time: *"I want there to be
+  exercise demonstrations in the app AND form cues."* The cues shipped; the
+  demonstrations were never started and nothing recorded dropping them. Asked
+  again on 5 Sep 2026 with two screenshots, she chose a muscle map on every
+  exercise plus a video on the ones we have checked.
+  ONE SCREEN INSTEAD OF TWO POP-UPS. Her reference was mostly already built and
+  split: cues in ExerciseDetailDialog, chart/PRs/sessions in
+  ExerciseHistoryDialog, two menu items that knew nothing about each other.
+  Merged into Summary · History · How to; the history dialog is deleted, its
+  content absorbed unchanged, and both menu items open the merged one at the
+  tab they name. The program view gained technique as a result, REVERSING a
+  pinned gate assertion — it was withheld because that view had no dialog
+  wired, and one dialog now serves both.
+  THE MAP IS DRAWN, NOT FETCHED. Hand-rolled SVG on ExerciseStrengthChart's
+  "no library for one chart" precedent, which is what makes it work with no
+  signal — the service worker never caches cross-origin content by design, so
+  anything hosted elsewhere is blank in a basement gym. Coverage MEASURED
+  first: 198 of 199 live exercises paint, Burpees ("cardiovascular system,
+  full body") gets a sentence rather than an unlit body, and 0 of the 62
+  distinct muscle spellings are unrecognised.
+  THE VIDEO SHIPS WITH ZERO VIDEOS, deliberately. The field, the guarded
+  button, the nocookie player and the gates are built; no id is seeded because
+  a video teaches a lift correctly or teaches someone to hurt themselves, and
+  nobody here can watch one. The gate requires no minimum count — a number
+  would be pressure to add one unwatched.
+  LOOKING AT IT CAUGHT A DEFECT NO CHECK WOULD HAVE. The first draft copied
+  the reference's "Primary: <muscle>" line. The catalogue has one muscle field
+  and no secondary, so that invents a ranking the data does not hold — it read
+  as a harmless repeat on Deadlifts and as nonsense on Burpees ("Primary:
+  Cardiovascular system"). Removed. Found by rendering the screen, which is
+  now possible for the REAL panel: the body was split into ExerciseDetailPanel
+  so render-screens photographs the component rather than a replica.
+  ONE MUTATION WORTH RECORDING: adding a 12th group to MUSCLE_GROUPS — the
+  denominator for weekly per-muscle volume — left test:muscle-balance GREEN.
+  Only the new gate catches it, which is why the map keeps its own display
+  vocabulary and never touches the measurement one.
+
 - [x] **STEPS MOVED TO THE EXERCISE TAB, reversing a rule this repo had written
   down and gated.** Ashley, 5 Sep 2026: *"we currently log steps in the
   nutrition tab but that isn't right."* Asked where instead, she chose

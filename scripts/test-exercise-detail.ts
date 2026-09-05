@@ -6,9 +6,11 @@
  * the app to see an exercise."
  *
  * She was right that there was nowhere — and the striking part is that the
- * content was already written. All 158 catalogue entries carry `form_cues`,
- * 635 of them, and NOTHING IN THE REPO READ THEM: not the UI, not a prompt,
- * not a test. They shipped in every bundle and were never shown to anyone.
+ * content was already written. Every catalogue entry carries `form_cues` and
+ * NOTHING IN THE REPO READ THEM: not the UI, not a prompt, not a test. They
+ * shipped in every bundle and were never shown to anyone. (This said "158
+ * entries, 635 cues" until 5 Sep 2026, by which point the catalogue held 200
+ * and 805 — the counts are printed from the data below rather than retyped.)
  * `coach_note_swap` was barely better, rendered only on the ALTERNATIVES in
  * the swap dialog — so the app would explain a movement you were considering
  * and never the one you were about to perform.
@@ -16,7 +18,7 @@
  * §1 protects the data the panel needs. §3 protects the wiring, because a
  * correct dialog nothing opens is the failure mode this repo keeps producing.
  */
-import { readFileSync } from 'fs'
+import { readFileSync, existsSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { EXERCISE_DATABASE, getExerciseEntry, jointListDisplay } from '../src/lib/exercise-db'
@@ -53,6 +55,19 @@ check('no cue leaks internal vocabulary to the screen', jargon.length === 0,
   jargon.slice(0, 3).map(e => ({ [e.name]: e.form_cues })))
 
 console.log('\n2. The panel shows what it has, and admits what it does not\n')
+// MERGED 5 Sep 2026. The panel is now the "How to" tab of one three-tab
+// dialog that also absorbed ExerciseHistoryDialog (deleted). Every check
+// below still applies — the content did not change, only which tab it sits
+// in — so they are kept verbatim rather than relaxed for the restructure.
+check('it is one dialog with three tabs, not two dialogs about one exercise',
+  /TabsTrigger value="summary"/.test(panel)
+  && /TabsTrigger value="history"/.test(panel)
+  && /TabsTrigger value="howto"/.test(panel))
+check('...and the absorbed dialog is gone, not left behind as a second copy',
+  !existsSync(join(ROOT, 'src/components/exercise/ExerciseHistoryDialog.tsx')))
+check('the history content really moved in rather than being dropped',
+  /derivePRHistory/.test(panel) && /formatCompletedSummary/.test(panel)
+  && /ExerciseStrengthChart/.test(panel))
 check('it reads cues from the catalogue', /entry\.form_cues\.map/.test(panel))
 check('it shows the rationale that used to appear only on other exercises',
   /entry\.coach_note_swap/.test(panel))
@@ -85,11 +100,16 @@ check("today's session menu opens it", /onOpenDetail\(ex\.name\)/.test(row) && /
 check('the shared browse menu opens it', /onOpenDetail\(ex\.name\)/.test(dayList) && /How to do it/.test(dayList))
 check('...and the peek threads the prop into that menu',
   /onOpenDetail=\{onOpenDetail\}/.test(peek))
-// The program view deliberately does NOT pass onOpenDetail today — it has no
-// dialog wired to it, and a menu item that opens nothing is worse than an
-// absent one. Asserted so its absence reads as a decision, not an omission.
-check('...while the program view offers history instead, not technique',
-  /onOpenHistory=\{onOpenHistory\}/.test(program) && !/onOpenDetail=/.test(program))
+// REVERSED 5 Sep 2026, and the old text is kept so the reversal is legible.
+// This used to assert the OPPOSITE — "the program view offers history
+// instead, not technique" — because that view had no detail dialog wired to
+// it and "a menu item that opens nothing is worse than an absent one". True
+// then. The two dialogs merged, the program view already opens the merged one
+// for history, so withholding the technique item would have hidden a tab the
+// user could already reach by tapping the other item — on the one screen
+// where you browse lifts you have NOT yet performed.
+check('the program view offers technique as well as history now',
+  /onOpenHistory=\{onOpenHistory\}/.test(program) && /onOpenDetail=\{onOpenDetail\}/.test(program))
 // The prop has to survive the whole thread or the menu item never renders:
 // ExerciseTab -> TodayPanel -> ExerciseList -> rowProps -> ExerciseRow.
 // SLICED, not windowed. Two earlier versions of this check used a character
@@ -144,14 +164,25 @@ check('...and the ranked list still has its own', /\{note\}/.test(swap))
   check('ExerciseTab still has two return branches (sanity check on this check)', split > 0, split)
   const branches = { program: tab.slice(0, split), session: tab.slice(split) }
   for (const [name, body] of Object.entries(branches)) {
-    if (!/setDetailTarget\(name\)/.test(body)) continue
+    if (!/setDetailTarget\(\{/.test(body)) continue
     check(`the ${name} branch sets detailTarget AND renders the dialog`,
       /<ExerciseDetailDialog\s+open=\{!!detailTarget\}/.test(body))
   }
   // At least one branch must actually do it, or the loop above is vacuous.
-  check('...and at least one branch was checked', /setDetailTarget\(name\)/.test(tab))
+  check('...and at least one branch was checked', /setDetailTarget\(\{/.test(tab))
+  // BOTH branches now, not "at least one". The merge raised the stakes on
+  // this check: one missing dialog used to cost the technique panel on one
+  // screen; it now costs technique AND history AND the muscle map together.
+  for (const [name, body] of Object.entries(branches)) {
+    check(`the ${name} branch renders the one merged dialog`,
+      /<ExerciseDetailDialog\s+open=\{!!detailTarget\}/.test(body))
+  }
+  // The two menu items must land on DIFFERENT tabs, or merging them threw
+  // away the thing that made them two items in the first place.
+  check('"How to do it" opens the technique tab', /tab: 'howto'/.test(tab))
+  check('...and the history item opens the history tab', /tab: 'history'/.test(tab))
 }
 
 
 if (failures > 0) { console.error(`\n${failures} check(s) failed\n`); process.exit(1) }
-console.log('\n635 cues, finally with a reader.\n')
+console.log(`\n${EXERCISE_DATABASE.reduce((n, e) => n + (e.form_cues?.length ?? 0), 0)} cues, finally with a reader.\n`)
