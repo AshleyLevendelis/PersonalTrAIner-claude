@@ -620,6 +620,53 @@ grocery_items          id, list_id FK CASCADE, canonical_key, display_name,
 
 Every step obeys I1 (no server write), I2 (through the store), and Decision #1 (append-only ⇒ immediate + receipt + undo).
 
+### 5.5 Four invariants the whole-app audit turned into gates (5 Sep 2026)
+
+Written up here because each one had already shipped at least once, in more
+than one place, and each was invisible to a gate suite that was fully green.
+They are properties of the architecture, not of the features that broke them.
+
+**Q1 — One source per fact.** If the client computes something and sends it,
+the server does not compute it again. The edge function was independently
+refetching `exercise_set_logs` and rendering `toLocaleTimeString()`, which is
+UTC in Deno: a set logged at 11pm read "10:00 PM", inside a 48-hour window
+titled "TODAY'S". Two sources for one fact means one of them is wrong, and the
+better formatter is not the fix — the second source is. Corollary: the server
+never asks its own clock what day it is. `current_local_date`, `day_of_week`
+and `current_time_formatted` all come from the client, with a fallback only for
+the seconds around a deploy. Held by `test:context-is-read`.
+
+**Q2 — Sent implies read; read implies sent.** A context field the server never
+reads is a fact the model will be asked to supply from nowhere, and the prompt
+will eventually instruct it to (`steps_summary` was sent, unread, and referred
+to twice as "the STEPS line of their context"). A field the server reads that
+the client never sends renders as an empty prompt line. Both directions are
+checked, plus the rule stated generally: every "the X line of their context"
+instruction must have an X line that actually interpolates something.
+
+**Q3 — Every local-first queue publishes, and something listens.** Five queues
+(sets, water, grocery, cardio, meals) each write locally and sync in the
+background. `meal-store` was the one without a notify/subscribe pair, and that
+single gap produced three unconnected bug reports: rings that did not follow
+the meal list above them, a coach whose calories-remaining froze at whatever
+the day looked like when the chat tab mounted, and dead-lettered meals that
+never reached the offline badge. The queue rule has three parts and all three
+are gated: publish on every state change, appear in `queue-health`'s four
+switches, and never burn a retry attempt while `navigator.onLine` is false —
+plus a backoff timer, because the `online` event never fires for a connection
+that did not drop. Held by `test:queue-listeners`.
+
+**Q4 — A replace carries what it replaced.** Any write that REPLACES rather
+than appends needs its inverse to hold the pre-image, and needs no window where
+the data is absent from the database. `restoreStepsForDate` was the first
+instance and stated the rule; four more places did not follow it — the whole
+mesocycle (delete-then-insert, five call sites), a chat set correction whose
+Undo destroyed both versions, a meal-pool regeneration that could empty a slot,
+and an adaptation revert that closed its own row before restoring the plan. The
+shape to reach for is upsert-then-trim, or capture-then-delete; never
+delete-then-write. Held by `test:replace-without-losing`, whose first section
+runs the real executor rather than reading it.
+
 ---
 
 ## 6. Information architecture

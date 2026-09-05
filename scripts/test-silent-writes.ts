@@ -237,5 +237,78 @@ console.log('\n7. Chat message persistence -- four writes that used to vanish in
     /delete\(\)[\s\S]*?\.then\(\(\{\s*error\s*\}\)\s*=>/.test(clearChatBody))
 }
 
+console.log('\n8. The five found by the whole-app audit, 5 Sep 2026')
+{
+  // Every one of these updated the screen, or claimed a result, over a write
+  // whose outcome was dropped. Same family as §1-§4, found by walking every
+  // action rather than by a report — which is why they are held here rather
+  // than in five separate gates.
+
+  // (a) "Session complete" for a session the database never closed. The catch
+  // logged and returned the success result, and the summary dialog opened on
+  // it, so the tick, the streak and the coach's "have you reviewed it yet"
+  // all disagreed with the row for good — nothing ever tried again.
+  const session = stripComments(readFileSync(join(ROOT, 'src/hooks/useActiveSession.tsx'), 'utf8'))
+  check('finishSession records that the server close failed',
+    /serverCloseFailed = true/.test(session) && /serverCloseFailedAt/.test(session))
+  check('...and returns it so the dialog can stop saying "complete"',
+    /serverCloseFailed,?\s*\}/.test(session) || /serverCloseFailed \}/.test(session))
+  check('...and something retries it later', /retryUnclosedSession/.test(session))
+  const summary = stripComments(readFileSync(join(ROOT, 'src/components/exercise/SessionSummaryDialog.tsx'), 'utf8'))
+  check('...and the dialog title changes when it has not landed',
+    /serverCloseFailed \? 'Session saved'/.test(summary))
+
+  // (b) The Nutrition Method switch applied every macro on screen and dropped
+  // the update's error — the handler immediately below it in the same file
+  // has done this correctly since it was written.
+  const mode = handlerBody(app, 'const handleMacroModeChange')
+  check('the macro-mode switch reads its write\'s error', /const \{ error \}/.test(mode), mode.slice(0, 200))
+  // BOTH halves of the revert, named separately. The first version checked
+  // only for `macro_calculation_mode: previousMode`, which also appears in
+  // the setMacros recompute on the next line — so deleting the setProfile
+  // revert entirely left this green. Found by mutation.
+  check('...and reverts the stored profile when it failed',
+    /setProfile\(prev => \(prev \? \{ \.\.\.prev, macro_calculation_mode: previousMode \} : prev\)\)/.test(mode))
+  check('...and recomputes the macros back with it',
+    /setMacros\(computeTargets\(\{ \.\.\.updated, macro_calculation_mode: previousMode \}/.test(mode))
+  // A target snapshot written for a change that failed is a number in the
+  // history the user was shown for a second and never actually had.
+  for (const [label, body] of [['mode', mode], ['split', handlerBody(app, 'const handleMacroSplitChange')]] as const) {
+    const snapshotAt = body.indexOf('snapshotTargetsIfChanged')
+    const writeAt = body.indexOf('fitness_profiles')
+    check(`the ${label} handler snapshots only after the write`, snapshotAt > writeAt && writeAt >= 0, { snapshotAt, writeAt })
+  }
+
+  // (c) Unlogging a meal removed it locally whether or not the server agreed,
+  // so the meal reappeared a moment later with nothing said.
+  const mealStore = stripComments(readFileSync(join(ROOT, 'src/lib/meal-store.ts'), 'utf8'))
+  check('voidMealEvent returns whether the void landed',
+    /export async function voidMealEvent\([^)]*\): Promise<boolean>/.test(mealStore))
+  check('...distinguishing a never-synced event from a failed one', /wasPendingOnly/.test(mealStore))
+  const mealPlan = stripComments(readFileSync(join(ROOT, 'src/components/MealPlan.tsx'), 'utf8'))
+  // FROM THE HANDLER, not just present in the file — setUnlogError also
+  // appears in its own useState and in the banner's Dismiss button, so a bare
+  // presence check passed with the call in onUnlog removed. Found by mutation.
+  check('...and the screen says so when it did not',
+    /onUnlog=\{async clientIds => \{[\s\S]{0,400}?setUnlogError\(removed \?/.test(mealPlan))
+
+  // (d) A failed dashboard load left "Loading your day…" on screen forever:
+  // `finally` cleared `loading` but `data` stayed null, and the render guard
+  // is `loading || !data`.
+  const dashboard = stripComments(readFileSync(join(ROOT, 'src/components/Dashboard.tsx'), 'utf8'))
+  check('the dashboard load has a catch', /\.catch\(err =>[\s\S]{0,200}setLoadError\(true\)/.test(dashboard))
+  check('...and a failed load renders a retry rather than a spinner',
+    /loadError && !data/.test(dashboard) && /setRetryVersion/.test(dashboard))
+
+  // (e) Foods to avoid — safety-adjacent under CLAUDE.md. The typed word was
+  // cleared before the write was awaited, and every rejection was an
+  // unhandled promise, so "shellfish" vanishing from the box read as saved.
+  check('saving foods to avoid surfaces its failure', /Saving foods to avoid failed/.test(profile))
+  check('...says plainly that the food is NOT being avoided', /it is NOT being avoided yet/.test(profile))
+  check('...and rethrows so the typed word stays in the box', /throw err/.test(profile))
+  check('the tag list awaits its save before clearing the input',
+    /await onSave\(\[\.\.\.values, v\]\)[\s\S]{0,80}setInput\(''\)/.test(profile))
+}
+
 if (failures > 0) { console.error(`\n${failures} failure(s)`); process.exit(1) }
 console.log('\nAll silent-write checks passed.')

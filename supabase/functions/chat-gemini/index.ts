@@ -754,7 +754,7 @@ const toolDeclarations = [
   {
     name: "log_meal",
     description:
-      "Call whenever the user describes food they ate, OR asks a MACRO question about specific food (e.g. 'how many calories is 2 eggs and toast', 'what's the protein in this shake'). Do NOT call this for an allergen or food-safety question ('does this have nuts', 'is this safe for my allergy', 'is there dairy in it') — those never get a tool call, they're answered in plain reply text under ALLERGEN HONESTY. Extract ONLY the ingredients the user actually stated, with their exact quantities and units — the app computes real macros from a verified food database from what you extract, so you must never calculate or state a macro number yourself. Never add an ingredient the user didn't mention (no assumed cooking oil, seasoning, or protein powder) — if an addition seems implied, ask instead of guessing. If an ingredient has an ambiguous variant (e.g. 'greek yoghurt' could be 0% or full-fat, 'milk' could be whole or skimmed), name the SPECIFIC variant you're assuming (e.g. 'greek yoghurt 0%', not 'greek yoghurt') and record it in assumptions. If a quantity is missing, use a typical portion and record that assumption too.",
+      "DOES NOT LOG ANYTHING — it computes macros and points the user at the Nutrition tab, where they log the meal themselves. Never tell them it is recorded, and never say food logging is 'coming in an update': the button exists, it is just not yours to press. (Intended behaviour once built: write the meal event directly.) Call whenever the user describes food they ate, OR asks a MACRO question about specific food (e.g. 'how many calories is 2 eggs and toast', 'what's the protein in this shake'). Do NOT call this for an allergen or food-safety question ('does this have nuts', 'is this safe for my allergy', 'is there dairy in it') — those never get a tool call, they're answered in plain reply text under ALLERGEN HONESTY. Extract ONLY the ingredients the user actually stated, with their exact quantities and units — the app computes real macros from a verified food database from what you extract, so you must never calculate or state a macro number yourself. Never add an ingredient the user didn't mention (no assumed cooking oil, seasoning, or protein powder) — if an addition seems implied, ask instead of guessing. If an ingredient has an ambiguous variant (e.g. 'greek yoghurt' could be 0% or full-fat, 'milk' could be whole or skimmed), name the SPECIFIC variant you're assuming (e.g. 'greek yoghurt 0%', not 'greek yoghurt') and record it in assumptions. If a quantity is missing, use a typical portion and record that assumption too.",
     parameters: {
       type: "object",
       properties: {
@@ -1179,6 +1179,19 @@ Deno.serve(async (req: Request) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+
+    // THIS FUNCTION NEVER ASKS ITS OWN CLOCK WHAT DAY IT IS.
+    //
+    // It runs in UTC. Every `new Date()` here is therefore the wrong day for
+    // part of every day in almost every timezone, and five tool handlers were
+    // stamping rows with it — a set logged at 00:30 in the UK filed under
+    // yesterday, an evening session in Sydney under tomorrow. The client sends
+    // the date the whole app agrees on (dev clock included); this is a
+    // fallback for the seconds around a deploy where an older client is still
+    // posting without it, not a second source of truth.
+    if (!context.current_local_date) context.current_local_date = new Date().toISOString().split("T")[0];
+    if (!context.day_of_week) context.day_of_week = new Date().toLocaleDateString("en-US", { weekday: "long" });
+    if (!context.current_time_formatted) context.current_time_formatted = new Date().toLocaleString("en-US", { weekday: "long", hour: "numeric", minute: "2-digit", hour12: true });
 
     // TODAY'S LOGGED SETS USED TO BE REFETCHED HERE. Deleted 5 Sep 2026, and
     // this comment is the gravestone because the block caused a real report.
@@ -1659,7 +1672,6 @@ NUTRITION TARGETS:
 - Protein: ${context.macros.protein}g | Carbs: ${context.macros.carbs}g | Fat: ${context.macros.fat}g
 
 STEPS: ${context.steps_summary || 'no step count available for today.'}
-This IS the STEPS line the log_steps rules refer to. It was being built and sent by the app and never interpolated here, so an instruction to "add it to the count in the STEPS line" pointed at nothing — and log_steps REPLACES a day's total, so a made-up base is a destructive write, not just a wrong sentence.
 
 CURRENT EXERCISE PLAN (this includes the PRESCRIBED WEIGHT for every movement — the "@" clause):
 How to read the "@" clause:
@@ -1761,7 +1773,7 @@ NEVER CLAIM AN ACTION YOU DID NOT TAKE:
 
 Always use the user's specific data when answering. Nutrition, supplements, and recovery questions are always within your scope — answer them directly. For anything genuinely off-topic, see §1e above (factual question vs. task request get different treatment).
 
-CONTEXT: Current Time: ${context.current_time_formatted || new Date().toLocaleString('en-US', { weekday: 'long', hour: 'numeric', minute: '2-digit', hour12: true })} | Preferred Training Time: ${context.profile?.preferred_time || 'morning'} | Workout Logged Today: ${context.workout_logged_today ? 'Yes' : 'No'}.
+CONTEXT: Current Time: ${context.current_time_formatted} | Preferred Training Time: ${context.profile?.preferred_time || 'morning'} | Workout Logged Today: ${context.workout_logged_today ? 'Yes' : 'No'}.
 Keep this context in mind to ensure your greetings and questions naturally align with the time of day and their workout status.`;
 
     const contents: Array<{ role: string; parts: Array<{ text: string }> }> = [];
@@ -1978,7 +1990,11 @@ Keep this context in mind to ensure your greetings and questions naturally align
       }
 
       if (name === "log_workout_session") {
-        const dayOfWeek = args.day || new Date().toLocaleDateString("en-US", { weekday: "long" });
+        // context.day_of_week, not the server's own clock: this function runs
+        // in UTC, so "what day is it" answered here is wrong for part of every
+        // day in almost every timezone — and this value is written onto the
+        // rows, not just shown.
+        const dayOfWeek = args.day || context.day_of_week;
         const logs = args.logs as Array<{ exercise_name: string; sets_completed: number; reps_completed: number; weight_kg?: number; is_bodyweight?: boolean }>;
         const profileId = context.profile_id;
 
@@ -1991,7 +2007,7 @@ Keep this context in mind to ensure your greetings and questions naturally align
 
         if (profileId && logs && logs.length > 0) {
           try {
-            const todayDate = new Date().toISOString().split("T")[0];
+            const todayDate = context.current_local_date;
             const rows: UnifiedSetRow[] = [];
             // Two logs[] entries can name the same exercise differently
             // ("Push-Ups" then "Push ups" later in one message) — both slug
@@ -2086,7 +2102,7 @@ Keep this context in mind to ensure your greetings and questions naturally align
 
         let dbSuccess = true;
         try {
-          const todayDate = new Date().toISOString().split("T")[0];
+          const todayDate = context.current_local_date;
           const resp = await fetch(
             `${supabaseUrl}/rest/v1/daily_metrics?on_conflict=profile_id,date`,
             {
@@ -2148,7 +2164,7 @@ Keep this context in mind to ensure your greetings and questions naturally align
         }
         const swapDate = typeof args.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(args.date)
           ? args.date
-          : new Date().toISOString().split("T")[0];
+          : context.current_local_date;
 
         let dbSuccess = true;
         try {
@@ -2347,8 +2363,8 @@ Keep this context in mind to ensure your greetings and questions naturally align
           try {
             resolved = await resolveWeight(supabaseUrl, serviceKey, profileId, args.exercise_name, args.weight_kg, args.is_bodyweight);
             if (resolved) {
-              const todayDate = new Date().toISOString().split("T")[0];
-              const dayOfWeek = new Date().toLocaleDateString("en-US", { weekday: "long" });
+              const todayDate = context.current_local_date;
+              const dayOfWeek = context.day_of_week;
               const sessionId = await ensureWorkoutSession(supabaseUrl, serviceKey, profileId, todayDate, dayOfWeek);
               await upsertUnifiedSets(supabaseUrl, serviceKey, profileId, sessionId, dayOfWeek, [{
                 exercise_name: args.exercise_name,

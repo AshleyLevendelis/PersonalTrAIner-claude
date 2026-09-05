@@ -174,7 +174,11 @@
     "test:session-continuity": "tsx scripts/test-session-continuity.ts",
     "test:installable": "tsx scripts/test-installable.ts",
     "test:spend-cap": "tsx scripts/test-spend-cap.ts",
-    "test:user-data": "tsx scripts/test-user-data.ts"
+    "test:user-data": "tsx scripts/test-user-data.ts",
+    "test:context-is-read": "tsx scripts/test-context-is-read.ts",
+    "test:queue-listeners": "tsx scripts/test-queue-listeners.ts",
+    "test:bounds-and-boundaries": "tsx scripts/test-bounds-and-boundaries.ts",
+    "test:replace-without-losing": "tsx scripts/test-replace-without-losing.ts"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.4",

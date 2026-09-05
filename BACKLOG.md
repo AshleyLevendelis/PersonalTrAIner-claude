@@ -2,6 +2,93 @@
 
 Newest first. One line each.
 
+- [x] **EVERY ACTION, AND EVERY WAY IT WAS GOING WRONG.** Ashley: "think about
+  every action that can happen in the app and every way it could go wrong and
+  then fix it." Three parallel audits plus the full gate suite — which passed
+  throughout, which is the finding: every fix below was invisible to the tests
+  that already existed. Four shapes account for nearly all of it: the app
+  asserts what it was never given; a write lands in the database and never on
+  the screen; a control does nothing; a write fails and the app says it
+  succeeded.
+  FIRST, A CORRECTION. The "10:00 PM" bug was NOT formatLogsForAI dropping
+  `completed_at` (the entry directly below this one). The edge function
+  independently fetched the same table and built its own block: a 48-HOUR
+  window titled "TODAY'S", rendering `toLocaleTimeString()`, which is UTC in
+  Deno. A set logged at 11pm the previous evening read "10:00 PM" and was
+  labelled today — one block, both of her complaints. I checked the client
+  formatter, found a real gap, and stopped at the first plausible cause
+  instead of grepping the edge function for a second timestamp source. The
+  yesterday fix stands on its own merits; it was not the cause.
+  UNTRUE THINGS, REMOVED: that block deleted entirely (with the "Workout
+  Logged Today" answer it corrupted); `steps_summary` sent and never read
+  while the prompt twice told the model to read "the STEPS line" that did not
+  exist (my own bug, two commits old, and `log_steps` REPLACES the day);
+  `remaining_macros_today`, a field that never existed, modelled in two
+  fabrication examples; `ban_exercise` promising a permanent removal its
+  handler declines; `log_meal` announcing a feature that shipped as "coming in
+  the next update"; APP_REALITY omitting meal logging while telling the coach
+  its list was complete. And five more UTC-clock reads found by the new gate:
+  the server was stamping written rows with its own date and day-of-week, so a
+  set logged at 00:30 in the UK filed under yesterday.
+  DATA LOSS, CLOSED: saveMesocycle (delete-then-insert of the whole plan, five
+  call sites) is upsert-then-trim; undoing a chat set CORRECTION destroyed
+  both versions and now carries the pre-image; undoMealAddition deleted every
+  row matching a NAME and now uses pool_index; revertAdaptation closed the row
+  before restoring the plan and now reopens it if the restore fails;
+  persistPools checked no step of its delete-then-insert and now restores the
+  old pool on a failed insert.
+  VANISHED WRITES AND DEAD CONTROLS: meal-store was the only local-first queue
+  with no listener — one fix closed three findings (the rings above the meal
+  list, the coach's calories-remaining, and meal dead-letters reaching the
+  offline badge); "Session complete" over a session the database never closed;
+  the Nutrition Method switch dropping its error; unlogging a meal reappearing
+  with nothing said; a failed dashboard load stuck on "Loading your day…"
+  forever; Foods to avoid clearing the typed word and surfacing nothing
+  (safety-adjacent); the plate calculator in Additional Work; a first-ever-log
+  celebration nobody listened for; "Load from today's session" in Timers,
+  which could never render; window.confirm for Clear chat, dead in an
+  installed PWA; four unbounded number inputs; no error boundary anywhere; the
+  cardio and meal queues with no offline guard and no retry timer.
+  FOUR NEW GATES, for the classes rather than the instances:
+  test:context-is-read (every field sent is read, every field read is sent, no
+  second timestamp source, no prompt pointing at a line that is not built),
+  test:queue-listeners (every queue publishes, is in queue-health, guards
+  offline and retries), test:bounds-and-boundaries (the bounds are real
+  functions that say no, no control renders without a handler, no
+  window.confirm anywhere, the boundary is mounted outside every provider),
+  test:replace-without-losing (behavioural: the real executor hands back its
+  pre-image). Plus test:silent-writes §8 and test:coach-promises §7. Thirty-one
+  mutations run; four survived first time and each one strengthened the check
+  that missed it — including a whole section that ran AFTER its own
+  `process.exit`, so seven checks were decorative until moved.
+
+- [ ] **`exercise_set_logs` has no `date` column, and five places derive one.**
+  Every one of them derives it from a timestamp, which means UTC unless the
+  deriver remembers otherwise, and they do not all remember. A real column
+  written by the store would fix all five at once and is the better long-term
+  answer — it is out of scope here only because it is a migration, and
+  migrations need Ashley's explicit say-so every time.
+
+- [ ] **`block-consistency.ts` counts rest days as attendance, and has zero
+  callers.** Real defect, no blast radius today. Flagged so it is not wired up
+  as-is: whatever reads it first would inherit an attendance figure that
+  rewards not training.
+
+- [ ] **`endAdaptationEarly` is exported and called by nobody.** The store
+  supports "I'm good now, end this injury adaptation early" — status
+  `ended_early`, pre-image restored, the whole path written and tested — and
+  no screen or coach tool reaches it. Wiring it up is a product decision
+  (where does that control live, and does the coach offer it?), not a gap to
+  fill unilaterally. Found by the whole-app audit, 5 Sep 2026.
+
+- [ ] **DST duplicates a day, and a session frozen at midnight keeps
+  yesterday's date.** Both known, both narrow, both listed here rather than
+  quietly fixed inside an audit whose scope was elsewhere.
+
+- [ ] **e1RM and PR labelling.** The chart's "One Rep Max" is an estimate
+  presented as a measurement, and PRs on added weight (dip belt, weighted
+  chins) are still judged on `weight_kg`, which is 0 for those rows.
+
 - [x] **TWO FROM ASHLEY'S PHONE, 5 Sep 2026 — an invented time, and cardio the
   coach never heard about.**
   (1) "it says I logged an exercise which i didn't. at 10pm today, but it's

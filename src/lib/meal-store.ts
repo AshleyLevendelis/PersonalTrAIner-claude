@@ -149,6 +149,25 @@ export function subscribeMealStore(fn: () => void): () => void {
 }
 
 let flushPromise: Promise<void> | null = null
+let retryTimer: ReturnType<typeof setTimeout> | null = null
+let consecutiveFailures = 0
+
+/**
+ * Backoff retry — added 5 Sep 2026 alongside cardio-log-store's, and found
+ * the same way: by a gate that asked every queue the same question rather
+ * than by anyone noticing this one.
+ *
+ * doFlush skips a transiently-failed event for the rest of its pass and then
+ * returns. Nothing brought it back. The `online` event never fires for a
+ * connection that never dropped, so a single 5xx left a meal pending until
+ * the user happened to log another one — and it could not even reach
+ * MAX_ATTEMPTS, so it never surfaced in the offline indicator either.
+ */
+function scheduleRetry(): void {
+  if (typeof window === 'undefined' || retryTimer) return
+  const delayMs = Math.min(60_000, 2_000 * 2 ** Math.min(consecutiveFailures, 5))
+  retryTimer = setTimeout(() => { retryTimer = null; void flushPending() }, delayMs)
+}
 
 /** Local-first write: persisted to the pending queue synchronously, synced in the background. Returns the record (with its idempotency clientId) immediately. */
 export function recordMealEvent(input: RecordMealEventInput): MealEventRecord {
@@ -175,6 +194,14 @@ export function flushPending(): Promise<void> {
 }
 
 async function doFlush(): Promise<void> {
+  try {
+    await syncPass()
+  } finally {
+    if (loadPending().length > 0) scheduleRetry()
+  }
+}
+
+async function syncPass(): Promise<void> {
   // Reload fresh each iteration so events queued mid-flush still drain, and
   // skip transient failures for the rest of the pass — no op ever blocks
   // the ones behind it (the set-log store's poison-pill lesson).
@@ -200,6 +227,7 @@ async function doFlush(): Promise<void> {
       // Synced — or already synced by an earlier retry (unique client_id
       // rejected the duplicate), which is the idempotency working.
       savePending(loadPending().filter(e => e.clientId !== next.clientId))
+      consecutiveFailures = 0
       notifyListeners()
       continue
     }
@@ -220,6 +248,7 @@ async function doFlush(): Promise<void> {
       notifyListeners()
     } else {
       savePending(loadPending().map(e => (e.clientId === next.clientId ? bumped : e)))
+      consecutiveFailures += 1
       skipThisPass.add(next.clientId)
     }
   }
@@ -557,7 +586,7 @@ export function logMealEaten(profileId: string, date: string, slot: MealSlotName
 
 /** Flush when connectivity returns — mirrors set-log-store's listener. */
 if (typeof window !== 'undefined') {
-  window.addEventListener('online', () => { notifyListeners(); flushPending() })
+  window.addEventListener('online', () => { consecutiveFailures = 0; notifyListeners(); flushPending() })
   // Going offline changes nothing in the queue and everything about what the
   // indicator should say, so it is worth a notification of its own — the same
   // pairing water-store makes.

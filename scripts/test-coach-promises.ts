@@ -575,6 +575,63 @@ console.log('\nWANTING TO TRAIN IS NOT A SCHEDULE CHANGE\n')
     /If you were asking something else, like what today's session is/.test(ui))
 }
 
+console.log('\n7. A tool that declines says so in its own description')
+{
+  // THE OTHER HALF OF §1. That section proves every declared tool has a
+  // handler; this one proves the handler does what the description says.
+  //
+  // Both instances were live on 5 Sep 2026. `ban_exercise` was described as
+  // "permanently exclude this exercise from future plans" and the prompt told
+  // the model to "confirm you've permanently removed it" — while the handler
+  // returned "that's coming in an update soon". `log_meal` replied "meal
+  // logging arrives in the next update" for a feature that had SHIPPED, on a
+  // screen with a Log button, in the same prompt that forbids that exact
+  // sentence. A model reading only the description has no way to know either.
+  //
+  // The rule: if a handler's reply declines, its description must open by
+  // saying it does not do the thing. Detected from the reply text rather than
+  // from whether the body writes — several tools legitimately write through
+  // the client instead of the server, and "no supabase call here" would have
+  // flagged six honest ones.
+  const DECLINE_PHRASES = /can't [^"]{0,40}\byet\b|coming in an update|in the next update|arrives in the next/i
+  const MARKS_ITSELF = /NOT WIRED UP YET|DOES NOT LOG ANYTHING|DOES NOT WRITE/
+
+  const declared = [...chat.matchAll(/^\s*name:\s*"([a-z_]+)",\s*$/gm)].map(m => m[1])
+  const descriptionOf = (tool: string): string => {
+    const at = chat.indexOf(`name: "${tool}"`)
+    if (at < 0) return ''
+    const desc = chat.indexOf('description:', at)
+    return desc < 0 ? '' : chat.slice(desc, chat.indexOf('parameters:', desc))
+  }
+  const handlerOf = (tool: string): string => {
+    const at = chat.indexOf(`name === "${tool}"`)
+    if (at < 0) return ''
+    const next = chat.indexOf('if (name === "', at + 5)
+    return chat.slice(at, next < 0 ? at + 6000 : next)
+  }
+
+  const decliners = declared.filter(t => DECLINE_PHRASES.test(handlerOf(t)))
+  // Sanity check on this check: if the phrase list stops matching anything,
+  // the loop below is vacuous and passes on a prompt full of false promises.
+  // Two tools decline today and both are deliberate.
+  check('the decline detector still finds the tools that decline', decliners.length >= 2, decliners)
+  for (const tool of decliners) {
+    check(`${tool} declines, and its description says so up front`,
+      MARKS_ITSELF.test(descriptionOf(tool)), descriptionOf(tool).slice(0, 160))
+  }
+
+  // And the reverse: a tool that DOES write must not describe itself as
+  // unavailable, which is how log_meal came to talk a user out of a button
+  // that was right there.
+  const liars = declared.filter(t => !decliners.includes(t) && /coming in an update|in the next update/i.test(descriptionOf(t)))
+  check('no working tool describes itself as unbuilt', liars.length === 0, liars)
+
+  // The prompt must not contradict a decline either — this is the sentence
+  // that actually reached the user.
+  check('the prompt does not tell the model to confirm a ban as done',
+    !/confirm you've permanently removed/i.test(chat))
+}
+
 if (failures > 0) {
   console.error(`\n${failures} check(s) failed`)
   process.exit(1)

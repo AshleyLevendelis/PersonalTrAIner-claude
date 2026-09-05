@@ -968,6 +968,19 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
 
     return {
       current_date: now.toISOString(),
+      /**
+       * TODAY, AS THE APP RECKONS IT — the same YYYY-MM-DD every screen and
+       * every local write uses, dev-clock included.
+       *
+       * `current_date` above is an ISO timestamp, so splitting it on "T" gives
+       * the UTC date, and the edge function was doing exactly that in five
+       * places to stamp rows it wrote. In the UK in summer a set logged at
+       * 00:30 filed under yesterday; in Sydney an evening session filed under
+       * tomorrow. Same defect as the "10:00 PM" one, on the write side rather
+       * than the prompt side, which makes it worse — that one misread a row,
+       * this one creates a misdated one.
+       */
+      current_local_date: todayStr,
       current_time_formatted: currentTimeFormatted,
       workout_logged_today: workoutLoggedToday,
       day_of_week: now.toLocaleDateString('en-US', { weekday: 'long' }),
