@@ -47,7 +47,8 @@ import { classifyConfirmationReply } from '@/lib/confirmation-reply'
 import { getPRCache } from '@/lib/pr-engine'
 import { loadDashboardData, type DashboardData } from '@/lib/dashboard-data'
 import { getAllItems as getAllGroceryItems, addItemLocal, setCheckedLocal, undoAddLocal, type GroceryItemRow, type GroceryCategory } from '@/lib/grocery-store'
-import { logWater, undoLog as undoWaterLog } from '@/lib/water-store'
+import { logWater, undoLog as undoWaterLog, subscribeWaterStore } from '@/lib/water-store'
+import { subscribeCardioLogStore } from '@/lib/cardio-log-store'
 import { getStepsForDate, logStepsManual, restoreStepsForDate, isPlausibleStepCount, MAX_PLAUSIBLE_DAILY_STEPS } from '@/lib/steps-store'
 import { buildCoachStepsSummary } from '@/lib/steps-context'
 import { ProposalCard } from '@/components/chat/ProposalCard'
@@ -404,6 +405,27 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
    */
   const [ownWriteVersion, setOwnWriteVersion] = useState(0)
   const bumpOwnWrites = () => setOwnWriteVersion(v => v + 1)
+
+  /**
+   * THE LOCAL-FIRST STORES TELL US DIRECTLY, rather than waiting to be told.
+   *
+   * Ashley, 5 Sep 2026: she logged the rest-day cardio on the Exercise tab and
+   * the coach, one message later, asked whether she had done any walking or
+   * cycling. Cardio is logged from FOUR places — the rest-day card, the active
+   * recovery card, the session finisher and unplanned work — and not one of
+   * them told anybody. Threading a callback out of all four would have fixed
+   * those four and missed the fifth.
+   *
+   * Both stores already broadcast on every save, delete and queue flush and
+   * nothing in the chat tab was listening. Subscribing covers every writer
+   * that exists now, every writer added later, the offline flush, and undo —
+   * which a prop from App cannot, because App does not see those either.
+   */
+  useEffect(() => {
+    const bump = () => setOwnWriteVersion(v => v + 1)
+    const unsubs = [subscribeCardioLogStore(bump), subscribeWaterStore(bump)]
+    return () => unsubs.forEach(u => u())
+  }, [])
   const [workoutLogHistory, setWorkoutLogHistory] = useState('')
   const [cardioLogHistory, setCardioLogHistory] = useState('')
   const [quickRepliesDismissed, setQuickRepliesDismissed] = useState(false)

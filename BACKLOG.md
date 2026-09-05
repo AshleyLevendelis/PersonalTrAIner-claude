@@ -2,6 +2,36 @@
 
 Newest first. One line each.
 
+- [x] **TWO FROM ASHLEY'S PHONE, 5 Sep 2026 — an invented time, and cardio the
+  coach never heard about.**
+  (1) "it says I logged an exercise which i didn't. at 10pm today, but it's
+  currently 5pm." The SET data was real and reached the coach; the TIME never
+  did. formatLogsForAI emitted `date: Exercise: BW x 8` and dropped
+  `completed_at`, which sits on every row — so the model had no source for an
+  hour and produced a plausible one. Now sent, on the LOCAL clock (this repo
+  has already shipped one UTC/local "you didn't train when you did" bug), and
+  omitted entirely when a row has no timestamp so absence reads as absence.
+  Plus a prompt rule with the incident in it: state only what the lines
+  contain, a movement not on them was not logged, and their memory outranks
+  the list even though the list is what the coach may ASSERT.
+  NOT RESOLVED FROM HERE: whether the Clamshells row itself is real. No
+  database access in this sandbox; the time is provably invented, the set is
+  not disprovable. Flagged to Ashley rather than asserted either way.
+  (2) "I logged the rest day cardio but the chat has no knowledge of it."
+  Cardio is written from THREE components (rest-day/active-recovery card,
+  session finisher, unplanned work) and not one told anybody, so the coach
+  asked whether she'd walked one message after she logged a walk. Fixed by
+  SUBSCRIBING the chat tab to cardio-log-store and water-store rather than
+  threading a callback out of each writer: both stores already broadcast on
+  every save, delete and queue flush, and nothing was listening. That covers
+  the three writers, the next one, the offline flush and undo — none of which
+  a prop from App can see.
+  test:stale-after-write gained §6 (derives the cardio writer count from the
+  source, so a fourth writer does not silently escape) and §7 (the time is
+  read, rendered locally, omitted when absent, and the prompt forbids
+  inventing one). Five more mutations bit, including re-dropping the timestamp
+  and re-rendering it in UTC.
+
 - [x] **A WRITE NOW REACHES THE SCREEN THAT SHOWS IT — and I had the bug
   backwards first.** Ashley: "fix the reload bug. also fix it for any other
   items that need a refresh to update."

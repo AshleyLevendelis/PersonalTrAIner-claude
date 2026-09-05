@@ -25,6 +25,7 @@
  * actually re-reads.
  */
 import { readFileSync } from 'fs'
+import { execSync } from 'child_process'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 
@@ -34,6 +35,7 @@ const read = (p: string) =>
   raw(p).replace(/\/\*[\s\S]*?\*\//g, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
 
 const app = read('src/App.tsx')
+const fn = read('supabase/functions/chat-gemini/index.ts')
 const chat = read('src/components/ChatAssistant.tsx')
 const stepsRow = read('src/components/exercise/StepsRow.tsx')
 
@@ -128,6 +130,46 @@ console.log('\n5. Writes on other tabs reach the tab that never unmounts\n')
   check('...only after the write succeeded, never in the catch',
     handler.indexOf('onLogged?.()') !== -1
     && handler.indexOf('onLogged?.()') < handler.indexOf('} catch'), handler.slice(0, 200))
+}
+
+console.log('\n6. Every local-first writer reaches the tab that never unmounts\n')
+{
+  // Ashley, 5 Sep 2026: she logged the rest-day cardio and the coach asked, one
+  // message later, whether she'd done any walking. Cardio is logged from FOUR
+  // components and none of them told anyone. Threading a callback out of each
+  // would have fixed those four and missed the next one — so the chat tab
+  // subscribes to the store instead, which every writer already notifies.
+  const cardioWriters = execSync(
+    "grep -rl 'saveCardioLog(' src/components/ || true",
+    { cwd: ROOT, encoding: 'utf8' },
+  ).split('\n').filter(Boolean)
+  check(`cardio is written from several places (${cardioWriters.length})`, cardioWriters.length >= 3, cardioWriters)
+  check('...so chat subscribes to the store rather than to each of them',
+    /subscribeCardioLogStore\(/.test(chat))
+  check('...and to water for the same reason', /subscribeWaterStore\(/.test(chat))
+  // A subscription that never unsubscribes leaks a listener per mount.
+  check('the subscriptions are cleaned up', /unsubs\.forEach\(u => u\(\)\)/.test(chat))
+  // And the store really does broadcast, or subscribing proves nothing.
+  const cardioStore = read('src/lib/cardio-log-store.ts')
+  check('cardio-log-store notifies on write (sanity check on this check)',
+    (cardioStore.match(/notify\(\)/g) ?? []).length >= 2)
+}
+
+console.log('\n7. The coach is given the time, so it need not invent one\n')
+{
+  // "You logged one set of Clamshells at 10:00 PM today" — said at 17:41.
+  // completed_at was on every row and formatLogsForAI dropped it, so the model
+  // had no source for a time and produced a plausible-sounding one.
+  const tracking = read('src/lib/daily-tracking.ts')
+  check('the set formatter reads completed_at', /completed_at/.test(tracking))
+  check('...renders it on the local clock, never UTC',
+    /toLocaleTimeString/.test(tracking) && !/toISOString\(\)[\s\S]{0,40}getHours/.test(tracking))
+  check('...and omits it entirely when the row has none',
+    /times\.length > 0 \?/.test(tracking))
+  // The prompt half: given the time or not, it may not make one up.
+  check('the prompt forbids inventing a time', /never an invented hour/i.test(fn))
+  check('...and forbids inventing the log itself', /it was not logged/i.test(fn))
+  check('...while still trusting the user over the list', /Their memory outranks/i.test(fn))
 }
 
 if (failures > 0) { console.error(`\n${failures} check(s) failed\n`); process.exit(1) }
