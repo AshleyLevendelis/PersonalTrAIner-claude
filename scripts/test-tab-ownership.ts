@@ -27,6 +27,7 @@ const homeStrip = read('src/components/HomeWeekStrip.tsx')
 // direction nothing checked: not a deleted call site, but a call site that
 // never existed.
 const exStrip = read('src/components/exercise/WeekContextRow.tsx')
+const stepsRow = read('src/components/exercise/StepsRow.tsx')
 const glyphs = read('src/lib/week-glyphs.ts')
 const arch = read('docs/VISION-ARCHITECTURE.md')
 
@@ -43,13 +44,41 @@ check('Home keeps the weigh-in — the one documented exception', /WeighInCard/.
 check('the exception is written down, not just done',
   /owns no number, with exactly one exception/i.test(arch) && /weigh-in/i.test(arch))
 
-console.log('\n2. Steps moved to Nutrition, target rule unchanged\n')
-check('Nutrition logs steps', /logStepsManual/.test(nutrition))
+// MOVED AGAIN, 5 Sep 2026. Home -> Nutrition -> Exercise, on Ashley's ruling:
+// "we currently log steps in the nutrition tab but that isn't right." The four
+// checks below are the ones that guarded the row on Nutrition, re-pointed at
+// the component it now lives in. §5.1a records why the earlier rule was
+// reversed rather than pretending it never said otherwise.
+console.log('\n2. Steps moved to Exercise, target rule unchanged\n')
+check('the Exercise tab logs steps', /logStepsManual/.test(stepsRow))
 check('...deriving the target from the shared rule, not a second copy',
-  /stepsTargetFor/.test(nutrition) && !/daily_step_target\s*\?\?/.test(nutrition))
-check('...and says where the override lives', /override it in your profile/.test(nutrition))
+  /stepsTargetFor/.test(stepsRow) && !/daily_step_target\s*\?\?/.test(stepsRow))
+check('...and says where the override lives', /override it in your profile/.test(stepsRow))
 check('no second step-target setter was invented',
-  !/setDailyStepTarget|daily_step_target:/.test(nutrition))
+  !/setDailyStepTarget|daily_step_target:/.test(stepsRow))
+// THE OTHER HALF, and the one that would otherwise let both tabs own it. A
+// move that only adds is a copy: the row has to be GONE from Nutrition, or
+// two screens log one number and this file's whole premise is broken.
+check('Nutrition no longer logs steps', !/logStepsManual/.test(nutrition))
+check('...and no longer draws a step ring of its own', !/STEP_RING/.test(nutrition))
+// A COMPONENT NOTHING IMPORTS PROVES NOTHING — the same failure this file was
+// burned by once already (see the WeekContextRow note above), so the new
+// component gets the same treatment as the strips do, not an exemption.
+//
+// AN IMPORT IS NOT A RENDER, and the first version of this check stopped at
+// the import. Deleting the `<StepsRow ... />` call site left the import line
+// untouched, so the check stayed GREEN against a tab that no longer shows the
+// row — found by running the mutation, not by reading the check. Both halves
+// are asserted now: something imports it, and something actually draws it.
+{
+  const importers = execSync(
+    `grep -rl "from '[^']*StepsRow'" src/ --include=*.tsx --include=*.ts || true`,
+    { cwd: ROOT, encoding: 'utf8' },
+  ).split('\n').filter(l => l.trim() && !l.endsWith('src/components/exercise/StepsRow.tsx'))
+  check('StepsRow is imported by something', importers.length > 0, importers)
+  const renderers = importers.filter(f => /<StepsRow[\s/>]/.test(read(f)))
+  check('...and actually rendered, not just imported', renderers.length > 0, importers)
+}
 
 console.log('\n3. One glyph vocabulary, two strips\n')
 check('the vocabulary has its own module', /export const GLYPH/.test(glyphs))

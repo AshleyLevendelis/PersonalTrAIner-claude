@@ -500,8 +500,9 @@ Everything else on Home reads and points.
 
 One fact, one owner. The rule, in full:
 
-> **Nutrition** owns what you accumulate through the day — food, water, steps.
-> **Exercise** owns the program and the session.
+> **Nutrition** owns what you eat and drink — food and water.
+> **Exercise** owns the program, the session, and the movement you do outside
+> it — including steps.
 > **Tools** owns nothing.
 > **Home** owns the progress facts — weight, streak, consistency, PRs — and
 > points at everything else.
@@ -509,11 +510,20 @@ One fact, one owner. The rule, in full:
 Two consequences worth stating, because both were violations before this rule
 existed:
 
-- **Steps live on Nutrition.** `steps-target.ts` had already decided it: the
-  step target is derived from the same `activity_level` that drives the
-  calorie target's PAL multipliers, deliberately, "so the step target and the
-  calorie target never disagree about who is more active". Two numbers from
-  one input belong on one tab. Home keeps a read-only tile.
+- **Steps live on Exercise.** Ashley, 5 Sep 2026, looking at the Nutrition
+  tab: *"we currently log steps in the nutrition tab but that isn't right."*
+  Asked where instead, she chose Exercise. **This reverses what this section
+  said before**, and the previous reasoning is kept here rather than deleted,
+  because it was sound and is still half-true: `steps-target.ts` derives the
+  step target from the same `activity_level` that drives the calorie target's
+  PAL multipliers, deliberately, "so the step target and the calorie target
+  never disagree about who is more active" — and that derivation is unchanged.
+  What changed is the conclusion drawn from it. Two numbers sharing an *input*
+  is not the same as two numbers belonging on one *tab*: steps are movement
+  you do, and movement is what the Exercise tab is for. The shared derivation
+  now has to be explained in words instead, which the row's caption does
+  ("Target from the activity level your calorie target uses"). Home keeps a
+  read-only tile, and that tile now points at Exercise.
 - **The week strip exists on two tabs as two different things.** Home's is the
   RECORD — 26px cells, no handler, no cursor, no focus ring. Exercise's is the
   NAVIGATOR — 38px, tap a day to peek, plus the phase line and the program

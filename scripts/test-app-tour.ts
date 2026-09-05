@@ -429,10 +429,21 @@ console.log('\n7. The copy still describes the app it is pointing at')
   check('...so the tiles step names steps, not just calories and water',
     !homeHasStepsTile || /steps/i.test(tiles), tiles)
 
-  const nutritionLogsSteps = /logStepsManual/.test(nutri)
-  check('Nutrition owns step logging (the fact the copy depends on)', nutritionLogsSteps)
-  check('...so the Nutrition step tells you steps live there',
-    !nutritionLogsSteps || /steps/i.test(copyOf('nutrition')), copyOf('nutrition'))
+  // RE-POINTED 5 Sep 2026. This read NutritionDisplay and demanded the
+  // Nutrition step mention steps; steps moved to the Exercise tab, so the
+  // same claim now has to be tied to the same fact in its new home. Tied to
+  // the source fact rather than hard-coded, so if steps ever move again the
+  // check moves with them instead of going red on correct copy.
+  const stepsRow = readFileSync(join(ROOT, 'src/components/exercise/StepsRow.tsx'), 'utf8')
+  const exerciseLogsSteps = /logStepsManual/.test(stepsRow)
+  check('Exercise owns step logging (the fact the copy depends on)', exerciseLogsSteps)
+  check('...so the Exercise step tells you steps live there',
+    !exerciseLogsSteps || /steps/i.test(copyOf('exercise')), copyOf('exercise'))
+  // And the tab it LEFT must stop claiming them, or the tour sends someone to
+  // a screen the row is no longer on — the exact failure this section exists
+  // for, just pointed the other way.
+  check('...and the Nutrition step no longer claims them',
+    !/logStepsManual/.test(nutri) && !/steps/i.test(copyOf('nutrition')), copyOf('nutrition'))
 
   const gearHasAppearance = /<AppearanceSection/.test(prof)
   check('the gear carries Appearance (the fact the copy depends on)', gearHasAppearance)

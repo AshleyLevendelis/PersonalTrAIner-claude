@@ -202,9 +202,10 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
     )
   }
 
-  // Steps are LOGGED on Nutrition now, not here. Home still reads the figure
-  // for its third tile — the read stays because the tile is a pointer, and a
-  // pointer with no number on it points at nothing.
+  // Steps are LOGGED on the Exercise tab now (Ashley's ruling, 5 Sep 2026 —
+  // they were on Nutrition before that, and on Home before that). Home still
+  // reads the figure for its third tile: the read stays because the tile is a
+  // pointer, and a pointer with no number on it points at nothing.
   // PROPOSAL 3, assembled here rather than inline so the three states read as
   // one decision. Each part is dropped when its value is genuinely unknown
   // rather than filled with a placeholder — an estimate we do not have is not
@@ -228,12 +229,16 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
 
   // Three tiles, one shape. Water is --chart-3 here exactly as it is on
   // Nutrition: mint means "on track", and water is a fill, not a verdict.
-  const homeTiles: { value: string; label: string; sub: string; pct: number; tint?: string }[] = [
+  // Each tile carries its own destination now. Two of the three still lead to
+  // Nutrition; steps leads to Exercise, because that is where it is logged and
+  // a pointer that lands on the wrong tab is worse than no pointer.
+  const homeTiles: { value: string; label: string; sub: string; pct: number; tint?: string; tab: 'nutrition' | 'exercise' }[] = [
     {
       value: Math.round(data.caloriesEaten).toLocaleString(),
       label: 'kcal',
       sub: data.hasNutritionTargets ? `of ${Math.round(data.caloriesTarget).toLocaleString()}` : 'no target yet',
       pct: data.hasNutritionTargets && data.caloriesTarget > 0 ? Math.min(1, data.caloriesEaten / data.caloriesTarget) : 0,
+      tab: 'nutrition',
     },
     {
       value: (data.waterMl / 1000).toFixed(1),
@@ -241,12 +246,14 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
       sub: `of ${(data.waterTargetMl / 1000).toFixed(1)}`,
       pct: data.waterTargetMl > 0 ? Math.min(1, data.waterMl / data.waterTargetMl) : 0,
       tint: 'var(--chart-3)',
+      tab: 'nutrition',
     },
     {
       value: (steps?.steps ?? 0).toLocaleString(),
       label: 'steps',
       sub: `of ${stepsTarget.toLocaleString()}`,
       pct: stepsTarget > 0 ? Math.min(1, (steps?.steps ?? 0) / stepsTarget) : 0,
+      tab: 'exercise',
     },
   ]
 
@@ -505,7 +512,7 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
               <button
                 key={tile.label}
                 type="button"
-                onClick={() => { window.location.hash = tabHash('nutrition') }}
+                onClick={() => { window.location.hash = tabHash(tile.tab) }}
                 className="rounded-[14px] px-3 py-3 text-left"
                 style={{ background: 'var(--surface-raised)' }}
               >

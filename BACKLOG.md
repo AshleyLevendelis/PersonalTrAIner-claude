@@ -2,6 +2,34 @@
 
 Newest first. One line each.
 
+- [x] **STEPS MOVED TO THE EXERCISE TAB, reversing a rule this repo had written
+  down and gated.** Ashley, 5 Sep 2026: *"we currently log steps in the
+  nutrition tab but that isn't right."* Asked where instead, she chose
+  Exercise. The row was extracted verbatim into
+  `src/components/exercise/StepsRow.tsx` — handler, try/catch, the deliberate
+  "don't clear the input on failure", and the ring geometry all travelled
+  unchanged, because a move is not the moment to also redesign the thing being
+  moved. One thing could NOT travel: `entryError` was shared with the
+  water-target handler, so Nutrition kept its own and the steps row got a new
+  one; one string serving two unrelated writes is how one failure comes to
+  describe the other. Home's steps tile now points at Exercise while the other
+  two still point at Nutrition, so `homeTiles` carries a per-tile destination
+  instead of one hardcoded hash. Three tour copies were rewritten — the tiles
+  step could no longer say "all logged in Nutrition" without sending someone
+  to the wrong tab. VISION-ARCHITECTURE §5.1a keeps the OLD reasoning rather
+  than deleting it: the step target really is derived from the same
+  `activity_level` as the calorie target, that is unchanged, and what the
+  ruling reversed is the conclusion drawn from it — two numbers sharing an
+  input is not two numbers belonging on one tab.
+  A MUTATION SURVIVED FIRST TIME AND CHANGED THE GATE. The new "StepsRow is
+  actually rendered" check greped for the import; deleting the `<StepsRow />`
+  call site left the import line untouched and the gate stayed green against a
+  tab that no longer showed the row. An import is not a render — both halves
+  are asserted now. Found by running the mutation, not by reading the check.
+  Five other mutations bit first time: caption deleted, a second copy of the
+  target rule, the try/catch stripped, the block left on Nutrition as well,
+  and the Exercise tour copy no longer naming steps.
+
 - [x] **FOUR FROM ASHLEY'S PHONE (3 Sep 2026), and two of them were writes
   that landed with no visible consequence.** (1) "How to do it" was a dead
   control on the session screen: ExerciseTab renders ExerciseDetailDialog in

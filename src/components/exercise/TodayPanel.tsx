@@ -24,6 +24,7 @@ import { SupersetGroup } from './SupersetGroup'
 import { FinisherRow } from './FinisherRow'
 import { AdditionalWorkSection } from './AdditionalWorkSection'
 import { AddUnplannedWork } from './AddUnplannedWork'
+import { StepsRow } from './StepsRow'
 import { RestDayCard, ActiveRecoveryCard } from './RestDayCard'
 import { SessionSummaryDialog, type SessionSummaryData } from './SessionSummaryDialog'
 import { InsightBanner } from '@/components/ui/insight-banner'
@@ -446,6 +447,13 @@ export function TodayPanel({
           />
         </div>
       )}
+
+      {/* STEPS — moved here from Nutrition on Ashley's ruling, 5 Sep 2026.
+          Outside the day ternary on purpose: steps are the day's movement
+          whether today is a session, a rest day or active recovery, and a
+          rest day is exactly when they are the only movement there is.
+          Hidden while peeking at ANOTHER day, because the box logs today. */}
+      {!peekWorkout && <StepsRow profile={profile} profileId={profileId} date={today} />}
     </div>
   )
 }

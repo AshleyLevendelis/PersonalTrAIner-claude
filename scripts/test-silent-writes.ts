@@ -50,6 +50,9 @@ const nutrition = stripComments(readFileSync(join(ROOT, 'src/components/Nutritio
 const profile = stripComments(readFileSync(join(ROOT, 'src/components/ProfileScreen.tsx'), 'utf8'))
 const indicator = stripComments(readFileSync(join(ROOT, 'src/components/OfflineStatusIndicator.tsx'), 'utf8'))
 const chat = stripComments(readFileSync(join(ROOT, 'src/components/ChatAssistant.tsx'), 'utf8'))
+// Steps moved off Nutrition to the Exercise tab on 5 Sep 2026. The handler
+// travelled verbatim, so the checks travel with it rather than being relaxed.
+const stepsRow = stripComments(readFileSync(join(ROOT, 'src/components/exercise/StepsRow.tsx'), 'utf8'))
 
 console.log('\n1. Swapping an exercise')
 {
@@ -77,7 +80,7 @@ console.log('\n2. Banning an exercise')
 
 console.log('\n3. Steps and the water target')
 {
-  const steps = handlerBody(nutrition, 'const handleLogSteps')
+  const steps = handlerBody(stepsRow, 'const handleLogSteps')
   check('logging steps is guarded', /try \{/.test(steps) && /catch/.test(steps))
   check('...and reports the failure', /setEntryError\(/.test(steps))
   // The value is the user's — losing it once is bad enough without making
@@ -86,6 +89,11 @@ console.log('\n3. Steps and the water target')
   // success path, and an earlier version of this check confused the two.
   const stepsCatch = steps.slice(steps.indexOf('} catch'))
   check('...and keeps the typed number instead of clearing it', !/setStepsInput\(''\)/.test(stepsCatch), stepsCatch.slice(0, 200))
+  // Its own error state, not a borrowed one. On Nutrition this was SHARED
+  // with the water-target handler, and a shared string is how one failure
+  // comes to describe the other once the two live on different screens.
+  check('...and the steps error is rendered on the tab that logs them',
+    /\{entryError && \(/.test(stepsRow))
 
   const water = handlerBody(nutrition, 'const handleSaveWaterTarget')
   check('saving the water target is guarded', /try \{/.test(water) && /catch/.test(water))
