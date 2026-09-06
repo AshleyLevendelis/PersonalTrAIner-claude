@@ -7,6 +7,9 @@ import { useTrainingWeek } from '@/hooks/useTrainingWeek'
 import { useTimers } from '@/hooks/useTimers'
 import { getDoubleProgressionRecommendation, getAddedLoadProgression, type DoubleProgressionRecommendation } from '@/lib/progression-engine'
 import { groupExercises, mainLiftGroupIndex, resolveCalibrationAnchorIndex, computeSessionSummary, type ExerciseGroup } from '@/lib/session-derive'
+import { sessionNudge } from '@/lib/session-nudge'
+import { TrainerNudge } from '@/components/TrainerNudge'
+import { calibrationCueText } from './CalibrationCue'
 import { computeSessionPRs } from '@/lib/pr-engine'
 import { getExerciseId } from '@/lib/exercise-db'
 import { estimateDaySeconds } from '@/lib/session-duration'
@@ -17,6 +20,8 @@ import { seededRngFromKey } from '@/lib/seeded-random'
 import { executeSecondSportVolume } from '@/lib/pending-action-executor'
 import { getLocalDateString } from '@/lib/dev-clock'
 import { tabHash } from '@/lib/app-route'
+import { TAB_BAR_HEIGHT_PX } from '@/components/BottomTabBar'
+import { useBottomDockHeight } from '@/hooks/useBottomDockHeight'
 import { ceilingToAskFor, saveStatedCeiling, declineStatedCeilings } from '@/lib/load-ceiling-prompt'
 import { LoadCeilingPrompt } from './LoadCeilingPrompt'
 import { WeekContextRow } from './WeekContextRow'
@@ -91,6 +96,14 @@ export function TodayPanel({
   // support it (see useWakeLock).
   useWakeLock(status === 'running')
   const timers = useTimers()
+  // How tall BottomDock currently is, so the fixed CTA bar below rides above
+  // it instead of under it — the same published height the chat composer uses.
+  const { dockHeightPx } = useBottomDockHeight()
+  // The week's phase-focus / note disclosure. Lifted out of WeekContextRow
+  // because the clamped nudge below it opens the same thing — a "Do…" that
+  // ends in an ellipsis has to lead somewhere, and chat is not where the rest
+  // of that sentence is.
+  const [weekNotesOpen, setWeekNotesOpen] = useState(false)
 
   const totalWeeks = mesocycle && mesocycle.length > 0 ? mesocycle.length : 4
   const hasMesocycle = mesocycle && mesocycle.length > 0
@@ -329,6 +342,36 @@ export function TodayPanel({
     }
   })()
 
+  // THE TRAINER'S LINE FOR TODAY (design_handoff_app_polish, Exercise §3).
+  // Assembled here rather than in ExerciseList because the three sources live
+  // at three different levels — the progression note is state on this
+  // component, the calibration cue is a per-row fact, and the coach note
+  // belongs to the week. The PRECEDENCE between them is sessionNudge's, so it
+  // can be asserted; this only supplies today's three candidates.
+  const todayNudge = (() => {
+    if (!workout || isRestDay || isActiveRecovery || peekWorkout) return null
+    const groups = groupExercises(workout.exercises)
+    const mainIdx = mainLiftGroupIndex(groups, workout.exercises)
+    const mainGroup = mainIdx >= 0 ? groups[mainIdx] : null
+    const mainLift = mainGroup && mainGroup.kind === 'single' ? mainGroup.ex : null
+    const anchorIdx = currentMesoWeekObj?.isCalibrationWeek
+      ? resolveCalibrationAnchorIndex(workout.exercises)
+      : null
+    // Only when the cue is attached to THIS lift — otherwise the nudge would
+    // give an instruction for a row further down the list without saying so.
+    const cueIsOnMainLift = anchorIdx != null && mainLift != null && workout.exercises[anchorIdx] === mainLift
+    return sessionNudge({
+      mainLiftName: mainLift?.name ?? null,
+      progressionNote: mainLift
+        ? (mainLift.block_hold_note ?? progressionNotes[mainLift.name]?.note ?? null)
+        : null,
+      calibrationCue: cueIsOnMainLift
+        ? calibrationCueText(mainLift!.suggested_load_kg != null)
+        : null,
+      coachNote: currentMesoWeekObj?.coach_note ?? null,
+    })
+  })()
+
   return (
     <div className="space-y-3">
       <WeekContextRow
@@ -346,8 +389,10 @@ export function TodayPanel({
         estimatedMinutes={sessionEstimate.minutes}
         shortfallNote={sessionEstimate.shortfall?.note}
         onOpenProgram={onOpenProgram}
-        onAddUnplannedWork={!isRestDay && !isActiveRecovery && !peekWorkout ? () => setUnplannedWorkOpen(true) : undefined}
         onOpenSessionHistory={onOpenSessionHistory}
+        coachNoteShownBelow={todayNudge?.source === 'week-note'}
+        expanded={weekNotesOpen}
+        onToggleExpanded={setWeekNotesOpen}
       />
 
       {peekWorkout ? (
@@ -422,15 +467,18 @@ export function TodayPanel({
               )}
             </div>
             <p className="mt-1.5 text-[2.25rem] font-bold leading-[1.02] tracking-[-.035em] glow-text">{workout!.focus}</p>
-            <div className="mt-3.5 h-[2px] rounded-full" style={{ background: 'var(--hairline)' }}>
+            <div className="mt-3 h-[2px] rounded-full" style={{ background: 'var(--hairline)' }}>
               <div
                 className="h-[2px] rounded-full bg-primary glow-mint-box"
                 style={{ width: `${totalSetsPlanned > 0 ? Math.min(100, (totalSetsLogged / totalSetsPlanned) * 100) : 0}%` }}
               />
             </div>
-            {status !== 'running' ? (
-              <Button size="sm" className="mt-3" onClick={startSession}>Start session</Button>
-            ) : (
+            {/* START MOVED OUT OF THE HERO on 6 Sep 2026 — it is the fixed
+                bar above the tab bar now (see the end of this branch), where
+                it stays reachable after scrolling into the list. FINISH did
+                not move: it belongs beside the thing it ends, and the dock
+                already declines to carry a second entry point for it. */}
+            {status === 'running' && (
               <>
                 <Button size="sm" className="mt-3" onClick={handleFinish}>Finish session</Button>
                 {/* The line between a look and a workout, said before Finish
@@ -445,6 +493,18 @@ export function TodayPanel({
               </>
             )}
           </div>
+
+          {/* THE TRAINER'S LINE, under the hero and above the list it is
+              about — the progression note for today's main lift, the
+              calibration instruction, or the week's note, whichever is the
+              most specific thing true today (src/lib/session-nudge.ts). */}
+          {todayNudge && (
+            todayNudge.source === 'week-note'
+              // Clamped, so its chevron must open the REST OF THIS SENTENCE
+              // (the week disclosure above), never the chat tab.
+              ? <TrainerNudge text={todayNudge.text} clamp={!weekNotesOpen} onOpen={weekNotesOpen ? undefined : () => setWeekNotesOpen(true)} />
+              : <TrainerNudge text={todayNudge.text} openChat />
+          )}
           <SessionSummaryDialog open={summaryOpen} onOpenChange={setSummaryOpen} data={summaryData} nothingLogged={summaryNothingLogged} serverCloseFailed={summaryCloseFailed} />
           {/* WHAT CAN YOU ACTUALLY LOAD — asked at first use, not in
               onboarding (Ashley's call: someone who has never trained cannot
@@ -514,11 +574,46 @@ export function TodayPanel({
             </>
           )}
           <AdditionalWorkSection plannedExercises={workout!.exercises} onOpenPlateCalc={onOpenPlateCalc} />
+          {/* VISIBLE AGAIN, and the "⋮" menu no longer carries it. Turn 5 put
+              it behind that menu; the polish handoff puts it back at the foot
+              of the list, which is where someone finishing a session looks
+              for "I also did…". One entry point either way. */}
+          <button
+            type="button"
+            onClick={() => setUnplannedWorkOpen(true)}
+            className="hit-slop-44 text-left text-[0.8125rem] text-text-tertiary"
+          >
+            ＋ Add unplanned work
+          </button>
           <AddUnplannedWork
             open={unplannedWorkOpen}
             onOpenChange={setUnplannedWorkOpen}
             hideTrigger
           />
+          {/* Clears the fixed CTA bar below, so the last row is never sitting
+              underneath it. Matches the bar's own height plus its fade. */}
+          {status !== 'running' && <div aria-hidden className="h-[100px]" />}
+        </div>
+      )}
+
+      {/* THE PRIMARY ACTION, fixed above the tab bar. It used to be a small
+          button in the hero, which scrolled away the moment anyone read past
+          the first exercise — on a phone, the one control the screen exists
+          for was off-screen for most of the screen. Rides above BottomDock
+          when a timer is up, using the height the dock already publishes for
+          the chat composer (useBottomDockHeight) rather than a second guess
+          at how tall it is. */}
+      {!peekWorkout && !isRestDay && !isActiveRecovery && workout && status !== 'running' && (
+        <div
+          className="fixed inset-x-0 z-40 px-[22px] pb-3 pt-2.5"
+          style={{
+            bottom: `calc(${TAB_BAR_HEIGHT_PX}px + env(safe-area-inset-bottom) + ${dockHeightPx > 0 ? dockHeightPx + 12 : 0}px)`,
+            background: 'linear-gradient(to top, var(--background) 70%, transparent)',
+          }}
+        >
+          <Button className="h-[52px] w-full text-[0.9375rem] font-semibold" onClick={startSession}>
+            Start workout
+          </Button>
         </div>
       )}
 

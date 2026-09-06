@@ -39,15 +39,28 @@ export interface TrainerNudgeProps {
   actions?: TrainerNudgeAction[]
   /** Trailing chevron that opens the chat tab. */
   openChat?: boolean
+  /**
+   * Trailing chevron that calls this instead of going to chat. For a clamped
+   * line, where the chevron has to lead to the rest of the sentence.
+   * Ignored when `openChat` is set — one chevron, one destination.
+   */
+  onOpen?: () => void
   /** Active-session rail: tighter padding, smaller avatar and type, no border. */
   compact?: boolean
+  /**
+   * Cap the line at three rows. For the Exercise tab's week-note fallback,
+   * which is a paragraph rather than a sentence and pushed the session
+   * itself off the first screen. Only set it where the full text is still
+   * reachable in place — here the week row's own chevron expands it.
+   */
+  clamp?: boolean
   className?: string
   'data-testid'?: string
 }
 
 const AVATAR_GRADIENT = 'linear-gradient(180deg, color-mix(in oklab, var(--primary) 84%, white), var(--primary-2))'
 
-export function TrainerNudge({ text, actions, openChat, compact, className, ...rest }: TrainerNudgeProps) {
+export function TrainerNudge({ text, actions, openChat, onOpen, compact, clamp, className, ...rest }: TrainerNudgeProps) {
   const avatar = compact ? 20 : 22
   return (
     <div
@@ -69,7 +82,7 @@ export function TrainerNudge({ text, actions, openChat, compact, className, ...r
         <MessageCircle size={12} strokeWidth={2.6} />
       </span>
       <div className="min-w-0 flex-1">
-        <div className="m-0" style={{ fontSize: compact ? '0.78125rem' : '0.8125rem', lineHeight: 1.5, color: 'var(--role-ai-text)' }}>
+        <div className={cn('m-0', clamp && 'line-clamp-3')} style={{ fontSize: compact ? '0.78125rem' : '0.8125rem', lineHeight: 1.5, color: 'var(--role-ai-text)' }}>
           {text}
         </div>
         {actions && actions.length > 0 && (
@@ -89,11 +102,11 @@ export function TrainerNudge({ text, actions, openChat, compact, className, ...r
           </div>
         )}
       </div>
-      {openChat && (
+      {(openChat || onOpen) && (
         <button
           type="button"
-          aria-label="Open the Personal TrAIner chat"
-          onClick={() => { window.location.hash = tabHash('chat') }}
+          aria-label={openChat ? 'Open the Personal TrAIner chat' : 'Read the rest of this'}
+          onClick={openChat ? () => { window.location.hash = tabHash('chat') } : onOpen}
           className="hit-slop-44 -mr-1 flex shrink-0 items-center justify-center bg-transparent p-0"
           style={{ color: 'var(--muted-foreground)', width: 20, height: 20, marginTop: compact ? 0 : 1 }}
         >

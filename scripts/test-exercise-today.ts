@@ -1,0 +1,170 @@
+/**
+ * Gate: the Exercise tab leads with today, and says one true thing about it.
+ *
+ * Three things this file holds down, each of which has already gone wrong
+ * once in some form:
+ *
+ *  1. THE PRIMARY ACTION IS REACHABLE. "Start workout" was a small button in
+ *     the hero, which scrolled off the moment anyone read past the first
+ *     exercise — the one control the screen exists for, absent for most of
+ *     the screen. It is a fixed bar now, and §1 asserts it stays fixed, stays
+ *     clear of the tab bar, and rides above BottomDock using the height the
+ *     dock already publishes rather than a second guess at it.
+ *
+ *  2. THE COACHING LINE HAS A PRECEDENCE, AND IT IS ASSERTABLE. Three
+ *     candidate sentences, one slot. §2 tests session-nudge.ts directly,
+ *     because "which of these three wins" cannot be read off JSX.
+ *
+ *  3. NOTHING IS SAID TWICE, AND NOTHING IS LOST. The week note can appear in
+ *     the nudge or in the context row, never both; "Add unplanned work" moved
+ *     out of the overflow menu and must be gone from it, not duplicated. §3
+ *     asserts both halves of each, the same way test:tab-ownership does for a
+ *     row that changes tabs.
+ */
+import { readFileSync } from 'fs'
+import { join, dirname } from 'path'
+import { fileURLToPath } from 'url'
+import { sessionNudge } from '../src/lib/session-nudge'
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
+const read = (p: string) => readFileSync(join(ROOT, p), 'utf8')
+const today = read('src/components/exercise/TodayPanel.tsx')
+const contextRow = read('src/components/exercise/WeekContextRow.tsx')
+const cue = read('src/components/exercise/CalibrationCue.tsx')
+const nudgeComponent = read('src/components/TrainerNudge.tsx')
+
+/**
+ * Comments stripped before any "is it gone?" check. A file that explains WHY
+ * a control moved out of it names that control in prose — counting that as a
+ * call site is how test-no-dead-code's own list came to include two functions
+ * that were already wired up.
+ */
+const stripComments = (s: string) =>
+  s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
+const contextRowCode = stripComments(contextRow)
+const todayCode = stripComments(today)
+
+let failures = 0
+const check = (label: string, ok: boolean, extra?: unknown) => {
+  if (ok) console.log(`  ok: ${label}`)
+  else { failures++; console.error(`  FAIL: ${label}${extra !== undefined ? ` — ${JSON.stringify(extra).slice(0, 300)}` : ''}`) }
+}
+
+// ---------------------------------------------------------------------------
+console.log('\n1. Start workout is a fixed bar, and it does not sit on anything')
+// ---------------------------------------------------------------------------
+check('the CTA is fixed, not in the scroll', /className="fixed inset-x-0 z-40[^"]*"/.test(today))
+check('...and reads "Start workout"', />\s*Start workout\s*</.test(today))
+check('...at 52px', /h-\[52px\]/.test(today))
+check('...clear of the tab bar and the home indicator',
+  /TAB_BAR_HEIGHT_PX\}px \+ env\(safe-area-inset-bottom\)/.test(today))
+// THE DOCK COLLISION. Both are fixed to the same baseline; the dock is z-50
+// against this bar's z-40, so without the offset a running rest timer would
+// sit directly on top of the button. Measured, never assumed — the dock has
+// three shapes and the rest card's height depends on whether the exercise
+// name wraps.
+check('...and above BottomDock, using the height the dock publishes',
+  /useBottomDockHeight\(\)/.test(today) && /dockHeightPx > 0 \? dockHeightPx \+ 12 : 0/.test(today))
+check('...rather than a hard-coded guess at the dock height',
+  !/bottom:\s*`calc\([^`]*\+ 6[048]px/.test(today))
+// A fixed bar over the last row is the same bug in a nicer shirt.
+check('the list is padded so the last row clears the bar', /className="h-\[100px\]"/.test(today))
+check('the bar only exists before the session starts', /status !== 'running' && \(/.test(today))
+// Finish is not duplicated into the bar: BottomDock's own comment promises it
+// stays singly owned in the hero, and two Finish buttons is how a session gets
+// closed by accident.
+check('Finish stays in the hero, one of it', (today.match(/Finish session/g) ?? []).length === 1)
+check('...and the hero no longer carries a Start button too',
+  !/>Start session</.test(todayCode))
+
+// ---------------------------------------------------------------------------
+console.log('\n2. The coaching line: the most specific true thing, or nothing')
+// ---------------------------------------------------------------------------
+{
+  const NOTE = 'Load goes up again this week.'
+  const CUE = 'Calibration: leave 3-4 reps in reserve. Log what you actually do.'
+  const base = { mainLiftName: 'Bench Press', progressionNote: null, calibrationCue: null, coachNote: null }
+
+  check('nothing to say → silent', sessionNudge(base) === null)
+  check('...and blank strings are nothing, not something',
+    sessionNudge({ ...base, progressionNote: '  ', calibrationCue: '', coachNote: '   ' }) === null)
+
+  const week = sessionNudge({ ...base, coachNote: NOTE })
+  check('the week note is the floor', week?.source === 'week-note' && week.text === NOTE, week)
+
+  const calib = sessionNudge({ ...base, calibrationCue: CUE, coachNote: NOTE })
+  check('a calibration cue outranks the week note', calib?.source === 'calibration' && calib.text === CUE, calib)
+
+  const prog = sessionNudge({ ...base, progressionNote: 'goes to 62.5 kg', calibrationCue: CUE, coachNote: NOTE })
+  check('a progression note outranks both', prog?.source === 'progression', prog)
+  check('...and is prefixed with the lift it is about', prog?.text === 'Bench Press: goes to 62.5 kg', prog)
+  // "Bench Press — Bench Press goes to 62.5 kg" is what naive prefixing gives
+  // on the notes that already name themselves.
+  const named = sessionNudge({ ...base, progressionNote: 'Bench Press goes to 62.5 kg' })
+  check('...but never twice when the note already names it',
+    named?.text === 'Bench Press goes to 62.5 kg', named)
+  const noLift = sessionNudge({ ...base, mainLiftName: null, progressionNote: 'goes to 62.5 kg' })
+  check('...and a day with no main lift still speaks', noLift?.text === 'goes to 62.5 kg', noLift)
+
+  check('TodayPanel uses the rule rather than an inline chain', /sessionNudge\(\{/.test(today))
+  check('...and renders it through the shared nudge, never bare text',
+    /\{todayNudge && \(/.test(today) && (today.match(/<TrainerNudge/g) ?? []).length === 2)
+  // The cue is ONE string with two renderers, not two copies that drift.
+  check('the calibration copy has a single source', /export function calibrationCueText/.test(cue))
+  check('...and the row renders that, not its own copy',
+    /<span>\{calibrationCueText\(hasLoad\)\}<\/span>/.test(cue))
+  check('...and TodayPanel reads the same one', /calibrationCueText\(/.test(today))
+}
+
+// ---------------------------------------------------------------------------
+console.log('\n3. Said once: the week note, and the way into unplanned work')
+// ---------------------------------------------------------------------------
+check('the context row can be told the nudge is carrying the note',
+  /coachNoteShownBelow/.test(contextRow))
+check('...and suppresses its own copy when it is',
+  /!expanded && coachNote && !coachNoteShownBelow/.test(contextRow))
+check('...and TodayPanel tells it, from the source that actually won',
+  /coachNoteShownBelow=\{todayNudge\?\.source === 'week-note'\}/.test(today))
+// The other direction: with the nudge saying something else, the note must
+// still be on screen untapped. Ashley, 3 Sep 2026: "the notes section doesn't
+// populate" — that fix is not allowed to regress into "only behind a chevron".
+check('...so the note is never only behind the chevron',
+  /\{!expanded && coachNote && !coachNoteShownBelow && \(/.test(contextRow))
+check('a long week note is capped rather than pushing the session off screen',
+  /<TrainerNudge text=\{todayNudge\.text\} clamp=\{!weekNotesOpen\}/.test(today) && /clamp && 'line-clamp-3'/.test(nudgeComponent))
+// ...and uncapped once it is opened, in place, rather than reprinted above.
+check('...and expanding unclamps it rather than printing it twice',
+  /clamp=\{!weekNotesOpen\}/.test(today)
+  && /coachNote && !coachNoteShownBelow && <p/.test(contextRow))
+// A CLAMPED LINE ENDS IN AN ELLIPSIS, AND AN ELLIPSIS IS A PROMISE. Its
+// chevron opens the disclosure that holds the rest of the sentence, not the
+// chat tab — which is why the disclosure's open state is controlled by
+// TodayPanel rather than private to the row.
+check('...and its chevron opens the rest of that sentence, not chat',
+  /onOpen=\{weekNotesOpen \? undefined : \(\) => setWeekNotesOpen\(true\)\}/.test(today))
+check('...which is the SAME state the week row\'s own chevron toggles',
+  /expanded=\{weekNotesOpen\}/.test(today) && /onToggleExpanded=\{setWeekNotesOpen\}/.test(today))
+check('...so the row keeps no private copy of it', !/useState\(false\)/.test(contextRowCode))
+check('the chevron only ever has one destination',
+  /onClick=\{openChat \? \(\) => \{ window\.location\.hash = tabHash\('chat'\) \} : onOpen\}/.test(nudgeComponent))
+
+check('"Add unplanned work" is a visible control again', /＋ Add unplanned work/.test(today))
+check('...on a 44px target', /hit-slop-44[\s\S]{0,200}＋ Add unplanned work/.test(today))
+check('...and is GONE from the overflow menu, not duplicated',
+  !/Add unplanned work/.test(contextRowCode) && !/ListPlus/.test(contextRowCode))
+check('...while session history stays in it', /Session history/.test(contextRow))
+
+// ---------------------------------------------------------------------------
+console.log('\n4. The week context is context — no card, tertiary, strip under it')
+// ---------------------------------------------------------------------------
+check('the --surface-raised box is gone', !/var\(--surface-raised\)/.test(contextRowCode))
+check('...and so is the rounded panel it sat in', !/rounded-2xl/.test(contextRowCode))
+check('the context line is tertiary, not foreground', /text-\[0\.78125rem\] text-text-tertiary/.test(contextRow))
+check('the tour anchor survived the restyle', /data-tour="extoday"/.test(contextRow))
+check('the strip sits 12px under the line', /className="mt-3 flex items-start justify-between"/.test(contextRow))
+// The assistant has one name in UI text.
+check('nothing on this screen calls it "Coach"',
+  !/Coach:/.test(contextRowCode) && !/Coach:/.test(todayCode), 'Coach: found')
+
+if (failures > 0) { console.error(`\n${failures} exercise-today check(s) FAILED\n`); process.exit(1) }
+console.log('\nAll exercise-today checks passed.\n')

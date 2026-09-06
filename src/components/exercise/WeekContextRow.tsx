@@ -1,5 +1,4 @@
-import { useState } from 'react'
-import { ChevronDown, MoreVertical, ListPlus, History } from 'lucide-react'
+import { ChevronDown, MoreVertical, History } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import type { TrainingWeekDay } from '@/hooks/useTrainingWeek'
@@ -46,8 +45,10 @@ export function WeekContextRow({
   estimatedMinutes,
   shortfallNote,
   onOpenProgram,
-  onAddUnplannedWork,
   onOpenSessionHistory,
+  coachNoteShownBelow,
+  expanded,
+  onToggleExpanded,
 }: {
   days: TrainingWeekDay[]
   todayName: string
@@ -64,10 +65,18 @@ export function WeekContextRow({
   /** Why today runs shorter than the length they asked for — see session-shortfall.ts. Absent when it does not. */
   shortfallNote?: string
   onOpenProgram?: () => void
-  onAddUnplannedWork?: () => void
   onOpenSessionHistory?: () => void
+  /** The TrAIner nudge below is already showing `coachNote`, so this row must not repeat it. */
+  coachNoteShownBelow?: boolean
+  /**
+   * CONTROLLED, since 6 Sep 2026. The disclosure has two triggers now — this
+   * row's chevron and the clamped TrAIner nudge above it — and two triggers
+   * over one private useState is how "expanded" comes to mean two different
+   * things on one screen. TodayPanel owns the flag.
+   */
+  expanded: boolean
+  onToggleExpanded: (next: boolean) => void
 }) {
-  const [expanded, setExpanded] = useState(false)
   const phaseToken = isCalibrationWeek ? 'Calibration' : isDeload ? 'Deload week' : phaseLabel
 
   // Tab-restructure handoff — "Wk 3/16 · B1 Hypertrophy · ~52 min" as one
@@ -78,11 +87,16 @@ export function WeekContextRow({
   if (estimatedMinutes != null) headerParts.push(`~${estimatedMinutes} min`)
 
   return (
-    <div data-tour="extoday" className="rounded-2xl p-3.5" style={{ background: 'var(--surface-raised)' }}>
+    // NO CARD. The --surface-raised box around this row went on 6 Sep 2026
+    // (design_handoff_app_polish, Exercise §1): it is context, not content,
+    // and a raised panel was giving the week's admin more visual weight than
+    // the session underneath it. The week strip now sits directly under the
+    // line it belongs to.
+    <div data-tour="extoday">
       <div className="flex items-center justify-between gap-3">
         <button
           type="button"
-          className="min-w-0 flex-1 text-left text-[0.78125rem] text-foreground"
+          className="min-w-0 flex-1 text-left text-[0.78125rem] text-text-tertiary"
           onClick={onOpenProgram}
         >
           {headerParts.join(' · ')}
@@ -92,14 +106,18 @@ export function WeekContextRow({
             <button
               type="button"
               className="hit-slop-44 text-primary"
-              onClick={() => setExpanded(v => !v)}
-              aria-label={expanded ? "Hide the coach's notes on this week" : "Show the coach's notes on this week"}
+              onClick={() => onToggleExpanded(!expanded)}
+              aria-label={expanded ? "Hide the Personal TrAIner's notes on this week" : "Show the Personal TrAIner's notes on this week"}
               aria-expanded={expanded}
             >
               <ChevronDown className={`size-3.5 transition-transform ${expanded ? 'rotate-180' : ''}`} />
             </button>
           )}
-          {(onAddUnplannedWork || onOpenSessionHistory) && (
+          {/* "Add unplanned work" LEFT THIS MENU on 6 Sep 2026 and is a
+              visible line at the foot of the exercise list again
+              (design_handoff_app_polish, Exercise §6). Moved, not copied:
+              two entry points to one dialog is how they drift apart. */}
+          {onOpenSessionHistory && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="size-7 shrink-0 text-muted-foreground" aria-label="More options">
@@ -107,18 +125,10 @@ export function WeekContextRow({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                {onAddUnplannedWork && (
-                  <DropdownMenuItem onClick={onAddUnplannedWork}>
-                    <ListPlus className="size-3.5" />
-                    Add unplanned work
-                  </DropdownMenuItem>
-                )}
-                {onOpenSessionHistory && (
-                  <DropdownMenuItem onClick={onOpenSessionHistory}>
-                    <History className="size-3.5" />
-                    Session history
-                  </DropdownMenuItem>
-                )}
+                <DropdownMenuItem onClick={onOpenSessionHistory}>
+                  <History className="size-3.5" />
+                  Session history
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           )}
@@ -141,25 +151,35 @@ export function WeekContextRow({
           3 Sep 2026: "the notes section doesn't populate"). Collapsed, the
           first line of the note shows and reads as the thing to tap;
           expanded, the phase focus and the whole note. */}
-      {!expanded && coachNote && (
+      {/* ...UNLESS THE NUDGE ABOVE IS ALREADY SAYING IT. From 6 Sep 2026 the
+          TrAIner's line under the hero falls back to this same note when it
+          has nothing more specific to say, and one screen must not carry the
+          sentence twice. Ashley's requirement is untouched either way: the
+          note is on screen without a tap — here when the nudge is saying
+          something else, there when it is not. */}
+      {!expanded && coachNote && !coachNoteShownBelow && (
         <button
           type="button"
-          onClick={() => setExpanded(true)}
+          onClick={() => onToggleExpanded(true)}
           className="mt-2 w-full text-left text-xs leading-[1.5] line-clamp-1"
           style={{ color: 'var(--role-ai-text)' }}
-          aria-label="Show the coach's notes on this week"
+          aria-label="Show the Personal TrAIner's notes on this week"
         >
-          Coach: {coachNote}
+          {coachNote}
         </button>
       )}
-      {expanded && (phaseFocus || coachNote) && (
+      {/* Expanded, the note is STILL only in one place. When the nudge below
+          is carrying it, expanding reveals the phase focus here and unclamps
+          the note down there — otherwise tapping "read the rest" would print
+          the same paragraph twice, one above the other. */}
+      {expanded && (phaseFocus || (coachNote && !coachNoteShownBelow)) && (
         <div className="mt-2.5 space-y-1.5">
           {phaseFocus && <p className="text-xs leading-[1.5] text-text-tertiary">{phaseFocus}</p>}
-          {coachNote && <p className="text-xs leading-[1.5]" style={{ color: 'var(--role-ai-text)' }}>Coach: {coachNote}</p>}
+          {coachNote && !coachNoteShownBelow && <p className="text-xs leading-[1.5]" style={{ color: 'var(--role-ai-text)' }}>{coachNote}</p>}
         </div>
       )}
 
-      <div className="mt-3.5 flex items-start justify-between">
+      <div className="mt-3 flex items-start justify-between">
         {days.map(d => {
           const isToday = d.dayName === todayName
           return (
