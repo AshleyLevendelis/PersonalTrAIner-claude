@@ -47,14 +47,16 @@ export function BottomTabBar({
   activeTab: Tab
   onTabChange: (tab: string) => void
   /**
-   * The coach has something that wants an answer — an unreviewed session, a
-   * missed day (coach-opener.ts, `attention`). Draws one small dot on the
-   * chat button and nothing else: no count, no pulse, no colour change on
-   * the button itself. It is a nudge, not a demand, and it goes away the
-   * moment the chat is opened, whether or not they answer.
+   * The coach has something that wants an answer — an unreviewed session or a
+   * missed day (coach-opener.ts, `attention`), or a reply the trainee has not
+   * read yet (chat-unread.ts). Draws one small dot on the chat button and
+   * nothing else: no count, no pulse, no colour change on the button itself.
+   * It is a nudge, not a demand, and it goes away the moment the chat is
+   * opened, whether or not they answer.
    *
    * Deliberately NOT lit for "today is a training day" — that is every other
-   * day, and a dot that is always on is a dot nobody sees.
+   * day, and a dot that is always on is a dot nobody sees. The same rule is
+   * why the client-composed opener does not count as an unread message.
    */
   chatAttention?: boolean
 }) {

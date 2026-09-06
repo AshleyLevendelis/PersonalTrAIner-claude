@@ -10,9 +10,13 @@
 //       one thing is ever said
 //   §2  Ashley's ruling — NO chips under the how-did-it-feel question
 //   §3  every chip is a sentence the coach's existing tools can finish
-//   §4  attention (the tab dot) lights for exactly the two kinds that want
-//       an answer, and the wiring in ChatAssistant/App/BottomTabBar carries it
+//   §4  attention (the chat button's indicator) lights for exactly the two
+//       opener kinds that want an answer, and the wiring in
+//       ChatAssistant/App/BottomTabBar carries it
 //   §5  the model-side check-in ranks a missed yesterday where it belongs
+//   §8  the third reason added 6 Sep 2026 — a coach reply nobody has read
+//       yet (chat-unread.ts) — and the seen set that keeps three independent
+//       reasons from hiding each other
 //
 // Pure functions where possible; source reads for the wiring, same split as
 // test-session-feel.ts.
@@ -22,6 +26,8 @@ import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { pickOpener, missedYesterdayFrom, type OpenerInput } from '../src/lib/coach-opener'
 import { pickAccountabilityCheckIn, type AccountabilityInput } from '../src/lib/accountability'
+import type { ChatMessage } from '../src/lib/types'
+import { attentionReasons, nextSeenAttention, hasUnseenAttention, loadSeenAttention, saveSeenAttention } from '../src/lib/chat-unread'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 let failures = 0
@@ -104,7 +110,7 @@ console.log('\n3. Every chip is a sentence the coach\'s existing tools can finis
   check('propose_volume_change exists for the short-on-time chip', /name: "propose_volume_change"/.test(chat) && /"lighter"/.test(chat))
 }
 
-console.log('\n4. Attention: the tab dot lights for exactly the kinds that want an answer')
+console.log('\n4. Attention: the chat button lights for exactly the opener kinds that want an answer')
 {
   check('an unreviewed session wants an answer', pickOpener({ ...base, awaitingFeel: { date: '2026-09-02', isToday: true } }).attention)
   check('a missed day wants an answer', pickOpener({ ...base, missedYesterday: { dayName: 'Monday', focus: 'Legs' } }).attention)
@@ -118,12 +124,22 @@ console.log('\n4. Attention: the tab dot lights for exactly the kinds that want 
   const bar = readFileSync(join(ROOT, 'src/components/BottomTabBar.tsx'), 'utf8')
   // The same rule, stated in ChatAssistant without going through pickOpener.
   // Pinned here so the tab and the bubble cannot drift apart.
-  check('ChatAssistant derives attention from the same two facts', /const hasAttention = !!feelContext\?\.awaiting \|\| !!missedYesterday/.test(chatUi))
-  check('...and reports it upward', /onAttentionChange\?\.\(hasAttention\)/.test(chatUi))
+  check('ChatAssistant feeds the same two facts into the reason set',
+    /awaitingFeelDate: feelContext\?\.awaiting\?\.date \?\? null/.test(chatUi) && /missedYesterdayDay: missedYesterday\?\.dayName \?\? null/.test(chatUi))
+  check('...and the transcript, so an unread reply is the third reason', /attentionReasons\(\{[\s\S]{0,240}\n\s+messages,\n\s+\}\)/.test(chatUi))
+  check('...judged against a seen SET, not one flag', /hasUnseenAttention\(activeAttention, seenAttention\)/.test(chatUi))
+  check('...and reports the verdict upward', /onAttentionChange\?\.\(hasAttention\)/.test(chatUi))
+  check('...knowing whether the chat is actually on screen', /chatVisible=\{activeTab === 'chat'\}/.test(app))
   check('App receives it', /onAttentionChange=\{setChatAttention\}/.test(app))
-  check('...clears it once the chat is opened', /if \(activeTab === 'chat'\) setAttentionSeen\(true\)/.test(app))
-  check('...re-arms only when the condition goes away', /if \(!chatAttention\) \{ setAttentionSeen\(false\); return \}/.test(app))
-  check('...and never shows the dot while already on the chat tab', /chatAttention=\{chatAttention && !attentionSeen && activeTab !== 'chat'\}/.test(app))
+  check('...and never shows it while already on the chat tab', /chatAttention=\{chatAttention && activeTab !== 'chat'\}/.test(app))
+  // The bug that made three reasons necessary: a single seen-flag upstream
+  // remembers that ONE thing was looked at, so a new coach reply arriving
+  // under an already-seen feel question could never light the button. If a
+  // flag ever comes back here, that failure mode comes back with it.
+  // Comments stripped first — App.tsx's own note records why the flag went,
+  // and an absence check that a comment can satisfy proves nothing.
+  const appCode = app.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+  check('...with no second seen-flag left in App to swallow one of them', !/attentionSeen/.test(appCode))
   check('the tab bar draws it', /data-testid="chat-attention-dot"/.test(bar))
   // The wording changed on 6 Sep 2026 when the assistant took one name in UI
   // text ("Personal TrAIner" everywhere). What this check is FOR is unchanged:
@@ -203,10 +219,106 @@ console.log('\n7. No React hook is called after App.tsx\'s early return')
   check('no hook is called after it — a hook below an early return is a black screen on load',
     offenders.length === 0, offenders)
 
-  // And the effect that caused it is where it belongs: above the return, and
-  // beside the state it drives.
-  const effectIdx = app.indexOf('if (!chatAttention) { setAttentionSeen(false); return }')
-  check('the attention effect is above the early return', effectIdx > 0 && effectIdx < returnIdx, { effectIdx, returnIdx })
+  // The effect that caused it now lives in ChatAssistant (the seen set moved
+  // there on 6 Sep 2026 — see §8), so what is anchored here is the state it
+  // used to drive, which is still declared in App and still has to sit above
+  // the return. The check above is the one that actually guards the defect;
+  // this one keeps a named example of it in place.
+  const stateIdx = app.indexOf('const [chatAttention, setChatAttention] = useState(false)')
+  check('the chat-attention state is above the early return', stateIdx > 0 && stateIdx < returnIdx, { stateIdx, returnIdx })
+}
+
+console.log('\n8. An unread coach reply is the third reason, and no reason hides another')
+{
+  const reply = (over: Partial<ChatMessage> = {}): ChatMessage =>
+    ({ id: 'msg-1', role: 'assistant', content: 'Nice work.', status: 'complete', ...over })
+  const said = (text: string): ChatMessage => ({ id: 'u-1', role: 'user', content: text, status: 'complete' })
+
+  // --- what counts as unread -----------------------------------------------
+  const reasonsFor = (messages: ChatMessage[], feel: string | null = null, missed: string | null = null) =>
+    attentionReasons({ awaitingFeelDate: feel, missedYesterdayDay: missed, messages })
+
+  check('a finished coach reply at the end of the transcript is a reason',
+    reasonsFor([said('how did I do'), reply()]) === 'unread:msg-1', reasonsFor([said('how did I do'), reply()]))
+  check('...but not once the trainee has answered it',
+    reasonsFor([reply(), said('thanks')]) === '', reasonsFor([reply(), said('thanks')]))
+  check('a reply still streaming is not a message yet',
+    reasonsFor([said('hi'), reply({ status: 'pending', content: '' })]) === '')
+  // A failed turn shows its own retry in the transcript. Lighting the button
+  // for it sends the trainee to look at an error.
+  check('a failed reply does not light it', reasonsFor([said('hi'), reply({ status: 'failed' })]) === '')
+  // THE ONE THAT KEEPS THE BUTTON MEANINGFUL. The opener and the first-run
+  // intro are composed on the client on every mount and never carry a DB id;
+  // counting them lights the button every single day, which is the "a dot
+  // that is always on is a dot nobody sees" failure BottomTabBar warns about.
+  check('the client-composed opener does NOT light it — it has no id',
+    reasonsFor([{ role: 'assistant', content: 'Morning Ashley — today\'s Push & Press.', status: 'complete' }]) === '')
+  check('an empty transcript is no reason at all', reasonsFor([]) === '')
+
+  // --- the three compose, in a stable order --------------------------------
+  const all = reasonsFor([said('hi'), reply()], '2026-09-05', 'Thursday')
+  check('all three reasons can be live at once', all === 'feel:2026-09-05|missed:Thursday|unread:msg-1', all)
+  check('each carries the identity of the thing wanting an answer, not just its kind',
+    reasonsFor([], '2026-09-05') !== reasonsFor([], '2026-09-04'))
+
+  // --- the seen set ---------------------------------------------------------
+  // Nothing stored yet: the transcript on screen is what they last read
+  // (chat-cache.ts writes it in the same tick they saw it), so shipping this
+  // must not light the button for a conversation finished days ago. The two
+  // opener reasons are deliberately NOT seeded — they re-arm on a fresh mount
+  // today and this change does not touch that.
+  check('a first run seeds the unread reply as already seen',
+    nextSeenAttention(null, 'feel:2026-09-05|unread:msg-1', false) === 'unread:msg-1',
+    nextSeenAttention(null, 'feel:2026-09-05|unread:msg-1', false))
+  check('...and seeds nothing else, so an open feel question still nudges',
+    !hasUnseenAttention('unread:msg-1', nextSeenAttention(null, 'unread:msg-1', false)) &&
+    hasUnseenAttention('feel:2026-09-05|unread:msg-1', nextSeenAttention(null, 'feel:2026-09-05|unread:msg-1', false)))
+  check('being on the chat tab marks everything showing as seen, answered or not',
+    nextSeenAttention('', 'feel:2026-09-05|unread:msg-1', true) === 'feel:2026-09-05|unread:msg-1')
+  check('a reason that goes away is dropped, so the same kind can nudge again later',
+    nextSeenAttention('missed:Thursday', 'feel:2026-09-05', false) === '')
+
+  // --- the bug the seen SET exists for --------------------------------------
+  // Ashley opened the chat on an unanswered feel question, went back to
+  // another tab, and a later coach reply never lit the button: one seen-flag
+  // was already set and there was nothing to distinguish the two.
+  {
+    const seenTheFeelQuestion = nextSeenAttention('', 'feel:2026-09-05', true)
+    const replyArrives = 'feel:2026-09-05|unread:msg-9'
+    check('a new reply under an already-seen feel question DOES light the button',
+      hasUnseenAttention(replyArrives, nextSeenAttention(seenTheFeelQuestion, replyArrives, false)))
+    // ...and the mirror image: reading the reply must not re-light the button
+    // for the feel question they already looked at.
+    const afterReading = nextSeenAttention(replyArrives, replyArrives, true)
+    check('...and reading it does not re-light the feel question they already saw',
+      !hasUnseenAttention('feel:2026-09-05', nextSeenAttention(afterReading, 'feel:2026-09-05', false)))
+  }
+  check('nothing live means nothing unseen', !hasUnseenAttention('', 'feel:2026-09-05'))
+
+  // --- what survives a reload ----------------------------------------------
+  // Only the message id. It is durable, so a reply read yesterday must not
+  // light the button again after a reload; feel/missed are re-derived from
+  // live state on every mount and keeping them out leaves that as it was.
+  {
+    const store = new Map<string, string>()
+    ;(globalThis as { localStorage?: unknown }).localStorage = {
+      getItem: (k: string) => (store.has(k) ? store.get(k)! : null),
+      setItem: (k: string, v: string) => { store.set(k, v) },
+      removeItem: (k: string) => { store.delete(k) },
+    }
+    check('nothing written yet reads back as "never stored", not as "nothing seen"',
+      loadSeenAttention('p1') === null)
+    saveSeenAttention('p1', 'feel:2026-09-05|missed:Thursday|unread:msg-1')
+    check('only the unread reason is persisted', loadSeenAttention('p1') === 'unread:msg-1', loadSeenAttention('p1'))
+    check('...so the reply stays read across a reload',
+      !hasUnseenAttention('unread:msg-1', loadSeenAttention('p1')!))
+    check('...and the feel question still nudges after one, as it did before this change',
+      hasUnseenAttention('feel:2026-09-05', loadSeenAttention('p1')!))
+    saveSeenAttention('p2', 'feel:2026-09-05')
+    check('a profile with nothing durable to remember stores an empty set, not null',
+      loadSeenAttention('p2') === '')
+    check('profiles do not share a seen set', loadSeenAttention('p1') === 'unread:msg-1')
+  }
 }
 
 if (failures > 0) { console.error(`\n${failures} check(s) failed\n`); process.exit(1) }

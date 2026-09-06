@@ -109,28 +109,32 @@ function App() {
   /** The weight that actually drives computeTargets — a threshold-gated 7-day average (getEffectiveTargetWeightKg), not the raw latest reading. Kept separate from latestWeightKg so a noisy day-to-day swing never retunes calories on its own; only a real trend move does. Null until the first target computation resolves it. */
   const [targetWeightAnchorKg, setTargetWeightAnchorKg] = useState<number | null>(null)
   const [exercisePlan, setExercisePlan] = useState<WorkoutDay[]>([])
-  // The dot on the chat tab. ChatAssistant (force-mounted, so live before
-  // the tab is ever opened) reports whether the coach has something that
-  // wants an answer; `attentionSeen` makes the dot a nudge rather than a
-  // demand — it clears the moment the chat is opened, whether or not they
-  // answer, and re-arms only when the underlying condition goes away and
-  // a new one arrives. See coach-opener.ts for what counts.
+  // The ring on the chat button. ChatAssistant (force-mounted, so live
+  // before the tab is ever opened) reports whether the coach has something
+  // that wants an answer — an unreviewed session, a missed day, or a reply
+  // the trainee has not seen. It reports the verdict ALREADY accounting for
+  // what has been seen, so nothing here decides that a second time.
+  //
+  // The `attentionSeen` flag that used to live here is gone, and its removal
+  // is the point: one flag could only remember that ONE thing had been seen,
+  // so once it was set for a feel question the trainee had looked at, a
+  // genuinely new coach reply arriving afterwards could never light the
+  // button. chat-unread.ts tracks a seen SET instead, beside the state that
+  // produces the reasons.
   const [chatAttention, setChatAttention] = useState(false)
-  const [attentionSeen, setAttentionSeen] = useState(false)
-  // MUST STAY ABOVE THE `if (!profile)` EARLY RETURN BELOW. This effect was
-  // written under handleTabChange, a few lines before the JSX and ~70 lines
-  // AFTER that return — so on the first render (profile still null) it never
-  // ran, and on the render after the profile resolved it did. One more hook
-  // than the previous render is exactly what React forbids: it threw
-  // "Rendered more hooks than during the previous render", unmounted the
-  // tree, and every user got a black screen. Shipped to production in #15
-  // and caught by Ashley on her phone, not by any gate — typecheck and the
-  // bundler do not check hook order and nothing in the suite renders App.
-  // test:coach-opener now asserts no hook call appears after that return.
-  useEffect(() => {
-    if (!chatAttention) { setAttentionSeen(false); return }
-    if (activeTab === 'chat') setAttentionSeen(true)
-  }, [chatAttention, activeTab])
+  // EVERY HOOK IN THIS COMPONENT MUST STAY ABOVE THE `if (!profile)` EARLY
+  // RETURN BELOW. Recorded here because this is where it went wrong: the
+  // effect that used to keep `attentionSeen` (now in ChatAssistant, see
+  // above) was written under handleTabChange, a few lines before the JSX and
+  // ~70 lines AFTER that return — so on the first render (profile still
+  // null) it never ran, and on the render after the profile resolved it did.
+  // One more hook than the previous render is exactly what React forbids: it
+  // threw "Rendered more hooks than during the previous render", unmounted
+  // the tree, and every user got a black screen. Shipped to production in
+  // #15 and caught by Ashley on her phone, not by any gate — typecheck and
+  // the bundler do not check hook order and nothing in the suite renders
+  // App. test:coach-opener §7 asserts no hook call appears after that
+  // return, over the whole file rather than over any one hook.
   const [mesocycle, setMesocycle] = useState<MesocycleWeek[]>([])
   // Client-authored dismissible notices — never model prose, same
   // convention as every other receipt in this app. Four sources feed this
@@ -2467,12 +2471,13 @@ function App() {
               revealSpeed={revealSpeed}
               pendingLoadSuggestions={adaptationMessages.filter(m => m.loadSuggestionId).map(m => m.text)}
               onAttentionChange={setChatAttention}
+              chatVisible={activeTab === 'chat'}
             />
           </TabsContent>
         </Tabs>
       </main>
       <BottomDock />
-      <BottomTabBar activeTab={activeTab} onTabChange={handleTabChange} chatAttention={chatAttention && !attentionSeen && activeTab !== 'chat'} />
+      <BottomTabBar activeTab={activeTab} onTabChange={handleTabChange} chatAttention={chatAttention && activeTab !== 'chat'} />
       {/* Sibling of <main>, like BottomDock, so it overlays every tab AND the
           tab bar — the tour's nav stops spotlight the real tab buttons, which
           it could not reach from inside a tab's own subtree. */}
