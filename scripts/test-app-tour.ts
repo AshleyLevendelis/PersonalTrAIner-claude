@@ -445,6 +445,17 @@ console.log('\n7. The copy still describes the app it is pointing at')
     !/logStepsManual/.test(readFileSync(join(ROOT, 'src/components/exercise/TodayPanel.tsx'), 'utf8'))
     && !/steps/i.test(copyOf('exercise')), copyOf('exercise'))
 
+  // WATER, the same shape, moved Nutrition -> Home on 6 Sep 2026. The
+  // Nutrition step promised "+250 / +500 log water in one tap" for as long as
+  // that row was there and would have kept promising it afterwards; §1-2
+  // cannot see copy, only targets.
+  const homeLogsWater = /logWater\b/.test(dash)
+  check('Home owns water logging (the fact the copy depends on)', homeLogsWater)
+  check('...so the tiles step says water is logged there',
+    !homeLogsWater || /water/i.test(tiles), tiles)
+  check('...and the Nutrition step no longer promises the quick-adds',
+    !/logWater\b/.test(nutri) && !/\+250|one tap/i.test(copyOf('nutrition')), copyOf('nutrition'))
+
   const gearHasAppearance = /<AppearanceSection/.test(prof)
   check('the gear carries Appearance (the fact the copy depends on)', gearHasAppearance)
   check('...so the settings step mentions how the app looks',

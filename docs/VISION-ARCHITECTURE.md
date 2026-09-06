@@ -517,8 +517,10 @@ existed:
   steps, and it is the third time steps have moved** (Home → Nutrition →
   Exercise → Home), so the reasoning matters more than the destination:
   ownership of a NUMBER is not the same as the place you tap to add to it.
-  Nutrition still owns water — the ring, the legend, the target editor — and
-  Home only carries the quick-add; Exercise still owns the program and the
+  Nutrition still owns water — the ring, the legend, the target editor (now
+  inside "How it's set") — and Home carries the quick-add. **The +250 / +500
+  row and its undo are GONE from Nutrition, not copied**: same discipline as
+  the steps row, for the same reason. Exercise still owns the program and the
   session. What Home gained is the day's logging surface, because "what have I
   done today" is the question Home exists to answer and sending someone to
   another tab to answer it is what made it a scoreboard nobody used.

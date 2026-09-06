@@ -5,7 +5,7 @@ import {
   RefreshCw,
   Loader2,
   Check,
-  ChevronDown,
+  ChevronRight,
   ShieldAlert,
   Plus,
 } from 'lucide-react'
@@ -14,8 +14,10 @@ import type { MacroTargets } from '@/lib/types'
 import { getTodayLedger, logMealEaten, voidMealEvents, loggedEventsBySlot, type MealSlotName, type MealEventRecord } from '@/lib/meal-store'
 import { checkMealAgainstRestrictions, type MealRestrictionVerdict } from '@/lib/meal-restriction-check'
 import type { PoolOption } from '@/lib/meal-generation'
+import { tabHash } from '@/lib/app-route'
 
-const SLOT_ORDER: MealSlotName[] = ['breakfast', 'lunch', 'dinner', 'snack']
+/** Exported so NutritionDisplay's shortfall nudge names slots in the same order this list renders them, rather than keeping a second copy that can drift. */
+export const SLOT_ORDER: MealSlotName[] = ['breakfast', 'lunch', 'dinner', 'snack']
 export const SLOT_LABEL: Record<MealSlotName, string> = {
   breakfast: 'Breakfast',
   lunch: 'Lunch',
@@ -218,17 +220,32 @@ export function MealPlan({
           </button>
         </InsightBanner>
       )}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <span className="ds-label">Today's meals</span>
-        <button
-          type="button"
-          onClick={onRegenerateAll}
-          disabled={isGenerating}
-          className="flex items-center gap-1.5 text-xs font-semibold text-primary disabled:opacity-50"
-        >
-          {isGenerating ? <Loader2 className="size-3 animate-spin" /> : <RefreshCw className="size-3" />}
-          Regenerate all
-        </button>
+        {/* TWO CONTROLS, not one. The handoff specifies "Grocery list ›" on
+            this row and shows nothing else; Regenerate all is kept beside it
+            because this header is its ONLY call site — dropping it to match
+            the frame would delete the one way to redo a day's meals, which
+            is a capability change, not a presentation one. Flagged in the
+            commit rather than silently resolved either way. */}
+        <span className="flex shrink-0 items-center gap-3">
+          <button
+            type="button"
+            onClick={onRegenerateAll}
+            disabled={isGenerating}
+            className="hit-slop-44 flex items-center gap-1.5 text-[0.6875rem] font-semibold text-muted-foreground disabled:opacity-50"
+          >
+            {isGenerating ? <Loader2 className="size-3 animate-spin" /> : <RefreshCw className="size-3" />}
+            Regenerate all
+          </button>
+          <button
+            type="button"
+            onClick={() => { window.location.hash = tabHash('tools') }}
+            className="hit-slop-44 text-[0.6875rem] font-semibold text-primary"
+          >
+            Grocery list ›
+          </button>
+        </span>
       </div>
       <p className="text-xs text-muted-foreground/70">
         Ingredients are filtered, not verified. Check labels if you have an allergy.
@@ -484,7 +501,7 @@ function MealSlotRow({
                   name in the pool while keeping the row compact. `min-w-0`
                   stays either way — without it the flex row refuses to shrink
                   and the macros beside it get pushed off. */}
-              <span className={expanded ? 'min-w-0 text-[1.1875rem] font-semibold tracking-[-.02em]' : 'min-w-0 line-clamp-2 text-[1.03125rem] font-medium'}>
+              <span className={expanded ? 'min-w-0 text-[1.1875rem] font-semibold tracking-[-.02em]' : 'min-w-0 line-clamp-2 text-[1rem] font-medium'}>
                 {option.name}
               </span>
               {!expanded && (
@@ -500,11 +517,11 @@ function MealSlotRow({
                       the new pick. Considered and kept: what the day is
                       carrying is the useful truth here, and unlogging and
                       logging again corrects it in two taps. */}
-                  <span className={`tabular-mono text-xs ${duplicated ? 'text-[color:var(--role-warn-text)]' : isLogged ? 'text-primary glow-mint' : 'text-muted-foreground'}`}>
-                    {isLogged ? '✓ ' : ''}{Math.round(isLogged ? loggedKcal : option.macros.calories)} kcal
+                  <span className={`tabular-mono text-[0.8125rem] ${duplicated ? 'text-[color:var(--role-warn-text)]' : isLogged ? 'text-primary glow-mint' : 'text-muted-foreground'}`}>
+                    {Math.round(isLogged ? loggedKcal : option.macros.calories)} kcal{isLogged ? ' ✓' : ''}
                     {duplicated ? ` ·×${loggedEvents.length}` : ''}
                   </span>
-                  <ChevronDown className="size-3.5 text-muted-foreground" />
+                  <ChevronRight className="size-3.5 text-muted-foreground" />
                 </span>
               )}
             </>

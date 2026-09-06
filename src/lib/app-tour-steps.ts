@@ -77,8 +77,11 @@ export const TOUR_STEPS: TourStep[] = [
     nav: 'navNutrition', tapHint: 'Tap Nutrition', teaser: 'Next stop — where your food lives.',
     // Steps used to be named here. They moved to Exercise on 5 Sep 2026, so
     // this step is food and drink only — naming them here would point at a
-    // row that is no longer on this screen.
-    copy: 'Everything you eat and drink lives here. The rings are your day, and +250 / +500 log water in one tap.',
+    // row that is no longer on this screen. The water quick-adds went the
+    // same way on 6 Sep (to Home, with the rest of the day's logging), so
+    // this copy no longer promises a tap it cannot deliver on this tab; what
+    // Nutrition owns is the read-out and the targets behind it.
+    copy: "Everything you eat and drink lives here. The rings are your day at a glance, and the targets behind them — calories, macros, water — are set from this tab.",
   },
   {
     key: 'meals', tab: 'nutrition', target: 'meals',

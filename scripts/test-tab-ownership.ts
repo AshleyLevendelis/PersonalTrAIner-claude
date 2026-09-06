@@ -112,6 +112,20 @@ for (const rel of ['src/components/exercise/WeekContextRow.tsx', 'src/components
   check(`${base} is actually imported by something`, importers.length > 0, importers)
 }
 
+// SAME SHAPE AS §2, for water. The quick-adds moved Nutrition -> Home on
+// 6 Sep 2026 (design_handoff_app_polish, Nutrition §6). §1 already asserts
+// Home logs it; this is the half that stops the row existing in two places,
+// which is the only way "one fact, one owner" can be broken by an addition.
+console.log('\n2b. Water is logged in exactly one place\n')
+check('Nutrition no longer logs water', !/logWater\b/.test(nutrition))
+check('...nor undoes a water log', !/undoWaterLog|undoLog\(/.test(nutrition))
+// AND STILL OWNS THE TARGET. Home logs the day; Nutrition sets what the day
+// is measured against. Losing this would make the move a deletion.
+check('...but still sets the water target', /setWaterTargetMl/.test(nutrition))
+check('...from a control the user can reach', /setEditingWaterTarget\(true\)/.test(nutrition))
+check('...and still READS the day, or the H2O ring would show nothing',
+  /getAllWaterLogs|getAllLogs as getAllWaterLogs/.test(nutrition))
+
 console.log('\n4. Water is one colour everywhere — status never follows the accent\n')
 check('Home draws water in --chart-3, not the mint accent', /--chart-3/.test(home))
 check('Nutrition already did', /--chart-3/.test(nutrition))

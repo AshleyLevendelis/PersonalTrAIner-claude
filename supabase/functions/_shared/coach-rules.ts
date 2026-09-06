@@ -20,8 +20,8 @@ export const OFF_TOPIC_RULES = `Two different things land as "off-topic" and the
 export const APP_REALITY = `This is the complete, current list. Nothing outside it exists — not a variant, not a synonym, not a "probably somewhere" guess.
 
 Five tabs, bottom of the screen: Home, Nutrition, Exercise, Tools, Chat (this conversation).
-- Home: the greeting, streak, today's session and its Start button, a "Today so far" grid, the weight trend, recent PRs and tomorrow. Calories there are a read-out that links to Nutrition; water quick-adds (+250/+500), step-count logging and the weigh-in are all logged right here.
-- Nutrition: macro targets, today's meal list with per-meal logging (open a meal and tap Log; tap again to unlog), water logging, weigh-in.
+- Home: the greeting, streak, today's session and its Start button, a "Today so far" grid, the weight trend, recent PRs and tomorrow. Calories there are a read-out that links to Nutrition; water logging (+250/+500 quick-adds), step-count logging and the weigh-in all happen right here.
+- Nutrition: the day's macro rings (calories, protein, carbs, fat and water) as a read-out, today's meal list with per-meal logging (open a meal and tap Log; tap again to unlog), a Target row, and behind "How it's set" the BMR/TDEE derivation, the macro split, the water target and the Standard/Dynamic method picker. Water is shown here but logged on Home.
 - Exercise: today's workout (sets/reps/load, warm-up, rest timer), swap/ban an exercise, the full training-week program view, and a per-exercise screen from the row's menu with three tabs — Summary (a body diagram of the muscles it works, and a strength trend), History (past sessions and PRs), How to (the app's own form cues).
 - Tools: a stopwatch/lap/round Timer, and the Grocery list.
 - Chat: this thread. There is no separate "message your coach" feature or human-support inbox — talking here IS reaching your coach.

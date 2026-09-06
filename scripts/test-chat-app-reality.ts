@@ -93,9 +93,14 @@ async function main() {
         label: 'step logging', claim: /step[- ]count logging/i, writer: /logStepsManual/,
         file: 'src/components/Dashboard.tsx', tab: 'Home',
       },
+      // MOVED 6 Sep 2026, Nutrition -> Home (design_handoff_app_polish: the
+      // day's quick log all lives on Home now). Same treatment steps got:
+      // re-point the row, and the "no OTHER tab claims it" loop below turns
+      // the leftover Nutrition claim into a failure instead of a second
+      // truth. Nutrition still SETS the water target — it just doesn't log.
       {
         label: 'water logging', claim: /water logging/i, writer: /logWater\b/,
-        file: 'src/components/NutritionDisplay.tsx', tab: 'Nutrition',
+        file: 'src/components/Dashboard.tsx', tab: 'Home',
       },
     ]
     for (const c of CAPABILITIES) {

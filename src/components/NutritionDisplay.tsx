@@ -1,21 +1,21 @@
 import { useEffect, useRef, useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Calculator, Layers } from 'lucide-react'
-import { MealPlan } from '@/components/MealPlan'
+import { MealPlan, SLOT_ORDER, SLOT_LABEL } from '@/components/MealPlan'
 import { MacroSplitCard } from '@/components/MacroSplitCard'
+import { TrainerNudge } from '@/components/TrainerNudge'
 import { useActiveSession } from '@/hooks/useActiveSession'
-import { getTodayLedger, subscribeMealStore } from '@/lib/meal-store'
-import { getAllLogs as getAllWaterLogs, logWater, undoLog as undoWaterLog, setWaterTargetMl, type WaterLogRow } from '@/lib/water-store'
+import { getTodayLedger, subscribeMealStore, loggedEventsBySlot } from '@/lib/meal-store'
+import { getAllLogs as getAllWaterLogs, setWaterTargetMl, type WaterLogRow } from '@/lib/water-store'
 import type { MacroTargets, UserProfile, WorkoutDay, MacroCalculationMode } from '@/lib/types'
 import type { MealSlotName } from '@/lib/meal-store'
 import type { PoolOption } from '@/lib/meal-generation'
 import { calculateWeeklySchedule, getMacroDerivation } from '@/lib/macro-calculator'
+import { macroShortfallLine } from '@/lib/macro-shortfall'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { MissingBodyMetricsNotice } from '@/components/MissingBodyMetricsNotice'
 import { InsightBanner } from '@/components/ui/insight-banner'
-
-const WATER_QUICK_ADD_ML = [250, 500]
 
 // Tab-restructure handoff — the ring meter moves here from Dashboard.tsx and
 // grows a 5th (outermost) water ring, each ring now its own colour instead
@@ -140,9 +140,11 @@ export function NutritionDisplay({
   // App.tsx, since nothing else in the tree needs this data.
   const { dayName } = useActiveSession()
   const [eaten, setEaten] = useState({ kcal: 0, protein: 0, carbs: 0, fat: 0 })
+  const [loggedSlots, setLoggedSlots] = useState<MealSlotName[]>([])
   const [waterLogs, setWaterLogs] = useState<WaterLogRow[]>([])
   const [waterTarget, setWaterTarget] = useState(profile.water_target_ml ?? 2000)
   const [editingWaterTarget, setEditingWaterTarget] = useState(false)
+  const [howItsSetOpen, setHowItsSetOpen] = useState(false)
   const [waterTargetInput, setWaterTargetInput] = useState(String(profile.water_target_ml ?? 2000))
   /**
    * Shared by the water-target editor below. It stayed when the steps row
@@ -160,14 +162,26 @@ export function NutritionDisplay({
    * on a meal moved the row's own state and left the ring directly above it on
    * the same screen showing the day's totals from before the meal — the two
    * halves of one screen disagreeing about what had been eaten. `ledgerVersion`
-   * is the re-read trigger; the effect body is unchanged.
+   * is the re-read trigger. The effect also lifts the ledger's logged-by-slot
+   * grouping out, so the shortfall nudge below names a meal off the same
+   * read — one fetch, one truth about the day.
    */
   const [ledgerVersion, setLedgerVersion] = useState(0)
   useEffect(() => subscribeMealStore(() => setLedgerVersion(v => v + 1)), [])
 
   useEffect(() => {
     if (!profileId || !date || !macros) return
-    getTodayLedger(profileId, date, macros).then(l => setEaten(l.eaten)).catch(console.error)
+    getTodayLedger(profileId, date, macros)
+      .then(l => {
+        setEaten(l.eaten)
+        // Which slots are already eaten, read off the SAME ledger the rings
+        // are drawn from rather than a second fetch — the shortfall nudge
+        // below can then only ever name a meal the list underneath still
+        // shows as unlogged. loggedEventsBySlot is MealPlan's own grouping,
+        // reused so the two halves of this tab agree on what "logged" means.
+        setLoggedSlots(Object.keys(loggedEventsBySlot(l.events)) as MealSlotName[])
+      })
+      .catch(console.error)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profileId, date, macros, mealTotals, ledgerVersion])
 
@@ -179,25 +193,12 @@ export function NutritionDisplay({
 
   useEffect(() => { setWaterTarget(profile.water_target_ml ?? 2000) }, [profile.water_target_ml])
 
+  // READ ONLY, since 6 Sep 2026. The quick-adds and the undo beside them
+  // moved to Home's "Today so far" grid with the rest of the day's logging
+  // (design_handoff_app_polish, "Home becomes the day"); water is the H2O
+  // ring and its legend entry here, and the TARGET is still set here, inside
+  // "How it's set". What is left is the total the ring is drawn from.
   const todayWaterMl = waterLogs.filter(l => l.date === date).reduce((s, l) => s + l.amount_ml, 0)
-  // The most recent entry logged today, whichever tap or chat line made it,
-  // so an accidental +500 can be taken back after a reload too — not only in
-  // the seconds after the tap, which is all the old in-memory "last log"
-  // remembered. Undo removes exactly that row; tap it again for the one
-  // before. Ashley, 3 Sep 2026.
-  const todayWaterLogs = waterLogs.filter(l => l.date === date).sort((a, b) => a.created_at.localeCompare(b.created_at))
-  const lastWaterLog: WaterLogRow | null = todayWaterLogs.length > 0 ? todayWaterLogs[todayWaterLogs.length - 1] : null
-
-  const handleAddWater = (amountMl: number) => {
-    if (!profileId || !date) return
-    const row = logWater({ profileId, date, amountMl, source: 'manual' })
-    setWaterLogs(prev => [...prev, row])
-  }
-  const handleUndoWater = () => {
-    if (!lastWaterLog) return
-    undoWaterLog(lastWaterLog)
-    setWaterLogs(prev => prev.filter(l => l.id !== lastWaterLog.id))
-  }
   const handleSaveWaterTarget = async () => {
     const n = Number(waterTargetInput)
     if (!profileId || !Number.isFinite(n) || n <= 0) { setEditingWaterTarget(false); return }
@@ -238,6 +239,22 @@ export function NutritionDisplay({
     // setState on a gone component if the trainee switches tabs mid-sparkle.
     return () => clearTimeout(timer)
   }, [waterComplete])
+
+  // THE TRAINER'S ONE LINE about the macro furthest behind, derived from the
+  // same eaten/target pairs the rings above are drawn from — no second
+  // source, no extra call. The rule for when it stays silent lives in
+  // macro-shortfall.ts so a gate can assert it; this only supplies today.
+  const macroNudge = macroShortfallLine({
+    targets: macros,
+    eaten,
+    waterTargetMl: waterTarget,
+    waterMl: todayWaterMl,
+    meals: SLOT_ORDER.filter(slot => chosen[slot]).map(slot => ({
+      label: SLOT_LABEL[slot],
+      logged: loggedSlots.includes(slot),
+      macros: chosen[slot]!.macros,
+    })),
+  })
 
   const ringValues: Record<string, { eaten: number; target: number }> = {
     water: { eaten: todayWaterMl, target: waterTarget },
@@ -299,25 +316,30 @@ export function NutritionDisplay({
               <p className="ds-num-mega tabular-mono text-[#E4FCF4] glow-mint-lg">{macros ? Math.round(eaten.kcal) : '—'}</p>
               <p className="mt-1 text-[0.65625rem] uppercase tracking-[.16em] text-muted-foreground">
                 {macros
-                  ? <>kcal · of <span className="tabular-mono">{Math.round(macros.calories)}</span></>
+                  ? <>kcal · <span className="tabular-mono">{Math.max(0, Math.round(macros.calories - eaten.kcal))}</span> left</>
                   : 'kcal · add your weight for a target'}
               </p>
             </div>
-            <div className="flex flex-col gap-[6px]">
+            {/* 2x2, not four stacked rows: the four values fit beside a
+                112px meter without wrapping, and stacked they pushed the
+                block taller than the rings it labels. Letters rather than
+                words for the same reason — the swatch carries the identity
+                and the colour is the same one the ring is drawn in. */}
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1">
               {([
-                { key: 'water', label: 'Water', unit: 'ml' },
-                { key: 'protein', label: 'Protein', unit: 'g' },
-                { key: 'carbs', label: 'Carbs', unit: 'g' },
-                { key: 'fat', label: 'Fat', unit: 'g' },
+                { key: 'protein', label: 'P', unit: 'g' },
+                { key: 'carbs', label: 'C', unit: 'g' },
+                { key: 'fat', label: 'F', unit: 'g' },
+                { key: 'water', label: 'H\u2082O', unit: 'ml' },
               ] as const).map(row => {
                 const ring = NUTRITION_RINGS.find(r => r.key === row.key)!
                 const { eaten: e, target: t } = ringValues[row.key]
                 return (
-                  <div key={row.key} className="flex items-baseline gap-[9px]">
-                    <span className="h-[9px] w-[9px] shrink-0 rounded-[3px]" style={{ background: ring.color }} />
-                    <span className="flex-1 text-[0.625rem] uppercase tracking-[.16em] text-muted-foreground">{row.label}</span>
-                    <span className="tabular-mono text-[0.78125rem]">
-                      {Math.round(e)}<span className="text-muted-foreground"> / {Math.round(t)}{row.unit}</span>
+                  <div key={row.key} className="flex items-baseline gap-1.5">
+                    <span className="h-2 w-2 shrink-0 rounded-[2px]" style={{ background: ring.color }} />
+                    <span className="shrink-0 text-[0.6875rem] text-muted-foreground">{row.label}</span>
+                    <span className="tabular-mono text-[0.6875rem]">
+                      {Math.round(e)}<span className="text-muted-foreground">/{Math.round(t)}{row.unit}</span>
                     </span>
                   </div>
                 )
@@ -326,54 +348,11 @@ export function NutritionDisplay({
           </div>
         </div>
 
-        {/* Water logging row — moved off Dashboard.tsx. Quick-adds and the
-            progress bar use --chart-3 (blue) to match the water ring above,
-            deliberately not the mint accent — this is the one place on the
-            app where the mint "on-track" colour doesn't apply, since water
-            isn't a macro target the split card governs. */}
-        <div className="flex items-baseline justify-between pt-3.5 pb-2.5" style={{ borderTop: '1px solid var(--hairline)' }}>
-          <span className="text-[0.8125rem] text-text-tertiary">Water</span>
-          {editingWaterTarget ? (
-            <div className="flex items-center gap-1">
-              <input
-                type="number"
-                value={waterTargetInput}
-                onChange={e => setWaterTargetInput(e.target.value)}
-                className="h-7 w-16 min-w-0 rounded-md bg-[color:var(--surface-raised)] px-1.5 text-xs"
-              />
-              <Button size="sm" variant="ghost" className="h-7 shrink-0 px-1.5 text-[0.625rem]" onClick={handleSaveWaterTarget}>Save</Button>
-            </div>
-          ) : (
-            <span className="flex flex-wrap items-baseline justify-end gap-x-3 gap-y-1">
-              <span className="tabular-mono text-[0.8125rem]">{todayWaterMl} / {waterTarget} ml</span>
-              {WATER_QUICK_ADD_ML.map(ml => (
-                <button key={ml} className="hit-slop-44 text-xs font-semibold" style={{ color: 'var(--chart-3)' }} onClick={() => handleAddWater(ml)}>+{ml}</button>
-              ))}
-              <button className="hit-slop-44 text-xs text-muted-foreground" onClick={() => { setWaterTargetInput(String(waterTarget)); setEditingWaterTarget(true) }}>edit</button>
-              {lastWaterLog && (
-                <button
-                  className="hit-slop-44 text-xs text-muted-foreground"
-                  onClick={handleUndoWater}
-                  aria-label={`Remove the last water entry, ${lastWaterLog.amount_ml} ml`}
-                  title="Removes the most recent entry; tap again for the one before"
-                >
-                  undo +{lastWaterLog.amount_ml}
-                </button>
-              )}
-            </span>
-          )}
-        </div>
-        <div className="mt-0 h-[3px] rounded-full" style={{ background: 'var(--hairline)' }}>
-          <div
-            className="h-[3px] rounded-full"
-            style={{
-              width: `${waterTarget > 0 ? Math.min(100, (todayWaterMl / waterTarget) * 100) : 0}%`,
-              background: 'var(--chart-3)',
-              boxShadow: '0 0 10px rgba(111,183,255,.7)',
-            }}
-          />
-        </div>
-
+        {/* THE WATER ROW LEFT THIS SCROLL, 6 Sep 2026. Water is the H2O ring
+            and its legend entry here; the quick-adds are on Home's "Today so
+            far" grid, which is the one screen that logs the day. The TARGET
+            editor is not gone — it moved into "How it's set", with the other
+            numbers that are set once and read rarely. */}
         {entryError && (
           <InsightBanner tone="warning" className="items-start justify-between">
             <span>{entryError}</span>
@@ -387,6 +366,11 @@ export function NutritionDisplay({
           </InsightBanner>
         )}
       </div>
+
+      {/* THE TRAINER'S LINE. One sentence about the macro furthest behind,
+          and only when something is. Derived here from the same eaten/target
+          pairs the rings are drawn from — no second source, no new call. */}
+      {macroNudge && <TrainerNudge text={macroNudge} openChat />}
 
       <MealPlan
         profileId={profileId}
@@ -408,176 +392,221 @@ export function NutritionDisplay({
         onRegenerateAll={onRegenerateAllMeals}
       />
 
-      {/* Turn 12: the stacked rows-with-sub-explanation layout (turn 10)
-          compresses into a single always-visible 4-column strip — BMR/TDEE/
-          adjustment/target, no expand needed. The "how it's derived" prose
-          moves to the caption below; the numbers themselves are the whole
-          point of this card now that meals sit above it. */}
-      {/* No body metrics means no target to explain. The notice replaces the
-          whole derivation card rather than showing it with holes in it — a
-          BMR row with a blank number reads as a loading bug, not as a
-          deliberate absence. */}
+      {/* THE TARGET, AS ONE ROW. Until 6 Sep 2026 this tab ended in four
+          stacked Cards — the BMR/TDEE strip, the macro-split control, the
+          weekly dynamic table and the method picker — roughly two screens of
+          numbers that are set once and read rarely, sitting under the meals
+          somebody opens this tab to check. They are all still here, behind
+          "How it's set"; what stays in the scroll is the one line that
+          answers "what am I aiming at, and why that number".
+          (design_handoff_app_polish, Nutrition §5.) */}
       {derivation ? (
-      <Card>
-        <CardHeader className="pb-1">
-          <CardTitle className="text-base">How your targets are set</CardTitle>
-        </CardHeader>
-        <CardContent className="pt-0">
-          <div className="flex gap-3">
-            <div className="flex-1 min-w-0">
-              <p className="tabular-mono text-[1.0625rem] font-bold tracking-[-.03em]">{derivation.bmr}</p>
-              <p className="mt-0.5 text-[0.53125rem] uppercase tracking-[.14em] text-muted-foreground">BMR</p>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="tabular-mono text-[1.0625rem] font-bold tracking-[-.03em]">{derivation.tdee}</p>
-              <p className="mt-0.5 text-[0.53125rem] uppercase tracking-[.14em] text-muted-foreground">TDEE</p>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="tabular-mono text-[1.0625rem] font-bold tracking-[-.03em]">{derivation.surplusKcal > 0 ? '+' : ''}{derivation.surplusKcal}</p>
-              <p className="mt-0.5 text-[0.53125rem] uppercase tracking-[.14em] text-muted-foreground">{derivation.surplusLabel.split(' ')[0]}</p>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="tabular-mono text-[1.0625rem] font-bold tracking-[-.03em] text-primary glow-mint">{derivation.target.calories}</p>
-              <p className="mt-0.5 text-[0.53125rem] uppercase tracking-[.14em] text-muted-foreground">Target</p>
-            </div>
+        <div className="border-t border-[color:var(--hairline)] pt-3">
+          <div className="flex items-baseline justify-between gap-3">
+            <p className="ds-label">Target</p>
+            <button
+              type="button"
+              onClick={() => setHowItsSetOpen(true)}
+              className="hit-slop-44 shrink-0 text-[0.6875rem] font-semibold text-primary"
+            >
+              How it's set ›
+            </button>
           </div>
-          <p className="mt-2.5 text-[0.6875rem] leading-normal text-muted-foreground">
-            {derivation.splitApplies
-              ? `From ${effectiveProfile.weight_kg} kg, ${effectiveProfile.height_cm} cm, ${effectiveProfile.age} y · protein ${derivation.split.proteinPerKg.toFixed(1)} g/kg · fat ${Math.round(derivation.split.fatPercent * 100)}% · carbs the remainder.`
-              : `From ${effectiveProfile.weight_kg} kg, ${effectiveProfile.height_cm} cm, ${effectiveProfile.age} y · a fixed 20% protein / 25% fat / 55% carb split for conditioning goals.`}
+          <p className="mt-1 text-[0.8125rem]">
+            <span className="tabular-mono">{derivation.target.calories}</span> kcal
+            {' · '}
+            <span className="text-muted-foreground">
+              TDEE <span className="tabular-mono">{derivation.tdee}</span>
+              {' '}{derivation.surplusKcal === 0 ? 'held at' : derivation.surplusKcal > 0 ? '+' : '−'}
+              {derivation.surplusKcal !== 0 && <span className="tabular-mono">{Math.abs(derivation.surplusKcal)}</span>}
+              {' · '}{derivation.surplusLabel.toLowerCase()}
+            </span>
           </p>
-        </CardContent>
-      </Card>
+        </div>
       ) : (
+        // No body metrics means no target to explain — and a Target row with
+        // a blank number reads as a loading bug, not as a deliberate absence.
         <MissingBodyMetricsNotice profile={profile} />
       )}
 
-      {/* The split control edits protein-per-KG and shows the resulting
-          grams — both meaningless without a bodyweight, and a 0 here
-          would render "0 g protein" all over again. Hidden entirely
-          rather than shown with a stand-in; derivation is non-null
-          exactly when the weight exists, so the assertion is safe. */}
-      {derivation && (
-      <MacroSplitCard
-        profile={profile}
-        effectiveWeightKg={effectiveProfile.weight_kg!}
-        calorieTarget={derivation.target.calories}
-        applies={mode === 'STANDARD_STATIC' && profile.fitness_goal !== 'conditioning'}
-        disabledReason={
-          profile.fitness_goal === 'conditioning'
-            ? 'Not available for the conditioning goal, which uses its own fixed 20% protein / 25% fat / 55% carb split rather than a bodyweight-anchored one.'
-            : 'Not available in Dynamic CSCS mode, which varies protein and carbs by training day using its own periodization — switch to Standard Static (below) to use this control.'
-        }
-        onChange={patch => onMacroSplitChange?.(patch)}
-        isGeneratingMeals={isGeneratingMeals}
-        onRegenerateAllMeals={onRegenerateAllMeals}
-      />
-      )}
+      {/* Everything that used to be in the scroll, unchanged in behaviour and
+          moved bodily into one sheet: the derivation strip, the water target,
+          the split control, the dynamic week table and the method picker. */}
+      <Dialog open={howItsSetOpen} onOpenChange={setHowItsSetOpen}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-base">How your targets are set</DialogTitle>
+          </DialogHeader>
 
-      {mode === 'DYNAMIC_CSCS' && weeklySchedule && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Weekly Dynamic Targets</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as const).map((day) => {
-                const d = weeklySchedule[day]
-                return (
-                  <div
-                    key={day}
-                    className={`flex items-center justify-between rounded-lg px-3 py-2 text-sm ${
-                      d.dayType === 'training' ? 'bg-[color:var(--role-warn-bg)]' : 'bg-muted/50'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium capitalize w-20">{day.slice(0, 3)}</span>
-                      <Badge variant={d.dayType === 'training' ? 'warning' : 'outline'} className="text-[0.625rem]">
-                        {d.dayType === 'training' ? 'Train' : 'Rest'}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center gap-4 text-xs font-mono">
-                      <span>{d.calories} kcal</span>
-                      <span className="text-[color:var(--chart-2)]">P{d.protein}g</span>
-                      <span className="text-[color:var(--role-warn)]">C{d.carbs}g</span>
-                      <span className="text-text-tertiary">F{d.fat}g</span>
-                    </div>
-                  </div>
-                )
-              })}
+          {derivation && (
+            <div>
+              <div className="flex gap-3">
+                <div className="flex-1 min-w-0">
+                  <p className="tabular-mono text-[1.0625rem] font-bold tracking-[-.03em]">{derivation.bmr}</p>
+                  <p className="mt-0.5 text-[0.53125rem] uppercase tracking-[.14em] text-muted-foreground">BMR</p>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="tabular-mono text-[1.0625rem] font-bold tracking-[-.03em]">{derivation.tdee}</p>
+                  <p className="mt-0.5 text-[0.53125rem] uppercase tracking-[.14em] text-muted-foreground">TDEE</p>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="tabular-mono text-[1.0625rem] font-bold tracking-[-.03em]">{derivation.surplusKcal > 0 ? '+' : ''}{derivation.surplusKcal}</p>
+                  <p className="mt-0.5 text-[0.53125rem] uppercase tracking-[.14em] text-muted-foreground">{derivation.surplusLabel.split(' ')[0]}</p>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="tabular-mono text-[1.0625rem] font-bold tracking-[-.03em] text-primary glow-mint">{derivation.target.calories}</p>
+                  <p className="mt-0.5 text-[0.53125rem] uppercase tracking-[.14em] text-muted-foreground">Target</p>
+                </div>
+              </div>
+              <p className="mt-2.5 text-[0.6875rem] leading-normal text-muted-foreground">
+                {derivation.splitApplies
+                  ? `From ${effectiveProfile.weight_kg} kg, ${effectiveProfile.height_cm} cm, ${effectiveProfile.age} y · protein ${derivation.split.proteinPerKg.toFixed(1)} g/kg · fat ${Math.round(derivation.split.fatPercent * 100)}% · carbs the remainder.`
+                  : `From ${effectiveProfile.weight_kg} kg, ${effectiveProfile.height_cm} cm, ${effectiveProfile.age} y · a fixed 20% protein / 25% fat / 55% carb split for conditioning goals.`}
+              </p>
             </div>
-          </CardContent>
-        </Card>
-      )}
+          )}
 
-      {/*
-        Fix — Nutrition Method demoted to the bottom of the tab. It's a
-        set-once decision (how the numbers above get computed), not daily
-        reading, so it was competing for prime position with numbers the
-        user actually checks every day. Kept IN this tab rather than moved
-        into ProfileScreen/Settings: it's the toggle that directly controls
-        the two target cards immediately above it on this same screen —
-        burying it in a separate settings surface would put the control and
-        the numbers it governs in two different places for what is a
-        genuinely rare edit, with no offsetting benefit (there's no daily-use
-        cost to it sitting at the bottom of an already-short tab).
-      */}
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-base">Nutrition Method</CardTitle>
-            <Badge variant="secondary" className="text-xs">
-              {mode === 'STANDARD_STATIC' ? 'Standard' : 'Dynamic CSCS'}
-            </Badge>
+          {/* THE WATER TARGET STAYS ON THIS TAB even though the quick-adds
+              left it: Home logs the day, Nutrition sets what the day is
+              measured against. Same editor, same optimistic-then-put-back
+              failure handling it had in the scroll. */}
+          <div className="border-t border-[color:var(--hairline)] pt-3">
+            <div className="flex items-center justify-between gap-3">
+              <p className="ds-label">Water target</p>
+              {editingWaterTarget ? (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    value={waterTargetInput}
+                    onChange={e => setWaterTargetInput(e.target.value)}
+                    className="h-9 w-24 rounded-md border border-border bg-transparent px-2 text-right tabular-mono text-[0.8125rem]"
+                    aria-label="Daily water target in millilitres"
+                  />
+                  <Button size="sm" className="hit-slop-44" onClick={() => void handleSaveWaterTarget()}>Save</Button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => { setWaterTargetInput(String(waterTarget)); setEditingWaterTarget(true) }}
+                  className="hit-slop-44 text-[0.8125rem]"
+                >
+                  <span className="tabular-mono">{waterTarget}</span> ml <span className="text-primary">Edit</span>
+                </button>
+              )}
+            </div>
           </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <button
-              type="button"
-              onClick={() => onMacroModeChange?.('STANDARD_STATIC')}
-              className={`w-full rounded-lg border p-3 text-left transition-all cursor-pointer ${
-                mode === 'STANDARD_STATIC'
-                  ? 'border-primary bg-primary/5 ring-1 ring-primary'
-                  : 'border-border hover:border-muted-foreground/30 hover:bg-muted/30'
-              }`}
-            >
-              <div className="flex items-center gap-2.5">
-                <div className={`flex size-7 shrink-0 items-center justify-center rounded-full ${
-                  mode === 'STANDARD_STATIC' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
-                }`}>
-                  <Calculator className="size-3.5" />
-                </div>
-                <div>
-                  <p className="font-medium text-xs text-foreground">Standard Static</p>
-                  <p className="text-[0.625rem] text-muted-foreground mt-0.5">Same macros every day</p>
-                </div>
+
+          {/* The split control edits protein-per-KG and shows the resulting
+              grams — both meaningless without a bodyweight, and a 0 here
+              would render "0 g protein" all over again. Hidden entirely
+              rather than shown with a stand-in; derivation is non-null
+              exactly when the weight exists, so the assertion is safe. */}
+          {derivation && (
+            <MacroSplitCard
+              profile={profile}
+              effectiveWeightKg={effectiveProfile.weight_kg!}
+              calorieTarget={derivation.target.calories}
+              applies={mode === 'STANDARD_STATIC' && profile.fitness_goal !== 'conditioning'}
+              disabledReason={
+                profile.fitness_goal === 'conditioning'
+                  ? 'Not available for the conditioning goal, which uses its own fixed 20% protein / 25% fat / 55% carb split rather than a bodyweight-anchored one.'
+                  : 'Not available in Dynamic CSCS mode, which varies protein and carbs by training day using its own periodization — switch to Standard Static (below) to use this control.'
+              }
+              onChange={patch => onMacroSplitChange?.(patch)}
+              isGeneratingMeals={isGeneratingMeals}
+              onRegenerateAllMeals={onRegenerateAllMeals}
+            />
+          )}
+
+          {mode === 'DYNAMIC_CSCS' && weeklySchedule && (
+            <div>
+              <p className="ds-label mb-2">Weekly dynamic targets</p>
+              <div className="space-y-2">
+                {(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as const).map((day) => {
+                  const d = weeklySchedule[day]
+                  return (
+                    <div
+                      key={day}
+                      className={`flex items-center justify-between rounded-lg px-3 py-2 text-sm ${
+                        d.dayType === 'training' ? 'bg-[color:var(--role-warn-bg)]' : 'bg-muted/50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium capitalize w-20">{day.slice(0, 3)}</span>
+                        <Badge variant={d.dayType === 'training' ? 'warning' : 'outline'} className="text-[0.625rem]">
+                          {d.dayType === 'training' ? 'Train' : 'Rest'}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-4 text-xs font-mono">
+                        <span>{d.calories} kcal</span>
+                        <span className="text-[color:var(--chart-2)]">P{d.protein}g</span>
+                        <span className="text-[color:var(--role-warn)]">C{d.carbs}g</span>
+                        <span className="text-text-tertiary">F{d.fat}g</span>
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
-            </button>
-            <button
-              type="button"
-              onClick={() => onMacroModeChange?.('DYNAMIC_CSCS')}
-              className={`w-full rounded-lg border p-3 text-left transition-all cursor-pointer ${
-                mode === 'DYNAMIC_CSCS'
-                  ? 'border-primary bg-primary/5 ring-1 ring-primary'
-                  : 'border-border hover:border-muted-foreground/30 hover:bg-muted/30'
-              }`}
-            >
-              <div className="flex items-center gap-2.5">
-                <div className={`flex size-7 shrink-0 items-center justify-center rounded-full ${
-                  mode === 'DYNAMIC_CSCS' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
-                }`}>
-                  <Layers className="size-3.5" />
+            </div>
+          )}
+
+          {/* The method picker — the toggle that governs every number above
+              it in this sheet, so it sits with them rather than in Settings. */}
+          <div>
+            <div className="flex items-center justify-between">
+              <p className="ds-label">Method</p>
+              <Badge variant="secondary" className="text-xs">
+                {mode === 'STANDARD_STATIC' ? 'Standard' : 'Dynamic CSCS'}
+              </Badge>
+            </div>
+            <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => onMacroModeChange?.('STANDARD_STATIC')}
+                className={`w-full rounded-lg border p-3 text-left transition-all cursor-pointer ${
+                  mode === 'STANDARD_STATIC'
+                    ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                    : 'border-border hover:border-muted-foreground/30 hover:bg-muted/30'
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className={`flex size-7 shrink-0 items-center justify-center rounded-full ${
+                    mode === 'STANDARD_STATIC' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
+                  }`}>
+                    <Calculator className="size-3.5" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-xs text-foreground">Standard Static</p>
+                    <p className="text-[0.625rem] text-muted-foreground mt-0.5">Same macros every day</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="font-medium text-xs text-foreground">Dynamic CSCS</p>
-                  <p className="text-[0.625rem] text-muted-foreground mt-0.5">Carb-cycles by training day</p>
+              </button>
+              <button
+                type="button"
+                onClick={() => onMacroModeChange?.('DYNAMIC_CSCS')}
+                className={`w-full rounded-lg border p-3 text-left transition-all cursor-pointer ${
+                  mode === 'DYNAMIC_CSCS'
+                    ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                    : 'border-border hover:border-muted-foreground/30 hover:bg-muted/30'
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className={`flex size-7 shrink-0 items-center justify-center rounded-full ${
+                    mode === 'DYNAMIC_CSCS' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
+                  }`}>
+                    <Layers className="size-3.5" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-xs text-foreground">Dynamic CSCS</p>
+                    <p className="text-[0.625rem] text-muted-foreground mt-0.5">Carb-cycles by training day</p>
+                  </div>
                 </div>
-              </div>
-            </button>
+              </button>
+            </div>
           </div>
-        </CardContent>
-      </Card>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
