@@ -15,13 +15,39 @@
 // the first chip, and its swatch shows the CURRENT theme's accent, so it
 // changes as the theme does.
 // ---------------------------------------------------------------------------
-import { Check, RotateCcw, AlertTriangle } from 'lucide-react'
+import { Check, RotateCcw, AlertTriangle, Monitor } from 'lucide-react'
 import type { GlowLevel } from '@/lib/appearance-store'
 import { DEFAULT_APPEARANCE, isLightTheme } from '@/lib/appearance-store'
 import {
-  THEME_PREVIEWS, ACCENT_PREVIEWS, THEME_ORDER, ACCENT_ORDER,
+  THEME_PREVIEWS, ACCENT_PREVIEWS, ACCENT_ORDER, DARK_THEME_ORDER, LIGHT_THEME_ORDER,
   resolveAccentColor, contrastRatio, CONTRAST_FLOOR,
 } from '@/lib/appearance-palette'
+import type { ThemeName } from '@/lib/appearance-store'
+
+/**
+ * What "Match system" resolves to. Two themes, because the OS tells us one
+ * bit — light or dark — and the honest answer to one bit is the default of
+ * each kind, not a guess at which of the six darks somebody would want.
+ */
+const SYSTEM_DARK: ThemeName = 'nightshift'
+const SYSTEM_LIGHT: ThemeName = 'daylight'
+
+/**
+ * --primary-foreground per theme, mirrored for the preview. It used to be
+ * `t.light ? white : canvas`, a guess that was wrong for both Frost (white on
+ * cobalt, not near-black) and every dark theme (its own ink, not its canvas).
+ * The gate asserts these against index.css.
+ */
+const THEME_INK: Record<ThemeName, string> = {
+  nightshift: '#08281F', graphite: '#08281F', ember: '#2A1300', field: '#1B2600',
+  midnight: '#04213F', rosewood: '#3A0A16',
+  daylight: '#08281F', linen: '#2A1300', frost: '#FFFFFF',
+}
+
+function systemTheme(): ThemeName {
+  if (typeof window === 'undefined' || !window.matchMedia) return SYSTEM_DARK
+  return window.matchMedia('(prefers-color-scheme: light)').matches ? SYSTEM_LIGHT : SYSTEM_DARK
+}
 import type { AppearanceController } from '@/hooks/useAppearance'
 
 const GLOW_LEVELS: GlowLevel[] = ['off', 'subtle', 'full']
@@ -36,7 +62,7 @@ const GLOW_LEVELS: GlowLevel[] = ['off', 'subtle', 'full']
  * figure on surface, muted against both — because those are what a bad pair
  * breaks.
  */
-function HomePreview({ theme, accent, glow }: { theme: typeof THEME_ORDER[number]; accent: typeof ACCENT_ORDER[number]; glow: GlowLevel }) {
+function HomePreview({ theme, accent, glow }: { theme: ThemeName; accent: typeof ACCENT_ORDER[number]; glow: GlowLevel }) {
   const t = THEME_PREVIEWS[theme]
   const a = resolveAccentColor(theme, accent)
   const strength = glow === 'off' ? 0 : glow === 'subtle' ? 0.5 : 1
@@ -63,7 +89,7 @@ function HomePreview({ theme, accent, glow }: { theme: typeof THEME_ORDER[number
       <p className="mt-2.5 text-[0.9375rem] font-semibold" style={{ color: t.text }}>Full Body Power</p>
       <p className="text-[0.6875rem]" style={{ color: t.muted }}>6 exercises · ~52 min</p>
       <div className="mt-2 flex h-[30px] items-center justify-center rounded-[9px] text-[0.75rem] font-semibold"
-        style={{ background: a, color: t.light ? '#FFFFFF' : t.canvas, boxShadow: halo }}>
+        style={{ background: a, color: THEME_INK[theme], boxShadow: halo }}>
         Start session
       </div>
       <div className="mt-2.5 flex items-baseline gap-1.5">
@@ -124,13 +150,38 @@ export function AppearanceSection({ appearance }: { appearance: AppearanceContro
           <p className="mt-0.5 text-xs text-muted-foreground">
             Sets canvas, surfaces and text. Complete stays green and attention stays amber in every theme, so status never depends on your pick.
           </p>
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            {THEME_ORDER.map(name => {
+          {/* MATCH SYSTEM, first. It is not a tenth theme — it sets the
+              default of whichever kind the phone is in, and says which, so
+              nobody has to work out what it did. */}
+          <button
+            type="button"
+            onClick={() => appearance.setTheme(systemTheme())}
+            className="hit-slop-44 mt-3 inline-flex min-h-[38px] items-center gap-2 rounded-full px-3 text-[0.75rem]"
+            style={{ background: 'var(--surface-raised)' }}
+          >
+            <Monitor className="size-3.5" />
+            Match system
+            <span className="text-[color:var(--muted-foreground)]">
+              · {THEME_PREVIEWS[systemTheme()].label}
+            </span>
+          </button>
+
+          {[
+            { label: 'Dark', names: DARK_THEME_ORDER },
+            { label: 'Light', names: LIGHT_THEME_ORDER },
+          ].map(group => (
+          <div key={group.label}>
+          <p className="ds-label mt-3">{group.label}</p>
+          <div className="mt-2 grid grid-cols-3 gap-2">
+            {group.names.map(name => {
               const p = THEME_PREVIEWS[name]
               const active = theme === name
               // Each card previews the theme WITH the accent currently chosen,
               // so the pair is judged together rather than one at a time.
               const cardAccent = resolveAccentColor(name, accent)
+              // The card's tick and bar are fills; its NAME is words, and on
+              // a light card the fill step is what washes out.
+              const cardInk = resolveAccentColor(name, accent, /* forText */ true)
               return (
                 <button
                   key={name}
@@ -145,10 +196,10 @@ export function AppearanceSection({ appearance }: { appearance: AppearanceContro
                   }}
                 >
                   <span className="flex items-center justify-between">
-                    <span className="text-[0.8125rem] font-semibold" style={{ color: p.text }}>{p.label}</span>
+                    <span className="text-[0.75rem] font-semibold" style={{ color: active ? cardInk : p.text }}>{p.label}</span>
                     {active && (
-                      <span className="flex size-[16px] items-center justify-center rounded-full" style={{ background: cardAccent }}>
-                        <Check className="size-2.5" style={{ color: p.light ? '#FFFFFF' : p.canvas }} />
+                      <span className="flex size-[14px] shrink-0 items-center justify-center rounded-full" style={{ background: cardAccent }}>
+                        <Check className="size-2" style={{ color: p.light ? '#FFFFFF' : p.canvas }} />
                       </span>
                     )}
                   </span>
@@ -157,11 +208,13 @@ export function AppearanceSection({ appearance }: { appearance: AppearanceContro
                     <span className="h-[6px] flex-1 rounded-full" style={{ background: cardAccent }} />
                     <span className="size-[12px] rounded-[4px]" style={{ background: p.surface }} />
                   </span>
-                  <span className="mt-1.5 block text-[0.625rem]" style={{ color: p.muted }}>{p.subtitle}</span>
+                  <span className="mt-1.5 block text-[0.5625rem] leading-tight" style={{ color: p.muted }}>{p.subtitle}</span>
                 </button>
               )
             })}
           </div>
+          </div>
+          ))}
         </div>
 
         {/* ACTION COLOUR — names visible, not aria-label-only. A row of
@@ -173,9 +226,13 @@ export function AppearanceSection({ appearance }: { appearance: AppearanceContro
             {ACCENT_ORDER.map(value => {
               const a = ACCENT_PREVIEWS[value]
               const active = accent === value
-              // 'theme' has no colour of its own, so its swatch shows the
-              // theme's accent and moves when the theme does.
-              const swatch = resolveAccentColor(theme, value)
+              // THE SWATCH SHOWS THE TEXT STEP, not the fill. People judge an
+              // accent by what a link looks like, and on a light canvas those
+              // are two different colours — a chip painted in the fill would
+              // promise a brightness the words never have. 'theme' has no
+              // colour of its own, so its swatch borrows the theme's and
+              // moves when the theme does.
+              const swatch = resolveAccentColor(theme, value, /* forText */ true)
               const glowRgb = a.glowRgb ?? '255,255,255'
               return (
                 <button
