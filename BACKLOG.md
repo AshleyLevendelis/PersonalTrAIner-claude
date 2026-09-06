@@ -2,6 +2,58 @@
 
 Newest first. One line each.
 
+- [x] **THE CLASSES COUNT AS TRAINING LOAD — BUILT, Ashley's ruling (option 1
+  + a toggle on the card),
+  [docs/plans/count-the-classes-as-load.md](docs/plans/count-the-classes-as-load.md).**
+  The (b) her 6 Sep ruling on the second sport left for later, asked for the
+  same day: "fix all 1 at a time. calf raise, muay thai and deload." After (a)
+  someone with Muay Thai on Tuesday and Thursday got the lighter sessions on
+  those nights and EXACTLY as many working sets as without it. Her rule, in
+  her words: two or more sessions a week, or one hard/combat session, takes
+  the plan one recovery notch down; light mobility/yoga only moves the
+  schedule; and the workout card says so — "Volume reduced ~N% for Muay Thai
+  recovery" — with a one-tap **Revert to full volume**.
+  Built as ONE derived value: `effectiveRecoveryCapacity(profile)` — the
+  stated answer, one notch down (high → moderate, moderate → low, low stays
+  low) when a load-bearing sport exists — and every reader of
+  `recovery_capacity` in generation and scoring now goes through it (the set
+  multiplier, the top-up exemption, the fifth-day trim, the rest-day cardio
+  cap, the conditioning mode, the scorer's under-budget exemption and its
+  low-vs-high expectation), so a second sport cannot reach some readers and
+  not others. The revert lives on the activity (`keep_full_volume`, jsonb —
+  no migration). **Proven exact:** Muay Thai at moderate is byte-identical to
+  a reverted Muay Thai at low; low with Muay Thai equals low without the
+  notch; a gentle weekly yoga class equals its reverted twin byte for byte.
+  Measured on her profile: 77 → 64 working sets a week (−17%); across a
+  stride-11 sample of the quality grid one notch is median −27% (p10 −35%,
+  p90 −17%), which is why the card's percentage is MEASURED from a regenerated
+  week rather than fixed at "~20%" — decided unprompted, recorded in the plan
+  doc. The chat card's volume sentence is measured the same way ("about 77 →
+  64 working sets a week") with honest variants for someone already at low
+  recovery and for a second sport that already carries the notch; the receipt
+  gains a "Lifting volume:" line; the coach's tool description, §3g, data
+  block and rules no longer say the lifting is unchanged, tell it never to
+  offer `propose_volume_change` "because of" the sport, and show when the
+  person kept full volume; APP_REALITY in both copies. The card button runs
+  `executeSecondSportVolume` (rebuild first, write second, forward-only).
+  `test:concurrent-activity` §5–§7 new (the rule as a table incl. the 0.7
+  boundary both sides; the ≥15% reduction by the scorer's own threshold; the
+  three byte-identity proofs; no raw read of `recovery_capacity` left outside
+  the helper and the one comparison selector; every piece of wiring).
+  **Nine mutations, nine caught.** `test:session-shortfall` re-pinned.
+  **Verified after the build:** tsc and build clean; 130 of 131 runnable
+  gates (the one failure needs a browser and fails identically on an
+  unmodified tree). `test:audit` and `test:quality` for this change follow in
+  the next commit — the calf-raise quality sweep was still occupying the
+  machine — and both must be unchanged: no profile on either grid carries a
+  second sport, and `effectiveRecoveryCapacity` returns the stated answer
+  untouched without one (§3's byte-identity check covers exactly that).
+  One plan generation is ~120ms here, so the card's two-generation
+  measurement costs about a quarter of a second, once, and only for someone
+  with a qualifying sport.
+  Needs `deploy:functions:prod -- chat-gemini` (prompt + tool description).
+  No migration.
+
 - [x] **THE 48kg SINGLE-LEG CALF RAISE — BUILT, Ashley's ruling A,
   [docs/plans/the-48kg-calf-raise.md](docs/plans/the-48kg-calf-raise.md).**
   Single-Leg Dumbbell Calf Raise was priced as a MACHINE calf raise (0.65 ×

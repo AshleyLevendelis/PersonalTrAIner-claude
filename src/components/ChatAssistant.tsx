@@ -18,8 +18,9 @@ import { APPEND_PROPOSAL_KINDS, INTENT_PROPOSAL_VERB, buildIntentProposal } from
 import { pickAccountabilityCheckIn } from '@/lib/accountability'
 import { executeExerciseSwap, executeMealSwap, executeMealAddition, undoMealAddition, undoExerciseSwap, executeInjuryAdaptation, executeLastingInjury, executeInjuryRecovered, executeEquipmentAdaptation, executeVolumeChange, executeScheduleChange, executeStyleChange, executeConcurrentActivity, executeRestDay, undoRestDay, undoWeekRangeChange, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type LastingInjuryPayload, type InjuryRecoveredPayload, type EquipmentAdaptationPayload, type VolumeChangePayload, type ScheduleChangePayload, type StyleChangePayload, type ConcurrentActivityPayload, type RestDayPayload } from '@/lib/pending-action-executor'
 import { STYLE_OPTIONS } from '@/lib/onboarding-slots'
-import { MOVEMENT_DEMANDS, TIMES_OF_DAY, canonicalDay, activityDays, describeActivity, reorderTracksForClassDays, HEAVY_TRACKS } from '@/lib/concurrent-activity'
-import { getSplitForDays } from '@/lib/exercise-plan'
+import { MOVEMENT_DEMANDS, TIMES_OF_DAY, canonicalDay, activityDays, describeActivity, reorderTracksForClassDays, HEAVY_TRACKS, activityCountsAsLoad, countWorkingSets } from '@/lib/concurrent-activity'
+import { getSplitForDays, generateMesocycle, setRandomSource, resetRandomSource } from '@/lib/exercise-plan'
+import { seededRngFromKey } from '@/lib/seeded-random'
 import type { ConcurrentActivity } from '@/lib/types'
 import { adjustDayVolume, isVolumeAdjustable } from '@/lib/volume-adjust'
 import { buildMealAdditionProposal, type MealAdditionPayload } from '@/lib/meal-addition'
@@ -1943,8 +1944,36 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     if (daysChange) rows.push({ field: 'Training days', before: beforeDays.join(', ') || 'none', after: wantedDays.join(', ') })
     if (timeChange) rows.push({ field: 'Gym sessions', before: `${profile.preferred_time}s`, after: `${gymTime}s` })
 
+    // THE VOLUME SENTENCE IS MEASURED, NOT ASSERTED. Ashley's ruling, 6 Sep
+    // 2026: a sport that is two or more sessions a week, or one hard/combat
+    // session, also takes the lifting one recovery notch down, and the card
+    // says by how much. Two generations from the same seed, differing only in
+    // keep_full_volume, so the gap between them IS the notch and nothing else.
+    // Nobody else pays for this: it runs only when the rule applies.
+    const futureActivities = [...(profile.concurrent_activities ?? []).filter(a => a.name.toLowerCase() !== name.toLowerCase()), activity]
+    const notchApplies = activityCountsAsLoad(activity) && !activity.keep_full_volume
+    const statedRecovery = profile.recovery_capacity || 'moderate'
+    const volumeSentence = (() => {
+      if (!notchApplies) return 'Same amount of lifting — only which day carries which session changes.'
+      if (statedRecovery === 'low') return `Your recovery setting is already at its lowest, so ${name} changes the schedule but nothing further comes off the lifting.`
+      const futureProfile: UserProfile = { ...profile, concurrent_activities: futureActivities, training_days: (profile.training_days ?? []).map(d => ({ ...d, available: daysChange ? wantedDays.includes(d.day) : d.available })) }
+      const seededWeek = (p: UserProfile) => {
+        setRandomSource(seededRngFromKey(`volume:${profile.id ?? 'anon'}:${name.toLowerCase()}`))
+        const l = console.log; console.log = () => {}
+        try {
+          const meso = generateMesocycle(p)
+          return meso.find(w => w.week_number === startWeek && !w.is_deload) ?? meso.find(w => !w.is_deload)
+        } finally { console.log = l; resetRandomSource() }
+      }
+      const withNotch = countWorkingSets(seededWeek(futureProfile))
+      const withoutNotch = countWorkingSets(seededWeek({ ...futureProfile, concurrent_activities: futureActivities.map(a => a.name === activity.name ? { ...a, keep_full_volume: true } : a) }))
+      const otherLoad = futureActivities.filter(a => a.name !== activity.name && activityCountsAsLoad(a) && !a.keep_full_volume).map(a => a.name)
+      if (otherLoad.length > 0 && withNotch === withoutNotch) return `The lifting is already one recovery notch down for ${otherLoad.join(' and ')}; ${name} does not take it further.`
+      if (withoutNotch <= 0 || withNotch >= withoutNotch) return `The lifting also comes down one recovery notch while ${name} is on — two hard sessions a week are training too. Revert to full volume any time from the workout card.`
+      return `The lifting also comes down one recovery notch while ${name} is on — two hard sessions a week are training too: about ${withoutNotch} → ${withNotch} working sets a week. Revert to full volume any time from the workout card.`
+    })()
     const implications: { severity: 'info' | 'warn'; text: string }[] = [
-      { severity: 'info', text: `Rebuilds ${weeksAhead} week${weeksAhead === 1 ? '' : 's'} from week ${startWeek} on so the lighter gym sessions land on ${days.join(' and ')} and no extra cardio is prescribed there. Same amount of lifting — only which day carries which session changes. Anything you've already logged stays exactly as it is.` },
+      { severity: 'info', text: `Rebuilds ${weeksAhead} week${weeksAhead === 1 ? '' : 's'} from week ${startWeek} on so the lighter gym sessions land on ${days.join(' and ')} and no extra cardio is prescribed there. ${volumeSentence} Anything you've already logged stays exactly as it is.` },
     ]
     if (unavoidable.length > 0) {
       implications.push({

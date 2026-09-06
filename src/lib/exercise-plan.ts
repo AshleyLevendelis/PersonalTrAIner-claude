@@ -16,7 +16,7 @@ import {
   shiftReps, adjustRest, dedupeAdjacentPhases, isRegressionFor, stepIntervalSeconds, getPhaseTempo, formatTempo, type PhaseConfig, type TrainingPhase,
 } from './periodization'
 import { getGoalPolicy, restrictPhaseSequence, resolveConditioningFrequency, RECOVERY_SET_MULTIPLIER, MAIN_LIFT_REST_FLOOR_SECONDS, type GoalPolicy } from './goal-policies'
-import { HEAVY_TRACKS, activityDays, reorderTracksForClassDays } from './concurrent-activity'
+import { HEAVY_TRACKS, activityDays, reorderTracksForClassDays, effectiveRecoveryCapacity } from './concurrent-activity'
 import { dayAnchorExercise, anchorScore } from './session-derive'
 import { isStartingOut, applyStartingOut, startingOutActivity } from './starting-out'
 import { getDurationBudgetSeconds, getSessionMinimumSeconds, getSessionMaximumSeconds, getSteadyStateSeconds, DEFAULT_CARRY_DISTANCE_M, estimateDaySeconds, estimateSlotsSeconds, parseRestSeconds, SESSION_OVERHEAD_SECONDS } from './session-duration'
@@ -4130,7 +4130,7 @@ function assignConditioningNotes(days: WorkoutDay[], profile: UserProfile, polic
   // found "seven training days a week... that's not a rest day, that's a
   // euphemism" on a client flagged moderate recovery. High recovery can
   // genuinely absorb cardio on every rest day; moderate/low cannot.
-  const recovery = profile.recovery_capacity || 'moderate'
+  const recovery = effectiveRecoveryCapacity(profile)
   const maxCardioRestDays = recovery === 'high'
     ? restDayNames.length
     : Math.max(0, restDayNames.length - 1)
@@ -4350,7 +4350,7 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
   // here used to throw outright rather than degrade — an unhelpful failure
   // mode for a field a malformed stored row could plausibly be missing.
   let availableDays = (profile.training_days || []).filter(d => d.available)
-  if (profile.recovery_capacity === 'low' && availableDays.length >= 5) {
+  if (effectiveRecoveryCapacity(profile) === 'low' && availableDays.length >= 5) {
     // Low recovery capacity (poor sleep, high stress, a physically demanding
     // job) can't safely absorb 5+ weekly sessions on top of everything else
     // it's already carrying — trim the last selected day back to rest rather
@@ -5038,7 +5038,7 @@ function computeDurationTopUp(
     // for low-recovery profiles — a real regression that the 9216-combo
     // harness will NOT flag, since the score would just look artificially
     // perfect.
-    if (profile.recovery_capacity === 'low') {
+    if (effectiveRecoveryCapacity(profile) === 'low') {
       return day.exercises.map(() => 0)
     }
 
@@ -5339,7 +5339,7 @@ function applyDurationFiller(
    */
   sessionMinimumSeconds: number,
 ): void {
-  const recovery = profile.recovery_capacity || 'moderate'
+  const recovery = effectiveRecoveryCapacity(profile)
   const mobilityOnly = recovery === 'low' || recovery === 'moderate' || profile.conditioning_preference === 'avoid'
 
   for (const day of days) {
@@ -5465,7 +5465,11 @@ export function generateMesocycle(
   const styleConfig = STYLE_CONFIGS[profile.training_style || 'hybrid']
   const pool = getConstrainedPool(profile, exclusions)
   const policy = getGoalPolicy(goal)
-  const recoverySetMultiplier = RECOVERY_SET_MULTIPLIER[profile.recovery_capacity || 'moderate']
+  // Through effectiveRecoveryCapacity, never the raw answer: a qualifying
+  // second sport is one notch of recovery spent before the gym (see
+  // concurrent-activity.ts). test:concurrent-activity pins that no raw read
+  // of recovery_capacity remains anywhere in generation or scoring.
+  const recoverySetMultiplier = RECOVERY_SET_MULTIPLIER[effectiveRecoveryCapacity(profile)]
   const totalBudgetSeconds = getDurationBudgetSeconds(profile.session_duration_preference || '45-60')
 
   // Experience already trims power/strength for beginners/novices

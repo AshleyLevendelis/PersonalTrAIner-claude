@@ -18,7 +18,7 @@
 // ship without a volume argument.
 // ---------------------------------------------------------------------------
 
-import type { ConcurrentActivity, TrainingDay } from './types'
+import type { ConcurrentActivity, TrainingDay, RecoveryCapacity, UserProfile } from './types'
 
 /**
  * What a second sport asks of the body, in the plan's own vocabulary.
@@ -149,4 +149,82 @@ export function describeActivity(a: ConcurrentActivity): string {
     : days.length === 1 ? days[0]
     : `${days.slice(0, -1).join(', ')} & ${days[days.length - 1]}`
   return `${a.name} · ${when}${a.timeOfDay ? ` ${a.timeOfDay}s` : ''}`
+}
+
+// ---------------------------------------------------------------------------
+// THE CLASSES COUNT AS TRAINING LOAD — Ashley's ruling, 6 Sep 2026 (option 1
+// of docs/plans/count-the-classes-as-load.md, plus a toggle on the card).
+//
+// (a) above moves sessions; it never changes how much work a week holds. Two
+// hard evenings of striking are real load, and the app's one "how much can
+// this body absorb" input is recovery_capacity. So a qualifying sport takes
+// the plan ONE RECOVERY NOTCH down — the same lever, the same gates — and the
+// workout card says so with a one-tap revert.
+//
+// Her rule, in her words: "Automatically reduce volume by one recovery notch
+// when 2+ sessions or 1 hard/combat session (e.g., Muay Thai, sparring, heavy
+// running) are added. Light mobility/yoga only affects scheduling, not
+// volume." Judged PER ACTIVITY: two different gentle classes on two nights do
+// not add up to a notch, on purpose — the rule reaches for the sentence she
+// gave and no further.
+// ---------------------------------------------------------------------------
+
+/** The coach's 0-1 effort estimate at or above which ONE session a week is "hard". */
+export const HARD_ACTIVITY_INTENSITY = 0.7
+/** Demands that make a single session count regardless of the stated effort — a combat class is never a stretch class. */
+const COMBAT_DEMANDS: ReadonlySet<string> = new Set(['striking', 'grappling'])
+
+/** Does this activity, by the rule, count as training load? Ignores the user's revert — see loadBearingActivities. */
+export function activityCountsAsLoad(a: ConcurrentActivity): boolean {
+  const sessions = activityDays([a]).size
+  if (sessions === 0) return false
+  if (sessions >= 2) return true
+  if ((a.movement_demands ?? []).some(d => COMBAT_DEMANDS.has(d))) return true
+  return typeof a.intensity === 'number' && a.intensity >= HARD_ACTIVITY_INTENSITY
+}
+
+/** The activities the plan is actually shortening its week for: qualifying by the rule AND not reverted by the person. */
+function loadBearingActivities(activities: ConcurrentActivity[] | undefined): ConcurrentActivity[] {
+  return (activities ?? []).filter(a => activityCountsAsLoad(a) && !a.keep_full_volume)
+}
+
+export function countsAsTrainingLoad(activities: ConcurrentActivity[] | undefined): boolean {
+  return loadBearingActivities(activities).length > 0
+}
+
+const ONE_NOTCH_DOWN: Record<RecoveryCapacity, RecoveryCapacity> = { high: 'moderate', moderate: 'low', low: 'low' }
+
+/**
+ * THE ONE PLACE THE PLAN READS RECOVERY. Every consumer of recovery_capacity
+ * in generation and scoring goes through here (test:concurrent-activity pins
+ * that no raw read remains), so a second sport reaches all six of them at
+ * once — the set multiplier, the top-up exemption, the fifth-day trim, the
+ * rest-day cardio cap, the conditioning mode and the scorer's under-budget
+ * exemption — and cannot reach some and not others. Byte-identical to the
+ * stated answer for anyone without a qualifying sport.
+ */
+export function effectiveRecoveryCapacity(profile: Pick<UserProfile, 'recovery_capacity' | 'concurrent_activities'>): RecoveryCapacity {
+  const stated: RecoveryCapacity = profile.recovery_capacity || 'moderate'
+  return countsAsTrainingLoad(profile.concurrent_activities) ? ONE_NOTCH_DOWN[stated] : stated
+}
+
+/**
+ * What the card should say about volume, or null when there is nothing to
+ * say. `atFloor` is the honest case the rule cannot help: someone already at
+ * low recovery has no notch left, and the card must not claim one came off.
+ */
+export function volumeNotice(profile: Pick<UserProfile, 'recovery_capacity' | 'concurrent_activities'>): { names: string[]; atFloor: boolean; reverted: boolean } | null {
+  const all = profile.concurrent_activities ?? []
+  const qualifying = all.filter(activityCountsAsLoad)
+  if (qualifying.length === 0) return null
+  const names = [...new Set(qualifying.map(a => a.name))]
+  const reverted = qualifying.every(a => a.keep_full_volume === true)
+  const stated: RecoveryCapacity = profile.recovery_capacity || 'moderate'
+  return { names, atFloor: stated === 'low', reverted }
+}
+
+/** Working sets in one week — the number the card and the proposal compare. Fillers and cardio slots are not working sets. */
+export function countWorkingSets(week: { days: { exercises: { sets?: number; is_filler?: boolean; prescription_type?: string }[] }[] } | undefined): number {
+  if (!week) return 0
+  return week.days.reduce((s, d) => s + d.exercises.filter(e => !e.is_filler && e.prescription_type !== 'cardio').reduce((a, e) => a + (e.sets || 0), 0), 0)
 }

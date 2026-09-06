@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useWakeLock } from '@/hooks/useWakeLock'
@@ -11,6 +11,10 @@ import { computeSessionPRs } from '@/lib/pr-engine'
 import { getExerciseId } from '@/lib/exercise-db'
 import { estimateDaySeconds } from '@/lib/session-duration'
 import { describeSessionShortfall } from '@/lib/session-shortfall'
+import { effectiveRecoveryCapacity, volumeNotice, activityCountsAsLoad, countWorkingSets } from '@/lib/concurrent-activity'
+import { generateMesocycle, setRandomSource, resetRandomSource } from '@/lib/exercise-plan'
+import { seededRngFromKey } from '@/lib/seeded-random'
+import { executeSecondSportVolume } from '@/lib/pending-action-executor'
 import { getLocalDateString } from '@/lib/dev-clock'
 import { tabHash } from '@/lib/app-route'
 import { ceilingToAskFor, saveStatedCeiling, declineStatedCeilings } from '@/lib/load-ceiling-prompt'
@@ -54,6 +58,8 @@ export function TodayPanel({
   onOpenProgram,
   onOpenSwap,
   onBanExercise,
+  onMesocycleUpdated,
+  onProfileChanged,
   onOpenPlateCalc,
   onOpenHistory,
   onOpenDetail,
@@ -74,6 +80,8 @@ export function TodayPanel({
   onOpenProgram: () => void
   onOpenSwap: (dayName: string, exIndex: number, exerciseName: string) => void
   onBanExercise: (exerciseName: string) => void | Promise<void>
+  onMesocycleUpdated?: (mesocycle: MesocycleWeek[]) => void
+  onProfileChanged?: (patch: Partial<UserProfile>) => void
   onOpenPlateCalc: (weightKg: number) => void
   onOpenHistory?: (exerciseId: string, exerciseName: string) => void
   /** Opens the technique panel — threaded to both ExerciseRow and PeekPanel. */
@@ -246,6 +254,51 @@ export function TodayPanel({
     .filter(d => d.exercises.length > 0 && d.day !== todayName)
     .map(d => d.day)
 
+  // THE SECOND-SPORT VOLUME NOTICE — Ashley's ruling, 6 Sep 2026: when a sport
+  // counts as training load the plan comes down one recovery notch, the card
+  // SAYS SO with the measured figure, and one tap reverts it. The figure is
+  // measured, not the multiplier: two generations from the same seed that
+  // differ only in keep_full_volume, so the gap is the notch and nothing else.
+  // Costs nothing for anyone without a qualifying sport — the memo returns
+  // before generating.
+  const volume = profile ? volumeNotice(profile) : null
+  const volumeNames = volume ? volume.names.join(' and ') : ''
+  const [volumeBusy, setVolumeBusy] = useState(false)
+  const [volumeError, setVolumeError] = useState<string | null>(null)
+  const volumeReduction = useMemo(() => {
+    if (!profile || !volume || volume.atFloor || !hasMesocycle) return null
+    const activities = profile.concurrent_activities ?? []
+    const variant = (keepFull: boolean): UserProfile => ({
+      ...profile,
+      concurrent_activities: activities.map(a => activityCountsAsLoad(a) ? { ...a, keep_full_volume: keepFull } : a),
+    })
+    const seededWeek = (p: UserProfile) => {
+      setRandomSource(seededRngFromKey(`volume-notice:${profileId ?? 'anon'}`))
+      const l = console.log; console.log = () => {}
+      try {
+        const meso = generateMesocycle(p)
+        return meso.find(w => w.week_number === liveWeek && !w.is_deload) ?? meso.find(w => !w.is_deload)
+      } finally { console.log = l; resetRandomSource() }
+    }
+    const full = countWorkingSets(seededWeek(variant(true)))
+    const reduced = countWorkingSets(seededWeek(variant(false)))
+    if (full <= 0 || reduced >= full) return null
+    return { full, reduced, pct: Math.round((1 - reduced / full) * 100) }
+  }, [profile, volume, hasMesocycle, liveWeek, profileId])
+  const handleVolumeToggle = async (keepFull: boolean) => {
+    if (!profile || !mesocycle || !onMesocycleUpdated || !onProfileChanged || volumeBusy) return
+    setVolumeBusy(true)
+    setVolumeError(null)
+    try {
+      const result = await executeSecondSportVolume(profile, mesocycle, exclusions, { keepFullVolume: keepFull, fromWeek: liveWeek })
+      if (result.receipt.failed.length > 0) { setVolumeError(result.receipt.failed[0].error); return }
+      onMesocycleUpdated(result.mesocycle)
+      onProfileChanged(result.profilePatch)
+    } finally {
+      setVolumeBusy(false)
+    }
+  }
+
   const handleBan = async (name: string) => {
     setBanBusy(name)
     try {
@@ -277,7 +330,7 @@ export function TodayPanel({
       minutes: Math.round(seconds / 60),
       shortfall: describeSessionShortfall(seconds, profile?.session_duration_preference, {
         isDeload: currentMesoWeekObj?.is_deload,
-        lowRecovery: profile?.recovery_capacity === 'low',
+        lowRecovery: !!profile && effectiveRecoveryCapacity(profile) === 'low',
       }),
     }
   })()
@@ -337,6 +390,25 @@ export function TodayPanel({
         />
       ) : (
         <div className="space-y-3">
+          {volume && (
+            <InsightBanner tone="ai" className="flex items-center justify-between gap-3" data-testid="second-sport-volume">
+              <span className="text-sm">
+                {volume.atFloor
+                  ? `Recovery is already at its lowest setting, so ${volumeNames} changes the schedule, not the sets.`
+                  : volume.reverted
+                    ? `Full lifting volume kept despite ${volumeNames}.`
+                    : volumeReduction
+                      ? `Volume reduced ~${volumeReduction.pct}% for ${volumeNames} recovery — ${volumeReduction.reduced} of ${volumeReduction.full} working sets this week.`
+                      : `Volume reduced one recovery notch for ${volumeNames} recovery.`}
+              </span>
+              {!volume.atFloor && onMesocycleUpdated && onProfileChanged && (
+                <Button size="sm" variant="ghost" className="shrink-0" disabled={volumeBusy} onClick={() => handleVolumeToggle(!volume.reverted)}>
+                  {volumeBusy ? 'Rebuilding…' : volume.reverted ? 'Reduce again' : 'Revert to full volume'}
+                </Button>
+              )}
+            </InsightBanner>
+          )}
+          {volumeError && <p className="text-xs text-destructive">{volumeError} Nothing has changed.</p>}
           {/* Turn 5 hero block — supersedes IdentityLine's old day/focus text
               (now deleted; its timers entry point moved into WeekContextRow's
               "⋮" menu above). New: a 2px session-progress line under the

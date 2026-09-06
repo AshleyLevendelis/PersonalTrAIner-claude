@@ -2404,6 +2404,8 @@ function App() {
               devBypassLocks={devBypassLocks}
               onSwapExercise={handleSwapExercise}
               onBanExercise={handleBanExercise}
+              onMesocycleUpdated={setMesocycle}
+              onProfileChanged={patch => setProfile(prev => prev ? { ...prev, ...patch } : prev)}
               onDevOverrideWeekChange={setDevOverrideWeek}
               onDevOverrideDayChange={setDevOverrideDay}
               onDevBypassLocksChange={setDevBypassLocks}

@@ -39,6 +39,9 @@ interface ExerciseTabProps {
   devBypassLocks?: boolean
   onSwapExercise: (weekNumber: number, dayName: string, exIndex: number, newExercise: ExerciseEntry, scope: SwapScope) => void | Promise<void>
   onBanExercise: (exerciseName: string) => void | Promise<void>
+  /** The second-sport volume toggle on the workout card rewrites the plan from the live week; these carry the result into App state. */
+  onMesocycleUpdated?: (mesocycle: MesocycleWeek[]) => void
+  onProfileChanged?: (patch: Partial<UserProfile>) => void
   onDevOverrideWeekChange: (week: number | null) => void
   onDevOverrideDayChange: (day: string | null) => void
   onDevBypassLocksChange: (bypass: boolean) => void
@@ -60,6 +63,8 @@ export function ExerciseTab({
   devBypassLocks,
   onSwapExercise,
   onBanExercise,
+  onMesocycleUpdated,
+  onProfileChanged,
   onDevOverrideWeekChange,
   onDevOverrideDayChange,
   onDevBypassLocksChange,
@@ -161,6 +166,8 @@ export function ExerciseTab({
         onOpenProgram={() => { window.location.hash = programHash(liveWeek) }}
         onOpenSwap={(dayName, exIndex, exerciseName) => setSwapTarget({ dayName, exIndex, exerciseName })}
         onBanExercise={onBanExercise}
+        onMesocycleUpdated={onMesocycleUpdated}
+        onProfileChanged={onProfileChanged}
         onOpenPlateCalc={handleOpenPlateCalc}
         onOpenHistory={(id, name) => setDetailTarget({ exerciseName: name, exerciseId: id, tab: 'history' })}
         onOpenDetail={(name: string) => setDetailTarget({ exerciseName: name, tab: 'howto' })}

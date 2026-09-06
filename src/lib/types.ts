@@ -24,6 +24,14 @@ export interface ConcurrentActivity {
   movement_demands: string[]
   /** When in the day the class happens. Absent when the user did not say — never guessed. */
   timeOfDay?: 'morning' | 'afternoon' | 'evening'
+  /**
+   * The person tapped "Revert to full volume" on the workout card. The sport
+   * still counts as load by the rule in concurrent-activity.ts; this says the
+   * plan is not to act on it. Absent means the rule decides. Lives on the
+   * activity rather than on a new profile column so no migration is needed
+   * and removing the sport removes the choice with it.
+   */
+  keep_full_volume?: boolean
 }
 
 export interface UserProfile {

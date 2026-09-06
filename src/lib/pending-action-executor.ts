@@ -16,7 +16,7 @@ import { adjustDayVolume, describeVolumeChange, isVolumeAdjustable, type VolumeD
 import { rebuildFromCurrentWeek } from './plan-invalidation'
 import { updateProfileField } from './profile-store'
 import type { MesocycleWeek, UserProfile, EquipmentAccess, TrainingStyle, ConcurrentActivity } from './types'
-import { describeActivity } from './concurrent-activity'
+import { describeActivity, activityCountsAsLoad } from './concurrent-activity'
 import { swapExerciseInMesocycle, type SwapScope } from './mesocycle-edit'
 import { saveMesocycle, saveMesocycleWeek } from './mesocycle-persistence'
 import { getExerciseEntry } from './exercise-db'
@@ -844,6 +844,7 @@ export async function executeConcurrentActivity(
   const landed = failed.length === 0
     ? [
         `Other training: ${describeActivity(payload.activity)}`,
+        ...volumeReceiptLine(profile, payload.activity),
         ...(wanted ? [`Training days: ${payload.trainingDays!.join(', ')}`] : []),
         ...(payload.gymTimeOfDay ? [`Gym sessions: ${payload.gymTimeOfDay}s`] : []),
         `Rebuilt ${rebuild.weeksRebuilt} week${rebuild.weeksRebuilt === 1 ? '' : 's'} from week ${payload.fromWeek} on`,
@@ -851,4 +852,81 @@ export async function executeConcurrentActivity(
     : []
 
   return { mesocycle: rebuild.mesocycle, preImage, receipt: { landed, failed } }
+}
+
+/**
+ * The receipt's volume line for a second sport. Present only when the rule
+ * in concurrent-activity.ts counts it as load, and honest in the one case the
+ * notch has nowhere to go: someone already at low recovery keeps the
+ * schedule change and nothing comes off the sets.
+ */
+function volumeReceiptLine(profile: UserProfile, activity: ConcurrentActivity): string[] {
+  if (!activityCountsAsLoad(activity)) return []
+  if (activity.keep_full_volume) return [`Lifting volume: full, as you chose, despite ${activity.name}`]
+  if ((profile.recovery_capacity || 'moderate') === 'low') {
+    return [`Lifting volume: already at its lowest setting — ${activity.name} changes the schedule, not the sets`]
+  }
+  return [`Lifting volume: one recovery notch down for ${activity.name} — revert any time from the workout card`]
+}
+
+export interface SecondSportVolumePayload {
+  /** true = keep full lifting volume despite the sport(s); false = put the notch back. */
+  keepFullVolume: boolean
+  fromWeek: number
+}
+
+/**
+ * The workout card's one-tap toggle, Ashley's ruling of 6 Sep 2026: "a
+ * simple inline button to Revert to Full Volume". Same shape as
+ * executeConcurrentActivity — rebuild first, write second, forward-only — so
+ * a failed rebuild writes nothing and the card can say exactly which half
+ * failed. Applies to every activity the rule counts, because the card shows
+ * one line for all of them; the choice lives on each activity
+ * (keep_full_volume) so removing the sport removes it too.
+ */
+export async function executeSecondSportVolume(
+  profile: UserProfile,
+  mesocycle: MesocycleWeek[],
+  exclusions: string[],
+  payload: SecondSportVolumePayload,
+): Promise<AdaptationResult & { profilePatch: Partial<UserProfile> }> {
+  const preImage = mesocycle
+  const activities: ConcurrentActivity[] = (profile.concurrent_activities ?? []).map(a => {
+    if (!activityCountsAsLoad(a)) return a
+    if (payload.keepFullVolume) return { ...a, keep_full_volume: true }
+    const { keep_full_volume: _reverted, ...rest } = a
+    return rest
+  })
+  const names = [...new Set((profile.concurrent_activities ?? []).filter(activityCountsAsLoad).map(a => a.name))].join(' and ')
+  const updated: UserProfile = { ...profile, concurrent_activities: activities }
+
+  const rebuild = await rebuildFromCurrentWeek(updated, exclusions, mesocycle, payload.fromWeek)
+  if (!rebuild.ok || !rebuild.mesocycle) {
+    return {
+      mesocycle, preImage, profilePatch: {},
+      receipt: { landed: [], failed: [{ op: 'rebuild', error: rebuild.error ?? 'The plan could not be rebuilt.' }] },
+    }
+  }
+
+  const failed: { op: string; error: string }[] = []
+  if (profile.id) {
+    try { await updateProfileField(profile.id, { concurrent_activities: activities }) }
+    catch { failed.push({ op: 'save', error: "That choice didn't save" }) }
+    for (const week of rebuild.mesocycle) {
+      if (week.week_number < payload.fromWeek) continue
+      try { await saveMesocycleWeek(profile.id, week) }
+      catch { failed.push({ op: 'save', error: `Week ${week.week_number} didn't save` }) }
+    }
+  }
+
+  const landed = failed.length === 0
+    ? [
+        payload.keepFullVolume
+          ? `Lifting volume: full, despite ${names}`
+          : `Lifting volume: one recovery notch down for ${names}`,
+        `Rebuilt ${rebuild.weeksRebuilt} week${rebuild.weeksRebuilt === 1 ? '' : 's'} from week ${payload.fromWeek} on`,
+      ]
+    : []
+
+  return { mesocycle: rebuild.mesocycle, preImage, receipt: { landed, failed }, profilePatch: { concurrent_activities: activities } }
 }

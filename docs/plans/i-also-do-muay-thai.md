@@ -162,6 +162,8 @@ Asked in the conversation, one question, three options with a recommendation.
 She chose *"put the lighter gym days on the Muay Thai days"* — the
 recommendation. (b) counting the classes as load is therefore a separate later
 piece and is not authorised by this answer; (c) is declined.
+**Update 6 Sep 2026 (later): (b) was then asked for, ruled and built — see
+[count-the-classes-as-load.md](count-the-classes-as-load.md).**
 
 **Recommendation as put to her: (a) now, (b) as its own measured piece after.** (a) is a
 reordering of decisions the generator already makes — it changes *which day*
