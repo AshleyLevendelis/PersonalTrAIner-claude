@@ -70,7 +70,7 @@ export function ReceiptCard({
   }
 
   const icon = status === 'done'
-    ? <CheckCircle2 className="size-3.5 text-primary shrink-0" />
+    ? <CheckCircle2 className="size-3.5 text-primary-text shrink-0" />
     : status === 'partial'
       ? <AlertTriangle className="size-3.5 text-[color:var(--role-warn)] shrink-0" />
       : <XCircle className="size-3.5 text-destructive shrink-0" />

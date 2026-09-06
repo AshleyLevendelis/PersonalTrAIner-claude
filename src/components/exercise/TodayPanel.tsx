@@ -454,7 +454,7 @@ export function TodayPanel({
               title. */}
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[0.65625rem] uppercase tracking-[.2em] text-primary glow-mint">
+              <span className="text-[0.65625rem] uppercase tracking-[.2em] text-primary-text glow-mint">
                 Today · {effectiveDayName}
               </span>
               {devOverrideDay && (

@@ -140,14 +140,14 @@ export function SwapDialog({
                       <div className="flex flex-wrap gap-1">
                         <Badge variant="secondary" className="text-xs">{exercise.mechanics_tier.replace(/_/g, ' ')}</Badge>
                         {exercise.joint_stress === 'low' && currentEntry?.joint_stress !== 'low' && (
-                          <Badge className="text-xs bg-primary/15 text-primary">
+                          <Badge className="text-xs bg-primary/15 text-primary-text">
                             lower stress
                           </Badge>
                         )}
                       </div>
                       {note && (
                         <p className="text-xs text-muted-foreground mt-1 flex items-start gap-1">
-                          <Zap className="size-3 mt-0.5 shrink-0 text-primary" />
+                          <Zap className="size-3 mt-0.5 shrink-0 text-primary-text" />
                           <span>{note}</span>
                         </p>
                       )}

@@ -45,7 +45,7 @@ export function TimersPanel({
           <TabsTrigger
             key={mode}
             value={mode}
-            className="rounded-none border-0 bg-transparent px-0 pb-2 text-[0.8125rem] capitalize shadow-none data-[state=active]:bg-transparent data-[state=active]:font-semibold data-[state=active]:text-[color:var(--primary)] data-[state=active]:shadow-[inset_0_-2px_0_0_var(--primary)]"
+            className="rounded-none border-0 bg-transparent px-0 pb-2 text-[0.8125rem] capitalize shadow-none data-[state=active]:bg-transparent data-[state=active]:font-semibold data-[state=active]:text-[color:var(--primary-text)] data-[state=active]:shadow-[inset_0_-2px_0_0_var(--primary)]"
           >
             {mode}
           </TabsTrigger>

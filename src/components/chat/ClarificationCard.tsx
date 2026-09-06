@@ -52,7 +52,7 @@ export function ClarificationCard({
         </div>
       )}
       <p className="flex items-start gap-1.5 text-xs font-medium">
-        <HelpCircle className="size-3.5 mt-0.5 shrink-0 text-primary" />
+        <HelpCircle className="size-3.5 mt-0.5 shrink-0 text-primary-text" />
         {prompt}
       </p>
       {!resolved && (

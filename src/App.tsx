@@ -2175,7 +2175,7 @@ function App() {
       return (
         <div className="min-h-screen bg-background flex items-center justify-center">
           <div className="flex flex-col items-center gap-3 text-center px-4">
-            <Loader2 className="size-8 animate-spin text-primary" />
+            <Loader2 className="size-8 animate-spin text-primary-text" />
             <p className="font-medium">{generatingStatus || 'Building your plan...'}</p>
             <p className="text-sm text-muted-foreground">This may take a moment while we optimize your portions</p>
           </div>

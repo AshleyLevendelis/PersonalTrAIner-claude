@@ -86,9 +86,9 @@ export function SessionSummaryDialog({
                 <p className="ds-label-compact">New PRs</p>
                 {data.prs.map(pr => (
                   <p key={pr.exerciseName} className="flex items-center gap-1.5 text-sm">
-                    <Trophy className="size-3.5 text-primary glow-mint shrink-0" />
+                    <Trophy className="size-3.5 text-primary-text glow-mint shrink-0" />
                     <span className="font-medium">{pr.exerciseName}</span>
-                    <span className="tabular-mono text-primary glow-mint">{pr.result.newWeight}kg</span>
+                    <span className="tabular-mono text-primary-text glow-mint">{pr.result.newWeight}kg</span>
                   </p>
                 ))}
               </div>
@@ -96,12 +96,12 @@ export function SessionSummaryDialog({
 
             {progressionLines.length > 0 && (
               <div className="space-y-2 rounded-xl bg-[color:var(--surface-deep)] p-3.5">
-                <p className="ds-label-compact text-primary glow-mint">Next session</p>
+                <p className="ds-label-compact text-primary-text glow-mint">Next session</p>
                 <div className="space-y-2.5">
                   {progressionLines.map(([name, rec]) => (
                     <div key={name}>
                       <p className="text-[0.9375rem] font-semibold leading-tight">{name}</p>
-                      <p className={`text-sm mt-0.5 ${rec.didProgress ? 'text-primary glow-mint' : 'text-muted-foreground'}`}>{rec.note}</p>
+                      <p className={`text-sm mt-0.5 ${rec.didProgress ? 'text-primary-text glow-mint' : 'text-muted-foreground'}`}>{rec.note}</p>
                     </div>
                   ))}
                 </div>

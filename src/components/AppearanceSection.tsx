@@ -90,8 +90,14 @@ function HomePreview({ theme, accent, glow }: { theme: typeof THEME_ORDER[number
 export function AppearanceSection({ appearance }: { appearance: AppearanceController }) {
   const { theme, accent, glow } = appearance
   const t = THEME_PREVIEWS[theme]
+  // TWO COLOURS, not one, since the fill/text split. `resolved` is the button
+  // and the glow sample; `ink` is what a link, a PR value and the active tab
+  // label are actually printed in. The guard measures the INK: a filled button
+  // is judged by the ink on it, and measuring the fill against the canvas is
+  // what pushed Daylight into one over-darkened colour doing neither job.
   const resolved = resolveAccentColor(theme, accent)
-  const ratio = contrastRatio(resolved, t.canvas)
+  const ink = resolveAccentColor(theme, accent, /* forText */ true)
+  const ratio = contrastRatio(ink, t.canvas)
   const lowContrast = ratio < CONTRAST_FLOOR
   const glowClamped = isLightTheme(theme) && glow === 'full'
   // What the preview and the sample dot must show — the glow actually applied,
@@ -198,7 +204,7 @@ export function AppearanceSection({ appearance }: { appearance: AppearanceContro
              style={{ background: 'rgba(var(--role-warn-rgb, 245 158 11) / .10)', color: 'var(--role-warn-text)' }}>
             <AlertTriangle className="mt-[1px] size-3.5 shrink-0" />
             <span>
-              {ACCENT_PREVIEWS[accent].label === 'Match theme' ? t.label : ACCENT_PREVIEWS[accent].label} sits at {ratio.toFixed(1)}:1 against {t.label}&apos;s canvas — under the {CONTRAST_FLOOR}:1 floor for a button you have to find.
+              {ACCENT_PREVIEWS[accent].label === 'Match theme' ? t.label : ACCENT_PREVIEWS[accent].label} reads at {ratio.toFixed(1)}:1 against {t.label}&apos;s canvas — under the {CONTRAST_FLOOR}:1 floor for text you have to read.
             </span>
           </p>
         )}

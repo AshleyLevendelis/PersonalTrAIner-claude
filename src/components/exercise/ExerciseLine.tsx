@@ -51,7 +51,7 @@ export function ExerciseLine({
   const loadIsUnverified = loadSource != null && isUnverifiedLoadSource(loadSource)
 
   const summary = allSetsLogged && loggedSummary ? (
-    <span className="tabular-mono text-xs text-primary glow-mint">✓ {loggedSummary}</span>
+    <span className="tabular-mono text-xs text-primary-text glow-mint">✓ {loggedSummary}</span>
   ) : (
     <span className="tabular-mono text-xs text-muted-foreground">
       {ex.sets}×{ex.reps}
@@ -110,7 +110,7 @@ export function ExerciseLine({
       >
         <div className="flex items-center gap-2 max-w-full">
           {supersetLabel && (
-            <span className="shrink-0 font-mono text-[0.625rem] font-semibold text-primary glow-mint">{supersetLabel}</span>
+            <span className="shrink-0 font-mono text-[0.625rem] font-semibold text-primary-text glow-mint">{supersetLabel}</span>
           )}
           <span
             className={`truncate ${expanded ? 'text-[1.1875rem] font-semibold' : 'text-[0.96875rem] font-medium'} ${
@@ -144,7 +144,7 @@ export function ExerciseLine({
  */
 export function SectionLabel({ text, expanded }: { text: string; expanded: boolean }) {
   return (
-    <span className={expanded ? 'ds-label-compact text-primary glow-mint' : 'ds-label-compact'}>
+    <span className={expanded ? 'ds-label-compact text-primary-text glow-mint' : 'ds-label-compact'}>
       {text}{expanded ? ' · open' : ''}
     </span>
   )

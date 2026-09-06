@@ -288,7 +288,7 @@ export function ProgramBrowse({
                 {blockCount > 1 && (
                   <span
                     className={`mt-[7px] truncate text-center text-[0.625rem] uppercase tracking-[.1em] ${isCurrentBlock ? 'font-semibold' : 'text-muted-foreground/80'}`}
-                    style={isCurrentBlock ? { color: 'var(--primary)' } : undefined}
+                    style={isCurrentBlock ? { color: 'var(--primary-text)' } : undefined}
                   >
                     {shortPhaseLabel(b.label)}
                   </span>
@@ -320,7 +320,7 @@ export function ProgramBrowse({
               className="tabular-mono inline-flex items-center text-[0.6875rem] font-semibold px-2 py-[3px] rounded-md"
               style={deltaChip.warn
                 ? { background: 'color-mix(in srgb, var(--role-warn) 12%, transparent)', color: 'var(--role-warn)' }
-                : { background: 'color-mix(in srgb, var(--primary) 12%, transparent)', color: 'var(--primary)' }}
+                : { background: 'color-mix(in srgb, var(--primary) 12%, transparent)', color: 'var(--primary-text)' }}
             >
               {deltaChip.text}
             </span>

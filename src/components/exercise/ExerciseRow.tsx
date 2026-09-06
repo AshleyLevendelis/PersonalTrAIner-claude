@@ -224,7 +224,7 @@ export function ExerciseRow({
                 </div>
               )}
               <div className="mt-1.5 flex items-center gap-3.5">
-                <button type="button" className="hit-slop-44 text-xs font-semibold text-primary" onClick={onSwap}>
+                <button type="button" className="hit-slop-44 text-xs font-semibold text-primary-text" onClick={onSwap}>
                   Swap exercise
                 </button>
                 <button

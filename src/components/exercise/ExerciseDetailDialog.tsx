@@ -170,7 +170,7 @@ export function ExerciseDetailPanel({
                       type="button"
                       onClick={() => setPlaying(true)}
                       aria-label={`Watch a demonstration of ${exerciseName}`}
-                      className="hit-slop-44 flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-[0.8125rem] font-semibold text-primary"
+                      className="hit-slop-44 flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-[0.8125rem] font-semibold text-primary-text"
                       style={{ background: 'var(--surface-raised)' }}
                     >
                       <Play className="size-3.5 shrink-0" aria-hidden />
@@ -213,8 +213,8 @@ export function ExerciseDetailPanel({
                     <div className="space-y-1.5">
                       {prs.map(pr => (
                         <p key={`${pr.sessionId}-${pr.kind}`} className="flex items-center gap-1.5 text-sm">
-                          <Trophy className="size-3.5 text-primary glow-mint shrink-0" aria-hidden />
-                          <span className="tabular-mono text-primary glow-mint">{pr.weightKg}kg</span>
+                          <Trophy className="size-3.5 text-primary-text glow-mint shrink-0" aria-hidden />
+                          <span className="tabular-mono text-primary-text glow-mint">{pr.weightKg}kg</span>
                           <span className="text-xs text-muted-foreground">· {pr.date}</span>
                         </p>
                       ))}
@@ -294,7 +294,7 @@ export function ExerciseDetailPanel({
                   {(entry.indicated_joints?.length ?? 0) > 0 && (
                     <div className="flex items-baseline justify-between gap-3" style={{ borderTop: '1px solid var(--hairline)', paddingTop: '10px' }}>
                       <span className="text-[0.75rem] text-muted-foreground">Good for</span>
-                      <span className="text-right text-[0.78125rem] text-primary">{jointListDisplay(entry.indicated_joints ?? [])}</span>
+                      <span className="text-right text-[0.78125rem] text-primary-text">{jointListDisplay(entry.indicated_joints ?? [])}</span>
                     </div>
                   )}
                   {(entry.contraindicated_joints?.length ?? 0) > 0 && (

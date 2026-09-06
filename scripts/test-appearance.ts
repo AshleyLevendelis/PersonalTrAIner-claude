@@ -72,6 +72,29 @@ for (const name of THEME_ORDER) {
   // whose entire job is showing you what you are choosing.
   check(`  ...and its --theme-primary matches the preview (${p.accent})`,
     new RegExp(`\\[data-theme="${name}"\\][\\s\\S]{0,1400}?--theme-primary:\\s*${p.accent};`, 'i').test(css), p.accent)
+  // AND ITS TEXT STEP. Found by mutation: reverting index.css's
+  // --primary-text for daylight to the value this round replaced left every
+  // check green, because the floors read the TS palette and the palette was
+  // still right. The app would have painted the old, failing colour while a
+  // green gate said otherwise — the precise drift §3 exists to stop, on the
+  // one token this round is about.
+  const wantText = p.accentText === p.accent ? 'var\\(--theme-primary\\)' : p.accentText
+  check(`  ...and its --primary-text matches the preview (${p.accentText})`,
+    new RegExp(`\\[data-theme="${name}"\\][\\s\\S]{0,1600}?--primary-text:\\s*${wantText};`, 'i').test(css), p.accentText)
+  check(`  ...and it defines --num-hero, --primary-foreground and the three role-ai tints`,
+    ['--num-hero', '--primary-foreground', '--role-ai-bg', '--role-ai-border', '--role-ai-text'].every(tok =>
+      new RegExp(`\\[data-theme="${name}"\\][\\s\\S]{0,1800}?${tok}:`, 'i').test(css)))
+}
+// ...AND NOTHING THEME-DEPENDENT IS LEFT IN :root. --role-ai-text lived there
+// as one pale lilac for every canvas and measured 1.5:1 on paper; a token that
+// has to change per theme cannot have a global default, or the theme that
+// forgets to override it fails silently.
+{
+  const rootBlock = css.slice(css.indexOf(':root {'), css.indexOf('[data-glow="off"]'))
+  for (const tok of ['--role-ai-text', '--role-ai-bg', '--role-ai-border']) {
+    check(`${tok} no longer has a :root value`, !new RegExp(`^\\s*${tok}:`, 'm').test(rootBlock))
+  }
+  check('--role-ai itself stays global (the hue is not theme-dependent)', /^\s*--role-ai:/m.test(rootBlock))
 }
 for (const a of ACCENT_ORDER) {
   if (a === 'theme') {
@@ -130,14 +153,25 @@ check(`Field + Lime is comfortably ABOVE the floor, not below it (${fieldLime.to
 // Daylight's accent to #008C72, and mint's dark step with it for the same
 // reason, so the honest assertion is now the stronger one: nothing we ship
 // asks a person to find a button they cannot see.
+// RE-ANCHORED ONTO THE TEXT STEP, 6 Sep 2026, and the reason is the whole
+// point of the themes handoff. This measured the FILL against the canvas: the
+// colour of a button. That number was doing two jobs and now does one —
+// Daylight's fill is #19B894 (2.27:1 on paper, and correctly so: a filled
+// button is judged by the ink ON it, not by its edge against the page), while
+// the words are #00705B. Measuring the fill after the split would have
+// demanded a button dark enough to be readable AS TEXT, which is how the
+// theme ended up with one over-darkened colour doing neither job well.
+//
+// So: the guard measures --primary-text, per the handoff. The fill gets its
+// own floor instead — primary-foreground against primary — in §9.
 const under: string[] = []
 for (const th of THEME_ORDER) {
   for (const ac of ACCENT_ORDER) {
-    const r = contrastRatio(resolveAccentColor(th, ac), THEME_PREVIEWS[th].canvas)
+    const r = contrastRatio(resolveAccentColor(th, ac, /* forText */ true), THEME_PREVIEWS[th].canvas)
     if (r < CONTRAST_FLOOR) under.push(`${th}+${ac} ${r.toFixed(2)}:1`)
   }
 }
-check(`all ${THEME_ORDER.length * ACCENT_ORDER.length} shipped combinations clear ${CONTRAST_FLOOR}:1`,
+check(`all ${THEME_ORDER.length * ACCENT_ORDER.length} shipped combinations clear ${CONTRAST_FLOOR}:1 AS TEXT`,
   under.length === 0, under)
 
 // AND THE GUARD IS STILL REACHABLE — proven against a colour chosen to fail,
@@ -148,13 +182,29 @@ check(`all ${THEME_ORDER.length * ACCENT_ORDER.length} shipped combinations clea
 check('the guard still fires on a colour that genuinely fails',
   contrastRatio('#00A88A', THEME_PREVIEWS.daylight.canvas) < CONTRAST_FLOOR,
   contrastRatio('#00A88A', THEME_PREVIEWS.daylight.canvas))
-check('...and the value it used to ship with is exactly that colour',
-  Math.abs(contrastRatio('#00A88A', THEME_PREVIEWS.daylight.canvas) - 2.74) < 0.02)
-check('Daylight now clears it with room', contrastRatio(THEME_PREVIEWS.daylight.accent, THEME_PREVIEWS.daylight.canvas) > 3.5,
-  contrastRatio(THEME_PREVIEWS.daylight.accent, THEME_PREVIEWS.daylight.canvas).toFixed(2))
+// #008C72 is what Daylight shipped as its single accent, and it is the exact
+// value this round replaced: it measured 3.8:1 as words, over the 3:1 button
+// floor and UNDER the 4.5:1 floor for body copy — which is what Ashley was
+// reading when she said the light theme was hard to read.
+check('...and the value it used to ship with fails the TEXT floor it was used at',
+  contrastRatio('#008C72', THEME_PREVIEWS.daylight.canvas) < 4.5,
+  contrastRatio('#008C72', THEME_PREVIEWS.daylight.canvas).toFixed(2))
+check('Daylight\'s text step clears that floor', contrastRatio(THEME_PREVIEWS.daylight.accentText, THEME_PREVIEWS.daylight.canvas) >= 4.5,
+  contrastRatio(THEME_PREVIEWS.daylight.accentText, THEME_PREVIEWS.daylight.canvas).toFixed(2))
+check('...and its fill is a separate, lighter colour', THEME_PREVIEWS.daylight.accent !== THEME_PREVIEWS.daylight.accentText)
 
 check('the guard exists and is a warning, not a block',
   /CONTRAST_FLOOR/.test(sheet) && !/disabled=\{lowContrast/.test(sheet))
+// AND IT MEASURES THE INK, NOT THE FILL. Found by mutation: pointing the
+// guard back at the fill left every check green while the sheet warned about
+// Daylight's own button at 2.27:1 — a theme complaining about itself, which
+// is the failure this codebase already fixed once by over-darkening a colour.
+// The floors below measure both; the SHEET must measure what a person reads.
+check('the in-app guard measures --primary-text, not the fill',
+  /resolveAccentColor\(theme, accent, \/\* forText \*\/ true\)/.test(sheet)
+  && /contrastRatio\(ink, t\.canvas\)/.test(sheet))
+check('...and still keeps the fill for the button and the glow sample',
+  /const resolved = resolveAccentColor\(theme, accent\)/.test(sheet))
 
 console.log('\n7. The sheet is wired, and chat settings left it\n')
 check('ProfileScreen renders the section', /<AppearanceSection appearance=\{appearance\} \/>/.test(profile))

@@ -161,7 +161,7 @@ export function ToolsTab({ profileId, mealPools, targets, softLikedFoods, todays
               className="flex min-h-[104px] flex-col justify-between gap-3 rounded-2xl p-3.5 text-left"
               style={{ background: 'var(--surface-raised)' }}
             >
-              <tile.icon className="size-5 shrink-0" style={{ color: 'var(--primary)' }} aria-hidden />
+              <tile.icon className="size-5 shrink-0" style={{ color: 'var(--primary-text)' }} aria-hidden />
               <span>
                 <span className="block text-[0.9375rem] font-semibold">{tile.label}</span>
                 <span className="mt-0.5 block text-[0.71875rem] leading-[1.3] text-muted-foreground">{tile.sub}</span>

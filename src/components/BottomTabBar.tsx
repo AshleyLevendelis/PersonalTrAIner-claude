@@ -134,7 +134,7 @@ function SideTabButton({
       onClick={onClick}
       aria-current={active ? 'page' : undefined}
       className={`flex flex-1 flex-col items-center justify-center gap-0.5 ${
-        active ? 'text-primary glow-mint' : 'text-muted-foreground'
+        active ? 'text-primary-text glow-mint' : 'text-muted-foreground'
       }`}
     >
       <Icon className={`size-5 ${active ? 'glow-icon' : ''}`} />

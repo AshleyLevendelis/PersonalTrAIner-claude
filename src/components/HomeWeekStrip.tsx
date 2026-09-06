@@ -40,7 +40,7 @@ export function HomeWeekStrip({ days, todayName }: { days: TrainingWeekDay[]; to
             ) : (
               <span
                 aria-hidden
-                className={`leading-none ${isDone ? 'text-[0.75rem] text-primary' : 'text-[0.6875rem] text-muted-foreground'}`}
+                className={`leading-none ${isDone ? 'text-[0.75rem] text-primary-text' : 'text-[0.6875rem] text-muted-foreground'}`}
               >
                 {GLYPH[d.state]}
               </span>

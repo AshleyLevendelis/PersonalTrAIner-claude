@@ -105,7 +105,7 @@ export function WeekContextRow({
           {(phaseFocus || coachNote) && (
             <button
               type="button"
-              className="hit-slop-44 text-primary"
+              className="hit-slop-44 text-primary-text"
               onClick={() => onToggleExpanded(!expanded)}
               aria-label={expanded ? "Hide the Personal TrAIner's notes on this week" : "Show the Personal TrAIner's notes on this week"}
               aria-expanded={expanded}
@@ -195,13 +195,13 @@ export function WeekContextRow({
               // here because that fix went into the copy nothing renders.
               aria-label={`${d.dayName}: ${STATE_LABEL[d.state]}`}
             >
-              <span className={`text-[0.5625rem] uppercase tracking-[.08em] ${isToday ? 'font-semibold text-primary' : 'text-muted-foreground'}`}>
+              <span className={`text-[0.5625rem] uppercase tracking-[.08em] ${isToday ? 'font-semibold text-primary-text' : 'text-muted-foreground'}`}>
                 {SHORT_DAY[d.dayName] ?? d.dayName.slice(0, 1)}
               </span>
               {isToday && d.state === 'due' ? (
                 <span aria-hidden className="size-[7px] rounded-full bg-primary glow-dot" />
               ) : (
-                <span className={`text-[0.75rem] leading-none ${isToday ? 'text-primary glow-mint' : 'text-muted-foreground'}`}>
+                <span className={`text-[0.75rem] leading-none ${isToday ? 'text-primary-text glow-mint' : 'text-muted-foreground'}`}>
                   {GLYPH[d.state]}
                 </span>
               )}
@@ -211,7 +211,7 @@ export function WeekContextRow({
       </div>
 
       {onOpenProgram && (
-        <button type="button" className="mt-3 text-[0.71875rem] font-semibold text-primary" onClick={onOpenProgram}>
+        <button type="button" className="mt-3 text-[0.71875rem] font-semibold text-primary-text" onClick={onOpenProgram}>
           See the whole program ›
         </button>
       )}

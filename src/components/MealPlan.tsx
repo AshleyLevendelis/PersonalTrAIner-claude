@@ -241,7 +241,7 @@ export function MealPlan({
           <button
             type="button"
             onClick={() => { window.location.hash = tabHash('tools') }}
-            className="hit-slop-44 text-[0.6875rem] font-semibold text-primary"
+            className="hit-slop-44 text-[0.6875rem] font-semibold text-primary-text"
           >
             Grocery list ›
           </button>
@@ -360,7 +360,7 @@ function TotalsHero({ totals, targets }: { totals: MacroTargets; targets: MacroT
         <div className="h-[2px] rounded-full bg-primary glow-mint-box" style={{ width: `${calPct}%` }} />
       </div>
       <div className="mt-3 flex items-baseline gap-4 tabular-mono text-xs">
-        <span className={proteinAchieved ? 'text-primary glow-mint' : 'text-muted-foreground'}>
+        <span className={proteinAchieved ? 'text-primary-text glow-mint' : 'text-muted-foreground'}>
           {Math.round(totals.protein)} / {targets.protein} P
         </span>
         <span className="text-muted-foreground">{Math.round(totals.carbs)} / {targets.carbs} C</span>
@@ -485,7 +485,7 @@ function MealSlotRow({
   return (
     <div className="py-4" style={!isFirst ? { borderTop: '1px solid var(--hairline)' } : undefined}>
       <button type="button" onClick={onToggle} disabled={!option} className="flex w-full flex-col gap-1.5 text-left disabled:cursor-default">
-        <span className={expanded ? 'ds-label-compact text-primary glow-mint' : 'ds-label-compact'}>
+        <span className={expanded ? 'ds-label-compact text-primary-text glow-mint' : 'ds-label-compact'}>
           {SLOT_LABEL[slot]}{expanded ? ' · open' : ''}
         </span>
         <div className="flex items-baseline justify-between gap-3">
@@ -517,7 +517,7 @@ function MealSlotRow({
                       the new pick. Considered and kept: what the day is
                       carrying is the useful truth here, and unlogging and
                       logging again corrects it in two taps. */}
-                  <span className={`tabular-mono text-[0.8125rem] ${duplicated ? 'text-[color:var(--role-warn-text)]' : isLogged ? 'text-primary glow-mint' : 'text-muted-foreground'}`}>
+                  <span className={`tabular-mono text-[0.8125rem] ${duplicated ? 'text-[color:var(--role-warn-text)]' : isLogged ? 'text-primary-text glow-mint' : 'text-muted-foreground'}`}>
                     {Math.round(isLogged ? loggedKcal : option.macros.calories)} kcal{isLogged ? ' ✓' : ''}
                     {duplicated ? ` ·×${loggedEvents.length}` : ''}
                   </span>
@@ -611,7 +611,7 @@ function MealSlotRow({
               disabled={busy || (blocked && !isLogged)}
               className={
                 isLogged
-                  ? 'flex min-h-[44px] items-center gap-1.5 rounded-xl bg-primary/15 px-3.5 text-xs font-semibold text-primary'
+                  ? 'flex min-h-[44px] items-center gap-1.5 rounded-xl bg-primary/15 px-3.5 text-xs font-semibold text-primary-text'
                   : blocked
                     ? 'flex min-h-[44px] items-center gap-1.5 rounded-xl bg-[color:var(--surface-raised)] px-3.5 text-xs font-semibold text-muted-foreground'
                     : 'flex min-h-[44px] items-center gap-1.5 rounded-xl bg-primary px-3.5 text-xs font-semibold text-primary-foreground glow-mint-box'
@@ -663,7 +663,7 @@ function MealSlotRow({
                       )}
                     </div>
                     {verdict.ok && (
-                      <span className={`tabular-mono shrink-0 text-[0.65625rem] ${Math.abs(calDelta) < 20 ? 'text-muted-foreground' : calDelta > 0 ? 'text-[color:var(--role-warn)]' : 'text-primary'}`}>
+                      <span className={`tabular-mono shrink-0 text-[0.65625rem] ${Math.abs(calDelta) < 20 ? 'text-muted-foreground' : calDelta > 0 ? 'text-[color:var(--role-warn)]' : 'text-primary-text'}`}>
                         {calDelta > 0 ? '+' : ''}{calDelta} kcal, {proteinDelta > 0 ? '+' : ''}{proteinDelta}g P
                       </span>
                     )}

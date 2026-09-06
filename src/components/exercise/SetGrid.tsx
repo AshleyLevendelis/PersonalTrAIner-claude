@@ -391,7 +391,7 @@ export function SetGrid({
               isSaved ? 'bg-primary/10' : ''
             }`}
           >
-            <span className={`w-5 text-xs font-medium text-center ${isSaved ? 'text-primary' : 'text-muted-foreground'}`}>
+            <span className={`w-5 text-xs font-medium text-center ${isSaved ? 'text-primary-text' : 'text-muted-foreground'}`}>
               {setNumber}
             </span>
             <Input
@@ -404,7 +404,7 @@ export function SetGrid({
               value={isBW ? '' : input.weight}
               onChange={e => updateInput(setNumber, 'weight', e.target.value)}
               onFocus={scrollRowIntoView}
-              className={`h-7 border-0 bg-[color:var(--surface-raised)] text-sm shadow-none ${isSaved ? 'text-primary' : ''} ${isBW ? 'text-muted-foreground' : ''} ${rowErrors[setNumber] ? 'ring-1 ring-destructive' : ''}`}
+              className={`h-7 border-0 bg-[color:var(--surface-raised)] text-sm shadow-none ${isSaved ? 'text-primary-text' : ''} ${isBW ? 'text-muted-foreground' : ''} ${rowErrors[setNumber] ? 'ring-1 ring-destructive' : ''}`}
               disabled={isBW}
             />
             {/* The `?.` used to make this button silently inert wherever the
@@ -446,11 +446,11 @@ export function SetGrid({
               value={input.reps}
               onChange={e => updateInput(setNumber, 'reps', e.target.value)}
               onFocus={scrollRowIntoView}
-              className={`h-7 border-0 bg-[color:var(--surface-raised)] text-sm shadow-none ${isSaved ? 'text-primary' : ''} ${rowErrors[setNumber] ? 'ring-1 ring-destructive' : ''}`}
+              className={`h-7 border-0 bg-[color:var(--surface-raised)] text-sm shadow-none ${isSaved ? 'text-primary-text' : ''} ${rowErrors[setNumber] ? 'ring-1 ring-destructive' : ''}`}
             />
             <div className="flex items-center gap-1">
               {isPRSet && prBadgeSet?.result && (
-                <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[0.625rem] font-medium bg-primary/15 text-primary glow-mint whitespace-nowrap ${animatingPr ? 'animate-pulse scale-110' : ''} transition-transform`}>
+                <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[0.625rem] font-medium bg-primary/15 text-primary-text glow-mint whitespace-nowrap ${animatingPr ? 'animate-pulse scale-110' : ''} transition-transform`}>
                   <Trophy className="size-2.5" />
                   PR
                 </span>
@@ -470,7 +470,7 @@ export function SetGrid({
                 data-tour={isSaved ? undefined : 'setrow'}
                 variant="ghost"
                 size="icon"
-                className={`size-7 shrink-0 ${isSaved ? 'text-primary' : 'text-[color:var(--primary-foreground)] glow-pulse'}`}
+                className={`size-7 shrink-0 ${isSaved ? 'text-primary-text' : 'text-[color:var(--primary-foreground)] glow-pulse'}`}
                 style={isSaved ? undefined : { background: 'linear-gradient(180deg, color-mix(in oklab, var(--primary) 84%, white), var(--primary-2))' }}
                 onClick={() => handleSaveSet(setNumber)}
                 aria-label={isSaved ? `Set ${setNumber} saved` : `Save set ${setNumber}`}
@@ -485,7 +485,7 @@ export function SetGrid({
             const armed = confirmDeleteSet === setNumber
             return (
               <div className="flex items-center justify-between gap-2 px-1 -mt-0.5">
-                <p className="text-[0.625rem] text-primary">
+                <p className="text-[0.625rem] text-primary-text">
                   Set {setNumber}: {logged.is_bodyweight
                     ? `${logged.reps_completed} reps · Bodyweight`
                     : `${logged.reps_completed} reps @ ${logged.weight_kg}kg`} ✓

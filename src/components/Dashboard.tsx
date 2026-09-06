@@ -575,7 +575,7 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
                     className="h-8 w-[4.5rem] rounded-[9px] px-2 text-[0.75rem] tabular-mono"
                     style={{ background: 'var(--surface-raised)' }}
                   />
-                  <button type="button" onClick={() => void handleLogSteps()} className="hit-slop-44 text-[0.6875rem] font-semibold text-primary">
+                  <button type="button" onClick={() => void handleLogSteps()} className="hit-slop-44 text-[0.6875rem] font-semibold text-primary-text">
                     Log
                   </button>
                 </span>
@@ -583,7 +583,7 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
                 <button
                   type="button"
                   onClick={() => setStepsOpen(true)}
-                  className="hit-slop-44 mt-2 block text-[0.6875rem] font-semibold text-primary"
+                  className="hit-slop-44 mt-2 block text-[0.6875rem] font-semibold text-primary-text"
                 >
                   Log ›
                 </button>
@@ -621,7 +621,7 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
                 </span>
               </button>
               {weightDeltaKg != null && (
-                <span className="mt-2 block text-[0.6875rem] font-semibold text-primary">
+                <span className="mt-2 block text-[0.6875rem] font-semibold text-primary-text">
                   {weightDeltaKg > 0 ? '+' : ''}{weightDeltaKg.toFixed(1)} kg since week 1
                 </span>
               )}
@@ -670,7 +670,7 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
                   {/* The prototype shows "60 kg × 9". RecentPR carries no rep
                       count (dashboard-data.ts), and a rep number nobody
                       recorded would be an invention — the weight alone. */}
-                  <span className="shrink-0 tabular-mono text-[0.8125rem] font-semibold text-primary">
+                  <span className="shrink-0 tabular-mono text-[0.8125rem] font-semibold text-primary-text">
                     {pr.weightKg} kg
                   </span>
                 </div>

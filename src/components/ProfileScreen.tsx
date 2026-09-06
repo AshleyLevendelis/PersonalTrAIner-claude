@@ -122,7 +122,7 @@ function Group({
         className="hit-slop-44 flex w-full items-center justify-between gap-2 py-3 text-left"
       >
         <span className="ds-label">{label}</span>
-        <ChevronDown className={`size-3.5 shrink-0 text-primary transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`size-3.5 shrink-0 text-primary-text transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
       <div hidden={!isOpen} className="pb-4 space-y-4">{children}</div>
     </div>
@@ -768,7 +768,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                   <ToggleGroupItem
                     key={o.value}
                     value={o.value}
-                    className="h-8 rounded-full border px-2.5 text-[0.6875rem] data-[state=on]:border-primary data-[state=on]:text-primary"
+                    className="h-8 rounded-full border px-2.5 text-[0.6875rem] data-[state=on]:border-primary data-[state=on]:text-primary-text"
                   >
                     {o.icon} {o.label}
                   </ToggleGroupItem>
@@ -839,7 +839,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                 <ToggleGroupItem
                   key={o.value}
                   value={o.value}
-                  className="h-8 rounded-full border px-2.5 text-[0.6875rem] data-[state=on]:border-primary data-[state=on]:text-primary"
+                  className="h-8 rounded-full border px-2.5 text-[0.6875rem] data-[state=on]:border-primary data-[state=on]:text-primary-text"
                 >
                   {o.icon} {o.label}
                 </ToggleGroupItem>

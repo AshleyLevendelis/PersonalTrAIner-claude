@@ -11,6 +11,13 @@
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  /* THE ACCENT AS WORDS, not as a fill. `text-primary` resolved to
+   * --primary, which is tuned to be seen as a button on its canvas —
+   * at 11-13px on paper the same value measured 3.8:1. Every text use
+   * reads --primary-text instead; --primary stays for fills, rings,
+   * progress lines and borders. */
+  --color-primary-text: var(--primary-text);
+  --color-num-hero: var(--num-hero);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
@@ -77,11 +84,13 @@
   --chart-4: #FFB454;
   --chart-5: #6FB7FF;
 
-  /* Role tokens — not part of the shadcn set. Theme/accent-independent. */
+  /* Role tokens — not part of the shadcn set. --role-ai itself is
+   * theme-independent (the assistant is violet wherever you are), but its
+   * TINTS are not: --role-ai-text lived here as #DAD5FA, a pale lilac tuned
+   * for a dark canvas, and on paper it measured 1.5:1 — the Personal
+   * TrAIner's own line was the least readable text on the light theme.
+   * The bg/border/text trio is defined per theme now; only the hue stays. */
   --role-ai: #8B7BFF;
-  --role-ai-bg: rgba(139, 123, 255, .10);
-  --role-ai-border: rgba(139, 123, 255, .28);
-  --role-ai-text: #DAD5FA;
   --role-warn: #FFB454;
   --role-warn-bg: rgba(255, 180, 84, .09);
   --role-warn-border: rgba(255, 180, 84, .3);
@@ -144,6 +153,12 @@
   --theme-glow-rgb: 91, 233, 194;
   /* The hero's ambient wash, as a token because it is the one value that has
    * to change on a light canvas — Dashboard.tsx used to hardcode the rgba. */
+  --primary-text: var(--theme-primary);
+  --primary-foreground: #08281F;
+  --num-hero: #E4FCF4;
+  --role-ai-bg: rgba(139, 123, 255, .10);
+  --role-ai-border: rgba(139, 123, 255, .25);
+  --role-ai-text: #DAD5FA;
   --hero-wash: rgba(156, 141, 255, .20);
 }
 
@@ -176,6 +191,12 @@
   --theme-primary: #FF8A3D;
   --theme-primary-2: #E85F14;
   --theme-glow-rgb: 255, 138, 61;
+  --primary-text: var(--theme-primary);
+  --primary-foreground: #2A1300;
+  --num-hero: #FFF1E4;
+  --role-ai-bg: rgba(255, 138, 61, .10);
+  --role-ai-border: rgba(255, 138, 61, .25);
+  --role-ai-text: #FFD9BD;
 }
 
 /* Theme: Field — khaki · military green. */
@@ -208,6 +229,12 @@
   --theme-primary: #C6F24E;
   --theme-primary-2: #8FBE1F;
   --theme-glow-rgb: 198, 242, 78;
+  --primary-text: var(--theme-primary);
+  --primary-foreground: #1B2600;
+  --num-hero: #F4FBDD;
+  --role-ai-bg: rgba(198, 242, 78, .08);
+  --role-ai-border: rgba(198, 242, 78, .22);
+  --role-ai-text: #E3F0B8;
 }
 
 /* Theme: Graphite — near-black · violet. (Values keep; the SUBTITLE was
@@ -238,6 +265,12 @@
   --theme-primary: #B49BFF;
   --theme-primary-2: #7C5AE0;
   --theme-glow-rgb: 155, 125, 245;
+  --primary-text: var(--theme-primary);
+  --primary-foreground: #08281F;
+  --num-hero: #F3EEFF;
+  --role-ai-bg: rgba(180, 155, 255, .10);
+  --role-ai-border: rgba(180, 155, 255, .25);
+  --role-ai-text: #DDD3FF;
 }
 
 /* Theme: Daylight — paper · deep mint. THE FIRST LIGHT CANVAS.
@@ -246,42 +279,47 @@
  * as Nightshift, inverted: the text tokens become the dark end, the surface
  * tints stay violet-family so the app still reads as itself. */
 [data-theme="daylight"] {
-  --background: #F5F3FA;
-  --foreground: #1A1636;
+  --background: #F4F2FA;
+  --foreground: #15122B;
   --card: #FFFFFF;
-  --card-foreground: #1A1636;
+  --card-foreground: #15122B;
   --popover: #FFFFFF;
-  --popover-foreground: #1A1636;
-  --secondary: #E9E6F4;
-  --secondary-foreground: #1A1636;
+  --popover-foreground: #15122B;
+  --secondary: #E9E6F3;
+  --secondary-foreground: #15122B;
   --muted: #EFEDF7;
-  --muted-foreground: #6B6590;
-  --accent: #E9E6F4;
-  --accent-foreground: #1A1636;
-  --border: #D8D3E8;
+  --muted-foreground: #5C5680;
+  --accent: #E9E6F3;
+  --accent-foreground: #15122B;
+  --border: #D3CDE4;
   --input: #FFFFFF;
-  --text-tertiary: #3F3868;
-  --text-dim: #A9A2C4;
-  --surface-deep: #ECE9F5;
+  --text-tertiary: #3A3462;
+  --text-dim: #B3ADCB;
+  --surface-deep: #E9E6F3;
   --surface-raised: rgba(90, 80, 150, .10);
   --line-emphasis: #C6BFDE;
-  --hairline: rgba(26, 22, 54, .13);
+  --hairline: rgba(21, 18, 43, .14);
   /* Inverted with the canvas: grain is a dark speckle on paper, not a light
    * one, or the texture disappears entirely. */
-  --grain-rgb: 26, 22, 54;
-  /* DARKENED ON ASHLEY'S RULING. The handoff specified #00A88A, and the
-   * contrast guard the same handoff asked for measured it at 2.74:1 against
-   * this canvas — under the 3:1 floor. So the new theme's first act was to
-   * warn about its own colour, which reads as a broken app rather than a
-   * careful one. #008C72 (its former deep step) measures 3.82:1 and clears
-   * it; the deep step moves down to match so the CTA gradient keeps its
-   * depth instead of going flat. */
-  --theme-primary: #008C72;
-  --theme-primary-2: #00705B;
-  --theme-glow-rgb: 0, 140, 114;
-  /* .14, not .20: the same violet that reads as depth over a dark canvas
-   * reads as a stain over paper. */
-  --hero-wash: rgba(156, 141, 255, .14);
+  --grain-rgb: 21, 18, 43;
+  /* THE ACCENT SPLITS IN TWO HERE, and that is the whole fix. #19B894 is the
+   * FILL — a button you have to find on paper. #00705B is the same hue taken
+   * down until it holds as WORDS at 11-13px, which is what "Nutrition >", a
+   * PR value and the active tab label actually are. The previous single
+   * value (#008C72) was a compromise between the two jobs and did neither:
+   * 3.8:1 as text, under the 4.5 floor for body copy. */
+  --theme-primary: #19B894;
+  --theme-primary-2: #0E9C7C;
+  --theme-glow-rgb: 25, 184, 148;
+  --primary-text: #00705B;
+  --primary-foreground: #08281F;
+  --num-hero: #0F3D33;
+  --role-ai-bg: rgba(124, 90, 224, .10);
+  --role-ai-border: rgba(124, 90, 224, .22);
+  --role-ai-text: #3F2E8C;
+  /* .08, not .14: the same violet that reads as depth over a dark canvas
+   * reads as a stain over paper, and .14 was still a stain. */
+  --hero-wash: rgba(156, 141, 255, .08);
 }
 
 /* Accent override — replaces just the accent hue regardless of theme.
@@ -292,15 +330,21 @@
  * Each accent declares three stops rather than two. The bright/deep pair is
  * what a dark canvas uses; --accent-dark is the same hue taken down far
  * enough to hold its own against paper, where the bright end washes out. */
-/* mint's dark step darkened with Daylight's own accent, and for the same
- * reason: #00A88A measured 2.74:1 on paper, so choosing the Mint chip on a
- * light canvas re-created the warning the theme fix had just cleared. Same
- * colour, same failure, one value apart. */
-[data-accent="mint"]   { --accent-bright: #5BE9C2; --accent-deep: #3ED3AA; --accent-dark: #008C72; --theme-glow-rgb: 91, 233, 194; }
-[data-accent="coral"]  { --accent-bright: #FF7A6B; --accent-deep: #E8493A; --accent-dark: #D1362A; --theme-glow-rgb: 255, 122, 107; }
-[data-accent="violet"] { --accent-bright: #B49BFF; --accent-deep: #7C5AE0; --accent-dark: #6541C8; --theme-glow-rgb: 155, 125, 245; }
-[data-accent="sky"]    { --accent-bright: #6FB7FF; --accent-deep: #2E7FE0; --accent-dark: #1D6FD0; --theme-glow-rgb: 111, 183, 255; }
-[data-accent="lime"]   { --accent-bright: #C6F24E; --accent-deep: #8FBE1F; --accent-dark: #5F8A00; --theme-glow-rgb: 198, 242, 78; }
+/* Each accent now declares FOUR stops, and the fourth is the point of this
+ * round. bright/deep is what a dark canvas uses. --accent-dark is the same
+ * hue taken down far enough to hold as a FILL on paper. --accent-text is
+ * taken down further still, because a fill only has to be found and a word
+ * has to be read: the two jobs stopped agreeing at 11-13px, which is where
+ * the light theme was failing.
+ *
+ * --accent-on is the ink printed ON that fill. It splits by hue rather than
+ * by canvas: white reads on sky/violet/coral/rose, near-black on
+ * mint/lime/gold/amber. */
+[data-accent="mint"]   { --accent-bright: #5BE9C2; --accent-deep: #3ED3AA; --accent-dark: #19B894; --accent-text: #00705B; --accent-on: #08281F; --theme-glow-rgb: 91, 233, 194; }
+[data-accent="coral"]  { --accent-bright: #FF7A6B; --accent-deep: #E8493A; --accent-dark: #E8493A; --accent-text: #B32A1D; --accent-on: #FFFFFF; --theme-glow-rgb: 255, 122, 107; }
+[data-accent="violet"] { --accent-bright: #B49BFF; --accent-deep: #7C5AE0; --accent-dark: #7C5AE0; --accent-text: #5A3FC4; --accent-on: #FFFFFF; --theme-glow-rgb: 155, 125, 245; }
+[data-accent="sky"]    { --accent-bright: #6FB7FF; --accent-deep: #2E7FE0; --accent-dark: #2569D0; --accent-text: #1A5FBF; --accent-on: #FFFFFF; --theme-glow-rgb: 111, 183, 255; }
+[data-accent="lime"]   { --accent-bright: #C6F24E; --accent-deep: #8FBE1F; --accent-dark: #7FAF12; --accent-text: #4E7300; --accent-on: #08281F; --theme-glow-rgb: 198, 242, 78; }
 
 /* ONE rule pair, keyed off the canvas being light — not one rule per theme x
  * accent. A light theme added later inherits the dark-step behaviour for
@@ -308,10 +352,67 @@
 [data-accent]:not([data-accent="theme"]) {
   --theme-primary: var(--accent-bright);
   --theme-primary-2: var(--accent-deep);
+  --primary-text: var(--accent-bright);
 }
 [data-canvas="light"][data-accent]:not([data-accent="theme"]) {
   --theme-primary: var(--accent-dark);
   --theme-primary-2: var(--accent-dark);
+  --primary-text: var(--accent-text);
+  /* The theme's own --primary-foreground is tuned for the theme's own accent.
+   * Override it with the accent's, or picking Sky on Linen prints near-black
+   * on cobalt. */
+  --primary-foreground: var(--accent-on);
+}
+
+/* ---------------------------------------------------------------------------
+ * LIGHT CANVAS BEHAVIOUR — the rules that are about paper, not about a hue.
+ *
+ * A halo is a bloom of light. On a dark canvas it reads as the thing glowing;
+ * on paper it is a grey smudge around the letters, and at 11-13px it is the
+ * difference between crisp and hazy. So TEXT shadows go entirely, while BOX
+ * glows stay (the CTA still needs to look tappable) at the subtle clamp
+ * resolveGlow already applies for a light theme.
+ *
+ * Keyed off the canvas flag, not a theme name, so a light theme added later
+ * inherits all of it without a line of CSS.
+ * ------------------------------------------------------------------------- */
+/* --role-warn-text IS THE SAME BUG AS --role-ai-text, ONE TOKEN OVER, and the
+ * handoff does not cover it. #FFD9A6 is a pale amber tuned for a dark canvas;
+ * on paper it measures 1.20:1 — Home's "no meals logged yet" line was
+ * effectively invisible on the theme this round exists to fix. No colour is
+ * invented here: this is the handoff's own amber accent TEXT step
+ * (--accent-text for amber, #9A3F0B), which is the value it specifies for
+ * amber-family words on a light canvas. Measures 6.1:1 on all three.
+ *
+ * Flagged rather than folded in silently — the right long-term shape is
+ * per-theme role-warn tints, the same move --role-ai just made, and that is
+ * a designer's call about hue, not mine. */
+[data-canvas="light"] {
+  --role-warn-text: #9A3F0B;
+}
+
+[data-canvas="light"] .glow-text,
+[data-canvas="light"] .glow-mint,
+[data-canvas="light"] .glow-mint-lg,
+[data-canvas="light"] .glow-violet,
+[data-canvas="light"] .glow-warn {
+  text-shadow: none;
+}
+
+/* The CTA keeps depth, as a drop shadow rather than a halo — a halo under a
+ * button on paper looks like a printing fault. */
+[data-canvas="light"] .glow-mint-box {
+  box-shadow: 0 6px 16px rgba(var(--glow-rgb), .25);
+}
+/* .glow-bloom-once is `both`-filled, so its END state is what the CTA wears
+ * at rest — overriding the class alone would not reach it. Its own keyframe
+ * lands on the same flat shadow instead. */
+[data-canvas="light"] .glow-bloom-once {
+  animation-name: dsBloomInLight;
+}
+@keyframes dsBloomInLight {
+  0% { opacity: 0; transform: scale(.96); box-shadow: 0 0 0 rgba(var(--glow-rgb), 0); }
+  100% { opacity: 1; transform: scale(1); box-shadow: 0 6px 16px rgba(var(--glow-rgb), calc(.25 * var(--glow-strength))); }
 }
 
 /* Resolves the accent axis (theme default or override) into the tokens the
@@ -321,7 +422,6 @@
 :root {
   --primary: var(--theme-primary);
   --primary-2: var(--theme-primary-2);
-  --primary-foreground: #08281F;
   --ring: var(--theme-primary);
   --chart-1: var(--theme-primary);
   --glow-rgb: var(--theme-glow-rgb);

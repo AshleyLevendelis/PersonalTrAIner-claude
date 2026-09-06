@@ -3732,7 +3732,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       const normalized = normalizeExternalUrl(href)
       if (!normalized) return <>{children}</>
       return (
-        <a href={normalized} target="_blank" rel="noopener noreferrer" className="text-primary underline hover:opacity-80">{children}</a>
+        <a href={normalized} target="_blank" rel="noopener noreferrer" className="text-primary-text underline hover:opacity-80">{children}</a>
       )
     },
   }
@@ -4079,7 +4079,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
             <div className="flex gap-2">
               <button
                 type="button"
-                className="text-[0.625rem] text-primary glow-mint"
+                className="text-[0.625rem] text-primary-text glow-mint"
                 onClick={async () => {
                   try { await navigator.clipboard.writeText(voiceDebugLines.join('\n')) } catch { /* clipboard unavailable — lines are still on screen to copy manually */ }
                 }}

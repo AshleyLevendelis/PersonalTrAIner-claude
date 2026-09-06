@@ -10,7 +10,9 @@ import { tabHash } from '@/lib/app-route'
 // sentence: the caller hands it a line from the existing adaptation-message /
 // coach-tip / progression-payoff chain, and when there is nothing to say the
 // caller renders nothing. Every colour is a token; the two tints are
-// color-mix over --role-ai so the other themes and accent overrides keep it.
+// read from --role-ai-bg/-border/-text, which every theme defines. They were
+// a color-mix over --role-ai plus a --role-ai-text in :root — one pale
+// lilac for eight canvases, which measured 1.5:1 on paper.
 // ---------------------------------------------------------------------------
 
 export interface TrainerNudgeAction {
@@ -70,8 +72,8 @@ export function TrainerNudge({ text, actions, openChat, onOpen, compact, clamp, 
       className={cn('glow-bloom-once flex items-start', compact ? 'gap-2 rounded-xl' : 'gap-2.5 rounded-[14px]', className)}
       style={{
         padding: compact ? '10px 12px' : '12px 14px',
-        background: 'color-mix(in oklab, var(--role-ai) 10%, transparent)',
-        border: compact ? 'none' : '1px solid color-mix(in oklab, var(--role-ai) 25%, transparent)',
+        background: 'var(--role-ai-bg)',
+        border: compact ? 'none' : '1px solid var(--role-ai-border)',
       }}
     >
       <span

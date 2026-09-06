@@ -337,7 +337,7 @@ export function GroceryList({ profileId, mealPools, targets, softLikedFoods, tod
           <button
             type="button"
             onClick={() => setShowAll(v => !v)}
-            className="hit-slop-44 pt-2.5 text-[0.75rem] font-semibold text-primary"
+            className="hit-slop-44 pt-2.5 text-[0.75rem] font-semibold text-primary-text"
           >
             {showAll ? 'Show fewer' : `All ${items.length} items ›`}
           </button>

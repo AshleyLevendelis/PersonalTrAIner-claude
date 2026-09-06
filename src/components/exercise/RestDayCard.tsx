@@ -42,7 +42,7 @@ function ActivityLogEntry() {
     return (
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
         <span>Activity logged for today.</span>
-        <button type="button" className="font-semibold text-primary disabled:opacity-50" disabled={undoing} onClick={handleUndo}>
+        <button type="button" className="font-semibold text-primary-text disabled:opacity-50" disabled={undoing} onClick={handleUndo}>
           {undoing ? 'Undoing…' : 'Undo'}
         </button>
       </div>
@@ -283,7 +283,7 @@ function RecoveryFinisher({ cardio }: { cardio: RecommendedCardio }) {
       {loggedClientId ? (
         <div className="flex items-center gap-2 shrink-0">
           <span className="text-xs text-muted-foreground">Logged</span>
-          <button type="button" className="text-xs font-semibold text-primary disabled:opacity-50" disabled={undoing} onClick={handleUndo}>
+          <button type="button" className="text-xs font-semibold text-primary-text disabled:opacity-50" disabled={undoing} onClick={handleUndo}>
             {undoing ? 'Undoing…' : 'Undo'}
           </button>
         </div>

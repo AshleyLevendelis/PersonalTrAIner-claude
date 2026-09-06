@@ -1611,7 +1611,7 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
         </div>
         <div className="flex-1 min-w-0 flex flex-col gap-px">
           <span className="text-base font-semibold text-foreground">Personal TrAIner</span>
-          <span className="text-xs text-primary flex items-center gap-1.5">
+          <span className="text-xs text-primary-text flex items-center gap-1.5">
             <span className="size-1.5 rounded-full bg-primary shrink-0" />
             Building your plan
           </span>
@@ -1659,7 +1659,7 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
           {messages.map((msg, i) =>
             msg.isReceipt ? (
               <div key={i} className="flex items-center gap-1.5 pl-1">
-                <Check className="size-3 shrink-0 text-primary" />
+                <Check className="size-3 shrink-0 text-primary-text" />
                 <p className="text-xs text-muted-foreground">{msg.content.slice(RECEIPT_PREFIX.length)}</p>
               </div>
             ) : (

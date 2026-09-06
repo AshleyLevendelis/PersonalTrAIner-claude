@@ -313,7 +313,7 @@ export function NutritionDisplay({
           </svg>
           <div className="flex min-w-0 flex-1 flex-col gap-3">
             <div>
-              <p className="ds-num-mega tabular-mono text-[#E4FCF4] glow-mint-lg">{macros ? Math.round(eaten.kcal) : '—'}</p>
+              <p className="ds-num-mega tabular-mono text-[color:var(--num-hero)] glow-mint-lg">{macros ? Math.round(eaten.kcal) : '—'}</p>
               <p className="mt-1 text-[0.65625rem] uppercase tracking-[.16em] text-muted-foreground">
                 {macros
                   ? <>kcal · <span className="tabular-mono">{Math.max(0, Math.round(macros.calories - eaten.kcal))}</span> left</>
@@ -407,7 +407,7 @@ export function NutritionDisplay({
             <button
               type="button"
               onClick={() => setHowItsSetOpen(true)}
-              className="hit-slop-44 shrink-0 text-[0.6875rem] font-semibold text-primary"
+              className="hit-slop-44 shrink-0 text-[0.6875rem] font-semibold text-primary-text"
             >
               How it's set ›
             </button>
@@ -454,7 +454,7 @@ export function NutritionDisplay({
                   <p className="mt-0.5 text-[0.53125rem] uppercase tracking-[.14em] text-muted-foreground">{derivation.surplusLabel.split(' ')[0]}</p>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="tabular-mono text-[1.0625rem] font-bold tracking-[-.03em] text-primary glow-mint">{derivation.target.calories}</p>
+                  <p className="tabular-mono text-[1.0625rem] font-bold tracking-[-.03em] text-primary-text glow-mint">{derivation.target.calories}</p>
                   <p className="mt-0.5 text-[0.53125rem] uppercase tracking-[.14em] text-muted-foreground">Target</p>
                 </div>
               </div>
@@ -491,7 +491,7 @@ export function NutritionDisplay({
                   onClick={() => { setWaterTargetInput(String(waterTarget)); setEditingWaterTarget(true) }}
                   className="hit-slop-44 text-[0.8125rem]"
                 >
-                  <span className="tabular-mono">{waterTarget}</span> ml <span className="text-primary">Edit</span>
+                  <span className="tabular-mono">{waterTarget}</span> ml <span className="text-primary-text">Edit</span>
                 </button>
               )}
             </div>

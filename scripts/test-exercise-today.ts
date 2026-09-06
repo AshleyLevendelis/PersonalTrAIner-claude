@@ -189,8 +189,13 @@ console.log('\n5. The rest dock: one number, the lift it belongs to, and both di
     /disabled=\{restMs <= 30_000\}/.test(dock))
   check('...so a tap reading "a bit less" cannot flip the dock to overrun',
     /restMs <= 30_000/.test(dock) && /const isOverrun = hasRest && restMs <= 0/.test(dock))
+  // `text-primary` became `text-primary-text` on 6 Sep 2026 when the accent
+  // split into a fill and a text step; Skip is words, so it takes the text
+  // one. The requirement is unchanged: of -30s / +30s / Skip, only Skip is
+  // in the accent.
   check('Skip is still there and still the primary of the three',
-    /text-primary" onClick=\{dismissRest\}/.test(dock))
+    /text-primary-text" onClick=\{dismissRest\}/.test(dock)
+    && /text-text-tertiary[^"]*"\s*\n?\s*disabled/.test(dock))
   check('the elapsed fill survived the restyle', /fillFraction \* 100/.test(dock))
 }
 

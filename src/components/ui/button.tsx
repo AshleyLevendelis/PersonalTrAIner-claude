@@ -13,7 +13,7 @@ const buttonVariants = cva(
         outline: "border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground",
         secondary: "bg-secondary text-secondary-foreground shadow-xs hover:bg-secondary/80",
         ghost: "hover:bg-accent hover:text-accent-foreground",
-        link: "text-primary underline-offset-4 hover:underline",
+        link: "text-primary-text underline-offset-4 hover:underline",
       },
       // EVERY SIZE BELOW 44px CARRIES hit-slop-44, which is where this
       // belongs rather than at each call site. Measured across the four tabs

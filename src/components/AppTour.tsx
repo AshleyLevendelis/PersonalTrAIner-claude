@@ -488,7 +488,7 @@ export function AppTour({ profileId, armed }: { profileId?: string; armed: boole
         <p className="mt-2 text-[0.84375rem] leading-[1.55] text-foreground">{body}</p>
 
         {tapPhase ? (
-          <p className="mb-1 mt-2.5 text-[0.78125rem] font-semibold text-primary glow-mint">→ {step.tapHint}</p>
+          <p className="mb-1 mt-2.5 text-[0.78125rem] font-semibold text-primary-text glow-mint">→ {step.tapHint}</p>
         ) : (
           <div className="mt-3 flex items-center gap-2.5">
             {stepIndex > 0 && (
