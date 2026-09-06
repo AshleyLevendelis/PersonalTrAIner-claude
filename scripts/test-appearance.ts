@@ -21,7 +21,8 @@ import { fileURLToPath } from 'url'
 import { DEFAULT_APPEARANCE, isLightTheme, resolveGlow, type ThemeName, type AccentOverride } from '../src/lib/appearance-store'
 import {
   THEME_PREVIEWS, ACCENT_PREVIEWS, THEME_ORDER, ACCENT_ORDER, DARK_THEME_ORDER, LIGHT_THEME_ORDER,
-  resolveAccentColor, contrastRatio, luminance, CONTRAST_FLOOR,
+  THEME_INKS, ACCENT_INKS, CONTRAST_FLOORS, resolveAccentColor, resolveInkOnFill,
+  contrastRatio, luminance, CONTRAST_FLOOR,
 } from '../src/lib/appearance-palette'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -256,6 +257,111 @@ console.log('\n8. Status colour never moves with a cosmetic choice\n')
 check('water stays --chart-3 in the preview, not the accent', /#5AA9E6|--chart-3/.test(sheet))
 check('the accent never overwrites --destructive or --role-warn',
   !/--destructive:\s*var\(--theme-primary/.test(css) && !/--role-warn[^:]*:\s*var\(--theme-primary/.test(css))
+
+console.log('\n9. The seven contrast floors, measured for every theme\n')
+// ---------------------------------------------------------------------------
+// THE POINT OF THE WHOLE ROUND. Ashley: the light theme is hard to read. The
+// cause was three tokens with no light value and an accent doing two jobs, and
+// the way that stays fixed is a number per token per theme rather than an eye.
+//
+// Printed, not just asserted. A gate that says "ok" tells you nothing about
+// how much room a value has; the table is what makes the next retune a
+// decision instead of a guess.
+// ---------------------------------------------------------------------------
+{
+  const COLS = [
+    ['foreground', CONTRAST_FLOORS.foreground, (t: ThemeName) => [THEME_PREVIEWS[t].text, THEME_PREVIEWS[t].canvas]],
+    ['tertiary', CONTRAST_FLOORS.textTertiary, (t: ThemeName) => [THEME_INKS[t].textTertiary, THEME_PREVIEWS[t].canvas]],
+    ['muted', CONTRAST_FLOORS.mutedForeground, (t: ThemeName) => [THEME_PREVIEWS[t].muted, THEME_PREVIEWS[t].canvas]],
+    ['prim-text', CONTRAST_FLOORS.primaryText, (t: ThemeName) => [THEME_PREVIEWS[t].accentText, THEME_PREVIEWS[t].canvas]],
+    ['num-hero', CONTRAST_FLOORS.numHero, (t: ThemeName) => [THEME_INKS[t].numHero, THEME_PREVIEWS[t].canvas]],
+    ['ai-text', CONTRAST_FLOORS.roleAiText, (t: ThemeName) => [THEME_INKS[t].roleAiText, THEME_PREVIEWS[t].canvas]],
+    ['on-fill', CONTRAST_FLOORS.primaryForeground, (t: ThemeName) => [THEME_INKS[t].primaryForeground, THEME_PREVIEWS[t].accent]],
+  ] as const
+
+  console.log('     theme      ' + COLS.map(c => `${c[0]}(${c[1]})`.padStart(14)).join(''))
+  const below: string[] = []
+  for (const t of THEME_ORDER) {
+    const cells = COLS.map(([name, floor, pair]) => {
+      const [fg, bg] = pair(t)
+      const r = contrastRatio(fg, bg)
+      if (r < floor) below.push(`${t}.${name} ${r.toFixed(2)} < ${floor}`)
+      return `${r.toFixed(2)}${r < floor ? '!' : ' '}`.padStart(14)
+    })
+    console.log(`     ${t.padEnd(11)}${cells.join('')}`)
+  }
+  check(`all ${THEME_ORDER.length} themes clear all ${COLS.length} floors`, below.length === 0, below)
+}
+
+console.log('\n10. ...and every theme x accent pair, on the two the accent moves\n')
+// An accent override replaces --primary-text and, on a light canvas, the fill
+// and the ink on it. Those two floors therefore have to hold for all 81 pairs,
+// not just for each theme's own accent.
+{
+  const textBelow: string[] = []
+  const inkBelow: string[] = []
+  for (const t of THEME_ORDER) {
+    const light = THEME_PREVIEWS[t].light
+    for (const a of ACCENT_ORDER) {
+      const rText = contrastRatio(resolveAccentColor(t, a, /* forText */ true), THEME_PREVIEWS[t].canvas)
+      if (rText < CONTRAST_FLOORS.primaryText) textBelow.push(`${t}+${a} ${rText.toFixed(2)}`)
+      const rInk = contrastRatio(resolveInkOnFill(t, a, light), resolveAccentColor(t, a))
+      if (rInk < CONTRAST_FLOORS.primaryForeground) inkBelow.push(`${t}+${a} ${rInk.toFixed(2)}`)
+    }
+  }
+  const pairs = THEME_ORDER.length * ACCENT_ORDER.length
+  check(`all ${pairs} pairs clear primary-text / canvas >= ${CONTRAST_FLOORS.primaryText}`,
+    textBelow.length === 0, textBelow)
+
+  // ------------------------------------------------------------------------
+  // SIX PAIRS MISS primary-foreground / primary, AND THEY ARE NAMED RATHER
+  // THAN HIDDEN. The handoff assigns white ink to sky/violet/coral/rose on a
+  // light canvas. White on coral's #E8493A is 3.86 and on rose's #E85A78 is
+  // 3.41 — under the 4.5 floor, on each of the three light themes.
+  //
+  // Not silently retuned, per the handoff's own instruction to report a value
+  // that cannot meet its floor rather than change it. Pinned as an exact set
+  // so a SEVENTH failure is a red gate, and so these six go green only by
+  // being fixed, not by being forgotten. Measured alternatives, for whoever
+  // picks the fix:
+  //   rose  — a mapping problem. #08281F (already assigned to four other
+  //           accents) measures 4.62 on the same fill and clears it.
+  //   coral — a fill problem. White 3.86, #08281F 4.08, #3A0A16 4.41; no ink
+  //           in this palette clears 4.5 against #E8493A. Needs a darker
+  //           --accent-dark, which is a hue call.
+  // ------------------------------------------------------------------------
+  const KNOWN_INK_SHORTFALLS = [
+    'daylight+coral 3.86', 'daylight+rose 3.41',
+    'linen+coral 3.86', 'linen+rose 3.41',
+    'frost+coral 3.86', 'frost+rose 3.41',
+  ]
+  check(`${pairs - KNOWN_INK_SHORTFALLS.length} of ${pairs} pairs clear primary-foreground / primary >= ${CONTRAST_FLOORS.primaryForeground}`,
+    inkBelow.slice().sort().join('; ') === KNOWN_INK_SHORTFALLS.slice().sort().join('; '),
+    { measured: inkBelow, expected: KNOWN_INK_SHORTFALLS })
+  check('...and the six that do not are only the two light-canvas reds',
+    inkBelow.every(x => /\+(coral|rose) /.test(x)), inkBelow)
+}
+
+console.log('\n11. The ink table agrees with index.css\n')
+// Same justification as §3: the floors above are measured on THEME_INKS, so a
+// value that drifts from index.css would make every ratio a statement about a
+// colour the app does not paint.
+for (const t of THEME_ORDER) {
+  const ink = THEME_INKS[t]
+  for (const [tok, want] of [
+    ['--text-tertiary', ink.textTertiary], ['--num-hero', ink.numHero],
+    ['--role-ai-text', ink.roleAiText], ['--primary-foreground', ink.primaryForeground],
+  ] as const) {
+    check(`${t} ${tok} is ${want}`,
+      new RegExp(`\\[data-theme="${t}"\\][\\s\\S]{0,1800}?${tok}:\\s*${want};`, 'i').test(css), want)
+  }
+}
+for (const [a, ink] of Object.entries(ACCENT_INKS)) {
+  check(`accent ${a} declares --accent-on ${ink}`,
+    new RegExp(`\\[data-accent="${a}"\\][^}]*--accent-on:\\s*${ink};`, 'i').test(css), ink)
+}
+check('the light rule maps --primary-foreground to it',
+  /\[data-canvas="light"\]\[data-accent\]:not\(\[data-accent="theme"\]\)[\s\S]{0,400}?--primary-foreground:\s*var\(--accent-on\);/.test(css))
 
 if (failures > 0) { console.error(`\n${failures} check(s) failed\n`); process.exit(1) }
 console.log('\nAppearance: every value reachable, every preview honest.\n')

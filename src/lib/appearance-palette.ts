@@ -167,5 +167,71 @@ export function contrastRatio(a: string, b: string): number {
   return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05)
 }
 
-/** Below this, a button you have to FIND is too close to its canvas. */
+/** Below this, accent WORDS are too close to their canvas. */
 export const CONTRAST_FLOOR = 3
+
+/**
+ * The seven floors every theme is held to, from design_handoff_themes.
+ *
+ * They differ because the jobs differ. Body copy needs 4.5:1 and a heading
+ * can live at 3:1, so the tokens that carry small text (muted-foreground,
+ * primary-text, role-ai-text) sit at 4.5; the ones that carry large or
+ * structural text (foreground, text-tertiary, num-hero) sit higher; and
+ * primary-foreground is measured against the FILL it is printed on rather
+ * than against the canvas, because that is where it lands.
+ */
+export const CONTRAST_FLOORS = {
+  foreground: 12,
+  textTertiary: 7,
+  mutedForeground: 4.5,
+  primaryText: 4.5,
+  numHero: 7,
+  roleAiText: 4.5,
+  /** Against --primary, not against the canvas. */
+  primaryForeground: 4.5,
+} as const
+
+/**
+ * The per-theme values the floors are measured on that the preview table does
+ * not already carry. Duplicated from index.css for the same reason everything
+ * else here is — a gate cannot read a theme it is not wearing — and pinned
+ * against it by test-appearance.ts §3.
+ */
+export interface ThemeInk {
+  textTertiary: string
+  numHero: string
+  roleAiText: string
+  /** The ink printed ON --primary. Per theme since 6 Sep 2026. */
+  primaryForeground: string
+}
+
+export const THEME_INKS: Record<ThemeName, ThemeInk> = {
+  nightshift: { textTertiary: '#C2BCE8', numHero: '#E4FCF4', roleAiText: '#DAD5FA', primaryForeground: '#08281F' },
+  graphite:   { textTertiary: '#C4C1D2', numHero: '#F3EEFF', roleAiText: '#DDD3FF', primaryForeground: '#08281F' },
+  ember:      { textTertiary: '#DCC9B7', numHero: '#FFF1E4', roleAiText: '#FFD9BD', primaryForeground: '#2A1300' },
+  field:      { textTertiary: '#CBD3B7', numHero: '#F4FBDD', roleAiText: '#E3F0B8', primaryForeground: '#1B2600' },
+  midnight:   { textTertiary: '#C2CFE3', numHero: '#E6F1FF', roleAiText: '#CFE2FF', primaryForeground: '#04213F' },
+  rosewood:   { textTertiary: '#E0C7D3', numHero: '#FFEEF3', roleAiText: '#FFD3DC', primaryForeground: '#3A0A16' },
+  daylight:   { textTertiary: '#3A3462', numHero: '#0F3D33', roleAiText: '#3F2E8C', primaryForeground: '#08281F' },
+  linen:      { textTertiary: '#4A3B2D', numHero: '#3A1E0C', roleAiText: '#7A3A12', primaryForeground: '#2A1300' },
+  frost:      { textTertiary: '#2F4260', numHero: '#0C2A4A', roleAiText: '#1E4D8F', primaryForeground: '#FFFFFF' },
+}
+
+/** The ink an accent override prints on its own fill, on a light canvas. */
+export const ACCENT_INKS: Record<Exclude<AccentOverride, 'theme'>, string> = {
+  mint: '#08281F', coral: '#FFFFFF', violet: '#FFFFFF', sky: '#FFFFFF',
+  lime: '#08281F', amber: '#08281F', rose: '#FFFFFF', gold: '#08281F',
+}
+
+/**
+ * The ink actually printed on the button for a theme+accent pair.
+ *
+ * On a light canvas an accent override brings its own (--accent-on), because
+ * the theme's ink is tuned for the theme's own accent — near-black on cobalt
+ * would fail. On a dark canvas the accent only replaces the fill's bright
+ * step, which every theme's ink already clears, so the theme keeps its own.
+ */
+export function resolveInkOnFill(theme: ThemeName, accent: AccentOverride, light: boolean): string {
+  if (accent === 'theme' || !light) return THEME_INKS[theme].primaryForeground
+  return ACCENT_INKS[accent]
+}
