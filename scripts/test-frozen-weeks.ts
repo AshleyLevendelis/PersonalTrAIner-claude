@@ -227,6 +227,62 @@ console.log('\n1. A rep bought must never cost weight')
     newRises.length === 0, newRises.slice(0, 3).join(' | '))
   check('...with the known ones still exactly as recorded — remove them here when fixed',
     fixedRises.length === 0, fixedRises.join(' | '))
+
+  // THE GRID ABOVE NEVER HELD THE DEFECT. Its ledger reached zero on 1 Sep
+  // 2026 and the entry said so honestly: "displaced, not fixed — the mechanism
+  // is untouched". Measured on the full 9,216-plan quality grid on 6 Sep: 30
+  // deloads heavier than the week before them, ALL functional-goal, all lifts
+  // the coherence pass clamps (Landmine Press, Walking Lunges, Hack Squat,
+  // Bulgarian Split Squats). The mechanism: functional rotates accessories
+  // EVERY week (accessoryRotationWeeks 1), so the deload week can hold a lift
+  // in a slot with no week-3 anchor, and that slot fell through to a FRESH
+  // estimate at full value — heavier than the same lift's ramped number the
+  // week before on another day. Now an unanchored deload slot takes 70% of
+  // the lift's own last displayed number (by name), or of the fresh estimate
+  // when it was not seen at all. This sweep is the slice of that grid where
+  // they lived: 144 plans, 46 rises before the fix, 0 after — 46 with the
+  // no-anchor branch removed, 20 with the by-name reference removed. Zero,
+  // listed by name — no ledger, no budget.
+  const functionalRises: string[] = []
+  let functionalDrops = 0, functionalPlans = 0
+  const gridDays = [
+    { day: 'Monday', available: true }, { day: 'Tuesday', available: true }, { day: 'Wednesday', available: false },
+    { day: 'Thursday', available: true }, { day: 'Friday', available: true }, { day: 'Saturday', available: false }, { day: 'Sunday', available: false },
+  ]
+  for (const equipment_access of ['full_gym', 'home_gym'] as const)
+    for (const session_duration_preference of ['60-90', '90+'] as const)
+      for (const training_style of ['hybrid', 'functional'] as const)
+        for (const training_experience of ['intermediate', 'advanced'] as const)
+          for (const recovery_capacity of ['low', 'moderate', 'high'] as const)
+            for (const conditioning_preference of ['love', 'tolerate', 'avoid'] as const) {
+              const label = ['functional', equipment_access, session_duration_preference, training_style, training_experience, recovery_capacity, conditioning_preference].join('/')
+              const profile = buildProfile({
+                fitness_goal: 'functional', workout_split_preference: 'ai_recommendation', training_days: gridDays,
+                equipment_access, session_duration_preference, training_style, training_experience, recovery_capacity, conditioning_preference,
+              })
+              const plan = meso(profile, `deload-gate|${label}`)
+              functionalPlans++
+              for (let i = 1; i < plan.length; i++) {
+                const wk = plan[i]
+                if (!wk.is_deload) continue
+                const prevWeek = new Map<string, number>()
+                for (const day of plan[i - 1].days) for (const e of day.exercises) {
+                  if (e.suggested_load_kg == null) continue
+                  const already = prevWeek.get(e.name)
+                  prevWeek.set(e.name, already == null ? e.suggested_load_kg : Math.min(already, e.suggested_load_kg))
+                }
+                for (const day of wk.days) for (const e of day.exercises) {
+                  if (e.suggested_load_kg == null) continue
+                  const prev = prevWeek.get(e.name)
+                  if (prev == null) continue
+                  if (e.suggested_load_kg < prev) functionalDrops++
+                  if (e.suggested_load_kg > prev) functionalRises.push(`${label} ${e.name} wk${wk.week_number}: ${prev} -> ${e.suggested_load_kg}`)
+                }
+              }
+            }
+  check(`on the functional-goal grid where the rises lived (${functionalPlans} plans), a deload still takes weight down (${functionalDrops} drops)`, functionalDrops > 0)
+  check(`...and NO deload there comes in heavier than the week before it (${functionalRises.length}, must be 0)`,
+    functionalRises.length === 0, functionalRises.slice(0, 4).join(' | '))
 }
 
 // ---------------------------------------------------------------------------

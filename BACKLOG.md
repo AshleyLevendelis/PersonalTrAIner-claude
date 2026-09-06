@@ -2,6 +2,52 @@
 
 Newest first. One line each.
 
+- [x] **A DELOAD CAN COME IN HEAVIER THAN THE WEEK BEFORE IT — FOUND ON THE
+  RIGHT GRID, TRACED TO A DIFFERENT MECHANISM THAN THE ONE I GUESSED, FIXED.**
+  Ashley: "fix all 1 at a time. calf raise, muay thai and deload." FIRST, A
+  CORRECTION: when I recommended this I said "a few plans on the quality grid"
+  from memory of the BACKLOG headline, not from a measurement — and the gate's
+  own ledger had read ZERO since 1 Sep. Measured before touching anything: the
+  audit-shaped grid `test:frozen-weeks` sweeps really has none; the 9,216-plan
+  quality grid has **30**, every one a `functional`-goal plan (Landmine Press
+  23, Walking Lunges 4, Hack Squat 2, Bulgarian Split Squats 1) — a deload
+  prescribing 32.5kg the week after 25kg at the same reps, a "recovery week"
+  Hack Squat at 167.5kg after 87.5kg. So the claim was right and the reason I
+  gave for it was not; the 1 Sep entry's "displaced, not fixed — the
+  mechanism is untouched" was the accurate sentence.
+  THEN A SECOND CORRECTION, mid-fix. Reading the code I concluded the cause
+  was week 3's number being snapshotted before the coherence pass had pulled
+  week 3 down, and built that. It removed 5 of 46 rises on the reproduction
+  grid. Tracing one survivor week by week showed the real mechanism: the
+  functional goal rotates accessories EVERY week (`accessoryRotationWeeks` 1),
+  so the deload week holds Landmine Press in a slot that carried a different
+  press in week 3 — no week-3 anchor for that slot — and the deload branch
+  fell through to a FRESH estimate at full value, heavier than the ramped
+  50kg the same lift carried the day before on another day. The fix that
+  matters: an unanchored deload slot now takes 70% of the lift's own last
+  displayed loading-week number wherever it sat (by name), or of the fresh
+  estimate when the lift was not seen at all. 46 → 0 on the reproduction
+  grid; with that branch removed 46 come back, with the by-name reference
+  removed 20 do. The snapshot move is kept — 70% of a number the trainee never
+  saw is wrong even where it does not show — and labelled honestly in the
+  code as a statement of the rule: with the real fix in place, putting the
+  snapshot back changed no rise on 144- and 432-plan grids. What it does
+  change at plan level is recorded below.
+  `test:frozen-weeks` §1 gains the sweep that could see it: 144 functional-
+  goal plans in the quality grid's shape (2 equipment × 2 durations × 2
+  styles × 2 tiers × 3 recovery × 3 cardio), **46 rises before the fix, 0
+  after**, listed by name with no ledger and no budget — the original sweep's
+  empty ledger kept alongside.
+  **Verified at commit:** tsc clean; `test:frozen-weeks` green with the new
+  sweep at 0; ten generator gates that would notice a deload-load change
+  (`week-load-consistency`, `block-phases`, `ramp-arrived`, `main-lift-rest`,
+  `session-length`, `one-day-one-look`, `muscle-balance`,
+  `cardio-share-score`, `training-week`, `block-rest-sizing`) all green.
+  The full 9,216-plan re-sweep, the plan-level diff of what the fix changed,
+  and the final gate/audit/quality run were still going when this was
+  committed — recorded in the follow-up commit.
+  No migration, no edge-function change.
+
 - [x] **THE CLASSES COUNT AS TRAINING LOAD — BUILT, Ashley's ruling (option 1
   + a toggle on the card),
   [docs/plans/count-the-classes-as-load.md](docs/plans/count-the-classes-as-load.md).**
@@ -732,7 +778,7 @@ Newest first. One line each.
 - [x] **7,340 LOAD CLAMPS THE CODE ITSELF SAYS NOT TO TRUST.** (BUILT 6 Sep 2026 — see the top entry; the calf raise was the structural clamp and is gone, the 4,597 that remain are the honest top-corner kind.) Surfaced by the quality sweep's log while verifying the load floor, then measured on the audit: **7,340 clamp warnings, identical with and without that change**, so entirely pre-existing. The warning's own words: *"This is a safety net, not a fix: something upstream produced a wrong number and should be traced, not just the clamp trusted."* 24 distinct exercises hit a ceiling; the top one is **Single-Leg Dumbbell Calf Raise at 2,829 of them**, computing 50, 52, 54, 58, 60, 64, 66, 72kg against a 48kg implement ceiling — so it is not a rounding edge, it is a number that climbs well past the cap and gets silently pulled back. Others: Dumbbell Floor Press (556), Dumbbell Shrugs (553), Shrugs (478), Farmer's Walk (379). The audit passes at 0 failures BECAUSE the clamp catches these, which is exactly the shape of a check satisfied by the wrong thing — the plan is safe, and the calculation underneath is wrong. Worth tracing the calf raise first: a per-side isolation lift being priced above a full dumbbell rack is a big, specific error and likely one shared root.
   UPDATE 1 Sep 2026 — **traced, and my "likely one shared root" guess was wrong.** Measured every exercise that reaches its implement ceiling anywhere in a 240-cell grid (4 experience × 5 bodies × 4 rep ranges × 3 RPEs). `Single-Leg Dumbbell Calf Raise` hits it in **56 of 240** cells; the next worst is 23, and **every other one clamps only in the top corner** — a 120kg advanced male — which is the honest "ran out of dumbbell" case the ceiling was written for. So it is one mis-modelled exercise plus a long tail of the safety net working, not a systemic fault. The cause: `isolation_calf` is 0.65 × squat, calibrated for a MACHINE where the machine supplies the load, applied to a lift where the trainee is standing on one foot and the leg already carries full bodyweight before the dumbbell exists. An intermediate 80kg man is told to hold **36kg in one hand** balancing on a step; advanced wants 60kg and gets clamped to 48. **Investigated only — nothing built.** Load prescription and the numbers are Ashley's: `docs/plans/the-48kg-calf-raise.md` has the current table, three options, a recommendation, and a candidate table to rule on the way she ruled on kettlebell swings. NOTE ON DENOMINATORS: "7,340" counts warnings logged in one audit run (the same prescription once per week per profile); the 56/240 above counts distinct grid cells. Not comparable — the ranking is the part that carries. **CONFIRMED ON A THIRD CORPUS:** the full plan-quality sweep (9,216 profiles × 16 weeks) logs **88,046 clamp warnings, 100% of them this one exercise** — no other catalogue entry reaches its ceiling anywhere in it, because that grid's body weights are ordinary rather than reaching 120kg, so the honest top-corner clamps never fire and only the structural one is left. That sweep scores **11.45 / 12 with 0 plans below the 7.2 floor** throughout: a quality score measures structure, progression, time fit and selection, not whether 48kg in one hand on a step is an instruction anyone can follow.
 
-- [ ] **A DELOAD CAN COME IN HEAVIER THAN THE WEEK BEFORE IT.** Two cases, found by a check added during the above and present identically with and without it, so pre-existing: `full_gym/full_body/intermediate Seated Cable Row wk12: 40 → 45` and `minimalist/full_body/intermediate Dumbbell Floor Press wk16: 18 → 20`. A deload is supposed to be the easy week. Pinned in the gate BY NAME rather than by a count, so fixing one while breaking another still fails — a budget of "at most 2" is the exact shape §1 spent eleven offenders learning to distrust.
+- [x] **A DELOAD CAN COME IN HEAVIER THAN THE WEEK BEFORE IT.** (FIXED 6 Sep 2026 — see the top entry: the mechanism was a deload slot with no week-3 anchor falling through to a fresh full estimate, on functional plans that rotate accessories weekly.) Two cases, found by a check added during the above and present identically with and without it, so pre-existing: `full_gym/full_body/intermediate Seated Cable Row wk12: 40 → 45` and `minimalist/full_body/intermediate Dumbbell Floor Press wk16: 18 → 20`. A deload is supposed to be the easy week. Pinned in the gate BY NAME rather than by a count, so fixing one while breaking another still fails — a budget of "at most 2" is the exact shape §1 spent eleven offenders learning to distrust.
   UPDATE 1 Sep 2026: the full_gym case stopped reproducing when the machine-floor batch added 15 full_gym candidates and changed which exercises that seeded plan picks. **Displaced, not fixed** — the mechanism is untouched and the minimalist case still reproduces, so this stays open. The gate's ledger now lists only the minimalist case; if the full_gym one re-manifests under a future pool it fails by name as a NEW rise.
   UPDATE 1 Sep 2026 (later): **the minimalist case is now genuinely fixed, and by something else.** `enforceOneWeightPerPrescription` (see the entry above) settles one weight per lift per week; Dumbbell Floor Press had been holding two in week 15, and this check compares the deload against the LOWER of them (`Math.min`). One weight per week removes the disagreement the comparison was reading. The gate's pinned list is now **empty** — which makes it stronger, not weaker: any deload rise at all now fails by name.
 - [x] **AND A CORRECTION ON HOW I FOUND IT.** My first probe used `RPE 8`, got 6kg for both rep ranges, and concluded the rep target didn't explain the drop — I nearly went looking in the wrong place. The real week uses `RPE 7-8`, where the estimate does fall 6 → 4. I had guessed an input instead of reading it off the generated week: the same error shape as the calorie misdiagnosis, arithmetic on assumed inputs rather than actual ones. Reading the real week's `intensity` off the mesocycle took one line.

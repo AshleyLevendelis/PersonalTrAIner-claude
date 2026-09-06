@@ -6328,6 +6328,36 @@ export function generateMesocycle(
                 // volume did the reducing") is unambiguous rather than an
                 // accident of rounding.
                 forceStartingWeightKg = deloadAtFloor ? equipmentFloor! : week3Kg * 0.7
+              } else if (forceStartingWeightKg == null) {
+                // NO WEEK-3 ANCHOR FOR THIS SLOT, AND A DELOAD MUST STILL
+                // BACK OFF. The anchor is name-keyed, so a slot whose
+                // exercise changed since week 3 has none — and goals that
+                // rotate accessories every week (functional's
+                // accessoryRotationWeeks) change it in the deload week too.
+                // This branch used to fall through to prescribeLoad's fresh
+                // estimate at full value: a "recovery week" introducing a
+                // lift at a heavier number than the same lift carried the
+                // week before on another day. Measured on the quality grid,
+                // 6 Sep 2026: 30 deloads heavier than their preceding week,
+                // all functional, e.g. Landmine Press 50kg -> 52.5kg. So the
+                // no-anchor case takes the same 70% — of the LIFT's own last
+                // displayed loading-week number wherever it sat (by name,
+                // lastWeekDisplayedKgByLift, which the trainee actually saw
+                // and which the unverified ramp may still hold well under the
+                // estimate: 30kg in week 3 against a 55kg estimate), and only
+                // when the lift was not seen last week at all, of the fresh
+                // estimate at this week's own reps and RPE — already the
+                // lighter deload target, so if anything that errs light.
+                const lastSeenKg = lastWeekDisplayedKgByLift.get(dbEntry.name)?.kg
+                if (lastSeenKg != null) {
+                  forceStartingWeightKg = lastSeenKg * 0.7
+                } else {
+                  const fresh = prescribeLoad(dbEntry, profile, {
+                    targetRpeLabel: intensity, isFirstBlock: blockIndex === 0, sets, phase,
+                    isCalibrationWeek, knownWorkingWeights, repRangeLabel: reps, loadIsProgressing: rampLoad,
+                  })
+                  if (fresh.starting_weight_kg != null) forceStartingWeightKg = fresh.starting_weight_kg * 0.7
+                }
               }
             }
 
@@ -6532,10 +6562,8 @@ export function generateMesocycle(
               blockBaselineKg[dayIdx][exIdx] = load.starting_weight_kg
               blockBaselineName[dayIdx][exIdx] = dbEntry.name
             }
-            if (w === 3) {
-              blockWeek3Kg[dayIdx][exIdx] = load.starting_weight_kg
-              blockWeek3Name[dayIdx][exIdx] = dbEntry.name
-            }
+            // Week 3's number for the deload is snapshotted AFTER the week's
+            // passes have run, not here — see "THE DELOAD'S REFERENCE" below.
             // Deload weeks are read-only for this tracker (see its
             // declaration) — the next block's week 1 must step from the
             // last real loading week, not the deload back-off. Written
@@ -6827,6 +6855,35 @@ export function generateMesocycle(
             const already = lastWeekDisplayedKgByLift.get(ex.name)
             const entry = { kg: ex.suggested_load_kg, repLow: repLowOf(ex.reps) }
             lastWeekDisplayedKgByLift.set(ex.name, already == null || entry.kg < already.kg ? entry : already)
+          }
+        }
+      }
+
+      // THE DELOAD'S REFERENCE IS THE NUMBER THE TRAINEE SAW. blockWeek3Kg
+      // used to be written inside the exercises.map above — BEFORE
+      // enforceOneWeightPerPrescription, enforceLoadCoherence and the
+      // never-drops floor had run on the week — so a slot those passes pulled
+      // down in week 3 had its deload built as 70% of a figure nobody was
+      // shown. Same lesson as the unverified tracker above, which was moved
+      // here on 31 Aug for the same reason; this snapshot was not moved with
+      // it. It is now. Name-keyed as before, so a slot whose exercise changed
+      // has no week-3 anchor — see the deload branch in the map for what
+      // happens then, which is where the measured defect actually lived.
+      //
+      // HONESTLY: this half is a statement of the rule, not a measured fix.
+      // The 30 deloads-heavier-than-the-week-before found on the quality grid
+      // on 6 Sep 2026 were all the NO-ANCHOR case; with that case handled,
+      // putting this snapshot back inside the map changed no deload rise on
+      // 144- and 432-plan functional grids. It is kept because 70% of a number
+      // the trainee never saw is wrong even where it does not show, and the
+      // plan-level diff records what it does change.
+      if (w === 3) {
+        for (let dayIdx = 0; dayIdx < days.length; dayIdx++) {
+          const dayExercises = days[dayIdx].exercises
+          for (let exIdx = 0; exIdx < dayExercises.length; exIdx++) {
+            const ex = dayExercises[exIdx]
+            blockWeek3Kg[dayIdx][exIdx] = ex.suggested_load_kg ?? null
+            blockWeek3Name[dayIdx][exIdx] = ex.suggested_load_kg == null ? null : ex.name
           }
         }
       }
