@@ -17,6 +17,8 @@
 //   §8  the third reason added 6 Sep 2026 — a coach reply nobody has read
 //       yet (chat-unread.ts) — and the seen set that keeps three independent
 //       reasons from hiding each other
+//   §9  ...and what the button DOES about it: a ring and a pulse that both
+//       vanish at glow Off and stop under reduced motion
 //
 // Pure functions where possible; source reads for the wiring, same split as
 // test-session-feel.ts.
@@ -319,6 +321,93 @@ console.log('\n8. An unread coach reply is the third reason, and no reason hides
       loadSeenAttention('p2') === '')
     check('profiles do not share a seen set', loadSeenAttention('p1') === 'unread:msg-1')
   }
+}
+
+console.log('\n9. The ring and the pulse vanish at glow Off and stop under reduced motion')
+{
+  const css = readFileSync(join(ROOT, 'src/index.css'), 'utf8')
+  const bar = readFileSync(join(ROOT, 'src/components/BottomTabBar.tsx'), 'utf8')
+
+  // Brace-matched bodies for a rule or @keyframes block (keyframes nest, so
+  // indexOf('}') is not enough). ALL of them, because a selector can appear
+  // more than once — and matched only where the header STARTS a rule, so
+  // `.chat-unread-ring` does not also pick up `[data-canvas="light"]
+  // .chat-unread-ring`, and `@keyframes chatUnreadPulse` does not pick up
+  // `...PulseLight`. Both of those silently returned the wrong block while
+  // this section was being written, and every check passed on the wrong one.
+  const blocks = (header: string): string[] => {
+    const re = new RegExp(`(?:^|[\\n,{])\\s*${header.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{`, 'g')
+    const out: string[] = []
+    for (const m of css.matchAll(re)) {
+      let depth = 0
+      const i = css.indexOf('{', (m.index ?? 0) + m[0].length - 1)
+      for (let j = i; j < css.length; j++) {
+        if (css[j] === '{') depth++
+        else if (css[j] === '}' && --depth === 0) { out.push(css.slice(i + 1, j)); break }
+      }
+    }
+    return out
+  }
+  const block = (header: string): string => blocks(header)[0] ?? ''
+
+  const FRAMES = ['chatUnreadPulse', 'chatUnreadRing', 'chatUnreadPulseLight', 'chatUnreadRingLight']
+  for (const name of FRAMES) {
+    const body = block(`@keyframes ${name}`)
+    check(`@keyframes ${name} exists`, body.length > 0)
+    // THE GLOW-OFF GUARANTEE. Ashley asked for these to vanish when glow is
+    // turned off. --glow-strength is 0 at "off", so every colour these
+    // animate has to carry it in its ALPHA — a blur that shrinks to nothing
+    // still paints if the alpha does not.
+    const alphas = [...body.matchAll(/rgba\([^)]*var\(--glow-rgb\)\s*,\s*([^;]*?)\)\s*[;,]/g)].map(m => m[1])
+    check(`...and every colour in it fades to nothing at glow Off (${alphas.length} found)`,
+      alphas.length > 0 && alphas.every(a => a.includes('var(--glow-strength)')), alphas)
+    // A transform is not a halo: it would keep pulsing at strength 0, which
+    // is exactly what "vanishing when glow is turned off" rules out.
+    check('...and animates no transform, which glow Off cannot switch off', !/transform/.test(body), body.slice(0, 120))
+  }
+  // The house rule for a DARK-canvas halo is both blur AND alpha (see the
+  // glow-system comment). The light variants are flat drop shadows, where
+  // the alpha alone does the vanishing — same as dsBloomInLight.
+  for (const name of ['chatUnreadPulse', 'chatUnreadRing']) {
+    const blurs = [...block(`@keyframes ${name}`).matchAll(/(\d+px)(?!\s*\*)/g)].map(m => m[0])
+    check(`${name} scales its blur radii too, not just its alphas`,
+      blurs.length === 0 && /calc\(\d+px \* var\(--glow-strength\)\)/.test(block(`@keyframes ${name}`)), blurs)
+  }
+
+  // The pulse starts and ends on .glow-mint-box's own resting shadow, so
+  // adding or removing the class does not make the button jump.
+  const resting = /0 0 calc\(12px \* var\(--glow-strength\)\) rgba\(var\(--glow-rgb\), calc\(\.90 \* var\(--glow-strength\)\)\),\s*0 0 calc\(24px \* var\(--glow-strength\)\) rgba\(var\(--glow-rgb\), calc\(\.45 \* var\(--glow-strength\)\)\)/
+  check('the pulse rests exactly where .glow-mint-box already sits',
+    resting.test(block('.glow-mint-box')) && resting.test(block('@keyframes chatUnreadPulse')))
+
+  // Reduced motion strips the animations. What is LEFT has to still say
+  // something, so the ring's resting border is glow-multiplied in the class
+  // itself rather than only inside the keyframes.
+  // There is more than one reduced-motion block in the file (onboarding has
+  // its own); the pulse only has to be stopped by one of them.
+  const reduced = blocks('@media (prefers-reduced-motion: reduce)')
+  check('there are reduced-motion blocks to look in', reduced.length > 0, reduced.length)
+  check('reduced motion stops the pulse', reduced.some(b => /\.chat-unread\s*,/.test(b)))
+  check('...and the ring', reduced.some(b => /\.chat-unread-ring\s*,/.test(b)))
+  check('...leaving a static ring behind, which still scales with glow',
+    /border:\s*1\.5px solid rgba\(var\(--glow-rgb\), calc\([.\d]+ \* var\(--glow-strength\)\)\)/.test(block('.chat-unread-ring')))
+
+  // On paper a halo under a button reads as a printing fault — the same
+  // reason .glow-bloom-once swaps keyframes on a light canvas.
+  check('a light canvas swaps the pulse for a flat drop shadow',
+    /\[data-canvas="light"\] \.chat-unread \{\s*animation-name: chatUnreadPulseLight/.test(css))
+  check('...and drops the ring\'s halo, leaving its border to do the work',
+    /\[data-canvas="light"\] \.chat-unread-ring \{\s*animation-name: chatUnreadRingLight/.test(css) &&
+    !/box-shadow/.test(block('@keyframes chatUnreadRingLight')))
+
+  // ...and the button actually wears them, only when something is waiting.
+  check('the button wears the pulse only while something is waiting',
+    /chatAttention \? 'chat-unread' : ''/.test(bar))
+  check('the ring is drawn only then too', /\{chatAttention && \([\s\S]{0,400}className="chat-unread-ring"/.test(bar))
+  // The dot survives both: at glow Off with reduced motion on it is the only
+  // thing left saying the coach is waiting.
+  check('...and the dot is still drawn underneath, outside the glow system',
+    /data-testid="chat-attention-dot"[\s\S]{0,300}bg-amber-400/.test(bar))
 }
 
 if (failures > 0) { console.error(`\n${failures} check(s) failed\n`); process.exit(1) }

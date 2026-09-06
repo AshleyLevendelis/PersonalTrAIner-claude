@@ -49,14 +49,21 @@ export function BottomTabBar({
   /**
    * The coach has something that wants an answer — an unreviewed session or a
    * missed day (coach-opener.ts, `attention`), or a reply the trainee has not
-   * read yet (chat-unread.ts). Draws one small dot on the chat button and
-   * nothing else: no count, no pulse, no colour change on the button itself.
-   * It is a nudge, not a demand, and it goes away the moment the chat is
+   * read yet (chat-unread.ts). Draws a ring outside the disc, a pulse on the
+   * disc's own halo, and the small dot. Still no count and no colour change:
+   * it is a nudge, not a demand, and it goes away the moment the chat is
    * opened, whether or not they answer.
    *
+   * The ring and the pulse REPLACE "one small dot and nothing else", which
+   * was a deliberate decision recorded here until 6 Sep 2026. Ashley asked
+   * for them by name after not finding them on her phone; the app-polish
+   * handoff had specified them and deferred the keyframes to a chat handoff
+   * that never arrived. The dot stays underneath both, because both live in
+   * the glow system and vanish at glow Off — see .chat-unread in index.css.
+   *
    * Deliberately NOT lit for "today is a training day" — that is every other
-   * day, and a dot that is always on is a dot nobody sees. The same rule is
-   * why the client-composed opener does not count as an unread message.
+   * day, and a signal that is always on is a signal nobody sees. The same
+   * rule is why the client-composed opener does not count as unread.
    */
   chatAttention?: boolean
 }) {
@@ -90,20 +97,27 @@ export function BottomTabBar({
             onClick={() => onTabChange('chat')}
             aria-label={chatAttention ? 'Chat — your Personal TrAIner has something for you' : 'Chat'}
             aria-current={activeTab === 'chat' ? 'page' : undefined}
+            // The active-tab ring and the attention ring never co-occur:
+            // App suppresses chatAttention while the chat is the open tab.
             className={`relative -mt-6 flex size-14 shrink-0 items-center justify-center rounded-full text-primary-foreground transition-shadow glow-mint-box ${
+              chatAttention ? 'chat-unread' : ''
+            } ${
               activeTab === 'chat' ? 'ring-2 ring-primary/40 ring-offset-2 ring-offset-[color:var(--surface-deep)]' : ''
             }`}
             style={{ background: 'linear-gradient(180deg, color-mix(in oklab, var(--primary) 84%, white), var(--primary-2))' }}
           >
             <MessageCircle className="size-6" />
             {chatAttention && (
-              <span
-                data-testid="chat-attention-dot"
-                aria-hidden="true"
-                className="absolute -right-0.5 -top-0.5 size-3 rounded-full bg-[color:var(--background)] p-[2px]"
-              >
-                <span className="block size-full rounded-full bg-amber-400" />
-              </span>
+              <>
+                <span data-testid="chat-unread-ring" aria-hidden="true" className="chat-unread-ring" />
+                <span
+                  data-testid="chat-attention-dot"
+                  aria-hidden="true"
+                  className="absolute -right-0.5 -top-0.5 size-3 rounded-full bg-[color:var(--background)] p-[2px]"
+                >
+                  <span className="block size-full rounded-full bg-amber-400" />
+                </span>
+              </>
             )}
           </button>
         </div>

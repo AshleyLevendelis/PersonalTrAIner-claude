@@ -2,6 +2,47 @@
 
 Newest first. One line each.
 
+- [x] **THE CHAT BUTTON LIGHTS WHEN THE COACH HAS ACTUALLY SAID SOMETHING** —
+  Ashley, 6 Sep 2026, after asking why she could not see "the outer ring round
+  the chat button and the pulsating chat icon when I have a new message". Two
+  halves, both hers to call and both approved.
+  **The trigger.** It lit for exactly two things, both raised by the opener:
+  an unreviewed session, and a scheduled yesterday nothing was logged against.
+  A reply from the coach was not one of them, so sending a message, switching
+  tabs and coming back left the answer waiting with nothing on screen saying
+  so. `src/lib/chat-unread.ts` (new) adds it as a third reason. Unread means
+  the LAST message is the coach's, is `complete`, and carries a DB id — the id
+  is what separates a real reply from the client-composed opener and the
+  first-run intro, which are recomposed on every mount; counting those would
+  light the button every day, the failure the old "a dot that is always on is
+  a dot nobody sees" note warns about.
+  **App.tsx's single seen-flag is gone**, and its removal is the point: one
+  flag could only remember that one thing had been looked at, so a reply
+  arriving under an already-seen feel question could never light the button,
+  and reading the reply would re-light it for the feel question. The seen SET
+  lives in ChatAssistant beside the state that produces the reasons. Only
+  `unread:` reasons persist — a message id is durable; feel and missed are
+  re-derived each mount and re-arm across a reload exactly as before.
+  **The visuals.** `.chat-unread` (a breathing halo on the disc) and
+  `.chat-unread-ring` (a ring outside it) at 2.4s, written here rather than
+  transcribed: the app-polish handoff named them and deferred the keyframes to
+  a chat handoff that never arrived. No transform in either — a scale would
+  keep pulsing at glow Off, and the instruction was that these vanish when
+  glow is turned off — so every animated property is a blur or an alpha times
+  `--glow-strength`. A light canvas swaps both for flat-shadow variants, the
+  same reason `.glow-bloom-once` does. The amber dot stays underneath: at glow
+  Off with reduced motion on, it is the only thing left.
+  `test:coach-opener` §8 (unread definition, seeding, persistence filter, both
+  directions of the bug the set exists for) and §9 (every colour fades at glow
+  Off, no transform, both classes in the reduced-motion list, the light-canvas
+  swaps, the dot survives). **Twenty-five mutations tried, twenty-five
+  caught.** Verified in Chromium at 390x844 on five states: ring and pulse
+  running with a reply waiting; nothing at all with none; ring and halo
+  invisible at glow Off; static ring and zero animations under reduced motion;
+  flat-shadow variants on `daylight`. Opening the chat clears it and writes
+  the reply's id to the seen set, so a reload does not re-light it.
+  134 of 134 sweep gates pass.
+
 - [x] **TOOLS STOPS BEING A JUNK DRAWER** — `design_handoff_app_polish` step 4
   of 8. Six tiles with live subtitles (grocery items and how many are checked,
   sessions and PRs, weeks and which block) over a three-row grocery preview
