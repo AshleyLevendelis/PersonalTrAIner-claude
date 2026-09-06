@@ -60,7 +60,8 @@ check(`a day is the ceiling (${MAX_PLAUSIBLE_CARDIO_MINUTES} min)`,
   isPlausibleCardioDuration(MAX_PLAUSIBLE_CARDIO_MINUTES) && !isPlausibleCardioDuration(MAX_PLAUSIBLE_CARDIO_MINUTES + 1))
 
 console.log('\n2. Every typed number goes through one\n')
-const steps = stripComments(read('src/components/exercise/StepsRow.tsx'))
+// Moved to Home with the input, 6 Sep 2026 — the guard travels with the box.
+const steps = stripComments(read('src/components/Dashboard.tsx'))
 check('the steps box checks plausibility before writing',
   /isPlausibleStepCount\(rounded\)/.test(steps))
 check('...and says what the limit is rather than just refusing',

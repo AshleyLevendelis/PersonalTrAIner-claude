@@ -249,35 +249,58 @@ async function main() {
     // space on the screen someone opens every morning.
     const dash = fs.readFileSync('src/components/Dashboard.tsx', 'utf-8')
     const avgIdx = dash.indexOf('data.weightTrend.rollingAvgKg.toFixed(1)')
-    check('the rolling average is rendered somewhere (sanity check on this check)', avgIdx > 0, avgIdx)
 
-    // COMMENTS STRIPPED FIRST, and that is not fussiness — the first version
-    // of this check tested the raw block, and the explanation sitting above
-    // the label (which says "rolling average", "daily reading", "average")
-    // satisfied it. BOTH mutations below passed against a screen with no
-    // label on it at all. A check its own subject's comment can satisfy is
-    // not a check; it took running the mutations to find that out.
-    const blockRaw = dash.slice(avgIdx, dash.indexOf(') : (', avgIdx))
-    const block = blockRaw
-      .replace(/\{\/\*[\s\S]*?\*\/\}/g, '')   // JSX comments
-      .replace(/\/\*[\s\S]*?\*\//g, '')          // block comments
-      .replace(/^\s*\/\/.*$/gm, '')                // line comments
+    // TIED TO THE SUBJECT, 6 Sep 2026. design_handoff_app_polish removed the
+    // "Progress" block: Home's Weight cell now shows the RAW last weigh-in,
+    // the number the trainee typed, and the trend chart carries the shape of
+    // the change. That dissolves the incident below rather than fixing it —
+    // there is no second, smoothed number to disagree with the logged one.
+    // (The comment that block carried cited "VISION-ARCHITECTURE §5.4" for
+    // "never a raw daily reading as the headline". §5.4 is the chat-door
+    // worked example and says nothing of the kind; the citation was wrong,
+    // and no such rule is written anywhere in that document.)
+    //
+    // The lesson is kept and made conditional: IF a rolling average is ever
+    // rendered here again, it must say it is an average, unconditionally.
+    // Ashley, 3 Sep 2026: she logged 85kg, saw 86.0, logged 85 again and saw
+    // 85.7, and reported the display as broken. It was right and unlabelled,
+    // which on screen is the same thing.
+    check('Home shows a weight number at all (sanity check on this check)',
+      /lastWeighIn\.kg\.toFixed\(1\)/.test(dash) || avgIdx > 0)
+    if (avgIdx > 0) {
+      // COMMENTS STRIPPED FIRST, and that is not fussiness — the first version
+      // of this check tested the raw block, and the explanation sitting above
+      // the label (which says "rolling average", "daily reading", "average")
+      // satisfied it. BOTH mutations below passed against a screen with no
+      // label on it at all. A check its own subject's comment can satisfy is
+      // not a check; it took running the mutations to find that out.
+      const blockRaw = dash.slice(avgIdx, dash.indexOf(') : (', avgIdx))
+      const block = blockRaw
+        .replace(/\{\/\*[\s\S]*?\*\/\}/g, '')   // JSX comments
+        .replace(/\/\*[\s\S]*?\*\//g, '')          // block comments
+        .replace(/^\s*\/\/.*$/gm, '')                // line comments
 
-    // A RENDERED text node, i.e. between > and <, not a string in an
-    // attribute and not prose in a comment.
-    const rendered = [...block.matchAll(/>([^<>{}]*?)</g)].map(m => m[1].trim()).filter(Boolean)
-    check('...and a rendered label names it an average',
-      rendered.some(t => /average/i.test(t)), rendered)
+      // A RENDERED text node, i.e. between > and <, not a string in an
+      // attribute and not prose in a comment.
+      const rendered = [...block.matchAll(/>([^<>{}]*?)</g)].map(m => m[1].trim()).filter(Boolean)
+      check('...and a rendered label names it an average',
+        rendered.some(t => /average/i.test(t)), rendered)
 
-    // Not hidden behind the thin-sample condition: gated that way it would
-    // vanish for almost everyone, which is the state that produced the report.
-    const labelLine = blockRaw.split('\n').find(l => />[^<]*average/i.test(l) && !l.trimStart().startsWith('//'))
-    const idxOfLabel = labelLine ? blockRaw.indexOf(labelLine) : -1
-    const before = idxOfLabel > 0
-      ? blockRaw.slice(0, idxOfLabel).replace(/\{\/\*[\s\S]*?\*\/\}/g, '').trimEnd()
-      : ''
-    check('...unconditionally, not only for a thin sample',
-      idxOfLabel > 0 && !/&&\s*\(?\s*$/.test(before), before.slice(-160))
+      // Not hidden behind the thin-sample condition: gated that way it would
+      // vanish for almost everyone, which is the state that produced the report.
+      const labelLine = blockRaw.split('\n').find(l => />[^<]*average/i.test(l) && !l.trimStart().startsWith('//'))
+      const idxOfLabel = labelLine ? blockRaw.indexOf(labelLine) : -1
+      const before = idxOfLabel > 0
+        ? blockRaw.slice(0, idxOfLabel).replace(/\{\/\*[\s\S]*?\*\/\}/g, '').trimEnd()
+        : ''
+      check('...unconditionally, not only for a thin sample',
+        idxOfLabel > 0 && !/&&\s*\(?\s*$/.test(before), before.slice(-160))
+    } else {
+      // The other half of "one weight, not two": with no average on screen,
+      // the cell must be the logged reading and nothing may quietly smooth it.
+      check('...and it is the logged reading, not an unlabelled smoothing',
+        /lastWeighIn\.kg\.toFixed\(1\)/.test(dash) && !/rollingAvgKg/.test(dash))
+    }
   }
 
   console.log('\nA write from the chat reaches the screen')

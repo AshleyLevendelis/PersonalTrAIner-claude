@@ -52,7 +52,9 @@ const indicator = stripComments(readFileSync(join(ROOT, 'src/components/OfflineS
 const chat = stripComments(readFileSync(join(ROOT, 'src/components/ChatAssistant.tsx'), 'utf8'))
 // Steps moved off Nutrition to the Exercise tab on 5 Sep 2026. The handler
 // travelled verbatim, so the checks travel with it rather than being relaxed.
-const stepsRow = stripComments(readFileSync(join(ROOT, 'src/components/exercise/StepsRow.tsx'), 'utf8'))
+// Steps moved to Home's "Today so far" grid on 6 Sep 2026 (VISION-ARCHITECTURE
+// §5.1a). Same three assertions, pointed at the surface that now writes them.
+const stepsHost = stripComments(readFileSync(join(ROOT, 'src/components/Dashboard.tsx'), 'utf8'))
 
 console.log('\n1. Swapping an exercise')
 {
@@ -80,9 +82,15 @@ console.log('\n2. Banning an exercise')
 
 console.log('\n3. Steps and the water target')
 {
-  const steps = handlerBody(stepsRow, 'const handleLogSteps')
+  const steps = handlerBody(stepsHost, 'const handleLogSteps')
   check('logging steps is guarded', /try \{/.test(steps) && /catch/.test(steps))
-  check('...and reports the failure', /setEntryError\(/.test(steps))
+  // THE CATCH BLOCK, not the handler. This asserted `setStepsError(` anywhere
+  // in the function and was satisfied by the plausibility guard's own call
+  // thirty lines above the catch — so emptying the catch left it green.
+  // Found by mutation on 6 Sep 2026 while re-pointing this file at Home; the
+  // same weakness was in the version that read StepsRow.
+  check('...and reports the failure from the CATCH, not just somewhere in the handler',
+    /setStepsError\(/.test(steps.slice(steps.indexOf('} catch'))))
   // The value is the user's — losing it once is bad enough without making
   // them retype it. Checked by slicing the catch block, not by looking for
   // the clear anywhere in the handler: it legitimately appears in the
@@ -93,7 +101,7 @@ console.log('\n3. Steps and the water target')
   // with the water-target handler, and a shared string is how one failure
   // comes to describe the other once the two live on different screens.
   check('...and the steps error is rendered on the tab that logs them',
-    /\{entryError && \(/.test(stepsRow))
+    /\{stepsError && </.test(stepsHost))
 
   const water = handlerBody(nutrition, 'const handleSaveWaterTarget')
   check('saving the water target is guarded', /try \{/.test(water) && /catch/.test(water))

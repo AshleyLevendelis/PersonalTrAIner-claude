@@ -58,18 +58,31 @@ console.log('\n1. A glow is never clipped by its own box')
   const dash = readFileSync(join(ROOT, 'src/components/Dashboard.tsx'), 'utf8')
   check('...and the scan is looking at real files (glow-text is still used somewhere)',
     /glow-text/.test(dash))
-  check('the session name still truncates — the fix dropped the glow, not the clamp',
-    /min-w-0 truncate">\{data\.session\.focus\}/.test(dash))
+  // FLIPPED 6 Sep 2026 by design_handoff_app_polish, which specifies the
+  // focus name WITH the glow and explicitly NOT truncated. That resolves the
+  // conflict this check recorded — the old fix dropped the glow to keep the
+  // clamp; the handoff drops the clamp and keeps the glow, so a long name
+  // wraps instead of being cut. §1's generic scan above is what now protects
+  // it: glow + clip on one element still fails.
+  check('the session name glows and does NOT clip it',
+    /glow-text">\{data\.session\.focus\}/.test(dash) && !/truncate[^"]*">\{data\.session\.focus\}/.test(dash))
 }
 
-console.log('\n2. The ambient surface reaches the screen edges')
+console.log('\n2. The ambient surface is gone with the cards')
 {
+  // WHAT THIS SECTION USED TO PIN, and why it does the opposite now. Home had
+  // two radial washes and a grain overlay pulled 12px past the gutter, and
+  // this section pinned that geometry — including the px-4 / -mx-1 pair the
+  // -12 depended on. design_handoff_app_polish removes all three: with no
+  // cards left there is no panel edge for a texture to sit inside, and the
+  // section headings carry the structure the wash used to imply. The checks
+  // are kept, inverted, rather than deleted, so re-adding a wash without
+  // re-deciding the direction fails here with a sentence.
   const dash = readFileSync(join(ROOT, 'src/components/Dashboard.tsx'), 'utf8')
   const app = readFileSync(join(ROOT, 'src/App.tsx'), 'utf8')
-  check('the hero wash is pulled out past the gutter', /left: -12,\s*\n\s*right: -12,/.test(dash))
-  check('...and so is the grain', /grain-overlay" aria-hidden style=\{\{ left: -12, right: -12 \}\}/.test(dash))
-  check('...and neither uses inset-x-0 any more', !/pointer-events-none absolute inset-x-0/.test(dash))
-  // -12 is only right while the page keeps px-4 and the wrapper keeps -mx-1.
+  check('the hero wash is gone', !/--hero-wash/.test(dash))
+  check('...and so is the grain', !/grain-overlay/.test(dash))
+  check('...and nothing replaced them with a full-bleed layer', !/pointer-events-none absolute inset-x-0/.test(dash))
   check('the page gutter is still px-4', /max-w-6xl mx-auto px-4/.test(app))
   check('...and the wrapper still -mx-1 px-1', /className="relative -mx-1 px-1"/.test(dash))
 }

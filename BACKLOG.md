@@ -2,6 +2,65 @@
 
 Newest first. One line each.
 
+- [x] **HOME BECOMES THE DAY, AND THE TRAINER SPEAKS IN ONE VOICE** —
+  `design_handoff_app_polish` direction 1a, steps 1-2 of 8
+  ([README](design_handoff_app_polish/README.md)). Presentation pass: no store,
+  route, safety rule or coach behaviour changed.
+  **`<TrainerNudge>`** replaces both the hand-rolled coach bubble on Home and
+  the `InsightBanner tone="ai"` stack App.tsx floated above every tab. Source
+  order is the handoff's — the first adaptation message (carrying its own
+  confirm/decline, same handlers and busy labels), then the coach tip, then
+  nothing. The remaining messages wait their turn instead of stacking.
+  **Home** is now a greeting + streak, the nudge, today's session with its CTA
+  and the week strip under it, a hairline 2×2 "Today so far", the weight trend,
+  recent PRs and a Tomorrow row. The hero wash, the grain overlay and the
+  rolling-average "Progress" block are gone.
+  **THE ONE REAL CONFLICT, and it is a reversal of Ashley's own 5 Sep ruling:**
+  the handoff puts water and step logging on Home, and steps had been moved to
+  Exercise the day before ("we currently log steps in the nutrition tab but
+  that isn't right"). The handoff is newer, explicit ("opens the existing
+  inline number input **in place**"), and reasons about ownership itself for
+  water. So it was built — as a MOVE, not a copy: `StepsRow.tsx` is deleted,
+  Exercise no longer writes steps, and VISION-ARCHITECTURE §5.1a records the
+  third move and why the destination changed while the rule did not. If that
+  is wrong, it is one file to put back.
+  Three things the README names that do not exist here, handled rather than
+  invented: `projectNextLoad` (no such symbol — the chain ends at the coach
+  tip); the "What's left" warn line (removed from Home as specified, and the
+  nudge carries it in warn colour, which is why its text prop is a node); the
+  keyed reply chips (not in the README, live data, kept under the nudge).
+  `RecentPR` has no rep count, so the PR row shows the weight alone rather
+  than the prototype's "60 kg × 9".
+  **SEVEN GATES MOVED WITH THE DESIGN**, each re-pointed rather than relaxed:
+  `tab-ownership` (Home logs, Exercise no longer does, and the deleted file is
+  really deleted), `hero-surface` (§2 inverted — it pinned the wash's -12px
+  geometry, it now pins its absence; the focus name glows and no longer
+  clips), `dashboard` (the rolling-average label check is now conditional on a
+  rolling average being rendered at all), `app-tour`, `silent-writes`,
+  `bounds-and-boundaries`, `chat-app-reality` (+ the coach's own APP_REALITY,
+  both copies, which credited step logging to Exercise and called the tab
+  "Dashboard" when the tab bar says "Home"). Nine mutations, nine caught —
+  two of them only after strengthening the checks they walked through: the
+  silent-writes steps check accepted a `setStepsError` from the plausibility
+  guard thirty lines above an emptied catch, and the coherence check accepted
+  one stack rounding step.
+  **AND A CORRECTION I OWE THIS SESSION.** I reported `test:onboarding-reachable`
+  as an environmental failure — "needs a browser, fails identically on a clean
+  tree" — in every sweep. It was not environmental and I never checked it: I
+  read the gate's own "skips loudly where there is no browser" comment and
+  assumed that was the branch it was taking. Two real defects were behind it,
+  both found only because I built a second browser harness for these
+  screenshots and hit the first one myself. (1) Its Supabase fixture answered
+  EVERY `/auth/v1/**` call with a session object, including `/auth/v1/user`,
+  which wants the user itself — so `session.user` was undefined, sign-in
+  failed, and the app rendered an error screen with no `<input>` on it. (2) A
+  `dist` built without `VITE_SUPABASE_URL` renders that same screen. Both are
+  fixed, and the gate now fails with a sentence naming the build precondition
+  instead of a bare Playwright locator timeout. **It passes — 131 of 131 now,
+  not 130 of 131.**
+  No migration. Needs `deploy:functions:prod -- chat-gemini` for the
+  APP_REALITY change; the rest ships via push → Vercel.
+
 - [x] **A DELOAD CAN COME IN HEAVIER THAN THE WEEK BEFORE IT — FOUND ON THE
   RIGHT GRID, TRACED TO A DIFFERENT MECHANISM THAN THE ONE I GUESSED, FIXED.**
   Ashley: "fix all 1 at a time. calf raise, muay thai and deload." FIRST, A

@@ -39,7 +39,8 @@ const fn = read('supabase/functions/chat-gemini/index.ts')
 const chat = read('src/components/ChatAssistant.tsx')
 const app = read('src/App.tsx')
 const store = read('src/lib/steps-store.ts')
-const stepsRow = read('src/components/exercise/StepsRow.tsx')
+// Steps moved to Home's "Today so far" grid, 6 Sep 2026 (§5.1a).
+const stepsRow = read('src/components/Dashboard.tsx')
 
 let failures = 0
 const check = (name: string, ok: boolean, detail?: unknown) => {
@@ -129,9 +130,11 @@ console.log('\n4. One writer, one rule, and the write is visible\n')
   // check is here so steps cannot ship the same dead prop.
   check('App actually passes onStepsChanged, not merely declares it',
     /onStepsChanged=\{/.test(app), 'declared-but-unpassed is the onWaterChanged bug')
-  check('...and the refresh reaches the row that renders the number',
-    /refreshToken/.test(stepsRow) && /stepsVersion/.test(app))
-  check('the receipt deep-links to Exercise, where steps live',
+  check('...and the refresh reaches the cell that renders the number',
+    /stepsVersion/.test(stepsRow) && /stepsVersion/.test(app))
+  check('...as a dependency of the read, or the effect never re-runs',
+    /\[profile\.id, activeSession\.date, stepsVersion\]/.test(stepsRow))
+  check('the receipt deep-links somewhere the number is visible',
     /onViewExercise/.test(chat))
 }
 

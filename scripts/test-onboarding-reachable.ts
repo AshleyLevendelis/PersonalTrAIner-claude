@@ -24,6 +24,7 @@
 // the onboarding screen by answering "no profile" to its first read.
 // ---------------------------------------------------------------------------
 
+import { execSync } from 'child_process'
 import { chromium, type Page } from 'playwright-core'
 import { createServer } from 'http'
 import { readFileSync, existsSync } from 'fs'
@@ -108,12 +109,22 @@ async function onboardingPage(): Promise<{ page: Page; close: () => Promise<void
   // Every Supabase call answered locally. Auth hands back a real-shaped
   // anonymous session; the profile read hands back an empty list, which is
   // what sends App.tsx to onboarding rather than to the app.
+  // TWO SHAPES, NOT ONE — and this gate was red for weeks because it sent one.
+  // supabase-js calls /auth/v1/token|signup and expects a SESSION, then
+  // /auth/v1/user and expects the USER itself. Answering both with the session
+  // left `user` undefined, ensureSignedIn failed, and the app rendered "We
+  // couldn't sign you in" — a screen with no <input> on it, so the wait below
+  // timed out. The failure was recorded in this session as "needs a browser,
+  // environmental". It was not: the browser was fine and the fixture was
+  // wrong. Found 6 Sep 2026 by building a second harness that hit the same
+  // wall and had to be fixed to get past it.
+  const AUTH_USER = { id: '00000000-0000-4000-8000-000000000001', aud: 'authenticated', role: 'authenticated', is_anonymous: true, app_metadata: {}, user_metadata: {}, created_at: new Date().toISOString() }
   await context.route('**/auth/v1/**', route => route.fulfill({
     status: 200, contentType: 'application/json',
-    body: JSON.stringify({
+    body: JSON.stringify(route.request().url().includes('/auth/v1/user') ? AUTH_USER : {
       access_token: 'test', token_type: 'bearer', expires_in: 3600,
       expires_at: Math.floor(Date.now() / 1000) + 3600, refresh_token: 'test',
-      user: { id: '00000000-0000-4000-8000-000000000001', aud: 'authenticated', role: 'authenticated', is_anonymous: true },
+      user: AUTH_USER,
     }),
   }))
   await context.route('**/rest/v1/**', route => route.fulfill({
@@ -125,6 +136,36 @@ async function onboardingPage(): Promise<{ page: Page; close: () => Promise<void
 
   const page = await context.newPage()
   await page.goto(BASE, { waitUntil: 'networkidle' })
+
+  // SAY WHY, rather than timing out on a selector. A dist built without
+  // VITE_SUPABASE_URL cannot construct the client at all: the app renders
+  // "We couldn't sign you in · supabaseUrl is required" — a screen with no
+  // <input> on it — and the wait below then fails with a bare Playwright
+  // timeout that names a locator and nothing else. That is exactly how this
+  // gate came to be filed as "needs a browser, environmental" when the
+  // browser was fine and the BUILD was the problem.
+  let bodyText = await page.evaluate(() => document.body.innerText)
+  if (/supabaseUrl is required|couldn't sign you in/i.test(bodyText)) {
+    // FIX IT AND CARRY ON, once. A dist built without VITE_SUPABASE_URL
+    // cannot construct the client, so the app renders the sign-in error — a
+    // screen with no <input> — and the wait below used to die on a bare
+    // Playwright locator timeout that named nothing. Any placeholder works:
+    // every network call this gate makes is faked above. Rebuilt here rather
+    // than demanded of the caller because `test:render-screens` runs its own
+    // `npm run build` mid-sweep and silently strips the env from dist, which
+    // made this gate's result depend on gate ORDER.
+    console.log('  · dist has no Supabase env — rebuilding with placeholders (every call here is faked)')
+    execSync('npm run build', {
+      cwd: ROOT, stdio: 'ignore',
+      env: { ...process.env, VITE_SUPABASE_URL: 'https://example.test', VITE_SUPABASE_ANON_KEY: 'test' },
+    })
+    await page.reload({ waitUntil: 'networkidle' })
+    bodyText = await page.evaluate(() => document.body.innerText)
+    if (/supabaseUrl is required|couldn't sign you in/i.test(bodyText)) {
+      await context.close()
+      throw new Error('rebuilt dist with placeholder Supabase env and the app STILL renders the sign-in error — this is not the build, look at ensureSignedIn')
+    }
+  }
   await page.waitForSelector('input', { timeout: 15000 })
   return { page, close: () => context.close() }
 }

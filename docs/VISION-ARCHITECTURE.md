@@ -500,17 +500,31 @@ Everything else on Home reads and points.
 
 One fact, one owner. The rule, in full:
 
-> **Nutrition** owns what you eat and drink — food and water.
-> **Exercise** owns the program, the session, and the movement you do outside
-> it — including steps.
+> **Nutrition** owns what you eat and drink — food and water: the ring, the
+> legend, the meals, and the targets behind them.
+> **Exercise** owns the program and the session.
 > **Tools** owns nothing.
 > **Home** owns the progress facts — weight, streak, consistency, PRs — and
-> points at everything else.
+> the day's QUICK LOG: water, steps and the weigh-in.
+> Home still owns no target and no plan: it points at the tab that does.
 
 Two consequences worth stating, because both were violations before this rule
 existed:
 
-- **Steps live on Exercise.** Ashley, 5 Sep 2026, looking at the Nutrition
+- **The quick log came back to Home, 6 Sep 2026** — `design_handoff_app_polish`
+  ("Home becomes informative"). Home's "Today so far" grid logs water (+250 /
+  +500), steps and the weigh-in in place. **This reverses the bullet below for
+  steps, and it is the third time steps have moved** (Home → Nutrition →
+  Exercise → Home), so the reasoning matters more than the destination:
+  ownership of a NUMBER is not the same as the place you tap to add to it.
+  Nutrition still owns water — the ring, the legend, the target editor — and
+  Home only carries the quick-add; Exercise still owns the program and the
+  session. What Home gained is the day's logging surface, because "what have I
+  done today" is the question Home exists to answer and sending someone to
+  another tab to answer it is what made it a scoreboard nobody used.
+  The steps ROW is gone from Exercise rather than duplicated: two tabs writing
+  one number is the drift this section was written to stop.
+- **Steps lived on Exercise between 5 and 6 Sep 2026.** Ashley, 5 Sep 2026, looking at the Nutrition
   tab: *"we currently log steps in the nutrition tab but that isn't right."*
   Asked where instead, she chose Exercise. **This reverses what this section
   said before**, and the previous reasoning is kept here rather than deleted,

@@ -370,8 +370,10 @@ function App() {
   const [devBypassLocks, setDevBypassLocks] = useState(false)
   const [logsVersion, setLogsVersion] = useState(0)
   /**
-   * Bumped when the coach logs steps from chat, so the Exercise tab's StepsRow
-   * re-reads instead of sitting on the number it loaded on mount.
+   * Bumped when the coach logs steps from chat, so Home's Steps cell re-reads
+   * instead of sitting on the number it loaded on mount. (Was the Exercise
+   * tab's StepsRow until 6 Sep 2026; the row moved, the signal moved with
+   * it — see VISION-ARCHITECTURE §5.1a.)
    *
    * The same shape as logsVersion, and for the same reason it exists: a write
    * that lands in the database and not on the screen is indistinguishable from
@@ -2316,6 +2318,8 @@ function App() {
           <TabsContent value="dashboard">
             <Dashboard
               trainerNudge={homeNudge}
+              stepsVersion={stepsVersion}
+              onStepsLogged={bumpCoachData}
               profile={profile}
               macros={macros}
               exercisePlan={exercisePlan}
@@ -2354,8 +2358,6 @@ function App() {
 
           <TabsContent value="exercise">
             <ExerciseTab
-              stepsVersion={stepsVersion}
-              onStepsLogged={bumpCoachData}
               plan={exercisePlan}
               mesocycle={mesocycle}
               exclusions={effectiveExclusions}

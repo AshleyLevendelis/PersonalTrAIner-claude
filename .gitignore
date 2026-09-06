@@ -39,3 +39,9 @@ meal-quality-report.txt
 .env
 .env.*
 !.env.example
+
+# Ad-hoc screenshot harness written during the polish pass (scripts/tmp-*).
+# Kept out of the repo deliberately: it fakes every Supabase call and would
+# rot the moment a table's shape changes, which is exactly the "gate passing
+# against a fixture nobody maintains" failure this suite avoids.
+scripts/tmp-*

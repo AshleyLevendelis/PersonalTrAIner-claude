@@ -28,7 +28,6 @@ import { SupersetGroup } from './SupersetGroup'
 import { FinisherRow } from './FinisherRow'
 import { AdditionalWorkSection } from './AdditionalWorkSection'
 import { AddUnplannedWork } from './AddUnplannedWork'
-import { StepsRow } from './StepsRow'
 import { RestDayCard, ActiveRecoveryCard } from './RestDayCard'
 import { SessionSummaryDialog, type SessionSummaryData } from './SessionSummaryDialog'
 import { InsightBanner } from '@/components/ui/insight-banner'
@@ -52,8 +51,6 @@ export function TodayPanel({
   profile,
   profileId,
   planCreatedAt,
-  stepsVersion,
-  onStepsLogged,
   devOverrideDay,
   onOpenProgram,
   onOpenSwap,
@@ -72,10 +69,7 @@ export function TodayPanel({
   profileId?: string
   /** When this plan came into being — days before it were never prescribed. */
   planCreatedAt?: string
-  /** Bumped when the coach logs steps from chat, so StepsRow re-reads rather than showing a stale count. */
-  stepsVersion?: number
   /** Fired when steps are logged here, so the always-mounted chat tab re-reads them. */
-  onStepsLogged?: () => void
   devOverrideDay?: string | null
   onOpenProgram: () => void
   onOpenSwap: (dayName: string, exIndex: number, exerciseName: string) => void
@@ -528,12 +522,12 @@ export function TodayPanel({
         </div>
       )}
 
-      {/* STEPS — moved here from Nutrition on Ashley's ruling, 5 Sep 2026.
-          Outside the day ternary on purpose: steps are the day's movement
-          whether today is a session, a rest day or active recovery, and a
-          rest day is exactly when they are the only movement there is.
-          Hidden while peeking at ANOTHER day, because the box logs today. */}
-      {!peekWorkout && <StepsRow profile={profile} profileId={profileId} date={today} refreshToken={stepsVersion} onLogged={onStepsLogged} />}
+      {/* STEPS MOVED TO HOME, 6 Sep 2026 — design_handoff_app_polish's
+          "Today so far" grid, which logs them in place. The row is REMOVED
+          here rather than left as a second writer: two tabs owning one number
+          is the drift VISION-ARCHITECTURE §5.1a exists to stop, and this is
+          the third move steps have made (see that section for why the
+          destination changed and the rule did not). */}
     </div>
   )
 }

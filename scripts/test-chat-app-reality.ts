@@ -48,9 +48,19 @@ async function main() {
 
   console.log('[1] Every real tab (app-route.ts TABS) is named in §1a-i, so a renamed/added tab cannot go silently ungrounded')
   check('TABS is non-empty (sanity check on the gate itself)', TABS.length > 0, TABS)
+  // THE NAME THE USER SEES, not the route id. `dashboard` is labelled "Home"
+  // in BottomTabBar, and the coach describing a "Dashboard tab" sends someone
+  // looking for a tab that is not there — so the expected name is read from
+  // the tab bar's own label table, and the chat FAB's label from its aria.
+  const tabBar = readFileSync(join(ROOT, 'src/components/BottomTabBar.tsx'), 'utf-8')
+  const labelFromBar = (tab: string) =>
+    new RegExp(`tab: '${tab}', label: '([^']+)'`).exec(tabBar)?.[1]
+  const TAB_LABEL: Record<string, string> = { chat: 'Chat' }
   for (const tab of TABS) {
-    const capitalized = tab.charAt(0).toUpperCase() + tab.slice(1)
-    check(`§1a-i mentions "${capitalized}"`, appRealityBlock.includes(capitalized))
+    const label = TAB_LABEL[tab] ?? labelFromBar(tab)
+    check(`the tab bar labels "${tab}" (sanity check on this check)`, !!label, label)
+    if (!label) continue
+    check(`§1a-i mentions "${label}"`, appRealityBlock.includes(label))
   }
 
   // -------------------------------------------------------------------------
@@ -81,7 +91,7 @@ async function main() {
     const CAPABILITIES: { label: string; claim: RegExp; writer: RegExp; file: string; tab: string }[] = [
       {
         label: 'step logging', claim: /step[- ]count logging/i, writer: /logStepsManual/,
-        file: 'src/components/exercise/StepsRow.tsx', tab: 'Exercise',
+        file: 'src/components/Dashboard.tsx', tab: 'Home',
       },
       {
         label: 'water logging', claim: /water logging/i, writer: /logWater\b/,
@@ -95,7 +105,9 @@ async function main() {
       check(`§1a-i credits ${c.label} to ${c.tab}`, c.claim.test(bulletFor(c.tab)), bulletFor(c.tab))
       // And no OTHER tab claims it. A move that only adds is a lie kept in
       // two places, which is exactly how the Dashboard line survived.
-      for (const other of ['Dashboard', 'Nutrition', 'Exercise', 'Tools', 'Chat']) {
+      // The tab's user-visible name is Home (BottomTabBar); APP_REALITY said
+      // "Dashboard" until 6 Sep 2026, which is the code's name for it.
+      for (const other of ['Home', 'Nutrition', 'Exercise', 'Tools', 'Chat']) {
         if (other === c.tab) continue
         check(`...and ${other} no longer claims ${c.label}`, !c.claim.test(bulletFor(other)), bulletFor(other))
       }

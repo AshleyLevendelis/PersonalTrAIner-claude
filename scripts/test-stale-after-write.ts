@@ -37,7 +37,8 @@ const read = (p: string) =>
 const app = read('src/App.tsx')
 const fn = read('supabase/functions/chat-gemini/index.ts')
 const chat = read('src/components/ChatAssistant.tsx')
-const stepsRow = read('src/components/exercise/StepsRow.tsx')
+// Steps moved to Home's "Today so far" grid, 6 Sep 2026 (§5.1a).
+const stepsRow = read('src/components/Dashboard.tsx')
 
 let failures = 0
 const check = (name: string, ok: boolean, detail?: unknown) => {
@@ -123,13 +124,13 @@ console.log('\n5. Writes on other tabs reach the tab that never unmounts\n')
   check('...and when steps are typed on the Exercise tab', /onStepsLogged=\{bumpCoachData\}/.test(app))
   check('the version actually reaches chat', /dataVersion=\{coachDataVersion\}/.test(app))
 
-  // The Exercise tab's own step entry is the one that has to travel furthest:
-  // StepsRow -> TodayPanel -> ExerciseTab -> App -> ChatAssistant.
-  check('StepsRow reports a successful log', /onLogged\?\.\(\)/.test(stepsRow))
+  // Home's step entry has the shortest trip now (Dashboard -> App ->
+  // ChatAssistant) but the same rule: the callback fires on success only.
+  check('the Steps cell reports a successful log', /onStepsLogged\?\.\(\)/.test(stepsRow))
   const handler = /const handleLogSteps[\s\S]*?\n  \}/.exec(stepsRow)?.[0] ?? ''
   check('...only after the write succeeded, never in the catch',
-    handler.indexOf('onLogged?.()') !== -1
-    && handler.indexOf('onLogged?.()') < handler.indexOf('} catch'), handler.slice(0, 200))
+    handler.indexOf('onStepsLogged?.()') !== -1
+    && handler.indexOf('onStepsLogged?.()') < handler.indexOf('} catch'), handler.slice(0, 200))
 }
 
 console.log('\n6. Every local-first writer reaches the tab that never unmounts\n')

@@ -169,8 +169,13 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
   // the streak uses, since day-of-week availability doesn't change week to
   // week within a mesocycle.
   const tomorrowWorkoutDay = findWorkoutDay(exercisePlan, tomorrowName)
+  // The count rides along because Home's Tomorrow row shows it
+  // ("Pull & Hinge · 5 exercises") and the day is already in hand here.
+  // Counted exactly as today's own glance counts (session.exerciseCount):
+  // every exercise on the day.
+  const tomorrowCount = tomorrowWorkoutDay?.exercises.length ?? 0
   const tomorrowLabel = tomorrowWorkoutDay && tomorrowWorkoutDay.exercises.length > 0
-    ? `Tomorrow: ${tomorrowWorkoutDay.focus}`
+    ? `Tomorrow: ${tomorrowWorkoutDay.focus}${tomorrowCount > 0 ? ` · ${tomorrowCount} exercise${tomorrowCount === 1 ? '' : 's'}` : ''}`
     : 'Tomorrow: Rest'
 
   // ---- Today's session status --------------------------------------------

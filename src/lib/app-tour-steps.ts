@@ -70,7 +70,7 @@ export const TOUR_STEPS: TourStep[] = [
     // Exercise on 5 Sep 2026, so the copy can't say "all logged in Nutrition"
     // any more without sending someone to the wrong tab. Each tile still
     // takes you to wherever that number is logged — which is now two tabs.
-    copy: 'Calories, water and steps at a glance — a read-out, not a form. Tap any tile and it takes you to where that number is logged: food and water in Nutrition, steps in Exercise.',
+    copy: 'Your day so far. Calories are a read-out — tap through to Nutrition, which owns them. Water, steps and your weigh-in are logged right here.',
   },
   {
     key: 'nutrition', tab: 'nutrition', target: 'rings',
@@ -90,7 +90,7 @@ export const TOUR_STEPS: TourStep[] = [
     // Steps MOVED here from Nutrition, and this is the one place the tour can
     // say so. Anyone who used the old Nutrition logger will otherwise go
     // looking for it on the tab it left.
-    copy: 'Your program lives here — the week at a glance, the phase you’re in, and my notes on the week right under the header (tap to read the whole thing). Today’s session sits right below, and your steps for the day are logged at the bottom.',
+    copy: 'Your program lives here — the week at a glance, the phase you’re in, and my notes on the week right under the header (tap to read the whole thing). Today’s session sits right below.',
   },
   {
     key: 'set', tab: 'exercise', target: 'setrow', gate: true,
