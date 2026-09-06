@@ -38,11 +38,13 @@ import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { DEFAULT_CARRY_DISTANCE_M } from '../src/lib/session-duration'
 import { seededRngFromKey } from '../src/lib/seeded-random'
-import type { UserProfile, MesocycleWeek } from '../src/lib/types'
+import type { UserProfile, MesocycleWeek, Exercise } from '../src/lib/types'
+import { atPrescribedCeiling, ceilingLabel, ceilingNoteForCoach } from '../src/lib/progression-ceiling'
 
 // Read from source rather than restated, so raising either constant in
 // exercise-plan.ts fails this gate instead of silently widening the cap.
-const PLAN_SRC = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../src/lib/exercise-plan.ts'), 'utf8')
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
+const PLAN_SRC = readFileSync(join(ROOT, 'src/lib/exercise-plan.ts'), 'utf8')
 const STEP_M = Number(/const FROZEN_CARRY_DISTANCE_STEP_M = (\d+)/.exec(PLAN_SRC)?.[1] ?? NaN)
 const MAX_STEPS = Number(/const MAX_FROZEN_CARRY_DISTANCE_STEPS = (\d+)/.exec(PLAN_SRC)?.[1] ?? NaN)
 
@@ -225,6 +227,62 @@ console.log('\n1. A rep bought must never cost weight')
     newRises.length === 0, newRises.slice(0, 3).join(' | '))
   check('...with the known ones still exactly as recorded — remove them here when fixed',
     fixedRises.length === 0, fixedRises.join(' | '))
+
+  // THE GRID ABOVE NEVER HELD THE DEFECT. Its ledger reached zero on 1 Sep
+  // 2026 and the entry said so honestly: "displaced, not fixed — the mechanism
+  // is untouched". Measured on the full 9,216-plan quality grid on 6 Sep: 30
+  // deloads heavier than the week before them, ALL functional-goal, all lifts
+  // the coherence pass clamps (Landmine Press, Walking Lunges, Hack Squat,
+  // Bulgarian Split Squats). The mechanism: functional rotates accessories
+  // EVERY week (accessoryRotationWeeks 1), so the deload week can hold a lift
+  // in a slot with no week-3 anchor, and that slot fell through to a FRESH
+  // estimate at full value — heavier than the same lift's ramped number the
+  // week before on another day. Now an unanchored deload slot takes 70% of
+  // the lift's own last displayed number (by name), or of the fresh estimate
+  // when it was not seen at all. This sweep is the slice of that grid where
+  // they lived: 144 plans, 46 rises before the fix, 0 after — 46 with the
+  // no-anchor branch removed, 20 with the by-name reference removed. Zero,
+  // listed by name — no ledger, no budget.
+  const functionalRises: string[] = []
+  let functionalDrops = 0, functionalPlans = 0
+  const gridDays = [
+    { day: 'Monday', available: true }, { day: 'Tuesday', available: true }, { day: 'Wednesday', available: false },
+    { day: 'Thursday', available: true }, { day: 'Friday', available: true }, { day: 'Saturday', available: false }, { day: 'Sunday', available: false },
+  ]
+  for (const equipment_access of ['full_gym', 'home_gym'] as const)
+    for (const session_duration_preference of ['60-90', '90+'] as const)
+      for (const training_style of ['hybrid', 'functional'] as const)
+        for (const training_experience of ['intermediate', 'advanced'] as const)
+          for (const recovery_capacity of ['low', 'moderate', 'high'] as const)
+            for (const conditioning_preference of ['love', 'tolerate', 'avoid'] as const) {
+              const label = ['functional', equipment_access, session_duration_preference, training_style, training_experience, recovery_capacity, conditioning_preference].join('/')
+              const profile = buildProfile({
+                fitness_goal: 'functional', workout_split_preference: 'ai_recommendation', training_days: gridDays,
+                equipment_access, session_duration_preference, training_style, training_experience, recovery_capacity, conditioning_preference,
+              })
+              const plan = meso(profile, `deload-gate|${label}`)
+              functionalPlans++
+              for (let i = 1; i < plan.length; i++) {
+                const wk = plan[i]
+                if (!wk.is_deload) continue
+                const prevWeek = new Map<string, number>()
+                for (const day of plan[i - 1].days) for (const e of day.exercises) {
+                  if (e.suggested_load_kg == null) continue
+                  const already = prevWeek.get(e.name)
+                  prevWeek.set(e.name, already == null ? e.suggested_load_kg : Math.min(already, e.suggested_load_kg))
+                }
+                for (const day of wk.days) for (const e of day.exercises) {
+                  if (e.suggested_load_kg == null) continue
+                  const prev = prevWeek.get(e.name)
+                  if (prev == null) continue
+                  if (e.suggested_load_kg < prev) functionalDrops++
+                  if (e.suggested_load_kg > prev) functionalRises.push(`${label} ${e.name} wk${wk.week_number}: ${prev} -> ${e.suggested_load_kg}`)
+                }
+              }
+            }
+  check(`on the functional-goal grid where the rises lived (${functionalPlans} plans), a deload still takes weight down (${functionalDrops} drops)`, functionalDrops > 0)
+  check(`...and NO deload there comes in heavier than the week before it (${functionalRises.length}, must be 0)`,
+    functionalRises.length === 0, functionalRises.slice(0, 4).join(' | '))
 }
 
 // ---------------------------------------------------------------------------
@@ -575,6 +633,123 @@ console.log('\n7. A held bar is held for a reason the plan can name — and neve
   check(`Power blocks with loaded main lifts exist in the sweep (${powerMainSlots} transitions)`, powerMainSlots > 0, String(powerMainSlots))
   check(`an intermediate's Power main lift is never left frozen for want of a larger bump (${stuckInPower.length})`,
     stuckInPower.length === 0, stuckInPower.slice(0, 3).join(' | '))
+}
+
+console.log('\n8. A week that repeats itself SAYS so — Ashley\'s ruling, 5 Sep 2026')
+{
+  // She was asked what the app should do when a lift genuinely cannot get
+  // heavier — add a set, rotate the exercise, let the reps climb, or say so
+  // and ask for one logged set — and chose the last. §1-§7 above are all about
+  // making the number move; this section is about the weeks where it honestly
+  // cannot, and it is the ONLY thing standing between a trainee and a card
+  // that repeats itself for the last third of their plan with nothing said.
+  //
+  // The measured case that produced the ruling: a BEGINNER's Barbell Bench
+  // Press reading `3 x 11-13 @ 30kg` character-for-character from week 11 to
+  // week 15.
+
+  // --- the rule, as a unit. Both halves required, and each half proved to
+  // matter by a case that must come back false.
+  const ex = (o: Partial<Exercise>): Exercise => ({
+    name: 'Barbell Bench Press', sets: 3, reps: '11-13', rest: '90s', ...o,
+  } as Exercise)
+
+  check('a bar at the estimate ceiling with no rep left to buy IS at a ceiling',
+    atPrescribedCeiling(ex({ load_hold: 'ceiling', rep_bump: 'capped' })))
+  check('...and so is one whose rep range cannot move at all',
+    atPrescribedCeiling(ex({ load_hold: 'ceiling', rep_bump: 'range_fixed' })))
+  check('an implement at its safety cap is too',
+    atPrescribedCeiling(ex({ load_hold: 'implement', rep_bump: 'capped' })))
+  check('a carry whose distance ramp has run out is too',
+    atPrescribedCeiling(ex({ load_hold: 'ceiling', distance_bump: 'capped' })))
+
+  // THE FALSE CASES ARE THE POINT. A weight held while the REPS climb is a
+  // lift that is still progressing; calling that "at your ceiling" would be
+  // alarming and untrue, and is the single most likely way this feature turns
+  // into a lie of its own.
+  check('a held bar that still bought a rep is NOT at a ceiling',
+    !atPrescribedCeiling(ex({ load_hold: 'ceiling', rep_bump: 'bought' })))
+  check('a carry still walking further is NOT at a ceiling',
+    !atPrescribedCeiling(ex({ load_hold: 'ceiling', distance_bump: 'walked' })))
+  check('no hold at all is NOT a ceiling, whatever the bump did',
+    !atPrescribedCeiling(ex({ rep_bump: 'capped' })))
+  // 'floor' is a load rounded UP to the bar and 'matched' is a coherence
+  // decision about presentation — neither means "this is as far as we can
+  // take you", and both would fire on healthy weeks if they were included.
+  check('a load rounded up to the bar is NOT a ceiling',
+    !atPrescribedCeiling(ex({ load_hold: 'floor', rep_bump: 'capped' })))
+  check('a load matched to the same lift\'s other slot is NOT a ceiling',
+    !atPrescribedCeiling(ex({ load_hold: 'matched', rep_bump: 'capped' })))
+  check('a plain healthy week is NOT a ceiling', !atPrescribedCeiling(ex({})))
+
+  // --- the two wordings, because the two claims genuinely differ: a logged
+  // set can move a bar off an ESTIMATE; nothing moves a full backpack.
+  check('the estimate wording points at the thing that changes it',
+    ceilingLabel(ex({ load_hold: 'ceiling', rep_bump: 'capped' })) === "at your estimate's ceiling")
+  check('the implement wording does not promise a logged set will help',
+    ceilingLabel(ex({ load_hold: 'implement', rep_bump: 'capped' })) === 'as heavy as this gets')
+  check('a healthy week gets no label at all', ceilingLabel(ex({})) === null)
+  check('the coach is told not to call it progression',
+    /do not present it as progression/.test(ceilingNoteForCoach(ex({ load_hold: 'ceiling', rep_bump: 'capped' })) ?? ''))
+  check('...and asked for the one thing that unsticks it',
+    /ask for one logged set/.test(ceilingNoteForCoach(ex({ load_hold: 'ceiling', rep_bump: 'capped' })) ?? ''))
+  check('...but never promises that for a full implement',
+    !/logged set/.test(ceilingNoteForCoach(ex({ load_hold: 'implement', rep_bump: 'capped' })) ?? ''))
+
+  // --- IT IS RENDERED, AND NOT BEHIND THE ⓘ. The sentence explaining this has
+  // existed in load_guidance since 30 Aug 2026 and renders only when the info
+  // button is tapped — correct words, one tap away from nobody, which is the
+  // exact defect this section closes. A label nothing draws is the same bug
+  // one layer up, so assert the render and not just the import.
+  const chip = readFileSync(join(ROOT, 'src/components/exercise/LoadChip.tsx'), 'utf8')
+  check('the card computes the label', /ceilingLabel\(ex\)/.test(chip))
+  check('...and RENDERS it outside the explainer', /\{ceiling && \(/.test(chip))
+  check('...and drops it once a logged number is driving the weight',
+    /source === 'logged' \? null : ceilingLabel\(ex\)/.test(chip))
+
+  // --- AND THE COACH GETS THE SAME FACT. Two surfaces describing one week
+  // differently is the disagreement this repo keeps producing.
+  const ctx = readFileSync(join(ROOT, 'src/lib/chat-plan-context.ts'), 'utf8')
+  check('the coach summary carries the ceiling note', /ceilingNoteForCoach\(e\)/.test(ctx))
+
+  // --- and the generator records the carry half, or the rule above is blind
+  // to every carry. 490 of 4,892 carry slots in the sweep sit at the cap.
+  check('the generator records when a carry hits its distance cap',
+    /distanceBump = steps >= MAX_FROZEN_CARRY_DISTANCE_STEPS \? 'capped' : 'walked'/.test(PLAN_SRC))
+  check('...and puts it on the exercise', /distance_bump: distanceBump/.test(PLAN_SRC))
+
+  // --- END TO END, on real plans: every frozen pair whose week-B slot is held
+  // by a real ceiling must be labelled. This is the check that would catch the
+  // label silently ceasing to fire while every unit test above still passed.
+  let heldAndFrozen = 0, labelled = 0
+  const unlabelled: string[] = []
+  // A BEGINNER ON A SHORT SESSION, which is the profile the measured case came
+  // from — a beginner's estimate is the lowest and therefore the soonest
+  // reached, and a 30-45 minute session has the fewest slots to spread work
+  // across. The first version of this swept full_body/novice and found ZERO
+  // ceiling-held repeats, which the sanity check below caught rather than
+  // letting twelve green ticks sit on an empty loop.
+  for (const equipment_access of EQUIP) {
+    const plan = meso(
+      buildProfile({
+        equipment_access, training_experience: 'beginner',
+        training_style: 'functional', session_duration_preference: '30-45',
+      }),
+      `frozen8:${equipment_access}`,
+    )
+    for (const { exA, exB, weekA, weekB, day } of transitions(plan)) {
+      const loadFrozen = exA.suggested_load_kg == null
+        ? exB.suggested_load_kg == null
+        : exA.suggested_load_kg === exB.suggested_load_kg
+      if (!loadFrozen || exA.reps !== exB.reps) continue
+      if (exB.load_hold !== 'ceiling' && exB.load_hold !== 'implement') continue
+      heldAndFrozen++
+      if (atPrescribedCeiling(exB)) labelled++
+      else unlabelled.push(`${exB.name} ${day} w${weekA}->w${weekB} hold=${exB.load_hold} bump=${exB.rep_bump ?? '-'}/${exB.distance_bump ?? '-'}`)
+    }
+  }
+  check(`the sweep contains repeated weeks held by a ceiling (${heldAndFrozen}) — sanity check on this check`, heldAndFrozen > 0, String(heldAndFrozen))
+  check(`every one of them is labelled (${labelled}/${heldAndFrozen})`, unlabelled.length === 0, unlabelled.slice(0, 3).join(' | '))
 }
 
 console.log(failures === 0 ? '\nAll frozen-week checks passed.\n' : `\n${failures} FAILED\n`)

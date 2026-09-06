@@ -94,6 +94,15 @@ export async function getActiveAdaptations(profileId: string): Promise<PlanAdapt
  * actually flips the row wins, and the loser returns null and writes
  * nothing, rather than both racing to write pre_image and both surfacing a
  * duplicate reversion message.
+ *
+ * AND IT PUTS THE ROW BACK IF THE RESTORE FAILS. Claiming first is what makes
+ * the race safe, but it also means the row is already closed while the weeks
+ * that undo the adaptation are still being written — and until 5 Sep 2026 a
+ * failure there was permanent: the adaptation was marked expired, nothing
+ * would ever sweep it again, and the trainee kept a plan reduced around an
+ * injury they had recovered from, with no surface anywhere that could put it
+ * back. Reopening costs one write on a path that only runs when something has
+ * already gone wrong, and turns permanent loss into "the next load retries".
  */
 async function revertAdaptation(profileId: string, row: PlanAdaptationRow, status: 'expired' | 'ended_early'): Promise<MesocycleWeek[] | null> {
   const { data: updated } = await supabase
@@ -104,11 +113,25 @@ async function revertAdaptation(profileId: string, row: PlanAdaptationRow, statu
     .select('id')
   if (!updated || updated.length === 0) return null
 
-  await Promise.all(
-    row.pre_image
-      .filter(week => row.affected_week_numbers.includes(week.week_number))
-      .map(week => saveMesocycleWeek(profileId, week))
-  )
+  try {
+    await Promise.all(
+      row.pre_image
+        .filter(week => row.affected_week_numbers.includes(week.week_number))
+        .map(week => saveMesocycleWeek(profileId, week))
+    )
+  } catch (err) {
+    console.error('Reverting an adaptation failed to restore the plan; reopening it so the next sweep retries:', err)
+    // Best effort by necessity — if this write fails too the row stays
+    // closed, which is the old behaviour and no worse. Not awaited into the
+    // caller's result: either way this reversion did not happen, and saying
+    // so is what stops the UI announcing one.
+    await supabase
+      .from('plan_adaptations')
+      .update({ status: 'active', ended_at: null })
+      .eq('id', row.id)
+      .eq('status', status)
+    return null
+  }
   return row.pre_image
 }
 

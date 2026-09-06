@@ -122,7 +122,9 @@ console.log('\n4. The typing indicator is someone typing, not a spinner')
   const busy = ui.slice(ui.indexOf('{busy && ('), ui.indexOf('{busy && (') + 800)
   check('there are three dots', (busy.match(/ds-typing-dot/g) ?? []).length === 3, (busy.match(/ds-typing-dot/g) ?? []).length)
   check('...staggered', /\[animation-delay:150ms\]/.test(busy) && /\[animation-delay:300ms\]/.test(busy))
-  check('...and announced to a screen reader', /aria-live="polite"/.test(busy) && /Coach is typing/.test(busy))
+  // "Coach is typing" until 6 Sep 2026 — renamed with every other UI string
+  // that named the assistant. The requirement is the announcement, not the noun.
+  check('...and announced to a screen reader', /aria-live="polite"/.test(busy) && /Personal TrAIner is typing/.test(busy))
   check('the dots are 7px', /\.ds-typing-dot\s*\{[^}]*width:\s*7px/s.test(css))
   // v2: mint, not grey. Grey reads as the app buffering; the accent says the
   // coach specifically is composing.

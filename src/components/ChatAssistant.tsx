@@ -16,7 +16,12 @@ import { getExerciseEntry } from '@/lib/exercise-db'
 import { createPendingAction, claimPendingAction, declinePendingAction, markExecuting, resolvePendingAction, getPendingAction, expireOldPendingActions, isWithinUndoWindow, type PendingActionReceipt } from '@/lib/pending-actions-store'
 import { APPEND_PROPOSAL_KINDS, INTENT_PROPOSAL_VERB, buildIntentProposal } from '@/lib/intent-proposal'
 import { pickAccountabilityCheckIn } from '@/lib/accountability'
-import { executeExerciseSwap, executeMealSwap, executeMealAddition, undoMealAddition, undoExerciseSwap, executeInjuryAdaptation, executeLastingInjury, executeInjuryRecovered, executeEquipmentAdaptation, executeVolumeChange, executeScheduleChange, executeRestDay, undoRestDay, undoWeekRangeChange, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type LastingInjuryPayload, type InjuryRecoveredPayload, type EquipmentAdaptationPayload, type VolumeChangePayload, type ScheduleChangePayload, type RestDayPayload } from '@/lib/pending-action-executor'
+import { executeExerciseSwap, executeMealSwap, executeMealAddition, undoMealAddition, undoExerciseSwap, executeInjuryAdaptation, executeLastingInjury, executeInjuryRecovered, executeEquipmentAdaptation, executeVolumeChange, executeScheduleChange, executeStyleChange, executeConcurrentActivity, executeRestDay, undoRestDay, undoWeekRangeChange, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type LastingInjuryPayload, type InjuryRecoveredPayload, type EquipmentAdaptationPayload, type VolumeChangePayload, type ScheduleChangePayload, type StyleChangePayload, type ConcurrentActivityPayload, type RestDayPayload } from '@/lib/pending-action-executor'
+import { STYLE_OPTIONS } from '@/lib/onboarding-slots'
+import { MOVEMENT_DEMANDS, TIMES_OF_DAY, canonicalDay, activityDays, describeActivity, reorderTracksForClassDays, HEAVY_TRACKS, activityCountsAsLoad, countWorkingSets } from '@/lib/concurrent-activity'
+import { getSplitForDays, generateMesocycle, setRandomSource, resetRandomSource } from '@/lib/exercise-plan'
+import { seededRngFromKey } from '@/lib/seeded-random'
+import type { ConcurrentActivity } from '@/lib/types'
 import { adjustDayVolume, isVolumeAdjustable } from '@/lib/volume-adjust'
 import { buildMealAdditionProposal, type MealAdditionPayload } from '@/lib/meal-addition'
 import { buildCustomMealProposal } from '@/lib/custom-meal'
@@ -35,7 +40,7 @@ import { TAB_BAR_HEIGHT_PX } from '@/components/BottomTabBar'
 import { useBottomDockHeight } from '@/hooks/useBottomDockHeight'
 import { cn } from '@/lib/utils'
 import { parseWorkoutEntries, type ParsedSetGroup, type WorkoutEntryInput } from '@/lib/set-parse'
-import { executeLogWorkout } from '@/lib/nl-logging-executor'
+import { executeLogWorkout, type ReplacedSetPreImage } from '@/lib/nl-logging-executor'
 import { normalizeExternalUrl } from '@/lib/chat-links'
 import { buildFirstRunIntro, planShapeFromMesocycle, type FirstRunSessionBrief } from '@/lib/first-run-intro'
 import { buildCoachExerciseSummary, buildCoachPhaseBrief } from '@/lib/chat-plan-context'
@@ -46,12 +51,16 @@ import { classifyConfirmationReply } from '@/lib/confirmation-reply'
 import { getPRCache } from '@/lib/pr-engine'
 import { loadDashboardData, type DashboardData } from '@/lib/dashboard-data'
 import { getAllItems as getAllGroceryItems, addItemLocal, setCheckedLocal, undoAddLocal, type GroceryItemRow, type GroceryCategory } from '@/lib/grocery-store'
-import { logWater, undoLog as undoWaterLog } from '@/lib/water-store'
+import { logWater, undoLog as undoWaterLog, subscribeWaterStore } from '@/lib/water-store'
+import { subscribeCardioLogStore } from '@/lib/cardio-log-store'
+import { subscribeMealStore } from '@/lib/meal-store'
+import { getStepsForDate, logStepsManual, restoreStepsForDate, isPlausibleStepCount, MAX_PLAUSIBLE_DAILY_STEPS } from '@/lib/steps-store'
+import { buildCoachStepsSummary } from '@/lib/steps-context'
 import { ProposalCard } from '@/components/chat/ProposalCard'
 import { TypewriterMarkdown } from '@/components/chat/TypewriterMarkdown'
 import { ReceiptCard } from '@/components/chat/ReceiptCard'
 import { ClarificationCard } from '@/components/chat/ClarificationCard'
-import type { ChatMessage, UserProfile, MacroTargets, WorkoutDay, MealPlanDay, MesocycleWeek, PlanAction, ChatPendingActionView, ChatReceiptView, ChatClarificationView } from '@/lib/types'
+import type { ChatMessage, UserProfile, MacroTargets, WorkoutDay, MealPlanDay, MesocycleWeek, PlanAction, ChatPendingActionView, ChatReceiptView, ChatClarificationView, TrainingStyle } from '@/lib/types'
 import { DEFAULT_REVEAL_SPEED, type RevealSpeed } from '@/lib/reveal-speed-store'
 import { FEEL_SCALE, type SessionFeel } from '@/lib/types'
 import { takeChatPrefill } from '@/lib/chat-prefill-store'
@@ -156,6 +165,21 @@ interface ChatAssistantProps {
   onOpenGrocery?: () => void
   /** Fired after a chat water log so App.tsx/Dashboard can refresh their own local water state (same "caller reloads after" shape, though water-store's own local-first merge already reflects the write immediately for anything reading it fresh). */
   onWaterChanged?: () => void | Promise<void>
+  /** Re-read steps after a chat log, so the Exercise tab does not sit on a stale number. */
+  onStepsChanged?: () => void | Promise<void>
+  /**
+   * Bumped by App whenever something the coach READS changed on another tab —
+   * a set logged, steps entered on the Exercise tab, water tapped in.
+   *
+   * THIS TAB NEVER UNMOUNTS. It is the only TabsContent with forceMount (App
+   * keeps the conversation alive across tab switches), so unlike Nutrition or
+   * Exercise it does not get a fresh mount and a fresh read when you come back
+   * to it. Everything it fetches for itself would otherwise be read once per
+   * session and quoted for the rest of the day.
+   */
+  dataVersion?: number
+  /** Deep-link target for a steps receipt — steps live on Exercise. */
+  onOpenExercise?: () => void
   /** Deep-link target for a water receipt's "View" button — navigates to the Dashboard tab. */
   onOpenDashboard?: () => void
   /**
@@ -186,7 +210,7 @@ function sessionCutoffHour(preferredTime: string | undefined): number {
   return SESSION_PASSED_CUTOFF[preferredTime || 'morning'] || 22
 }
 
-export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onProfileChanged, onMealSwapApplied, onFindMoreMealOptions, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenProfile, groceryItems, onGroceryChanged, onOpenGrocery, onWaterChanged, onOpenDashboard, onAttentionChange, revealSpeed = DEFAULT_REVEAL_SPEED, pendingLoadSuggestions }: ChatAssistantProps) {
+export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onProfileChanged, onMealSwapApplied, onFindMoreMealOptions, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenProfile, groceryItems, onGroceryChanged, onOpenGrocery, onWaterChanged, onStepsChanged, onOpenExercise, onOpenDashboard, dataVersion = 0, onAttentionChange, revealSpeed = DEFAULT_REVEAL_SPEED, pendingLoadSuggestions }: ChatAssistantProps) {
   // NL logging (§3) writes through the SAME frozen session identity +
   // logSet facade SetGrid.tsx uses — never saveSet directly (see
   // nl-logging-executor.ts's own doc comment).
@@ -374,9 +398,52 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
   const [isRecalibrating, setIsRecalibrating] = useState(false)
   const [lastFailedInput, setLastFailedInput] = useState<string | null>(null)
   const [favorites, setFavorites] = useState<FavoriteMeal[]>([])
+  // READ-ONLY. StepsRow on the Exercise tab still owns the writing; this is
+  // here so the coach can SEE the number, which is what turns "another 3,000"
+  // into the right total instead of a replace that wipes the day.
+  const [todaySteps, setTodaySteps] = useState<number | null>(null)
+  /**
+   * Bumped after any write THIS tab makes. Same purpose as `dataVersion` from
+   * App, for the half App cannot see: the coach logging water and then quoting
+   * the pre-log total two sentences later, because the figure it quotes comes
+   * from proactiveData and nothing told proactiveData to look again.
+   */
+  const [ownWriteVersion, setOwnWriteVersion] = useState(0)
+  const bumpOwnWrites = () => setOwnWriteVersion(v => v + 1)
+
+  /**
+   * THE LOCAL-FIRST STORES TELL US DIRECTLY, rather than waiting to be told.
+   *
+   * Ashley, 5 Sep 2026: she logged the rest-day cardio on the Exercise tab and
+   * the coach, one message later, asked whether she had done any walking or
+   * cycling. Cardio is logged from FOUR places — the rest-day card, the active
+   * recovery card, the session finisher and unplanned work — and not one of
+   * them told anybody. Threading a callback out of all four would have fixed
+   * those four and missed the fifth.
+   *
+   * Both stores already broadcast on every save, delete and queue flush and
+   * nothing in the chat tab was listening. Subscribing covers every writer
+   * that exists now, every writer added later, the offline flush, and undo —
+   * which a prop from App cannot, because App does not see those either.
+   *
+   * Meals joined them on 5 Sep 2026, once meal-store had a listener to
+   * subscribe to. It matters more here than anywhere: this is the tab that
+   * never unmounts, so "calories remaining" was frozen at whatever the day
+   * looked like when chat first read it — a user could log every meal and
+   * still be told they had the whole day's food left.
+   */
+  useEffect(() => {
+    const bump = () => setOwnWriteVersion(v => v + 1)
+    const unsubs = [subscribeCardioLogStore(bump), subscribeWaterStore(bump), subscribeMealStore(bump)]
+    return () => unsubs.forEach(u => u())
+  }, [])
   const [workoutLogHistory, setWorkoutLogHistory] = useState('')
   const [cardioLogHistory, setCardioLogHistory] = useState('')
   const [quickRepliesDismissed, setQuickRepliesDismissed] = useState(false)
+  /** Clear-chat's armed state — see handleClearChat for why this is not a window.confirm. */
+  const [clearArmed, setClearArmed] = useState(false)
+  const clearArmTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => () => { if (clearArmTimer.current) clearTimeout(clearArmTimer.current) }, [])
   const [showScrollPill, setShowScrollPill] = useState(false)
   const [hasMoreMessages, setHasMoreMessages] = useState(false)
   const [isLoadingOlder, setIsLoadingOlder] = useState(false)
@@ -433,10 +500,26 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     if (nearBottom) setShowScrollPill(false)
   }, [checkIfNearBottom])
 
+  // THE DATA THE COACH READS FOR ITSELF, re-read whenever it changes.
+  //
+  // Split from the conversation load below on 5 Sep 2026. All four used to sit
+  // on [profile.id], which in a tab that never unmounts means "once, ever":
+  // log a set on Exercise, come back and ask what you lifted, and the answer
+  // came from whatever was true when the app started.
+  //
+  // loadChatHistory is deliberately NOT here — re-running it would refetch and
+  // re-render the conversation itself every time a set was logged.
   useEffect(() => {
     if (profile.id) {
       loadFavorites()
       loadWorkoutLogs()
+      loadTodaySteps()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile.id, dataVersion, ownWriteVersion, activeSession.logs.length])
+
+  useEffect(() => {
+    if (profile.id) {
       loadChatHistory()
       // The lazy sweep expireOldPendingActions was written for — its own doc
       // comment says "call on chat mount / load", and nothing ever did, so
@@ -471,7 +554,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     }).then(d => { if (!cancelled) setProactiveData(d) }).catch(() => {})
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeSession.ready, activeSession.date, activeSession.logs.length, profile.id])
+  }, [activeSession.ready, activeSession.date, activeSession.logs.length, profile.id, dataVersion, ownWriteVersion])
 
   // How recent sessions FELT — the affect signal (see session-feel.ts for why
   // it exists and Ashley's 2 Sep 2026 ruling that the coach asks for it in
@@ -728,6 +811,29 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     }
   }
 
+  /**
+   * Today's step count, for the coach's context only.
+   *
+   * Read here as well as on the Exercise tab, which is fine and is what Home
+   * already does: both go through getStepsForDate, so there is one source and
+   * no second rule. What must NOT happen is a second WRITER — StepsRow and
+   * the confirmed chat card both go through steps-store, and the gate pins it.
+   *
+   * Re-run after a chat log so the number the coach quotes next turn is the
+   * one it just wrote, rather than the one it read on mount.
+   */
+  const loadTodaySteps = async () => {
+    if (!profile.id) return
+    try {
+      const row = await getStepsForDate(profile.id, activeSession.date)
+      setTodaySteps(row?.steps ?? null)
+    } catch (err) {
+      // A failed READ is not a failed write and must not shout. The coach
+      // simply says nothing is logged yet, which is what it would say anyway.
+      console.error('Failed to load today\'s steps for the coach:', err)
+    }
+  }
+
   const loadFavorites = async () => {
     if (!profile.id) return
     const { data } = await supabase
@@ -802,6 +908,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     // literal right here, which is exactly how it went unnoticed that it
     // carried no prescribed weight while the Exercise tab showed that weight
     // on the next screen.
+    const stepsSummary = buildCoachStepsSummary(todaySteps, profile)
     const exerciseSummary = buildCoachExerciseSummary({
       days: activeWeekData,
       coachNote: activeMesoWeek?.coach_note,
@@ -865,6 +972,19 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
 
     return {
       current_date: now.toISOString(),
+      /**
+       * TODAY, AS THE APP RECKONS IT — the same YYYY-MM-DD every screen and
+       * every local write uses, dev-clock included.
+       *
+       * `current_date` above is an ISO timestamp, so splitting it on "T" gives
+       * the UTC date, and the edge function was doing exactly that in five
+       * places to stamp rows it wrote. In the UK in summer a set logged at
+       * 00:30 filed under yesterday; in Sydney an evening session filed under
+       * tomorrow. Same defect as the "10:00 PM" one, on the write side rather
+       * than the prompt side, which makes it worse — that one misread a row,
+       * this one creates a misdated one.
+       */
+      current_local_date: todayStr,
       current_time_formatted: currentTimeFormatted,
       workout_logged_today: workoutLoggedToday,
       day_of_week: now.toLocaleDateString('en-US', { weekday: 'long' }),
@@ -912,6 +1032,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         .join('\n'),
       training_days_count: profile.training_days.filter(d => d.available).length,
       exercise_summary: exerciseSummary,
+      steps_summary: stepsSummary,
       phase_brief: phaseBrief,
       // Empty string when there is nothing to say — which is also what stops
       // the coach asking twice: once record_session_feel writes `felt`, the
@@ -1244,6 +1365,8 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     }
     if (pendingAction.kind === 'propose_volume_change') return "Here's the change to that session:"
     if (pendingAction.kind === 'propose_schedule_change') return "Here's the new week:"
+    if (pendingAction.kind === 'propose_style_change') return "Here's your plan in the new style:"
+    if (pendingAction.kind === 'propose_concurrent_activity') return "Here's the week built around it:"
     if (pendingAction.kind === 'propose_rest_day') return 'Want me to mark that as a rest day?'
     const intentVerb = INTENT_PROPOSAL_VERB[pendingAction.kind]
     if (intentVerb) return `Want me to ${intentVerb} **${rows[0].after}**?`
@@ -1722,6 +1845,167 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     }
   }
 
+  const buildStyleChangeProposal = (rawArgs: Record<string, unknown>): {
+    scopeKey: string
+    preconditions: Record<string, unknown>
+    payload: StyleChangePayload
+    preImage: MesocycleWeek[]
+    diff: import('@/lib/pending-actions-store').ProposalDiff
+  } | null => {
+    // Validate against the real option list, never the model's spelling —
+    // an unrecognised style is dropped and the proposal doesn't happen.
+    const wantedOpt = STYLE_OPTIONS.find(o => o.value === String(rawArgs.training_style ?? '').trim().toLowerCase())
+    if (!wantedOpt || mesocycle.length === 0) return null
+    const beforeValue = profile.training_style ?? 'hybrid'
+    if (wantedOpt.value === beforeValue) return null
+    const beforeOpt = STYLE_OPTIONS.find(o => o.value === beforeValue)
+
+    const startWeek = activeSession.liveWeek
+    const weeksAhead = mesocycle.filter(w => w.week_number >= startWeek).length
+    if (weeksAhead === 0) return null
+
+    return {
+      scopeKey: `${profile.id}:propose_style_change:${wantedOpt.value}:${startWeek}`,
+      preconditions: { before: beforeValue, wanted: wantedOpt.value, startWeek },
+      payload: { trainingStyle: wantedOpt.value, fromWeek: startWeek, reason: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined },
+      preImage: mesocycle,
+      diff: {
+        rows: [{ field: 'Training style', before: beforeOpt?.label ?? beforeValue, after: wantedOpt.label }],
+        implications: [
+          { severity: 'info', text: `Rebuilds ${weeksAhead} week${weeksAhead === 1 ? '' : 's'} from week ${startWeek} on. Anything you've already logged stays exactly as it is.` },
+          { severity: 'warn', text: 'The exercises and rep ranges change, not just the name — this is a different programme from here on.' },
+        ],
+        rationale: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined,
+        reversible: true,
+      },
+    }
+  }
+
+  /**
+   * "I also do Muay Thai twice a week" — builds propose_concurrent_activity's
+   * card. Ashley's ruling, 6 Sep 2026: the lighter gym sessions go on the
+   * class days and prescribed cardio stays off them; volume is untouched.
+   *
+   * Validates every field against the app's own vocabularies rather than
+   * trusting the model's spelling — unknown days are dropped, and if none
+   * survive the proposal does not happen. The `unavoidable` line is the
+   * honest half: a four-day split has one light track, so with two class
+   * days one of them still carries a heavy session, and the card says which
+   * rather than implying every class day got a light one.
+   */
+  const buildConcurrentActivityProposal = (rawArgs: Record<string, unknown>): {
+    scopeKey: string
+    preconditions: Record<string, unknown>
+    payload: ConcurrentActivityPayload
+    preImage: MesocycleWeek[]
+    diff: import('@/lib/pending-actions-store').ProposalDiff
+  } | null => {
+    const name = String(rawArgs.name ?? '').trim()
+    const rawDays = Array.isArray(rawArgs.days) ? rawArgs.days : []
+    const days = [...new Set(rawDays.map(d => canonicalDay(String(d))).filter((d): d is string => !!d))]
+    if (!name || days.length === 0 || mesocycle.length === 0) return null
+
+    const timeOfDay = (TIMES_OF_DAY as readonly string[]).includes(String(rawArgs.time_of_day)) ? rawArgs.time_of_day as ConcurrentActivity['timeOfDay'] : undefined
+    const demands = (Array.isArray(rawArgs.movement_demands) ? rawArgs.movement_demands : [])
+      .map(d => String(d)).filter(d => (MOVEMENT_DEMANDS as readonly string[]).includes(d))
+    const intensityRaw = typeof rawArgs.intensity === 'number' ? rawArgs.intensity : 0.6
+    const activity: ConcurrentActivity = {
+      name, days, movement_demands: demands,
+      intensity: Math.min(1, Math.max(0, intensityRaw)),
+      ...(timeOfDay ? { timeOfDay } : {}),
+    }
+
+    // Already recorded identically → nothing to propose.
+    const existing = (profile.concurrent_activities ?? []).find(a => a.name.toLowerCase() === name.toLowerCase())
+    if (existing && [...activityDays([existing])].sort().join('|') === [...days].sort().join('|') && (existing.timeOfDay ?? null) === (timeOfDay ?? null)) return null
+
+    // Passengers, resolved exactly as buildScheduleChangeProposal resolves them.
+    const known = new Map((profile.training_days ?? []).map(d => [d.day.toLowerCase(), d.day]))
+    const rawTraining = Array.isArray(rawArgs.training_days) ? rawArgs.training_days : []
+    const wantedDays = [...new Set(rawTraining.map(d => known.get(String(d).trim().toLowerCase())).filter((d): d is string => !!d))]
+    const beforeDays = (profile.training_days ?? []).filter(d => d.available).map(d => d.day)
+    const daysChange = wantedDays.length > 0 && !(beforeDays.length === wantedDays.length && beforeDays.every(d => wantedDays.includes(d)))
+    const gymTime = rawArgs.gym_time_of_day === 'morning' || rawArgs.gym_time_of_day === 'evening' ? rawArgs.gym_time_of_day : undefined
+    const timeChange = !!gymTime && gymTime !== profile.preferred_time
+
+    const startWeek = activeSession.liveWeek
+    const weeksAhead = mesocycle.filter(w => w.week_number >= startWeek).length
+    if (weeksAhead === 0) return null
+
+    // Which class day, if any, will still carry a heavy session — computed
+    // with the same function the generator uses, on the days the plan will
+    // actually have after this card.
+    const futureDays = (profile.training_days ?? []).map(d => ({ ...d, available: daysChange ? wantedDays.includes(d.day) : d.available })).filter(d => d.available)
+    const split = getSplitForDays(futureDays.length, profile.fitness_goal, profile.workout_split_preference || 'ai_recommendation', profile.training_style || 'hybrid')
+    const { unavoidable } = reorderTracksForClassDays(futureDays, split, new Set(days))
+    const lightCount = futureDays.map((_, i) => split[i % split.length]).filter(t => !HEAVY_TRACKS.has(t)).length
+
+    const rows = [{ field: 'Other training', before: existing ? describeActivity(existing) : 'none', after: describeActivity(activity) }]
+    if (daysChange) rows.push({ field: 'Training days', before: beforeDays.join(', ') || 'none', after: wantedDays.join(', ') })
+    if (timeChange) rows.push({ field: 'Gym sessions', before: `${profile.preferred_time}s`, after: `${gymTime}s` })
+
+    // THE VOLUME SENTENCE IS MEASURED, NOT ASSERTED. Ashley's ruling, 6 Sep
+    // 2026: a sport that is two or more sessions a week, or one hard/combat
+    // session, also takes the lifting one recovery notch down, and the card
+    // says by how much. Two generations from the same seed, differing only in
+    // keep_full_volume, so the gap between them IS the notch and nothing else.
+    // Nobody else pays for this: it runs only when the rule applies.
+    const futureActivities = [...(profile.concurrent_activities ?? []).filter(a => a.name.toLowerCase() !== name.toLowerCase()), activity]
+    const notchApplies = activityCountsAsLoad(activity) && !activity.keep_full_volume
+    const statedRecovery = profile.recovery_capacity || 'moderate'
+    const volumeSentence = (() => {
+      if (!notchApplies) return 'Same amount of lifting — only which day carries which session changes.'
+      if (statedRecovery === 'low') return `Your recovery setting is already at its lowest, so ${name} changes the schedule but nothing further comes off the lifting.`
+      const futureProfile: UserProfile = { ...profile, concurrent_activities: futureActivities, training_days: (profile.training_days ?? []).map(d => ({ ...d, available: daysChange ? wantedDays.includes(d.day) : d.available })) }
+      const seededWeek = (p: UserProfile) => {
+        setRandomSource(seededRngFromKey(`volume:${profile.id ?? 'anon'}:${name.toLowerCase()}`))
+        const l = console.log; console.log = () => {}
+        try {
+          const meso = generateMesocycle(p)
+          return meso.find(w => w.week_number === startWeek && !w.is_deload) ?? meso.find(w => !w.is_deload)
+        } finally { console.log = l; resetRandomSource() }
+      }
+      const withNotch = countWorkingSets(seededWeek(futureProfile))
+      const withoutNotch = countWorkingSets(seededWeek({ ...futureProfile, concurrent_activities: futureActivities.map(a => a.name === activity.name ? { ...a, keep_full_volume: true } : a) }))
+      const otherLoad = futureActivities.filter(a => a.name !== activity.name && activityCountsAsLoad(a) && !a.keep_full_volume).map(a => a.name)
+      if (otherLoad.length > 0 && withNotch === withoutNotch) return `The lifting is already one recovery notch down for ${otherLoad.join(' and ')}; ${name} does not take it further.`
+      if (withoutNotch <= 0 || withNotch >= withoutNotch) return `The lifting also comes down one recovery notch while ${name} is on — two hard sessions a week are training too. Revert to full volume any time from the workout card.`
+      return `The lifting also comes down one recovery notch while ${name} is on — two hard sessions a week are training too: about ${withoutNotch} → ${withNotch} working sets a week. Revert to full volume any time from the workout card.`
+    })()
+    const implications: { severity: 'info' | 'warn'; text: string }[] = [
+      { severity: 'info', text: `Rebuilds ${weeksAhead} week${weeksAhead === 1 ? '' : 's'} from week ${startWeek} on so the lighter gym sessions land on ${days.join(' and ')} and no extra cardio is prescribed there. ${volumeSentence} Anything you've already logged stays exactly as it is.` },
+    ]
+    if (unavoidable.length > 0) {
+      implications.push({
+        severity: 'warn',
+        text: lightCount === 0
+          ? `Your ${futureDays.length}-day week has no lighter session in it, so ${unavoidable.join(' and ')} will still be a full gym day on a class night.`
+          : `Your ${futureDays.length}-day week only has ${lightCount} lighter session${lightCount === 1 ? '' : 's'}, so ${unavoidable.join(' and ')} will still carry a heavy one on a class night.`,
+      })
+    }
+    if (daysChange && wantedDays.length !== beforeDays.length) {
+      implications.push({ severity: 'warn', text: `Going from ${beforeDays.length} to ${wantedDays.length} gym day${wantedDays.length === 1 ? '' : 's'} changes the split — the same work doesn't just move, it gets rebalanced.` })
+    }
+
+    return {
+      scopeKey: `${profile.id}:propose_concurrent_activity:${name.toLowerCase()}:${[...days].sort().join(',')}:${startWeek}`,
+      preconditions: {
+        beforeActivities: profile.concurrent_activities ?? [],
+        beforeDays, wantedDays: daysChange ? wantedDays : undefined,
+        beforeTime: profile.preferred_time, wantedTime: timeChange ? gymTime : undefined,
+        startWeek,
+      },
+      payload: {
+        activity, fromWeek: startWeek,
+        ...(daysChange ? { trainingDays: wantedDays } : {}),
+        ...(timeChange ? { gymTimeOfDay: gymTime } : {}),
+        reason: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined,
+      },
+      preImage: mesocycle,
+      diff: { rows, implications, rationale: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined, reversible: true },
+    }
+  }
+
   /**
    * VISION-ARCHITECTURE.md §3.1/§3.4 — runs the deterministic parser over a
    * log_workout turn's entries and decides RECEIPT vs CLARIFICATION.
@@ -2084,6 +2368,9 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     const amountMl = typeof args.amount_ml === 'number' && args.amount_ml > 0 ? Math.round(args.amount_ml) : 250
     const row = logWater({ profileId, date: activeSession.date, amountMl, source: 'chat' })
     await onWaterChanged?.()
+    // The coach quotes waterMl off proactiveData; without this it would say
+    // the pre-log total in its very next sentence.
+    bumpOwnWrites()
 
     return {
       text: `Logged ${amountMl}ml of water.`,
@@ -2095,6 +2382,89 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         undoToken: row.id,
         resolvedAt: new Date().toISOString(),
       },
+    }
+  }
+
+  /**
+   * The steps chat door — ALWAYS reached from a confirmed card, never directly.
+   *
+   * Ashley's ruling, 5 Sep 2026, asked as a straight question: told that
+   * "I walked 9,000 steps today" reads as a statement rather than an
+   * instruction, she chose the confirm card every time. So log_steps has no
+   * intent channel at all; the server always returns a proposal and this runs
+   * on Confirm.
+   *
+   * THREE WAYS THIS DIFFERS FROM WATER, all forced by the table rather than
+   * chosen:
+   *
+   *   daily_steps holds ONE ROW PER DAY and logStepsManual upserts, so this
+   *   REPLACES the day rather than appending to it. That is why the undo token
+   *   carries a pre-image (below) and why the card shows a before.
+   *
+   *   There is no safe default. Water falls back to 250ml; a missing step
+   *   count has no equivalent, so nothing is written and the coach is told to
+   *   ask instead.
+   *
+   *   steps-store is plain async with no offline queue (its own header says
+   *   so), so this await can reject where logWater cannot. It is wrapped, and
+   *   a failure returns a failed receipt rather than a cheerful sentence about
+   *   a write that did not happen.
+   */
+  const resolveAndSaveSteps = async (intent: { tool: 'log_steps'; rawArgs: Record<string, unknown> }): Promise<{ text: string; receipt?: ChatReceiptView }> => {
+    const args = intent.rawArgs
+    const profileId = profile.id
+    if (!profileId) return { text: "I can't log that yet — your profile hasn't finished setting up." }
+
+    const raw = typeof args.steps === 'number' ? Math.round(args.steps) : NaN
+    if (!isPlausibleStepCount(raw)) {
+      // A mistyped 900,000 would REPLACE the day with a number nobody walked,
+      // and the upsert makes that permanent rather than additive. Say what
+      // happened rather than writing it and hoping.
+      return { text: `That doesn't look like a day's step count — I can log anything up to ${MAX_PLAUSIBLE_DAILY_STEPS.toLocaleString()}. What was the real number?` }
+    }
+
+    // Local calendar date, never a UTC slice (test:local-dates pins this file).
+    const date = typeof args.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(args.date)
+      ? args.date
+      : activeSession.date
+
+    try {
+      // THE PRE-IMAGE, read before the write. Undo has to put back what was
+      // there, and after the upsert that number is gone.
+      const existing = await getStepsForDate(profileId, date)
+      const previous = existing?.steps ?? null
+      await logStepsManual(profileId, date, raw)
+      await onStepsChanged?.()
+      bumpOwnWrites()
+
+      return {
+        text: `Logged ${raw.toLocaleString()} steps.`,
+        receipt: {
+          kind: 'steps_logged',
+          title: 'Steps logged',
+          rows: [{
+            label: `${raw.toLocaleString()} steps`,
+            detail: previous === null ? 'recorded for today' : `replacing ${previous.toLocaleString()}`,
+          }],
+          status: 'done',
+          // Opaque string by contract, and grocery already packs JSON into it.
+          // A bare row id would not do here: undo must RESTORE, not delete.
+          undoToken: JSON.stringify({ date, previous }),
+          resolvedAt: new Date().toISOString(),
+        },
+      }
+    } catch (err) {
+      console.error('Logging steps from chat failed:', err)
+      return {
+        text: "That didn't save — check your connection and I'll try again.",
+        receipt: {
+          kind: 'steps_logged',
+          title: 'Steps not logged',
+          rows: [{ label: `${raw.toLocaleString()} steps`, detail: 'could not be saved' }],
+          status: 'failed',
+          resolvedAt: new Date().toISOString(),
+        },
+      }
     }
   }
 
@@ -2166,7 +2536,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         .filter(e => e.suggested_load_kg != null)
         .map(e => [e.name, e.suggested_load_kg as number] as const)
     )
-    const { rows, totalSets, loggedKeys, replacedSets } = executeLogWorkout(parsed.groups, {
+    const { rows, totalSets, loggedKeys, replacedSets, replacedLogs } = executeLogWorkout(parsed.groups, {
       profileId: activeSession.profileId ?? '',
       date: activeSession.date,
       weekNumber: activeSession.liveWeek,
@@ -2207,7 +2577,13 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         // Undo (C17) parses this back out to call deleteSet per natural key
         // — loggedKeys never leaves this module otherwise, so JSON-encode
         // it onto the one field the receipt view already carries.
-        undoToken: JSON.stringify(loggedKeys),
+        //
+        // BOTH HALVES, since 5 Sep 2026. A correction deletes what was there
+        // before writing its replacement, so undoing it means deleting the
+        // new sets AND writing the old ones back. Carrying only `logged` made
+        // Undo destroy both versions — see ReplacedSetPreImage. `replaced` is
+        // empty for an ordinary append, which is every non-correction turn.
+        undoToken: JSON.stringify({ logged: loggedKeys, replaced: replacedLogs }),
       },
     }
   }
@@ -2415,6 +2791,27 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
             ? `You're already training ${current.join(', ')} — nothing to change there. If you were asking something else, like what today's session is, say so and I'll answer that instead.`
             : "Nothing to change there. If you were asking something else, like what today's session is, say so and I'll answer that instead."
         }
+      } else if (result.proposal.kind === 'propose_style_change' && result.proposal.rawArgs) {
+        const style = buildStyleChangeProposal(result.proposal.rawArgs)
+        if (style) built = { scopeKey: style.scopeKey, preconditions: style.preconditions, payload: style.payload as unknown as Record<string, unknown>, preImage: style.preImage, diff: style.diff }
+        else {
+          // Same honesty as the schedule branch: say what the style IS, and
+          // that a one-off session is a different request.
+          const current = STYLE_OPTIONS.find(o => o.value === (profile.training_style ?? 'hybrid'))?.label ?? 'this style'
+          refusal = `You're already training ${current} — nothing to change there. If you meant just today's session, say so and I'll sort that instead.`
+        }
+      } else if (result.proposal.kind === 'propose_concurrent_activity' && result.proposal.rawArgs) {
+        const activity = buildConcurrentActivityProposal(result.proposal.rawArgs)
+        if (activity) built = { scopeKey: activity.scopeKey, preconditions: activity.preconditions, payload: activity.payload as unknown as Record<string, unknown>, preImage: activity.preImage, diff: activity.diff }
+        else {
+          // Either it is already recorded exactly like that, or no day the
+          // app recognises survived — both are "nothing to propose", and the
+          // honest reply names what IS recorded rather than pretending.
+          const have = (profile.concurrent_activities ?? []).map(describeActivity)
+          refusal = have.length > 0
+            ? `I've already got ${have.join(' and ')} down, and the plan is built around it. If the days have changed, tell me the new ones and I'll move things.`
+            : "I couldn't tell which days that's on — which evenings is it? Then I'll rebuild the week around it."
+        }
       } else if (result.proposal.kind === 'propose_rest_day' && result.proposal.rawArgs) {
         const rest = buildRestDayProposal(result.proposal.rawArgs)
         if (rest) built = { scopeKey: rest.scopeKey, preconditions: rest.preconditions, payload: rest.payload as unknown as Record<string, unknown>, diff: rest.diff }
@@ -2424,7 +2821,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         // check_off_grocery_item/log_water now arrive here too whenever
         // classifyImperative didn't confidently classify the request —
         // previously a bare offer with nothing to resolve on a later "yes".
-        built = buildIntentProposal(result.proposal.kind, result.proposal.rawArgs, profile.id)
+        built = buildIntentProposal(result.proposal.kind, result.proposal.rawArgs, profile.id, todaySteps)
       } else if (result.proposal.diff && result.proposal.payload && result.proposal.scopeKey) {
         built = { scopeKey: result.proposal.scopeKey, preconditions: result.proposal.preconditions ?? {}, payload: result.proposal.payload, preImage: result.proposal.preImage, diff: result.proposal.diff }
       }
@@ -2658,7 +3055,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       // copy rather than surfacing "Failed to fetch" verbatim.
       const displayMessage = error.retryable
         ? (error.message || 'Something went wrong with the AI service. Tap "Retry" to try again.')
-        : 'Couldn\'t reach the coach — check your connection and tap "Retry".'
+        : 'Couldn\'t reach your Personal TrAIner — check your connection and tap "Retry".'
       responseText = isTimeout
         ? '_That request took too long to process. Tap "Retry" to try again._'
         : `_${displayMessage}_`
@@ -2704,7 +3101,23 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
   // localStorage mirror, and the server rows (so a reload doesn't resurrect
   // the old conversation via loadChatHistory).
   const handleClearChat = () => {
-    if (!window.confirm('Clear this conversation? This cannot be undone.')) return
+    // ARMED-THEN-CONFIRM, NOT window.confirm.
+    //
+    // This repo documents the reason twice already (SetGrid's set delete,
+    // ProfileScreen's memory delete): an installed PWA can suppress
+    // window.confirm entirely, and a suppressed confirm here returned false —
+    // so on the one surface most likely to be installed, the Clear chat button
+    // did nothing at all, forever, with no way to tell. Two taps within three
+    // seconds is the pattern the rest of the app already uses for a delete
+    // with no undo, and it cannot be suppressed by anything.
+    if (!clearArmed) {
+      setClearArmed(true)
+      if (clearArmTimer.current) clearTimeout(clearArmTimer.current)
+      clearArmTimer.current = setTimeout(() => setClearArmed(false), 3000)
+      return
+    }
+    if (clearArmTimer.current) clearTimeout(clearArmTimer.current)
+    setClearArmed(false)
     setMessages([{ role: 'assistant', content: buildInitialGreeting(), status: 'complete' }])
     setHasMoreMessages(false)
     setQuickRepliesDismissed(false)
@@ -2903,8 +3316,10 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         }
         if (!picked) {
           // Roll the pool write back rather than leaving a meal in the plan
-          // that the receipt is about to say couldn't be added.
-          await undoMealAddition(profile.id, payload)
+          // that the receipt is about to say couldn't be added. The exact
+          // pool_index came back from the insert, so this removes the row it
+          // wrote and never a same-named meal that was already there.
+          await undoMealAddition(profile.id, payload, result.poolIndex)
           receipt = { landed: [], failed: [{ op: 'save', error: "The meal didn't save — try again" }] }
           ok = false
         }
@@ -3004,6 +3419,36 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       title = ok ? 'Schedule updated' : "Couldn't change the schedule"
       rows = ok ? receipt.landed.map(line => { const [label, detail] = line.split(': '); return { label, detail } }) : []
       undoToken = ok ? row.id : undefined
+    } else if (row.kind === 'propose_style_change') {
+      const payload = row.payload as unknown as StyleChangePayload
+      const result = await executeStyleChange(profile, mesocycle, exerciseExclusions, payload)
+      onMesocycleUpdated(result.mesocycle)
+      // executeStyleChange writes fitness_profiles.training_style itself;
+      // mirror it into App state the same way the schedule branch does.
+      if (result.receipt.failed.length === 0) onProfileChanged({ training_style: payload.trainingStyle })
+      receipt = result.receipt
+      const ok = receipt.failed.length === 0
+      title = ok ? 'Style updated' : "Couldn't change the style"
+      rows = ok ? receipt.landed.map(line => { const [label, detail] = line.split(': '); return { label, detail } }) : []
+      undoToken = ok ? row.id : undefined
+    } else if (row.kind === 'propose_concurrent_activity') {
+      const payload = row.payload as unknown as ConcurrentActivityPayload
+      const result = await executeConcurrentActivity(profile, mesocycle, exerciseExclusions, payload)
+      onMesocycleUpdated(result.mesocycle)
+      // The executor writes the profile itself; mirror what it wrote into
+      // App state, same lockstep as the schedule and style branches.
+      if (result.receipt.failed.length === 0) {
+        const others = (profile.concurrent_activities ?? []).filter(a => a.name.toLowerCase() !== payload.activity.name.toLowerCase())
+        const patch: Partial<UserProfile> = { concurrent_activities: [...others, payload.activity] }
+        if (payload.trainingDays) patch.training_days = (profile.training_days ?? []).map(d => ({ ...d, available: payload.trainingDays!.some(w => w.toLowerCase() === d.day.toLowerCase()) }))
+        if (payload.gymTimeOfDay) patch.preferred_time = payload.gymTimeOfDay
+        onProfileChanged(patch)
+      }
+      receipt = result.receipt
+      const ok = receipt.failed.length === 0
+      title = ok ? 'Plan built around it' : "Couldn't add that"
+      rows = ok ? receipt.landed.map(line => { const [label, ...rest] = line.split(': '); return { label, detail: rest.join(': ') } }) : []
+      undoToken = ok ? row.id : undefined
     } else if (row.kind === 'propose_rest_day') {
       const payload = row.payload as unknown as RestDayPayload
       const result = await executeRestDay(profile, payload)
@@ -3023,11 +3468,21 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       // second write path, just a deferred call to the existing one.
       const payload = row.payload as unknown as { tool: string; rawArgs: Record<string, unknown> }
       const intent = { tool: payload.tool, rawArgs: payload.rawArgs }
+      // EVERY KIND NAMED, NO UNGUARDED DEFAULT. This chain used to end in a
+      // bare `: resolveAndSaveWater(...)`, which was fine while water was the
+      // only remaining member and a trapdoor the moment it was not: adding
+      // log_steps to APPEND_PROPOSAL_KINDS without touching this line would
+      // have logged WATER when the user confirmed a steps card. Caught before
+      // it shipped; the gate now pins the routing per kind.
       const saveResult = row.kind === 'record_fact' || row.kind === 'record_goal'
         ? await resolveAndSaveMemory(intent as Parameters<typeof resolveAndSaveMemory>[0])
         : row.kind === 'add_to_grocery_list' || row.kind === 'check_off_grocery_item'
         ? await resolveAndSaveGrocery(intent as Parameters<typeof resolveAndSaveGrocery>[0])
-        : await resolveAndSaveWater(intent as Parameters<typeof resolveAndSaveWater>[0])
+        : row.kind === 'log_steps'
+        ? await resolveAndSaveSteps(intent as Parameters<typeof resolveAndSaveSteps>[0])
+        : row.kind === 'log_water'
+        ? await resolveAndSaveWater(intent as Parameters<typeof resolveAndSaveWater>[0])
+        : (() => { throw new Error(`No resolver wired for append proposal kind: ${row.kind}`) })()
 
       if (saveResult.receipt) {
         richReceipt = saveResult.receipt
@@ -3083,10 +3538,33 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
 
     if (receipt.kind === 'log_workout') {
       if (!isWithinUndoWindow(receipt.resolvedAt ?? null)) return
-      const keys: { exerciseId: string; setNumber: number }[] = JSON.parse(receipt.undoToken)
+      // TWO SHAPES, ON PURPOSE. Receipts written before 5 Sep 2026 carry a
+      // bare array of keys; current ones carry { logged, replaced }. Chat
+      // history is persisted, so a receipt from the old shape can still be
+      // inside its 10-minute window on the deploy that changes it — and an
+      // undo that throws leaves the sets in place while the button reports
+      // nothing at all. Read both, and treat an unparseable token as "no undo
+      // available" rather than as an exception on a tap.
+      let keys: { exerciseId: string; setNumber: number }[] = []
+      let replaced: ReplacedSetPreImage[] = []
+      try {
+        const token = JSON.parse(receipt.undoToken) as
+          | { exerciseId: string; setNumber: number }[]
+          | { logged?: { exerciseId: string; setNumber: number }[]; replaced?: ReplacedSetPreImage[] }
+        if (Array.isArray(token)) keys = token
+        else { keys = token.logged ?? []; replaced = token.replaced ?? [] }
+      } catch (err) {
+        console.error('Undoing a chat workout log failed to read its own token:', err)
+        return
+      }
+      // DELETE FIRST, THEN RESTORE — never the reverse. A correction usually
+      // reuses the same set numbers it freed (that is the whole point of
+      // clearing them), so restoring first and deleting second would delete
+      // the sets just put back.
       for (const key of keys) {
         activeSession.deleteSet({ userId: profile.id, date: activeSession.date, exerciseId: key.exerciseId, setNumber: key.setNumber })
       }
+      for (const pre of replaced) activeSession.logSet(pre)
       // deleteSet is the raw store function (unlike logSet, which already
       // calls refresh() after writing) — without this, the Exercise tab's
       // dot ladder, TodayPanel progress, dock chip, and dashboard aggregate
@@ -3110,13 +3588,34 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       // created} (one per item added this turn), since undoing a merge onto
       // an existing line means subtracting back out, not deleting the row.
       if (!isWithinUndoWindow(receipt.resolvedAt ?? null)) return
-      const entries: { id: string; addedQuantity: number; created: boolean }[] = JSON.parse(receipt.undoToken)
+      let entries: { id: string; addedQuantity: number; created: boolean }[]
+      try {
+        entries = JSON.parse(receipt.undoToken)
+      } catch (err) {
+        console.error('Undoing a chat grocery add failed to read its own token:', err)
+        return
+      }
       const current = await getAllGroceryItems(profile.id)
       for (const entry of entries) {
         const row = current.find(i => i.id === entry.id)
         if (row) undoAddLocal(row, entry.addedQuantity, entry.created)
       }
       await onGroceryChanged?.()
+    } else if (receipt.kind === 'steps_logged') {
+      // RESTORE, NOT DELETE — the opposite of water's undo, and for a reason
+      // water's own comment spells out: it has no row to merge onto, this has
+      // exactly one per day. Deleting after a 6,240 -> 9,240 correction would
+      // throw away the 6,240 the user never touched.
+      if (!isWithinUndoWindow(receipt.resolvedAt ?? null)) return
+      if (!receipt.undoToken || !profile.id) return
+      try {
+        const { date, previous } = JSON.parse(receipt.undoToken) as { date: string; previous: number | null }
+        await restoreStepsForDate(profile.id, date, previous)
+        await onStepsChanged?.()
+        bumpOwnWrites()
+      } catch (err) {
+        console.error('Undoing a chat steps log failed:', err)
+      }
     } else if (receipt.kind === 'water_logged') {
       // undoToken is just the row id — a fresh log has nothing to merge
       // onto (unlike grocery's canonical_key coalescing), so undo is
@@ -3125,6 +3624,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       if (!isWithinUndoWindow(receipt.resolvedAt ?? null)) return
       undoWaterLog({ id: receipt.undoToken, profile_id: profile.id } as Parameters<typeof undoWaterLog>[0])
       await onWaterChanged?.()
+      bumpOwnWrites()
     } else {
       const row = await getPendingAction(receipt.undoToken)
       if (!row || !isWithinUndoWindow(row.resolved_at)) return
@@ -3135,7 +3635,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         if (!preImage || !planCreatedAt) return
         await undoExerciseSwap(profile.id, preImage, payload.weekNumber, payload.scope, planCreatedAt)
         onMesocycleUpdated(preImage)
-      } else if (row.kind === 'propose_volume_change' || row.kind === 'propose_schedule_change') {
+      } else if (row.kind === 'propose_volume_change' || row.kind === 'propose_schedule_change' || row.kind === 'propose_style_change' || row.kind === 'propose_concurrent_activity') {
         // Both wrote a RUN of weeks, so undo restores the same run rather
         // than the swap's single week. The starting week comes off the
         // payload, not off today's live week — undoing tomorrow must put
@@ -3144,7 +3644,11 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         if (!preImage) return
         const fromWeek = row.kind === 'propose_volume_change'
           ? Math.min(...(row.payload as unknown as VolumeChangePayload).weekNumbers)
-          : (row.payload as unknown as ScheduleChangePayload).fromWeek
+          : row.kind === 'propose_style_change'
+            ? (row.payload as unknown as StyleChangePayload).fromWeek
+            : row.kind === 'propose_concurrent_activity'
+              ? (row.payload as unknown as ConcurrentActivityPayload).fromWeek
+              : (row.payload as unknown as ScheduleChangePayload).fromWeek
         await undoWeekRangeChange(profile.id, preImage, fromWeek)
         onMesocycleUpdated(preImage)
         if (row.kind === 'propose_schedule_change') {
@@ -3155,6 +3659,24 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
           const restored = (profile.training_days ?? []).map(d => ({ ...d, available: before.some(b => b.toLowerCase() === d.day.toLowerCase()) }))
           await updateProfileField(profile.id, { training_days: restored })
           onProfileChanged({ training_days: restored })
+        }
+        if (row.kind === 'propose_concurrent_activity') {
+          // The plan goes back, so everything the card wrote goes back with
+          // it — the activity, and the two passengers if they rode along.
+          const pre = row.preconditions as { beforeActivities?: ConcurrentActivity[]; beforeDays?: string[]; wantedDays?: string[]; beforeTime?: UserProfile['preferred_time']; wantedTime?: string } | null
+          const patch: Partial<UserProfile> = { concurrent_activities: pre?.beforeActivities ?? [] }
+          if (pre?.wantedDays && pre.beforeDays) patch.training_days = (profile.training_days ?? []).map(d => ({ ...d, available: pre.beforeDays!.some(b => b.toLowerCase() === d.day.toLowerCase()) }))
+          if (pre?.wantedTime && pre.beforeTime) patch.preferred_time = pre.beforeTime
+          await updateProfileField(profile.id, patch)
+          onProfileChanged(patch)
+        }
+        if (row.kind === 'propose_style_change') {
+          // Same divergence, same fix: the plan goes back, so the style must too.
+          const before = (row.preconditions as { before?: string } | null)?.before
+          if (before) {
+            await updateProfileField(profile.id, { training_style: before as TrainingStyle })
+            onProfileChanged({ training_style: before as TrainingStyle })
+          }
         }
       } else if (row.kind === 'propose_rest_day') {
         await undoRestDay(profile.id, row.payload as unknown as RestDayPayload)
@@ -3169,7 +3691,12 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         // undo that only dropped the pick would leave the meal sitting in
         // the slot's options forever, which is not what "undo" said.
         const payload = row.payload as unknown as MealAdditionPayload
-        await undoMealAddition(profile.id, payload)
+        // No pool_index here — the pending_actions payload predates it — so
+        // undoMealAddition finds the appended row itself. If the delete
+        // doesn't land, keep the Undo button so the user can try again,
+        // exactly as the meal swap above does.
+        const removed = await undoMealAddition(profile.id, payload)
+        if (!removed) return
         // Nothing to restore as the on-screen pick: the slot had whatever
         // assembleDay chose before this, and clearing the pick is what makes
         // the Nutrition tab fall back to it. onMealSwapApplied can't express
@@ -3205,7 +3732,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       const normalized = normalizeExternalUrl(href)
       if (!normalized) return <>{children}</>
       return (
-        <a href={normalized} target="_blank" rel="noopener noreferrer" className="text-primary underline hover:opacity-80">{children}</a>
+        <a href={normalized} target="_blank" rel="noopener noreferrer" className="text-primary-text underline hover:opacity-80">{children}</a>
       )
     },
   }
@@ -3260,14 +3787,14 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     <Card className="flex flex-col h-[600px] max-h-[80dvh]">
       <CardContent className="relative flex-1 flex flex-col p-0 overflow-hidden">
         <Button
-          variant="ghost"
-          size="icon-sm"
+          variant={clearArmed ? 'destructive' : 'ghost'}
+          size={clearArmed ? 'sm' : 'icon-sm'}
           onClick={handleClearChat}
-          aria-label="Clear chat"
-          title="Clear chat"
+          aria-label={clearArmed ? 'Tap again to clear this conversation' : 'Clear chat'}
+          title={clearArmed ? 'Tap again to clear this conversation' : 'Clear chat'}
           className="absolute top-2 right-2 z-10 bg-background/80 backdrop-blur-sm"
         >
-          <Trash2 className="size-3.5" />
+          {clearArmed ? <span className="text-xs">Tap again to clear</span> : <Trash2 className="size-3.5" />}
         </Button>
         <div
           // min-h-0: a flex item defaults to min-height:auto and refuses to
@@ -3404,6 +3931,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
                         }
                         onViewGrocery={msg.receipt.kind === 'grocery_item_added' ? onOpenGrocery : undefined}
                         onViewDashboard={msg.receipt.kind === 'water_logged' ? onOpenDashboard : undefined}
+                        onViewExercise={msg.receipt.kind === 'steps_logged' ? onOpenExercise : undefined}
                       />
                     )}
                     {msg.clarification && msg.status !== 'failed' && (
@@ -3551,7 +4079,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
             <div className="flex gap-2">
               <button
                 type="button"
-                className="text-[0.625rem] text-primary glow-mint"
+                className="text-[0.625rem] text-primary-text glow-mint"
                 onClick={async () => {
                   try { await navigator.clipboard.writeText(voiceDebugLines.join('\n')) } catch { /* clipboard unavailable — lines are still on screen to copy manually */ }
                 }}

@@ -257,6 +257,12 @@ console.log('\n6. The prompt teaches every form the builder can emit')
   check('tempo is named as the prescription where there is no weight', /the TEMPO is the prescription/.test(fn))
   check('the added-load divergence with the Exercise tab is admitted',
     /the screen is right/.test(fn))
+  // The builder started emitting a technique block on 5 Sep 2026. This
+  // section's own rule — the prompt teaches every form the builder can emit
+  // — is what says an assertion for it belongs here and not only in the new
+  // test:coach-sees-technique.
+  check('the technique block the builder now emits is taught too',
+    /HOW TO PERFORM THESE/.test(fn) && /never contradict them/i.test(fn))
 }
 
 if (failures > 0) { console.error(`\n${failures} check(s) failed`); process.exit(1) }

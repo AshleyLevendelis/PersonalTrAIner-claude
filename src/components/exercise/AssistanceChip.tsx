@@ -27,7 +27,7 @@ export function AssistanceChip({ ex }: { ex: Exercise }) {
         <span
           className={`inline-flex items-center gap-0.5 rounded border px-1 py-0 text-[0.625rem] leading-4 ${
             readyToGraduate
-              ? 'border-primary/40 bg-primary/10 text-primary font-medium'
+              ? 'border-primary/40 bg-primary/10 text-primary-text font-medium'
               : 'border-muted-foreground/40 text-muted-foreground/70'
           }`}
         >
@@ -37,7 +37,7 @@ export function AssistanceChip({ ex }: { ex: Exercise }) {
         <span className="text-[0.5625rem] italic text-muted-foreground/60">less over time = stronger</span>
       </div>
       {readyToGraduate && (
-        <p className="text-[0.625rem] text-primary/90 italic max-w-xs">
+        <p className="text-[0.625rem] text-primary-text/90 italic max-w-xs">
           You've hit full bodyweight range on the assisted rig — try the real, unassisted version next session.
         </p>
       )}

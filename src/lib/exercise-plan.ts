@@ -16,6 +16,7 @@ import {
   shiftReps, adjustRest, dedupeAdjacentPhases, isRegressionFor, stepIntervalSeconds, getPhaseTempo, formatTempo, type PhaseConfig, type TrainingPhase,
 } from './periodization'
 import { getGoalPolicy, restrictPhaseSequence, resolveConditioningFrequency, RECOVERY_SET_MULTIPLIER, MAIN_LIFT_REST_FLOOR_SECONDS, type GoalPolicy } from './goal-policies'
+import { HEAVY_TRACKS, activityDays, reorderTracksForClassDays, effectiveRecoveryCapacity } from './concurrent-activity'
 import { dayAnchorExercise, anchorScore } from './session-derive'
 import { isStartingOut, applyStartingOut, startingOutActivity } from './starting-out'
 import { getDurationBudgetSeconds, getSessionMinimumSeconds, getSessionMaximumSeconds, getSteadyStateSeconds, DEFAULT_CARRY_DISTANCE_M, estimateDaySeconds, estimateSlotsSeconds, parseRestSeconds, SESSION_OVERHEAD_SECONDS } from './session-duration'
@@ -1134,7 +1135,9 @@ function stageTimeCap(
 // Split selection (preserved from previous version)
 // ---------------------------------------------------------------------------
 
-function getSplitForDays(dayCount: number, goal: FitnessGoal, splitPref: WorkoutSplit, trainingStyle: TrainingStyle = 'hybrid'): TrackFocus[] {
+// Exported 6 Sep 2026 so the second-sport card can say which class day will
+// still carry a heavy session, using the SAME split the generator will use.
+export function getSplitForDays(dayCount: number, goal: FitnessGoal, splitPref: WorkoutSplit, trainingStyle: TrainingStyle = 'hybrid'): TrackFocus[] {
   if (splitPref === 'ppl') {
     if (dayCount <= 2) return ['Push & Press', 'Pull & Hinge']
     if (dayCount === 3) return ['Push & Press', 'Pull & Hinge', 'Squat & Carry']
@@ -1736,7 +1739,7 @@ function buildPatternGapNote(uncovered: MovementPattern[], covered: ExerciseEntr
   const offerPart = coveredLabels.length > 0
     ? ` The rest of this session still covers ${coveredLabels.join(', ')}.`
     : ''
-  return `Your current equipment and injury settings leave ${gapPart} — not a bug, just a real gap in what's available.${offerPart} Update your equipment or injuries in Profile, or ask your coach in Chat, if that changes.`
+  return `Your current equipment and injury settings leave ${gapPart} — not a bug, just a real gap in what's available.${offerPart} Update your equipment or injuries in Profile, or ask your Personal TrAIner in Chat, if that changes.`
 }
 
 /**
@@ -2715,7 +2718,16 @@ function coherenceGroup(entry: ExerciseEntry): string | null {
     case 'isolation_shoulder': return entry.substitution_group === 'shrug' ? 'shrug' : 'lateral_delt'
     case 'isolation_quad': return 'quad_isolation'
     case 'isolation_hamstring': return 'hamstring_isolation'
-    case 'isolation_calf': return 'calf_isolation'
+    // Split the same way shrugs were split from laterals, and for the same
+    // reason. A single-leg calf raise with a dumbbell in one hand is priced
+    // off BODYWEIGHT (single_leg_calf, load-prescription.ts) — the leg
+    // already carries the body — while a machine calf raise is priced off the
+    // squat with the machine supplying every kilo. Measured at the anchor
+    // change: an 80kg intermediate's 12kg dumbbell next to his 70kg machine
+    // calf raise is a 5.8x raw spread, and this pass would have pulled the
+    // MACHINE down to 24kg to "fix" it. Keyed on categorize, the one place
+    // that decides which anchor a calf raise gets, rather than on a name.
+    case 'isolation_calf': return categorize(entry) === 'single_leg_calf' ? 'calf_single_leg' : 'calf_isolation'
     default: return null
   }
 }
@@ -2848,7 +2860,10 @@ function substituteFloorClampedIsolation(
   }
 }
 
-function enforceLoadCoherence(days: WorkoutDay[]): void {
+// Exported for test:single-leg-calf, which runs the pass on a two-exercise
+// day directly: the plan-level version of that check passed under mutation
+// by one stack rounding step (12kg cap -> 12.5kg, "more than twice 6kg").
+export function enforceLoadCoherence(days: WorkoutDay[]): void {
   for (const day of days) {
     const mainLifts = day.exercises.filter(ex => {
       const entry = findEntry(ex.name)
@@ -4060,10 +4075,18 @@ function assignConditioningNotes(days: WorkoutDay[], profile: UserProfile, polic
   const isTimeLimited = duration === '30-45'
   const goal = profile.fitness_goal
 
-  const heavyTrackDays = new Set(['Push & Press', 'Pull & Hinge', 'Squat & Carry', 'Legs & Calves', 'Full Body Power'])
+  // Hoisted to concurrent-activity.ts on 6 Sep 2026 — the same "which days
+  // are the hard ones" fact now also decides which day gets which track.
+  const heavyTrackDays = HEAVY_TRACKS
   const allDayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
   const trainingDayNames = new Set(days.map(d => d.day))
-  const restDayNames = allDayNames.filter(d => !trainingDayNames.has(d))
+  // A NIGHT WITH A CLASS ON IT IS NOT A REST DAY. The rest-day cardio loop
+  // below used to take the first N non-training days blindly, which for
+  // someone doing Muay Thai on Tuesday and Thursday evenings meant a 45-minute
+  // Zone 2 session prescribed on top of a kicking class. The classes ARE the
+  // conditioning; nothing extra goes on those days. Ashley's ruling, 6 Sep.
+  const classDays = activityDays(profile.concurrent_activities)
+  const restDayNames = allDayNames.filter(d => !trainingDayNames.has(d) && !classDays.has(d))
 
   const cardioForGoal = getConditioningProfile(goal)
   let remaining = Math.max(0, Math.round(resolveConditioningFrequency(policy, profile.conditioning_preference)))
@@ -4107,7 +4130,7 @@ function assignConditioningNotes(days: WorkoutDay[], profile: UserProfile, polic
   // found "seven training days a week... that's not a rest day, that's a
   // euphemism" on a client flagged moderate recovery. High recovery can
   // genuinely absorb cardio on every rest day; moderate/low cannot.
-  const recovery = profile.recovery_capacity || 'moderate'
+  const recovery = effectiveRecoveryCapacity(profile)
   const maxCardioRestDays = recovery === 'high'
     ? restDayNames.length
     : Math.max(0, restDayNames.length - 1)
@@ -4128,8 +4151,13 @@ function assignConditioningNotes(days: WorkoutDay[], profile: UserProfile, polic
     remaining--
   })
 
+  // And no prescribed cardio on a gym day that ALSO carries a class that
+  // evening — the same rule as the rest-day exclusion above, applied to the
+  // light-day and heavy-day loops below. A dedicated Conditioning & Core day
+  // is left alone: that day IS conditioning by design and the reorder above
+  // will already have tried to keep it off a class day.
   const remainingTrainingDays = days.filter(
-    d => d.focus !== 'Conditioning & Core' && d.focus !== 'Active Recovery + Cardio'
+    d => d.focus !== 'Conditioning & Core' && d.focus !== 'Active Recovery + Cardio' && !classDays.has(d.day)
   )
   const lightDays = remainingTrainingDays.filter(d => !heavyTrackDays.has(d.focus))
   const heavyDays = remainingTrainingDays.filter(d => heavyTrackDays.has(d.focus))
@@ -4322,7 +4350,7 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
   // here used to throw outright rather than degrade — an unhelpful failure
   // mode for a field a malformed stored row could plausibly be missing.
   let availableDays = (profile.training_days || []).filter(d => d.available)
-  if (profile.recovery_capacity === 'low' && availableDays.length >= 5) {
+  if (effectiveRecoveryCapacity(profile) === 'low' && availableDays.length >= 5) {
     // Low recovery capacity (poor sleep, high stress, a physically demanding
     // job) can't safely absorb 5+ weekly sessions on top of everything else
     // it's already carrying — trim the last selected day back to rest rather
@@ -4330,7 +4358,17 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
     availableDays = availableDays.slice(0, -1)
   }
   const splitPref = profile.workout_split_preference || 'ai_recommendation'
-  const split = getSplitForDays(availableDays.length, profile.fitness_goal, splitPref, trainingStyle)
+  const baseSplit = getSplitForDays(availableDays.length, profile.fitness_goal, splitPref, trainingStyle)
+  // THE LIGHTER SESSIONS GO ON THE CLASS DAYS. Day-to-focus was purely
+  // positional — day 1 got track 1 — so a trainee with Muay Thai on Tuesday
+  // and Thursday evenings could be handed the heavy leg day the morning of a
+  // kicking class, because nothing here knew the class existed. This is a
+  // PERMUTATION of the same tracks: the week's total work is unchanged, only
+  // which weekday carries which session. With no concurrent activity it
+  // returns the split untouched, which is what keeps every other plan on the
+  // grid byte-identical (proven by scripts/fingerprint-plans.ts, before and
+  // after). Ashley's ruling, 6 Sep 2026, over also cutting volume.
+  const { tracks: split } = reorderTracksForClassDays(availableDays, baseSplit, activityDays(profile.concurrent_activities))
 
 
   const weeklyUsed = new Set<string>()
@@ -4342,7 +4380,7 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
   const weeklyRequiredNames = new Set<string>()
 
   const days: WorkoutDay[] = availableDays.map((day, index) => {
-    const rawTrack = split[index % split.length]
+    const rawTrack = split[index]
     const trackFocus = getViableTrack(rawTrack, pool)
     const track = TRACKS[trackFocus]
 
@@ -5000,7 +5038,7 @@ function computeDurationTopUp(
     // for low-recovery profiles — a real regression that the 9216-combo
     // harness will NOT flag, since the score would just look artificially
     // perfect.
-    if (profile.recovery_capacity === 'low') {
+    if (effectiveRecoveryCapacity(profile) === 'low') {
       return day.exercises.map(() => 0)
     }
 
@@ -5301,7 +5339,7 @@ function applyDurationFiller(
    */
   sessionMinimumSeconds: number,
 ): void {
-  const recovery = profile.recovery_capacity || 'moderate'
+  const recovery = effectiveRecoveryCapacity(profile)
   const mobilityOnly = recovery === 'low' || recovery === 'moderate' || profile.conditioning_preference === 'avoid'
 
   for (const day of days) {
@@ -5427,7 +5465,11 @@ export function generateMesocycle(
   const styleConfig = STYLE_CONFIGS[profile.training_style || 'hybrid']
   const pool = getConstrainedPool(profile, exclusions)
   const policy = getGoalPolicy(goal)
-  const recoverySetMultiplier = RECOVERY_SET_MULTIPLIER[profile.recovery_capacity || 'moderate']
+  // Through effectiveRecoveryCapacity, never the raw answer: a qualifying
+  // second sport is one notch of recovery spent before the gym (see
+  // concurrent-activity.ts). test:concurrent-activity pins that no raw read
+  // of recovery_capacity remains anywhere in generation or scoring.
+  const recoverySetMultiplier = RECOVERY_SET_MULTIPLIER[effectiveRecoveryCapacity(profile)]
   const totalBudgetSeconds = getDurationBudgetSeconds(profile.session_duration_preference || '45-60')
 
   // Experience already trims power/strength for beginners/novices
@@ -6016,6 +6058,8 @@ export function generateMesocycle(
           // the bump block that sets it and the assignment that reads it are
           // different branches of it.
           let repBump: Exercise['rep_bump']
+          /** The carry twin, same scope and same reason — see Exercise.distance_bump. */
+          let distanceBump: Exercise['distance_bump']
           // The hold on this slot's NATURAL prescription. Captured before the
           // bump block, because buying a rep re-prescribes through the forced
           // path and that prescription reports no hold of its own — which is
@@ -6284,6 +6328,36 @@ export function generateMesocycle(
                 // volume did the reducing") is unambiguous rather than an
                 // accident of rounding.
                 forceStartingWeightKg = deloadAtFloor ? equipmentFloor! : week3Kg * 0.7
+              } else if (forceStartingWeightKg == null) {
+                // NO WEEK-3 ANCHOR FOR THIS SLOT, AND A DELOAD MUST STILL
+                // BACK OFF. The anchor is name-keyed, so a slot whose
+                // exercise changed since week 3 has none — and goals that
+                // rotate accessories every week (functional's
+                // accessoryRotationWeeks) change it in the deload week too.
+                // This branch used to fall through to prescribeLoad's fresh
+                // estimate at full value: a "recovery week" introducing a
+                // lift at a heavier number than the same lift carried the
+                // week before on another day. Measured on the quality grid,
+                // 6 Sep 2026: 30 deloads heavier than their preceding week,
+                // all functional, e.g. Landmine Press 50kg -> 52.5kg. So the
+                // no-anchor case takes the same 70% — of the LIFT's own last
+                // displayed loading-week number wherever it sat (by name,
+                // lastWeekDisplayedKgByLift, which the trainee actually saw
+                // and which the unverified ramp may still hold well under the
+                // estimate: 30kg in week 3 against a 55kg estimate), and only
+                // when the lift was not seen last week at all, of the fresh
+                // estimate at this week's own reps and RPE — already the
+                // lighter deload target, so if anything that errs light.
+                const lastSeenKg = lastWeekDisplayedKgByLift.get(dbEntry.name)?.kg
+                if (lastSeenKg != null) {
+                  forceStartingWeightKg = lastSeenKg * 0.7
+                } else {
+                  const fresh = prescribeLoad(dbEntry, profile, {
+                    targetRpeLabel: intensity, isFirstBlock: blockIndex === 0, sets, phase,
+                    isCalibrationWeek, knownWorkingWeights, repRangeLabel: reps, loadIsProgressing: rampLoad,
+                  })
+                  if (fresh.starting_weight_kg != null) forceStartingWeightKg = fresh.starting_weight_kg * 0.7
+                }
               }
             }
 
@@ -6463,6 +6537,11 @@ export function generateMesocycle(
               frozenCarryStepsByLift.set(dbEntry.name, steps)
               const baseM = parseInt(String(reps), 10)
               reps = `${baseM + steps * FROZEN_CARRY_DISTANCE_STEP_M}m`
+              // At the cap the distance stops moving too, and then the whole
+              // card repeats: same weight, same sets, same metres. Recorded so
+              // the screen and the coach can say so rather than presenting an
+              // identical week as progress.
+              distanceBump = steps >= MAX_FROZEN_CARRY_DISTANCE_STEPS ? 'capped' : 'walked'
             } else if (canBuyDistance && naturalKg != null && previousNaturalKg != null) {
               // The weight moved, so the distance resets — same reasoning as
               // the rep reset above. A carry that earned a heavier load should
@@ -6483,10 +6562,8 @@ export function generateMesocycle(
               blockBaselineKg[dayIdx][exIdx] = load.starting_weight_kg
               blockBaselineName[dayIdx][exIdx] = dbEntry.name
             }
-            if (w === 3) {
-              blockWeek3Kg[dayIdx][exIdx] = load.starting_weight_kg
-              blockWeek3Name[dayIdx][exIdx] = dbEntry.name
-            }
+            // Week 3's number for the deload is snapshotted AFTER the week's
+            // passes have run, not here — see "THE DELOAD'S REFERENCE" below.
             // Deload weeks are read-only for this tracker (see its
             // declaration) — the next block's week 1 must step from the
             // last real loading week, not the deload back-off. Written
@@ -6579,6 +6656,7 @@ export function generateMesocycle(
             // week (never carried through the ...ex spread from last week).
             load_hold: load ? naturalHold : ex.load_hold,
             rep_bump: repBump,
+            distance_bump: distanceBump,
             // THE FALLBACK USED TO BE A BARE `ex.suggested_assistance_kg`, and
             // it leaked across a rotation. This slot's identity can CHANGE
             // week to week; `ex` is what was here before. Swap Pull-Ups
@@ -6777,6 +6855,35 @@ export function generateMesocycle(
             const already = lastWeekDisplayedKgByLift.get(ex.name)
             const entry = { kg: ex.suggested_load_kg, repLow: repLowOf(ex.reps) }
             lastWeekDisplayedKgByLift.set(ex.name, already == null || entry.kg < already.kg ? entry : already)
+          }
+        }
+      }
+
+      // THE DELOAD'S REFERENCE IS THE NUMBER THE TRAINEE SAW. blockWeek3Kg
+      // used to be written inside the exercises.map above — BEFORE
+      // enforceOneWeightPerPrescription, enforceLoadCoherence and the
+      // never-drops floor had run on the week — so a slot those passes pulled
+      // down in week 3 had its deload built as 70% of a figure nobody was
+      // shown. Same lesson as the unverified tracker above, which was moved
+      // here on 31 Aug for the same reason; this snapshot was not moved with
+      // it. It is now. Name-keyed as before, so a slot whose exercise changed
+      // has no week-3 anchor — see the deload branch in the map for what
+      // happens then, which is where the measured defect actually lived.
+      //
+      // HONESTLY: this half is a statement of the rule, not a measured fix.
+      // The 30 deloads-heavier-than-the-week-before found on the quality grid
+      // on 6 Sep 2026 were all the NO-ANCHOR case; with that case handled,
+      // putting this snapshot back inside the map changed no deload rise on
+      // 144- and 432-plan functional grids. It is kept because 70% of a number
+      // the trainee never saw is wrong even where it does not show, and the
+      // plan-level diff records what it does change.
+      if (w === 3) {
+        for (let dayIdx = 0; dayIdx < days.length; dayIdx++) {
+          const dayExercises = days[dayIdx].exercises
+          for (let exIdx = 0; exIdx < dayExercises.length; exIdx++) {
+            const ex = dayExercises[exIdx]
+            blockWeek3Kg[dayIdx][exIdx] = ex.suggested_load_kg ?? null
+            blockWeek3Name[dayIdx][exIdx] = ex.suggested_load_kg == null ? null : ex.name
           }
         }
       }

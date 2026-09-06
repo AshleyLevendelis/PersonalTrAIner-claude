@@ -271,14 +271,38 @@ export async function getRecentLogs(
   })
 }
 
+/**
+ * Local clock time for a set, or '' when the row has no timestamp.
+ *
+ * WHY THIS EXISTS. Ashley, 5 Sep 2026, at 17:41: the coach told her "you
+ * logged one set of Clamshells (8 reps at bodyweight) AT 10:00 PM TODAY" — a
+ * time that had not happened yet. Nothing in this function had ever sent a
+ * time, so the model had no source for it and produced one that sounded
+ * plausible. `completed_at` was sitting on every row, unused.
+ *
+ * Local, not UTC, and deliberately so: this repo has already shipped one
+ * "coach insists you didn't train when you did" bug from a UTC/local mismatch
+ * (see chat-plan-context's todayStr comment). A time is only useful if it is
+ * the time on the trainee's own clock.
+ */
+function setTimeLabel(completedAt?: string): string {
+  if (!completedAt) return ''
+  const d = new Date(completedAt)
+  if (Number.isNaN(d.getTime())) return ''
+  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+}
+
 export function formatLogsForAI(logs: ExerciseSetLog[]): string {
   if (logs.length === 0) return ''
 
-  const grouped: Record<string, Record<string, { weight: number; reps: number; bw: boolean }[]>> = {}
+  const grouped: Record<string, Record<string, { weight: number; reps: number; bw: boolean; at: string }[]>> = {}
   for (const log of logs) {
     if (!grouped[log.date]) grouped[log.date] = {}
     if (!grouped[log.date][log.exercise_name]) grouped[log.date][log.exercise_name] = []
-    grouped[log.date][log.exercise_name].push({ weight: log.weight_kg, reps: log.reps_completed, bw: log.is_bodyweight })
+    grouped[log.date][log.exercise_name].push({
+      weight: log.weight_kg, reps: log.reps_completed, bw: log.is_bodyweight,
+      at: setTimeLabel(log.completed_at),
+    })
   }
 
   const lines: string[] = []
@@ -287,7 +311,12 @@ export function formatLogsForAI(logs: ExerciseSetLog[]): string {
     const parts: string[] = []
     for (const [name, sets] of Object.entries(exercises)) {
       const setsStr = sets.map(s => s.bw ? `BW x ${s.reps}` : `${s.weight}kg x ${s.reps}`).join(', ')
-      parts.push(`${name}: ${setsStr}`)
+      // The times, once, after the sets — not repeated per set, which would
+      // treble the line length for something read at a glance. Omitted
+      // entirely when no row carries one, so an absent time reads as absent
+      // rather than as a value the model may fill in.
+      const times = [...new Set(sets.map(s => s.at).filter(Boolean))]
+      parts.push(`${name}: ${setsStr}${times.length > 0 ? ` [logged at ${times.join(', ')}]` : ''}`)
     }
     lines.push(`${date}: ${parts.join(' | ')}`)
   }

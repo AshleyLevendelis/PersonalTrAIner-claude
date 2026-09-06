@@ -48,9 +48,81 @@ async function main() {
 
   console.log('[1] Every real tab (app-route.ts TABS) is named in §1a-i, so a renamed/added tab cannot go silently ungrounded')
   check('TABS is non-empty (sanity check on the gate itself)', TABS.length > 0, TABS)
+  // THE NAME THE USER SEES, not the route id. `dashboard` is labelled "Home"
+  // in BottomTabBar, and the coach describing a "Dashboard tab" sends someone
+  // looking for a tab that is not there — so the expected name is read from
+  // the tab bar's own label table, and the chat FAB's label from its aria.
+  const tabBar = readFileSync(join(ROOT, 'src/components/BottomTabBar.tsx'), 'utf-8')
+  const labelFromBar = (tab: string) =>
+    new RegExp(`tab: '${tab}', label: '([^']+)'`).exec(tabBar)?.[1]
+  const TAB_LABEL: Record<string, string> = { chat: 'Chat' }
   for (const tab of TABS) {
-    const capitalized = tab.charAt(0).toUpperCase() + tab.slice(1)
-    check(`§1a-i mentions "${capitalized}"`, appRealityBlock.includes(capitalized))
+    const label = TAB_LABEL[tab] ?? labelFromBar(tab)
+    check(`the tab bar labels "${tab}" (sanity check on this check)`, !!label, label)
+    if (!label) continue
+    check(`§1a-i mentions "${label}"`, appRealityBlock.includes(label))
+  }
+
+  // -------------------------------------------------------------------------
+  // [1b] EVERY CAPABILITY CLAIM IS TIED TO THE CODE THAT PROVIDES IT.
+  //
+  // Added 5 Sep 2026, and the reason is the whole point of this gate. §1a-i
+  // said "Dashboard: … water logging, step-count logging …" for WEEKS after
+  // both moved off the Dashboard — and every check in this file stayed GREEN,
+  // because they only ever asserted that a tab was NAMED. Meanwhile
+  // test:tab-ownership was asserting, correctly, that Home logs neither. Two
+  // gates, two contradictory pictures of one app, both passing.
+  //
+  // The cost is not abstract: §1a-i opens "This is the complete, current list.
+  // Nothing outside it exists", so the coach confidently sent people to a tab
+  // that had no logger on it.
+  //
+  // Same fix as test-app-tour.ts's: tie the claim to the source fact, so the
+  // NEXT time a control moves, the gate moves with it or goes red.
+  // -------------------------------------------------------------------------
+  console.log('\n[1b] A capability §1a-i claims for a tab is provided by that tab')
+  {
+    const bulletFor = (tab: string) => {
+      const m = appRealityBlock.match(new RegExp(`^- ${tab}:.*$`, 'm'))
+      return m ? m[0] : ''
+    }
+    const src = (rel: string) => readFileSync(join(ROOT, rel), 'utf-8')
+    // Each row: the writer that PROVES the capability, and where it lives now.
+    const CAPABILITIES: { label: string; claim: RegExp; writer: RegExp; file: string; tab: string }[] = [
+      {
+        label: 'step logging', claim: /step[- ]count logging/i, writer: /logStepsManual/,
+        file: 'src/components/Dashboard.tsx', tab: 'Home',
+      },
+      // MOVED 6 Sep 2026, Nutrition -> Home (design_handoff_app_polish: the
+      // day's quick log all lives on Home now). Same treatment steps got:
+      // re-point the row, and the "no OTHER tab claims it" loop below turns
+      // the leftover Nutrition claim into a failure instead of a second
+      // truth. Nutrition still SETS the water target — it just doesn't log.
+      {
+        label: 'water logging', claim: /water logging/i, writer: /logWater\b/,
+        file: 'src/components/Dashboard.tsx', tab: 'Home',
+      },
+    ]
+    for (const c of CAPABILITIES) {
+      // The component really does the writing — or this check is asserting
+      // against a file that stopped being the owner and nobody noticed.
+      check(`${c.label}: ${c.file} is the writer (sanity check on this check)`, c.writer.test(src(c.file)))
+      check(`§1a-i credits ${c.label} to ${c.tab}`, c.claim.test(bulletFor(c.tab)), bulletFor(c.tab))
+      // And no OTHER tab claims it. A move that only adds is a lie kept in
+      // two places, which is exactly how the Dashboard line survived.
+      // The tab's user-visible name is Home (BottomTabBar); APP_REALITY said
+      // "Dashboard" until 6 Sep 2026, which is the code's name for it.
+      for (const other of ['Home', 'Nutrition', 'Exercise', 'Tools', 'Chat']) {
+        if (other === c.tab) continue
+        check(`...and ${other} no longer claims ${c.label}`, !c.claim.test(bulletFor(other)), bulletFor(other))
+      }
+    }
+    // The technique screen shipped 5 Sep 2026 and the coach must know it
+    // exists, or it answers "where can I see how to do this?" with nothing.
+    check('§1a-i names the per-exercise technique screen',
+      /how to|form cues/i.test(bulletFor('Exercise')), bulletFor('Exercise'))
+    check('...and the app really has one (sanity check on this check)',
+      /form_cues/.test(src('src/components/exercise/ExerciseDetailDialog.tsx')))
   }
 
   console.log('\n[2] §1a-i names exactly as many tabs as TABS.length — catches a tab being silently dropped from the list even if the others still match')

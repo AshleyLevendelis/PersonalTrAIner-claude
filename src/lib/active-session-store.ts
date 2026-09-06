@@ -28,6 +28,20 @@ export interface ActiveSessionRecord {
   startedAtIso: string
   finishedAtIso?: string
   lastActivityIso: string
+  /**
+   * Set when Finish closed the session locally but the SERVER close
+   * (markSessionCompleted) failed — the moment it failed, ISO.
+   *
+   * The sets themselves are safe: they go through set-log-store's own offline
+   * queue. What is missing is the workout_sessions row's completed stamp, and
+   * that stamp is what history, the streak and "have you reviewed this
+   * session yet" all read. Before 5 Sep 2026 the failure was caught, logged to
+   * the console, and the app showed "Session complete" over the top of it —
+   * permanently, because nothing ever tried again. This marker is what lets
+   * the next mount or foreground retry, and what lets the summary dialog stop
+   * claiming a finish that has not happened yet.
+   */
+  serverCloseFailedAt?: string
   /** Deadline-anchored rest — set by startRest, cleared by dismissRest. Absent when no rest is running. */
   restEndsAt?: string
   restLabel?: string

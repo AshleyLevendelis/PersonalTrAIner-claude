@@ -28,6 +28,7 @@ export function ReceiptCard({
   onViewProfile,
   onViewGrocery,
   onViewDashboard,
+  onViewExercise,
 }: {
   title: string
   rows: ReceiptRow[]
@@ -43,6 +44,8 @@ export function ReceiptCard({
   onViewGrocery?: () => void
   /** VISION-ARCHITECTURE.md §5.4 — present only for water_logged receipts, deep-links to the Dashboard tab. */
   onViewDashboard?: () => void
+  /** Present only for steps_logged receipts. Steps live on the EXERCISE tab (§5.1a, 5 Sep 2026) — sending them to the Dashboard would be pointing at the tile rather than the number. */
+  onViewExercise?: () => void
 }) {
   const [busy, setBusy] = useState<'undo' | string | null>(null)
 
@@ -67,7 +70,7 @@ export function ReceiptCard({
   }
 
   const icon = status === 'done'
-    ? <CheckCircle2 className="size-3.5 text-primary shrink-0" />
+    ? <CheckCircle2 className="size-3.5 text-primary-text shrink-0" />
     : status === 'partial'
       ? <AlertTriangle className="size-3.5 text-[color:var(--role-warn)] shrink-0" />
       : <XCircle className="size-3.5 text-destructive shrink-0" />
@@ -128,6 +131,11 @@ export function ReceiptCard({
           )}
           {onViewDashboard && (
             <Button size="sm" variant="ghost" className="h-6 text-[0.6875rem]" onClick={onViewDashboard}>
+              View
+            </Button>
+          )}
+          {onViewExercise && (
+            <Button size="sm" variant="ghost" className="h-6 text-[0.6875rem]" onClick={onViewExercise}>
               View
             </Button>
           )}

@@ -6,7 +6,8 @@ import { EXPERIENCE_RPE_CEILING } from './periodization'
 import { setRandomSource, resetRandomSource } from './exercise-plan'
 import { seededRngFromKey } from './seeded-random'
 import { DURATION_BUDGET_SECONDS, getSessionMinimumSeconds, getSessionMaximumSeconds, estimateDaySeconds, estimateSlotsSeconds, parseRestSeconds } from './session-duration'
-import { getEquipmentFloorKg, labelModeForEntry, isExternallyLoaded } from './load-prescription'
+import { getEquipmentFloorKg, labelModeForEntry, isExternallyLoaded, categorize } from './load-prescription'
+import { effectiveRecoveryCapacity } from './concurrent-activity'
 
 // ---------------------------------------------------------------------------
 // PLAN QUALITY SCORING
@@ -108,7 +109,7 @@ function scoreTimeRatio(seconds: number, minimum: number, maximum: number, exemp
   }
   // LOAD-BEARING COUPLING with exercise-plan.ts's computeDurationTopUp — do
   // not change one side without the other. `exemptUnderrun` is passed in as
-  // exactly `profile.recovery_capacity === 'low'`, which is only a safe
+  // exactly `effectiveRecoveryCapacity(profile) === 'low'`, which is only a safe
   // signal because computeDurationTopUp returns ZERO top-up sets for that
   // exact case (see its own matching comment). That makes a low-recovery
   // under-budget day categorically different from every other under-budget
@@ -174,7 +175,11 @@ function scoreTimeFit(profile: UserProfile, mesocycle: MesocycleWeek[]): Dimensi
   // See scoreTimeRatio's own comment — this is only valid while
   // computeDurationTopUp (exercise-plan.ts) returns zero top-up for low
   // recovery_capacity. The two must move together.
-  const exemptUnderrun = profile.recovery_capacity === 'low'
+  // Effective, not stated: a second sport that counts as load puts a
+  // moderate profile on the low tier's zero-top-up path, and the exemption
+  // must follow the same value the generator read or every such plan scores
+  // as under-filled.
+  const exemptUnderrun = effectiveRecoveryCapacity(profile) === 'low'
   let worstScore = 2
   let worst: { week: number; day: string; seconds: number; ratio: number; isOver: boolean } | null = null
   let worstCardioScore = 2
@@ -1025,7 +1030,11 @@ function scoreSelection(profile: UserProfile, mesocycle: MesocycleWeek[]): Dimen
     if (p === 'isolation_shoulder') return entry.substitution_group === 'shrug' ? 'shrug' : 'lateral_delt'
     if (p === 'isolation_quad') return 'quad_isolation'
     if (p === 'isolation_hamstring') return 'hamstring_isolation'
-    if (p === 'isolation_calf') return 'calf_isolation'
+    // Mirrors exercise-plan.ts's coherenceGroup: a bodyweight-anchored
+    // single-leg calf raise (single_leg_calf) is not comparable to a machine
+    // calf raise even after the per-side x2 below — 24kg normalised against a
+    // 70kg stack is the anchor difference, not an incoherence.
+    if (p === 'isolation_calf') return categorize(entry) === 'single_leg_calf' ? 'calf_single_leg' : 'calf_isolation'
     return null
   }
   for (const day of week1?.days ?? []) {
@@ -1183,7 +1192,11 @@ function scoreGoalAlignment(profile: UserProfile, mesocycle: MesocycleWeek[], co
     const highMeso = generateComparisonMesocycle(highProfile, `${comboKey}::high-recovery-compare`)
     const lowSets = sumWeeklySets(week1)
     const highSets = sumWeeklySets(highMeso.find(w => w.week_number === 1))
-    const expectedRatio = RECOVERY_SET_MULTIPLIER.low / RECOVERY_SET_MULTIPLIER.high
+    // The comparison varies the STATED answer; the generator applies the
+    // EFFECTIVE one. With a load-bearing second sport "high" is built as
+    // moderate and "low" stays low, so the expected gap is between those two
+    // effective tiers — not the raw low/high gap the profile names suggest.
+    const expectedRatio = RECOVERY_SET_MULTIPLIER[effectiveRecoveryCapacity(profile)] / RECOVERY_SET_MULTIPLIER[effectiveRecoveryCapacity(highProfile)]
     const recoveryOk = highSets > 0 && lowSets <= highSets * (expectedRatio + 0.02)
     checks.push({
       pass: recoveryOk,

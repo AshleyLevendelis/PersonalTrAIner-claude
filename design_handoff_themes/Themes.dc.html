@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0F0D22;color:#F5F3FF;font-family:'Space Grotesk',ui-sans-serif,system-ui,sans-serif;}
+a{color:#5BE9C2;} a:hover{color:#3ED3AA;}
+</style>
+</helmet>
+
+<section id="turn-1" style="padding:40px 48px 64px;display:flex;flex-direction:column;gap:28px">
+  <div style="display:flex;flex-direction:column;gap:10px;max-width:960px">
+    <div style="display:flex;align-items:baseline;gap:14px"><span style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#9A93C9">Turn 1</span><span style="font-size:18px;font-weight:600">Themes — 5 → 8, and light canvases that you can actually read</span></div>
+    <p style="margin:0;font-size:13px;line-height:19px;color:#C2BCE8;text-wrap:pretty">Why Daylight is hard to read today: three tokens never got a light value. Hero numbers are hard‑coded <code style="color:#F5F3FF">#E4FCF4</code> (near‑white on paper), the TrAIner's text is <code style="color:#F5F3FF">#DAD5FA</code> in <code style="color:#F5F3FF">:root</code> (lavender on paper), and the accent is used as <em>text</em> at 11–13px where it measures 3.8:1. Glow text‑shadows also haze small type on a light canvas. The fix below adds three tokens every theme must define — <code style="color:#F5F3FF">--primary-text</code>, <code style="color:#F5F3FF">--num-hero</code>, <code style="color:#F5F3FF">--role-ai-text</code> — and tunes every light value to ≥ 4.5:1 for body/labels and ≥ 7:1 for secondary text. Ratios shown are computed live from the values.</p>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:#9A93C9"><span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#5BE9C2;margin-right:6px"></span>≥ 7:1</span><span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#C2BCE8;margin-right:6px"></span>≥ 4.5:1 (AA body)</span><span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#FFB454;margin-right:6px"></span>3–4.5 (large text / fills only)</span><span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#FF7A6B;margin-right:6px"></span>fails</span></div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:12px">
+    <div style="display:flex;align-items:center;gap:10px"><a id="1a" href="#1a" style="font-size:11px;font-weight:700;letter-spacing:.12em;text-decoration:none;color:#08281F;background:#5BE9C2;border-radius:999px;padding:3px 9px">1a</a><span style="font-size:15px;font-weight:600">Dark canvases</span><span style="font-size:12px;color:#9A93C9">4 existing (values kept, new tokens added) + 2 new</span></div>
+    <div style="display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start">
+      <sc-for list="{{ dark }}" as="t" hint-placeholder-count="6">
+        <div style="width:300px;display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:14px;font-weight:600">{{ t.label }} <span style="font-size:11px;font-weight:500;color:#5BE9C2;margin-left:4px">{{ t.tag }}</span></span><span style="font-size:11px;color:#9A93C9">{{ t.subtitle }}</span></div>
+          <!-- mini screen -->
+          <div data-screen-label="{{ t.label }}" style="border-radius:22px;overflow:hidden;border:1px solid rgba(245,243,255,.11);background: {{ t.bg }};color: {{ t.fg }};padding:18px 18px 0;display:flex;flex-direction:column;gap:14px;font-size:13px;line-height:18px">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start"><div><div style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color: {{ t.muted }}">Wednesday · Week 3</div><div style="font-size:22px;font-weight:700;letter-spacing:-.03em;line-height:1.1;margin-top:4px">Morning, Ashley</div></div><span style="display:flex;align-items:center;gap:5px;border-radius:999px;padding:4px 8px;background: {{ t.raised }}"><span style="width:5px;height:5px;border-radius:999px;background: {{ t.primary }}"></span><span style="font-family:ui-monospace,monospace;font-size:11px;font-weight:600">12</span><span style="font-size:10px;color: {{ t.muted }}">days</span></span></div>
+            <div style="display:flex;gap:8px;align-items:flex-start;padding:10px 12px;border-radius:12px;background: {{ t.aiBg }};border:1px solid {{ t.aiBorder }}"><span style="width:18px;height:18px;flex:none;border-radius:999px;background:linear-gradient(180deg, {{ t.primary }}, {{ t.primary2 }})"></span><span style="font-size:12px;line-height:1.5;color: {{ t.aiText }}">Bench moves to 62.5 kg today — I'll flag it on the set.</span></div>
+            <div><div style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color: {{ t.muted }}">Today's session</div><div style="font-size:19px;font-weight:700;letter-spacing:-.02em;margin-top:4px">Full Body Power</div><div style="font-size:11.5px;color: {{ t.tertiary }};margin-top:2px">6 exercises · 21 sets · ~52 min</div><div style="margin-top:10px;height:40px;border-radius:11px;background:linear-gradient(180deg, {{ t.primaryHi }}, {{ t.primary }} 55%, {{ t.primary2 }});color: {{ t.onPrimary }};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;box-shadow: {{ t.ctaShadow }}">Start session</div></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;border-top:1px solid {{ t.hairline }}">
+              <div style="padding:10px 10px 12px 0;border-right:1px solid {{ t.hairline }}"><div style="font-size:10px;color: {{ t.muted }}">Calories</div><div style="font-family:ui-monospace,monospace;font-size:18px;font-weight:700;color: {{ t.numHero }}">1240<span style="font-size:10px;font-weight:400;color: {{ t.muted }}"> / 2480</span></div><div style="font-size:10px;color: {{ t.primaryText }};margin-top:4px">Nutrition ›</div></div>
+              <div style="padding:10px 0 12px 10px"><div style="font-size:10px;color: {{ t.muted }}">Weight</div><div style="font-family:ui-monospace,monospace;font-size:18px;font-weight:700;color: {{ t.numHero }}">78.4<span style="font-size:10px;font-weight:400;color: {{ t.muted }}"> kg</span></div><div style="font-size:10px;color: {{ t.primaryText }};margin-top:4px">−2.0 kg since week 1</div></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;padding:10px 0;border-top:1px solid {{ t.hairline }};font-size:12px"><span>Bench Press</span><span style="font-family:ui-monospace,monospace;color: {{ t.primaryText }}">60 kg × 9</span></div>
+            <div style="margin:0 -18px;height:44px;background: {{ t.deep }};display:flex;align-items:center;justify-content:space-around;font-size:9px;color: {{ t.muted }}"><span style="color: {{ t.primaryText }}">Home</span><span>Nutrition</span><span style="width:34px;height:34px;margin-top:-14px;border-radius:999px;background:linear-gradient(180deg, {{ t.primaryHi }}, {{ t.primary2 }})"></span><span>Exercise</span><span>Tools</span></div>
+          </div>
+          <!-- swatches -->
+          <div style="display:flex;gap:4px;height:22px;border-radius:6px;overflow:hidden"><span style="flex:1;background: {{ t.bg }}"></span><span style="flex:1;background: {{ t.deep }}"></span><span style="flex:1;background: {{ t.card }}"></span><span style="flex:1;background: {{ t.dim }}"></span><span style="flex:1;background: {{ t.muted }}"></span><span style="flex:1;background: {{ t.tertiary }}"></span><span style="flex:1;background: {{ t.fg }}"></span><span style="flex:1;background: {{ t.primary }}"></span><span style="flex:1;background: {{ t.primary2 }}"></span></div>
+          <!-- contrast -->
+          <div style="display:grid;grid-template-columns:1fr auto;gap:3px 10px;font-size:11px;color:#C2BCE8">
+            <sc-for list="{{ t.checks }}" as="c" hint-placeholder-count="6"><span>{{ c.name }}</span><span style="font-family:ui-monospace,monospace;text-align:right;color: {{ c.color }}">{{ c.ratio }}</span></sc-for>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:12px;padding-top:20px;border-top:1px solid rgba(245,243,255,.11)">
+    <div style="display:flex;align-items:center;gap:10px"><a id="1b" href="#1b" style="font-size:11px;font-weight:700;letter-spacing:.12em;text-decoration:none;color:#08281F;background:#5BE9C2;border-radius:999px;padding:3px 9px">1b</a><span style="font-size:15px;font-weight:600">Light canvases</span><span style="font-size:12px;color:#9A93C9">Daylight retuned + 2 new. No text glow; accent used for fills, <code style="color:#C2BCE8">--primary-text</code> for words.</span></div>
+    <div style="display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start">
+      <div style="width:300px;display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:14px;font-weight:600">Daylight <span style="font-size:11px;font-weight:500;color:#FF7A6B;margin-left:4px">as shipped</span></span><span style="font-size:11px;color:#9A93C9">what's wrong</span></div>
+        <div data-screen-label="Daylight current" style="border-radius:22px;overflow:hidden;border:1px solid rgba(245,243,255,.11);background:#F5F3FA;color:#1A1636;padding:18px 18px 0;display:flex;flex-direction:column;gap:14px;font-size:13px;line-height:18px">
+          <div><div style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#6B6590">Wednesday · Week 3</div><div style="font-size:22px;font-weight:700;letter-spacing:-.03em;line-height:1.1;margin-top:4px;text-shadow:0 0 26px rgba(0,140,114,.35)">Morning, Ashley</div></div>
+          <div style="display:flex;gap:8px;align-items:flex-start;padding:10px 12px;border-radius:12px;background:rgba(139,123,255,.10)"><span style="width:18px;height:18px;flex:none;border-radius:999px;background:#008C72"></span><span style="font-size:12px;line-height:1.5;color:#DAD5FA">Bench moves to 62.5 kg today — I'll flag it on the set.</span></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;border-top:1px solid rgba(26,22,54,.13)">
+            <div style="padding:10px 10px 12px 0;border-right:1px solid rgba(26,22,54,.13)"><div style="font-size:10px;color:#6B6590">Calories</div><div style="font-family:ui-monospace,monospace;font-size:18px;font-weight:700;color:#E4FCF4;text-shadow:0 0 18px rgba(0,140,114,.5)">1240<span style="font-size:10px;font-weight:400;color:#6B6590"> / 2480</span></div><div style="font-size:10px;color:#008C72;margin-top:4px">Nutrition ›</div></div>
+            <div style="padding:10px 0 12px 10px"><div style="font-size:10px;color:#6B6590">Weight</div><div style="font-family:ui-monospace,monospace;font-size:18px;font-weight:700;color:#E4FCF4;text-shadow:0 0 18px rgba(0,140,114,.5)">78.4<span style="font-size:10px;font-weight:400;color:#6B6590"> kg</span></div><div style="font-size:10px;color:#008C72;margin-top:4px">−2.0 kg since week 1</div></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:10px 0;border-top:1px solid rgba(26,22,54,.13);font-size:12px"><span>Bench Press</span><span style="font-family:ui-monospace,monospace;color:#008C72">60 kg × 9</span></div>
+          <div style="margin:0 -18px;height:44px;background:#ECE9F5"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr auto;gap:3px 10px;font-size:11px;color:#C2BCE8">
+          <sc-for list="{{ oldDaylight }}" as="c" hint-placeholder-count="4"><span>{{ c.name }}</span><span style="font-family:ui-monospace,monospace;text-align:right;color: {{ c.color }}">{{ c.ratio }}</span></sc-for>
+        </div>
+      </div>
+      <sc-for list="{{ light }}" as="t" hint-placeholder-count="3">
+        <div style="width:300px;display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:14px;font-weight:600">{{ t.label }} <span style="font-size:11px;font-weight:500;color:#5BE9C2;margin-left:4px">{{ t.tag }}</span></span><span style="font-size:11px;color:#9A93C9">{{ t.subtitle }}</span></div>
+          <div data-screen-label="{{ t.label }}" style="border-radius:22px;overflow:hidden;border:1px solid rgba(245,243,255,.11);background: {{ t.bg }};color: {{ t.fg }};padding:18px 18px 0;display:flex;flex-direction:column;gap:14px;font-size:13px;line-height:18px">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start"><div><div style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color: {{ t.muted }}">Wednesday · Week 3</div><div style="font-size:22px;font-weight:700;letter-spacing:-.03em;line-height:1.1;margin-top:4px">Morning, Ashley</div></div><span style="display:flex;align-items:center;gap:5px;border-radius:999px;padding:4px 8px;background: {{ t.raised }}"><span style="width:5px;height:5px;border-radius:999px;background: {{ t.primary }}"></span><span style="font-family:ui-monospace,monospace;font-size:11px;font-weight:600">12</span><span style="font-size:10px;color: {{ t.muted }}">days</span></span></div>
+            <div style="display:flex;gap:8px;align-items:flex-start;padding:10px 12px;border-radius:12px;background: {{ t.aiBg }};border:1px solid {{ t.aiBorder }}"><span style="width:18px;height:18px;flex:none;border-radius:999px;background:linear-gradient(180deg, {{ t.primary }}, {{ t.primary2 }})"></span><span style="font-size:12px;line-height:1.5;color: {{ t.aiText }}">Bench moves to 62.5 kg today — I'll flag it on the set.</span></div>
+            <div><div style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color: {{ t.muted }}">Today's session</div><div style="font-size:19px;font-weight:700;letter-spacing:-.02em;margin-top:4px">Full Body Power</div><div style="font-size:11.5px;color: {{ t.tertiary }};margin-top:2px">6 exercises · 21 sets · ~52 min</div><div style="margin-top:10px;height:40px;border-radius:11px;background:linear-gradient(180deg, {{ t.primaryHi }}, {{ t.primary }} 55%, {{ t.primary2 }});color: {{ t.onPrimary }};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;box-shadow: {{ t.ctaShadow }}">Start session</div></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;border-top:1px solid {{ t.hairline }}">
+              <div style="padding:10px 10px 12px 0;border-right:1px solid {{ t.hairline }}"><div style="font-size:10px;color: {{ t.muted }}">Calories</div><div style="font-family:ui-monospace,monospace;font-size:18px;font-weight:700;color: {{ t.numHero }}">1240<span style="font-size:10px;font-weight:400;color: {{ t.muted }}"> / 2480</span></div><div style="font-size:10px;color: {{ t.primaryText }};margin-top:4px">Nutrition ›</div></div>
+              <div style="padding:10px 0 12px 10px"><div style="font-size:10px;color: {{ t.muted }}">Weight</div><div style="font-family:ui-monospace,monospace;font-size:18px;font-weight:700;color: {{ t.numHero }}">78.4<span style="font-size:10px;font-weight:400;color: {{ t.muted }}"> kg</span></div><div style="font-size:10px;color: {{ t.primaryText }};margin-top:4px">−2.0 kg since week 1</div></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;padding:10px 0;border-top:1px solid {{ t.hairline }};font-size:12px"><span>Bench Press</span><span style="font-family:ui-monospace,monospace;color: {{ t.primaryText }}">60 kg × 9</span></div>
+            <div style="margin:0 -18px;height:44px;background: {{ t.deep }};display:flex;align-items:center;justify-content:space-around;font-size:9px;color: {{ t.muted }}"><span style="color: {{ t.primaryText }}">Home</span><span>Nutrition</span><span style="width:34px;height:34px;margin-top:-14px;border-radius:999px;background:linear-gradient(180deg, {{ t.primaryHi }}, {{ t.primary2 }})"></span><span>Exercise</span><span>Tools</span></div>
+          </div>
+          <div style="display:flex;gap:4px;height:22px;border-radius:6px;overflow:hidden"><span style="flex:1;background: {{ t.bg }}"></span><span style="flex:1;background: {{ t.deep }}"></span><span style="flex:1;background: {{ t.card }}"></span><span style="flex:1;background: {{ t.dim }}"></span><span style="flex:1;background: {{ t.muted }}"></span><span style="flex:1;background: {{ t.tertiary }}"></span><span style="flex:1;background: {{ t.fg }}"></span><span style="flex:1;background: {{ t.primary }}"></span><span style="flex:1;background: {{ t.primaryText }}"></span></div>
+          <div style="display:grid;grid-template-columns:1fr auto;gap:3px 10px;font-size:11px;color:#C2BCE8">
+            <sc-for list="{{ t.checks }}" as="c" hint-placeholder-count="6"><span>{{ c.name }}</span><span style="font-family:ui-monospace,monospace;text-align:right;color: {{ c.color }}">{{ c.ratio }}</span></sc-for>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:12px;padding-top:20px;border-top:1px solid rgba(245,243,255,.11)">
+    <div style="display:flex;align-items:center;gap:10px"><a id="1c" href="#1c" href="#1c" style="font-size:11px;font-weight:700;letter-spacing:.12em;text-decoration:none;color:#08281F;background:#5BE9C2;border-radius:999px;padding:3px 9px">1c</a><span style="font-size:15px;font-weight:600">Action colours</span><span style="font-size:12px;color:#9A93C9">6 → 8 overrides. Each carries a <em>text</em> step for light canvases so a link is never the fill colour.</span></div>
+    <div style="display:flex;flex-wrap:wrap;gap:10px">
+      <sc-for list="{{ accents }}" as="a" hint-placeholder-count="8">
+        <div style="width:150px;padding:12px;border-radius:14px;background:#1A1636;border:1px solid rgba(245,243,255,.11);display:flex;flex-direction:column;gap:8px">
+          <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:13px;font-weight:600">{{ a.label }}</span><span style="font-size:10px;color:#9A93C9">{{ a.tag }}</span></div>
+          <div style="display:flex;gap:4px;height:26px;border-radius:7px;overflow:hidden"><span style="flex:1;background: {{ a.bright }}"></span><span style="flex:1;background: {{ a.deep }}"></span><span style="flex:1;background: {{ a.dark }}"></span><span style="flex:1;background: {{ a.text }}"></span></div>
+          <div style="display:flex;gap:4px"><div style="flex:1;height:34px;border-radius:8px;background:#1A1636;border:1px solid rgba(245,243,255,.11);display:flex;align-items:center;justify-content:center;font-size:10px;color: {{ a.bright }}">link {{ a.darkRatio }}</div><div style="flex:1;height:34px;border-radius:8px;background:#F4F2FA;display:flex;align-items:center;justify-content:center;font-size:10px;color: {{ a.text }}">link {{ a.lightRatio }}</div></div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:12px;padding-top:20px;border-top:1px solid rgba(245,243,255,.11);max-width:960px">
+    <div style="display:flex;align-items:center;gap:10px"><a id="1d" href="#1d" style="font-size:11px;font-weight:700;letter-spacing:.12em;text-decoration:none;color:#08281F;background:#5BE9C2;border-radius:999px;padding:3px 9px">1d</a><span style="font-size:15px;font-weight:600">The rules that make every theme readable</span></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;font-size:12.5px;line-height:18px;color:#C2BCE8">
+      <div style="padding:14px;border-radius:14px;background:#1A1636;border:1px solid rgba(245,243,255,.11)"><div style="font-weight:600;color:#F5F3FF;margin-bottom:6px">Three new tokens, every theme defines them</div><code style="color:#5BE9C2">--primary-text</code> — the accent when it is words (links, "Nutrition ›", PR values, active tab label). Dark themes: same as <code>--primary</code>. Light: a step dark enough for 4.5:1.<br><code style="color:#5BE9C2">--num-hero</code> — replaces hard‑coded <code>#E4FCF4</code>. Light: an ink of the accent hue.<br><code style="color:#5BE9C2">--role-ai-text</code> / <code style="color:#5BE9C2">--role-ai-bg</code> — moved out of <code>:root</code> into each theme.</div>
+      <div style="padding:14px;border-radius:14px;background:#1A1636;border:1px solid rgba(245,243,255,.11)"><div style="font-weight:600;color:#F5F3FF;margin-bottom:6px">Floors, checked by test-appearance.ts</div>foreground ≥ 12:1 · text‑tertiary ≥ 7:1 · muted‑foreground ≥ 4.5:1 (it's used at 11px) · primary‑text ≥ 4.5:1 · num‑hero ≥ 7:1 · role‑ai‑text ≥ 4.5:1 on role‑ai‑bg · primary‑foreground ≥ 4.5:1 on primary. The in‑app contrast guard measures <code>--primary-text</code>, not the fill.</div>
+      <div style="padding:14px;border-radius:14px;background:#1A1636;border:1px solid rgba(245,243,255,.11)"><div style="font-weight:600;color:#F5F3FF;margin-bottom:6px">Light canvas behaviour</div>Text glow (<code>.glow-text</code>, <code>.glow-mint*</code> on text) resolves to none — a light halo on paper is haze. Box glow on the CTA/FAB is kept at subtle. <code>--hero-wash</code> drops to .08. Grain stays inverted. <code>--primary-foreground</code> becomes per‑theme (white on Frost's blue, dark on Linen's amber).</div>
+      <div style="padding:14px;border-radius:14px;background:#1A1636;border:1px solid rgba(245,243,255,.11)"><div style="font-weight:600;color:#F5F3FF;margin-bottom:6px">Settings sheet</div>Theme cards split into two rows labelled <em>Dark</em> and <em>Light</em>; a 2×2 grid of 8 gets long. Add <em>Match system</em> as a first chip: picks the default dark (Nightshift) or default light (Daylight) from <code>prefers-color-scheme</code>. Accent chips show the resolved <em>text</em> step on light themes, so the swatch is honest about what a link will look like.</div>
+    </div>
+  </div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  lum(hex) { const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim()); if (!m) return 0; const n = parseInt(m[1], 16); const ch = v => { const c = v / 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; }; return 0.2126 * ch((n >> 16) & 255) + 0.7152 * ch((n >> 8) & 255) + 0.0722 * ch(n & 255); }
+  ratio(a, b) { const la = this.lum(a), lb = this.lum(b); return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05); }
+  check(name, fg, bg, floor) { const r = this.ratio(fg, bg); const color = r >= 7 ? '#5BE9C2' : r >= 4.5 ? '#C2BCE8' : r >= 3 ? '#FFB454' : '#FF7A6B'; return { name, ratio: r.toFixed(1) + ':1', color: r < floor ? '#FF7A6B' : color }; }
+  theme(t) {
+    const light = !!t.light;
+    return {
+      ...t,
+      primaryText: t.primaryText || t.primary,
+      numHero: t.numHero,
+      primaryHi: t.primaryHi,
+      onPrimary: t.onPrimary || '#08281F',
+      raised: t.raised,
+      ctaShadow: light ? '0 6px 16px rgba(' + t.glow + ',.25)' : '0 0 18px rgba(' + t.glow + ',.45)',
+      aiBg: t.aiBg, aiBorder: t.aiBorder, aiText: t.aiText,
+      checks: [
+        this.check('foreground / canvas', t.fg, t.bg, 12),
+        this.check('text-tertiary / canvas', t.tertiary, t.bg, 7),
+        this.check('muted-foreground / canvas (11px)', t.muted, t.bg, 4.5),
+        this.check('primary-text / canvas', t.primaryText || t.primary, t.bg, 4.5),
+        this.check('num-hero / canvas', t.numHero, t.bg, 7),
+        this.check('role-ai-text / canvas', t.aiText, t.bg, 4.5),
+        this.check('primary-foreground / primary', t.onPrimary || '#08281F', t.primary, 4.5),
+      ],
+    };
+  }
+  renderVals() {
+    const dark = [
+      { label: 'Nightshift', tag: 'default', subtitle: 'deep violet · mint', bg: '#1A1636', deep: '#221C48', card: '#241E4E', dim: '#453C8E', muted: '#9A93C9', tertiary: '#C2BCE8', fg: '#F5F3FF', raised: 'rgba(69,60,142,.28)', hairline: 'rgba(245,243,255,.11)', primary: '#5BE9C2', primary2: '#3ED3AA', primaryHi: '#7DEDCD', glow: '91,233,194', numHero: '#E4FCF4', aiBg: 'rgba(139,123,255,.10)', aiBorder: 'rgba(139,123,255,.25)', aiText: '#DAD5FA' },
+      { label: 'Graphite', tag: '', subtitle: 'near-black · violet', bg: '#121216', deep: '#17171C', card: '#1D1D24', dim: '#35333F', muted: '#9B9AA8', tertiary: '#C4C1D2', fg: '#F1F0F5', raised: 'rgba(53,51,63,.34)', hairline: 'rgba(241,240,245,.11)', primary: '#B49BFF', primary2: '#7C5AE0', primaryHi: '#C9B7FF', glow: '155,125,245', numHero: '#F3EEFF', aiBg: 'rgba(180,155,255,.10)', aiBorder: 'rgba(180,155,255,.25)', aiText: '#DDD3FF' },
+      { label: 'Ember', tag: '', subtitle: 'warm dark · amber', bg: '#171210', deep: '#1E1512', card: '#261913', dim: '#5A3E28', muted: '#B5A292', tertiary: '#DCC9B7', fg: '#F7EFE7', raised: 'rgba(90,62,40,.32)', hairline: 'rgba(247,239,231,.11)', primary: '#FF8A3D', primary2: '#E85F14', primaryHi: '#FFA76B', glow: '255,138,61', numHero: '#FFF1E4', aiBg: 'rgba(255,138,61,.10)', aiBorder: 'rgba(255,138,61,.25)', aiText: '#FFD9BD', onPrimary: '#2A1300' },
+      { label: 'Field', tag: '', subtitle: 'olive · lime', bg: '#141810', deep: '#1A1E14', card: '#1F2618', dim: '#465234', muted: '#A6AF92', tertiary: '#CBD3B7', fg: '#F1F4E9', raised: 'rgba(70,82,52,.34)', hairline: 'rgba(241,244,233,.11)', primary: '#C6F24E', primary2: '#8FBE1F', primaryHi: '#D9F77F', glow: '198,242,78', numHero: '#F4FBDD', aiBg: 'rgba(198,242,78,.08)', aiBorder: 'rgba(198,242,78,.22)', aiText: '#E3F0B8', onPrimary: '#1B2600' },
+      { label: 'Midnight', tag: 'new', subtitle: 'navy · sky', bg: '#0E1626', deep: '#121C30', card: '#16223A', dim: '#2B3A58', muted: '#8E9FBC', tertiary: '#C2CFE3', fg: '#EEF3FB', raised: 'rgba(60,84,130,.28)', hairline: 'rgba(238,243,251,.11)', primary: '#6FB7FF', primary2: '#2E7FE0', primaryHi: '#93CBFF', glow: '111,183,255', numHero: '#E6F1FF', aiBg: 'rgba(111,183,255,.10)', aiBorder: 'rgba(111,183,255,.25)', aiText: '#CFE2FF', onPrimary: '#04213F' },
+      { label: 'Rosewood', tag: 'new', subtitle: 'plum · coral', bg: '#1C1018', deep: '#23141E', card: '#2A1824', dim: '#4E2F42', muted: '#B899A9', tertiary: '#E0C7D3', fg: '#FBEFF4', raised: 'rgba(110,60,90,.30)', hairline: 'rgba(251,239,244,.11)', primary: '#FF8FA3', primary2: '#E85A78', primaryHi: '#FFB0BE', glow: '255,143,163', numHero: '#FFEEF3', aiBg: 'rgba(255,143,163,.10)', aiBorder: 'rgba(255,143,163,.25)', aiText: '#FFD3DC', onPrimary: '#3A0A16' },
+    ].map(t => this.theme(t));
+    const light = [
+      { label: 'Daylight', tag: 'retuned', subtitle: 'paper · deep mint', light: true, bg: '#F4F2FA', deep: '#E9E6F3', card: '#FFFFFF', dim: '#B3ADCB', muted: '#5C5680', tertiary: '#3A3462', fg: '#15122B', raised: 'rgba(90,80,150,.10)', hairline: 'rgba(21,18,43,.14)', primary: '#19B894', primary2: '#0E9C7C', primaryHi: '#3FCBAA', primaryText: '#00705B', glow: '25,184,148', numHero: '#0F3D33', aiBg: 'rgba(124,90,224,.10)', aiBorder: 'rgba(124,90,224,.22)', aiText: '#3F2E8C', onPrimary: '#08281F' },
+      { label: 'Linen', tag: 'new', subtitle: 'cream · amber', light: true, bg: '#F7F2EA', deep: '#EEE6DA', card: '#FFFDF9', dim: '#C4B5A3', muted: '#6E5E4E', tertiary: '#4A3B2D', fg: '#231A12', raised: 'rgba(120,90,60,.10)', hairline: 'rgba(35,26,18,.13)', primary: '#F0843F', primary2: '#D8651E', primaryHi: '#F79E66', primaryText: '#9A3F0B', glow: '240,132,63', numHero: '#3A1E0C', aiBg: 'rgba(154,63,11,.08)', aiBorder: 'rgba(154,63,11,.20)', aiText: '#7A3A12', onPrimary: '#2A1300' },
+      { label: 'Frost', tag: 'new', subtitle: 'ice · cobalt', light: true, bg: '#EEF3F8', deep: '#E1E9F1', card: '#FFFFFF', dim: '#A9B8CA', muted: '#56697F', tertiary: '#2F4260', fg: '#0F1B2D', raised: 'rgba(60,90,130,.10)', hairline: 'rgba(15,27,45,.13)', primary: '#2569D0', primary2: '#1B57B8', primaryHi: '#3F85E6', primaryText: '#1A5FBF', glow: '37,105,208', numHero: '#0C2A4A', aiBg: 'rgba(26,95,191,.08)', aiBorder: 'rgba(26,95,191,.20)', aiText: '#1E4D8F', onPrimary: '#FFFFFF' },
+    ].map(t => this.theme(t));
+    const old = { bg: '#F5F3FA' };
+    const oldDaylight = [
+      this.check('muted-foreground #6B6590', '#6B6590', old.bg, 4.5),
+      this.check('accent as text #008C72', '#008C72', old.bg, 4.5),
+      this.check('hero number #E4FCF4 (hard-coded)', '#E4FCF4', old.bg, 7),
+      this.check('role-ai-text #DAD5FA (in :root)', '#DAD5FA', old.bg, 4.5),
+    ];
+    const lightBg = '#F4F2FA', darkBg = '#1A1636';
+    const accents = [
+      { label: 'Mint', tag: '', bright: '#5BE9C2', deep: '#3ED3AA', dark: '#19B894', text: '#00705B' },
+      { label: 'Coral', tag: '', bright: '#FF7A6B', deep: '#E8493A', dark: '#E8493A', text: '#B32A1D' },
+      { label: 'Violet', tag: '', bright: '#B49BFF', deep: '#7C5AE0', dark: '#7C5AE0', text: '#5A3FC4' },
+      { label: 'Sky', tag: '', bright: '#6FB7FF', deep: '#2E7FE0', dark: '#2E7FE0', text: '#1A5FBF' },
+      { label: 'Lime', tag: '', bright: '#C6F24E', deep: '#8FBE1F', dark: '#7FAF12', text: '#4E7300' },
+      { label: 'Amber', tag: 'new', bright: '#FF8A3D', deep: '#E85F14', dark: '#F0843F', text: '#9A3F0B' },
+      { label: 'Rose', tag: 'new', bright: '#FF8FA3', deep: '#E85A78', dark: '#E85A78', text: '#B7264B' },
+      { label: 'Gold', tag: 'new', bright: '#FFD166', deep: '#E6B02E', dark: '#D9A21E', text: '#7A5600' },
+    ].map(a => ({ ...a, darkRatio: this.ratio(a.bright, darkBg).toFixed(1), lightRatio: this.ratio(a.text, lightBg).toFixed(1) }));
+    return { dark, light, oldDaylight, accents };
+  }
+}
+</script>
+</body>
+</html>

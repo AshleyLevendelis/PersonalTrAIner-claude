@@ -8,8 +8,7 @@ import { DevTestPanel } from '@/components/DevTestPanel'
 import { isDevAccount } from '@/lib/dev-clock'
 import { TodayPanel } from './TodayPanel'
 import { SwapDialog, type SwapTarget } from './SwapDialog'
-import { ExerciseHistoryDialog } from './ExerciseHistoryDialog'
-import { ExerciseDetailDialog } from './ExerciseDetailDialog'
+import { ExerciseDetailDialog, type ExerciseDetailTab } from './ExerciseDetailDialog'
 import { SessionHistoryDialog } from './SessionHistoryDialog'
 import type { ExerciseEntry } from '@/lib/exercise-db'
 import type { SwapScope } from '@/lib/mesocycle-edit'
@@ -30,12 +29,16 @@ interface ExerciseTabProps {
   softExercisePreferences?: { liked: string[]; disliked: string[] }
   profile?: UserProfile
   profileId?: string
+  /** Fired when steps are logged HERE, so the chat tab (which never unmounts) re-reads them. */
   planCreatedAt?: string
   devOverrideWeek?: number | null
   devOverrideDay?: string | null
   devBypassLocks?: boolean
   onSwapExercise: (weekNumber: number, dayName: string, exIndex: number, newExercise: ExerciseEntry, scope: SwapScope) => void | Promise<void>
   onBanExercise: (exerciseName: string) => void | Promise<void>
+  /** The second-sport volume toggle on the workout card rewrites the plan from the live week; these carry the result into App state. */
+  onMesocycleUpdated?: (mesocycle: MesocycleWeek[]) => void
+  onProfileChanged?: (patch: Partial<UserProfile>) => void
   onDevOverrideWeekChange: (week: number | null) => void
   onDevOverrideDayChange: (day: string | null) => void
   onDevBypassLocksChange: (bypass: boolean) => void
@@ -55,6 +58,8 @@ export function ExerciseTab({
   devBypassLocks,
   onSwapExercise,
   onBanExercise,
+  onMesocycleUpdated,
+  onProfileChanged,
   onDevOverrideWeekChange,
   onDevOverrideDayChange,
   onDevBypassLocksChange,
@@ -67,10 +72,15 @@ export function ExerciseTab({
   const [swapTarget, setSwapTarget] = useState<SwapTarget | null>(null)
   const [plateCalcOpen, setPlateCalcOpen] = useState(false)
   const [plateCalcWeight, setPlateCalcWeight] = useState(0)
-  const [historyTarget, setHistoryTarget] = useState<{ exerciseId: string; exerciseName: string } | null>(null)
-  // One instance, two entry points (day view and peek), same target-state
-  // shape as swapTarget/historyTarget above.
-  const [detailTarget, setDetailTarget] = useState<string | null>(null)
+  // ONE TARGET, ONE DIALOG, THREE TABS. There were two dialogs about one
+  // exercise until 5 Sep 2026 — technique in one, chart/PRs/sessions in
+  // another — reached from two menu items that never knew about each other.
+  // They are merged now, so both menu items set this and only the `tab`
+  // differs: "How to do it" lands on How to, "History"/"Past sessions" on
+  // History. Keeping two states would have kept the split alive underneath.
+  const [detailTarget, setDetailTarget] = useState<
+    { exerciseName: string; exerciseId?: string; tab: ExerciseDetailTab } | null
+  >(null)
   const [sessionHistoryOpen, setSessionHistoryOpen] = useState(false)
 
   const handleOpenPlateCalc = (weightKg: number) => {
@@ -110,7 +120,8 @@ export function ExerciseTab({
           initialWeek={route.kind === 'program' ? route.week : undefined}
           onOpenSwap={setSwapTarget}
           onBanExercise={onBanExercise}
-          onOpenHistory={(id, name) => setHistoryTarget({ exerciseId: id, exerciseName: name })}
+          onOpenHistory={(id, name) => setDetailTarget({ exerciseName: name, exerciseId: id, tab: 'history' })}
+          onOpenDetail={(name: string) => setDetailTarget({ exerciseName: name, tab: 'howto' })}
         />
         <SwapDialog
           target={swapTarget}
@@ -123,14 +134,10 @@ export function ExerciseTab({
         <ExerciseDetailDialog
           open={!!detailTarget}
           onOpenChange={open => { if (!open) setDetailTarget(null) }}
-          exerciseName={detailTarget}
-        />
-        <ExerciseHistoryDialog
-          open={!!historyTarget}
-          onOpenChange={open => { if (!open) setHistoryTarget(null) }}
-          exerciseId={historyTarget?.exerciseId ?? null}
-          exerciseName={historyTarget?.exerciseName ?? null}
+          exerciseName={detailTarget?.exerciseName ?? null}
+          exerciseId={detailTarget?.exerciseId ?? null}
           profileId={profileId}
+          initialTab={detailTarget?.tab ?? 'summary'}
         />
       </>
     )
@@ -152,9 +159,11 @@ export function ExerciseTab({
         onOpenProgram={() => { window.location.hash = programHash(liveWeek) }}
         onOpenSwap={(dayName, exIndex, exerciseName) => setSwapTarget({ dayName, exIndex, exerciseName })}
         onBanExercise={onBanExercise}
+        onMesocycleUpdated={onMesocycleUpdated}
+        onProfileChanged={onProfileChanged}
         onOpenPlateCalc={handleOpenPlateCalc}
-        onOpenHistory={(id, name) => setHistoryTarget({ exerciseId: id, exerciseName: name })}
-        onOpenDetail={(name: string) => setDetailTarget(name)}
+        onOpenHistory={(id, name) => setDetailTarget({ exerciseName: name, exerciseId: id, tab: 'history' })}
+        onOpenDetail={(name: string) => setDetailTarget({ exerciseName: name, tab: 'howto' })}
         onOpenSessionHistory={() => setSessionHistoryOpen(true)}
       />
       <SwapDialog
@@ -175,21 +184,17 @@ export function ExerciseTab({
           onOpenDetail to TodayPanel — so on the session screen the "How to do
           it" menu item appeared, set detailTarget, and nothing was listening.
           A dead control, reported by Ashley from her phone on 3 Sep 2026.
-          The two branches already duplicate SwapDialog and
-          ExerciseHistoryDialog; this follows that shape rather than
-          restructuring the file. test:exercise-detail now pins that BOTH
-          branches render it. */}
+          The two branches already duplicate SwapDialog; this follows that
+          shape rather than restructuring the file. test:exercise-detail pins
+          that BOTH branches render it. Now that one dialog serves technique
+          AND history, forgetting it here would take out both at once. */}
       <ExerciseDetailDialog
         open={!!detailTarget}
         onOpenChange={open => { if (!open) setDetailTarget(null) }}
-        exerciseName={detailTarget}
-      />
-      <ExerciseHistoryDialog
-        open={!!historyTarget}
-        onOpenChange={open => { if (!open) setHistoryTarget(null) }}
-        exerciseId={historyTarget?.exerciseId ?? null}
-        exerciseName={historyTarget?.exerciseName ?? null}
+        exerciseName={detailTarget?.exerciseName ?? null}
+        exerciseId={detailTarget?.exerciseId ?? null}
         profileId={profileId}
+        initialTab={detailTarget?.tab ?? 'summary'}
       />
       <SessionHistoryDialog
         open={sessionHistoryOpen}

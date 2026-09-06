@@ -119,7 +119,55 @@ function isPermanentError(err: { code?: string } | null): boolean {
   return code.startsWith('23') || code.startsWith('22') || code.startsWith('PGRST')
 }
 
+// ---------------------------------------------------------------------------
+// THE FIFTH QUEUE FINALLY PUBLISHES. Audit §3.5, closed 5 Sep 2026.
+//
+// Every other local-first store — sets, water, grocery, cardio — has had this
+// trio for a while. meal-store was the one that never got it, and three
+// separate symptoms all traced back here:
+//
+//   1. Log a meal on the Nutrition tab and the rings ABOVE it did not move,
+//      because the ledger they read is only re-fetched on mount.
+//   2. The coach's "calories remaining" stayed on whatever it was when the
+//      chat tab last read the day — and chat is the one tab that never
+//      unmounts, so "whatever it was" could be hours old.
+//   3. A meal event that exhausted its retries dead-lettered in silence:
+//      subscribeAllQueues had no meal subscription to repaint the badge with.
+//
+// One notification, three fixes. Every write path below calls it, including
+// the ones inside doFlush — a row leaving the queue is a change to what the
+// offline indicator should be showing, exactly as much as a row entering it.
+// ---------------------------------------------------------------------------
+
+let listeners: Array<() => void> = []
+function notifyListeners(): void { listeners.forEach(fn => fn()) }
+
+/** Subscribe to meal-event queue and ledger changes. Returns its own unsubscribe. */
+export function subscribeMealStore(fn: () => void): () => void {
+  listeners.push(fn)
+  return () => { listeners = listeners.filter(l => l !== fn) }
+}
+
 let flushPromise: Promise<void> | null = null
+let retryTimer: ReturnType<typeof setTimeout> | null = null
+let consecutiveFailures = 0
+
+/**
+ * Backoff retry — added 5 Sep 2026 alongside cardio-log-store's, and found
+ * the same way: by a gate that asked every queue the same question rather
+ * than by anyone noticing this one.
+ *
+ * doFlush skips a transiently-failed event for the rest of its pass and then
+ * returns. Nothing brought it back. The `online` event never fires for a
+ * connection that never dropped, so a single 5xx left a meal pending until
+ * the user happened to log another one — and it could not even reach
+ * MAX_ATTEMPTS, so it never surfaced in the offline indicator either.
+ */
+function scheduleRetry(): void {
+  if (typeof window === 'undefined' || retryTimer) return
+  const delayMs = Math.min(60_000, 2_000 * 2 ** Math.min(consecutiveFailures, 5))
+  retryTimer = setTimeout(() => { retryTimer = null; void flushPending() }, delayMs)
+}
 
 /** Local-first write: persisted to the pending queue synchronously, synced in the background. Returns the record (with its idempotency clientId) immediately. */
 export function recordMealEvent(input: RecordMealEventInput): MealEventRecord {
@@ -129,6 +177,10 @@ export function recordMealEvent(input: RecordMealEventInput): MealEventRecord {
     createdAt: new Date().toISOString(),
   }
   savePending([...loadPending(), { ...record, attempts: 0 }])
+  // BEFORE the flush, not after: the flush is async and may not even start
+  // (offline, or one already in flight), and the thing the screen needs to
+  // know — this meal counts now — is already true.
+  notifyListeners()
   flushPending()
   return record
 }
@@ -142,6 +194,14 @@ export function flushPending(): Promise<void> {
 }
 
 async function doFlush(): Promise<void> {
+  try {
+    await syncPass()
+  } finally {
+    if (loadPending().length > 0) scheduleRetry()
+  }
+}
+
+async function syncPass(): Promise<void> {
   // Reload fresh each iteration so events queued mid-flush still drain, and
   // skip transient failures for the rest of the pass — no op ever blocks
   // the ones behind it (the set-log store's poison-pill lesson).
@@ -167,6 +227,8 @@ async function doFlush(): Promise<void> {
       // Synced — or already synced by an earlier retry (unique client_id
       // rejected the duplicate), which is the idempotency working.
       savePending(loadPending().filter(e => e.clientId !== next.clientId))
+      consecutiveFailures = 0
+      notifyListeners()
       continue
     }
 
@@ -174,6 +236,7 @@ async function doFlush(): Promise<void> {
       console.error(`meal_events row permanently rejected (${error.code}) — dead-lettering`, error.message)
       saveDeadLetter([...loadDeadLetter(), next])
       savePending(loadPending().filter(e => e.clientId !== next.clientId))
+      notifyListeners()
       continue
     }
 
@@ -182,8 +245,10 @@ async function doFlush(): Promise<void> {
     if (bumped.attempts >= MAX_ATTEMPTS) {
       saveDeadLetter([...loadDeadLetter(), bumped])
       savePending(loadPending().filter(e => e.clientId !== next.clientId))
+      notifyListeners()
     } else {
       savePending(loadPending().map(e => (e.clientId === next.clientId ? bumped : e)))
+      consecutiveFailures += 1
       skipThisPass.add(next.clientId)
     }
   }
@@ -227,11 +292,13 @@ export function retryDeadLetterItem(clientId: string): void {
   if (!item) return
   saveDeadLetter(items.filter(e => e !== item))
   savePending([...loadPending().filter(e => e.clientId !== clientId), { ...item, attempts: 0 }])
+  notifyListeners()
   void flushPending()
 }
 
 export function discardDeadLetterItem(clientId: string): void {
   saveDeadLetter(loadDeadLetter().filter(e => e.clientId !== clientId))
+  notifyListeners()
 }
 
 function sumMacros(events: MealEventRecord[]): MealMacros {
@@ -423,9 +490,27 @@ export async function swapPoolMeal(
  * the server-side UPDATE below then matches zero rows in that case, which
  * is correct (nothing to void because nothing was ever written).
  */
-export async function voidMealEvent(clientId: string): Promise<void> {
-  savePending(loadPending().filter(e => e.clientId !== clientId))
-  await supabase.from('meal_events').update({ voided_at: new Date().toISOString() }).eq('client_id', clientId)
+export async function voidMealEvent(clientId: string): Promise<boolean> {
+  // Captured BEFORE the removal, because it is the discriminator. An event
+  // still sitting in the pending queue has never reached the server, so
+  // dropping it here IS the whole undo and the UPDATE below matching nothing
+  // (or failing outright, offline) changes nothing. An event that is not in
+  // the queue has synced, and then the server's answer is the only thing that
+  // decides whether the meal is really unlogged.
+  const pending = loadPending()
+  const wasPendingOnly = pending.some(e => e.clientId === clientId)
+  savePending(pending.filter(e => e.clientId !== clientId))
+  const { error } = await supabase.from('meal_events').update({ voided_at: new Date().toISOString() }).eq('client_id', clientId)
+  notifyListeners()
+  // RETURNED, NOT SWALLOWED. Until 5 Sep 2026 this error went nowhere: the
+  // caller re-read the ledger, the still-un-voided row came straight back,
+  // and the meal reappeared on screen a moment after the user tapped Undo
+  // with nothing anywhere saying why.
+  if (error && !wasPendingOnly) {
+    console.error('Voiding a meal event failed:', error)
+    return false
+  }
+  return true
 }
 
 /**
@@ -445,8 +530,15 @@ export async function voidMealEvent(clientId: string): Promise<void> {
  * partial failure would therefore show up as a copy still counting after an
  * undo, which is what the ledger re-read in the caller would reveal.
  */
-export async function voidMealEvents(clientIds: string[]): Promise<void> {
-  for (const id of clientIds) await voidMealEvent(id)
+export async function voidMealEvents(clientIds: string[]): Promise<boolean> {
+  let allVoided = true
+  // Every id is attempted even after one fails — a slot's copies are
+  // independent rows, and stopping early would leave more of them counting
+  // than necessary.
+  for (const id of clientIds) {
+    if (!(await voidMealEvent(id))) allVoided = false
+  }
+  return allVoided
 }
 
 /**
@@ -494,7 +586,11 @@ export function logMealEaten(profileId: string, date: string, slot: MealSlotName
 
 /** Flush when connectivity returns — mirrors set-log-store's listener. */
 if (typeof window !== 'undefined') {
-  window.addEventListener('online', () => { flushPending() })
+  window.addEventListener('online', () => { consecutiveFailures = 0; notifyListeners(); flushPending() })
+  // Going offline changes nothing in the queue and everything about what the
+  // indicator should say, so it is worth a notification of its own — the same
+  // pairing water-store makes.
+  window.addEventListener('offline', () => notifyListeners())
 }
 
 // ---------------------------------------------------------------------------

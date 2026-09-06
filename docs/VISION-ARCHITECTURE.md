@@ -500,20 +500,46 @@ Everything else on Home reads and points.
 
 One fact, one owner. The rule, in full:
 
-> **Nutrition** owns what you accumulate through the day — food, water, steps.
+> **Nutrition** owns what you eat and drink — food and water: the ring, the
+> legend, the meals, and the targets behind them.
 > **Exercise** owns the program and the session.
 > **Tools** owns nothing.
 > **Home** owns the progress facts — weight, streak, consistency, PRs — and
-> points at everything else.
+> the day's QUICK LOG: water, steps and the weigh-in.
+> Home still owns no target and no plan: it points at the tab that does.
 
 Two consequences worth stating, because both were violations before this rule
 existed:
 
-- **Steps live on Nutrition.** `steps-target.ts` had already decided it: the
-  step target is derived from the same `activity_level` that drives the
-  calorie target's PAL multipliers, deliberately, "so the step target and the
-  calorie target never disagree about who is more active". Two numbers from
-  one input belong on one tab. Home keeps a read-only tile.
+- **The quick log came back to Home, 6 Sep 2026** — `design_handoff_app_polish`
+  ("Home becomes informative"). Home's "Today so far" grid logs water (+250 /
+  +500), steps and the weigh-in in place. **This reverses the bullet below for
+  steps, and it is the third time steps have moved** (Home → Nutrition →
+  Exercise → Home), so the reasoning matters more than the destination:
+  ownership of a NUMBER is not the same as the place you tap to add to it.
+  Nutrition still owns water — the ring, the legend, the target editor (now
+  inside "How it's set") — and Home carries the quick-add. **The +250 / +500
+  row and its undo are GONE from Nutrition, not copied**: same discipline as
+  the steps row, for the same reason. Exercise still owns the program and the
+  session. What Home gained is the day's logging surface, because "what have I
+  done today" is the question Home exists to answer and sending someone to
+  another tab to answer it is what made it a scoreboard nobody used.
+  The steps ROW is gone from Exercise rather than duplicated: two tabs writing
+  one number is the drift this section was written to stop.
+- **Steps lived on Exercise between 5 and 6 Sep 2026.** Ashley, 5 Sep 2026, looking at the Nutrition
+  tab: *"we currently log steps in the nutrition tab but that isn't right."*
+  Asked where instead, she chose Exercise. **This reverses what this section
+  said before**, and the previous reasoning is kept here rather than deleted,
+  because it was sound and is still half-true: `steps-target.ts` derives the
+  step target from the same `activity_level` that drives the calorie target's
+  PAL multipliers, deliberately, "so the step target and the calorie target
+  never disagree about who is more active" — and that derivation is unchanged.
+  What changed is the conclusion drawn from it. Two numbers sharing an *input*
+  is not the same as two numbers belonging on one *tab*: steps are movement
+  you do, and movement is what the Exercise tab is for. The shared derivation
+  now has to be explained in words instead, which the row's caption does
+  ("Target from the activity level your calorie target uses"). Home keeps a
+  read-only tile, and that tile now points at Exercise.
 - **The week strip exists on two tabs as two different things.** Home's is the
   RECORD — 26px cells, no handler, no cursor, no focus ring. Exercise's is the
   NAVIGATOR — 38px, tap a day to peek, plus the phase line and the program
@@ -609,6 +635,53 @@ grocery_items          id, list_id FK CASCADE, canonical_key, display_name,
 5. `[Undo]` reverses via the op's `reverse` spec within 10 minutes.
 
 Every step obeys I1 (no server write), I2 (through the store), and Decision #1 (append-only ⇒ immediate + receipt + undo).
+
+### 5.5 Four invariants the whole-app audit turned into gates (5 Sep 2026)
+
+Written up here because each one had already shipped at least once, in more
+than one place, and each was invisible to a gate suite that was fully green.
+They are properties of the architecture, not of the features that broke them.
+
+**Q1 — One source per fact.** If the client computes something and sends it,
+the server does not compute it again. The edge function was independently
+refetching `exercise_set_logs` and rendering `toLocaleTimeString()`, which is
+UTC in Deno: a set logged at 11pm read "10:00 PM", inside a 48-hour window
+titled "TODAY'S". Two sources for one fact means one of them is wrong, and the
+better formatter is not the fix — the second source is. Corollary: the server
+never asks its own clock what day it is. `current_local_date`, `day_of_week`
+and `current_time_formatted` all come from the client, with a fallback only for
+the seconds around a deploy. Held by `test:context-is-read`.
+
+**Q2 — Sent implies read; read implies sent.** A context field the server never
+reads is a fact the model will be asked to supply from nowhere, and the prompt
+will eventually instruct it to (`steps_summary` was sent, unread, and referred
+to twice as "the STEPS line of their context"). A field the server reads that
+the client never sends renders as an empty prompt line. Both directions are
+checked, plus the rule stated generally: every "the X line of their context"
+instruction must have an X line that actually interpolates something.
+
+**Q3 — Every local-first queue publishes, and something listens.** Five queues
+(sets, water, grocery, cardio, meals) each write locally and sync in the
+background. `meal-store` was the one without a notify/subscribe pair, and that
+single gap produced three unconnected bug reports: rings that did not follow
+the meal list above them, a coach whose calories-remaining froze at whatever
+the day looked like when the chat tab mounted, and dead-lettered meals that
+never reached the offline badge. The queue rule has three parts and all three
+are gated: publish on every state change, appear in `queue-health`'s four
+switches, and never burn a retry attempt while `navigator.onLine` is false —
+plus a backoff timer, because the `online` event never fires for a connection
+that did not drop. Held by `test:queue-listeners`.
+
+**Q4 — A replace carries what it replaced.** Any write that REPLACES rather
+than appends needs its inverse to hold the pre-image, and needs no window where
+the data is absent from the database. `restoreStepsForDate` was the first
+instance and stated the rule; four more places did not follow it — the whole
+mesocycle (delete-then-insert, five call sites), a chat set correction whose
+Undo destroyed both versions, a meal-pool regeneration that could empty a slot,
+and an adaptation revert that closed its own row before restoring the plan. The
+shape to reach for is upsert-then-trim, or capture-then-delete; never
+delete-then-write. Held by `test:replace-without-losing`, whose first section
+runs the real executor rather than reading it.
 
 ---
 

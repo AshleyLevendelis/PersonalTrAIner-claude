@@ -79,6 +79,13 @@ function formatShoppingQuantity(item: GroceryItemRow): { primary: string; exact:
   return { primary, exact }
 }
 
+/**
+ * The largest quantity one shopping line will hold. Line items are stored in
+ * grams, so this is 100kg of a single ingredient — comfortably past any real
+ * shop, and squarely into slipped-decimal-point territory.
+ */
+const MAX_GROCERY_QUANTITY = 100_000
+
 export function GroceryList({ profileId, mealPools, targets, softLikedFoods, todaysPicks, refreshToken }: GroceryListProps) {
   const [items, setItems] = useState<GroceryItemRow[]>([])
   const [loading, setLoading] = useState(false)
@@ -88,7 +95,12 @@ export function GroceryList({ profileId, mealPools, targets, softLikedFoods, tod
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
   const [editQty, setEditQty] = useState('')
+  const [editError, setEditError] = useState<string | null>(null)
   const [expandedRefs, setExpandedRefs] = useState<Set<string>>(new Set())
+  // COLLAPSED TO THREE by default — design_handoff_app_polish. Tools is a
+  // utility tab you glance at; the whole list is one tap away and the
+  // categories come back with it.
+  const [showAll, setShowAll] = useState(false)
 
   const reload = async () => {
     if (!profileId) return
@@ -129,12 +141,29 @@ export function GroceryList({ profileId, mealPools, targets, softLikedFoods, tod
     setEditName(item.display_name)
     setEditQty(String(item.quantity))
   }
-  const cancelEdit = () => { setEditingId(null); setEditName(''); setEditQty('') }
+  const cancelEdit = () => { setEditingId(null); setEditName(''); setEditQty(''); setEditError(null) }
+  /**
+   * A shopping quantity has to be a positive number.
+   *
+   * `Number.isFinite` was the only check, so 0 and -200 both passed: a line
+   * reading "-200 g chicken" is not a thing anyone can buy, and 0 is an item
+   * on your list you are meant to purchase none of — either way the list
+   * stops being a list you can shop from. The ceiling is the same kind of
+   * typo guard as the step and cardio ones: a line item is grams, and 100 kg
+   * of one ingredient is a slipped decimal point, not a shop.
+   */
   const saveEdit = (id: string) => {
     const current = items.find(i => i.id === id)
     if (!current) return
     const quantity = Number(editQty)
-    const row = editItemLocal(current, { displayName: editName.trim() || undefined, quantity: Number.isFinite(quantity) ? quantity : undefined })
+    if (!Number.isFinite(quantity) || quantity <= 0 || quantity > MAX_GROCERY_QUANTITY) {
+      // The editor stays open with the typed value in it, which is what says
+      // "not that number" without also throwing away the rest of the edit.
+      setEditError(`Quantity must be between 0 and ${MAX_GROCERY_QUANTITY.toLocaleString()}.`)
+      return
+    }
+    setEditError(null)
+    const row = editItemLocal(current, { displayName: editName.trim() || undefined, quantity })
     setItems(prev => prev.map(i => (i.id === id ? row : i)))
     cancelEdit()
   }
@@ -167,17 +196,24 @@ export function GroceryList({ profileId, mealPools, targets, softLikedFoods, tod
     .map(cat => ({ category: cat, items: items.filter(i => i.category === cat).sort((a, b) => Number(a.checked) - Number(b.checked)) }))
     .filter(g => g.items.length > 0)
 
+  // Collapsed: the first three in the order the full list would show them, as
+  // one unheaded group. Categories are a way to shop, not a way to preview.
+  const COLLAPSED_COUNT = 3
+  const COLLAPSED_GROUPS = grouped.length > 0
+    ? [{ category: grouped[0].category, items: grouped.flatMap(g => g.items).slice(0, COLLAPSED_COUNT) }]
+    : []
+
   return (
     // BORDERLESS, like every other surface in the app. Tools was the last tab
     // still on bordered shadcn Cards, which is what made it read as somebody
     // else's screen rather than this one's.
     <div>
       <div className="pb-3">
-        <div className="flex items-center justify-between gap-2">
-          <span className="flex items-center gap-2 text-base font-semibold">
-            <ShoppingCart className="size-4 text-primary" />
-            Grocery List
-          </span>
+        {/* NO TITLE HERE. The section this renders into already carries a
+            .ds-label ("Grocery · this week"), and two headings a line apart
+            saying the same thing is the card-era habit this pass is removing.
+            The Clear-checked control stays where it was. */}
+        <div className="flex items-center justify-end gap-2">
           {items.some(i => i.checked) && (
             <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={handleClearChecked}>
               Clear checked
@@ -234,34 +270,39 @@ export function GroceryList({ profileId, mealPools, targets, softLikedFoods, tod
           </div>
         )}
 
-        {grouped.map(({ category, items: catItems }, idx) => (
-          <div key={category} className="space-y-1.5">
-            {idx > 0 && <Separator />}
-            <h3 className="ds-label pt-1">{CATEGORY_LABEL[category]}</h3>
+        {(showAll ? grouped : COLLAPSED_GROUPS).map(({ category, items: catItems }, idx) => (
+          <div key={category} className={showAll ? 'space-y-1.5' : ''}>
+            {showAll && idx > 0 && <Separator />}
+            {showAll && <h3 className="ds-label pt-1">{CATEGORY_LABEL[category]}</h3>}
             {catItems.map(item => (
-              <div key={item.id} className={`rounded-md border p-2 flex items-start gap-2 ${item.checked ? 'opacity-50 border-border/30' : 'border-border/50'}`}>
+              <div key={item.id} className="flex items-start gap-2.5 py-2.5" style={{ borderBottom: '1px solid var(--hairline)' }}>
                 <button
                   onClick={() => toggleChecked(item)}
-                  className={`hit-slop-44 mt-0.5 size-5 shrink-0 rounded border flex items-center justify-center transition-colors ${item.checked ? 'bg-primary border-primary' : 'border-muted-foreground/40'}`}
+                  className="hit-slop-44 mt-px size-5 shrink-0 rounded-md flex items-center justify-center transition-colors"
+                  style={{
+                    background: item.checked ? 'var(--primary)' : 'transparent',
+                    border: item.checked ? '1.5px solid var(--primary)' : '1.5px solid var(--border)',
+                  }}
                   aria-label={item.checked ? 'Uncheck item' : 'Check off item'}
                 >
-                  {item.checked && <Check className="size-3.5 text-primary-foreground" />}
+                  {item.checked && <Check className="size-3 text-primary-foreground" />}
                 </button>
 
                 <div className="flex-1 min-w-0">
                   {editingId === item.id ? (
-                    <div className="flex items-center gap-1.5">
-                      <Input value={editName} onChange={e => setEditName(e.target.value)} className="h-7 text-sm flex-1" />
-                      <Input value={editQty} onChange={e => setEditQty(e.target.value)} className="h-7 text-sm w-16" inputMode="decimal" />
-                      <Button size="icon" variant="ghost" className="hit-slop-44 size-7" onClick={() => saveEdit(item.id)} aria-label={`Save changes to ${item.display_name}`}><Check className="size-3.5" /></Button>
-                      <Button size="icon" variant="ghost" className="hit-slop-44 size-7" onClick={cancelEdit} aria-label="Cancel editing"><X className="size-3.5" /></Button>
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-1.5">
+                        <Input value={editName} onChange={e => setEditName(e.target.value)} className="h-7 text-sm flex-1" />
+                        <Input value={editQty} onChange={e => setEditQty(e.target.value)} className="h-7 text-sm w-16" inputMode="decimal" />
+                        <Button size="icon" variant="ghost" className="hit-slop-44 size-7" onClick={() => saveEdit(item.id)} aria-label={`Save changes to ${item.display_name}`}><Check className="size-3.5" /></Button>
+                        <Button size="icon" variant="ghost" className="hit-slop-44 size-7" onClick={cancelEdit} aria-label="Cancel editing"><X className="size-3.5" /></Button>
+                      </div>
+                      {editError && <p className="text-[0.6875rem] leading-[1.4] text-[color:var(--role-warn-text)]">{editError}</p>}
                     </div>
                   ) : (
-                    <div className={`flex items-center justify-between gap-2 ${item.checked ? 'line-through' : ''}`}>
-                      <span className="text-sm truncate">
-                        <span className="font-mono text-xs text-muted-foreground mr-1.5">{formatShoppingQuantity(item).primary}</span>
-                        {item.display_name}
-                      </span>
+                    <div className={`flex items-center justify-between gap-2 ${item.checked ? 'line-through opacity-60' : ''}`}>
+                      <span className="min-w-0 truncate text-[0.875rem]">{item.display_name}</span>
+                      <span className="shrink-0 tabular-mono text-[0.75rem] text-muted-foreground">{formatShoppingQuantity(item).primary}</span>
                       {/* Fix 4.5 (ux-sweep): bare "check" told a shopper nothing about what to check or why. needs_review means the ingredient name didn't match anything in food-db, so its quantity/unit is a rough guess rather than a real lookup. */}
                       {item.needs_review && <Badge variant="outline" className="text-[0.5625rem] px-1 py-0 shrink-0" title="Not matched to a known ingredient — quantity is a rough estimate">unmatched</Badge>}
                     </div>
@@ -291,6 +332,16 @@ export function GroceryList({ profileId, mealPools, targets, softLikedFoods, tod
             ))}
           </div>
         ))}
+
+        {items.length > COLLAPSED_COUNT && (
+          <button
+            type="button"
+            onClick={() => setShowAll(v => !v)}
+            className="hit-slop-44 pt-2.5 text-[0.75rem] font-semibold text-primary-text"
+          >
+            {showAll ? 'Show fewer' : `All ${items.length} items ›`}
+          </button>
+        )}
       </div>
     </div>
   )

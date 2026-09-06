@@ -429,10 +429,32 @@ console.log('\n7. The copy still describes the app it is pointing at')
   check('...so the tiles step names steps, not just calories and water',
     !homeHasStepsTile || /steps/i.test(tiles), tiles)
 
-  const nutritionLogsSteps = /logStepsManual/.test(nutri)
-  check('Nutrition owns step logging (the fact the copy depends on)', nutritionLogsSteps)
-  check('...so the Nutrition step tells you steps live there',
-    !nutritionLogsSteps || /steps/i.test(copyOf('nutrition')), copyOf('nutrition'))
+  // RE-POINTED TWICE: Nutrition -> Exercise (5 Sep) -> Home (6 Sep). Tied to
+  // the source fact rather than hard-coded, which is why each move costs one
+  // line here instead of a red gate on correct copy.
+  const homeLogsSteps = /logStepsManual/.test(dash)
+  check('Home owns step logging (the fact the copy depends on)', homeLogsSteps)
+  check('...so the tiles step says they are logged there',
+    !homeLogsSteps || /logged right here|logged here/i.test(tiles), tiles)
+  // And every tab it LEFT must stop claiming them, or the tour sends someone
+  // to a screen the row is no longer on — the exact failure this section
+  // exists for, just pointed the other way.
+  check('...and the Nutrition step no longer claims them',
+    !/logStepsManual/.test(nutri) && !/steps/i.test(copyOf('nutrition')), copyOf('nutrition'))
+  check('...nor the Exercise one',
+    !/logStepsManual/.test(readFileSync(join(ROOT, 'src/components/exercise/TodayPanel.tsx'), 'utf8'))
+    && !/steps/i.test(copyOf('exercise')), copyOf('exercise'))
+
+  // WATER, the same shape, moved Nutrition -> Home on 6 Sep 2026. The
+  // Nutrition step promised "+250 / +500 log water in one tap" for as long as
+  // that row was there and would have kept promising it afterwards; §1-2
+  // cannot see copy, only targets.
+  const homeLogsWater = /logWater\b/.test(dash)
+  check('Home owns water logging (the fact the copy depends on)', homeLogsWater)
+  check('...so the tiles step says water is logged there',
+    !homeLogsWater || /water/i.test(tiles), tiles)
+  check('...and the Nutrition step no longer promises the quick-adds',
+    !/logWater\b/.test(nutri) && !/\+250|one tap/i.test(copyOf('nutrition')), copyOf('nutrition'))
 
   const gearHasAppearance = /<AppearanceSection/.test(prof)
   check('the gear carries Appearance (the fact the copy depends on)', gearHasAppearance)

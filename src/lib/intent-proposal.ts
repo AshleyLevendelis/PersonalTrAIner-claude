@@ -18,6 +18,10 @@ import type { ProposalDiff } from './pending-actions-store'
 
 export const APPEND_PROPOSAL_KINDS = new Set([
   'record_fact', 'record_goal', 'add_to_grocery_list', 'check_off_grocery_item', 'log_water',
+  // log_steps is the only member that ALWAYS arrives here — the others land
+  // on this path only when classifyImperative could not read the request as a
+  // command. Ashley's ruling, 5 Sep 2026: a step count always gets a card.
+  'log_steps',
 ])
 
 export interface IntentProposal {
@@ -34,6 +38,7 @@ export const INTENT_PROPOSAL_VERB: Record<string, string> = {
   add_to_grocery_list: 'add',
   check_off_grocery_item: 'check off',
   log_water: 'log',
+  log_steps: 'log',
 }
 
 /**
@@ -44,7 +49,13 @@ export const INTENT_PROPOSAL_VERB: Record<string, string> = {
  * ChatAssistant.tsx's handleConfirmProposal), just gated behind an explicit
  * confirm instead of running immediately.
  */
-export function buildIntentProposal(kind: string, rawArgs: Record<string, unknown>, profileId: string): IntentProposal {
+export function buildIntentProposal(
+  kind: string,
+  rawArgs: Record<string, unknown>,
+  profileId: string,
+  /** Today's step count, where the caller knows it — only log_steps uses it, to show what the confirm would replace. */
+  currentSteps?: number | null,
+): IntentProposal {
   const quote = typeof rawArgs.origin_verbatim_quote === 'string' && rawArgs.origin_verbatim_quote
     ? rawArgs.origin_verbatim_quote
     : JSON.stringify(rawArgs)
@@ -77,6 +88,9 @@ export function buildIntentProposal(kind: string, rawArgs: Record<string, unknow
 
   let field = 'Do'
   let after = spoken
+  // Empty for every append-style kind — appending has nothing to overwrite.
+  // log_steps is the exception and fills it in; see its branch below.
+  let before = ''
   if (kind === 'record_fact') {
     field = 'Remember'
     after = firstOf(rawArgs.target_phrase, rawArgs.timing_subject)
@@ -94,11 +108,21 @@ export function buildIntentProposal(kind: string, rawArgs: Record<string, unknow
     field = 'Log water'
     const amount = typeof rawArgs.amount_ml === 'number' && rawArgs.amount_ml > 0 ? Math.round(rawArgs.amount_ml) : 250
     after = `${amount}ml`
+  } else if (kind === 'log_steps') {
+    // THE ONLY DIFF ON THIS LIST THAT SHOWS A `before`, because it is the only
+    // one that REPLACES rather than appends. daily_steps holds one row per day
+    // and the write upserts, so confirming this card can overwrite a number
+    // the user already had. A replace they cannot see is a replace they cannot
+    // consent to — the count is threaded in as `currentSteps` for exactly this.
+    field = 'Steps'
+    const n = typeof rawArgs.steps === 'number' ? Math.round(rawArgs.steps) : NaN
+    after = Number.isFinite(n) ? n.toLocaleString() : spoken
+    if (typeof currentSteps === 'number') before = currentSteps.toLocaleString()
   }
   return {
     scopeKey: `${profileId}:${kind}:${quote}`,
     preconditions: {},
     payload: { tool: kind, rawArgs },
-    diff: { rows: [{ field, before: '', after }], implications: [], reversible: false },
+    diff: { rows: [{ field, before, after }], implications: [], reversible: false },
   }
 }

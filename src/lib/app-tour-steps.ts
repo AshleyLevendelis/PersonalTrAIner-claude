@@ -66,19 +66,22 @@ export const TOUR_STEPS: TourStep[] = [
   },
   {
     key: 'tiles', tab: 'dashboard', target: 'tiles',
-    // THREE tiles now, not two — steps joined them when steps moved to
-    // Nutrition. The old copy named two of the three, which reads as a
-    // mistake to anyone looking at the row while it is spotlighted.
-    copy: 'Calories, water and steps at a glance — a read-out, not a form. Meals, water and steps are all logged in Nutrition; tap any tile and it takes you there.',
+    // THREE tiles, and they no longer all lead to one place: steps moved to
+    // Exercise on 5 Sep 2026, so the copy can't say "all logged in Nutrition"
+    // any more without sending someone to the wrong tab. Each tile still
+    // takes you to wherever that number is logged — which is now two tabs.
+    copy: 'Your day so far. Calories are a read-out — tap through to Nutrition, which owns them. Water, steps and your weigh-in are logged right here.',
   },
   {
     key: 'nutrition', tab: 'nutrition', target: 'rings',
     nav: 'navNutrition', tapHint: 'Tap Nutrition', teaser: 'Next stop — where your food lives.',
-    // Steps MOVED here, and this is the one place the tour can say so. Their
-    // target comes from the same activity level as the calorie target, which
-    // is exactly why they share a tab — worth one clause, since anyone who
-    // used the old Home logger will otherwise go looking for it.
-    copy: 'Everything you eat and drink lives here — plus your steps, which share a target with your calories. The rings are your day, and +250 / +500 log water in one tap.',
+    // Steps used to be named here. They moved to Exercise on 5 Sep 2026, so
+    // this step is food and drink only — naming them here would point at a
+    // row that is no longer on this screen. The water quick-adds went the
+    // same way on 6 Sep (to Home, with the rest of the day's logging), so
+    // this copy no longer promises a tap it cannot deliver on this tab; what
+    // Nutrition owns is the read-out and the targets behind it.
+    copy: "Everything you eat and drink lives here. The rings are your day at a glance, and the targets behind them — calories, macros, water — are set from this tab.",
   },
   {
     key: 'meals', tab: 'nutrition', target: 'meals',
@@ -87,6 +90,9 @@ export const TOUR_STEPS: TourStep[] = [
   {
     key: 'exercise', tab: 'exercise', target: 'extoday',
     nav: 'navExercise', tapHint: 'Tap Exercise', teaser: 'Now the training side.',
+    // Steps MOVED here from Nutrition, and this is the one place the tour can
+    // say so. Anyone who used the old Nutrition logger will otherwise go
+    // looking for it on the tab it left.
     copy: 'Your program lives here — the week at a glance, the phase you’re in, and my notes on the week right under the header (tap to read the whole thing). Today’s session sits right below.',
   },
   {
@@ -109,7 +115,7 @@ export const TOUR_STEPS: TourStep[] = [
   {
     key: 'chat', tab: 'chat', target: null, last: true,
     nav: 'chatfab', tapHint: 'Tap the chat button', teaser: 'Last stop — the important one.',
-    copy: "And this is where we talk. Anything you'd tell a coach — a heavy day, a food you hate, a sore shoulder — just say it. I'll take it from here.",
+    copy: "And this is where we talk. Anything you'd tell a trainer — a heavy day, a food you hate, a sore shoulder — just say it. I'll take it from here.",
   },
 ]
 

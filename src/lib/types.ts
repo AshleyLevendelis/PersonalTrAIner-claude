@@ -1,8 +1,37 @@
+/**
+ * A sport or class the trainee does OUTSIDE this plan, on a standing weekly
+ * schedule — "Muay Thai, Tuesday and Thursday evenings".
+ *
+ * Existed as a column and a type since July 2026 and was written by nothing
+ * and read by nothing in generation until 6 Sep 2026. Now read by
+ * concurrent-activity.ts, which steers the lighter gym sessions onto the days
+ * that carry a class and keeps prescribed cardio off those nights.
+ */
 export interface ConcurrentActivity {
+  /** In the user's words — "Muay Thai", "five-a-side", "parkrun". */
   name: string
+  /** 0-1, a rough effort weight. The coach's estimate; nothing scales load from it yet. */
   intensity: number
+  /** Full weekday names in the app's own spelling. Anything else is dropped by canonicalDay. */
   days: string[]
+  /**
+   * What the sport asks of the body, from the closed set in
+   * concurrent-activity.ts. Was a bare string[] with no vocabulary — a field
+   * that lied about carrying information. Stored rows written before the
+   * vocabulary existed may hold anything; readers treat unknown values as
+   * absent.
+   */
   movement_demands: string[]
+  /** When in the day the class happens. Absent when the user did not say — never guessed. */
+  timeOfDay?: 'morning' | 'afternoon' | 'evening'
+  /**
+   * The person tapped "Revert to full volume" on the workout card. The sport
+   * still counts as load by the rule in concurrent-activity.ts; this says the
+   * plan is not to act on it. Absent means the rule decides. Lives on the
+   * activity rather than on a new profile column so no migration is needed
+   * and removing the sport removes the choice with it.
+   */
+  keep_full_volume?: boolean
 }
 
 export interface UserProfile {
@@ -336,6 +365,19 @@ export interface Exercise {
    */
   rep_bump?: 'bought' | 'capped' | 'range_fixed' | 'band' | 'matched'
   /**
+   * The carry twin of `rep_bump` — what the frozen-load DISTANCE ramp did
+   * this week, when it ran at all (a carry, weight unchanged from last
+   * loading week):
+   *   'walked'  the carry goes further this week than last
+   *   'capped'  already MAX_FROZEN_CARRY_DISTANCE_STEPS steps up — held by
+   *             design, and there is no lever left
+   * Absent when the ramp was not in question (not a carry, weight moved,
+   * deload). Added 5 Sep 2026: without it a carry parked at its distance cap
+   * was indistinguishable, to anything reading a plan, from one still
+   * progressing — and 490 of 4,892 carry slots in the sweep sit at the cap.
+   */
+  distance_bump?: 'walked' | 'capped'
+  /**
    * Per-set load breakdown for externally-loaded work — the last entry is
    * always the top/working set (same value as suggested_load_kg). Ramps
    * progressively across sets for compounds in strength/power phases;
@@ -577,7 +619,7 @@ export interface ChatPendingActionView {
 }
 
 export interface ChatReceiptView {
-  kind: 'log_workout' | 'propose_exercise_swap' | 'propose_meal_swap' | 'propose_custom_meal' | 'propose_meal_food_add' | 'propose_injury_adaptation' | 'propose_injury_as_lasting' | 'propose_injury_recovered' | 'propose_equipment_adaptation' | 'propose_volume_change' | 'propose_schedule_change' | 'propose_rest_day' | 'memory_fact_saved' | 'memory_goal_saved' | 'memory_context_fact_saved' | 'display_name_saved' | 'grocery_item_added' | 'water_logged'
+  kind: 'log_workout' | 'propose_exercise_swap' | 'propose_meal_swap' | 'propose_custom_meal' | 'propose_meal_food_add' | 'propose_injury_adaptation' | 'propose_injury_as_lasting' | 'propose_injury_recovered' | 'propose_equipment_adaptation' | 'propose_volume_change' | 'propose_schedule_change' | 'propose_style_change' | 'propose_concurrent_activity' | 'propose_rest_day' | 'memory_fact_saved' | 'memory_goal_saved' | 'memory_context_fact_saved' | 'display_name_saved' | 'grocery_item_added' | 'water_logged' | 'steps_logged'
   title: string
   rows: { label: string; detail: string; note?: string }[]
   summary?: string

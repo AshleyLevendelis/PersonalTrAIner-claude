@@ -80,6 +80,14 @@ export interface FinishSessionResult {
    * nothing.
    */
   nothingLogged?: boolean
+  /**
+   * True when the sets are saved but the session's completed stamp did not
+   * reach the server. The local session IS finished — never trap someone in a
+   * running session over a network failure — but the dialog says so rather
+   * than showing an unqualified "Session complete", and the marker on the
+   * record makes the next mount or foreground-return retry it.
+   */
+  serverCloseFailed?: boolean
 }
 
 export interface ActiveSessionValue extends ActiveSessionIdentity, RestState {
@@ -363,16 +371,51 @@ export function ActiveSessionProvider({
       setStatus('finished')
       return { startedAtIso: startedAt, finishedAtIso, prSnapshotAtStart: record?.prSnapshotAtStart ?? {}, nothingLogged: true }
     }
+    let serverCloseFailed = false
     try {
       const sessionId = await ensureSessionSynced(identity.profileId, identity.date, 'training')
       await markSessionCompleted(sessionId) // real "now" — the explicit tap IS the finish moment
     } catch (e) {
       console.error(e)
+      serverCloseFailed = true
     }
-    patchRecord({ status: 'finished', finishedAtIso })
+    // The local finish happens either way: the tap is the user's decision and
+    // a dead connection must not veto it. What changes is that the failure is
+    // now RECORDED rather than swallowed — see serverCloseFailedAt.
+    patchRecord({ status: 'finished', finishedAtIso, serverCloseFailedAt: serverCloseFailed ? finishedAtIso : undefined })
     setStatus('finished')
-    return { startedAtIso: startedAt, finishedAtIso, prSnapshotAtStart: record?.prSnapshotAtStart ?? {} }
+    return { startedAtIso: startedAt, finishedAtIso, prSnapshotAtStart: record?.prSnapshotAtStart ?? {}, serverCloseFailed }
   }, [identity.profileId, identity.date, patchRecord])
+
+  /**
+   * Finish the server half of a session whose local half already finished.
+   *
+   * Runs on the same triggers as resolveStaleSession — mount, and every
+   * foreground-return — because those are exactly the moments a phone has just
+   * got its connection back. Deliberately separate from that function: a stale
+   * session is one still RUNNING past its window, this one is already
+   * finished and merely unsynced, and folding two different states into one
+   * sweep is how a cleanup path comes to close sessions it shouldn't.
+   *
+   * Silent in both directions. A success needs no announcement (the user was
+   * already told it would retry) and a failure just leaves the marker for the
+   * next attempt.
+   */
+  const retryUnclosedSession = useCallback(async (profileId: string) => {
+    const record = getMostRecentActiveSessionRecord(profileId)
+    if (!record?.serverCloseFailedAt) return
+    try {
+      const sessionId = await ensureSessionSynced(profileId, record.date, 'training')
+      // The finish moment, not now — "now" is whenever the connection came
+      // back, which could be the next morning.
+      await markSessionCompleted(sessionId, new Date(record.finishedAtIso ?? record.serverCloseFailedAt))
+    } catch (e) {
+      console.error('Retrying a session close failed; will try again next time:', e)
+      return
+    }
+    const fresh = getActiveSessionRecord(profileId, record.date)
+    if (fresh) saveActiveSessionRecord({ ...fresh, serverCloseFailedAt: undefined })
+  }, [])
 
   // Auto-close a stale "running" session left open past D7's 6h grace
   // window (or one whose date has rolled past "today") — forgiving by
@@ -405,13 +448,17 @@ export function ActiveSessionProvider({
   useEffect(() => {
     if (!identity.profileId || !identity.date) return
     void resolveStaleSession(identity.profileId, identity.date)
-  }, [identity.profileId, identity.date, resolveStaleSession])
+    void retryUnclosedSession(identity.profileId)
+  }, [identity.profileId, identity.date, resolveStaleSession, retryUnclosedSession])
 
   useEffect(() => {
     if (!identity.profileId || !identity.date) return
     const profileId = identity.profileId
     const todayDate = identity.date
-    const handler = () => { void resolveStaleSession(profileId, todayDate) }
+    const handler = () => {
+      void resolveStaleSession(profileId, todayDate)
+      void retryUnclosedSession(profileId)
+    }
     document.addEventListener('visibilitychange', handler)
     window.addEventListener('focus', handler)
     window.addEventListener('pageshow', handler)
@@ -420,7 +467,7 @@ export function ActiveSessionProvider({
       window.removeEventListener('focus', handler)
       window.removeEventListener('pageshow', handler)
     }
-  }, [identity.profileId, identity.date, resolveStaleSession])
+  }, [identity.profileId, identity.date, resolveStaleSession, retryUnclosedSession])
 
   // --- Set drafts (audit §6.3) ------------------------------------------
   //

@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0F0D22;color:#F5F3FF;font-family:'Space Grotesk',ui-sans-serif,system-ui,sans-serif;}
+a{color:#5BE9C2;} a:hover{color:#3ED3AA;}
+@keyframes dcPulse{0%,100%{transform:scale(1);box-shadow:0 0 0 2px #221C48,0 0 0 4px rgba(91,233,194,.4),0 0 12px rgba(91,233,194,.9)}50%{transform:scale(1.06);box-shadow:0 0 0 2px #221C48,0 0 0 8px rgba(91,233,194,0),0 0 12px rgba(91,233,194,.9)}}
+</style>
+</helmet>
+
+<section id="turn-1" style="padding:40px 48px 64px;display:flex;flex-direction:column;gap:36px">
+  <div style="display:flex;flex-direction:column;gap:8px;max-width:900px">
+    <div style="display:flex;align-items:baseline;gap:14px"><span style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#9A93C9">Turn 1</span><span style="font-size:18px;font-weight:600">Whole-app revamp — three directions</span></div>
+    <p style="margin:0;font-size:13px;line-height:19px;color:#C2BCE8;text-wrap:pretty">All three keep Nightshift tokens and the local-first stores. <a href="#1a">1a</a> polishes what exists. <a href="#1b">1b</a> and <a href="#1c">1c</a> restructure: fewer tabs, Tools dissolved into where its things are used, the TrAIner present outside chat. Every phone is 390×844.</p>
+  </div>
+
+  <!-- ================= 1a POLISH ================= -->
+  <div id="1a" style="display:flex;flex-direction:column;gap:14px">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <a href="#1a" style="font-size:11px;font-weight:700;letter-spacing:.12em;text-decoration:none;color:#08281F;background:#5BE9C2;border-radius:999px;padding:3px 9px">1a</a>
+      <span style="font-size:15px;font-weight:600">Polish — one column, no boxes</span>
+      <span style="font-size:12px;color:#9A93C9">Same 4 tabs + chat FAB. Cards become hairline sections; one hero number per section; a single "TrAIner says" line at the top of every tab; Tools becomes a real utility grid.</span>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start">
+
+      <!-- 1a Home -->
+      <div style="display:flex;flex-direction:column;gap:8px;width:390px">
+        <span style="font-size:12px;font-weight:600;color:#C2BCE8">Home</span>
+        <div data-screen-label="1a Home" style="width:390px;height:844px;position:relative;overflow:hidden;background:#1A1636;color:#F5F3FF;border-radius:28px;border:1px solid rgba(245,243,255,.11);font-size:14px;line-height:20px;flex:none">
+          <div style="position:absolute;inset:0 0 64px 0;overflow-y:auto;padding:52px 22px 24px;scrollbar-width:none;display:flex;flex-direction:column;gap:26px">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start">
+              <div><div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#9A93C9">Wednesday · Week 3 of 16</div><div style="font-size:28px;font-weight:700;letter-spacing:-.03em;line-height:1.1;margin-top:6px">Morning, Ashley</div></div>
+              <div style="display:flex;align-items:center;gap:6px;background:rgba(69,60,142,.28);border-radius:999px;padding:5px 10px;margin-top:2px"><span style="width:5px;height:5px;border-radius:999px;background:#5BE9C2"></span><span style="font-family:ui-monospace,monospace;font-size:13px;font-weight:600">12</span><span style="font-size:11px;color:#9A93C9">day streak</span></div>
+            </div>
+            <div style="display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:14px;background:rgba(139,123,255,.10);border:1px solid rgba(139,123,255,.25)">
+              <span style="width:22px;height:22px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;color:#08281F;background:linear-gradient(180deg,#8FF0D5,#3ED3AA)">{{ ic.msg12 }}</span>
+              <div style="flex:1;min-width:0;font-size:13px;line-height:1.5;color:#DAD5FA">You've hit every rep two sessions running. Bench moves to 62.5 kg today — I'll flag it on the set.</div>
+              <span style="color:#9A93C9;margin-top:2px">{{ ic.chev14 }}</span>
+            </div>
+            <div>
+              <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#9A93C9">Today's session</span><span style="font-size:11px;color:#9A93C9">~52 min</span></div>
+              <div style="font-size:25px;font-weight:700;letter-spacing:-.02em;margin-top:8px;text-shadow:0 0 26px rgba(91,233,194,.35)">Full Body Power</div>
+              <div style="font-size:12.5px;color:#9A93C9;margin-top:4px">6 exercises · 21 sets · Bench, Squat, RDL +3</div>
+              <button style="margin-top:14px;width:100%;height:52px;border:0;border-radius:14px;background:linear-gradient(180deg,#7DEDCD 0%,#5BE9C2 55%,#3ED3AA 100%);color:#08281F;font:inherit;font-size:15px;font-weight:600;box-shadow:0 0 18px rgba(91,233,194,.45)">Start session</button>
+              <div style="display:flex;gap:6px;margin-top:14px">
+                <sc-for list="{{ week }}" as="d" hint-placeholder-count="7"><div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 0;border-radius:9px;background: {{ d.bg }};border:1px solid {{ d.border }}"><span style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color: {{ d.color }}">{{ d.n }}</span><span style="font-size:12px;color: {{ d.color }}">{{ d.g }}</span></div></sc-for>
+              </div>
+            </div>
+            <div>
+              <div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#9A93C9">Today so far</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;margin-top:6px;border-top:1px solid rgba(245,243,255,.11)">
+                <div style="padding:14px 0;border-bottom:1px solid rgba(245,243,255,.11);border-right:1px solid rgba(245,243,255,.11);padding-right:14px"><div style="display:flex;align-items:center;gap:6px;font-size:11px;color:#9A93C9">{{ ic.flame12 }}Calories</div><div style="font-family:ui-monospace,monospace;font-size:22px;font-weight:700;margin-top:4px">1240<span style="font-size:11px;font-weight:400;color:#9A93C9"> / 2480</span></div><div style="height:2px;background:rgba(245,243,255,.11);border-radius:1px;margin-top:8px"><div style="width:50%;height:2px;background:#5BE9C2;border-radius:1px"></div></div></div>
+                <div style="padding:14px 0 14px 14px;border-bottom:1px solid rgba(245,243,255,.11)"><div style="display:flex;align-items:center;gap:6px;font-size:11px;color:#9A93C9">{{ ic.drop12 }}Water</div><div style="font-family:ui-monospace,monospace;font-size:22px;font-weight:700;margin-top:4px">1250<span style="font-size:11px;font-weight:400;color:#9A93C9"> / 2000 ml</span></div><div style="display:flex;gap:6px;margin-top:6px"><button style="border:0;border-radius:999px;background:rgba(111,183,255,.15);color:#6FB7FF;font:inherit;font-size:11px;font-weight:600;padding:5px 9px">+250</button><button style="border:0;border-radius:999px;background:rgba(111,183,255,.15);color:#6FB7FF;font:inherit;font-size:11px;font-weight:600;padding:5px 9px">+500</button></div></div>
+                <div style="padding:14px 14px 14px 0;border-right:1px solid rgba(245,243,255,.11)"><div style="display:flex;align-items:center;gap:6px;font-size:11px;color:#9A93C9">{{ ic.steps12 }}Steps</div><div style="font-family:ui-monospace,monospace;font-size:22px;font-weight:700;margin-top:4px">6,240<span style="font-size:11px;font-weight:400;color:#9A93C9"> / 8k</span></div><div style="font-size:11px;color:#5BE9C2;margin-top:6px">Log ›</div></div>
+                <div style="padding:14px 0 14px 14px"><div style="display:flex;align-items:center;gap:6px;font-size:11px;color:#9A93C9">{{ ic.scale12 }}Weight</div><div style="font-family:ui-monospace,monospace;font-size:22px;font-weight:700;margin-top:4px">78.4<span style="font-size:11px;font-weight:400;color:#9A93C9"> kg · today ✓</span></div><div style="font-size:11px;color:#5BE9C2;margin-top:6px">−2.0 kg since week 1</div></div>
+              </div>
+            </div>
+            <div>
+              <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#9A93C9">Weight trend</span><span style="font-size:11px;color:#9A93C9">goal 72 kg</span></div>
+              <svg viewBox="0 0 320 60" width="100%" height="60" preserveAspectRatio="none" style="display:block;margin-top:10px"><polygon points="0,20 46,24 92,22 138,30 184,34 230,38 276,42 320,46 320,60 0,60" fill="rgba(91,233,194,.10)"></polygon><polyline points="0,20 46,24 92,22 138,30 184,34 230,38 276,42 320,46" fill="none" stroke="#5BE9C2" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linecap="round" stroke-linejoin="round"></polyline><circle cx="320" cy="46" r="3.5" fill="#5BE9C2"></circle></svg>
+            </div>
+            <div>
+              <div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#9A93C9">Recent PRs</div>
+              <div style="display:flex;flex-direction:column;margin-top:6px;border-top:1px solid rgba(245,243,255,.11)">
+                <div style="display:flex;justify-content:space-between;padding:11px 0;border-bottom:1px solid rgba(245,243,255,.11);font-size:13px"><span>Bench Press</span><span style="font-family:ui-monospace,monospace;color:#5BE9C2">60 kg × 9</span></div>
+                <div style="display:flex;justify-content:space-between;padding:11px 0;border-bottom:1px solid rgba(245,243,255,.11);font-size:13px"><span>Romanian Deadlift</span><span style="font-family:ui-monospace,monospace;color:#5BE9C2">80 kg × 8</span></div>
+              </div>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-radius:14px;background:rgba(69,60,142,.28)"><div><div style="font-size:11px;color:#9A93C9">Tomorrow</div><div style="font-size:13.5px;font-weight:500">Pull & Hinge · 5 exercises</div></div><span style="color:#9A93C9">{{ ic.chev14 }}</span></div>
+          </div>
+          <div style="position:absolute;top:10px;right:12px;display:flex;gap:4px"><button style="width:32px;height:32px;border:0;background:transparent;color:#F5F3FF;display:flex;align-items:center;justify-content:center">{{ ic.gear16 }}</button></div>
+          <nav style="position:absolute;left:0;right:0;bottom:0;height:64px;background:#221C48;display:flex;align-items:stretch">
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:#5BE9C2">{{ ic.home20 }}<span style="font-size:10px;font-weight:500">Home</span></div>
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:#9A93C9">{{ ic.pie20 }}<span style="font-size:10px;font-weight:500">Nutrition</span></div>
+            <div style="flex:1;display:flex;align-items:center;justify-content:center"><span style="width:56px;height:56px;margin-top:-24px;border-radius:999px;display:flex;align-items:center;justify-content:center;color:#08281F;background:linear-gradient(180deg,#8FF0D5,#3ED3AA);animation:dcPulse 1.6s ease-in-out infinite">{{ ic.msg24 }}</span></div>
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:#9A93C9">{{ ic.activity20 }}<span style="font-size:10px;font-weight:500">Exercise</span></div>
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:#9A93C9">{{ ic.wrench20 }}<span style="font-size:10px;font-weight:500">Tools</span></div>
+          </nav>
+        </div>
+      </div>
+
+      <!-- 1a Nutrition -->
+      <div style="display:flex;flex-direction:column;gap:8px;width:390px">
+        <span style="font-size:12px;font-weight:600;color:#C2BCE8">Nutrition</span>
+        <div data-screen-label="1a Nutrition" style="width:390px;height:844px;position:relative;overflow:hidden;background:#1A1636;color:#F5F3FF;border-radius:28px;border:1px solid rgba(245,243,255,.11);font-size:14px;line-height:20px;flex:none">
+          <div style="position:absolute;inset:0 0 64px 0;overflow-y:auto;padding:52px 22px 24px;scrollbar-width:none;display:flex;flex-direction:column;gap:26px">
+            <div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#9A93C9">Nutrition · Wednesday</div>
+            <div style="display:flex;gap:18px;align-items:center">
+              <svg width="112" height="112" viewBox="0 0 112 112"><g transform="rotate(-90 56 56)"><circle cx="56" cy="56" r="50" fill="none" stroke="rgba(69,60,142,.45)" stroke-width="3"></circle><circle cx="56" cy="56" r="50" fill="none" stroke="#6FB7FF" stroke-width="3" stroke-linecap="round" stroke-dasharray="196 314"></circle><circle cx="56" cy="56" r="40" fill="none" stroke="rgba(69,60,142,.45)" stroke-width="8"></circle><circle cx="56" cy="56" r="40" fill="none" stroke="#5BE9C2" stroke-width="8" stroke-linecap="round" stroke-dasharray="126 251"></circle><circle cx="56" cy="56" r="30" fill="none" stroke="rgba(69,60,142,.45)" stroke-width="5"></circle><circle cx="56" cy="56" r="30" fill="none" stroke="#8B7BFF" stroke-width="5" stroke-linecap="round" stroke-dasharray="115 188"></circle><circle cx="56" cy="56" r="22" fill="none" stroke="rgba(69,60,142,.45)" stroke-width="5"></circle><circle cx="56" cy="56" r="22" fill="none" stroke="#FFB454" stroke-width="5" stroke-linecap="round" stroke-dasharray="62 138"></circle><circle cx="56" cy="56" r="14" fill="none" stroke="rgba(69,60,142,.45)" stroke-width="5"></circle><circle cx="56" cy="56" r="14" fill="none" stroke="#C2BCE8" stroke-width="5" stroke-linecap="round" stroke-dasharray="40 88"></circle></g></svg>
+              <div style="flex:1;min-width:0"><div style="font-family:ui-monospace,monospace;font-size:46px;font-weight:700;letter-spacing:-.04em;line-height:1;color:#E4FCF4;text-shadow:0 0 26px rgba(91,233,194,.45)">1240</div><div style="font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:#9A93C9;margin-top:4px">kcal · 1240 left</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;margin-top:10px;font-size:11px">
+                  <div style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:2px;background:#8B7BFF"></span><span style="color:#9A93C9">P</span><span style="font-family:ui-monospace,monospace">98/160</span></div>
+                  <div style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:2px;background:#FFB454"></span><span style="color:#9A93C9">C</span><span style="font-family:ui-monospace,monospace">120/270</span></div>
+                  <div style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:2px;background:#C2BCE8"></span><span style="color:#9A93C9">F</span><span style="font-family:ui-monospace,monospace">38/82</span></div>
+                  <div style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:2px;background:#6FB7FF"></span><span style="color:#9A93C9">H₂O</span><span style="font-family:ui-monospace,monospace">1.25/2 L</span></div>
+                </div>
+              </div>
+            </div>
+            <div style="display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:14px;background:rgba(139,123,255,.10);border:1px solid rgba(139,123,255,.25)"><span style="width:22px;height:22px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;color:#08281F;background:linear-gradient(180deg,#8FF0D5,#3ED3AA)">{{ ic.msg12 }}</span><div style="flex:1;font-size:13px;line-height:1.5;color:#DAD5FA">Protein's behind — 62 g to go. Dinner covers 45; add the yoghurt snack and you're there.</div></div>
+            <div>
+              <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#9A93C9">Today's meals</span><span style="font-size:11px;color:#5BE9C2">Grocery list ›</span></div>
+              <div style="display:flex;flex-direction:column;margin-top:6px;border-top:1px solid rgba(245,243,255,.11)">
+                <sc-for list="{{ meals }}" as="m" hint-placeholder-count="4">
+                  <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid rgba(245,243,255,.11)">
+                    <div style="min-width:0"><div style="font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:#9A93C9">{{ m.slot }}</div><div style="font-size:16px;font-weight:500;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ m.name }}</div></div>
+                    <div style="display:flex;align-items:center;gap:10px;flex:none"><span style="font-family:ui-monospace,monospace;font-size:13px;color: {{ m.color }}">{{ m.kcal }}</span><span style="color:#9A93C9">{{ ic.chev14 }}</span></div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0"><div><div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#9A93C9">Target</div><div style="font-size:13px;margin-top:4px">2480 kcal · <span style="color:#9A93C9">TDEE 2780 − 300 for fat loss</span></div></div><span style="font-size:11px;color:#5BE9C2">How it's set ›</span></div>
+          </div>
+          <div style="position:absolute;top:10px;right:12px"><button style="width:32px;height:32px;border:0;background:transparent;color:#F5F3FF;display:flex;align-items:center;justify-content:center">{{ ic.gear16 }}</button></div>
+          <nav style="position:absolute;left:0;right:0;bottom:0;height:64px;background:#221C48;display:flex;align-items:stretch">
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:#9A93C9">{{ ic.home20 }}<span style="font-size:10px;font-weight:500">Home</span></div>
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:#5BE9C2">{{ ic.pie20 }}<span style="font-size:10px;font-weight:500">Nutrition</span></div>
+            <div style="flex:1;display:flex;align-items:center;justify-content:center"><span style="width:56px;height:56px;margin-top:-24px;border-radius:999px;display:flex;align-items:center;justify-content:center;color:#08281F;background:linear-gradient(180deg,#8FF0D5,#3ED3AA);box-shadow:0 0 12px rgba(91,233,194,.9)">{{ ic.msg24 }}</span></div>
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:#9A93C9">{{ ic.activity20 }}<span style="font-size:10px;font-weight:500">Exercise</span></div>
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:#9A93C9">{{ ic.wrench20 }}<span style="font-size:10px;font-weight:500">Tools</span></div>
+          </nav>
+        </div>
+      </div>
+
+      <!-- 1a Exercise today -->
+      <div style="display:flex;flex-direction:column;gap:8px;width:390px">
+        <span style="font-size:12px;font-weight:600;color:#C2BCE8">Exercise · today</span>
+        <div data-screen-label="1a Exercise" style="width:390px;height:844px;position:relative;overflow:hidden;background:#1A1636;color:#F5F3FF;border-radius:28px;border:1px solid rgba(245,243,255,.11);font-size:14px;line-height:20px;flex:none">
+          <div style="position:absolute;inset:0 0 64px 0;overflow-y:auto;padding:52px 22px 100px;scrollbar-width:none;display:flex;flex-direction:column;gap:22px">
+            <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:12.5px;color:#C2BCE8">Wk 3/16 · B1 Hypertrophy · ~52 min</span><span style="color:#5BE9C2">{{ ic.chevd14 }}</span></div>
+            <div style="display:flex;gap:6px;margin-top:-10px">
+              <sc-for list="{{ week }}" as="d" hint-placeholder-count="7"><div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 0;border-radius:9px;background: {{ d.bg }};border:1px solid {{ d.border }}"><span style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color: {{ d.color }}">{{ d.n }}</span><span style="font-size:12px;color: {{ d.color }}">{{ d.g }}</span></div></sc-for>
+            </div>
+            <div>
+              <div style="font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:#5BE9C2">Today · Wednesday</div>
+              <div style="font-size:36px;font-weight:700;letter-spacing:-.035em;line-height:1.02;margin-top:6px;text-shadow:0 0 26px rgba(91,233,194,.35)">Full Body Power</div>
+              <div style="height:2px;background:rgba(245,243,255,.11);border-radius:1px;margin-top:12px"><div style="width:0%;height:2px;background:#5BE9C2"></div></div>
+            </div>
+            <div style="display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:14px;background:rgba(139,123,255,.10);border:1px solid rgba(139,123,255,.25)"><span style="width:22px;height:22px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;color:#08281F;background:linear-gradient(180deg,#8FF0D5,#3ED3AA)">{{ ic.msg12 }}</span><div style="flex:1;font-size:13px;line-height:1.5;color:#DAD5FA">Bench is up 2.5 kg. If set 3 gets away from you, drop back — I'd rather 9 clean reps than 8 ugly ones.</div></div>
+            <div style="font-size:13px;color:#C2BCE8">▸ Warm-up · 4 moves · ~6 min</div>
+            <div style="display:flex;flex-direction:column;border-top:1px solid rgba(245,243,255,.11)">
+              <sc-for list="{{ exercises }}" as="e" hint-placeholder-count="6">
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid rgba(245,243,255,.11)">
+                  <div style="min-width:0"><div style="font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:#9A93C9">{{ e.label }}</div><div style="font-size:16px;font-weight:500;margin-top:2px">{{ e.name }}</div></div>
+                  <div style="display:flex;align-items:center;gap:10px;flex:none"><span style="font-family:ui-monospace,monospace;font-size:12px;color:#C2BCE8">{{ e.rx }}</span><span style="color:#9A93C9">{{ ic.chev14 }}</span></div>
+                </div>
+              </sc-for>
+            </div>
+            <div style="font-size:13px;color:#C2BCE8">＋ Add unplanned work</div>
+          </div>
+          <div style="position:absolute;left:0;right:0;bottom:64px;padding:10px 22px 12px;background:linear-gradient(to top,#1A1636 70%,transparent)"><button style="width:100%;height:52px;border:0;border-radius:14px;background:linear-gradient(180deg,#7DEDCD 0%,#5BE9C2 55%,#3ED3AA 100%);color:#08281F;font:inherit;font-size:15px;font-weight:600;box-shadow:0 0 18px rgba(91,233,194,.45)">Start workout</button></div>
+          <div style="position:absolute;top:10px;right:12px"><button style="width:32px;height:32px;border:0;background:transparent;color:#F5F3FF;display:flex;align-items:center;justify-content:center">{{ ic.gear16 }}</button></div>
+          <nav style="position:absolute;left:0;right:0;bottom:0;height:64px;background:#221C48;display:flex;align-items:stretch">
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:#9A93C9">{{ ic.home20 }}<span style="font-size:10px;font-weight:500">Home</span></div>
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:#9A93C9">{{ ic.pie20 }}<span style="font-size:10px;font-weight:500">Nutrition</span></div>
+            <div style="flex:1;display:flex;align-items:center;justify-content:center"><span style="width:56px;height:56px;margin-top:-24px;border-radius:999px;display:flex;align-items:center;justify-content:center;color:#08281F;background:linear-gradient(180deg,#8FF0D5,#3ED3AA);box-shadow:0 0 12px rgba(91,233,194,.9)">{{ ic.msg24 }}</span></div>
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:#5BE9C2">{{ ic.activity20 }}<span style="font-size:10px;font-weight:500">Exercise</span></div>
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:#9A93C9">{{ ic.wrench20 }}<span style="font-size:10px;font-weight:500">Tools</span></div>
+          </nav>
+        </div>
+      </div>
+
+      <!-- 1a Active session -->
+      <div style="display:flex;flex-direction:column;gap:8px;width:390px">
+        <span style="font-size:12px;font-weight:600;color:#C2BCE8">Exercise · active session (#/train)</span>
+        <div data-screen-label="1a Active" style="width:390px;height:844px;position:relative;overflow:hidden;background:#1A1636;color:#F5F3FF;border-radius:28px;border:1px solid rgba(245,243,255,.11);font-size:14px;line-height:20px;flex:none">
+          <div style="position:absolute;top:0;left:0;right:0;padding:14px 16px 0;display:flex;align-items:center;gap:10px"><button style="width:32px;height:32px;border:0;background:transparent;color:#F5F3FF;display:flex;align-items:center;justify-content:center">{{ ic.x16 }}</button><div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600">Full Body Power</div><div style="font-size:11px;color:#9A93C9">Wednesday · <span style="font-family:ui-monospace,monospace">41:12</span></div></div><button style="height:32px;border:0;border-radius:10px;background:transparent;color:#5BE9C2;font:inherit;font-size:13px;font-weight:600;padding:0 10px">Finish</button></div>
+          <div style="position:absolute;top:60px;left:0;right:0;display:flex;gap:6px;padding:8px 16px;overflow-x:auto;scrollbar-width:none">
+            <sc-for list="{{ rail }}" as="r" hint-placeholder-count="5"><div style="flex:none;display:flex;align-items:center;gap:6px;height:30px;padding:0 10px;border-radius:999px;background: {{ r.bg }};border:1px solid {{ r.border }};font-size:12px;color: {{ r.color }}"><span>{{ r.mark }}</span><span>{{ r.name }}</span></div></sc-for>
+          </div>
+          <div style="position:absolute;top:112px;left:0;right:0;bottom:150px;overflow-y:auto;padding:14px 22px;scrollbar-width:none;display:flex;flex-direction:column;gap:16px">
+            <div><div style="font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:#9A93C9">Main lift · 2 of 6</div><div style="font-size:30px;font-weight:700;letter-spacing:-.03em;line-height:1.05;margin-top:4px">Barbell Bench Press</div><div style="display:flex;align-items:baseline;gap:8px;margin-top:8px"><span style="font-family:ui-monospace,monospace;font-size:32px;font-weight:700;color:#E4FCF4">62.5</span><span style="font-size:13px;color:#9A93C9">kg · from your last session ⓘ</span></div></div>
+            <div style="display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:12px;background:rgba(139,123,255,.10)"><span style="width:20px;height:20px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;color:#08281F;background:linear-gradient(180deg,#8FF0D5,#3ED3AA)">{{ ic.msg12 }}</span><div style="font-size:12.5px;line-height:1.5;color:#DAD5FA">New weight today. Two in reserve on set 1, then we'll see.</div></div>
+            <div><div style="font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:#9A93C9">Ramp</div><div style="display:flex;gap:8px;margin-top:6px;font-family:ui-monospace,monospace;font-size:12px"><span style="color:#5BE9C2">⊙ 20×10</span><span style="color:#5BE9C2">⊙ 40×5</span><span>○ 50×3</span><span>○ 57.5×1</span></div></div>
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:12px;background:rgba(69,60,142,.28)"><span style="width:20px;font-family:ui-monospace,monospace;font-size:11px;color:#9A93C9">S1</span><span style="flex:1;font-family:ui-monospace,monospace;font-size:13px">62.5 kg × 9</span><span style="color:#5BE9C2">{{ ic.check14 }}</span></div>
+              <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:12px;background:rgba(69,60,142,.28)"><span style="width:20px;font-family:ui-monospace,monospace;font-size:11px;color:#9A93C9">S2</span><span style="flex:1;font-family:ui-monospace,monospace;font-size:13px">62.5 kg × 8</span><span style="color:#5BE9C2">{{ ic.check14 }}</span></div>
+              <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:12px;background:rgba(69,60,142,.28);border:1px solid rgba(91,233,194,.3)"><span style="width:20px;font-family:ui-monospace,monospace;font-size:11px;color:#9A93C9">S3</span><div style="display:flex;align-items:center;gap:4px"><span style="width:56px;height:36px;border-radius:9px;background:#1A1636;display:flex;align-items:center;justify-content:center;font-family:ui-monospace,monospace;font-size:13px">62.5</span><span style="font-size:10px;color:#9A93C9">kg</span></div><div style="display:flex;align-items:center;gap:4px"><span style="width:44px;height:36px;border-radius:9px;background:#1A1636;display:flex;align-items:center;justify-content:center;font-family:ui-monospace,monospace;font-size:13px;color:#9A93C9">8</span><span style="font-size:10px;color:#9A93C9">reps</span></div><span style="flex:1"></span><button style="width:44px;height:36px;border:0;border-radius:9px;background:#5BE9C2;color:#08281F;display:flex;align-items:center;justify-content:center;box-shadow:0 0 12px rgba(91,233,194,.6)">{{ ic.check14 }}</button></div>
+              <div style="font-size:12px;color:#9A93C9;padding:4px 12px">＋ Add set</div>
+            </div>
+          </div>
+          <div style="position:absolute;left:0;right:0;bottom:0;background:#221C48;padding:10px 16px 14px;display:flex;flex-direction:column;gap:8px">
+            <div style="display:flex;align-items:center;gap:10px;height:44px;padding:0 12px;border-radius:12px;background:rgba(69,60,142,.28)"><span style="color:#5BE9C2">{{ ic.timer16 }}</span><span style="font-family:ui-monospace,monospace;font-size:18px;font-weight:600">1:23</span><span style="font-size:12px;color:#9A93C9">Rest · Bench</span><span style="flex:1"></span><button style="border:0;background:transparent;color:#C2BCE8;font:inherit;font-size:12px">−30s</button><button style="border:0;background:transparent;color:#C2BCE8;font:inherit;font-size:12px">+30s</button><button style="border:0;background:transparent;color:#5BE9C2;font:inherit;font-size:12px;font-weight:600">Skip ▸</button></div>
+            <div style="display:flex;gap:8px"><button style="flex:1;height:48px;border:0;border-radius:12px;background:#5BE9C2;color:#08281F;font:inherit;font-size:14px;font-weight:600">Next: Goblet Squat ▸</button><button style="width:48px;height:48px;border:0;border-radius:12px;background:rgba(69,60,142,.28);color:#5BE9C2;display:flex;align-items:center;justify-content:center">{{ ic.calc16 }}</button><button style="width:48px;height:48px;border:0;border-radius:12px;background:rgba(69,60,142,.28);color:#F5F3FF;display:flex;align-items:center;justify-content:center">{{ ic.msg16 }}</button></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 1a Tools -->
+      <div style="display:flex;flex-direction:column;gap:8px;width:390px">
+        <span style="font-size:12px;font-weight:600;color:#C2BCE8">Tools — becomes a utility grid</span>
+        <div data-screen-label="1a Tools" style="width:390px;height:844px;position:relative;overflow:hidden;background:#1A1636;color:#F5F3FF;border-radius:28px;border:1px solid rgba(245,243,255,.11);font-size:14px;line-height:20px;flex:none">
+          <div style="position:absolute;inset:0 0 64px 0;overflow-y:auto;padding:52px 22px 24px;scrollbar-width:none;display:flex;flex-direction:column;gap:26px">
+            <div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#9A93C9">Tools</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              <sc-for list="{{ tools }}" as="t" hint-placeholder-count="6"><div style="padding:16px 14px;border-radius:16px;background:rgba(69,60,142,.28);display:flex;flex-direction:column;gap:12px;min-height:104px"><span style="color:#5BE9C2">{{ t.icon }}</span><div><div style="font-size:15px;font-weight:600">{{ t.name }}</div><div style="font-size:11.5px;color:#9A93C9;margin-top:2px">{{ t.sub }}</div></div></div></sc-for>
+            </div>
+            <div>
+              <div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#9A93C9">Grocery · this week</div>
+              <div style="display:flex;flex-direction:column;margin-top:6px;border-top:1px solid rgba(245,243,255,.11)">
+                <div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid rgba(245,243,255,.11);font-size:14px"><span style="width:20px;height:20px;border-radius:6px;border:1.5px solid #453C8E"></span><span style="flex:1">Chicken breast</span><span style="font-family:ui-monospace,monospace;font-size:12px;color:#9A93C9">1.2 kg</span></div>
+                <div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid rgba(245,243,255,.11);font-size:14px"><span style="width:20px;height:20px;border-radius:6px;border:1.5px solid #453C8E"></span><span style="flex:1">Greek yoghurt</span><span style="font-family:ui-monospace,monospace;font-size:12px;color:#9A93C9">4 × 170 g</span></div>
+                <div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid rgba(245,243,255,.11);font-size:14px;color:#9A93C9"><span style="width:20px;height:20px;border-radius:6px;background:#5BE9C2;display:flex;align-items:center;justify-content:center;color:#08281F">{{ ic.check12 }}</span><span style="flex:1;text-decoration:line-through">Basmati rice</span><span style="font-family:ui-monospace,monospace;font-size:12px">1 kg</span></div>
+                <div style="font-size:12px;color:#5BE9C2;padding:12px 0">All 14 items ›</div>
+              </div>
+            </div>
+          </div>
+          <div style="position:absolute;top:10px;right:12px"><button style="width:32px;height:32px;border:0;background:transparent;color:#F5F3FF;display:flex;align-items:center;justify-content:center">{{ ic.gear16 }}</button></div>
+          <nav style="position:absolute;left:0;right:0;bottom:0;height:64px;background:#221C48;display:flex;align-items:stretch">
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:#9A93C9">{{ ic.home20 }}<span style="font-size:10px;font-weight:500">Home</span></div>
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:#9A93C9">{{ ic.pie20 }}<span style="font-size:10px;font-weight:500">Nutrition</span></div>
+            <div style="flex:1;display:flex;align-items:center;justify-content:center"><span style="width:56px;height:56px;margin-top:-24px;border-radius:999px;display:flex;align-items:center;justify-content:center;color:#08281F;background:linear-gradient(180deg,#8FF0D5,#3ED3AA);box-shadow:0 0 12px rgba(91,233,194,.9)">{{ ic.msg24 }}</span></div>
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:#9A93C9">{{ ic.activity20 }}<span style="font-size:10px;font-weight:500">Exercise</span></div>
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:#5BE9C2">{{ ic.wrench20 }}<span style="font-size:10px;font-weight:500">Tools</span></div>
+          </nav>
+        </div>
+      </div>
+
+      <!-- 1a Profile -->
+      <div style="display:flex;flex-direction:column;gap:8px;width:390px">
+        <span style="font-size:12px;font-weight:600;color:#C2BCE8">Profile / settings — grouped list</span>
+        <div data-screen-label="1a Profile" style="width:390px;height:844px;position:relative;overflow:hidden;background:#1A1636;color:#F5F3FF;border-radius:28px;border:1px solid rgba(245,243,255,.11);font-size:14px;line-height:20px;flex:none">
+          <div style="position:absolute;inset:0;overflow-y:auto;padding:14px 22px 30px;scrollbar-width:none;display:flex;flex-direction:column;gap:24px">
+            <div style="display:flex;align-items:center;gap:10px"><button style="width:32px;height:32px;margin-left:-8px;border:0;background:transparent;color:#F5F3FF;display:flex;align-items:center;justify-content:center">{{ ic.x16 }}</button><span style="font-size:15px;font-weight:600">Profile</span></div>
+            <div style="display:flex;align-items:center;gap:14px"><span style="width:56px;height:56px;border-radius:999px;background:rgba(69,60,142,.5);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:600">A</span><div><div style="font-size:20px;font-weight:700;letter-spacing:-.02em">Ashley</div><div style="font-size:12px;color:#9A93C9">Fat loss · 4 days/week · Home gym</div></div></div>
+            <sc-for list="{{ profileGroups }}" as="g" hint-placeholder-count="4">
+              <div><div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#9A93C9">{{ g.title }}</div>
+                <div style="display:flex;flex-direction:column;margin-top:6px;border-top:1px solid rgba(245,243,255,.11)">
+                  <sc-for list="{{ g.rows }}" as="r" hint-placeholder-count="3"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid rgba(245,243,255,.11)"><span style="font-size:14px">{{ r.k }}</span><span style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:#9A93C9">{{ r.v }}{{ ic.chev14 }}</span></div></sc-for>
+                </div>
+              </div>
+            </sc-for>
+            <button style="height:44px;border:1px solid rgba(255,107,107,.35);border-radius:12px;background:transparent;color:#FF8A8A;font:inherit;font-size:13px;font-weight:500">Start a new plan…</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 1b TODAY · PLAN · COACH ================= -->
+  <div id="1b" style="display:flex;flex-direction:column;gap:14px;padding-top:24px;border-top:1px solid rgba(245,243,255,.11)">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <a href="#1b" style="font-size:11px;font-weight:700;letter-spacing:.12em;text-decoration:none;color:#08281F;background:#5BE9C2;border-radius:999px;padding:3px 9px">1b</a>
+      <span style="font-size:15px;font-weight:600">Rethink — Today · Plan · Coach</span>
+      <span style="font-size:12px;color:#9A93C9">Three tabs. <b style="color:#C2BCE8">Today</b> is everything you do today in one scroll — session, meals, water, steps, weigh-in — opened by the TrAIner's morning brief. <b style="color:#C2BCE8">Plan</b> is structure: program, targets, grocery. <b style="color:#C2BCE8">Coach</b> is the chat. Tools dissolve: timers live in the session, grocery in Plan, plate calc on the set row.</span>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start">
+
+      <!-- 1b Today -->
+      <div style="display:flex;flex-direction:column;gap:8px;width:390px">
+        <span style="font-size:12px;font-weight:600;color:#C2BCE8">Today (replaces Home)</span>
+        <div data-screen-label="1b Today" style="width:390px;height:844px;position:relative;overflow:hidden;background:#1A1636;color:#F5F3FF;border-radius:28px;border:1px solid rgba(245,243,255,.11);font-size:14px;line-height:20px;flex:none">
+          <div style="position:absolute;inset:0 0 64px 0;overflow-y:auto;padding:52px 22px 24px;scrollbar-width:none;display:flex;flex-direction:column;gap:24px">
+            <div style="display:flex;justify-content:space-between;align-items:flex-end"><div><div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#9A93C9">Wednesday · Wk 3 of 16</div><div style="font-size:28px;font-weight:700;letter-spacing:-.03em;line-height:1.1;margin-top:6px">Today</div></div><div style="display:flex;gap:4px">
+              <sc-for list="{{ week }}" as="d" hint-placeholder-count="7"><span style="width:18px;height:18px;border-radius:999px;display:flex;align-items:center;justify-content:center;font-size:10px;background: {{ d.bg }};border:1px solid {{ d.border }};color: {{ d.color }}">{{ d.g }}</span></sc-for>
+            </div></div>
+            <div style="display:flex;gap:12px;align-items:flex-start">
+              <span style="width:32px;height:32px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;color:#08281F;background:linear-gradient(180deg,#8FF0D5,#3ED3AA);box-shadow:0 0 18px rgba(91,233,194,.45)">{{ ic.msg16 }}</span>
+              <div style="flex:1;min-width:0"><div style="font-size:15.5px;line-height:1.5;text-wrap:pretty">Morning. Two clean sessions in a row, so Bench goes up 2.5 kg today. You're 62 g of protein short on a normal Wednesday — I've put the yoghurt back in as a snack. Weigh in before breakfast if you can.</div><div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><button style="border:1px solid rgba(91,233,194,.35);border-radius:999px;background:transparent;padding:0 12px;height:32px;font:inherit;font-size:12px;font-weight:500;color:#5BE9C2">Why 2.5 kg?</button><button style="border:1px solid rgba(91,233,194,.35);border-radius:999px;background:transparent;padding:0 12px;height:32px;font:inherit;font-size:12px;font-weight:500;color:#5BE9C2">Swap the snack</button></div></div>
+            </div>
+            <div style="padding:16px;border-radius:18px;background:#241E4E">
+              <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:#5BE9C2">Session</span><span style="font-size:11px;color:#9A93C9">~52 min · 6 exercises</span></div>
+              <div style="font-size:26px;font-weight:700;letter-spacing:-.025em;margin-top:6px">Full Body Power</div>
+              <div style="font-size:12.5px;color:#9A93C9;margin-top:2px">Bench 62.5 · Goblet Squat · RDL 80 · +3</div>
+              <button style="margin-top:14px;width:100%;height:48px;border:0;border-radius:12px;background:linear-gradient(180deg,#7DEDCD 0%,#5BE9C2 55%,#3ED3AA 100%);color:#08281F;font:inherit;font-size:15px;font-weight:600;box-shadow:0 0 18px rgba(91,233,194,.45)">Start</button>
+            </div>
+            <div>
+              <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#9A93C9">Meals · 1240 of 2480 kcal</span><span style="font-size:11px;color:#9A93C9">P 98/160</span></div>
+              <div style="height:3px;display:flex;gap:2px;margin-top:8px;border-radius:2px;overflow:hidden"><span style="flex:1;background:#5BE9C2"></span><span style="flex:1;background:#5BE9C2"></span><span style="flex:1;background:rgba(245,243,255,.11)"></span><span style="flex:1;background:rgba(245,243,255,.11)"></span></div>
+              <div style="display:flex;flex-direction:column;margin-top:4px">
+                <sc-for list="{{ meals }}" as="m" hint-placeholder-count="4">
+                  <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid rgba(245,243,255,.11)">
+                    <div style="min-width:0;display:flex;align-items:center;gap:12px"><span style="width:22px;height:22px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;background: {{ m.dotBg }};color:#08281F;border:1.5px solid {{ m.dotBorder }}">{{ m.check }}</span><div><div style="font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:#9A93C9">{{ m.slot }}</div><div style="font-size:15px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ m.name }}</div></div></div>
+                    <span style="font-family:ui-monospace,monospace;font-size:12.5px;color: {{ m.color }};flex:none">{{ m.kcal }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+              <div style="padding:12px;border-radius:14px;background:rgba(69,60,142,.28)"><div style="display:flex;align-items:center;gap:5px;font-size:10.5px;color:#9A93C9">{{ ic.drop12 }}Water</div><div style="font-family:ui-monospace,monospace;font-size:17px;font-weight:700;margin-top:4px">1.25<span style="font-size:10px;color:#9A93C9;font-weight:400"> / 2 L</span></div><button style="margin-top:8px;height:28px;border:0;border-radius:999px;background:rgba(111,183,255,.15);color:#6FB7FF;font:inherit;font-size:11px;font-weight:600;padding:0 10px">+250</button></div>
+              <div style="padding:12px;border-radius:14px;background:rgba(69,60,142,.28)"><div style="display:flex;align-items:center;gap:5px;font-size:10.5px;color:#9A93C9">{{ ic.steps12 }}Steps</div><div style="font-family:ui-monospace,monospace;font-size:17px;font-weight:700;margin-top:4px">6.2k<span style="font-size:10px;color:#9A93C9;font-weight:400"> / 8k</span></div><button style="margin-top:8px;height:28px;border:0;border-radius:999px;background:rgba(91,233,194,.14);color:#5BE9C2;font:inherit;font-size:11px;font-weight:600;padding:0 10px">Log</button></div>
+              <div style="padding:12px;border-radius:14px;background:rgba(69,60,142,.28)"><div style="display:flex;align-items:center;gap:5px;font-size:10.5px;color:#9A93C9">{{ ic.scale12 }}Weigh-in</div><div style="font-family:ui-monospace,monospace;font-size:17px;font-weight:700;margin-top:4px">78.4<span style="font-size:10px;color:#9A93C9;font-weight:400"> kg</span></div><div style="margin-top:8px;height:28px;display:flex;align-items:center;font-size:11px;color:#5BE9C2">✓ today</div></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0"><div><div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#9A93C9">Streak</div><div style="font-size:13px;margin-top:3px"><span style="font-family:ui-monospace,monospace;font-weight:600">12</span> days · −2.0 kg since week 1</div></div><span style="font-size:11px;color:#5BE9C2">Progress ›</span></div>
+          </div>
+          <div style="position:absolute;top:10px;right:12px"><span style="width:32px;height:32px;border-radius:999px;background:rgba(69,60,142,.5);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600">A</span></div>
+          <nav style="position:absolute;left:0;right:0;bottom:0;height:64px;background:#221C48;display:flex;align-items:stretch">
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:#5BE9C2">{{ ic.sun20 }}<span style="font-size:10px;font-weight:500">Today</span></div>
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:#9A93C9">{{ ic.cal20 }}<span style="font-size:10px;font-weight:500">Plan</span></div>
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:#9A93C9;position:relative">{{ ic.msg20 }}<span style="font-size:10px;font-weight:500">Coach</span><span style="position:absolute;top:12px;right:calc(50% - 16px);width:8px;height:8px;border-radius:999px;background:#5BE9C2;box-shadow:0 0 8px rgba(91,233,194,.9)"></span></div>
+          </nav>
+        </div>
+      </div>
+
+      <!-- 1b Plan (Training) -->
+      <div style="display:flex;flex-direction:column;gap:8px;width:390px">
+        <span style="font-size:12px;font-weight:600;color:#C2BCE8">Plan · Training (replaces Exercise browse)</span>
+        <div data-screen-label="1b Plan Training" style="width:390px;height:844px;position:relative;overflow:hidden;background:#1A1636;color:#F5F3FF;border-radius:28px;border:1px solid rgba(245,243,255,.11);font-size:14px;line-height:20px;flex:none">
+          <div style="position:absolute;inset:0 0 64px 0;overflow-y:auto;padding:52px 22px 24px;scrollbar-width:none;display:flex;flex-direction:column;gap:24px">
+            <div style="font-size:28px;font-weight:700;letter-spacing:-.03em;line-height:1.1">Plan</div>
+            <div style="display:flex;padding:3px;border-radius:12px;background:rgba(69,60,142,.28)"><span style="flex:1;height:34px;display:flex;align-items:center;justify-content:center;border-radius:9px;background:#241E4E;font-size:13px;font-weight:600">Training</span><span style="flex:1;height:34px;display:flex;align-items:center;justify-content:center;font-size:13px;color:#9A93C9">Nutrition</span></div>
+            <div>
+              <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#9A93C9">16 weeks · 4 blocks</span><span style="font-size:11px;color:#9A93C9">started 18 Aug</span></div>
+              <div style="display:flex;gap:4px;margin-top:10px;height:6px"><span style="flex:4;border-radius:3px;background:#5BE9C2;box-shadow:0 0 10px rgba(91,233,194,.6)"></span><span style="flex:4;border-radius:3px;background:rgba(69,60,142,.5)"></span><span style="flex:4;border-radius:3px;background:rgba(69,60,142,.5)"></span><span style="flex:4;border-radius:3px;background:rgba(69,60,142,.5)"></span></div>
+              <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:10px;color:#9A93C9"><span style="color:#5BE9C2">B1 Hypertrophy</span><span>B2 Strength</span><span>B3 Strength</span><span>B4 Peak</span></div>
+            </div>
+            <div style="padding:14px 16px;border-radius:16px;background:rgba(69,60,142,.28)">
+              <div style="font-size:12.5px;font-weight:600">Block 1 · Hypertrophy · weeks 1–4</div>
+              <div style="font-size:12px;line-height:1.5;color:#C2BCE8;margin-top:6px">Find working weights, then load. Every block ends with an easier week so the work sticks.</div>
+              <div style="display:flex;flex-direction:column;margin-top:10px;border-top:1px solid rgba(245,243,255,.11)">
+                <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(245,243,255,.11);font-size:13px"><span>Wk 1 · Calibration</span><span style="color:#9A93C9">done ✓</span></div>
+                <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(245,243,255,.11);font-size:13px"><span>Wk 2 · Loading</span><span style="color:#9A93C9">done ✓</span></div>
+                <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(245,243,255,.11);font-size:13px"><span>Wk 3 · Loading</span><span style="color:#5BE9C2">← you are here</span></div>
+                <div style="display:flex;justify-content:space-between;padding:10px 0;font-size:13px"><span>Wk 4 · Deload</span><span style="color:#9A93C9"></span></div>
+              </div>
+            </div>
+            <div>
+              <div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#9A93C9">Week 3</div>
+              <div style="display:flex;flex-direction:column;margin-top:6px;border-top:1px solid rgba(245,243,255,.11)">
+                <sc-for list="{{ weekDays }}" as="w" hint-placeholder-count="7"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid rgba(245,243,255,.11)"><div><div style="font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color: {{ w.dayColor }}">{{ w.day }}</div><div style="font-size:15px;font-weight:500;margin-top:2px;color: {{ w.nameColor }}">{{ w.name }}</div></div><span style="display:flex;align-items:center;gap:8px;font-size:12px;color:#9A93C9">{{ w.meta }}{{ ic.chev14 }}</span></div></sc-for>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:2px">
+              <div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#9A93C9;margin-bottom:6px">More</div>
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-top:1px solid rgba(245,243,255,.11);font-size:14px"><span style="display:flex;align-items:center;gap:10px"><span style="color:#5BE9C2">{{ ic.history16 }}</span>Session history & PRs</span>{{ ic.chev14 }}</div>
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-top:1px solid rgba(245,243,255,.11);border-bottom:1px solid rgba(245,243,255,.11);font-size:14px"><span style="display:flex;align-items:center;gap:10px"><span style="color:#5BE9C2">{{ ic.timer16 }}</span>Interval & round timers</span>{{ ic.chev14 }}</div>
+            </div>
+          </div>
+          <div style="position:absolute;top:10px;right:12px"><span style="width:32px;height:32px;border-radius:999px;background:rgba(69,60,142,.5);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600">A</span></div>
+          <nav style="position:absolute;left:0;right:0;bottom:0;height:64px;background:#221C48;display:flex;align-items:stretch">
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:#9A93C9">{{ ic.sun20 }}<span style="font-size:10px;font-weight:500">Today</span></div>
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:#5BE9C2">{{ ic.cal20 }}<span style="font-size:10px;font-weight:500">Plan</span></div>
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:#9A93C9">{{ ic.msg20 }}<span style="font-size:10px;font-weight:500">Coach</span></div>
+          </nav>
+        </div>
+      </div>
+
+      <!-- 1b Plan (Nutrition) -->
+      <div style="display:flex;flex-direction:column;gap:8px;width:390px">
+        <span style="font-size:12px;font-weight:600;color:#C2BCE8">Plan · Nutrition (targets + grocery; Tools' grocery lands here)</span>
+        <div data-screen-label="1b Plan Nutrition" style="width:390px;height:844px;position:relative;overflow:hidden;background:#1A1636;color:#F5F3FF;border-radius:28px;border:1px solid rgba(245,243,255,.11);font-size:14px;line-height:20px;flex:none">
+          <div style="position:absolute;inset:0 0 64px 0;overflow-y:auto;padding:52px 22px 24px;scrollbar-width:none;display:flex;flex-direction:column;gap:24px">
+            <div style="font-size:28px;font-weight:700;letter-spacing:-.03em;line-height:1.1">Plan</div>
+            <div style="display:flex;padding:3px;border-radius:12px;background:rgba(69,60,142,.28)"><span style="flex:1;height:34px;display:flex;align-items:center;justify-content:center;font-size:13px;color:#9A93C9">Training</span><span style="flex:1;height:34px;display:flex;align-items:center;justify-content:center;border-radius:9px;background:#241E4E;font-size:13px;font-weight:600">Nutrition</span></div>
+            <div>
+              <div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#9A93C9">Daily target</div>
+              <div style="display:flex;align-items:baseline;gap:8px;margin-top:8px"><span style="font-family:ui-monospace,monospace;font-size:40px;font-weight:700;letter-spacing:-.04em;color:#E4FCF4;text-shadow:0 0 26px rgba(91,233,194,.45)">2480</span><span style="font-size:13px;color:#9A93C9">kcal · fat loss, −300</span></div>
+              <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px">
+                <div style="padding:10px;border-radius:12px;background:rgba(69,60,142,.28)"><div style="font-size:10px;color:#9A93C9">BMR</div><div style="font-family:ui-monospace,monospace;font-size:14px;font-weight:600;margin-top:2px">1690</div></div>
+                <div style="padding:10px;border-radius:12px;background:rgba(69,60,142,.28)"><div style="font-size:10px;color:#9A93C9">TDEE</div><div style="font-family:ui-monospace,monospace;font-size:14px;font-weight:600;margin-top:2px">2780</div></div>
+                <div style="padding:10px;border-radius:12px;background:rgba(69,60,142,.28)"><div style="font-size:10px;color:#9A93C9">Adjust</div><div style="font-family:ui-monospace,monospace;font-size:14px;font-weight:600;margin-top:2px">−300</div></div>
+                <div style="padding:10px;border-radius:12px;background:rgba(91,233,194,.14)"><div style="font-size:10px;color:#9A93C9">Target</div><div style="font-family:ui-monospace,monospace;font-size:14px;font-weight:600;margin-top:2px;color:#5BE9C2">2480</div></div>
+              </div>
+              <div style="display:flex;justify-content:space-between;margin-top:12px;font-size:12.5px"><span style="color:#9A93C9">Split</span><span><span style="color:#8B7BFF">P 160</span> · <span style="color:#FFB454">C 270</span> · <span style="color:#C2BCE8">F 82</span> g</span></div>
+              <div style="display:flex;justify-content:space-between;margin-top:8px;font-size:12.5px"><span style="color:#9A93C9">Method</span><span>Weekly dynamic · <span style="color:#5BE9C2">change ›</span></span></div>
+            </div>
+            <div>
+              <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#9A93C9">This week's meals</span><span style="font-size:11px;color:#5BE9C2">Regenerate all</span></div>
+              <div style="display:flex;gap:8px;margin-top:10px;overflow-x:auto;scrollbar-width:none">
+                <sc-for list="{{ weekDays }}" as="w" hint-placeholder-count="7"><div style="flex:none;width:72px;padding:10px;border-radius:12px;background:rgba(69,60,142,.28);border:1px solid {{ w.mealBorder }}"><div style="font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color: {{ w.dayColor }}">{{ w.day }}</div><div style="font-family:ui-monospace,monospace;font-size:13px;font-weight:600;margin-top:4px">{{ w.kcal }}</div><div style="font-size:10px;color:#9A93C9">kcal</div></div></sc-for>
+              </div>
+            </div>
+            <div>
+              <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#9A93C9">Grocery · 14 items</span><span style="font-size:11px;color:#5BE9C2">Share</span></div>
+              <div style="display:flex;flex-direction:column;margin-top:6px;border-top:1px solid rgba(245,243,255,.11)">
+                <div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid rgba(245,243,255,.11);font-size:14px"><span style="width:20px;height:20px;border-radius:6px;border:1.5px solid #453C8E"></span><span style="flex:1">Chicken breast</span><span style="font-family:ui-monospace,monospace;font-size:12px;color:#9A93C9">1.2 kg</span></div>
+                <div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid rgba(245,243,255,.11);font-size:14px"><span style="width:20px;height:20px;border-radius:6px;border:1.5px solid #453C8E"></span><span style="flex:1">Greek yoghurt</span><span style="font-family:ui-monospace,monospace;font-size:12px;color:#9A93C9">4 × 170 g</span></div>
+                <div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid rgba(245,243,255,.11);font-size:14px;color:#9A93C9"><span style="width:20px;height:20px;border-radius:6px;background:#5BE9C2;display:flex;align-items:center;justify-content:center;color:#08281F">{{ ic.check12 }}</span><span style="flex:1;text-decoration:line-through">Basmati rice</span><span style="font-family:ui-monospace,monospace;font-size:12px">1 kg</span></div>
+              </div>
+            </div>
+          </div>
+          <div style="position:absolute;top:10px;right:12px"><span style="width:32px;height:32px;border-radius:999px;background:rgba(69,60,142,.5);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600">A</span></div>
+          <nav style="position:absolute;left:0;right:0;bottom:0;height:64px;background:#221C48;display:flex;align-items:stretch">
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:#9A93C9">{{ ic.sun20 }}<span style="font-size:10px;font-weight:500">Today</span></div>
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:#5BE9C2">{{ ic.cal20 }}<span style="font-size:10px;font-weight:500">Plan</span></div>
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:#9A93C9">{{ ic.msg20 }}<span style="font-size:10px;font-weight:500">Coach</span></div>
+          </nav>
+        </div>
+      </div>
+
+      <!-- 1b Session sheet (today's exercise detail) -->
+      <div style="display:flex;flex-direction:column;gap:8px;width:390px">
+        <span style="font-size:12px;font-weight:600;color:#C2BCE8">Session detail (tap the session card) — replaces Exercise today</span>
+        <div data-screen-label="1b Session" style="width:390px;height:844px;position:relative;overflow:hidden;background:#1A1636;color:#F5F3FF;border-radius:28px;border:1px solid rgba(245,243,255,.11);font-size:14px;line-height:20px;flex:none">
+          <div style="position:absolute;inset:0;overflow-y:auto;padding:14px 22px 110px;scrollbar-width:none;display:flex;flex-direction:column;gap:22px">
+            <div style="display:flex;align-items:center;gap:8px;margin-left:-8px"><button style="width:32px;height:32px;border:0;background:transparent;color:#F5F3FF;display:flex;align-items:center;justify-content:center">{{ ic.back16 }}</button><span style="font-size:13px;color:#9A93C9">Today</span></div>
+            <div><div style="font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:#5BE9C2">Wednesday · Wk 3 · B1 Hypertrophy</div><div style="font-size:36px;font-weight:700;letter-spacing:-.035em;line-height:1.02;margin-top:6px">Full Body Power</div><div style="font-size:12.5px;color:#9A93C9;margin-top:6px">~52 min · 6 exercises · 21 sets</div></div>
+            <div style="font-size:13px;color:#C2BCE8">▸ Warm-up · 4 moves · ~6 min</div>
+            <div style="display:flex;flex-direction:column;border-top:1px solid rgba(245,243,255,.11)">
+              <div style="padding:13px 0;border-bottom:1px solid rgba(245,243,255,.11)">
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><div><div style="font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:#5BE9C2">Main lift · open</div><div style="font-size:19px;font-weight:600;margin-top:2px">Barbell Bench Press</div></div><span style="color:#9A93C9">{{ ic.chevu14 }}</span></div>
+                <div style="display:flex;align-items:baseline;gap:8px;margin-top:10px"><span style="font-family:ui-monospace,monospace;font-size:32px;font-weight:700;color:#E4FCF4">62.5</span><span style="font-size:12px;color:#9A93C9">kg · from your last session ⓘ</span><span style="flex:1"></span><span style="font-size:11px;color:#5BE9C2">+2.5 today</span></div>
+                <div style="font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:#9A93C9;margin-top:12px">4 ramp sets</div>
+                <div style="font-family:ui-monospace,monospace;font-size:12px;color:#C2BCE8;margin-top:4px;line-height:1.7">20 kg × 10<br>40 kg × 5<br>50 kg × 3<br>57.5 kg × 1</div>
+                <div style="font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:#9A93C9;margin-top:12px">3 working sets · 8–11 reps</div>
+                <div style="display:flex;gap:14px;margin-top:10px;font-size:12.5px"><span style="color:#5BE9C2">Swap · 4 alternatives</span><span style="color:#9A93C9">Plate calculator</span><span style="color:#9A93C9">History</span></div>
+              </div>
+              <sc-for list="{{ exercisesRest }}" as="e" hint-placeholder-count="5">
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid rgba(245,243,255,.11)"><div><div style="font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:#9A93C9">{{ e.label }}</div><div style="font-size:16px;font-weight:500;margin-top:2px">{{ e.name }}</div></div><div style="display:flex;align-items:center;gap:10px;flex:none"><span style="font-family:ui-monospace,monospace;font-size:12px;color:#C2BCE8">{{ e.rx }}</span><span style="color:#9A93C9">{{ ic.chev14 }}</span></div></div>
+              </sc-for>
+            </div>
+          </div>
+          <div style="position:absolute;left:0;right:0;bottom:0;padding:10px 22px 22px;background:linear-gradient(to top,#1A1636 70%,transparent)"><button style="width:100%;height:52px;border:0;border-radius:14px;background:linear-gradient(180deg,#7DEDCD 0%,#5BE9C2 55%,#3ED3AA 100%);color:#08281F;font:inherit;font-size:15px;font-weight:600;box-shadow:0 0 18px rgba(91,233,194,.45)">Start workout</button></div>
+        </div>
+      </div>
+
+      <!-- 1b Active -->
+      <div style="display:flex;flex-direction:column;gap:8px;width:390px">
+        <span style="font-size:12px;font-weight:600;color:#C2BCE8">Active session — TrAIner in the dock, timer + plate calc built in</span>
+        <div data-screen-label="1b Active" style="width:390px;height:844px;position:relative;overflow:hidden;background:#1A1636;color:#F5F3FF;border-radius:28px;border:1px solid rgba(245,243,255,.11);font-size:14px;line-height:20px;flex:none">
+          <div style="position:absolute;top:0;left:0;right:0;padding:14px 16px 0;display:flex;align-items:center;gap:10px"><button style="width:32px;height:32px;border:0;background:transparent;color:#F5F3FF;display:flex;align-items:center;justify-content:center">{{ ic.x16 }}</button><div style="flex:1;min-width:0;display:flex;align-items:baseline;gap:8px"><span style="font-family:ui-monospace,monospace;font-size:20px;font-weight:700">41:12</span><span style="font-size:12px;color:#9A93C9">11 of 21 sets</span></div><button style="height:32px;border:0;border-radius:10px;background:transparent;color:#5BE9C2;font:inherit;font-size:13px;font-weight:600;padding:0 10px">Finish</button></div>
+          <div style="position:absolute;top:56px;left:22px;right:22px;height:3px;display:flex;gap:3px"><span style="flex:3;background:#5BE9C2;border-radius:2px"></span><span style="flex:3;background:#5BE9C2;border-radius:2px;opacity:.6"></span><span style="flex:3;background:rgba(245,243,255,.11);border-radius:2px"></span><span style="flex:3;background:rgba(245,243,255,.11);border-radius:2px"></span><span style="flex:3;background:rgba(245,243,255,.11);border-radius:2px"></span><span style="flex:3;background:rgba(245,243,255,.11);border-radius:2px"></span></div>
+          <div style="position:absolute;top:76px;left:0;right:0;bottom:190px;overflow-y:auto;padding:14px 22px;scrollbar-width:none;display:flex;flex-direction:column;gap:18px">
+            <div><div style="font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:#9A93C9">2 of 6 · Main lift</div><div style="font-size:34px;font-weight:700;letter-spacing:-.035em;line-height:1.02;margin-top:4px">Barbell Bench Press</div></div>
+            <div style="display:flex;gap:10px"><div style="flex:1;padding:12px 14px;border-radius:14px;background:#241E4E"><div style="font-size:10px;color:#9A93C9">Load</div><div style="display:flex;align-items:baseline;gap:4px"><span style="font-family:ui-monospace,monospace;font-size:28px;font-weight:700;color:#E4FCF4">62.5</span><span style="font-size:11px;color:#9A93C9">kg</span></div><div style="font-size:10.5px;color:#5BE9C2;margin-top:2px">20 + 2×20 + 2×1.25</div></div><div style="flex:1;padding:12px 14px;border-radius:14px;background:#241E4E"><div style="font-size:10px;color:#9A93C9">Target</div><div style="display:flex;align-items:baseline;gap:4px"><span style="font-family:ui-monospace,monospace;font-size:28px;font-weight:700;color:#E4FCF4">3×8</span><span style="font-size:11px;color:#9A93C9">–11</span></div><div style="font-size:10.5px;color:#9A93C9;margin-top:2px">last time 9 · 8 · 8</div></div></div>
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <div style="display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:12px;background:rgba(69,60,142,.28)"><span style="width:20px;font-family:ui-monospace,monospace;font-size:11px;color:#9A93C9">S1</span><span style="flex:1;font-family:ui-monospace,monospace;font-size:14px">62.5 × 9</span><span style="font-size:11px;color:#5BE9C2">PR</span><span style="color:#5BE9C2">{{ ic.check14 }}</span></div>
+              <div style="display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:12px;background:rgba(69,60,142,.28)"><span style="width:20px;font-family:ui-monospace,monospace;font-size:11px;color:#9A93C9">S2</span><span style="flex:1;font-family:ui-monospace,monospace;font-size:14px">62.5 × 8</span><span style="color:#5BE9C2">{{ ic.check14 }}</span></div>
+              <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:12px;background:rgba(69,60,142,.28);border:1px solid rgba(91,233,194,.3)"><span style="width:20px;font-family:ui-monospace,monospace;font-size:11px;color:#9A93C9">S3</span><span style="width:64px;height:40px;border-radius:9px;background:#1A1636;display:flex;align-items:center;justify-content:center;font-family:ui-monospace,monospace;font-size:15px">62.5</span><span style="width:52px;height:40px;border-radius:9px;background:#1A1636;display:flex;align-items:center;justify-content:center;font-family:ui-monospace,monospace;font-size:15px;color:#9A93C9">8</span><span style="flex:1"></span><button style="width:56px;height:40px;border:0;border-radius:9px;background:#5BE9C2;color:#08281F;display:flex;align-items:center;justify-content:center;box-shadow:0 0 12px rgba(91,233,194,.6)">{{ ic.check14 }}</button></div>
+            </div>
+          </div>
+          <div style="position:absolute;left:0;right:0;bottom:0;background:#221C48;padding:10px 16px 16px;display:flex;flex-direction:column;gap:8px">
+            <div style="display:flex;gap:10px;align-items:center;padding:8px 12px;border-radius:12px;background:rgba(139,123,255,.12)"><span style="width:22px;height:22px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;color:#08281F;background:linear-gradient(180deg,#8FF0D5,#3ED3AA)">{{ ic.msg12 }}</span><span style="flex:1;font-size:12.5px;color:#DAD5FA">Set 1 was a PR. Same weight, aim for 8.</span><span style="font-size:12px;color:#5BE9C2;font-weight:500">Reply</span></div>
+            <div style="display:flex;align-items:center;gap:10px;height:44px;padding:0 12px;border-radius:12px;background:rgba(69,60,142,.28)"><span style="color:#5BE9C2">{{ ic.timer16 }}</span><span style="font-family:ui-monospace,monospace;font-size:18px;font-weight:600">1:23</span><span style="font-size:12px;color:#9A93C9">rest</span><span style="flex:1"></span><button style="border:0;background:transparent;color:#C2BCE8;font:inherit;font-size:12px">−30s</button><button style="border:0;background:transparent;color:#C2BCE8;font:inherit;font-size:12px">+30s</button><button style="border:0;background:transparent;color:#5BE9C2;font:inherit;font-size:12px;font-weight:600">Skip ▸</button></div>
+            <button style="height:48px;border:0;border-radius:12px;background:#5BE9C2;color:#08281F;font:inherit;font-size:14px;font-weight:600">Next: Goblet Squat ▸</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 1b Profile -->
+      <div style="display:flex;flex-direction:column;gap:8px;width:390px">
+        <span style="font-size:12px;font-weight:600;color:#C2BCE8">Profile — sheet from the avatar; "what the TrAIner knows" up front</span>
+        <div data-screen-label="1b Profile" style="width:390px;height:844px;position:relative;overflow:hidden;background:#1A1636;color:#F5F3FF;border-radius:28px;border:1px solid rgba(245,243,255,.11);font-size:14px;line-height:20px;flex:none">
+          <div style="position:absolute;inset:0;background:rgba(15,13,34,.6)"></div>
+          <div style="position:absolute;left:0;right:0;bottom:0;top:60px;background:#1A1636;border-radius:24px 24px 0 0;overflow-y:auto;padding:12px 22px 30px;scrollbar-width:none;display:flex;flex-direction:column;gap:22px">
+            <div style="width:36px;height:4px;border-radius:2px;background:rgba(245,243,255,.2);margin:0 auto"></div>
+            <div style="display:flex;align-items:center;gap:14px"><span style="width:56px;height:56px;border-radius:999px;background:rgba(69,60,142,.5);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:600">A</span><div style="flex:1"><div style="font-size:20px;font-weight:700;letter-spacing:-.02em">Ashley</div><div style="font-size:12px;color:#9A93C9">Fat loss · 72 kg goal · 4 days/week</div></div><span style="font-size:12px;color:#5BE9C2">Edit</span></div>
+            <div style="padding:14px 16px;border-radius:16px;background:rgba(139,123,255,.10);border:1px solid rgba(139,123,255,.25)">
+              <div style="display:flex;align-items:center;gap:8px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#DAD5FA"><span style="width:18px;height:18px;border-radius:999px;display:flex;align-items:center;justify-content:center;color:#08281F;background:linear-gradient(180deg,#8FF0D5,#3ED3AA)">{{ ic.msg12 }}</span>What your TrAIner knows</div>
+              <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px"><span style="font-size:12px;padding:5px 10px;border-radius:999px;background:rgba(69,60,142,.4)">Left knee niggle</span><span style="font-size:12px;padding:5px 10px;border-radius:999px;background:rgba(69,60,142,.4)">No dairy at breakfast</span><span style="font-size:12px;padding:5px 10px;border-radius:999px;background:rgba(69,60,142,.4)">Home gym · DBs to 24 kg</span><span style="font-size:12px;padding:5px 10px;border-radius:999px;background:rgba(69,60,142,.4)">Hates burpees</span><span style="font-size:12px;padding:5px 10px;border-radius:999px;color:#5BE9C2;border:1px solid rgba(91,233,194,.35)">+ tell it something</span></div>
+            </div>
+            <sc-for list="{{ profileGroupsB }}" as="g" hint-placeholder-count="3">
+              <div><div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#9A93C9">{{ g.title }}</div>
+                <div style="display:flex;flex-direction:column;margin-top:6px;border-top:1px solid rgba(245,243,255,.11)">
+                  <sc-for list="{{ g.rows }}" as="r" hint-placeholder-count="3"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid rgba(245,243,255,.11)"><span style="font-size:14px">{{ r.k }}</span><span style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:#9A93C9">{{ r.v }}{{ ic.chev14 }}</span></div></sc-for>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 1c COACH SHEET ================= -->
+  <div id="1c" style="display:flex;flex-direction:column;gap:14px;padding-top:24px;border-top:1px solid rgba(245,243,255,.11)">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <a href="#1c" style="font-size:11px;font-weight:700;letter-spacing:.12em;text-decoration:none;color:#08281F;background:#5BE9C2;border-radius:999px;padding:3px 9px">1c</a>
+      <span style="font-size:15px;font-weight:600">Rethink — the TrAIner is a layer, not a tab</span>
+      <span style="font-size:12px;color:#9A93C9">Four tabs, no FAB: Home · Nutrition · Train · Progress. The chat is a persistent bar above the tab bar on every screen — tap to pull the conversation up as a sheet over whatever you were doing, with that screen as context. Home is a timeline of the day. Tools' contents move to Train and Nutrition; Progress (PRs, weight, history, streak) gets its own tab.</span>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start">
+
+      <!-- 1c Home -->
+      <div style="display:flex;flex-direction:column;gap:8px;width:390px">
+        <span style="font-size:12px;font-weight:600;color:#C2BCE8">Home — the day as a timeline</span>
+        <div data-screen-label="1c Home" style="width:390px;height:844px;position:relative;overflow:hidden;background:#1A1636;color:#F5F3FF;border-radius:28px;border:1px solid rgba(245,243,255,.11);font-size:14px;line-height:20px;flex:none">
+          <div style="position:absolute;inset:0 0 124px 0;overflow-y:auto;padding:52px 22px 24px;scrollbar-width:none;display:flex;flex-direction:column;gap:22px">
+            <div><div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#9A93C9">Wednesday · Week 3 of 16 · 12-day streak</div><div style="font-size:28px;font-weight:700;letter-spacing:-.03em;line-height:1.1;margin-top:6px">Your day</div></div>
+            <div style="display:flex;gap:14px">
+              <div style="width:22px;flex:none;display:flex;flex-direction:column;align-items:center"><span style="width:2px;flex:1;background:linear-gradient(180deg,#5BE9C2 0%,#5BE9C2 30%,rgba(91,233,194,.15) 100%)"></span></div>
+              <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:18px">
+                <sc-for list="{{ timeline }}" as="t" hint-placeholder-count="5">
+                  <div style="position:relative">
+                    <span style="position:absolute;left:-35px;top:6px;width:12px;height:12px;border-radius:999px;background: {{ t.dotBg }};border:2px solid {{ t.dotBorder }};box-sizing:border-box"></span>
+                    <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color: {{ t.timeColor }}">{{ t.time }}</span><span style="font-size:11px;color:#9A93C9">{{ t.meta }}</span></div>
+                    <div style="font-size:17px;font-weight:600;margin-top:2px;color: {{ t.titleColor }}">{{ t.title }}</div>
+                    <div style="font-size:12.5px;color:#9A93C9;margin-top:2px">{{ t.sub }}</div>
+                    <sc-if value="{{ t.cta }}" hint-placeholder-val="{{ false }}"><button style="margin-top:10px;height:40px;border:0;border-radius:12px;background:#5BE9C2;color:#08281F;font:inherit;font-size:13px;font-weight:600;padding:0 18px;box-shadow:0 0 14px rgba(91,233,194,.45)">{{ t.cta }}</button></sc-if>
+                    <sc-if value="{{ t.chips }}" hint-placeholder-val="{{ false }}"><div style="display:flex;gap:6px;margin-top:8px"><sc-for list="{{ t.chips }}" as="c" hint-placeholder-count="2"><button style="height:30px;border:0;border-radius:999px;background:rgba(111,183,255,.15);color:#6FB7FF;font:inherit;font-size:11.5px;font-weight:600;padding:0 11px">{{ c }}</button></sc-for></div></sc-if>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+          <div style="position:absolute;top:10px;right:12px"><span style="width:32px;height:32px;border-radius:999px;background:rgba(69,60,142,.5);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600">A</span></div>
+          <div style="position:absolute;left:0;right:0;bottom:64px;padding:8px 16px 8px;background:linear-gradient(to top,#1A1636 60%,transparent)"><div style="display:flex;align-items:center;gap:10px;height:48px;padding:0 6px 0 14px;border-radius:16px;background:#241E4E;border:1px solid rgba(91,233,194,.25);box-shadow:0 8px 24px rgba(0,0,0,.35)"><span style="width:24px;height:24px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;color:#08281F;background:linear-gradient(180deg,#8FF0D5,#3ED3AA)">{{ ic.msg12 }}</span><span style="flex:1;font-size:13.5px;color:#C2BCE8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Bench goes up 2.5 kg today — ask me anything</span><span style="width:36px;height:36px;border-radius:12px;display:flex;align-items:center;justify-content:center;color:#5BE9C2">{{ ic.chevu14 }}</span></div></div>
+          <nav style="position:absolute;left:0;right:0;bottom:0;height:64px;background:#221C48;display:flex;align-items:stretch">
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:#5BE9C2">{{ ic.home20 }}<span style="font-size:10px;font-weight:500">Home</span></div>
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:#9A93C9">{{ ic.pie20 }}<span style="font-size:10px;font-weight:500">Nutrition</span></div>
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:#9A93C9">{{ ic.activity20 }}<span style="font-size:10px;font-weight:500">Train</span></div>
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:#9A93C9">{{ ic.trend20 }}<span style="font-size:10px;font-weight:500">Progress</span></div>
+          </nav>
+        </div>
+      </div>
+
+      <!-- 1c Train with coach sheet open -->
+      <div style="display:flex;flex-direction:column;gap:8px;width:390px">
+        <span style="font-size:12px;font-weight:600;color:#C2BCE8">Train — with the TrAIner sheet pulled up over it</span>
+        <div data-screen-label="1c Train sheet" style="width:390px;height:844px;position:relative;overflow:hidden;background:#1A1636;color:#F5F3FF;border-radius:28px;border:1px solid rgba(245,243,255,.11);font-size:14px;line-height:20px;flex:none">
+          <div style="position:absolute;inset:0 0 64px 0;padding:52px 22px 0;display:flex;flex-direction:column;gap:18px;opacity:.5;filter:blur(1px)">
+            <div style="display:flex;justify-content:space-between"><span style="font-size:12.5px;color:#C2BCE8">Wk 3/16 · B1 Hypertrophy · ~52 min</span></div>
+            <div style="font-size:36px;font-weight:700;letter-spacing:-.035em;line-height:1.02">Full Body Power</div>
+            <div style="display:flex;flex-direction:column;border-top:1px solid rgba(245,243,255,.11)"><sc-for list="{{ exercises }}" as="e" hint-placeholder-count="3"><div style="display:flex;justify-content:space-between;padding:13px 0;border-bottom:1px solid rgba(245,243,255,.11)"><span style="font-size:16px;font-weight:500">{{ e.name }}</span><span style="font-family:ui-monospace,monospace;font-size:12px;color:#C2BCE8">{{ e.rx }}</span></div></sc-for></div>
+          </div>
+          <div style="position:absolute;inset:0;background:rgba(15,13,34,.45)"></div>
+          <div style="position:absolute;left:0;right:0;bottom:0;top:250px;background:#1A1636;border-radius:24px 24px 0 0;box-shadow:0 -12px 40px rgba(0,0,0,.5);display:flex;flex-direction:column">
+            <div style="padding:10px 16px 8px;display:flex;flex-direction:column;gap:10px"><div style="width:36px;height:4px;border-radius:2px;background:rgba(245,243,255,.2);margin:0 auto"></div><div style="display:flex;align-items:center;gap:10px"><span style="width:28px;height:28px;border-radius:999px;display:flex;align-items:center;justify-content:center;color:#08281F;background:linear-gradient(180deg,#8FF0D5,#3ED3AA)">{{ ic.msg14 }}</span><div style="flex:1"><div style="font-size:14px;font-weight:600">Personal TrAIner</div><div style="font-size:11px;color:#9A93C9">Looking at · Today's session</div></div><span style="font-size:12px;color:#5BE9C2">Full chat ›</span></div></div>
+            <div style="flex:1;overflow-y:auto;padding:8px 16px;display:flex;flex-direction:column;gap:14px;scrollbar-width:none">
+              <div style="display:flex;justify-content:flex-end"><div style="max-width:86%;border-radius:18px 18px 6px 18px;background:rgba(91,233,194,.14);padding:10px 14px;line-height:1.5">Can I swap the goblet squats? Knee's a bit sore.</div></div>
+              <div style="display:flex;align-items:flex-end;gap:10px"><span style="width:26px;height:26px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;color:#08281F;background:linear-gradient(180deg,#8FF0D5,#3ED3AA)">{{ ic.msg14 }}</span><div style="display:flex;flex-direction:column;gap:4px;max-width:92%;align-items:flex-start"><div style="background:#241E4E;border-radius:18px 18px 18px 6px;padding:10px 14px;line-height:1.5">Sensible. Leg press keeps the leg work but takes the knee out of deep flexion.</div><div style="background:#241E4E;border-radius:6px 18px 18px 18px;padding:12px 14px;box-shadow:inset 3px 0 0 #5BE9C2;width:100%;box-sizing:border-box;display:flex;flex-direction:column;gap:8px"><div style="font-size:12px;font-weight:600">Swap exercise · today</div><div style="display:flex;justify-content:space-between;font-size:12px"><span style="color:#9A93C9">Out</span><span style="text-decoration:line-through;color:#C2BCE8">Goblet Squat · 3×8</span></div><div style="display:flex;justify-content:space-between;font-size:12px"><span style="color:#9A93C9">In</span><span style="font-weight:500">Leg Press · 3×10</span></div><div style="display:flex;gap:8px;margin-top:2px"><button style="flex:1;height:44px;border:0;border-radius:12px;background:#5BE9C2;color:#08281F;font:inherit;font-size:13px;font-weight:600">Confirm swap</button><button style="height:44px;border:1px solid rgba(245,243,255,.11);border-radius:12px;background:transparent;color:#C2BCE8;font:inherit;font-size:13px;padding:0 16px">Leave it</button></div></div></div></div>
+            </div>
+            <div style="padding:8px 16px 12px"><div style="display:flex;align-items:flex-end;gap:10px;border-radius:20px;background:rgba(69,60,142,.28);padding:6px 6px 6px 16px"><span style="flex:1;min-height:40px;padding:8px 0;font-size:14px;color:#9A93C9">Message your Personal TrAIner…</span><span style="width:36px;height:36px;border-radius:999px;display:flex;align-items:center;justify-content:center;color:#F5F3FF">{{ ic.mic16 }}</span><span style="width:36px;height:36px;border-radius:999px;background:#5BE9C2;color:#08281F;opacity:.5;display:flex;align-items:center;justify-content:center">{{ ic.send16 }}</span></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 1c Nutrition -->
+      <div style="display:flex;flex-direction:column;gap:8px;width:390px">
+        <span style="font-size:12px;font-weight:600;color:#C2BCE8">Nutrition — meals first, numbers second, grocery lives here</span>
+        <div data-screen-label="1c Nutrition" style="width:390px;height:844px;position:relative;overflow:hidden;background:#1A1636;color:#F5F3FF;border-radius:28px;border:1px solid rgba(245,243,255,.11);font-size:14px;line-height:20px;flex:none">
+          <div style="position:absolute;inset:0 0 124px 0;overflow-y:auto;padding:52px 22px 24px;scrollbar-width:none;display:flex;flex-direction:column;gap:22px">
+            <div style="display:flex;justify-content:space-between;align-items:flex-end"><div><div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#9A93C9">Wednesday</div><div style="font-size:28px;font-weight:700;letter-spacing:-.03em;line-height:1.1;margin-top:6px">Nutrition</div></div><div style="display:flex;padding:3px;border-radius:10px;background:rgba(69,60,142,.28)"><span style="height:28px;padding:0 10px;display:flex;align-items:center;border-radius:7px;background:#241E4E;font-size:12px;font-weight:600">Today</span><span style="height:28px;padding:0 10px;display:flex;align-items:center;font-size:12px;color:#9A93C9">Week</span><span style="height:28px;padding:0 10px;display:flex;align-items:center;font-size:12px;color:#9A93C9">Grocery</span></div></div>
+            <div style="display:flex;gap:6px;height:44px">
+              <div style="flex:1240;border-radius:10px 4px 4px 10px;background:#5BE9C2;display:flex;align-items:center;padding:0 12px;color:#08281F;font-family:ui-monospace,monospace;font-size:14px;font-weight:700">1240</div>
+              <div style="flex:1240;border-radius:4px 10px 10px 4px;background:rgba(69,60,142,.28);display:flex;align-items:center;justify-content:flex-end;padding:0 12px;font-family:ui-monospace,monospace;font-size:13px;color:#9A93C9">1240 left</div>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;font-size:11px">
+              <div style="display:flex;flex-direction:column;gap:4px"><div style="display:flex;justify-content:space-between"><span style="color:#9A93C9">Protein</span><span style="font-family:ui-monospace,monospace">98/160</span></div><div style="height:3px;background:rgba(245,243,255,.11);border-radius:2px"><div style="width:61%;height:3px;background:#8B7BFF;border-radius:2px"></div></div></div>
+              <div style="display:flex;flex-direction:column;gap:4px"><div style="display:flex;justify-content:space-between"><span style="color:#9A93C9">Carbs</span><span style="font-family:ui-monospace,monospace">120/270</span></div><div style="height:3px;background:rgba(245,243,255,.11);border-radius:2px"><div style="width:44%;height:3px;background:#FFB454;border-radius:2px"></div></div></div>
+              <div style="display:flex;flex-direction:column;gap:4px"><div style="display:flex;justify-content:space-between"><span style="color:#9A93C9">Fat</span><span style="font-family:ui-monospace,monospace">38/82</span></div><div style="height:3px;background:rgba(245,243,255,.11);border-radius:2px"><div style="width:46%;height:3px;background:#C2BCE8;border-radius:2px"></div></div></div>
+              <div style="display:flex;flex-direction:column;gap:4px"><div style="display:flex;justify-content:space-between"><span style="color:#9A93C9">Water</span><span style="font-family:ui-monospace,monospace">1.25/2</span></div><div style="height:3px;background:rgba(245,243,255,.11);border-radius:2px"><div style="width:62%;height:3px;background:#6FB7FF;border-radius:2px"></div></div></div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <sc-for list="{{ mealsC }}" as="m" hint-placeholder-count="4">
+                <div style="padding:14px 16px;border-radius:16px;background: {{ m.bg }};border:1px solid {{ m.border }}">
+                  <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color: {{ m.slotColor }}">{{ m.slot }} · {{ m.time }}</span><span style="font-family:ui-monospace,monospace;font-size:12.5px;color: {{ m.color }}">{{ m.kcal }} kcal</span></div>
+                  <div style="font-size:17px;font-weight:600;margin-top:4px">{{ m.name }}</div>
+                  <div style="font-size:11.5px;color:#9A93C9;margin-top:2px">{{ m.macros }}</div>
+                  <div style="display:flex;gap:8px;margin-top:10px"><button style="height:36px;border:0;border-radius:10px;background: {{ m.btnBg }};color: {{ m.btnColor }};font:inherit;font-size:12.5px;font-weight:600;padding:0 14px">{{ m.btn }}</button><button style="height:36px;border:0;border-radius:10px;background:transparent;color:#9A93C9;font:inherit;font-size:12.5px;padding:0 8px">Swap</button></div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+          <div style="position:absolute;top:10px;right:12px"><span style="width:32px;height:32px;border-radius:999px;background:rgba(69,60,142,.5);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600">A</span></div>
+          <div style="position:absolute;left:0;right:0;bottom:64px;padding:8px 16px 8px;background:linear-gradient(to top,#1A1636 60%,transparent)"><div style="display:flex;align-items:center;gap:10px;height:48px;padding:0 6px 0 14px;border-radius:16px;background:#241E4E;border:1px solid rgba(91,233,194,.25);box-shadow:0 8px 24px rgba(0,0,0,.35)"><span style="width:24px;height:24px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;color:#08281F;background:linear-gradient(180deg,#8FF0D5,#3ED3AA)">{{ ic.msg12 }}</span><span style="flex:1;font-size:13.5px;color:#C2BCE8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">62 g protein to go — want a swap for dinner?</span><span style="width:36px;height:36px;border-radius:12px;display:flex;align-items:center;justify-content:center;color:#5BE9C2">{{ ic.chevu14 }}</span></div></div>
+          <nav style="position:absolute;left:0;right:0;bottom:0;height:64px;background:#221C48;display:flex;align-items:stretch">
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:#9A93C9">{{ ic.home20 }}<span style="font-size:10px;font-weight:500">Home</span></div>
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:#5BE9C2">{{ ic.pie20 }}<span style="font-size:10px;font-weight:500">Nutrition</span></div>
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:#9A93C9">{{ ic.activity20 }}<span style="font-size:10px;font-weight:500">Train</span></div>
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:#9A93C9">{{ ic.trend20 }}<span style="font-size:10px;font-weight:500">Progress</span></div>
+          </nav>
+        </div>
+      </div>
+
+      <!-- 1c Progress -->
+      <div style="display:flex;flex-direction:column;gap:8px;width:390px">
+        <span style="font-size:12px;font-weight:600;color:#C2BCE8">Progress — new tab (PRs, weight, history; replaces Tools)</span>
+        <div data-screen-label="1c Progress" style="width:390px;height:844px;position:relative;overflow:hidden;background:#1A1636;color:#F5F3FF;border-radius:28px;border:1px solid rgba(245,243,255,.11);font-size:14px;line-height:20px;flex:none">
+          <div style="position:absolute;inset:0 0 124px 0;overflow-y:auto;padding:52px 22px 24px;scrollbar-width:none;display:flex;flex-direction:column;gap:24px">
+            <div><div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#9A93C9">Week 3 of 16</div><div style="font-size:28px;font-weight:700;letter-spacing:-.03em;line-height:1.1;margin-top:6px">Progress</div></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+              <div style="padding:12px;border-radius:14px;background:rgba(69,60,142,.28)"><div style="font-size:10.5px;color:#9A93C9">Weight</div><div style="font-family:ui-monospace,monospace;font-size:20px;font-weight:700;margin-top:4px;color:#E4FCF4">78.4</div><div style="font-size:11px;color:#5BE9C2">−2.0 kg</div></div>
+              <div style="padding:12px;border-radius:14px;background:rgba(69,60,142,.28)"><div style="font-size:10.5px;color:#9A93C9">Sessions</div><div style="font-family:ui-monospace,monospace;font-size:20px;font-weight:700;margin-top:4px;color:#E4FCF4">10<span style="font-size:11px;font-weight:400;color:#9A93C9">/12</span></div><div style="font-size:11px;color:#9A93C9">83% kept</div></div>
+              <div style="padding:12px;border-radius:14px;background:rgba(69,60,142,.28)"><div style="font-size:10.5px;color:#9A93C9">PRs</div><div style="font-family:ui-monospace,monospace;font-size:20px;font-weight:700;margin-top:4px;color:#E4FCF4">7</div><div style="font-size:11px;color:#5BE9C2">2 this week</div></div>
+            </div>
+            <div>
+              <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#9A93C9">Weight · 3 weeks</span><span style="font-size:11px;color:#9A93C9">goal 72 kg · ~0.6 kg/wk</span></div>
+              <svg viewBox="0 0 320 80" width="100%" height="80" preserveAspectRatio="none" style="display:block;margin-top:10px"><line x1="0" y1="8" x2="320" y2="8" stroke="rgba(245,243,255,.11)" stroke-dasharray="3 4"></line><polygon points="0,22 46,28 92,26 138,36 184,42 230,48 276,54 320,58 320,80 0,80" fill="rgba(91,233,194,.10)"></polygon><polyline points="0,22 46,28 92,26 138,36 184,42 230,48 276,54 320,58" fill="none" stroke="#5BE9C2" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linecap="round" stroke-linejoin="round"></polyline><circle cx="320" cy="58" r="3.5" fill="#5BE9C2"></circle></svg>
+            </div>
+            <div>
+              <div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#9A93C9">Strength · main lifts</div>
+              <div style="display:flex;flex-direction:column;margin-top:6px;border-top:1px solid rgba(245,243,255,.11)">
+                <sc-for list="{{ lifts }}" as="l" hint-placeholder-count="3"><div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid rgba(245,243,255,.11)"><div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:500">{{ l.name }}</div><div style="font-size:11px;color:#9A93C9;margin-top:1px">{{ l.sub }}</div></div><svg width="72" height="24" viewBox="0 0 72 24"><polyline points="{{ l.pts }}" fill="none" stroke="#5BE9C2" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></polyline></svg><span style="font-family:ui-monospace,monospace;font-size:13px;color:#5BE9C2;width:52px;text-align:right">{{ l.now }}</span></div></sc-for>
+              </div>
+            </div>
+            <div>
+              <div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#9A93C9">Consistency</div>
+              <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:8px">
+                <sc-for list="{{ heat }}" as="h" hint-placeholder-count="21"><span style="height:22px;border-radius:5px;background: {{ h }}"></span></sc-for>
+              </div>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-top:1px solid rgba(245,243,255,.11);border-bottom:1px solid rgba(245,243,255,.11);font-size:14px"><span>Session history</span>{{ ic.chev14 }}</div>
+          </div>
+          <div style="position:absolute;top:10px;right:12px"><span style="width:32px;height:32px;border-radius:999px;background:rgba(69,60,142,.5);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600">A</span></div>
+          <div style="position:absolute;left:0;right:0;bottom:64px;padding:8px 16px 8px;background:linear-gradient(to top,#1A1636 60%,transparent)"><div style="display:flex;align-items:center;gap:10px;height:48px;padding:0 6px 0 14px;border-radius:16px;background:#241E4E;border:1px solid rgba(91,233,194,.25);box-shadow:0 8px 24px rgba(0,0,0,.35)"><span style="width:24px;height:24px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;color:#08281F;background:linear-gradient(180deg,#8FF0D5,#3ED3AA)">{{ ic.msg12 }}</span><span style="flex:1;font-size:13.5px;color:#C2BCE8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">On pace for 72 kg by week 13</span><span style="width:36px;height:36px;border-radius:12px;display:flex;align-items:center;justify-content:center;color:#5BE9C2">{{ ic.chevu14 }}</span></div></div>
+          <nav style="position:absolute;left:0;right:0;bottom:0;height:64px;background:#221C48;display:flex;align-items:stretch">
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:#9A93C9">{{ ic.home20 }}<span style="font-size:10px;font-weight:500">Home</span></div>
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:#9A93C9">{{ ic.pie20 }}<span style="font-size:10px;font-weight:500">Nutrition</span></div>
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:#9A93C9">{{ ic.activity20 }}<span style="font-size:10px;font-weight:500">Train</span></div>
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:#5BE9C2">{{ ic.trend20 }}<span style="font-size:10px;font-weight:500">Progress</span></div>
+          </nav>
+        </div>
+      </div>
+    </div>
+    <p style="margin:0;font-size:12px;color:#9A93C9;max-width:900px">1c's active session and profile follow <a href="#1b">1b</a>'s (dock TrAIner line, timer + plate maths inline; profile as a sheet).</p>
+  </div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  static P = {
+    msg: [['path', { d: 'M7.9 20A9 9 0 1 0 4 16.1L2 22Z' }]],
+    send: [['path', { d: 'm22 2-7 20-4-9-9-4Z' }], ['path', { d: 'M22 2 11 13' }]],
+    mic: [['path', { d: 'M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z' }], ['path', { d: 'M19 10v2a7 7 0 0 1-14 0v-2' }], ['line', { x1: 12, x2: 12, y1: 19, y2: 22 }]],
+    home: [['rect', { width: 7, height: 9, x: 3, y: 3, rx: 1 }], ['rect', { width: 7, height: 5, x: 14, y: 3, rx: 1 }], ['rect', { width: 7, height: 9, x: 14, y: 12, rx: 1 }], ['rect', { width: 7, height: 5, x: 3, y: 16, rx: 1 }]],
+    pie: [['path', { d: 'M21.21 15.89A10 10 0 1 1 8 2.83' }], ['path', { d: 'M22 12A10 10 0 0 0 12 2v10z' }]],
+    activity: [['path', { d: 'M22 12h-4l-3 9L9 3l-3 9H2' }]],
+    wrench: [['path', { d: 'M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z' }]],
+    gear: [['path', { d: 'M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z' }], ['circle', { cx: 12, cy: 12, r: 3 }]],
+    chev: [['path', { d: 'm9 18 6-6-6-6' }]],
+    chevd: [['path', { d: 'm6 9 6 6 6-6' }]],
+    chevu: [['path', { d: 'm18 15-6-6-6 6' }]],
+    back: [['path', { d: 'm15 18-6-6 6-6' }]],
+    x: [['path', { d: 'M18 6 6 18' }], ['path', { d: 'm6 6 12 12' }]],
+    check: [['path', { d: 'M20 6 9 17l-5-5' }]],
+    flame: [['path', { d: 'M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z' }]],
+    drop: [['path', { d: 'M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z' }]],
+    steps: [['path', { d: 'M4 16v-2.38C4 11.5 2.97 10.5 3 8c.03-2.72 1.49-6 4.5-6C9.37 2 10 3.8 10 5.5c0 3.11-2 5.66-2 8.68V16a2 2 0 1 1-4 0Z' }], ['path', { d: 'M20 20v-2.38c0-2.12 1.03-3.12 1-5.62-.03-2.72-1.49-6-4.5-6C14.63 6 14 7.8 14 9.5c0 3.11 2 5.66 2 8.68V20a2 2 0 1 0 4 0Z' }]],
+    scale: [['path', { d: 'm16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z' }], ['path', { d: 'm2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z' }], ['path', { d: 'M7 21h10' }], ['path', { d: 'M12 3v18' }], ['path', { d: 'M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2' }]],
+    timer: [['line', { x1: 10, x2: 14, y1: 2, y2: 2 }], ['line', { x1: 12, x2: 15, y1: 14, y2: 11 }], ['circle', { cx: 12, cy: 14, r: 8 }]],
+    calc: [['rect', { width: 16, height: 20, x: 4, y: 2, rx: 2 }], ['line', { x1: 8, x2: 16, y1: 6, y2: 6 }], ['line', { x1: 16, x2: 16, y1: 14, y2: 18 }], ['path', { d: 'M16 10h.01' }], ['path', { d: 'M12 10h.01' }], ['path', { d: 'M8 10h.01' }], ['path', { d: 'M12 14h.01' }], ['path', { d: 'M8 14h.01' }], ['path', { d: 'M12 18h.01' }], ['path', { d: 'M8 18h.01' }]],
+    list: [['line', { x1: 8, x2: 21, y1: 6, y2: 6 }], ['line', { x1: 8, x2: 21, y1: 12, y2: 12 }], ['line', { x1: 8, x2: 21, y1: 18, y2: 18 }], ['line', { x1: 3, x2: 3.01, y1: 6, y2: 6 }], ['line', { x1: 3, x2: 3.01, y1: 12, y2: 12 }], ['line', { x1: 3, x2: 3.01, y1: 18, y2: 18 }]],
+    history: [['path', { d: 'M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8' }], ['path', { d: 'M3 3v5h5' }], ['path', { d: 'M12 7v5l4 2' }]],
+    trend: [['polyline', { points: '22 7 13.5 15.5 8.5 10.5 2 17' }], ['polyline', { points: '16 7 22 7 22 13' }]],
+    sun: [['circle', { cx: 12, cy: 12, r: 4 }], ['path', { d: 'M12 2v2' }], ['path', { d: 'M12 20v2' }], ['path', { d: 'm4.93 4.93 1.41 1.41' }], ['path', { d: 'm17.66 17.66 1.41 1.41' }], ['path', { d: 'M2 12h2' }], ['path', { d: 'M20 12h2' }], ['path', { d: 'm6.34 17.66-1.41 1.41' }], ['path', { d: 'm19.07 4.93-1.41 1.41' }]],
+    cal: [['path', { d: 'M8 2v4' }], ['path', { d: 'M16 2v4' }], ['rect', { width: 18, height: 18, x: 3, y: 4, rx: 2 }], ['path', { d: 'M3 10h18' }]],
+    stopwatch: [['circle', { cx: 12, cy: 13, r: 8 }], ['path', { d: 'M12 9v4l2 2' }], ['path', { d: 'M5 3 2 6' }], ['path', { d: 'm22 6-3-3' }]],
+    plate: [['circle', { cx: 12, cy: 12, r: 10 }], ['circle', { cx: 12, cy: 12, r: 3 }]],
+    book: [['path', { d: 'M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20' }]],
+  };
+  icon(name, size, sw = 2) {
+    const kids = Component.P[name].map(([t, a], i) => React.createElement(t, { key: i, ...a }));
+    return React.createElement('svg', { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: sw, strokeLinecap: 'round', strokeLinejoin: 'round', style: { display: 'block', flex: 'none' } }, kids);
+  }
+  renderVals() {
+    const i = (n, s, w) => this.icon(n, s, w);
+    const M = '#9A93C9', P = '#5BE9C2', T = '#C2BCE8', H = 'rgba(245,243,255,.11)', R = 'rgba(69,60,142,.28)';
+    const day = (n, g, state) => {
+      if (state === 'today') return { n, g, bg: 'rgba(91,233,194,.14)', border: 'rgba(91,233,194,.4)', color: P };
+      if (state === 'done') return { n, g, bg: R, border: 'transparent', color: T };
+      return { n, g, bg: R, border: 'transparent', color: M };
+    };
+    const week = [day('Mo', '✓', 'done'), day('Tu', '–'), day('We', '●', 'today'), day('Th', '●'), day('Fr', '●'), day('Sa', '–'), day('Su', '~')];
+    const meals = [
+      { slot: 'Breakfast', name: 'Oats, berries & whey', kcal: '480 ✓', color: P, check: i('check', 12, 3), dotBg: P, dotBorder: P },
+      { slot: 'Lunch', name: 'Chicken & rice bowl', kcal: '760 ✓', color: P, check: i('check', 12, 3), dotBg: P, dotBorder: P },
+      { slot: 'Snack', name: 'Greek yoghurt & almonds', kcal: '320', color: M, check: null, dotBg: 'transparent', dotBorder: '#453C8E' },
+      { slot: 'Dinner', name: 'Salmon, potatoes & greens', kcal: '920', color: M, check: null, dotBg: 'transparent', dotBorder: '#453C8E' },
+    ];
+    const exercises = [
+      { label: 'Main lift', name: 'Barbell Bench Press', rx: '3×8–11 · 62.5 kg' },
+      { label: 'Main lift', name: 'Goblet Squat', rx: '3×8 · 24 kg' },
+      { label: 'Main lift', name: 'Romanian Deadlift', rx: '3×8 · 80 kg' },
+      { label: 'Superset A · alternate', name: 'Incline DB Press', rx: '3×10 · 22 kg' },
+      { label: 'Superset A · alternate', name: 'Chest-Supported Row', rx: '3×10 · 20 kg' },
+      { label: 'Finisher', name: 'Incline walk', rx: '15 min · RPE 6' },
+    ];
+    const rail = [
+      { name: 'Bench', mark: '●', bg: 'rgba(91,233,194,.14)', border: 'rgba(91,233,194,.4)', color: P },
+      { name: 'Squat', mark: '○', bg: R, border: 'transparent', color: T },
+      { name: 'RDL', mark: '○', bg: R, border: 'transparent', color: T },
+      { name: 'A1/A2', mark: '○', bg: R, border: 'transparent', color: T },
+      { name: 'Finisher', mark: '○', bg: R, border: 'transparent', color: T },
+    ];
+    const tools = [
+      { icon: i('timer', 20), name: 'Rest timer', sub: 'Auto-starts after a set' },
+      { icon: i('stopwatch', 20), name: 'Rounds & intervals', sub: 'EMOM, Tabata, laps' },
+      { icon: i('plate', 20), name: 'Plate calculator', sub: '20 kg bar · your plates' },
+      { icon: i('list', 20), name: 'Grocery list', sub: '14 items · 3 checked' },
+      { icon: i('history', 20), name: 'Session history', sub: '10 sessions · 7 PRs' },
+      { icon: i('book', 20), name: 'Your program', sub: '16 weeks · block 1 of 4' },
+    ];
+    const profileGroups = [
+      { title: 'You', rows: [{ k: 'Body & goal', v: '78.4 kg → 72 kg' }, { k: 'Training days', v: 'Mon · Wed · Thu · Fri' }, { k: 'Equipment', v: 'Home gym' }] },
+      { title: 'Nutrition', rows: [{ k: 'Dietary restrictions', v: 'None' }, { k: 'Foods to avoid', v: '3' }, { k: 'Method', v: 'Weekly dynamic' }] },
+      { title: 'TrAIner', rows: [{ k: 'Injuries & niggles', v: 'Left knee' }, { k: 'Things it remembers', v: '6 facts' }, { k: 'Reply speed', v: 'Normal' }] },
+      { title: 'App', rows: [{ k: 'Appearance', v: 'Nightshift' }, { k: 'Units', v: 'kg · cm' }, { k: 'Replay the tour', v: '' }] },
+    ];
+    const profileGroupsB = [
+      { title: 'You', rows: [{ k: 'Body & goal', v: '78.4 kg → 72 kg' }, { k: 'Training days & time', v: '4 × ~55 min' }, { k: 'Equipment', v: 'Home gym' }] },
+      { title: 'Nutrition', rows: [{ k: 'Restrictions & dislikes', v: '3 items' }, { k: 'Target method', v: 'Weekly dynamic' }] },
+      { title: 'App', rows: [{ k: 'Appearance', v: 'Nightshift' }, { k: 'Units', v: 'kg · cm' }, { k: 'Start a new plan…', v: '' }] },
+    ];
+    const weekDays = [
+      { day: 'Mon', name: 'Legs & Core', meta: '5 exercises ✓', dayColor: M, nameColor: T, kcal: '2480', mealBorder: 'transparent' },
+      { day: 'Tue', name: 'Rest', meta: '', dayColor: M, nameColor: M, kcal: '2280', mealBorder: 'transparent' },
+      { day: 'Wed', name: 'Full Body Power', meta: '6 exercises', dayColor: P, nameColor: '#F5F3FF', kcal: '2480', mealBorder: 'rgba(91,233,194,.4)' },
+      { day: 'Thu', name: 'Pull & Hinge', meta: '5 exercises', dayColor: M, nameColor: '#F5F3FF', kcal: '2480', mealBorder: 'transparent' },
+      { day: 'Fri', name: 'Push & Press', meta: '5 exercises', dayColor: M, nameColor: '#F5F3FF', kcal: '2480', mealBorder: 'transparent' },
+      { day: 'Sat', name: 'Rest', meta: '', dayColor: M, nameColor: M, kcal: '2280', mealBorder: 'transparent' },
+      { day: 'Sun', name: 'Active recovery', meta: '30 min walk', dayColor: M, nameColor: T, kcal: '2280', mealBorder: 'transparent' },
+    ];
+    const timeline = [
+      { time: 'Morning · done', meta: '78.4 kg', title: 'Weigh-in', sub: '−0.3 kg since Monday · on pace', dotBg: P, dotBorder: P, timeColor: M, titleColor: T },
+      { time: 'Breakfast · done', meta: '480 kcal', title: 'Oats, berries & whey', sub: 'Lunch logged too · 1240 of 2480 so far', dotBg: P, dotBorder: P, timeColor: M, titleColor: T },
+      { time: 'Now', meta: '~52 min', title: 'Full Body Power', sub: 'Bench 62.5 (+2.5) · Goblet Squat · RDL · +3', dotBg: '#1A1636', dotBorder: P, timeColor: P, titleColor: '#F5F3FF', cta: 'Start session' },
+      { time: 'Afternoon', meta: '1.25 / 2 L', title: 'Water & steps', sub: '6,240 steps · 750 ml to go', dotBg: '#1A1636', dotBorder: '#453C8E', timeColor: M, titleColor: '#F5F3FF', chips: ['+250 ml', '+500 ml', 'Log steps'] },
+      { time: 'Evening', meta: '920 kcal', title: 'Salmon, potatoes & greens', sub: 'Covers 45 g of the 62 g protein you still need', dotBg: '#1A1636', dotBorder: '#453C8E', timeColor: M, titleColor: '#F5F3FF' },
+      { time: 'Tomorrow', meta: 'Pull & Hinge', title: 'Rest tonight, lift tomorrow', sub: '5 exercises · ~48 min', dotBg: '#1A1636', dotBorder: '#453C8E', timeColor: M, titleColor: T },
+    ];
+    const mealsC = [
+      { slot: 'Breakfast', time: '7:30', name: 'Oats, berries & whey', macros: 'P 32 · C 58 · F 12', kcal: '480', color: P, slotColor: P, bg: 'rgba(91,233,194,.06)', border: 'rgba(91,233,194,.2)', btn: '✓ Logged', btnBg: 'rgba(91,233,194,.14)', btnColor: P },
+      { slot: 'Lunch', time: '12:30', name: 'Chicken & rice bowl', macros: 'P 48 · C 72 · F 14', kcal: '760', color: P, slotColor: P, bg: 'rgba(91,233,194,.06)', border: 'rgba(91,233,194,.2)', btn: '✓ Logged', btnBg: 'rgba(91,233,194,.14)', btnColor: P },
+      { slot: 'Snack', time: '16:00', name: 'Greek yoghurt & almonds', macros: 'P 22 · C 18 · F 16', kcal: '320', color: M, slotColor: M, bg: '#241E4E', border: 'transparent', btn: 'Log this meal', btnBg: P, btnColor: '#08281F' },
+      { slot: 'Dinner', time: '19:30', name: 'Salmon, potatoes & greens', macros: 'P 45 · C 82 · F 30', kcal: '920', color: M, slotColor: M, bg: '#241E4E', border: 'transparent', btn: 'Log this meal', btnBg: P, btnColor: '#08281F' },
+    ];
+    const lifts = [
+      { name: 'Bench Press', sub: 'e1RM 78 kg · +6%', pts: '0,18 18,16 36,12 54,10 72,4', now: '62.5 kg' },
+      { name: 'Romanian Deadlift', sub: 'e1RM 102 kg · +4%', pts: '0,20 18,14 36,14 54,8 72,6', now: '80 kg' },
+      { name: 'Goblet Squat', sub: 'capped by 24 kg DB', pts: '0,12 18,10 36,8 54,8 72,8', now: '24 kg' },
+    ];
+    const heat = ['#5BE9C2', R, '#5BE9C2', '#5BE9C2', 'rgba(91,233,194,.45)', R, R, '#5BE9C2', R, '#5BE9C2', '#5BE9C2', '#5BE9C2', R, R, '#5BE9C2', R, 'rgba(91,233,194,.4)', 'rgba(245,243,255,.06)', 'rgba(245,243,255,.06)', R, R];
+    return {
+      ic: {
+        msg12: i('msg', 12, 2.6), msg14: i('msg', 14, 2.4), msg16: i('msg', 16, 2.4), msg20: i('msg', 20), msg24: i('msg', 24),
+        send16: i('send', 16), mic16: i('mic', 16), gear16: i('gear', 16), x16: i('x', 16), back16: i('back', 16),
+        chev14: i('chev', 14), chevd14: i('chevd', 14), chevu14: i('chevu', 14), check12: i('check', 12, 3), check14: i('check', 14, 2.6),
+        flame12: i('flame', 12), drop12: i('drop', 12), steps12: i('steps', 12), scale12: i('scale', 12), timer16: i('timer', 16), calc16: i('calc', 16), history16: i('history', 16),
+        home20: i('home', 20), pie20: i('pie', 20), activity20: i('activity', 20), wrench20: i('wrench', 20), trend20: i('trend', 20), sun20: i('sun', 20), cal20: i('cal', 20),
+      },
+      week, meals, mealsC, exercises, exercisesRest: exercises.slice(1), rail, tools, profileGroups, profileGroupsB, weekDays, timeline, lifts, heat,
+    };
+  }
+}
+</script>
+</body>
+</html>

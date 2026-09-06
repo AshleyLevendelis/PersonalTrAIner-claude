@@ -40,7 +40,7 @@ export function WarmupSection({
     <Collapsible open={open} onOpenChange={onToggle} className="rounded-[10px] border bg-card">
       <CollapsibleTrigger className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-accent/30 transition-colors">
         <span className="flex items-center gap-2 text-xs font-medium text-foreground">
-          <Thermometer className="size-3.5 text-primary" />
+          <Thermometer className="size-3.5 text-primary-text" />
           Warm-up
           <Badge variant="outline" className="text-[0.625rem] px-1.5 py-0 h-4">{moveCount} {moveCount === 1 ? 'move' : 'moves'} · ~{totalMinutes} min</Badge>
         </span>

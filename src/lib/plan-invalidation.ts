@@ -33,8 +33,22 @@ import { rebuildAgainstProfile } from './plan-adaptations'
  * would teach people to dismiss the dialog without reading it, and then the
  * one that matters gets dismissed too.
  */
-export const PLAN_INVALIDATING_FIELDS = ['injuries', 'equipment_access', 'training_days'] as const
-export type PlanInvalidatingField = typeof PLAN_INVALIDATING_FIELDS[number]
+// training_style joined on 5 Sep 2026, found while building the chat tool for
+// it: generation reads the style in three places (the pool's style filter,
+// the base rep range per tier, STYLE_CONFIGS), and Settings saved the field
+// without ever offering the rebuild — so the profile said "bodybuilding"
+// while the plan on screen stayed the "combat" one until the next full
+// regeneration. The same profile-disagrees-with-plan shape training_days had.
+// fitness_goal joined on 5 Sep 2026, on Ashley's ruling. It had been kept OFF
+// this list deliberately (test:rebuild-offer's own "nothing else does" section
+// named it) on the reasoning that the goal feeds macros, which recompute on
+// their own. That was half the picture: goal-policies.ts also sets the set
+// volume, the rest multipliers and the loaded main-lift rest floor, the
+// rep-range shift per tier, which phases are allowed, the split, and the
+// conditioning profile — more of the programme than style touches. Put to her
+// as a question; she chose to offer the rebuild, same as style.
+export const PLAN_INVALIDATING_FIELDS = ['injuries', 'equipment_access', 'training_days', 'training_style', 'fitness_goal'] as const
+export type PlanInvalidatingField = typeof PLAN_INVALIDATING_FIELDS[number] | 'concurrent_activities'
 
 export interface PlanInvalidation {
   field: PlanInvalidatingField
@@ -79,6 +93,26 @@ export function detectPlanInvalidation(
   // so dropping a day leaves sessions scheduled on a day they have just said
   // they do not train. Same shape as the equipment case — added after the
   // audit's own probe caught it missing from the first pass.
+  // The week is BUILT AROUND a second sport (concurrent-activity.ts steers the
+  // lighter sessions onto its days). Removing it from the Profile leaves a
+  // plan arranged around evenings that no longer have a class — not unsafe,
+  // but not the plan they would get now, so offer the rebuild the same way a
+  // dropped training day does.
+  if ('concurrent_activities' in patch) {
+    const key = (list: UserProfile['concurrent_activities']) =>
+      (list ?? []).map(a => `${a.name.toLowerCase()}:${[...(a.days ?? [])].sort().join(',')}`).sort().join('|')
+    if (key(before.concurrent_activities) !== key(patch.concurrent_activities)) {
+      return {
+        field: 'concurrent_activities',
+        title: 'Rebuild your plan around this?',
+        detail:
+          'Your current plan was arranged around your other training — the lighter gym days ' +
+          'sit on those class days. Now that has changed, I can rebuild from this week onwards ' +
+          'to match. Everything you have already logged stays exactly as it is.',
+      }
+    }
+  }
+
   if ('training_days' in patch) {
     const dayKey = (days: UserProfile['training_days'] | undefined) =>
       (days ?? []).filter(d => d.available).map(d => d.day).sort().join('|')
@@ -102,6 +136,29 @@ export function detectPlanInvalidation(
         'Your current plan was built for what you had before, so it still asks for equipment ' +
         'you have just told me you do not have. I can rebuild it from this week onwards. ' +
         'Everything you have already logged stays exactly as it is.',
+    }
+  }
+
+  if ('training_style' in patch && patch.training_style !== before.training_style) {
+    return {
+      field: 'training_style',
+      title: 'Rebuild your plan in this style?',
+      detail:
+        'Your current plan was built for the style you had before, so the exercises and rep ' +
+        'ranges still follow it. I can rebuild it from this week onwards in the new style. ' +
+        'Everything you have already logged stays exactly as it is.',
+    }
+  }
+
+  if ('fitness_goal' in patch && patch.fitness_goal !== before.fitness_goal) {
+    return {
+      field: 'fitness_goal',
+      title: 'Rebuild your plan for this goal?',
+      detail:
+        'Your current plan was built for the goal you had before, so how much you do, how long ' +
+        'you rest, the rep ranges and the conditioning all still follow it. I can rebuild it ' +
+        'from this week onwards for the new goal. Everything you have already logged stays ' +
+        'exactly as it is.',
     }
   }
 

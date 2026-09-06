@@ -105,9 +105,24 @@ export interface LoggedSetKey {
   setNumber: number
 }
 
-export function executeLogWorkout(groups: ParsedSetGroup[], ctx: LogWorkoutContext): { rows: LogWorkoutReceiptRow[]; totalSets: number; loggedKeys: LoggedSetKey[]; replacedSets: number } {
+/**
+ * A set as it stood BEFORE a correction replaced it — enough to write it back
+ * exactly, which is why it is a whole SaveSetInput and not a natural key.
+ *
+ * Added 5 Sep 2026. Undo for a chat log was a pure delete of what this turn
+ * wrote, which is right for "I did three more sets" and silently destructive
+ * for "no, 3x10 deadlifts": the correction deleted the original three sets,
+ * undo deleted the three replacing them, and the trainee was left with none of
+ * the six — having tapped a button labelled Undo. Same lesson as
+ * restoreStepsForDate: when a write REPLACES rather than appends, its inverse
+ * has to carry what it replaced.
+ */
+export type ReplacedSetPreImage = SaveSetInput
+
+export function executeLogWorkout(groups: ParsedSetGroup[], ctx: LogWorkoutContext): { rows: LogWorkoutReceiptRow[]; totalSets: number; loggedKeys: LoggedSetKey[]; replacedSets: number; replacedLogs: ReplacedSetPreImage[] } {
   const rows: LogWorkoutReceiptRow[] = []
   const loggedKeys: LoggedSetKey[] = []
+  const replacedLogs: ReplacedSetPreImage[] = []
   let totalSets = 0
   let replacedSets = 0
 
@@ -144,9 +159,30 @@ export function executeLogWorkout(groups: ParsedSetGroup[], ctx: LogWorkoutConte
     // two apart. When the caller says this is a correction, the exercise's
     // existing sets for the day go first, so the allocator sees a clean slate
     // and refills from set 1.
+    //
+    // AND IT IS RECORDED BEFORE IT IS DESTROYED. Undo is offered on the very
+    // next line of the receipt, and a delete-only undo would have left the
+    // trainee with neither the wrong sets nor the right ones. The pre-image
+    // below is what makes Undo mean "put it back".
     const existingLogs = ctx.setsFor(exerciseId, exerciseName)
     if (ctx.replaceExisting && ctx.deleteSet) {
       for (const l of existingLogs) {
+        replacedLogs.push({
+          userId: ctx.profileId,
+          date: ctx.date,
+          weekNumber: ctx.weekNumber,
+          day: ctx.dayName,
+          exerciseId,
+          exerciseName,
+          setNumber: l.set_number,
+          weightKg: l.weight_kg,
+          repsCompleted: l.reps_completed,
+          rpe: l.rpe ?? null,
+          unit: l.unit,
+          isBodyweight: l.is_bodyweight,
+          isWarmup: l.is_warmup,
+          addedLoadKg: l.added_load_kg ?? null,
+        })
         ctx.deleteSet({ exerciseId, setNumber: l.set_number })
         replacedSets++
       }
@@ -197,5 +233,5 @@ export function executeLogWorkout(groups: ParsedSetGroup[], ctx: LogWorkoutConte
     })
   }
 
-  return { rows, totalSets, loggedKeys, replacedSets }
+  return { rows, totalSets, loggedKeys, replacedSets, replacedLogs }
 }

@@ -5,7 +5,7 @@ import {
   RefreshCw,
   Loader2,
   Check,
-  ChevronDown,
+  ChevronRight,
   ShieldAlert,
   Plus,
 } from 'lucide-react'
@@ -14,8 +14,10 @@ import type { MacroTargets } from '@/lib/types'
 import { getTodayLedger, logMealEaten, voidMealEvents, loggedEventsBySlot, type MealSlotName, type MealEventRecord } from '@/lib/meal-store'
 import { checkMealAgainstRestrictions, type MealRestrictionVerdict } from '@/lib/meal-restriction-check'
 import type { PoolOption } from '@/lib/meal-generation'
+import { tabHash } from '@/lib/app-route'
 
-const SLOT_ORDER: MealSlotName[] = ['breakfast', 'lunch', 'dinner', 'snack']
+/** Exported so NutritionDisplay's shortfall nudge names slots in the same order this list renders them, rather than keeping a second copy that can drift. */
+export const SLOT_ORDER: MealSlotName[] = ['breakfast', 'lunch', 'dinner', 'snack']
 export const SLOT_LABEL: Record<MealSlotName, string> = {
   breakfast: 'Breakfast',
   lunch: 'Lunch',
@@ -130,6 +132,13 @@ export function MealPlan({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { void reloadLogged() }, [profileId, date])
 
+  /**
+   * Undo tapped, and the meal stayed logged. Local to this screen because it
+   * is about one tap, clears on the next attempt, and needs no plumbing
+   * through App — the same reasoning the steps row's own entryError uses.
+   */
+  const [unlogError, setUnlogError] = useState<string | null>(null)
+
   const errorBanner = regenerateError && (
     <InsightBanner tone="warning" className="items-start justify-between">
       <span>{regenerateError}</span>
@@ -185,6 +194,14 @@ export function MealPlan({
   return (
     <div data-tour="meals" className="space-y-4">
       {unrecognisedBanner || errorBanner}
+      {unlogError && (
+        <InsightBanner tone="warning" className="items-start justify-between">
+          <span>{unlogError}</span>
+          <button type="button" onClick={() => setUnlogError(null)} className="shrink-0 text-xs font-semibold underline">
+            Dismiss
+          </button>
+        </InsightBanner>
+      )}
       {blockedSlots.length > 0 && (
         <InsightBanner tone="warning" className="items-start justify-between">
           <span>
@@ -203,17 +220,32 @@ export function MealPlan({
           </button>
         </InsightBanner>
       )}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <span className="ds-label">Today's meals</span>
-        <button
-          type="button"
-          onClick={onRegenerateAll}
-          disabled={isGenerating}
-          className="flex items-center gap-1.5 text-xs font-semibold text-primary disabled:opacity-50"
-        >
-          {isGenerating ? <Loader2 className="size-3 animate-spin" /> : <RefreshCw className="size-3" />}
-          Regenerate all
-        </button>
+        {/* TWO CONTROLS, not one. The handoff specifies "Grocery list ›" on
+            this row and shows nothing else; Regenerate all is kept beside it
+            because this header is its ONLY call site — dropping it to match
+            the frame would delete the one way to redo a day's meals, which
+            is a capability change, not a presentation one. Flagged in the
+            commit rather than silently resolved either way. */}
+        <span className="flex shrink-0 items-center gap-3">
+          <button
+            type="button"
+            onClick={onRegenerateAll}
+            disabled={isGenerating}
+            className="hit-slop-44 flex items-center gap-1.5 text-[0.6875rem] font-semibold text-muted-foreground disabled:opacity-50"
+          >
+            {isGenerating ? <Loader2 className="size-3 animate-spin" /> : <RefreshCw className="size-3" />}
+            Regenerate all
+          </button>
+          <button
+            type="button"
+            onClick={() => { window.location.hash = tabHash('tools') }}
+            className="hit-slop-44 text-[0.6875rem] font-semibold text-primary-text"
+          >
+            Grocery list ›
+          </button>
+        </span>
       </div>
       <p className="text-xs text-muted-foreground/70">
         Ingredients are filtered, not verified. Check labels if you have an allergy.
@@ -245,8 +277,12 @@ export function MealPlan({
               await reloadLogged()
             }}
             onUnlog={async clientIds => {
-              await voidMealEvents(clientIds)
+              const removed = await voidMealEvents(clientIds)
+              // The reload runs either way — it is what puts a failed undo's
+              // meal back on screen, and the message below is what explains
+              // why it came back instead of leaving the user to guess.
               await reloadLogged()
+              setUnlogError(removed ? null : "That meal is still logged — we couldn't reach the server. Try again in a moment.")
             }}
           />
         ))}
@@ -324,7 +360,7 @@ function TotalsHero({ totals, targets }: { totals: MacroTargets; targets: MacroT
         <div className="h-[2px] rounded-full bg-primary glow-mint-box" style={{ width: `${calPct}%` }} />
       </div>
       <div className="mt-3 flex items-baseline gap-4 tabular-mono text-xs">
-        <span className={proteinAchieved ? 'text-primary glow-mint' : 'text-muted-foreground'}>
+        <span className={proteinAchieved ? 'text-primary-text glow-mint' : 'text-muted-foreground'}>
           {Math.round(totals.protein)} / {targets.protein} P
         </span>
         <span className="text-muted-foreground">{Math.round(totals.carbs)} / {targets.carbs} C</span>
@@ -449,7 +485,7 @@ function MealSlotRow({
   return (
     <div className="py-4" style={!isFirst ? { borderTop: '1px solid var(--hairline)' } : undefined}>
       <button type="button" onClick={onToggle} disabled={!option} className="flex w-full flex-col gap-1.5 text-left disabled:cursor-default">
-        <span className={expanded ? 'ds-label-compact text-primary glow-mint' : 'ds-label-compact'}>
+        <span className={expanded ? 'ds-label-compact text-primary-text glow-mint' : 'ds-label-compact'}>
           {SLOT_LABEL[slot]}{expanded ? ' · open' : ''}
         </span>
         <div className="flex items-baseline justify-between gap-3">
@@ -465,7 +501,7 @@ function MealSlotRow({
                   name in the pool while keeping the row compact. `min-w-0`
                   stays either way — without it the flex row refuses to shrink
                   and the macros beside it get pushed off. */}
-              <span className={expanded ? 'min-w-0 text-[1.1875rem] font-semibold tracking-[-.02em]' : 'min-w-0 line-clamp-2 text-[1.03125rem] font-medium'}>
+              <span className={expanded ? 'min-w-0 text-[1.1875rem] font-semibold tracking-[-.02em]' : 'min-w-0 line-clamp-2 text-[1rem] font-medium'}>
                 {option.name}
               </span>
               {!expanded && (
@@ -481,11 +517,11 @@ function MealSlotRow({
                       the new pick. Considered and kept: what the day is
                       carrying is the useful truth here, and unlogging and
                       logging again corrects it in two taps. */}
-                  <span className={`tabular-mono text-xs ${duplicated ? 'text-[color:var(--role-warn-text)]' : isLogged ? 'text-primary glow-mint' : 'text-muted-foreground'}`}>
-                    {isLogged ? '✓ ' : ''}{Math.round(isLogged ? loggedKcal : option.macros.calories)} kcal
+                  <span className={`tabular-mono text-[0.8125rem] ${duplicated ? 'text-[color:var(--role-warn-text)]' : isLogged ? 'text-primary-text glow-mint' : 'text-muted-foreground'}`}>
+                    {Math.round(isLogged ? loggedKcal : option.macros.calories)} kcal{isLogged ? ' ✓' : ''}
                     {duplicated ? ` ·×${loggedEvents.length}` : ''}
                   </span>
-                  <ChevronDown className="size-3.5 text-muted-foreground" />
+                  <ChevronRight className="size-3.5 text-muted-foreground" />
                 </span>
               )}
             </>
@@ -575,7 +611,7 @@ function MealSlotRow({
               disabled={busy || (blocked && !isLogged)}
               className={
                 isLogged
-                  ? 'flex min-h-[44px] items-center gap-1.5 rounded-xl bg-primary/15 px-3.5 text-xs font-semibold text-primary'
+                  ? 'flex min-h-[44px] items-center gap-1.5 rounded-xl bg-primary/15 px-3.5 text-xs font-semibold text-primary-text'
                   : blocked
                     ? 'flex min-h-[44px] items-center gap-1.5 rounded-xl bg-[color:var(--surface-raised)] px-3.5 text-xs font-semibold text-muted-foreground'
                     : 'flex min-h-[44px] items-center gap-1.5 rounded-xl bg-primary px-3.5 text-xs font-semibold text-primary-foreground glow-mint-box'
@@ -627,7 +663,7 @@ function MealSlotRow({
                       )}
                     </div>
                     {verdict.ok && (
-                      <span className={`tabular-mono shrink-0 text-[0.65625rem] ${Math.abs(calDelta) < 20 ? 'text-muted-foreground' : calDelta > 0 ? 'text-[color:var(--role-warn)]' : 'text-primary'}`}>
+                      <span className={`tabular-mono shrink-0 text-[0.65625rem] ${Math.abs(calDelta) < 20 ? 'text-muted-foreground' : calDelta > 0 ? 'text-[color:var(--role-warn)]' : 'text-primary-text'}`}>
                         {calDelta > 0 ? '+' : ''}{calDelta} kcal, {proteinDelta > 0 ? '+' : ''}{proteinDelta}g P
                       </span>
                     )}

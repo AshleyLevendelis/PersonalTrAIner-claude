@@ -210,7 +210,7 @@ export async function checkForBlockReview(
       })
 
       anyPatch = true
-      messages.push(`Coach note on ${exerciseName}: ${note}`)
+      messages.push(`Note on ${exerciseName}: ${note}`)
     }
   }
 

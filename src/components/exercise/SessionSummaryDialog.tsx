@@ -30,12 +30,15 @@ export function SessionSummaryDialog({
   onOpenChange,
   data,
   nothingLogged = false,
+  serverCloseFailed = false,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   data: SessionSummaryData | null
   /** Finish was tapped with no working set logged — the day was left open (useActiveSession.finishSession). */
   nothingLogged?: boolean
+  /** The sets are saved but the session's completed stamp didn't reach the server. The app retries; this stops the dialog claiming it already worked. */
+  serverCloseFailed?: boolean
 }) {
   const progressionLines = (data?.progressions ?? []).filter((entry): entry is readonly [string, { note: string; didProgress: boolean }] => entry[1] != null)
 
@@ -43,8 +46,18 @@ export function SessionSummaryDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-sm max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{nothingLogged ? 'Nothing logged' : 'Session complete'}</DialogTitle>
+          <DialogTitle>{nothingLogged ? 'Nothing logged' : serverCloseFailed ? 'Session saved' : 'Session complete'}</DialogTitle>
         </DialogHeader>
+        {serverCloseFailed && !nothingLogged && (
+          // "Complete" is a claim about the record, and the record did not
+          // take it. The sets are genuinely safe — they have their own offline
+          // queue — so this says what IS true and what is still pending,
+          // rather than either a false tick or an alarm about lost work.
+          <p className="text-sm leading-[1.5] text-muted-foreground">
+            Your sets are saved. Finishing the session hasn&apos;t synced yet — the app will
+            keep trying, so there&apos;s nothing you need to do.
+          </p>
+        )}
         {nothingLogged && (
           <p className="text-sm leading-[1.5] text-muted-foreground">
             No sets were logged, so this didn't count as a session and the day stays open.
@@ -73,9 +86,9 @@ export function SessionSummaryDialog({
                 <p className="ds-label-compact">New PRs</p>
                 {data.prs.map(pr => (
                   <p key={pr.exerciseName} className="flex items-center gap-1.5 text-sm">
-                    <Trophy className="size-3.5 text-primary glow-mint shrink-0" />
+                    <Trophy className="size-3.5 text-primary-text glow-mint shrink-0" />
                     <span className="font-medium">{pr.exerciseName}</span>
-                    <span className="tabular-mono text-primary glow-mint">{pr.result.newWeight}kg</span>
+                    <span className="tabular-mono text-primary-text glow-mint">{pr.result.newWeight}kg</span>
                   </p>
                 ))}
               </div>
@@ -83,12 +96,12 @@ export function SessionSummaryDialog({
 
             {progressionLines.length > 0 && (
               <div className="space-y-2 rounded-xl bg-[color:var(--surface-deep)] p-3.5">
-                <p className="ds-label-compact text-primary glow-mint">Next session</p>
+                <p className="ds-label-compact text-primary-text glow-mint">Next session</p>
                 <div className="space-y-2.5">
                   {progressionLines.map(([name, rec]) => (
                     <div key={name}>
                       <p className="text-[0.9375rem] font-semibold leading-tight">{name}</p>
-                      <p className={`text-sm mt-0.5 ${rec.didProgress ? 'text-primary glow-mint' : 'text-muted-foreground'}`}>{rec.note}</p>
+                      <p className={`text-sm mt-0.5 ${rec.didProgress ? 'text-primary-text glow-mint' : 'text-muted-foreground'}`}>{rec.note}</p>
                     </div>
                   ))}
                 </div>

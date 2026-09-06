@@ -94,7 +94,7 @@ console.log('\n4. It changed what is said, and not one set')
     /shortfallNote=\{sessionEstimate\.shortfall\?\.note\}/.test(panel))
   check('...telling it about deloads and low recovery, so it can stay quiet for those',
     /isDeload: currentMesoWeekObj\?\.is_deload/.test(panel) &&
-    /lowRecovery: profile\?\.recovery_capacity === 'low'/.test(panel))
+    /lowRecovery: !!profile && effectiveRecoveryCapacity\(profile\) === 'low'/.test(panel))
 
   const row = stripComments(readFileSync(join(ROOT, 'src/components/exercise/WeekContextRow.tsx'), 'utf8'))
   check('the reason is shown next to the number, not hidden behind the expander',

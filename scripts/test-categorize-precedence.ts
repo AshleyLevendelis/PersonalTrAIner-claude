@@ -110,6 +110,14 @@ console.log('\n3. TRAPDOOR: no other exercise in the database moved')
   // isolation_bicep, Dumbbell Pullover to isolation_lat, Machine Hip
   // Thrust to hinge_accessory, Machine Shrug to shrug, Landmine Row to
   // row). No pre-existing name moved buckets.
+  //
+  // UPDATED 6 Sep 2026: ONE name moved, on purpose. Single-Leg Dumbbell Calf
+  // Raise left isolation_calf for its own bodyweight-anchored category,
+  // single_leg_calf (load-prescription.ts, ISOLATION_FRACTION_OF_BODYWEIGHT)
+  // — it had been priced as a machine calf raise and was the only exercise in
+  // the catalogue reaching its implement ceiling for an ordinary body. The
+  // two bodyweight single-leg calf entries stay put: the match is unilateral
+  // AND hand-held, and they hold nothing.
   const AT_THE_FIX: Record<string, string[]> = {
     bench: ["Archer Push-Ups","Barbell Bench Press","Barbell Floor Press","Chest Dips","Chest Press Machine","Deficit Push-Ups","Dumbbell Bench Press","Dumbbell Floor Press","Incline Dumbbell Press","Incline Machine Press","Incline Push-Ups","Knee Push-Ups","Neutral-Grip Dumbbell Press","Push-Ups","Smith Machine Bench Press","Wide Push-Ups"],
     carry: ["Farmer Squat Hold (Isometric Carry)","Farmer's Walk","Loaded Backpack Walk","Suitcase Carry","Trap Bar Carry"],
@@ -117,7 +125,8 @@ console.log('\n3. TRAPDOOR: no other exercise in the database moved')
     goblet_squat: ["Goblet Squats"],
     hinge_accessory: ["Bodyweight Good Morning","Glute Bridge","Good Mornings","Hip Thrust","Machine Hip Thrust","Romanian Deadlifts","Single-Leg Glute Bridge","Single-Leg RDL (Bodyweight)"],
     isolation_bicep: ["Backpack Curl","Band Curl","Barbell Curls","Cable Curls","Dumbbell Curls","Hammer Curls","Incline Dumbbell Curls","Machine Preacher Curl","Preacher Curl (EZ bar)"],
-    isolation_calf: ["Bent-Knee Calf Raise (Bodyweight)","Calf Raises","Calf Raises (Bodyweight)","Seated Calf Raises","Single-Leg Calf Raise (Bodyweight)","Single-Leg Calf Raise Hold","Single-Leg Dumbbell Calf Raise"],
+    isolation_calf: ["Bent-Knee Calf Raise (Bodyweight)","Calf Raises","Calf Raises (Bodyweight)","Seated Calf Raises","Single-Leg Calf Raise (Bodyweight)","Single-Leg Calf Raise Hold"],
+    single_leg_calf: ["Single-Leg Dumbbell Calf Raise"],
     isolation_chest: ["Cable Crossover","Cable Flyes","Dumbbell Flyes","Pec Deck Machine"],
     isolation_hamstring: ["Bodyweight Hip Hinge to Wall","Cable Pull-Through","Dumbbell Leg Curl","Glute Kickback Machine","Hip Abduction Machine","Hip Adduction Machine","Lying Leg Curl","Nordic Hamstring Curl","Prone Hamstring Curl (Bodyweight)","Seated Band Leg Curl","Seated Leg Curl","Single-Leg Sliding Leg Curl","Sliding Leg Curl"],
     isolation_lat: ["Dumbbell Pullover","Scapular Pull-Ups","Single-Arm Band Pulldown","Straight-Arm Pulldown"],

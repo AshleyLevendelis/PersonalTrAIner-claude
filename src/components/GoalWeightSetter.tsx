@@ -71,7 +71,7 @@ export function GoalWeightSetter({ profileId, baselineKg, onSet }: { profileId: 
       <button
         onClick={handleSave}
         disabled={saving || !input}
-        className="shrink-0 text-[0.8125rem] font-semibold text-primary glow-mint disabled:opacity-40 disabled:[text-shadow:none]"
+        className="shrink-0 text-[0.8125rem] font-semibold text-primary-text glow-mint disabled:opacity-40 disabled:[text-shadow:none]"
       >
         {saving ? 'Saving…' : 'Set'}
       </button>

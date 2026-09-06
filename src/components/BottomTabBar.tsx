@@ -86,7 +86,7 @@ export function BottomTabBar({
             type="button"
             data-tour={TOUR_KEY.chat}
             onClick={() => onTabChange('chat')}
-            aria-label={chatAttention ? 'Chat — the coach has something for you' : 'Chat'}
+            aria-label={chatAttention ? 'Chat — your Personal TrAIner has something for you' : 'Chat'}
             aria-current={activeTab === 'chat' ? 'page' : undefined}
             className={`relative -mt-6 flex size-14 shrink-0 items-center justify-center rounded-full text-primary-foreground transition-shadow glow-mint-box ${
               activeTab === 'chat' ? 'ring-2 ring-primary/40 ring-offset-2 ring-offset-[color:var(--surface-deep)]' : ''
@@ -134,7 +134,7 @@ function SideTabButton({
       onClick={onClick}
       aria-current={active ? 'page' : undefined}
       className={`flex flex-1 flex-col items-center justify-center gap-0.5 ${
-        active ? 'text-primary glow-mint' : 'text-muted-foreground'
+        active ? 'text-primary-text glow-mint' : 'text-muted-foreground'
       }`}
     >
       <Icon className={`size-5 ${active ? 'glow-icon' : ''}`} />

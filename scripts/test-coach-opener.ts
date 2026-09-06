@@ -125,7 +125,11 @@ console.log('\n4. Attention: the tab dot lights for exactly the kinds that want 
   check('...re-arms only when the condition goes away', /if \(!chatAttention\) \{ setAttentionSeen\(false\); return \}/.test(app))
   check('...and never shows the dot while already on the chat tab', /chatAttention=\{chatAttention && !attentionSeen && activeTab !== 'chat'\}/.test(app))
   check('the tab bar draws it', /data-testid="chat-attention-dot"/.test(bar))
-  check('...and says so to a screen reader', /the coach has something for you/.test(bar))
+  // The wording changed on 6 Sep 2026 when the assistant took one name in UI
+  // text ("Personal TrAIner" everywhere). What this check is FOR is unchanged:
+  // the dot is a coloured circle, so a screen reader has to be told what it
+  // means or the signal exists only for people who can see it.
+  check('...and says so to a screen reader', /your Personal TrAIner has something for you/.test(bar))
 
   // The opener composes from the LIVE week, not the base plan, so a
   // mesocycle user is told about the right day.

@@ -52,6 +52,7 @@ import { PeekPanel } from '@/components/exercise/PeekPanel'
 import { RestDayCard } from '@/components/exercise/RestDayCard'
 import { WarmupSection } from '@/components/exercise/WarmupSection'
 import { LoadCeilingPrompt } from '@/components/exercise/LoadCeilingPrompt'
+import { ExerciseDetailPanel } from '@/components/exercise/ExerciseDetailDialog'
 import { SlotChipsCard } from '@/components/onboarding/SlotChipsCard'
 import { buildOnboardingIntro } from '@/lib/first-run-intro'
 import { initialSlotValues, ONBOARDING_SLOTS } from '@/lib/onboarding-slots'
@@ -298,6 +299,33 @@ function OnboardingConversation() {
 }
 
 const screens: Screen[] = [
+  // THE EXERCISE SCREEN, at phone width. Ashley asked for demonstrations
+  // twice; this is the screen that answers the second ask, so it is the one
+  // worth looking at rather than reasoning about. Three tabs, one per shot,
+  // because each has a different worst case: Summary carries the drawing and
+  // a chart, How to carries the longest cue list, History carries the empty
+  // states (no profileId here, so nothing loads — which is exactly the state
+  // a new user sees).
+  {
+    name: 'exercise-summary',
+    title: 'Exercise · Summary (muscle map, no video on this lift)',
+    node: <ExerciseDetailPanel exerciseName="Deadlifts" initialTab="summary" />,
+  },
+  {
+    name: 'exercise-howto',
+    title: 'Exercise · How to (cues, facts, the honest line)',
+    node: <ExerciseDetailPanel exerciseName="Deadlifts" initialTab="howto" />,
+  },
+  {
+    name: 'exercise-history-empty',
+    title: 'Exercise · History with nothing logged yet',
+    node: <ExerciseDetailPanel exerciseName="Deadlifts" initialTab="history" />,
+  },
+  {
+    name: 'exercise-summary-fullbody',
+    title: 'Exercise · Summary for a lift with nothing to paint (Burpees)',
+    node: <ExerciseDetailPanel exerciseName="Burpees" initialTab="summary" />,
+  },
   {
     name: 'day-bodyweight-week11',
     title: 'Another day · bodyweight, week 11 (tempo + capped loads)',

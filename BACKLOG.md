@@ -2,6 +2,608 @@
 
 Newest first. One line each.
 
+- [x] **TOOLS STOPS BEING A JUNK DRAWER** — `design_handoff_app_polish` step 4
+  of 8. Six tiles with live subtitles (grocery items and how many are checked,
+  sessions and PRs, weeks and which block) over a three-row grocery preview
+  with an "All N items ›" that expands in place. Rows are hairlines with a
+  20px token-coloured checkbox instead of bordered boxes, and the component
+  stops repeating the section heading above it.
+  The timer panel now OPENS from its two tiles instead of sitting under them
+  permanently — safe because the running state lives in the `useTimers`
+  provider, which the gate pins.
+  **One tile the handoff names has nowhere to go:** it points "Rest timer" at
+  a settings sheet that does not exist, and the rest timer is automatic (it
+  starts itself on a logged set and has nothing to configure). Rather than
+  render a control that opens nothing — the dead-control class the whole-app
+  audit spent a day removing — it opens the stopwatch, the timer surface that
+  does exist. `test:tools-grid` (new): six tiles, six real handlers, none
+  empty; every destination really mounted; every count READ from a store with
+  a worded fallback rather than a fabricated zero; the preview collapses to
+  three and expands in place. **Seven mutations, seven caught.**
+  132 of 132 gates pass.
+
+- [x] **HOME BECOMES THE DAY, AND THE TRAINER SPEAKS IN ONE VOICE** —
+  `design_handoff_app_polish` direction 1a, steps 1-2 of 8
+  ([README](design_handoff_app_polish/README.md)). Presentation pass: no store,
+  route, safety rule or coach behaviour changed.
+  **`<TrainerNudge>`** replaces both the hand-rolled coach bubble on Home and
+  the `InsightBanner tone="ai"` stack App.tsx floated above every tab. Source
+  order is the handoff's — the first adaptation message (carrying its own
+  confirm/decline, same handlers and busy labels), then the coach tip, then
+  nothing. The remaining messages wait their turn instead of stacking.
+  **Home** is now a greeting + streak, the nudge, today's session with its CTA
+  and the week strip under it, a hairline 2×2 "Today so far", the weight trend,
+  recent PRs and a Tomorrow row. The hero wash, the grain overlay and the
+  rolling-average "Progress" block are gone.
+  **THE ONE REAL CONFLICT, and it is a reversal of Ashley's own 5 Sep ruling:**
+  the handoff puts water and step logging on Home, and steps had been moved to
+  Exercise the day before ("we currently log steps in the nutrition tab but
+  that isn't right"). The handoff is newer, explicit ("opens the existing
+  inline number input **in place**"), and reasons about ownership itself for
+  water. So it was built — as a MOVE, not a copy: `StepsRow.tsx` is deleted,
+  Exercise no longer writes steps, and VISION-ARCHITECTURE §5.1a records the
+  third move and why the destination changed while the rule did not. If that
+  is wrong, it is one file to put back.
+  Three things the README names that do not exist here, handled rather than
+  invented: `projectNextLoad` (no such symbol — the chain ends at the coach
+  tip); the "What's left" warn line (removed from Home as specified, and the
+  nudge carries it in warn colour, which is why its text prop is a node); the
+  keyed reply chips (not in the README, live data, kept under the nudge).
+  `RecentPR` has no rep count, so the PR row shows the weight alone rather
+  than the prototype's "60 kg × 9".
+  **SEVEN GATES MOVED WITH THE DESIGN**, each re-pointed rather than relaxed:
+  `tab-ownership` (Home logs, Exercise no longer does, and the deleted file is
+  really deleted), `hero-surface` (§2 inverted — it pinned the wash's -12px
+  geometry, it now pins its absence; the focus name glows and no longer
+  clips), `dashboard` (the rolling-average label check is now conditional on a
+  rolling average being rendered at all), `app-tour`, `silent-writes`,
+  `bounds-and-boundaries`, `chat-app-reality` (+ the coach's own APP_REALITY,
+  both copies, which credited step logging to Exercise and called the tab
+  "Dashboard" when the tab bar says "Home"). Nine mutations, nine caught —
+  two of them only after strengthening the checks they walked through: the
+  silent-writes steps check accepted a `setStepsError` from the plausibility
+  guard thirty lines above an emptied catch, and the coherence check accepted
+  one stack rounding step.
+  **AND A CORRECTION I OWE THIS SESSION.** I reported `test:onboarding-reachable`
+  as an environmental failure — "needs a browser, fails identically on a clean
+  tree" — in every sweep. It was not environmental and I never checked it: I
+  read the gate's own "skips loudly where there is no browser" comment and
+  assumed that was the branch it was taking. Two real defects were behind it,
+  both found only because I built a second browser harness for these
+  screenshots and hit the first one myself. (1) Its Supabase fixture answered
+  EVERY `/auth/v1/**` call with a session object, including `/auth/v1/user`,
+  which wants the user itself — so `session.user` was undefined, sign-in
+  failed, and the app rendered an error screen with no `<input>` on it. (2) A
+  `dist` built without `VITE_SUPABASE_URL` renders that same screen. Both are
+  fixed, and the gate now fails with a sentence naming the build precondition
+  instead of a bare Playwright locator timeout. **It passes — 131 of 131 now,
+  not 130 of 131.**
+  No migration. Needs `deploy:functions:prod -- chat-gemini` for the
+  APP_REALITY change; the rest ships via push → Vercel.
+
+- [x] **A DELOAD CAN COME IN HEAVIER THAN THE WEEK BEFORE IT — FOUND ON THE
+  RIGHT GRID, TRACED TO A DIFFERENT MECHANISM THAN THE ONE I GUESSED, FIXED.**
+  Ashley: "fix all 1 at a time. calf raise, muay thai and deload." FIRST, A
+  CORRECTION: when I recommended this I said "a few plans on the quality grid"
+  from memory of the BACKLOG headline, not from a measurement — and the gate's
+  own ledger had read ZERO since 1 Sep. Measured before touching anything: the
+  audit-shaped grid `test:frozen-weeks` sweeps really has none; the 9,216-plan
+  quality grid has **30**, every one a `functional`-goal plan (Landmine Press
+  23, Walking Lunges 4, Hack Squat 2, Bulgarian Split Squats 1) — a deload
+  prescribing 32.5kg the week after 25kg at the same reps, a "recovery week"
+  Hack Squat at 167.5kg after 87.5kg. So the claim was right and the reason I
+  gave for it was not; the 1 Sep entry's "displaced, not fixed — the
+  mechanism is untouched" was the accurate sentence.
+  THEN A SECOND CORRECTION, mid-fix. Reading the code I concluded the cause
+  was week 3's number being snapshotted before the coherence pass had pulled
+  week 3 down, and built that. It removed 5 of 46 rises on the reproduction
+  grid. Tracing one survivor week by week showed the real mechanism: the
+  functional goal rotates accessories EVERY week (`accessoryRotationWeeks` 1),
+  so the deload week holds Landmine Press in a slot that carried a different
+  press in week 3 — no week-3 anchor for that slot — and the deload branch
+  fell through to a FRESH estimate at full value, heavier than the ramped
+  50kg the same lift carried the day before on another day. The fix that
+  matters: an unanchored deload slot now takes 70% of the lift's own last
+  displayed loading-week number wherever it sat (by name), or of the fresh
+  estimate when the lift was not seen at all. 46 → 0 on the reproduction
+  grid; with that branch removed 46 come back, with the by-name reference
+  removed 20 do. The snapshot move is kept — 70% of a number the trainee never
+  saw is wrong even where it does not show — and labelled honestly in the
+  code as a statement of the rule: with the real fix in place, putting the
+  snapshot back changed no rise on 144- and 432-plan grids. What it does
+  change at plan level is recorded below.
+  `test:frozen-weeks` §1 gains the sweep that could see it: 144 functional-
+  goal plans in the quality grid's shape (2 equipment × 2 durations × 2
+  styles × 2 tiers × 3 recovery × 3 cardio), **46 rises before the fix, 0
+  after**, listed by name with no ledger and no budget — the original sweep's
+  empty ledger kept alongside.
+  **Verified at commit:** tsc clean; `test:frozen-weeks` green with the new
+  sweep at 0; ten generator gates that would notice a deload-load change
+  (`week-load-consistency`, `block-phases`, `ramp-arrived`, `main-lift-rest`,
+  `session-length`, `one-day-one-look`, `muscle-balance`,
+  `cardio-share-score`, `training-week`, `block-rest-sizing`) all green.
+  The full 9,216-plan re-sweep, the plan-level diff of what the fix changed,
+  and the final gate/audit/quality run were still going when this was
+  committed — recorded in the follow-up commit.
+  No migration, no edge-function change.
+
+- [x] **THE CLASSES COUNT AS TRAINING LOAD — BUILT, Ashley's ruling (option 1
+  + a toggle on the card),
+  [docs/plans/count-the-classes-as-load.md](docs/plans/count-the-classes-as-load.md).**
+  The (b) her 6 Sep ruling on the second sport left for later, asked for the
+  same day: "fix all 1 at a time. calf raise, muay thai and deload." After (a)
+  someone with Muay Thai on Tuesday and Thursday got the lighter sessions on
+  those nights and EXACTLY as many working sets as without it. Her rule, in
+  her words: two or more sessions a week, or one hard/combat session, takes
+  the plan one recovery notch down; light mobility/yoga only moves the
+  schedule; and the workout card says so — "Volume reduced ~N% for Muay Thai
+  recovery" — with a one-tap **Revert to full volume**.
+  Built as ONE derived value: `effectiveRecoveryCapacity(profile)` — the
+  stated answer, one notch down (high → moderate, moderate → low, low stays
+  low) when a load-bearing sport exists — and every reader of
+  `recovery_capacity` in generation and scoring now goes through it (the set
+  multiplier, the top-up exemption, the fifth-day trim, the rest-day cardio
+  cap, the conditioning mode, the scorer's under-budget exemption and its
+  low-vs-high expectation), so a second sport cannot reach some readers and
+  not others. The revert lives on the activity (`keep_full_volume`, jsonb —
+  no migration). **Proven exact:** Muay Thai at moderate is byte-identical to
+  a reverted Muay Thai at low; low with Muay Thai equals low without the
+  notch; a gentle weekly yoga class equals its reverted twin byte for byte.
+  Measured on her profile: 77 → 64 working sets a week (−17%); across a
+  stride-11 sample of the quality grid one notch is median −27% (p10 −35%,
+  p90 −17%), which is why the card's percentage is MEASURED from a regenerated
+  week rather than fixed at "~20%" — decided unprompted, recorded in the plan
+  doc. The chat card's volume sentence is measured the same way ("about 77 →
+  64 working sets a week") with honest variants for someone already at low
+  recovery and for a second sport that already carries the notch; the receipt
+  gains a "Lifting volume:" line; the coach's tool description, §3g, data
+  block and rules no longer say the lifting is unchanged, tell it never to
+  offer `propose_volume_change` "because of" the sport, and show when the
+  person kept full volume; APP_REALITY in both copies. The card button runs
+  `executeSecondSportVolume` (rebuild first, write second, forward-only).
+  `test:concurrent-activity` §5–§7 new (the rule as a table incl. the 0.7
+  boundary both sides; the ≥15% reduction by the scorer's own threshold; the
+  three byte-identity proofs; no raw read of `recovery_capacity` left outside
+  the helper and the one comparison selector; every piece of wiring).
+  **Nine mutations, nine caught.** `test:session-shortfall` re-pinned.
+  **Verified after the build:** tsc and build clean; 130 of 131 runnable
+  gates (the one failure needs a browser and fails identically on an
+  unmodified tree). `test:audit` and `test:quality` for this change follow in
+  the next commit — the calf-raise quality sweep was still occupying the
+  machine — and both must be unchanged: no profile on either grid carries a
+  second sport, and `effectiveRecoveryCapacity` returns the stated answer
+  untouched without one (§3's byte-identity check covers exactly that).
+  One plan generation is ~120ms here, so the card's two-generation
+  measurement costs about a quarter of a second, once, and only for someone
+  with a qualifying sport.
+  Needs `deploy:functions:prod -- chat-gemini` (prompt + tool description).
+  No migration.
+
+- [x] **THE 48kg SINGLE-LEG CALF RAISE — BUILT, Ashley's ruling A,
+  [docs/plans/the-48kg-calf-raise.md](docs/plans/the-48kg-calf-raise.md).**
+  Single-Leg Dumbbell Calf Raise was priced as a MACHINE calf raise (0.65 ×
+  squat) on a lift where the leg already carries the whole body: 36kg in one
+  hand on a step for an 80kg intermediate, 60kg wanted and clamped to the 48kg
+  dumbbell for advanced — the only exercise in the catalogue reaching its
+  implement ceiling for an ordinary body, on all three corpora. Now its own
+  category, `single_leg_calf`, matched on PROPERTIES (unilateral + hand-held,
+  so a stack version keeps the machine anchor and a future kettlebell version
+  is covered unnamed) and anchored to BODYWEIGHT — 6 / 10 / 16 / 22% by tier
+  as the reference working weight, through the same body basis and age taper
+  as everything else, and NOT halved again on the way out. Asked with the
+  resulting weights, one question, four options: she chose the
+  recommendation — **80kg man 12kg intermediate / 16kg advanced, 60kg woman
+  8 / 12, beginners 4kg, 24kg the most anyone is asked to hold on one foot.**
+  TWO THINGS THE FIX UNCOVERED, both decided unprompted and both recorded in
+  the plan doc: (1) the old 36kg had been the MINIMUM of the calf coherence
+  bucket in plans holding both calf exercises, so the MACHINE was being capped
+  at twice it — the bucket is now split (generator and scorer alike, the shrug
+  precedent) and 554 machine calf-raise weeks on a stride-5 grid rose to their
+  own standards number (e.g. 37.5 → 55kg); (2) the rotation guard's ±40%
+  yardstick now declines to rotate most machine users onto the dumbbell
+  version — left alone, the manual swap for a busy machine still offers it and
+  the gate pins that. One more: both 125%-band rotation checks (audit and
+  `per-side-load`) fired on a 2kg notch at 6kg — granularity, not
+  inheritance — and now also require more than one implement notch of
+  absolute gap; removing the slack re-fails exactly that case and the audit
+  had zero such offences before, so nothing is hidden.
+  `test:single-leg-calf` new (property match, the ruled table as spec,
+  sex-blind/squat-blind/scales-with-body with the machine as the control,
+  0 of 600 cells at the implement, ≤30% of bodyweight in hand, machine tables
+  pinned bit-identical, the coherence split run directly on a two-exercise
+  day, the swap path still offers it). **Eight mutations, eight caught** —
+  after a first version let the generator-side split survive by one stack
+  rounding step. Proven by diff: a 53,400-cell load dump differs on exactly
+  one exercise; audit clamp warnings 7,340 → 4,597 with none from this lift.
+  **Verified after the build:** tsc and build clean; 130 of 131 runnable
+  gates (the one failure needs a browser and fails identically on an
+  unmodified tree); `test:audit` **17,423 / 0** on the final tree (a first run
+  failed on exactly the one-notch case above, which is how it was found);
+  `test:quality` **11.51 / 12 with 0 of 9,216 plans below the 7.2 floor** —
+  unchanged from the baseline, as it should be: the score measures structure,
+  progression, time fit and selection, and the only structural movement was
+  the calf rotation described above (recorded in a follow-up commit; the
+  sweep took 47 minutes with the machine busy).
+  No migration, no edge-function change — plan generation is client-side and
+  ships via push → Vercel.
+
+- [x] **"I ALSO DO MUAY THAI TWICE A WEEK" — BUILT, Ashley's ruling (a),
+  [docs/plans/i-also-do-muay-thai.md](docs/plans/i-also-do-muay-thai.md).**
+  She asked to be able to say "I train in the gym Mon/Tue/Thu/Fri in the
+  mornings but I also do Muay Thai twice a week in the evenings" and have the
+  app build a plan for that. Traced first: `concurrent_activities` had been a
+  column, a type, DB hydration and a bare line in the coach's prompt since
+  July — **written by nothing, read by nothing in generation**,
+  `movement_demands` with no vocabulary, `preferred_time` hardcoded to
+  'morning' at onboarding and read by nothing. Sent and ignored for two months
+  — the generator-side twin of the `steps_summary` bug `test:context-is-read`
+  now catches on the coach side.
+  Asked what the plan should DO about two hard evenings: she chose **keep the
+  gym days, put the lighter sessions on the class days, keep prescribed cardio
+  off those nights** — over also cutting volume (a separate later piece, NOT
+  authorised by this answer) and over record-and-tell-only.
+  Built as a PERMUTATION of the split, so the week's total work is untouched
+  and a plan with no second sport is **byte-identical before and after**
+  (fingerprinted across a 250-plan stride; 10 profiles asserted in-process for
+  empty AND undefined). Her sentence, probed: the light day moves Fri→Tue,
+  Squat & Carry moves Thu→Fri, Thursday still carries a heavy session because
+  a 4-day split has one light track — and the card SAYS SO rather than
+  implying every class day got a light one.
+  The writer: `propose_concurrent_activity`, courier-only like every proposal,
+  with the gym days and gym time-of-day riding along as passengers so one
+  sentence is one confirm card; §3g in the prompt separating "I do Muay Thai
+  every Tuesday" (this) from "I'm doing Muay Thai instead of legs tonight"
+  (`swap_session_for_activity`) and "I can't train Tuesdays"
+  (`propose_schedule_change`); the data dump replaced with rules (name the
+  class, no added cardio there, never a "rest day"); rebuild-first executor;
+  undo restoring the activity and both passengers; an Other training block on
+  the Profile with a rebuild offer on removal; APP_REALITY in both copies.
+  `test:concurrent-activity` new (120-case permutation sweep, all 16 weeks,
+  byte-identity, legacy junk rows, read/written/shown/undoable);
+  `coach-volume-schedule` §8 and `coach-promises` §6b extended. **Ten
+  mutations, ten caught.** `no-dead-code` back under budget by consumption.
+  STILL OPEN: (b) counting the classes as training load; an onboarding slot so
+  new users are asked; more than one overlapping sport.
+  **Verified after the build:** tsc and build clean; 129 of 130 runnable gates
+  (the one failure needs a browser and fails identically on an unmodified
+  tree); `test:audit` 17,423 / 0 and `test:quality` 11.51 / 12 with 0 below
+  the 7.2 floor — both unchanged, as they must be: no profile on either grid
+  carries a second sport, and the change is a permutation for those that do.
+  Needs `deploy:functions:prod -- chat-gemini` (new tool + prompt). No
+  migration — the column has existed since July.
+
+- [x] **EVERY ACTION, AND EVERY WAY IT WAS GOING WRONG.** Ashley: "think about
+  every action that can happen in the app and every way it could go wrong and
+  then fix it." Three parallel audits plus the full gate suite — which passed
+  throughout, which is the finding: every fix below was invisible to the tests
+  that already existed. Four shapes account for nearly all of it: the app
+  asserts what it was never given; a write lands in the database and never on
+  the screen; a control does nothing; a write fails and the app says it
+  succeeded.
+  FIRST, A CORRECTION. The "10:00 PM" bug was NOT formatLogsForAI dropping
+  `completed_at` (the entry directly below this one). The edge function
+  independently fetched the same table and built its own block: a 48-HOUR
+  window titled "TODAY'S", rendering `toLocaleTimeString()`, which is UTC in
+  Deno. A set logged at 11pm the previous evening read "10:00 PM" and was
+  labelled today — one block, both of her complaints. I checked the client
+  formatter, found a real gap, and stopped at the first plausible cause
+  instead of grepping the edge function for a second timestamp source. The
+  yesterday fix stands on its own merits; it was not the cause.
+  UNTRUE THINGS, REMOVED: that block deleted entirely (with the "Workout
+  Logged Today" answer it corrupted); `steps_summary` sent and never read
+  while the prompt twice told the model to read "the STEPS line" that did not
+  exist (my own bug, two commits old, and `log_steps` REPLACES the day);
+  `remaining_macros_today`, a field that never existed, modelled in two
+  fabrication examples; `ban_exercise` promising a permanent removal its
+  handler declines; `log_meal` announcing a feature that shipped as "coming in
+  the next update"; APP_REALITY omitting meal logging while telling the coach
+  its list was complete. And five more UTC-clock reads found by the new gate:
+  the server was stamping written rows with its own date and day-of-week, so a
+  set logged at 00:30 in the UK filed under yesterday.
+  DATA LOSS, CLOSED: saveMesocycle (delete-then-insert of the whole plan, five
+  call sites) is upsert-then-trim; undoing a chat set CORRECTION destroyed
+  both versions and now carries the pre-image; undoMealAddition deleted every
+  row matching a NAME and now uses pool_index; revertAdaptation closed the row
+  before restoring the plan and now reopens it if the restore fails;
+  persistPools checked no step of its delete-then-insert and now restores the
+  old pool on a failed insert.
+  VANISHED WRITES AND DEAD CONTROLS: meal-store was the only local-first queue
+  with no listener — one fix closed three findings (the rings above the meal
+  list, the coach's calories-remaining, and meal dead-letters reaching the
+  offline badge); "Session complete" over a session the database never closed;
+  the Nutrition Method switch dropping its error; unlogging a meal reappearing
+  with nothing said; a failed dashboard load stuck on "Loading your day…"
+  forever; Foods to avoid clearing the typed word and surfacing nothing
+  (safety-adjacent); the plate calculator in Additional Work; a first-ever-log
+  celebration nobody listened for; "Load from today's session" in Timers,
+  which could never render; window.confirm for Clear chat, dead in an
+  installed PWA; four unbounded number inputs; no error boundary anywhere; the
+  cardio and meal queues with no offline guard and no retry timer.
+  FOUR NEW GATES, for the classes rather than the instances:
+  test:context-is-read (every field sent is read, every field read is sent, no
+  second timestamp source, no prompt pointing at a line that is not built),
+  test:queue-listeners (every queue publishes, is in queue-health, guards
+  offline and retries), test:bounds-and-boundaries (the bounds are real
+  functions that say no, no control renders without a handler, no
+  window.confirm anywhere, the boundary is mounted outside every provider),
+  test:replace-without-losing (behavioural: the real executor hands back its
+  pre-image). Plus test:silent-writes §8 and test:coach-promises §7. Thirty-one
+  mutations run; four survived first time and each one strengthened the check
+  that missed it — including a whole section that ran AFTER its own
+  `process.exit`, so seven checks were decorative until moved.
+
+- [x] **A WEEK THAT REPEATS ITSELF NOW SAYS SO — Ashley's ruling (c),
+  [docs/plans/the-last-third-of-the-plan.md](docs/plans/the-last-third-of-the-plan.md).**
+  Asked what the app should do when a lift genuinely cannot get heavier, she
+  chose: say so, and ask for one logged set — over adding a set, rotating the
+  exercise, or letting the reps climb.
+  **STEP 1 KILLED MY OWN HYPOTHESIS, and I had already called it "confirmed".**
+  I traced ONE plan, saw a carry repeat while the week's other days caught up,
+  and concluded the distance ramp was comparing the wrong two numbers. Swept:
+  of **672 frozen pairs, 671 are a genuinely stalled lift and exactly one is
+  that artifact** — the one I traced. Same error shape as the Clamshells
+  diagnosis: one plausible case, no sweep, a confident conclusion. The ramp is
+  also alive (1,118 of 4,892 carry slots above the 40m default), and the 490 at
+  55m are its cap — so carries freeze for the same reason as barbells and
+  backpacks: the ramp ran out. One story, no hidden mechanical fix.
+  **The honest sentence already existed** — load-prescription has written *"This
+  is as far as the estimate goes… Log a set and the number can start moving
+  again"* since 30 Aug, inside `load_guidance`, which the card renders ONLY
+  behind the ⓘ. Correct words, one tap away from nobody. So the fix was to make
+  a fact the app already knew visible without a tap.
+  Shipped: `Exercise.distance_bump` (the carry twin of `rep_bump`);
+  `progression-ceiling.ts` with one rule requiring BOTH that the weight cannot
+  move and that no other lever did (a held weight while reps climb is still
+  progressing, and labelling that would be its own lie); two wordings, because
+  a bar at an estimate and a full backpack are different claims; the label on
+  the card outside the ⓘ, dropped once logged provenance drives the weight; and
+  the same fact in the coach's context so the two cannot disagree.
+  `test:frozen-weeks` §8 — ten unit cases including six that must be FALSE,
+  both wordings, the render, the coach wiring, the generator's record, and an
+  end-to-end 37/37. Eight mutations, all caught; the end-to-end check's first
+  version swept the wrong profile and found zero cases, which its own sanity
+  check caught.
+  **Coverage 100% of every ceiling-held frozen pair** (carry 316/317,
+  implement 151/151, ceiling 129/129); the 76 skipped have no ceiling at all
+  and the label would be false on them.
+  **THE FROZEN COUNT DID NOT MOVE — 626 pairs, 41.6% of plans, byte-identical
+  before and after.** It was never going to: this is an honesty fix, and
+  reporting it as a reduction would be the small lie it exists to remove.
+  Needs `deploy:functions:prod -- chat-gemini` for the coach half.
+  STILL OPEN: adding a set when a lift is capped is option (a) and is
+  deliberately NOT covered by her answer — a separate piece.
+
+- [x] **A STALE NUMBER I QUOTED HER, corrected for the record.** Pitching the
+  work above I said it was "6 in 10 plans, pull-ups stuck at 4-6 @ bodyweight"
+  and quoted **61.7%**. That is the 29 Aug figure and it had been worked three
+  times since. Re-measured on the same grid before writing anything:
+  **41.6% of plans, and bodyweight lifts are 0.0% of frozen pairs** — the
+  example I gave her does not exist any more. I recalled a headline out of this
+  file instead of running `measure-frozen-exercises.ts`, which sits in the repo
+  for exactly this purpose. The problem was real; my description of it was a
+  month old.
+
+- [ ] **`exercise_set_logs` has no `date` column, and five places derive one.**
+  Every one of them derives it from a timestamp, which means UTC unless the
+  deriver remembers otherwise, and they do not all remember. A real column
+  written by the store would fix all five at once and is the better long-term
+  answer — it is out of scope here only because it is a migration, and
+  migrations need Ashley's explicit say-so every time.
+
+- [ ] **`block-consistency.ts` counts rest days as attendance, and has zero
+  callers.** Real defect, no blast radius today. Flagged so it is not wired up
+  as-is: whatever reads it first would inherit an attendance figure that
+  rewards not training.
+
+- [ ] **`endAdaptationEarly` is exported and called by nobody.** The store
+  supports "I'm good now, end this injury adaptation early" — status
+  `ended_early`, pre-image restored, the whole path written and tested — and
+  no screen or coach tool reaches it. Wiring it up is a product decision
+  (where does that control live, and does the coach offer it?), not a gap to
+  fill unilaterally. Found by the whole-app audit, 5 Sep 2026.
+
+- [ ] **DST duplicates a day, and a session frozen at midnight keeps
+  yesterday's date.** Both known, both narrow, both listed here rather than
+  quietly fixed inside an audit whose scope was elsewhere.
+
+- [ ] **e1RM and PR labelling.** The chart's "One Rep Max" is an estimate
+  presented as a measurement, and PRs on added weight (dip belt, weighted
+  chins) are still judged on `weight_kg`, which is 0 for those rows.
+
+- [x] **TWO FROM ASHLEY'S PHONE, 5 Sep 2026 — an invented time, and cardio the
+  coach never heard about.**
+  (1) "it says I logged an exercise which i didn't. at 10pm today, but it's
+  currently 5pm." The SET data was real and reached the coach; the TIME never
+  did. formatLogsForAI emitted `date: Exercise: BW x 8` and dropped
+  `completed_at`, which sits on every row — so the model had no source for an
+  hour and produced a plausible one. Now sent, on the LOCAL clock (this repo
+  has already shipped one UTC/local "you didn't train when you did" bug), and
+  omitted entirely when a row has no timestamp so absence reads as absence.
+  Plus a prompt rule with the incident in it: state only what the lines
+  contain, a movement not on them was not logged, and their memory outranks
+  the list even though the list is what the coach may ASSERT.
+  NOT RESOLVED FROM HERE: whether the Clamshells row itself is real. No
+  database access in this sandbox; the time is provably invented, the set is
+  not disprovable. Flagged to Ashley rather than asserted either way.
+  (2) "I logged the rest day cardio but the chat has no knowledge of it."
+  Cardio is written from THREE components (rest-day/active-recovery card,
+  session finisher, unplanned work) and not one told anybody, so the coach
+  asked whether she'd walked one message after she logged a walk. Fixed by
+  SUBSCRIBING the chat tab to cardio-log-store and water-store rather than
+  threading a callback out of each writer: both stores already broadcast on
+  every save, delete and queue flush, and nothing was listening. That covers
+  the three writers, the next one, the offline flush and undo — none of which
+  a prop from App can see.
+  test:stale-after-write gained §6 (derives the cardio writer count from the
+  source, so a fourth writer does not silently escape) and §7 (the time is
+  read, rendered locally, omitted when absent, and the prompt forbids
+  inventing one). Five more mutations bit, including re-dropping the timestamp
+  and re-rendering it in UTC.
+
+- [x] **A WRITE NOW REACHES THE SCREEN THAT SHOWS IT — and I had the bug
+  backwards first.** Ashley: "fix the reload bug. also fix it for any other
+  items that need a refresh to update."
+  MY REPORTED DIAGNOSIS WAS WRONG. I said onWaterChanged being unpassed meant
+  "the Nutrition tab keeps showing the old number until you reload". Two things
+  make that false and both were readable at the time: water-store is
+  local-first so anything reading it fresh already sees the write (the prop's
+  OWN doc comment says exactly that, and I quoted the prop without reading its
+  comment), and every TabsContent except chat unmounts when inactive, so
+  returning to Nutrition is a fresh mount and a fresh read. I inferred
+  user-visible staleness from a dead prop without checking either.
+  THE REAL BUG IS THE OPPOSITE SHAPE. `chat` is the ONE tab with forceMount —
+  App keeps it alive so the conversation survives tab switches — so it is the
+  only surface that never gets a free re-read. Its self-fetched context
+  (favourites, 14 days of workout logs, today's steps) sat on [profile.id],
+  which in a component that never unmounts means ONCE PER SESSION. Log a set on
+  Exercise, come back and ask what you lifted, and the answer came from
+  app-start. Worse for water: the figure the coach quotes comes from
+  proactiveData, keyed on logs.length, so logging water in chat left the coach
+  quoting the pre-log total in its very next sentence.
+  FIXED IN TWO HALVES. Chat bumps its own version after every write it makes;
+  App keeps one coachDataVersion bumped by every source that changes what the
+  coach reads, including steps typed on the Exercise tab (threaded StepsRow ->
+  TodayPanel -> ExerciseTab -> App). loadChatHistory is deliberately split onto
+  its own effect — re-running it on every logged set would refetch the
+  conversation underneath the user.
+  New test:stale-after-write pins the class: exactly one tab is forceMounted
+  (a second one inherits the problem and goes red), no callback prop is
+  declared and left unpassed, the always-mounted tab's loaders are keyed on a
+  version, and StepsRow reports a log only after the write succeeded. Six
+  mutations bit, including the original unpassed prop.
+
+- [x] **THE COACH CAN LOG YOUR STEPS — behind a confirm card, on Ashley's
+  ruling.** "build it so it can log them for you." One fork was hers: the app
+  only ACTS on an instruction and OFFERS on a statement, and "I walked 9,000
+  steps today" has no imperative verb in it, so her own example sentence would
+  have logged nothing. Offered three options; she chose the confirm card every
+  time. That made it simpler than log_water — steps never take the immediate
+  path, so there is no intent channel at all.
+  THE COACH COULD NOT SEE STEPS EITHER, and that half had to ship with it:
+  daily_steps holds ONE ROW PER DAY and logStepsManual UPSERTS, so "I did
+  another 3,000" from a blind coach would REPLACE a 6,240 day with 3,000. The
+  context line plus a prompt rule ("add it to the count in the STEPS line and
+  send the total") is what stops it.
+  THREE DIVERGENCES FROM WATER, ALL FORCED BY THE TABLE: the card shows a
+  BEFORE (the only append-proposal that overwrites); undo RESTORES rather than
+  deletes, packing {date, previous} into the opaque token, and deletes the row
+  rather than writing 0 when there was nothing before (zero and "never logged"
+  are different facts); and a plausibility bound, because there is no safe
+  default the way water falls back to 250ml and a mistyped 900,000 would be
+  permanent.
+  A LANDMINE FOUND BEFORE IT SHIPPED. The confirm branch routed append
+  proposals through a ternary ending in a bare `: resolveAndSaveWater(...)`.
+  Adding log_steps to APPEND_PROPOSAL_KINDS without touching that line would
+  have LOGGED WATER when the user confirmed a steps card. Every kind is named
+  now and an unknown one throws.
+  onStepsChanged is WIRED, not just declared — because onWaterChanged is
+  declared, awaited twice, and passed by NOBODY (verified: zero assignments in
+  src/), so chat water logs don't refresh Nutrition today. Flagged, not fixed;
+  one line in App.tsx whenever she wants it.
+  Seven mutations bit. One exposed a weak check of mine: silent-writes'
+  "bound before write" compared indexOf positions and -1 < anything, so
+  deleting the guard left it GREEN. Presence asserted before order now.
+  No migration — a spoken count is still `source: 'manual'`.
+
+- [x] **THE COACH COULD NOT SEE THE APP'S OWN FORM CUES — the third time this
+  exact hole has been patched.** Ashley, told about it: "fix it." `form_cues`
+  had EXACTLY ONE READER in the whole repo (the Exercise tab's How-to panel),
+  so chat answered technique from the model's general knowledge while the app
+  held its own answer one tap away. Precedents, both quoted in the new gate:
+  the coach saying "none of your scheduled meals actually contain almond
+  butter" about a breakfast holding 13g ("two readers of the same data, one
+  right and one blind"), and intensity/tempo withheld until someone noticed it
+  left the coach "unable to answer 'how hard should the push-ups be?' about a
+  number on the next screen". Fixed as a near-copy of meal-ingredients.ts —
+  cap, ANNOUNCED truncation, absence stated in words — appended to the
+  exercise_summary payload. Context injection rather than a tool because
+  chat-gemini makes one generateContent call with every tool branch terminal:
+  a lookup tool would be new mechanism plus a second billed call under a cap
+  that counts requests, not calls.
+  A SECOND DEFECT FOUND WHILE RESEARCHING, AND PART OF IT WAS MINE. APP_REALITY
+  — the coach's map of the app, prefaced "This is the complete, current list" —
+  still credited the Dashboard with water AND step logging. Water moved to
+  Nutrition weeks ago; steps moved to Exercise THIS MORNING in commit 1a01747.
+  So "where do I log my steps?" sent people to a tab with no logger, and my own
+  change made it wronger.
+  AND EVERY CHECK IN test:chat-app-reality WAS GREEN THROUGH ALL OF IT —
+  verified by running it before touching anything. It only asserted that each
+  tab was NAMED, while test:tab-ownership correctly asserted Home logs no
+  steps: two gates, two contradictory pictures of one app, both passing. §1b
+  now ties each capability claim to the code that provides it, the way
+  test-app-tour ties tour copy to the screen it describes.
+  Bound measured before choosing: one week is 26-30 exercises (~1,100 tokens),
+  the mesocycle 66, the catalogue 199 (~7,000). The week is what people ask
+  about mid-session and matches the food precedent's "today only". Six
+  mutations all bit, including appending the block unconditionally, which
+  correctly breaks test:log-correction's literal empty-plan contract.
+
+- [x] **YOU CAN SEE THE EXERCISE NOW — and Ashley had to ask twice.** Her
+  earlier words sat quoted in two files the whole time: *"I want there to be
+  exercise demonstrations in the app AND form cues."* The cues shipped; the
+  demonstrations were never started and nothing recorded dropping them. Asked
+  again on 5 Sep 2026 with two screenshots, she chose a muscle map on every
+  exercise plus a video on the ones we have checked.
+  ONE SCREEN INSTEAD OF TWO POP-UPS. Her reference was mostly already built and
+  split: cues in ExerciseDetailDialog, chart/PRs/sessions in
+  ExerciseHistoryDialog, two menu items that knew nothing about each other.
+  Merged into Summary · History · How to; the history dialog is deleted, its
+  content absorbed unchanged, and both menu items open the merged one at the
+  tab they name. The program view gained technique as a result, REVERSING a
+  pinned gate assertion — it was withheld because that view had no dialog
+  wired, and one dialog now serves both.
+  THE MAP IS DRAWN, NOT FETCHED. Hand-rolled SVG on ExerciseStrengthChart's
+  "no library for one chart" precedent, which is what makes it work with no
+  signal — the service worker never caches cross-origin content by design, so
+  anything hosted elsewhere is blank in a basement gym. Coverage MEASURED
+  first: 198 of 199 live exercises paint, Burpees ("cardiovascular system,
+  full body") gets a sentence rather than an unlit body, and 0 of the 62
+  distinct muscle spellings are unrecognised.
+  THE VIDEO SHIPS WITH ZERO VIDEOS, deliberately. The field, the guarded
+  button, the nocookie player and the gates are built; no id is seeded because
+  a video teaches a lift correctly or teaches someone to hurt themselves, and
+  nobody here can watch one. The gate requires no minimum count — a number
+  would be pressure to add one unwatched.
+  LOOKING AT IT CAUGHT A DEFECT NO CHECK WOULD HAVE. The first draft copied
+  the reference's "Primary: <muscle>" line. The catalogue has one muscle field
+  and no secondary, so that invents a ranking the data does not hold — it read
+  as a harmless repeat on Deadlifts and as nonsense on Burpees ("Primary:
+  Cardiovascular system"). Removed. Found by rendering the screen, which is
+  now possible for the REAL panel: the body was split into ExerciseDetailPanel
+  so render-screens photographs the component rather than a replica.
+  ONE MUTATION WORTH RECORDING: adding a 12th group to MUSCLE_GROUPS — the
+  denominator for weekly per-muscle volume — left test:muscle-balance GREEN.
+  Only the new gate catches it, which is why the map keeps its own display
+  vocabulary and never touches the measurement one.
+
+- [x] **STEPS MOVED TO THE EXERCISE TAB, reversing a rule this repo had written
+  down and gated.** Ashley, 5 Sep 2026: *"we currently log steps in the
+  nutrition tab but that isn't right."* Asked where instead, she chose
+  Exercise. The row was extracted verbatim into
+  `src/components/exercise/StepsRow.tsx` — handler, try/catch, the deliberate
+  "don't clear the input on failure", and the ring geometry all travelled
+  unchanged, because a move is not the moment to also redesign the thing being
+  moved. One thing could NOT travel: `entryError` was shared with the
+  water-target handler, so Nutrition kept its own and the steps row got a new
+  one; one string serving two unrelated writes is how one failure comes to
+  describe the other. Home's steps tile now points at Exercise while the other
+  two still point at Nutrition, so `homeTiles` carries a per-tile destination
+  instead of one hardcoded hash. Three tour copies were rewritten — the tiles
+  step could no longer say "all logged in Nutrition" without sending someone
+  to the wrong tab. VISION-ARCHITECTURE §5.1a keeps the OLD reasoning rather
+  than deleting it: the step target really is derived from the same
+  `activity_level` as the calorie target, that is unchanged, and what the
+  ruling reversed is the conclusion drawn from it — two numbers sharing an
+  input is not two numbers belonging on one tab.
+  A MUTATION SURVIVED FIRST TIME AND CHANGED THE GATE. The new "StepsRow is
+  actually rendered" check greped for the import; deleting the `<StepsRow />`
+  call site left the import line untouched and the gate stayed green against a
+  tab that no longer showed the row. An import is not a render — both halves
+  are asserted now. Found by running the mutation, not by reading the check.
+  Five other mutations bit first time: caption deleted, a second copy of the
+  target rule, the try/catch stripped, the block left on Nutrition as well,
+  and the Exercise tour copy no longer naming steps.
+
 - [x] **FOUR FROM ASHLEY'S PHONE (3 Sep 2026), and two of them were writes
   that landed with no visible consequence.** (1) "How to do it" was a dead
   control on the session screen: ExerciseTab renders ExerciseDetailDialog in
@@ -252,10 +854,10 @@ Newest first. One line each.
   **Rear delts** get `isolation_rear_delt`, deliberately the SAME fraction as the side delt (0.19 of bench): the two heads are comparable, and the existing per-side halving separates the implements by itself — a dumbbell fly lands per hand on the lateral-raise number, a cable or machine version at roughly double because it is both arms. **Lat isolation** gets `isolation_lat` anchored to the ROW family, not bench — that is the entire point, since this work is limited by pulling strength. **Core gets no anchor at all**, on purpose: trunk rotation is not predicted by any barbell lift, so a fraction would be the same guess in a new place. All seven core movements now behave alike — progress by reps and tempo, as Plank and Dead Bug already did — which also retires the 27.5kg loaded spinal rotation. Two more fell out of the same fix: a bodyweight hip hinge is hamstring work, and a wall sit is quad work.
 - [x] **AND THE CHECK THAT FOUND THEM ALMOST DIDN'T EXIST.** `test:categorize-precedence` was red only because its snapshot was stale (158 of 185 exercises). Regenerating it from the database would have turned it green while blessing every one of these fifteen — a gate passing because it was told the wrong answer is the right one. So the snapshot was regenerated AND an independent check added: an exercise in `isolation_chest` whose own `primary_muscles` contain no chest did not get chosen, it fell through. That check is derived from the data, not from a list I wrote, which is why it found twelve I did not know about.
 
-- [ ] **7,340 LOAD CLAMPS THE CODE ITSELF SAYS NOT TO TRUST.** Surfaced by the quality sweep's log while verifying the load floor, then measured on the audit: **7,340 clamp warnings, identical with and without that change**, so entirely pre-existing. The warning's own words: *"This is a safety net, not a fix: something upstream produced a wrong number and should be traced, not just the clamp trusted."* 24 distinct exercises hit a ceiling; the top one is **Single-Leg Dumbbell Calf Raise at 2,829 of them**, computing 50, 52, 54, 58, 60, 64, 66, 72kg against a 48kg implement ceiling — so it is not a rounding edge, it is a number that climbs well past the cap and gets silently pulled back. Others: Dumbbell Floor Press (556), Dumbbell Shrugs (553), Shrugs (478), Farmer's Walk (379). The audit passes at 0 failures BECAUSE the clamp catches these, which is exactly the shape of a check satisfied by the wrong thing — the plan is safe, and the calculation underneath is wrong. Worth tracing the calf raise first: a per-side isolation lift being priced above a full dumbbell rack is a big, specific error and likely one shared root.
+- [x] **7,340 LOAD CLAMPS THE CODE ITSELF SAYS NOT TO TRUST.** (BUILT 6 Sep 2026 — see the top entry; the calf raise was the structural clamp and is gone, the 4,597 that remain are the honest top-corner kind.) Surfaced by the quality sweep's log while verifying the load floor, then measured on the audit: **7,340 clamp warnings, identical with and without that change**, so entirely pre-existing. The warning's own words: *"This is a safety net, not a fix: something upstream produced a wrong number and should be traced, not just the clamp trusted."* 24 distinct exercises hit a ceiling; the top one is **Single-Leg Dumbbell Calf Raise at 2,829 of them**, computing 50, 52, 54, 58, 60, 64, 66, 72kg against a 48kg implement ceiling — so it is not a rounding edge, it is a number that climbs well past the cap and gets silently pulled back. Others: Dumbbell Floor Press (556), Dumbbell Shrugs (553), Shrugs (478), Farmer's Walk (379). The audit passes at 0 failures BECAUSE the clamp catches these, which is exactly the shape of a check satisfied by the wrong thing — the plan is safe, and the calculation underneath is wrong. Worth tracing the calf raise first: a per-side isolation lift being priced above a full dumbbell rack is a big, specific error and likely one shared root.
   UPDATE 1 Sep 2026 — **traced, and my "likely one shared root" guess was wrong.** Measured every exercise that reaches its implement ceiling anywhere in a 240-cell grid (4 experience × 5 bodies × 4 rep ranges × 3 RPEs). `Single-Leg Dumbbell Calf Raise` hits it in **56 of 240** cells; the next worst is 23, and **every other one clamps only in the top corner** — a 120kg advanced male — which is the honest "ran out of dumbbell" case the ceiling was written for. So it is one mis-modelled exercise plus a long tail of the safety net working, not a systemic fault. The cause: `isolation_calf` is 0.65 × squat, calibrated for a MACHINE where the machine supplies the load, applied to a lift where the trainee is standing on one foot and the leg already carries full bodyweight before the dumbbell exists. An intermediate 80kg man is told to hold **36kg in one hand** balancing on a step; advanced wants 60kg and gets clamped to 48. **Investigated only — nothing built.** Load prescription and the numbers are Ashley's: `docs/plans/the-48kg-calf-raise.md` has the current table, three options, a recommendation, and a candidate table to rule on the way she ruled on kettlebell swings. NOTE ON DENOMINATORS: "7,340" counts warnings logged in one audit run (the same prescription once per week per profile); the 56/240 above counts distinct grid cells. Not comparable — the ranking is the part that carries. **CONFIRMED ON A THIRD CORPUS:** the full plan-quality sweep (9,216 profiles × 16 weeks) logs **88,046 clamp warnings, 100% of them this one exercise** — no other catalogue entry reaches its ceiling anywhere in it, because that grid's body weights are ordinary rather than reaching 120kg, so the honest top-corner clamps never fire and only the structural one is left. That sweep scores **11.45 / 12 with 0 plans below the 7.2 floor** throughout: a quality score measures structure, progression, time fit and selection, not whether 48kg in one hand on a step is an instruction anyone can follow.
 
-- [ ] **A DELOAD CAN COME IN HEAVIER THAN THE WEEK BEFORE IT.** Two cases, found by a check added during the above and present identically with and without it, so pre-existing: `full_gym/full_body/intermediate Seated Cable Row wk12: 40 → 45` and `minimalist/full_body/intermediate Dumbbell Floor Press wk16: 18 → 20`. A deload is supposed to be the easy week. Pinned in the gate BY NAME rather than by a count, so fixing one while breaking another still fails — a budget of "at most 2" is the exact shape §1 spent eleven offenders learning to distrust.
+- [x] **A DELOAD CAN COME IN HEAVIER THAN THE WEEK BEFORE IT.** (FIXED 6 Sep 2026 — see the top entry: the mechanism was a deload slot with no week-3 anchor falling through to a fresh full estimate, on functional plans that rotate accessories weekly.) Two cases, found by a check added during the above and present identically with and without it, so pre-existing: `full_gym/full_body/intermediate Seated Cable Row wk12: 40 → 45` and `minimalist/full_body/intermediate Dumbbell Floor Press wk16: 18 → 20`. A deload is supposed to be the easy week. Pinned in the gate BY NAME rather than by a count, so fixing one while breaking another still fails — a budget of "at most 2" is the exact shape §1 spent eleven offenders learning to distrust.
   UPDATE 1 Sep 2026: the full_gym case stopped reproducing when the machine-floor batch added 15 full_gym candidates and changed which exercises that seeded plan picks. **Displaced, not fixed** — the mechanism is untouched and the minimalist case still reproduces, so this stays open. The gate's ledger now lists only the minimalist case; if the full_gym one re-manifests under a future pool it fails by name as a NEW rise.
   UPDATE 1 Sep 2026 (later): **the minimalist case is now genuinely fixed, and by something else.** `enforceOneWeightPerPrescription` (see the entry above) settles one weight per lift per week; Dumbbell Floor Press had been holding two in week 15, and this check compares the deload against the LOWER of them (`Math.min`). One weight per week removes the disagreement the comparison was reading. The gate's pinned list is now **empty** — which makes it stronger, not weaker: any deload rise at all now fails by name.
 - [x] **AND A CORRECTION ON HOW I FOUND IT.** My first probe used `RPE 8`, got 6kg for both rep ranges, and concluded the rep target didn't explain the drop — I nearly went looking in the wrong place. The real week uses `RPE 7-8`, where the estimate does fall 6 → 4. I had guessed an input instead of reading it off the generated week: the same error shape as the calorie misdiagnosis, arithmetic on assumed inputs rather than actual ones. Reading the real week's `intensity` off the mesocycle took one line.
@@ -1756,3 +2358,16 @@ Newest first. One line each.
   **(2) `isDevAccount` READ A FIELD THAT HAS NEVER EXISTED, MASKED BY `as any`.** Gates access to the dev-only test page and panel. One of its two paths checked `(profile as any).email` for a `test.local`/`@dev.` domain — `UserProfile` has no `email` field, at the TypeScript level or the database's (`fitness_profiles` carries no `email` column in any migration), so this branch could never once fire; the `as any` is what let it compile anyway. Zero user impact — this only gates a developer tool, and the function's other path (a `localStorage` flag) still works and is how dev access has actually been granted this whole time — but it is dead code hiding behind a type-safety escape hatch, the exact shape this session's audit spent all day naming. Removed rather than wired up: whether a profile should carry an email at all is a data-model/privacy question, not a mechanical fix, and out of scope for "go through and fix every issue" read plainly.
   **CHECKED AND CLEAN, so recorded rather than silently passed over:** no other bare `.then()` anywhere in `src/`; no empty or console.log-only `onClick` handlers; no `useState` set-but-never-read (re-swept after today's earlier edits); no comment-only `catch` blocks; every one of the 26 server-declared chat tools is referenced client-side except `log_meal`, which is deliberately server-only and already says plainly it isn't live yet (M0 retirement, documented in its own handler) — not a bug; no migration filename or timestamp collisions; build clean beyond the known chunk-size note. A broader "asymmetric JSX tag across return branches" scan produced ~150 hits across the app but turned out to be near-entirely noise — most files it flagged (`Dashboard.tsx`, `TodayPanel.tsx`, `ProfileScreen.tsx` among them) have multiple independent top-level functions or a genuine loading/loaded split, not the dead-dialog defect shape; spot-checked the two highest-traffic screens (`Dashboard.tsx`'s early return is a "Loading your day…" skeleton, confirmed legitimate) rather than chase all 150.
   `test:silent-writes`, `test:no-dead-code`, `test:audit`, `test:no-forked-state`, `test:logging-roundtrip`, `test:chat-actions`, `test:coach-promises`, `test:chat-app-reality` all green; full 126-gate sweep run again after these two fixes.
+
+- [x] **CHANGE YOUR TRAINING STYLE IN CHAT — AND SETTINGS FINALLY OFFERS THE REBUILD IT NEVER DID, 5 Sep 2026.** After the whole-app audit, Ashley chose the first gap to close: *"change training style in chat"*. VISION: *"Settings and chat are equal paths… anything a user can do in the Profile screens they should be able to ask the coach for."* Style was the right first pick because it is the setting that reshapes the whole programme — `exercise-plan.ts` reads `training_style` for the pool's style filter, the base rep range per tier, and `STYLE_CONFIGS`. Full record and decision log: `docs/plans/change-your-style-in-chat.md`.
+  **THE RESEARCH FOUND A SECOND HALF.** `PLAN_INVALIDATING_FIELDS` was `injuries, equipment_access, training_days`. **Style was not in it.** So changing style in Settings saved the field and never offered a rebuild: Profile said "bodybuilding" while the plan on screen stayed the "combat" one until the next full regeneration — the same profile-disagrees-with-plan divergence the §2.4 schedule fix closed for training days. Shipping the chat tool alone would have made chat the MORE honest door, the opposite of parity. Both doors now open onto one rebuild path (`rebuildFromCurrentWeek`, forward only, past weeks untouched).
+  **BUILT.** Settings: `training_style` joins the invalidating list with its own offer ("the exercises and rep ranges still follow it… I can rebuild it from this week onwards in the new style"); `ProfileScreen`, the dialog and `handleConfirmRebuild` were already field-agnostic. Chat: `propose_style_change`, built as `propose_schedule_change` with the field swapped — NOT as `propose_equipment_adaptation`, which is temporary and auto-reverts — a pass-through server handler that writes nothing, a new §3f prompt section carrying the same anti-misfire language §3e earned live ("make today harder" is not a style change), an executor that rebuilds FIRST and writes the field second so the field only changes once a plan matches it, a card that validates against `STYLE_OPTIONS` rather than the model's spelling and says the exercises *and* rep ranges change rather than just the name, a receipt in the card's own words ("Training style: Combat / conditioning"), and an undo that restores the week range **and** the field. Registries: `ChatReceiptView.kind`, `kindsRequiringPreImage`.
+  **GATED.** `test:rebuild-offer`'s exact-list assertion now names four fields, plus five style checks (offers, says what changes, promises logged work untouched, names no field, same style does not). `test:pending-actions` §6d, production-shaped: the store refuses the kind without a pre-image; execute writes the field and rebuilds only the live week forward; past weeks are untouched on disk **and kept by identity in memory**; undo restores every week content-identical and the field; and, source-read with comments stripped, the UI's undo branch restores the field too. `test:coach-promises` found the declaration/handler pair on its own ("all 28 declared tools have an executor branch"). Eight chat-surface gates green.
+  **SIX MUTATIONS, EACH CONFIRMED TO APPLY.** Style removed from the invalidating list → rebuild-offer red. Executor skips the profile write → red. Executor rebuilds from week 1 instead of the live week → red, caught by the identity check (disk stayed correct because the save loop still skipped the past; memory held freshly generated past weeks, which is exactly what a trainee would see). Server handler deleted → coach-promises red. UI undo drops the field restore → red. **One did NOT fire and is recorded rather than dressed up:** executor saves every week instead of only the live week forward — the rebuild returns the *original* objects for past weeks, so re-saving them writes identical content and a content check cannot see it. That check stands as a guard, not as something this mutation proved.
+  **TWO DEFECTS IN MY OWN GATE, BOTH CAUGHT BEFORE THEY COULD PASS A BROKEN APP.** (1) The first §6d saved raw generated weeks and compared against a JSON snapshot; every week "differed" before anything ran, with zero fields differing under JSON. Cause: the generator writes explicit undefined-valued keys (`selection_note: undefined`, 3 sites); the in-memory mock keeps objects by reference so they survive; the gate's `stableStringify` walks `Object.keys` and keeps them; JSON drops them; a real Supabase wire drops them too. The test was measuring the mock. Rewritten to mirror production's save → load path with normalised comparison. (2) The source check for the UI undo matched the CONFIRM branch — the same `if (row.kind === 'propose_style_change')` text opens both — and failed against correct code; it now anchors on the week-range undo first. Both are the "a check satisfied or broken by the wrong thing" shape this repo keeps finding; both found by running the check against code known to be right before trusting a red.
+  **FLAGGED, NOT BUILT — ASHLEY'S CALL.** `fitness_goal` sits on `test:rebuild-offer`'s must-not-invalidate list, yet the goal drives rest floors, phase rep floors and the conditioning profile. Changing goal in Settings today has the same silent shape style had. A rebuild dialog on every goal change is precisely the "trains people to dismiss it" risk that list exists to avoid, so it is asked, not done.
+  `test:audit` **17,423 / 0** (unchanged — no generation logic touched). `test:quality` **Overall average: 11.51 / 12 · Plans below the 7.2 floor: 0 / 9216** (unchanged). Full 127-gate sweep on the pushed code: 124 pass; the 3 reds are the same three sandbox-environment failures as before the change (`meal-quality` and `onboarding-reachable` need the `.env.local` the container restart wiped, `schema-parity` needs the TEST link) — none touch this change. Full 127-gate sweep run before pushing. **Needs `npm run deploy:functions:prod -- chat-gemini` on Ashley's machine** — the third pending addition to the same function (session feel, meal food add, now style). The Settings half ships with the Vercel push and works without it.
+
+- [x] **CHANGING YOUR GOAL IN SETTINGS NOW OFFERS THE REBUILD — ASHLEY'S RULING, 5 Sep 2026.** Found while building the style change and put to her as one question with three options (offer every time, recommended; leave it; offer only for a "large" change). **She chose: offer the rebuild, same as style.** This reverses a deliberate earlier decision: `fitness_goal` sat on `test:rebuild-offer`'s **must-not-invalidate** list on the reasoning that the goal feeds macros, which recompute on their own. That was half the picture. Measured from `goal-policies.ts` and its consumers in `exercise-plan.ts`, the goal also sets the set volume, the rest multipliers **and** the loaded main-lift rest floor (90s vs 120s), the rep-range shift per tier, which periodisation phases are allowed, the split chosen for the week, and the conditioning frequency and profile — more of the programme than style touches. So changing goal in Settings saved the field and left the plan built for the old goal until the next full regeneration: the same profile-disagrees-with-plan gap style had.
+  **Built:** `fitness_goal` joins `PLAN_INVALIDATING_FIELDS` with its own offer ("how much you do, how long you rest, the rep ranges and the conditioning all still follow it… I can rebuild it from this week onwards for the new goal"), same three beats as the other four, no field names. `ProfileScreen`, the dialog and `handleConfirmRebuild` needed nothing — field-agnostic, and `rebuildFromCurrentWeek` already receives the merged profile. Macros still recompute as before; this adds the plan half. **Settings only, deliberately:** a `propose_goal_change` chat tool is the same shape as the style tool and the natural next step, but she ruled on the gap raised, which was Settings.
+  **Gated:** the noise entry removed from `test:rebuild-offer` §2 with the date and reason beside it; the exact-list assertion now names five fields; five positive checks (offers, says what it changes in plain terms, promises logged work untouched, names no database field, same goal does not offer). **Three mutations, each confirmed to apply:** goal removed from the list → red; the message emptied → two red; the same-goal guard removed → red. `test:profile-restore`, `test:no-forked-state`, `test:silent-writes` green. `test:audit` 17,423 / 17,423 (unchanged) — nothing on the generation path changed, and this is the proof no import leaked. No deploy needed; Settings ships with the Vercel push.

@@ -15,7 +15,8 @@
 import { adjustDayVolume, describeVolumeChange, isVolumeAdjustable, type VolumeDirection } from './volume-adjust'
 import { rebuildFromCurrentWeek } from './plan-invalidation'
 import { updateProfileField } from './profile-store'
-import type { MesocycleWeek, UserProfile, EquipmentAccess } from './types'
+import type { MesocycleWeek, UserProfile, EquipmentAccess, TrainingStyle, ConcurrentActivity } from './types'
+import { describeActivity, activityCountsAsLoad } from './concurrent-activity'
 import { swapExerciseInMesocycle, type SwapScope } from './mesocycle-edit'
 import { saveMesocycle, saveMesocycleWeek } from './mesocycle-persistence'
 import { getExerciseEntry } from './exercise-db'
@@ -23,6 +24,7 @@ import { swapPoolMeal, clearMealPick, getMealPicksForDate, USER_REQUESTED_TAG, t
 import { supabase } from './supabase'
 import { setDeliberateRest } from './daily-tracking'
 import type { MealAdditionPayload } from './meal-addition'
+import { STYLE_OPTIONS } from './onboarding-slots'
 import { substituteForInjury, substituteForEquipment, rebuildForInjury } from './plan-adaptations'
 import type { PendingActionReceipt } from './pending-actions-store'
 
@@ -233,12 +235,61 @@ export async function executeMealAddition(
  * but the pick doesn't: a meal left in the pool after a receipt said
  * "Couldn't add it" is the same kind of quiet disagreement between what the
  * app claims and what it stored that this framework exists to prevent.
+ *
+ * ONE ROW, NOT EVERY ROW WITH THAT NAME. Until 5 Sep 2026 this deleted on
+ * (profile, slot, name), and nothing makes a name unique within a slot: ask
+ * the coach for a chicken curry when the generator had already put a chicken
+ * curry in your dinners, tap Undo, and BOTH disappear — the one you added and
+ * the one that was always there. `pool_index` is the actual identity of a pool
+ * entry, so undo uses it: the exact index when the caller still has it (the
+ * rollback path, which just received it from executeMealAddition), and
+ * otherwise the highest-indexed row of that name, which is the one an append
+ * created.
+ *
+ * Returns false if the pool row is still there afterwards, so the caller can
+ * leave the Undo button up rather than clearing it over a delete that didn't
+ * happen — the same choice the meal-swap undo above it makes.
  */
-export async function undoMealAddition(profileId: string, payload: MealAdditionPayload): Promise<void> {
+export async function undoMealAddition(
+  profileId: string,
+  payload: MealAdditionPayload,
+  poolIndex?: number | null,
+): Promise<boolean> {
   const { slot, date, option } = payload
-  await supabase.from('meal_plan_slots').delete().eq('profile_id', profileId).eq('slot', slot).eq('name', option.name)
+
+  let targetIndex = poolIndex ?? null
+  if (targetIndex === null) {
+    const { data, error } = await supabase
+      .from('meal_plan_slots')
+      .select('pool_index')
+      .eq('profile_id', profileId)
+      .eq('slot', slot)
+      .eq('name', option.name)
+      .order('pool_index', { ascending: false })
+      .limit(1)
+    if (error) return false
+    // Already gone (a second Undo tap, or the pool was regenerated under it).
+    // Nothing to remove is not a failure — fall through and clear the pick.
+    targetIndex = data?.[0]?.pool_index ?? null
+  }
+
+  if (targetIndex !== null) {
+    const { error } = await supabase
+      .from('meal_plan_slots')
+      .delete()
+      .eq('profile_id', profileId)
+      .eq('slot', slot)
+      .eq('pool_index', targetIndex)
+      // Belt as well as braces: an index that no longer holds the meal we
+      // added is somebody else's row, and deleting it would be the same
+      // mistake in a different column.
+      .eq('name', option.name)
+    if (error) return false
+  }
+
   const picks = await getMealPicksForDate(profileId, date)
   if (picks[slot] === option.name) await clearMealPick(profileId, date, slot)
+  return true
 }
 
 export interface InjuryAdaptationPayload {
@@ -603,6 +654,72 @@ export async function executeScheduleChange(
 }
 
 // ---------------------------------------------------------------------------
+// CHANGING HOW THEY TRAIN — 5 Sep 2026.
+//
+// The first of the ten Profile settings the coach could not touch (VISION:
+// "Settings and chat are equal paths"), and the one that reshapes the whole
+// programme: exercise-plan.ts reads training_style for the pool's style
+// filter, the base rep range per tier, and STYLE_CONFIGS. Built as
+// executeScheduleChange with the field swapped, because it is the same
+// operation — a lasting profile change the plan has to follow, from the live
+// week forward, past weeks untouched — and the same generation path
+// Settings' rebuild offer already takes. Nothing new about how a plan is
+// built; only a new way to ask for one.
+// ---------------------------------------------------------------------------
+
+export interface StyleChangePayload {
+  /** The style they will train in from now on, replacing whatever was there. */
+  trainingStyle: TrainingStyle
+  fromWeek: number
+  reason?: string
+}
+
+export async function executeStyleChange(
+  profile: UserProfile,
+  mesocycle: MesocycleWeek[],
+  exclusions: string[],
+  payload: StyleChangePayload,
+): Promise<AdaptationResult> {
+  const preImage = mesocycle
+  const updated: UserProfile = { ...profile, training_style: payload.trainingStyle }
+
+  const rebuild = await rebuildFromCurrentWeek(updated, exclusions, mesocycle, payload.fromWeek)
+  if (!rebuild.ok || !rebuild.mesocycle) {
+    return {
+      mesocycle,
+      preImage,
+      receipt: { landed: [], failed: [{ op: 'rebuild', error: rebuild.error ?? 'The plan could not be rebuilt.' }] },
+    }
+  }
+
+  // Rebuild first, write second — the field only changes once there is a
+  // plan that matches it. Writing the style and then failing the rebuild
+  // would recreate the exact divergence this tool exists to close.
+  const failed: { op: string; error: string }[] = []
+  if (profile.id) {
+    try { await updateProfileField(profile.id, { training_style: payload.trainingStyle }) }
+    catch { failed.push({ op: 'save', error: "The new style didn't save" }) }
+    for (const week of rebuild.mesocycle) {
+      if (week.week_number < payload.fromWeek) continue
+      try { await saveMesocycleWeek(profile.id, week) }
+      catch { failed.push({ op: 'save', error: `Week ${week.week_number} didn't save` }) }
+    }
+  }
+
+  return {
+    mesocycle: rebuild.mesocycle,
+    preImage,
+    receipt: {
+      landed: failed.length === 0
+        ? [`Training style: ${STYLE_OPTIONS.find(o => o.value === payload.trainingStyle)?.label ?? payload.trainingStyle}`,
+           `Rebuilt ${rebuild.weeksRebuilt} week${rebuild.weeksRebuilt === 1 ? '' : 's'} from week ${payload.fromWeek} on`]
+        : [],
+      failed,
+    },
+  }
+}
+
+// ---------------------------------------------------------------------------
 // RESTING A PRESCRIBED DAY — 31 Aug 2026.
 //
 // The plainer half of the swap this file already executes. "I'm doing Muay
@@ -649,4 +766,167 @@ export async function executeRestDay(
 /** Clears the flag. The day goes back to whatever it was — due, or missed. */
 export async function undoRestDay(profileId: string, payload: RestDayPayload): Promise<void> {
   await setDeliberateRest(profileId, payload.date, false)
+}
+
+// ---------------------------------------------------------------------------
+// "I ALSO DO MUAY THAI TWICE A WEEK" — a second sport, on a standing schedule.
+//
+// Ashley's ruling, 6 Sep 2026, choosing this over cutting volume and over
+// recording it without acting: keep the gym days, put the LIGHTER sessions on
+// the class days, and keep prescribed cardio off those nights. The generator
+// reads `concurrent_activities` for exactly that (concurrent-activity.ts);
+// this executor is what finally WRITES the field, which nothing had done since
+// the column was created in July.
+//
+// Same rail as executeScheduleChange / executeStyleChange, for the same
+// reason: a lasting profile change the plan has to follow. Rebuild first,
+// write second — the field only changes once there is a plan that matches it.
+// ---------------------------------------------------------------------------
+
+export interface ConcurrentActivityPayload {
+  /** The activity as validated by the client builder — days canonical, vocabulary checked. */
+  activity: ConcurrentActivity
+  /**
+   * PASSENGERS. Her sentence carried a day change AND an activity; two confirm
+   * cards for one sentence reads as the app not listening. When present these
+   * are applied in the same rebuild. Absent = leave the profile's value alone.
+   */
+  trainingDays?: string[]
+  gymTimeOfDay?: 'morning' | 'evening'
+  fromWeek: number
+  reason?: string
+}
+
+export async function executeConcurrentActivity(
+  profile: UserProfile,
+  mesocycle: MesocycleWeek[],
+  exclusions: string[],
+  payload: ConcurrentActivityPayload,
+): Promise<AdaptationResult> {
+  const preImage = mesocycle
+  // Replace by name, otherwise append — telling the coach about Muay Thai a
+  // second time with different days corrects it rather than duplicating it.
+  const others = (profile.concurrent_activities ?? []).filter(a => a.name.toLowerCase() !== payload.activity.name.toLowerCase())
+  const activities: ConcurrentActivity[] = [...others, payload.activity]
+  const wanted = payload.trainingDays ? new Set(payload.trainingDays.map(d => d.toLowerCase())) : null
+  const updated: UserProfile = {
+    ...profile,
+    concurrent_activities: activities,
+    training_days: wanted
+      ? (profile.training_days ?? []).map(d => ({ ...d, available: wanted.has(d.day.toLowerCase()) }))
+      : profile.training_days,
+    preferred_time: payload.gymTimeOfDay ?? profile.preferred_time,
+  }
+
+  const rebuild = await rebuildFromCurrentWeek(updated, exclusions, mesocycle, payload.fromWeek)
+  if (!rebuild.ok || !rebuild.mesocycle) {
+    return {
+      mesocycle,
+      preImage,
+      receipt: { landed: [], failed: [{ op: 'rebuild', error: rebuild.error ?? 'The plan could not be rebuilt.' }] },
+    }
+  }
+
+  const failed: { op: string; error: string }[] = []
+  if (profile.id) {
+    const patch: Partial<UserProfile> = { concurrent_activities: activities }
+    if (wanted) patch.training_days = updated.training_days
+    if (payload.gymTimeOfDay) patch.preferred_time = payload.gymTimeOfDay
+    try { await updateProfileField(profile.id, patch) }
+    catch { failed.push({ op: 'save', error: "The activity didn't save" }) }
+    for (const week of rebuild.mesocycle) {
+      if (week.week_number < payload.fromWeek) continue
+      try { await saveMesocycleWeek(profile.id, week) }
+      catch { failed.push({ op: 'save', error: `Week ${week.week_number} didn't save` }) }
+    }
+  }
+
+  const landed = failed.length === 0
+    ? [
+        `Other training: ${describeActivity(payload.activity)}`,
+        ...volumeReceiptLine(profile, payload.activity),
+        ...(wanted ? [`Training days: ${payload.trainingDays!.join(', ')}`] : []),
+        ...(payload.gymTimeOfDay ? [`Gym sessions: ${payload.gymTimeOfDay}s`] : []),
+        `Rebuilt ${rebuild.weeksRebuilt} week${rebuild.weeksRebuilt === 1 ? '' : 's'} from week ${payload.fromWeek} on`,
+      ]
+    : []
+
+  return { mesocycle: rebuild.mesocycle, preImage, receipt: { landed, failed } }
+}
+
+/**
+ * The receipt's volume line for a second sport. Present only when the rule
+ * in concurrent-activity.ts counts it as load, and honest in the one case the
+ * notch has nowhere to go: someone already at low recovery keeps the
+ * schedule change and nothing comes off the sets.
+ */
+function volumeReceiptLine(profile: UserProfile, activity: ConcurrentActivity): string[] {
+  if (!activityCountsAsLoad(activity)) return []
+  if (activity.keep_full_volume) return [`Lifting volume: full, as you chose, despite ${activity.name}`]
+  if ((profile.recovery_capacity || 'moderate') === 'low') {
+    return [`Lifting volume: already at its lowest setting — ${activity.name} changes the schedule, not the sets`]
+  }
+  return [`Lifting volume: one recovery notch down for ${activity.name} — revert any time from the workout card`]
+}
+
+export interface SecondSportVolumePayload {
+  /** true = keep full lifting volume despite the sport(s); false = put the notch back. */
+  keepFullVolume: boolean
+  fromWeek: number
+}
+
+/**
+ * The workout card's one-tap toggle, Ashley's ruling of 6 Sep 2026: "a
+ * simple inline button to Revert to Full Volume". Same shape as
+ * executeConcurrentActivity — rebuild first, write second, forward-only — so
+ * a failed rebuild writes nothing and the card can say exactly which half
+ * failed. Applies to every activity the rule counts, because the card shows
+ * one line for all of them; the choice lives on each activity
+ * (keep_full_volume) so removing the sport removes it too.
+ */
+export async function executeSecondSportVolume(
+  profile: UserProfile,
+  mesocycle: MesocycleWeek[],
+  exclusions: string[],
+  payload: SecondSportVolumePayload,
+): Promise<AdaptationResult & { profilePatch: Partial<UserProfile> }> {
+  const preImage = mesocycle
+  const activities: ConcurrentActivity[] = (profile.concurrent_activities ?? []).map(a => {
+    if (!activityCountsAsLoad(a)) return a
+    if (payload.keepFullVolume) return { ...a, keep_full_volume: true }
+    const { keep_full_volume: _reverted, ...rest } = a
+    return rest
+  })
+  const names = [...new Set((profile.concurrent_activities ?? []).filter(activityCountsAsLoad).map(a => a.name))].join(' and ')
+  const updated: UserProfile = { ...profile, concurrent_activities: activities }
+
+  const rebuild = await rebuildFromCurrentWeek(updated, exclusions, mesocycle, payload.fromWeek)
+  if (!rebuild.ok || !rebuild.mesocycle) {
+    return {
+      mesocycle, preImage, profilePatch: {},
+      receipt: { landed: [], failed: [{ op: 'rebuild', error: rebuild.error ?? 'The plan could not be rebuilt.' }] },
+    }
+  }
+
+  const failed: { op: string; error: string }[] = []
+  if (profile.id) {
+    try { await updateProfileField(profile.id, { concurrent_activities: activities }) }
+    catch { failed.push({ op: 'save', error: "That choice didn't save" }) }
+    for (const week of rebuild.mesocycle) {
+      if (week.week_number < payload.fromWeek) continue
+      try { await saveMesocycleWeek(profile.id, week) }
+      catch { failed.push({ op: 'save', error: `Week ${week.week_number} didn't save` }) }
+    }
+  }
+
+  const landed = failed.length === 0
+    ? [
+        payload.keepFullVolume
+          ? `Lifting volume: full, despite ${names}`
+          : `Lifting volume: one recovery notch down for ${names}`,
+        `Rebuilt ${rebuild.weeksRebuilt} week${rebuild.weeksRebuilt === 1 ? '' : 's'} from week ${payload.fromWeek} on`,
+      ]
+    : []
+
+  return { mesocycle: rebuild.mesocycle, preImage, receipt: { landed, failed }, profilePatch: { concurrent_activities: activities } }
 }

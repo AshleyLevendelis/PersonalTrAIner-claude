@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, lazy, Suspense } from 'react'
+import { useState, useEffect, useRef, lazy, Suspense, useMemo } from 'react'
 import { Tabs, TabsContent } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Loader2 } from 'lucide-react'
@@ -82,6 +82,7 @@ function ScreenLoading() {
 }
 import { EmailPrompt } from '@/components/EmailPrompt'
 import { InsightBanner } from '@/components/ui/insight-banner'
+import type { TrainerNudgeProps } from '@/components/TrainerNudge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { getActiveFacts, getActiveGoals, getActiveContextFacts, createFact, createContextFact, createGoal, type UserFactRow, type UserGoalRow, type UserContextFactRow } from '@/lib/memory-store'
 import { compileExerciseExclusions, compileFoodDislikes, compileTimingRules, compileSoftExercisePreferences, compileSoftFoodPreferences, compileTrainingDayOverrides, compileKnownLiftOverrides, resolveFoodTarget, resolveExerciseTarget } from '@/lib/fact-compiler'
@@ -368,6 +369,33 @@ function App() {
   const [devOverrideDay, setDevOverrideDay] = useState<string | null>(null)
   const [devBypassLocks, setDevBypassLocks] = useState(false)
   const [logsVersion, setLogsVersion] = useState(0)
+  /**
+   * Bumped when the coach logs steps from chat, so Home's Steps cell re-reads
+   * instead of sitting on the number it loaded on mount. (Was the Exercise
+   * tab's StepsRow until 6 Sep 2026; the row moved, the signal moved with
+   * it — see VISION-ARCHITECTURE §5.1a.)
+   *
+   * The same shape as logsVersion, and for the same reason it exists: a write
+   * that lands in the database and not on the screen is indistinguishable from
+   * one that failed. (onWaterChanged is declared on ChatAssistant and passed
+   * by NOBODY — chat water logs have this exact bug today. Not fixed here,
+   * flagged in the plan, but very much the reason this line is not skipped.)
+   */
+  const [stepsVersion, setStepsVersion] = useState(0)
+  /**
+   * Everything the CHAT tab reads for itself, versioned.
+   *
+   * Chat is the only tab with forceMount — it stays alive across tab switches
+   * so the conversation survives — which means it never gets the fresh mount
+   * and fresh read every other tab gets for free. Without this it reads its
+   * workout history, favourites and step count once per session and quotes
+   * them for the rest of the day.
+   *
+   * Bumped from every source that changes one of those, including the ones
+   * that happen on OTHER tabs.
+   */
+  const [coachDataVersion, setCoachDataVersion] = useState(0)
+  const bumpCoachData = () => setCoachDataVersion(v => v + 1)
 
   useEffect(() => {
     restoreSession()
@@ -1845,6 +1873,55 @@ function App() {
     }
   }
 
+  // THE TRAINER'S LINE ON HOME — design_handoff_app_polish. The adaptation
+  // messages used to render as a stack of InsightBanner tone="ai" above every
+  // tab; now the FIRST one is the Home nudge, with its confirm/decline as
+  // inline text buttons, and Home falls back to the coach tip when there is
+  // none (Dashboard.tsx owns that fallback). Same handlers, same busy state,
+  // same labels — only where it renders changed. The remaining messages wait
+  // their turn: answering or dismissing the first reveals the next.
+  const homeNudge = useMemo<TrainerNudgeProps | null>(() => {
+    const msg = adaptationMessages[0]
+    if (!msg) return null
+    if (msg.loadSuggestionId) {
+      const id = msg.loadSuggestionId
+      const busy = loadSuggestionBusy === id
+      return { text: msg.text, actions: [
+        { label: busy ? 'Applying…' : 'Start heavier', onClick: () => void handleLoadSuggestionConfirm(id), disabled: busy },
+        { label: 'Keep as is', onClick: () => void handleLoadSuggestionDecline(id), disabled: busy, secondary: true },
+      ] }
+    }
+    if (msg.loadCatchupId) {
+      const id = msg.loadCatchupId
+      const busy = loadSuggestionBusy === id
+      // "Keep the plan" rather than "Dismiss": declining is a real answer
+      // that is remembered for this block, and the label has to say which
+      // way it goes.
+      return { text: msg.text, actions: [
+        { label: busy ? 'Updating…' : 'Yes, use my weights', onClick: () => void handleLoadCatchupConfirm(id), disabled: busy },
+        { label: 'Keep the plan', onClick: () => void handleLoadCatchupDecline(id), disabled: busy, secondary: true },
+      ] }
+    }
+    if (msg.weightBasisOfferId) {
+      const id = msg.weightBasisOfferId
+      const busy = loadSuggestionBusy === id
+      // "No thanks" and not "Dismiss": this records a permanent answer, and
+      // the label has to say so.
+      return { text: msg.text, actions: [
+        { label: busy ? 'Rebuilding…' : 'Yes, redo them', onClick: () => void handleWeightBasisConfirm(id), disabled: busy },
+        { label: 'No thanks', onClick: () => void handleWeightBasisDecline(id), disabled: busy, secondary: true },
+      ] }
+    }
+    return { text: msg.text, actions: [{
+      label: 'Dismiss', secondary: true,
+      onClick: () => {
+        if (msg.goalId) dismissGoalProximity(msg.goalId)
+        setAdaptationMessages(prev => prev.filter((_, idx) => idx !== 0))
+      },
+    }] }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [adaptationMessages, loadSuggestionBusy])
+
   const handleReset = async () => {
     setNewPlanResetting(true)
     try {
@@ -1917,11 +1994,28 @@ function App() {
     const targets = computeTargets(updated, { latestWeightKg: targetWeightAnchorKg, exercisePlan })
     setMacros(targets)
     if (profile.id) {
-      snapshotTargetsIfChanged(profile.id, updated, targets, targetWeightAnchorKg)
-      await supabase
+      // REVERT ON FAILURE, AND SNAPSHOT ONLY AFTER IT LANDS. This is the same
+      // optimistic-apply the split handler below does, and until 5 Sep 2026 it
+      // was the only one of the two missing its second half: the update's
+      // error was destructured by nobody, so a failed write left every macro
+      // on screen showing the new mode, the coach quoting those numbers, and
+      // the database still on the old one — and a reload would silently put
+      // it all back with no explanation.
+      const previousMode = profile.macro_calculation_mode
+      const { error } = await supabase
         .from('fitness_profiles')
         .update({ macro_calculation_mode: mode })
         .eq('id', profile.id)
+      if (error) {
+        console.error('Macro mode save failed — reverting', error)
+        setProfile(prev => (prev ? { ...prev, macro_calculation_mode: previousMode } : prev))
+        setMacros(computeTargets({ ...updated, macro_calculation_mode: previousMode }, { latestWeightKg: targetWeightAnchorKg, exercisePlan }))
+        return
+      }
+      // After the write, never before: the snapshot is the historical record
+      // of what this person's targets WERE, and writing one for a mode change
+      // that failed puts a number in that history nothing ever showed them.
+      snapshotTargetsIfChanged(profile.id, updated, targets, targetWeightAnchorKg)
     }
   }
 
@@ -1937,14 +2031,19 @@ function App() {
     // anchor, no weight moved, no notice.
     const targets = computeTargets(updated, { latestWeightKg: targetWeightAnchorKg, exercisePlan })
     setMacros(targets)
-    snapshotTargetsIfChanged(profile.id, updated, targets, targetWeightAnchorKg)
     supabase.from('fitness_profiles').update(patch).eq('id', profile.id).then(({ error }) => {
       if (error) {
         console.error('Macro split save failed — reverting', error)
         setProfile(prev => (prev ? { ...prev, ...revertPatch } : prev))
         const revertedTargets = computeTargets({ ...updated, ...revertPatch }, { latestWeightKg: targetWeightAnchorKg, exercisePlan })
         setMacros(revertedTargets)
+        return
       }
+      // Moved below the write on 5 Sep 2026, same reason as the mode handler
+      // above: this snapshot is the target history, and a revert that leaves
+      // one behind records a target the user was shown for a second and never
+      // actually had. Both handlers now snapshot only what survived.
+      if (profile.id) snapshotTargetsIfChanged(profile.id, updated, targets, targetWeightAnchorKg)
     })
   }
 
@@ -2076,7 +2175,7 @@ function App() {
       return (
         <div className="min-h-screen bg-background flex items-center justify-center">
           <div className="flex flex-col items-center gap-3 text-center px-4">
-            <Loader2 className="size-8 animate-spin text-primary" />
+            <Loader2 className="size-8 animate-spin text-primary-text" />
             <p className="font-medium">{generatingStatus || 'Building your plan...'}</p>
             <p className="text-sm text-muted-foreground">This may take a moment while we optimize your portions</p>
           </div>
@@ -2185,14 +2284,14 @@ function App() {
         className="fixed right-3 z-40"
         style={{ top: 'calc(0.625rem + env(safe-area-inset-top))' }}
       >
+        {/* NEW PLAN LEFT THIS MENU on 6 Sep 2026 — it is Profile's
+            destructive footer now (design_handoff_app_polish). It was a
+            dropdown row of the same weight as "Profile", for the one action
+            here that abandons a profile. Replay the tour stays: the tour's
+            own welcome step promises it is in the settings menu. */}
         <ProfileMenu
           onOpenProfile={() => { setProfileInfoSection(undefined); setProfileInfoOpen(true) }}
           onReplayTour={replayAppTour}
-          onNewPlan={() => {
-            setActiveAdaptationsForReset([])
-            if (profile?.id) getActiveAdaptations(profile.id).then(setActiveAdaptationsForReset).catch(console.error)
-            setNewPlanConfirmOpen(true)
-          }}
         />
       </div>
       <div
@@ -2215,96 +2314,12 @@ function App() {
             </button>
           </InsightBanner>
         )}
-        {adaptationMessages.length > 0 && (
-          <div className="space-y-2">
-            {adaptationMessages.map((msg, i) => (
-              <InsightBanner key={i} tone="ai" className="items-start justify-between">
-                <span>{msg.text}</span>
-                {msg.loadSuggestionId ? (
-                  <div className="flex shrink-0 items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={() => void handleLoadSuggestionConfirm(msg.loadSuggestionId!)}
-                      disabled={loadSuggestionBusy === msg.loadSuggestionId}
-                      className="text-xs font-semibold underline opacity-90 hover:opacity-100 disabled:opacity-50"
-                    >
-                      {loadSuggestionBusy === msg.loadSuggestionId ? 'Applying…' : 'Start heavier'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void handleLoadSuggestionDecline(msg.loadSuggestionId!)}
-                      disabled={loadSuggestionBusy === msg.loadSuggestionId}
-                      className="text-xs underline opacity-70 hover:opacity-100 disabled:opacity-50"
-                    >
-                      Keep as is
-                    </button>
-                  </div>
-                ) : msg.loadCatchupId ? (
-                  <div className="flex shrink-0 items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={() => void handleLoadCatchupConfirm(msg.loadCatchupId!)}
-                      disabled={loadSuggestionBusy === msg.loadCatchupId}
-                      className="text-xs font-semibold underline opacity-90 hover:opacity-100 disabled:opacity-50"
-                    >
-                      {loadSuggestionBusy === msg.loadCatchupId ? 'Updating…' : 'Yes, use my weights'}
-                    </button>
-                    {/* "Keep the plan" rather than "Dismiss": declining is a
-                        real answer that is remembered for this block, and the
-                        label has to say which way it goes. */}
-                    <button
-                      type="button"
-                      onClick={() => void handleLoadCatchupDecline(msg.loadCatchupId!)}
-                      disabled={loadSuggestionBusy === msg.loadCatchupId}
-                      className="text-xs underline opacity-70 hover:opacity-100 disabled:opacity-50"
-                    >
-                      Keep the plan
-                    </button>
-                  </div>
-                ) : msg.weightBasisOfferId ? (
-                  <div className="flex shrink-0 items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={() => void handleWeightBasisConfirm(msg.weightBasisOfferId!)}
-                      disabled={loadSuggestionBusy === msg.weightBasisOfferId}
-                      className="text-xs font-semibold underline opacity-90 hover:opacity-100 disabled:opacity-50"
-                    >
-                      {loadSuggestionBusy === msg.weightBasisOfferId ? 'Rebuilding…' : 'Yes, redo them'}
-                    </button>
-                    {/* "No thanks" and not "Dismiss": this records a permanent
-                        answer, and the label has to say so. A dismiss-shaped
-                        control on a decision that never comes back would be
-                        the app deciding something on their behalf while
-                        looking like it hadn't. */}
-                    <button
-                      type="button"
-                      onClick={() => void handleWeightBasisDecline(msg.weightBasisOfferId!)}
-                      disabled={loadSuggestionBusy === msg.weightBasisOfferId}
-                      className="text-xs underline opacity-70 hover:opacity-100 disabled:opacity-50"
-                    >
-                      No thanks
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (msg.goalId) dismissGoalProximity(msg.goalId)
-                      setAdaptationMessages(prev => prev.filter((_, idx) => idx !== i))
-                    }}
-                    className="shrink-0 text-xs underline opacity-70 hover:opacity-100"
-                    aria-label="Dismiss"
-                  >
-                    Dismiss
-                  </button>
-                )}
-              </InsightBanner>
-            ))}
-          </div>
-        )}
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
           <TabsContent value="dashboard">
             <Dashboard
+              trainerNudge={homeNudge}
+              stepsVersion={stepsVersion}
+              onStepsLogged={bumpCoachData}
               profile={profile}
               macros={macros}
               exercisePlan={exercisePlan}
@@ -2355,6 +2370,8 @@ function App() {
               devBypassLocks={devBypassLocks}
               onSwapExercise={handleSwapExercise}
               onBanExercise={handleBanExercise}
+              onMesocycleUpdated={setMesocycle}
+              onProfileChanged={patch => setProfile(prev => prev ? { ...prev, ...patch } : prev)}
               onDevOverrideWeekChange={setDevOverrideWeek}
               onDevOverrideDayChange={setDevOverrideDay}
               onDevBypassLocksChange={setDevBypassLocks}
@@ -2363,7 +2380,7 @@ function App() {
           </TabsContent>
 
           <TabsContent value="tools">
-            <ToolsTab profileId={profile.id} mealPools={mealPools} targets={macros} softLikedFoods={compiledSoftFoodPreferences} todaysPicks={chosenMeals} />
+            <ToolsTab profileId={profile.id} mealPools={mealPools} targets={macros} softLikedFoods={compiledSoftFoodPreferences} todaysPicks={chosenMeals} exercisePlan={exercisePlan} mesocycle={mesocycle} liveWeek={getActiveMesocycleWeek(mesocycleCreatedAt ?? profile.created_at, undefined, mesocycle.length || 4)} />
           </TabsContent>
 
           <TabsContent value="chat" forceMount className="data-[state=inactive]:hidden">
@@ -2377,7 +2394,7 @@ function App() {
               exerciseExclusions={effectiveExclusions}
               latestWeightKg={latestWeightKg}
               onPlanUpdate={handlePlanUpdate}
-              onLogsUpdated={() => setLogsVersion(v => v + 1)}
+              onLogsUpdated={() => { setLogsVersion(v => v + 1); bumpCoachData() }}
               onWeightLogged={handleWeightLogged}
               onMesocycleUpdated={setMesocycle}
               onProfileChanged={patch => setProfile(prev => prev ? { ...prev, ...patch } : prev)}
@@ -2437,6 +2454,16 @@ function App() {
               onGroceryChanged={() => { if (profile?.id) return reloadGrocery(profile.id) }}
               onOpenGrocery={() => { window.location.hash = tabHash('tools') }}
               onOpenDashboard={() => { window.location.hash = tabHash('dashboard') }}
+              onStepsChanged={() => { setStepsVersion(v => v + 1); bumpCoachData() }}
+              // WIRED, not merely declared. This prop existed, was awaited in
+              // two places, and was passed by nobody — so it did nothing at
+              // all. Water is local-first, so the tabs that unmount re-read it
+              // correctly on their next mount; what was actually stale is the
+              // figure the COACH quotes, which comes from a dashboard read
+              // that had no reason to run again.
+              onWaterChanged={bumpCoachData}
+              dataVersion={coachDataVersion}
+              onOpenExercise={() => { window.location.hash = tabHash('exercise') }}
               revealSpeed={revealSpeed}
               pendingLoadSuggestions={adaptationMessages.filter(m => m.loadSuggestionId).map(m => m.text)}
               onAttentionChange={setChatAttention}
@@ -2461,6 +2488,11 @@ function App() {
         initialSection={profileInfoSection}
         revealSpeed={revealSpeed}
         onRevealSpeedChange={handleRevealSpeedChange}
+        onNewPlan={() => {
+          setActiveAdaptationsForReset([])
+          if (profile?.id) getActiveAdaptations(profile.id).then(setActiveAdaptationsForReset).catch(console.error)
+          setNewPlanConfirmOpen(true)
+        }}
       />
       {/* ASK, NEVER SILENTLY (audit §2.1). A rebuild rewrites the weeks
           ahead, so it happens on an explicit yes and nowhere else. Declining

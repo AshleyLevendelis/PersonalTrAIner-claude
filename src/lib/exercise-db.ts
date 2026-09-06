@@ -238,6 +238,31 @@ export interface ExerciseEntry {
    * exercise, ordered easiest-to-hardest in band_tiers.
    */
   assistance?: { unit: 'kg' | 'band_tier'; band_tiers?: string[] }
+  /**
+   * A YOUTUBE VIDEO ID — eleven characters, not a URL.
+   *
+   * Ashley, 5 Sep 2026, asking for demonstrations in the app: a muscle map on
+   * every exercise, plus a video on the ones we have checked. An id rather
+   * than a URL on purpose: a URL field can carry any host, and this one must
+   * only ever reach the player embedded in ExerciseDetailDialog.
+   *
+   * ABSENT ON PURPOSE, NOT UNFINISHED. The "Watch demonstration" button
+   * renders only where this is set, so an exercise without one shows no
+   * control at all rather than a control that fails. VISION.md: "The app
+   * never offers a style, a mode, or an audience it cannot genuinely serve
+   * yet." Nothing anywhere requires a minimum count — an empty field across
+   * the whole catalogue is a valid, honest state.
+   *
+   * FILLED BY A PERSON WHO WATCHED IT. A video teaches a lift correctly or it
+   * teaches someone to hurt themselves, and that is not a judgement any
+   * automated pass can make. Every id here means a human watched it through
+   * and vouched for it. `demo_video_credit` names whose video it is, and is
+   * shown beside the player — the app is borrowing this teaching, not
+   * claiming it.
+   */
+  demo_video_id?: string
+  /** Whose video it is — channel or coach name. Required wherever demo_video_id is set. */
+  demo_video_credit?: string
 }
 
 export const EXERCISE_DATABASE: ExerciseEntry[] = [

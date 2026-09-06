@@ -1,5 +1,6 @@
 import { Dumbbell, Info, Timer } from 'lucide-react'
 import { describeTempo } from '@/lib/periodization'
+import { ceilingLabel } from '@/lib/progression-ceiling'
 import type { Exercise } from '@/lib/types'
 import type { PrescribedLoadSource } from '@/lib/load-prescription'
 
@@ -111,6 +112,10 @@ export function LoadChip({
   if (source == null) return null
   const explainer = explainerFor(source, ex.load_guidance)
   const label = loadSourceLabel(source)
+  // Suppressed once a real logged number is driving the weight: 'logged'
+  // means the progression engine is working from what this person actually
+  // lifted, so the estimate's ceiling is no longer what is holding it.
+  const ceiling = source === 'logged' ? null : ceilingLabel(ex)
 
   return (
     <div className="flex flex-col gap-0.5 mt-0.5">
@@ -145,6 +150,18 @@ export function LoadChip({
           </span>
         )}
         {label && <span className="text-[0.5625rem] italic text-muted-foreground/60">{label}</span>}
+        {/* NOT BEHIND THE ⓘ. The sentence that explains this has existed in
+            load_guidance since 30 Aug 2026 — "This is as far as the estimate
+            goes… Log a set and the number can start moving again" — and it
+            renders only when the info button is tapped. Correct words, one tap
+            away from nobody, while the card silently repeated the same
+            prescription for the last third of a plan. This is the same fact at
+            a glance; the full sentence is still one tap away, unchanged. */}
+        {ceiling && (
+          <span className="inline-flex items-center rounded border border-dashed border-muted-foreground/40 px-1 py-0 text-[0.5625rem] leading-4 text-muted-foreground/70">
+            {ceiling}
+          </span>
+        )}
         {explainer && (
           <button
             type="button"
@@ -160,7 +177,7 @@ export function LoadChip({
         <p className="text-[0.625rem] text-muted-foreground/80 italic max-w-xs">{explainer}</p>
       )}
       {progressionNote && (
-        <span className={`text-[0.625rem] italic ${progressionNote.didProgress ? 'text-primary' : 'text-muted-foreground/80'}`}>
+        <span className={`text-[0.625rem] italic ${progressionNote.didProgress ? 'text-primary-text' : 'text-muted-foreground/80'}`}>
           {progressionNote.note}
         </span>
       )}

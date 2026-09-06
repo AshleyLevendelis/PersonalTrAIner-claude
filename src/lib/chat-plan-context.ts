@@ -27,7 +27,9 @@
  *      prescription is the "+17.5kg" and `suggested_load` reads "Bodyweight".
  */
 import type { Exercise, WorkoutDay } from './types'
+import { buildCoachTechniqueSummary } from './exercise-technique'
 import { describeTempo } from './periodization'
+import { ceilingNoteForCoach } from './progression-ceiling'
 
 /** True when the per-set loads are not all the same — a ramp, not a straight-across weight. */
 function isRamped(perSet: Exercise['per_set_load']): boolean {
@@ -109,6 +111,13 @@ export function describeExerciseForCoach(e: Exercise): string {
     + ')'
     + (e.selection_note ? ` [why: ${e.selection_note}]` : '')
     + (e.block_hold_note ? ` [note: ${e.block_hold_note}]` : '')
+    // THE COACH GETS THE SAME FACT THE CARD NOW SHOWS. Ashley's ruling,
+    // 5 Sep 2026. An identical week reached the coach with nothing attached to
+    // say it was identical, so it described a stalled lift as progression —
+    // and the trainee reading that had no way to know the app had simply run
+    // out of levers. Attached per exercise rather than as a week-level line
+    // because it is true of one lift, not the session.
+    + (ceilingNoteForCoach(e) ? ` [ceiling: ${ceilingNoteForCoach(e)}]` : '')
 }
 
 /**
@@ -143,6 +152,23 @@ export interface CoachWeekBrief {
 
 /** The whole `exercise_summary` payload sent to chat-gemini. */
 export function buildCoachExerciseSummary({ days, coachNote, pendingLoadSuggestions }: CoachWeekBrief): string {
+  // HOW TO DO THEM, not just what they are. Added 5 Sep 2026 on Ashley's
+  // "fix it": the app's 801 curated form cues had one reader in the whole
+  // repo (the Exercise tab's How-to panel) and the coach was not it, so it
+  // answered technique from the model's own knowledge while the app held its
+  // answer one tap away. Same defect as the ingredients the coach could not
+  // see, and as the intensity/tempo this very file's header records.
+  //
+  // A SEPARATE BLOCK, not more text on describeExerciseForCoach: a lift
+  // programmed twice in a week would otherwise carry its cues twice.
+  //
+  // Deduplicated and capped inside buildCoachTechniqueSummary, which returns
+  // '' when there is nothing — which is what keeps the empty-plan contract
+  // below intact.
+  const technique = buildCoachTechniqueSummary(
+    days.flatMap(d => d.exercises.map(e => e.name)),
+  )
+
   return days
     .map(d => `${d.day}: ${d.focus} - ${d.exercises.length > 0
       ? d.exercises.map(describeExerciseForCoach).join(', ')
@@ -152,6 +178,12 @@ export function buildCoachExerciseSummary({ days, coachNote, pendingLoadSuggesti
     + (pendingLoadSuggestions && pendingLoadSuggestions.length > 0
       ? `\nPending suggestion(s) waiting on the dashboard, not yet answered: ${pendingLoadSuggestions.join(' | ')}`
       : '')
+    // EMPTY PLAN STILL RETURNS EXACTLY ''. test-log-correction.ts pins that
+    // literally, and it is load-bearing: the prompt has a rule keyed on this
+    // section being empty ("if the section above is EMPTY, say you don't have
+    // their prescribed weights"). An unconditional header here would make the
+    // coach think it had a plan it does not have.
+    + (technique ? `\nHOW TO PERFORM THESE (the app's own cues, the same words shown on the Exercise tab):\n${technique}` : '')
 }
 
 // ---------------------------------------------------------------------------

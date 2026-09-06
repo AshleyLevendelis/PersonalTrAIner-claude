@@ -24,7 +24,7 @@ export function FinisherRow({ cardio, onLogged }: { cardio: RecommendedCardio; o
     // saveCardioLog is synchronous/local-first — the UI reflects the save
     // immediately; the network round-trip and any retry happen in the
     // background (cardio-log-store's flush loop).
-    saveCardioLog({
+    const view = saveCardioLog({
       userId: profileId,
       date,
       activityName: cardio.activity,
@@ -32,6 +32,14 @@ export function FinisherRow({ cardio, onLogged }: { cardio: RecommendedCardio; o
       intensityRpe: cardio.targetRpe,
     })
     setSaving(false)
+    // The plan supplies this duration, so a refusal is a bad prescription
+    // rather than a bad tap — but "Logged" over a row that never wrote is
+    // the exact class of lie this round is closing, so the state only flips
+    // when the write really happened.
+    if (!view) {
+      console.error('Refused to log the prescribed finisher cardio:', cardio)
+      return
+    }
     setLogged(true)
     onLogged?.()
   }

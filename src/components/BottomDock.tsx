@@ -148,7 +148,7 @@ export function BottomDock() {
           onClick={timers.requestScreenOpen}
           className="w-full rounded-xl bg-card/95 glow-mint-box backdrop-blur-sm shadow-lg px-3 py-1.5 flex items-center gap-1.5 text-xs font-medium tabular-nums text-left"
         >
-          <Timer className="h-3 w-3 text-primary shrink-0" />
+          <Timer className="h-3 w-3 text-primary-text shrink-0" />
           {chipLabel}
         </button>
       </div>
@@ -170,7 +170,7 @@ export function BottomDock() {
           onClick={() => { if (!window.location.hash.startsWith('#/tab/exercise')) window.location.hash = tabHash('exercise') }}
           className="w-full rounded-xl bg-card/95 glow-mint-box backdrop-blur-sm shadow-lg px-3 py-1.5 flex items-center gap-1.5 text-xs font-medium tabular-nums text-left"
         >
-          <Timer className="h-3 w-3 text-primary shrink-0" />
+          <Timer className="h-3 w-3 text-primary-text shrink-0" />
           Session running · {formatDuration(elapsedMs)}
         </button>
       </div>
@@ -183,7 +183,7 @@ export function BottomDock() {
     return (
       <div ref={dockRef} className="fixed left-4 right-4 z-50 md:left-auto md:right-4 md:w-96" style={bottomStyle}>
         <div className="rounded-xl bg-card/95 glow-mint-box backdrop-blur-sm shadow-lg px-3 py-1.5 inline-flex items-center gap-1.5 text-xs font-medium tabular-nums">
-          <Timer className="h-3 w-3 text-primary shrink-0" />
+          <Timer className="h-3 w-3 text-primary-text shrink-0" />
           {isOverrun
             ? (restTargetSetNumber != null ? `Rest complete — set ${restTargetSetNumber}` : 'Rest complete')
             : formatDuration(restMs)}
@@ -198,7 +198,7 @@ export function BottomDock() {
         <Card className="bg-card/95 backdrop-blur-sm shadow-lg">
           <div className="p-3 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 min-w-0">
-              <Timer className="h-4 w-4 text-primary shrink-0" />
+              <Timer className="h-4 w-4 text-primary-text shrink-0" />
               <p className="text-sm font-medium truncate">
                 {restTargetSetNumber != null
                   ? `Rest complete — ready for set ${restTargetSetNumber}?`
@@ -236,27 +236,56 @@ export function BottomDock() {
 
   return (
     <div ref={dockRef} className="fixed left-4 right-4 z-50 md:left-auto md:right-4 md:w-96" style={bottomStyle}>
-      <div className="relative overflow-hidden rounded-[14px] bg-card/95 backdrop-blur-sm shadow-lg">
+      {/* Row A, to design_handoff_app_polish's active-session spec: a 44px
+          --surface-raised row rather than a card, the countdown as the one
+          big mono number, and the lift it belongs to on its own muted line
+          instead of trailing the clock. The elapsed fill stays — it is the
+          only thing on this dock that shows how far through the rest is at a
+          glance, and the spec replaces the card, not the mechanism. */}
+      <div
+        className="relative flex items-center gap-3 overflow-hidden rounded-xl px-3 shadow-lg"
+        style={{
+          minHeight: 44,
+          // --surface-raised is a 28%-alpha tint, so on its own the exercise
+          // row underneath reads straight through the dock. Composited over
+          // the opaque --surface-deep the design names for this dock, which
+          // is what makes it a surface rather than a filter.
+          background: 'linear-gradient(var(--surface-raised), var(--surface-raised)), var(--surface-deep)',
+        }}
+      >
         <div
           aria-hidden
           className="absolute inset-y-0 left-0 transition-[width] duration-1000 ease-linear"
           style={{ width: `${fillFraction * 100}%`, background: 'linear-gradient(90deg, rgba(var(--glow-rgb),.22), rgba(var(--glow-rgb),.32))' }}
         />
-        <div className="relative p-3 flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-sm font-medium tabular-mono">
-              {formatDuration(restMs)}
-              {restLabel && <span className="text-muted-foreground font-normal not-italic font-sans"> · rest · {restLabel}</span>}
-            </p>
-          </div>
-          <div className="flex items-center gap-1 shrink-0">
-            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => adjustRest(30)}>
-              +30s
-            </Button>
-            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={dismissRest}>
-              Skip ▸
-            </Button>
-          </div>
+        <Timer className="relative size-4 shrink-0 text-primary-text" />
+        <div className="relative min-w-0 flex-1 py-1.5">
+          <p className="tabular-mono text-[1.125rem] font-semibold leading-none">{formatDuration(restMs)}</p>
+          {restLabel && (
+            <p className="mt-0.5 truncate text-xs text-muted-foreground">Rest · {restLabel}</p>
+          )}
+        </div>
+        <div className="relative flex shrink-0 items-center gap-0.5">
+          {/* -30s was never on this dock even though adjustRest has always
+              taken a negative delta — so "I'm ready sooner" meant Skip, which
+              throws away the "ready for set N" prompt too. Disabled under 30s
+              left: there is nothing to take off, and taking the clock past
+              zero would flip the dock to its overrun state on a tap that
+              reads as "a bit less", not "done". */}
+          <Button
+            variant="ghost" size="sm"
+            className="h-7 px-1.5 text-[0.6875rem] text-text-tertiary disabled:opacity-40"
+            disabled={restMs <= 30_000}
+            onClick={() => adjustRest(-30)}
+          >
+            −30s
+          </Button>
+          <Button variant="ghost" size="sm" className="h-7 px-1.5 text-[0.6875rem] text-text-tertiary" onClick={() => adjustRest(30)}>
+            +30s
+          </Button>
+          <Button variant="ghost" size="sm" className="h-7 px-1.5 text-[0.6875rem] text-primary-text" onClick={dismissRest}>
+            Skip ▸
+          </Button>
         </div>
       </div>
     </div>

@@ -10,7 +10,7 @@
  * the Exercise tab disagree about…". Two surfaces showing one number, each
  * computing it its own way, drift silently and are found by a user.
  */
-import { readFileSync } from 'fs'
+import { readFileSync, existsSync } from 'fs'
 import { execSync } from 'child_process'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
@@ -27,6 +27,7 @@ const homeStrip = read('src/components/HomeWeekStrip.tsx')
 // direction nothing checked: not a deleted call site, but a call site that
 // never existed.
 const exStrip = read('src/components/exercise/WeekContextRow.tsx')
+const exToday = read('src/components/exercise/TodayPanel.tsx')
 const glyphs = read('src/lib/week-glyphs.ts')
 const arch = read('docs/VISION-ARCHITECTURE.md')
 
@@ -36,20 +37,55 @@ const check = (label: string, ok: boolean, extra?: unknown) => {
   else { failures++; console.error(`  FAIL: ${label}${extra !== undefined ? ` — ${JSON.stringify(extra).slice(0, 240)}` : ''}`) }
 }
 
-console.log('\n1. Home reads and points; it does not log (except the weigh-in)\n')
-check('Home no longer writes steps', !/logStepsManual/.test(home))
-check('...and still READS them, or its tile would point at nothing', /getStepsForDate/.test(home))
-check('Home keeps the weigh-in — the one documented exception', /WeighInCard/.test(home))
-check('the exception is written down, not just done',
-  /owns no number, with exactly one exception/i.test(arch) && /weigh-in/i.test(arch))
+console.log("\n1. Home is the day's quick log — and still owns no target\n")
+// REVERSED 6 Sep 2026 (design_handoff_app_polish, "Home becomes
+// informative"). Home's "Today so far" grid logs water, steps and the
+// weigh-in in place. The rule did not change — one fact, one owner — the
+// place you tap did: see VISION-ARCHITECTURE §5.1a, which records this as the
+// third move steps have made and says why the destination changed and the
+// invariant did not.
+check('Home logs steps', /logStepsManual/.test(home))
+check('...and water', /logWater/.test(home))
+check('...and the weigh-in', /WeighInCard/.test(home))
+check('...and still READS steps, or the cell would show nothing', /getStepsForDate/.test(home))
+// THE HALF THAT KEEPS IT AN OWNERSHIP RULE RATHER THAN A FREE-FOR-ALL. Home
+// may log, but it must not invent a target: every one of these still belongs
+// to the tab that sets it.
+check('Home sets no target of its own',
+  !/setWaterTargetMl|setDailyStepTarget|daily_step_target:/.test(home))
+check('...and derives the step target from the shared rule, not a second copy',
+  /stepsTargetFor/.test(home))
+check('the reversal is written down, not just done', /quick log came back to Home/i.test(arch))
 
-console.log('\n2. Steps moved to Nutrition, target rule unchanged\n')
-check('Nutrition logs steps', /logStepsManual/.test(nutrition))
-check('...deriving the target from the shared rule, not a second copy',
-  /stepsTargetFor/.test(nutrition) && !/daily_step_target\s*\?\?/.test(nutrition))
-check('...and says where the override lives', /override it in your profile/.test(nutrition))
+// MOVED AGAIN, 6 Sep 2026. Home -> Nutrition -> Exercise -> Home. The checks
+// below are the ones that guarded the row on each previous tab, re-pointed at
+// the one it now lives on. §5.1a records every move and why the destination
+// changed while the rule did not, rather than pretending it never said
+// otherwise.
+console.log('\n2. Steps are logged in exactly one place\n')
+check('...and Home says where the target override lives', /override it in your profile/.test(home))
 check('no second step-target setter was invented',
-  !/setDailyStepTarget|daily_step_target:/.test(nutrition))
+  !/setDailyStepTarget|daily_step_target:/.test(home))
+// THE OTHER HALF, and the one that would otherwise let two tabs own it. A
+// move that only adds is a copy: the row has to be GONE from the tab it left,
+// or two screens log one number and this file's whole premise is broken.
+check('Nutrition no longer logs steps', !/logStepsManual/.test(nutrition))
+check('Exercise no longer logs steps either', !/logStepsManual|StepsRow/.test(exToday))
+check('...and the deleted row is really deleted, not just unmounted',
+  !existsSync(join(ROOT, 'src/components/exercise/StepsRow.tsx')))
+check('...and no longer draws a step ring of its own', !/STEP_RING/.test(nutrition))
+// AN IMPORT IS NOT A RENDER. This block used to assert that StepsRow was both
+// imported AND drawn somewhere — added after deleting a `<StepsRow />` call
+// site left the import line behind and kept the check green against a tab
+// that no longer showed the row. The component is gone now (the input moved
+// into Home's Steps cell), so the same lesson is pointed at the thing that
+// replaced it: importing logStepsManual proves nothing if no control calls it.
+{
+  const callsIt = /onClick=\{\(\) => void handleLogSteps\(\)\}/.test(home)
+    && /onKeyDown=\{e => \{ if \(e\.key === 'Enter'\) void handleLogSteps\(\) \}\}/.test(home)
+  check('Home does not merely import the writer — a control calls it', callsIt)
+  check('...from an input the user can actually reach', /setStepsOpen\(true\)/.test(home) && /type="number"/.test(home))
+}
 
 console.log('\n3. One glyph vocabulary, two strips\n')
 check('the vocabulary has its own module', /export const GLYPH/.test(glyphs))
@@ -75,6 +111,20 @@ for (const rel of ['src/components/exercise/WeekContextRow.tsx', 'src/components
   ).split('\n').filter(l => l.trim() && !l.endsWith(rel))
   check(`${base} is actually imported by something`, importers.length > 0, importers)
 }
+
+// SAME SHAPE AS §2, for water. The quick-adds moved Nutrition -> Home on
+// 6 Sep 2026 (design_handoff_app_polish, Nutrition §6). §1 already asserts
+// Home logs it; this is the half that stops the row existing in two places,
+// which is the only way "one fact, one owner" can be broken by an addition.
+console.log('\n2b. Water is logged in exactly one place\n')
+check('Nutrition no longer logs water', !/logWater\b/.test(nutrition))
+check('...nor undoes a water log', !/undoWaterLog|undoLog\(/.test(nutrition))
+// AND STILL OWNS THE TARGET. Home logs the day; Nutrition sets what the day
+// is measured against. Losing this would make the move a deletion.
+check('...but still sets the water target', /setWaterTargetMl/.test(nutrition))
+check('...from a control the user can reach', /setEditingWaterTarget\(true\)/.test(nutrition))
+check('...and still READS the day, or the H2O ring would show nothing',
+  /getAllWaterLogs|getAllLogs as getAllWaterLogs/.test(nutrition))
 
 console.log('\n4. Water is one colour everywhere — status never follows the accent\n')
 check('Home draws water in --chart-3, not the mint accent', /--chart-3/.test(home))
