@@ -2,6 +2,51 @@
 
 Newest first. One line each.
 
+- [x] **THE 48kg SINGLE-LEG CALF RAISE — BUILT, Ashley's ruling A,
+  [docs/plans/the-48kg-calf-raise.md](docs/plans/the-48kg-calf-raise.md).**
+  Single-Leg Dumbbell Calf Raise was priced as a MACHINE calf raise (0.65 ×
+  squat) on a lift where the leg already carries the whole body: 36kg in one
+  hand on a step for an 80kg intermediate, 60kg wanted and clamped to the 48kg
+  dumbbell for advanced — the only exercise in the catalogue reaching its
+  implement ceiling for an ordinary body, on all three corpora. Now its own
+  category, `single_leg_calf`, matched on PROPERTIES (unilateral + hand-held,
+  so a stack version keeps the machine anchor and a future kettlebell version
+  is covered unnamed) and anchored to BODYWEIGHT — 6 / 10 / 16 / 22% by tier
+  as the reference working weight, through the same body basis and age taper
+  as everything else, and NOT halved again on the way out. Asked with the
+  resulting weights, one question, four options: she chose the
+  recommendation — **80kg man 12kg intermediate / 16kg advanced, 60kg woman
+  8 / 12, beginners 4kg, 24kg the most anyone is asked to hold on one foot.**
+  TWO THINGS THE FIX UNCOVERED, both decided unprompted and both recorded in
+  the plan doc: (1) the old 36kg had been the MINIMUM of the calf coherence
+  bucket in plans holding both calf exercises, so the MACHINE was being capped
+  at twice it — the bucket is now split (generator and scorer alike, the shrug
+  precedent) and 554 machine calf-raise weeks on a stride-5 grid rose to their
+  own standards number (e.g. 37.5 → 55kg); (2) the rotation guard's ±40%
+  yardstick now declines to rotate most machine users onto the dumbbell
+  version — left alone, the manual swap for a busy machine still offers it and
+  the gate pins that. One more: both 125%-band rotation checks (audit and
+  `per-side-load`) fired on a 2kg notch at 6kg — granularity, not
+  inheritance — and now also require more than one implement notch of
+  absolute gap; removing the slack re-fails exactly that case and the audit
+  had zero such offences before, so nothing is hidden.
+  `test:single-leg-calf` new (property match, the ruled table as spec,
+  sex-blind/squat-blind/scales-with-body with the machine as the control,
+  0 of 600 cells at the implement, ≤30% of bodyweight in hand, machine tables
+  pinned bit-identical, the coherence split run directly on a two-exercise
+  day, the swap path still offers it). **Eight mutations, eight caught** —
+  after a first version let the generator-side split survive by one stack
+  rounding step. Proven by diff: a 53,400-cell load dump differs on exactly
+  one exercise; audit clamp warnings 7,340 → 4,597 with none from this lift.
+  **Verified after the build:** tsc and build clean; 130 of 131 runnable
+  gates (the one failure needs a browser and fails identically on an
+  unmodified tree); `test:audit` **17,423 / 0** on the final tree (a first run
+  failed on exactly the one-notch case above, which is how it was found);
+  `test:quality` was still running when this was committed — its number is
+  recorded in the follow-up commit, the same way the second-sport build's was.
+  No migration, no edge-function change — plan generation is client-side and
+  ships via push → Vercel.
+
 - [x] **"I ALSO DO MUAY THAI TWICE A WEEK" — BUILT, Ashley's ruling (a),
   [docs/plans/i-also-do-muay-thai.md](docs/plans/i-also-do-muay-thai.md).**
   She asked to be able to say "I train in the gym Mon/Tue/Thu/Fri in the
@@ -629,7 +674,7 @@ Newest first. One line each.
   **Rear delts** get `isolation_rear_delt`, deliberately the SAME fraction as the side delt (0.19 of bench): the two heads are comparable, and the existing per-side halving separates the implements by itself — a dumbbell fly lands per hand on the lateral-raise number, a cable or machine version at roughly double because it is both arms. **Lat isolation** gets `isolation_lat` anchored to the ROW family, not bench — that is the entire point, since this work is limited by pulling strength. **Core gets no anchor at all**, on purpose: trunk rotation is not predicted by any barbell lift, so a fraction would be the same guess in a new place. All seven core movements now behave alike — progress by reps and tempo, as Plank and Dead Bug already did — which also retires the 27.5kg loaded spinal rotation. Two more fell out of the same fix: a bodyweight hip hinge is hamstring work, and a wall sit is quad work.
 - [x] **AND THE CHECK THAT FOUND THEM ALMOST DIDN'T EXIST.** `test:categorize-precedence` was red only because its snapshot was stale (158 of 185 exercises). Regenerating it from the database would have turned it green while blessing every one of these fifteen — a gate passing because it was told the wrong answer is the right one. So the snapshot was regenerated AND an independent check added: an exercise in `isolation_chest` whose own `primary_muscles` contain no chest did not get chosen, it fell through. That check is derived from the data, not from a list I wrote, which is why it found twelve I did not know about.
 
-- [ ] **7,340 LOAD CLAMPS THE CODE ITSELF SAYS NOT TO TRUST.** Surfaced by the quality sweep's log while verifying the load floor, then measured on the audit: **7,340 clamp warnings, identical with and without that change**, so entirely pre-existing. The warning's own words: *"This is a safety net, not a fix: something upstream produced a wrong number and should be traced, not just the clamp trusted."* 24 distinct exercises hit a ceiling; the top one is **Single-Leg Dumbbell Calf Raise at 2,829 of them**, computing 50, 52, 54, 58, 60, 64, 66, 72kg against a 48kg implement ceiling — so it is not a rounding edge, it is a number that climbs well past the cap and gets silently pulled back. Others: Dumbbell Floor Press (556), Dumbbell Shrugs (553), Shrugs (478), Farmer's Walk (379). The audit passes at 0 failures BECAUSE the clamp catches these, which is exactly the shape of a check satisfied by the wrong thing — the plan is safe, and the calculation underneath is wrong. Worth tracing the calf raise first: a per-side isolation lift being priced above a full dumbbell rack is a big, specific error and likely one shared root.
+- [x] **7,340 LOAD CLAMPS THE CODE ITSELF SAYS NOT TO TRUST.** (BUILT 6 Sep 2026 — see the top entry; the calf raise was the structural clamp and is gone, the 4,597 that remain are the honest top-corner kind.) Surfaced by the quality sweep's log while verifying the load floor, then measured on the audit: **7,340 clamp warnings, identical with and without that change**, so entirely pre-existing. The warning's own words: *"This is a safety net, not a fix: something upstream produced a wrong number and should be traced, not just the clamp trusted."* 24 distinct exercises hit a ceiling; the top one is **Single-Leg Dumbbell Calf Raise at 2,829 of them**, computing 50, 52, 54, 58, 60, 64, 66, 72kg against a 48kg implement ceiling — so it is not a rounding edge, it is a number that climbs well past the cap and gets silently pulled back. Others: Dumbbell Floor Press (556), Dumbbell Shrugs (553), Shrugs (478), Farmer's Walk (379). The audit passes at 0 failures BECAUSE the clamp catches these, which is exactly the shape of a check satisfied by the wrong thing — the plan is safe, and the calculation underneath is wrong. Worth tracing the calf raise first: a per-side isolation lift being priced above a full dumbbell rack is a big, specific error and likely one shared root.
   UPDATE 1 Sep 2026 — **traced, and my "likely one shared root" guess was wrong.** Measured every exercise that reaches its implement ceiling anywhere in a 240-cell grid (4 experience × 5 bodies × 4 rep ranges × 3 RPEs). `Single-Leg Dumbbell Calf Raise` hits it in **56 of 240** cells; the next worst is 23, and **every other one clamps only in the top corner** — a 120kg advanced male — which is the honest "ran out of dumbbell" case the ceiling was written for. So it is one mis-modelled exercise plus a long tail of the safety net working, not a systemic fault. The cause: `isolation_calf` is 0.65 × squat, calibrated for a MACHINE where the machine supplies the load, applied to a lift where the trainee is standing on one foot and the leg already carries full bodyweight before the dumbbell exists. An intermediate 80kg man is told to hold **36kg in one hand** balancing on a step; advanced wants 60kg and gets clamped to 48. **Investigated only — nothing built.** Load prescription and the numbers are Ashley's: `docs/plans/the-48kg-calf-raise.md` has the current table, three options, a recommendation, and a candidate table to rule on the way she ruled on kettlebell swings. NOTE ON DENOMINATORS: "7,340" counts warnings logged in one audit run (the same prescription once per week per profile); the 56/240 above counts distinct grid cells. Not comparable — the ranking is the part that carries. **CONFIRMED ON A THIRD CORPUS:** the full plan-quality sweep (9,216 profiles × 16 weeks) logs **88,046 clamp warnings, 100% of them this one exercise** — no other catalogue entry reaches its ceiling anywhere in it, because that grid's body weights are ordinary rather than reaching 120kg, so the honest top-corner clamps never fire and only the structural one is left. That sweep scores **11.45 / 12 with 0 plans below the 7.2 floor** throughout: a quality score measures structure, progression, time fit and selection, not whether 48kg in one hand on a step is an instruction anyone can follow.
 
 - [ ] **A DELOAD CAN COME IN HEAVIER THAN THE WEEK BEFORE IT.** Two cases, found by a check added during the above and present identically with and without it, so pre-existing: `full_gym/full_body/intermediate Seated Cable Row wk12: 40 → 45` and `minimalist/full_body/intermediate Dumbbell Floor Press wk16: 18 → 20`. A deload is supposed to be the easy week. Pinned in the gate BY NAME rather than by a count, so fixing one while breaking another still fails — a budget of "at most 2" is the exact shape §1 spent eleven offenders learning to distrust.

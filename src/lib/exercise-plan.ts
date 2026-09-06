@@ -2718,7 +2718,16 @@ function coherenceGroup(entry: ExerciseEntry): string | null {
     case 'isolation_shoulder': return entry.substitution_group === 'shrug' ? 'shrug' : 'lateral_delt'
     case 'isolation_quad': return 'quad_isolation'
     case 'isolation_hamstring': return 'hamstring_isolation'
-    case 'isolation_calf': return 'calf_isolation'
+    // Split the same way shrugs were split from laterals, and for the same
+    // reason. A single-leg calf raise with a dumbbell in one hand is priced
+    // off BODYWEIGHT (single_leg_calf, load-prescription.ts) — the leg
+    // already carries the body — while a machine calf raise is priced off the
+    // squat with the machine supplying every kilo. Measured at the anchor
+    // change: an 80kg intermediate's 12kg dumbbell next to his 70kg machine
+    // calf raise is a 5.8x raw spread, and this pass would have pulled the
+    // MACHINE down to 24kg to "fix" it. Keyed on categorize, the one place
+    // that decides which anchor a calf raise gets, rather than on a name.
+    case 'isolation_calf': return categorize(entry) === 'single_leg_calf' ? 'calf_single_leg' : 'calf_isolation'
     default: return null
   }
 }
@@ -2851,7 +2860,10 @@ function substituteFloorClampedIsolation(
   }
 }
 
-function enforceLoadCoherence(days: WorkoutDay[]): void {
+// Exported for test:single-leg-calf, which runs the pass on a two-exercise
+// day directly: the plan-level version of that check passed under mutation
+// by one stack rounding step (12kg cap -> 12.5kg, "more than twice 6kg").
+export function enforceLoadCoherence(days: WorkoutDay[]): void {
   for (const day of days) {
     const mainLifts = day.exercises.filter(ex => {
       const entry = findEntry(ex.name)

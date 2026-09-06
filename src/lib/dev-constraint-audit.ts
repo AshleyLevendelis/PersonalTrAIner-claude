@@ -87,6 +87,13 @@ export const SAFETY_CEILING_KG_TOTAL: Partial<Record<string, number>> = {
   // triples and sets of twenty alike — the prescription had stopped adjusting
   // for them, the same failure the kettlebell ceiling produced.
   isolation_calf: 230,
+  // Bodyweight-anchored single-leg calf raise (single_leg_calf, load-
+  // prescription.ts). The formula's real top is 30kg in one hand for a 120kg
+  // advanced male at 3-5 reps — 60kg on the per-side x2 basis this table is
+  // written in — so 75 is the usual ~25% of headroom. Its own entry rather
+  // than isolation_calf's 230 because a dumbbell held on one foot must not be
+  // allowed anywhere near a calf machine's numbers before the audit notices.
+  single_leg_calf: 75,
   carry: 130,
   // The three that were per-hand, doubled to say the same thing as a total.
   // 25 -> 50, 70 -> 140, 60 -> 120: the allowance each movement actually
@@ -1211,7 +1218,20 @@ async function runMesocycleBehaviorChecks(): Promise<AuditTestCase[]> {
                 // otherwise — prescribeLoad's own convention), so they
                 // compare directly without needing to know loadingMode here.
                 const ratio = ex.suggested_load_kg / fresh.starting_weight_kg
-                if (ratio > 1.25) {
+                // A relative band cannot see plate granularity. On a 6kg
+                // dumbbell one 2kg notch is 133%; the identical mechanism on
+                // the same lift at 18kg (its old, wrong anchor) was 111% and
+                // never fired. Found the day the single-leg calf raise moved
+                // to a bodyweight anchor: the rotated-in slot was matched to
+                // the same lift's own held 8kg on another day (one weight
+                // per lift per week) against a fresh 6kg at that day's
+                // bumped reps. Nothing was inherited from a stranger. So an
+                // offence needs BOTH the ratio AND more than one loading
+                // notch of absolute gap — a two-notch jump on the lightest
+                // dumbbell is still caught, and nothing changes above ~20kg
+                // where a notch is inside the band anyway.
+                const oneNotch = unverifiedRampStepKg(entry)
+                if (ratio > 1.25 && ex.suggested_load_kg - fresh.starting_weight_kg > oneNotch) {
                   failures.push({
                     check: 'rotation_relative_load',
                     combination: comboLabel,

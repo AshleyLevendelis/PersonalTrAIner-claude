@@ -6,7 +6,7 @@ import { EXPERIENCE_RPE_CEILING } from './periodization'
 import { setRandomSource, resetRandomSource } from './exercise-plan'
 import { seededRngFromKey } from './seeded-random'
 import { DURATION_BUDGET_SECONDS, getSessionMinimumSeconds, getSessionMaximumSeconds, estimateDaySeconds, estimateSlotsSeconds, parseRestSeconds } from './session-duration'
-import { getEquipmentFloorKg, labelModeForEntry, isExternallyLoaded } from './load-prescription'
+import { getEquipmentFloorKg, labelModeForEntry, isExternallyLoaded, categorize } from './load-prescription'
 
 // ---------------------------------------------------------------------------
 // PLAN QUALITY SCORING
@@ -1025,7 +1025,11 @@ function scoreSelection(profile: UserProfile, mesocycle: MesocycleWeek[]): Dimen
     if (p === 'isolation_shoulder') return entry.substitution_group === 'shrug' ? 'shrug' : 'lateral_delt'
     if (p === 'isolation_quad') return 'quad_isolation'
     if (p === 'isolation_hamstring') return 'hamstring_isolation'
-    if (p === 'isolation_calf') return 'calf_isolation'
+    // Mirrors exercise-plan.ts's coherenceGroup: a bodyweight-anchored
+    // single-leg calf raise (single_leg_calf) is not comparable to a machine
+    // calf raise even after the per-side x2 below — 24kg normalised against a
+    // 70kg stack is the anchor difference, not an incoherence.
+    if (p === 'isolation_calf') return categorize(entry) === 'single_leg_calf' ? 'calf_single_leg' : 'calf_isolation'
     return null
   }
   for (const day of week1?.days ?? []) {

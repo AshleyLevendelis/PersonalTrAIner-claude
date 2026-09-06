@@ -1,8 +1,8 @@
 # The 48kg single-leg calf raise
 
-**Status: investigation and proposal. Nothing built.** Load prescription, so
-this waits for Ashley per CLAUDE.md. It is here rather than in the code
-because the *shape* of the fix is clear and the *numbers* are hers.
+**Status: BUILT, 6 Sep 2026 — option A, on Ashley's ruling.** The
+investigation below is kept as written; the ruling and what was built follow
+it at the end of this document.
 
 ## What the app is telling people right now
 
@@ -138,3 +138,113 @@ The backlog's "7,340 clamp warnings" is a count of *warnings logged during one
 audit run*, which counts the same prescription once per week per profile. The
 table above counts *distinct grid cells*, which is a different denominator.
 The two numbers are not comparable, and the ranking is the part that matters.
+
+## Ashley's ruling, 6 Sep 2026: **A**
+
+Asked in the conversation, one question, four options, with the weights the
+app would actually show rather than the multiplier. The single-leg dumbbell
+calf raise is now priced off the person's own bodyweight; the number is what
+goes in one hand while standing on one foot. She chose the recommendation:
+
+| | 60kg woman | 70kg woman | 80kg man | 100kg man | 120kg man |
+|---|---|---|---|---|---|
+| beginner | 4kg | 4kg | 4kg | 6kg | 6kg |
+| novice | 6kg | 6kg | 8kg | 10kg | 10kg |
+| intermediate | 8kg | 10kg | 12kg | 14kg | 18kg |
+| advanced | 12kg | 14kg | 16kg | 20kg | 24kg |
+
+(12-15 reps at RPE 7-8, the ordinary calf prescription. These differ from the
+candidate table above by a step here and there because the reference is a
+10-rep RPE-8 working weight scaled to the week's reps, like every other
+isolation anchor, and rounded to a 2kg dumbbell.) The alternatives offered:
+B lighter (8 / 12 for the 80kg man), C heavier (14 / 20), D halve today's
+numbers and keep the squat anchor. Not chosen.
+
+## BUILT
+
+- **`single_leg_calf`**, a new standards category in `categorize()`
+  (`src/lib/load-prescription.ts`), matched on PROPERTIES: `isolation_calf`
+  AND `unilateral` AND a hand-held implement (one dumbbell/kettlebell, or a
+  pair). A unilateral calf raise on a stack stays `isolation_calf` — the
+  machine supplies the load. A future single-leg kettlebell calf raise is
+  covered by construction; no name is matched.
+- **`ISOLATION_FRACTION_OF_BODYWEIGHT`** — 6 / 10 / 16 / 22% of bodyweight
+  by experience as the reference working weight, resolved through the same
+  `resolveBodyBasis` and age taper the parent-lift path uses, so an assumed
+  body and a 55-year-old behave exactly as they do everywhere else.
+- **Not halved twice.** The reference is already the number in the hand, so
+  `prescribeLoad`'s per-side halving skips categories declared in
+  `BODYWEIGHT_ANCHORED_PER_SIDE` (derived from the table's keys, so the two
+  cannot drift apart). The label still reads "(single side)", which is true.
+- **The two anchors are never compared.** `enforceLoadCoherence`'s
+  same-muscle pass caps every member of a group at twice its lightest; with a
+  12kg dumbbell and a 70kg machine in one `calf_isolation` bucket it would
+  have pulled the MACHINE down to 24kg. Both the generator's `coherenceGroup`
+  and the scorer's `coherenceGroupOf` now put the bodyweight-anchored lift in
+  its own `calf_single_leg` bucket — the same split shrugs got from lateral
+  raises, for the same reason. **This was already happening the other way:**
+  the old 36kg single-leg number was the group's minimum in plans that held
+  both, and the machine calf raise was being capped at twice it. Freed, those
+  machine numbers rose to their own standards value (554 exercise-weeks on a
+  stride-5 grid; e.g. Seated Calf Raises 37.5kg → 55kg for an intermediate
+  80kg man at 12-17 reps). Decided unprompted: it restores the intended
+  number rather than setting a new one.
+- **Rotation.** `rotateVariation`'s relative-load guard (±40% of effective
+  total load) now declines to rotate a machine user onto the dumbbell version
+  for most bodies, because 2 × 12kg against a 70kg stack reads as a
+  regression to that yardstick. Left as is: the guard is doing its stated job
+  on an honest number, and the exercise's reason to exist — a manual swap for
+  a busy calf machine — does not use that guard and still offers it (pinned
+  in the gate). Net effect on a stride-5 grid: 1,655 plan-days changed which
+  calf variant a block rotated to, all of them machine ↔ machine.
+- **Audit ceiling** `SAFETY_CEILING_KG_TOTAL.single_leg_calf = 75` (per-side
+  ×2 basis; the formula's real top is 30kg in one hand for a 120kg advanced
+  man at 3-5 reps, so 60 total with the usual ~25% headroom).
+- **`CALF_MACHINE_CEILING_KG`'s mode gate stays** and its comment now says
+  why: a named ceiling exception may only ever apply to a stack.
+- **One-notch slack on the two rotation checks** (`rotation_relative_load` in
+  `dev-constraint-audit.ts` and `test:per-side-load` §6). Both compared a
+  rotated-in load against a fresh estimate with a bare 125% band; on a 6kg
+  dumbbell one 2kg notch is 133%, and the identical mechanism on the same
+  lift at its old 18kg was 111% and never fired. The flagged case was the
+  lift matched to ITS OWN held weight on another day (one weight per lift per
+  week) against a fresh estimate at that day's bumped reps — nothing
+  inherited from a stranger. An offence now needs the ratio AND more than one
+  implement notch of absolute gap; removing the slack re-fails on exactly that
+  case and nothing else, and the audit had zero such offences before, so
+  nothing is hidden.
+
+## Gate: `npm run test:single-leg-calf` (new)
+
+Seven sections: the category is a property (real entry, three fabricated
+variants, both machines); the ruled table pinned as the spec; anchored to the
+person (sex-blind at the same body across 300 cells, a reported 200kg squat
+changes nothing, twice the body is twice the dumbbell — with the machine
+calf raise as the control that still reads the squat table); never at the
+48kg implement across 600 cells, never more than 30% of bodyweight in one
+hand, the clamp never fires; the machine calf raises pinned bit-identical at
+three bodies each; the coherence split proven on a real plan AND by running
+the pass directly on a two-exercise day (a first version passed under
+mutation by one stack rounding step, so the direct test exists); the swap
+path still offers the dumbbell version for a busy machine.
+
+**Eight mutations, eight caught** after the direct pass test was added:
+category reverted; halved again; anchored to the squat; the unilateral half
+of the match dropped; the generator's coherence split reverted; the scorer's
+split reverted; a ruled fraction changed; the match widened to stacks.
+`test:categorize-precedence`'s snapshot updated for the one deliberate move.
+
+## Verified
+
+- prescribeLoad-level: a 53,400-cell dump (every loaded exercise × 2 sexes ×
+  5 bodies × 4 tiers × 5 rep ranges × 3 RPEs) before and after differs on
+  **exactly one exercise**, the single-leg dumbbell calf raise. Clamp cells on
+  that grid 686 → 602: the 84 it owned are gone, every other clamp identical.
+- Plan-level (stride-5 quality grid, 893,096 exercise-weeks): the dumbbell
+  calf raise down everywhere it appears; machine calf raises up in 554
+  exercise-weeks (the released coherence cap, above); 1,655 plan-days with a
+  different machine calf variant in a block (the rotation guard, above); no
+  other exercise moved.
+- Audit clamp warnings 7,340 → 4,597 (the balance is the honest top-corner
+  clamps the ceiling exists for; the calf raise contributed none).
+- Gates, audit and quality: recorded in BACKLOG with the numbers.

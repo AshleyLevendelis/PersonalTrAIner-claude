@@ -32,7 +32,7 @@
 
 import {
   isPerSideLoad, labelModeForEntry, prescribeLoad, estimateEffectiveTotalKg,
-  isExternallyLoaded, loadingMode, categorize,
+  isExternallyLoaded, loadingMode, categorize, unverifiedRampStepKg,
 } from '../src/lib/load-prescription'
 import { EXERCISE_DATABASE, type ExerciseEntry } from '../src/lib/exercise-db'
 import { generateMesocycle, setRandomSource, resetRandomSource } from '../src/lib/exercise-plan'
@@ -279,7 +279,10 @@ console.log('\n6. A block baseline never survives a rotation')
           })
           if (!fresh.starting_weight_kg) continue
           const ratio = ex.suggested_load_kg / fresh.starting_weight_kg
-          if (ratio > 1.25) {
+          // Same one-notch slack as the audit's rotation_relative_load check
+          // (dev-constraint-audit.ts) and for the same reason: a 2kg step on
+          // a 6kg dumbbell is 133%, and that is granularity, not inheritance.
+          if (ratio > 1.25 && ex.suggested_load_kg - fresh.starting_weight_kg > unverifiedRampStepKg(entry)) {
             offences.push(`${label} wk${week.week_number} ${day.day} "${prevEx.name}"->"${ex.name}" ${ex.suggested_load_kg}kg vs fresh ${fresh.starting_weight_kg}kg (${Math.round(ratio * 100)}%)`)
           }
         }

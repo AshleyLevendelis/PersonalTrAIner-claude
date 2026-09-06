@@ -349,6 +349,51 @@ const ISOLATION_FRACTION_OF_COMPOUND: Record<string, { parent: LiftFamily; fract
 }
 
 /**
+ * Isolation work whose load IS the trainee, sized against the trainee.
+ *
+ * A single-leg calf raise with a dumbbell in one hand is not a machine calf
+ * raise with less iron on it. On one foot, that leg already carries the whole
+ * body before the dumbbell exists; the dumbbell is what goes ON TOP of
+ * bodyweight, so it has to be priced as a fraction of bodyweight — exactly
+ * the reasoning prescribeAddedLoad uses for a weighted pull-up or dip.
+ *
+ * Until 6 Sep 2026 it shared isolation_calf's 0.65 × squat anchor, which is
+ * calibrated for a MACHINE where the machine supplies all the load. Measured:
+ * an 80kg intermediate man was told to balance on a step holding 36kg in one
+ * hand; advanced wanted 60kg and was silently clamped to the 48kg implement
+ * ceiling. Across three corpora it was the only exercise in the catalogue that
+ * reached its implement ceiling for an ordinary body (56 of 240 grid cells;
+ * 100% of the plan-quality sweep's 88,046 clamp warnings). Grip and balance
+ * give out long before a calf does — it was a number, not a prescription.
+ *
+ * Values are the REFERENCE working weight (~10 reps at RPE 8), the same
+ * convention as ISOLATION_FRACTION_OF_COMPOUND, and they are the number IN
+ * THE HAND — see BODYWEIGHT_ANCHORED_PER_SIDE for why prescribeLoad must not
+ * halve them again. Age-tapered like every other isolation reference, via the
+ * same ageAdjustment the parent-lift path applies.
+ *
+ * Ashley's ruling, 6 Sep 2026, given the resulting weights rather than the
+ * multiplier (docs/plans/the-48kg-calf-raise.md): see that doc for the table
+ * she was shown and which column she chose.
+ */
+const ISOLATION_FRACTION_OF_BODYWEIGHT: Record<string, Record<TrainingExperience, number>> = {
+  single_leg_calf: { beginner: 0.06, novice: 0.10, intermediate: 0.16, advanced: 0.22 },
+}
+
+/**
+ * Categories whose reference weight is already the per-side figure.
+ *
+ * The standards model produces a TOTAL and prescribeLoad halves it for any
+ * per-side movement (isPerSideLoad). A bodyweight-anchored single-leg lift has
+ * no meaningful total — "22% of bodyweight" describes the one dumbbell in the
+ * one hand — so it is written per side and skips that halving. Declared next
+ * to the table rather than special-cased by name at the halving site, so a
+ * second bodyweight-anchored category cannot be added to one and forgotten by
+ * the other.
+ */
+const BODYWEIGHT_ANCHORED_PER_SIDE: ReadonlySet<string> = new Set(Object.keys(ISOLATION_FRACTION_OF_BODYWEIGHT))
+
+/**
  * Extracts a numeric effort value from an RPE label like 'RPE 6-7' or a bare
  * 'RPE 7'. Falls back to a conservative mid-range guess if unparseable —
  * defaulting light is the safe failure mode here, not defaulting heavy.
@@ -427,7 +472,15 @@ export function categorize(entry: ExerciseEntry): string | null {
       case 'isolation_shoulder': return 'isolation_shoulder'
       case 'isolation_quad': return 'isolation_quad'
       case 'isolation_hamstring': return 'isolation_hamstring'
-      case 'isolation_calf': return 'isolation_calf'
+      // A calf raise done ON ONE LEG with the load IN THE HAND is anchored to
+      // bodyweight, not to the squat (see ISOLATION_FRACTION_OF_BODYWEIGHT).
+      // Matched on properties, not the name: unilateral, and a hand-held
+      // implement (one dumbbell/kettlebell, or a pair). A unilateral calf
+      // raise on a STACK stays isolation_calf — there the machine supplies the
+      // load and the squat anchor is right; a bodyweight one falls to the
+      // 'stack' bucket by loadingMode's fallthrough and stays too, which is
+      // harmless because it is never externally loaded.
+      case 'isolation_calf': return isHandHeldUnilateral(entry) ? 'single_leg_calf' : 'isolation_calf'
       // THE FIVE PATTERNS THAT USED TO FALL THROUGH. Each one landed on the
       // default below and was priced as chest isolation — 0.38 of a bench
       // press — because the switch had no case for it. Found by
@@ -567,10 +620,17 @@ export function categorize(entry: ExerciseEntry): string | null {
     case 'isolation_hamstring':
       return 'isolation_hamstring'
     case 'isolation_calf':
-      return 'isolation_calf'
+      return isHandHeldUnilateral(entry) ? 'single_leg_calf' : 'isolation_calf'
     default:
       return null
   }
+}
+
+/** One leg (or arm) working, with the load held in the hand rather than supplied by a machine. */
+function isHandHeldUnilateral(entry: ExerciseEntry): boolean {
+  if (!entry.unilateral) return false
+  const mode = loadingMode(entry)
+  return mode === 'single_implement' || mode === 'dumbbell'
 }
 
 /**
@@ -687,10 +747,13 @@ const LEG_PRESS_CEILING_KG = 400
 // highest legitimate value. It changes no prescribed weight below 102.5kg,
 // which is everything the formula currently produces.
 //
-// Deliberately gated on loading mode too. Single-Leg Dumbbell Calf Raise is
-// isolation_calf as well, and its 48kg clamp is CORRECT and stays: 48kg is
-// the heaviest dumbbell most gyms own, so a strong lifter really has run out
-// of implement. That is the honest kind of clamp.
+// Deliberately gated on loading mode too. When this was written Single-Leg
+// Dumbbell Calf Raise was isolation_calf as well, and its 48kg clamp had to
+// stay: 48kg is the heaviest dumbbell most gyms own. That lift now has its own
+// bodyweight-anchored category (single_leg_calf) and no longer reaches 48kg at
+// all, but the mode gate stays — a named ceiling exception may only ever
+// apply to a stack (test:ceiling-units pins this), so a future unilateral
+// calf raise on a dumbbell cannot inherit a machine's ceiling by category.
 const CALF_MACHINE_CEILING_KG = 250
 
 /** The realistic implement ceiling for this exercise, in the same units prescribeLoad's `rounded` already uses for its loading mode (per hand for a dumbbell pair, total otherwise). */
@@ -1313,8 +1376,16 @@ function resolveCompoundOneRepMaxKg(category: string, profile: UserProfile): num
  */
 function resolveIsolationReferenceKg(category: string, profile: UserProfile): number | null {
   const isolation = ISOLATION_FRACTION_OF_COMPOUND[category]
-  if (!isolation) return null
-  return resolveParentOneRepMaxKg(isolation.parent, profile) * isolation.fraction
+  if (isolation) return resolveParentOneRepMaxKg(isolation.parent, profile) * isolation.fraction
+  // Bodyweight-anchored: the same body basis and age taper the parent-lift
+  // path uses, without a parent lift in between. resolveBodyBasis means an
+  // assumed body flows through here exactly as it does everywhere else, and
+  // prescribeLoad's bodyAssumed copy already covers this branch.
+  const ofBodyweight = ISOLATION_FRACTION_OF_BODYWEIGHT[category]
+  if (!ofBodyweight) return null
+  const body = resolveBodyBasis(profile)
+  const experience = profile.training_experience || 'novice'
+  return body.weightKg * (ofBodyweight[experience] ?? ofBodyweight.novice) * ageAdjustment(body.ageYears)
 }
 
 /**
@@ -1476,7 +1547,13 @@ export function prescribeLoad(
     // kettlebell used BILATERALLY (goblet squats, two-handed swings) is not
     // halved and is not labeled "per hand" — see loadingMode() and
     // isUnilateralSingleImplement above.
-    if (perSideLoad) estimate = estimate / 2
+    //
+    // EXCEPT a bodyweight-anchored per-side category, whose reference is
+    // already the number in the hand (BODYWEIGHT_ANCHORED_PER_SIDE). Halving
+    // it again would hand a single-leg calf raise half the weight its table
+    // was ruled on. The label is unaffected: labelModeForEntry still says
+    // "(single side)", which is true.
+    if (perSideLoad && !BODYWEIGHT_ANCHORED_PER_SIDE.has(category)) estimate = estimate / 2
 
     if (options.unverifiedPreviousLoadingWeekKg != null && !fromKnownWeight) {
       // Every loading week after calibration, still no verified number for
