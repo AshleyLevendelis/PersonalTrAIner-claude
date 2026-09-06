@@ -2,6 +2,26 @@
 
 Newest first. One line each.
 
+- [x] **TOOLS STOPS BEING A JUNK DRAWER** — `design_handoff_app_polish` step 4
+  of 8. Six tiles with live subtitles (grocery items and how many are checked,
+  sessions and PRs, weeks and which block) over a three-row grocery preview
+  with an "All N items ›" that expands in place. Rows are hairlines with a
+  20px token-coloured checkbox instead of bordered boxes, and the component
+  stops repeating the section heading above it.
+  The timer panel now OPENS from its two tiles instead of sitting under them
+  permanently — safe because the running state lives in the `useTimers`
+  provider, which the gate pins.
+  **One tile the handoff names has nowhere to go:** it points "Rest timer" at
+  a settings sheet that does not exist, and the rest timer is automatic (it
+  starts itself on a logged set and has nothing to configure). Rather than
+  render a control that opens nothing — the dead-control class the whole-app
+  audit spent a day removing — it opens the stopwatch, the timer surface that
+  does exist. `test:tools-grid` (new): six tiles, six real handlers, none
+  empty; every destination really mounted; every count READ from a store with
+  a worded fallback rather than a fabricated zero; the preview collapses to
+  three and expands in place. **Seven mutations, seven caught.**
+  132 of 132 gates pass.
+
 - [x] **HOME BECOMES THE DAY, AND THE TRAINER SPEAKS IN ONE VOICE** —
   `design_handoff_app_polish` direction 1a, steps 1-2 of 8
   ([README](design_handoff_app_polish/README.md)). Presentation pass: no store,

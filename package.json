@@ -143,6 +143,7 @@
     "test:load-ceilings": "tsx scripts/test-load-ceilings.ts",
     "test:ceiling-units": "tsx scripts/test-load-ceiling-units.ts",
     "test:single-leg-calf": "tsx scripts/test-single-leg-calf.ts",
+    "test:tools-grid": "tsx scripts/test-tools-grid.ts",
     "test:main-lift-rest": "tsx scripts/test-main-lift-rest.ts",
     "test:composer-focus": "tsx scripts/test-composer-focus.ts",
     "test:reset-clears-draft": "tsx scripts/test-reset-clears-draft.ts",
