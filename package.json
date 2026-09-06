@@ -178,7 +178,8 @@
     "test:context-is-read": "tsx scripts/test-context-is-read.ts",
     "test:queue-listeners": "tsx scripts/test-queue-listeners.ts",
     "test:bounds-and-boundaries": "tsx scripts/test-bounds-and-boundaries.ts",
-    "test:replace-without-losing": "tsx scripts/test-replace-without-losing.ts"
+    "test:replace-without-losing": "tsx scripts/test-replace-without-losing.ts",
+    "test:concurrent-activity": "tsx scripts/test-concurrent-activity.ts"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.4",

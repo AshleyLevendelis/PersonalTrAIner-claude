@@ -218,6 +218,10 @@ console.log('\n8. The client can actually execute what the server proposes')
   const EXECUTOR: Record<string, string> = {
     propose_volume_change: 'executeVolumeChange',
     propose_schedule_change: 'executeScheduleChange',
+    // Added 6 Sep 2026 with the second-sport card — same rail, same three
+    // obligations: a propose branch, a confirm branch that calls the executor,
+    // and the new plan handed back to the app.
+    propose_concurrent_activity: 'executeConcurrentActivity',
   }
   for (const [kind, executor] of Object.entries(EXECUTOR)) {
     check(`${kind} has a propose branch`, ui.includes(`result.proposal.kind === '${kind}'`))
@@ -228,9 +232,8 @@ console.log('\n8. The client can actually execute what the server proposes')
   }
 
   // Undo is claimed on the card (reversible: true), so it has to exist.
-  check('both kinds require a pre_image to be stored',
-    /propose_volume_change/.test(readFileSync(join(ROOT, 'src/lib/pending-actions-store.ts'), 'utf8'))
-    && /propose_schedule_change/.test(readFileSync(join(ROOT, 'src/lib/pending-actions-store.ts'), 'utf8')))
+  check('every kind in the map requires a pre_image to be stored',
+    Object.keys(EXECUTOR).every(k => new RegExp(k).test(readFileSync(join(ROOT, 'src/lib/pending-actions-store.ts'), 'utf8'))))
   check('...and undo has a branch that restores it', /undoWeekRangeChange\(/.test(ui))
   check('...which really writes the pre-image back', /export async function undoWeekRangeChange/.test(exec))
 

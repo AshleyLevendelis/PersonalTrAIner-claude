@@ -15,7 +15,8 @@
 import { adjustDayVolume, describeVolumeChange, isVolumeAdjustable, type VolumeDirection } from './volume-adjust'
 import { rebuildFromCurrentWeek } from './plan-invalidation'
 import { updateProfileField } from './profile-store'
-import type { MesocycleWeek, UserProfile, EquipmentAccess, TrainingStyle } from './types'
+import type { MesocycleWeek, UserProfile, EquipmentAccess, TrainingStyle, ConcurrentActivity } from './types'
+import { describeActivity } from './concurrent-activity'
 import { swapExerciseInMesocycle, type SwapScope } from './mesocycle-edit'
 import { saveMesocycle, saveMesocycleWeek } from './mesocycle-persistence'
 import { getExerciseEntry } from './exercise-db'
@@ -765,4 +766,89 @@ export async function executeRestDay(
 /** Clears the flag. The day goes back to whatever it was — due, or missed. */
 export async function undoRestDay(profileId: string, payload: RestDayPayload): Promise<void> {
   await setDeliberateRest(profileId, payload.date, false)
+}
+
+// ---------------------------------------------------------------------------
+// "I ALSO DO MUAY THAI TWICE A WEEK" — a second sport, on a standing schedule.
+//
+// Ashley's ruling, 6 Sep 2026, choosing this over cutting volume and over
+// recording it without acting: keep the gym days, put the LIGHTER sessions on
+// the class days, and keep prescribed cardio off those nights. The generator
+// reads `concurrent_activities` for exactly that (concurrent-activity.ts);
+// this executor is what finally WRITES the field, which nothing had done since
+// the column was created in July.
+//
+// Same rail as executeScheduleChange / executeStyleChange, for the same
+// reason: a lasting profile change the plan has to follow. Rebuild first,
+// write second — the field only changes once there is a plan that matches it.
+// ---------------------------------------------------------------------------
+
+export interface ConcurrentActivityPayload {
+  /** The activity as validated by the client builder — days canonical, vocabulary checked. */
+  activity: ConcurrentActivity
+  /**
+   * PASSENGERS. Her sentence carried a day change AND an activity; two confirm
+   * cards for one sentence reads as the app not listening. When present these
+   * are applied in the same rebuild. Absent = leave the profile's value alone.
+   */
+  trainingDays?: string[]
+  gymTimeOfDay?: 'morning' | 'evening'
+  fromWeek: number
+  reason?: string
+}
+
+export async function executeConcurrentActivity(
+  profile: UserProfile,
+  mesocycle: MesocycleWeek[],
+  exclusions: string[],
+  payload: ConcurrentActivityPayload,
+): Promise<AdaptationResult> {
+  const preImage = mesocycle
+  // Replace by name, otherwise append — telling the coach about Muay Thai a
+  // second time with different days corrects it rather than duplicating it.
+  const others = (profile.concurrent_activities ?? []).filter(a => a.name.toLowerCase() !== payload.activity.name.toLowerCase())
+  const activities: ConcurrentActivity[] = [...others, payload.activity]
+  const wanted = payload.trainingDays ? new Set(payload.trainingDays.map(d => d.toLowerCase())) : null
+  const updated: UserProfile = {
+    ...profile,
+    concurrent_activities: activities,
+    training_days: wanted
+      ? (profile.training_days ?? []).map(d => ({ ...d, available: wanted.has(d.day.toLowerCase()) }))
+      : profile.training_days,
+    preferred_time: payload.gymTimeOfDay ?? profile.preferred_time,
+  }
+
+  const rebuild = await rebuildFromCurrentWeek(updated, exclusions, mesocycle, payload.fromWeek)
+  if (!rebuild.ok || !rebuild.mesocycle) {
+    return {
+      mesocycle,
+      preImage,
+      receipt: { landed: [], failed: [{ op: 'rebuild', error: rebuild.error ?? 'The plan could not be rebuilt.' }] },
+    }
+  }
+
+  const failed: { op: string; error: string }[] = []
+  if (profile.id) {
+    const patch: Partial<UserProfile> = { concurrent_activities: activities }
+    if (wanted) patch.training_days = updated.training_days
+    if (payload.gymTimeOfDay) patch.preferred_time = payload.gymTimeOfDay
+    try { await updateProfileField(profile.id, patch) }
+    catch { failed.push({ op: 'save', error: "The activity didn't save" }) }
+    for (const week of rebuild.mesocycle) {
+      if (week.week_number < payload.fromWeek) continue
+      try { await saveMesocycleWeek(profile.id, week) }
+      catch { failed.push({ op: 'save', error: `Week ${week.week_number} didn't save` }) }
+    }
+  }
+
+  const landed = failed.length === 0
+    ? [
+        `Other training: ${describeActivity(payload.activity)}`,
+        ...(wanted ? [`Training days: ${payload.trainingDays!.join(', ')}`] : []),
+        ...(payload.gymTimeOfDay ? [`Gym sessions: ${payload.gymTimeOfDay}s`] : []),
+        `Rebuilt ${rebuild.weeksRebuilt} week${rebuild.weeksRebuilt === 1 ? '' : 's'} from week ${payload.fromWeek} on`,
+      ]
+    : []
+
+  return { mesocycle: rebuild.mesocycle, preImage, receipt: { landed, failed } }
 }

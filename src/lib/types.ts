@@ -1,8 +1,29 @@
+/**
+ * A sport or class the trainee does OUTSIDE this plan, on a standing weekly
+ * schedule — "Muay Thai, Tuesday and Thursday evenings".
+ *
+ * Existed as a column and a type since July 2026 and was written by nothing
+ * and read by nothing in generation until 6 Sep 2026. Now read by
+ * concurrent-activity.ts, which steers the lighter gym sessions onto the days
+ * that carry a class and keeps prescribed cardio off those nights.
+ */
 export interface ConcurrentActivity {
+  /** In the user's words — "Muay Thai", "five-a-side", "parkrun". */
   name: string
+  /** 0-1, a rough effort weight. The coach's estimate; nothing scales load from it yet. */
   intensity: number
+  /** Full weekday names in the app's own spelling. Anything else is dropped by canonicalDay. */
   days: string[]
+  /**
+   * What the sport asks of the body, from the closed set in
+   * concurrent-activity.ts. Was a bare string[] with no vocabulary — a field
+   * that lied about carrying information. Stored rows written before the
+   * vocabulary existed may hold anything; readers treat unknown values as
+   * absent.
+   */
   movement_demands: string[]
+  /** When in the day the class happens. Absent when the user did not say — never guessed. */
+  timeOfDay?: 'morning' | 'afternoon' | 'evening'
 }
 
 export interface UserProfile {
@@ -590,7 +611,7 @@ export interface ChatPendingActionView {
 }
 
 export interface ChatReceiptView {
-  kind: 'log_workout' | 'propose_exercise_swap' | 'propose_meal_swap' | 'propose_custom_meal' | 'propose_meal_food_add' | 'propose_injury_adaptation' | 'propose_injury_as_lasting' | 'propose_injury_recovered' | 'propose_equipment_adaptation' | 'propose_volume_change' | 'propose_schedule_change' | 'propose_style_change' | 'propose_rest_day' | 'memory_fact_saved' | 'memory_goal_saved' | 'memory_context_fact_saved' | 'display_name_saved' | 'grocery_item_added' | 'water_logged' | 'steps_logged'
+  kind: 'log_workout' | 'propose_exercise_swap' | 'propose_meal_swap' | 'propose_custom_meal' | 'propose_meal_food_add' | 'propose_injury_adaptation' | 'propose_injury_as_lasting' | 'propose_injury_recovered' | 'propose_equipment_adaptation' | 'propose_volume_change' | 'propose_schedule_change' | 'propose_style_change' | 'propose_concurrent_activity' | 'propose_rest_day' | 'memory_fact_saved' | 'memory_goal_saved' | 'memory_context_fact_saved' | 'display_name_saved' | 'grocery_item_added' | 'water_logged' | 'steps_logged'
   title: string
   rows: { label: string; detail: string; note?: string }[]
   summary?: string

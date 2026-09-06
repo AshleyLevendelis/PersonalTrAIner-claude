@@ -577,6 +577,38 @@ const toolDeclarations = [
     },
   },
   {
+    name: "propose_concurrent_activity",
+    description:
+      "PROPOSES recording a second sport or class the user does OUTSIDE this plan on a STANDING weekly schedule ('I also do Muay Thai on Tuesday and Thursday evenings', 'I play five-a-side every Wednesday night', 'I run with a club on Saturday mornings'), then rebuilding the plan from the live week forward so the LIGHTER gym sessions land on those days and no extra cardio is prescribed on them. This does NOT apply anything: the app shows a before/after card and the user taps Confirm. Total lifting work is unchanged — only which weekday carries which session. If the same sentence ALSO states which days they train in the gym ('I train Mon/Tue/Thu/Fri and I also do Muay Thai…') pass the COMPLETE gym-day list in training_days so it is one card, not two; and if they state when their gym sessions are ('in the mornings'), pass gym_time_of_day. NOT for a one-off ('I'm doing Muay Thai instead of legs tonight' is swap_session_for_activity) and NOT for a day they simply can't train (that is propose_schedule_change). Never guess a time of day, an intensity, or the days — if they didn't say which days, ask before calling.",
+    parameters: {
+      type: "object",
+      properties: {
+        name: { type: "string", description: "The activity in the user's own words, e.g. 'Muay Thai', 'five-a-side', 'club run'." },
+        days: {
+          type: "array",
+          description: "Full weekday names the activity happens on: Monday … Sunday. Only the days they actually stated.",
+          items: { type: "string" },
+        },
+        time_of_day: { type: "string", enum: ["morning", "afternoon", "evening"], description: "When the class happens, ONLY if they said. Omit otherwise — never guess." },
+        intensity: { type: "number", description: "Rough effort 0-1 if they described it (a sparring session ~0.8, a gentle yoga class ~0.3). Omit if unclear." },
+        movement_demands: {
+          type: "array",
+          description: "What the sport asks of the body, from: horizontal_push, horizontal_pull, vertical_push, vertical_pull, hip_hinge, knee_dominant, single_leg, carry, striking, grappling, running, jumping, conditioning, mobility. E.g. Muay Thai → striking, knee_dominant, hip_hinge, conditioning. Omit anything you are not sure of.",
+          items: { type: "string" },
+        },
+        training_days: {
+          type: "array",
+          description: "PASSENGER, optional: the COMPLETE list of gym days from now on, ONLY when the same message states them. Same contract as propose_schedule_change — a full set, never a patch.",
+          items: { type: "string" },
+        },
+        gym_time_of_day: { type: "string", enum: ["morning", "evening"], description: "PASSENGER, optional: when their GYM sessions are, only when the same message states it." },
+        reason: { type: "string", description: "One short sentence on what the user described — shown on the card as the rationale." },
+        origin_verbatim_quote: { type: "string", description: "The exact substring of the user's CURRENT message describing the activity. Copied verbatim, not paraphrased." },
+      },
+      required: ["name", "days", "origin_verbatim_quote"],
+    },
+  },
+  {
     name: "propose_style_change",
     description:
       "PROPOSES changing HOW the user trains — their training style (functional / bodybuilding / combat / hybrid) — then rebuilding the plan from the live week forward. This does NOT apply anything: the app shows a before/after card and the user taps Confirm. Weeks already underway or finished are never rewritten; anything logged stays exactly as it is. The style changes the exercises chosen AND the rep ranges, not just a label — say so. ONLY for a LASTING change to how they train. 'Make today harder', 'give me a bodybuilding session today', 'I want a different workout' are NOT style changes — nothing about them asks to retrain for the rest of the plan; answer those in text or with a swap, never with this.",
@@ -1253,7 +1285,7 @@ Five tabs, bottom of the screen: Dashboard, Nutrition, Exercise, Tools, Chat (th
 - Tools: a stopwatch/lap/round Timer, and the Grocery list.
 - Chat: this thread. There is no separate "message your coach" feature or human-support inbox — talking here IS reaching your coach.
 
-Profile screen (opened via the profile icon, not a tab): editable identity/training-setup fields, injuries, dietary preferences, training days, Goals (target weight, lift targets, session-frequency goals — set by telling me in chat or editing here directly), saved facts/preferences, tone & context notes, appearance/theme.
+Profile screen (opened via the profile icon, not a tab): editable identity/training-setup fields, injuries, dietary preferences, training days, other training (a second sport or class on a standing weekly schedule — set by telling me in chat; removable here), Goals (target weight, lift targets, session-frequency goals — set by telling me in chat or editing here directly), saved facts/preferences, tone & context notes, appearance/theme.
 
 These do NOT exist, at all, anywhere in this app — never describe a path to any of them, and never assume one is what a vague question is about: a subscription, billing, payment, or account-cancellation feature of any kind (this app is free, no in-app purchase, no App Store/Google Play subscription to manage either — don't send someone to check phone subscription settings for an app that has none); data export; progress-photo upload or gallery; a community or social feed; any settings gear or calendar icon inside the Exercise tab.
 
@@ -1396,6 +1428,14 @@ When the user wants a LASTING change to how they train ("switch me to bodybuildi
 - WHAT TO DO INSTEAD for a one-off: answer in text, or use propose_exercise_swap with scope "today" for the specific exercise they want different. If they say the current style isn't working for them at all, that is the moment to ask whether they want to change it for good.
 - A tool that returns "that's already your style" was the wrong tool. If you call this and the card says nothing changes, you answered a question they did not ask — the fix is not to call it again.
 
+=== 3g. A SECOND SPORT ON A STANDING SCHEDULE (propose_concurrent_activity) ===
+When the user tells you about something they do OUTSIDE this plan on a regular weekly schedule ("I also do Muay Thai on Tuesday and Thursday evenings", "I play five-a-side every Wednesday", "club run on Saturday mornings"):
+- Call propose_concurrent_activity with the name, the days they stated, and the time of day ONLY if they said it. If the same message also says which days they train in the gym, pass the complete gym-day list as training_days so it is ONE card, not a schedule card and then an activity card — two cards for one sentence reads as not listening. If it also says when their gym sessions are ("in the mornings"), pass gym_time_of_day.
+- What the card does, and say so in a sentence: the plan is rebuilt from this week forward so the LIGHTER gym sessions fall on the class days and no extra cardio is prescribed on those nights — the classes are the cardio. Total lifting work does not change; only which weekday carries which session. Weeks already logged are untouched.
+- A four-day week has a fixed shape. If the card says one class day still carries a heavy session, that is honest — do not promise every class day got a light one.
+- THREE SENTENCES THAT LOOK ALIKE AND ARE NOT: "I do Muay Thai every Tuesday" is THIS tool (a standing commitment, the plan bends around it). "I'm doing Muay Thai instead of legs tonight" is swap_session_for_activity (one day, marked as a deliberate swap). "I can't train on Tuesdays" is propose_schedule_change (a gym day removed). Pick by what they said, and if it is genuinely unclear whether a session is one-off or every week, ask.
+- Never guess days, time of day or intensity. If they say "twice a week" without naming the days, ask which days before calling — a plan reorganised around the wrong evenings is worse than one that did not move.
+
 === 4. TAG HYGIENE & QUICK REPLIES ===
 - Strict Placement: Place any system action or quick reply tag on its OWN DEDICATED LINE at the absolute bottom of your response.
 - Message-break tag ([BREAK]): the ONE tag that appears mid-response, on its own line, wherever you want the reply to split into a second sent message (§1). Maximum two [BREAK]s (three messages). Never put one immediately before a [QUICK_REPLIES] or [ACTION] line — those always belong at the very bottom, after the final message's text.
@@ -1406,7 +1446,7 @@ When the user wants a LASTING change to how they train ("switch me to bodybuildi
   - Feel/effort check-ins: "how did that feel?" / "how's the shoulder holding up?" -> "Easy" | "About right" | "Hard" (adapt wording to what was actually asked)
   - A named choice between two or more specific things you just mentioned (exercises, meals, days) — the options ARE the names, e.g. asking whether they meant Front Squat or Back Squat -> "Front Squat" | "Back Squat"
   - Scope questions: "just today, or the rest of the block?" -> "Today only" | "Rest of block"
-  Do NOT add the tag when the question is genuinely open-ended — asks for a number, a description, a reason, or anything where the honest answer space isn't a short known set (e.g. "how much did you lift?", "what's been going on?"). When in doubt: if you could plausibly render the answer as 2-4 short buttons without stripping out anything the user might actually want to say, add it — free text is always still available underneath either way. Plan-mutation proposals (propose_exercise_swap, propose_meal_swap, propose_meal_addition, propose_injury_adaptation, propose_equipment_adaptation, propose_volume_change, propose_schedule_change, propose_rest_day, propose_custom_meal, propose_meal_food_add) already render their own Confirm/Not-now buttons via the card — never add a redundant [QUICK_REPLIES] tag to those turns. The one exception is the equipment-clarifying question itself (§3b) — that's asked BEFORE the tool call, not on the proposal turn, so it gets a normal [QUICK_REPLIES] tag.
+  Do NOT add the tag when the question is genuinely open-ended — asks for a number, a description, a reason, or anything where the honest answer space isn't a short known set (e.g. "how much did you lift?", "what's been going on?"). When in doubt: if you could plausibly render the answer as 2-4 short buttons without stripping out anything the user might actually want to say, add it — free text is always still available underneath either way. Plan-mutation proposals (propose_exercise_swap, propose_meal_swap, propose_meal_addition, propose_injury_adaptation, propose_equipment_adaptation, propose_volume_change, propose_schedule_change, propose_style_change, propose_concurrent_activity, propose_rest_day, propose_custom_meal, propose_meal_food_add) already render their own Confirm/Not-now buttons via the card — never add a redundant [QUICK_REPLIES] tag to those turns. The one exception is the equipment-clarifying question itself (§3b) — that's asked BEFORE the tool call, not on the proposal turn, so it gets a normal [QUICK_REPLIES] tag.
 
 === FEW-SHOT EXAMPLES ===
 User: "Hey"
@@ -1591,12 +1631,12 @@ FAVORITE MEALS PRIORITIZATION:
 ${favoritesSection}
 
 FUNCTION CALL RULES (CRITICAL):
-- NEVER write tool names, parameter names, or enum values (like "propose_volume_change", "propose_schedule_change", "propose_style_change", "propose_rest_day", "training_days", "training_style", "lighter", "heavier") in your visible text response. These exist only for native tool invocations. Your text must read like a human personal trainer — no code, no parameter labels, no function syntax.
+- NEVER write tool names, parameter names, or enum values (like "propose_volume_change", "propose_schedule_change", "propose_style_change", "propose_concurrent_activity", "propose_rest_day", "training_days", "training_style", "concurrent_activities", "lighter", "heavier") in your visible text response. These exist only for native tool invocations. Your text must read like a human personal trainer — no code, no parameter labels, no function syntax.
 - Trigger propose_meal_swap or propose_exercise_swap when the user gives a DIRECT COMMAND to modify their plan. Command verbs include: "replace", "swap", "change", "switch", "use X instead". Both ALWAYS require origin_verbatim_quote — the exact substring of the CURRENT message that is the command; if the request is a question, a hypothetical, or a statement with no imperative verb (e.g. "I didn't train today", "should I switch to dumbbells?"), do NOT call the tool — answer in text instead.
 - Trigger propose_injury_adaptation / propose_equipment_adaptation per §3a/§3b once you have the required fields (affected_area or equipment_tier, plus duration_days) AND an imperative origin_verbatim_quote — a mention alone ("my shoulder's a bit sore") is not yet enough; wait until the exchange has established it's manageable and plan-relevant (injury) or you know both what's available and for how long (equipment).
 - Neither propose_meal_swap nor propose_exercise_swap applies anything itself — both show the user a confirm card. Put your reasoning in the "reason" field, not in a preceding question; do not say "Shall I make this change?" or claim the swap happened.
 - Exercise swaps default to scope: "today" (only applies to today's workout; the original exercise returns next time that day comes up). Only set scope: "permanent" when the user explicitly says they want a lasting change (e.g. "for the rest of the plan", "permanently", "I never want to do X", "always use Y instead").
-- Trigger propose_volume_change / propose_schedule_change / propose_style_change per §3d/§3e/§3f once the request is an actual imperative and you have the required fields, WITH an origin_verbatim_quote. None applies anything — all three show a confirm card. "Should I drop to three days?" is a question, not a command: answer it in text.
+- Trigger propose_volume_change / propose_schedule_change / propose_style_change / propose_concurrent_activity per §3d/§3e/§3f/§3g once the request is an actual imperative and you have the required fields, WITH an origin_verbatim_quote. None applies anything — all four show a confirm card. "Should I drop to three days?" is a question, not a command: answer it in text.
 - Trigger propose_custom_meal when the user TELLS you what they eat or will eat ("I usually have eggs and greek yoghurt and fruit for breakfast"). The flow Ashley specified: if any stated food has no amount, ask how much of each — one question, not an interrogation — then call with their exact foods and amounts. Their portions are never adjusted; the app fits the rest of the day around the meal. "What should I have for breakfast?" is a question — answer it or use propose_meal_addition; this tool is for what they are actually having.
 - Trigger propose_rest_day the same way when they tell you they are resting a training day and name nothing in its place. "Rest day today" is a statement of fact about their day, not a question — call the tool. "Should I rest today?" is a question: answer it.
 - Answer exercise form/technique questions ("How do I do X?", "What muscles does X work?") directly in your text response. Provide step-by-step form cues, target muscles, common mistakes, and coaching tips.
@@ -1617,7 +1657,7 @@ MEMORY & GOALS (VISION-ARCHITECTURE.md §1 Part 2):
 - Call record_fact/record_goal/record_context_fact ONLY when the user clearly and directly states a preference, goal, or constraint about themselves. Never infer one from an incidental mention — "I had eggs today" is not a fact; "I can't stand eggs" is.
 - At most ONE record_* call per turn, same rule as plan-mutation proposals — if the user states several things at once, take the clearest one and ask about the rest, or wait for a follow-up.
 - For record_goal on a measurable metric (body_weight_kg, lift_working_kg, lift_1rm_kg, sessions_per_week): include baseline_value ONLY if the user actually stated their current number. Never estimate or invent one — the app will look up logged data or ask.
-- A DAY THEY CAN'T TRAIN IS A SCHEDULE CHANGE, NOT A MEMORY NOTE. record_fact's kind list includes "hard_constraint", and "I can't train on Tuesdays" reads like one — but filing it as a fact only writes it down, and the plan carries on prescribing Tuesday sessions the user then misses. §3e is the answer to that sentence: call propose_schedule_change so the week is actually rebuilt. Offering to REMEMBER a problem you have a tool to FIX is the worst of both — it looks like help and changes nothing. The same goes for a single day off ("I can't train this Tuesday") — that is propose_rest_day, not a fact. Only reach for record_fact on availability when the user is describing something no schedule can express, e.g. "my shifts change every week".
+- A DAY THEY CAN'T TRAIN IS A SCHEDULE CHANGE, NOT A MEMORY NOTE. record_fact's kind list includes "hard_constraint", and "I can't train on Tuesdays" reads like one — but filing it as a fact only writes it down, and the plan carries on prescribing Tuesday sessions the user then misses. §3e is the answer to that sentence: call propose_schedule_change so the week is actually rebuilt. Offering to REMEMBER a problem you have a tool to FIX is the worst of both — it looks like help and changes nothing. The same goes for a single day off ("I can't train this Tuesday") — that is propose_rest_day, not a fact. Only reach for record_fact on availability when the user is describing something no schedule can express, e.g. "my shifts change every week". And a SECOND SPORT on set days ("I also do Muay Thai on Tuesdays and Thursdays") is not a fact to remember either — it is propose_concurrent_activity (§3g), which actually moves the lighter sessions onto those days.
 - Never call record_fact/record_goal for something that only affects HOW you talk to the user (motivation, tone, life context like an upcoming event) — that is record_context_fact instead, and it must never be described as something that will change the plan.
 - DON'T ANNOUNCE THE SAVE. A coach who remembers something doesn't tell you they're filing it. For record_fact and record_context_fact, acknowledge in at most half a sentence, folded into a normal reply — "Fair enough, I'll keep it off your plans", "Noted", "Good to know" — then carry on with the actual conversation. Never say "Saved to memory", "I've recorded that", "Added to your profile", or describe where it went. The app handles the receipt; your job is to keep talking like a person.
 - When offering to record, or acknowledging, a food dislike or allergy: state the action, not a certainty the matching can't back. Say "I can keep that off what I suggest" or "I'll exclude that going forward" — never "I'll make sure it never appears" or any other guaranteed-X-free phrasing. True regardless of how well the matching actually catches it, and it doesn't promise more than the app can stand behind.
@@ -1642,7 +1682,8 @@ STEPS:
 - If you have no count for that day and they give only an increment, ask what the total is. Do not guess, and do not send the increment as though it were the total.
 - There is no default step count. If they name no number, ask; do not call the tool.
 
-${context.concurrent_activities && context.concurrent_activities.length > 0 ? `CONCURRENT ACTIVITIES (external training demands):\n${context.concurrent_activities.map((a: { name: string; intensity: number; days: string[]; movement_demands: string[] }) => `- ${a.name}: intensity ${Math.round(a.intensity * 100)}%, days: ${a.days.join(", ")}, demands: ${a.movement_demands.join(", ")}`).join("\n")}` : ""}
+${context.concurrent_activities && context.concurrent_activities.length > 0 ? `OTHER TRAINING THEY DO (a standing weekly commitment outside this plan — the plan below was built around it):\n${context.concurrent_activities.map((a: { name: string; intensity: number; days: string[]; movement_demands: string[]; timeOfDay?: string }) => `- ${a.name}: ${a.days.join(", ")}${a.timeOfDay ? ` ${a.timeOfDay}s` : ""}${a.intensity ? `, roughly ${Math.round(a.intensity * 100)}% effort` : ""}${a.movement_demands?.length ? ` (${a.movement_demands.join(", ")})` : ""}`).join("\n")}
+RULES FOR THESE DAYS: name the class when you talk about that day; the gym sessions on those days were deliberately made the lighter ones and any prescribed cardio was kept off them, so never suggest adding cardio or a finisher there, and never call one of these nights a "rest day" — it is not one. If they say a class was cancelled this week, that is a one-off, not a reason to change the plan.` : ""}
 
 USER PROFILE:
 - Age: ${context.profile.age} years | Gender: ${context.profile.gender}
@@ -1900,6 +1941,31 @@ Keep this context in mind to ensure your greetings and questions naturally align
             proposal: {
               kind: "propose_schedule_change",
               rawArgs: { training_days: args.training_days, reason: args.reason },
+            },
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (name === "propose_concurrent_activity") {
+        // Same rail as propose_schedule_change and propose_style_change: a
+        // lasting profile change the plan has to follow. I1 holds — the
+        // server writes nothing and forwards raw args; the client validates
+        // days against the profile's own spelling and the vocabulary against
+        // concurrent-activity.ts, builds the before/after card, and re-runs
+        // rebuildFromCurrentWeek. The generator now reads
+        // concurrent_activities (it did not, for two months); this is the
+        // first thing that ever writes it.
+        return new Response(
+          JSON.stringify({
+            reply: "",
+            proposal: {
+              kind: "propose_concurrent_activity",
+              rawArgs: {
+                name: args.name, days: args.days, time_of_day: args.time_of_day, intensity: args.intensity,
+                movement_demands: args.movement_demands, training_days: args.training_days,
+                gym_time_of_day: args.gym_time_of_day, reason: args.reason,
+              },
             },
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }

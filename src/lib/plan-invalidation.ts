@@ -48,7 +48,7 @@ import { rebuildAgainstProfile } from './plan-adaptations'
 // conditioning profile — more of the programme than style touches. Put to her
 // as a question; she chose to offer the rebuild, same as style.
 export const PLAN_INVALIDATING_FIELDS = ['injuries', 'equipment_access', 'training_days', 'training_style', 'fitness_goal'] as const
-export type PlanInvalidatingField = typeof PLAN_INVALIDATING_FIELDS[number]
+export type PlanInvalidatingField = typeof PLAN_INVALIDATING_FIELDS[number] | 'concurrent_activities'
 
 export interface PlanInvalidation {
   field: PlanInvalidatingField
@@ -93,6 +93,26 @@ export function detectPlanInvalidation(
   // so dropping a day leaves sessions scheduled on a day they have just said
   // they do not train. Same shape as the equipment case — added after the
   // audit's own probe caught it missing from the first pass.
+  // The week is BUILT AROUND a second sport (concurrent-activity.ts steers the
+  // lighter sessions onto its days). Removing it from the Profile leaves a
+  // plan arranged around evenings that no longer have a class — not unsafe,
+  // but not the plan they would get now, so offer the rebuild the same way a
+  // dropped training day does.
+  if ('concurrent_activities' in patch) {
+    const key = (list: UserProfile['concurrent_activities']) =>
+      (list ?? []).map(a => `${a.name.toLowerCase()}:${[...(a.days ?? [])].sort().join(',')}`).sort().join('|')
+    if (key(before.concurrent_activities) !== key(patch.concurrent_activities)) {
+      return {
+        field: 'concurrent_activities',
+        title: 'Rebuild your plan around this?',
+        detail:
+          'Your current plan was arranged around your other training — the lighter gym days ' +
+          'sit on those class days. Now that has changed, I can rebuild from this week onwards ' +
+          'to match. Everything you have already logged stays exactly as it is.',
+      }
+    }
+  }
+
   if ('training_days' in patch) {
     const dayKey = (days: UserProfile['training_days'] | undefined) =>
       (days ?? []).filter(d => d.available).map(d => d.day).sort().join('|')

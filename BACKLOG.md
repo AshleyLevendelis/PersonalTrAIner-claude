@@ -2,6 +2,46 @@
 
 Newest first. One line each.
 
+- [x] **"I ALSO DO MUAY THAI TWICE A WEEK" — BUILT, Ashley's ruling (a),
+  [docs/plans/i-also-do-muay-thai.md](docs/plans/i-also-do-muay-thai.md).**
+  She asked to be able to say "I train in the gym Mon/Tue/Thu/Fri in the
+  mornings but I also do Muay Thai twice a week in the evenings" and have the
+  app build a plan for that. Traced first: `concurrent_activities` had been a
+  column, a type, DB hydration and a bare line in the coach's prompt since
+  July — **written by nothing, read by nothing in generation**,
+  `movement_demands` with no vocabulary, `preferred_time` hardcoded to
+  'morning' at onboarding and read by nothing. Sent and ignored for two months
+  — the generator-side twin of the `steps_summary` bug `test:context-is-read`
+  now catches on the coach side.
+  Asked what the plan should DO about two hard evenings: she chose **keep the
+  gym days, put the lighter sessions on the class days, keep prescribed cardio
+  off those nights** — over also cutting volume (a separate later piece, NOT
+  authorised by this answer) and over record-and-tell-only.
+  Built as a PERMUTATION of the split, so the week's total work is untouched
+  and a plan with no second sport is **byte-identical before and after**
+  (fingerprinted across a 250-plan stride; 10 profiles asserted in-process for
+  empty AND undefined). Her sentence, probed: the light day moves Fri→Tue,
+  Squat & Carry moves Thu→Fri, Thursday still carries a heavy session because
+  a 4-day split has one light track — and the card SAYS SO rather than
+  implying every class day got a light one.
+  The writer: `propose_concurrent_activity`, courier-only like every proposal,
+  with the gym days and gym time-of-day riding along as passengers so one
+  sentence is one confirm card; §3g in the prompt separating "I do Muay Thai
+  every Tuesday" (this) from "I'm doing Muay Thai instead of legs tonight"
+  (`swap_session_for_activity`) and "I can't train Tuesdays"
+  (`propose_schedule_change`); the data dump replaced with rules (name the
+  class, no added cardio there, never a "rest day"); rebuild-first executor;
+  undo restoring the activity and both passengers; an Other training block on
+  the Profile with a rebuild offer on removal; APP_REALITY in both copies.
+  `test:concurrent-activity` new (120-case permutation sweep, all 16 weeks,
+  byte-identity, legacy junk rows, read/written/shown/undoable);
+  `coach-volume-schedule` §8 and `coach-promises` §6b extended. **Ten
+  mutations, ten caught.** `no-dead-code` back under budget by consumption.
+  STILL OPEN: (b) counting the classes as training load; an onboarding slot so
+  new users are asked; more than one overlapping sport.
+  Needs `deploy:functions:prod -- chat-gemini` (new tool + prompt). No
+  migration — the column has existed since July.
+
 - [x] **EVERY ACTION, AND EVERY WAY IT WAS GOING WRONG.** Ashley: "think about
   every action that can happen in the app and every way it could go wrong and
   then fix it." Three parallel audits plus the full gate suite — which passed

@@ -43,6 +43,7 @@ import {
 } from '@/lib/onboarding-slots'
 import { detectPlanInvalidation, type PlanInvalidation } from '@/lib/plan-invalidation'
 import type { UserProfile, TrainingDay, TrainingExperience, EquipmentAccess, TrainingStyle } from '@/lib/types'
+import { describeActivity } from '@/lib/concurrent-activity'
 import { buildDataExport, downloadExport, summariseExport, deleteAllUserData } from '@/lib/user-data'
 
 const GENDER_OPTIONS = [{ value: 'male', label: 'Male' }, { value: 'female', label: 'Female' }]
@@ -616,6 +617,39 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
             <div className="space-y-1">
               <span className="text-muted-foreground">Training days</span>
               <TrainingDaysEditor days={profile.training_days} onSave={v => savePatch({ training_days: v })} />
+            </div>
+            {/* OTHER TRAINING — a second sport on a standing weekly schedule.
+                Written by the coach (propose_concurrent_activity) and shown
+                here so a stored activity is never invisible until someone
+                asks about it. Adding stays chat-only: the coach is the
+                surface that can ask which evenings. Removing is here, through
+                the same armed delete every other row uses, and goes through
+                savePatch so the plan-invalidation offer fires — the week was
+                built AROUND this, so taking it away is a reason to rebuild. */}
+            <div className="space-y-1">
+              <span className="text-muted-foreground">Other training</span>
+              {(profile.concurrent_activities ?? []).length === 0 ? (
+                <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">None yet — tell the coach in chat ("I also do Muay Thai on Tuesday and Thursday evenings") and the plan is rebuilt around it.</p>
+              ) : (
+                <div className="flex flex-wrap gap-x-2.5 gap-y-2.5">
+                  {(profile.concurrent_activities ?? []).map(a => {
+                    const key = `activity:${a.name}`
+                    return (
+                      <Badge key={key} variant="secondary" className="text-[0.625rem] gap-1 pr-1">
+                        {describeActivity(a)}
+                        <button
+                          type="button"
+                          onClick={() => requestDelete(key, async () => { savePatch({ concurrent_activities: (profile.concurrent_activities ?? []).filter(x => x.name !== a.name) }) })}
+                          aria-label={armedDeleteKey === key ? `Tap again to remove ${a.name}` : `Remove ${a.name}`}
+                          className={`hit-slop-44 ${armedDeleteKey === key ? 'text-destructive' : ''}`}
+                        >
+                          <X className="size-2.5" />
+                        </button>
+                      </Badge>
+                    )
+                  })}
+                </div>
+              )}
             </div>
             <Row label="Session length"><EditableSelectField value={profile.session_duration_preference} options={DURATION_OPTIONS} onSave={v => savePatch({ session_duration_preference: v })} /></Row>
             <Row label="Style"><EditableSelectField value={profile.training_style ?? ''} options={STYLE_OPTIONS} onSave={v => savePatch({ training_style: v as TrainingStyle })} /></Row>

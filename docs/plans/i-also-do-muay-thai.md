@@ -1,8 +1,8 @@
 # "I also do Muay Thai twice a week"
 
 *Plan before build, per CLAUDE.md — this changes what the plan prescribes.
-Written 5 Sep 2026 from a read-only trace. Nothing built. The one product
-question it turns on is at the bottom and the build waits on Ashley's answer.*
+Written 5 Sep 2026 from a read-only trace; Ashley chose (a) on 6 Sep and it
+was built the same day — see "BUILT" below.*
 
 ## What she asked for
 
@@ -156,7 +156,14 @@ Honest and small. Downside: it is exactly the state the field is in now, minus
 the "nobody wrote it" part — the plan she asked the app to "create for that"
 would not actually be for that.
 
-**Recommendation: (a) now, (b) as its own measured piece after.** (a) is a
+### Ashley's ruling, 6 Sep 2026: **(a)**
+
+Asked in the conversation, one question, three options with a recommendation.
+She chose *"put the lighter gym days on the Muay Thai days"* — the
+recommendation. (b) counting the classes as load is therefore a separate later
+piece and is not authorised by this answer; (c) is declined.
+
+**Recommendation as put to her: (a) now, (b) as its own measured piece after.** (a) is a
 reordering of decisions the generator already makes — it changes *which day*
 gets a session, not *how much* — so it can be built and gated without a load
 or volume argument, and it is what a human coach does first on hearing this
@@ -164,6 +171,65 @@ sentence. (b) is the right second step and deserves the same treatment the
 recovery multiplier got: measured on the grid, a named threshold, a gate that
 pins the direction. Folding it into (a) would make one plan doc carry two
 separate risks.
+
+## BUILT, 6 Sep 2026 — (a), end to end
+
+**Slice 1 — the generator reads the field.** `src/lib/concurrent-activity.ts`:
+`HEAVY_TRACKS` hoisted out of a local in `assignConditioningNotes` so one fact
+serves both decisions; `reorderTracksForClassDays` — a stable, greedy
+PERMUTATION of the split (light tracks onto class days first, the rest in the
+split's own order), returning `unavoidable` for any class day that still has
+to take a heavy track; `activityDays` canonicalising day spellings and
+dropping the rest; closed `MOVEMENT_DEMANDS` / `TIMES_OF_DAY` vocabularies so
+the field stops lying about carrying information; `describeActivity`, which
+never invents a time of day. In `exercise-plan.ts` the split is reordered
+before day→focus assignment, and both the rest-day and the post-session
+cardio loops skip class days.
+
+**Proven, not asserted:** `scripts/fingerprint-plans.ts` hashes day, focus and
+conditioning for every week of every plan on a 250-plan stride of the quality
+grid — **byte-identical before and after** when `concurrent_activities` is
+empty. Her exact sentence, probed:
+
+```
+WITHOUT                         WITH Muay Thai Tue/Thu
+Mon  Push & Press               Mon  Push & Press
+Tue  Pull & Hinge               Tue  Upper Pull & Core   ← the light day moved here
+Thu  Squat & Carry              Thu  Pull & Hinge        ← unavoidable: 4-day split, 1 light track
+Fri  Upper Pull & Core          Fri  Squat & Carry
+Wed  rest-day walk              Wed  rest-day walk
+```
+
+Tuesday also shows a post-session mobility flow — that is the session-LENGTH
+filler topping up a short light session in the morning, not budgeted cardio;
+the probe prints `FILLER` beside it and §2 of the gate excludes fillers.
+
+**Slice 2 — the writer.** Everything follows the `propose_style_change`
+footprint: `propose_concurrent_activity` declared and handled (courier only,
+I1) with `training_days` / `gym_time_of_day` as optional PASSENGERS so her
+sentence is one card, not two; §3g in the prompt separating the three
+look-alike sentences (standing sport → this; one-off swap →
+`swap_session_for_activity`; a day removed → `propose_schedule_change`); the
+bare `CONCURRENT ACTIVITIES` data dump replaced with a block plus RULES (name
+the class, never add cardio there, never call it a rest day); the client
+builder validating every field against the app's own vocabularies and naming
+the `unavoidable` day on the card; `executeConcurrentActivity` — rebuild
+first, write second, replace-by-name; confirm and undo branches, undo
+restoring the activity and both passengers; an **Other training** block on
+the Profile (remove only — adding stays with the coach, who can ask which
+evenings); `detectPlanInvalidation` offers a rebuild when the sport is
+removed, because the week was arranged around it; `APP_REALITY` updated in
+both copies.
+
+**Gates:** new `test:concurrent-activity` (the reorder as a unit incl. a
+120-case permutation sweep across four split shapes × every class-day subset;
+her sentence end to end across all 16 weeks; byte-identity on 10 profiles for
+empty AND undefined; a legacy row with junk in it changes nothing; the field
+is read/written/shown/undoable). `test:coach-volume-schedule` §8's executor
+map and `test:coach-promises` §6b extended. **Ten mutations, ten caught** —
+including the executor writing before it rebuilds and `Squat & Carry`
+quietly leaving the heavy set. `test:no-dead-code` back to 39/40 by
+consumption, not by budget.
 
 ## Deliberately NOT in scope
 

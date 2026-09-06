@@ -16,8 +16,11 @@ import { getExerciseEntry } from '@/lib/exercise-db'
 import { createPendingAction, claimPendingAction, declinePendingAction, markExecuting, resolvePendingAction, getPendingAction, expireOldPendingActions, isWithinUndoWindow, type PendingActionReceipt } from '@/lib/pending-actions-store'
 import { APPEND_PROPOSAL_KINDS, INTENT_PROPOSAL_VERB, buildIntentProposal } from '@/lib/intent-proposal'
 import { pickAccountabilityCheckIn } from '@/lib/accountability'
-import { executeExerciseSwap, executeMealSwap, executeMealAddition, undoMealAddition, undoExerciseSwap, executeInjuryAdaptation, executeLastingInjury, executeInjuryRecovered, executeEquipmentAdaptation, executeVolumeChange, executeScheduleChange, executeStyleChange, executeRestDay, undoRestDay, undoWeekRangeChange, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type LastingInjuryPayload, type InjuryRecoveredPayload, type EquipmentAdaptationPayload, type VolumeChangePayload, type ScheduleChangePayload, type StyleChangePayload, type RestDayPayload } from '@/lib/pending-action-executor'
+import { executeExerciseSwap, executeMealSwap, executeMealAddition, undoMealAddition, undoExerciseSwap, executeInjuryAdaptation, executeLastingInjury, executeInjuryRecovered, executeEquipmentAdaptation, executeVolumeChange, executeScheduleChange, executeStyleChange, executeConcurrentActivity, executeRestDay, undoRestDay, undoWeekRangeChange, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type LastingInjuryPayload, type InjuryRecoveredPayload, type EquipmentAdaptationPayload, type VolumeChangePayload, type ScheduleChangePayload, type StyleChangePayload, type ConcurrentActivityPayload, type RestDayPayload } from '@/lib/pending-action-executor'
 import { STYLE_OPTIONS } from '@/lib/onboarding-slots'
+import { MOVEMENT_DEMANDS, TIMES_OF_DAY, canonicalDay, activityDays, describeActivity, reorderTracksForClassDays, HEAVY_TRACKS } from '@/lib/concurrent-activity'
+import { getSplitForDays } from '@/lib/exercise-plan'
+import type { ConcurrentActivity } from '@/lib/types'
 import { adjustDayVolume, isVolumeAdjustable } from '@/lib/volume-adjust'
 import { buildMealAdditionProposal, type MealAdditionPayload } from '@/lib/meal-addition'
 import { buildCustomMealProposal } from '@/lib/custom-meal'
@@ -1362,6 +1365,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     if (pendingAction.kind === 'propose_volume_change') return "Here's the change to that session:"
     if (pendingAction.kind === 'propose_schedule_change') return "Here's the new week:"
     if (pendingAction.kind === 'propose_style_change') return "Here's your plan in the new style:"
+    if (pendingAction.kind === 'propose_concurrent_activity') return "Here's the week built around it:"
     if (pendingAction.kind === 'propose_rest_day') return 'Want me to mark that as a rest day?'
     const intentVerb = INTENT_PROPOSAL_VERB[pendingAction.kind]
     if (intentVerb) return `Want me to ${intentVerb} **${rows[0].after}**?`
@@ -1873,6 +1877,103 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         rationale: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined,
         reversible: true,
       },
+    }
+  }
+
+  /**
+   * "I also do Muay Thai twice a week" — builds propose_concurrent_activity's
+   * card. Ashley's ruling, 6 Sep 2026: the lighter gym sessions go on the
+   * class days and prescribed cardio stays off them; volume is untouched.
+   *
+   * Validates every field against the app's own vocabularies rather than
+   * trusting the model's spelling — unknown days are dropped, and if none
+   * survive the proposal does not happen. The `unavoidable` line is the
+   * honest half: a four-day split has one light track, so with two class
+   * days one of them still carries a heavy session, and the card says which
+   * rather than implying every class day got a light one.
+   */
+  const buildConcurrentActivityProposal = (rawArgs: Record<string, unknown>): {
+    scopeKey: string
+    preconditions: Record<string, unknown>
+    payload: ConcurrentActivityPayload
+    preImage: MesocycleWeek[]
+    diff: import('@/lib/pending-actions-store').ProposalDiff
+  } | null => {
+    const name = String(rawArgs.name ?? '').trim()
+    const rawDays = Array.isArray(rawArgs.days) ? rawArgs.days : []
+    const days = [...new Set(rawDays.map(d => canonicalDay(String(d))).filter((d): d is string => !!d))]
+    if (!name || days.length === 0 || mesocycle.length === 0) return null
+
+    const timeOfDay = (TIMES_OF_DAY as readonly string[]).includes(String(rawArgs.time_of_day)) ? rawArgs.time_of_day as ConcurrentActivity['timeOfDay'] : undefined
+    const demands = (Array.isArray(rawArgs.movement_demands) ? rawArgs.movement_demands : [])
+      .map(d => String(d)).filter(d => (MOVEMENT_DEMANDS as readonly string[]).includes(d))
+    const intensityRaw = typeof rawArgs.intensity === 'number' ? rawArgs.intensity : 0.6
+    const activity: ConcurrentActivity = {
+      name, days, movement_demands: demands,
+      intensity: Math.min(1, Math.max(0, intensityRaw)),
+      ...(timeOfDay ? { timeOfDay } : {}),
+    }
+
+    // Already recorded identically → nothing to propose.
+    const existing = (profile.concurrent_activities ?? []).find(a => a.name.toLowerCase() === name.toLowerCase())
+    if (existing && [...activityDays([existing])].sort().join('|') === [...days].sort().join('|') && (existing.timeOfDay ?? null) === (timeOfDay ?? null)) return null
+
+    // Passengers, resolved exactly as buildScheduleChangeProposal resolves them.
+    const known = new Map((profile.training_days ?? []).map(d => [d.day.toLowerCase(), d.day]))
+    const rawTraining = Array.isArray(rawArgs.training_days) ? rawArgs.training_days : []
+    const wantedDays = [...new Set(rawTraining.map(d => known.get(String(d).trim().toLowerCase())).filter((d): d is string => !!d))]
+    const beforeDays = (profile.training_days ?? []).filter(d => d.available).map(d => d.day)
+    const daysChange = wantedDays.length > 0 && !(beforeDays.length === wantedDays.length && beforeDays.every(d => wantedDays.includes(d)))
+    const gymTime = rawArgs.gym_time_of_day === 'morning' || rawArgs.gym_time_of_day === 'evening' ? rawArgs.gym_time_of_day : undefined
+    const timeChange = !!gymTime && gymTime !== profile.preferred_time
+
+    const startWeek = activeSession.liveWeek
+    const weeksAhead = mesocycle.filter(w => w.week_number >= startWeek).length
+    if (weeksAhead === 0) return null
+
+    // Which class day, if any, will still carry a heavy session — computed
+    // with the same function the generator uses, on the days the plan will
+    // actually have after this card.
+    const futureDays = (profile.training_days ?? []).map(d => ({ ...d, available: daysChange ? wantedDays.includes(d.day) : d.available })).filter(d => d.available)
+    const split = getSplitForDays(futureDays.length, profile.fitness_goal, profile.workout_split_preference || 'ai_recommendation', profile.training_style || 'hybrid')
+    const { unavoidable } = reorderTracksForClassDays(futureDays, split, new Set(days))
+    const lightCount = futureDays.map((_, i) => split[i % split.length]).filter(t => !HEAVY_TRACKS.has(t)).length
+
+    const rows = [{ field: 'Other training', before: existing ? describeActivity(existing) : 'none', after: describeActivity(activity) }]
+    if (daysChange) rows.push({ field: 'Training days', before: beforeDays.join(', ') || 'none', after: wantedDays.join(', ') })
+    if (timeChange) rows.push({ field: 'Gym sessions', before: `${profile.preferred_time}s`, after: `${gymTime}s` })
+
+    const implications: { severity: 'info' | 'warn'; text: string }[] = [
+      { severity: 'info', text: `Rebuilds ${weeksAhead} week${weeksAhead === 1 ? '' : 's'} from week ${startWeek} on so the lighter gym sessions land on ${days.join(' and ')} and no extra cardio is prescribed there. Same amount of lifting — only which day carries which session changes. Anything you've already logged stays exactly as it is.` },
+    ]
+    if (unavoidable.length > 0) {
+      implications.push({
+        severity: 'warn',
+        text: lightCount === 0
+          ? `Your ${futureDays.length}-day week has no lighter session in it, so ${unavoidable.join(' and ')} will still be a full gym day on a class night.`
+          : `Your ${futureDays.length}-day week only has ${lightCount} lighter session${lightCount === 1 ? '' : 's'}, so ${unavoidable.join(' and ')} will still carry a heavy one on a class night.`,
+      })
+    }
+    if (daysChange && wantedDays.length !== beforeDays.length) {
+      implications.push({ severity: 'warn', text: `Going from ${beforeDays.length} to ${wantedDays.length} gym day${wantedDays.length === 1 ? '' : 's'} changes the split — the same work doesn't just move, it gets rebalanced.` })
+    }
+
+    return {
+      scopeKey: `${profile.id}:propose_concurrent_activity:${name.toLowerCase()}:${[...days].sort().join(',')}:${startWeek}`,
+      preconditions: {
+        beforeActivities: profile.concurrent_activities ?? [],
+        beforeDays, wantedDays: daysChange ? wantedDays : undefined,
+        beforeTime: profile.preferred_time, wantedTime: timeChange ? gymTime : undefined,
+        startWeek,
+      },
+      payload: {
+        activity, fromWeek: startWeek,
+        ...(daysChange ? { trainingDays: wantedDays } : {}),
+        ...(timeChange ? { gymTimeOfDay: gymTime } : {}),
+        reason: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined,
+      },
+      preImage: mesocycle,
+      diff: { rows, implications, rationale: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined, reversible: true },
     }
   }
 
@@ -2670,6 +2771,18 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
           const current = STYLE_OPTIONS.find(o => o.value === (profile.training_style ?? 'hybrid'))?.label ?? 'this style'
           refusal = `You're already training ${current} — nothing to change there. If you meant just today's session, say so and I'll sort that instead.`
         }
+      } else if (result.proposal.kind === 'propose_concurrent_activity' && result.proposal.rawArgs) {
+        const activity = buildConcurrentActivityProposal(result.proposal.rawArgs)
+        if (activity) built = { scopeKey: activity.scopeKey, preconditions: activity.preconditions, payload: activity.payload as unknown as Record<string, unknown>, preImage: activity.preImage, diff: activity.diff }
+        else {
+          // Either it is already recorded exactly like that, or no day the
+          // app recognises survived — both are "nothing to propose", and the
+          // honest reply names what IS recorded rather than pretending.
+          const have = (profile.concurrent_activities ?? []).map(describeActivity)
+          refusal = have.length > 0
+            ? `I've already got ${have.join(' and ')} down, and the plan is built around it. If the days have changed, tell me the new ones and I'll move things.`
+            : "I couldn't tell which days that's on — which evenings is it? Then I'll rebuild the week around it."
+        }
       } else if (result.proposal.kind === 'propose_rest_day' && result.proposal.rawArgs) {
         const rest = buildRestDayProposal(result.proposal.rawArgs)
         if (rest) built = { scopeKey: rest.scopeKey, preconditions: rest.preconditions, payload: rest.payload as unknown as Record<string, unknown>, diff: rest.diff }
@@ -3289,6 +3402,24 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       title = ok ? 'Style updated' : "Couldn't change the style"
       rows = ok ? receipt.landed.map(line => { const [label, detail] = line.split(': '); return { label, detail } }) : []
       undoToken = ok ? row.id : undefined
+    } else if (row.kind === 'propose_concurrent_activity') {
+      const payload = row.payload as unknown as ConcurrentActivityPayload
+      const result = await executeConcurrentActivity(profile, mesocycle, exerciseExclusions, payload)
+      onMesocycleUpdated(result.mesocycle)
+      // The executor writes the profile itself; mirror what it wrote into
+      // App state, same lockstep as the schedule and style branches.
+      if (result.receipt.failed.length === 0) {
+        const others = (profile.concurrent_activities ?? []).filter(a => a.name.toLowerCase() !== payload.activity.name.toLowerCase())
+        const patch: Partial<UserProfile> = { concurrent_activities: [...others, payload.activity] }
+        if (payload.trainingDays) patch.training_days = (profile.training_days ?? []).map(d => ({ ...d, available: payload.trainingDays!.some(w => w.toLowerCase() === d.day.toLowerCase()) }))
+        if (payload.gymTimeOfDay) patch.preferred_time = payload.gymTimeOfDay
+        onProfileChanged(patch)
+      }
+      receipt = result.receipt
+      const ok = receipt.failed.length === 0
+      title = ok ? 'Plan built around it' : "Couldn't add that"
+      rows = ok ? receipt.landed.map(line => { const [label, ...rest] = line.split(': '); return { label, detail: rest.join(': ') } }) : []
+      undoToken = ok ? row.id : undefined
     } else if (row.kind === 'propose_rest_day') {
       const payload = row.payload as unknown as RestDayPayload
       const result = await executeRestDay(profile, payload)
@@ -3475,7 +3606,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         if (!preImage || !planCreatedAt) return
         await undoExerciseSwap(profile.id, preImage, payload.weekNumber, payload.scope, planCreatedAt)
         onMesocycleUpdated(preImage)
-      } else if (row.kind === 'propose_volume_change' || row.kind === 'propose_schedule_change' || row.kind === 'propose_style_change') {
+      } else if (row.kind === 'propose_volume_change' || row.kind === 'propose_schedule_change' || row.kind === 'propose_style_change' || row.kind === 'propose_concurrent_activity') {
         // Both wrote a RUN of weeks, so undo restores the same run rather
         // than the swap's single week. The starting week comes off the
         // payload, not off today's live week — undoing tomorrow must put
@@ -3486,7 +3617,9 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
           ? Math.min(...(row.payload as unknown as VolumeChangePayload).weekNumbers)
           : row.kind === 'propose_style_change'
             ? (row.payload as unknown as StyleChangePayload).fromWeek
-            : (row.payload as unknown as ScheduleChangePayload).fromWeek
+            : row.kind === 'propose_concurrent_activity'
+              ? (row.payload as unknown as ConcurrentActivityPayload).fromWeek
+              : (row.payload as unknown as ScheduleChangePayload).fromWeek
         await undoWeekRangeChange(profile.id, preImage, fromWeek)
         onMesocycleUpdated(preImage)
         if (row.kind === 'propose_schedule_change') {
@@ -3497,6 +3630,16 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
           const restored = (profile.training_days ?? []).map(d => ({ ...d, available: before.some(b => b.toLowerCase() === d.day.toLowerCase()) }))
           await updateProfileField(profile.id, { training_days: restored })
           onProfileChanged({ training_days: restored })
+        }
+        if (row.kind === 'propose_concurrent_activity') {
+          // The plan goes back, so everything the card wrote goes back with
+          // it — the activity, and the two passengers if they rode along.
+          const pre = row.preconditions as { beforeActivities?: ConcurrentActivity[]; beforeDays?: string[]; wantedDays?: string[]; beforeTime?: UserProfile['preferred_time']; wantedTime?: string } | null
+          const patch: Partial<UserProfile> = { concurrent_activities: pre?.beforeActivities ?? [] }
+          if (pre?.wantedDays && pre.beforeDays) patch.training_days = (profile.training_days ?? []).map(d => ({ ...d, available: pre.beforeDays!.some(b => b.toLowerCase() === d.day.toLowerCase()) }))
+          if (pre?.wantedTime && pre.beforeTime) patch.preferred_time = pre.beforeTime
+          await updateProfileField(profile.id, patch)
+          onProfileChanged(patch)
         }
         if (row.kind === 'propose_style_change') {
           // Same divergence, same fix: the plan goes back, so the style must too.

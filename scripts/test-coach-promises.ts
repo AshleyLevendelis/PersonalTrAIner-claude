@@ -575,6 +575,31 @@ console.log('\nWANTING TO TRAIN IS NOT A SCHEDULE CHANGE\n')
     /If you were asking something else, like what today's session is/.test(ui))
 }
 
+console.log('\n6b. A second sport is a tool, not a memory note — and not the one-off swap')
+{
+  // 6 Sep 2026. "I also do Muay Thai on Tuesday and Thursday evenings" had
+  // exactly one tool that knew the phrase: swap_session_for_activity, which
+  // marks ONE day as swapped. A standing commitment filed through it would
+  // have marked one Tuesday and left the plan prescribing heavy legs the
+  // morning of every class. record_fact would have written it down and
+  // changed nothing. The rule has to separate three sentences that look
+  // alike, and the tool has to exist and be executed.
+  check('propose_concurrent_activity is declared', /name:\s*"propose_concurrent_activity"/.test(chat))
+  check('...and has a handler', /name === "propose_concurrent_activity"/.test(chat))
+  check('...which PROPOSES rather than writing',
+    /kind: "propose_concurrent_activity"/.test(chat) && !/name === "propose_concurrent_activity"[\s\S]{0,900}fitness_profiles/.test(chat))
+  const g = chat.slice(chat.indexOf('=== 3g.'), chat.indexOf('=== 4. TAG HYGIENE'))
+  check('§3g exists', g.length > 200, g.length)
+  check('...and names all three look-alike sentences with their tools',
+    /swap_session_for_activity/.test(g) && /propose_schedule_change/.test(g) && /propose_concurrent_activity/.test(g))
+  check('...says it never guesses the days', /Never guess days/.test(g))
+  check('...and that one class day may still carry a heavy session', /still carries a heavy session/.test(g))
+  check('the memory-note precedence rule names it too',
+    /SECOND SPORT on set days[\s\S]{0,200}propose_concurrent_activity/.test(chat))
+  check('the coach context block carries a rule, not just data',
+    /RULES FOR THESE DAYS/.test(chat) && /never call one of these nights a "rest day"/.test(chat))
+}
+
 console.log('\n7. A tool that declines says so in its own description')
 {
   // THE OTHER HALF OF §1. That section proves every declared tool has a
