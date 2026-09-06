@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// The five themes and six accents, as DATA — one table the settings sheet
+// The eight themes and nine accents, as DATA — one table the settings sheet
 // reads for its previews, its swatches and its contrast maths.
 //
 // These values duplicate index.css on purpose and it is worth saying why,
@@ -68,6 +68,30 @@ export const THEME_PREVIEWS: Record<ThemeName, ThemePreview> = {
     text: '#15122B', muted: '#5C5680', hairline: 'rgba(21,18,43,.14)',
     accent: '#19B894', accent2: '#0E9C7C', accentText: '#00705B', light: true,
   },
+  midnight: {
+    label: 'Midnight', subtitle: 'navy · sky',
+    canvas: '#0E1626', surface: 'rgba(60,84,130,.28)',
+    text: '#EEF3FB', muted: '#8E9FBC', hairline: 'rgba(238,243,251,.11)',
+    accent: '#6FB7FF', accent2: '#2E7FE0', accentText: '#6FB7FF', light: false,
+  },
+  rosewood: {
+    label: 'Rosewood', subtitle: 'plum · coral',
+    canvas: '#1C1018', surface: 'rgba(110,60,90,.30)',
+    text: '#FBEFF4', muted: '#B899A9', hairline: 'rgba(251,239,244,.11)',
+    accent: '#FF8FA3', accent2: '#E85A78', accentText: '#FF8FA3', light: false,
+  },
+  linen: {
+    label: 'Linen', subtitle: 'cream · amber',
+    canvas: '#F7F2EA', surface: 'rgba(120,90,60,.10)',
+    text: '#231A12', muted: '#6E5E4E', hairline: 'rgba(35,26,18,.13)',
+    accent: '#F0843F', accent2: '#D8651E', accentText: '#9A3F0B', light: true,
+  },
+  frost: {
+    label: 'Frost', subtitle: 'ice · cobalt',
+    canvas: '#EEF3F8', surface: 'rgba(60,90,130,.10)',
+    text: '#0F1B2D', muted: '#56697F', hairline: 'rgba(15,27,45,.13)',
+    accent: '#2569D0', accent2: '#1B57B8', accentText: '#1A5FBF', light: true,
+  },
 }
 
 export interface AccentPreview {
@@ -89,10 +113,19 @@ export const ACCENT_PREVIEWS: Record<AccentOverride, AccentPreview> = {
   violet: { label: 'Violet', bright: '#B49BFF', deep: '#7C5AE0', dark: '#7C5AE0', text: '#5A3FC4', glowRgb: '155,125,245' },
   sky:    { label: 'Sky',    bright: '#6FB7FF', deep: '#2E7FE0', dark: '#2569D0', text: '#1A5FBF', glowRgb: '111,183,255' },
   lime:   { label: 'Lime',   bright: '#C6F24E', deep: '#8FBE1F', dark: '#7FAF12', text: '#4E7300', glowRgb: '198,242,78' },
+  amber:  { label: 'Amber',  bright: '#FF8A3D', deep: '#E85F14', dark: '#F0843F', text: '#9A3F0B', glowRgb: '255,138,61' },
+  rose:   { label: 'Rose',   bright: '#FF8FA3', deep: '#E85A78', dark: '#E85A78', text: '#B7264B', glowRgb: '255,143,163' },
+  gold:   { label: 'Gold',   bright: '#FFD166', deep: '#E6B02E', dark: '#D9A21E', text: '#7A5600', glowRgb: '255,209,102' },
 }
 
-export const THEME_ORDER: ThemeName[] = ['nightshift', 'graphite', 'ember', 'field', 'daylight']
-export const ACCENT_ORDER: AccentOverride[] = ['theme', 'mint', 'coral', 'violet', 'sky', 'lime']
+/**
+ * DARK FIRST, THEN LIGHT, and the settings sheet draws the break between them
+ * as two labelled rows. Six and three at three per row on a 390px screen.
+ */
+export const DARK_THEME_ORDER: ThemeName[] = ['nightshift', 'graphite', 'ember', 'field', 'midnight', 'rosewood']
+export const LIGHT_THEME_ORDER: ThemeName[] = ['daylight', 'linen', 'frost']
+export const THEME_ORDER: ThemeName[] = [...DARK_THEME_ORDER, ...LIGHT_THEME_ORDER]
+export const ACCENT_ORDER: AccentOverride[] = ['theme', 'mint', 'coral', 'violet', 'sky', 'lime', 'amber', 'rose', 'gold']
 
 /**
  * The colour a given theme+accent pair actually paints with.

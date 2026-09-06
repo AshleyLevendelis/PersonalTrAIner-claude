@@ -330,6 +330,149 @@
  * Each accent declares three stops rather than two. The bright/deep pair is
  * what a dark canvas uses; --accent-dark is the same hue taken down far
  * enough to hold its own against paper, where the bright end washes out. */
+/* Theme: Midnight — navy · sky. */
+[data-theme="midnight"] {
+  --background: #0E1626;
+  --foreground: #EEF3FB;
+  --card: #16223A;
+  --card-foreground: #EEF3FB;
+  --popover: #16223A;
+  --popover-foreground: #EEF3FB;
+  --secondary: #1C2C48;
+  --secondary-foreground: #EEF3FB;
+  --muted: #16223A;
+  --muted-foreground: #8E9FBC;
+  --accent: #1C2C48;
+  --accent-foreground: #EEF3FB;
+  --border: #2B3A58;
+  --input: #16223A;
+  --text-tertiary: #C2CFE3;
+  --text-dim: #2B3A58;
+  --surface-deep: #121C30;
+  --surface-raised: rgba(60, 84, 130, .28);
+  --line-emphasis: #34496F;
+  --hairline: rgba(238, 243, 251, .11);
+  --grain-rgb: 238, 243, 251;
+  --theme-primary: #6FB7FF;
+  --theme-primary-2: #2E7FE0;
+  --theme-glow-rgb: 111, 183, 255;
+  --primary-text: var(--theme-primary);
+  --primary-foreground: #04213F;
+  --num-hero: #E6F1FF;
+  --role-ai-bg: rgba(111, 183, 255, .10);
+  --role-ai-border: rgba(111, 183, 255, .25);
+  --role-ai-text: #CFE2FF;
+  --hero-wash: rgba(111, 183, 255, .16);
+}
+
+/* Theme: Rosewood — plum · coral. */
+[data-theme="rosewood"] {
+  --background: #1C1018;
+  --foreground: #FBEFF4;
+  --card: #2A1824;
+  --card-foreground: #FBEFF4;
+  --popover: #2A1824;
+  --popover-foreground: #FBEFF4;
+  --secondary: #382030;
+  --secondary-foreground: #FBEFF4;
+  --muted: #2A1824;
+  --muted-foreground: #B899A9;
+  --accent: #382030;
+  --accent-foreground: #FBEFF4;
+  --border: #4E2F42;
+  --input: #2A1824;
+  --text-tertiary: #E0C7D3;
+  --text-dim: #4E2F42;
+  --surface-deep: #23141E;
+  --surface-raised: rgba(110, 60, 90, .30);
+  --line-emphasis: #5E3A50;
+  --hairline: rgba(251, 239, 244, .11);
+  --grain-rgb: 251, 239, 244;
+  --theme-primary: #FF8FA3;
+  --theme-primary-2: #E85A78;
+  --theme-glow-rgb: 255, 143, 163;
+  --primary-text: var(--theme-primary);
+  --primary-foreground: #3A0A16;
+  --num-hero: #FFEEF3;
+  --role-ai-bg: rgba(255, 143, 163, .10);
+  --role-ai-border: rgba(255, 143, 163, .25);
+  --role-ai-text: #FFD3DC;
+  --hero-wash: rgba(255, 143, 163, .14);
+}
+
+/* Theme: Linen — cream · amber. THE SECOND LIGHT CANVAS. */
+[data-theme="linen"] {
+  --background: #F7F2EA;
+  --foreground: #231A12;
+  --card: #FFFDF9;
+  --card-foreground: #231A12;
+  --popover: #FFFDF9;
+  --popover-foreground: #231A12;
+  --secondary: #EEE6DA;
+  --secondary-foreground: #231A12;
+  --muted: #F1EBE1;
+  --muted-foreground: #6E5E4E;
+  --accent: #EEE6DA;
+  --accent-foreground: #231A12;
+  --border: #D9CDBD;
+  --input: #FFFDF9;
+  --text-tertiary: #4A3B2D;
+  --text-dim: #C4B5A3;
+  --surface-deep: #EEE6DA;
+  --surface-raised: rgba(120, 90, 60, .10);
+  --line-emphasis: #CDBDA8;
+  --hairline: rgba(35, 26, 18, .13);
+  --grain-rgb: 35, 26, 18;
+  --theme-primary: #F0843F;
+  --theme-primary-2: #D8651E;
+  --theme-glow-rgb: 240, 132, 63;
+  --primary-text: #9A3F0B;
+  --primary-foreground: #2A1300;
+  --num-hero: #3A1E0C;
+  --role-ai-bg: rgba(154, 63, 11, .08);
+  --role-ai-border: rgba(154, 63, 11, .20);
+  --role-ai-text: #7A3A12;
+  --hero-wash: rgba(240, 132, 63, .08);
+}
+
+/* Theme: Frost — ice · cobalt. THE THIRD LIGHT CANVAS. */
+[data-theme="frost"] {
+  --background: #EEF3F8;
+  --foreground: #0F1B2D;
+  --card: #FFFFFF;
+  --card-foreground: #0F1B2D;
+  --popover: #FFFFFF;
+  --popover-foreground: #0F1B2D;
+  --secondary: #E1E9F1;
+  --secondary-foreground: #0F1B2D;
+  --muted: #E7EEF5;
+  --muted-foreground: #56697F;
+  --accent: #E1E9F1;
+  --accent-foreground: #0F1B2D;
+  --border: #C9D6E4;
+  --input: #FFFFFF;
+  --text-tertiary: #2F4260;
+  --text-dim: #A9B8CA;
+  --surface-deep: #E1E9F1;
+  --surface-raised: rgba(60, 90, 130, .10);
+  --line-emphasis: #B9C9DA;
+  --hairline: rgba(15, 27, 45, .13);
+  --grain-rgb: 15, 27, 45;
+  --theme-primary: #2569D0;
+  --theme-primary-2: #1B57B8;
+  --theme-glow-rgb: 37, 105, 208;
+  --primary-text: #1A5FBF;
+  /* WHITE, not the near-black every other theme uses: cobalt is dark enough
+   * that dark ink on it fails, which is why --primary-foreground had to stop
+   * being a single global value. */
+  --primary-foreground: #FFFFFF;
+  --num-hero: #0C2A4A;
+  --role-ai-bg: rgba(26, 95, 191, .08);
+  --role-ai-border: rgba(26, 95, 191, .20);
+  --role-ai-text: #1E4D8F;
+  --hero-wash: rgba(37, 105, 208, .08);
+}
+
 /* Each accent now declares FOUR stops, and the fourth is the point of this
  * round. bright/deep is what a dark canvas uses. --accent-dark is the same
  * hue taken down far enough to hold as a FILL on paper. --accent-text is
@@ -345,6 +488,9 @@
 [data-accent="violet"] { --accent-bright: #B49BFF; --accent-deep: #7C5AE0; --accent-dark: #7C5AE0; --accent-text: #5A3FC4; --accent-on: #FFFFFF; --theme-glow-rgb: 155, 125, 245; }
 [data-accent="sky"]    { --accent-bright: #6FB7FF; --accent-deep: #2E7FE0; --accent-dark: #2569D0; --accent-text: #1A5FBF; --accent-on: #FFFFFF; --theme-glow-rgb: 111, 183, 255; }
 [data-accent="lime"]   { --accent-bright: #C6F24E; --accent-deep: #8FBE1F; --accent-dark: #7FAF12; --accent-text: #4E7300; --accent-on: #08281F; --theme-glow-rgb: 198, 242, 78; }
+[data-accent="amber"]  { --accent-bright: #FF8A3D; --accent-deep: #E85F14; --accent-dark: #F0843F; --accent-text: #9A3F0B; --accent-on: #08281F; --theme-glow-rgb: 255, 138, 61; }
+[data-accent="rose"]   { --accent-bright: #FF8FA3; --accent-deep: #E85A78; --accent-dark: #E85A78; --accent-text: #B7264B; --accent-on: #FFFFFF; --theme-glow-rgb: 255, 143, 163; }
+[data-accent="gold"]   { --accent-bright: #FFD166; --accent-deep: #E6B02E; --accent-dark: #D9A21E; --accent-text: #7A5600; --accent-on: #08281F; --theme-glow-rgb: 255, 209, 102; }
 
 /* ONE rule pair, keyed off the canvas being light — not one rule per theme x
  * accent. A light theme added later inherits the dark-step behaviour for

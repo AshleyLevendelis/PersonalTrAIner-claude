@@ -20,7 +20,7 @@ import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { DEFAULT_APPEARANCE, isLightTheme, resolveGlow, type ThemeName, type AccentOverride } from '../src/lib/appearance-store'
 import {
-  THEME_PREVIEWS, ACCENT_PREVIEWS, THEME_ORDER, ACCENT_ORDER,
+  THEME_PREVIEWS, ACCENT_PREVIEWS, THEME_ORDER, ACCENT_ORDER, DARK_THEME_ORDER, LIGHT_THEME_ORDER,
   resolveAccentColor, contrastRatio, luminance, CONTRAST_FLOOR,
 } from '../src/lib/appearance-palette'
 
@@ -43,8 +43,21 @@ check('...and it is the shipped default', DEFAULT_APPEARANCE.accent === 'theme')
 check('every accent the type allows has a chip', ACCENT_ORDER.length === Object.keys(ACCENT_PREVIEWS).length,
   { order: ACCENT_ORDER.length, previews: Object.keys(ACCENT_PREVIEWS).length })
 check('every theme the type allows has a card', THEME_ORDER.length === Object.keys(THEME_PREVIEWS).length)
-check('...and there are five of each kind (sanity check on this check)',
-  THEME_ORDER.length === 5 && ACCENT_ORDER.length === 6, { themes: THEME_ORDER.length, accents: ACCENT_ORDER.length })
+// NINE themes, nine accent chips (8 hues + "Match theme"). The handoff's
+// overview says "themes 5 -> 8" and its floors line says "all 8 themes", but
+// its own body adds four to the shipped five and its settings spec draws
+// "Dark (6)" and "Light (3)" — 9. The prototype's data has 6 dark + 3 light
+// too. Built to the lists, which agree with each other, not to the arithmetic
+// in the summary; pinned here so the number is a decision rather than a
+// drifting count.
+check('...and there are nine themes and nine accent chips (sanity check on this check)',
+  THEME_ORDER.length === 9 && ACCENT_ORDER.length === 9, { themes: THEME_ORDER.length, accents: ACCENT_ORDER.length })
+check('...of which eight accents are hues and one is "Match theme"',
+  ACCENT_ORDER.filter(a => a !== 'theme').length === 8)
+check('...split six dark and three light, which is what the sheet draws',
+  DARK_THEME_ORDER.length === 6 && LIGHT_THEME_ORDER.length === 3
+  && DARK_THEME_ORDER.every(t => !isLightTheme(t)) && LIGHT_THEME_ORDER.every(t => isLightTheme(t)),
+  { dark: DARK_THEME_ORDER, light: LIGHT_THEME_ORDER })
 
 console.log('\n2. Retired accent values migrate rather than vanishing\n')
 // Read the map out of the source: importing it would need it exported purely
@@ -108,8 +121,17 @@ for (const a of ACCENT_ORDER) {
 }
 
 console.log('\n4. A light canvas changes two things, by rule not by combination\n')
-check('daylight is flagged light', isLightTheme('daylight' as ThemeName) && THEME_PREVIEWS.daylight.light)
-check('every other theme is not', THEME_ORDER.filter(t => t !== 'daylight').every(t => !isLightTheme(t)))
+// THREE LIGHT THEMES NOW, and the store and the palette have to agree about
+// which — the store's flag drives the CSS rules, the palette's drives the
+// preview, and a theme light in one and dark in the other previews a canvas
+// the app will not paint.
+for (const t of THEME_ORDER) {
+  check(`${t}: the store and the palette agree on light vs dark (${isLightTheme(t) ? 'light' : 'dark'})`,
+    isLightTheme(t) === THEME_PREVIEWS[t].light)
+}
+check('daylight, linen and frost are the light ones',
+  THEME_ORDER.filter(t => isLightTheme(t)).join(',') === 'daylight,linen,frost',
+  THEME_ORDER.filter(t => isLightTheme(t)))
 check('the accent dark step is one rule keyed off the canvas flag',
   /\[data-canvas="light"\]\[data-accent\]:not\(\[data-accent="theme"\]\)/.test(css))
 check('...and it is not written per theme × accent',

@@ -20,18 +20,23 @@ const KEY = 'fitplan_appearance_v2'
 const LEGACY_KEY = 'fitplan_appearance_v1'
 
 export type GlowLevel = 'off' | 'subtle' | 'full'
-export type ThemeName = 'nightshift' | 'ember' | 'field' | 'graphite' | 'daylight'
+export type ThemeName =
+  | 'nightshift' | 'ember' | 'field' | 'graphite' | 'midnight' | 'rosewood'
+  | 'daylight' | 'linen' | 'frost'
 /** 'theme' means "use the active theme's own default accent" — not an override. */
-export type AccentOverride = 'theme' | 'mint' | 'coral' | 'violet' | 'sky' | 'lime'
+export type AccentOverride =
+  | 'theme' | 'mint' | 'coral' | 'violet' | 'sky' | 'lime' | 'amber' | 'rose' | 'gold'
 
 /**
  * Themes that paint on paper rather than on a dark canvas.
  *
- * A SET, not a `theme === 'daylight'` check, because two rules key off it —
- * the accent's dark step and the glow clamp — and both must stay true for any
- * light theme added later, not just this one.
+ * A SET, not a `theme === 'daylight'` check, because four rules key off it
+ * now — the accent's fill step, the accent's TEXT step, the accent's ink, and
+ * the glow clamp — and all four must stay true for any light theme added
+ * later. Linen and Frost joined on 6 Sep 2026 and needed no other change,
+ * which is the whole point of the flag.
  */
-const LIGHT_THEMES: ReadonlySet<ThemeName> = new Set<ThemeName>(['daylight'])
+const LIGHT_THEMES: ReadonlySet<ThemeName> = new Set<ThemeName>(['daylight', 'linen', 'frost'])
 
 export function isLightTheme(theme: ThemeName): boolean {
   return LIGHT_THEMES.has(theme)
@@ -61,8 +66,8 @@ export interface AppearanceRecord {
 export const DEFAULT_APPEARANCE: AppearanceRecord = { glow: 'full', theme: 'nightshift', accent: 'theme' }
 
 const GLOW_VALUES: GlowLevel[] = ['off', 'subtle', 'full']
-const THEME_VALUES: ThemeName[] = ['nightshift', 'ember', 'field', 'graphite', 'daylight']
-const ACCENT_VALUES: AccentOverride[] = ['theme', 'mint', 'coral', 'violet', 'sky', 'lime']
+const THEME_VALUES: ThemeName[] = ['nightshift', 'ember', 'field', 'graphite', 'midnight', 'rosewood', 'daylight', 'linen', 'frost']
+const ACCENT_VALUES: AccentOverride[] = ['theme', 'mint', 'coral', 'violet', 'sky', 'lime', 'amber', 'rose', 'gold']
 
 /**
  * The old accent set was four of the other themes' own accents plus blue — an
