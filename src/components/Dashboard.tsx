@@ -15,10 +15,10 @@ import { stepsTargetFor } from '@/lib/steps-target'
 import { getStepsForDate, type DailyStepsRow } from '@/lib/steps-store'
 import { WeighInCard } from '@/components/WeighInCard'
 import type { UserProfile, MacroTargets, WorkoutDay, MesocycleWeek } from '@/lib/types'
-import { MessageCircle } from 'lucide-react'
 import { useTrainingWeek } from '@/hooks/useTrainingWeek'
 import { HomeWeekStrip, HomeWeekStripLabels } from '@/components/HomeWeekStrip'
 import { setChatPrefill } from '@/lib/chat-prefill-store'
+import { TrainerNudge, type TrainerNudgeProps } from '@/components/TrainerNudge'
 
 interface DashboardProps {
   profile: UserProfile
@@ -30,6 +30,13 @@ interface DashboardProps {
   onWeightLogged?: () => void | Promise<void>
   /** App's logsVersion — bumped when the chat writes a rest day or a session, so the week strip re-reads instead of showing a stale glyph. */
   logsVersion?: number
+  /**
+   * The first adaptation message, already shaped into a nudge by App.tsx —
+   * the line that used to be an InsightBanner tone="ai" stacked above every
+   * tab. Absent when there is none, and Home falls through to its own coach
+   * tip. See TrainerNudge and design_handoff_app_polish.
+   */
+  trainerNudge?: TrainerNudgeProps | null
 }
 
 // Tab-restructure handoff — Dashboard.tsx no longer owns the macro ring
@@ -145,7 +152,7 @@ function chipsForTip(key: string | null): { label: string; prefill: string }[] {
   return key ? (TIP_CHIPS[key] ?? []) : []
 }
 
-export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreatedAt, onWeightLogged, logsVersion }: DashboardProps) {
+export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreatedAt, onWeightLogged, logsVersion, trainerNudge }: DashboardProps) {
   const stepsTarget = stepsTargetFor(profile)
   const activeSession = useActiveSession()
   const [data, setData] = useState<DashboardData | null>(null)
@@ -252,6 +259,25 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
   const sessionGlance = glanceParts.join(' · ')
 
   const replyChips = chipsForTip(data.coachTipKey)
+
+  // The nudge's line, in the handoff's stated order: an adaptation message
+  // that wants an answer, else the coach tip, else nothing. Never filler.
+  const homeNudge: TrainerNudgeProps | null = trainerNudge
+    ?? ((data.coachTip || data.whatsLeftLine)
+      ? {
+          openChat: true,
+          text: (
+            <>
+              {data.coachTip}
+              {data.whatsLeftLine && (
+                <span className={`block text-[0.78125rem] text-[color:var(--role-warn-text)] ${data.coachTip ? 'mt-1' : ''}`}>
+                  {data.whatsLeftLine}
+                </span>
+              )}
+            </>
+          ),
+        }
+      : null)
 
   // Three tiles, one shape. Water is --chart-3 here exactly as it is on
   // Nutrition: mint means "on track", and water is a fill, not a verdict.
@@ -396,43 +422,37 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
           )}
         </div>
 
-        {/* 5. COACH BUBBLE — the tip and what is still outstanding in ONE
-            block, because they are both the coach talking. The avatar does
-            the work the amber dot and the lightning emoji used to do
-            separately, and matches the avatar in chat so the voice is
-            recognisably the same one. */}
-        {(data.coachTip || data.whatsLeftLine) && (
-          <div className="mt-5 flex items-start gap-2.5">
-            <span
-              aria-hidden
-              className="mt-[1px] flex size-[26px] shrink-0 items-center justify-center rounded-full"
-              style={{ background: 'linear-gradient(180deg, color-mix(in oklab, var(--primary) 84%, white), var(--primary-2))' }}
-            >
-              <MessageCircle className="size-3.5" style={{ color: 'var(--primary-foreground)' }} />
-            </span>
-            <div className="min-w-0 flex-1">
-              {data.coachTip && <p className="text-[0.875rem] leading-[1.5]">{data.coachTip}</p>}
-              {data.whatsLeftLine && (
-                <p className={`text-[0.78125rem] leading-[1.5] text-[color:var(--role-warn-text)] ${data.coachTip ? 'mt-1' : ''}`}>
-                  {data.whatsLeftLine}
-                </p>
-              )}
-              {replyChips.length > 0 && (
-                <div className="mt-2.5 flex flex-wrap gap-2">
-                  {replyChips.map(chip => (
-                    <button
-                      key={chip.label}
-                      type="button"
-                      onClick={() => { setChatPrefill(chip.prefill); window.location.hash = tabHash('chat') }}
-                      className="inline-flex min-h-[34px] items-center rounded-full px-3 text-[0.75rem]"
-                      style={{ background: 'var(--accent)' }}
-                    >
-                      {chip.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+        {/* 5. THE TRAINER'S LINE — design_handoff_app_polish. Was a
+            hand-rolled bubble here plus a stack of InsightBanner tone="ai"
+            above every tab; both are now the one <TrainerNudge>, so the
+            assistant has ONE look wherever it speaks outside chat.
+            The order is the handoff's: an adaptation message that needs an
+            answer first (it carries its own confirm/decline), then the coach
+            tip, then nothing. What is still outstanding rides inside the
+            same block in warn colour — that is the "What's left" line the
+            handoff removed from Home and said the nudge would carry.
+            THE REPLY CHIPS STAY. They are keyed to the tip that produced
+            them (chipsForTip) and open chat with a real prefill; the handoff
+            does not mention them, and dropping a shipped affordance is not a
+            presentation change. Recorded in the commit message. */}
+        {homeNudge && (
+          <div className="mt-5">
+            <TrainerNudge {...homeNudge} />
+            {!trainerNudge && replyChips.length > 0 && (
+              <div className="mt-2.5 flex flex-wrap gap-2">
+                {replyChips.map(chip => (
+                  <button
+                    key={chip.label}
+                    type="button"
+                    onClick={() => { setChatPrefill(chip.prefill); window.location.hash = tabHash('chat') }}
+                    className="inline-flex min-h-[34px] items-center rounded-full px-3 text-[0.75rem]"
+                    style={{ background: 'var(--accent)' }}
+                  >
+                    {chip.label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

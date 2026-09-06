@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, lazy, Suspense } from 'react'
+import { useState, useEffect, useRef, lazy, Suspense, useMemo } from 'react'
 import { Tabs, TabsContent } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Loader2 } from 'lucide-react'
@@ -82,6 +82,7 @@ function ScreenLoading() {
 }
 import { EmailPrompt } from '@/components/EmailPrompt'
 import { InsightBanner } from '@/components/ui/insight-banner'
+import type { TrainerNudgeProps } from '@/components/TrainerNudge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { getActiveFacts, getActiveGoals, getActiveContextFacts, createFact, createContextFact, createGoal, type UserFactRow, type UserGoalRow, type UserContextFactRow } from '@/lib/memory-store'
 import { compileExerciseExclusions, compileFoodDislikes, compileTimingRules, compileSoftExercisePreferences, compileSoftFoodPreferences, compileTrainingDayOverrides, compileKnownLiftOverrides, resolveFoodTarget, resolveExerciseTarget } from '@/lib/fact-compiler'
@@ -1870,6 +1871,55 @@ function App() {
     }
   }
 
+  // THE TRAINER'S LINE ON HOME — design_handoff_app_polish. The adaptation
+  // messages used to render as a stack of InsightBanner tone="ai" above every
+  // tab; now the FIRST one is the Home nudge, with its confirm/decline as
+  // inline text buttons, and Home falls back to the coach tip when there is
+  // none (Dashboard.tsx owns that fallback). Same handlers, same busy state,
+  // same labels — only where it renders changed. The remaining messages wait
+  // their turn: answering or dismissing the first reveals the next.
+  const homeNudge = useMemo<TrainerNudgeProps | null>(() => {
+    const msg = adaptationMessages[0]
+    if (!msg) return null
+    if (msg.loadSuggestionId) {
+      const id = msg.loadSuggestionId
+      const busy = loadSuggestionBusy === id
+      return { text: msg.text, actions: [
+        { label: busy ? 'Applying…' : 'Start heavier', onClick: () => void handleLoadSuggestionConfirm(id), disabled: busy },
+        { label: 'Keep as is', onClick: () => void handleLoadSuggestionDecline(id), disabled: busy, secondary: true },
+      ] }
+    }
+    if (msg.loadCatchupId) {
+      const id = msg.loadCatchupId
+      const busy = loadSuggestionBusy === id
+      // "Keep the plan" rather than "Dismiss": declining is a real answer
+      // that is remembered for this block, and the label has to say which
+      // way it goes.
+      return { text: msg.text, actions: [
+        { label: busy ? 'Updating…' : 'Yes, use my weights', onClick: () => void handleLoadCatchupConfirm(id), disabled: busy },
+        { label: 'Keep the plan', onClick: () => void handleLoadCatchupDecline(id), disabled: busy, secondary: true },
+      ] }
+    }
+    if (msg.weightBasisOfferId) {
+      const id = msg.weightBasisOfferId
+      const busy = loadSuggestionBusy === id
+      // "No thanks" and not "Dismiss": this records a permanent answer, and
+      // the label has to say so.
+      return { text: msg.text, actions: [
+        { label: busy ? 'Rebuilding…' : 'Yes, redo them', onClick: () => void handleWeightBasisConfirm(id), disabled: busy },
+        { label: 'No thanks', onClick: () => void handleWeightBasisDecline(id), disabled: busy, secondary: true },
+      ] }
+    }
+    return { text: msg.text, actions: [{
+      label: 'Dismiss', secondary: true,
+      onClick: () => {
+        if (msg.goalId) dismissGoalProximity(msg.goalId)
+        setAdaptationMessages(prev => prev.filter((_, idx) => idx !== 0))
+      },
+    }] }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [adaptationMessages, loadSuggestionBusy])
+
   const handleReset = async () => {
     setNewPlanResetting(true)
     try {
@@ -2262,96 +2312,10 @@ function App() {
             </button>
           </InsightBanner>
         )}
-        {adaptationMessages.length > 0 && (
-          <div className="space-y-2">
-            {adaptationMessages.map((msg, i) => (
-              <InsightBanner key={i} tone="ai" className="items-start justify-between">
-                <span>{msg.text}</span>
-                {msg.loadSuggestionId ? (
-                  <div className="flex shrink-0 items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={() => void handleLoadSuggestionConfirm(msg.loadSuggestionId!)}
-                      disabled={loadSuggestionBusy === msg.loadSuggestionId}
-                      className="text-xs font-semibold underline opacity-90 hover:opacity-100 disabled:opacity-50"
-                    >
-                      {loadSuggestionBusy === msg.loadSuggestionId ? 'Applying…' : 'Start heavier'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void handleLoadSuggestionDecline(msg.loadSuggestionId!)}
-                      disabled={loadSuggestionBusy === msg.loadSuggestionId}
-                      className="text-xs underline opacity-70 hover:opacity-100 disabled:opacity-50"
-                    >
-                      Keep as is
-                    </button>
-                  </div>
-                ) : msg.loadCatchupId ? (
-                  <div className="flex shrink-0 items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={() => void handleLoadCatchupConfirm(msg.loadCatchupId!)}
-                      disabled={loadSuggestionBusy === msg.loadCatchupId}
-                      className="text-xs font-semibold underline opacity-90 hover:opacity-100 disabled:opacity-50"
-                    >
-                      {loadSuggestionBusy === msg.loadCatchupId ? 'Updating…' : 'Yes, use my weights'}
-                    </button>
-                    {/* "Keep the plan" rather than "Dismiss": declining is a
-                        real answer that is remembered for this block, and the
-                        label has to say which way it goes. */}
-                    <button
-                      type="button"
-                      onClick={() => void handleLoadCatchupDecline(msg.loadCatchupId!)}
-                      disabled={loadSuggestionBusy === msg.loadCatchupId}
-                      className="text-xs underline opacity-70 hover:opacity-100 disabled:opacity-50"
-                    >
-                      Keep the plan
-                    </button>
-                  </div>
-                ) : msg.weightBasisOfferId ? (
-                  <div className="flex shrink-0 items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={() => void handleWeightBasisConfirm(msg.weightBasisOfferId!)}
-                      disabled={loadSuggestionBusy === msg.weightBasisOfferId}
-                      className="text-xs font-semibold underline opacity-90 hover:opacity-100 disabled:opacity-50"
-                    >
-                      {loadSuggestionBusy === msg.weightBasisOfferId ? 'Rebuilding…' : 'Yes, redo them'}
-                    </button>
-                    {/* "No thanks" and not "Dismiss": this records a permanent
-                        answer, and the label has to say so. A dismiss-shaped
-                        control on a decision that never comes back would be
-                        the app deciding something on their behalf while
-                        looking like it hadn't. */}
-                    <button
-                      type="button"
-                      onClick={() => void handleWeightBasisDecline(msg.weightBasisOfferId!)}
-                      disabled={loadSuggestionBusy === msg.weightBasisOfferId}
-                      className="text-xs underline opacity-70 hover:opacity-100 disabled:opacity-50"
-                    >
-                      No thanks
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (msg.goalId) dismissGoalProximity(msg.goalId)
-                      setAdaptationMessages(prev => prev.filter((_, idx) => idx !== i))
-                    }}
-                    className="shrink-0 text-xs underline opacity-70 hover:opacity-100"
-                    aria-label="Dismiss"
-                  >
-                    Dismiss
-                  </button>
-                )}
-              </InsightBanner>
-            ))}
-          </div>
-        )}
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
           <TabsContent value="dashboard">
             <Dashboard
+              trainerNudge={homeNudge}
               profile={profile}
               macros={macros}
               exercisePlan={exercisePlan}
