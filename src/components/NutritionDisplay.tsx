@@ -95,6 +95,8 @@ export interface NutritionDisplayProps {
   chosen: Partial<Record<MealSlotName, PoolOption>>
   mealTotals: MacroTargets
   isGeneratingMeals: boolean
+  /** The FIRST pool build after onboarding, still running in the background. Distinct from isGeneratingMeals: this one means "there have never been meals yet", which is what decides between a building state and an empty one. */
+  initialMealBuild?: boolean
   mealRegenerateError?: string | null
   onDismissRegenerateError?: () => void
   /** The compiled avoid-list — the same value generation is given, so the meals shown are judged by the rule that produced them. */
@@ -111,7 +113,7 @@ export interface NutritionDisplayProps {
 
 export function NutritionDisplay({
   profile, macros, exercisePlan = [], latestWeightKg, onMacroModeChange, onMacroSplitChange,
-  profileId, date, pools, chosen, mealTotals, isGeneratingMeals, mealRegenerateError, onDismissRegenerateError, avoidFoods = [],
+  profileId, date, pools, chosen, mealTotals, isGeneratingMeals, initialMealBuild = false, mealRegenerateError, onDismissRegenerateError, avoidFoods = [],
   unrecognisedDietaryRestrictions, onFixDietaryRestrictions,
   onSwapMealSlot, onRegenerateMealSlot, onFindMoreOptions, onRegenerateAllMeals,
 }: NutritionDisplayProps) {
@@ -380,6 +382,7 @@ export function NutritionDisplay({
         totals={mealTotals}
         targets={macros}
         isGenerating={isGeneratingMeals}
+        initialBuild={initialMealBuild}
         regenerateError={mealRegenerateError}
         onDismissRegenerateError={onDismissRegenerateError}
         unrecognisedDietaryRestrictions={unrecognisedDietaryRestrictions}

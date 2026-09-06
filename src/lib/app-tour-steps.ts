@@ -31,6 +31,14 @@ export interface TourStep {
   tapHint?: string
   /** Shown in the info phase. */
   copy: string
+  /**
+   * Stands in for `copy` while the thing this stop points at genuinely is not
+   * there yet. Lives HERE rather than as a literal in AppTour.tsx so it goes
+   * through the same honesty scan as every other line — copy written inside
+   * the component would escape the check entirely, which is the exact failure
+   * the header above exists to prevent.
+   */
+  pendingCopy?: string
   title?: string
   last?: boolean
 }
@@ -86,6 +94,13 @@ export const TOUR_STEPS: TourStep[] = [
   {
     key: 'meals', tab: 'nutrition', target: 'meals',
     copy: 'Your meals for the day. Open one to log it, swap it, or regenerate it — every kcal here feeds the rings above.',
+    // Since 6 Sep 2026 the app hands over before the meals are built, so this
+    // stop can be reached while they are still coming. `copy` promises three
+    // things you can do to a meal; over an empty slot that is a promise the
+    // app cannot keep the moment it is made, which the honesty rule above
+    // rules out. Ashley chose to wait here rather than skip the stop or
+    // reword it permanently, so this is what the wait says.
+    pendingCopy: "Your meals go here — I'm still building them. Give me a moment and they'll appear right below.",
   },
   {
     key: 'exercise', tab: 'exercise', target: 'extoday',
@@ -121,3 +136,5 @@ export const TOUR_STEPS: TourStep[] = [
 
 
 export const SET_STEP_KEY = 'set'
+/** The stop that can outrun its own content — see its pendingCopy above. */
+export const MEALS_STEP_KEY = 'meals'

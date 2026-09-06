@@ -86,6 +86,7 @@
     "test:beat-target": "tsx scripts/test-beat-target-offer.ts",
     "test:session-feel": "tsx scripts/test-session-feel.ts",
     "test:coach-opener": "tsx scripts/test-coach-opener.ts",
+    "test:onboarding-handover": "tsx scripts/test-onboarding-handover.ts",
     "test:lift-plausibility": "tsx scripts/test-lift-plausibility.ts",
     "test:custom-meal": "tsx scripts/test-custom-meal.ts",
     "test:meal-food-add": "tsx scripts/test-meal-food-add.ts",

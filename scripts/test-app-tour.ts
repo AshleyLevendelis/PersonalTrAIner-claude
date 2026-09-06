@@ -25,7 +25,7 @@
 import { readFileSync, readdirSync, statSync } from 'fs'
 import { join, dirname, extname } from 'path'
 import { fileURLToPath } from 'url'
-import { TOUR_STEPS, SET_STEP_KEY, type TourStep } from '../src/lib/app-tour-steps'
+import { TOUR_STEPS, SET_STEP_KEY, MEALS_STEP_KEY, type TourStep } from '../src/lib/app-tour-steps'
 import { TABS } from '../src/lib/app-route'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -193,7 +193,7 @@ console.log('\n4. Nothing the tour promises is a capability the coach declines')
     [/\b(ban|never give you|blacklist)\b/i, 'ban_exercise'],
   ]
   for (const s of TOUR_STEPS) {
-    const text = [s.copy, s.teaser, s.tapHint, s.title].filter(Boolean).join(' ')
+    const text = [s.copy, s.pendingCopy, s.teaser, s.tapHint, s.title].filter(Boolean).join(' ')
     const hit = OVERCLAIM.find(([re]) => re.test(text))
     check(`${s.key}: promises nothing that lands on a decliner`,
       hit === undefined || !decliningStubs.includes(hit[1]), hit?.[1])
@@ -467,6 +467,69 @@ console.log('\n7. The copy still describes the app it is pointing at')
   check('the welcome step promises the tour is in settings', promisesSettings)
   check('...and the settings step closes that loop',
     !promisesSettings || /tour/i.test(copyOf('settings')), copyOf('settings'))
+}
+
+// ---------------------------------------------------------------------------
+console.log('\n8. The meals stop survives meals that have not arrived yet')
+// ---------------------------------------------------------------------------
+{
+  // WHY THIS SECTION EXISTS. On 6 Sep 2026 onboarding stopped waiting for the
+  // meal build and started handing the app over first, so this stop can now be
+  // reached while the meals are still being generated. Two things had to hold
+  // for that to be safe, and neither did before:
+  //
+  //  - the spotlight needs a target on EVERY branch of MealPlan, not just the
+  //    populated one. Section 1 above only asks whether the key appears in the
+  //    source at all, so a key tagged on one branch of a component that returns
+  //    early passes it while pointing at nothing at runtime. That is exactly
+  //    the hole this stop fell through.
+  //  - the copy has to stop promising "open one to log it" while there is
+  //    nothing to open, WITHOUT moving that wording out of app-tour-steps.ts,
+  //    where section 4's honesty scan can still read it.
+  const mealPlan = readFileSync(join(ROOT, 'src/components/MealPlan.tsx'), 'utf8')
+  const tour = readFileSync(join(ROOT, 'src/components/AppTour.tsx'), 'utf8')
+  const app = readFileSync(join(ROOT, 'src/App.tsx'), 'utf8')
+  const step = TOUR_STEPS.find(s => s.key === MEALS_STEP_KEY)
+
+  check('the meals stop still exists to reason about', !!step)
+
+  // Scoped to the MealPlan component's OWN body — the file also defines
+  // EmptySlotRow, TotalsHero and MealSlotRow below it, and their returns are
+  // not branches of this stop's target. Sliced from its signature to the next
+  // top-level declaration.
+  const bodyStart = mealPlan.indexOf('export function MealPlan(')
+  const after = mealPlan.slice(bodyStart + 1)
+  const nextTop = after.search(/\n(?:export )?function /)
+  const body = nextTop === -1 ? after : after.slice(0, nextTop)
+  check('the MealPlan component body was located (sanity check on this check)', bodyStart > 0 && body.length > 500)
+
+  // JSX tags only: the file also explains itself in a comment, and a comment
+  // is not a spotlight.
+  const tags = body.match(/<\w[^>]*\sdata-tour="meals"/g) ?? []
+  const returns = (body.match(/^\s*return \(/gm) ?? []).length
+  check(`MealPlan has more than one render branch, so this check has teeth (${returns})`, returns >= 2, returns)
+  check('...and every one of them carries data-tour="meals"', tags.length >= returns, { tags: tags.length, returns })
+
+  check('the meals stop has a line for when the meals are not there yet', !!step?.pendingCopy, step?.pendingCopy)
+  check('...that does not promise what it cannot deliver right then',
+    !/\bopen one\b|\bswap it\b|\bregenerate it\b/i.test(step?.pendingCopy ?? ''), step?.pendingCopy)
+  check('...while the real copy still does, for once they have landed',
+    /open one/i.test(step?.copy ?? ''), step?.copy)
+  check('the waiting line is authored in app-tour-steps.ts, where the honesty scan reads it',
+    !tour.includes(step?.pendingCopy ?? ' '))
+
+  // Section 3 asserts this stop is un-gated and carries no tapHint/teaser, so
+  // the wait cannot be expressed as either. It is a held Next instead.
+  check('AppTour holds the stop while the meals are pending', /holdingForMeals/.test(tour))
+  // Asserted on the BODY derivation, not merely on the identifier appearing
+  // somewhere: a first version of this check passed while the ternary that
+  // actually chooses the line had been deleted, because the `showPending`
+  // declaration above it still mentioned pendingCopy.
+  check('...showing the pending line rather than the real one',
+    /const body = [^\n]*showPending \? step\.pendingCopy/.test(tour))
+  check('...bounded, so a slow or failed build can never trap anyone',
+    /MEALS_WAIT_MS/.test(tour) && /setMealsWaitExpired\(true\)/.test(tour))
+  check('App tells the tour whether the meals are still coming', /mealsPending=\{/.test(app))
 }
 
 console.log(failures === 0 ? '\nAll app-tour checks passed.\n' : `\n${failures} FAILED\n`)

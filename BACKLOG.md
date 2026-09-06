@@ -2,6 +2,54 @@
 
 Newest first. One line each.
 
+- [x] **THE APP LOADS WHILE THE MEALS ARE STILL BEING BUILT** — Ashley, on her
+  phone straight after onboarding, looking at a full-screen spinner reading
+  "Building your meal pools…": *"can it not load the tour while the meal plan
+  generates in the background."*
+  It could, and the wait was worse than it looked. By the time that spinner
+  appeared the training plan was already generated AND already written to the
+  database; all that was left was meal generation — up to three sequential
+  edge-function calls against a 45s abort each. The blocking was never
+  designed: the whole-app gate is `!profile`, and `setProfile` simply happened
+  to sit below the meal `await` along with every other commit, including the
+  one that arms the tour.
+  **The handover** now happens the moment the plan is saved. The seven commits
+  became `commitPlan()`, called from both paths — a design review caught that
+  moving them up naively would put them inside `if (data)`, where a profile
+  whose INSERT failed would lose `setProfile` and get bounced back into
+  onboarding with its warning rendered nowhere.
+  **The background build** is guarded twice, both earned: the result is dropped
+  unless the profile it was built for is still on screen (via a ref — that
+  `.then` closes over a render where `profile` is null and stays null, so the
+  obvious guard would never fire), and it merges per slot rather than replacing,
+  because four other things write `mealPools`. A failure now says so instead of
+  a `console.error`, keeping the reached-vs-unreachable split and dropping the
+  "your existing plan is unchanged" wording, which is false on a first build.
+  **The meals area** distinguishes building from empty — the old copy told
+  someone who had just finished onboarding to "complete onboarding", and its
+  button would have fired a second concurrent build.
+  **The tour's meals stop** was pointing at nothing whenever meals were
+  missing: `data-tour="meals"` lived only on MealPlan's populated branch, so the
+  stop dimmed the whole screen. It is on both branches now. Ashley chose to
+  **wait** at that stop rather than skip it or reword it permanently, so it
+  holds with an honest line, bounded at 15s so a slow or failed build can never
+  trap anyone, and Skip is never blocked.
+  `test:onboarding-handover` (new, 5 sections) pins the ordering — the feature
+  IS an ordering, and nothing in the suite renders App, so tsc and the bundler
+  would both accept the old order silently. `test:app-tour` §8 pins the target
+  on every render branch and routes the waiting line through the existing
+  honesty scan. **Fourteen mutations tried, fourteen caught** — one survived
+  first and the check was strengthened rather than the mutation dropped.
+  **Verified in Chromium at 390x844**, walking the real tour through real taps:
+  with empty pools the stop now has a target (358x288) where it previously had
+  none; the held state shows "Building your meals…" spotlit, the honest line,
+  and a disabled "Still cooking…"; after 17s the hold releases to an enabled
+  Next; with meals present the stop shows the real copy over the full list.
+  **Not** browser-verified: the handover instant itself — nothing in the suite
+  completes onboarding in a browser, so that half is pinned by source order,
+  and the building state was reached by forcing the flag rather than by running
+  a real build.
+
 - [x] **THE CHAT BUTTON LIGHTS WHEN THE COACH HAS ACTUALLY SAID SOMETHING** —
   Ashley, 6 Sep 2026, after asking why she could not see "the outer ring round
   the chat button and the pulsating chat icon when I have a new message". Two
