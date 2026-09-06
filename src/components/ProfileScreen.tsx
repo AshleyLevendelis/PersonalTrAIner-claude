@@ -19,7 +19,7 @@ import { Separator } from '@/components/ui/separator'
 import { InsightBanner } from '@/components/ui/insight-banner'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { Pencil, Trash2, Check, X, Plus } from 'lucide-react'
+import { Pencil, Trash2, Check, X, Plus, ChevronDown } from 'lucide-react'
 import {
   getAllFacts, getAllGoals, getAllContextFacts, createFact,
   deleteFactPermanently, deleteGoalPermanently, deleteContextFactPermanently,
@@ -39,7 +39,7 @@ import {
   EXPERIENCE_OPTIONS, EQUIPMENT_OPTIONS, STYLE_OPTIONS, RECOVERY_OPTIONS,
   CONDITIONING_PREF_OPTIONS, ACTIVITY_OPTIONS, DIETARY_OPTIONS, FAVORITE_CUISINE_OPTIONS,
   INJURY_OPTIONS, COOKING_TIME_OPTIONS, MEALS_PER_DAY_OPTIONS, DURATION_OPTIONS, BREAKFAST_STYLE_OPTIONS,
-  DAYS_FULL, partitionInjuries,
+  DAYS_FULL, partitionInjuries, GOAL_OPTIONS,
 } from '@/lib/onboarding-slots'
 import { detectPlanInvalidation, type PlanInvalidation } from '@/lib/plan-invalidation'
 import type { UserProfile, TrainingDay, TrainingExperience, EquipmentAccess, TrainingStyle } from '@/lib/types'
@@ -78,15 +78,53 @@ interface ProfileScreenProps {
   /** Chat typewriter reveal-speed preference — see reveal-speed-store.ts. */
   revealSpeed: RevealSpeed
   onRevealSpeedChange: (speed: RevealSpeed) => void
+  /** Opens App.tsx's existing New Plan confirm dialog — the footer's only job. */
+  onNewPlan: () => void
 }
 
 // ---- Shared small field-row components (scoped to this screen) -----------
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex justify-between items-center gap-2">
-      <span className="text-muted-foreground shrink-0">{label}</span>
+    <div
+      className="flex items-center justify-between gap-2 py-2 first:pt-0 last:pb-0"
+      style={{ borderTop: '1px solid var(--hairline)' }}
+    >
+      <span className="shrink-0 text-[0.875rem] text-muted-foreground">{label}</span>
       {children}
+    </div>
+  )
+}
+
+/**
+ * ONE OF FOUR. Profile used to be eight headings and every editor in the app
+ * open at once — about six screens of controls, most of them set once. The
+ * design handoff's answer is four named groups you drill into; this is that,
+ * with the existing editors moved inside unchanged rather than rebuilt as
+ * sub-screens (there are none, and `initialSection` is a scroll-to-ref, not a
+ * route).
+ *
+ * `forceOpen` is what keeps that ref working: a section somebody was sent
+ * here to fix ("your dietary restrictions can't be enforced") must not land
+ * inside a collapsed group, which would scroll to nothing.
+ */
+function Group({
+  label, forceOpen, children,
+}: { label: string; forceOpen?: boolean; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false)
+  const isOpen = open || !!forceOpen
+  return (
+    <div style={{ borderTop: '1px solid var(--hairline)' }}>
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        aria-expanded={isOpen}
+        className="hit-slop-44 flex w-full items-center justify-between gap-2 py-3 text-left"
+      >
+        <span className="ds-label">{label}</span>
+        <ChevronDown className={`size-3.5 shrink-0 text-primary transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+      <div hidden={!isOpen} className="pb-4 space-y-4">{children}</div>
     </div>
   )
 }
@@ -302,7 +340,7 @@ function factEffect(fact: UserFactRow): string {
   return 'recorded — not yet applied (takes effect on your next plan regeneration)'
 }
 
-export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onProfileChanged, onPlanInvalidated, onMemoryChanged, initialSection, revealSpeed, onRevealSpeedChange }: ProfileScreenProps) {
+export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onProfileChanged, onPlanInvalidated, onMemoryChanged, initialSection, revealSpeed, onRevealSpeedChange, onNewPlan }: ProfileScreenProps) {
   const [facts, setFacts] = useState<UserFactRow[]>([])
   const [goals, setGoals] = useState<UserGoalRow[]>([])
   const [contextFacts, setContextFacts] = useState<UserContextFactRow[]>([])
@@ -567,13 +605,43 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
     })
   }
 
+  // "Fat loss · 4 days/week · Home gym" — read off the profile, never stored.
+  // Every part is dropped rather than guessed at when its field is unset, so
+  // an activity-format profile (no equipment tier) shows two facts, not a
+  // blank where the third should be.
+  const identitySummary = [
+    GOAL_OPTIONS.find(o => o.value === profile.fitness_goal)?.label,
+    profile.training_days?.length ? `${profile.training_days.length} days/week` : null,
+    EQUIPMENT_OPTIONS.find(o => o.value === profile.equipment_access)?.label,
+  ].filter(Boolean).join(' · ')
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
-        <DialogHeader>
+        <DialogHeader className="sr-only">
           <DialogTitle>Profile</DialogTitle>
           <DialogDescription>Everything the app knows about you — correct or remove anything here.</DialogDescription>
         </DialogHeader>
+
+        {/* WHO THIS IS, before the list of what it knows. The one-line
+            summary underneath is read straight off the profile rather than
+            stored: goal, days a week, equipment — the three answers that
+            decide what every screen in the app shows. */}
+        <div className="flex items-center gap-3.5">
+          <span
+            aria-hidden
+            className="flex size-14 shrink-0 items-center justify-center rounded-full text-[1.25rem] font-bold"
+            style={{ background: 'color-mix(in oklab, var(--surface-raised) 50%, var(--surface-deep))' }}
+          >
+            {(profile.display_name?.trim()?.[0] ?? '·').toUpperCase()}
+          </span>
+          <div className="min-w-0">
+            <p className="truncate text-[1.25rem] font-bold tracking-[-.02em]">
+              {profile.display_name?.trim() || 'Your profile'}
+            </p>
+            <p className="mt-0.5 truncate text-xs text-muted-foreground">{identitySummary}</p>
+          </div>
+        </div>
 
         {saveError && (
           <InsightBanner tone="warning" className="items-start justify-between">
@@ -584,14 +652,14 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
           </InsightBanner>
         )}
 
-        <AppearanceSection appearance={appearance} />
-
-        <Separator />
-
+        {/* FOUR GROUPS, and everything that used to be eight headings open at
+            once now lives inside one of them. The editors themselves are
+            unchanged — this is where they sit, not how they work. */}
+        <Group label="You">
         {/* Identity & metrics */}
         <div className="space-y-2">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Identity &amp; metrics</h3>
-          <div className="rounded-md border p-2.5 space-y-2 text-sm">
+          <h3 className="ds-label">Identity &amp; metrics</h3>
+          <div className="text-sm">
             <Row label="Name"><EditableStringField value={profile.display_name} placeholder="Not set" onSave={v => savePatch({ display_name: v })} /></Row>
             <Row label="Age"><EditableTextField value={profile.age} unit="years" min={13} max={100} onSave={n => savePatch({ age: n })} /></Row>
             <Row label="Gender"><EditableSelectField value={profile.gender} options={GENDER_OPTIONS as { value: 'male' | 'female'; label: string }[]} onSave={v => savePatch({ gender: v })} /></Row>
@@ -605,8 +673,8 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
 
         {/* Training setup */}
         <div className="space-y-2">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Training setup</h3>
-          <div className="rounded-md border p-2.5 space-y-2 text-sm">
+          <h3 className="ds-label">Training setup</h3>
+          <div className="text-sm">
             {/* The three gym-only fields below are optional on UserProfile (an
                 activity-format profile has no equipment tier or lifting style).
                 The `??` here is display-only — an activity profile shows the
@@ -629,7 +697,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
             <div className="space-y-1">
               <span className="text-muted-foreground">Other training</span>
               {(profile.concurrent_activities ?? []).length === 0 ? (
-                <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">None yet — tell the coach in chat ("I also do Muay Thai on Tuesday and Thursday evenings") and the plan is rebuilt around it.</p>
+                <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">None yet — tell your Personal TrAIner in chat ("I also do Muay Thai on Tuesday and Thursday evenings") and the plan is rebuilt around it.</p>
               ) : (
                 <div className="flex flex-wrap gap-x-2.5 gap-y-2.5">
                   {(profile.concurrent_activities ?? []).map(a => {
@@ -674,64 +742,13 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
           </div>
         </div>
 
-        {/* Injuries — a picker, for the same reason the dietary restrictions
-            above are one. Audit §2.2: this was free text, and the plan engine
-            only understands eight exact codes, so twelve of fourteen ordinary
-            entries were stored, shown back, and changed nothing. "Lower back"
-            — the field's own placeholder — was one of them. */}
-        <div className="space-y-2">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Injuries</h3>
-          <div className="rounded-md border p-2.5 space-y-2.5 text-sm">
-            <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">Areas to work around. Picking one changes which exercises your plan gives you.</p>
-            <ToggleGroup
-              type="multiple"
-              value={injuryCodes}
-              onValueChange={(next: string[]) => savePatch({ injuries: [...next, ...unrecognisedInjuries] })}
-              className="flex flex-wrap justify-start gap-1.5"
-            >
-              {INJURY_OPTIONS.map(o => (
-                <ToggleGroupItem
-                  key={o.value}
-                  value={o.value}
-                  className="h-8 rounded-full border px-2.5 text-[0.6875rem] data-[state=on]:border-primary data-[state=on]:text-primary"
-                >
-                  {o.icon} {o.label}
-                </ToggleGroupItem>
-              ))}
-            </ToggleGroup>
-            {unrecognisedInjuries.length > 0 && (
-              /* Kept, not deleted. These were typed when the field was free
-                 text; they never changed the plan, and quietly removing them
-                 would be the same silent discarding this fix is about. Said
-                 plainly, with a way to clear each one. */
-              <div className="space-y-1.5 pt-2" style={{ borderTop: '1px solid var(--hairline)' }}>
-                <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">
-                  These are saved but don't change your plan — the app can only work around the areas above. Tell your coach in Chat about anything else.
-                </p>
-                <div className="flex flex-wrap gap-1.5">
-                  {unrecognisedInjuries.map((v: string) => (
-                    <span key={v} className="inline-flex items-center gap-1 rounded-full border border-dashed px-2.5 py-1 text-[0.6875rem] text-muted-foreground">
-                      {v}
-                      <button
-                        type="button"
-                        aria-label={`Remove ${v}`}
-                        className="hit-slop-44 text-muted-foreground hover:text-foreground"
-                        onClick={() => savePatch({ injuries: [...injuryCodes, ...unrecognisedInjuries.filter((u: string) => u !== v)] })}
-                      >
-                        <X className="size-3" />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
+        </Group>
 
+        <Group label="Nutrition" forceOpen={initialSection === 'dietary'}>
         {/* Dietary & cooking */}
         <div className="space-y-2">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Dietary &amp; cooking</h3>
-          <div className="rounded-md border p-2.5 space-y-3 text-sm">
+          <h3 className="ds-label">Dietary &amp; cooking</h3>
+          <div className="space-y-3 text-sm">
             {/* Dietary-safety round 2 — the two lanes are now visibly
                 different things, and only the canonical one is pickable.
                 This was free text before, which let a user type an
@@ -792,13 +809,76 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
           </div>
         </div>
 
-        <Separator />
+        </Group>
+
+        {/* goals / facts / context ALL live in this group — every
+            initialSection value except 'dietary' scrolls to a ref inside it,
+            and a ref inside a collapsed group scrolls to nothing. */}
+        <Group label="Personal TrAIner" forceOpen={initialSection === 'goals' || initialSection === 'facts' || initialSection === 'context'}>
+        {/* INJURIES MOVED HERE, 6 Sep 2026. It sat between the training
+            settings and the dietary ones, which put "my shoulder hurts"
+            among the dropdowns. It belongs with the things the Personal
+            TrAIner works around and remembers — the handoff's own grouping,
+            and the honest one. The picker itself is untouched. */}
+        {/* Injuries — a picker, for the same reason the dietary restrictions
+            above are one. Audit §2.2: this was free text, and the plan engine
+            only understands eight exact codes, so twelve of fourteen ordinary
+            entries were stored, shown back, and changed nothing. "Lower back"
+            — the field's own placeholder — was one of them. */}
+        <div className="space-y-2">
+          <h3 className="ds-label">Injuries</h3>
+          <div className="space-y-2.5 text-sm">
+            <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">Areas to work around. Picking one changes which exercises your plan gives you.</p>
+            <ToggleGroup
+              type="multiple"
+              value={injuryCodes}
+              onValueChange={(next: string[]) => savePatch({ injuries: [...next, ...unrecognisedInjuries] })}
+              className="flex flex-wrap justify-start gap-1.5"
+            >
+              {INJURY_OPTIONS.map(o => (
+                <ToggleGroupItem
+                  key={o.value}
+                  value={o.value}
+                  className="h-8 rounded-full border px-2.5 text-[0.6875rem] data-[state=on]:border-primary data-[state=on]:text-primary"
+                >
+                  {o.icon} {o.label}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+            {unrecognisedInjuries.length > 0 && (
+              /* Kept, not deleted. These were typed when the field was free
+                 text; they never changed the plan, and quietly removing them
+                 would be the same silent discarding this fix is about. Said
+                 plainly, with a way to clear each one. */
+              <div className="space-y-1.5 pt-2" style={{ borderTop: '1px solid var(--hairline)' }}>
+                <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">
+                  These are saved but don't change your plan — the app can only work around the areas above. Tell your Personal TrAIner in Chat about anything else.
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {unrecognisedInjuries.map((v: string) => (
+                    <span key={v} className="inline-flex items-center gap-1 rounded-full border border-dashed px-2.5 py-1 text-[0.6875rem] text-muted-foreground">
+                      {v}
+                      <button
+                        type="button"
+                        aria-label={`Remove ${v}`}
+                        className="hit-slop-44 text-muted-foreground hover:text-foreground"
+                        onClick={() => savePatch({ injuries: [...injuryCodes, ...unrecognisedInjuries.filter((u: string) => u !== v)] })}
+                      >
+                        <X className="size-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
 
         {loading && <p className="text-sm text-muted-foreground">Loading…</p>}
 
         {goals.length > 0 && (
           <div ref={goalsRef} className="space-y-2">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Goals</h3>
+            <h3 className="ds-label">Goals</h3>
             {/* SETTING a goal weight lives here now, next to where a set one
                 already appeared. It used to be an input row on the dashboard —
                 the only place to create one was a screen it did not belong on,
@@ -876,7 +956,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
           <div ref={factsRef} className="space-y-4">
             {grouped.map(({ kind, items }) => (
               <div key={kind} className="space-y-2">
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{FACT_KIND_LABEL[kind]}</h3>
+                <h3 className="ds-label">{FACT_KIND_LABEL[kind]}</h3>
                 {items.map(f => (
                   <div key={f.id} className="rounded-md border p-2.5 space-y-1">
                     {editingId === f.id ? (
@@ -910,12 +990,16 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
           </div>
         )}
 
-        {contextFacts.length > 0 && (
-          <div ref={contextRef} className="space-y-2">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tone &amp; context</h3>
-            <div>
+        {/* REPLY SPEED IS NOT A REMEMBERED FACT. It lived inside the
+            `contextFacts.length > 0` branch below, so a trainee the coach had
+            never stored a note about could not reach it at all — a preference
+            control that appeared only once something unrelated existed.
+            Hoisted out; the notes keep their own conditional block. */}
+        <div className="space-y-2">
+          <h3 className="ds-label">Tone</h3>
+          <div>
             <p className="text-sm font-medium">Chat reveal speed</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">How fast the coach's replies type out — Off shows them instantly</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">How fast your Personal TrAIner's replies type out — Off shows them instantly</p>
             <div className="mt-3 flex gap-[3px] rounded-xl bg-background p-[3px]">
               {(['off', 'slow', 'normal', 'fast'] as const).map(level => (
                 <button
@@ -938,6 +1022,11 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
               Reduced-motion system settings always show replies instantly, regardless of this choice.
             </p>
           </div>
+        </div>
+
+        {contextFacts.length > 0 && (
+          <div ref={contextRef} className="space-y-2">
+            <h3 className="ds-label">Things it remembers about you</h3>
             {contextFacts.map(c => (
               <div key={c.id} className="rounded-md border p-2.5 space-y-1">
                 {editingId === c.id ? (
@@ -960,7 +1049,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                     </div>
                   </div>
                 )}
-                <EffectLine text="Shapes how the coach talks to you — never your plan" />
+                <EffectLine text="Shapes how your Personal TrAIner talks to you — never your plan" />
                 <ProvenanceBadge source={c.source} createdAt={c.created_at} />
               </div>
             ))}
@@ -971,7 +1060,10 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
           <p className="text-sm text-muted-foreground">Nothing recorded yet — state a preference, goal, or constraint in chat and it'll show up here.</p>
         )}
 
-        <Separator />
+        </Group>
+
+        <Group label="App">
+        <AppearanceSection appearance={appearance} />
 
         {/* Audit §1.4 — there was neither of these. "New Plan" cleared the
             browser and started fresh without deleting a single row, so
@@ -980,8 +1072,8 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
             Ashley, and both are far easier to build now than after someone
             asks for them in writing. */}
         <div className="space-y-2">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Your data</h3>
-          <div className="rounded-md border p-2.5 space-y-3 text-sm">
+          <h3 className="ds-label">Your data</h3>
+          <div className="space-y-3 text-sm">
             <div className="space-y-1.5">
               <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">
                 Everything the app has stored about you, as one file.
@@ -1037,6 +1129,25 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
               )}
             </div>
           </div>
+        </div>
+        </Group>
+
+        {/* THE FOOTER. "New Plan" moved here from the gear menu — it is the
+            most consequential thing a person can do from a settings surface
+            (a brand-new profile row; the old plan, its adaptations and its
+            history are left behind), and it sat in a dropdown between
+            "Profile" and "Replay the tour" as if it were the same weight of
+            action. Moved, not copied: the menu no longer offers it. The
+            confirm dialog it opens is unchanged, and still names what is
+            lost. */}
+        <div className="pt-1" style={{ borderTop: '1px solid var(--hairline)' }}>
+          <Button
+            variant="outline"
+            className="hit-slop-44 h-11 w-full border-destructive/40 text-destructive"
+            onClick={() => { onOpenChange(false); onNewPlan() }}
+          >
+            Start a new plan…
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

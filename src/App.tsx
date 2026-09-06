@@ -2284,14 +2284,14 @@ function App() {
         className="fixed right-3 z-40"
         style={{ top: 'calc(0.625rem + env(safe-area-inset-top))' }}
       >
+        {/* NEW PLAN LEFT THIS MENU on 6 Sep 2026 — it is Profile's
+            destructive footer now (design_handoff_app_polish). It was a
+            dropdown row of the same weight as "Profile", for the one action
+            here that abandons a profile. Replay the tour stays: the tour's
+            own welcome step promises it is in the settings menu. */}
         <ProfileMenu
           onOpenProfile={() => { setProfileInfoSection(undefined); setProfileInfoOpen(true) }}
           onReplayTour={replayAppTour}
-          onNewPlan={() => {
-            setActiveAdaptationsForReset([])
-            if (profile?.id) getActiveAdaptations(profile.id).then(setActiveAdaptationsForReset).catch(console.error)
-            setNewPlanConfirmOpen(true)
-          }}
         />
       </div>
       <div
@@ -2488,6 +2488,11 @@ function App() {
         initialSection={profileInfoSection}
         revealSpeed={revealSpeed}
         onRevealSpeedChange={handleRevealSpeedChange}
+        onNewPlan={() => {
+          setActiveAdaptationsForReset([])
+          if (profile?.id) getActiveAdaptations(profile.id).then(setActiveAdaptationsForReset).catch(console.error)
+          setNewPlanConfirmOpen(true)
+        }}
       />
       {/* ASK, NEVER SILENTLY (audit §2.1). A rebuild rewrites the weeks
           ahead, so it happens on an explicit yes and nowhere else. Declining

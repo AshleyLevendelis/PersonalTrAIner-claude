@@ -166,10 +166,18 @@ check('a live Home preview sits above the controls',
   sheet.indexOf('HomePreview') < sheet.indexOf('>Theme<'))
 check('there is a reset back to the shipped default', /appearance\.reset/.test(sheet))
 // Reveal speed is a chat behaviour. It must have LEFT appearance, not just
-// exist somewhere — checked by position, since both live in one file.
+// exist somewhere.
+//
+// RE-ANCHORED 6 Sep 2026. This compared its position against the "Tone &
+// context" heading, which the profile regrouping renamed and moved — so a
+// correct screen went red on a heading string. The requirement was never
+// about that heading: it is that the control is not inside AppearanceSection,
+// which is what is checked now, by the component boundary rather than by a
+// neighbouring word.
 const revealAt = profile.indexOf('Chat reveal speed')
-const toneAt = profile.indexOf('Tone &amp; context')
-check('chat reveal speed moved out of Appearance', revealAt > toneAt && toneAt > 0, { revealAt, toneAt })
+check('the reveal-speed control is in ProfileScreen at all (sanity check on this check)', revealAt > 0)
+check('chat reveal speed moved out of Appearance',
+  !/reveal|RevealSpeed/i.test(sheet), sheet.match(/.{0,40}reveal.{0,40}/i)?.[0])
 check('...and still exists (not deleted in the move)', revealAt > 0)
 
 console.log('\n8. Status colour never moves with a cosmetic choice\n')

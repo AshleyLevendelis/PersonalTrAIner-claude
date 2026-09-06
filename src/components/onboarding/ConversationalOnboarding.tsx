@@ -1718,7 +1718,7 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
               rendering glitch more than as someone typing. No label in v2 —
               the header already says who is composing. */}
           {busy && (
-            <div className="ob-message-in flex flex-col gap-1.5 py-1.5" aria-live="polite" aria-label="Coach is typing">
+            <div className="ob-message-in flex flex-col gap-1.5 py-1.5" aria-live="polite" aria-label="Your Personal TrAIner is typing">
               <div className="flex items-center gap-1.5">
                 <span className="ds-typing-dot" />
                 <span className="ds-typing-dot [animation-delay:150ms]" />

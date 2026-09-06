@@ -3055,7 +3055,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       // copy rather than surfacing "Failed to fetch" verbatim.
       const displayMessage = error.retryable
         ? (error.message || 'Something went wrong with the AI service. Tap "Retry" to try again.')
-        : 'Couldn\'t reach the coach — check your connection and tap "Retry".'
+        : 'Couldn\'t reach your Personal TrAIner — check your connection and tap "Retry".'
       responseText = isTimeout
         ? '_That request took too long to process. Tap "Retry" to try again._'
         : `_${displayMessage}_`

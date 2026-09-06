@@ -115,7 +115,7 @@ export const TOUR_STEPS: TourStep[] = [
   {
     key: 'chat', tab: 'chat', target: null, last: true,
     nav: 'chatfab', tapHint: 'Tap the chat button', teaser: 'Last stop — the important one.',
-    copy: "And this is where we talk. Anything you'd tell a coach — a heavy day, a food you hate, a sore shoulder — just say it. I'll take it from here.",
+    copy: "And this is where we talk. Anything you'd tell a trainer — a heavy day, a food you hate, a sore shoulder — just say it. I'll take it from here.",
   },
 ]
 

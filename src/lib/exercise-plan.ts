@@ -1739,7 +1739,7 @@ function buildPatternGapNote(uncovered: MovementPattern[], covered: ExerciseEntr
   const offerPart = coveredLabels.length > 0
     ? ` The rest of this session still covers ${coveredLabels.join(', ')}.`
     : ''
-  return `Your current equipment and injury settings leave ${gapPart} — not a bug, just a real gap in what's available.${offerPart} Update your equipment or injuries in Profile, or ask your coach in Chat, if that changes.`
+  return `Your current equipment and injury settings leave ${gapPart} — not a bug, just a real gap in what's available.${offerPart} Update your equipment or injuries in Profile, or ask your Personal TrAIner in Chat, if that changes.`
 }
 
 /**
