@@ -94,8 +94,11 @@ Newest first. One line each.
   gates (the one failure needs a browser and fails identically on an
   unmodified tree); `test:audit` **17,423 / 0** on the final tree (a first run
   failed on exactly the one-notch case above, which is how it was found);
-  `test:quality` was still running when this was committed — its number is
-  recorded in the follow-up commit, the same way the second-sport build's was.
+  `test:quality` **11.51 / 12 with 0 of 9,216 plans below the 7.2 floor** —
+  unchanged from the baseline, as it should be: the score measures structure,
+  progression, time fit and selection, and the only structural movement was
+  the calf rotation described above (recorded in a follow-up commit; the
+  sweep took 47 minutes with the machine busy).
   No migration, no edge-function change — plan generation is client-side and
   ships via push → Vercel.
 
