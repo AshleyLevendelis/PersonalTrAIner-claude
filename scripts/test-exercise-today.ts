@@ -166,5 +166,33 @@ check('the strip sits 12px under the line', /className="mt-3 flex items-start ju
 check('nothing on this screen calls it "Coach"',
   !/Coach:/.test(contextRowCode) && !/Coach:/.test(todayCode), 'Coach: found')
 
+// ---------------------------------------------------------------------------
+console.log('\n5. The rest dock: one number, the lift it belongs to, and both directions')
+// ---------------------------------------------------------------------------
+{
+  const dock = stripComments(read('src/components/BottomDock.tsx'))
+  check('the running rest row is --surface-raised, not a card',
+    /linear-gradient\(var\(--surface-raised\), var\(--surface-raised\)\)/.test(dock))
+  // THE TINT IS 28% ALPHA. Painted alone it let the exercise row underneath
+  // read straight through the dock — caught in the browser, not by tsc.
+  check('...composited over an opaque surface, not floated on the tint alone',
+    /var\(--surface-raised\)\), var\(--surface-deep\)/.test(dock))
+  check('...at 44px', /minHeight: 44/.test(dock))
+  check('the countdown is the one big mono number', /tabular-mono text-\[1\.125rem\] font-semibold/.test(dock))
+  check('...and the lift sits under it rather than trailing the clock',
+    /Rest · \{restLabel\}/.test(dock) && !/· rest · \{restLabel\}/.test(dock))
+  // THE GAP THE RESTYLE CLOSED. adjustRest has always taken a negative
+  // delta; nothing on this dock ever sent one, so "I'm ready sooner" meant
+  // Skip — which also throws away the "ready for set N" prompt.
+  check('rest can be shortened, not only extended', /adjustRest\(-30\)/.test(dock))
+  check('...and is disabled when there is nothing left to take off',
+    /disabled=\{restMs <= 30_000\}/.test(dock))
+  check('...so a tap reading "a bit less" cannot flip the dock to overrun',
+    /restMs <= 30_000/.test(dock) && /const isOverrun = hasRest && restMs <= 0/.test(dock))
+  check('Skip is still there and still the primary of the three',
+    /text-primary" onClick=\{dismissRest\}/.test(dock))
+  check('the elapsed fill survived the restyle', /fillFraction \* 100/.test(dock))
+}
+
 if (failures > 0) { console.error(`\n${failures} exercise-today check(s) FAILED\n`); process.exit(1) }
 console.log('\nAll exercise-today checks passed.\n')
