@@ -39,6 +39,11 @@ Newest first. One line each.
   mutations, ten caught.** `no-dead-code` back under budget by consumption.
   STILL OPEN: (b) counting the classes as training load; an onboarding slot so
   new users are asked; more than one overlapping sport.
+  **Verified after the build:** tsc and build clean; 129 of 130 runnable gates
+  (the one failure needs a browser and fails identically on an unmodified
+  tree); `test:audit` 17,423 / 0 and `test:quality` 11.51 / 12 with 0 below
+  the 7.2 floor — both unchanged, as they must be: no profile on either grid
+  carries a second sport, and the change is a permutation for those that do.
   Needs `deploy:functions:prod -- chat-gemini` (new tool + prompt). No
   migration — the column has existed since July.
 
