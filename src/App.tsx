@@ -27,7 +27,7 @@ import { computeTargets, getLatestWeightKg, getEffectiveTargetWeightKg, snapshot
 import { describeGoalProximity, isGoalProximityDismissed, dismissGoalProximity } from '@/lib/goal-proximity'
 import { upsertDailyMetric } from '@/lib/daily-tracking'
 import { generateExercisePlan, generateMesocycle, MESOCYCLE_WEEK_LABELS } from '@/lib/exercise-plan'
-import { getPools, swapPoolMeal, getMealPicksForDate, setMealPick, clearMealPick, clearAllMealPicksForDate, type MealSlotName } from '@/lib/meal-store'
+import { getPools, readPools, swapPoolMeal, getMealPicksForDate, setMealPick, clearMealPick, clearAllMealPicksForDate, type MealSlotName } from '@/lib/meal-store'
 import { generateMealPools, assembleDay, chosenToMealPlanDays, type PoolOption } from '@/lib/meal-generation'
 import { supabase } from '@/lib/supabase'
 import { saveMesocycle, saveMesocycleWeek, restoreMesocycle } from '@/lib/mesocycle-persistence'
@@ -642,7 +642,7 @@ function App() {
     setExerciseExclusions(restoredExclusions)
 
     const [restoredPools, { data: exerciseRows }, fullMesocycle] = await Promise.all([
-      getPools(ownedId),
+      readPools(ownedId),
       supabase.from('exercise_plans').select('*').eq('profile_id', ownedId),
       restoreMesocycle(ownedId),
     ])
@@ -775,7 +775,13 @@ function App() {
     setLatestWeightKg(restoredWeight)
     setTargetWeightAnchorKg(effectiveTargetWeight.weightKg ?? null)
     setMacros(liveTargets)
-    setMealPools(restoredPools)
+    setMealPools(restoredPools.pools)
+    // A read that FAILED must not render as "No meal plan generated yet" — that
+    // sends someone whose meals exist to regenerate them, and the button they
+    // are pointed at deletes and rewrites the plan they still had.
+    if (restoredPools.failed) {
+      setMealRegenerateError("I couldn't load your meals just then — that's a connection problem, not a missing plan. Pull down to refresh before regenerating anything.")
+    }
     setExercisePlan(restoredExercises)
     setMesocycle(restoredMesocycle)
     setIsRestoring(false)
@@ -2465,7 +2471,6 @@ function App() {
               chosen={chosenMeals}
               mealTotals={mealTotals}
               isGeneratingMeals={isGeneratingMeals || initialMealBuild}
-              initialMealBuild={initialMealBuild}
               mealRegenerateError={mealRegenerateError}
               onDismissRegenerateError={() => setMealRegenerateError(null)}
               avoidFoods={effectiveDislikedFoods}
@@ -2602,10 +2607,11 @@ function App() {
       <AppTour
         profileId={profile.id}
         armed={tourArmed}
-        // Pending means BOTH still building AND nothing to show yet — a build
-        // that has already filled some slots has something for the stop to
-        // point at, so it should not hold.
-        mealsPending={initialMealBuild && Object.keys(mealPools).length === 0}
+        // Pending means a build is running AND there is nothing to show yet.
+        // Not "the first build": a regenerate from an empty state leaves the
+        // stop pointing at the same nothing, and the trainee cannot tell which
+        // kind of build started it.
+        mealsPending={(isGeneratingMeals || initialMealBuild) && Object.keys(mealPools).length === 0}
       />
       <ProfileScreen
         open={profileInfoOpen}

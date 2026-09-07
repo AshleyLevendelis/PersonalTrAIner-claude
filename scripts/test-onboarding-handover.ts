@@ -143,24 +143,100 @@ console.log('\n4. A failed background build says so')
   check('the build clears any stale error before it starts', /setMealRegenerateError\(null\)/.test(buildFn))
 }
 
-console.log('\n5. The meals area distinguishes "building" from "none"')
+console.log('\n5. The meals area says it is building for ANY build, not just the first')
 {
+  // RE-ANCHORED 7 Sep 2026, and the reason is the whole point of this section.
+  //
+  // Yesterday this asserted an `initialBuild` prop: the building state existed
+  // only for the background build after onboarding. The next morning Ashley
+  // pressed "Generate meals" on the empty state. It ran for 34 seconds and
+  // wrote thirteen meals — and for all 34 seconds the screen still read "No
+  // meal plan generated yet" over a button wearing a small spinner, because a
+  // user-pressed build was not "the first build". She reported it as dead.
+  //
+  // So the checks now pin the WIDER rule and, deliberately, forbid the narrow
+  // one coming back: any build with nothing yet to show says so.
   const mealPlan = readFileSync(join(ROOT, 'src/components/MealPlan.tsx'), 'utf8')
-  check('MealPlan is told whether this is the first build', /initialBuild/.test(mealPlan))
-  // The old copy is wrong twice over during a background build: they HAVE just
-  // completed onboarding, and the button would fire a second concurrent build.
+  const nutrition = readFileSync(join(ROOT, 'src/components/NutritionDisplay.tsx'), 'utf8')
+
   const emptyBranch = /if \(activeSlots\.length === 0 && emptySlots\.length === 0\) \{([\s\S]*?)\n {2}\}/.exec(mealPlan)?.[1] ?? ''
-  check('the empty branch was located', emptyBranch.length > 200, emptyBranch.length)
-  check('...and says it is building when it is', /initialBuild \?/.test(emptyBranch))
-  check('...offering no Generate button in that state',
-    emptyBranch.indexOf('Generate meals') > emptyBranch.indexOf('initialBuild ?'))
+  check('the empty branch was located (sanity check on this check)', emptyBranch.length > 200, emptyBranch.length)
+  // Asserted as STRUCTURE, not as "the token appears somewhere". The first
+  // version of this check tested `/\{isGenerating \?/` and passed happily with
+  // the branch deleted, because the Generate button's own spinner icon is
+  // `{isGenerating ? <Loader2 .../> : <RefreshCw .../>}` — the same token,
+  // three lines further down, testing nothing. Two mutations survived on it.
+  const choose = emptyBranch.indexOf('{isGenerating ? (')
+  const building = emptyBranch.indexOf('Building your meals')
+  const otherwise = emptyBranch.indexOf(') : (')
+  const generate = emptyBranch.indexOf('Generate meals')
+  check('a build in progress is what chooses what this branch renders', choose >= 0, choose)
+  check('...with the building copy on the true side', choose < building && building < otherwise,
+    { choose, building, otherwise })
+  check('...and the Generate button only on the other side', otherwise < generate, { otherwise, generate })
   check('...while keeping the genuine empty state for when nothing is running',
     /No meal plan generated yet/.test(emptyBranch) && /Generate meals/.test(emptyBranch))
+  // The narrow flag must not return. It is gone from both components, and a
+  // first-build-only condition here is the defect, not a refinement of it.
+  check('no first-build-only flag decides it any more',
+    !/initialBuild/.test(mealPlan) && !/initialMealBuild/.test(nutrition))
 
-  const nutrition = readFileSync(join(ROOT, 'src/components/NutritionDisplay.tsx'), 'utf8')
-  check('the flag is threaded through Nutrition', /initialBuild=\{initialMealBuild\}/.test(nutrition))
-  check('App passes it, and folds it into the generating flag the buttons read',
-    /initialMealBuild=\{initialMealBuild\}/.test(code) && /isGeneratingMeals=\{isGeneratingMeals \|\| initialMealBuild\}/.test(code))
+  const appCode = readFileSync(join(ROOT, 'src/App.tsx'), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+  check('App folds the background build into the flag the meals area reads',
+    /isGeneratingMeals=\{isGeneratingMeals \|\| initialMealBuild\}/.test(appCode))
+  check('...and the tour holds for any build with nothing to show, not just the first',
+    /mealsPending=\{\(isGeneratingMeals \|\| initialMealBuild\) &&/.test(appCode))
+}
+
+console.log('\n6. A round that succeeds is saved before the next one is asked for')
+{
+  // THE BUG THIS SECTION EXISTS FOR, and it cost a real user a real plan.
+  //
+  // 6 Sep, 19:31 UTC: onboarding ran two generation rounds — 14.1s and 8.3s,
+  // both HTTP 200, both producing meals — and then the page went away before
+  // the third finished. persistPools was called ONCE, after the loop. Every
+  // meal from both successful rounds was discarded, and Ashley woke up to an
+  // empty Nutrition tab with nothing anywhere saying a thing had happened.
+  //
+  // Her ruling when asked what a partial plan should do: keep what it got.
+  const gen = readFileSync(join(ROOT, 'src/lib/meal-generation.ts'), 'utf8')
+  const loop = /for \(let round = 0; round < MAX_GENERATION_ROUNDS; round\+\+\) \{([\s\S]*?)\n {2}\}\n/.exec(gen)?.[1] ?? ''
+  check('the generation loop was located (sanity check on this check)', loop.length > 500, loop.length)
+
+  // The property, stated as position: the commit happens INSIDE the loop.
+  check('each round commits what it won before the next request goes out',
+    /commitProgress\(\)/.test(loop))
+  check('...and the commit really writes, rather than only counting',
+    /const commitProgress = async \(\) => \{[\s\S]{0,600}await persistPools\(/.test(gen))
+  // A trailing-only persist is exactly what was there before. If the only
+  // persistPools call drifts back below the loop, this fails.
+  const afterLoop = gen.slice(gen.indexOf('const shortfalls = activeSlots'))
+  check('...and nothing relies on a single write after the loop',
+    !/await persistPools\(/.test(afterLoop), afterLoop.slice(0, 120))
+  // "Find more options" is the one path that must NOT write per round: its
+  // pool_index base is read up front, so repeated writes collide on it.
+  check('the append path still writes once, at the end', /await appendPools\(/.test(afterLoop))
+  check('...and is skipped by the per-round commit', /if \(!params\.appendToExisting\) await commitProgress\(\)/.test(loop))
+}
+
+console.log('\n7. A failed read of the meals does not masquerade as an empty one')
+{
+  // getPools answered a failed read with `{}`, which the Nutrition tab renders
+  // as "No meal plan generated yet" — telling someone whose meals exist to go
+  // and make them again, and pointing them at a button that deletes and
+  // rewrites the plan they still had.
+  const store = readFileSync(join(ROOT, 'src/lib/meal-store.ts'), 'utf8')
+  check('there is a read that reports whether it worked', /export async function readPools\(/.test(store))
+  check('...which says so rather than returning silence', /return \{ pools: \{\}, failed: true \}/.test(store))
+  check('...and leaves a trace in the console too', /console\.error\('Reading meal pools failed/.test(store))
+  check('getPools still exists for callers that genuinely want empty-on-failure',
+    /export async function getPools\(/.test(store))
+
+  const appCode = readFileSync(join(ROOT, 'src/App.tsx'), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+  check('the restore path uses the reporting read', /readPools\(ownedId\)/.test(appCode))
+  check('...and tells the user when it failed', /if \(restoredPools\.failed\)/.test(appCode))
 }
 
 if (failures > 0) { console.error(`\n${failures} check(s) failed\n`); process.exit(1) }

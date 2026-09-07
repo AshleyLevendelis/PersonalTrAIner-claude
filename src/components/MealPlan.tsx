@@ -38,13 +38,6 @@ interface MealPlanProps {
   targets: MacroTargets | null
   isGenerating: boolean
   /**
-   * The FIRST pool build after onboarding, still running in the background.
-   * Narrower than isGenerating, and the difference is the whole point: it
-   * means meals have never existed yet, so the empty state below is a
-   * "building" state rather than an invitation to generate.
-   */
-  initialBuild?: boolean
-  /**
    * Set when a (re)generate call failed or came back empty for one or more
    * slots. USUALLY the existing plan is left in place when this fires — but
    * not on the first background build after onboarding, where there is no
@@ -86,7 +79,7 @@ interface MealPlanProps {
  * mirroring ExerciseRow's collapsed/expanded contract.
  */
 export function MealPlan({
-  profileId, date, pools, chosen, totals, targets, isGenerating, initialBuild = false, regenerateError, onDismissRegenerateError,
+  profileId, date, pools, chosen, totals, targets, isGenerating, regenerateError, onDismissRegenerateError,
   unrecognisedDietaryRestrictions, onFixDietaryRestrictions, dietaryPreferences = [], avoidFoods = [],
   onSwapSlot, onRegenerateSlot, onFindMoreOptions, onRegenerateAll,
 }: MealPlanProps) {
@@ -184,13 +177,21 @@ export function MealPlan({
   )
 
   // NOTHING TO SHOW YET — two different situations, and telling them apart is
-  // what the `initialBuild` prop is for.
+  // the difference between a screen that is working and one that looks broken.
   //
   // Since 6 Sep 2026 onboarding hands the app over BEFORE the meals are built
   // and finishes them in the background, so this branch is now the normal
-  // first thing a new user sees on this tab. The old copy would be wrong twice
-  // over for them: they have just completed onboarding, and "Generate meals"
-  // would fire a second concurrent build of the one already running.
+  // first thing a new user sees on this tab. The old copy is wrong twice over
+  // for them: they have just completed onboarding, and "Generate meals" would
+  // fire a second concurrent build of the one already running.
+  //
+  // IT IS KEYED ON `isGenerating`, NOT ON "was this the first build". It was
+  // the narrower thing for one day and that was a mistake with a witness:
+  // Ashley pressed Generate meals on 7 Sep, generation ran for 34 seconds and
+  // wrote thirteen meals — and for all 34 of those seconds this heading still
+  // read "No meal plan generated yet" above a button wearing a small spinner,
+  // because a user-pressed build was not "the first build". She reported the
+  // button as dead. Any build with nothing yet to show says so.
   //
   // `data-tour="meals"` is on this branch as well as the populated one below,
   // and both tags stay in THIS file — the tour gate requires a key to be
@@ -201,11 +202,11 @@ export function MealPlan({
     return (
       <div data-tour="meals" className="flex flex-col items-center justify-center gap-3 py-16">
         {unrecognisedBanner || errorBanner}
-        {initialBuild ? (
+        {isGenerating ? (
           <>
             <Loader2 className="size-8 animate-spin text-primary-text" />
             <p className="text-sm text-muted-foreground">Building your meals…</p>
-            <p className="text-xs text-muted-foreground/70">Your training plan is ready — this part takes a moment longer.</p>
+            <p className="text-xs text-muted-foreground/70">They arrive one meal at a time — this takes up to a minute.</p>
           </>
         ) : (
           <>

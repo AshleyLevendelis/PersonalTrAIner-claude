@@ -496,6 +496,39 @@ export async function generateMealPools(params: {
   let generatorReached = false
   for (const slot of activeSlots) accepted[slot] = []
 
+  /**
+   * SAVE WHAT EACH ROUND WON, BEFORE ASKING FOR THE NEXT ONE.
+   *
+   * Until 7 Sep 2026 persistence happened once, after the whole loop. That is
+   * survivable on a desktop and quietly catastrophic on a phone: on 6 Sep
+   * Ashley's onboarding ran two rounds — 14.1s and 8.3s, both HTTP 200, both
+   * producing meals — and then the page went away before the third finished.
+   * Every one of those meals was discarded. She woke up to "No meal plan
+   * generated yet" and no way to know a thing had ever happened. The edge
+   * function logs and the empty slot table both say so.
+   *
+   * Her ruling when asked what a partial plan should do: keep what it got, and
+   * say which meals are missing. So each round commits its own winnings and
+   * the next round can only add to them.
+   *
+   * Only slots that actually GREW are rewritten — persistPools is a
+   * read-delete-insert per slot, and re-writing an unchanged slot is three
+   * round trips to say nothing. A slot whose write fails is not retried unless
+   * a later round grows it again, which matches what persistPools already does
+   * with a per-slot failure: log it and leave that slot alone.
+   */
+  const persistedCount: Partial<Record<MealSlotName, number>> = {}
+  const commitProgress = async () => {
+    const grown: Partial<Record<MealSlotName, PoolOption[]>> = {}
+    for (const slot of activeSlots) {
+      const have = accepted[slot]?.length ?? 0
+      if (have > (persistedCount[slot] ?? 0)) grown[slot] = accepted[slot]!
+    }
+    if (Object.keys(grown).length === 0) return
+    await persistPools(params.profileId, grown)
+    for (const slot of Object.keys(grown) as MealSlotName[]) persistedCount[slot] = accepted[slot]?.length ?? 0
+  }
+
   for (let round = 0; round < MAX_GENERATION_ROUNDS; round++) {
     const remaining: Partial<Record<MealSlotName, number>> = {}
     for (const slot of activeSlots) {
@@ -574,6 +607,11 @@ export async function generateMealPools(params: {
       const option = verifyProposal(proposal, slot, budget, params.dietaryPreferences, rejectionLog, effectiveDislikes, unrecognisedPreferences)
       if (option) accepted[slot]!.push(option)
     }
+
+    // The whole point: this round's meals are on disk before the next request
+    // goes out, so losing the page from here on costs the REST of the plan
+    // rather than all of it. Skipped for the append path — see below.
+    if (!params.appendToExisting) await commitProgress()
   }
 
   const shortfalls = activeSlots
@@ -584,8 +622,10 @@ export async function generateMealPools(params: {
     console.warn('generateMealPools: some slots did not reach target pool size', shortfalls, rejectionLog)
   }
 
+  // "Find more options" stays a single write at the end. It is short, the user
+  // is watching it, and appendPools bases its pool_index on the slot length it
+  // read up front — writing it once per round would collide on that index.
   if (params.appendToExisting) await appendPools(params.profileId, accepted, existingBySlot)
-  else await persistPools(params.profileId, accepted)
 
   return { accepted, rejectionLog, shortfalls, unrecognisedPreferences: [...unrecognisedPreferences].sort(), generatorReached }
 }

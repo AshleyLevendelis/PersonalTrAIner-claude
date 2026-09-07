@@ -383,14 +383,31 @@ export async function getTodayLedger(
  */
 export const USER_REQUESTED_TAG = 'user-requested'
 
-export async function getPools(profileId: string): Promise<Partial<Record<MealSlotName, PoolOption[]>>> {
+/**
+ * The pools, AND whether the read actually worked.
+ *
+ * getPools below returns only the pools and answers a failed read with `{}` —
+ * which the Nutrition tab renders as "No meal plan generated yet", i.e. it
+ * blames the absence on generation never having run. That is a lie in the one
+ * direction that matters: it tells someone whose meals exist to go and make
+ * them again, and hands them a button that will delete and rewrite a plan they
+ * already had. Callers that put an empty state in front of a person should use
+ * this and say something different when `failed` is true.
+ */
+export async function readPools(profileId: string): Promise<{ pools: Partial<Record<MealSlotName, PoolOption[]>>; failed: boolean }> {
   const { data, error } = await supabase
     .from('meal_plan_slots')
     .select('slot, pool_index, name, ingredients, macros, tags')
     .eq('profile_id', profileId)
     .order('pool_index', { ascending: true })
 
-  if (error || !data) return {}
+  if (error || !data) {
+    // Logged as well as reported: this used to be a bare `return {}` with no
+    // trace anywhere, so a read that failed every time was indistinguishable
+    // from a profile that had never generated.
+    console.error('Reading meal pools failed — the Nutrition tab will say so rather than claiming none were generated:', error)
+    return { pools: {}, failed: true }
+  }
 
   const grouped: Partial<Record<MealSlotName, PoolOption[]>> = {}
   for (const row of data) {
@@ -406,7 +423,17 @@ export async function getPools(profileId: string): Promise<Partial<Record<MealSl
     if (!grouped[slot]) grouped[slot] = []
     grouped[slot]!.push(option)
   }
-  return grouped
+  return { pools: grouped, failed: false }
+}
+
+/**
+ * The pools alone, empty on failure. Correct for the callers that only want to
+ * know what is currently in the pool — a generator asking what to avoid
+ * repeating, a swap looking for alternatives — where "couldn't read" and
+ * "nothing there" genuinely lead to the same next step.
+ */
+export async function getPools(profileId: string): Promise<Partial<Record<MealSlotName, PoolOption[]>>> {
+  return (await readPools(profileId)).pools
 }
 
 /**

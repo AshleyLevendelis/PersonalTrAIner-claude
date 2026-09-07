@@ -2,6 +2,37 @@
 
 Newest first. One line each.
 
+- [x] **A HALF-BUILT MEAL PLAN IS KEPT, AND THE APP SAYS IT IS BUILDING** —
+  Ashley, 7 Sep 2026: an empty Nutrition tab, and "Generate meals" apparently
+  doing nothing. Diagnosed from PRODUCTION (read-only) and the edge-function
+  logs rather than guessed. **Nothing was broken server-side: `generate-meals`
+  returned 200 on every call.** On 6 Sep at 19:31 her onboarding ran two
+  rounds — 14.1s and 8.3s, both producing meals — and the page went away
+  before the third finished. On 7 Sep at 04:43 three rounds ran and thirteen
+  meals were written, the same minute as her screenshot.
+  **The data-loss bug:** `persistPools` ran ONCE, after the whole round loop,
+  so an interrupted build saved nothing. Two successful rounds were discarded.
+  Each round now commits before the next request goes out; only slots that
+  actually grew are rewritten. Ashley's ruling when asked what a partial plan
+  should do: keep what it got.
+  **The feedback bug, and it was mine:** yesterday's "Building your meals…"
+  state was wired to the onboarding build only, so a user-pressed Generate got
+  34 seconds of "No meal plan generated yet" over a spinning icon. It is keyed
+  on any in-flight build now, and the gate pins the branch STRUCTURE after two
+  mutations survived a check that was matching the button's own spinner
+  ternary instead of the branch that chooses.
+  **The silent-read bug:** `getPools` answered a failed read with `{}`, which
+  renders as "No meal plan generated yet" — sending someone whose meals exist
+  to regenerate, via a button that deletes and rewrites the plan they had.
+  `readPools` reports the failure; the restore path says so.
+  `test:meal-roundtrip` case D reproduces the 19:31 interruption exactly and
+  asserts round 1 is on disk before round 2 is requested — a positional
+  property no return value can show. `test:onboarding-handover` §5-§7 re-anchored
+  and extended. **Eleven mutations tried, eleven caught** (two after
+  strengthening). 135 of 135 gates pass.
+  **Not deployed.** Production is still the 6 Sep 17:13 merge; this and the two
+  commits before it are preview-only until Ashley says to deploy.
+
 - [x] **THE APP LOADS WHILE THE MEALS ARE STILL BEING BUILT** — Ashley, on her
   phone straight after onboarding, looking at a full-screen spinner reading
   "Building your meal pools…": *"can it not load the tour while the meal plan
