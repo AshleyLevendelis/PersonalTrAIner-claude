@@ -70,7 +70,12 @@ check('...rather than a hard-coded guess at the dock height',
   !/bottom:\s*`calc\([^`]*\+ 6[048]px/.test(today))
 // A fixed bar over the last row is the same bug in a nicer shirt.
 check('the list is padded so the last row clears the bar', /className="h-\[100px\]"/.test(today))
-check('the bar only exists before the session starts', /status !== 'running' && \(/.test(today))
+// RE-ANCHORED 7 Sep 2026. The name of this check has always been right and
+// the assertion was not: `status !== 'running'` is true of a FINISHED session
+// as well as an unstarted one, so the bar came back over a day whose every
+// exercise was struck through and ticked. Ashley saw it and reported it. The
+// check now asserts what it always said it did.
+check('the bar only exists before the session starts', /status === 'idle' && \(/.test(today))
 // Finish is not duplicated into the bar: BottomDock's own comment promises it
 // stays singly owned in the hero, and two Finish buttons is how a session gets
 // closed by accident.

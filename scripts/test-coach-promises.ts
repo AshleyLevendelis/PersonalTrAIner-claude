@@ -360,12 +360,20 @@ console.log('\n6. The first-run starter chips only offer things that work')
   // ...and the reason that check can be trusted: log_meal really is still the
   // declining one. If it ever starts working, this comment is the thing that
   // says the copy may open up.
-  // ...and the reason that check can be trusted: log_meal really is still the
-  // declining one. Read from the CODE, because the first version of this read
-  // the whole file and matched the comment explaining the decline rather than
-  // the reply performing it — the reply string could have become anything.
-  check('...because log_meal is still the tool that declines',
-    /can't record it from here yet/.test(chatCode))
+  // THE PREMISE CHANGED ON 7 Sep 2026 AND THE CHECK HAD TO CHANGE WITH IT.
+  // This used to read "...because log_meal is still the tool that declines" —
+  // true while its handler pointed at a table that had never existed. It now
+  // proposes a confirmation card and the app writes the meal on the tap, so
+  // the old assertion would be pinning a state that is gone.
+  //
+  // What still matters is the harm the welcome check exists to prevent: the
+  // coach must not claim a meal is recorded, because at the moment it replies
+  // it is not — the write happens after her tap. That is what is asserted now.
+  check('...and log_meal never claims to have recorded anything itself',
+    /YOU never record anything and must never say you have/.test(chatCode)
+    && /never report a meal as logged, added or saved/.test(chatCode))
+  check('...with the same rule stated in the prompt, not only the tool',
+    /Never say a meal is logged, saved or added/.test(chatCode))
 
   // THE WORDING SHE REJECTED, held so it cannot come back: "as far as the
   // user is concerned it is a person, so I dont like this wording." Naming
@@ -642,18 +650,27 @@ console.log('\n7. A tool that declines says so in its own description')
     const desc = chat.indexOf('description:', at)
     return desc < 0 ? '' : chat.slice(desc, chat.indexOf('parameters:', desc))
   }
+  // READS THE CODE, NOT THE COMMENTARY. This sliced `chat` until 7 Sep 2026,
+  // and a note in log_meal's handler recording what its old reply used to say
+  // ("I can't log food from chat yet") was enough to classify the tool as a
+  // decliner long after it had stopped declining. A detector that a comment
+  // can trip is a detector that reports the past.
   const handlerOf = (tool: string): string => {
-    const at = chat.indexOf(`name === "${tool}"`)
+    const at = chatCode.indexOf(`name === "${tool}"`)
     if (at < 0) return ''
-    const next = chat.indexOf('if (name === "', at + 5)
-    return chat.slice(at, next < 0 ? at + 6000 : next)
+    const next = chatCode.indexOf('if (name === "', at + 5)
+    return chatCode.slice(at, next < 0 ? at + 6000 : next)
   }
 
   const decliners = declared.filter(t => DECLINE_PHRASES.test(handlerOf(t)))
   // Sanity check on this check: if the phrase list stops matching anything,
   // the loop below is vacuous and passes on a prompt full of false promises.
-  // Two tools decline today and both are deliberate.
-  check('the decline detector still finds the tools that decline', decliners.length >= 2, decliners)
+  //
+  // Was ">= 2" until 7 Sep 2026, when log_meal stopped declining — it now
+  // proposes a confirmation card and the app records the meal on the tap. The
+  // floor is 1 rather than 0 so the loop cannot go vacuous, and the list is
+  // printed so a change in WHICH tools decline is visible rather than silent.
+  check('the decline detector still finds the tools that decline', decliners.length >= 1, decliners)
   for (const tool of decliners) {
     check(`${tool} declines, and its description says so up front`,
       MARKS_ITSELF.test(descriptionOf(tool)), descriptionOf(tool).slice(0, 160))
@@ -691,37 +708,57 @@ console.log('\nA macro QUESTION is answered, not apologised for\n')
   check('...and rules on the ambiguous case rather than leaving it open',
     /it is a QUESTION: they asked, so answer/.test(chatCode))
 
-  // THE HANDLER. One route, two replies.
+  // THE HANDLER. One route, two outcomes — and after 7 Sep 2026 only ONE of
+  // them is prose. Logging returns a proposal for the app to render as a
+  // confirmation card; the reply is deliberately empty, because the client
+  // authors the text for a proposal turn and the model must not be able to
+  // describe a meal as recorded.
   const handler = chatCode.slice(chatCode.indexOf('const asked = args.intent === "question"'), chatCode.indexOf('if (name === "log_workout")'))
   check('the handler was located (sanity check on this check)', handler.length > 200, handler.length)
-  const askedReply = /asked\s*\?\s*`([^`]+)`/.exec(handler)?.[1] ?? ''
-  // The logging branch is two template literals concatenated, so it is taken
-  // whole rather than by first-backtick — a first version captured only the
-  // opening fragment and reported the Nutrition-tab clause missing when it was
-  // simply on the next line.
-  const loggedReply = handler.slice(handler.indexOf('\n            : '), handler.indexOf('];'))
-  check('a question is answered with the numbers', /macroLine/.test(askedReply), askedReply)
-  // THE PROPERTY. She asked what something came to; logging was never the
-  // subject, and an apology for not doing it is not an answer to her question.
+
+  const proposalBranch = handler.slice(handler.indexOf('if (!asked)'), handler.indexOf('const parts'))
+  check('a logging intent returns a proposal rather than prose',
+    /kind: "propose_meal_log"/.test(proposalBranch), proposalBranch.slice(0, 200))
+  check('...with an empty reply, so the model cannot narrate the write',
+    /reply: ""/.test(proposalBranch))
+  check('...carrying the numbers already computed from the verified food database',
+    /computed: \{[\s\S]{0,200}kcal: computed\.kcal/.test(proposalBranch))
+  // NOTHING IS WRITTEN HERE. Same shape test-meal-addition.ts pins for its own
+  // courier: the confirmed write belongs to the client, after the tap.
+  check('...and writes nothing itself', !/method:\s*"(POST|PATCH|PUT)"/.test(handler), handler.slice(0, 120))
+
+  const askedReply = /`\*\*\$\{args\.food_name\}\*\* is ([^`]+)`/.exec(handler)?.[0] ?? ''
+  check('a question is still answered with the numbers, in prose', /macroLine/.test(askedReply), askedReply)
+  // THE PROPERTY THAT STARTED ALL THIS. She asked what something came to;
+  // logging was never the subject, and an apology for not doing it is not an
+  // answer to her question.
   check("...and says nothing about logging, which she never asked about",
-    !/log|Nutrition tab|can't|cannot/i.test(askedReply), askedReply)
-  check('a genuine log still gets told where to record it',
-    /Nutrition tab/.test(loggedReply), loggedReply)
-  // §1a: "NEVER lead with what the app can't do... If a limitation genuinely
-  // changes what they should do next, it goes in a short clause at the END."
-  check('...at the END of the reply, never leading it',
-    loggedReply.indexOf('macroLine') < loggedReply.indexOf('Nutrition tab'), loggedReply)
+    !/\blog\b|Nutrition tab|can't|cannot/i.test(askedReply), askedReply)
   check('...and the rule it is obeying is still in the prompt',
     /NEVER lead with what the app can't do/.test(chatCode))
 
   // A field name is not a word. "keep an eye on your snack_1 against its
   // budget" was reaching the screen verbatim.
+  // Re-anchored 7 Sep 2026: this pinned the phrase "first snack", which was
+  // the mapping for a slot key that no longer exists. What matters is that the
+  // key is translated at all, and that the four the ledger accepts all have a
+  // word — "snack" was missing from the map when the enum was corrected, which
+  // silently dropped the budget clause off every snack answer. test:meal-log
+  // holds the full list against the migration.
   check('slot keys are turned into words before they reach a reply',
-    /humanSlot\(args\.meal_slot\)/.test(chatCode) && /snack_1: "first snack"/.test(chatCode))
+    /humanSlot\(args\.meal_slot\)/.test(chatCode) && /snack: "snack"/.test(chatCode))
   check('...and an unknown key is dropped rather than echoed',
     /return known\[slot\.toLowerCase\(\)\] \?\? ""/.test(chatCode))
-  check('...with no raw key left in either reply',
-    !/snack_1/.test(askedReply) && !/snack_1/.test(loggedReply) && !/\$\{args\.meal_slot\}/.test(handler))
+  check('...with no raw key left in the reply, nor interpolated straight in',
+    !/snack_1/.test(askedReply) && !/\$\{args\.meal_slot\}/.test(handler))
+  // AND THE LIST THE MODEL IS GIVEN MATCHES THE DATABASE. snack_1/snack_2 were
+  // in the tool's slot description until 7 Sep 2026; meal_events accepts
+  // breakfast/lunch/dinner/snack and nothing else, so every snack log would
+  // have been rejected on arrival the moment logging was wired up. Held
+  // against the migration in test:meal-log; named here because this is where
+  // the leak was first seen.
+  check('the slot list offered to the model has no snack_1/snack_2 left in it',
+    !/snack_1|snack_2/.test(schema), schema.slice(schema.indexOf('meal_slot'), schema.indexOf('meal_slot') + 200))
 }
 
 if (failures > 0) {

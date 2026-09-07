@@ -2,6 +2,132 @@
 
 Newest first. One line each.
 
+- [x] **THE COACH SPEAKS FIRST, MID-CONVERSATION** — Ashley, 7 Sep 2026: *"i
+  want the chat to start conversation unprompted based off events such as a
+  completed workout or upcoming workout, etc."*
+  **What was actually missing.** The coach already had one way to speak first —
+  `coach-opener.ts` — but that effect refuses to run unless the conversation is
+  exactly one untouched greeting (`ChatAssistant.tsx:711`), and
+  `loadChatHistory` restores the last twenty messages with no date filter. So
+  from the SECOND conversation onward the chat opened on the old thread and the
+  coach added nothing new, ever, until the chat was cleared. The chat button
+  could glow (`chat-unread.ts`) with no message behind it.
+  **Two rulings, both hers.** Where: **in the app**, not the lock screen —
+  phone notifications were offered with their real cost (a server that decides
+  and sends; the app installed to her home screen before iOS allows it at all)
+  and declined; the app has no notification capability of any kind today, only
+  the offline-cache service worker at `src/main.tsx:45`. How chatty:
+  **training + wins** — a finished session, a missed day, today's session, a
+  new PR and a streak milestone; NOT the evening protein/water shortfalls or
+  the stale weigh-in `accountability.ts` can already produce, for the reason
+  `BottomTabBar.tsx` already records in its own words.
+  **The mechanism.** `coach-nudge.ts` — pure, at most one message, ranked by
+  how actionable it is now. The key is the EVENT (`pr:Bench Press:2026-09-07:80`),
+  not its kind, so a PR is congratulated once and a second PR on a different
+  lift is its own message; an outranked event is delayed, never lost. A PR from
+  the session being asked about folds into the how-did-it-feel question and
+  burns both keys. The message is WRITTEN TO `chat_messages`, which is the
+  load-bearing decision: a real id means `chat-unread.ts` lights the button AND
+  blocks the next nudge until she has seen it — one mechanism, both jobs. Plus
+  a persisted 30-minute quiet period, and the opener burning the keys it covered
+  so the two can never say the same thing twice.
+  **Verified live**, not by construction: the real `ChatAssistant` in App.tsx's
+  real wrapper, a 14-message thread and a finished-but-unreviewed session, at
+  390x844 — one message added, on screen and scrolled into view, one row in
+  `chat_messages`, the chat button glowing while Home is the active tab, and
+  still exactly one five seconds later (`verify:coach-speaks-first`). Gate
+  `test:coach-nudge`; 19 mutations applied, all caught, one after strengthening
+  a check that was passing on an input the guard could not see.
+  **Two fixes to the browser double fell out of this** and are worth naming
+  because they were silently limiting every harness run before it:
+  `fake-supabase.ts` ignored `{ count: 'exact' }`, so `isFirstEverChat` read
+  true for a seeded conversation and anything gated on "they have talked to the
+  coach before" was unreachable; and it had no `.not()`, so
+  `loadFeelContext`'s answered-sessions query threw into a `.catch(() => {})`
+  and `feelContext` stayed null forever.
+  **Not built, stated:** phone notifications; chips surviving a reload
+  (`quickReplies` is not a `chat_messages` column — the message keeps its words
+  and loses its buttons, exactly as the opener does today).
+  Plan: `docs/plans/the-coach-speaks-first.md`.
+
+- [x] **TWO TODAYS, AND A FINISHED DAY OFFERING TO START** — Ashley, 7 Sep
+  2026, two screenshots a minute apart. Exercise tab at 15:30: "TODAY ·
+  MONDAY", every exercise struck through and ticked, and a full-width "Start
+  workout" under them. Chat at 15:31: *"we're on for Tuesday's Push & Press
+  session today... I saw you logged your first session yesterday... how did
+  Monday's workout actually feel?"*
+  **1. The start button.** `TodayPanel.tsx` gated it on `status !== 'running'`.
+  Status has THREE values, so a **finished** session fell through and was
+  offered the workout it had just completed. The gate check covering it was
+  named "the bar only exists before the session starts" and asserted
+  `status !== 'running'` — the name was right and the assertion pinned the
+  defect. Both now say `status === 'idle'`, and the 100px spacer follows it.
+  **2. The two todays, and this one touches data.** `useActiveSession`'s
+  `identity` — the app's date and day name, and what every logged set is
+  stamped with — was memoised on `[profileId, devOverrideWeek, devOverrideDay,
+  planCreatedAt, totalWeeks]`. None of those changes at midnight, so the stamp
+  never moved; the provider wraps the whole app and never unmounts. A session
+  left open across a day boundary kept yesterday for as long as the tab lived,
+  while every fresh `getSessionDateContext` caller — the coach's context among
+  them — read the real day. Two todays, and sets file under whichever this hook
+  is holding.
+  The freeze itself is deliberate and stays: re-deriving per render splits one
+  workout in two at midnight (dev-clock.ts's documented hazard). What changed
+  is that the stamp now refreshes on a genuine day change **and only while no
+  session is running** — checked on foreground and on a 60s interval, because a
+  phone left on the Exercise tab never re-mounts, and updated only when the
+  value actually differs.
+  Eight mutations, all caught (one after strengthening: a check for
+  "visibilitychange" anywhere was satisfied by the cleanup's
+  `removeEventListener`, so deleting the subscription walked through).
+  138 of 138 gates.
+  **UNVERIFIED, AND IT MATTERS:** whether Ashley's own sets were mis-dated by
+  this — filed under Monday while performed on Tuesday — is a one-query
+  question against PRODUCTION (`workout_sessions.date` vs the sets'
+  `completed_at`). The read needs her approval and has not been run. The
+  mechanism is proven from source; the damage to her specific rows is not.
+
+- [x] **THE COACH CAN LOG WHAT YOU ATE** — Ashley, 7 Sep 2026: "how do we fix
+  meal logging". Plan first (`docs/plans/the-coach-can-log-what-you-ate.md`),
+  then built on her go-ahead.
+  **The cause:** `log_meal`'s handler used to insert into `daily_food_logs`, a
+  table that appears in NO migration and has never existed on the live
+  database. Every attempt failed, so it was retired to an honest decline — and
+  the decline outlived its reason by weeks, sitting there while `meal_events`
+  existed and the Nutrition tab wrote to it on every Log tap. Not broken
+  plumbing: plumbing never connected.
+  **Her ruling:** ask first, log on confirm. Which also settles the
+  architecture — the write belongs on the CLIENT after the tap, through
+  `recordMealEvent`, or it loses the offline queue, the `client_id`
+  idempotency, the synchronous on-screen update and the void-based undo, and
+  the card would be claiming a write she cannot see. The edge function is a
+  courier: `intent: 'logging'` returns `{ reply: "", proposal }` and writes
+  nothing, exactly as `propose_meal_addition` does.
+  **The landmine, found while tracing and worth the whole exercise:** the tool
+  told the model its slots were `breakfast, lunch, dinner, snack_1, snack_2`.
+  `meal_events` accepts four values and neither snack_N is among them, so every
+  snack log would have been rejected on arrival — and that mismatch is where
+  the `snack_1` in her replies came from. `test:meal-log` now parses the CHECK
+  constraint out of the migration and asserts the tool's enum and the app's
+  `MealSlotName` are the same set.
+  **A slip the gate caught immediately:** correcting the enum to `snack` left
+  `humanSlot` without a mapping for it, which silently dropped the budget
+  clause off every snack answer.
+  The verifier refuses rather than logging a number too low to trust: an
+  under-resolved meal fails the same `MIN_COVERAGE` floor every generated meal
+  passes, because 40 kcal for a real dinner does not read as missing — it reads
+  as a light day, and everything downstream believes it.
+  Ten mutations, ten caught. Three gate checks re-anchored because they pinned
+  states that are now gone (log_meal as "the tool that declines"; the decline
+  detector reading a historical COMMENT as code; "first snack" as a slot word).
+  137 of 137 gates.
+  **Not in scope, recorded:** allergen flagging on an already-eaten meal
+  (recording is not endorsing, and refusing to log a real meal leaves the day
+  wrong — but whether to flag is a fair, safety-adjacent question); and a
+  chat-side undo, since the confirm card is the agreed safety and the Nutrition
+  tab already voids events.
+  **Needs the deploy.** Rides with the `intent` fix — one typed phrase, both.
+
 - [x] **ONE UNREAD INDICATOR, NOT TWO** — Ashley, 7 Sep 2026: *"the glowing
   chat button ... looks great but theres still the orange dot also. we no
   longer need the orange dot because the glowing outer ring now does that

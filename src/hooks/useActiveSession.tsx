@@ -181,25 +181,72 @@ export function ActiveSessionProvider({
     if (profileId) refreshPRCacheFromDB(profileId).catch(console.error)
   }, [profileId])
 
-  // Identity: stamped once per mount and re-stamped only when its actual
-  // inputs change — never re-derived from a fresh clock read on every
-  // render (dev-clock.ts's documented hazard: a mid-workout day rollover
-  // would otherwise silently split one session into two).
+  /**
+   * The calendar day the app is living in, re-read only when it is SAFE to.
+   *
+   * Identity below is memoised so the day cannot change under a running
+   * session — dev-clock.ts's documented hazard, and a real one: re-deriving on
+   * every render would split one workout into two the moment midnight passed.
+   * But its dependencies are profile and plan facts, none of which change at
+   * midnight, so the stamp never moved at all. In a session left open across a
+   * day boundary the Exercise tab kept yesterday's date and day name for as
+   * long as the tab lived, while every fresh caller of getSessionDateContext —
+   * the coach's context among them — read the real one.
+   *
+   * Ashley saw both at once on 7 Sep 2026: the Exercise tab headed
+   * "TODAY · MONDAY" with the session logged, and the coach one minute later
+   * saying "we're on for Tuesday's session today... you logged your first
+   * session yesterday". Two todays, and the sets go in under whichever one
+   * this hook is holding.
+   *
+   * So the stamp is refreshed on a real day change, and ONLY while no session
+   * is running: the hazard the freeze exists for is preserved exactly, and the
+   * staleness it caused is not. Checked on foreground and on a slow interval,
+   * because a phone left on the Exercise tab overnight never re-mounts.
+   */
+  const [dayStamp, setDayStamp] = useState(() => getSessionDateContext(profileId))
+  const statusRef = useRef<'idle' | 'running' | 'finished'>('idle')
+
+  useEffect(() => {
+    if (!profileId) return
+    const check = () => {
+      // A running session owns the date it started on, whatever the clock now
+      // says. Finishing it releases the hold at the next check.
+      if (statusRef.current === 'running') return
+      const fresh = getSessionDateContext(profileId)
+      setDayStamp(prev => (prev.date === fresh.date && prev.day === fresh.day ? prev : fresh))
+    }
+    check()
+    const onVisible = () => { if (document.visibilityState === 'visible') check() }
+    document.addEventListener('visibilitychange', onVisible)
+    // A minute is far finer than the thing being watched and costs a string
+    // comparison; the point is that a phone sitting on this tab notices.
+    const timer = setInterval(check, 60_000)
+    return () => { document.removeEventListener('visibilitychange', onVisible); clearInterval(timer) }
+  }, [profileId])
+
+  // Identity: stamped from dayStamp above, so it re-stamps when the day
+  // genuinely turns over and at no other time — never re-derived from a fresh
+  // clock read on every render (dev-clock.ts's documented hazard: a mid-workout
+  // day rollover would otherwise silently split one session into two).
   const identity = useMemo<ActiveSessionIdentity>(() => {
     if (!profileId) return { profileId: undefined, date: '', dayName: '', liveWeek: 1 }
-    const ctx = getSessionDateContext(profileId)
     return {
       profileId,
-      date: ctx.date,
-      dayName: devOverrideDay ?? ctx.day,
+      date: dayStamp.date,
+      dayName: devOverrideDay ?? dayStamp.day,
       liveWeek: devOverrideWeek ?? getActiveMesocycleWeek(planCreatedAt, getAppNow(profileId), totalWeeks),
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profileId, devOverrideWeek, devOverrideDay, planCreatedAt, totalWeeks])
+  }, [profileId, devOverrideWeek, devOverrideDay, planCreatedAt, totalWeeks, dayStamp])
 
   const [logs, setLogs] = useState<ExerciseSetLog[]>([])
   const [ready, setReady] = useState(false)
   const [status, setStatus] = useState<'idle' | 'running' | 'finished'>('idle')
+  // Mirrored into a ref so the day-rollover check above can read it without
+  // depending on it — the check must not re-subscribe every time a session
+  // starts or ends.
+  useEffect(() => { statusRef.current = status }, [status])
   const [startedAtIso, setStartedAtIso] = useState<string | null>(null)
   /**
    * Ramp ticks, MIRRORED INTO REACT STATE and not only into the record.

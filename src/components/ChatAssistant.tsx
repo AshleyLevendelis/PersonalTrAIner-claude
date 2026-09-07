@@ -11,8 +11,8 @@ import { getAppNow, getSessionDateContext, getLocalDateString } from '@/lib/dev-
 import { supabase } from '@/lib/supabase'
 import { getRecentLogs, formatLogsForAI, getRecentCardioLogs, formatCardioLogsForAI } from '@/lib/daily-tracking'
 import { saveChatCache, loadChatCache, clearChatCache } from '@/lib/chat-cache'
-import { attentionReasons, nextSeenAttention, hasUnseenAttention, loadSeenAttention, saveSeenAttention } from '@/lib/chat-unread'
-import { swapPoolMeal, setMealPick, type MealSlotName } from '@/lib/meal-store'
+import { attentionReasons, nextSeenAttention, hasUnseenAttention, hasUnreadCoachMessage, loadSeenAttention, saveSeenAttention } from '@/lib/chat-unread'
+import { swapPoolMeal, setMealPick, recordMealEvent, type MealSlotName } from '@/lib/meal-store'
 import { getExerciseEntry } from '@/lib/exercise-db'
 import { createPendingAction, claimPendingAction, declinePendingAction, markExecuting, resolvePendingAction, getPendingAction, expireOldPendingActions, isWithinUndoWindow, type PendingActionReceipt } from '@/lib/pending-actions-store'
 import { APPEND_PROPOSAL_KINDS, INTENT_PROPOSAL_VERB, buildIntentProposal } from '@/lib/intent-proposal'
@@ -25,6 +25,7 @@ import { seededRngFromKey } from '@/lib/seeded-random'
 import type { ConcurrentActivity } from '@/lib/types'
 import { adjustDayVolume, isVolumeAdjustable } from '@/lib/volume-adjust'
 import { buildMealAdditionProposal, type MealAdditionPayload } from '@/lib/meal-addition'
+import { buildMealLogProposal, type MealLogPayload, type MealLogComputed } from '@/lib/meal-log-proposal'
 import { buildCustomMealProposal } from '@/lib/custom-meal'
 import { buildMealFoodAddProposal } from '@/lib/meal-food-add'
 import { buildMealSwapProposal } from '@/lib/meal-swap-proposal'
@@ -68,6 +69,11 @@ import { takeChatPrefill } from '@/lib/chat-prefill-store'
 import { loadFeelContext, buildFeelBrief, feelRun, recordSessionFeel, type FeelContext } from '@/lib/session-feel'
 import { useTrainingWeek } from '@/hooks/useTrainingWeek'
 import { pickOpener, missedYesterdayFrom, type Opener } from '@/lib/coach-opener'
+import {
+  pickNudge, nudgeKeys, keysCoveredByOpener, loadNudgeStore, saveNudgeStore,
+  rememberNudge, rememberWithoutSpeaking, NUDGE_MIN_GAP_MS,
+  type NudgeInput, type NudgeStore,
+} from '@/lib/coach-nudge'
 
 const ACTION_TAG_RE = /\[ACTION:\s*.*?\]/gi
 const QUICK_REPLIES_RE = /\[QUICK_REPLIES:\s*(.*?)\]/gi
@@ -628,10 +634,15 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     ? null
     : missedYesterdayFrom(trainingWeek.days, yesterdayDate, liveWeekDays)
 
+  // Today's session, and how it is named, hoisted out of composeOpener so the
+  // opener (the first bubble) and coach-nudge.ts (everything after it) describe
+  // the same day in the same words. Two copies of this lookup is exactly how
+  // the two mechanisms would start disagreeing about what today is.
+  const todayPlan = liveWeekDays.find(d => d.day === activeSession.dayName && d.exercises.length > 0)
+  const movementsOf = (d: WorkoutDay) => d.exercises.map(e => e.name).slice(0, 3).join(', ') + (d.exercises.length > 3 ? '...' : '')
+
   const composeOpener = (): Opener => {
     const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-    const todayPlan = liveWeekDays.find(d => d.day === activeSession.dayName && d.exercises.length > 0)
-    const movementsOf = (d: WorkoutDay) => d.exercises.map(e => e.name).slice(0, 3).join(', ') + (d.exercises.length > 3 ? '...' : '')
     // The next scheduled session after today, up to six days out — named
     // "tomorrow" when it is, otherwise by its day.
     let tomorrowSession: Opener extends never ? never : { dayName: string; focus: string; lead: string | null } | null = null
@@ -657,6 +668,51 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       todayLogged: activeSession.logs.length > 0,
       tomorrowSession,
     })
+  }
+
+  // ---------------------------------------------------------------------------
+  // THE COACH SPEAKING FIRST, MID-CONVERSATION (coach-nudge.ts).
+  //
+  // The opener above only ever runs on an EMPTY chat — one untouched greeting,
+  // nothing sent. Once there is a conversation, loadChatHistory restores it and
+  // until 7 Sep 2026 the coach added nothing new to it, ever. Ashley: "i want
+  // the chat to start conversation unprompted based off events such as a
+  // completed workout or upcoming workout, etc."
+  //
+  // Same inputs as the opener, deliberately: the two must never disagree about
+  // what happened. What differs is only WHERE the sentence goes.
+  // ---------------------------------------------------------------------------
+  const nudgeInput: NudgeInput = {
+    today: activeSession.date,
+    hour: getAppNow(profile.id).getHours(),
+    cutoffHour: sessionCutoffHour(profile.preferred_time),
+    planKnown,
+    awaitingFeel: feelContext?.awaiting
+      ? { date: feelContext.awaiting.date, day: feelContext.awaiting.day, isToday: feelContext.awaiting.date === activeSession.date }
+      : null,
+    missedYesterday: missedYesterday ? { date: yesterdayDate, ...missedYesterday } : null,
+    recentPR: proactiveData?.recentPRs[0] ?? null,
+    streak: proactiveData?.streak ?? 0,
+    todaySession: todayPlan ? { focus: todayPlan.focus, movements: movementsOf(todayPlan) } : null,
+    todayLogged: activeSession.logs.length > 0,
+  }
+  // A ref as well as the value, because the opener finalises from inside a
+  // setTimeout: the closure it captured could be several data arrivals old by
+  // the time it burns the keys it covered, and burning the wrong key is a
+  // message said twice or never.
+  const nudgeInputRef = useRef(nudgeInput)
+  nudgeInputRef.current = nudgeInput
+
+  const nudgeStoreRef = useRef<NudgeStore | null>(null)
+  const nudgeStore = (): NudgeStore => {
+    if (nudgeStoreRef.current == null) {
+      nudgeStoreRef.current = profile.id ? loadNudgeStore(profile.id) : { said: [], lastAt: 0 }
+    }
+    return nudgeStoreRef.current
+  }
+  const writeNudgeStore = (next: NudgeStore) => {
+    nudgeStoreRef.current = next
+    if (profile.id) saveNudgeStore(profile.id, next)
   }
 
   // The indicator on the chat tab. THREE reasons now, not two: the same two
@@ -691,6 +747,79 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     onAttentionChange?.(hasAttention)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasAttention])
+
+  // THE UNPROMPTED MESSAGE ITSELF.
+  //
+  // Written to chat_messages rather than composed in memory like the opener,
+  // and that is the load-bearing decision here. A row means a real id, which
+  // means chat-unread.ts counts it as an unread coach reply and lights the
+  // button — AND that the next one is blocked until she has seen it. One
+  // mechanism does both jobs, so there is no second rule about how often the
+  // coach may speak that could drift out of step with the indicator.
+  //
+  // The five guards, each for its own reason:
+  //   - a brand-new account gets the first-run introduction and nothing else;
+  //   - a reply in flight must not be interleaved with;
+  //   - unlike the opener, NOTHING IS ON SCREEN WAITING for this, so it waits
+  //     for the real data instead of guessing on a 2.5s deadline;
+  //   - a conversation that is exactly one bubble with no database id IS the
+  //     opener, which has already said its one thing;
+  //   - and never twice unanswered.
+  const nudgeInFlightRef = useRef(false)
+  useEffect(() => {
+    if (!profile.id || nudgeInFlightRef.current) return
+    if (!historyLoaded || isFirstEverChat !== false || isLoading) return
+    if (!proactiveData || !feelContext || trainingWeek.loading || !planKnown) return
+    if (messages.length === 0) return
+    if (messages.length === 1 && !messages[0].id) return
+    if (hasUnreadCoachMessage(messages, seenAttention)) return
+    // NEVER OVER A QUESTION SHE IS IN THE MIDDLE OF ANSWERING. hasUnreadCoachMessage
+    // covers the case where she has not looked yet; this covers the case where she
+    // has — a proposal card open for confirmation, or a clarification waiting on a
+    // choice. Speaking under either buries the thing that needs an answer and moves
+    // the quick replies onto a different question.
+    if (messages.some(m => m.pendingAction?.status === 'pending')) return
+    if (messages[messages.length - 1]?.clarification) return
+
+    const now = Date.now()
+    if (now - nudgeStore().lastAt < NUDGE_MIN_GAP_MS) return
+    const nudge = pickNudge(nudgeInputRef.current, nudgeStore().said)
+    if (!nudge) return
+
+    nudgeInFlightRef.current = true
+    const profileId = profile.id
+    void (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('chat_messages')
+          .insert({ profile_id: profileId, role: 'assistant', content: nudge.text, status: 'complete' })
+          .select('id')
+          .maybeSingle()
+        if (error || !data?.id) {
+          // The coach stays silent rather than showing a message that would
+          // vanish on the next reload and would never light the button. The
+          // keys stay UNBURNT, so nothing is lost — it is said next time. Only
+          // the quiet period is started, so a database refusing writes is not
+          // retried on every render.
+          console.error('coach nudge: insert failed -- staying silent rather than posting a message that would vanish on reload', error)
+          writeNudgeStore({ ...nudgeStore(), lastAt: now })
+          return
+        }
+        writeNudgeStore(rememberNudge(nudgeStore(), nudge.keys, now))
+        setMessages(prev => [...prev, {
+          id: data.id as string,
+          role: 'assistant',
+          content: nudge.text,
+          status: 'complete',
+          quickReplies: nudge.chips.length > 0 ? nudge.chips : undefined,
+        }])
+        setQuickRepliesDismissed(false)
+      } finally {
+        nudgeInFlightRef.current = false
+      }
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile.id, historyLoaded, isFirstEverChat, isLoading, proactiveData, feelContext, trainingWeek.loading, planKnown, messages, seenAttention])
 
   // One-shot finalization of the synchronous fallback greeting once we know
   // (a) whether this is a genuinely first-ever conversation (no prior
@@ -759,6 +888,14 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         status: 'complete',
         quickReplies: opener.chips.length > 0 ? opener.chips : undefined,
       }])
+      // The opener has now said its one thing, so coach-nudge.ts must not say
+      // it again the moment she replies. Burnt WITHOUT starting the quiet
+      // period: she opened the chat herself, so this bubble is not an
+      // interruption and must not delay one that would be.
+      writeNudgeStore(rememberWithoutSpeaking(
+        nudgeStore(),
+        keysCoveredByOpener(opener.kind, nudgeKeys(nudgeInputRef.current), Boolean(recentPR)),
+      ))
     }
 
     // Wait for what the opener reads — the dashboard aggregate, the feel
@@ -1427,6 +1564,9 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     // amounts, and the day bends around it rather than the other way.
     if (pendingAction.kind === 'propose_custom_meal') return `Here's **${rows[0].after}**, exactly as you have it:`
     if (pendingAction.kind === 'propose_meal_food_add') return `I can add **${rows[0].after}** to your ${rows[0].before}, at the amount you said:`
+    // Asks; never announces. The write happens on the tap, so the wording has
+    // to be a question right up until it does.
+    if (pendingAction.kind === 'propose_meal_log') return `Log this to your ${rows[0].before}?`
     // The rationale IS the offer here ("that's all five I've got — want me to
     // find new ones?"), so repeating a headline above it would say it twice.
     if (pendingAction.kind === 'propose_meal_pool_refresh') return pendingAction.diff.rationale ?? 'Want me to find you some new options?'
@@ -2774,6 +2914,27 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
           if (addition.ok) built = { scopeKey: addition.scopeKey, preconditions: addition.preconditions, payload: addition.payload as unknown as Record<string, unknown>, diff: addition.diff }
           else refusal = addition.reason
         }
+      } else if (result.proposal.kind === 'propose_meal_log' && result.proposal.rawArgs) {
+        // "I just had greek yoghurt with honey." Ashley's ruling, 7 Sep 2026:
+        // ask first, log on confirm. Nothing is written until the tap.
+        //
+        // The macros are NOT recomputed here. They came from the verified food
+        // database inside the edge function, and the coach has already quoted
+        // them in the turn before this card; recomputing would give the card a
+        // second opinion about one meal, which is the disagreement this repo
+        // keeps finding. buildMealLogProposal verifies what arrived — a real
+        // slot, real numbers, and the same coverage floor every generated meal
+        // has to pass — and refuses rather than logging a number too low to
+        // trust.
+        const logged = buildMealLogProposal({
+          rawArgs: result.proposal.rawArgs,
+          computed: (result.proposal as { computed?: MealLogComputed }).computed ?? { kcal: NaN, protein: NaN, carbs: NaN, fat: NaN },
+          assumptions: (result.proposal as { assumptions?: string[] }).assumptions ?? [],
+          profileId: profile.id,
+          todayDate: getSessionDateContext(profile.id).date,
+        })
+        if (logged.ok) built = { scopeKey: logged.scopeKey, preconditions: logged.preconditions, payload: logged.payload as unknown as Record<string, unknown>, diff: logged.diff }
+        else refusal = logged.reason
       } else if (result.proposal.kind === 'propose_meal_food_add' && result.proposal.rawArgs) {
         // A food JOINING a meal already on the plan. Ashley, 3 Sep 2026:
         // "add a banana to my breakfast" was routed to propose_meal_addition,
@@ -3364,6 +3525,40 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       rows = ok ? result.added.map(n => ({ label: slot, detail: n })) : []
       // No undo: generating already cost a model call, and undoing would only
       // delete options the user can ignore for free.
+    } else if (row.kind === 'propose_meal_log') {
+      // THE WHOLE WRITE, and it is one call. recordMealEvent queues the event
+      // locally, returns synchronously with its client_id, notifies every
+      // meal-store listener so the Nutrition tab's numbers move before any
+      // promise settles, and syncs in the background — offline included. That
+      // is exactly why the edge function does not write this itself: a
+      // server-side insert would land somewhere she cannot see, would not
+      // survive being offline, and would have no undo.
+      const payload = row.payload as unknown as MealLogPayload
+      const event = recordMealEvent({
+        profileId: payload.profileId,
+        date: payload.date,
+        slot: payload.slot,
+        eventType: 'confirmed',
+        mealName: payload.mealName,
+        macros: payload.macros,
+        source: 'chat',
+      })
+      receipt = { landed: [`${payload.slot}: ${payload.mealName} — ${payload.macros.kcal} kcal`], failed: [] }
+      title = 'Logged'
+      rows = [{ label: payload.slot, detail: `${payload.mealName} · ${payload.macros.kcal} kcal` }]
+      void event
+      // NO UNDO ON THIS RECEIPT, deliberately and for now. The confirmation
+      // card IS the safety mechanism Ashley asked for — nothing is written
+      // until she taps — and the ledger's undo already exists where meals are
+      // managed: the Nutrition tab voids the event (meal_events is append-only,
+      // so undo is a void and never a delete). Wiring a second undo path
+      // through the receipt's single opaque token is real work and belongs in
+      // its own change, not bolted onto this one half-done.
+      //
+      // recordMealEvent has already notified every meal-store listener, and
+      // this component subscribes, so the coach's own view of the day updates
+      // without a refetch.
+      bumpOwnWrites()
     } else if (row.kind === 'propose_meal_addition' || row.kind === 'propose_custom_meal' || row.kind === 'propose_meal_food_add') {
       // ONE executor for all three, on purpose: a custom meal IS an addition once
       // verified — same pool insert, same pick, same rollback — the only
