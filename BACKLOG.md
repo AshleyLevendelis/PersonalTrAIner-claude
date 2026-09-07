@@ -2,6 +2,54 @@
 
 Newest first. One line each.
 
+- [x] **THE COACH SPEAKS FIRST, MID-CONVERSATION** — Ashley, 7 Sep 2026: *"i
+  want the chat to start conversation unprompted based off events such as a
+  completed workout or upcoming workout, etc."*
+  **What was actually missing.** The coach already had one way to speak first —
+  `coach-opener.ts` — but that effect refuses to run unless the conversation is
+  exactly one untouched greeting (`ChatAssistant.tsx:711`), and
+  `loadChatHistory` restores the last twenty messages with no date filter. So
+  from the SECOND conversation onward the chat opened on the old thread and the
+  coach added nothing new, ever, until the chat was cleared. The chat button
+  could glow (`chat-unread.ts`) with no message behind it.
+  **Two rulings, both hers.** Where: **in the app**, not the lock screen —
+  phone notifications were offered with their real cost (a server that decides
+  and sends; the app installed to her home screen before iOS allows it at all)
+  and declined; the app has no notification capability of any kind today, only
+  the offline-cache service worker at `src/main.tsx:45`. How chatty:
+  **training + wins** — a finished session, a missed day, today's session, a
+  new PR and a streak milestone; NOT the evening protein/water shortfalls or
+  the stale weigh-in `accountability.ts` can already produce, for the reason
+  `BottomTabBar.tsx` already records in its own words.
+  **The mechanism.** `coach-nudge.ts` — pure, at most one message, ranked by
+  how actionable it is now. The key is the EVENT (`pr:Bench Press:2026-09-07:80`),
+  not its kind, so a PR is congratulated once and a second PR on a different
+  lift is its own message; an outranked event is delayed, never lost. A PR from
+  the session being asked about folds into the how-did-it-feel question and
+  burns both keys. The message is WRITTEN TO `chat_messages`, which is the
+  load-bearing decision: a real id means `chat-unread.ts` lights the button AND
+  blocks the next nudge until she has seen it — one mechanism, both jobs. Plus
+  a persisted 30-minute quiet period, and the opener burning the keys it covered
+  so the two can never say the same thing twice.
+  **Verified live**, not by construction: the real `ChatAssistant` in App.tsx's
+  real wrapper, a 14-message thread and a finished-but-unreviewed session, at
+  390x844 — one message added, on screen and scrolled into view, one row in
+  `chat_messages`, the chat button glowing while Home is the active tab, and
+  still exactly one five seconds later (`verify:coach-speaks-first`). Gate
+  `test:coach-nudge`; 19 mutations applied, all caught, one after strengthening
+  a check that was passing on an input the guard could not see.
+  **Two fixes to the browser double fell out of this** and are worth naming
+  because they were silently limiting every harness run before it:
+  `fake-supabase.ts` ignored `{ count: 'exact' }`, so `isFirstEverChat` read
+  true for a seeded conversation and anything gated on "they have talked to the
+  coach before" was unreachable; and it had no `.not()`, so
+  `loadFeelContext`'s answered-sessions query threw into a `.catch(() => {})`
+  and `feelContext` stayed null forever.
+  **Not built, stated:** phone notifications; chips surviving a reload
+  (`quickReplies` is not a `chat_messages` column — the message keeps its words
+  and loses its buttons, exactly as the opener does today).
+  Plan: `docs/plans/the-coach-speaks-first.md`.
+
 - [x] **TWO TODAYS, AND A FINISHED DAY OFFERING TO START** — Ashley, 7 Sep
   2026, two screenshots a minute apart. Exercise tab at 15:30: "TODAY ·
   MONDAY", every exercise struck through and ticked, and a full-width "Start

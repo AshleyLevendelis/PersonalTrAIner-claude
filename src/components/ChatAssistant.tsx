@@ -11,7 +11,7 @@ import { getAppNow, getSessionDateContext, getLocalDateString } from '@/lib/dev-
 import { supabase } from '@/lib/supabase'
 import { getRecentLogs, formatLogsForAI, getRecentCardioLogs, formatCardioLogsForAI } from '@/lib/daily-tracking'
 import { saveChatCache, loadChatCache, clearChatCache } from '@/lib/chat-cache'
-import { attentionReasons, nextSeenAttention, hasUnseenAttention, loadSeenAttention, saveSeenAttention } from '@/lib/chat-unread'
+import { attentionReasons, nextSeenAttention, hasUnseenAttention, hasUnreadCoachMessage, loadSeenAttention, saveSeenAttention } from '@/lib/chat-unread'
 import { swapPoolMeal, setMealPick, recordMealEvent, type MealSlotName } from '@/lib/meal-store'
 import { getExerciseEntry } from '@/lib/exercise-db'
 import { createPendingAction, claimPendingAction, declinePendingAction, markExecuting, resolvePendingAction, getPendingAction, expireOldPendingActions, isWithinUndoWindow, type PendingActionReceipt } from '@/lib/pending-actions-store'
@@ -69,6 +69,11 @@ import { takeChatPrefill } from '@/lib/chat-prefill-store'
 import { loadFeelContext, buildFeelBrief, feelRun, recordSessionFeel, type FeelContext } from '@/lib/session-feel'
 import { useTrainingWeek } from '@/hooks/useTrainingWeek'
 import { pickOpener, missedYesterdayFrom, type Opener } from '@/lib/coach-opener'
+import {
+  pickNudge, nudgeKeys, keysCoveredByOpener, loadNudgeStore, saveNudgeStore,
+  rememberNudge, rememberWithoutSpeaking, NUDGE_MIN_GAP_MS,
+  type NudgeInput, type NudgeStore,
+} from '@/lib/coach-nudge'
 
 const ACTION_TAG_RE = /\[ACTION:\s*.*?\]/gi
 const QUICK_REPLIES_RE = /\[QUICK_REPLIES:\s*(.*?)\]/gi
@@ -629,10 +634,15 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     ? null
     : missedYesterdayFrom(trainingWeek.days, yesterdayDate, liveWeekDays)
 
+  // Today's session, and how it is named, hoisted out of composeOpener so the
+  // opener (the first bubble) and coach-nudge.ts (everything after it) describe
+  // the same day in the same words. Two copies of this lookup is exactly how
+  // the two mechanisms would start disagreeing about what today is.
+  const todayPlan = liveWeekDays.find(d => d.day === activeSession.dayName && d.exercises.length > 0)
+  const movementsOf = (d: WorkoutDay) => d.exercises.map(e => e.name).slice(0, 3).join(', ') + (d.exercises.length > 3 ? '...' : '')
+
   const composeOpener = (): Opener => {
     const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-    const todayPlan = liveWeekDays.find(d => d.day === activeSession.dayName && d.exercises.length > 0)
-    const movementsOf = (d: WorkoutDay) => d.exercises.map(e => e.name).slice(0, 3).join(', ') + (d.exercises.length > 3 ? '...' : '')
     // The next scheduled session after today, up to six days out — named
     // "tomorrow" when it is, otherwise by its day.
     let tomorrowSession: Opener extends never ? never : { dayName: string; focus: string; lead: string | null } | null = null
@@ -658,6 +668,51 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       todayLogged: activeSession.logs.length > 0,
       tomorrowSession,
     })
+  }
+
+  // ---------------------------------------------------------------------------
+  // THE COACH SPEAKING FIRST, MID-CONVERSATION (coach-nudge.ts).
+  //
+  // The opener above only ever runs on an EMPTY chat — one untouched greeting,
+  // nothing sent. Once there is a conversation, loadChatHistory restores it and
+  // until 7 Sep 2026 the coach added nothing new to it, ever. Ashley: "i want
+  // the chat to start conversation unprompted based off events such as a
+  // completed workout or upcoming workout, etc."
+  //
+  // Same inputs as the opener, deliberately: the two must never disagree about
+  // what happened. What differs is only WHERE the sentence goes.
+  // ---------------------------------------------------------------------------
+  const nudgeInput: NudgeInput = {
+    today: activeSession.date,
+    hour: getAppNow(profile.id).getHours(),
+    cutoffHour: sessionCutoffHour(profile.preferred_time),
+    planKnown,
+    awaitingFeel: feelContext?.awaiting
+      ? { date: feelContext.awaiting.date, day: feelContext.awaiting.day, isToday: feelContext.awaiting.date === activeSession.date }
+      : null,
+    missedYesterday: missedYesterday ? { date: yesterdayDate, ...missedYesterday } : null,
+    recentPR: proactiveData?.recentPRs[0] ?? null,
+    streak: proactiveData?.streak ?? 0,
+    todaySession: todayPlan ? { focus: todayPlan.focus, movements: movementsOf(todayPlan) } : null,
+    todayLogged: activeSession.logs.length > 0,
+  }
+  // A ref as well as the value, because the opener finalises from inside a
+  // setTimeout: the closure it captured could be several data arrivals old by
+  // the time it burns the keys it covered, and burning the wrong key is a
+  // message said twice or never.
+  const nudgeInputRef = useRef(nudgeInput)
+  nudgeInputRef.current = nudgeInput
+
+  const nudgeStoreRef = useRef<NudgeStore | null>(null)
+  const nudgeStore = (): NudgeStore => {
+    if (nudgeStoreRef.current == null) {
+      nudgeStoreRef.current = profile.id ? loadNudgeStore(profile.id) : { said: [], lastAt: 0 }
+    }
+    return nudgeStoreRef.current
+  }
+  const writeNudgeStore = (next: NudgeStore) => {
+    nudgeStoreRef.current = next
+    if (profile.id) saveNudgeStore(profile.id, next)
   }
 
   // The indicator on the chat tab. THREE reasons now, not two: the same two
@@ -692,6 +747,79 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     onAttentionChange?.(hasAttention)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasAttention])
+
+  // THE UNPROMPTED MESSAGE ITSELF.
+  //
+  // Written to chat_messages rather than composed in memory like the opener,
+  // and that is the load-bearing decision here. A row means a real id, which
+  // means chat-unread.ts counts it as an unread coach reply and lights the
+  // button — AND that the next one is blocked until she has seen it. One
+  // mechanism does both jobs, so there is no second rule about how often the
+  // coach may speak that could drift out of step with the indicator.
+  //
+  // The five guards, each for its own reason:
+  //   - a brand-new account gets the first-run introduction and nothing else;
+  //   - a reply in flight must not be interleaved with;
+  //   - unlike the opener, NOTHING IS ON SCREEN WAITING for this, so it waits
+  //     for the real data instead of guessing on a 2.5s deadline;
+  //   - a conversation that is exactly one bubble with no database id IS the
+  //     opener, which has already said its one thing;
+  //   - and never twice unanswered.
+  const nudgeInFlightRef = useRef(false)
+  useEffect(() => {
+    if (!profile.id || nudgeInFlightRef.current) return
+    if (!historyLoaded || isFirstEverChat !== false || isLoading) return
+    if (!proactiveData || !feelContext || trainingWeek.loading || !planKnown) return
+    if (messages.length === 0) return
+    if (messages.length === 1 && !messages[0].id) return
+    if (hasUnreadCoachMessage(messages, seenAttention)) return
+    // NEVER OVER A QUESTION SHE IS IN THE MIDDLE OF ANSWERING. hasUnreadCoachMessage
+    // covers the case where she has not looked yet; this covers the case where she
+    // has — a proposal card open for confirmation, or a clarification waiting on a
+    // choice. Speaking under either buries the thing that needs an answer and moves
+    // the quick replies onto a different question.
+    if (messages.some(m => m.pendingAction?.status === 'pending')) return
+    if (messages[messages.length - 1]?.clarification) return
+
+    const now = Date.now()
+    if (now - nudgeStore().lastAt < NUDGE_MIN_GAP_MS) return
+    const nudge = pickNudge(nudgeInputRef.current, nudgeStore().said)
+    if (!nudge) return
+
+    nudgeInFlightRef.current = true
+    const profileId = profile.id
+    void (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('chat_messages')
+          .insert({ profile_id: profileId, role: 'assistant', content: nudge.text, status: 'complete' })
+          .select('id')
+          .maybeSingle()
+        if (error || !data?.id) {
+          // The coach stays silent rather than showing a message that would
+          // vanish on the next reload and would never light the button. The
+          // keys stay UNBURNT, so nothing is lost — it is said next time. Only
+          // the quiet period is started, so a database refusing writes is not
+          // retried on every render.
+          console.error('coach nudge: insert failed -- staying silent rather than posting a message that would vanish on reload', error)
+          writeNudgeStore({ ...nudgeStore(), lastAt: now })
+          return
+        }
+        writeNudgeStore(rememberNudge(nudgeStore(), nudge.keys, now))
+        setMessages(prev => [...prev, {
+          id: data.id as string,
+          role: 'assistant',
+          content: nudge.text,
+          status: 'complete',
+          quickReplies: nudge.chips.length > 0 ? nudge.chips : undefined,
+        }])
+        setQuickRepliesDismissed(false)
+      } finally {
+        nudgeInFlightRef.current = false
+      }
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile.id, historyLoaded, isFirstEverChat, isLoading, proactiveData, feelContext, trainingWeek.loading, planKnown, messages, seenAttention])
 
   // One-shot finalization of the synchronous fallback greeting once we know
   // (a) whether this is a genuinely first-ever conversation (no prior
@@ -760,6 +888,14 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         status: 'complete',
         quickReplies: opener.chips.length > 0 ? opener.chips : undefined,
       }])
+      // The opener has now said its one thing, so coach-nudge.ts must not say
+      // it again the moment she replies. Burnt WITHOUT starting the quiet
+      // period: she opened the chat herself, so this bubble is not an
+      // interruption and must not delay one that would be.
+      writeNudgeStore(rememberWithoutSpeaking(
+        nudgeStore(),
+        keysCoveredByOpener(opener.kind, nudgeKeys(nudgeInputRef.current), Boolean(recentPR)),
+      ))
     }
 
     // Wait for what the opener reads — the dashboard aggregate, the feel

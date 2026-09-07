@@ -90,6 +90,26 @@ export function attentionReasons(input: {
   ].filter(Boolean).join('|')
 }
 
+/**
+ * True when the last thing in the transcript is a coach message the trainee has
+ * not seen yet.
+ *
+ * Added 7 Sep 2026 for coach-nudge.ts, which needs exactly one guarantee before
+ * it speaks unprompted: DON'T SPEAK TWICE UNANSWERED. Because a nudge is
+ * written to chat_messages it carries a real id, so it becomes the newest coach
+ * message by the same rule everything else here uses — and the next nudge is
+ * blocked until she has seen it. One mechanism does both jobs.
+ *
+ * Distinct from hasUnseenAttention, which is true for a missed day or an
+ * unreviewed session as well. Those are reasons to LIGHT THE BUTTON; only an
+ * unread reply is a reason for the coach to keep quiet.
+ */
+export function hasUnreadCoachMessage(messages: ChatMessage[], seen: string | null): boolean {
+  const id = newestCoachMessageId(messages)
+  if (!id || seen === null) return false
+  return !split(seen).includes(`${UNREAD}${id}`)
+}
+
 function split(reasons: string): string[] {
   return reasons ? reasons.split('|').filter(Boolean) : []
 }

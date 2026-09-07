@@ -57,6 +57,7 @@ export function makeFakeSupabase(db: Db) {
     let onConflict: string[] | null = null
     let single = false
     let limitN: number | null = null
+    let wantCount = false
     const filters: ((r: Row) => boolean)[] = []
     const orders: [string, boolean][] = []
 
@@ -91,12 +92,23 @@ export function makeFakeSupabase(db: Db) {
       for (const [col, asc] of [...orders].reverse()) {
         rows = [...rows].sort((a, b) => (asc ? 1 : -1) * cmp(a[col], b[col]))
       }
+      // The MATCHING row count, before the limit — which is what
+      // `{ count: 'exact' }` means and what the fake silently omitted until
+      // 7 Sep 2026. loadChatHistory reads it to decide whether this is a
+      // brand-new account, so an absent count made every seeded conversation
+      // look like a first-ever chat, and every feature gated on "they have
+      // talked to the coach before" was unreachable in the harness.
+      const total = rows.length
       if (limitN != null) rows = rows.slice(0, limitN)
-      return { data: single ? (rows[0] ?? null) : rows.map(r => ({ ...r })), error: null }
+      return {
+        data: single ? (rows[0] ?? null) : rows.map(r => ({ ...r })),
+        error: null,
+        ...(wantCount ? { count: total } : {}),
+      }
     }
 
     const api: Record<string, unknown> = {
-      select: () => api,
+      select: (_cols?: string, opts?: { count?: string }) => { if (opts?.count) wantCount = true; return api },
       insert: (rows: Row | Row[]) => { op = 'insert'; payload = Array.isArray(rows) ? rows : [rows]; return api },
       upsert: (rows: Row | Row[], opts?: { onConflict?: string }) => {
         op = 'upsert'; payload = Array.isArray(rows) ? rows : [rows]
@@ -112,6 +124,15 @@ export function makeFakeSupabase(db: Db) {
       lt: (c: string, v: unknown) => { filters.push(r => cmp(r[c], v) < 0); return api },
       lte: (c: string, v: unknown) => { filters.push(r => cmp(r[c], v) <= 0); return api },
       is: (c: string, v: unknown) => { filters.push(r => (r[c] ?? null) === v); return api },
+      // `.not('felt', 'is', null)` — session-feel.ts's answered-sessions query.
+      // Absent until 7 Sep 2026, so that query threw, loadFeelContext's
+      // .catch(() => {}) swallowed it, and feelContext stayed null forever:
+      // every screen that waits for it (the opener, and now coach-nudge.ts)
+      // sat waiting on a fake that could not answer.
+      not: (c: string, op: string, v: unknown) => {
+        filters.push(r => (op === 'is' ? (r[c] ?? null) !== v : r[c] !== v))
+        return api
+      },
       in: (c: string, vs: unknown[]) => { filters.push(r => vs.includes(r[c])); return api },
       match: (obj: Row) => { for (const [c, v] of Object.entries(obj)) filters.push(r => r[c] === v); return api },
       order: (c: string, opts?: { ascending?: boolean }) => { orders.push([c, opts?.ascending !== false]); return api },

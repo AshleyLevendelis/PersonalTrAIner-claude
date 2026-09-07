@@ -82,21 +82,61 @@ const seeded = Array.from({ length: 14 }, (_, i) => ({
 // that were a finding about the app.
 localStorage.setItem(`chat_history_cache_${PROFILE_ID}`, JSON.stringify(seeded))
 
+// ---------------------------------------------------------------------------
+// ?seed=nudge — THE COACH SPEAKING FIRST INTO AN ONGOING THREAD.
+//
+// Off by default, so verify:chat-shell measures exactly what it measured
+// before. On, it supplies the three facts coach-nudge.ts needs and that the
+// default fixture deliberately lacks:
+//
+//   - chat_messages ROWS, not just the localStorage mirror. isFirstEverChat is
+//     set from the row COUNT, and a nudge refuses to speak to someone who has
+//     never had a conversation. An empty table reads as a brand-new account.
+//   - a finished session with no `felt` — the event itself.
+//   - the attention indicator wired to the tab bar, with the chat NOT on
+//     screen, which is the situation the whole feature is for: she is
+//     somewhere else in the app and the coach has something to say.
+// ---------------------------------------------------------------------------
+const SEED_NUDGE = new URLSearchParams(location.search).get('seed') === 'nudge'
+const todayStr = new Date().toISOString().slice(0, 10)
+const seededRows = SEED_NUDGE
+  ? seeded.map((m, i) => ({
+      id: `seed-${i}`,
+      profile_id: PROFILE_ID,
+      role: m.role,
+      content: m.content,
+      status: 'complete',
+      created_at: new Date(Date.now() - (seeded.length - i) * 60_000).toISOString(),
+    }))
+  : []
+const finishedSession = SEED_NUDGE
+  ? [{
+      id: 'ws-today', profile_id: PROFILE_ID, date: todayStr,
+      day: mesocycle[0].days.find(d => d.day === DAYS[todayIdx])?.focus ?? 'Session',
+      is_completed: true, felt: null,
+    }]
+  : []
+
 const db: Db = {
   fitness_profiles: [{ ...profile, id: PROFILE_ID }],
-  daily_metrics: [], exercise_set_logs: [], workout_sessions: [], cardio_logs: [],
+  daily_metrics: [], exercise_set_logs: [], workout_sessions: finishedSession, cardio_logs: [],
   daily_steps: [], meal_events: [], meal_plan_picks: [], meal_plan_slots: [],
   favorite_meals: [], grocery_items: [], load_suggestions: [], pending_actions: [],
   plan_adaptations: [], user_facts: [], user_context_facts: [], user_goals: [],
-  chat_messages: [], exercise_plans: [], mesocycle_weeks: [],
+  chat_messages: seededRows, exercise_plans: [], mesocycle_weeks: [],
   daily_nutrition_targets: [], workout_exercises: [], weight_basis_offers: [],
 }
 setSupabaseClient(makeFakeSupabase(db) as never)
+// The driver reads rows back to prove the nudge REACHED the database rather
+// than only React state — a message that exists in neither survives a reload
+// nor lights the chat button.
+;(window as never as Record<string, unknown>).__fakeDb = db
 
 const noop = () => {}
 
 function Harness() {
   const [, setTick] = useState(0)
+  const [chatAttention, setChatAttention] = useState(false)
   return (
     <AppearanceProvider>
     <ActiveSessionProvider profileId={PROFILE_ID} planCreatedAt={profile.created_at} totalWeeks={mesocycle.length} refreshToken={0}>
@@ -127,10 +167,12 @@ function Harness() {
               memoryContextFacts={[]}
               onMemoryChanged={noop}
               groceryItems={[]}
+              onAttentionChange={setChatAttention}
+              chatVisible={!SEED_NUDGE}
             />
           </div>
         </main>
-        <BottomTabBar activeTab="chat" onTabChange={noop} />
+        <BottomTabBar activeTab={SEED_NUDGE ? 'dashboard' : 'chat'} onTabChange={noop} chatAttention={chatAttention && SEED_NUDGE} />
       </div>
     </BottomDockHeightProvider>
     </TimersProvider>
