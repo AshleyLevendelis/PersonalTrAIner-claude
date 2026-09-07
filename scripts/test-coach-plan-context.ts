@@ -263,6 +263,132 @@ console.log('\n6. The prompt teaches every form the builder can emit')
   // test:coach-sees-technique.
   check('the technique block the builder now emits is taught too',
     /HOW TO PERFORM THESE/.test(fn) && /never contradict them/i.test(fn))
+  // The instruction that produced "today's bench and shoulder press" about a
+  // session two days out. The builder now states the answer; the prompt must
+  // send the model to it rather than asking for the join again.
+  check('the prompt no longer asks the model to work out which day is which',
+    !/Cross-reference this with the user's exercise plan/.test(fn))
+  check('...and points at the tagged rows instead',
+    /is NOT today's, however well it fits/.test(fn))
+}
+
+// ---------------------------------------------------------------------------
+// WHICH DAY IT IS — answered, not left for the model to cross-reference.
+//
+// Ashley, 7 Sep 2026, 6:33 PM on a Monday. "Let me know how today's bench and
+// shoulder press go" — that session is Tuesday's. Then, asked outright: "Today
+// is Monday, so you've got Full Body Power... are you planning to head in for
+// that session this morning?" — of a session already finished, in the evening.
+//
+// The week reached the coach as seven unmarked rows and the prompt said
+// "Today is Monday. Cross-reference this with the user's exercise plan below."
+// Every fact was in the app; the join was the model's job, every turn.
+// ---------------------------------------------------------------------------
+console.log('\n7. WHICH DAY IT IS')
+{
+  const { buildTodayHeader, buildCoachExerciseSummary: build } = await import('../src/lib/chat-plan-context')
+  type Today = Parameters<typeof buildTodayHeader>[0]
+
+  const lift = (name: string) => ({ name, sets: 3, reps: '8-10', rest: '2 min' }) as unknown as Exercise
+  const week = [
+    { day: 'Monday', focus: 'Full Body Power', exercises: [lift('Trap Bar Deadlifts')] },
+    { day: 'Tuesday', focus: 'Push & Press', exercises: [lift('Barbell Bench Press')] },
+    { day: 'Thursday', focus: 'Pull & Hinge', exercises: [lift('Deadlifts')] },
+  ] as never
+
+  /** Her case exactly: Monday evening, the Monday session closed out. */
+  const hers: Today = {
+    dayName: 'Monday', hour: 18, clock: '6:33 PM',
+    focus: 'Full Body Power', isGymSession: true,
+    setsLogged: 3, setsPlanned: 3, finished: true,
+    next: { dayName: 'Tuesday', focus: 'Push & Press', isTomorrow: true },
+  }
+
+  const summary = build({ days: week, today: hers })
+  check('today is named outright, not implied by a day list', /Today's session is Monday's Full Body Power/.test(summary), summary.slice(0, 200))
+  check('...and said to be done, so it is not offered as something to head in for',
+    /ALREADY DONE/.test(summary), summary.slice(0, 200))
+  check('the row for today carries the tag', /^Monday \(TODAY\): Full Body Power/m.test(summary))
+  check('...and exactly one row does', (summary.match(/\(TODAY\)/g) ?? []).length === 1)
+  check('tomorrow is tagged too, so "today\'s bench" cannot be Tuesday\'s',
+    /^Tuesday \(tomorrow\): Push & Press/m.test(summary))
+  check('...and exactly one row is tomorrow', (summary.match(/\(tomorrow\)/g) ?? []).length === 1)
+  check('a day that is neither is left unmarked', /^Thursday: Pull & Hinge/m.test(summary))
+
+  // "this morning", at 6:33 PM. The clock alone was already in the prompt and
+  // was not enough; the part of the day is now said in words.
+  check('the evening is called the evening', /It is Monday evening \(6:33 PM\)\./.test(summary), summary.slice(0, 60))
+  check('the morning is called the morning', /Monday morning/.test(buildTodayHeader({ ...hers, hour: 8, clock: '8:05 AM' })))
+  check('the afternoon is called the afternoon', /Monday afternoon/.test(buildTodayHeader({ ...hers, hour: 13, clock: '1:10 PM' })))
+  check('midday is afternoon, not morning', /afternoon/.test(buildTodayHeader({ ...hers, hour: 12, clock: '12:01 PM' })))
+  check('one minute to midday is still morning', /morning/.test(buildTodayHeader({ ...hers, hour: 11, clock: '11:59 AM' })))
+
+  // DONE means the session was CLOSED OUT, not that the set count happens to
+  // match. A trainee who logs every set and never finishes the session is
+  // mid-workout, and telling the coach otherwise is the same class of error.
+  const allSetsButOpen = buildTodayHeader({ ...hers, finished: false })
+  check('every set logged but the session still open is not "done"', !/ALREADY DONE/.test(allSetsButOpen), allSetsButOpen)
+  check('part-done says how far', /PART-DONE: 1 of 3 sets logged/.test(buildTodayHeader({ ...hers, setsLogged: 1, finished: false })))
+  check('nothing logged says so', /NOT LOGGED yet/.test(buildTodayHeader({ ...hers, setsLogged: 0, finished: false })))
+
+  const rest = buildTodayHeader({ ...hers, dayName: 'Wednesday', focus: null, isGymSession: false, setsLogged: 0, setsPlanned: 0, finished: false })
+  check('a rest day never claims a session', /REST DAY/.test(rest) && !/Today's session is/.test(rest), rest)
+  const walk = buildTodayHeader({ ...hers, dayName: 'Wednesday', focus: 'Recovery', isGymSession: false, setsLogged: 0, setsPlanned: 0, finished: false })
+  check('a walk day is not called a rest day — the tagged row below would contradict it',
+    !/REST DAY/.test(walk) && /Recovery/.test(walk), walk)
+  // ...and is not described as a gym session either. The first version of this
+  // check passed with the whole non-gym branch deleted, because a walk day then
+  // fell through to "Today's session is Wednesday's Recovery, NOT LOGGED yet" —
+  // which mentions Recovery and never says rest, and is wrong in both
+  // directions: there are no sets to log, and nothing is outstanding.
+  check('...nor as a session with sets outstanding',
+    /not a gym session/.test(walk) && !/NOT LOGGED|PART-DONE|Today's session is/.test(walk), walk)
+
+  check('the next session is named', /next session after today is tomorrow's Push & Press/.test(summary))
+  check('...by day name when it is not tomorrow',
+    /next session after today is Thursday's Pull & Hinge/.test(buildTodayHeader({ ...hers, next: { dayName: 'Thursday', focus: 'Pull & Hinge', isTomorrow: false } })))
+  check('...and left out entirely when there is none', !/next session/.test(buildTodayHeader({ ...hers, next: null })))
+
+  // The tomorrow tag has to wrap the week, or a Saturday says nothing is next.
+  const satWeek = [
+    { day: 'Saturday', focus: 'Full Body', exercises: [lift('Squats')] },
+    { day: 'Sunday', focus: 'Conditioning', exercises: [lift('Rower')] },
+  ] as never
+  const sat = build({ days: satWeek, today: { ...hers, dayName: 'Saturday', focus: 'Full Body' } })
+  check('Saturday\'s tomorrow is Sunday', /^Sunday \(tomorrow\)/m.test(sat), sat)
+
+  // FACTS, NOT INSTRUCTIONS. This block is context; the moment it starts
+  // telling the coach what to say it becomes a second, invisible prompt that
+  // nothing reviews.
+  const everyShape = [summary, allSetsButOpen, rest, walk, buildTodayHeader({ ...hers, setsLogged: 0, finished: false })]
+  for (const shape of everyShape) {
+    const header = shape.split('\n')[0]
+    check(`states facts rather than directing the coach: ${header.slice(0, 40)}...`,
+      !/\b(do not|don't|you should|make sure|tell them|ask them|remind them|never say)\b/i.test(header), header)
+  }
+
+  // The empty-plan contract, which a prepended header is exactly the shape of
+  // change that breaks. The prompt has a rule keyed on this section being
+  // empty; a header here would make the coach think it had a plan it lacks.
+  check('an empty plan is still exactly the empty string', build({ days: [], today: hers }) === '')
+
+  // The wiring: the app must send the closed-out status, and must not walk the
+  // week twice to find the next session.
+  {
+    const { readFileSync } = await import('fs')
+    const { join, dirname } = await import('path')
+    const { fileURLToPath } = await import('url')
+    const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
+    const chat = readFileSync(join(ROOT, 'src/components/ChatAssistant.tsx'), 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+    check('the coach is told which day it is', /buildCoachExerciseSummary\(\{[\s\S]{0,400}?today: \{/.test(chat))
+    check('...from the same clock every write uses', /hour: nowForToday\.getHours\(\)/.test(chat))
+    check('...and "done" is the session status, not the set count',
+      /finished: activeSession\.status === 'finished'/.test(chat))
+    check('one walk of the week finds the next session, shared with the opener',
+      (chat.match(/const nextSessionAfterToday =/g) ?? []).length === 1 &&
+      (chat.match(/nextSessionAfterToday\(\)/g) ?? []).length >= 2)
+  }
 }
 
 if (failures > 0) { console.error(`\n${failures} check(s) failed`); process.exit(1) }

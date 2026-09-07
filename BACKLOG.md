@@ -2,6 +2,46 @@
 
 Newest first. One line each.
 
+- [x] **"TODAY'S BENCH AND SHOULDER PRESS" — ON A DAY THAT WAS NEITHER** —
+  Ashley, 7 Sep 2026, 6:33 PM on a Monday. The coach said *"let me know how
+  today's bench and shoulder press go"* (that session is Tuesday's), then, asked
+  outright, said *"today is Monday, so you've got Full Body Power"* and in the
+  same breath *"are you planning to head in for that session this morning?"* —
+  of a session already finished, in the evening. It corrected itself only when
+  she said "You said today".
+  **The cause is a join nobody did.** The week reached the coach as seven
+  unmarked day rows, and the prompt asked the model to do the matching itself:
+  *"Today is Monday. Cross-reference this with the user's exercise plan below."*
+  Every fact was already in the app — which day, which session, whether it was
+  logged, when the next one is — and none of it was joined up before being sent.
+  A model that gets that join right nine times in ten still gets it wrong in
+  front of the person whose training it is.
+  **Fixed by stating it.** `buildCoachExerciseSummary` now opens with the
+  answer — *"It is Monday evening (6:33 PM). Today's session is Monday's Full
+  Body Power, and it is ALREADY DONE — finished and logged. There is nothing
+  left to train today. The next session after today is tomorrow's Push &
+  Press."* — and every day row is tagged `(TODAY)` or `(tomorrow)`.
+  **Done means the session was CLOSED OUT**, not that the set count happens to
+  match: it reads `activeSession.status === 'finished'`, the same three-valued
+  status the Exercise tab's start button reads, so the coach and that button
+  cannot disagree. The part of the day is now said in words, because the clock
+  string alone was already in the prompt and did not stop "this morning" at
+  6:33 PM.
+  **Inside `exercise_summary` deliberately**, not as a new context field: that
+  field is interpolated verbatim by the DEPLOYED edge function, so this reaches
+  her phone on a frontend push. A new field would have needed a function deploy
+  — the fix would have sat behind the one already waiting.
+  **Facts, not instructions**, and the gate pins it: the moment this block
+  starts telling the coach what to say it becomes a second, invisible prompt
+  that nothing reviews.
+  Also: the opener, the unprompted message and the coach's context now share one
+  walk of the week for "the next session", rather than three copies that could
+  disagree. The prompt's cross-reference instruction is replaced too — that
+  ships only when she runs the chat-gemini deploy.
+  Gate `test:coach-plan-context` §7, 16 mutations all caught (one after
+  strengthening a walk-day check that passed with the whole branch deleted).
+  140/140 gates.
+
 - [x] **THE COACH SPEAKS FIRST, MID-CONVERSATION** — Ashley, 7 Sep 2026: *"i
   want the chat to start conversation unprompted based off events such as a
   completed workout or upcoming workout, etc."*
