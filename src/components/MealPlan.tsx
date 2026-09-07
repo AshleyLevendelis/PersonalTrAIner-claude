@@ -37,7 +37,13 @@ interface MealPlanProps {
   totals: MacroTargets
   targets: MacroTargets | null
   isGenerating: boolean
-  /** Set when a (re)generate call failed or came back empty for one or more slots — the existing plan is always left in place when this fires. */
+  /**
+   * Set when a (re)generate call failed or came back empty for one or more
+   * slots. USUALLY the existing plan is left in place when this fires — but
+   * not on the first background build after onboarding, where there is no
+   * existing plan to preserve. That path writes its own copy accordingly;
+   * don't assume the "your plan is unchanged" framing here.
+   */
   regenerateError?: string | null
   onDismissRegenerateError?: () => void
   /**
@@ -170,22 +176,54 @@ export function MealPlan({
     </InsightBanner>
   )
 
+  // NOTHING TO SHOW YET — two different situations, and telling them apart is
+  // the difference between a screen that is working and one that looks broken.
+  //
+  // Since 6 Sep 2026 onboarding hands the app over BEFORE the meals are built
+  // and finishes them in the background, so this branch is now the normal
+  // first thing a new user sees on this tab. The old copy is wrong twice over
+  // for them: they have just completed onboarding, and "Generate meals" would
+  // fire a second concurrent build of the one already running.
+  //
+  // IT IS KEYED ON `isGenerating`, NOT ON "was this the first build". It was
+  // the narrower thing for one day and that was a mistake with a witness:
+  // Ashley pressed Generate meals on 7 Sep, generation ran for 34 seconds and
+  // wrote thirteen meals — and for all 34 of those seconds this heading still
+  // read "No meal plan generated yet" above a button wearing a small spinner,
+  // because a user-pressed build was not "the first build". She reported the
+  // button as dead. Any build with nothing yet to show says so.
+  //
+  // `data-tour="meals"` is on this branch as well as the populated one below,
+  // and both tags stay in THIS file — the tour gate requires a key to be
+  // tagged in exactly one file, and it is the tour's only anchor for its meals
+  // stop. Without it here, that stop dims the whole screen and points at
+  // nothing whenever the meals are not ready.
   if (activeSlots.length === 0 && emptySlots.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center gap-3 py-16">
+      <div data-tour="meals" className="flex flex-col items-center justify-center gap-3 py-16">
         {unrecognisedBanner || errorBanner}
-        <UtensilsCrossed className="size-8 text-muted-foreground/50" />
-        <p className="text-sm text-muted-foreground">No meal plan generated yet.</p>
-        {unrecognisedBanner ? (
-          <p className="text-xs text-muted-foreground/70">Fix the restriction above, then generate.</p>
+        {isGenerating ? (
+          <>
+            <Loader2 className="size-8 animate-spin text-primary-text" />
+            <p className="text-sm text-muted-foreground">Building your meals…</p>
+            <p className="text-xs text-muted-foreground/70">They arrive one meal at a time — this takes up to a minute.</p>
+          </>
         ) : (
-          <p className="text-xs text-muted-foreground/70">Complete onboarding to generate your meal pools, or regenerate below.</p>
-        )}
-        {!unrecognisedBanner && (
-          <Button size="sm" onClick={onRegenerateAll} disabled={isGenerating} className="mt-2">
-            {isGenerating ? <Loader2 className="size-3.5 animate-spin mr-1.5" /> : <RefreshCw className="size-3.5 mr-1.5" />}
-            Generate meals
-          </Button>
+          <>
+            <UtensilsCrossed className="size-8 text-muted-foreground/50" />
+            <p className="text-sm text-muted-foreground">No meal plan generated yet.</p>
+            {unrecognisedBanner ? (
+              <p className="text-xs text-muted-foreground/70">Fix the restriction above, then generate.</p>
+            ) : (
+              <p className="text-xs text-muted-foreground/70">Complete onboarding to generate your meal pools, or regenerate below.</p>
+            )}
+            {!unrecognisedBanner && (
+              <Button size="sm" onClick={onRegenerateAll} disabled={isGenerating} className="mt-2">
+                {isGenerating ? <Loader2 className="size-3.5 animate-spin mr-1.5" /> : <RefreshCw className="size-3.5 mr-1.5" />}
+                Generate meals
+              </Button>
+            )}
+          </>
         )}
       </div>
     )

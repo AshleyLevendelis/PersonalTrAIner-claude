@@ -2,6 +2,126 @@
 
 Newest first. One line each.
 
+- [x] **A HALF-BUILT MEAL PLAN IS KEPT, AND THE APP SAYS IT IS BUILDING** —
+  Ashley, 7 Sep 2026: an empty Nutrition tab, and "Generate meals" apparently
+  doing nothing. Diagnosed from PRODUCTION (read-only) and the edge-function
+  logs rather than guessed. **Nothing was broken server-side: `generate-meals`
+  returned 200 on every call.** On 6 Sep at 19:31 her onboarding ran two
+  rounds — 14.1s and 8.3s, both producing meals — and the page went away
+  before the third finished. On 7 Sep at 04:43 three rounds ran and thirteen
+  meals were written, the same minute as her screenshot.
+  **The data-loss bug:** `persistPools` ran ONCE, after the whole round loop,
+  so an interrupted build saved nothing. Two successful rounds were discarded.
+  Each round now commits before the next request goes out; only slots that
+  actually grew are rewritten. Ashley's ruling when asked what a partial plan
+  should do: keep what it got.
+  **The feedback bug, and it was mine:** yesterday's "Building your meals…"
+  state was wired to the onboarding build only, so a user-pressed Generate got
+  34 seconds of "No meal plan generated yet" over a spinning icon. It is keyed
+  on any in-flight build now, and the gate pins the branch STRUCTURE after two
+  mutations survived a check that was matching the button's own spinner
+  ternary instead of the branch that chooses.
+  **The silent-read bug:** `getPools` answered a failed read with `{}`, which
+  renders as "No meal plan generated yet" — sending someone whose meals exist
+  to regenerate, via a button that deletes and rewrites the plan they had.
+  `readPools` reports the failure; the restore path says so.
+  `test:meal-roundtrip` case D reproduces the 19:31 interruption exactly and
+  asserts round 1 is on disk before round 2 is requested — a positional
+  property no return value can show. `test:onboarding-handover` §5-§7 re-anchored
+  and extended. **Eleven mutations tried, eleven caught** (two after
+  strengthening). 135 of 135 gates pass.
+  **Not deployed.** Production is still the 6 Sep 17:13 merge; this and the two
+  commits before it are preview-only until Ashley says to deploy.
+
+- [x] **THE APP LOADS WHILE THE MEALS ARE STILL BEING BUILT** — Ashley, on her
+  phone straight after onboarding, looking at a full-screen spinner reading
+  "Building your meal pools…": *"can it not load the tour while the meal plan
+  generates in the background."*
+  It could, and the wait was worse than it looked. By the time that spinner
+  appeared the training plan was already generated AND already written to the
+  database; all that was left was meal generation — up to three sequential
+  edge-function calls against a 45s abort each. The blocking was never
+  designed: the whole-app gate is `!profile`, and `setProfile` simply happened
+  to sit below the meal `await` along with every other commit, including the
+  one that arms the tour.
+  **The handover** now happens the moment the plan is saved. The seven commits
+  became `commitPlan()`, called from both paths — a design review caught that
+  moving them up naively would put them inside `if (data)`, where a profile
+  whose INSERT failed would lose `setProfile` and get bounced back into
+  onboarding with its warning rendered nowhere.
+  **The background build** is guarded twice, both earned: the result is dropped
+  unless the profile it was built for is still on screen (via a ref — that
+  `.then` closes over a render where `profile` is null and stays null, so the
+  obvious guard would never fire), and it merges per slot rather than replacing,
+  because four other things write `mealPools`. A failure now says so instead of
+  a `console.error`, keeping the reached-vs-unreachable split and dropping the
+  "your existing plan is unchanged" wording, which is false on a first build.
+  **The meals area** distinguishes building from empty — the old copy told
+  someone who had just finished onboarding to "complete onboarding", and its
+  button would have fired a second concurrent build.
+  **The tour's meals stop** was pointing at nothing whenever meals were
+  missing: `data-tour="meals"` lived only on MealPlan's populated branch, so the
+  stop dimmed the whole screen. It is on both branches now. Ashley chose to
+  **wait** at that stop rather than skip it or reword it permanently, so it
+  holds with an honest line, bounded at 15s so a slow or failed build can never
+  trap anyone, and Skip is never blocked.
+  `test:onboarding-handover` (new, 5 sections) pins the ordering — the feature
+  IS an ordering, and nothing in the suite renders App, so tsc and the bundler
+  would both accept the old order silently. `test:app-tour` §8 pins the target
+  on every render branch and routes the waiting line through the existing
+  honesty scan. **Fourteen mutations tried, fourteen caught** — one survived
+  first and the check was strengthened rather than the mutation dropped.
+  **Verified in Chromium at 390x844**, walking the real tour through real taps:
+  with empty pools the stop now has a target (358x288) where it previously had
+  none; the held state shows "Building your meals…" spotlit, the honest line,
+  and a disabled "Still cooking…"; after 17s the hold releases to an enabled
+  Next; with meals present the stop shows the real copy over the full list.
+  **Not** browser-verified: the handover instant itself — nothing in the suite
+  completes onboarding in a browser, so that half is pinned by source order,
+  and the building state was reached by forcing the flag rather than by running
+  a real build.
+
+- [x] **THE CHAT BUTTON LIGHTS WHEN THE COACH HAS ACTUALLY SAID SOMETHING** —
+  Ashley, 6 Sep 2026, after asking why she could not see "the outer ring round
+  the chat button and the pulsating chat icon when I have a new message". Two
+  halves, both hers to call and both approved.
+  **The trigger.** It lit for exactly two things, both raised by the opener:
+  an unreviewed session, and a scheduled yesterday nothing was logged against.
+  A reply from the coach was not one of them, so sending a message, switching
+  tabs and coming back left the answer waiting with nothing on screen saying
+  so. `src/lib/chat-unread.ts` (new) adds it as a third reason. Unread means
+  the LAST message is the coach's, is `complete`, and carries a DB id — the id
+  is what separates a real reply from the client-composed opener and the
+  first-run intro, which are recomposed on every mount; counting those would
+  light the button every day, the failure the old "a dot that is always on is
+  a dot nobody sees" note warns about.
+  **App.tsx's single seen-flag is gone**, and its removal is the point: one
+  flag could only remember that one thing had been looked at, so a reply
+  arriving under an already-seen feel question could never light the button,
+  and reading the reply would re-light it for the feel question. The seen SET
+  lives in ChatAssistant beside the state that produces the reasons. Only
+  `unread:` reasons persist — a message id is durable; feel and missed are
+  re-derived each mount and re-arm across a reload exactly as before.
+  **The visuals.** `.chat-unread` (a breathing halo on the disc) and
+  `.chat-unread-ring` (a ring outside it) at 2.4s, written here rather than
+  transcribed: the app-polish handoff named them and deferred the keyframes to
+  a chat handoff that never arrived. No transform in either — a scale would
+  keep pulsing at glow Off, and the instruction was that these vanish when
+  glow is turned off — so every animated property is a blur or an alpha times
+  `--glow-strength`. A light canvas swaps both for flat-shadow variants, the
+  same reason `.glow-bloom-once` does. The amber dot stays underneath: at glow
+  Off with reduced motion on, it is the only thing left.
+  `test:coach-opener` §8 (unread definition, seeding, persistence filter, both
+  directions of the bug the set exists for) and §9 (every colour fades at glow
+  Off, no transform, both classes in the reduced-motion list, the light-canvas
+  swaps, the dot survives). **Twenty-five mutations tried, twenty-five
+  caught.** Verified in Chromium at 390x844 on five states: ring and pulse
+  running with a reply waiting; nothing at all with none; ring and halo
+  invisible at glow Off; static ring and zero animations under reduced motion;
+  flat-shadow variants on `daylight`. Opening the chat clears it and writes
+  the reply's id to the seen set, so a reload does not re-light it.
+  134 of 134 sweep gates pass.
+
 - [x] **TOOLS STOPS BEING A JUNK DRAWER** — `design_handoff_app_polish` step 4
   of 8. Six tiles with live subtitles (grocery items and how many are checked,
   sessions and PRs, weeks and which block) over a three-row grocery preview

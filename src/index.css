@@ -560,6 +560,24 @@
   0% { opacity: 0; transform: scale(.96); box-shadow: 0 0 0 rgba(var(--glow-rgb), 0); }
   100% { opacity: 1; transform: scale(1); box-shadow: 0 6px 16px rgba(var(--glow-rgb), calc(.25 * var(--glow-strength))); }
 }
+/* Same reason as .glow-bloom-once above: on paper a halo under a button
+ * reads as a printing fault, so the unread pulse breathes the CTA's flat
+ * drop shadow instead of a glow, and the ring drops its halo and does the
+ * whole job with its border. Both still scale with --glow-strength. */
+[data-canvas="light"] .chat-unread {
+  animation-name: chatUnreadPulseLight;
+}
+@keyframes chatUnreadPulseLight {
+  0%, 100% { box-shadow: 0 6px 16px rgba(var(--glow-rgb), calc(.25 * var(--glow-strength))); }
+  50% { box-shadow: 0 8px 26px rgba(var(--glow-rgb), calc(.55 * var(--glow-strength))); }
+}
+[data-canvas="light"] .chat-unread-ring {
+  animation-name: chatUnreadRingLight;
+}
+@keyframes chatUnreadRingLight {
+  0%, 100% { border-color: rgba(var(--glow-rgb), calc(.45 * var(--glow-strength))); }
+  50% { border-color: rgba(var(--glow-rgb), calc(.95 * var(--glow-strength))); }
+}
 
 /* Resolves the accent axis (theme default or override) into the tokens the
  * rest of the app actually reads — kept as a separate step from the
@@ -749,6 +767,37 @@
    * below like every other animation here. */
   .glow-bloom-once { animation: dsBloomIn 900ms cubic-bezier(.2, .8, .2, 1) both; }
 
+  /* --- The chat button with something waiting ---------------------------
+   * Ashley, 6 Sep 2026, after asking why she could not see "the outer ring
+   * round the chat button and the pulsating chat icon when I have a new
+   * message": the app-polish handoff specified both but deferred the
+   * keyframes to a chat handoff that never arrived, so these are written
+   * here rather than transcribed from a spec.
+   *
+   * Two parts, one rhythm (2.4s, both): a ring OUTSIDE the disc, and the
+   * disc's own halo breathing under it. Deliberately no transform in
+   * either — a scale would keep pulsing at glow Off, and Ashley's
+   * instruction was that these vanish when glow is turned off. So every
+   * animated property is a blur or an alpha multiplied by --glow-strength,
+   * which reduces the whole thing to nothing at strength 0 with no
+   * conditional rule and no layout shift. (dsDotPulse does scale; that
+   * predates this instruction.)
+   *
+   * The ring's RESTING border is glow-multiplied too, not just its
+   * keyframes: under reduced motion the animation is stripped and this rule
+   * is what is left, so a static ring still marks the button. The amber dot
+   * is separate from all of it and stays — at glow Off with reduced motion
+   * on, it is the only thing left saying the coach is waiting. */
+  .chat-unread { animation: chatUnreadPulse 2.4s ease-in-out infinite; }
+  .chat-unread-ring {
+    position: absolute;
+    inset: -5px;
+    border-radius: 9999px;
+    border: 1.5px solid rgba(var(--glow-rgb), calc(.45 * var(--glow-strength)));
+    pointer-events: none;
+    animation: chatUnreadRing 2.4s ease-in-out infinite;
+  }
+
   /* Numeric alignment — every weight/rep/time/ml value in the density-pass
    * screens. Monospace so a "9" and a "0" occupy the same width (numbers
    * that change every set shouldn't visibly reflow their neighbours). */
@@ -817,6 +866,33 @@
       0 0 calc(12px * var(--glow-strength)) rgba(var(--glow-rgb), calc(.95 * var(--glow-strength)));
   }
 }
+/* The unread-reply pulse on the chat button. The 0%/100% shadow is
+ * .glow-mint-box's own resting value verbatim, so the animation starts and
+ * ends where the un-animated button already sits and nothing jumps when it
+ * is added or removed. */
+@keyframes chatUnreadPulse {
+  0%, 100% {
+    box-shadow:
+      0 0 calc(12px * var(--glow-strength)) rgba(var(--glow-rgb), calc(.90 * var(--glow-strength))),
+      0 0 calc(24px * var(--glow-strength)) rgba(var(--glow-rgb), calc(.45 * var(--glow-strength)));
+  }
+  50% {
+    box-shadow:
+      0 0 calc(22px * var(--glow-strength)) rgba(var(--glow-rgb), var(--glow-strength)),
+      0 0 calc(48px * var(--glow-strength)) rgba(var(--glow-rgb), calc(.70 * var(--glow-strength)));
+  }
+}
+@keyframes chatUnreadRing {
+  0%, 100% {
+    border-color: rgba(var(--glow-rgb), calc(.45 * var(--glow-strength)));
+    box-shadow: 0 0 calc(8px * var(--glow-strength)) rgba(var(--glow-rgb), calc(.22 * var(--glow-strength)));
+  }
+  50% {
+    border-color: rgba(var(--glow-rgb), calc(.95 * var(--glow-strength)));
+    box-shadow: 0 0 calc(20px * var(--glow-strength)) rgba(var(--glow-rgb), calc(.55 * var(--glow-strength)));
+  }
+}
+
 @keyframes dsDotPulse {
   0%, 100% { box-shadow: 0 0 calc(10px * var(--glow-strength)) rgba(var(--glow-rgb), calc(.8 * var(--glow-strength))); transform: scale(1); }
   50% { box-shadow: 0 0 calc(22px * var(--glow-strength)) rgba(var(--glow-rgb), var(--glow-strength)); transform: scale(1.18); }
@@ -935,6 +1011,8 @@
   .glow-warn-dot,
   .glow-sweep,
   .glow-bloom-once,
+  .chat-unread,
+  .chat-unread-ring,
   .tour-breathe,
   .tour-fade,
   /* Kept invisible rather than merely un-animated: with the animation

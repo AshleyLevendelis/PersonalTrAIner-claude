@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { MessageCircle } from 'lucide-react'
 import { useAppRoute, tabHash, type Tab } from '@/lib/app-route'
-import { TOUR_STEPS, SET_STEP_KEY } from '@/lib/app-tour-steps'
+import { TOUR_STEPS, SET_STEP_KEY, MEALS_STEP_KEY } from '@/lib/app-tour-steps'
 import { TAB_BAR_HEIGHT_PX } from '@/components/BottomTabBar'
 import { useBottomDockHeight } from '@/hooks/useBottomDockHeight'
 import { useViewportInset } from '@/hooks/useViewportInset'
@@ -32,6 +32,18 @@ import { useViewportInset } from '@/hooks/useViewportInset'
 
 const STEPS = TOUR_STEPS
 const SET_STEP_INDEX = STEPS.findIndex(s => s.key === SET_STEP_KEY)
+const MEALS_STEP_INDEX = STEPS.findIndex(s => s.key === MEALS_STEP_KEY)
+/**
+ * How long the meals stop will wait for meals that are still being built
+ * before it stops waiting and lets the user move on regardless.
+ *
+ * It does NOT bound the build — that is three rounds against a 45s abort, so
+ * ~135s worst case. It bounds the WAIT, which is the thing that would
+ * otherwise be a trap. In the ordinary case the meals land long before this
+ * and it never fires; in the cases where it does fire, something has gone
+ * wrong and the honest move is to hand the tour back rather than hold it.
+ */
+const MEALS_WAIT_MS = 15000
 
 /** Spotlight padding around the measured rect, and its corner radius. */
 const SPOT_PAD = 6
@@ -144,7 +156,16 @@ function bringIntoView(el: HTMLElement): void {
   if (Math.abs(delta) > 4) window.scrollBy({ top: delta, behavior: 'auto' })
 }
 
-export function AppTour({ profileId, armed }: { profileId?: string; armed: boolean }) {
+export function AppTour({ profileId, armed, mealsPending = false }: {
+  profileId?: string
+  armed: boolean
+  /**
+   * The first meal build is still running and there are no meals yet. Passed
+   * in rather than read from a store: this component takes every fact as a
+   * prop, and one boolean is cheaper than a second route into the meal state.
+   */
+  mealsPending?: boolean
+}) {
   const { route } = useAppRoute()
   const activeTab: Tab = route.kind === 'tab' ? route.tab : 'dashboard'
   const { dockHeightPx } = useBottomDockHeight()
@@ -337,7 +358,12 @@ export function AppTour({ profileId, armed }: { profileId?: string; armed: boole
 
       if (!el) { setRect(prev => (prev === null ? prev : null)); return }
 
-      const scrollKey = `${stepIndex}:${phase}`
+      // The size token matters, not just the step and phase: the meals target
+      // swaps from a short "building" block to a full meal list underneath the
+      // spotlight, and without it bringIntoView never runs again — the rect
+      // grows and the highlight runs off the bottom of the screen at the exact
+      // moment the user is looking at it.
+      const scrollKey = `${stepIndex}:${phase}:${Math.round(el.getBoundingClientRect().height)}`
       if (scrolledFor !== scrollKey) { scrolledFor = scrollKey; bringIntoView(el) }
 
       const r = el.getBoundingClientRect()
@@ -357,6 +383,26 @@ export function AppTour({ profileId, armed }: { profileId?: string; armed: boole
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)
   }, [running, phase, step, stepIndex])
+
+  // -- the meals stop waits for meals that have not arrived ------------------
+  //
+  // Onboarding hands the app over before the meals are built (App.tsx), so
+  // this stop can be reached while they are still coming. Ashley's ruling:
+  // wait here, rather than skip the stop or permanently reword it — the stop
+  // reveals the real thing the moment it lands.
+  //
+  // The wait is bounded and Skip is never blocked, so it cannot become a trap:
+  // if the build is slow or fails, the timer releases Next and the stop reads
+  // its pending line instead. The timer is armed only while actually waiting,
+  // so a stop reached after the meals landed never starts one.
+  const [mealsWaitExpired, setMealsWaitExpired] = useState(false)
+  const holdingForMeals = running && stepIndex === MEALS_STEP_INDEX && mealsPending && !mealsWaitExpired
+
+  useEffect(() => {
+    if (!running || stepIndex !== MEALS_STEP_INDEX || !mealsPending || mealsWaitExpired) return
+    const timer = window.setTimeout(() => setMealsWaitExpired(true), MEALS_WAIT_MS)
+    return () => window.clearTimeout(timer)
+  }, [running, stepIndex, mealsPending, mealsWaitExpired])
 
   // -- the rest-day variant --------------------------------------------------
 
@@ -398,7 +444,11 @@ export function AppTour({ profileId, armed }: { profileId?: string; armed: boole
   if (!running) return null
 
   const tapPhase = phase === 'tap'
-  const body = tapPhase ? (step.teaser ?? '') : step.copy
+  // While the meals are genuinely not there, the stop says so instead of
+  // promising three things you can do to a meal that is not on screen. Once
+  // they land — or the wait expires — it goes back to the real line.
+  const showPending = stepIndex === MEALS_STEP_INDEX && mealsPending && !!step.pendingCopy
+  const body = tapPhase ? (step.teaser ?? '') : (showPending ? step.pendingCopy! : step.copy)
   const calloutTop = calloutPosition(rect, step.last === true)
 
   return (
@@ -513,10 +563,11 @@ export function AppTour({ profileId, armed }: { profileId?: string; armed: boole
             <button
               type="button"
               onClick={step.last ? finish : advance}
-              className="h-[34px] rounded-[10px] px-4 text-[0.78125rem] font-semibold text-primary-foreground glow-mint-box"
+              disabled={holdingForMeals}
+              className="h-[34px] rounded-[10px] px-4 text-[0.78125rem] font-semibold text-primary-foreground glow-mint-box disabled:opacity-60"
               style={{ background: 'var(--primary)' }}
             >
-              {stepIndex === 0 ? 'Show me around' : step.last ? 'Finish' : 'Next'}
+              {holdingForMeals ? 'Still cooking…' : stepIndex === 0 ? 'Show me around' : step.last ? 'Finish' : 'Next'}
             </button>
           </div>
         )}

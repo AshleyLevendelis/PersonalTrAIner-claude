@@ -27,7 +27,7 @@ import { computeTargets, getLatestWeightKg, getEffectiveTargetWeightKg, snapshot
 import { describeGoalProximity, isGoalProximityDismissed, dismissGoalProximity } from '@/lib/goal-proximity'
 import { upsertDailyMetric } from '@/lib/daily-tracking'
 import { generateExercisePlan, generateMesocycle, MESOCYCLE_WEEK_LABELS } from '@/lib/exercise-plan'
-import { getPools, swapPoolMeal, getMealPicksForDate, setMealPick, clearMealPick, clearAllMealPicksForDate, type MealSlotName } from '@/lib/meal-store'
+import { getPools, readPools, swapPoolMeal, getMealPicksForDate, setMealPick, clearMealPick, clearAllMealPicksForDate, type MealSlotName } from '@/lib/meal-store'
 import { generateMealPools, assembleDay, chosenToMealPlanDays, type PoolOption } from '@/lib/meal-generation'
 import { supabase } from '@/lib/supabase'
 import { saveMesocycle, saveMesocycleWeek, restoreMesocycle } from '@/lib/mesocycle-persistence'
@@ -109,28 +109,32 @@ function App() {
   /** The weight that actually drives computeTargets — a threshold-gated 7-day average (getEffectiveTargetWeightKg), not the raw latest reading. Kept separate from latestWeightKg so a noisy day-to-day swing never retunes calories on its own; only a real trend move does. Null until the first target computation resolves it. */
   const [targetWeightAnchorKg, setTargetWeightAnchorKg] = useState<number | null>(null)
   const [exercisePlan, setExercisePlan] = useState<WorkoutDay[]>([])
-  // The dot on the chat tab. ChatAssistant (force-mounted, so live before
-  // the tab is ever opened) reports whether the coach has something that
-  // wants an answer; `attentionSeen` makes the dot a nudge rather than a
-  // demand — it clears the moment the chat is opened, whether or not they
-  // answer, and re-arms only when the underlying condition goes away and
-  // a new one arrives. See coach-opener.ts for what counts.
+  // The ring on the chat button. ChatAssistant (force-mounted, so live
+  // before the tab is ever opened) reports whether the coach has something
+  // that wants an answer — an unreviewed session, a missed day, or a reply
+  // the trainee has not seen. It reports the verdict ALREADY accounting for
+  // what has been seen, so nothing here decides that a second time.
+  //
+  // The `attentionSeen` flag that used to live here is gone, and its removal
+  // is the point: one flag could only remember that ONE thing had been seen,
+  // so once it was set for a feel question the trainee had looked at, a
+  // genuinely new coach reply arriving afterwards could never light the
+  // button. chat-unread.ts tracks a seen SET instead, beside the state that
+  // produces the reasons.
   const [chatAttention, setChatAttention] = useState(false)
-  const [attentionSeen, setAttentionSeen] = useState(false)
-  // MUST STAY ABOVE THE `if (!profile)` EARLY RETURN BELOW. This effect was
-  // written under handleTabChange, a few lines before the JSX and ~70 lines
-  // AFTER that return — so on the first render (profile still null) it never
-  // ran, and on the render after the profile resolved it did. One more hook
-  // than the previous render is exactly what React forbids: it threw
-  // "Rendered more hooks than during the previous render", unmounted the
-  // tree, and every user got a black screen. Shipped to production in #15
-  // and caught by Ashley on her phone, not by any gate — typecheck and the
-  // bundler do not check hook order and nothing in the suite renders App.
-  // test:coach-opener now asserts no hook call appears after that return.
-  useEffect(() => {
-    if (!chatAttention) { setAttentionSeen(false); return }
-    if (activeTab === 'chat') setAttentionSeen(true)
-  }, [chatAttention, activeTab])
+  // EVERY HOOK IN THIS COMPONENT MUST STAY ABOVE THE `if (!profile)` EARLY
+  // RETURN BELOW. Recorded here because this is where it went wrong: the
+  // effect that used to keep `attentionSeen` (now in ChatAssistant, see
+  // above) was written under handleTabChange, a few lines before the JSX and
+  // ~70 lines AFTER that return — so on the first render (profile still
+  // null) it never ran, and on the render after the profile resolved it did.
+  // One more hook than the previous render is exactly what React forbids: it
+  // threw "Rendered more hooks than during the previous render", unmounted
+  // the tree, and every user got a black screen. Shipped to production in
+  // #15 and caught by Ashley on her phone, not by any gate — typecheck and
+  // the bundler do not check hook order and nothing in the suite renders
+  // App. test:coach-opener §7 asserts no hook call appears after that
+  // return, over the whole file rather than over any one hook.
   const [mesocycle, setMesocycle] = useState<MesocycleWeek[]>([])
   // Client-authored dismissible notices — never model prose, same
   // convention as every other receipt in this app. Four sources feed this
@@ -176,6 +180,35 @@ function App() {
   // valid for its slot any day, per the M0 architecture decision).
   const [mealPools, setMealPools] = useState<Partial<Record<MealSlotName, PoolOption[]>>>({})
   const [isGeneratingMeals, setIsGeneratingMeals] = useState(false)
+  /**
+   * The FIRST pool build, running in the background after onboarding handed
+   * over — a separate fact from isGeneratingMeals, deliberately.
+   *
+   * They are not the same thing and sharing one flag breaks both. Each
+   * regenerate handler clears isGeneratingMeals in its own `finally`, so a
+   * slot regenerate started during the first build clears the flag when IT
+   * finishes — and the meals area would drop out of "building" back to "no
+   * meal plan generated yet", offering a Generate button, while a build is
+   * still running. "The initial build is in flight" and "the user asked for a
+   * regenerate" are different facts about different work; this is not a
+   * forked copy of one fact.
+   */
+  const [initialMealBuild, setInitialMealBuild] = useState(false)
+  /**
+   * The profile the app is currently showing. Read by the background meal
+   * build to decide whether its result is still wanted.
+   *
+   * A ref rather than the `profile` state because the build's `.then` closes
+   * over the render that started it, where `profile` is null and always will
+   * be — a `profile?.id === id` guard there would never fire. The window is
+   * real: a build's worst case is three rounds against a 45s abort
+   * (meal-generation.ts), and handleReset clears the profile without touching
+   * anything in flight, so a reset and re-onboard inside it would otherwise
+   * paint the first profile's meals onto the second.
+   */
+  const activeProfileIdRef = useRef<string | null>(null)
+  /** Kept in sync here rather than at each setProfile call site — restore, onboarding, reset and every patch all go through this one mirror, so none of them can forget. */
+  useEffect(() => { activeProfileIdRef.current = profile?.id ?? null }, [profile?.id])
   /** Set when a (re)generate call reaches the server but comes back with nothing for one or more slots — surfaced so a failed regenerate reads as a failure, not as "your plan is gone." */
   const [mealRegenerateError, setMealRegenerateError] = useState<string | null>(null)
   /**
@@ -609,7 +642,7 @@ function App() {
     setExerciseExclusions(restoredExclusions)
 
     const [restoredPools, { data: exerciseRows }, fullMesocycle] = await Promise.all([
-      getPools(ownedId),
+      readPools(ownedId),
       supabase.from('exercise_plans').select('*').eq('profile_id', ownedId),
       restoreMesocycle(ownedId),
     ])
@@ -742,7 +775,13 @@ function App() {
     setLatestWeightKg(restoredWeight)
     setTargetWeightAnchorKg(effectiveTargetWeight.weightKg ?? null)
     setMacros(liveTargets)
-    setMealPools(restoredPools)
+    setMealPools(restoredPools.pools)
+    // A read that FAILED must not render as "No meal plan generated yet" — that
+    // sends someone whose meals exist to regenerate them, and the button they
+    // are pointed at deletes and rewrites the plan they still had.
+    if (restoredPools.failed) {
+      setMealRegenerateError("I couldn't load your meals just then — that's a connection problem, not a missing plan. Pull down to refresh before regenerating anything.")
+    }
     setExercisePlan(restoredExercises)
     setMesocycle(restoredMesocycle)
     setIsRestoring(false)
@@ -948,6 +987,12 @@ function App() {
                 // already have — a plain regenerate would delete the pool and
                 // hand them five different meals instead of five more.
                 if (!profile?.id || !macros) return { added: [], error: "I need your body details before I can fit new meals to your targets." }
+                // The one meal path with no button to disable — it is reached
+                // from the coach chat. appendPools bases its pool_index on the
+                // slot length it reads up front, so running it against a first
+                // build that is still writing collides on that index. Every
+                // other caller is already blocked by a disabled control.
+                if (initialMealBuild) return { added: [], error: "I'm still building your first set of meals — give me a moment and ask me again." }
                 try {
                   const result = await generateMealPools({
                     profileId: profile.id,
@@ -986,6 +1031,82 @@ function App() {
                   return { added: [], error: `I couldn't reach the meal generator just then — try me again in a moment.` }
                 }
               }
+
+  /**
+   * The first meal-pool build, run in the background after the app has already
+   * been handed over. Fire-and-forget on purpose: nothing above it waits.
+   *
+   * Two guards, both earned rather than defensive:
+   *
+   *  - The result is dropped unless the profile it was built for is still the
+   *    one on screen. This `.then` closes over the render that started it,
+   *    where `profile` is null and stays null, so the live answer has to come
+   *    from activeProfileIdRef. A reset and re-onboard inside the build window
+   *    would otherwise paint one person's meals onto the next.
+   *  - The commit MERGES per slot instead of replacing the object, and only
+   *    where the new options are non-empty. Four other things write mealPools
+   *    (the two regenerate handlers, find-more-options, and the chat swap
+   *    path); a build landing late must not blank what one of them just put
+   *    there. Same shape handleRegenerateAllMeals already uses.
+   *
+   * What it cannot do is CANCEL: generateMealPools takes no AbortSignal, and
+   * its own 45s abort is internal per round. Ignoring a result is the whole of
+   * the available remedy — the edge-function spend is already incurred.
+   */
+  const startInitialMealBuild = (profileId: string, forProfile: UserProfile, targets: MacroTargets) => {
+    setInitialMealBuild(true)
+    setMealRegenerateError(null)
+    generateMealPools({
+      profileId,
+      targets,
+      dietaryPreferences: forProfile.dietary_preferences,
+      mealsPerDay: forProfile.meals_per_day,
+      includeSnacks: forProfile.include_snacks,
+      cookingTimePreference: forProfile.cooking_time_preference,
+      favoriteCuisines: forProfile.favorite_cuisines,
+      dislikedFoods: forProfile.disliked_foods,
+      breakfastStyle: forProfile.breakfast_style,
+    })
+      .then(result => {
+        if (activeProfileIdRef.current !== profileId) return
+        // Onboarding's dietary_preferences always comes from the picker, so
+        // this branch is defensive rather than reachable today — but it costs
+        // nothing to keep the one piece of state honest from first load
+        // rather than only ever touched by the regenerate handlers.
+        if (result.unrecognisedPreferences.length > 0) setUnrecognisedDietaryRestrictions(result.unrecognisedPreferences)
+        const filled = Object.entries(result.accepted).filter(([, o]) => (o?.length ?? 0) > 0)
+        if (filled.length > 0) {
+          setMealPools(prev => {
+            const next = { ...prev }
+            for (const [slot, options] of filled) next[slot as MealSlotName] = options as PoolOption[]
+            return next
+          })
+          return
+        }
+        // Nothing came back. Until now this was a bare console.error, which
+        // was survivable only because a blocking screen ended in an empty
+        // state that explained itself. In the background it has to say so.
+        // generatorReached is the distinction that matters here: "the call
+        // worked and nothing fits your targets" is deterministic and worth
+        // naming a fix for; "the call failed" is transient and retrying
+        // genuinely is the advice. Neither line claims an existing plan was
+        // preserved — on a first build there is nothing to preserve.
+        setMealRegenerateError(
+          result.generatorReached
+            ? "I couldn't fit any meals to your targets. Try loosening a dietary restriction, widening your calorie range, or turning off a meal slot, then generate below."
+            : "I couldn't reach the meal generator to build your meals. Your training plan is ready — generate them below when you're back on a good connection."
+        )
+      })
+      .catch(err => {
+        console.error('Initial meal pool build failed:', err)
+        if (activeProfileIdRef.current !== profileId) return
+        setMealRegenerateError("I couldn't reach the meal generator to build your meals. Your training plan is ready — generate them below when you're back on a good connection.")
+      })
+      .finally(() => {
+        if (activeProfileIdRef.current !== profileId) return
+        setInitialMealBuild(false)
+      })
+  }
 
   const handleOnboardingComplete = async (userProfile: UserProfile) => {
     setIsGenerating(true)
@@ -1134,7 +1255,36 @@ function App() {
       )
     }
 
-    let generatedPools: Partial<Record<MealSlotName, PoolOption[]>> = {}
+    // The seven commits that make the app appear, as a function so both paths
+    // below can call it exactly once: the normal one, right after the plan is
+    // saved and BEFORE the meals are built, and the insert-failure one.
+    //
+    // MUST be called after `enrichedProfile.id = data.id` on the saved path.
+    // AppTour renders nothing without a profileId, several tabs key off it —
+    // and enrichedProfile is mutated in place, so assigning .id after
+    // setProfile would not re-render at all: same object, same identity.
+    const commitPlan = () => {
+      // Synchronously, not via the mirror effect below: the meal build starts
+      // in this same tick, and a build that resolved before React flushed
+      // that effect would find a null ref, decide the profile had changed,
+      // and throw its own result away.
+      activeProfileIdRef.current = enrichedProfile.id ?? null
+      setProfile(enrichedProfile)
+      setMacros(calculatedMacros)
+      // Arms the app tour. Deliberately here and not in the `finally` below:
+      // this line is only reached when a plan was genuinely built, and a tour of
+      // an app whose onboarding just failed would be the wrong thing to show
+      // someone staring at an error.
+      setTourArmed(true)
+      // The onboarding weight IS the first weigh-in (it's written to
+      // daily_metrics above) — seed the shared latestWeightKg from it so the
+      // derivation/targets never render a previous profile's stale weight.
+      setLatestWeightKg(enrichedProfile.weight_kg ?? null)
+      setExercisePlan(workout)
+      setMesocycle(mesocycleData)
+      setMesocycleCreatedAt(new Date().toISOString())
+    }
+
     if (data) {
       enrichedProfile.id = data.id
       localStorage.setItem(STORAGE_KEY, data.id)
@@ -1297,51 +1447,28 @@ function App() {
       } catch (err) {
         console.error('Persisting mesocycle failed:', err)
       }
-      // No targets means no macro budget for meals to hit. Generating a pool
-      // against invented numbers would produce a plausible-looking day of
-      // food built on nothing — skip it; the nutrition surface explains why
-      // and the meals appear as soon as a weight is added.
-      if (calculatedMacros) try {
-        setGeneratingStatus('Building your meal pools...')
-        const result = await generateMealPools({
-          profileId: data.id,
-          targets: calculatedMacros,
-          dietaryPreferences: enrichedProfile.dietary_preferences,
-          mealsPerDay: enrichedProfile.meals_per_day,
-          includeSnacks: enrichedProfile.include_snacks,
-          cookingTimePreference: enrichedProfile.cooking_time_preference,
-          favoriteCuisines: enrichedProfile.favorite_cuisines,
-          dislikedFoods: enrichedProfile.disliked_foods,
-          breakfastStyle: enrichedProfile.breakfast_style,
-        })
-        generatedPools = result.accepted
-        // Onboarding's dietary_preferences always comes from the picker, so
-        // this branch is defensive rather than reachable today — but it
-        // costs nothing to keep the one piece of state honest from first
-        // load rather than only ever touched by the regenerate handlers.
-        if (result.unrecognisedPreferences.length > 0) setUnrecognisedDietaryRestrictions(result.unrecognisedPreferences)
-      } catch (err) {
-        // Meal generation failing must not block the rest of the plan —
-        // the Meals tab shows its own empty state with a manual retry.
-        console.error('Meal pool generation failed:', err)
-      }
+      // HAND THE APP OVER HERE — before the meals, not after them.
+      //
+      // Everything the app needs is now built AND saved: the plan and the
+      // mesocycle were generated synchronously above and persisted in the two
+      // blocks just before this. The only work left is meal generation, which
+      // is up to three sequential calls to an edge function against a 45s
+      // abort each. Until 6 Sep 2026 the state commits sat below that await,
+      // so a new user watched a spinner reading "Building your meal pools..."
+      // for as long as a minute while a finished plan sat on the other side
+      // of it. Ashley asked for the app and its tour to load while the meals
+      // finish in the background, and nothing here needs them to.
+      commitPlan()
+      if (calculatedMacros) startInitialMealBuild(data.id, enrichedProfile, calculatedMacros)
     }
 
-    setProfile(enrichedProfile)
-    setMacros(calculatedMacros)
-    // Arms the app tour. Deliberately here and not in the `finally` below:
-    // this line is only reached when a plan was genuinely built, and a tour of
-    // an app whose onboarding just failed would be the wrong thing to show
-    // someone staring at an error.
-    setTourArmed(true)
-    // The onboarding weight IS the first weigh-in (it's written to
-    // daily_metrics above) — seed the shared latestWeightKg from it so the
-    // derivation/targets never render a previous profile's stale weight.
-    setLatestWeightKg(enrichedProfile.weight_kg ?? null)
-    setExercisePlan(workout)
-    setMesocycle(mesocycleData)
-    setMesocycleCreatedAt(new Date().toISOString())
-    setMealPools(generatedPools)
+    // The insert-failure path. `data` is null, unsavedProfileWarning is set
+    // above, and the app must still come up so that warning has somewhere to
+    // render — see the state's own note. THIS IS WHY commitPlan IS A FUNCTION
+    // called twice rather than lines moved up into the `if (data)` block: put
+    // them in there and a failed insert drops the user back into onboarding
+    // with the warning rendered nowhere.
+    if (!data) commitPlan()
     } catch (err) {
       console.error('Onboarding failed:', err)
       setSetupError(
@@ -2343,7 +2470,7 @@ function App() {
               pools={mealPools}
               chosen={chosenMeals}
               mealTotals={mealTotals}
-              isGeneratingMeals={isGeneratingMeals}
+              isGeneratingMeals={isGeneratingMeals || initialMealBuild}
               mealRegenerateError={mealRegenerateError}
               onDismissRegenerateError={() => setMealRegenerateError(null)}
               avoidFoods={effectiveDislikedFoods}
@@ -2467,16 +2594,25 @@ function App() {
               revealSpeed={revealSpeed}
               pendingLoadSuggestions={adaptationMessages.filter(m => m.loadSuggestionId).map(m => m.text)}
               onAttentionChange={setChatAttention}
+              chatVisible={activeTab === 'chat'}
             />
           </TabsContent>
         </Tabs>
       </main>
       <BottomDock />
-      <BottomTabBar activeTab={activeTab} onTabChange={handleTabChange} chatAttention={chatAttention && !attentionSeen && activeTab !== 'chat'} />
+      <BottomTabBar activeTab={activeTab} onTabChange={handleTabChange} chatAttention={chatAttention && activeTab !== 'chat'} />
       {/* Sibling of <main>, like BottomDock, so it overlays every tab AND the
           tab bar — the tour's nav stops spotlight the real tab buttons, which
           it could not reach from inside a tab's own subtree. */}
-      <AppTour profileId={profile.id} armed={tourArmed} />
+      <AppTour
+        profileId={profile.id}
+        armed={tourArmed}
+        // Pending means a build is running AND there is nothing to show yet.
+        // Not "the first build": a regenerate from an empty state leaves the
+        // stop pointing at the same nothing, and the trainee cannot tell which
+        // kind of build started it.
+        mealsPending={(isGeneratingMeals || initialMealBuild) && Object.keys(mealPools).length === 0}
+      />
       <ProfileScreen
         open={profileInfoOpen}
         onOpenChange={setProfileInfoOpen}

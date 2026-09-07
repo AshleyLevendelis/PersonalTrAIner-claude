@@ -11,6 +11,7 @@ import { getAppNow, getSessionDateContext, getLocalDateString } from '@/lib/dev-
 import { supabase } from '@/lib/supabase'
 import { getRecentLogs, formatLogsForAI, getRecentCardioLogs, formatCardioLogsForAI } from '@/lib/daily-tracking'
 import { saveChatCache, loadChatCache, clearChatCache } from '@/lib/chat-cache'
+import { attentionReasons, nextSeenAttention, hasUnseenAttention, loadSeenAttention, saveSeenAttention } from '@/lib/chat-unread'
 import { swapPoolMeal, setMealPick, type MealSlotName } from '@/lib/meal-store'
 import { getExerciseEntry } from '@/lib/exercise-db'
 import { createPendingAction, claimPendingAction, declinePendingAction, markExecuting, resolvePendingAction, getPendingAction, expireOldPendingActions, isWithinUndoWindow, type PendingActionReceipt } from '@/lib/pending-actions-store'
@@ -184,13 +185,28 @@ interface ChatAssistantProps {
   onOpenDashboard?: () => void
   /**
    * Fired whenever "the coach has something that wants an answer" changes —
-   * an unreviewed session, a missed day (coach-opener.ts, `attention`).
-   * App.tsx turns it into the dot on the chat tab. Reported from here rather
-   * than computed in App.tsx because this component is force-mounted and
-   * already holds every input; a second copy of the rule upstream would be
-   * a second thing to drift.
+   * an unreviewed session, a missed day (coach-opener.ts, `attention`), or a
+   * reply from the coach the trainee has not seen yet (chat-unread.ts).
+   * App.tsx turns it into the indicator on the chat tab. Reported from here
+   * rather than computed in App.tsx because this component is force-mounted
+   * and already holds every input; a second copy of the rule upstream would
+   * be a second thing to drift.
+   *
+   * Already accounts for what has been seen — App renders it as-is. That
+   * bookkeeping moved here on 6 Sep 2026 when the unread reply became a
+   * third reason: App's single seen-flag could only track one of them, so a
+   * new reply arriving under an already-seen feel question was silently
+   * swallowed. See chat-unread.ts's header.
    */
   onAttentionChange?: (has: boolean) => void
+  /**
+   * Whether the chat is the tab currently on screen. The component is
+   * force-mounted, so being mounted says nothing about being visible — and
+   * "they have seen it" is exactly the difference. Passed in rather than
+   * sniffed from the DOM: the parent's `data-[state=inactive]:hidden` is a
+   * styling detail this should not depend on.
+   */
+  chatVisible?: boolean
   /** User's chat typewriter-reveal-speed preference (Settings → Profile). Defaults to 'normal' if omitted. */
   revealSpeed?: RevealSpeed
   /** Vision Step 6 — any pending "start heavier next block?" suggestions currently showing on the dashboard banner, so the coach can discuss one if asked directly. Confirming/declining still only happens via the banner's own buttons, not from here (see load-suggestions.ts's own doc comment on why chat-driven confirm is out of scope for this pass). */
@@ -210,7 +226,7 @@ function sessionCutoffHour(preferredTime: string | undefined): number {
   return SESSION_PASSED_CUTOFF[preferredTime || 'morning'] || 22
 }
 
-export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onProfileChanged, onMealSwapApplied, onFindMoreMealOptions, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenProfile, groceryItems, onGroceryChanged, onOpenGrocery, onWaterChanged, onStepsChanged, onOpenExercise, onOpenDashboard, dataVersion = 0, onAttentionChange, revealSpeed = DEFAULT_REVEAL_SPEED, pendingLoadSuggestions }: ChatAssistantProps) {
+export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onProfileChanged, onMealSwapApplied, onFindMoreMealOptions, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenProfile, groceryItems, onGroceryChanged, onOpenGrocery, onWaterChanged, onStepsChanged, onOpenExercise, onOpenDashboard, dataVersion = 0, onAttentionChange, chatVisible = false, revealSpeed = DEFAULT_REVEAL_SPEED, pendingLoadSuggestions }: ChatAssistantProps) {
   // NL logging (§3) writes through the SAME frozen session identity +
   // logSet facade SetGrid.tsx uses — never saveSet directly (see
   // nl-logging-executor.ts's own doc comment).
@@ -624,10 +640,34 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     })
   }
 
-  // The dot on the chat tab. Defined here as the same two kinds the opener
-  // marks `attention: true`, and asserted equal to that in
-  // test-coach-opener.ts so the tab and the bubble cannot disagree.
-  const hasAttention = !!feelContext?.awaiting || !!missedYesterday
+  // The indicator on the chat tab. THREE reasons now, not two: the same two
+  // kinds the opener marks `attention: true` (asserted equal to pickOpener's
+  // own rule in test-coach-opener.ts, so the tab and the bubble cannot
+  // disagree), plus a coach reply the trainee has not seen yet — Ashley,
+  // 6 Sep 2026, "whenever there is a new unread message from the coach, in
+  // addition to the existing post-workout feedback and missed-training
+  // prompts".
+  //
+  // Each reason carries the identity of the thing wanting an answer, so two
+  // of them can be live at once without either hiding the other. What counts
+  // as unread, what is seen, and what survives a reload are all in
+  // chat-unread.ts; this only feeds it the three facts and reports the verdict.
+  const activeAttention = attentionReasons({
+    awaitingFeelDate: feelContext?.awaiting?.date ?? null,
+    missedYesterdayDay: missedYesterday?.dayName ?? null,
+    messages,
+  })
+  const [seenAttention, setSeenAttention] = useState<string | null>(() => (profile.id ? loadSeenAttention(profile.id) : null))
+  useEffect(() => {
+    setSeenAttention(prev => nextSeenAttention(prev, activeAttention, chatVisible))
+  }, [activeAttention, chatVisible])
+  useEffect(() => {
+    if (profile.id && seenAttention !== null) saveSeenAttention(profile.id, seenAttention)
+  }, [profile.id, seenAttention])
+  // Null means the seed in nextSeenAttention has not run yet (first render).
+  // Nothing is unseen until there is something to compare against, which is
+  // also what keeps the indicator from flashing on for one frame at mount.
+  const hasAttention = seenAttention !== null && hasUnseenAttention(activeAttention, seenAttention)
   useEffect(() => {
     onAttentionChange?.(hasAttention)
     // eslint-disable-next-line react-hooks/exhaustive-deps

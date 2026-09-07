@@ -494,6 +494,45 @@ async function main() {
     check('an empty-but-successful response still sets generatorReached true', exhausted.generatorReached === true, exhausted)
     check('accepted stays empty when nothing was proposed', (exhausted.accepted.lunch?.length ?? 0) === 0, exhausted.accepted)
 
+    // Case D — THE ONE THAT COST A REAL PLAN. 6 Sep 2026, 19:31 UTC: Ashley's
+    // onboarding ran two rounds (14.1s and 8.3s, both HTTP 200, both producing
+    // meals) and the page went away before the third finished. Persistence
+    // happened once, after the loop, so every meal from both successful rounds
+    // was discarded and she woke to an empty Nutrition tab.
+    //
+    // The property that fixes it is POSITIONAL and cannot be read off the
+    // return value: a round's meals must be on disk BEFORE the next request
+    // goes out. So the mock inspects the store from inside the next call — if
+    // round 1 did not commit, round 2 sees an empty table.
+    db.meal_plan_slots.length = 0
+    let dRound = 0
+    let slotsVisibleAtRound2 = -1
+    globalThis.fetch = (async () => {
+      dRound++
+      if (dRound === 2) slotsVisibleAtRound2 = db.meal_plan_slots.length
+      // Round 3 dies the way a closed tab dies: nothing ever comes back.
+      if (dRound >= 3) throw new Error('simulated page going away mid-build')
+      return {
+        ok: true,
+        json: async () => ({
+          meals: [{
+            slot: 'lunch', name: `Verified Chicken Rice Bowl ${dRound}`,
+            ingredients: ['200g chicken breast', '220g cooked basmati rice', '1 tbsp olive oil', '100g broccoli'],
+            prep: '20 min', cuisine: 'Other',
+          }],
+        }),
+      } as Response
+    }) as typeof fetch
+    const interrupted = await generateMealPools({
+      profileId: PROFILE_ID, targets, dietaryPreferences: [], mealsPerDay: 3, includeSnacks: false,
+      onlySlots: ['lunch'], poolSize: 3,
+    })
+    check('two rounds ran before the interruption, so this case has teeth', dRound >= 2, { dRound })
+    check('...and round 1 was already saved before round 2 was asked for', slotsVisibleAtRound2 > 0, { slotsVisibleAtRound2 })
+    check('an interrupted build leaves the meals it managed on disk, not nothing',
+      db.meal_plan_slots.filter(r => r.slot === 'lunch').length > 0, db.meal_plan_slots.length)
+    check('...and reports them as accepted too', (interrupted.accepted.lunch?.length ?? 0) > 0, interrupted.accepted)
+
     globalThis.fetch = originalFetch
   }
 
