@@ -82,6 +82,7 @@
     "test:plate-math": "tsx scripts/test-plate-math.ts",
     "check:demo-coverage": "tsx scripts/check-demo-coverage.ts",
     "test:meal-log": "tsx scripts/test-meal-log.ts",
+    "test:one-today": "tsx scripts/test-one-today.ts",
     "test:exercise-detail": "tsx scripts/test-exercise-detail.ts",
     "test:says-what-it-contains": "tsx scripts/test-says-what-it-contains.ts",
     "test:week-note": "tsx scripts/test-week-note.ts",

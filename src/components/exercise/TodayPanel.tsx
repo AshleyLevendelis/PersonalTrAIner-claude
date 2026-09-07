@@ -592,7 +592,7 @@ export function TodayPanel({
           />
           {/* Clears the fixed CTA bar below, so the last row is never sitting
               underneath it. Matches the bar's own height plus its fade. */}
-          {status !== 'running' && <div aria-hidden className="h-[100px]" />}
+          {status === 'idle' && <div aria-hidden className="h-[100px]" />}
         </div>
       )}
 
@@ -603,7 +603,17 @@ export function TodayPanel({
           when a timer is up, using the height the dock already publishes for
           the chat composer (useBottomDockHeight) rather than a second guess
           at how tall it is. */}
-      {!peekWorkout && !isRestDay && !isActiveRecovery && workout && status !== 'running' && (
+      {/* ONLY WHEN THERE IS A WORKOUT TO START. This read `status !== 'running'`
+          until 7 Sep 2026, and status has THREE values — so the moment a
+          session was finished it fell back through to here and offered
+          "Start workout" again, on a screen where every exercise was struck
+          through and ticked. Ashley: "the home tab is still showing start
+          workout for todays workout even though I have already logged todays
+          workout."
+          A finished day gets no primary action: the work is done, and the
+          summary it produced is the thing to look at. `idle` is the only
+          state that means "not started". */}
+      {!peekWorkout && !isRestDay && !isActiveRecovery && workout && status === 'idle' && (
         <div
           className="fixed inset-x-0 z-40 px-[22px] pb-3 pt-2.5"
           style={{

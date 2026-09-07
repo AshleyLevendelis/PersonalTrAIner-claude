@@ -2,6 +2,43 @@
 
 Newest first. One line each.
 
+- [x] **TWO TODAYS, AND A FINISHED DAY OFFERING TO START** — Ashley, 7 Sep
+  2026, two screenshots a minute apart. Exercise tab at 15:30: "TODAY ·
+  MONDAY", every exercise struck through and ticked, and a full-width "Start
+  workout" under them. Chat at 15:31: *"we're on for Tuesday's Push & Press
+  session today... I saw you logged your first session yesterday... how did
+  Monday's workout actually feel?"*
+  **1. The start button.** `TodayPanel.tsx` gated it on `status !== 'running'`.
+  Status has THREE values, so a **finished** session fell through and was
+  offered the workout it had just completed. The gate check covering it was
+  named "the bar only exists before the session starts" and asserted
+  `status !== 'running'` — the name was right and the assertion pinned the
+  defect. Both now say `status === 'idle'`, and the 100px spacer follows it.
+  **2. The two todays, and this one touches data.** `useActiveSession`'s
+  `identity` — the app's date and day name, and what every logged set is
+  stamped with — was memoised on `[profileId, devOverrideWeek, devOverrideDay,
+  planCreatedAt, totalWeeks]`. None of those changes at midnight, so the stamp
+  never moved; the provider wraps the whole app and never unmounts. A session
+  left open across a day boundary kept yesterday for as long as the tab lived,
+  while every fresh `getSessionDateContext` caller — the coach's context among
+  them — read the real day. Two todays, and sets file under whichever this hook
+  is holding.
+  The freeze itself is deliberate and stays: re-deriving per render splits one
+  workout in two at midnight (dev-clock.ts's documented hazard). What changed
+  is that the stamp now refreshes on a genuine day change **and only while no
+  session is running** — checked on foreground and on a 60s interval, because a
+  phone left on the Exercise tab never re-mounts, and updated only when the
+  value actually differs.
+  Eight mutations, all caught (one after strengthening: a check for
+  "visibilitychange" anywhere was satisfied by the cleanup's
+  `removeEventListener`, so deleting the subscription walked through).
+  138 of 138 gates.
+  **UNVERIFIED, AND IT MATTERS:** whether Ashley's own sets were mis-dated by
+  this — filed under Monday while performed on Tuesday — is a one-query
+  question against PRODUCTION (`workout_sessions.date` vs the sets'
+  `completed_at`). The read needs her approval and has not been run. The
+  mechanism is proven from source; the damage to her specific rows is not.
+
 - [x] **THE COACH CAN LOG WHAT YOU ATE** — Ashley, 7 Sep 2026: "how do we fix
   meal logging". Plan first (`docs/plans/the-coach-can-log-what-you-ate.md`),
   then built on her go-ahead.
