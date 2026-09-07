@@ -2,6 +2,47 @@
 
 Newest first. One line each.
 
+- [x] **THE COACH CAN LOG WHAT YOU ATE** — Ashley, 7 Sep 2026: "how do we fix
+  meal logging". Plan first (`docs/plans/the-coach-can-log-what-you-ate.md`),
+  then built on her go-ahead.
+  **The cause:** `log_meal`'s handler used to insert into `daily_food_logs`, a
+  table that appears in NO migration and has never existed on the live
+  database. Every attempt failed, so it was retired to an honest decline — and
+  the decline outlived its reason by weeks, sitting there while `meal_events`
+  existed and the Nutrition tab wrote to it on every Log tap. Not broken
+  plumbing: plumbing never connected.
+  **Her ruling:** ask first, log on confirm. Which also settles the
+  architecture — the write belongs on the CLIENT after the tap, through
+  `recordMealEvent`, or it loses the offline queue, the `client_id`
+  idempotency, the synchronous on-screen update and the void-based undo, and
+  the card would be claiming a write she cannot see. The edge function is a
+  courier: `intent: 'logging'` returns `{ reply: "", proposal }` and writes
+  nothing, exactly as `propose_meal_addition` does.
+  **The landmine, found while tracing and worth the whole exercise:** the tool
+  told the model its slots were `breakfast, lunch, dinner, snack_1, snack_2`.
+  `meal_events` accepts four values and neither snack_N is among them, so every
+  snack log would have been rejected on arrival — and that mismatch is where
+  the `snack_1` in her replies came from. `test:meal-log` now parses the CHECK
+  constraint out of the migration and asserts the tool's enum and the app's
+  `MealSlotName` are the same set.
+  **A slip the gate caught immediately:** correcting the enum to `snack` left
+  `humanSlot` without a mapping for it, which silently dropped the budget
+  clause off every snack answer.
+  The verifier refuses rather than logging a number too low to trust: an
+  under-resolved meal fails the same `MIN_COVERAGE` floor every generated meal
+  passes, because 40 kcal for a real dinner does not read as missing — it reads
+  as a light day, and everything downstream believes it.
+  Ten mutations, ten caught. Three gate checks re-anchored because they pinned
+  states that are now gone (log_meal as "the tool that declines"; the decline
+  detector reading a historical COMMENT as code; "first snack" as a slot word).
+  137 of 137 gates.
+  **Not in scope, recorded:** allergen flagging on an already-eaten meal
+  (recording is not endorsing, and refusing to log a real meal leaves the day
+  wrong — but whether to flag is a fair, safety-adjacent question); and a
+  chat-side undo, since the confirm card is the agreed safety and the Nutrition
+  tab already voids events.
+  **Needs the deploy.** Rides with the `intent` fix — one typed phrase, both.
+
 - [x] **ONE UNREAD INDICATOR, NOT TWO** — Ashley, 7 Sep 2026: *"the glowing
   chat button ... looks great but theres still the orange dot also. we no
   longer need the orange dot because the glowing outer ring now does that
