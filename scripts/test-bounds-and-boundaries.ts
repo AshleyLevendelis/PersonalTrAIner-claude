@@ -31,6 +31,7 @@ import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { isPlausibleStepCount, MAX_PLAUSIBLE_DAILY_STEPS } from '../src/lib/steps-store'
 import { isPlausibleCardioDuration, MAX_PLAUSIBLE_CARDIO_MINUTES } from '../src/lib/cardio-log-store'
+import { MAX_BARBELL_TARGET_KG } from '../src/lib/plate-math'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8')
@@ -92,10 +93,20 @@ check('a grocery quantity must be positive and bounded',
 const plates = stripComments(read('src/components/PlateCalculator.tsx'))
 check('the plate calculator has a target ceiling', /MAX_BARBELL_TARGET_KG/.test(plates))
 check('...applied to the bar as well as the target', /bar > MAX_BARBELL_TARGET_KG/.test(plates))
-// Belt as well as braces: the loop itself cannot run away even if a future
+// Belt as well as braces: the search itself cannot run away even if a future
 // caller reaches it around the input.
-check('...and the plate loop is bounded structurally too',
-  /plates\.length < MAX_PLATES_PER_SIDE/.test(plates))
+//
+// RE-ANCHORED 7 Sep 2026 — the loading moved out of the component and into
+// src/lib/plate-math.ts when it learned to return several answers instead of
+// one. The bound did not weaken; it grew a second half, because an
+// enumerating search can run away in a way a single greedy pass cannot.
+const plateMath = stripComments(read('src/lib/plate-math.ts'))
+check('...and the greedy pass is bounded structurally too',
+  /greedyCount < MAX_PLATES_PER_SIDE/.test(plateMath))
+check('...as is the search that finds the alternatives',
+  /used >= maxPlates/.test(plateMath) && /found\.length >= MAX_ENUMERATED/.test(plateMath))
+check('...with the ceiling itself still a real number under 501',
+  MAX_BARBELL_TARGET_KG > 0 && MAX_BARBELL_TARGET_KG <= 500, MAX_BARBELL_TARGET_KG)
 
 console.log('\n3. No control is drawn that cannot do anything\n')
 const setGrid = stripComments(read('src/components/exercise/SetGrid.tsx'))
