@@ -579,6 +579,26 @@
   50% { border-color: rgba(var(--glow-rgb), calc(.95 * var(--glow-strength))); }
 }
 
+/* ONE UNREAD INDICATOR AT A TIME (7 Sep 2026).
+ *
+ * Ashley, seeing the new ring and the old dot together: "we no longer need
+ * the orange dot because the glowing outer ring now does that job." It does —
+ * everywhere the ring is actually drawn.
+ *
+ * At glow Off it is not. Every colour in .chat-unread and .chat-unread-ring is
+ * multiplied by --glow-strength, which [data-glow="off"] sets to 0, so both
+ * fade to nothing by design. Deleting the dot outright would leave that
+ * setting with no unread signal at all — a silent regression behind a toggle,
+ * which is the worst place to put one.
+ *
+ * So the dot becomes the FALLBACK: hidden wherever the ring shows, and the
+ * only indicator where it cannot. Subtle (0.5) still draws a ring, so only
+ * Off gets the dot. Done in CSS rather than a prop because the condition is
+ * an ancestor attribute the component never sees.
+ */
+.chat-attention-dot { display: none; }
+[data-glow="off"] .chat-attention-dot { display: block; }
+
 /* Resolves the accent axis (theme default or override) into the tokens the
  * rest of the app actually reads — kept as a separate step from the
  * per-theme/per-accent blocks above so both can layer via plain attribute

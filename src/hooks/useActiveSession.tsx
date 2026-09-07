@@ -122,6 +122,9 @@ export interface ActiveSessionValue extends ActiveSessionIdentity, RestState {
    * reload or a backgrounded tab mid-session.
    */
   setDraft: (exerciseId: string, setNumber: number) => SetDraft | undefined
+  /** Which ramp-up steps are ticked for this exercise today. A place-keeper, never a log. */
+  rampTicksFor: (exerciseId: string) => number[]
+  toggleRampTick: (exerciseId: string, setNumber: number) => void
   saveSetDraft: (exerciseId: string, setNumber: number, draft: SetDraft) => void
   clearSetDrafts: (exerciseId: string) => void
   extraSetsFor: (exerciseId: string) => number[]
@@ -198,6 +201,21 @@ export function ActiveSessionProvider({
   const [ready, setReady] = useState(false)
   const [status, setStatus] = useState<'idle' | 'running' | 'finished'>('idle')
   const [startedAtIso, setStartedAtIso] = useState<string | null>(null)
+  /**
+   * Ramp ticks, MIRRORED INTO REACT STATE and not only into the record.
+   *
+   * The set drafts next door deliberately skip a mirror: a draft changes on
+   * every keystroke and lives in an uncontrolled input, so a re-render per
+   * character would cost more than it buys. A tick is the opposite — the
+   * whole point is that the step LOOKS different afterwards, and a value read
+   * straight from localStorage gives React nothing to re-render on.
+   *
+   * Copying the drafts' pattern is exactly what I did first, and the browser
+   * caught it: the tap wrote through, the strip did not change, and the tick
+   * only appeared after a tab switch remounted the row. A tick you cannot see
+   * is worse than no tick, because you tap it again.
+   */
+  const [rampTicks, setRampTicks] = useState<Record<string, number[]>>({})
 
   // Hydrate status/startedAtIso from the persisted record on identity
   // change — same pattern restEndsAt already uses below.
@@ -210,6 +228,7 @@ export function ActiveSessionProvider({
     const record = getActiveSessionRecord(identity.profileId, identity.date)
     setStatus(record?.status ?? 'idle')
     setStartedAtIso(record?.startedAtIso ?? null)
+    setRampTicks(record?.rampTicks ?? {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [identity.profileId, identity.date])
 
@@ -500,6 +519,29 @@ export function ActiveSessionProvider({
   const extraSetsFor = useCallback((exerciseId: string): number[] =>
     currentRecord()?.extraSets?.[exerciseId] ?? [], [currentRecord])
 
+  // --- Ramp ticks (7 Sep 2026) ------------------------------------------
+  //
+  // Which warm-up steps have been marked done. Same storage as the drafts
+  // above and for the same reason: it has to survive a tab switch, or it is
+  // no use to someone holding a phone between sets. It is NOT a log — see
+  // ActiveSessionRecord.rampTicks for why recording warm-ups would change
+  // nothing the app ever shows back.
+  const rampTicksFor = useCallback((exerciseId: string): number[] =>
+    rampTicks[exerciseId] ?? [], [rampTicks])
+
+  const toggleRampTick = useCallback((exerciseId: string, setNumber: number) => {
+    setRampTicks(prev => {
+      const current = prev[exerciseId] ?? []
+      const next = current.includes(setNumber)
+        ? current.filter(n => n !== setNumber)
+        : [...current, setNumber].sort((a, b) => a - b)
+      const updated = { ...prev, [exerciseId]: next }
+      // Written through in the same tick, so a reload mid-warm-up finds it.
+      patchRecord({ rampTicks: updated })
+      return updated
+    })
+  }, [patchRecord])
+
   const setExtraSets = useCallback((exerciseId: string, setNumbers: number[]) => {
     const existing = currentRecord()?.extraSets ?? {}
     patchRecord({ extraSets: { ...existing, [exerciseId]: setNumbers } })
@@ -639,6 +681,8 @@ export function ActiveSessionProvider({
     setDraft,
     saveSetDraft,
     clearSetDrafts,
+    rampTicksFor,
+    toggleRampTick,
     extraSetsFor,
     setExtraSets,
     declareOffPlan,
