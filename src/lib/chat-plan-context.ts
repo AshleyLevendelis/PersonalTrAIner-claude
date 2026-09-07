@@ -142,16 +142,104 @@ function describeNonLiftingDay(d: WorkoutDay): string {
   return bits.length > 0 ? bits.join(' | ') : 'no session prescribed'
 }
 
+/**
+ * WHICH DAY IT IS, AND WHAT THAT MEANS — resolved here rather than left to the
+ * model.
+ *
+ * Ashley, 7 Sep 2026, screenshot at 6:33 PM on a Monday. The coach said "let
+ * me know how today's bench and shoulder press go" (that session is Tuesday's),
+ * then, asked directly, said "today is Monday, so you've got Full Body Power"
+ * and in the same breath "are you planning to head in for that session this
+ * morning?" — of a session already finished, at half past six in the evening.
+ *
+ * THE CAUSE IS A JOIN NOBODY DID. The week reached the coach as seven
+ * unmarked rows, and the prompt asked the model to work it out:
+ * "Today is Monday. Cross-reference this with the user's exercise plan below."
+ * The app knows the answer exactly — which day, which session, whether it is
+ * logged, when the next one is — and was making the model re-derive it from a
+ * list every turn. A model that gets that join right nine times in ten still
+ * gets it wrong in front of the person whose training it is.
+ *
+ * So the facts are stated, and nothing is left to cross-reference. Facts only:
+ * this is context, not instructions, and it must not start telling the coach
+ * what to say.
+ */
+export interface CoachToday {
+  /** Today's day name, from the app clock — the same one every write is stamped with. */
+  dayName: string
+  /** Local hour 0-23, for morning/afternoon/evening. */
+  hour: number
+  /** "6:33 PM", already formatted by the caller. */
+  clock: string
+  /** Today's row in the live week — its focus — or null when the week has no row for today at all. */
+  focus: string | null
+  /**
+   * Whether today's row is a GYM session (it has exercises) as opposed to a
+   * walk, a conditioning day or a note. Separate from `focus` because a
+   * non-lifting day still has a name and a prescription, and calling it a rest
+   * day here would contradict the tagged row for the same day two lines below.
+   */
+  isGymSession: boolean
+  /** Sets logged today and planned for today — how "part-done" is known. */
+  setsLogged: number
+  setsPlanned: number
+  /** True once the session has been closed out, not merely logged against. */
+  finished: boolean
+  /** The next scheduled session after today, when there is one within the week. */
+  next: { dayName: string; focus: string; isTomorrow: boolean } | null
+}
+
+function partOfDay(hour: number): string {
+  if (hour < 12) return 'morning'
+  if (hour < 17) return 'afternoon'
+  return 'evening'
+}
+
+/**
+ * The two or three lines that open the exercise summary. Kept inside
+ * `exercise_summary` deliberately: that field is interpolated into the prompt
+ * verbatim by the deployed edge function, so this reaches Ashley's phone on a
+ * frontend push. A new context field would have needed a function deploy,
+ * which only she can run — the fix would have sat undeployed behind the one
+ * that is already waiting.
+ */
+export function buildTodayHeader(today: CoachToday): string {
+  const when = `It is ${today.dayName} ${partOfDay(today.hour)} (${today.clock}).`
+
+  let session: string
+  if (!today.focus) {
+    session = `Today, ${today.dayName}, is a REST DAY on the plan — there is no session to do today.`
+  } else if (!today.isGymSession) {
+    session = `Today is ${today.dayName}: ${today.focus} — not a gym session; what it prescribes is on the ${today.dayName} row below.`
+  } else if (today.finished) {
+    session = `Today's session is ${today.dayName}'s ${today.focus}, and it is ALREADY DONE — finished and logged. There is nothing left to train today.`
+  } else if (today.setsLogged > 0 && today.setsPlanned > 0 && today.setsLogged < today.setsPlanned) {
+    session = `Today's session is ${today.dayName}'s ${today.focus}, PART-DONE: ${today.setsLogged} of ${today.setsPlanned} sets logged.`
+  } else if (today.setsLogged > 0) {
+    session = `Today's session is ${today.dayName}'s ${today.focus}, and sets have been logged against it today.`
+  } else {
+    session = `Today's session is ${today.dayName}'s ${today.focus}, NOT LOGGED yet.`
+  }
+
+  const next = today.next
+    ? ` The next session after today is ${today.next.isTomorrow ? 'tomorrow' : today.next.dayName}'s ${today.next.focus}.`
+    : ''
+
+  return `${when} ${session}${next}`
+}
+
 export interface CoachWeekBrief {
   days: WorkoutDay[]
   /** The active mesocycle week's own note — where a block-boundary load-hold or a deload explains itself. */
   coachNote?: string | null
   /** Load suggestions sitting unanswered on the dashboard, so the coach doesn't re-offer what's already pending. */
   pendingLoadSuggestions?: string[] | null
+  /** Which day it is and what is true of it — see CoachToday. Omitted only when the caller genuinely does not know yet. */
+  today?: CoachToday | null
 }
 
 /** The whole `exercise_summary` payload sent to chat-gemini. */
-export function buildCoachExerciseSummary({ days, coachNote, pendingLoadSuggestions }: CoachWeekBrief): string {
+export function buildCoachExerciseSummary({ days, coachNote, pendingLoadSuggestions, today }: CoachWeekBrief): string {
   // HOW TO DO THEM, not just what they are. Added 5 Sep 2026 on Ashley's
   // "fix it": the app's 801 curated form cues had one reader in the whole
   // repo (the Exercise tab's How-to panel) and the coach was not it, so it
@@ -169,11 +257,27 @@ export function buildCoachExerciseSummary({ days, coachNote, pendingLoadSuggesti
     days.flatMap(d => d.exercises.map(e => e.name)),
   )
 
-  return days
-    .map(d => `${d.day}: ${d.focus} - ${d.exercises.length > 0
-      ? d.exercises.map(describeExerciseForCoach).join(', ')
-      : describeNonLiftingDay(d)}`)
-    .join('\n')
+  // EVERY ROW SAYS WHERE IT SITS RELATIVE TO NOW. Seven unmarked day names is
+  // what made "today's bench and shoulder press" possible on a day whose
+  // session was neither: the model had to match "today is Monday" against this
+  // list itself, every turn, and once it matched the wrong row everything after
+  // it was confidently wrong.
+  const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+  const todayIdx = today ? dayNames.indexOf(today.dayName) : -1
+  const tag = (day: string): string => {
+    if (todayIdx === -1) return ''
+    if (day === today!.dayName) return ' (TODAY)'
+    const idx = dayNames.indexOf(day)
+    if (idx === -1) return ''
+    return idx === (todayIdx + 1) % 7 ? ' (tomorrow)' : ''
+  }
+
+  return (today && days.length > 0 ? `${buildTodayHeader(today)}\n\n` : '')
+    + days
+      .map(d => `${d.day}${tag(d.day)}: ${d.focus} - ${d.exercises.length > 0
+        ? d.exercises.map(describeExerciseForCoach).join(', ')
+        : describeNonLiftingDay(d)}`)
+      .join('\n')
     + (coachNote ? `\nThis week's coaching note: ${coachNote}` : '')
     + (pendingLoadSuggestions && pendingLoadSuggestions.length > 0
       ? `\nPending suggestion(s) waiting on the dashboard, not yet answered: ${pendingLoadSuggestions.join(' | ')}`

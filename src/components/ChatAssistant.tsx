@@ -641,21 +641,32 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
   const todayPlan = liveWeekDays.find(d => d.day === activeSession.dayName && d.exercises.length > 0)
   const movementsOf = (d: WorkoutDay) => d.exercises.map(e => e.name).slice(0, 3).join(', ') + (d.exercises.length > 3 ? '...' : '')
 
-  const composeOpener = (): Opener => {
-    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-    // The next scheduled session after today, up to six days out — named
-    // "tomorrow" when it is, otherwise by its day.
-    let tomorrowSession: Opener extends never ? never : { dayName: string; focus: string; lead: string | null } | null = null
+  // The next scheduled session after today, up to six days out. Hoisted for the
+  // same reason todayPlan was: the opener, the unprompted message and the
+  // coach's own context must not each walk the week their own way and then
+  // disagree about which session is next.
+  const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+  const nextSessionAfterToday = (): { dayName: string; focus: string; lead: string | null; isTomorrow: boolean } | null => {
     const base = new Date(`${activeSession.date}T12:00:00`)
-    for (let ahead = 1; ahead <= 6 && !tomorrowSession; ahead++) {
+    for (let ahead = 1; ahead <= 6; ahead++) {
       const d = new Date(base); d.setDate(d.getDate() + ahead)
-      const name = dayNames[d.getDay()]
+      const name = DAY_NAMES[d.getDay()]
       const day = liveWeekDays.find(x => x.day === name && x.exercises.length > 0)
       if (day) {
         const lead = day.exercises.find(e => e.tier === 'tier_1_primary')?.name ?? day.exercises[0]?.name ?? null
-        tomorrowSession = { dayName: ahead === 1 ? 'tomorrow' : name, focus: day.focus, lead }
+        return { dayName: name, focus: day.focus, lead, isTomorrow: ahead === 1 }
       }
     }
+    return null
+  }
+
+  const composeOpener = (): Opener => {
+    // Named "tomorrow" when it is, otherwise by its day — the opener's own
+    // wording rule, applied to the shared walk above.
+    const upcoming = nextSessionAfterToday()
+    const tomorrowSession = upcoming
+      ? { dayName: upcoming.isTomorrow ? 'tomorrow' : upcoming.dayName, focus: upcoming.focus, lead: upcoming.lead }
+      : null
     return pickOpener({
       hour: getAppNow(profile.id).getHours(),
       cutoffHour: sessionCutoffHour(profile.preferred_time),
@@ -1117,10 +1128,34 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     // carried no prescribed weight while the Exercise tab showed that weight
     // on the next screen.
     const stepsSummary = buildCoachStepsSummary(todaySteps, profile)
+    // WHICH DAY IT IS, ANSWERED RATHER THAN IMPLIED. Ashley, 7 Sep 2026: the
+    // coach called Tuesday's bench "today's", then offered a finished Monday
+    // session as something to head in for "this morning" at 6:33 PM. Every
+    // fact it needed was in the app; none of it was joined up before being
+    // sent. See CoachToday in chat-plan-context.ts.
+    const nowForToday = getAppNow(profile.id)
+    const todayRow = liveWeekDays.find(d => d.day === activeSession.dayName)
+    const upcomingSession = nextSessionAfterToday()
     const exerciseSummary = buildCoachExerciseSummary({
       days: activeWeekData,
       coachNote: activeMesoWeek?.coach_note,
       pendingLoadSuggestions,
+      today: {
+        dayName: activeSession.dayName,
+        hour: nowForToday.getHours(),
+        clock: nowForToday.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
+        focus: todayRow?.focus ?? null,
+        isGymSession: (todayRow?.exercises.length ?? 0) > 0,
+        setsLogged: activeSession.logs.length,
+        setsPlanned: todayRow?.exercises.reduce((n, e) => n + (e.sets ?? 0), 0) ?? 0,
+        // The session being CLOSED OUT, not merely logged against — the same
+        // three-valued status the Exercise tab's start button reads, so the
+        // coach and that button can never disagree about whether today is done.
+        finished: activeSession.status === 'finished',
+        next: upcomingSession
+          ? { dayName: upcomingSession.dayName, focus: upcomingSession.focus, isTomorrow: upcomingSession.isTomorrow }
+          : null,
+      },
     })
 
     // WHERE THEY ARE, not just what this week holds. The plan has carried
