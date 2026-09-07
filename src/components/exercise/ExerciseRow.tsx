@@ -33,6 +33,15 @@ export interface ExerciseRowProps {
   loadSource: LoadSource | undefined
   progressionNote?: { note: string; didProgress: boolean }
   showCalibrationCue?: boolean
+  /**
+   * Week 1 with nothing verified yet.
+   *
+   * SEPARATE FROM showCalibrationCue, which is true for exactly ONE row per
+   * session (the anchor session-derive picks). The chip's wording has to be
+   * the same on every row of the week or the session reads as if some lifts
+   * were prescribed and others estimated.
+   */
+  isCalibrationWeek?: boolean
   onOpenPlateCalc: (weightKg: number) => void
   onSwap: () => void
   onBan: () => void | Promise<void>
@@ -52,6 +61,7 @@ export function ExerciseRow({
   loadSource,
   progressionNote,
   showCalibrationCue,
+  isCalibrationWeek,
   onOpenPlateCalc,
   onSwap,
   onBan,
@@ -163,8 +173,8 @@ export function ExerciseRow({
                   <span className="text-xs text-text-tertiary pb-0.5">kg assist</span>
                 </div>
               )}
-              {ex.suggested_load_kg != null && loadSourceLabel(loadSource) && (
-                <p className="text-[0.625rem] uppercase tracking-[.1em] text-muted-foreground">{loadSourceLabel(loadSource)}</p>
+              {ex.suggested_load_kg != null && loadSourceLabel(loadSource, isCalibrationWeek) && (
+                <p className="text-[0.625rem] uppercase tracking-[.1em] text-muted-foreground">{loadSourceLabel(loadSource, isCalibrationWeek)}</p>
               )}
               <div className="mt-1.5">
                 {/* A lift with no weight renders no LoadChip at all (see its
@@ -182,6 +192,7 @@ export function ExerciseRow({
                     explained={explainedLoadChip}
                     onToggleExplain={() => setExplainedLoadChip(v => !v)}
                     progressionNote={progressionNote}
+                    calibration={isCalibrationWeek}
                   />
                 )}
               </div>
