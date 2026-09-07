@@ -101,10 +101,27 @@ export const DURATION_OPTIONS: { value: SessionDuration; icon: string; label: st
 ]
 
 
+/**
+ * The descriptions have to name what each tier ACTUALLY unlocks, because the
+ * tier is a hard filter on every exercise the plan can contain.
+ *
+ * "Minimalist — Bands & kettlebells" was wrong in the one direction that costs
+ * something: EQUIPMENT_SETS.minimalist (exercise-plan.ts) also holds dumbbells,
+ * a pull-up bar, a jump rope, a medicine ball, a plyo box, an ab wheel and a
+ * weighted backpack. Read beside "Home gym — Barbell, dumbbells, bench",
+ * someone with dumbbells and no bench has only one chip that mentions dumbbells
+ * at all, taps Home gym, and gets prescribed barbell and bench work they cannot
+ * do. Measured twice on 7 Sep 2026: a free-text answer of "dumbbells up to
+ * 24kg, a pull-up bar and bands" was classified minimalist, which was exactly
+ * right — the label was the only thing that disagreed with the engine.
+ *
+ * The distinguishing fact leads in each, since a rack, a bench or neither is
+ * what someone scanning four chips is actually choosing between.
+ */
 export const EQUIPMENT_OPTIONS: { value: EquipmentAccess; icon: string; label: string; description: string }[] = [
-  { value: 'full_gym', icon: '🏢', label: 'Full gym', description: 'All machines & free weights' },
-  { value: 'home_gym', icon: '🏠', label: 'Home gym', description: 'Barbell, dumbbells, bench' },
-  { value: 'minimalist', icon: '🎒', label: 'Minimalist', description: 'Bands & kettlebells' },
+  { value: 'full_gym', icon: '🏢', label: 'Full gym', description: 'Machines, racks and free weights' },
+  { value: 'home_gym', icon: '🏠', label: 'Home gym', description: 'A barbell and a bench, plus dumbbells' },
+  { value: 'minimalist', icon: '🎒', label: 'Minimalist', description: 'Dumbbells, bands, kettlebells, pull-up bar — no barbell or bench' },
   { value: 'bodyweight', icon: '🤸', label: 'Bodyweight only', description: 'No equipment needed' },
 ]
 
@@ -365,6 +382,52 @@ export const BREAKFAST_STYLE_OPTIONS: { value: BreakfastStyle; icon: string; lab
  * The one multi-select toggle, previously hand-duplicated four times inline
  * in OnboardingFlow's switch cases (trainingDays/injuries/dietary/cuisines).
  */
+/**
+ * A per-hand dumbbell weight stated in free text, or null.
+ *
+ * DELIBERATELY NARROW, and refuses far more than it accepts. It only fires on a
+ * phrase that names dumbbells AND a number AND an upper bound ("up to 24kg",
+ * "24kg dumbbells", "dumbbells that go to 24"), because the cost of a false
+ * positive here is a silently wrong load ceiling that clamps every prescribed
+ * weight for sixteen weeks — the same class of harm ceiling-reconcile.ts exists
+ * to undo. Anything ambiguous returns null and the app asks at first use, which
+ * is the behaviour that was already correct.
+ *
+ * Per HAND is the assumption because that is the unit the Exercise tab's own
+ * prompt uses ("Per hand. I will stop suggesting weights you do not own."), and
+ * the unit statedCeilingKg compares against.
+ */
+export function parseVolunteeredDumbbellKg(text: string): number | null {
+  const t = text.toLowerCase()
+  if (!/dumbbell/.test(t)) return null
+  // A barbell OWNED in the same breath disqualifies the phrase: "a barbell and
+  // dumbbells up to 24kg" is a home_gym answer whose number could belong to
+  // either implement, and guessing wrong writes a ceiling onto the wrong one —
+  // worse than not capturing it, because the Exercise tab would then never ask.
+  //
+  // NEGATED CLAUSES ARE DROPPED FIRST, and that is not a nicety. The very
+  // sentence this feature exists for is "adjustable dumbbells up to 24kg each,
+  // a pull-up bar and bands. No barbell or bench." — the phrase most likely to
+  // carry a dumbbell ceiling is also the one most likely to mention a barbell,
+  // precisely because the person is ruling it out. Caught by the first live run
+  // of this fix, which captured nothing for exactly that reason.
+  const asserted = t
+    .split(/[,.;]| and | plus /)
+    .filter(clause => !/\b(no|not|non|don'?t|dont|without|haven'?t|nothing)\b/.test(clause))
+    .join(' ')
+  if (/barbell|plates/.test(asserted)) return null
+  // "up to 24kg", "goes up to 24 kg", "24kg dumbbells", "dumbbells are 24kg"
+  const m = t.match(/(?:up\s*to|max(?:imum)?(?:\s*of)?|go(?:es)?\s*(?:up\s*)?to|are|of)\s*(\d{1,3}(?:\.\d)?)\s*(?:kg|kilos?)/)
+    ?? t.match(/(\d{1,3}(?:\.\d)?)\s*(?:kg|kilos?)\s*(?:adjustable\s*)?dumbbells?/)
+  if (!m) return null
+  const kg = Number(m[1])
+  // Bounds, not validation theatre: below 2kg is not a working dumbbell and
+  // above 60kg is beyond anything sold as an adjustable pair — either is far
+  // more likely to be a misparse than a real answer.
+  if (!Number.isFinite(kg) || kg < 2 || kg > 60) return null
+  return kg
+}
+
 export function toggleValue<T>(arr: T[], value: T): T[] {
   return arr.includes(value) ? arr.filter(x => x !== value) : [...arr, value]
 }
@@ -405,6 +468,22 @@ export interface OnboardingSlotValues {
   dislikedFoods: string
   dislikedExercises: string
   breakfastStyle: BreakfastStyle | null
+  /**
+   * A per-hand dumbbell ceiling the user VOLUNTEERED while answering the
+   * equipment question — never asked for here, only caught if it is said.
+   *
+   * load-ceiling-prompt.ts asks this on the Exercise tab at first use, which is
+   * Ashley's ruling and stands ("someone who has never trained cannot answer
+   * how much they can load, and onboarding is where people drop out"). What was
+   * wrong is asking someone who has ALREADY told us. Measured twice on 7 Sep
+   * 2026: "adjustable dumbbells up to 24kg each" in onboarding, and the very
+   * first Exercise tab still opened with "What are your heaviest dumbbells?".
+   *
+   * Not a slot, deliberately — it must never appear in the catalog, in
+   * STILL UNKNOWN, or on the review card, because none of those would be
+   * "asked only at first use" any more.
+   */
+  volunteeredMaxDumbbellKg: number | null
 }
 
 /**
@@ -443,6 +522,7 @@ export function initialSlotValues(): OnboardingSlotValues {
     dislikedFoods: '',
     dislikedExercises: '',
     breakfastStyle: null,
+    volunteeredMaxDumbbellKg: null,
   }
 }
 
@@ -1027,6 +1107,10 @@ export function assembleProfile(data: OnboardingSlotValues): UserProfile {
     dietary_preferences: data.dietaryPreferences,
     session_duration_preference: data.sessionDuration!,
     equipment_access: data.equipment!,
+    // Only ever set when the user said it unprompted while describing their
+    // kit. Null leaves the column untouched, so the Exercise tab asks at first
+    // use exactly as it always has (load-ceiling-prompt.ts).
+    ...(data.volunteeredMaxDumbbellKg != null ? { max_dumbbell_kg: data.volunteeredMaxDumbbellKg } : {}),
     training_style: data.trainingStyle!,
     training_experience: data.trainingExperience!,
     conditioning_preference: data.conditioningPreference!,

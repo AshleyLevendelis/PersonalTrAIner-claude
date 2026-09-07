@@ -65,14 +65,29 @@ function DialogContent({
         {...props}
       >
         {children}
+        {/* THE POSITIONING LIVES ON A WRAPPER, and that is a fix rather than a
+            nesting preference. `hit-slop-44 absolute top-4 right-4` on the
+            button itself never produced an absolutely-positioned button:
+            index.css's `.hit-slop-44 { position: relative }` wins the cascade
+            over Tailwind's `absolute`, so top-4/right-4 had nothing to act on
+            and the close fell back into the grid as its last row.
+            Measured live on the Profile sheet, twice: computed position
+            "relative", rect 325px wide and 16px tall sitting at the very bottom
+            of the scroll, below "Delete everything". Profile therefore opened
+            with no visible way out — on every dialog in the app that uses this
+            close, not just that one.
+            The wrapper is positioned (nothing overrides it) and the button
+            keeps its 44px slop, so both rules get what they were asking for. */}
         {showCloseButton && (
-          <DialogPrimitive.Close
-            data-slot="dialog-close"
-            className="hit-slop-44 absolute top-4 right-4 rounded-xs opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
-          >
-            <XIcon />
-            <span className="sr-only">Close</span>
-          </DialogPrimitive.Close>
+          <span className="absolute top-4 right-4">
+            <DialogPrimitive.Close
+              data-slot="dialog-close"
+              className="hit-slop-44 flex rounded-xs opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+            >
+              <XIcon />
+              <span className="sr-only">Close</span>
+            </DialogPrimitive.Close>
+          </span>
         )}
       </DialogPrimitive.Content>
     </DialogPortal>

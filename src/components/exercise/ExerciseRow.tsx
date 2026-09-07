@@ -13,7 +13,8 @@ import { AssistanceChip } from './AssistanceChip'
 import { AddedLoadChip } from './AddedLoadChip'
 import { CalibrationCue } from './CalibrationCue'
 import { SetGrid, type SetGridProps } from './SetGrid'
-import type { Exercise, ExerciseSetLog } from '@/lib/types'
+import { loggedLoadCeilingKg } from '@/lib/logged-load-check'
+import type { Exercise, ExerciseSetLog, UserProfile } from '@/lib/types'
 
 // ---------------------------------------------------------------------------
 // The repeated unit for the today view's exercise list (LAYOUT-DESIGN.md
@@ -52,6 +53,13 @@ export interface ExerciseRowProps {
   onOpenHistory?: (exerciseId: string, exerciseName: string) => void
   /** Opens the technique panel — see ExerciseDetailDialog. */
   onOpenDetail?: (exerciseName: string) => void
+  /**
+   * Needed only to price this movement's loading ceiling, which is what a
+   * logged weight is questioned against (logged-load-check.ts). Optional so
+   * the read-only/browse renders that have no profile in hand skip the check
+   * rather than being forced to invent one.
+   */
+  profile?: UserProfile
 }
 
 export function ExerciseRow({
@@ -71,6 +79,7 @@ export function ExerciseRow({
   onToggleExpanded,
   onOpenHistory,
   onOpenDetail,
+  profile,
 }: ExerciseRowProps) {
   const { setsFor, requestedSetFocus, clearSetFocusRequest, rampTicksFor, toggleRampTick } = useActiveSession()
   const exerciseId = ex.id ?? getExerciseId(ex.name)
@@ -302,6 +311,7 @@ export function ExerciseRow({
             loadUnitLabel={(ex.suggested_load ? splitLoadDisplay(ex.suggested_load) : null)?.unit}
             perSetLoadKg={ex.per_set_load?.map(s => s.load_kg)}
             loadIsEstimate={loadIsUnverified}
+            loadCeilingKg={loggedLoadCeilingKg(ex.name, profile)}
             onOpenPlateCalc={onOpenPlateCalc}
             onSetCompleted={onSetCompleted}
           />

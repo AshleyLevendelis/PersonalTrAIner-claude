@@ -87,7 +87,7 @@ export function TodayPanel({
   onOpenDetail?: (exerciseName: string) => void
   onOpenSessionHistory?: () => void
 }) {
-  const { date: today, dayName: todayName, liveWeek, startRest, setsFor, logs, status, startSession, finishSession } = useActiveSession()
+  const { date: today, dayName: todayName, liveWeek, startRest, dismissRest, setsFor, logs, status, startSession, finishSession } = useActiveSession()
 
   // Audit §6.4 — hold the screen awake for as long as the session is
   // actually running, and no longer. Before this the phone dimmed and locked
@@ -126,6 +126,10 @@ export function TodayPanel({
   const [summaryCloseFailed, setSummaryCloseFailed] = useState(false)
 
   const handleFinish = async () => {
+    // The session is over, so any rest it left running is over too. Without
+    // this, a rest started by the last logged set outlived the workout and sat
+    // on the dock asking "ready for set 3?" of a session that had finished.
+    dismissRest()
     const result = await finishSession()
     if (!result || !workout) return
     setSummaryCloseFailed(!!result.serverCloseFailed)
@@ -549,6 +553,7 @@ export function TodayPanel({
           <ExerciseList
             workout={workout!}
             dayName={effectiveDayName}
+            profile={profile}
             currentMesoWeekObj={currentMesoWeekObj}
             progressedLoads={progressedLoads}
             progressedAddedLoads={progressedAddedLoads}
@@ -573,7 +578,7 @@ export function TodayPanel({
               <FinisherRow cardio={workout!.recommendedCardio} />
             </>
           )}
-          <AdditionalWorkSection plannedExercises={workout!.exercises} onOpenPlateCalc={onOpenPlateCalc} />
+          <AdditionalWorkSection plannedExercises={workout!.exercises} onOpenPlateCalc={onOpenPlateCalc} profile={profile} />
           {/* VISIBLE AGAIN, and the "⋮" menu no longer carries it. Turn 5 put
               it behind that menu; the polish handoff puts it back at the foot
               of the list, which is where someone finishing a session looks
@@ -640,6 +645,7 @@ export function TodayPanel({
 function ExerciseList({
   workout,
   dayName,
+  profile,
   currentMesoWeekObj,
   progressedLoads,
   progressedAddedLoads,
@@ -654,6 +660,8 @@ function ExerciseList({
 }: {
   workout: WorkoutDay
   dayName: string
+  /** Only ever used to price a movement's loading ceiling for the set grid's "is that weight right?" check. */
+  profile?: UserProfile
   currentMesoWeekObj?: MesocycleWeek
   progressedLoads: Record<string, number>
   progressedAddedLoads: Record<string, number>
@@ -714,6 +722,9 @@ function ExerciseList({
     return {
       ex: rowEx,
       dayName,
+      // Carried down only so the set grid can price this movement's loading
+      // ceiling — the number a logged weight is questioned against.
+      profile,
       loadSource: loadSourceFor(ex),
       // A persisted block-level hold (VISION.md Step 4 — see block-review.ts)
       // takes precedence over the live single-session note: it reflects a

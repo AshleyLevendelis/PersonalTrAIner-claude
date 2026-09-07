@@ -25,7 +25,8 @@ export function ClarificationCard({
 }: {
   /** What's already parsed/resolved, shown as muted context above the question. */
   contextLines?: string[]
-  prompt: string
+  /** Omitted when the message bubble above already shows this exact question — see the call site for why it rendered twice. */
+  prompt?: string
   options: ClarificationOption[]
   onChoose: (value: string) => Promise<void>
 }) {
@@ -51,10 +52,12 @@ export function ClarificationCard({
           ))}
         </div>
       )}
-      <p className="flex items-start gap-1.5 text-xs font-medium">
-        <HelpCircle className="size-3.5 mt-0.5 shrink-0 text-primary-text" />
-        {prompt}
-      </p>
+      {prompt && (
+        <p className="flex items-start gap-1.5 text-xs font-medium">
+          <HelpCircle className="size-3.5 mt-0.5 shrink-0 text-primary-text" />
+          {prompt}
+        </p>
+      )}
       {!resolved && (
         <div className="flex flex-wrap gap-1.5">
           {options.map(opt => (

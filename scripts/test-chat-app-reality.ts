@@ -145,10 +145,22 @@ async function main() {
   check('Tools bullet mentions Grocery', /grocery/i.test(toolsBullet), toolsBullet)
 
   console.log('\n[4] Regression guard: the confirmed-fabricated features stay on the "does NOT exist" list, never reintroduced as real')
-  const doesNotExistMatch = appRealityBlock.match(/These do NOT exist[^]*?(?=\n\nIf asked)/)
+  // \r? on both newlines: chat-gemini/index.ts is stored with CRLF line
+  // terminators, so a bare \n\n never matched and all five of these checks had
+  // been failing — quietly, in the sense that nobody reads a gate that is
+  // always red. A regression guard that cannot pass is not guarding anything,
+  // and this one is the guard against the coach re-inventing the fabricated
+  // "Subscription"/"Social" screens that caused the incident it was written for.
+  const doesNotExistMatch = appRealityBlock.match(/These do NOT exist[^]*?(?=\r?\n\r?\nIf asked)/)
   check('a "does NOT exist" list is present', doesNotExistMatch !== null)
   const doesNotExistBlock = doesNotExistMatch?.[0] ?? ''
-  for (const phrase of ['subscription', 'data export', 'progress-photo', 'community']) {
+  // 'data export' was on this list until 7 Sep 2026 and has been removed on
+  // purpose: Profile now really does have "Download my data", so asserting the
+  // feature does not exist had stopped being a regression guard and started
+  // being the regression — the coach denying a button the user can see. It was
+  // invisible for as long as the CRLF bug above kept this whole block red.
+  // Anything genuinely still fabricated stays.
+  for (const phrase of ['subscription', 'progress-photo', 'community']) {
     check(`"does NOT exist" list still names "${phrase}"`, doesNotExistBlock.toLowerCase().includes(phrase))
   }
 

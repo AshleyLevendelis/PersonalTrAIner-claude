@@ -29,8 +29,8 @@ import { buildMealLogProposal, type MealLogPayload, type MealLogComputed } from 
 import { buildCustomMealProposal } from '@/lib/custom-meal'
 import { buildMealFoodAddProposal } from '@/lib/meal-food-add'
 import { buildMealSwapProposal } from '@/lib/meal-swap-proposal'
-import { compileFoodDislikes } from '@/lib/fact-compiler'
-import type { SwapScope } from '@/lib/mesocycle-edit'
+import { compileFoodDislikes, compileSoftExercisePreferences } from '@/lib/fact-compiler'
+import { getReplacementCandidates, type SwapScope } from '@/lib/mesocycle-edit'
 import { createPlanAdaptation } from '@/lib/plan-adaptations-store'
 import { updateProfileField } from '@/lib/profile-store'
 import { substituteForInjury, substituteForEquipment, assessAdaptation, countSlots } from '@/lib/plan-adaptations'
@@ -58,6 +58,7 @@ import { subscribeCardioLogStore } from '@/lib/cardio-log-store'
 import { subscribeMealStore } from '@/lib/meal-store'
 import { getStepsForDate, logStepsManual, restoreStepsForDate, isPlausibleStepCount, MAX_PLAUSIBLE_DAILY_STEPS } from '@/lib/steps-store'
 import { buildCoachStepsSummary } from '@/lib/steps-context'
+import { buildCoachWaterSummary } from '@/lib/water-context'
 import { ProposalCard } from '@/components/chat/ProposalCard'
 import { TypewriterMarkdown } from '@/components/chat/TypewriterMarkdown'
 import { ReceiptCard } from '@/components/chat/ReceiptCard'
@@ -1128,6 +1129,10 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     // carried no prescribed weight while the Exercise tab showed that weight
     // on the next screen.
     const stepsSummary = buildCoachStepsSummary(todaySteps, profile)
+    // Reads the SAME numbers the rings draw (proactiveData), so the coach and
+    // the Home tab can never quote different totals. Null while that is still
+    // loading — see buildCoachWaterSummary for why null must not become 0.
+    const waterSummary = buildCoachWaterSummary(proactiveData?.waterMl, proactiveData?.waterTargetMl)
     // WHICH DAY IT IS, ANSWERED RATHER THAN IMPLIED. Ashley, 7 Sep 2026: the
     // coach called Tuesday's bench "today's", then offered a finished Monday
     // session as something to head in for "this morning" at 6:33 PM. Every
@@ -1276,6 +1281,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       training_days_count: profile.training_days.filter(d => d.available).length,
       exercise_summary: exerciseSummary,
       steps_summary: stepsSummary,
+      water_summary: waterSummary,
       phase_brief: phaseBrief,
       // Empty string when there is nothing to say — which is also what stops
       // the coach asking twice: once record_session_feel writes `felt`, the
@@ -1647,18 +1653,90 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     diff: import('@/lib/pending-actions-store').ProposalDiff
   } | null => {
     const dayArg = String(rawArgs.day ?? '')
-    const oldItem = String(rawArgs.old_item ?? '')
-    const newItem = String(rawArgs.new_item ?? '')
-    if (!dayArg || !oldItem || !newItem || mesocycle.length === 0) return null
+    const oldItem = String(rawArgs.old_item ?? '').trim()
+    const newItem = String(rawArgs.new_item ?? '').trim()
+    if (!oldItem || mesocycle.length === 0) return null
 
     const week = mesocycle.find(w => w.week_number === activeSession.liveWeek)
-    const day = week?.days.find(d => d.day.toLowerCase() === dayArg.toLowerCase())
-    if (!day) return null
-    const exIndex = day.exercises.findIndex(e => e.name.toLowerCase() === oldItem.toLowerCase())
-    if (exIndex === -1) return null
+    if (!week) return null
+
+    // FIND THE EXERCISE, THEN THE DAY — not the other way round, and not
+    // requiring a replacement to have been named.
+    //
+    // This required all three of day, old_item and new_item, matched the day
+    // by exact string and the exercise by exact string, and returned null at
+    // every step. Null becomes one generic sentence: "I couldn't find that on
+    // your current plan — it may have changed since you last looked." Measured
+    // live, 7 Sep 2026, and again on 7 Sep after a rebuild — every attempt
+    // refused that way:
+    //   "swap the floor press for the rest of the block"
+    //   "swap Dumbbell Floor Press for something easier on my shoulder"
+    //   "swap Hammer Curls for something else tomorrow"
+    // The third came one message after the coach itself had listed Hammer
+    // Curls as tomorrow's exercise. "Swap an exercise" is one of the three
+    // quick replies offered on the very first screen, so this is the advertised
+    // path failing, not an edge case.
+    //
+    // The common cause is the third argument: NOBODY NAMES A REPLACEMENT.
+    // "Swap X for something else" is how the request is actually phrased, so
+    // new_item arrives empty (or as an invented name the catalogue does not
+    // hold) and the build fails before anything else is considered. A missing
+    // day argument is the same shape of problem one step down.
+    const matchesName = (name: string, phrase: string) => {
+      const a = name.toLowerCase()
+      const b = phrase.toLowerCase()
+      return a === b || a.includes(b) || b.includes(a)
+    }
+    const namedDay = dayArg ? week.days.find(d => d.day.toLowerCase() === dayArg.toLowerCase()) : undefined
+    // The named day first (it disambiguates an exercise that appears twice in
+    // a week), then the rest — a missing or misheard day is not a reason to
+    // refuse a swap for an exercise that is plainly on the plan.
+    const searchDays = namedDay ? [namedDay, ...week.days.filter(d => d !== namedDay)] : week.days
+    let day: (typeof week.days)[number] | null = null
+    let exIndex = -1
+    for (const candidate of searchDays) {
+      const exact = candidate.exercises.findIndex(e => e.name.toLowerCase() === oldItem.toLowerCase())
+      const idx = exact !== -1 ? exact : candidate.exercises.findIndex(e => matchesName(e.name, oldItem))
+      if (idx !== -1) { day = candidate; exIndex = idx; break }
+    }
+    if (!day || exIndex === -1) return null
     const oldEx = day.exercises[exIndex]
-    const newEntry = getExerciseEntry(newItem)
+
+    // A named replacement wins when the catalogue has it. Otherwise pick the
+    // way the Exercise tab's own swap panel picks — getReplacementCandidates is
+    // already the app's constraint-checked answer to "what else could go here",
+    // filtered for equipment, injuries and bans and ranked by soft preference.
+    // Falling back to it is what makes "swap this for something else"
+    // answerable at all, which is the form the request nearly always takes.
+    const namedEntry = newItem ? getExerciseEntry(newItem) : null
+    const candidates = namedEntry ? [] : getReplacementCandidates(
+      oldEx.name,
+      profile,
+      exerciseExclusions,
+      // The SAME soft preferences the swap panel ranks with (App.tsx compiles
+      // these from user_facts) — not profile.disliked_exercises, which is an
+      // onboarding-only carrier and frozen everywhere else.
+      compileSoftExercisePreferences(memoryFacts),
+    )
+    // SAME MOVEMENT PATTERN FIRST. The ranked list legitimately includes
+    // cross-pattern suggestions — getReplacementCandidates says so, and the
+    // swap SHEET shows each one's note explaining why a squat is being offered
+    // instead of a bench press. A chat card has no such list to sit in: it
+    // shows one exercise as "the" answer, so the top-ranked cross-pattern pick
+    // arrives with no context at all. Measured while verifying this fix:
+    // "swap Dumbbell Floor Press for something easier on my shoulder" proposed
+    // a GLUTE BRIDGE, which is a defensible entry in a list and nonsense as a
+    // lone answer to a chest-press question.
+    const oldEntry = getExerciseEntry(oldEx.name)
+    const samePattern = oldEntry
+      ? candidates.find(c => c.exercise.movement_pattern === oldEntry.movement_pattern)
+      : undefined
+    const picked = namedEntry ? null : (samePattern ?? candidates[0] ?? null)
+    const newEntry = namedEntry ?? picked?.exercise ?? null
     if (!newEntry) return null
+    // Proposing a lift as its own replacement is a confirmation card that
+    // changes nothing — refuse and let the caller say something useful.
+    if (newEntry.name.toLowerCase() === oldEx.name.toLowerCase()) return null
 
     const scope: SwapScope = rawArgs.scope === 'permanent' ? 'permanent' : 'today'
     const payload: ExerciseSwapPayload = {
@@ -1679,7 +1757,17 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         rows: [{ field: 'Exercise', before: oldEx.name, after: newEntry.name }],
         unchanged: [`${day.day}'s other ${day.exercises.length - 1} exercise${day.exercises.length - 1 === 1 ? '' : 's'}`, `Sets × reps: ${oldEx.sets}×${oldEx.reps}`],
         implications: [{ severity: 'info', text: 'Load recomputed for the new movement once you confirm.' }],
-        rationale: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined,
+        // The model's own sentence ONLY when the model's own choice was used.
+        // When the app picked the replacement, that sentence describes a
+        // different exercise — measured while verifying this fix: the diff read
+        // "Dumbbell Floor Press -> Glute Bridge" under the rationale "Swapping
+        // to Push-Ups on Knees to reduce the shoulder load", because the model
+        // had named a lift the catalogue does not hold and the app quietly
+        // substituted its own. The candidate's own note is the honest
+        // explanation of the thing actually being offered.
+        rationale: namedEntry
+          ? (typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined)
+          : (picked?.note || undefined),
         editable: [{ field: 'scope', options: ['today', 'permanent'] }],
         reversible: true,
       },
@@ -2770,10 +2858,67 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       const prompt = group.resolution === 'ambiguous'
         ? `Which "${group.matchedRawPhrase}" did you mean?`
         : group.ambiguity?.message ?? "I need one more detail before I can log this."
-      const options = group.resolution === 'ambiguous' && group.ambiguousCandidates
-        ? group.ambiguousCandidates.map(c => ({ label: c.name, value: c.name }))
-        : []
-      return { text: prompt, clarification: { prompt, options, resolverId } }
+
+      // EVERY clarification gets something to tap.
+      //
+      // Only the ambiguous-NAME case ever had options. A missing weight or a
+      // missing sets x reps rendered the question with nothing under it, so the
+      // only way to answer was prose — which goes back through the model, comes
+      // back as a fresh log_workout call, re-parses from scratch with no memory
+      // of what was already known, and asks the identical question again.
+      //
+      // Measured live twice, 7 Sep 2026, trying to correct a mistyped weight:
+      //   "it was 8kg, not 500kg. Can you fix that?" -> "How many sets and reps?"
+      //   "the first set was 10 reps, the second was 9"  -> the same question
+      //   "2 sets of 10 reps at 8kg"  -> "What weight did you use?"
+      //   "8kg"                       -> the same question. Never resolves.
+      // chat-gemini's prompt already carries a rule against asking the same
+      // question twice running, added after this exact loop was measured
+      // before. It could never have held: these sentences come from
+      // set-parse.ts on the client, one message at a time, with no view of what
+      // was asked last turn. A tappable answer closes it deterministically
+      // instead of asking the model to remember.
+      const field: ChatClarificationView['field'] =
+        group.resolution === 'ambiguous' ? 'exercise_name' : group.ambiguity?.field as ChatClarificationView['field']
+
+      const planned = todaysWorkout?.exercises.find(e => e.name === group.exerciseName)
+      const ghostSets = group.exerciseId ? activeSession.ghosts(group.exerciseId) : []
+
+      let options: { label: string; value: string }[] = []
+      if (group.resolution === 'ambiguous' && group.ambiguousCandidates) {
+        options = group.ambiguousCandidates.map(c => ({ label: c.name, value: c.name }))
+      } else if (field === 'weight') {
+        // Everything the app already knows the answer might be: what it
+        // prescribed today, what they lifted last time, and bodyweight. Each is
+        // a real number this person has actually seen on this exercise.
+        const candidates: { label: string; value: string }[] = []
+        // WHAT THEY JUST SAID, FIRST. The parser asks for a weight because it
+        // could not find one in the sets phrase the model built — but the
+        // user's own sentence very often contains it, and it is by definition
+        // the likeliest right answer. Measured while verifying this fix: "it
+        // was 8kg, not 500kg" produced a card offering "6kg (today's target)"
+        // and "Bodyweight", with 8 nowhere on it — better than the loop it
+        // replaced, and still not the number the person had just typed.
+        // Deliberately takes the LAST figure in the phrase: a correction reads
+        // "it was 8kg, not 500kg" as often as "not 500kg, it was 8kg", and the
+        // corrected value is the one that trails in the first shape... so the
+        // first is preferred instead when the phrase contains "not", which is
+        // the marker for a correction.
+        const spoken = [...String(group.matchedRawPhrase ?? '').matchAll(/(\d{1,3}(?:\.\d)?)\s*kg/gi)].map(m => m[1])
+        const spokenPick = spoken.length > 1 && /\bnot\b/i.test(String(group.matchedRawPhrase ?? ''))
+          ? spoken[0]
+          : spoken[spoken.length - 1]
+        if (spokenPick) candidates.push({ label: `${spokenPick}kg (what you said)`, value: `@${spokenPick}kg` })
+        if (planned?.suggested_load_kg != null && String(planned.suggested_load_kg) !== spokenPick) candidates.push({ label: `${planned.suggested_load_kg}kg (today's target)`, value: `@${planned.suggested_load_kg}kg` })
+        const lastWeight = ghostSets.find(g => g.weight_kg > 0)?.weight_kg
+        if (lastWeight != null && lastWeight !== planned?.suggested_load_kg && String(lastWeight) !== spokenPick) candidates.push({ label: `${lastWeight}kg (last time)`, value: `@${lastWeight}kg` })
+        candidates.push({ label: 'Bodyweight', value: '@bodyweight' })
+        options = candidates
+      } else if (field === 'sets_x_reps') {
+        if (planned) options.push({ label: `${planned.sets}x${planned.reps} (as prescribed)`, value: `${planned.sets}x${planned.reps}` })
+      }
+
+      return { text: prompt, clarification: { prompt, options, resolverId, field } }
     }
 
     const todaysPlanSetCounts = new Map((todaysWorkout?.exercises ?? []).map(e => [e.name, e.sets] as const))
@@ -2845,7 +2990,21 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     const priorParse = parseWorkoutEntries({ entries: session.entries, todaysPlanExerciseNames: session.todaysPlanExerciseNames })
     const idx = priorParse.groups.findIndex((g: ParsedSetGroup) => g.resolution === 'ambiguous' || !!g.ambiguity)
     if (idx === -1) return
-    const updatedEntries = session.entries.map((e, i) => (i === idx ? { ...e, exercisePhrase: value } : e))
+    // The answer goes into the field the question was about. This used to
+    // write every answer into exercisePhrase, which was safe only because the
+    // other two kinds of question shipped with no options to answer — the
+    // moment they got some, a weight would have been pasted over the exercise
+    // name. The name case keeps its old behaviour exactly; the other two APPEND
+    // to the sets phrase, so the half already parsed ("2 sets") is kept and the
+    // missing half ("@8kg") joins it rather than replacing it.
+    const updatedEntries = session.entries.map((e, i) => {
+      if (i !== idx) return e
+      if (msg.clarification?.field === 'weight' || msg.clarification?.field === 'sets_x_reps') {
+        const merged = `${e.setsPhrase ?? ''} ${value}`.trim()
+        return { ...e, setsPhrase: merged, rawText: `${e.exercisePhrase} ${merged}`.trim() }
+      }
+      return { ...e, exercisePhrase: value }
+    })
 
     const outcome = resolveAndMaybeLog(updatedEntries)
     setMessages(prev => prev.map((m, i) => (i === msgIndex ? { ...m, clarification: outcome.clarification, receipt: outcome.receipt, content: outcome.text } : m)))
@@ -3025,6 +3184,19 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       } else if (result.proposal.kind === 'propose_exercise_swap' && result.proposal.rawArgs) {
         const swap = buildExerciseSwapProposal(result.proposal.rawArgs)
         if (swap) built = { scopeKey: swap.scopeKey, preconditions: swap.preconditions, payload: swap.payload as unknown as Record<string, unknown>, preImage: swap.preImage, diff: swap.diff }
+        else {
+          // NAME WHAT IS ACTUALLY THERE. The generic fallback below ("it may
+          // have changed since you last looked") is true of a stale plan and
+          // useless for everything else — it sent a user hunting for a change
+          // that had not happened while the real cause was a name that never
+          // resolved. Listing this week's exercises turns a dead end into
+          // something answerable in one more message.
+          const week = mesocycle.find(w => w.week_number === activeSession.liveWeek)
+          const names = [...new Set((week?.days ?? []).flatMap(d => d.exercises.map(e => e.name)))]
+          refusal = names.length > 0
+            ? `I couldn't match that to anything on this week. You're on: ${names.join(', ')}. Tell me which one and I'll find you something else for it.`
+            : "I couldn't match that to anything on your plan this week."
+        }
       } else if (result.proposal.kind === 'propose_injury_adaptation' && result.proposal.rawArgs) {
         const adaptation = await buildInjuryAdaptationProposal(result.proposal.rawArgs)
         if (adaptation) built = { scopeKey: adaptation.scopeKey, preconditions: adaptation.preconditions, payload: adaptation.payload as unknown as Record<string, unknown>, preImage: adaptation.preImage, diff: adaptation.diff }
@@ -4215,9 +4387,17 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
                         onReject={() => handleRejectProposal(i)}
                       />
                     )}
+                    {/* The receipt's title is suppressed when the bubble above
+                        is already saying it. resolveAndMaybeLog returns
+                        `text: title` beside the receipt (so the outcome
+                        survives a reload, where the card's own state does not),
+                        and passing it here as well printed "Logged · Monday"
+                        twice, one line under the other — measured 7 Sep 2026
+                        while verifying the clarification fix, which had exactly
+                        the same shape. */}
                     {msg.receipt && msg.status !== 'failed' && (
                       <ReceiptCard
-                        title={msg.receipt.title}
+                        title={msg.content?.trim() === msg.receipt.title.trim() ? undefined : msg.receipt.title}
                         rows={msg.receipt.rows}
                         summary={msg.receipt.summary}
                         status={msg.receipt.status}
@@ -4238,7 +4418,19 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
                     {msg.clarification && msg.status !== 'failed' && (
                       <ClarificationCard
                         contextLines={msg.clarification.contextLines}
-                        prompt={msg.clarification.prompt}
+                        // The message's own content IS this prompt
+                        // (resolveAndMaybeLog returns `text: prompt` beside the
+                        // card, deliberately, so the question survives a reload
+                        // where the transient card does not). Passing it again
+                        // here rendered it twice, one line under the other:
+                        // "How many sets and reps for Dumbbell Floor Press?"
+                        // "How many sets and reps for Dumbbell Floor Press?"
+                        // — measured live, 7 Sep 2026, which reads as the coach
+                        // stuttering rather than as one question with answers.
+                        // Suppressed only when the bubble above is already
+                        // saying it; a card built with its own prompt (or a
+                        // restored message whose content differs) still shows.
+                        prompt={msg.content?.trim() === msg.clarification.prompt.trim() ? undefined : msg.clarification.prompt}
                         options={msg.clarification.options}
                         onChoose={async value => {
                           if (navigator.vibrate) navigator.vibrate(10)
@@ -4327,6 +4519,16 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
           onChange={e => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={speech.isListening ? 'Listening…' : 'Ask about your plan or request changes...'}
+          /* A ceiling, not a limit anyone will meet by talking. Nothing capped
+             this: a 10,496-character message was accepted, echoed in full into
+             the thread and stored, and every message is a paid model call.
+             4,000 is far past the longest thing a person types to a coach
+             (the wordiest real turn in testing was under 200) while still
+             stopping a paste or a stuck key from becoming the whole context
+             window. maxLength truncates silently rather than erroring, which is
+             the right failure here — there is no sentence worth interrupting
+             someone mid-thought for. */
+          maxLength={4000}
           className="min-h-[40px] max-h-[88px] flex-1 resize-none border-0 bg-transparent px-0 py-2 shadow-none focus-visible:ring-0"
           rows={1}
         />

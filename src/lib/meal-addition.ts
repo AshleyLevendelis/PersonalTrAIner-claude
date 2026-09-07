@@ -99,13 +99,22 @@ export function explainRejection(log: string[], dishName: string, slot: MealSlot
     // contains_meat". Pull out the FOODS and the RESTRICTION and say it in
     // English, falling back to the plain sentence if the shape ever changes.
     const detail = line.split('—').slice(1).join('—')
-    const foods = [...detail.matchAll(/"([^"]+)"/g)].map(m => m[1])
+    // DEDUPED. The log quotes the offending food once per rule it breaks, so
+    // one ingredient failing three checks produced "it's got wholemeal toast,
+    // wholemeal toast and wholemeal toast in it" — measured live, 7 Sep 2026.
+    const foods = [...new Set([...detail.matchAll(/"([^"]+)"/g)].map(m => m[1]))]
     const restriction = /which ([a-z-]+) forbids/i.exec(detail)?.[1]
     const foodList = foods.length > 0
       ? foods.slice(0, 3).join(', ').replace(/, ([^,]*)$/, ' and $1')
       : null
+    // The old fallback asserted "which is on your avoid list" whenever the log
+    // line carried no "which X forbids" clause — so the same sentence told a
+    // user whose avoid list held only "mushrooms" that wholemeal toast was on
+    // it (measured live, 7 Sep 2026, twice). Naming a restriction we cannot
+    // actually identify is worse than admitting we cannot: one sends someone to
+    // a list to look for something that was never there.
     if (foodList) {
-      return `I can't add ${dishName} — it's got ${foodList} in it${restriction ? `, and you've told me you're ${restriction.replace(/-free$/, '-free')}` : ", which is on your avoid list"}. Give me a version without it and I'll add that instead.`
+      return `I can't add ${dishName} — it's got ${foodList} in it${restriction ? `, and you've told me you're ${restriction.replace(/-free$/, '-free')}` : ", which clashes with something you've told me to avoid"}. Give me a version without it and I'll add that instead.`
     }
     return `I can't add ${dishName} — it clashes with what you've told me you avoid. Give me a version without it and I'll add that instead.`
   }

@@ -24,6 +24,7 @@ import { computeSetRowNumbers, nextExtraSetNumber } from '@/lib/session-derive'
 import { checkForPR, getTopPRSet, type PRResult } from '@/lib/pr-engine'
 import { getExerciseEntry } from '@/lib/exercise-db'
 import { isExternallyLoaded } from '@/lib/load-prescription'
+import { isImplausibleLoggedLoad } from '@/lib/logged-load-check'
 import type { ExerciseSetLog } from '@/lib/types'
 
 const MAX_WEIGHT_KG = 9999.99
@@ -72,6 +73,16 @@ export interface SetGridProps {
   perSetLoadKg?: (number | null)[]
   /** Flips the weight input's helper copy from "here's the default" to "log what you actually lifted." */
   loadIsEstimate?: boolean
+  /**
+   * The heaviest weight that could actually be loaded on this movement — the
+   * lower of the implement's own ceiling and what this trainee says they own.
+   * A logged weight above it asks once before saving (see logged-load-check).
+   *
+   * Passed DOWN rather than derived here, for the same reason loadUnitLabel
+   * is: this component must not become a third place that decides what a
+   * weight means. Undefined/null simply disables the check.
+   */
+  loadCeilingKg?: number | null
   onSetCompleted?: (exerciseName: string, setNumber: number, weight: number, reps: number, rest: string, sets: number, prescribedReps: string, tier?: string) => void
   onOpenPlateCalc?: (weight: number) => void
   // REMOVED 5 Sep 2026: onFirstEverLog. It was declared here, forwarded by
@@ -100,6 +111,7 @@ export function SetGrid({
   loadUnitLabel,
   perSetLoadKg,
   loadIsEstimate,
+  loadCeilingKg,
   onSetCompleted,
   onOpenPlateCalc,
 }: SetGridProps) {
@@ -153,6 +165,24 @@ export function SetGrid({
   const [animatingPr, setAnimatingPr] = useState(false)
   /** Armed-then-confirm delete, tap-tap within 3s — no window.confirm (themed-app clash, PWA-suppressible per the UX sweep's Clear-chat finding), but a saved set is still a real row to lose, so a bare single tap doesn't do it. */
   const [confirmDeleteSet, setConfirmDeleteSet] = useState<number | null>(null)
+  /**
+   * A weight above what could be loaded here, waiting on a yes.
+   *
+   * NOT the armed-tap-tap shape the delete above uses. A second identical tap
+   * would sail straight through the exact mistake this exists to catch — the
+   * question has to be a question, with the number in it, so the answer is to
+   * the number rather than to a button that appeared.
+   */
+  const [confirmLoadSet, setConfirmLoadSet] = useState<{ setNumber: number; weightKg: number } | null>(null)
+  /**
+   * Exercises this session has already been told the ceiling is wrong for.
+   *
+   * "Ask once, then trust them" (Ashley, 7 Sep 2026). Asked per EXERCISE, not
+   * per set: someone using 30kg dumbbells they never told us about will log
+   * three sets of them, and questioning each one is the nagging her ruling on
+   * stated lifts was explicitly against.
+   */
+  const [loadConfirmed, setLoadConfirmed] = useState<Set<string>>(new Set())
 
   const inputFor = (setNumber: number): SetInputState => {
     if (inputs[setNumber]) return inputs[setNumber]
@@ -219,7 +249,7 @@ export function SetGrid({
    */
   const defaultRepsFor = (): string => /\d+/.exec(prescribedReps ?? '')?.[0] ?? ''
 
-  const handleSaveSet = (setNumber: number) => {
+  const handleSaveSet = (setNumber: number, skipLoadCheck = false) => {
     if (!profileId) return
     const input = inputFor(setNumber)
     const ghost = ghostFor(setNumber)
@@ -279,6 +309,26 @@ export function SetGrid({
     const addedLoadKg = takesAddedLoad && weight > 0 ? weight : null
     const storedWeightKg = addedLoadKg != null ? 0 : weight
     const storedIsBodyweight = addedLoadKg != null ? true : isBodyweight
+
+    // ASK ONCE about a weight that could not fit on the implement, then trust
+    // them (Ashley, 7 Sep 2026 — logged-load-check.ts carries the incident and
+    // the options she chose between). Placed here, after storedWeightKg, so it
+    // reads the same figure the row will actually store: an added-load row
+    // (weighted chin-up) stores 0 with the belt weight in its own column, and
+    // is correctly not measured against an implement ceiling.
+    //
+    // Returns rather than saving. Nothing is written and no rest timer starts
+    // until the question is answered — a set that quietly saved while the
+    // question was still on screen would make the question decorative.
+    if (
+      !skipLoadCheck
+      && !loadConfirmed.has(exerciseId)
+      && isImplausibleLoggedLoad(storedWeightKg, loadCeilingKg ?? null, storedIsBodyweight)
+    ) {
+      setConfirmLoadSet({ setNumber, weightKg: storedWeightKg })
+      return
+    }
+
     if (rowErrors[setNumber]) {
       setRowErrors(prev => { const next = { ...prev }; delete next[setNumber]; return next })
     }
@@ -396,6 +446,15 @@ export function SetGrid({
             </span>
             <Input
               id={`setgrid-weight-${exerciseId}-${setNumber}`}
+              /* The column headers above ("Weight"/"Reps") are the only thing
+                 naming these boxes, and a header is not an accessible name —
+                 a screen reader read the whole grid as unlabelled spin buttons,
+                 so which number went where was unrecoverable. The set number is
+                 in the name because the rows are otherwise identical, and the
+                 unit is there because this column is per-hand on a dumbbell
+                 pair and total everywhere else — the one ambiguity this grid
+                 already has a written warning about (see loadUnitLabel). */
+              aria-label={`Set ${setNumber} weight${loadUnitLabel ? ` in ${loadUnitLabel}` : ' in kg'}, ${exerciseName}`}
               type="number"
               min="0"
               max={MAX_WEIGHT_KG}
@@ -436,6 +495,7 @@ export function SetGrid({
               </Button>
             )}
             <Input
+              aria-label={`Set ${setNumber} ${prescriptionType === 'hold' ? 'seconds' : prescriptionType === 'distance' ? 'metres' : 'reps'}, ${exerciseName}`}
               type="number"
               min="0"
               max={MAX_REPS}
@@ -502,6 +562,41 @@ export function SetGrid({
               </div>
             )
           })()}
+          {confirmLoadSet?.setNumber === setNumber && (
+            <div className="flex flex-col gap-1.5 px-1 -mt-0.5">
+              {/* THE NUMBER IS THE QUESTION. "That looks wrong" gets a yes from
+                  anyone who has not re-read what they typed; the figure and the
+                  ceiling side by side is what makes a mistyped 500 obvious
+                  without accusing anyone of anything. */}
+              <p className="text-[0.6875rem] text-[color:var(--role-warn-text)]">
+                {confirmLoadSet.weightKg}{loadUnitLabel ? ` ${loadUnitLabel}` : 'kg'} — that's more than the {loadCeilingKg}kg
+                you can load on this. Is that right?
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 px-2 text-[0.6875rem]"
+                  onClick={() => {
+                    // Remembered for the exercise, then saved — so sets 2 and 3
+                    // of a genuinely heavier session go through untouched.
+                    setLoadConfirmed(prev => new Set(prev).add(exerciseId))
+                    setConfirmLoadSet(null)
+                    handleSaveSet(setNumber, true)
+                  }}
+                >
+                  Yes, that's right
+                </Button>
+                <button
+                  type="button"
+                  className="text-[0.6875rem] text-muted-foreground underline underline-offset-2"
+                  onClick={() => setConfirmLoadSet(null)}
+                >
+                  Let me fix it
+                </button>
+              </div>
+            </div>
+          )}
           {rowErrors[setNumber] && (
             <p className="text-[0.625rem] text-destructive px-1 -mt-0.5">{rowErrors[setNumber]}</p>
           )}

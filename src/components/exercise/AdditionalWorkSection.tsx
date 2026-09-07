@@ -5,7 +5,8 @@ import { useActiveSession } from '@/hooks/useActiveSession'
 import { getExerciseId } from '@/lib/exercise-db'
 import { computeOffPlanWork } from '@/lib/session-derive'
 import { SetGrid } from './SetGrid'
-import type { Exercise } from '@/lib/types'
+import { loggedLoadCeilingKg } from '@/lib/logged-load-check'
+import type { Exercise, UserProfile } from '@/lib/types'
 
 // ---------------------------------------------------------------------------
 // The union of declared (user-typed) and detected (chat-logged, swapped-
@@ -17,8 +18,17 @@ import type { Exercise } from '@/lib/types'
 export function AdditionalWorkSection({
   plannedExercises,
   onOpenPlateCalc,
+  profile,
 }: {
   plannedExercises: Exercise[]
+  /**
+   * Same reason onOpenPlateCalc is here: extra work is loaded work and must not
+   * get a worse row than the planned ones. Without it the "is that weight
+   * right?" check silently does not apply to anything logged through this
+   * section — and off-plan work is exactly where someone types a number with no
+   * prescription beside it to compare against.
+   */
+  profile?: UserProfile
   /**
    * Threaded in 5 Sep 2026. SetGrid draws a plate-calculator button beside
    * every weight input, and this screen rendered SetGrid without a handler —
@@ -67,6 +77,7 @@ export function AdditionalWorkSection({
               totalSets={3}
               prescribedReps="8-12"
               restTime="60s"
+              loadCeilingKg={loggedLoadCeilingKg(item.name, profile)}
               onOpenPlateCalc={onOpenPlateCalc}
             />
           </div>

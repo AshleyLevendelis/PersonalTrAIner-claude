@@ -685,12 +685,38 @@ export function ActiveSessionProvider({
   // stopwatch/lap/round timers) — the DISPLAYED value is always
   // `restEndsAt - now`, recomputed fresh each tick, never from the tick
   // counter itself, so a throttled/missed tick only delays the redraw.
+  /** How long "Rest complete" keeps asking before it gives up on its own — see restRemainingMs. */
+  const REST_OVERRUN_EXPIRY_MS = 10 * 60 * 1000
+
   const restTick = useDeadlineTick(!!restEndsAt)
 
   const restRemainingMs = useMemo(() => {
     if (!restEndsAt || !identity.profileId) return null
     void restTick
-    return new Date(restEndsAt).getTime() - getAppNow(identity.profileId).getTime()
+    const remaining = new Date(restEndsAt).getTime() - getAppNow(identity.profileId).getTime()
+    // EXPIRED, not merely very overrun.
+    //
+    // A rest notice is a nudge back to the next set. Once it has been overrun
+    // by this much the moment it was nudging towards is gone — the person has
+    // moved on, or put the phone down — and the bar is only occupying the
+    // bottom of every screen. It has to expire on a CLOCK rather than on a tap,
+    // because the two things that ought to have ended it do not: the deadline
+    // is persisted in the session record, so a page reload brings it straight
+    // back, and finishing the session never cleared it either.
+    //
+    // Measured live twice on 7 Sep 2026: "Rest complete · Dismiss" sat above
+    // the tab bar for the rest of a session — through tab changes, two page
+    // reloads and a finished workout — clipping the chat composer underneath.
+    //
+    // Ten minutes: comfortably longer than any rest anyone would still be
+    // waiting out (the longest this app prescribes is 3 min), short enough that
+    // it is gone before it becomes furniture. Returning null rather than a big
+    // negative is what makes it land everywhere at once: null is the value
+    // every consumer already reads as "no rest running", so the dock bar, the
+    // collapsed keyboard line and the dock's priority order all stand down
+    // together without any of them needing to know about this rule.
+    if (remaining < -REST_OVERRUN_EXPIRY_MS) return null
+    return remaining
   }, [restEndsAt, restTick, identity.profileId])
 
   // --- Cross-tree set-focus request (BottomDock -> the matching ExerciseRow,

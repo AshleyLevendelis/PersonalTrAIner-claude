@@ -609,9 +609,18 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
   // Every part is dropped rather than guessed at when its field is unset, so
   // an activity-format profile (no equipment tier) shows two facts, not a
   // blank where the third should be.
+  // AVAILABLE days, not the length of the array. training_days is ALWAYS a
+  // 7-entry array — one row per weekday carrying an `available` flag, which
+  // assembleProfile guarantees precisely so that readers can .filter/.some on
+  // it without a null guard. So `.length` is 7 for everybody, and this line
+  // told every user in the app they train "7 days/week" regardless of what they
+  // picked. Found 7 Sep 2026 on a profile that had chosen four days; the
+  // comment above it has said "4 days/week" as the intended output all along.
+  // ChatAssistant's training_days_count already counts it the right way.
+  const trainingDaysPerWeek = profile.training_days?.filter(d => d.available).length ?? 0
   const identitySummary = [
     GOAL_OPTIONS.find(o => o.value === profile.fitness_goal)?.label,
-    profile.training_days?.length ? `${profile.training_days.length} days/week` : null,
+    trainingDaysPerWeek > 0 ? `${trainingDaysPerWeek} days/week` : null,
     EQUIPMENT_OPTIONS.find(o => o.value === profile.equipment_access)?.label,
   ].filter(Boolean).join(' · ')
 

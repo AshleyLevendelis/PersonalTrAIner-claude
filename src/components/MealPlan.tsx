@@ -501,6 +501,31 @@ function MealSlotRow({
   const duplicated = loggedEvents.length > 1
   const loggedKcal = loggedEvents.reduce((sum, e) => sum + (e.macros?.kcal ?? 0), 0)
 
+  /**
+   * The meals actually eaten in this slot, when they are not the meal now shown
+   * on the row.
+   *
+   * The kcal beside the tick already comes from the EVENT rather than the pick
+   * — a deliberate ruling, see the comment on that number: what the day is
+   * carrying is the useful truth. But the NAME kept following the pick with
+   * nothing anywhere saying the two had come apart. Measured 7 Sep 2026: logged
+   * breakfast, lunch and a snack, then turned on Dairy-free and took the app's
+   * own "Redo them" offer. The slots kept their ticks and relabelled themselves
+   * to the new meals — the lunch row read "Italian Beef and Pasta Salad ·
+   * Logged", ingredients and all, for a Mexican beef bowl that had actually
+   * been eaten. meal_events had it right the whole time; only the screen was
+   * wrong, and it was wrong in the direction that makes a food diary useless.
+   *
+   * Named rather than reverted: the row still has to show the CURRENT pick
+   * (that is what the rest of the day is balanced around, and what the swap
+   * panel acts on), so the honest fix is to say both.
+   */
+  const eatenElsewhereNames = [...new Set(
+    loggedEvents
+      .map(e => e.mealName)
+      .filter(n => !!n && n.trim().toLowerCase() !== (option?.name ?? '').trim().toLowerCase())
+  )]
+
   const handleLogToggle = async () => {
     if (!option) return
     // A flagged meal cannot be logged as eaten. This is the half that makes
@@ -568,6 +593,16 @@ function MealSlotRow({
           )}
         </div>
       </button>
+
+      {/* OUTSIDE the expanded block on purpose. This line exists to correct a
+          wrong impression the COLLAPSED row gives on its own — putting it behind
+          the chevron would leave the misreading in place for everyone who never
+          opens the card. */}
+      {eatenElsewhereNames.length > 0 && (
+        <p className="mt-1 text-xs text-muted-foreground">
+          You logged {eatenElsewhereNames.join(', ')} — this slot has changed since.
+        </p>
+      )}
 
       {!option && (
         <Button variant="ghost" size="sm" onClick={handleRegenerate} disabled={busy} className="mt-2 h-7 px-2 text-xs">

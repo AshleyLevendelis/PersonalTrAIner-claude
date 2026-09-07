@@ -20,6 +20,7 @@ import {
   NEVER_BLOCKING_SLOTS,
   assembleProfile,
   toggleValue,
+  parseVolunteeredDumbbellKg,
   numericGroupFor,
   initialSlotValues,
   isStartingFromNothing,
@@ -151,7 +152,22 @@ function displayValueFor(def: SlotDef, values: OnboardingSlotValues): string {
     const opt = def.options.find(o => String(o.value) === String(v))
     if (opt) return opt.label
   }
+  // A MEASUREMENT WITHOUT ITS UNIT IS NOT AN ANSWER. These slots accept feet
+  // and stone and store centimetres and kilos (see coerceSlotValue), so someone
+  // who answers "5 foot 6" and "11 and a half stone" gets a review card reading
+  // "Height: 168" and "Weight: 73" — two bare numbers in units they never used,
+  // with nothing on screen saying which. The conversion is right; the silence
+  // about it is what makes the card unreadable to the person checking their own
+  // answers, and this card is the last thing they see before Generate.
+  const unit = SLOT_UNIT_SUFFIX[def.key]
+  if (unit) return `${v}${unit}`
   return String(v)
+}
+
+/** Units for the numeric slots whose value is meaningless without one. Age is deliberately absent — "34 years" reads worse than "34" and cannot be misread. */
+const SLOT_UNIT_SUFFIX: Partial<Record<SlotKey, string>> = {
+  heightCm: ' cm',
+  weightKg: ' kg',
 }
 
 function coerceSlotValue(def: SlotDef, raw: string): unknown {
@@ -842,6 +858,15 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
         // receipt (caught live: typing "Hybrid" against a pending style card
         // committed instantly, then the model's response echoed the same
         // set_slot and printed "✓ Style — Hybrid" a second time).
+        // A dumbbell ceiling the user VOLUNTEERED while describing their kit.
+        // Caught here rather than asked for: load-ceiling-prompt.ts still owns
+        // the question at first use (Ashley's ruling), but it should not ask
+        // someone who has already answered. Read off the user's own words, not
+        // the mapped slot value — "minimalist" carries no number.
+        if (key === 'equipment') {
+          const stated = parseVolunteeredDumbbellKg(userText)
+          if (stated != null) ws.values = { ...ws.values, volunteeredMaxDumbbellKg: stated }
+        }
         if (!applySlot(ws, key, coerced, ws.values, true, conversionNoteFor(def, String(action.args.value ?? '')))) {
           // Fail LOUD: the mapped value didn't validate — never store it,
           // re-ask with the real chips instead.
@@ -1293,7 +1318,23 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
   // --- chip interactions -------------------------------------------------
 
   const handleToggleMulti = (key: SlotKey, value: string) => {
-    setValues(v => ({ ...v, [key]: toggleValue((v[key] as string[]) ?? [], value) } as OnboardingSlotValues))
+    setValues(v => {
+      const next = toggleValue((v[key] as string[]) ?? [], value)
+      // KEPT IN THE ORDER THE OPTIONS ARE OFFERED, not the order they were
+      // tapped. toggleValue appends, so adding Tuesday to an existing
+      // Mon/Wed/Sat left the review card reading "Mon, Wed, Sat, Tue" — and the
+      // week strip beside it was correct, which makes the card look like a
+      // different, wrong answer rather than the same one shuffled. Measured on
+      // 7 Sep 2026, and again after a rebuild; it is also what the coach reads
+      // back and what lands in the saved draft.
+      // Applies to every multi slot (injuries, dietary, cuisines), all of which
+      // are read back to the user as a list.
+      const order = (getSlotDef(key)?.options ?? []).map(o => String(o.value))
+      const sorted = order.length > 0
+        ? [...next].sort((a, b) => order.indexOf(a) - order.indexOf(b))
+        : next
+      return { ...v, [key]: sorted } as OnboardingSlotValues
+    })
   }
 
   const handleResolveSingle = (key: SlotKey, value: string) => {
@@ -1398,7 +1439,12 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
           // A text slot has no card to render, so the composer is the only
           // way to answer it — say so rather than leaving a dead prompt.
           ? `Sure — type what you'd like ${def.shortLabel.toLowerCase()} to be instead.`
-          : `Sure — pick a different ${def.shortLabel.toLowerCase()}.`,
+          // "pick a different X" only reads as English when X is a singular
+          // countable noun, and these labels are reliably neither: it produced
+          // "pick a different equipment" and "pick a different training days".
+          // Naming the label as a label sidesteps its grammatical number
+          // entirely and works for every slot.
+          : `Sure — here's ${def.shortLabel.toLowerCase()} again. Pick whichever fits.`,
         slotCard: def.control === 'text' ? undefined : key,
         slotCardEditing: def.control === 'text' ? undefined : true,
       },

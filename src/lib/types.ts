@@ -636,6 +636,16 @@ export interface ChatClarificationView {
   options: { label: string; value: string }[]
   /** Correlates the chosen answer back to the parse session awaiting it. */
   resolverId: string
+  /**
+   * WHICH field the options answer, so the resolver knows where to put the
+   * chosen value.
+   *
+   * Without this the resolver assumed every clarification was an ambiguous
+   * exercise NAME and wrote the answer into exercisePhrase — which is why the
+   * other two kinds shipped with no options at all and no way to answer them.
+   * See handleClarificationChoice.
+   */
+  field?: 'exercise_name' | 'weight' | 'sets_x_reps'
 }
 
 export interface ChatMessage {

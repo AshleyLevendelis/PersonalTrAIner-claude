@@ -30,7 +30,8 @@ export function ReceiptCard({
   onViewDashboard,
   onViewExercise,
 }: {
-  title: string
+  /** Omitted when the message bubble above already shows this exact title — see the call site for why it rendered twice. */
+  title?: string
   rows: ReceiptRow[]
   summary?: string
   status: 'done' | 'partial' | 'failed'
@@ -77,6 +78,9 @@ export function ReceiptCard({
 
   return (
     <div className="mt-2 pl-3.5 border-l-2 border-[color:var(--hairline)] text-sm space-y-2">
+      {/* The icon stays even with no title — it is what marks this block as a
+          receipt rather than more prose, and the bubble above carries the words
+          in that case. */}
       <p className="flex items-center gap-1.5 text-xs font-medium">
         {icon}
         {title}
