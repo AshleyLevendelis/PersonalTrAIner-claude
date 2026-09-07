@@ -2,6 +2,33 @@
 
 Newest first. One line each.
 
+- [x] **THE RAMP-UP SETS CAN BE TICKED OFF** — Ashley, mid-session, 7 Sep 2026:
+  *"theres no way to log the ramp up weights."* Correct, and a half-built path
+  rather than a misunderstanding: the `is_warmup` column exists and is part of
+  the set's natural key, every read in the app already filters warm-ups out of
+  volume, PRs, progression and history — and **nothing anywhere ever wrote
+  one.** The ✓ in the set grid always saves `is_warmup: false`. Storage built,
+  exclusion built, entry never built. Same shape as `demo_video_id`.
+  **Her ruling, given the options: tick them off, do not log them.** Recording
+  a warm-up would change no number the app can show her, so it would be typing
+  into a drawer that does not open. Each ramp step is now a control that marks
+  itself done, on today's session only — the browse and peek surfaces render
+  the same component with no handler and get exactly the plain text they had,
+  because a tick there would be marking a set on a day that is not today.
+  **The bug the browser found, and it is the interesting part.** The tick was
+  first stored the way the set drafts next door are stored: straight into the
+  session record, read back from localStorage on every call. Drafts can do
+  that — they live in uncontrolled inputs and need no re-render. A tick is the
+  opposite: its whole job is to LOOK different afterwards. The tap wrote
+  through correctly and the strip did not change; the tick only appeared once
+  a tab switch remounted the row. `verify:six` caught it, and the gate check
+  that would have covered it had been asserting the *defect* — that the value
+  is read from the record. It now pins both halves: React state for the
+  repaint, write-through for the reload.
+  Six mutations, all caught. `verify:six` drives the taps, the tab switch, the
+  untick, and asserts every working-set counter still reads "0 logged".
+  136 of 136 gates.
+
 - [x] **SIX THINGS ASHLEY FOUND ON HER PHONE, 7 Sep 2026** — reported after
   the morning's deploy, from real use. Independent fixes, one commit each,
   though three shared a shape worth naming: **the app stating something

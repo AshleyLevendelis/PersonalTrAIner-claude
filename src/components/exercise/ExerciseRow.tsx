@@ -72,7 +72,7 @@ export function ExerciseRow({
   onOpenHistory,
   onOpenDetail,
 }: ExerciseRowProps) {
-  const { setsFor, requestedSetFocus, clearSetFocusRequest } = useActiveSession()
+  const { setsFor, requestedSetFocus, clearSetFocusRequest, rampTicksFor, toggleRampTick } = useActiveSession()
   const exerciseId = ex.id ?? getExerciseId(ex.name)
   const loggedSets = setsFor(exerciseId, ex.name)
   const completedSets = loggedSets.length
@@ -196,7 +196,20 @@ export function ExerciseRow({
                   />
                 )}
               </div>
-              {completedSets === 0 && ramp && <RampStrip ramp={ramp} />}
+              {/* TICKABLE HERE, AND ONLY HERE. This is today's session, so a
+                  tick means "I have done that one"; the browse and peek
+                  surfaces render the same component with no handler and get
+                  plain text, because a tick there would be marking a set on a
+                  day that is not today. Nothing is written to the database —
+                  see RampStrip's header for why recording warm-ups would
+                  change no number the app shows back. */}
+              {completedSets === 0 && ramp && (
+                <RampStrip
+                  ramp={ramp}
+                  ticked={rampTicksFor(exerciseId)}
+                  onToggle={n => toggleRampTick(exerciseId, n)}
+                />
+              )}
               {showCalibrationCue && <CalibrationCue hasLoad={ex.suggested_load_kg != null} />}
               <p className="mt-2 text-xs text-text-tertiary">
                 {ex.sets} working sets · {completedSets} logged

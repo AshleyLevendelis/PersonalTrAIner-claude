@@ -24,6 +24,11 @@ import { isExternallyLoaded } from '../src/lib/load-prescription'
 import { seededRngFromKey } from '../src/lib/seeded-random'
 import { formatRampSets } from '../src/lib/session-derive'
 import type { UserProfile, WorkoutDay } from '../src/lib/types'
+import { readFileSync } from 'fs'
+import { join, dirname } from 'path'
+import { fileURLToPath } from 'url'
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 
 let failures = 0
 function check(label: string, condition: boolean, extra?: unknown) {
@@ -176,6 +181,76 @@ async function main() {
         }
       }
     }
+  }
+
+  console.log('\n[4] The ramp can be ticked off on today, and nowhere else (7 Sep 2026)')
+  {
+    // Ashley, from the gym: "theres no way to log the ramp up weights." Five
+    // steps printed with weights and reps, none of them markable, so a warm-up
+    // you were three sets into looked exactly like one you had not started.
+    //
+    // Her ruling once the options were put to her: TICK THEM OFF, do not log
+    // them. That distinction is the whole of this section — a tick that
+    // quietly became a database row would put warm-up sets into a place every
+    // read in this app deliberately filters out.
+    const read = (p: string) => readFileSync(join(ROOT, p), 'utf8')
+    const strip = read('src/components/exercise/RampStrip.tsx')
+    const row = read('src/components/exercise/ExerciseRow.tsx')
+    const browse = read('src/components/exercise/ReadOnlyDayList.tsx')
+    const hook = read('src/hooks/useActiveSession.tsx')
+
+    check('a ramp step is a real control', /onClick=\{\(\) => onToggle!\(s\.setNumber\)\}/.test(strip))
+    check('...that says whether it is done', /aria-pressed=\{done\}/.test(strip))
+    check('...and says so in words, not only in styling',
+      /tap to unmark/.test(strip) && /tap to mark done/.test(strip))
+
+    // NOT A LOG. If a tick ever writes a set, this whole design is wrong —
+    // warm-ups are excluded from volume, PRs, progression and history, so the
+    // row would be invisible the moment it was written.
+    // Comments stripped: the header explaining WHY warm-ups are not logged
+    // names is_warmup, and an absence check a comment can fail is no check at
+    // all. Third time this file family has learned that lesson.
+    const stripCode = strip.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/^\s*\/\/.*$/gm, '')
+    check('ticking writes no set, anywhere in the strip',
+      !/logSet|saveSet|isWarmup|is_warmup|supabase/.test(stripCode), stripCode.match(/logSet|saveSet|isWarmup|is_warmup|supabase/g))
+    check('...and the row hands it a toggle, not a logger',
+      /onToggle=\{n => toggleRampTick\(exerciseId, n\)\}/.test(row))
+
+    // IT HAS TO SURVIVE A TAB SWITCH. Component state would drop every tick
+    // the moment she glanced at Nutrition, which on a gym floor is the same
+    // as not having it. Stored beside the set drafts, date-keyed, so it
+    // expires on its own.
+    check('a tick outlives a tab switch', /rampTicks\?: Record<string, number\[\]>/.test(read('src/lib/active-session-store.ts')))
+
+    // THE BUG THE BROWSER FOUND, and the reason this check is shaped the way
+    // it is. The first version copied the set drafts next door, which read
+    // straight from localStorage on every call. Drafts can do that: they live
+    // in uncontrolled inputs and need no re-render. A TICK IS THE OPPOSITE —
+    // its entire job is to look different afterwards — and a localStorage read
+    // gives React nothing to re-render on. The tap wrote through correctly and
+    // the strip did not change; the tick only appeared once a tab switch
+    // remounted the row. verify:six caught it. This file's earlier check
+    // asserted the read came from the record, which is precisely the defect.
+    //
+    // So both halves are pinned: state for the repaint, record for the reload.
+    check('a tick repaints the strip, because it is React state',
+      /const \[rampTicks, setRampTicks\] = useState<Record<string, number\[\]>>/.test(hook)
+      && /rampTicks\[exerciseId\] \?\? \[\]/.test(hook))
+    check('...and is written through, so a reload mid-warm-up still has it',
+      /patchRecord\(\{ rampTicks: updated \}\)/.test(hook))
+    check('...and is read back out of the record on mount',
+      /setRampTicks\(record\?\.rampTicks \?\? \{\}\)/.test(hook))
+    check('...and tapping a ticked step unticks it', /current\.includes\(setNumber\)/.test(hook))
+
+    // READ-ONLY SURFACES STAY READ-ONLY. A tick on the program browser would
+    // be marking a set on a day that is not today.
+    check('browse and peek pass no handler', /<RampStrip ramp=\{ramp\} \/>/.test(browse))
+    check('...so those steps render as text rather than dead buttons',
+      /const interactive = typeof onToggle === 'function'/.test(strip) && /if \(!interactive\)/.test(strip))
+    // The tick is only offered before the working sets start, which is the
+    // only time a warm-up is still ahead of you.
+    check('...and today only offers it before the first working set is logged',
+      /completedSets === 0 && ramp && \(/.test(row))
   }
 
   if (failures > 0) {
