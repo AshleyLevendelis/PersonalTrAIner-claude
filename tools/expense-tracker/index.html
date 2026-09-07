@@ -1,0 +1,790 @@
+<title>Trip Spend Ledger</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Instrument+Sans:wght@400;500;600;700&display=swap">
+<style>
+  :root {
+    --paper:#eef1f0; --surface:#ffffff; --surface-2:#e5eae8; --sunk:#e9edec;
+    --ink:#101614; --ink-2:#4a5450; --ink-3:#7c8783;
+    --line:#d2dad7; --line-2:#c0cac6;
+    --accent:#0b6b5f; --accent-soft:#d6e8e4; --accent-ink:#ffffff;
+    --danger:#a3341f; --danger-soft:#f3dcd6;
+    --hotel:#6f57a8; --flights:#2f6fc4; --food:#bd5a2a; --taxi:#8f6a15; --misc:#5f6e72;
+    --shadow:0 1px 2px rgba(16,22,20,.05), 0 8px 24px -12px rgba(16,22,20,.18);
+    --r:10px;
+  }
+  :root:not([data-theme="light"]) {
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:#0d1211; --surface:#151d1b; --surface-2:#1e2725; --sunk:#111917;
+      --ink:#e8efec; --ink-2:#a4b1ac; --ink-3:#75837e;
+      --line:#2a3532; --line-2:#38443f;
+      --accent:#3bbca7; --accent-soft:#12312d; --accent-ink:#04211d;
+      --danger:#e58068; --danger-soft:#3a1d16;
+      --hotel:#a493d8; --flights:#6ea6ee; --food:#e08e5e; --taxi:#cfa63f; --misc:#93a3a8;
+      --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -14px rgba(0,0,0,.7);
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --paper:#0d1211; --surface:#151d1b; --surface-2:#1e2725; --sunk:#111917;
+    --ink:#e8efec; --ink-2:#a4b1ac; --ink-3:#75837e;
+    --line:#2a3532; --line-2:#38443f;
+    --accent:#3bbca7; --accent-soft:#12312d; --accent-ink:#04211d;
+    --danger:#e58068; --danger-soft:#3a1d16;
+    --hotel:#a493d8; --flights:#6ea6ee; --food:#e08e5e; --taxi:#cfa63f; --misc:#93a3a8;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -14px rgba(0,0,0,.7);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "Instrument Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 16px;
+    line-height: 1.45;
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .app {
+    max-width: 31rem;
+    margin-inline: auto;
+    padding: 1.25rem 1rem calc(2.5rem + env(safe-area-inset-bottom));
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+  .mono { font-family: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace; font-variant-numeric: tabular-nums; }
+  .eyebrow {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: .6875rem; font-weight: 500;
+    letter-spacing: .13em; text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+
+  /* ---------- header ---------- */
+  .masthead { display: flex; flex-direction: column; gap: .875rem; }
+  .monthbar { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+  .monthbar h1 {
+    margin: 0; font-size: 1.0625rem; font-weight: 600; letter-spacing: -.01em;
+    text-align: center; flex: 1;
+  }
+  .nudge {
+    appearance: none; border: 1px solid var(--line); background: var(--surface);
+    color: var(--ink-2); width: 2.25rem; height: 2.25rem; border-radius: 999px;
+    font-size: 1.125rem; line-height: 1; cursor: pointer; flex: none;
+  }
+  .nudge:hover:not(:disabled) { border-color: var(--line-2); color: var(--ink); }
+  .nudge:disabled { opacity: .3; cursor: default; }
+
+  .total-line { display: flex; align-items: baseline; gap: .625rem; flex-wrap: wrap; }
+  .total {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: clamp(2.25rem, 11vw, 2.875rem);
+    font-weight: 500; letter-spacing: -.03em; line-height: 1;
+  }
+  .total-note { font-size: .8125rem; color: var(--ink-3); }
+
+  .breakdown { display: flex; flex-direction: column; gap: .875rem; }
+  .breakdown[hidden] { display: none !important; }
+  .bar { display: flex; height: .5rem; border-radius: 999px; overflow: hidden; background: var(--sunk); gap: 2px; }
+  .bar span { display: block; min-width: 3px; }
+  .bar.empty { background: var(--sunk); }
+
+  .legend { list-style: none; margin: 0; padding: 0; display: grid; gap: .375rem; }
+  .legend li { display: flex; align-items: center; gap: .5rem; font-size: .8125rem; }
+  .dot { width: .5rem; height: .5rem; border-radius: 2px; flex: none; }
+  .legend .name { color: var(--ink-2); }
+  .legend .pct { color: var(--ink-3); font-size: .75rem; }
+  .legend .amt { margin-left: auto; font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; font-size: .8125rem; }
+
+  .cards-split { display: grid; gap: .25rem; padding-top: .25rem; border-top: 1px solid var(--line); }
+  .cards-split div { display: flex; justify-content: space-between; gap: 1rem; font-size: .8125rem; color: var(--ink-2); }
+  .cards-split .v { font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; color: var(--ink); }
+
+  /* ---------- form ---------- */
+  form.entry {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    box-shadow: var(--shadow);
+    padding: 1rem;
+    display: flex; flex-direction: column; gap: 1rem;
+  }
+  form.entry.editing { border-color: var(--accent); }
+  .field { display: flex; flex-direction: column; gap: .5rem; }
+  .field > label.eyebrow { cursor: default; }
+
+  .amount-wrap { display: flex; align-items: center; gap: .375rem; border-bottom: 2px solid var(--line-2); padding-bottom: .25rem; }
+  .amount-wrap:focus-within { border-color: var(--accent); }
+  .amount-wrap .sym {
+    font-family: "IBM Plex Mono", monospace; font-size: 1.75rem; font-weight: 500; color: var(--ink-3);
+  }
+  input#amount {
+    flex: 1; min-width: 0; appearance: none; border: 0; background: transparent; color: var(--ink);
+    font-family: "IBM Plex Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums;
+    font-size: 1.75rem; font-weight: 500; letter-spacing: -.02em; padding: 0;
+  }
+  input#amount:focus { outline: none; }
+  input#amount::placeholder { color: var(--ink-3); opacity: .55; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: .375rem; }
+  .chip {
+    appearance: none; cursor: pointer;
+    border: 1px solid var(--line); background: var(--surface-2); color: var(--ink-2);
+    border-radius: 999px; padding: .5rem .75rem; min-height: 2.375rem;
+    font: inherit; font-size: .875rem; font-weight: 500;
+    display: inline-flex; align-items: center; gap: .4375rem;
+    transition: background .12s ease, border-color .12s ease, color .12s ease;
+  }
+  .chip .dot { width: .5rem; height: .5rem; border-radius: 2px; }
+  .chip[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--ink); }
+  .chip:hover:not([aria-pressed="true"]) { border-color: var(--line-2); }
+
+  .date-row { display: flex; gap: .375rem; align-items: stretch; }
+  input[type="date"], input#note {
+    appearance: none; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink);
+    border-radius: 8px; padding: .5625rem .625rem; font: inherit; font-size: 1rem; min-height: 2.375rem;
+    min-width: 0;
+  }
+  input[type="date"] { flex: 1; font-family: "IBM Plex Mono", monospace; font-size: .9375rem; }
+  input#note { width: 100%; }
+  input#note::placeholder { color: var(--ink-3); }
+
+  .submit {
+    appearance: none; cursor: pointer; border: 0; border-radius: 8px;
+    background: var(--accent); color: var(--accent-ink);
+    font: inherit; font-size: 1rem; font-weight: 600; padding: .8125rem 1rem; min-height: 3rem;
+  }
+  .submit:disabled { opacity: .4; cursor: not-allowed; }
+  .form-actions { display: flex; gap: .5rem; }
+  .form-actions .submit { flex: 1; }
+  .ghost {
+    appearance: none; cursor: pointer; border: 1px solid var(--line); background: transparent; color: var(--ink-2);
+    border-radius: 8px; font: inherit; font-size: .9375rem; padding: .8125rem 1rem;
+  }
+  .ghost:hover { border-color: var(--line-2); color: var(--ink); }
+
+  /* ---------- list ---------- */
+  .ledger { display: flex; flex-direction: column; gap: 1.125rem; }
+  .day { display: flex; flex-direction: column; gap: .25rem; }
+  .day-head {
+    display: flex; justify-content: space-between; align-items: baseline; gap: 1rem;
+    padding-bottom: .375rem; border-bottom: 1px solid var(--line);
+  }
+  .day-head .d { font-family: "IBM Plex Mono", monospace; font-size: .6875rem; font-weight: 500; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); }
+  .day-head .s { font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; font-size: .8125rem; color: var(--ink-2); }
+
+  .row {
+    display: grid; grid-template-columns: .5rem 1fr auto; align-items: center; gap: .625rem;
+    width: 100%; text-align: left;
+    appearance: none; border: 0; background: transparent; color: inherit; font: inherit;
+    padding: .625rem .25rem; cursor: pointer; border-radius: 6px;
+    border-bottom: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
+  }
+  .row:hover { background: var(--surface-2); }
+  .row .stripe { width: .5rem; height: 1.75rem; border-radius: 2px; }
+  .row .lines { min-width: 0; display: flex; flex-direction: column; gap: .0625rem; }
+  .row .cat { font-size: .9375rem; font-weight: 500; }
+  .row .sub { font-size: .75rem; color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row .amt { font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; font-size: 1rem; font-weight: 500; }
+  .row .amt .unsynced { display: block; font-size: .625rem; color: var(--taxi); letter-spacing: .06em; text-transform: uppercase; text-align: right; }
+
+  .row-actions { display: flex; gap: .5rem; padding: .125rem .25rem .625rem 1.125rem; }
+  .row-actions button {
+    appearance: none; cursor: pointer; font: inherit; font-size: .8125rem; font-weight: 500;
+    border-radius: 6px; padding: .4375rem .75rem; min-height: 2.125rem;
+    border: 1px solid var(--line); background: var(--surface-2); color: var(--ink-2);
+  }
+  .row-actions button.del { color: var(--danger); border-color: var(--danger-soft); background: var(--danger-soft); }
+
+  .empty-state {
+    border: 1px dashed var(--line-2); border-radius: var(--r); padding: 1.5rem 1.25rem;
+    display: flex; flex-direction: column; gap: .375rem; text-align: center; color: var(--ink-3);
+  }
+  .empty-state strong { color: var(--ink-2); font-weight: 600; font-size: .9375rem; }
+  .empty-state span { font-size: .8125rem; }
+
+  .footer { display: flex; flex-direction: column; gap: .625rem; }
+  .banner {
+    display: flex; gap: .5rem; align-items: flex-start;
+    border-radius: 8px; padding: .625rem .75rem; font-size: .8125rem; line-height: 1.4;
+    background: var(--danger-soft); color: var(--danger); border: 1px solid color-mix(in srgb, var(--danger) 25%, transparent);
+  }
+  .banner[hidden] { display: none !important; }
+  .toast {
+    position: fixed; left: 50%; bottom: calc(1rem + env(safe-area-inset-bottom)); transform: translateX(-50%);
+    background: var(--ink); color: var(--paper); border-radius: 999px; padding: .5rem 1rem;
+    font-size: .8125rem; font-weight: 500; box-shadow: var(--shadow); z-index: 10;
+    opacity: 0; pointer-events: none; transition: opacity .18s ease;
+  }
+  .toast.show { opacity: 1; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+<div class="app">
+  <header class="masthead">
+    <div class="monthbar">
+      <button class="nudge" id="prev" type="button" aria-label="Previous month">&lsaquo;</button>
+      <h1 id="month-label">—</h1>
+      <button class="nudge" id="next" type="button" aria-label="Next month">&rsaquo;</button>
+    </div>
+    <div>
+      <div class="eyebrow">Total spent</div>
+      <div class="total-line">
+        <span class="total" id="total">£0.00</span>
+        <span class="total-note" id="count">no entries yet</span>
+      </div>
+    </div>
+  </header>
+
+  <form class="entry" id="form" autocomplete="off">
+    <div class="field">
+      <label class="eyebrow" for="amount">Amount</label>
+      <div class="amount-wrap">
+        <span class="sym mono">£</span>
+        <input id="amount" type="text" inputmode="decimal" placeholder="0.00" aria-label="Amount in pounds">
+      </div>
+    </div>
+
+    <div class="field">
+      <span class="eyebrow" id="cat-label">Category</span>
+      <div class="chips" id="cats" role="group" aria-labelledby="cat-label"></div>
+    </div>
+
+    <div class="field">
+      <span class="eyebrow" id="card-label">Paid with</span>
+      <div class="chips" id="cards" role="group" aria-labelledby="card-label"></div>
+    </div>
+
+    <div class="field">
+      <label class="eyebrow" for="date">Date</label>
+      <div class="date-row">
+        <input id="date" type="date">
+        <button class="chip" type="button" id="today">Today</button>
+        <button class="chip" type="button" id="yday">Yesterday</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label class="eyebrow" for="note">Note <span style="text-transform:none;letter-spacing:0">(optional)</span></label>
+      <input id="note" type="text" placeholder="Gatwick to hotel" maxlength="90">
+    </div>
+
+    <div class="form-actions">
+      <button class="submit" id="submit" type="submit" disabled>Add expense</button>
+      <button class="ghost" id="cancel" type="button" hidden>Cancel</button>
+    </div>
+  </form>
+
+  <section class="breakdown" id="breakdown" hidden>
+    <div class="eyebrow">Where it went</div>
+    <div class="bar empty" id="bar" role="img" aria-label="Spend split by category"></div>
+    <ul class="legend" id="legend"></ul>
+    <div class="cards-split" id="cards-split"></div>
+  </section>
+
+  <section class="ledger" id="ledger" aria-live="polite"></section>
+
+  <div class="footer">
+    <div class="banner" id="offline-banner" hidden>
+      <span aria-hidden="true">!</span>
+      <span id="offline-text"></span>
+    </div>
+    <button class="ghost" id="export" type="button" hidden>Export this month as CSV</button>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  var CATEGORIES = [
+    { id: "hotel",   label: "Hotel",   color: "var(--hotel)" },
+    { id: "flights", label: "Flights", color: "var(--flights)" },
+    { id: "food",    label: "Food",    color: "var(--food)" },
+    { id: "taxi",    label: "Taxi",    color: "var(--taxi)" },
+    { id: "misc",    label: "Misc",    color: "var(--misc)" }
+  ];
+  var CARDS = [
+    { id: "amex",            label: "Amex" },
+    { id: "halifax-debit",   label: "Halifax debit" },
+    { id: "halifax-credit",  label: "Halifax credit" }
+  ];
+  var CAT = {}, CARD = {};
+  CATEGORIES.forEach(function (c) { CAT[c.id] = c; });
+  CARDS.forEach(function (c) { CARD[c.id] = c; });
+
+  var PENDING_KEY = "ledger.pending.v1";
+  var LASTCARD_KEY = "ledger.lastcard.v1";
+
+  var db = null;               // set when the db capability resolves
+  var downloads = null;
+  var remote = [];             // entries from the store
+  var pending = readPending();  // entries not yet written to the store
+  var draft = { category: null, card: readLast(), date: todayISO() };
+  var editingId = null;
+  var view = todayISO().slice(0, 7);
+  var dbSettled = false;
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  /* ---------- small helpers ---------- */
+  function todayISO() {
+    var d = new Date();
+    return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+  }
+  function shiftISO(days) {
+    var d = new Date();
+    d.setDate(d.getDate() + days);
+    return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+  }
+  function pad(n) { return n < 10 ? "0" + n : String(n); }
+  function parseISO(s) {
+    var p = String(s).split("-");
+    return new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+  }
+  function gbp(n) {
+    return "£" + n.toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  function newId() {
+    return Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8);
+  }
+  function readPending() {
+    try { return JSON.parse(localStorage.getItem(PENDING_KEY)) || []; } catch (e) { return []; }
+  }
+  function writePending() {
+    try { localStorage.setItem(PENDING_KEY, JSON.stringify(pending)); } catch (e) { /* private mode */ }
+  }
+  function readLast() {
+    try { return localStorage.getItem(LASTCARD_KEY) || null; } catch (e) { return null; }
+  }
+  function writeLast(card) {
+    try { localStorage.setItem(LASTCARD_KEY, card); } catch (e) { /* private mode */ }
+  }
+
+  var toastTimer;
+  function toast(msg) {
+    var t = $("toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.classList.remove("show"); }, 2200);
+  }
+
+  /* ---------- data ---------- */
+  function allEntries() {
+    var byId = {};
+    remote.forEach(function (e) { byId[e.id] = e; });
+    pending.forEach(function (e) { byId[e.id] = e; });
+    var list = Object.keys(byId).map(function (k) { return byId[k]; });
+    list.sort(function (a, b) {
+      if (a.date !== b.date) return a.date < b.date ? 1 : -1;
+      return (b.createdAt || 0) - (a.createdAt || 0);
+    });
+    return list;
+  }
+  function monthEntries() {
+    return allEntries().filter(function (e) { return e.date.slice(0, 7) === view; });
+  }
+
+  function save(entry) {
+    // Optimistic: hold it locally, then hand it to the store.
+    var others = pending.filter(function (p) { return p.id !== entry.id; });
+    pending = others.concat([entry]);
+    writePending();
+    render();
+    if (!db) return;
+    push(entry);
+  }
+  function push(entry) {
+    var body = {
+      amount: entry.amount, category: entry.category, card: entry.card,
+      date: entry.date, note: entry.note || "", createdAt: entry.createdAt
+    };
+    db.collection("expenses").doc(entry.id).set(body).then(function () {
+      pending = pending.filter(function (p) { return p.id !== entry.id; });
+      writePending();
+      render();
+    }).catch(function (err) {
+      showBanner(err && err.code === "quota_exceeded"
+        ? "Your ledger is full. Delete some older entries to add new ones."
+        : "Saved on this phone only — couldn't reach your ledger. It'll sync when you reopen the page.");
+      render();
+    });
+  }
+  function flushPending() {
+    pending.slice().forEach(push);
+  }
+  function remove(id) {
+    var wasPending = pending.some(function (p) { return p.id === id; });
+    pending = pending.filter(function (p) { return p.id !== id; });
+    writePending();
+    remote = remote.filter(function (e) { return e.id !== id; });
+    render();
+    if (db && !wasPending) {
+      db.collection("expenses").doc(id).delete().catch(function () {
+        showBanner("Couldn't delete that entry — it may come back when the page reloads.");
+      });
+    }
+  }
+
+  function showBanner(text) {
+    $("offline-text").textContent = text;
+    $("offline-banner").hidden = false;
+  }
+  function hideBanner() { $("offline-banner").hidden = true; }
+
+  /* ---------- form ---------- */
+  function buildChips() {
+    var cats = $("cats");
+    CATEGORIES.forEach(function (c) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "chip";
+      b.setAttribute("aria-pressed", "false");
+      b.dataset.cat = c.id;
+      b.innerHTML = '<span class="dot" style="background:' + c.color + '"></span>';
+      b.appendChild(document.createTextNode(c.label));
+      b.addEventListener("click", function () { draft.category = c.id; syncForm(); });
+      cats.appendChild(b);
+    });
+    var cards = $("cards");
+    CARDS.forEach(function (c) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "chip";
+      b.setAttribute("aria-pressed", "false");
+      b.dataset.card = c.id;
+      b.textContent = c.label;
+      b.addEventListener("click", function () { draft.card = c.id; syncForm(); });
+      cards.appendChild(b);
+    });
+  }
+
+  function amountValue() {
+    var raw = $("amount").value.replace(/[^0-9.]/g, "");
+    var n = parseFloat(raw);
+    return isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : null;
+  }
+
+  function syncForm() {
+    Array.prototype.forEach.call($("cats").children, function (b) {
+      b.setAttribute("aria-pressed", b.dataset.cat === draft.category ? "true" : "false");
+    });
+    Array.prototype.forEach.call($("cards").children, function (b) {
+      b.setAttribute("aria-pressed", b.dataset.card === draft.card ? "true" : "false");
+    });
+    $("date").value = draft.date;
+    var ready = amountValue() !== null && draft.category && draft.card && draft.date;
+    $("submit").disabled = !ready;
+    $("submit").textContent = editingId ? "Save changes" : "Add expense";
+    $("cancel").hidden = !editingId;
+    $("form").classList.toggle("editing", !!editingId);
+  }
+
+  function resetForm() {
+    editingId = null;
+    $("amount").value = "";
+    $("note").value = "";
+    draft = { category: null, card: readLast(), date: todayISO() };
+    syncForm();
+  }
+
+  function startEdit(entry) {
+    editingId = entry.id;
+    $("amount").value = entry.amount.toFixed(2);
+    $("note").value = entry.note || "";
+    draft = { category: entry.category, card: entry.card, date: entry.date };
+    syncForm();
+    $("form").scrollIntoView({ behavior: "smooth", block: "center" });
+    $("amount").focus();
+  }
+
+  /* ---------- render ---------- */
+  function render() {
+    var entries = monthEntries();
+    var total = entries.reduce(function (s, e) { return s + e.amount; }, 0);
+
+    var d = parseISO(view + "-01");
+    $("month-label").textContent = d.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
+    $("next").disabled = view >= todayISO().slice(0, 7);
+
+    $("total").textContent = gbp(total);
+    $("count").textContent = entries.length === 0
+      ? "no entries yet"
+      : entries.length + (entries.length === 1 ? " entry" : " entries");
+
+    $("breakdown").hidden = entries.length === 0;
+    renderBar(entries, total);
+    renderCards(entries);
+    renderLedger(entries);
+    $("export").hidden = !(downloads && entries.length);
+  }
+
+  function renderBar(entries, total) {
+    var bar = $("bar"), legend = $("legend");
+    bar.innerHTML = ""; legend.innerHTML = "";
+    var sums = CATEGORIES.map(function (c) {
+      return { cat: c, sum: entries.reduce(function (s, e) { return e.category === c.id ? s + e.amount : s; }, 0) };
+    }).filter(function (x) { return x.sum > 0; }).sort(function (a, b) { return b.sum - a.sum; });
+
+    bar.classList.toggle("empty", sums.length === 0);
+    if (!sums.length) { bar.removeAttribute("aria-label"); return; }
+    bar.setAttribute("aria-label", "Spend split by category, " + gbp(total) + " total");
+
+    sums.forEach(function (x) {
+      var seg = document.createElement("span");
+      seg.style.background = x.cat.color;
+      seg.style.flexGrow = String(x.sum);
+      bar.appendChild(seg);
+
+      var li = document.createElement("li");
+      var dot = document.createElement("span");
+      dot.className = "dot"; dot.style.background = x.cat.color;
+      var name = document.createElement("span");
+      name.className = "name"; name.textContent = x.cat.label;
+      var pct = document.createElement("span");
+      pct.className = "pct"; pct.textContent = Math.round((x.sum / total) * 100) + "%";
+      var amt = document.createElement("span");
+      amt.className = "amt"; amt.textContent = gbp(x.sum);
+      li.appendChild(dot); li.appendChild(name); li.appendChild(pct); li.appendChild(amt);
+      legend.appendChild(li);
+    });
+  }
+
+  function renderCards(entries) {
+    var wrap = $("cards-split");
+    wrap.innerHTML = "";
+    CARDS.forEach(function (c) {
+      var sum = entries.reduce(function (s, e) { return e.card === c.id ? s + e.amount : s; }, 0);
+      if (sum <= 0) return;
+      var row = document.createElement("div");
+      var l = document.createElement("span"); l.textContent = c.label;
+      var v = document.createElement("span"); v.className = "v"; v.textContent = gbp(sum);
+      row.appendChild(l); row.appendChild(v);
+      wrap.appendChild(row);
+    });
+  }
+
+  function dayLabel(iso) {
+    if (iso === todayISO()) return "Today";
+    if (iso === shiftISO(-1)) return "Yesterday";
+    return parseISO(iso).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+  }
+
+  function renderLedger(entries) {
+    var ledger = $("ledger");
+    ledger.innerHTML = "";
+
+    if (!entries.length) {
+      var empty = document.createElement("div");
+      empty.className = "empty-state";
+      var s = document.createElement("strong");
+      s.textContent = dbSettled && !db ? "Nothing saved for this month" : "Nothing logged this month yet";
+      var p = document.createElement("span");
+      p.textContent = "Type an amount above, tap a category and a card, and it lands here.";
+      empty.appendChild(s); empty.appendChild(p);
+      ledger.appendChild(empty);
+      return;
+    }
+
+    var groups = [];
+    entries.forEach(function (e) {
+      var g = groups[groups.length - 1];
+      if (!g || g.date !== e.date) { g = { date: e.date, items: [] }; groups.push(g); }
+      g.items.push(e);
+    });
+
+    groups.forEach(function (g) {
+      var sec = document.createElement("div");
+      sec.className = "day";
+      var head = document.createElement("div");
+      head.className = "day-head";
+      var dEl = document.createElement("span");
+      dEl.className = "d"; dEl.textContent = dayLabel(g.date);
+      var sEl = document.createElement("span");
+      sEl.className = "s";
+      sEl.textContent = gbp(g.items.reduce(function (s, e) { return s + e.amount; }, 0));
+      head.appendChild(dEl); head.appendChild(sEl);
+      sec.appendChild(head);
+
+      g.items.forEach(function (e) {
+        var cat = CAT[e.category] || CAT.misc;
+        var row = document.createElement("button");
+        row.type = "button";
+        row.className = "row";
+        row.setAttribute("aria-expanded", "false");
+
+        var stripe = document.createElement("span");
+        stripe.className = "stripe"; stripe.style.background = cat.color;
+
+        var lines = document.createElement("span");
+        lines.className = "lines";
+        var c1 = document.createElement("span");
+        c1.className = "cat"; c1.textContent = cat.label;
+        var c2 = document.createElement("span");
+        c2.className = "sub";
+        var cardName = (CARD[e.card] || {}).label || e.card;
+        c2.textContent = e.note ? cardName + " · " + e.note : cardName;
+        lines.appendChild(c1); lines.appendChild(c2);
+
+        var amt = document.createElement("span");
+        amt.className = "amt";
+        amt.appendChild(document.createTextNode(gbp(e.amount)));
+        if (pending.some(function (p) { return p.id === e.id; })) {
+          var u = document.createElement("span");
+          u.className = "unsynced"; u.textContent = "not synced";
+          amt.appendChild(u);
+        }
+
+        row.appendChild(stripe); row.appendChild(lines); row.appendChild(amt);
+
+        var actions = document.createElement("div");
+        actions.className = "row-actions";
+        actions.hidden = true;
+        var edit = document.createElement("button");
+        edit.type = "button"; edit.textContent = "Edit";
+        edit.addEventListener("click", function (ev) { ev.stopPropagation(); startEdit(e); });
+        var del = document.createElement("button");
+        del.type = "button"; del.className = "del"; del.textContent = "Delete";
+        del.addEventListener("click", function (ev) {
+          ev.stopPropagation();
+          remove(e.id);
+          toast("Deleted " + gbp(e.amount) + " " + cat.label.toLowerCase());
+        });
+        actions.appendChild(edit); actions.appendChild(del);
+
+        row.addEventListener("click", function () {
+          var open = actions.hidden;
+          actions.hidden = !open;
+          row.setAttribute("aria-expanded", open ? "true" : "false");
+        });
+
+        sec.appendChild(row);
+        sec.appendChild(actions);
+      });
+
+      ledger.appendChild(sec);
+    });
+  }
+
+  /* ---------- CSV ---------- */
+  function csvCell(v) {
+    var s = String(v == null ? "" : v);
+    return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }
+  function exportMonth() {
+    var entries = monthEntries().slice().reverse();
+    var rows = [["Date", "Category", "Card", "Amount (GBP)", "Note"]];
+    entries.forEach(function (e) {
+      rows.push([e.date, (CAT[e.category] || {}).label || e.category,
+                 (CARD[e.card] || {}).label || e.card, e.amount.toFixed(2), e.note || ""]);
+    });
+    var total = entries.reduce(function (s, e) { return s + e.amount; }, 0);
+    rows.push([]);
+    rows.push(["Total", "", "", total.toFixed(2), ""]);
+    var csv = rows.map(function (r) { return r.map(csvCell).join(","); }).join("\r\n");
+    downloads.save({ filename: "expenses-" + view + ".csv", data: "﻿" + csv })
+      .then(function () { toast("Exported"); })
+      .catch(function (err) {
+        if (err && err.code === "declined") return;
+        toast("Couldn't export that file");
+      });
+  }
+
+  /* ---------- wiring ---------- */
+  buildChips();
+  syncForm();
+  render();
+
+  $("amount").addEventListener("input", syncForm);
+  $("date").addEventListener("change", function () { draft.date = $("date").value; syncForm(); });
+  $("today").addEventListener("click", function () { draft.date = todayISO(); syncForm(); });
+  $("yday").addEventListener("click", function () { draft.date = shiftISO(-1); syncForm(); });
+  $("cancel").addEventListener("click", resetForm);
+  $("export").addEventListener("click", exportMonth);
+
+  $("prev").addEventListener("click", function () { stepMonth(-1); });
+  $("next").addEventListener("click", function () { stepMonth(1); });
+  function stepMonth(n) {
+    var y = Number(view.slice(0, 4)), m = Number(view.slice(5, 7)) - 1 + n;
+    var d = new Date(y, m, 1);
+    view = d.getFullYear() + "-" + pad(d.getMonth() + 1);
+    render();
+  }
+
+  $("form").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var amount = amountValue();
+    if (amount === null || !draft.category || !draft.card) return;
+
+    var existing = editingId;
+    var prior = allEntries().filter(function (e) { return e.id === existing; })[0];
+    var entry = {
+      id: existing || newId(),
+      amount: amount,
+      category: draft.category,
+      card: draft.card,
+      date: draft.date,
+      note: $("note").value.trim(),
+      createdAt: prior ? prior.createdAt : Date.now()
+    };
+    writeLast(entry.card);
+    var jumped = entry.date.slice(0, 7) !== view;
+    if (jumped) view = entry.date.slice(0, 7);
+    save(entry);
+    toast(existing ? "Updated" : gbp(amount) + " added");
+    resetForm();
+  });
+
+  /* ---------- capabilities ---------- */
+  if (window.claude && typeof window.claude.use === "function") {
+    window.claude.use("db").then(function (d) {
+      dbSettled = true;
+      if (!d) {
+        showBanner("Your ledger isn't reachable from here, so entries are being kept on this phone only. Reopen the page from claude.ai to sync them.");
+        render();
+        return;
+      }
+      db = d;
+      hideBanner();
+      db.collection("expenses").orderBy("date", "desc").limit(1000).onSnapshot(function (snap) {
+        remote = snap.docs.map(function (doc) {
+          var v = doc.data() || {};
+          return {
+            id: doc.id,
+            amount: Number(v.amount) || 0,
+            category: v.category || "misc",
+            card: v.card || "misc",
+            date: typeof v.date === "string" ? v.date : todayISO(),
+            note: v.note || "",
+            createdAt: Number(v.createdAt) || 0
+          };
+        });
+        render();
+      }, function (err) {
+        showBanner(err && err.code === "revoked"
+          ? "Your access to this ledger changed — new entries are being kept on this phone only."
+          : "Lost the live connection to your ledger. Reload the page to pick it back up.");
+      });
+      flushPending();
+    }).catch(function () { dbSettled = true; });
+
+    window.claude.use("downloads").then(function (d) {
+      downloads = d;
+      render();
+    }).catch(function () { /* no export */ });
+  } else {
+    dbSettled = true;
+    showBanner("Entries are being kept on this phone only. Open this page from claude.ai to save them to your ledger.");
+    render();
+  }
+})();
+</script>
