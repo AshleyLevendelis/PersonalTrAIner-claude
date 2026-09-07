@@ -104,9 +104,16 @@ export function ToolsTab({ profileId, mealPools, targets, softLikedFoods, todays
       // "your plates" promised a plate inventory that has never existed —
       // equipment is a four-value enum and nothing anywhere records what is
       // on your gym floor. The calculator offers every standard loading and
-      // lets you pick; the subtitle now says that instead of implying it
-      // already knows. A real inventory is in BACKLOG, not here.
-      label: 'Plate calculator', sub: '20 kg bar · every way to load it', icon: Disc,
+      // lets you pick; the subtitle says that instead of implying it already
+      // knows. A real inventory is in BACKLOG, not here.
+      //
+      // AND IT HAS TO FIT ON ONE LINE. The first replacement ("20 kg bar ·
+      // every way to load it") wrapped to a second, which grew this tile, grew
+      // the grid, and pushed the app tour's spotlight hole 12px past the
+      // bottom of a 390x844 screen — caught by verify:tour-real, invisible to
+      // all 136 gates. Keep it at or under the length of the string it
+      // replaced.
+      label: 'Plate calculator', sub: 'Options for any weight', icon: Disc,
       onClick: () => setPlateOpen(true),
     },
     {

@@ -80,6 +80,25 @@ Newest first. One line each.
   gained a `?slow=N` knob, without which neither window exists to look at.
   **Two things are Ashley's:** the `chat-gemini` deploy for #6, and the merge
   to `main`.
+  **One self-inflicted bug, found afterwards and worth the record.** The plate
+  tile's replacement subtitle ("20 kg bar · every way to load it") was honest
+  and 32 characters, which wrapped to a second line in a half-width tile —
+  growing the tile, growing the grid by 11px, and pushing the app tour's
+  spotlight hole 12px past the bottom of a 390x844 screen. All 136 gates were
+  green; `verify:tour-real` caught it, because it is the only thing that
+  renders. Subtitle shortened to "Options for any weight" (22 chars, under the
+  23 it replaced), tour re-run and back to its original 783px. `test:tools-grid`
+  now caps fixed subtitle length as an explicit PROXY for "fits on one line" —
+  it counts characters, not pixels, and says so.
+
+- [x] **SET LOGGING VERIFIED IN THE BROWSER** — open since the tour work; the
+  worry was that the ✓ no-ops. It does not. `verify:tour-real` reaches stop 7's
+  SECOND phase ("Logged — that easy"), and that phase is only reachable once
+  the set actually saves: the stop drops its own `data-tour` the moment the
+  write lands, which is why the driver reads the tour's own counter rather
+  than a loop index. Tapped, saved, advanced — with the app's real SetGrid
+  against the harness fake. The 11 Aug note about synthetic clicks holds:
+  clicks register. Still the current observed state, not a permanent fix.
 
 - [ ] **THE CALIBRATION WEEK STILL SPEAKS IN FOUR EFFORT TARGETS** — the cue
   and the load chip now agree ("3-4 reps in reserve"), but the generator's own
