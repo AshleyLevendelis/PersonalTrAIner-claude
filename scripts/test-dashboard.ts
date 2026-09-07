@@ -42,7 +42,11 @@ function cmp(a: unknown, b: unknown): number {
   return String(a) < String(b) ? -1 : String(a) > String(b) ? 1 : 0
 }
 
+/** Per-table read counter — the round trips this file's §6 exists to count. */
+const queryCounts: Record<string, number> = {}
+
 function fakeFrom(table: string) {
+  queryCounts[table] = (queryCounts[table] ?? 0) + 1
   db[table] = db[table] ?? []
   const filters: ((r: Row) => boolean)[] = []
   const orders: [string, boolean][] = []
@@ -361,6 +365,84 @@ async function main() {
     const meal = fs.readFileSync('src/components/MealPlan.tsx', 'utf-8')
     check('the meal name is not hard-truncated to one line',
       !/expanded \? 'min-w-0 truncate/.test(meal))
+  }
+
+  // ---- 6. Protein adherence: one query, and the right answer ---------------
+  console.log('\n[6] dashboard-data.ts: fourteen days of protein in ONE round trip')
+  {
+    // WHY THIS SECTION EXISTS. Home read protein day by day — `await
+    // getTodayLedger(...)` inside a `for` loop, fourteen times, sequentially,
+    // on every mount. loadDashboardData was imported by this file and never
+    // once called, so nothing in the suite noticed. Ashley, 7 Sep 2026: "when
+    // switching to the home tab the tab is blank for a few seconds while it
+    // loads."
+    //
+    // So this calls it for real, against the fake, and counts the reads.
+    const { getEatenProteinByDate } = await import('../src/lib/meal-store')
+    const PROFILE_ID = 'protein-profile'
+    const targets = { calories: 2000, protein: 100, carbs: 200, fat: 60 }
+
+    // Plan starts 12 Jan, today is the 15th, so plan week 1 is the 12th-18th
+    // and the three prior days inside it are the 12th, 13th and 14th.
+    // 95 is the threshold (95% of a 100g target): the 13th falls under it.
+    const eaten: [string, number][] = [
+      ['2026-01-14', 120], ['2026-01-13', 90], ['2026-01-12', 200], ['2026-01-11', 94],
+    ]
+    db.meal_events = eaten.map(([date, protein], i) => ({
+      id: `ev${i}`, profile_id: PROFILE_ID, client_id: `c${i}`, date,
+      slot: 'lunch', event_type: 'confirmed', meal_name: 'x',
+      macros: { kcal: 500, protein, carbs: 10, fat: 10 },
+      source: 'plan', created_at: `${date}T12:00:00Z`, voided_at: null,
+    }))
+    // Both land on the 13th and both are worth 50g. Counting either would
+    // lift that day over the line — which is exactly what a ranged read that
+    // filters differently from the ledger would do.
+    db.meal_events.push(
+      { id: 'v1', profile_id: PROFILE_ID, client_id: 'cv1', date: '2026-01-13', slot: 'dinner', event_type: 'confirmed',
+        macros: { kcal: 100, protein: 50, carbs: 1, fat: 1 }, source: 'plan', created_at: '2026-01-13T18:00:00Z',
+        voided_at: '2026-01-13T19:00:00Z' },
+      { id: 's1', profile_id: PROFILE_ID, client_id: 'cs1', date: '2026-01-13', slot: 'dinner', event_type: 'skipped',
+        macros: { kcal: 100, protein: 50, carbs: 1, fat: 1 }, source: 'plan', created_at: '2026-01-13T18:30:00Z',
+        voided_at: null },
+    )
+
+    // (a) The read itself — the part that was rewritten.
+    const before = queryCounts.meal_events ?? 0
+    const byDate = await getEatenProteinByDate(PROFILE_ID, ['2026-01-14', '2026-01-13', '2026-01-12', '2026-01-11'])
+    check('fourteen days of protein come back in ONE query',
+      (queryCounts.meal_events ?? 0) - before === 1, (queryCounts.meal_events ?? 0) - before)
+    check('...summed per day', byDate?.['2026-01-14'] === 120 && byDate?.['2026-01-12'] === 200, byDate)
+    check('...ignoring voided rows and uneaten events, exactly as the ledger does',
+      byDate?.['2026-01-13'] === 90, byDate?.['2026-01-13'])
+    check('...and a day with nothing on it is zero, not absent',
+      byDate?.['2026-01-10'] === undefined && Object.keys(byDate ?? {}).length === 4, byDate)
+
+    // (b) A FAILED READ IS NOT FOURTEEN MISSED DAYS. The per-day version
+    // caught each failure to null and recorded the day as not hit, so one bad
+    // network moment broke a real streak. Unknown must stay unknown.
+    const goodFrom = fakeClient.from
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(fakeClient as any).from = () => { throw new Error('network down') }
+    const failed = await getEatenProteinByDate(PROFILE_ID, ['2026-01-14']).catch(() => 'threw')
+    ;(fakeClient as any).from = goodFrom
+    check('a failed read answers "unknown", never "you ate nothing"', failed === null, failed)
+
+    // (c) End to end, through the aggregate the Home tab actually calls.
+    const profile = { id: PROFILE_ID, created_at: '2026-01-12T00:00:00Z' } as never
+    const beforeLoad = queryCounts.meal_events ?? 0
+    const result = await loadDashboardData({
+      profile, macros: targets, exercisePlan: [], mesocycle: [],
+      planCreatedAt: '2026-01-12T00:00:00Z', todayLogs: [], liveWeek: 1,
+      dayName: 'Thursday', todayStr: '2026-01-15',
+      now: new Date('2026-01-15T12:00:00'),
+    })
+    const mealReads = (queryCounts.meal_events ?? 0) - beforeLoad
+    // TWO: today's own ledger, and the fourteen-day range. Fifteen was the bug.
+    check('a whole dashboard load costs 2 reads of meal_events, not fifteen', mealReads === 2, mealReads)
+
+    const proteinComponent = result.consistency?.components.find(c => c.label === 'protein days')
+    check('the protein component counts the plan week\'s prior days', proteinComponent?.outOf === 3, result.consistency)
+    check('...and only the ones that actually hit the target', proteinComponent?.done === 2, proteinComponent)
   }
 
   if (failures > 0) {

@@ -45,17 +45,39 @@ export function loadChipClass(source: LoadSource | undefined): string {
   return source === 'estimate' ? ESTIMATE_CHIP_CLASS : CONFIDENT_CHIP_CLASS
 }
 
-export function loadSourceLabel(source: LoadSource | undefined): string | null {
+export function loadSourceLabel(source: LoadSource | undefined, calibration = false): string | null {
   // Not "suggested" — that word implies we suggested it FOR THEM. This number
   // is a floor to start from, and saying so is the whole point of the state.
   if (source === 'assumed_body') return 'starting light'
+  // CALIBRATION IS A WEEK, NOT A PROVENANCE, which is why it is a flag here
+  // and not a fifth PrescribedLoadSource. The number's origin really is an
+  // estimate; what week 1 changes is what the trainee is meant to DO with it.
+  //
+  // It needed saying because week 1's chip was styled and worded identically
+  // to week 7's, so nothing at a glance separated "seed, please overwrite"
+  // from "prescription" — and the cue two lines below was left carrying that
+  // distinction alone, which is how it ended up reading as an argument with
+  // the number above it (7 Sep 2026, Ashley).
+  if (source === 'estimate' && calibration) return 'starting point'
   if (source === 'estimate') return 'suggested'
   if (source === 'known_weight') return 'you told us'
   if (source === 'logged') return 'from your last session'
   return null
 }
 
-function explainerFor(source: LoadSource | undefined, loadGuidance?: string): string | null {
+function explainerFor(source: LoadSource | undefined, loadGuidance?: string, calibration = false): string | null {
+  // Week one, before a single set has been logged: the number is deliberately
+  // under half the standards estimate, so "find your real weight" is not a
+  // caveat on the prescription — it IS the prescription. Same words as the
+  // cue on the row (CalibrationCue.tsx), same effort target, and the same
+  // instruction to type what you finished on rather than tap through the
+  // prescribed default.
+  if (calibration && source === 'estimate') {
+    return 'Week one starts deliberately light — this is where to begin, not what to lift. '
+      + 'Add weight until the last rep leaves 3-4 reps in reserve (easier than your usual target, on purpose), '
+      + 'then type the weight you finished on; week 2 builds from your number.'
+      + (loadGuidance ? ` ${loadGuidance}` : '')
+  }
   if (source === 'assumed_body') {
     // MissingBodyMetricsNotice's rule: name the gap, say what still works,
     // give one action, stop. No placeholder figure dressed up as a
@@ -101,6 +123,7 @@ export function LoadChip({
   explained,
   onToggleExplain,
   progressionNote,
+  calibration = false,
 }: {
   ex: Exercise
   source: LoadSource | undefined
@@ -108,10 +131,12 @@ export function LoadChip({
   onToggleExplain: () => void
   /** Progression engine's per-row note (didProgress/hold copy) — today-session only. */
   progressionNote?: { note: string; didProgress: boolean }
+  /** Week 1 with nothing verified yet — changes the words, never the number. */
+  calibration?: boolean
 }) {
   if (source == null) return null
-  const explainer = explainerFor(source, ex.load_guidance)
-  const label = loadSourceLabel(source)
+  const explainer = explainerFor(source, ex.load_guidance, calibration)
+  const label = loadSourceLabel(source, calibration)
   // Suppressed once a real logged number is driving the weight: 'logged'
   // means the progression engine is working from what this person actually
   // lifted, so the estimate's ceiling is no longer what is holding it.

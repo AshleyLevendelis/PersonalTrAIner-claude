@@ -2,8 +2,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useState, useMemo } from 'react'
+import { plateCombinations, MAX_BARBELL_TARGET_KG } from '@/lib/plate-math'
 
-const STANDARD_PLATES = [25, 20, 15, 10, 5, 2.5, 1.25] as const
+export { MAX_BARBELL_TARGET_KG }
 
 const PLATE_COLORS: Record<number, { bg: string; text: string; label: string }> = {
   25: { bg: 'bg-red-500', text: 'text-white', label: '25' },
@@ -25,39 +26,19 @@ const PLATE_WIDTHS: Record<number, string> = {
   1.25: 'w-6 h-10',
 }
 
-/**
- * The heaviest target this will lay out, in kg.
- *
- * A number, because the loop below is unbounded and the input above it is a
- * bare `type="number"`. Type 9000000 into it — a slip of the finger away from
- * 90 — and calculatePlates pushes 25kg plates one at a time until it has built
- * an array of 180,000 of them, then React tries to render every one as a
- * coloured div. The tab locks up; on a phone it is killed. Nothing about that
- * is the user's mistake to pay for.
- *
- * 500 kg is deliberately past any real barbell: the heaviest raw squat ever
- * performed is around that, so this rejects typos without arguing with anyone
- * loading a real bar. Same reasoning, and the same shape, as
- * MAX_PLAUSIBLE_DAILY_STEPS.
- */
-export const MAX_BARBELL_TARGET_KG = 500
-
-/** Per side, at 1.25kg increments, 500kg of target cannot need more than this. Structural belt to the ceiling's braces. */
-const MAX_PLATES_PER_SIDE = 64
-
-function calculatePlates(targetWeight: number, barWeight: number): number[] {
-  const remainder = targetWeight - barWeight
-  if (remainder <= 0) return []
-  let perSide = remainder / 2
-  const plates: number[] = []
-  for (const plate of STANDARD_PLATES) {
-    while (perSide >= plate && plates.length < MAX_PLATES_PER_SIDE) {
-      plates.push(plate)
-      perSide -= plate
-      perSide = Math.round(perSide * 100) / 100
-    }
+/** "25, 25, 10" -> [{plate: 25, count: 2}, {plate: 10, count: 1}], in the order they go on. */
+function groupPlates(plates: number[]): { plate: number; count: number }[] {
+  const out: { plate: number; count: number }[] = []
+  for (const p of plates) {
+    const last = out[out.length - 1]
+    if (last && last.plate === p) last.count++
+    else out.push({ plate: p, count: 1 })
   }
-  return plates
+  return out
+}
+
+function describe(plates: number[]): string {
+  return groupPlates(plates).map(({ plate, count }) => `${count}x ${plate}kg`).join(', ')
 }
 
 interface PlateCalculatorProps {
@@ -77,9 +58,28 @@ export function PlateCalculator({ open, onOpenChange, initialWeight = 0 }: Plate
   // an answer to a question nobody asked.
   const outOfRange = target > MAX_BARBELL_TARGET_KG || bar > MAX_BARBELL_TARGET_KG
 
-  const plates = useMemo(() => (outOfRange ? [] : calculatePlates(target, bar)), [target, bar, outOfRange])
-  const perSideWeight = Math.max(0, (target - bar) / 2)
-  const achievableWeight = bar + plates.reduce((sum, p) => sum + p, 0) * 2
+  const options = useMemo(
+    () => (outOfRange ? [] : plateCombinations(target, bar)),
+    [target, bar, outOfRange],
+  )
+
+  // WHICH loading the bar picture is showing. Reset whenever the question
+  // changes, or option 3 of the old answer silently becomes option 3 of a
+  // different one.
+  const [chosen, setChosen] = useState(0)
+  const [lastQuestion, setLastQuestion] = useState('')
+  const question = `${target}:${bar}`
+  if (question !== lastQuestion) {
+    setLastQuestion(question)
+    setChosen(0)
+  }
+  const showing = options[chosen] ?? options[0] ?? null
+  const plates = showing?.plates ?? []
+
+  const perSideWeight = showing?.perSideKg ?? Math.max(0, (target - bar) / 2)
+  // Every option spells the same per-side number, so the closest loadable
+  // weight does not depend on which one is selected.
+  const achievableWeight = bar + (showing?.perSideKg ?? 0) * 2
   const hasRemainder = target > bar && achievableWeight < target
 
   // Reset target when modal opens with new initial weight
@@ -131,13 +131,13 @@ export function PlateCalculator({ open, onOpenChange, initialWeight = 0 }: Plate
             <div className="py-6 text-center text-sm text-muted-foreground">
               That&apos;s over {MAX_BARBELL_TARGET_KG}kg — check the number.
             </div>
-          ) : target <= bar ? (
+          ) : !showing ? (
             <div className="text-center py-6 text-sm text-muted-foreground">
               {target <= 0 ? 'Enter a target weight above' : 'No plates needed — bar only'}
             </div>
           ) : (
             <>
-              {/* Barbell sleeve visual */}
+              {/* Barbell sleeve visual — the option currently chosen below. */}
               <div className="relative flex items-center justify-start py-4 overflow-x-auto">
                 {/* Bar collar */}
                 <div className="w-4 h-8 bg-gray-600 rounded-l-sm shrink-0" />
@@ -167,24 +167,49 @@ export function PlateCalculator({ open, onOpenChange, initialWeight = 0 }: Plate
                   <span className="text-muted-foreground">Per side:</span>
                   <span className="font-semibold">{perSideWeight.toFixed(2)}kg</span>
                 </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {(() => {
-                    const counts: Record<number, number> = {}
-                    plates.forEach(p => { counts[p] = (counts[p] || 0) + 1 })
-                    return Object.entries(counts).map(([plate, count]) => {
-                      const p = Number(plate)
-                      const style = PLATE_COLORS[p]
-                      return (
-                        <span
-                          key={plate}
-                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${style.bg} ${style.text}`}
-                        >
-                          {count}x {style.label}kg
-                        </span>
-                      )
-                    })
-                  })()}
+
+                {/* EVERY WAY TO LOAD IT, not just the first one a greedy loop
+                    found. The old screen showed 1x 20kg and never mentioned
+                    2x 10kg, which is the same weight and the only one you can
+                    build if the 20s are already on someone else's bar. Tapping
+                    a row redraws the bar above, so the picture always matches
+                    the row that is selected. */}
+                <div role="group" aria-label="Ways to load each side" className="space-y-1.5">
+                  {options.map((option, idx) => {
+                    const isChosen = idx === (options[chosen] ? chosen : 0)
+                    return (
+                      <button
+                        key={option.plates.join('-')}
+                        type="button"
+                        onClick={() => setChosen(idx)}
+                        aria-pressed={isChosen}
+                        aria-label={`Load each side as ${describe(option.plates)}`}
+                        className={`hit-slop-44 flex w-full flex-wrap items-center gap-1.5 rounded-lg px-2 py-1.5 text-left transition-colors ${
+                          isChosen ? 'bg-muted ring-1 ring-primary/40' : 'hover:bg-muted/50'
+                        }`}
+                      >
+                        {groupPlates(option.plates).map(({ plate, count }, i) => {
+                          const style = PLATE_COLORS[plate]
+                          return (
+                            <span
+                              key={`${plate}-${i}`}
+                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${style.bg} ${style.text}`}
+                            >
+                              {count}x {style.label}kg
+                            </span>
+                          )
+                        })}
+                      </button>
+                    )
+                  })}
                 </div>
+
+                {options.length > 1 && (
+                  <p className="text-xs text-muted-foreground">
+                    All the same weight — pick whichever plates you can actually get to.
+                  </p>
+                )}
+
                 {hasRemainder && (
                   <p className="text-xs text-amber-600 dark:text-amber-400">
                     Closest loadable weight: {achievableWeight}kg (off by {(target - achievableWeight).toFixed(2)}kg)

@@ -37,6 +37,16 @@ function check(label: string, condition: boolean, extra?: unknown) {
 }
 
 const chat = readFileSync(join(ROOT, 'supabase/functions/chat-gemini/index.ts'), 'utf8')
+/**
+ * The same file with its comments removed.
+ *
+ * Added 7 Sep 2026 after finding a check in this very file satisfied by a
+ * COMMENT: "log_meal is still the tool that declines" matched a note
+ * explaining why it declines, not the reply that does it, so the reply could
+ * have been rewritten to anything without the check noticing. Anything
+ * asserting what the coach SAYS reads this, not `chat`.
+ */
+const chatCode = chat.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
 const hook = readFileSync(join(ROOT, 'src/hooks/useTrainingWeek.ts'), 'utf8')
 
 console.log('\n1. Every tool the coach is offered can actually be executed')
@@ -350,8 +360,12 @@ console.log('\n6. The first-run starter chips only offer things that work')
   // ...and the reason that check can be trusted: log_meal really is still the
   // declining one. If it ever starts working, this comment is the thing that
   // says the copy may open up.
+  // ...and the reason that check can be trusted: log_meal really is still the
+  // declining one. Read from the CODE, because the first version of this read
+  // the whole file and matched the comment explaining the decline rather than
+  // the reply performing it — the reply string could have become anything.
   check('...because log_meal is still the tool that declines',
-    /log_meal[\s\S]{0,4000}(isn't live|not live)/i.test(chat))
+    /can't record it from here yet/.test(chatCode))
 
   // THE WORDING SHE REJECTED, held so it cannot come back: "as far as the
   // user is concerned it is a person, so I dont like this wording." Naming
@@ -655,6 +669,59 @@ console.log('\n7. A tool that declines says so in its own description')
   // that actually reached the user.
   check('the prompt does not tell the model to confirm a ban as done',
     !/confirm you've permanently removed/i.test(chat))
+}
+
+console.log('\nA macro QUESTION is answered, not apologised for\n')
+{
+  // Ashley, 7 Sep 2026: "asking a simple question about macros and the app is
+  // trying to log it." Three attempts, three byte-identical replies, because
+  // log_meal's handler opened with "I can't log food from chat yet" whatever
+  // brought it there — and that string is server-authored, so no amount of
+  // "that was a question" could move it.
+  //
+  // The ROUTING was right and stays: a macro question goes through log_meal so
+  // the numbers come from the verified food database rather than the model's
+  // arithmetic. What was wrong is that one route produced one reply.
+  const schema = chatCode.slice(chatCode.indexOf('name: "log_meal"'), chatCode.indexOf('name: "log_workout_set"'))
+  check('the log_meal schema was located (sanity check on this check)', schema.length > 500, schema.length)
+  check('log_meal is told WHY it is being called', /intent: \{[\s\S]{0,200}enum: \["question", "logging"\]/.test(schema))
+  // Optional would make it optional in practice: the model omits what it can.
+  check('...and cannot leave it out', /required: \["intent",/.test(schema))
+  check('the prompt says which is which', /SET log_meal's intent ARGUMENT TO WHAT THEY ACTUALLY DID/.test(chatCode))
+  check('...and rules on the ambiguous case rather than leaving it open',
+    /it is a QUESTION: they asked, so answer/.test(chatCode))
+
+  // THE HANDLER. One route, two replies.
+  const handler = chatCode.slice(chatCode.indexOf('const asked = args.intent === "question"'), chatCode.indexOf('if (name === "log_workout")'))
+  check('the handler was located (sanity check on this check)', handler.length > 200, handler.length)
+  const askedReply = /asked\s*\?\s*`([^`]+)`/.exec(handler)?.[1] ?? ''
+  // The logging branch is two template literals concatenated, so it is taken
+  // whole rather than by first-backtick — a first version captured only the
+  // opening fragment and reported the Nutrition-tab clause missing when it was
+  // simply on the next line.
+  const loggedReply = handler.slice(handler.indexOf('\n            : '), handler.indexOf('];'))
+  check('a question is answered with the numbers', /macroLine/.test(askedReply), askedReply)
+  // THE PROPERTY. She asked what something came to; logging was never the
+  // subject, and an apology for not doing it is not an answer to her question.
+  check("...and says nothing about logging, which she never asked about",
+    !/log|Nutrition tab|can't|cannot/i.test(askedReply), askedReply)
+  check('a genuine log still gets told where to record it',
+    /Nutrition tab/.test(loggedReply), loggedReply)
+  // §1a: "NEVER lead with what the app can't do... If a limitation genuinely
+  // changes what they should do next, it goes in a short clause at the END."
+  check('...at the END of the reply, never leading it',
+    loggedReply.indexOf('macroLine') < loggedReply.indexOf('Nutrition tab'), loggedReply)
+  check('...and the rule it is obeying is still in the prompt',
+    /NEVER lead with what the app can't do/.test(chatCode))
+
+  // A field name is not a word. "keep an eye on your snack_1 against its
+  // budget" was reaching the screen verbatim.
+  check('slot keys are turned into words before they reach a reply',
+    /humanSlot\(args\.meal_slot\)/.test(chatCode) && /snack_1: "first snack"/.test(chatCode))
+  check('...and an unknown key is dropped rather than echoed',
+    /return known\[slot\.toLowerCase\(\)\] \?\? ""/.test(chatCode))
+  check('...with no raw key left in either reply',
+    !/snack_1/.test(askedReply) && !/snack_1/.test(loggedReply) && !/\$\{args\.meal_slot\}/.test(handler))
 }
 
 if (failures > 0) {

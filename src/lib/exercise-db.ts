@@ -263,6 +263,33 @@ export interface ExerciseEntry {
   demo_video_id?: string
   /** Whose video it is — channel or coach name. Required wherever demo_video_id is set. */
   demo_video_credit?: string
+  /**
+   * A still or looping demonstration of the movement, as a FILENAME under
+   * public/exercise-demos/ — never a URL.
+   *
+   * Ashley, 7 Sep 2026: "the anatomical body in the summary tab showing which
+   * muscles are targeted are not at all what I had in mind. I asked for
+   * exercise demos and more realistic images." Her ruling when the options
+   * and their prices were put to her: wire it up ready, and decide on the set
+   * separately. This is the socket; the images are a purchase.
+   *
+   * A FILENAME, AND SELF-HOSTED, for the reason the 5 Sep decision cited when
+   * it chose a hand-rolled muscle map instead: the service worker never
+   * caches anything cross-origin (public/sw.js:70), so an image fetched from
+   * a vendor's CDN is a blank rectangle in a basement gym with no signal —
+   * which is exactly where VISION says the app has to work. Served from our
+   * own origin it lands in ASSET_CACHE on first view with no precache step
+   * and no install bloat. A filename field cannot carry a host; a URL field
+   * could, and would eventually.
+   *
+   * ABSENT ON PURPOSE, NOT UNFINISHED — same contract as demo_video_id above.
+   * The image renders only where this is set. Zero of them across the whole
+   * catalogue is a valid, honest state, and is the state on the day this
+   * shipped.
+   */
+  demo_image?: string
+  /** Whose artwork it is, where the licence asks for it. Shown beside the image. */
+  demo_image_credit?: string
 }
 
 export const EXERCISE_DATABASE: ExerciseEntry[] = [

@@ -56,6 +56,44 @@ console.log('\n1. Which surfaces never get a fresh mount\n')
   // somebody has to think about it rather than inherit it silently.
   check('exactly one tab is kept mounted, and it is chat', forced.length === 1 && forced[0] === 'chat', forced)
   console.log(`     unmounting on switch (so they re-read for free): ${tabs.filter(t => !/forceMount/.test(t.attrs)).map(t => t.tab).join(', ')}`)
+
+  // 7 SEP 2026 — HOME NOW REMEMBERS WHAT IT LAST DREW, and this is where that
+  // gets kept honest. "A fresh mount is a fresh read" was costing Ashley two
+  // to four seconds of blank card on every switch to Home, so the tab paints
+  // its last snapshot immediately (dashboard-cache.ts). The compatible version
+  // of that is PAINT-ONLY: the cache decides what is on screen for a beat, and
+  // never whether to fetch.
+  //
+  // If the fetch ever becomes conditional on the cache, this file's whole
+  // premise is gone — Home would be showing numbers from the last time it felt
+  // like asking — so the unconditional fetch is asserted here rather than
+  // trusted. forceMount would break the premise differently and is still
+  // forbidden by the check above.
+  const cacheFile = 'src/lib/dashboard-cache.ts'
+  const home = read('src/components/Dashboard.tsx')
+  check('Home reads its last-known snapshot for the first paint',
+    /useState<DashboardData \| null>\(\s*\(\) => loadDashboardCache\(/.test(home))
+  check('...and writes one back after every successful load', /saveDashboardCache\(profile\.id, activeSession\.date, d\)/.test(home))
+  // AND ACTUALLY PAINTS IT. `loading` is true on every mount while the
+  // aggregate re-reads, so leaving it in the render guard means the snapshot
+  // is loaded, held, and never shown — the cache would exist and the screen
+  // would still be blank, which is the bug wearing a fix's clothes.
+  check('...and a re-read in flight no longer blanks a screen that has numbers',
+    /if \(!activeSession\.ready \|\| !data\) \{/.test(home) && !/loading \|\| !data/.test(home))
+  // THE PROPERTY. loadDashboardData is called with no cache test in front of
+  // it — no `if (!cached)`, no early return, no ternary choosing between them.
+  const loadCall = home.slice(home.indexOf('loadDashboardData({') - 400, home.indexOf('loadDashboardData({'))
+  check('...but the fetch still runs unconditionally on every mount',
+    !/cached|loadDashboardCache/.test(loadCall), loadCall.slice(-200))
+  check('...so a snapshot can never be served instead of a read',
+    !/if \(!?\s*cache/i.test(home) && !/return cached/.test(home))
+  // Yesterday's Home wearing today's date is the one genuinely harmful thing
+  // a paint cache can do, so the date is checked twice: in the key and in the
+  // payload.
+  const cacheSrc = read(cacheFile)
+  check('the snapshot is filed under the day it describes', /\$\{DASHBOARD_CACHE_PREFIX\}\$\{profileId\}_\$\{date\}/.test(cacheSrc))
+  check('...and refused if its own date disagrees', /parsed\.today !== date\) return null/.test(cacheSrc))
+  check('...and older days are swept rather than kept forever', /sweepOtherDays\(profileId, date\)/.test(cacheSrc))
 }
 
 console.log('\n2. No callback prop is declared and then never passed\n')

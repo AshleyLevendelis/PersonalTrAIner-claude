@@ -30,6 +30,7 @@ export type OpenerKind =
   | 'training_done_today'
   | 'training_today'
   | 'rest_day'
+  | 'plan_unknown'
 
 export interface OpenerSession {
   focus: string
@@ -46,7 +47,22 @@ export interface OpenerInput {
   awaitingFeel: { date: string; day?: string | null; isToday: boolean } | null
   /** Yesterday's session, if it was scheduled and nothing was logged, swapped or rested on purpose. */
   missedYesterday: { dayName: string; focus: string } | null
-  /** Today's session from the LIVE week, or null on a rest day. */
+  /**
+   * Whether the plan has arrived at all.
+   *
+   * SEPARATE FROM todaySession BEING NULL, and that conflation is the whole
+   * reason this field exists. On 7 Sep 2026 Ashley opened the chat on her
+   * phone and was told it was a rest day on a day she was due to train: the
+   * plan had not finished loading, todaySession was therefore null, and null
+   * meant "rest day" to every reader of this type. A slow network became a
+   * confident statement about her training.
+   *
+   * False means we do not know yet, and the opener must claim nothing about
+   * today. It never means "no plan": a trainee without one cannot reach this
+   * screen.
+   */
+  planKnown: boolean
+  /** Today's session from the LIVE week. Null on a rest day OR when planKnown is false — check that first. */
   todaySession: OpenerSession | null
   /** Any set logged today — so a fresh chat mid-session is not asked "feeling good for it?". */
   todayLogged: boolean
@@ -69,7 +85,7 @@ export interface Opener {
 }
 
 export function pickOpener(input: OpenerInput): Opener {
-  const { hour, cutoffHour, awaitingFeel, missedYesterday, todaySession, todayLogged, tomorrowSession } = input
+  const { hour, cutoffHour, awaitingFeel, missedYesterday, planKnown, todaySession, todayLogged, tomorrowSession } = input
 
   // 1. A finished session nobody has asked about. Outranks everything: it is
   //    the one signal the research says predicts whether they come back, and
@@ -109,7 +125,30 @@ export function pickOpener(input: OpenerInput): Opener {
     }
   }
 
-  // 3. A training day, past the hour they usually train, nothing awaiting a
+  // 3. THE PLAN HAS NOT ARRIVED. Everything below this line is a claim about
+  //    today — you train, you trained, you rest — and every one of them needs
+  //    the plan to be true. Above it, nothing does: an unreviewed session and
+  //    a missed day come from logged sessions and the week strip's own states,
+  //    which is why they are allowed to outrank this.
+  //
+  //    So the coach says the one thing it still knows, which is nothing about
+  //    today. No apology, no "loading", no promise that it will be along in a
+  //    moment — this bubble is composed once and never updates, so a promise
+  //    here is the next bug. Just a warm question, and two chips that route to
+  //    the coach, which reads its context fresh when a message is sent.
+  if (!planKnown) {
+    return {
+      kind: 'plan_unknown',
+      text: `how's it going?`,
+      chips: [
+        "What's on for today?",
+        'How am I doing so far?',
+      ],
+      attention: false,
+    }
+  }
+
+  // 4. A training day, past the hour they usually train, nothing awaiting a
   //    feel (so either they logged nothing, or the session is not marked
   //    finished). The pre-existing line, unchanged.
   if (todaySession && hour >= cutoffHour) {
@@ -121,7 +160,7 @@ export function pickOpener(input: OpenerInput): Opener {
     }
   }
 
-  // 4. A training day still ahead. The pre-existing line, plus the one chip
+  // 5. A training day still ahead. The pre-existing line, plus the one chip
   //    that maps cleanly onto an existing tool (propose_volume_change,
   //    direction lighter). Mid-session gets no chip: trimming a session
   //    they are already in is a different conversation.
@@ -134,7 +173,7 @@ export function pickOpener(input: OpenerInput): Opener {
     }
   }
 
-  // 5. A rest day. The pre-existing line, plus a look ahead when there is
+  // 6. A rest day. The pre-existing line, plus a look ahead when there is
   //    one — that is the blueprint's "preview tomorrow", and it costs nothing.
   //    Both chips are questions the coach can always answer from context.
   const ahead = tomorrowSession

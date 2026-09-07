@@ -100,7 +100,22 @@ export function ToolsTab({ profileId, mealPools, targets, softLikedFoods, todays
       onClick: () => { timers.setMode('stopwatch'); setTimerOpen(true) },
     },
     { label: 'Rounds & intervals', sub: 'EMOM, Tabata, laps', icon: TimerReset, onClick: () => { timers.setMode('round'); setTimerOpen(true) } },
-    { label: 'Plate calculator', sub: '20 kg bar · your plates', icon: Disc, onClick: () => setPlateOpen(true) },
+    {
+      // "your plates" promised a plate inventory that has never existed —
+      // equipment is a four-value enum and nothing anywhere records what is
+      // on your gym floor. The calculator offers every standard loading and
+      // lets you pick; the subtitle says that instead of implying it already
+      // knows. A real inventory is in BACKLOG, not here.
+      //
+      // AND IT HAS TO FIT ON ONE LINE. The first replacement ("20 kg bar ·
+      // every way to load it") wrapped to a second, which grew this tile, grew
+      // the grid, and pushed the app tour's spotlight hole 12px past the
+      // bottom of a 390x844 screen — caught by verify:tour-real, invisible to
+      // all 136 gates. Keep it at or under the length of the string it
+      // replaced.
+      label: 'Plate calculator', sub: 'Options for any weight', icon: Disc,
+      onClick: () => setPlateOpen(true),
+    },
     {
       label: 'Grocery list',
       sub: groceryCount ? `${groceryCount.total} item${groceryCount.total === 1 ? '' : 's'} · ${groceryCount.checked} checked` : 'This week\u2019s shopping',

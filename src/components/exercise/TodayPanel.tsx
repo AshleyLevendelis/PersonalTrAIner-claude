@@ -711,6 +711,10 @@ function ExerciseList({
       // last session's sets hit the top of the rep range.
       progressionNote: ex.block_hold_note ? { note: ex.block_hold_note, didProgress: false } : progressionNotes[ex.name],
       showCalibrationCue: calibrationAnchorIndex === exIndex,
+      // Every row of a calibration week, not just the anchor: the cue lands
+      // once, but the chip above the number has to say the same thing on all
+      // of them.
+      isCalibrationWeek: !!currentMesoWeekObj?.isCalibrationWeek,
       onOpenPlateCalc,
       onOpenHistory,
       onOpenDetail,

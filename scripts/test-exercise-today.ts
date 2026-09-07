@@ -25,6 +25,7 @@ import { readFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { sessionNudge } from '../src/lib/session-nudge'
+import { calibrationCueText } from '../src/components/exercise/CalibrationCue'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8')
@@ -114,6 +115,69 @@ console.log('\n2. The coaching line: the most specific true thing, or nothing')
   check('...and the row renders that, not its own copy',
     /<span>\{calibrationCueText\(hasLoad\)\}<\/span>/.test(cue))
   check('...and TodayPanel reads the same one', /calibrationCueText\(/.test(today))
+
+  // THE CUE MUST NOT ARGUE WITH THE NUMBER ABOVE IT. Ashley, 7 Sep 2026:
+  // "it tells the user to work up to a wight they could lift 3-4more times
+  // but also has weights for the working sets, so its unclear if the user
+  // should do the prescribed weights or work up".
+  //
+  // Note WHICH branch was doing it: the hasLoad one, which fires only where a
+  // prescribed weight is on screen. So the loaded variant has to relate the
+  // two — the printed number is the first rung — rather than issue a second,
+  // unconnected instruction.
+  const loaded = calibrationCueText(true)
+  const loadless = calibrationCueText(false)
+  check('the loaded cue names the printed weight as where to START',
+    /start at the weight shown/i.test(loaded), loaded)
+  check('...rather than sending them off to find one of their own',
+    !/work up to a weight/i.test(loaded), loaded)
+  check('...and still says where to finish', /3-4 reps in reserve/.test(loaded), loaded)
+  // A blank weight box logs the PRESCRIBED number (SetGrid's defaultWeightFor,
+  // which is Ashley's own ruling and the tour promises it). So a cue that says
+  // "work up" and then "log what you do" is satisfied by a tap that records
+  // 72.5 for a set performed at 100. It has to ask for the number.
+  check('...and asks them to TYPE it, because tapping the tick logs the prescription',
+    /type what you finish on/i.test(loaded), loaded)
+  // One vocabulary. "3-4 more times" and "3-4 reps in reserve" were the same
+  // instruction in two costumes, on two branches of one function.
+  check('both variants use one effort target, worded one way',
+    /3-4 reps in reserve/.test(loaded) && /3-4 reps in reserve/.test(loadless), { loaded, loadless })
+
+  // The chip above the number carries the other half. Week 1 read exactly
+  // like week 7 — "suggested" either way — which left the cue alone in saying
+  // the number was a seed.
+  const chip = read('src/components/exercise/LoadChip.tsx')
+  check('a calibration week labels its number a starting point, not a suggestion',
+    /source === 'estimate' && calibration\) return 'starting point'/.test(chip))
+  check('...and only a calibration week does', /if \(source === 'estimate'\) return 'suggested'/.test(chip))
+  check('...with an explainer that repeats the cue rather than competing with it',
+    /calibration && source === 'estimate'/.test(chip) && /3-4 reps in reserve/.test(chip))
+  // A flag, NOT a fifth PrescribedLoadSource: the number's provenance really
+  // is an estimate, and inventing a fifth state would have rippled into
+  // warmup, plan-adaptations, body-units, the weight-basis offer and the
+  // coach's plan context for the sake of two words on a chip.
+  check('...carried as a presentation flag, leaving load_source alone',
+    !/'calibration'/.test(read('src/lib/load-prescription.ts').slice(0, 4000)))
+
+  // EVERY ROW OF THE WEEK, not just the anchor. showCalibrationCue is true
+  // for one row per session; a chip label wired to it would make some lifts
+  // read as prescribed and others as seeds within one session.
+  const row = read('src/components/exercise/ExerciseRow.tsx')
+  check('the chip label is driven by the WEEK, not by which row got the cue',
+    /loadSourceLabel\(loadSource, isCalibrationWeek\)/.test(row) && /calibration=\{isCalibrationWeek\}/.test(row))
+  check('...and TodayPanel passes the week to every row',
+    /isCalibrationWeek: !!currentMesoWeekObj\?\.isCalibrationWeek/.test(today))
+
+  // The default that made "log what you do" ambiguous is deliberately UNCHANGED.
+  const setGrid = read('src/components/exercise/SetGrid.tsx')
+  // THE SAVE PATH, not merely a mention of the helper. A first version of
+  // this check tested for /defaultWeightFor\(setNumber\)/ anywhere in the file
+  // and passed with the save fallback replaced by '0' — the placeholder three
+  // hundred lines below still named the function. Caught by mutation.
+  check('a blank weight still logs the prescribed number, as ruled',
+    /input\.weight \|\| \(ghost \? String\(ghost\.weight_kg\) : defaultWeightFor\(setNumber\)\)/.test(setGrid))
+  check('...and the box shows that same number, so the tick keeps its promise',
+    /placeholder=\{isBW \? 'BW' : \(ghost \? String\(ghost\.weight_kg\) : defaultWeightFor\(setNumber\)\)\}/.test(setGrid))
 }
 
 // ---------------------------------------------------------------------------

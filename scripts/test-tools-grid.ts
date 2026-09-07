@@ -49,6 +49,30 @@ console.log('\n1. Six tiles, and every one of them goes somewhere\n')
   // Each destination is a real surface in this codebase, named here so that
   // deleting one of them fails against the tile that opens it.
   check('the plate calculator is really mounted', /<PlateCalculator open=\{plateOpen\}/.test(tools))
+
+  // A SUBTITLE THAT WRAPS COSTS MORE THAN A LINE. On 7 Sep the plate tile's
+  // caption was rewritten to "20 kg bar · every way to load it" — honest, and
+  // 32 characters, which wrapped to a second line in a half-width tile. That
+  // grew the tile, grew the grid by 11px, and pushed the app tour's spotlight
+  // hole past the bottom of a 390x844 screen. verify:tour-real caught it;
+  // all 136 gates did not, because none of them renders anything.
+  //
+  // This is a PROXY, and says so: it counts characters, not pixels, and a
+  // browser is the only thing that truly knows. It is here because the
+  // realistic way this breaks again is somebody writing a longer sentence,
+  // and a cheap check that catches that beats no check at all. If a subtitle
+  // genuinely needs to be longer, measure it in verify:tour-real and move
+  // this number — deliberately, not by deleting the check.
+  const SUB_MAX = 23
+  const staticSubs = [...tileBlock.matchAll(/sub: '([^']+)'/g)].map(m => m[1])
+  check('the static subtitles were found (sanity check on this check)', staticSubs.length >= 3, staticSubs)
+  const tooLong = staticSubs.filter(t => t.length > SUB_MAX)
+  check(`every fixed subtitle fits one line (<=${SUB_MAX} chars)`, tooLong.length === 0,
+    tooLong.map(t => ({ text: t, len: t.length })))
+  // The two computed ones are exempt: they are counts, and a count long
+  // enough to wrap would mean something else has gone wrong first.
+  check('...and the computed ones are counts, which cannot run long',
+    /groceryCount \? `/.test(tileBlock) && /historyCount \? `/.test(tileBlock))
   check('the session history dialog is really mounted', /<SessionHistoryDialog open=\{historyOpen\}/.test(tools))
   check('the program tile uses the route helper, not a hand-typed hash', /window\.location\.hash = programHash\(\)/.test(tools))
   check('the grocery tile scrolls to the section on this page', /grocerySectionRef\.current\?\.scrollIntoView/.test(tools))

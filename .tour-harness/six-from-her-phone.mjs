@@ -1,0 +1,189 @@
+// ---------------------------------------------------------------------------
+// The two things from 7 Sep that only a browser can settle.
+//
+// The gates prove the code says what it should. These are the questions a
+// source check cannot answer: does the plate calculator actually draw several
+// loadings and redraw the bar when you tap one, and does Home paint numbers
+// rather than a grey line when you come back to it.
+//
+// The fake Supabase now takes ?slow=N (fake-supabase.ts), which is what makes
+// the second one observable at all: with instant reads there is no window to
+// look at, and the bug Ashley reported lives entirely inside that window.
+// ---------------------------------------------------------------------------
+import { createServer } from 'http'
+import { readFileSync, existsSync, writeFileSync } from 'fs'
+import { join, extname } from 'path'
+import { spawn } from 'child_process'
+
+const DIST = new URL('./dist/', import.meta.url).pathname
+const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' }
+const server = createServer((req, res) => {
+  const p = req.url.split('?')[0]
+  const f = join(DIST, p === '/' ? '/.tour-harness/real.html' : p)
+  if (!existsSync(f)) { res.writeHead(404); res.end('nf'); return }
+  res.writeHead(200, { 'Content-Type': TYPES[extname(f)] ?? 'application/octet-stream' })
+  res.end(readFileSync(f))
+})
+await new Promise(r => server.listen(0, r))
+const port = server.address().port
+
+const chrome = spawn('/opt/pw-browsers/chromium', ['--headless=new', '--remote-debugging-port=9341', '--no-sandbox', '--disable-gpu', 'about:blank'], { stdio: 'ignore' })
+const wait = ms => new Promise(r => setTimeout(r, ms))
+let target
+for (let i = 0; i < 80; i++) {
+  try {
+    const l = await fetch('http://127.0.0.1:9341/json/list').then(r => r.json())
+    const g = l.find(x => x.type === 'page')
+    if (g) { target = g.webSocketDebuggerUrl; break }
+  } catch {}
+  await wait(250)
+}
+const ws = new WebSocket(target); await new Promise(r => ws.addEventListener('open', r, { once: true }))
+let id = 0; const pending = new Map()
+ws.addEventListener('message', e => { const m = JSON.parse(e.data); if (m.id && pending.has(m.id)) { pending.get(m.id)(m); pending.delete(m.id) } })
+const send = (m, p = {}) => new Promise(r => { const i = ++id; pending.set(i, r); ws.send(JSON.stringify({ id: i, method: m, params: p })) })
+const ev = async x => {
+  const r = await send('Runtime.evaluate', { expression: x, returnByValue: true, awaitPromise: true })
+  if (r.result?.exceptionDetails) throw new Error(JSON.stringify(r.result.exceptionDetails).slice(0, 400))
+  return r.result?.result?.value
+}
+const shoot = async name => {
+  const s = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true })
+  writeFileSync(new URL(`./${name}.png`, import.meta.url).pathname, Buffer.from(s.result.data, 'base64'))
+}
+
+let failures = 0
+const check = (name, ok, detail) => {
+  if (ok) console.log(`    ✓ ${name}`)
+  else { failures++; console.error(`    ✗ ${name}${detail !== undefined ? ` — ${JSON.stringify(detail).slice(0, 500)}` : ''}`) }
+}
+
+await send('Page.enable'); await send('Runtime.enable')
+const W = 390, H = 844
+await send('Emulation.setDeviceMetricsOverride', { width: W, height: H, deviceScaleFactor: 2, mobile: true })
+
+// A React-controlled input ignores `el.value = x`: the setter it installed
+// swallows it. Going through the native prototype setter and then firing the
+// event is what React itself listens for.
+const SET_INPUT = `(sel, value) => {
+  const el = document.querySelectorAll(sel)[arguments.length]
+  return el
+}`
+
+console.log('\n2. THE PLATE CALCULATOR — several loadings, and tapping one redraws the bar\n')
+{
+  await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off#/tab/tools` })
+  await wait(2500)
+  await ev(`location.hash = '#/tab/tools'`)
+  await wait(1200)
+
+  const opened = await ev(`(() => {
+    const tile = [...document.querySelectorAll('button')].find(b => /Plate calculator/i.test(b.innerText))
+    if (!tile) return 'no tile'
+    tile.click()
+    return 'clicked'
+  })()`)
+  check('the Plate calculator tile is there and opens', opened === 'clicked', opened)
+  await wait(700)
+
+  // 60kg on a 20kg bar: Ashley's own example — "2x10kg or 1x20kg".
+  const typed = await ev(`(() => {
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set
+    const inputs = [...document.querySelectorAll('input[type="number"]')]
+    if (inputs.length < 2) return 'inputs missing: ' + inputs.length
+    setter.call(inputs[0], '60'); inputs[0].dispatchEvent(new Event('input', { bubbles: true }))
+    setter.call(inputs[1], '20'); inputs[1].dispatchEvent(new Event('input', { bubbles: true }))
+    return 'typed'
+  })()`)
+  check('the target and bar can be typed into', typed === 'typed', typed)
+  await wait(500)
+
+  const read = () => ev(`(() => {
+    const group = document.querySelector('[role="group"][aria-label="Ways to load each side"]')
+    if (!group) return JSON.stringify({ rows: [], bar: [] })
+    const rows = [...group.querySelectorAll('button')].map(b => ({
+      text: b.innerText.replace(/\\s+/g, ' ').trim(),
+      pressed: b.getAttribute('aria-pressed'),
+    }))
+    // The barbell picture: the coloured plate divs, in order along the sleeve.
+    const bar = [...document.querySelectorAll('div')]
+      .filter(d => !d.children.length && /^(25|20|15|10|5|2\\.5|1\\.25)$/.test(d.textContent.trim()) && /rounded-sm/.test(d.className))
+      .map(d => d.textContent.trim())
+    return JSON.stringify({ rows, bar })
+  })()`)
+
+  const before = JSON.parse(await read())
+  check('more than one loading is offered', before.rows.length > 1, before.rows)
+  check('...including the single 20 and the pair of 10s Ashley asked for',
+    before.rows.some(r => /^1x 20kg$/.test(r.text)) && before.rows.some(r => /^2x 10kg$/.test(r.text)),
+    before.rows.map(r => r.text))
+  check('...with exactly one selected', before.rows.filter(r => r.pressed === 'true').length === 1, before.rows)
+  check('the bar draws the selected one', before.bar.length > 0, before.bar)
+  await shoot('six-plate-options')
+
+  // THE WIRE. A list of options nobody can act on is decoration.
+  const second = await ev(`(() => {
+    const group = document.querySelector('[role="group"][aria-label="Ways to load each side"]')
+    const rows = [...group.querySelectorAll('button')]
+    const i = rows.findIndex(b => /^2x 10kg$/.test(b.innerText.replace(/\\s+/g, ' ').trim()))
+    if (i < 0) return 'no 2x10 row'
+    rows[i].click()
+    return 'tapped'
+  })()`)
+  check('the 2x 10kg row can be tapped', second === 'tapped', second)
+  await wait(400)
+
+  const after = JSON.parse(await read())
+  check('...and the bar picture changes to match',
+    JSON.stringify(after.bar) !== JSON.stringify(before.bar) && after.bar.join('+') === '10+10',
+    { before: before.bar, after: after.bar })
+  check('...and the selection moves with it',
+    after.rows.filter(r => r.pressed === 'true').length === 1
+    && after.rows.find(r => r.pressed === 'true')?.text === '2x 10kg',
+    after.rows)
+  await shoot('six-plate-tapped')
+}
+
+console.log('\n5. HOME — last known numbers, not a grey line, on a tab switch\n')
+{
+  // 900ms per read, so the aggregate takes long enough to see. Without this
+  // the fake answers in the same microtask and the window under test does not
+  // exist.
+  await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off&slow=900#/tab/dashboard` })
+  await wait(1000)
+  const early = await ev(`document.body.innerText.slice(0, 400)`)
+  check('a genuinely cold Home still says it is loading (nothing to paint yet)',
+    /Loading your day/.test(early), early.slice(0, 120))
+
+  await ev(`location.hash = '#/tab/dashboard'`)
+  await wait(14000)
+  const loaded = await ev(`document.body.innerText.replace(/\\s+/g, ' ').slice(0, 300)`)
+  check('...and it finishes loading', !/Loading your day/.test(loaded), loaded.slice(0, 160))
+  await shoot('six-home-loaded')
+
+  const cached = await ev(`Object.keys(localStorage).filter(k => k.startsWith('dashboard_cache_'))`)
+  check('a snapshot was written for today', cached.length === 1, cached)
+  check('...keyed by profile and date', /^dashboard_cache_.+_\d{4}-\d{2}-\d{2}$/.test(cached[0] ?? ''), cached[0])
+
+  // THE SWITCH. Away and back, then look immediately — this is the window
+  // Ashley spent seconds staring at.
+  await ev(`location.hash = '#/tab/nutrition'`)
+  await wait(900)
+  await ev(`location.hash = '#/tab/dashboard'`)
+  await wait(120)
+  const onReturn = await ev(`document.body.innerText.replace(/\\s+/g, ' ').slice(0, 300)`)
+  check('coming back paints straight away, with no "Loading your day"',
+    !/Loading your day/.test(onReturn), onReturn.slice(0, 200))
+  check('...and what it paints is the real screen, not an empty card',
+    /Today so far|kcal|Tomorrow/i.test(onReturn), onReturn.slice(0, 200))
+  await shoot('six-home-on-return')
+
+  // And it is still not stale: the re-read runs and swaps in.
+  await wait(14000)
+  const settled = await ev(`document.body.innerText.replace(/\\s+/g, ' ').slice(0, 300)`)
+  check('...and the fresh read still lands behind it', !/Loading your day/.test(settled), settled.slice(0, 160))
+}
+
+console.log(failures === 0 ? '\nBoth verified in a browser at 390x844.\n' : `\n${failures} failures above.\n`)
+chrome.kill(); server.close()
+process.exit(failures === 0 ? 0 : 1)
