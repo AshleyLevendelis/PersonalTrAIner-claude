@@ -43,11 +43,14 @@ const base: OpenerInput = {
   cutoffHour: 13,
   awaitingFeel: null,
   missedYesterday: null,
+  planKnown: true,
   todaySession: { focus: 'Push & Press', movements: 'Barbell Bench Press, Overhead Press, Dips' },
   todayLogged: false,
   tomorrowSession: { dayName: 'tomorrow', focus: 'Pull & Hinge', lead: 'Deadlifts' },
 }
 const restDay: OpenerInput = { ...base, todaySession: null }
+/** The plan has not arrived. Distinct from restDay, which is the plan saying there is nothing today. */
+const planLoading: OpenerInput = { ...restDay, planKnown: false, tomorrowSession: null }
 
 console.log('\n1. Priority: the thing that matters most is the one thing said')
 {
@@ -70,6 +73,41 @@ console.log('\n1. Priority: the thing that matters most is the one thing said')
   check('...and previews the next session, with its lead lift', /Pull & Hinge/.test(rest.text) && /Deadlifts/.test(rest.text), rest.text)
   const restNoNext = pickOpener({ ...restDay, tomorrowSession: null })
   check('...but says nothing about a next session when there is none', !/leads with/.test(restNoNext.text), restNoNext.text)
+
+  // AN UNLOADED PLAN IS NOT A REST DAY. Ashley, 7 Sep 2026, from her phone:
+  // "i opened the chat and I see a message telling me its a rest day but
+  // today is not a rest day". The plan had not finished loading; todaySession
+  // was null; null meant rest day. A slow morning network turned into a
+  // confident claim about her training week.
+  //
+  // The two inputs below differ ONLY in planKnown, and they must not produce
+  // the same opener — that equality is the bug, stated as a test.
+  const unknown = pickOpener(planLoading)
+  check('a plan that has not loaded is never announced as a rest day', unknown.kind !== 'rest_day', unknown.kind)
+  check('...nor as a training day, in either direction',
+    unknown.kind !== 'training_today' && unknown.kind !== 'training_done_today', unknown.kind)
+  check('...it claims nothing about today at all',
+    !/rest day|today's|today was|recovery/i.test(unknown.text), unknown.text)
+  check('...and does not promise to be along in a moment, because it never updates',
+    !/loading|one moment|just a sec|hang on|pulling up/i.test(unknown.text), unknown.text)
+  check('...while still opening a conversation rather than going quiet',
+    unknown.text.trim().length > 0 && unknown.chips.length > 0, unknown)
+  check('...and does not put a dot on the tab — nothing is waiting on an answer', !unknown.attention)
+
+  // The other half, and the one a naive fix breaks: a plan that HAS loaded
+  // and has nothing scheduled is still a rest day, and must still say so.
+  const genuineRest = pickOpener({ ...restDay, planKnown: true })
+  check('a loaded plan with no session today is still a rest day', genuineRest.kind === 'rest_day', genuineRest.kind)
+
+  // The signals that do not depend on the plan keep outranking it: an
+  // unreviewed session and a missed day come from logged sessions and the
+  // week strip, and losing them to a slow plan fetch would be a new bug of
+  // the same shape.
+  const feelWhileLoading = pickOpener({ ...planLoading, awaitingFeel: { date: '2026-09-06', day: 'Sunday', isToday: false } })
+  check('an unreviewed session still gets asked about while the plan loads',
+    feelWhileLoading.kind === 'session_feel', feelWhileLoading.kind)
+  const missedWhileLoading = pickOpener({ ...planLoading, missedYesterday: { dayName: 'Monday', focus: 'Legs' } })
+  check('...as does a missed day', missedWhileLoading.kind === 'missed_yesterday', missedWhileLoading.kind)
 
   // Exactly one thing. An opener that mentions two situations is a status
   // report, and the check-in rule this is modelled on forbids stacking.
@@ -154,6 +192,30 @@ console.log('\n4. Attention: the chat button lights for exactly the opener kinds
   check('the opener reads the live week\'s days', /const liveWeekDays = mesocycle\.find\(w => w\.week_number === openerWeek\)\?\.days \?\? exercisePlan/.test(chatUi))
   check('...and the week strip\'s own states decide "missed"', /missedYesterdayFrom\(trainingWeek\.days, yesterdayDate, liveWeekDays\)/.test(chatUi))
   check('chips ride on the opener message', /quickReplies: opener\.chips\.length > 0 \? opener\.chips : undefined/.test(chatUi))
+
+  // THE OTHER HALF OF THE 7 SEP FIX. pickOpener can only be honest about a
+  // missing plan if it is TOLD the plan is missing, and the opener can only
+  // avoid the honest-but-empty line by waiting a beat for the plan to land.
+  // Both halves are here because either alone leaves the bug half-fixed: a
+  // planKnown that is always true restores the rest-day claim, and a wait
+  // that skips the plan makes the neutral opener the ordinary one.
+  check('planKnown is read from the plan itself, not assumed',
+    /const planKnown = liveWeekDays\.length > 0/.test(chatUi))
+  check('...and handed to the opener', /^\s+planKnown,$/m.test(chatUi))
+  check('the opener waits for the plan before it finalises',
+    /if \(proactiveData && feelContext && !trainingWeek\.loading && planKnown\) \{ finalize\(\); return \}/.test(chatUi))
+  check('...re-running when the plan arrives rather than sitting on the timer',
+    /trainingWeek\.loading, planKnown, messages\]/.test(chatUi))
+  // A timer restarted on every input's arrival is a bound that slides: five
+  // staggered arrivals could hold the first bubble far past the number
+  // written down. The deadline is an instant, fixed on the first run.
+  check('...under a deadline that does not restart with each input',
+    /openerDeadlineRef\.current == null\) openerDeadlineRef\.current = Date\.now\(\) \+ OPENER_MAX_WAIT_MS/.test(chatUi)
+    && /setTimeout\(finalize, Math\.max\(0, openerDeadlineRef\.current - Date\.now\(\)\)\)/.test(chatUi))
+  check('...and that deadline is a real ceiling, in seconds not minutes',
+    /const OPENER_MAX_WAIT_MS = (\d+)/.test(chatUi)
+    && Number(/const OPENER_MAX_WAIT_MS = (\d+)/.exec(chatUi)![1]) <= 5000,
+    /const OPENER_MAX_WAIT_MS = \d+/.exec(chatUi)?.[0])
 }
 
 console.log('\n5. missedYesterdayFrom reads only a real miss')

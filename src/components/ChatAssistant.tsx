@@ -74,6 +74,17 @@ const QUICK_REPLIES_RE = /\[QUICK_REPLIES:\s*(.*?)\]/gi
 const TRAILING_BRACKET_RE = /\[(?:ACTION|QUICK_REPLIES|BREAK)[^\]]*$/i
 const PAGE_SIZE = 20
 
+/**
+ * How long the first bubble will wait for its inputs before saying what it
+ * can with what it has.
+ *
+ * A ceiling, not a delay: the opener finalises the instant everything it
+ * reads has arrived, which on a warm load is well inside this. The number
+ * only bites on a slow network, where the choice is between a slightly later
+ * accurate opener and an immediate wrong one.
+ */
+const OPENER_MAX_WAIT_MS = 2500
+
 // Chat round 2, item 2 — the model splits a reply into consecutive sent
 // messages with a [BREAK] line. Collapsed here into a blank-line paragraph
 // break so each beat renders as its own visually separated block. NOTE this
@@ -598,6 +609,13 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
   // the strip about that.
   const openerWeek = getActiveMesocycleWeek(planCreatedAt ?? profile.created_at, getAppNow(profile.id), mesocycle.length > 0 ? mesocycle.length : 4)
   const liveWeekDays = mesocycle.find(w => w.week_number === openerWeek)?.days ?? exercisePlan
+  // HAS THE PLAN ARRIVED. Both sources empty means neither has loaded yet —
+  // not that there is no plan, which cannot happen: App keeps a trainee
+  // without one in onboarding, so anyone who reaches this screen has one.
+  // The opener needs this because "no session today" and "we don't know yet"
+  // were the same value until 7 Sep, and the second was being announced as a
+  // rest day.
+  const planKnown = liveWeekDays.length > 0
   // Safe to hand a fresh array each render: the hook refetches on profile and
   // date only and uses the plan synchronously for classification.
   const trainingWeek = useTrainingWeek(profile.id, activeSession.date, liveWeekDays, planCreatedAt ?? profile.created_at)
@@ -634,6 +652,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         ? { date: feelContext.awaiting.date, day: feelContext.awaiting.day, isToday: feelContext.awaiting.date === activeSession.date }
         : null,
       missedYesterday,
+      planKnown,
       todaySession: todayPlan ? { focus: todayPlan.focus, movements: movementsOf(todayPlan) } : null,
       todayLogged: activeSession.logs.length > 0,
       tomorrowSession,
@@ -686,6 +705,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
   // too, but don't hang forever if it's slow or fails (a missed bonus line
   // is fine; a stuck opener is not).
   const openerFinalizedRef = useRef(false)
+  const openerDeadlineRef = useRef<number | null>(null)
   useEffect(() => {
     if (openerFinalizedRef.current || !historyLoaded || isFirstEverChat == null || messages.length !== 1) return
     if (messages[0].role !== 'assistant' || messages[0].content !== buildInitialGreeting()) return
@@ -742,13 +762,24 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     }
 
     // Wait for what the opener reads — the dashboard aggregate, the feel
-    // context and the week strip's states — but never hang on them: a
-    // missed detail is fine, a stuck opener is not.
-    if (proactiveData && feelContext && !trainingWeek.loading) { finalize(); return }
-    const t = setTimeout(finalize, 2500)
+    // context, the week strip's states and THE PLAN — but never hang on them:
+    // a missed detail is fine, a stuck opener is not.
+    //
+    // The plan was not on this list until 7 Sep, which is what made "it's a
+    // rest day on your plan" the ordinary mobile-morning opener rather than a
+    // rare one. It is the only input here whose absence changes what the
+    // coach ASSERTS rather than how much detail it carries.
+    //
+    // The deadline is a fixed instant, not a fresh 2.5s per render. Each of
+    // these five inputs arrives separately, and a timer restarted on every one
+    // of them is a bound that slides — five staggered arrivals could hold the
+    // opener for far longer than the number written here.
+    if (openerDeadlineRef.current == null) openerDeadlineRef.current = Date.now() + OPENER_MAX_WAIT_MS
+    if (proactiveData && feelContext && !trainingWeek.loading && planKnown) { finalize(); return }
+    const t = setTimeout(finalize, Math.max(0, openerDeadlineRef.current - Date.now()))
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [historyLoaded, isFirstEverChat, proactiveData, feelContext, trainingWeek.loading, messages])
+  }, [historyLoaded, isFirstEverChat, proactiveData, feelContext, trainingWeek.loading, planKnown, messages])
 
   // Synchronous write-through mirror (see chat-cache.ts) — fires on every
   // messages change, so the cache is never behind what's rendered on screen
