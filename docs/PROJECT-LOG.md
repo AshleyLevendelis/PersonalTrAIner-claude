@@ -839,15 +839,25 @@ touching the prompt in `chat-gemini/index.ts` or `generate-meals/index.ts`.
 
 ```bash
 git push origin main
-vercel --prod
 ```
 
-Both have been run together at the end of nearly every substantive round
-in this project's history — treat "ship it" as meaning both, not just the
-git push. Whether the repo's Vercel git integration would deploy from the
-push alone has never actually been established here, which is the reason the
-pairing is the rule: **the push moves `main`, it is not proof the live site
-moved.** Confirm the deploy by looking at the site, not by the push exiting 0.
+**ESTABLISHED 7 Sep 2026: the git integration alone deploys production.**
+This section used to prescribe `vercel --prod` alongside the push, and said
+plainly that whether the push alone sufficed "has never actually been
+established here". It has been now. Pushing `c59ac6f` to `main` — with no
+`vercel --prod`, no Vercel CLI on the machine, and no `.vercel/` link —
+produced deployment `dpl_JDy48sgrTrykwXPWLtH2sK5t9GWe`, `target: "production"`,
+`state: "READY"`, carrying `githubDeployment: "1"`, `githubCommitRef: "main"`
+and `githubCommitSha: c59ac6f…`. The project also holds a
+`…-git-main-…vercel.app` domain, which only a git integration creates.
+
+The second half of the old rule stands and is the half that matters:
+**the push moves `main`, it is not proof the live site moved.** Confirm by
+fetching the deployed bundle and grepping for a string only the new build has
+— not by the push exiting 0, and not by a green deployment row alone. On this
+deploy that meant `Building your meals`, `chat_seen_attention_`, `Still
+cooking`, `Your meals go here` and `couldn't load your meals just then`, all
+five present in `/assets/index-*.js` on `personal-tr-a-iner-claude.vercel.app`.
 
 ### 7.5 Conventions this repo has enforced consistently
 
