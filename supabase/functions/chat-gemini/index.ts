@@ -18,6 +18,29 @@ const corsHeaders = {
 // lockstep with slugifyExerciseName in src/lib/exercise-db.ts.
 // ---------------------------------------------------------------------------
 
+/**
+ * A meal slot as a person would say it.
+ *
+ * `snack_1` was reaching user-facing text verbatim — "keep an eye on your
+ * snack_1 against its budget" — which is a field name wearing a sentence's
+ * clothes. Found alongside the 7 Sep macro-question report; small, and the
+ * kind of thing that quietly tells someone they are reading a database.
+ *
+ * Returns "" for anything unrecognised rather than echoing it: an unknown key
+ * printed back is the same defect with an extra step.
+ */
+function humanSlot(slot: unknown): string {
+  if (typeof slot !== "string") return "";
+  const known: Record<string, string> = {
+    breakfast: "breakfast",
+    lunch: "lunch",
+    dinner: "dinner",
+    snack_1: "first snack",
+    snack_2: "second snack",
+  };
+  return known[slot.toLowerCase()] ?? "";
+}
+
 function slugifyExerciseName(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 }
@@ -786,10 +809,16 @@ const toolDeclarations = [
   {
     name: "log_meal",
     description:
-      "DOES NOT LOG ANYTHING — it computes macros and points the user at the Nutrition tab, where they log the meal themselves. Never tell them it is recorded, and never say food logging is 'coming in an update': the button exists, it is just not yours to press. (Intended behaviour once built: write the meal event directly.) Call whenever the user describes food they ate, OR asks a MACRO question about specific food (e.g. 'how many calories is 2 eggs and toast', 'what's the protein in this shake'). Do NOT call this for an allergen or food-safety question ('does this have nuts', 'is this safe for my allergy', 'is there dairy in it') — those never get a tool call, they're answered in plain reply text under ALLERGEN HONESTY. Extract ONLY the ingredients the user actually stated, with their exact quantities and units — the app computes real macros from a verified food database from what you extract, so you must never calculate or state a macro number yourself. Never add an ingredient the user didn't mention (no assumed cooking oil, seasoning, or protein powder) — if an addition seems implied, ask instead of guessing. If an ingredient has an ambiguous variant (e.g. 'greek yoghurt' could be 0% or full-fat, 'milk' could be whole or skimmed), name the SPECIFIC variant you're assuming (e.g. 'greek yoghurt 0%', not 'greek yoghurt') and record it in assumptions. If a quantity is missing, use a typical portion and record that assumption too.",
+      "DOES NOT LOG ANYTHING — it computes macros and points the user at the Nutrition tab, where they log the meal themselves. Never tell them it is recorded, and never say food logging is 'coming in an update': the button exists, it is just not yours to press. (Intended behaviour once built: write the meal event directly.) Call whenever the user describes food they ate, OR asks a MACRO question about specific food (e.g. 'how many calories is 2 eggs and toast', 'what's the protein in this shake'). SET `intent` HONESTLY — 'question' when they asked, 'logging' when they ate. The two get different replies, and a question answered as a logging attempt reads as an apology for something they never asked for. Do NOT call this for an allergen or food-safety question ('does this have nuts', 'is this safe for my allergy', 'is there dairy in it') — those never get a tool call, they're answered in plain reply text under ALLERGEN HONESTY. Extract ONLY the ingredients the user actually stated, with their exact quantities and units — the app computes real macros from a verified food database from what you extract, so you must never calculate or state a macro number yourself. Never add an ingredient the user didn't mention (no assumed cooking oil, seasoning, or protein powder) — if an addition seems implied, ask instead of guessing. If an ingredient has an ambiguous variant (e.g. 'greek yoghurt' could be 0% or full-fat, 'milk' could be whole or skimmed), name the SPECIFIC variant you're assuming (e.g. 'greek yoghurt 0%', not 'greek yoghurt') and record it in assumptions. If a quantity is missing, use a typical portion and record that assumption too.",
     parameters: {
       type: "object",
       properties: {
+        intent: {
+          type: "string",
+          enum: ["question", "logging"],
+          description:
+            "WHY you are calling this. 'question' when they asked what is in something or what it comes to — 'how many calories is 2 eggs and toast', 'what's the protein in this shake', 'is that a lot of carbs'. 'logging' when they are telling you they ATE it — 'just had 2 eggs and toast', 'I had a shake after training'. Past tense about their own food is logging; everything else is a question. This decides what the reply leads with, so getting it wrong means answering a question with an apology for not doing something they never asked for.",
+        },
         meal_slot: {
           type: "string",
           description: "Which meal slot (breakfast, lunch, dinner, snack_1, snack_2)",
@@ -820,7 +849,7 @@ const toolDeclarations = [
           description: "Plain-English notes on any assumption you made — an ambiguous variant you picked, or a portion size you guessed because none was given. A short phrase each, e.g. 'assumed 0% fat greek yoghurt' — never your reasoning about what tool to call or why, that is not an assumption and must never appear here. Empty array if you made none.",
         },
       },
-      required: ["meal_slot", "food_name", "ingredients", "assumptions"],
+      required: ["intent", "meal_slot", "food_name", "ingredients", "assumptions"],
     },
   },
   {
@@ -1579,6 +1608,7 @@ ${context.exercise_exclusions && context.exercise_exclusions.length > 0 ? `\nPER
 === NATURAL LANGUAGE FOOD LOGGING & NUTRITION QUESTIONS (CRITICAL) ===
 - You must NEVER calculate or state a macro number (calories, protein, carbs, fat) yourself in your reply text, for ANY reason — not for logging food someone ate, not for answering "how many calories is X", not for coaching analysis. Every macro number in this app comes from a verified food database computed server-side; your job is parsing, never arithmetic.
 - Whenever the user describes food they ate, OR asks a nutrition/macro question about specific food (calories, protein, carbs, fat), call log_meal with the ingredients parsed from their message. The tool's response already contains the real computed numbers (and any coverage/assumption caveats) — your reply must use ONLY those numbers, never your own math on top of them.
+- SET log_meal's intent ARGUMENT TO WHAT THEY ACTUALLY DID. 'question' when they asked what something comes to; 'logging' when they told you they ate it. Past tense about their own food ("I had", "just ate", "finished a") is logging. A question about a quantity ("how many calories is", "what's the protein in", "is 2 eggs enough") is a question, even when it names food they are about to eat. When it is genuinely both — "just had 2 eggs, how much protein is that?" — it is a QUESTION: they asked, so answer. Getting this backwards answers a question with an apology for not logging something nobody asked to log, which is exactly the failure §1a forbids.
 - NEVER call log_meal for an allergen or food-safety question ("does this contain X", "is this safe for my allergy", "is there Y in it") — those are governed entirely by ALLERGEN HONESTY below, answered in your own reply text, no tool call. A macro question and a safety question can share the same sentence shape ("what's in tonight's dinner") but are never the same question — macros go through log_meal, safety never does.
 - Extract ONLY what the user actually stated. Never add an ingredient they didn't mention (no assumed cooking oil, seasoning, or protein powder) — if an addition seems implied, ask the user rather than silently including it.
 - If an ingredient has an ambiguous variant (fat content, whole vs. skimmed, etc.), pick one explicit, precisely-named variant and record the assumption. If a quantity is missing, use a typical portion and record that assumption too. See log_meal's parameter descriptions for exact requirements.
@@ -2386,9 +2416,31 @@ Keep this context in mind to ensure your greetings and questions naturally align
           ? `roughly ${computed.kcal} kcal (P: ${computed.protein}g, C: ${computed.carbs}g, F: ${computed.fat}g) from what I could identify — that's ${Math.round(computed.coverage * 100)}% of the meal by weight`
           : `${computed.kcal} kcal (P: ${computed.protein}g, C: ${computed.carbs}g, F: ${computed.fat}g)`;
 
+        // TWO REPLIES, BECAUSE THERE ARE TWO QUESTIONS.
+        //
+        // There used to be one, and it opened "I can't log food from chat yet".
+        // Ashley, 7 Sep 2026: "asking a simple question about macros and the
+        // app is trying to log it." She asked three times and got a
+        // byte-identical answer each time — the string is server-authored and
+        // fixed, so saying "that was a question" could not change a word of it.
+        //
+        // §1a of the prompt has forbidden exactly this shape since it was
+        // written ("NEVER lead with what the app can't do"), and the rule
+        // could not reach a hard-coded string. So the branch is here, keyed on
+        // what the model says the user was doing.
+        //
+        // A question gets the numbers and nothing about logging: she did not
+        // ask to log anything, and an apology for not doing an unrequested
+        // thing is not an answer. Logging gets the numbers first and the one
+        // clause about where to record it at the END, which is where §1a says
+        // a genuine limitation belongs.
+        const asked = args.intent === "question";
+        const slot = humanSlot(args.meal_slot);
         const parts: string[] = [
-          `I can't log food from chat yet — but you can log **${args.food_name}** yourself on the Nutrition tab: open that meal and tap Log. ` +
-          `For now, keep an eye on your ${args.meal_slot} against its budget: this is ${macroLine}.`,
+          asked
+            ? `**${args.food_name}** is ${macroLine}${slot ? ` — worth weighing against your ${slot} budget` : ""}.`
+            : `**${args.food_name}**: ${macroLine}. ` +
+              `Log it on the Nutrition tab when you get a second — open that ${slot || "meal"} and tap Log; I can't record it from here yet.`,
         ];
         if (computed.unmatched.length > 0) {
           parts.push(`I couldn't find these in my food database, so they're not counted above: ${computed.unmatched.join(", ")}.`);
