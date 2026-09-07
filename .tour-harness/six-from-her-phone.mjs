@@ -289,6 +289,54 @@ console.log('\nRAMP — the warm-up steps can be ticked off, and the tick surviv
     rows.length > 0 && rows.every(r => / 0 logged$/.test(r)), rows)
 }
 
-console.log(failures === 0 ? '\nAll three verified in a browser at 390x844.\n' : `\n${failures} failures above.\n`)
+console.log('\nCHAT BUTTON — one unread indicator at a time, in both glow settings\n')
+{
+  // Ashley, seeing the new ring and the old dot together: "we no longer need
+  // the orange dot because the glowing outer ring now does that job." True
+  // where the ring is drawn; at glow Off it is scaled to nothing, so the dot
+  // is the fallback. Both settings are driven here because the whole point is
+  // that exactly one of them shows.
+  await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off#/tab/dashboard` })
+  await wait(2500)
+
+  // Force the indicator on rather than waiting for real unread state: this
+  // section is about which marker is VISIBLE, not about when it lights.
+  const look = (glow) => ev(`(() => {
+    document.documentElement.setAttribute('data-glow', ${JSON.stringify(glow)})
+    const btn = document.querySelector('[data-tour="chatfab"]') || [...document.querySelectorAll('button')].find(b => /Chat/.test(b.getAttribute('aria-label') || ''))
+    if (!btn) return JSON.stringify({ found: false })
+    btn.classList.add('chat-unread')
+    let dot = btn.querySelector('[data-testid="chat-attention-dot"]')
+    if (!dot) {
+      dot = document.createElement('span')
+      dot.setAttribute('data-testid', 'chat-attention-dot')
+      dot.className = 'chat-attention-dot absolute'
+      btn.appendChild(dot)
+    }
+    const cs = getComputedStyle(dot)
+    return JSON.stringify({
+      found: true,
+      dotDisplay: cs.display,
+      glowStrength: getComputedStyle(document.documentElement).getPropertyValue('--glow-strength').trim(),
+    })
+  })()`)
+
+  const on = JSON.parse(await look('on'))
+  check('the chat button is on screen (sanity check on this check)', on.found === true, on)
+  check('with glow on, the glow system is live', on.glowStrength === '1', on)
+  check('...and the orange dot is not drawn — the ring has the job', on.dotDisplay === 'none', on)
+
+  const off = JSON.parse(await look('off'))
+  check('with glow off, the ring is scaled to nothing', off.glowStrength === '0', off)
+  check('...and the dot takes over, so the signal is never lost', off.dotDisplay !== 'none', off)
+
+  const subtle = JSON.parse(await look('subtle'))
+  // The computed value comes back as ".5", not "0.5" — compare numerically
+  // rather than by string, or this fails on a correct app.
+  check('subtle still draws a ring, so still no dot',
+    Number(subtle.glowStrength) === 0.5 && subtle.dotDisplay === 'none', subtle)
+}
+
+console.log(failures === 0 ? '\nAll four verified in a browser at 390x844.\n' : `\n${failures} failures above.\n`)
 chrome.kill(); server.close()
 process.exit(failures === 0 ? 0 : 1)

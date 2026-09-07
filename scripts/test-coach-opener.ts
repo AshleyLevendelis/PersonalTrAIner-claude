@@ -468,8 +468,33 @@ console.log('\n9. The ring and the pulse vanish at glow Off and stop under reduc
   check('the ring is drawn only then too', /\{chatAttention && \([\s\S]{0,400}className="chat-unread-ring"/.test(bar))
   // The dot survives both: at glow Off with reduced motion on it is the only
   // thing left saying the coach is waiting.
-  check('...and the dot is still drawn underneath, outside the glow system',
-    /data-testid="chat-attention-dot"[\s\S]{0,300}bg-amber-400/.test(bar))
+  // RE-ANCHORED 7 Sep 2026. This asserted that the dot is drawn UNDERNEATH the
+  // ring — which was true, and which Ashley then saw on her phone: "we no
+  // longer need the orange dot because the glowing outer ring now does that
+  // job." It does, everywhere the ring is drawn.
+  //
+  // At glow Off it is not drawn: every colour in .chat-unread and
+  // .chat-unread-ring is multiplied by --glow-strength, which [data-glow="off"]
+  // sets to 0. Deleting the dot outright would leave that setting with no
+  // unread signal at all — a silent regression behind a toggle. So the dot
+  // became the FALLBACK, and the property to pin is exclusivity: exactly one
+  // of them is visible in any given setting.
+  check('the dot still exists, as the fallback', /data-testid="chat-attention-dot"[\s\S]{0,300}bg-amber-400/.test(bar))
+  // BOTH HALVES, because the CSS alone is not the behaviour. A first version
+  // pinned only the two rules below, and dropping `chat-attention-dot` from
+  // the element's className sailed through: the rules matched nothing and the
+  // dot reappeared beside the ring — exactly what Ashley reported. Caught by
+  // mutation.
+  check('...and the element actually carries the class those rules target',
+    /data-testid="chat-attention-dot"[\s\S]{0,200}className="chat-attention-dot /.test(bar))
+  check('...which is hidden by default, so it never sits beside the ring',
+    /\.chat-attention-dot \{ display: none; \}/.test(css))
+  check('...appearing only where the ring cannot be seen',
+    /\[data-glow="off"\] \.chat-attention-dot \{ display: block; \}/.test(css))
+  // If the ring ever stops depending on --glow-strength, the fallback stops
+  // being needed and this pairing should be revisited rather than left.
+  check('...which is still exactly the setting that erases the ring',
+    /\[data-glow="off"\] \{ --glow-strength: 0; \}/.test(css))
 }
 
 if (failures > 0) { console.error(`\n${failures} check(s) failed\n`); process.exit(1) }

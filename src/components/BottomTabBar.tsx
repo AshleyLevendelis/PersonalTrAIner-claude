@@ -58,8 +58,16 @@ export function BottomTabBar({
    * was a deliberate decision recorded here until 6 Sep 2026. Ashley asked
    * for them by name after not finding them on her phone; the app-polish
    * handoff had specified them and deferred the keyframes to a chat handoff
-   * that never arrived. The dot stays underneath both, because both live in
-   * the glow system and vanish at glow Off — see .chat-unread in index.css.
+   * that never arrived.
+   *
+   * THE DOT IS NOW A FALLBACK, NOT A COMPANION (7 Sep 2026). Ashley, seeing
+   * both at once: "we no longer need the orange dot because the glowing outer
+   * ring now does that job." It does — except at glow Off, where the ring and
+   * the pulse are both scaled to nothing by --glow-strength and something has
+   * to be left saying the coach has something. So the dot is hidden by CSS
+   * wherever the ring is visible and shown only under [data-glow="off"]; see
+   * .chat-attention-dot in index.css. One indicator at a time, in every
+   * setting.
    *
    * Deliberately NOT lit for "today is a training day" — that is every other
    * day, and a signal that is always on is a signal nobody sees. The same
@@ -113,7 +121,7 @@ export function BottomTabBar({
                 <span
                   data-testid="chat-attention-dot"
                   aria-hidden="true"
-                  className="absolute -right-0.5 -top-0.5 size-3 rounded-full bg-[color:var(--background)] p-[2px]"
+                  className="chat-attention-dot absolute -right-0.5 -top-0.5 size-3 rounded-full bg-[color:var(--background)] p-[2px]"
                 >
                   <span className="block size-full rounded-full bg-amber-400" />
                 </span>

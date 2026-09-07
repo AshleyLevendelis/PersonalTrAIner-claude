@@ -2,6 +2,44 @@
 
 Newest first. One line each.
 
+- [x] **ONE UNREAD INDICATOR, NOT TWO** — Ashley, 7 Sep 2026: *"the glowing
+  chat button ... looks great but theres still the orange dot also. we no
+  longer need the orange dot because the glowing outer ring now does that
+  job."* It does, everywhere the ring is drawn.
+  **Not everywhere, though.** Every colour in `.chat-unread` and
+  `.chat-unread-ring` is multiplied by `--glow-strength`, and
+  `[data-glow="off"]` sets it to 0 — both fade to nothing by design. Deleting
+  the dot outright would have left that setting with no unread signal at all,
+  a silent regression behind a toggle. So the dot became the FALLBACK: hidden
+  by CSS wherever the ring shows, shown only under `[data-glow="off"]`. Subtle
+  (0.5) still draws a ring, so still no dot. Done in CSS because the condition
+  is an ancestor attribute the component never sees.
+  The gate check that asserted "the dot is still drawn underneath" was pinning
+  the behaviour she objected to; it now pins EXCLUSIVITY instead. Four
+  mutations; one survived first — the CSS rules were pinned but nothing checked
+  the element carried the class, so removing it brought the dot straight back.
+  Both halves pinned now. Verified in a browser across all three glow settings.
+
+- [ ] **THE DEPLOYED chat-gemini IS TWO GENERATIONS BEHIND THE REPO, AND THE
+  LAST DEPLOY SHIPPED STALE CODE** — Ashley asked the coach a macro question on
+  7 Sep and got *"Meal logging arrives in the next update — I can't record
+  Greek yoghurt with honey yet ... your snack_1 ..."*. That string is **not in
+  this repository**: `git log -S` puts its removal at `81d7e1c` (5 Sep), and
+  today's `87ef8af` replaced the wording again.
+  Read the deployed source directly (Supabase MCP, PRODUCTION, read-only):
+  chat-gemini **v69, updated 2026-09-06 17:15:54 UTC**, and it contains
+  ``Meal logging arrives in the next update — I can't record **${args.food_name}**
+  yet.`` as a live reply string — not as the prompt rule that quotes it
+  (checked: one capital-M occurrence in the handler, one lower-case in the
+  rule that forbids it). Its line endings are CRLF.
+  **`db6f470` — the 6 Sep 17:13 merge, two minutes before that deploy — already
+  contained `81d7e1c`.** So the deploy ran against a checkout that did not have
+  it. This is a recurrence of the incident CLAUDE.md's handover rule was
+  written after: *"a production deploy reported success while shipping code
+  three merges old — the commands were right and the context was missing."*
+  The command is not enough on its own; the handover prompt must pull first and
+  verify by a named string, and it now does.
+
 - [x] **THE RAMP-UP SETS CAN BE TICKED OFF** — Ashley, mid-session, 7 Sep 2026:
   *"theres no way to log the ramp up weights."* Correct, and a half-built path
   rather than a misunderstanding: the `is_warmup` column exists and is part of
