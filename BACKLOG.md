@@ -2,6 +2,119 @@
 
 Newest first. One line each.
 
+- [x] **SIX THINGS ASHLEY FOUND ON HER PHONE, 7 Sep 2026** — reported after
+  the morning's deploy, from real use. Independent fixes, one commit each,
+  though three shared a shape worth naming: **the app stating something
+  confident while it was still loading.**
+  **1. "It says it's a rest day but today is not a rest day."** The plan had
+  not finished loading. `OpenerInput.todaySession` was documented as "the LIVE
+  week's session, or null on a rest day", and on a slow mobile load both the
+  mesocycle and the base plan are empty — so null meant rest day to every
+  reader of the type. A new `planKnown` separates "nothing scheduled" from "we
+  do not know yet"; the unknown case claims nothing about today, and
+  deliberately makes no "loading, one moment" promise, because that bubble is
+  composed once and never updates. The opener also now waits for the plan
+  alongside its three other inputs, under a deadline fixed as an INSTANT — the
+  old 2.5s timer restarted on every input's arrival, so the ceiling written in
+  the file was never the one enforced.
+  **2. "Plate calculator should give you options ie 2x10kg or 1x20kg."** The
+  loader was greedy and returned a single `number[]` — the return type had no
+  room for a second answer. `plate-math.ts` enumerates every loading in
+  integers of 1.25kg, ranked fewest plates then fewest denominations; the
+  screen lists them and the bar picture follows whichever is tapped.
+  Alternatives capped at three plates more than the shortest, or "18x 1.25kg"
+  is offered with a straight face. The arithmetic had never been called by a
+  test; `test:plate-math` now sweeps 2,440 targets across five bar weights and
+  asserts every option weighs the same per side. Retired a dead promise next
+  door: the Tools tile read "20 kg bar · your plates" and no plate inventory
+  has ever existed (a real one is a profile field, a settings surface and a
+  migration — recorded, not built).
+  **3. "Calibration work note is confusing."** The contradiction was in the
+  branch condition: `calibrationCueText` picked "work up to a weight you could
+  lift 3-4 more times" precisely when a prescribed weight was on screen. The
+  number is deliberately 0.45-0.55 of the standards estimate — too light to be
+  a target — so it is the first rung, and the copy now says so. "Type what you
+  finish on", because a blank weight box logs the PRESCRIBED number: work up
+  to 100kg, tap the tick, and 72.5 goes in the ledger. That default is
+  Ashley's own ruling and the tour promises it, so it stays. Week 1's chip now
+  reads "starting point" rather than "suggested" — carried as a presentation
+  flag, not a fifth `PrescribedLoadSource`, which would have rippled through
+  warmup, plan-adaptations, body-units, the weight-basis offer and the coach's
+  plan context for two words.
+  **4. "The anatomical body is not at all what I had in mind."** Fair: the
+  5 Sep decision was a muscle map plus a video on checked exercises, both
+  halves were built, and `demo_video_id` is set on ZERO of 199. Her ruling on
+  the costs: wire it up ready. `demo_image` is a bare FILENAME under
+  `public/exercise-demos/` — never a URL, because `sw.js` never caches
+  cross-origin and a hot-linked image is blank in a gym with no signal, which
+  is the property the 5 Sep decision cited. `check:demo-coverage` answers the
+  question the vendors' headline counts do not (412 and 679 both exceed our
+  199; whether their NAMES map is the risk). Recommendation, prices and a
+  handover prompt in `docs/plans/buying-the-demonstrations.md`. Nothing bought.
+  **5. "The home tab is blank for a few seconds while it loads."** Two causes
+  multiplied: Home unmounts on every tab switch (deliberate — a fresh mount is
+  a free re-read) with no cache anywhere, and its aggregate was ~20 sequential
+  round trips, fourteen of them a `for` loop awaiting `getTodayLedger` per day.
+  One ranged query replaces the loop (~7 round trips), counting protein the
+  way the ledger does rather than a second way — and answering a failed read
+  with "unknown" instead of fourteen missed days, which used to break a real
+  streak on one bad network moment. `dashboard-cache.ts` paints the last
+  snapshot instantly, keyed by profile AND date, and is **paint-only**: the
+  fetch still runs unconditionally, so the stale window is exactly as long as
+  the blank window it replaces. Not `forceMount` — that gate stands, and now
+  also pins the cache as paint-only. `loadDashboardData` was imported by
+  `test:dashboard` and never called; it is now exercised end to end, round
+  trips counted.
+  **6. "Asking a simple question about macros and the app is trying to log
+  it."** The routing is deliberate and stays — a macro question goes through
+  `log_meal` so numbers come from the verified food database. The reply was
+  the problem: one hard-coded string opening "I can't log food from chat yet",
+  whatever brought it there, which is why three attempts got byte-identical
+  answers and why the prompt rule forbidding exactly that shape could not
+  reach it. `log_meal` now takes a required `intent`; a question gets the
+  numbers and nothing about logging, a log gets the limitation as a closing
+  clause. `snack_1` no longer reaches user-facing text.
+  136 of 136 gates pass. 44 mutations tried across the six, 44 caught (three
+  after strengthening a check that a mutation walked through). Plate options
+  and the Home repaint verified in a browser at 390x844 — the harness fake
+  gained a `?slow=N` knob, without which neither window exists to look at.
+  **Two things are Ashley's:** the `chat-gemini` deploy for #6, and the merge
+  to `main`.
+
+- [ ] **THE CALIBRATION WEEK STILL SPEAKS IN FOUR EFFORT TARGETS** — the cue
+  and the load chip now agree ("3-4 reps in reserve"), but the generator's own
+  week note says "RPE 6", the intensity line says "RPE 5-6", and the
+  experience tier prepends its own ("3-4 reps short of failure" for a
+  beginner, "1-2 reps in reserve" for an advanced trainee) into the same
+  `load_guidance` string. They differ by about a rep, so none is wrong, but
+  four wordings for one instruction is the drift this repo keeps finding.
+  Deliberately not fixed on 7 Sep: week notes are PERSISTED at generation
+  time, so rewording the generator reaches a trainee mid-programme only on a
+  plan rebuild — it would have left Ashley's cue saying one thing and her
+  stored note another. Fold into the next plan-rebuild change.
+
+- [ ] **A PLATE INVENTORY** — the calculator now offers every standard loading
+  and lets you pick, which is honest but not tailored: the app has never known
+  which plates anyone owns (equipment is a four-value enum). A real inventory
+  would make the options genuinely personal, and is a new profile field, a
+  settings surface and a migration. The Tools tile stopped claiming otherwise
+  on 7 Sep.
+
+- [ ] **water-store READS EVERY WATER LOG EVER WRITTEN** — `getAllLogs` selects
+  the whole table for a profile and filters by date in JS. Unbounded, and it
+  gets slower every week the app is used. Noticed while tracing Home's load
+  time on 7 Sep; out of scope for that fix, which was about the sequential
+  round trips and the blank card.
+
+- [ ] **audit-report.txt AND quality-report.txt ARE STALE IN GIT** — a fresh
+  `test:audit` on 7 Sep ran 17,423 combinations with 0 failures; the committed
+  report says 13,967 with 54. The combination count CHANGED, so the two are
+  not comparable — the committed file predates work already merged. Same shape
+  as the `quality-report.txt` discrepancy found on 6 Sep (committed 11.04, a
+  fresh run 11.51). The files are deliberately never committed from a session,
+  which is how they go stale; either they should be regenerated by whoever
+  changes the engine, or they should stop being tracked at all. Decide which.
+
 - [x] **A HALF-BUILT MEAL PLAN IS KEPT, AND THE APP SAYS IT IS BUILDING** —
   Ashley, 7 Sep 2026: an empty Nutrition tab, and "Generate meals" apparently
   doing nothing. Diagnosed from PRODUCTION (read-only) and the edge-function

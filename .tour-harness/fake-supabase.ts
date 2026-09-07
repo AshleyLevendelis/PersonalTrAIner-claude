@@ -26,6 +26,27 @@ export type Db = Record<string, Row[]>
 const cmp = (a: unknown, b: unknown): number =>
   a === b ? 0 : (a as never) < (b as never) ? -1 : 1
 
+/**
+ * Milliseconds to hold every read before answering — `?slow=800` in the URL.
+ *
+ * Added 7 Sep 2026. The fake answered in the same microtask, which is fine for
+ * "does this screen render" and useless for the whole class of bug Ashley
+ * reported from her phone: the chat announcing a rest day because the plan had
+ * not arrived, and Home blank for seconds on a tab switch. Both are about the
+ * window BEFORE the data lands, and a fake with no window has no way to show
+ * one.
+ *
+ * Zero by default, so every existing harness run is unchanged.
+ */
+const SLOW_MS = (() => {
+  try {
+    const n = Number(new URLSearchParams(location.search).get('slow'))
+    return Number.isFinite(n) && n > 0 ? Math.min(n, 10_000) : 0
+  } catch {
+    return 0
+  }
+})()
+
 export function makeFakeSupabase(db: Db) {
   const table = (name: string) => (db[name] ??= [])
 
@@ -98,7 +119,10 @@ export function makeFakeSupabase(db: Db) {
       maybeSingle: () => { single = true; return api },
       single: () => { single = true; return api },
       then: (resolve: (v: unknown) => void, reject?: (e: unknown) => void) =>
-        Promise.resolve().then(() => resolve(exec()), reject),
+        (SLOW_MS > 0
+          ? new Promise<void>(r => setTimeout(r, SLOW_MS))
+          : Promise.resolve()
+        ).then(() => resolve(exec()), reject),
     }
     return api
   }
