@@ -365,6 +365,67 @@ export async function getTodayLedger(
   return { targets, eaten, remaining, events }
 }
 
+/**
+ * Protein eaten on each of several past days, in ONE query.
+ *
+ * Exists because the dashboard used to ask getTodayLedger fourteen times in a
+ * row, awaiting each — fourteen sequential round trips, on every single switch
+ * to the Home tab, for a number that ends up as one streak count. That loop
+ * was most of the two-to-four seconds Ashley watched a blank card for on
+ * 7 Sep 2026. The comment beside it had said "a single ranged query would be
+ * cheaper" since it was written; this is that query.
+ *
+ * Deliberately the same arithmetic as getTodayLedger and not a second
+ * opinion: the same voided-row exclusion, the same three eaten event types,
+ * the same merge of the pending queue deduped by client_id. Two ways of
+ * counting the same protein is exactly the drift this repo keeps finding.
+ *
+ * NULL, NOT AN EMPTY MAP, when the read fails. A failed query is not evidence
+ * that fourteen days of protein were missed — and the old per-day version's
+ * `.catch(() => null)` recorded exactly that, quietly turning a network blip
+ * into a broken streak and a dented consistency score. The caller treats null
+ * as "unknown" and leaves the number out rather than guessing at zero.
+ */
+export async function getEatenProteinByDate(
+  profileId: string,
+  dates: string[],
+): Promise<Record<string, number> | null> {
+  if (dates.length === 0) return {}
+
+  let serverEvents: { date: string; clientId: string; eventType: string; protein: number }[] = []
+  try {
+    const { data, error } = await supabase
+      .from('meal_events')
+      .select('client_id, date, event_type, macros, created_at')
+      .eq('profile_id', profileId)
+      .in('date', dates)
+      .is('voided_at', null)
+    if (error) return null
+    serverEvents = (data ?? []).map(row => ({
+      date: row.date,
+      clientId: row.client_id ?? `server_${row.created_at}`,
+      eventType: row.event_type,
+      protein: row.macros?.protein ?? 0,
+    }))
+  } catch {
+    return null
+  }
+
+  const wanted = new Set(dates)
+  const seen = new Set(serverEvents.map(e => e.clientId))
+  const localOnly = loadPending()
+    .filter(e => e.profileId === profileId && wanted.has(e.date) && !seen.has(e.clientId))
+    .map(e => ({ date: e.date, clientId: e.clientId, eventType: e.eventType, protein: e.macros?.protein ?? 0 }))
+
+  const byDate: Record<string, number> = {}
+  for (const date of dates) byDate[date] = 0
+  for (const e of [...serverEvents, ...localOnly]) {
+    if (e.eventType !== 'confirmed' && e.eventType !== 'swapped_in' && e.eventType !== 'extra') continue
+    byDate[e.date] = (byDate[e.date] ?? 0) + e.protein
+  }
+  return byDate
+}
+
 // ---------------------------------------------------------------------------
 // Pool surface (M1) — real reads/writes against meal_plan_slots
 // ---------------------------------------------------------------------------

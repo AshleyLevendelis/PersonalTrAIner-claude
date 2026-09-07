@@ -10,7 +10,7 @@
 // construction, matching §5.1's rule.
 // ---------------------------------------------------------------------------
 
-import { getTodayLedger, type MealMacros } from './meal-store'
+import { getTodayLedger, getEatenProteinByDate, type MealMacros } from './meal-store'
 import { getRecentLogs, getRecentCardioLogs } from './daily-tracking'
 import { getRecentWeighIns } from './nutrition-targets'
 import { getTotalForDate as getWaterTotalForDate } from './water-store'
@@ -329,26 +329,38 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
   const loggedOfScheduledSoFarThisWeek = streakDays.filter(d => inCurrentPlanWeek(d) && d.scheduled && d.logged).length
 
   // Protein adherence: consecutive PRIOR days (not including in-progress
-  // today) hitting >=95% of target. Bounded to at most 14 sequential
-  // getTodayLedger calls, breaking on the first miss — usually far fewer
-  // in practice. A single ranged meal_events query grouped by date would
-  // be cheaper; left as the simpler per-date reuse of the existing ledger
-  // function for this first pass (read-cost discipline's actual
-  // requirement — "fetch once per mount, not on every render" — still
-  // holds, since this whole function runs once per dashboard mount).
+  // today) hitting >=95% of target, over a 14-day window.
+  //
+  // ONE QUERY, not fourteen. This used to await getTodayLedger once per day
+  // in a `for` loop — fourteen sequential round trips, re-run on every switch
+  // to the Home tab, and most of the two-to-four seconds Ashley spent looking
+  // at a blank card on 7 Sep 2026. The comment that stood here said a single
+  // ranged query would be cheaper; getEatenProteinByDate is that query, and
+  // it counts protein the same way the ledger does rather than a second way.
+  //
+  // A FAILED READ IS NOT FOURTEEN MISSED DAYS. The per-day version caught
+  // each failure to `null` and recorded the day as not hit, so one bad
+  // network moment broke a real streak and pulled down the consistency score.
+  // Unknown now stays unknown: no days, no streak claim, and the protein
+  // component drops out of consistency rather than scoring zero (see
+  // consistency-score.ts, which counts only components with outOf > 0).
   const proteinTarget = macros?.protein ?? 0
-  // Collect the days FIRST, then derive from them, rather than breaking out of
-  // the loop on the first miss. The streak still stops at the first miss (it
-  // is a streak) — but the consistency score needs to know how many days in
-  // the current plan week were hit, which a loop that exits early cannot say.
-  // Same fourteen fetches either way: no new reads, more answers.
+  // Collect the days FIRST, then derive from them, rather than stopping at
+  // the first miss. The streak still stops there (it is a streak) — but the
+  // consistency score needs to know how many days in the current plan week
+  // were hit, which an early exit cannot say.
   const proteinDays: { date: string; hit: boolean }[] = []
   if (proteinTarget > 0) {
+    const dates: string[] = []
     for (let i = 1; i <= 14; i++) {
       const d = new Date(now.getTime() - i * 86_400_000)
-      const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-      const dayLedger = await getTodayLedger(profileId, dateStr, macros!).catch(() => null)
-      proteinDays.push({ date: dateStr, hit: !!dayLedger && dayLedger.eaten.protein >= proteinTarget * 0.95 })
+      dates.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`)
+    }
+    const eatenByDate = await getEatenProteinByDate(profileId, dates).catch(() => null)
+    if (eatenByDate) {
+      for (const dateStr of dates) {
+        proteinDays.push({ date: dateStr, hit: (eatenByDate[dateStr] ?? 0) >= proteinTarget * 0.95 })
+      }
     }
   }
   let proteinStreak = 0

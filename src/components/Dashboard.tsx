@@ -11,6 +11,7 @@ import { useActiveSession } from '@/hooks/useActiveSession'
 import { getAppNow } from '@/lib/dev-clock'
 import { tabHash } from '@/lib/app-route'
 import { loadDashboardData, type DashboardData } from '@/lib/dashboard-data'
+import { loadDashboardCache, saveDashboardCache } from '@/lib/dashboard-cache'
 import { stepsTargetFor } from '@/lib/steps-target'
 import { getStepsForDate, logStepsManual, isPlausibleStepCount, MAX_PLAUSIBLE_DAILY_STEPS, type DailyStepsRow } from '@/lib/steps-store'
 import { logWater, undoLog, type WaterLogRow } from '@/lib/water-store'
@@ -161,7 +162,19 @@ function chipsForTip(key: string | null): { label: string; prefill: string }[] {
 export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreatedAt, onWeightLogged, logsVersion, trainerNudge, stepsVersion, onStepsLogged }: DashboardProps) {
   const stepsTarget = stepsTargetFor(profile)
   const activeSession = useActiveSession()
-  const [data, setData] = useState<DashboardData | null>(null)
+  // LAST KNOWN HOME, PAINTED IMMEDIATELY. Every tab but chat unmounts when you
+  // leave it, so coming back re-runs the whole aggregate — and until it lands
+  // there was one line of grey text where the screen should be. The snapshot
+  // is read synchronously here, the way ChatAssistant reads its own cache, so
+  // the first frame after a tab switch already has yesterday's — properly,
+  // this morning's — numbers on it.
+  //
+  // It does NOT skip the fetch. See dashboard-cache.ts: the effect below runs
+  // unconditionally and swaps the fresh data in, so the stale window is no
+  // longer than the blank window it replaces.
+  const [data, setData] = useState<DashboardData | null>(
+    () => loadDashboardCache(profile.id, activeSession.date),
+  )
   const [loading, setLoading] = useState(true)
 
   const [steps, setSteps] = useState<DailyStepsRow | null>(null)
@@ -197,7 +210,12 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
       dayName: activeSession.dayName, todayStr: activeSession.date,
       now: getAppNow(profile.id),
     })
-      .then(d => { if (!cancelled) { setData(d); setLoadError(false) } })
+      .then(d => {
+        if (cancelled) return
+        setData(d)
+        setLoadError(false)
+        saveDashboardCache(profile.id, activeSession.date, d)
+      })
       // WITHOUT THIS, A FAILED LOAD IS INDISTINGUISHABLE FROM A SLOW ONE —
       // forever. `finally` cleared `loading`, but `data` stayed null and the
       // render guard below is `loading || !data`, so one rejected promise left
@@ -302,7 +320,12 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
     )
   }
 
-  if (!activeSession.ready || loading || !data) {
+  // `loading` is deliberately NOT in this condition. It is true on every mount
+  // while the aggregate re-reads, and gating the render on it meant a
+  // last-known snapshot could never be shown — the cache would exist and the
+  // screen would still be blank. What decides whether there is something to
+  // draw is whether there is data, from wherever it came.
+  if (!activeSession.ready || !data) {
     return (
       <div className="rounded-xl bg-card py-12 text-center text-sm text-muted-foreground">Loading your day…</div>
     )
