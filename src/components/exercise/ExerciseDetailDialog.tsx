@@ -137,6 +137,35 @@ export function ExerciseDetailPanel({
                     right above it) and as nonsense on Burpees ("Primary:
                     Cardiovascular system"). The map's own caption lists all of
                     them, which is both honest and not a repeat. */}
+                {/* THE DEMONSTRATION, WHERE ONE HAS BEEN LICENSED AND
+                    SELF-HOSTED. Guarded on the field exactly as the video is
+                    below: no image, no slot, never a broken frame. The muscle
+                    map stays underneath and is what every exercise gets — it
+                    is the fallback, not the thing being replaced.
+
+                    Served from our own origin (public/exercise-demos/), so
+                    sw.js caches it on first view and it survives a gym with no
+                    signal. That property is the whole reason the 5 Sep
+                    decision went to hand-rolled SVG rather than a bought set;
+                    self-hosting is what buys it back. */}
+                {entry.demo_image && (
+                  <figure className="space-y-1.5">
+                    <div className="overflow-hidden rounded-xl" style={{ background: 'var(--surface-deep)' }}>
+                      <img
+                        src={`/exercise-demos/${entry.demo_image}`}
+                        alt={`${exerciseName} demonstration`}
+                        loading="lazy"
+                        className="w-full"
+                      />
+                    </div>
+                    {entry.demo_image_credit && (
+                      <figcaption className="text-[0.6875rem] leading-[1.4] text-muted-foreground">
+                        Illustration by {entry.demo_image_credit}.
+                      </figcaption>
+                    )}
+                  </figure>
+                )}
+
                 <MuscleMap entry={entry} />
 
                 {/* THE VIDEO, ONLY WHERE ONE HAS BEEN WATCHED. No id, no

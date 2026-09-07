@@ -145,5 +145,61 @@ console.log('\n4. What it is, and what it is not\n')
     existsSync(join(ROOT, 'src/components/exercise/MuscleMap.tsx')))
 }
 
+console.log('\n5. The demonstration image: a socket, and nothing hot-linked\n')
+{
+  // Ashley, 7 Sep 2026: "the anatomical body ... are not at all what I had in
+  // mind. I asked for exercise demos and more realistic images." Her ruling
+  // once the options and prices were in front of her: wire it up ready, buy
+  // the set separately. So this section gates the SOCKET.
+  //
+  // Zero images is a pass, exactly as zero videos is above. What is not a pass
+  // is a slot that renders without one, or a filename that turns out to be a
+  // vendor's URL.
+  const withImage = live.filter(e => e.demo_image)
+  console.log(`     ${withImage.length} of ${live.length} exercises have a licensed image`)
+
+  // THE GUARD, NOT THE MARKUP — same mutation this file's §3 was written for.
+  // Replacing the condition with `true` leaves an <img> with an undefined src
+  // on all 200 exercises: a broken frame on every card.
+  check('the image renders only where one exists', /\{entry\.demo_image && \(/.test(panel))
+  check('...and there is an image to guard', /src=\{`\/exercise-demos\/\$\{entry\.demo_image\}`\}/.test(panel))
+  check('...with alt text, since it is the whole point of the picture',
+    /alt=\{`\$\{exerciseName\} demonstration`\}/.test(panel))
+
+  // SAME ORIGIN OR IT IS BLANK IN A BASEMENT. sw.js:70 returns early for
+  // anything cross-origin, so a hot-linked image is a white rectangle exactly
+  // where VISION says the app has to work — the property the 5 Sep decision
+  // cited when it chose hand-rolled SVG over a bought set. The field takes a
+  // filename so it CANNOT carry a host; these checks are what keep that true.
+  check('the path is built from our own public folder, not from the field',
+    !/src=\{entry\.demo_image\}/.test(panel))
+  const sw = readFileSync(join(ROOT, 'public/sw.js'), 'utf8')
+  check('...and the service worker still refuses cross-origin, which is why',
+    /url\.origin !== self\.location\.origin\) return/.test(sw))
+
+  const DEMO_DIR = join(ROOT, 'public/exercise-demos')
+  for (const e of withImage) {
+    const value = e.demo_image!
+    check(`${e.name}: the image is a bare filename, not a URL or a path`,
+      /^[A-Za-z0-9._-]+\.(webp|png|jpg|jpeg|gif|svg)$/.test(value) && !value.includes('..'), value)
+    check(`${e.name}: the file is actually there`, existsSync(join(DEMO_DIR, value)), value)
+    if (e.demo_image_credit !== undefined) {
+      check(`${e.name}: a credit that exists is a real one`, !!e.demo_image_credit.trim(), e.demo_image_credit)
+    }
+  }
+
+  // The map is the fallback, not the thing being replaced: every exercise
+  // still gets one, and an exercise with an image gets both.
+  check('the muscle map still renders regardless', /<MuscleMap entry=\{entry\} \/>/.test(panel))
+  check('...below the image, so the picture leads',
+    panel.indexOf('entry.demo_image && (') < panel.indexOf('<MuscleMap entry={entry} />'))
+
+  // The tool that answers "does this set cover us" before money is spent.
+  check('there is a coverage check to run before buying a set',
+    existsSync(join(ROOT, 'scripts/check-demo-coverage.ts')))
+  const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'))
+  check('...and it is runnable by name', !!pkg.scripts['check:demo-coverage'])
+}
+
 if (failures > 0) { console.error(`\n${failures} check(s) failed\n`); process.exit(1) }
 console.log('\nYou can see what it works, and how it goes.\n')

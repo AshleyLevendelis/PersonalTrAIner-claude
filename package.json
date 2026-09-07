@@ -80,6 +80,7 @@
     "test:functions-deployable": "tsx scripts/test-functions-deployable.ts",
     "test:exercise-demo": "tsx scripts/test-exercise-demo.ts",
     "test:plate-math": "tsx scripts/test-plate-math.ts",
+    "check:demo-coverage": "tsx scripts/check-demo-coverage.ts",
     "test:exercise-detail": "tsx scripts/test-exercise-detail.ts",
     "test:says-what-it-contains": "tsx scripts/test-says-what-it-contains.ts",
     "test:week-note": "tsx scripts/test-week-note.ts",
