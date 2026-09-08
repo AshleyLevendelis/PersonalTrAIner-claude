@@ -2,6 +2,31 @@
 
 Newest first. One line each.
 
+- [ ] **THE 7 SEP DEPLOY RAN AND SHIPPED STALE CODE — THIRD RECURRENCE** —
+  found 8 Sep 2026 while writing the handover, by checking the live function
+  instead of assuming it had not been deployed. `chat-gemini` on
+  `sdkhuczcfnqqimdgfiks` is **version 70, published 2026-09-07 17:25:58 UTC** —
+  about five minutes after the first merge — and the code that went up still
+  contains `Meal logging arrives in the next update`, a string absent from this
+  repo since 5 Sep. It has none of `propose_meal_log`, `humanSlot` or the 7 Sep
+  prompt change, and still carries `Cross-reference this with the user's
+  exercise plan`. `propose_meal_log` is a string literal in the response
+  payload, so minification cannot explain its absence.
+  **The command was right and the checkout was stale** — the same shape as the
+  incident CLAUDE.md's 1 Sep handover rule was written after, now for the third
+  time. `deploy-functions.mjs` cannot catch it: it links and deploys in one
+  command and passes `--project-ref` on the deploy itself, so the TARGET cannot
+  be wrong, and nothing in it can know whether the CONTENT is current.
+  **Open, because the fix is not written yet.** The handover now makes proving
+  the checkout a hard gate (three greps that must return 1, 2 and 1 before the
+  deploy is offered) — `docs/plans/deploying-the-chat-function.md`. What would
+  actually close this is a check the deploy script runs itself: refuse when the
+  working tree is behind `origin/main`, or when the function file differs from
+  the merged one. Not built — it needs Ashley's word, because it can refuse a
+  deploy she wants to make from a deliberate local change.
+  **Still not live as of 8 Sep:** the honey/macro reply, the coach's side of
+  meal logging, and the prompt half of the which-day fix.
+
 - [x] **"TODAY'S BENCH AND SHOULDER PRESS" — ON A DAY THAT WAS NEITHER** —
   Ashley, 7 Sep 2026, 6:33 PM on a Monday. The coach said *"let me know how
   today's bench and shoulder press go"* (that session is Tuesday's), then, asked
