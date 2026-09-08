@@ -9,11 +9,12 @@
 // ---------------------------------------------------------------------------
 
 import { useCallback, useEffect, useState } from 'react'
-import { getWeeklyDashboard, type WeeklyDashboardDay } from '@/lib/daily-tracking'
+import { getWeeklyDashboard, getSessionMovesInRange, type WeeklyDashboardDay } from '@/lib/daily-tracking'
+import { sessionForDate, type SessionMove } from '@/lib/session-move'
 import { getAppNow, getLocalDateString } from '@/lib/dev-clock'
 import type { WorkoutDay } from '@/lib/types'
 
-export type DayGlyphState = 'done' | 'partial' | 'due' | 'missed' | 'rest' | 'recovery' | 'before_plan' | 'swapped' | 'rest_chosen'
+export type DayGlyphState = 'done' | 'partial' | 'due' | 'missed' | 'rest' | 'recovery' | 'before_plan' | 'swapped' | 'rest_chosen' | 'moved'
 
 export interface TrainingWeekDay {
   date: string
@@ -30,10 +31,23 @@ export interface TrainingWeekDay {
    * come to disagree; the state and the name now travel together.
    */
   swappedForActivity?: string | null
+  /** Set on the ORIGIN of a move — where this day's session went. */
+  movedTo?: { date: string; dayName: string } | null
+  /** Set on the TARGET of a move — where this day's session came from. */
+  movedFrom?: { date: string; dayName: string } | null
+  /**
+   * The session actually run on this date, moves taken into account. The one
+   * answer every screen used to derive for itself with
+   * `plan.find(d => d.day === dayName)` — right only for a day nothing has
+   * happened to, and there are now four ways that can be false.
+   */
+  session?: WorkoutDay | null
 }
 
 export interface TrainingWeekResult {
   days: TrainingWeekDay[]
+  /** Every move touching this window, both ends — the raw fact behind the two fields on each day. */
+  moves: SessionMove[]
   sessionsDone: number
   sessionsPlanned: number
   loading: boolean
@@ -67,9 +81,15 @@ function mondayOf(date: Date): Date {
  * real training — is defensible, and it is one entry in this predicate if
  * Ashley prefers it. What the trainee actually did is not lost either way:
  * it goes to cardio_logs and the streak already reads that table.
+ *
+ * 'moved' joins them for a different reason, and the arithmetic is the point:
+ * the session is still owed, so it must be counted exactly ONCE. It is
+ * counted on the day it landed on — which classifyDay now treats as an
+ * ordinary training day — so counting the origin as well would tell her she
+ * owes two sessions where the plan asked for one.
  */
 export function countsTowardWeekTally(state: DayGlyphState): boolean {
-  return state !== 'rest' && state !== 'recovery' && state !== 'before_plan' && state !== 'swapped' && state !== 'rest_chosen'
+  return state !== 'rest' && state !== 'recovery' && state !== 'before_plan' && state !== 'swapped' && state !== 'rest_chosen' && state !== 'moved'
 }
 
 export function classifyDay(
@@ -79,8 +99,21 @@ export function classifyDay(
   plan: WorkoutDay[],
   dashboardDay: WeeklyDashboardDay | undefined,
   planStartStr: string | undefined,
+  /**
+   * Moves touching this week — "I'll do Tuesday's session on Wednesday".
+   * Defaulted to none so every existing caller and every existing week
+   * classifies exactly as it did before.
+   */
+  moves: SessionMove[] = [],
 ): DayGlyphState {
-  const workout = plan.find(d => d.day === weekdayName)
+  // WHAT IS ACTUALLY RUN HERE, which is the plan's own row only for a day
+  // nothing has happened to. On the RECEIVING end of a move this is the
+  // session that travelled in, so a free Wednesday classifies as the training
+  // day it has become; on the ORIGIN we keep the plan's own row, because the
+  // day still HAS a session — it is just being run elsewhere, and the branch
+  // below is what says so.
+  const resolved = sessionForDate({ date: dateStr, plan, moves })
+  const workout = resolved.movedTo ? plan.find(d => d.day === weekdayName) : resolved.day ?? undefined
   if (!workout) return 'rest'
   if (workout.exercises.length === 0) return 'recovery'
 
@@ -104,6 +137,18 @@ export function classifyDay(
   // already states — logged work outranks every date judgement — must keep
   // holding. Ranked above the date judgement because a swap is exactly the
   // thing that stops a day being 'missed'.
+  // Moved to another day, and said so. Ranked with the swap and the chosen
+  // rest below for the same two reasons: logged work still outranks it
+  // (someone who said they would move it and then trained anyway has earned
+  // the 'done'), and it must sit above the date judgement, because not being
+  // called 'missed' is the entire point.
+  //
+  // A SEPARATE STATE from both. 'swapped' says work happened elsewhere and
+  // 'rest_chosen' says none happened and that was the plan; this one says the
+  // work is still owed, on a named day. Collapsing any two of them would lose
+  // the only fact the trainee actually gave us.
+  if (resolved.movedTo) return 'moved'
+
   if (dashboardDay?.session?.swapped_for_activity) return 'swapped'
 
   // Rested on purpose, and said so. Ranked here for the same two reasons the
@@ -161,6 +206,10 @@ export function useTrainingWeek(
   refreshToken?: number,
 ): TrainingWeekResult {
   const [dashboard, setDashboard] = useState<WeeklyDashboardDay[]>([])
+  // A SECOND READ, deliberately: a move's two ends need not sit in the same
+  // Monday-to-Sunday window (see getSessionMovesInRange). Held separately so
+  // the day loop below can ask one resolver about both ends at once.
+  const [moves, setMoves] = useState<SessionMove[]>([])
   const [loading, setLoading] = useState(false)
 
   const refresh = useCallback(() => {
@@ -169,8 +218,18 @@ export function useTrainingWeek(
     const sunday = new Date(monday)
     sunday.setDate(sunday.getDate() + 6)
     setLoading(true)
-    getWeeklyDashboard(profileId, getLocalDateString(monday), getLocalDateString(sunday))
-      .then(setDashboard)
+    const from = getLocalDateString(monday)
+    const to = getLocalDateString(sunday)
+    Promise.all([
+      getWeeklyDashboard(profileId, from, to),
+      // Never rejects — it logs and returns what it has, so one failing read
+      // cannot blank the whole strip.
+      getSessionMovesInRange(profileId, from, to).catch(err => {
+        console.error('useTrainingWeek: reading session moves failed', err)
+        return [] as SessionMove[]
+      }),
+    ])
+      .then(([week, wk]) => { setDashboard(week); setMoves(wk) })
       .catch(console.error)
       .finally(() => setLoading(false))
     // refreshToken is intentionally a dependency and intentionally unused
@@ -200,15 +259,28 @@ export function useTrainingWeek(
     // before data arrives, so gate explicitly on `loading`.
     const state = loading
       ? classifyLoadingSafe(dayName, plan, dateStr, planStartStr)
-      : classifyDay(dayName, dateStr, sessionDate, plan, dashboardDay, planStartStr)
-    return { date: dateStr, dayName, state, swappedForActivity: dashboardDay?.session?.swapped_for_activity ?? null }
+      : classifyDay(dayName, dateStr, sessionDate, plan, dashboardDay, planStartStr, moves)
+    // Both ends of a move, resolved ONCE here rather than by each of the three
+    // screens that need them. TodayPanel already reads the swap fact from this
+    // hook rather than re-reading the row, with a comment recording why; this
+    // follows the same path for the same reason.
+    const resolved = sessionForDate({ date: dateStr, plan, moves })
+    return {
+      date: dateStr,
+      dayName,
+      state,
+      swappedForActivity: dashboardDay?.session?.swapped_for_activity ?? null,
+      movedTo: resolved.movedTo,
+      movedFrom: resolved.movedFrom,
+      session: resolved.day,
+    }
   })
 
   const trainingDays = days.filter(d => countsTowardWeekTally(d.state))
   const sessionsPlanned = trainingDays.length
   const sessionsDone = trainingDays.filter(d => d.state === 'done').length
 
-  return { days, sessionsDone, sessionsPlanned, loading, refresh }
+  return { days, sessionsDone, sessionsPlanned, loading, refresh, moves }
 }
 
 function classifyLoadingSafe(

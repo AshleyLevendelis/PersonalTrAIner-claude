@@ -217,6 +217,10 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
   // weight is logged (session logs, date) already triggers this effect, and
   // a chat-side log_weight only refreshes App.tsx's own latestWeightKg, not
   // this component's independently-fetched weightSeries/weightTrend/goal.
+  // A STRING, not the array: week.moves is a fresh array every render, and an
+  // array in the dependency list below would re-run the whole aggregate on
+  // every one of them. This changes only when a move actually does.
+  const movesKey = week.moves.map(m => `${m.fromDate}>${m.toDate}`).join('|')
   const [weighInVersion, setWeighInVersion] = useState(0)
   const [loadError, setLoadError] = useState(false)
   /** Bumping this re-runs the load effect — the Retry button's whole mechanism. */
@@ -234,7 +238,7 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
     let cancelled = false
     setLoading(true)
     loadDashboardData({
-      profile, macros, exercisePlan, mesocycle, planCreatedAt,
+      profile, macros, exercisePlan, mesocycle, planCreatedAt, moves: week.moves,
       todayLogs: activeSession.logs, liveWeek: activeSession.liveWeek,
       dayName: activeSession.dayName, todayStr: activeSession.date,
       now: getAppNow(profile.id),
@@ -273,7 +277,7 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
     // on "Rest day" beside its own week strip showing four sessions. Both are
     // App.tsx useState arrays, so the identity is stable and this re-runs when
     // the plan actually changes, not on every render.
-  }, [activeSession.ready, activeSession.date, activeSession.logs.length, profile.id, weighInVersion, macros, retryVersion, exercisePlan, mesocycle])
+  }, [activeSession.ready, activeSession.date, activeSession.logs.length, profile.id, weighInVersion, macros, retryVersion, exercisePlan, mesocycle, movesKey])
 
   // THE CALORIE CELL FOLLOWS THE MEAL LIST ON THE OTHER TAB.
   //
@@ -566,6 +570,20 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
                 )}
               </div>
               <p className="mt-1.5 text-[0.78125rem] text-muted-foreground">{sessionGlance}</p>
+              {/* THE THIRD THING THAT CAN HAVE HAPPENED TO TODAY, after a swap
+                  and a chosen rest. The session stays on screen with its
+                  button — she may still do it today — and this says where it
+                  went, so Home and the Exercise tab tell her the same story. */}
+              {data.session.movedFrom && (
+                <p className="mt-1 text-[0.78125rem] text-muted-foreground">
+                  {data.session.movedFrom.dayName}&apos;s session, moved here.
+                </p>
+              )}
+              {data.session.movedTo && (
+                <p className="mt-1 text-[0.78125rem] text-muted-foreground">
+                  Moved to {data.session.movedTo.dayName} — still here if you want it today.
+                </p>
+              )}
               {data.session.status !== 'done' && (
                 <Button
                   size="cta"

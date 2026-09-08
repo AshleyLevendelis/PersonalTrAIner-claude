@@ -804,6 +804,20 @@ export interface WorkoutSession {
    */
   deliberate_rest?: boolean | null
   /**
+   * Set when this date's prescribed session is being RUN ON ANOTHER DAY —
+   * "I'll do it tomorrow". The third answer neither column above can hold:
+   * swapped_for_activity says work happened elsewhere, deliberate_rest says
+   * no work happened and that was the plan, and this one says the work is
+   * still owed, on a named day.
+   *
+   * ON THE ORIGIN ROW ONLY. The receiving day is derived (session-move.ts's
+   * sessionForDate), never stored, so the two ends of a move cannot drift
+   * apart — the failure this repo has now found four times, most recently
+   * with the week strip drawing a swap glyph while TodayPanel went on
+   * offering "Start workout" for the same day.
+   */
+  moved_to_date?: string | null
+  /**
    * How the session felt, in the trainee's own answer to the coach asking.
    * The document Ashley shared ("The Coach's Decision Stack") rates affect
    * DURING exercise as the strongest predictor of whether someone comes back

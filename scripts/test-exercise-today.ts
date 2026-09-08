@@ -296,8 +296,13 @@ console.log('\n5. A swapped day says so')
   // the next reader re-derives one of them and they drift apart again.
   check('the week day carries what they did instead, beside the state',
     /swappedForActivity\?: string \| null/.test(strip))
+  // RE-ANCHORED 8 Sep 2026: this matched `state, swappedForActivity: …` on one
+  // line, and broke when a third and fourth fact (movedTo / movedFrom) joined
+  // the same object and split it across lines. The property is unchanged — the
+  // activity name is read from the SAME dashboardDay row the state came from,
+  // not fetched again — so only the whitespace assumption goes.
   check('...populated from the same row the state is derived from',
-    /state, swappedForActivity: dashboardDay\?\.session\?\.swapped_for_activity/.test(strip))
+    /state,\s*swappedForActivity: dashboardDay\?\.session\?\.swapped_for_activity/.test(strip))
 
   // The BINDING, not just the expression. A first version matched the lookup
   // anywhere in the file, and survived a mutation that left the lookup in
@@ -317,10 +322,17 @@ console.log('\n5. A swapped day says so')
 
   // THE ACTUAL DEFECT. Not that a banner is missing, but that the primary
   // action claimed the session was still ahead of her.
+  // RE-ANCHORED 8 Sep 2026 for the same reason: a moved day (roadmap 8) needs
+  // the identical treatment, so the condition gained a second term. What must
+  // hold is that a swapped day is IN that condition and that the true branch is
+  // the honest label — which is exactly what a mutation dropping swappedToday,
+  // or restoring a bare 'Start workout', still breaks.
+  const ctaLabel = todayPanel.match(/\{[^{}]*\? 'Train it anyway' : 'Start workout'\}/)?.[0] ?? ''
   check('the button stops saying "Start workout" on a day already swapped',
-    /\{swappedToday \? 'Train it anyway' : 'Start workout'\}/.test(todayPanel))
+    ctaLabel.length > 0 && /swappedToday/.test(ctaLabel), ctaLabel)
+  const ctaVariant = todayPanel.match(/variant=\{[^{}]*\? 'outline' : 'default'\}/)?.[0] ?? ''
   check('...and drops out of the accent, so it reads as the escape hatch it is',
-    /variant=\{swappedToday \? 'outline' : 'default'\}/.test(todayPanel))
+    ctaVariant.length > 0 && /swappedToday/.test(ctaVariant), ctaVariant)
 }
 
 if (failures > 0) { console.error(`\n${failures} exercise-today check(s) FAILED\n`); process.exit(1) }

@@ -144,8 +144,19 @@ const db: Db = {
   // supplies the one row the panel reads through useTrainingWeek, which is the
   // only way to see on screen what a source check cannot show: whether the
   // session card still offers a workout she has already replaced.
+  // ?moved=1 — "I'll do it tomorrow". Same shape as ?swapped=1 above and for
+  // the same reason: one row is the only way to see on screen what a source
+  // check cannot show. Today IS a training day in this fixture and tomorrow
+  // is not (availableIdx), so this is the ordinary case — the session moves
+  // to the next free day, which is the one she asked for.
   workout_sessions: new URLSearchParams(location.search).get('swapped') === '1'
     ? [{ id: 'ws-swap', profile_id: PROFILE_ID, date: today, is_completed: false, swapped_for_activity: 'Muay Thai' }]
+    : new URLSearchParams(location.search).get('moved') === '1'
+    ? [{
+        id: 'ws-move', profile_id: PROFILE_ID, date: today, is_completed: false,
+        split_type: 'moved', duration_minutes: 0,
+        moved_to_date: new Date(Date.now() + 86400000).toISOString().slice(0, 10),
+      }]
     : [],
   cardio_logs: [],
   // A logged step count so the new ring renders — without one the row is

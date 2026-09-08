@@ -25,6 +25,7 @@ import { getLocalDateString } from './dev-clock'
 import { supabase } from './supabase'
 import type { UserProfile, MacroTargets, WorkoutDay, MesocycleWeek, ExerciseSetLog } from './types'
 import { estimateDaySeconds } from './session-duration'
+import { sessionForDate, type SessionMove } from './session-move'
 
 /**
  * 'unknown' IS NOT 'rest', and conflating them is the defect this value
@@ -63,6 +64,16 @@ export interface TodaySession {
   minutesLeft: number | null
   /** The heaviest external load in the session, e.g. "bench from 92.5 kg". */
   leadLift: { name: string; kg: number } | null
+  /**
+   * Set when today's session has been MOVED to another day ("I'll do it
+   * tomorrow"). The session stays on screen with its Start button — the same
+   * choice TodayPanel makes for a swapped day, and for the same reason: the
+   * work has not vanished, it is owed on a named day, and she may still do it
+   * today if she wants. This is the line that says so.
+   */
+  movedTo?: { date: string; dayName: string } | null
+  /** Set when today IS the day another session was moved onto — where it came from. */
+  movedFrom?: { date: string; dayName: string } | null
 }
 
 export interface PhaseContext {
@@ -156,6 +167,12 @@ export interface LoadDashboardDataInput {
   /** Flat week-1 plan — used as the day-of-week SCHEDULE pattern (which weekdays are training days) for both the streak and rest-day detection. */
   exercisePlan: WorkoutDay[]
   mesocycle: MesocycleWeek[]
+  /**
+   * One-off session moves touching this week, from useTrainingWeek — the same
+   * fact the week strip draws its arrow from, so Home and the strip cannot
+   * disagree about which day holds today's session.
+   */
+  moves?: SessionMove[]
   planCreatedAt?: string
   /** Today's already-fetched logs from useActiveSession — avoids a second independent fetch/race with the Exercise tab. */
   todayLogs: ExerciseSetLog[]
@@ -167,13 +184,20 @@ export interface LoadDashboardDataInput {
 }
 
 export async function loadDashboardData(input: LoadDashboardDataInput): Promise<DashboardData> {
-  const { profile, macros, exercisePlan, mesocycle, planCreatedAt, todayLogs, liveWeek, dayName, todayStr, now } = input
+  const { profile, macros, exercisePlan, mesocycle, moves = [], planCreatedAt, todayLogs, liveWeek, dayName, todayStr, now } = input
   const profileId = profile.id
   if (!profileId) throw new Error('loadDashboardData requires a saved profile')
 
   const totalWeeks = mesocycle.length || 4
   const liveWeekData = mesocycle.find(w => w.week_number === liveWeek)
-  const todayWorkoutDay = liveWeekData ? findWorkoutDay(liveWeekData.days, dayName) : findWorkoutDay(exercisePlan, dayName)
+  const activeWeekDays = liveWeekData ? liveWeekData.days : exercisePlan
+  // MOVES FIRST. On the receiving end of a move this is the session that
+  // travelled in; on the origin it is the plan's own session, kept
+  // deliberately (see TodaySession.movedTo) rather than blanked.
+  const todayResolved = sessionForDate({ date: todayStr, plan: activeWeekDays, moves })
+  const todayWorkoutDay = todayResolved.movedTo
+    ? findWorkoutDay(activeWeekDays, dayName)
+    : todayResolved.day ?? undefined
   // HAS THE PLAN ARRIVED AT ALL — see SessionStatus. Both sources empty is the
   // cold-load window, not a trainee without a plan.
   const planKnown = mesocycle.length > 0 || exercisePlan.length > 0
@@ -185,7 +209,9 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
   // week-1 pattern for the schedule shape (which days train), same source
   // the streak uses, since day-of-week availability doesn't change week to
   // week within a mesocycle.
-  const tomorrowWorkoutDay = findWorkoutDay(exercisePlan, tomorrowName)
+  const tomorrowStr = getLocalDateString(tomorrowDate)
+  const tomorrowResolved = sessionForDate({ date: tomorrowStr, plan: exercisePlan, moves })
+  const tomorrowWorkoutDay = tomorrowResolved.movedTo ? undefined : tomorrowResolved.day ?? undefined
   // The count rides along because Home's Tomorrow row shows it
   // ("Pull & Hinge · 5 exercises") and the day is already in hand here.
   // Counted exactly as today's own glance counts (session.exerciseCount):
@@ -233,6 +259,8 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
     ? { status: 'rest', focus: null, exerciseNames: [], setsLogged: 0, setsPlanned: 0,
         exerciseCount: 0, estimatedMinutes: null, minutesLeft: null, leadLift: null }
     : {
+        movedTo: todayResolved.movedTo,
+        movedFrom: todayResolved.movedFrom,
         // A completed flag only counts with a set behind it — the same rule
         // useTrainingWeek's classifyDay applies, for the same Thursday.
         status: (explicitlyCompleted && nonWarmupToday.length > 0) || (setsPlanned > 0 && nonWarmupToday.length >= setsPlanned)

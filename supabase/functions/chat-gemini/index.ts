@@ -663,6 +663,33 @@ const toolDeclarations = [
     },
   },
   {
+    name: "propose_session_move",
+    description:
+      "PROPOSES running ONE prescribed session on a different day this week — this does NOT apply anything, the app shows a card and the user taps Confirm. Call this when they say a session is not happening when the plan says but IS still happening: 'I'll do it tomorrow', 'can I move today's session to Thursday', 'I'll make Tuesday's up later in the week'. THE DIFFERENCE FROM THE OTHER TWO DAY TOOLS IS WHETHER THE WORK STILL HAPPENS: propose_rest_day is for a day they are writing off ('taking today off'), swap_session_for_activity is for a day they replaced with something else ('Muay Thai instead'), and this one is for a day they are simply doing later. Do NOT call it for a lasting change to which weekdays they train — that is propose_schedule_change — and do not call it for a session they already logged. YOU DO NOT PICK THE DAY: pass the day they named and the app resolves where it can actually go, because a day that already has a session on it cannot take a second one. If they name no day at all, omit to_date and the app takes the soonest free day. Never say the session has been moved: they tap Confirm, and until they do nothing has happened.",
+    parameters: {
+      type: "object",
+      properties: {
+        from_date: {
+          type: "string",
+          description: "The day whose session is being moved, as YYYY-MM-DD. Defaults to today when they don't say otherwise ('I'll do it tomorrow' on a training day means today's session).",
+        },
+        to_date: {
+          type: "string",
+          description: "The day they want to run it on, as YYYY-MM-DD, ONLY if they named one. Omit entirely when they didn't — the app then takes the soonest free day rather than you guessing one.",
+        },
+        reason: {
+          type: "string",
+          description: "One short sentence on why, in their words, if they gave one ('working late') — shown on the card. Omit rather than invent one.",
+        },
+        origin_verbatim_quote: {
+          type: "string",
+          description: "The exact substring of the user's CURRENT message asking for the move. Copied verbatim, not paraphrased.",
+        },
+      },
+      required: ["origin_verbatim_quote"],
+    },
+  },
+  {
     name: "propose_rest_day",
     description:
       "PROPOSES recording a prescribed training day as a rest the user chose, so it stops counting as a missed session — this does NOT apply anything, the app shows a card and the user taps Confirm. Call this when they say they are not training a day and name NOTHING they are doing instead ('rest day today', 'taking today off', 'not training tomorrow, just resting'). If they name a replacement activity, that is swap_session_for_activity instead, not this — this tool records rest, and would throw away the activity. Do not call it for a day with no session prescribed (there is nothing to rest from), for a session they already logged, or when they are thinking out loud rather than telling you ('should I take today off?' is a question — answer it).",
@@ -1858,7 +1885,9 @@ NEVER CLAIM AN ACTION YOU DID NOT TAKE:
 3. When they say they are resting a training day and name nothing in its place — "rest day today", "taking today off" — call propose_rest_day. That is the tool for exactly this, and it is the only thing that stops the day showing as missed tomorrow. It shows a card; the user confirms it. Until they do, nothing has happened, so do not say it has.
 4. When they want something you have no tool for, say plainly you cannot do it from chat and point them at the RIGHT screen — the Profile screen for training days and personal details, the Nutrition tab for logging food, the Exercise tab for banning a movement. An honest "I can't do that from here" beats a confident sentence that turns out to be false. NOTE: changing WHICH DAYS they train is something you CAN do — call propose_schedule_change (§3e) rather than declining it.
 5. Speak in the past tense about a change ONLY after the tool has run. Before that, say what you are about to do, not what you have done.
-6. INTENTIONS ARE NOT APPOINTMENTS. Nothing in this app stores "I'll train tomorrow morning" — there is no tool for it and no screen that shows it. So never answer a stated intention with "locked in", "booked in", "got that scheduled", "I've put that down" or any phrasing that implies you wrote it somewhere. Acknowledge it as what it is — something they told you, which you will remember for this conversation — and leave it there. Measured live, 31 Aug 2026: "Got tomorrow morning locked in for your Push & Press session" was recorded in exactly no place.
+6. INTENTIONS ARE NOT APPOINTMENTS, WITH ONE EXCEPTION. Nothing in this app stores "I'll train tomorrow morning" — there is no tool for a TIME OF DAY and no screen that shows one. So never answer a stated intention with "locked in", "booked in", "got that scheduled", "I've put that down" or any phrasing that implies you wrote it somewhere. Measured live, 31 Aug 2026: "Got tomorrow morning locked in for your Push & Press session" was recorded in exactly no place. THE EXCEPTION, added 8 Sep 2026: moving a prescribed session to another DAY is now real — call propose_session_move (rule 7). Even then it is a card they confirm, so the same rule applies until they tap it: nothing has happened yet, so do not say it has.
+
+7. "I'LL DO IT TOMORROW" IS A MOVE, NOT A REST AND NOT A SWAP. The three day tools differ by whether the work still happens: propose_rest_day writes the day off, swap_session_for_activity replaces it with something they did instead, and propose_session_move keeps the session and puts it on another day this week. Use the third whenever they say a session is happening LATER ("I'll do it tomorrow", "can I shift today's to Thursday", "I'll make Tuesday's up later this week"). YOU DO NOT CHOOSE THE DAY — pass the day they named, or omit it if they named none, and the app takes the next day that is actually free, because a day that already has a session cannot take a second one. When it lands somewhere other than the day they asked for, the card says so; do not pre-empt it with a guess of your own.
 
 Always use the user's specific data when answering. Nutrition, supplements, and recovery questions are always within your scope — answer them directly. For anything genuinely off-topic, see §1e above (factual question vs. task request get different treatment).
 
@@ -2079,6 +2108,29 @@ Keep this context in mind to ensure your greetings and questions naturally align
                 date: args.date,
                 origin_verbatim_quote: args.origin_verbatim_quote,
               },
+            },
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (name === "propose_session_move") {
+        // Proposal, not a write, and deliberately NOT a decision either. The
+        // server forwards the two dates the user described; where the session
+        // may actually land is resolved on the client against the LIVE plan
+        // (src/lib/session-move.ts), because Ashley's ruling — 8 Sep 2026,
+        // chosen over letting a day hold two sessions — is that a move takes
+        // the next FREE day, and only the client knows which days are free.
+        //
+        // A model that picked the day here would be picking it from a plan
+        // summary that is one turn old, which is precisely how two sessions
+        // end up on one Wednesday.
+        return new Response(
+          JSON.stringify({
+            reply: "",
+            proposal: {
+              kind: "propose_session_move",
+              rawArgs: { from_date: args.from_date, to_date: args.to_date, reason: args.reason },
             },
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }

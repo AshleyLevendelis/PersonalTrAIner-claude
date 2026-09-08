@@ -190,7 +190,17 @@ export function TodayPanel({
   const weekTrain = useTrainingWeek(profileId, today, liveWeekPlan, planCreatedAt)
 
   const effectiveDayName = borrowedDayName ?? todayName
-  const workout = liveWeekPlan.find(d => d.day === effectiveDayName)
+  // TODAY'S CELL, resolved by the hook that already holds the whole week.
+  // Borrowing a day is a deliberate look at ANOTHER day's prescription, so it
+  // stays a straight plan lookup — a move is a fact about a date, and there
+  // is no date being borrowed.
+  const todayCell = borrowedDayName ? undefined : weekTrain.days.find(d => d.date === today)
+  // `session` is the moved-in session on the receiving end of a move, and
+  // null on the origin — where the fallback puts the plan's own session back,
+  // deliberately: a moved day keeps its session on screen exactly as a swapped
+  // day does, with an honest line above it, rather than pretending the work
+  // vanished.
+  const workout = (todayCell?.session ?? undefined) ?? liveWeekPlan.find(d => d.day === effectiveDayName)
   // WHAT THEY DID INSTEAD, if they told the coach. The week strip has drawn
   // this correctly all along; this panel read nothing, so on 8 Sep 2026 it
   // went on offering "Start workout" for a session Ashley had already
@@ -200,6 +210,11 @@ export function TodayPanel({
   const swappedToday = weekTrain.days.find(d => d.date === today)?.state === 'swapped'
     ? (weekTrain.days.find(d => d.date === today)?.swappedForActivity || 'something else')
     : null
+
+  // MOVED, the third thing that can have happened to today. Same source as the
+  // glyph and the swap above — never a second read of the same row.
+  const movedAwayTo = todayCell?.movedTo ?? null
+  const movedInFrom = todayCell?.movedFrom ?? null
 
   const isRestDay = !workout
   const isActiveRecovery = !!workout && workout.exercises.length === 0
@@ -444,6 +459,23 @@ export function TodayPanel({
               this panel carried on as if the session were still ahead of her.
               The list stays visible — she may still want to train — but the
               screen has to say what it knows first. */}
+          {/* Both banners use the SAME component the swap below does, so the
+              three things that can have happened to a day look like three of
+              one kind rather than one styled thing and two afterthoughts. */}
+          {movedInFrom && (
+            <InsightBanner tone="ai" data-testid="moved-in">
+              <span className="text-sm">
+                This is <span className="font-semibold">{movedInFrom.dayName}</span>&apos;s session, moved here.
+              </span>
+            </InsightBanner>
+          )}
+          {movedAwayTo && (
+            <InsightBanner tone="ai" data-testid="moved-away">
+              <span className="text-sm">
+                You moved today&apos;s session to <span className="font-semibold">{movedAwayTo.dayName}</span>. It&apos;s still here if you want it today.
+              </span>
+            </InsightBanner>
+          )}
           {swappedToday && (
             <InsightBanner tone="ai" data-testid="swapped-today">
               <span className="text-sm">
@@ -649,10 +681,10 @@ export function TodayPanel({
               app telling her it did not hear. Same handler, honest label. */}
           <Button
             className="h-[52px] w-full text-[0.9375rem] font-semibold"
-            variant={swappedToday ? 'outline' : 'default'}
+            variant={swappedToday || movedAwayTo ? 'outline' : 'default'}
             onClick={startSession}
           >
-            {swappedToday ? 'Train it anyway' : 'Start workout'}
+            {swappedToday || movedAwayTo ? 'Train it anyway' : 'Start workout'}
           </Button>
         </div>
       )}

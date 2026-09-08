@@ -2,6 +2,61 @@
 
 Newest first. One line each.
 
+- [x] **"I'LL DO IT TOMORROW" NOW MOVES THE SESSION** (roadmap 8/12) — the one
+  answer the app had no way to hear. Plan doc first:
+  `docs/plans/ill-do-it-tomorrow.md`.
+  **MEASURED BEFORE**, `classifyDay` directly, Tuesday's Push & Press seen
+  from Wednesday morning: nothing recorded → `missed`, **counting against her
+  week**; a session row with no marks → `missed`; as if she had said "rest
+  day" → `rest_chosen`; as if she had said "Muay Thai instead" → `swapped`.
+  And Wednesday still resolved to its own Pull & Hinge, so the session she
+  said she would move appeared on **no day at all**. The coach had no tool —
+  its own prompt said so in as many words ("INTENTIONS ARE NOT APPOINTMENTS.
+  Nothing in this app stores 'I'll train tomorrow morning'"), and the two
+  tools that WOULD have cleared the mark both record that the session is not
+  happening.
+  **Ashley's ruling, 8 Sep 2026** — offered "next free day", "tomorrow anyway,
+  two sessions that day", or "don't move it, just stop the black mark": she
+  chose **the next free day, said out loud**. So a day never holds two
+  sessions, and when the day she names is busy the coach names the one that
+  is free.
+  **One column on the ORIGIN row** (`workout_sessions.moved_to_date`,
+  migration written, NOT run); the receiving end is derived, never stored, so
+  the two ends cannot drift — the failure this repo has found four times.
+  Two placement rules: the target weekday has nothing prescribed, and it falls
+  in the same MESOCYCLE week, because the plan repeats weekly and a move into
+  next week would put the same session on the calendar twice at two different
+  loads. A new pure module `src/lib/session-move.ts` holds both, plus
+  `sessionForDate` — the one answer to "what runs on this date" that the
+  Exercise tab, Home, the week strip and the coach's context all now call
+  instead of each running `plan.find(d => d.day === dayName)` themselves.
+  New glyph state `'moved'` (→), excluded from the week tally while the target
+  day counts, so a move changes what she owes by exactly nothing.
+  New tool `propose_session_move`; the server never picks the day (a model
+  reading a one-turn-old plan summary is how two sessions land on one
+  Wednesday) — the client resolves it against the live plan and the card says
+  when it landed somewhere other than she asked.
+  Gate `test:session-move` (72 checks — `classifyDay` and the resolver CALLED,
+  not regexed); **10 mutations, all caught**. `test:coach-nudge`'s
+  "one lookup of today's session" check re-anchored off the exact expression
+  it pinned; the replacement **survived its own mutation** on the first
+  attempt and was strengthened until it did not.
+  **Browser gate `verify:session-move`** (11 checks, both tabs, one real row):
+  **5 fail against pre-fix code**, where the strip read
+  `Tuesday: due · Wednesday: rest day` and the panel offered "Start workout"
+  for a session she had moved. After: `Tuesday: moved to another day`,
+  Wednesday a training day, "Train it anyway", and Home saying
+  "Moved to Wednesday — still here if you want it today."
+  **Two other gates moved.** `test:exercise-today` had three checks pinning the
+  swap banner's exact expression; a fourth day state joining the same object
+  and the same ternary broke all three while the property was untouched —
+  re-anchored to the property. And **the bundle budget moved, 950 kB → 975 kB**:
+  the app chunk was **945 kB before and 953 kB after** (+8 kB), so prior
+  bundle numbers are measured against a different line from here on.
+  **NOT LIVE YET on two counts**: the migration is Ashley's to run
+  (`npm run db:push-both`), and the tool half needs the `chat-gemini` deploy
+  already outstanding for roadmap 12.
+
 - [x] **A REST DAY IS A CLAIM, AND A CLAIM NEEDS THE PLAN** (roadmap 7/12,
   first half) — Ashley's report was the chat; the worse instance was Home.
   **The 7 Sep fix hardened the wrong bubble.** It taught `coach-opener.ts` the
