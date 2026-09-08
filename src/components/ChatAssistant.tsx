@@ -41,7 +41,8 @@ import { keepsComposerFocus, refocusComposer } from '@/lib/composer-focus'
 import { TAB_BAR_HEIGHT_PX } from '@/components/BottomTabBar'
 import { useBottomDockHeight } from '@/hooks/useBottomDockHeight'
 import { cn } from '@/lib/utils'
-import { parseWorkoutEntries, type ParsedSetGroup, type WorkoutEntryInput } from '@/lib/set-parse'
+import { parseWorkoutEntries, resolveExerciseName, type ParsedSetGroup, type WorkoutEntryInput } from '@/lib/set-parse'
+import { resolveSwapTarget } from '@/lib/swap-target'
 import { executeLogWorkout, type ReplacedSetPreImage } from '@/lib/nl-logging-executor'
 import { normalizeExternalUrl } from '@/lib/chat-links'
 import { buildFirstRunIntro, planShapeFromMesocycle, type FirstRunSessionBrief } from '@/lib/first-run-intro'
@@ -1644,26 +1645,63 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
    * time) — showing an approximate number pre-confirm risks being wrong
    * in a way "recomputed when applied" never is.
    */
+  /**
+   * @returns the built proposal, or a REASON it could not be built.
+   *
+   * Reasons, not null. This used to return null from five different places —
+   * no day argument, no such day, no such exercise, no such replacement, no
+   * mesocycle — and every one of them surfaced as the single sentence "I
+   * couldn't find that on your current plan", which is the message Ashley kept
+   * getting for exercises that were plainly on it (8 Sep 2026). Resolution now
+   * lives in swap-target.ts, tolerantly, and what comes back says which part
+   * did not resolve.
+   */
   const buildExerciseSwapProposal = (rawArgs: Record<string, unknown>): {
+    ok: true
     scopeKey: string
     preconditions: Record<string, unknown>
     payload: ExerciseSwapPayload
     preImage: MesocycleWeek[]
     diff: import('@/lib/pending-actions-store').ProposalDiff
-  } | null => {
+  } | { ok: false; reason: string } => {
     const dayArg = String(rawArgs.day ?? '')
     const oldItem = String(rawArgs.old_item ?? '')
     const newItem = String(rawArgs.new_item ?? '')
-    if (!dayArg || !oldItem || !newItem || mesocycle.length === 0) return null
+    if (mesocycle.length === 0) return { ok: false, reason: "Your plan hasn't loaded yet — give it a moment and ask me again." }
+    if (!oldItem) return { ok: false, reason: 'Which exercise did you want to change?' }
+    if (!newItem) return { ok: false, reason: `What would you like instead of ${oldItem}?` }
 
     const week = mesocycle.find(w => w.week_number === activeSession.liveWeek)
-    const day = week?.days.find(d => d.day.toLowerCase() === dayArg.toLowerCase())
-    if (!day) return null
-    const exIndex = day.exercises.findIndex(e => e.name.toLowerCase() === oldItem.toLowerCase())
-    if (exIndex === -1) return null
+    if (!week) return { ok: false, reason: "I can't see this week on your plan just now — give it a moment and ask me again." }
+
+    // An absent day means TODAY. "Swap this exercise" names no day at all, and
+    // demanding one was the commonest way into the dead end.
+    const target = resolveSwapTarget({
+      dayArg: dayArg || 'today',
+      exerciseArg: oldItem,
+      days: week.days,
+      todayName: activeSession.dayName,
+    })
+    if (!target.ok) return { ok: false, reason: target.message }
+
+    const day = week.days.find(d => d.day === target.dayName)!
+    const exIndex = target.exIndex
     const oldEx = day.exercises[exIndex]
-    const newEntry = getExerciseEntry(newItem)
-    if (!newEntry) return null
+
+    // The REPLACEMENT gets the same tolerance: "Lateral Raise" for "Lateral
+    // Raises" was a dead end too. resolveExerciseName is the resolver the set
+    // parser already uses, so the chat means the same thing by a name however
+    // it arrives.
+    const newResolved = resolveExerciseName(newItem, day.exercises.map(e => e.name))
+    const newEntry = newResolved.resolution === 'resolved' ? getExerciseEntry(newResolved.exerciseName) : undefined
+    if (!newEntry) {
+      return {
+        ok: false,
+        reason: newResolved.resolution === 'ambiguous'
+          ? `Did you mean ${newResolved.candidates.slice(0, 3).map(c => c.name).join(', ')}?`
+          : `I don't have "${newItem}" in the exercise library — try another name for it.`,
+      }
+    }
 
     const scope: SwapScope = rawArgs.scope === 'permanent' ? 'permanent' : 'today'
     const payload: ExerciseSwapPayload = {
@@ -1676,6 +1714,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     }
 
     return {
+      ok: true,
       scopeKey: `${profile.id}:propose_exercise_swap:${day.day}:${exIndex}`,
       preconditions: { day: day.day, exIndex, currentExerciseName: oldEx.name },
       payload,
@@ -3049,7 +3088,8 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         }
       } else if (result.proposal.kind === 'propose_exercise_swap' && result.proposal.rawArgs) {
         const swap = buildExerciseSwapProposal(result.proposal.rawArgs)
-        if (swap) built = { scopeKey: swap.scopeKey, preconditions: swap.preconditions, payload: swap.payload as unknown as Record<string, unknown>, preImage: swap.preImage, diff: swap.diff }
+        if (swap.ok) built = { scopeKey: swap.scopeKey, preconditions: swap.preconditions, payload: swap.payload as unknown as Record<string, unknown>, preImage: swap.preImage, diff: swap.diff }
+        else refusal = swap.reason
       } else if (result.proposal.kind === 'propose_injury_adaptation' && result.proposal.rawArgs) {
         const adaptation = await buildInjuryAdaptationProposal(result.proposal.rawArgs)
         if (adaptation) built = { scopeKey: adaptation.scopeKey, preconditions: adaptation.preconditions, payload: adaptation.payload as unknown as Record<string, unknown>, preImage: adaptation.preImage, diff: adaptation.diff }

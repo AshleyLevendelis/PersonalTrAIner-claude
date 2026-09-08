@@ -2,6 +2,40 @@
 
 Newest first. One line each.
 
+- [x] **"I COULDN'T FIND THAT ON YOUR CURRENT PLAN" — FOR THINGS THAT WERE ON
+  IT** (roadmap 6/12) — Ashley, 8 Sep 2026, asking the coach to swap an
+  exercise.
+  **The handler wanted three exact strings** — the day as the plan spells it,
+  the old exercise's full catalogue name, the new one's — and returned null
+  from five separate places, every one of which surfaced as that single
+  sentence. MEASURED against a real generated Tuesday:
+  `day`: "Tuesday" ok, **"today" MISS**, "Tue" MISS ·
+  `old_item`: "Barbell Squats" ok, **"Squats" MISS**, "Barbell" MISS ·
+  `new_item`: "Lateral Raises" ok, **"Lateral Raise" MISS**.
+  "Swap this exercise" names no day at all, so the model had to invent all
+  three, and one wrong plural was the whole difference.
+  **Fixed in a new pure module, `src/lib/swap-target.ts`.** The day accepts
+  today/tomorrow/weekday/abbreviation and comes back spelled as the PLAN
+  spells it; the exercise resolves by exact name, then substring either way,
+  then word-level — each step only counting when it lands on exactly one. The
+  replacement goes through `resolveExerciseName`, the resolver the set parser
+  already uses, so the chat means the same thing by a name however it arrives.
+  An absent day now means today.
+  **It refuses with a reason.** A swap rewrites the plan, so two candidates are
+  a question naming both, never a coin toss — and every failure says which of
+  the three parts failed. "I couldn't match X to anything on Tuesday. It has:
+  …" LISTS the day's exercises, which is the thing the old catch-all could
+  never do: it was indistinguishable from a plan that really had changed.
+  Gate `test:swap-target` (45 checks); 6 mutations, all caught, two after
+  adding a case that made the substring rule load-bearing and one that made the
+  listed-exercises sentence load-bearing.
+  **Browser-verified both ways** through the real chat (`verify:swap-request`,
+  model stubbed at the fetch boundary, everything after it real) with the
+  sloppy arguments the report is about — no day, `old_item: "squats"`,
+  `new_item: "leg press"`. **BEFORE: "I couldn't find that on your current
+  plan."** AFTER: a real proposal card, Barbell Squats → Leg Press, with Apply
+  and Keep.
+
 - [x] **THE CORRECTION THAT ONLY EVER ASKED QUESTIONS** (roadmap 5/12) —
   Ashley, 8 Sep 2026: asking the coach to fix a mislogged set "repeats
   questions endlessly without performing the update."
