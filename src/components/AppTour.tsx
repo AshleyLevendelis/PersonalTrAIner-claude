@@ -156,9 +156,23 @@ function bringIntoView(el: HTMLElement): void {
   if (Math.abs(delta) > 4) window.scrollBy({ top: delta, behavior: 'auto' })
 }
 
-export function AppTour({ profileId, armed, mealsPending = false }: {
+export function AppTour({ profileId, armed, mealsPending = false, onRunningChange }: {
   profileId?: string
   armed: boolean
+  /**
+   * Called whenever the tour starts or stops OCCUPYING THE SCREEN — its
+   * spotlight and card, not the small "Resume the tour" pill.
+   *
+   * Exists so App.tsx can hold back the email prompt while this is up.
+   * Both are triggered by finishing onboarding, from different code paths
+   * that had never met: the prompt is armed when the app finds no account to
+   * restore (so, at launch, for a brand-new user) and the tour is armed when
+   * their plan is committed — and the prompt is a full-screen overlay at the
+   * same z-index, so it landed on top of the first stop of the tour. Ashley,
+   * 8 Sep 2026. Reported UP rather than solved here: which of the two yields
+   * is App's decision, not the tour's.
+   */
+  onRunningChange?: (running: boolean) => void
   /**
    * The first meal build is still running and there are no meals yet. Passed
    * in rather than read from a store: this component takes every fact as a
@@ -202,6 +216,7 @@ export function AppTour({ profileId, armed, mealsPending = false }: {
   const step = STEPS[stepIndex]
   const phase: Phase = state.status === 'active' ? state.phase : 'info'
   const running = state.status === 'active'
+  useEffect(() => { onRunningChange?.(running) }, [running, onRunningChange])
 
   // The visible numbering skips the set stop when it does not apply.
   const totalSteps = STEPS.length - (setStepSkipped ? 1 : 0)

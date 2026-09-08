@@ -37,6 +37,7 @@ import { generateMesocycle, setRandomSource, resetRandomSource } from '@/lib/exe
 import { seededRngFromKey } from '@/lib/seeded-random'
 import { computeTargets } from '@/lib/nutrition-targets'
 import { useAppRoute, tabHash, type Tab } from '@/lib/app-route'
+import { saveActiveSessionRecord } from '@/lib/active-session-store'
 import type { UserProfile, MacroTargets } from '@/lib/types'
 
 import { Dashboard } from '@/components/Dashboard'
@@ -68,6 +69,25 @@ const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 
 const todayIdx = new Date().getDay()
 const availableIdx = new Set([todayIdx, (todayIdx + 2) % 7, (todayIdx + 4) % 7, (todayIdx + 5) % 7])
 
+// ?absurd=1 — the weight-plausibility check, on the screen it argues on.
+//
+// Two things it needs that the default harness does not have: a STATED
+// dumbbell ceiling, so the warning takes its "you told me" branch rather
+// than quoting the app's own table, and a row whose implement is known and
+// small. The row is seeded as Additional Work below, which is the weakest
+// link in the wiring (it reaches SetGrid through a different parent from
+// the plan rows) and, unlike the plan, is the same exercise on every
+// weekday. Off by default, so every existing run of this harness is
+// unchanged.
+const ABSURD = new URLSearchParams(location.search).get('absurd') === '1'
+
+// ?planDelay=N — App.tsx holds exercisePlan/mesocycle at [] until its read
+// resolves (App.tsx:111,138). Every other run of this harness hands them over
+// before first paint, so the window in which Home has no plan has never been
+// on screen here. 0 (the default) keeps that behaviour exactly.
+const PLAN_DELAY_MS = Number(new URLSearchParams(location.search).get('planDelay') ?? '0')
+export const STATED_DUMBBELL_KG = 24
+
 const profile: UserProfile = {
   id: PROFILE_ID,
   age: 30, gender: 'male', height_cm: 178, weight_kg: 80, activity_level: 'moderate',
@@ -83,6 +103,7 @@ const profile: UserProfile = {
   // scheduled days, so the consistency score correctly shows nothing and the
   // harness could never see it render.
   created_at: new Date(Date.now() - 9 * 86400000).toISOString(),
+  ...(ABSURD ? { max_dumbbell_kg: STATED_DUMBBELL_KG } : {}),
 } as UserProfile
 
 // ALWAYS FROM THE MESOCYCLE, never generateExercisePlan directly —
@@ -117,7 +138,27 @@ const db: Db = {
     weight_kg: 60, reps_completed: 8, is_bodyweight: false, is_warmup: false,
     completed_at: new Date(Date.now() - (back + 1) * 86400000).toISOString(),
     date: new Date(Date.now() - (back + 1) * 86400000).toISOString().slice(0, 10),
-  })), workout_sessions: [], cardio_logs: [],
+  })),
+  // ?swapped=1 — the day Ashley told the coach she had done Muay Thai instead.
+  // Off by default so every existing run of this harness is unchanged. On, it
+  // supplies the one row the panel reads through useTrainingWeek, which is the
+  // only way to see on screen what a source check cannot show: whether the
+  // session card still offers a workout she has already replaced.
+  // ?moved=1 — "I'll do it tomorrow". Same shape as ?swapped=1 above and for
+  // the same reason: one row is the only way to see on screen what a source
+  // check cannot show. Today IS a training day in this fixture and tomorrow
+  // is not (availableIdx), so this is the ordinary case — the session moves
+  // to the next free day, which is the one she asked for.
+  workout_sessions: new URLSearchParams(location.search).get('swapped') === '1'
+    ? [{ id: 'ws-swap', profile_id: PROFILE_ID, date: today, is_completed: false, swapped_for_activity: 'Muay Thai' }]
+    : new URLSearchParams(location.search).get('moved') === '1'
+    ? [{
+        id: 'ws-move', profile_id: PROFILE_ID, date: today, is_completed: false,
+        split_type: 'moved', duration_minutes: 0,
+        moved_to_date: new Date(Date.now() + 86400000).toISOString().slice(0, 10),
+      }]
+    : [],
+  cardio_logs: [],
   // A logged step count so the new ring renders — without one the row is
   // still the input, which is a different state.
   daily_steps: [{ id: 's1', profile_id: PROFILE_ID, date: today, steps: 7400 }], meal_events: [], meal_plan_picks: [], meal_plan_slots: [],
@@ -127,6 +168,23 @@ const db: Db = {
   daily_nutrition_targets: [], workout_exercises: [], weight_basis_offers: [],
 }
 setSupabaseClient(makeFakeSupabase(db) as never)
+
+// The Additional Work row for ?absurd=1. Declared through the same record
+// the app itself writes, so the section renders exactly as it does for a
+// trainee who typed "I also did..." — and picked as the first dumbbell
+// movement NOT already in today's session, because a declared exercise that
+// IS in the plan is correctly filtered out of Additional Work and the row
+// would silently never appear.
+if (ABSURD) {
+  const planned = new Set((exercisePlan.find(d => d.day === DAYS[todayIdx])?.exercises ?? []).map(e => e.name))
+  const name = ['Lateral Raises', 'Hammer Curls', 'Dumbbell Curls', 'Dumbbell Flyes'].find(n => !planned.has(n))!
+  ;(window as unknown as { __absurdExercise: string }).__absurdExercise = name
+  saveActiveSessionRecord({
+    profileId: PROFILE_ID, date: today, dayName: DAYS[todayIdx], liveWeek: 1,
+    status: 'running', startedAtIso: new Date().toISOString(), lastActivityIso: new Date().toISOString(),
+    declaredOffPlan: [name],
+  })
+}
 
 // Real meals, shaped like generate-meals' output, so the `meals` stop has
 // something with real height under it rather than an empty-state card.
@@ -151,6 +209,18 @@ function Harness() {
   const activeTab: Tab = route.kind === 'tab' ? route.tab : 'dashboard'
   const [ready, setReady] = useState(false)
   useEffect(() => { setReady(true) }, [])
+  const [planArrived, setPlanArrived] = useState(PLAN_DELAY_MS <= 0)
+  useEffect(() => {
+    // The driver reads this rather than trusting a wall-clock sample: whether
+    // the plan had arrived when a sentence rendered is the actual question,
+    // and bundle parse time moves first paint around by hundreds of ms.
+    ;(window as unknown as Record<string, unknown>).__planArrived = planArrived
+    if (planArrived) return
+    const t = setTimeout(() => setPlanArrived(true), PLAN_DELAY_MS)
+    return () => clearTimeout(t)
+  }, [planArrived])
+  const livePlan = planArrived ? exercisePlan : []
+  const liveMeso = planArrived ? mesocycle : []
 
   const noop = () => {}
   return (
@@ -171,8 +241,8 @@ function Harness() {
 
       <main className="mx-auto max-w-md px-4 pb-40 pt-14">
         {activeTab === 'dashboard' && (
-          <Dashboard profile={profile} macros={macros} exercisePlan={exercisePlan}
-            mesocycle={mesocycle} planCreatedAt={profile.created_at}
+          <Dashboard profile={profile} macros={macros} exercisePlan={livePlan}
+            mesocycle={liveMeso} planCreatedAt={profile.created_at}
 />
         )}
         {activeTab === 'nutrition' && (

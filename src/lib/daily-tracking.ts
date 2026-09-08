@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import type { SessionMove } from './session-move'
 import type { DailyMetric, DailyNutritionTarget, WorkoutSession, WorkoutExerciseRow, ExerciseSetLog, CardioLog } from './types'
 
 export async function upsertDailyMetric(metric: Omit<DailyMetric, 'id' | 'created_at' | 'updated_at'>) {
@@ -141,6 +142,116 @@ export async function setDeliberateRest(
     deliberate_rest: true,
   })
   if (error) console.error('setDeliberateRest: insert failed', error)
+  return !error
+}
+
+/**
+ * Records — or clears — "I'll do this day's session on that day instead".
+ *
+ * ONE COLUMN, ON THE ORIGIN ROW. `toDate` null clears the move and the day
+ * goes back to being an ordinary prescribed session.
+ *
+ * READ BEFORE WRITE for the same reason setDeliberateRest is: split_type is
+ * NOT NULL with no default, so an upsert payload has to carry it and would
+ * overwrite a real session's split with a placeholder whenever the row
+ * already existed.
+ *
+ * Returns whether the write landed. A caller that says "moved to Thursday" on
+ * a false here would be repeating the exact lie this whole path exists to
+ * stop — the coach's own rule 6 ("INTENTIONS ARE NOT APPOINTMENTS") was
+ * written after "Got tomorrow morning locked in" was recorded in no place at
+ * all.
+ */
+/**
+ * Every move that touches a date range — BOTH ends.
+ *
+ * A separate read rather than a field on getWeeklyDashboard's rows, because
+ * the two ends of a move need not sit in the same window. The strip's window
+ * is Monday-to-Sunday; the rule that keeps a move inside its own MESOCYCLE
+ * week (session-move.ts) is anchored to when the plan was created, and those
+ * two boundaries do not have to line up. Reading only the in-window origin
+ * rows would therefore drop a session that landed here from just outside —
+ * and the day would show its own empty self, which is the failure this whole
+ * feature exists to stop, one week over.
+ *
+ * Indexed by (profile_id, moved_to_date) — see the migration.
+ */
+export async function getSessionMovesInRange(
+  profileId: string,
+  startDate: string,
+  endDate: string,
+): Promise<SessionMove[]> {
+  const [origins, arrivals] = await Promise.all([
+    supabase
+      .from('workout_sessions')
+      .select('date, moved_to_date')
+      .eq('profile_id', profileId)
+      .not('moved_to_date', 'is', null)
+      .gte('date', startDate)
+      .lte('date', endDate),
+    supabase
+      .from('workout_sessions')
+      .select('date, moved_to_date')
+      .eq('profile_id', profileId)
+      .not('moved_to_date', 'is', null)
+      .gte('moved_to_date', startDate)
+      .lte('moved_to_date', endDate),
+  ])
+  if (origins.error) console.error('getSessionMovesInRange: origins read failed', origins.error)
+  if (arrivals.error) console.error('getSessionMovesInRange: arrivals read failed', arrivals.error)
+
+  const rows = [...(origins.data ?? []), ...(arrivals.data ?? [])] as { date: string; moved_to_date: string }[]
+  const seen = new Set<string>()
+  const moves: SessionMove[] = []
+  for (const r of rows) {
+    if (!r?.date || !r?.moved_to_date || seen.has(r.date)) continue
+    seen.add(r.date)
+    moves.push({ fromDate: r.date, toDate: r.moved_to_date })
+  }
+  return moves
+}
+
+export async function setSessionMove(
+  profileId: string,
+  date: string,
+  toDate: string | null,
+): Promise<boolean> {
+  const { data: existing, error: readErr } = await supabase
+    .from('workout_sessions')
+    .select('id')
+    .eq('profile_id', profileId)
+    .eq('date', date)
+    .maybeSingle()
+  if (readErr) {
+    console.error('setSessionMove: reading the day failed', readErr)
+    return false
+  }
+
+  if (existing?.id) {
+    const { error } = await supabase
+      .from('workout_sessions')
+      .update({ moved_to_date: toDate, updated_at: new Date().toISOString() })
+      .eq('id', existing.id)
+    if (error) console.error('setSessionMove: update failed', error)
+    return !error
+  }
+
+  // Nothing to clear if there is no row, and creating one to say "not moved"
+  // would write a session that never existed.
+  if (!toDate) return true
+
+  const { error } = await supabase.from('workout_sessions').insert({
+    profile_id: profileId,
+    date,
+    // Names what this row is rather than borrowing a split it never had, the
+    // same choice the rest and swap paths make. The lifting happens on the
+    // other day, so 0 is the honest duration for THIS one.
+    split_type: 'moved',
+    duration_minutes: 0,
+    is_completed: false,
+    moved_to_date: toDate,
+  })
+  if (error) console.error('setSessionMove: insert failed', error)
   return !error
 }
 

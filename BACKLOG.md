@@ -2,6 +2,474 @@
 
 Newest first. One line each.
 
+- [x] **A QUESTION MUST NOT PRODUCE A CARD** — Ashley, live from her phone,
+  8 Sep 2026, three turns before Muay Thai. She asked *"Im going to muay thai
+  tonight. What should I eat before hand to give me energy?"* and got
+  *"I couldn't quite tell what you ate — could you list it out with
+  quantities"*. She asked again, *"What should I eat?"*, and got a **PROPOSED
+  CHANGE card** offering to make a Mexican chicken and rice bowl her lunch for
+  2026-09-08 — at 15:54, about a snack that evening. Her third message:
+  *"I dont want you ro log anything um simply asking a question."*
+  **TWO SEPARATE HOLES, both in the repo** — neither would have been closed by
+  the `chat-gemini` deploy already outstanding.
+  **(1)** `log_meal`'s no-ingredients branch **returned at line 2453, before
+  `intent` was read at line 2507**, so the question/logging split built on
+  7 Sep never reached it. She asked what she SHOULD eat and was asked to
+  itemise what she HAD.
+  **(2)** `propose_meal_addition` was **the only one of the fifteen
+  `propose_*` tools with no `origin_verbatim_quote`** — the exact substring of
+  the message that ordered the change, which is what makes "nothing was asked
+  for" checkable rather than a matter of the model's judgement. And the prompt
+  named a question as a valid trigger for it, verbatim: *"'What should I have
+  for breakfast?' is a question — answer it **or use propose_meal_addition**"*.
+  Every comparable tool says the opposite.
+  **Fixed:** intent read inside the branch; the quote required and now
+  *verified* by `classifyImperative`, which already existed server-side for the
+  append tools and was never wired to this family; the prompt clause corrected
+  and the answer-then-offer rule added. **Ashley's ruling, 8 Sep** — offered
+  "answer then one line offering to add it", "just answer", or "answer and
+  still show the card": she chose **the first**.
+  **Two things the gate caught that the change had broken.** `'put'` was
+  missing from the imperative verb list, so the new guard would have refused
+  `"put overnight oats in for breakfast"` — one of the tool's OWN documented
+  examples. And the offer line had to name the words to say (*Say "add it"*),
+  because a bare "yes please" has no imperative verb either and would have
+  been refused in turn — rebuilding the endless-question loop roadmap item 5
+  was spent removing.
+  Gate `test:question-not-a-card` (31 checks, her sentences verbatim, plus
+  **"every `propose_*` tool requires the quote, counted, no exceptions"** so a
+  tool added later without one fails here rather than in her chat); 8
+  mutations, all caught — the last only after a lockstep check between the
+  client and server copies of the classifier, since mutating the server copy
+  alone survived.
+  **NOT LIVE**: all of this is `chat-gemini`, so it reaches her only through
+  the deploy outstanding for roadmap 12.
+
+- [x] **"I'LL DO IT TOMORROW" NOW MOVES THE SESSION** (roadmap 8/12) — the one
+  answer the app had no way to hear. Plan doc first:
+  `docs/plans/ill-do-it-tomorrow.md`.
+  **MEASURED BEFORE**, `classifyDay` directly, Tuesday's Push & Press seen
+  from Wednesday morning: nothing recorded → `missed`, **counting against her
+  week**; a session row with no marks → `missed`; as if she had said "rest
+  day" → `rest_chosen`; as if she had said "Muay Thai instead" → `swapped`.
+  And Wednesday still resolved to its own Pull & Hinge, so the session she
+  said she would move appeared on **no day at all**. The coach had no tool —
+  its own prompt said so in as many words ("INTENTIONS ARE NOT APPOINTMENTS.
+  Nothing in this app stores 'I'll train tomorrow morning'"), and the two
+  tools that WOULD have cleared the mark both record that the session is not
+  happening.
+  **Ashley's ruling, 8 Sep 2026** — offered "next free day", "tomorrow anyway,
+  two sessions that day", or "don't move it, just stop the black mark": she
+  chose **the next free day, said out loud**. So a day never holds two
+  sessions, and when the day she names is busy the coach names the one that
+  is free.
+  **One column on the ORIGIN row** (`workout_sessions.moved_to_date`,
+  migration written, NOT run); the receiving end is derived, never stored, so
+  the two ends cannot drift — the failure this repo has found four times.
+  Two placement rules: the target weekday has nothing prescribed, and it falls
+  in the same MESOCYCLE week, because the plan repeats weekly and a move into
+  next week would put the same session on the calendar twice at two different
+  loads. A new pure module `src/lib/session-move.ts` holds both, plus
+  `sessionForDate` — the one answer to "what runs on this date" that the
+  Exercise tab, Home, the week strip and the coach's context all now call
+  instead of each running `plan.find(d => d.day === dayName)` themselves.
+  New glyph state `'moved'` (→), excluded from the week tally while the target
+  day counts, so a move changes what she owes by exactly nothing.
+  New tool `propose_session_move`; the server never picks the day (a model
+  reading a one-turn-old plan summary is how two sessions land on one
+  Wednesday) — the client resolves it against the live plan and the card says
+  when it landed somewhere other than she asked.
+  Gate `test:session-move` (72 checks — `classifyDay` and the resolver CALLED,
+  not regexed); **10 mutations, all caught**. `test:coach-nudge`'s
+  "one lookup of today's session" check re-anchored off the exact expression
+  it pinned; the replacement **survived its own mutation** on the first
+  attempt and was strengthened until it did not.
+  **Browser gate `verify:session-move`** (11 checks, both tabs, one real row):
+  **5 fail against pre-fix code**, where the strip read
+  `Tuesday: due · Wednesday: rest day` and the panel offered "Start workout"
+  for a session she had moved. After: `Tuesday: moved to another day`,
+  Wednesday a training day, "Train it anyway", and Home saying
+  "Moved to Wednesday — still here if you want it today."
+  **Two other gates moved.** `test:exercise-today` had three checks pinning the
+  swap banner's exact expression; a fourth day state joining the same object
+  and the same ternary broke all three while the property was untouched —
+  re-anchored to the property. And **the bundle budget moved, 950 kB → 975 kB**:
+  the app chunk was **945 kB before and 953 kB after** (+8 kB), so prior
+  bundle numbers are measured against a different line from here on.
+  **NOT LIVE YET on two counts**: the migration is Ashley's to run
+  (`npm run db:push-both`), and the tool half needs the `chat-gemini` deploy
+  already outstanding for roadmap 12.
+
+- [x] **A REST DAY IS A CLAIM, AND A CLAIM NEEDS THE PLAN** (roadmap 7/12,
+  first half) — Ashley's report was the chat; the worse instance was Home.
+  **The 7 Sep fix hardened the wrong bubble.** It taught `coach-opener.ts` the
+  difference between "nothing scheduled" and "we don't know yet" — and the
+  sentence she saw is not composed there. `initialGreetingDetail` seeds a
+  greeting into `useState` synchronously, before any read resolves, from an
+  `exercisePlan` that is `[]` on every cold load, and its fallback was
+  "it's a rest day on your plan".
+  **And the 2.5s timer was cancelled by the very thing it waited for.** The
+  finalize effect recognised its own untouched opener by REBUILDING the
+  greeting and comparing — against a string that moves the moment the plan
+  lands. So the effect bailed, its cleanup having already cleared the timer.
+  MEASURED at `planDelay=1200` (inside the ceiling): the opener still read
+  "it's a rest day on your plan" at **6.8s**. The only runs that recovered
+  were the SLOW ones, where the plan missed the deadline and the timer fired.
+  **Home had it too, stickier.** `loadDashboardData` ran as soon as the active
+  session was ready, decided a rest day from the same empty array, and
+  `exercisePlan`/`mesocycle` were not in the effect's dependencies — so it
+  never looked again. MEASURED: at 6.8s Home read "Rest day" with no Start
+  button, beside its own week strip showing four sessions. It was also written
+  to `dashboard-cache`, which is the FIRST thing the next cold open draws.
+  **Fixed at all three:** one exported `PLAN_UNKNOWN_TEXT` both bubbles read;
+  the seeded sentence remembered in a ref instead of recomputed; a
+  `SessionStatus` of `'unknown'` distinct from `'rest'`, never cached, with
+  the plan in the effect's deps. Ashley's ruling, 8 Sep — offered a block-only
+  wait, holding the whole screen, or drawing the last-known session — chose
+  the first: **"Checking your plan…"** in that block alone, everything else
+  Home knows still on screen, and no Tomorrow row guessed from the same empty
+  plan. Gate `test:plan-unknown` (31 checks, `loadDashboardData` called for
+  real against a stubbed database rather than regexed); 9 mutations, all
+  caught. Browser gate `verify:rest-day-race` (16 checks, both screens, plan
+  landing at 1.5s) — **10 of them fail against pre-fix code**, reproducing her
+  exact sentence.
+
+- [x] **THE MACRO QUESTION ANSWERED AS AN APOLOGY** (roadmap 7/12, second
+  half) — **no code change was needed; the fix has been sitting undeployed
+  since 7 Sep.** Verified against the LIVE function rather than the note that
+  claimed it: production `chat-gemini` is **version 70, updated 2026-09-07
+  17:25 UTC**, and its `log_meal` handler still contains `daily_food_logs`
+  (the table that has never existed) and none of `args.intent === "question"`,
+  `propose_meal_log` or `humanSlot`. The sentence she gets today, verbatim
+  from the deployed source: *"Meal logging arrives in the next update — I
+  can't record **X** yet. For now, keep an eye on your `snack_1` against its
+  budget: this is …"* — a correct calculation behind a canned apology, with
+  the raw slot key in it. The repo's version answers the question and says
+  nothing about logging; `test:meal-log` (32), `test:coach-promises` (146) and
+  `test:macro-split` (57) all pin it. **This one needs the deploy in roadmap
+  12, not a patch.**
+
+- [ ] `verify:tap-targets` fails on Home — 2 of 87 controls under 44px (the
+  weigh-in button at 22px tall, a numeric input at 28px). Pre-existing, not in
+  the 146-gate list; confirmed identical against pre-step-7 code.
+
+- [ ] The last hard-coded "I can't …" reply in `chat-gemini` is
+  `ban_exercise`. Deliberate (§7.2 A0 keeps ban disabled via chat) and it
+  names the working alternative, so it is not the shape Ashley reported —
+  noted so a future sweep does not have to re-derive that.
+
+- [x] **"I COULDN'T FIND THAT ON YOUR CURRENT PLAN" — FOR THINGS THAT WERE ON
+  IT** (roadmap 6/12) — Ashley, 8 Sep 2026, asking the coach to swap an
+  exercise.
+  **The handler wanted three exact strings** — the day as the plan spells it,
+  the old exercise's full catalogue name, the new one's — and returned null
+  from five separate places, every one of which surfaced as that single
+  sentence. MEASURED against a real generated Tuesday:
+  `day`: "Tuesday" ok, **"today" MISS**, "Tue" MISS ·
+  `old_item`: "Barbell Squats" ok, **"Squats" MISS**, "Barbell" MISS ·
+  `new_item`: "Lateral Raises" ok, **"Lateral Raise" MISS**.
+  "Swap this exercise" names no day at all, so the model had to invent all
+  three, and one wrong plural was the whole difference.
+  **Fixed in a new pure module, `src/lib/swap-target.ts`.** The day accepts
+  today/tomorrow/weekday/abbreviation and comes back spelled as the PLAN
+  spells it; the exercise resolves by exact name, then substring either way,
+  then word-level — each step only counting when it lands on exactly one. The
+  replacement goes through `resolveExerciseName`, the resolver the set parser
+  already uses, so the chat means the same thing by a name however it arrives.
+  An absent day now means today.
+  **It refuses with a reason.** A swap rewrites the plan, so two candidates are
+  a question naming both, never a coin toss — and every failure says which of
+  the three parts failed. "I couldn't match X to anything on Tuesday. It has:
+  …" LISTS the day's exercises, which is the thing the old catch-all could
+  never do: it was indistinguishable from a plan that really had changed.
+  Gate `test:swap-target` (45 checks); 6 mutations, all caught, two after
+  adding a case that made the substring rule load-bearing and one that made the
+  listed-exercises sentence load-bearing.
+  **Browser-verified both ways** through the real chat (`verify:swap-request`,
+  model stubbed at the fetch boundary, everything after it real) with the
+  sloppy arguments the report is about — no day, `old_item: "squats"`,
+  `new_item: "leg press"`. **BEFORE: "I couldn't find that on your current
+  plan."** AFTER: a real proposal card, Barbell Squats → Leg Press, with Apply
+  and Keep.
+
+- [x] **THE CORRECTION THAT ONLY EVER ASKED QUESTIONS** (roadmap 5/12) —
+  Ashley, 8 Sep 2026: asking the coach to fix a mislogged set "repeats
+  questions endlessly without performing the update."
+  **One regex.** A weight was only ever recognised as `@60kg` —
+  `/@\s*(\d+(?:\.\d+)?)\s*kg?/i`, which needs a literal `@` AND a literal
+  `k` (the `?` sits on the g, not the k). **MEASURED: 3 of 20 phrasings a
+  person actually types parsed.** "3x8 60kg", "3x8 at 60kg", "3 sets of 8 at
+  60", "5x5 100kg", even "3x8 @ 60" — all came back with no weight, and a
+  missing weight on a loaded lift is a BLOCKING clarification.
+  **And the question had no answer.** The clarification card renders tap
+  options; a weight has none, so it drew a question and nothing else. The
+  answer went into the ordinary composer, back through the model as a fresh
+  turn, and reached the parser stripped of the half-finished entry it belonged
+  to — so it was asked for again. Forever, with nothing written.
+  **Fixed at both ends.** Three weight rules, most confident first (unit-
+  anchored, preposition-anchored, then exactly one leftover number), with the
+  reps and RPE spans claimed FIRST so a rep count can never be read as a load.
+  **19/20 now parse**; the one that does not is "3x8", which genuinely has no
+  weight. And the card now carries an answer box when there is nothing to tap,
+  with the answer merged into the entry it belongs to rather than sent as a
+  new message.
+  **Two further defects found on the way.** (1) A resumed clarification called
+  `resolveAndMaybeLog` without `correctsPrevious`, so a correction that needed
+  one more detail came back as an APPEND — the exact double-logging
+  nl-logging-executor's own comment was written about. The flag now rides in
+  the parse session. (2) With the weight parsing, "3x8 60kg" arriving with no
+  exercise would have written `custom:` with an empty name; a blank exercise is
+  now its own question, which also retires the "How many sets and reps for ?"
+  sentence.
+  Gate `test:correction-loop` (42 checks); 8 mutations, all caught.
+  **Browser-verified** end to end through the real chat (`verify:correction-loop`,
+  model stubbed at the fetch boundary, everything downstream real): log at 6kg
+  → correct → ONE question, answerable in place → "Corrected · replaced 3" at
+  3 × 8 @ 60kg, with no second call to the model.
+
+- [x] **THREE OVERLAYS IN THE WAY** (roadmap 4/12) — Ashley, 8 Sep 2026, all
+  three from her own phone.
+  **1. The ✕ at the bottom of every modal.** `.hit-slop-44` — the utility that
+  gives small controls a 44px tap target — sets `position: relative` to anchor
+  its `::after`. One class, declared after Tailwind's positioning utilities, so
+  `class="hit-slop-44 absolute"` silently lost its absolute and the dialog
+  close button laid out as the LAST item in the dialog's grid. Measured in the
+  harness before the fix: the ✕ at y=746 in a dialog spanning 73–771. Fixed
+  with `.hit-slop-44.absolute/.fixed/.sticky` — two classes beat one, so an
+  explicit position always wins, and every future combination is covered too.
+  **And a second half underneath it**, invisible until the first was fixed: the
+  scroll sat on the same element the ✕ was positioned against, so scrolling
+  carried it off the top (y=−259). `DialogContent` is now a non-scrolling
+  shell with a scrolling body, and it caps its own height — which also fixes
+  the two dialogs that had no cap and simply ran off the bottom of the phone.
+  The five call sites' own `overflow-y-auto` is gone; the gate keeps it gone.
+  **2. "Rest complete" that never left.** The rest deadline is persisted so it
+  survives a reload — right, mid-rest — and nothing ever expired it, so an
+  overrun sat in the record until somebody tapped Dismiss, on every tab, with
+  the chat composer riding above it. It now clears itself past
+  `REST_OVERRUN_GRACE_MS` (5 min), on the live tick and on restore, through
+  one shared `isRestOverrunExpired` so the two paths cannot disagree.
+  **3. The email form on top of the tour.** Both are armed by finishing
+  onboarding, from two code paths that had never met, and both are
+  full-screen overlays at z-50. The tour now reports when it occupies the
+  screen and App holds the prompt back until it doesn't. **The tour wins** —
+  it is the one-time arrival and cannot be deferred, while the email prompt is
+  deferrable by design ("Not now" snoozes it a week). Ashley's call to
+  overrule; the roadmap only said they must not overlap.
+  Gate `test:overlay-artifacts` (30 checks); 12 mutations, all caught, two
+  after scoping checks that a match elsewhere in the file satisfied.
+  **Browser-verified** at 390×420 (`verify:modal-close` — short on purpose, the
+  only way to make a real dialog in this harness overflow): the ✕ sits 17px
+  from the dialog top and does not move when the body is scrolled to the end,
+  and closing from there works. Swap and plate-calculator dialogs re-checked at
+  390×844 for layout: both fit, ✕ at 17px, nothing reflowed.
+
+- [x] **THE CALORIE COUNTER WAITED ON THE NETWORK** (roadmap 3/12) — Ashley,
+  8 Sep 2026: tapping "Log this meal" did not move the daily calorie counter
+  without an app reload.
+  **The write was never the problem.** `recordMealEvent` persists to the
+  pending queue synchronously and notifies before it even tries to flush. The
+  READ was: `getTodayLedger` begins with an `await` on a `meal_events` select
+  and merges the pending queue only after it resolves, so every screen showing
+  today's calories re-read through a request it did not need.
+  **Reproduced on the real screens** at `?slow=5000`: the tap logged the meal
+  in the same tick and the top-level counter sat on 0 for five full seconds.
+  On a phone whose request hangs rather than fails — a wifi-to-cell handover —
+  that wait has no end, which is the restart she was doing.
+  **Fixed by remembering the server's half.** `meal-store` keeps the rows from
+  each successful read and exposes `getLedgerSnapshot`, the same arithmetic
+  with no request. One shared `mergeEvents`, so the instant answer and the
+  authoritative one cannot drift. **Null until the server has actually answered
+  once** — a failed read leaves the cache untouched, because a cache that says
+  "you have eaten nothing" off a read that never happened is worse than a slow
+  number. An undo of an already-SYNCED meal (which the queue no longer holds)
+  is tracked in `locallyVoided` so it drops instantly too, and the next
+  successful read clears it — which is what puts the meal back when the undo
+  did not land.
+  **Three screens, and Home was the worst of them.** Home's "Today so far"
+  had no meal subscription at all; worse, its paint cache is written by Home
+  itself, so a meal logged on the Nutrition tab happened while Home was
+  unmounted and it re-opened on the pre-meal figure — a wrong number rather
+  than a missing one. It now corrects the cache on the way in, on notify, and
+  on every fresh load.
+  Gate `test:meal-ledger-snapshot` (23 checks); 9 mutations, all caught, two
+  after strengthening a check (one dedupe case that only exists while a row is
+  in both places at once, and one file-wide regex an import line satisfied).
+  **Browser-verified** at 390x844 (`verify:meal-counter`, `?slow=1500`, with
+  elapsed times measured rather than assumed): counter 5ms, Home 1ms, undo 5ms
+  — against a 1500ms request, and 10.5s for Home before the fix.
+  Two checks in `test:stale-after-write` re-anchored: they pinned the exact
+  call shape (the initialiser had to BE `() => loadDashboardCache(...)`, the
+  save had to pass the literal `d`), and Home now runs both through
+  `withMealSnapshot`. The property is what they assert now — and the second is
+  stronger for it, since it requires the write to sit inside the load's own
+  `then` rather than anywhere in the file. 3 further mutations, all caught.
+
+- [x] **A WEIGHT SHE DID NOT LIFT BECAME DATA** (roadmap 2/12) — the set logger
+  had no view on the number at all. The only bound anywhere on the path was
+  SetGrid's `9999.99`, which is the width of the database column and not a
+  claim about lifting, so a fat-fingered 240 on a 24kg dumbbell was stored, fed
+  the progression engine, moved every future prescription for that lift, and
+  came back as a personal record. The app already checked a *stated* lift at
+  onboarding (`lift-plausibility.ts`) and a cardio duration at its store; the
+  path a trainee touches forty times a session was the unguarded one.
+  **Ashley's ruling, 8 Sep 2026,** from four options: *"warn, second tap logs
+  it."* So new `src/lib/set-plausibility.ts` returns two verdicts, not one.
+  **Refused** — past `MAX_LOGGABLE_SET_KG` (600), enforced inside `saveSet`
+  itself so every writer passes it, exactly as `saveCardioLog` does. 600 rather
+  than plate-math's 500 because a plate-loaded leg press sled is the one
+  implement whose honest total runs past a world-record deadlift.
+  **Warned** — past 1.5x `effectiveLoadingCeilingKg`, said in the row and
+  logged on a second tap. 1.5x so a borrowed 26kg pair against a stated 24
+  passes without a word and a 240 does not. The message quotes her own number
+  only when her number is the binding one, and always in the unit the row logs
+  in (per hand, per side, total) via `labelModeForEntry` — no second copy of
+  the per-side rule.
+  The chat's log executor now counts what the store *accepted*: a receipt built
+  from what was parsed would have read "3 × 8 @ 900kg" over three rows that do
+  not exist.
+  Gate `test:set-plausibility` (45 checks); 13 mutations, all caught.
+  **Browser-verified** at 390x844 (`verify:absurd-weight`, `?absurd=1` fixture,
+  a stated 24kg ceiling and a dumbbell movement seeded as Additional Work —
+  the SetGrid parent that reaches the check by a different route): 240 warns
+  and does NOT log, the sentence fits the phone, the second tap logs it at 240,
+  900 is refused and a second tap does not talk it round.
+  **Two things deliberately left:** on a leg press the warn band is empty (its
+  400kg ceiling x1.5 lands exactly on the 600kg refusal), which is correct
+  rather than a gap — nothing under 600 on that machine is implausible; and a
+  row error still rings both the weight and the reps box, which predates this
+  and is now more visible.
+
+- [x] **THE DAY SHE SWAPPED, STILL OFFERING THE WORKOUT** (roadmap 1/12) —
+  Ashley, 8 Sep 2026: she told the coach she had missed the morning session and
+  done Muay Thai instead, and the Exercise tab carried on showing Push & Press
+  with "Start workout".
+  **Verified read-only against production: BOTH WRITES LANDED.**
+  `workout_sessions` 8 Sep carries `swapped_for_activity: 'Muay Thai'` (08:36:34Z)
+  and `cardio_logs` carries Muay Thai, 60 min, "Swapped in place of the
+  prescribed lifting session" (08:36:48Z) — one minute before her screenshot.
+  The coach told the truth; the screen did not reflect it.
+  **The gap:** `swapped_for_activity` had exactly one reader in the app,
+  `useTrainingWeek.ts:96`, which turns it into the strip's ⇄ glyph. TodayPanel
+  read nothing — no reference to the field anywhere in it — so the strip and the
+  card disagreed on the same screen.
+  **Fixed by carrying the fact, not re-reading it.** `TrainingWeekDay` now
+  carries `swappedForActivity` beside `state`, populated from the same row the
+  state comes from; TodayPanel reads that. The card names the activity, keeps
+  the session visible (she may still want it), and the primary action stops
+  saying "Start workout" — it becomes a non-accent "Train it anyway".
+  Gate `test:exercise-today` §5; 6 mutations, all caught, one after
+  strengthening a check that matched the lookup anywhere in the file and
+  survived the lookup being left on a dead variable. One existing check
+  re-anchored: it pinned the literal JSX `>Start workout<` and the label is now
+  conditional; the property — an ordinary day still offers Start workout — is
+  what it asserts now.
+  **Browser-verified** at 390x844 (`verify:swapped-day`, `?swapped=1` fixture):
+  banner names Muay Thai, no "Start workout" button, "Train it anyway" present,
+  session still listed — and an ordinary day unchanged. 140/140 gates.
+  **Still open from the same report:** "I'll do this morning's session tomorrow"
+  was dropped entirely — there is no reschedule tool. Roadmap item 8.
+
+- [ ] **THREE PREDICATES FOR "A BETTER IMPLEMENT", AND THEY DISAGREE** — found
+  8 Sep 2026 when `test:quality` contradicted the number in the commit right
+  before it. That commit reported improvised-kit picks going **310 → 0**; true
+  on its own 64-profile grid, and the 9,216-plan quality sweep flags
+  `worse_implement_than_available` on **1,314 plans (14.3%)**. No comparable
+  before-number exists — the rule scanned week 1 only until that same commit
+  widened it — so this is a wider measurement, not a regression. The claim was
+  still overstated and is corrected in
+  `docs/plans/the-style-tag-that-starved-a-movement.md`.
+  **The mechanism, traced.** The biggest contributor is `Band Lat Pulldown` at
+  `home_gym`. Three checks ask "was a better implement available" and none of
+  them asks it the same way: `quality-score.ts` compares pool-wide on
+  `movement_pattern` + tier; `scoreCandidate`'s `betterImplementInList` compares
+  within the SLOT'S candidate list; `poolForRotation` compares pool-wide on
+  `substitution_group` + tier. Rotation does drop the band pulldown (verified),
+  so the surviving picks come from initial selection, where the better peer was
+  not in that slot's list.
+  **And the "better peer" itself is arguable.** The peer being matched is
+  `Pull-Up Negatives`, which `bestEquipmentRank` calls `high` because its
+  equipment includes a pull-up bar. A bodyweight eccentric is not a
+  better-LOADING alternative to a band pulldown; the rank table is answering
+  "is this a real tool" and being read as "does this load the movement better".
+  The same tag-answering-the-wrong-question shape as the style filter it came
+  from.
+  **Not fixed, deliberately:** Ashley's reported defect is fixed and verified,
+  and reconciling the three predicates (or exempting bodyweight eccentrics from
+  counting as a better implement) is its own change with its own measurement.
+  Doing it inside this one would have shipped an unmeasured second fix.
+
+- [x] **A BACKPACK LATERAL RAISE AT A FULL GYM, AND A SWAP LIST OF ONE** —
+  Ashley, 8 Sep 2026, three screenshots: her Tuesday prescribed a Backpack
+  Lateral Raise beside a barbell bench press, and swapping it offered exactly
+  one alternative while the search box below turned up three more that were
+  obviously fine.
+  **One cause, both symptoms.** Her live profile (read-only from production) is
+  `full_gym` / `advanced` / no injuries / **`training_style: 'functional'`**,
+  and `stageStyleFilter` applies style as a HARD pool filter. Two of the
+  catalogue's seven `isolation_shoulder` entries carry `functional` — a
+  resistance band and a weighted backpack — so selection chose from a shortlist
+  of two and the swap had one left. `MIN_VIABLE_POOL` could not see it: it
+  counts the whole pool, and 151 of 199 entries carry `functional`. The same
+  shape that function's own comment records for knee rehab — *a tag answering
+  one question used to answer another.*
+  **Ashley's ruling: both fixes.** A per-pattern floor (a style may not leave a
+  movement fewer than four ways to train it; reinstated entries rank BELOW
+  on-style ones via a new `style_fit` term), and improvised kit never beating
+  the real thing you own — the equipment preference now reaches block rotation,
+  the weekly accessory rotation and the swap ranking, and is decisive rather
+  than a ±1 tie-break two weekly appearances cancel.
+  **A correction inside the change, caught by three gates.** The floor applied
+  everywhere turned a BODYWEIGHT plan from one loaded backpack item a week into
+  five to eight — every reinstated entry there was a backpack.
+  `test:week-note`, `test:loadless-notes` and `test:session-length` all caught
+  it and were right to. The floor is now scoped to tiers with real kit, on the
+  line `EQUIPMENT_QUALITY_TIERS` already draws.
+  **Measured** (`report:style-implement`, 4x4x4 grid, all 16 weeks): exercises
+  using improvised kit while a better peer sat in the pool **310 → 0**, of which
+  **309 were in week 2+** — invisible to `test:quality`, whose rule scanned week
+  1 only and now scans every week. Movements left with ≤2 options **329 → 53**;
+  with NO options **148 → 18**. Swap slots offering one option or none
+  **11.2% → 6.7%** (denominator moved 1199 → 1268, so the rate is the
+  comparable figure). Her own case: pool **2 → 7**, swap list **1 → 6** with
+  real kit first, Tuesday now **Cable Lateral Raises**.
+  **Residual, stated:** 64 of 84 remaining starved patterns are at bodyweight
+  where the floor deliberately does not apply; of the 20 elsewhere the worst is
+  2 of a possible 3, arising after the SKILL stage rather than the style one.
+  **Two gates re-anchored, not relaxed:** `test:rehab-prescribed` asserted
+  "every survivor is on-style", true only while the rehab exemption was the
+  sole route in. It now asserts the property — nothing rides in through the
+  exemption. Gate `test:style-starve`; 13 mutations, all caught, three after
+  strengthening checks that missed them.
+  Plan: `docs/plans/the-style-tag-that-starved-a-movement.md`.
+  **Not built:** her plan is persisted at generation time, so this reaches her
+  on a rebuild or a manual swap. Whether to rebuild mid-programme is her call.
+
+- [ ] **THE 7 SEP DEPLOY RAN AND SHIPPED STALE CODE — THIRD RECURRENCE** —
+  found 8 Sep 2026 while writing the handover, by checking the live function
+  instead of assuming it had not been deployed. `chat-gemini` on
+  `sdkhuczcfnqqimdgfiks` is **version 70, published 2026-09-07 17:25:58 UTC** —
+  about five minutes after the first merge — and the code that went up still
+  contains `Meal logging arrives in the next update`, a string absent from this
+  repo since 5 Sep. It has none of `propose_meal_log`, `humanSlot` or the 7 Sep
+  prompt change, and still carries `Cross-reference this with the user's
+  exercise plan`. `propose_meal_log` is a string literal in the response
+  payload, so minification cannot explain its absence.
+  **The command was right and the checkout was stale** — the same shape as the
+  incident CLAUDE.md's 1 Sep handover rule was written after, now for the third
+  time. `deploy-functions.mjs` cannot catch it: it links and deploys in one
+  command and passes `--project-ref` on the deploy itself, so the TARGET cannot
+  be wrong, and nothing in it can know whether the CONTENT is current.
+  **Open, because the fix is not written yet.** The handover now makes proving
+  the checkout a hard gate (three greps that must return 1, 2 and 1 before the
+  deploy is offered) — `docs/plans/deploying-the-chat-function.md`. What would
+  actually close this is a check the deploy script runs itself: refuse when the
+  working tree is behind `origin/main`, or when the function file differs from
+  the merged one. Not built — it needs Ashley's word, because it can refuse a
+  deploy she wants to make from a deliberate local change.
+  **Still not live as of 8 Sep:** the honey/macro reply, the coach's side of
+  meal logging, and the prompt half of the which-day fix.
+
 - [x] **"TODAY'S BENCH AND SHOULDER PRESS" — ON A DAY THAT WAS NEITHER** —
   Ashley, 7 Sep 2026, 6:33 PM on a Monday. The coach said *"let me know how
   today's bench and shoulder press go"* (that session is Tuesday's), then, asked

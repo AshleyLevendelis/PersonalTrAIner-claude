@@ -22,7 +22,7 @@ import { saveMesocycle, saveMesocycleWeek } from './mesocycle-persistence'
 import { getExerciseEntry } from './exercise-db'
 import { swapPoolMeal, clearMealPick, getMealPicksForDate, USER_REQUESTED_TAG, type MealSlotName } from './meal-store'
 import { supabase } from './supabase'
-import { setDeliberateRest } from './daily-tracking'
+import { setSessionMove, setDeliberateRest } from './daily-tracking'
 import type { MealAdditionPayload } from './meal-addition'
 import { STYLE_OPTIONS } from './onboarding-slots'
 import { substituteForInjury, substituteForEquipment, rebuildForInjury } from './plan-adaptations'
@@ -766,6 +766,52 @@ export async function executeRestDay(
 /** Clears the flag. The day goes back to whatever it was — due, or missed. */
 export async function undoRestDay(profileId: string, payload: RestDayPayload): Promise<void> {
   await setDeliberateRest(profileId, payload.date, false)
+}
+
+export interface SessionMovePayload {
+  /** ISO date of the day the session was prescribed for. */
+  fromDate: string
+  /** ISO date it is being run on instead. */
+  toDate: string
+  /** Both day names, resolved by the caller against the live plan — not re-derived here. */
+  fromDayName: string
+  toDayName: string
+  /** What the session is, for the receipt. */
+  sessionFocus?: string
+  /**
+   * Set when the day they NAMED was already taken and this is the next free
+   * one. The card says so; the receipt repeats it, because a move that landed
+   * two days from where she asked is exactly the thing she should not have to
+   * discover later.
+   */
+  requestedDayName?: string
+  reason?: string
+}
+
+export async function executeSessionMove(
+  profile: UserProfile,
+  payload: SessionMovePayload,
+): Promise<RestDayResult> {
+  if (!profile.id) {
+    return { receipt: { landed: [], failed: [{ op: 'save', error: 'No profile to save against' }] } }
+  }
+  const ok = await setSessionMove(profile.id, payload.fromDate, payload.toDate)
+  if (!ok) {
+    return { receipt: { landed: [], failed: [{ op: 'save', error: "Couldn't move that session — try again in a moment" }] } }
+  }
+  return {
+    receipt: {
+      landed: [
+        `${payload.fromDayName}${payload.sessionFocus ? `'s ${payload.sessionFocus}` : ''} moved to ${payload.toDayName}`
+        + (payload.requestedDayName ? ` (${payload.requestedDayName} already had a session on it)` : ''),
+      ],
+      failed: [],
+    },
+  }
+}
+
+export async function undoSessionMove(profileId: string, payload: SessionMovePayload): Promise<void> {
+  await setSessionMove(profileId, payload.fromDate, null)
 }
 
 // ---------------------------------------------------------------------------

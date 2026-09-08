@@ -55,7 +55,14 @@ const check = (label: string, ok: boolean, extra?: unknown) => {
 console.log('\n1. Start workout is a fixed bar, and it does not sit on anything')
 // ---------------------------------------------------------------------------
 check('the CTA is fixed, not in the scroll', /className="fixed inset-x-0 z-40[^"]*"/.test(today))
-check('...and reads "Start workout"', />\s*Start workout\s*</.test(today))
+// RE-ANCHORED 8 Sep 2026. This pinned the literal JSX `>Start workout<`, which
+// stopped matching the moment the label became conditional — a day already
+// swapped for something else now reads "Train it anyway" instead (§5). The
+// property was never "this exact markup"; it is that an ORDINARY training day
+// still offers Start workout, and that it is the default rather than the
+// special case.
+check('...and reads "Start workout" on an ordinary day',
+  /: 'Start workout'\}/.test(today) || />\s*Start workout\s*</.test(today))
 check('...at 52px', /h-\[52px\]/.test(today))
 check('...clear of the tab bar and the home indicator',
   /TAB_BAR_HEIGHT_PX\}px \+ env\(safe-area-inset-bottom\)/.test(today))
@@ -266,6 +273,66 @@ console.log('\n5. The rest dock: one number, the lift it belongs to, and both di
     /text-primary-text" onClick=\{dismissRest\}/.test(dock)
     && /text-text-tertiary[^"]*"\s*\n?\s*disabled/.test(dock))
   check('the elapsed fill survived the restyle', /fillFraction \* 100/.test(dock))
+}
+
+// ---------------------------------------------------------------------------
+// A DAY THEY SWAPPED SAYS SO — on this screen, not only on the strip.
+//
+// Ashley, 8 Sep 2026. She told the coach she had missed the morning session
+// and done Muay Thai instead. Both writes landed (workout_sessions
+// .swapped_for_activity, and a 60-minute cardio_log), and the week strip drew
+// its swap glyph correctly. This panel read neither and went on offering
+// "Start workout" for the session she had just replaced — the app agreeing
+// with itself on one screen and not the other.
+// ---------------------------------------------------------------------------
+console.log('\n5. A swapped day says so')
+{
+  const strip = readFileSync(join(ROOT, 'src/hooks/useTrainingWeek.ts'), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+  const todayPanel = readFileSync(join(ROOT, 'src/components/exercise/TodayPanel.tsx'), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+
+  // ONE SOURCE. The state and the activity name have to travel together, or
+  // the next reader re-derives one of them and they drift apart again.
+  check('the week day carries what they did instead, beside the state',
+    /swappedForActivity\?: string \| null/.test(strip))
+  // RE-ANCHORED 8 Sep 2026: this matched `state, swappedForActivity: …` on one
+  // line, and broke when a third and fourth fact (movedTo / movedFrom) joined
+  // the same object and split it across lines. The property is unchanged — the
+  // activity name is read from the SAME dashboardDay row the state came from,
+  // not fetched again — so only the whitespace assumption goes.
+  check('...populated from the same row the state is derived from',
+    /state,\s*swappedForActivity: dashboardDay\?\.session\?\.swapped_for_activity/.test(strip))
+
+  // The BINDING, not just the expression. A first version matched the lookup
+  // anywhere in the file, and survived a mutation that left the lookup in
+  // place on a dead variable while forcing swappedToday to null — the exact
+  // defect being fixed, with the evidence still on screen.
+  check('today\'s panel reads the swap from the week hook, not a second query',
+    /const swappedToday = weekTrain\.days\.find\(d => d\.date === today\)\?\.state === 'swapped'/.test(todayPanel))
+  check('...and the name it renders comes from that same lookup',
+    /\?\.swappedForActivity \|\| 'something else'\)\s*:\s*null/.test(todayPanel))
+  check('...and never queries workout_sessions itself',
+    !/from\('workout_sessions'\)/.test(todayPanel))
+
+  check('the screen names the activity',
+    /You swapped today for <span className="font-semibold">\{swappedToday\}<\/span>/.test(todayPanel))
+  check('...and still offers the session rather than hiding it',
+    /This session is still here if you want it/.test(todayPanel))
+
+  // THE ACTUAL DEFECT. Not that a banner is missing, but that the primary
+  // action claimed the session was still ahead of her.
+  // RE-ANCHORED 8 Sep 2026 for the same reason: a moved day (roadmap 8) needs
+  // the identical treatment, so the condition gained a second term. What must
+  // hold is that a swapped day is IN that condition and that the true branch is
+  // the honest label — which is exactly what a mutation dropping swappedToday,
+  // or restoring a bare 'Start workout', still breaks.
+  const ctaLabel = todayPanel.match(/\{[^{}]*\? 'Train it anyway' : 'Start workout'\}/)?.[0] ?? ''
+  check('the button stops saying "Start workout" on a day already swapped',
+    ctaLabel.length > 0 && /swappedToday/.test(ctaLabel), ctaLabel)
+  const ctaVariant = todayPanel.match(/variant=\{[^{}]*\? 'outline' : 'default'\}/)?.[0] ?? ''
+  check('...and drops out of the accent, so it reads as the escape hatch it is',
+    ctaVariant.length > 0 && /swappedToday/.test(ctaVariant), ctaVariant)
 }
 
 if (failures > 0) { console.error(`\n${failures} exercise-today check(s) FAILED\n`); process.exit(1) }

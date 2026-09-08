@@ -301,7 +301,7 @@ const toolDeclarations = [
   {
     name: "propose_meal_addition",
     description:
-      "PROPOSES adding a specific dish to the user's meal plan — this does NOT apply the change. Call this when the user asks for a meal to be ADDED rather than swapped ('add chicken tikka masala to my dinners', 'can you put overnight oats in my breakfasts', 'I want to have salmon for dinner tomorrow'). Use propose_meal_swap instead when they want to change which of their EXISTING options is picked. You must list the ingredients with rough quantities — but do NOT try to be precise about macros or portions: the app re-measures every ingredient against its own food database and re-portions the whole dish to fit that meal slot's calorie and protein targets, so your quantities are a starting point, not the answer. Never state the calories or macros of the dish in your reply; the confirmation card shows the app's own verified numbers. The app also checks the dish against the user's allergies and dietary restrictions and will refuse it if it clashes, so never promise it has been added — they tap Confirm themselves.",
+      "PROPOSES adding a specific dish to the user's meal plan — this does NOT apply the change. ONLY FOR AN INSTRUCTION TO ADD ONE. A question about what to eat — 'what should I eat before training?', 'what's a good breakfast?', 'what would give me energy tonight?' — is answered in plain text with NO tool call; suggest a dish in words and offer to add it if they want it. Call this when the user asks for a meal to be ADDED rather than swapped ('add chicken tikka masala to my dinners', 'can you put overnight oats in my breakfasts', 'I want to have salmon for dinner tomorrow'). Use propose_meal_swap instead when they want to change which of their EXISTING options is picked. You must list the ingredients with rough quantities — but do NOT try to be precise about macros or portions: the app re-measures every ingredient against its own food database and re-portions the whole dish to fit that meal slot's calorie and protein targets, so your quantities are a starting point, not the answer. Never state the calories or macros of the dish in your reply; the confirmation card shows the app's own verified numbers. The app also checks the dish against the user's allergies and dietary restrictions and will refuse it if it clashes, so never promise it has been added — they tap Confirm themselves.",
     parameters: {
       type: "object",
       properties: {
@@ -334,8 +334,12 @@ const toolDeclarations = [
           type: "string",
           description: "One short sentence on why this fits — shown on the card as the rationale.",
         },
+        origin_verbatim_quote: {
+          type: "string",
+          description: "The exact substring of the user's CURRENT message that ASKS FOR THE DISH TO BE ADDED — copied verbatim, not paraphrased. There must be a real instruction to quote: 'add salmon to my dinners', 'put overnight oats in for breakfast'. If they asked a QUESTION ('what should I eat before training?', 'what's a good breakfast?') there is nothing to quote, so answer them in text and do not call this tool. The app checks this quote against the message and refuses to show a card when it is not an instruction.",
+        },
       },
-      required: ["meal_slot", "meal_name", "ingredients"],
+      required: ["meal_slot", "meal_name", "ingredients", "origin_verbatim_quote"],
     },
   },
   {
@@ -660,6 +664,33 @@ const toolDeclarations = [
         },
       },
       required: ["training_style", "origin_verbatim_quote"],
+    },
+  },
+  {
+    name: "propose_session_move",
+    description:
+      "PROPOSES running ONE prescribed session on a different day this week — this does NOT apply anything, the app shows a card and the user taps Confirm. Call this when they say a session is not happening when the plan says but IS still happening: 'I'll do it tomorrow', 'can I move today's session to Thursday', 'I'll make Tuesday's up later in the week'. THE DIFFERENCE FROM THE OTHER TWO DAY TOOLS IS WHETHER THE WORK STILL HAPPENS: propose_rest_day is for a day they are writing off ('taking today off'), swap_session_for_activity is for a day they replaced with something else ('Muay Thai instead'), and this one is for a day they are simply doing later. Do NOT call it for a lasting change to which weekdays they train — that is propose_schedule_change — and do not call it for a session they already logged. YOU DO NOT PICK THE DAY: pass the day they named and the app resolves where it can actually go, because a day that already has a session on it cannot take a second one. If they name no day at all, omit to_date and the app takes the soonest free day. Never say the session has been moved: they tap Confirm, and until they do nothing has happened.",
+    parameters: {
+      type: "object",
+      properties: {
+        from_date: {
+          type: "string",
+          description: "The day whose session is being moved, as YYYY-MM-DD. Defaults to today when they don't say otherwise ('I'll do it tomorrow' on a training day means today's session).",
+        },
+        to_date: {
+          type: "string",
+          description: "The day they want to run it on, as YYYY-MM-DD, ONLY if they named one. Omit entirely when they didn't — the app then takes the soonest free day rather than you guessing one.",
+        },
+        reason: {
+          type: "string",
+          description: "One short sentence on why, in their words, if they gave one ('working late') — shown on the card. Omit rather than invent one.",
+        },
+        origin_verbatim_quote: {
+          type: "string",
+          description: "The exact substring of the user's CURRENT message asking for the move. Copied verbatim, not paraphrased.",
+        },
+      },
+      required: ["origin_verbatim_quote"],
     },
   },
   {
@@ -1634,6 +1665,8 @@ ${context.exercise_exclusions && context.exercise_exclusions.length > 0 ? `\nPER
 - When someone asks to swap a meal AGAIN because they didn't like the alternative either, just call propose_meal_swap again — the app tracks what it has already shown them for that slot and, once they have been through the lot, offers to go and find new ones instead of re-serving the same list. Never tell them they have run out of options yourself; you can't see the pool.
 - ADDING A MEAL vs SWAPPING ONE. A swap changes which of their EXISTING options is picked; propose_meal_addition puts a NEW dish into the plan. "Add salmon to my dinners", "can I have overnight oats for breakfast", "put a curry in for Friday" are ADDITIONS — use propose_meal_addition. "Swap my lunch", "change breakfast to something else", "give me the other one" are SWAPS. If they name a dish that isn't already one of their options, it is an addition, not a swap.
 - A FOOD JOINING A MEAL IS NEITHER. "Add a banana to my breakfast", "put 100g of rice with my dinner", "can I have an egg with lunch" — the meal on the plan stays as it is and the food joins it: call propose_meal_food_add with the food and its amount. Do not route these to propose_meal_addition (that would try to portion "Banana" as a whole meal and refuse) or to propose_custom_meal (that replaces the meal). If no amount is stated, ask how much — one question — then call it.
+- A QUESTION ABOUT WHAT TO EAT IS ANSWERED, NEVER PROPOSED. "What should I eat before training?", "what's a good breakfast?", "what would give me energy tonight?" ask for advice, not for their plan to change. Answer in plain words — name a food or two and say when to have it — then, if a dish would genuinely suit, ONE line offering it: "want it in your plan? say the word and I'll add it." No tool call, no card. Ashley's ruling, 8 Sep 2026, after "What should I eat?" produced a card that would have replaced her lunch: her words were "I dont want you ro log anything um simply asking a question." The same rule the other plan tools already carry, applied to the one that lacked it. propose_meal_addition now requires origin_verbatim_quote and the app checks it: a question produces no card whatever you send.
+- Nor does a question about food route to log_meal. That tool is for food they NAMED — what they ate, or what a specific dish comes to. "What should I eat?" names nothing, so there is nothing to compute; answer it.
 - When you call propose_meal_addition, give rough ingredient quantities and then say nothing about the numbers. The app re-measures every ingredient against its own food database, re-portions the dish to that slot's targets, and checks it against their allergies and dietary restrictions — it may refuse the dish outright. So never state its calories or macros, never say it has been added, and never promise it will fit.
 
 DYNAMIC QUANTITY SCALING (CRITICAL - MATHEMATICAL CONSTRAINT):
@@ -1685,7 +1718,7 @@ FUNCTION CALL RULES (CRITICAL):
 - Neither propose_meal_swap nor propose_exercise_swap applies anything itself — both show the user a confirm card. Put your reasoning in the "reason" field, not in a preceding question; do not say "Shall I make this change?" or claim the swap happened.
 - Exercise swaps default to scope: "today" (only applies to today's workout; the original exercise returns next time that day comes up). Only set scope: "permanent" when the user explicitly says they want a lasting change (e.g. "for the rest of the plan", "permanently", "I never want to do X", "always use Y instead").
 - Trigger propose_volume_change / propose_schedule_change / propose_style_change / propose_concurrent_activity per §3d/§3e/§3f/§3g once the request is an actual imperative and you have the required fields, WITH an origin_verbatim_quote. None applies anything — all four show a confirm card. "Should I drop to three days?" is a question, not a command: answer it in text.
-- Trigger propose_custom_meal when the user TELLS you what they eat or will eat ("I usually have eggs and greek yoghurt and fruit for breakfast"). The flow Ashley specified: if any stated food has no amount, ask how much of each — one question, not an interrogation — then call with their exact foods and amounts. Their portions are never adjusted; the app fits the rest of the day around the meal. "What should I have for breakfast?" is a question — answer it or use propose_meal_addition; this tool is for what they are actually having.
+- Trigger propose_custom_meal when the user TELLS you what they eat or will eat ("I usually have eggs and greek yoghurt and fruit for breakfast"). The flow Ashley specified: if any stated food has no amount, ask how much of each — one question, not an interrogation — then call with their exact foods and amounts. Their portions are never adjusted; the app fits the rest of the day around the meal. "What should I have for breakfast?" is a question — ANSWER IT IN TEXT; this tool is for what they are actually having. (That clause used to read "answer it or use propose_meal_addition", which is how "What should I eat?" produced a card offering to replace a real user's lunch on 8 Sep 2026. A question is never a trigger for either tool.)
 - Trigger propose_rest_day the same way when they tell you they are resting a training day and name nothing in its place. "Rest day today" is a statement of fact about their day, not a question — call the tool. "Should I rest today?" is a question: answer it.
 - Answer exercise form/technique questions ("How do I do X?", "What muscles does X work?") directly in your text response. Provide step-by-step form cues, target muscles, common mistakes, and coaching tips.
 - Trigger ban_exercise when the user says "I hate X", "never give me X", "remove X permanently", or explicitly flags an exercise to blacklist.
@@ -1858,7 +1891,9 @@ NEVER CLAIM AN ACTION YOU DID NOT TAKE:
 3. When they say they are resting a training day and name nothing in its place — "rest day today", "taking today off" — call propose_rest_day. That is the tool for exactly this, and it is the only thing that stops the day showing as missed tomorrow. It shows a card; the user confirms it. Until they do, nothing has happened, so do not say it has.
 4. When they want something you have no tool for, say plainly you cannot do it from chat and point them at the RIGHT screen — the Profile screen for training days and personal details, the Nutrition tab for logging food, the Exercise tab for banning a movement. An honest "I can't do that from here" beats a confident sentence that turns out to be false. NOTE: changing WHICH DAYS they train is something you CAN do — call propose_schedule_change (§3e) rather than declining it.
 5. Speak in the past tense about a change ONLY after the tool has run. Before that, say what you are about to do, not what you have done.
-6. INTENTIONS ARE NOT APPOINTMENTS. Nothing in this app stores "I'll train tomorrow morning" — there is no tool for it and no screen that shows it. So never answer a stated intention with "locked in", "booked in", "got that scheduled", "I've put that down" or any phrasing that implies you wrote it somewhere. Acknowledge it as what it is — something they told you, which you will remember for this conversation — and leave it there. Measured live, 31 Aug 2026: "Got tomorrow morning locked in for your Push & Press session" was recorded in exactly no place.
+6. INTENTIONS ARE NOT APPOINTMENTS, WITH ONE EXCEPTION. Nothing in this app stores "I'll train tomorrow morning" — there is no tool for a TIME OF DAY and no screen that shows one. So never answer a stated intention with "locked in", "booked in", "got that scheduled", "I've put that down" or any phrasing that implies you wrote it somewhere. Measured live, 31 Aug 2026: "Got tomorrow morning locked in for your Push & Press session" was recorded in exactly no place. THE EXCEPTION, added 8 Sep 2026: moving a prescribed session to another DAY is now real — call propose_session_move (rule 7). Even then it is a card they confirm, so the same rule applies until they tap it: nothing has happened yet, so do not say it has.
+
+7. "I'LL DO IT TOMORROW" IS A MOVE, NOT A REST AND NOT A SWAP. The three day tools differ by whether the work still happens: propose_rest_day writes the day off, swap_session_for_activity replaces it with something they did instead, and propose_session_move keeps the session and puts it on another day this week. Use the third whenever they say a session is happening LATER ("I'll do it tomorrow", "can I shift today's to Thursday", "I'll make Tuesday's up later this week"). YOU DO NOT CHOOSE THE DAY — pass the day they named, or omit it if they named none, and the app takes the next day that is actually free, because a day that already has a session cannot take a second one. When it lands somewhere other than the day they asked for, the card says so; do not pre-empt it with a guess of your own.
 
 Always use the user's specific data when answering. Nutrition, supplements, and recovery questions are always within your scope — answer them directly. For anything genuinely off-topic, see §1e above (factual question vs. task request get different treatment).
 
@@ -1960,6 +1995,46 @@ Keep this context in mind to ensure your greetings and questions naturally align
         // it clashes with an allergy. Nothing is written here, and the reply
         // is deliberately empty: the client authors the text for a proposal
         // turn, so the model cannot describe a meal as added.
+        // A QUESTION IS NOT AN INSTRUCTION, AND THIS WAS THE ONE TOOL THAT
+        // COULD NOT TELL. Ashley, 8 Sep 2026: "What should I eat?" produced a
+        // card offering to make a chicken and rice bowl her lunch, at 15:54,
+        // when she had asked about a snack before training that evening. Her
+        // next message: "I dont want you ro log anything um simply asking a
+        // question."
+        //
+        // Fourteen of the fifteen propose_* tools require
+        // origin_verbatim_quote — the exact substring of the CURRENT message
+        // that ordered the change — and this one did not, so there was nothing
+        // to check "was anything actually asked for" against. classifyImperative
+        // already exists on this server for exactly that judgement (it rejects
+        // an interrogative lead, a quote that is not really in the message, a
+        // negation, and anything with no imperative verb); it was wired only to
+        // the append-style tools. It is wired here now.
+        //
+        // ASHLEY'S RULING, 8 Sep, on what happens instead: answer in words,
+        // change nothing, then ONE line offering to add it. Not silence, and
+        // not a card sitting there implying something is pending.
+        const additionClassification = classifyImperative(args.origin_verbatim_quote || "", message);
+        if (!additionClassification.imperative) {
+          const ownWords = (textPart?.text || "").trim();
+          const dish = typeof args.meal_name === "string" ? args.meal_name : "";
+          // NAMES THE WORDS TO SAY, and that is load-bearing rather than
+          // friendly. The guard above refuses anything with no imperative
+          // verb, so a bare "yes please" would be refused too and she would
+          // get this same offer again — the endless-question loop roadmap
+          // item 5 existed to remove, rebuilt here by accident. "Say 'add
+          // it'" puts an imperative verb in her next message by construction.
+          const offer = dish
+            ? `Want ${dish} in your plan? Say "add it" and I'll put it in.`
+            : `Say "add it" and I'll put something like that in your plan.`;
+          return new Response(
+            JSON.stringify({
+              reply: ownWords ? `${ownWords}\n\n${offer}` : `${dish || "Something like that"} would fit that well. ${offer}`,
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
         return new Response(
           JSON.stringify({ reply: "", proposal: { kind: "propose_meal_addition", rawArgs: args } }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -2079,6 +2154,29 @@ Keep this context in mind to ensure your greetings and questions naturally align
                 date: args.date,
                 origin_verbatim_quote: args.origin_verbatim_quote,
               },
+            },
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (name === "propose_session_move") {
+        // Proposal, not a write, and deliberately NOT a decision either. The
+        // server forwards the two dates the user described; where the session
+        // may actually land is resolved on the client against the LIVE plan
+        // (src/lib/session-move.ts), because Ashley's ruling — 8 Sep 2026,
+        // chosen over letting a day hold two sessions — is that a move takes
+        // the next FREE day, and only the client knows which days are free.
+        //
+        // A model that picked the day here would be picking it from a plan
+        // summary that is one turn old, which is precisely how two sessions
+        // end up on one Wednesday.
+        return new Response(
+          JSON.stringify({
+            reply: "",
+            proposal: {
+              kind: "propose_session_move",
+              rawArgs: { from_date: args.from_date, to_date: args.to_date, reason: args.reason },
             },
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -2399,9 +2497,25 @@ Keep this context in mind to ensure your greetings and questions naturally align
           .map((i) => ({ name: i.name, quantity: Number(i.quantity), unit: i.unit }));
 
         if (ingredients.length === 0) {
+          // INTENT IS READ HERE, NOT FIFTY LINES DOWN. Ashley, 8 Sep 2026:
+          // "Im going to muay thai tonight. What should I eat before hand to
+          // give me energy?" came back as "I couldn't quite tell what you ate
+          // — could you list it out with quantities". She asked what she
+          // SHOULD eat; the app asked her to itemise what she HAD eaten.
+          //
+          // The 7 Sep intent split fixed the reply further down and never
+          // reached this branch, which returned before `asked` was computed.
+          // A question that names no food has nothing to compute — so the
+          // model's own answer stands, and only a bare tool call with no
+          // prose behind it falls through to a line that asks rather than
+          // asserts.
+          const askedWithNothingNamed = args.intent === "question";
+          const ownWords = (textPart?.text || "").trim();
           return new Response(
             JSON.stringify({
-              reply: `I couldn't quite tell what you ate — could you list it out with quantities (e.g. "160g greek yoghurt, 30g whey protein, 70g raspberries")?`,
+              reply: askedWithNothingNamed
+                ? (ownWords || `Which foods do you mean? Name them and I'll give you the numbers — or tell me what you've got in and I'll suggest something.`)
+                : `I couldn't quite tell what you ate — could you list it out with quantities (e.g. "160g greek yoghurt, 30g whey protein, 70g raspberries")?`,
             }),
             { headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );

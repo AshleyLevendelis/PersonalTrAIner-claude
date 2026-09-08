@@ -386,6 +386,17 @@ export function resolveTargetRpe(
  * available pool (so equipment and injury filtering still hold) and has to be
  * skill-appropriate. A rotation that hands a beginner a Nordic curl in block 3
  * would undo the skill gating entirely.
+ *
+ * "EQUIPMENT FILTERING STILL HOLDS" IS A CLAIM ABOUT THE HARD GATE ONLY, and
+ * at full gym that gate is null — every implement in the catalogue is
+ * allowed, so this function could rotate a dumbbell lateral raise to a
+ * weighted-backpack one and nothing here would notice. It has no scoring: the
+ * pick is `variations[(start + blockIndex + attempt) % length]` over an
+ * alphabetical sort, so "Backpack ..." wins index 0 on merit of the letter B.
+ * Ashley met that on 8 Sep 2026. The PREFERENCE is applied by the caller,
+ * which passes a pool already narrowed by poolForRotation (exercise-plan.ts) —
+ * stated here because a future caller passing a raw pool would silently
+ * reopen it.
  */
 /**
  * Variations that exist as easier on-ramps. They are the right answer for

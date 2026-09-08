@@ -4,7 +4,7 @@ import { X } from 'lucide-react'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { getExerciseId } from '@/lib/exercise-db'
 import { computeOffPlanWork } from '@/lib/session-derive'
-import { SetGrid } from './SetGrid'
+import { SetGrid, type SetGridProps } from './SetGrid'
 import type { Exercise } from '@/lib/types'
 
 // ---------------------------------------------------------------------------
@@ -16,9 +16,16 @@ import type { Exercise } from '@/lib/types'
 
 export function AdditionalWorkSection({
   plannedExercises,
+  profile,
   onOpenPlateCalc,
 }: {
   plannedExercises: Exercise[]
+  /**
+   * Threaded in 8 Sep 2026, for the same reason the plate-calculator handler
+   * was: extra work is loaded work. Without it these rows would be the only
+   * place in the app where a 500kg typo went in unquestioned.
+   */
+  profile?: SetGridProps['profile']
   /**
    * Threaded in 5 Sep 2026. SetGrid draws a plate-calculator button beside
    * every weight input, and this screen rendered SetGrid without a handler —
@@ -67,6 +74,7 @@ export function AdditionalWorkSection({
               totalSets={3}
               prescribedReps="8-12"
               restTime="60s"
+              profile={profile}
               onOpenPlateCalc={onOpenPlateCalc}
             />
           </div>

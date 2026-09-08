@@ -15,6 +15,7 @@ import { loadDashboardCache, saveDashboardCache } from '@/lib/dashboard-cache'
 import { stepsTargetFor } from '@/lib/steps-target'
 import { getStepsForDate, logStepsManual, isPlausibleStepCount, MAX_PLAUSIBLE_DAILY_STEPS, type DailyStepsRow } from '@/lib/steps-store'
 import { logWater, undoLog, type WaterLogRow } from '@/lib/water-store'
+import { getLedgerSnapshot, subscribeMealStore } from '@/lib/meal-store'
 import { Flame, Droplets, Footprints, Scale, ChevronRight } from 'lucide-react'
 import { WeighInCard } from '@/components/WeighInCard'
 import type { UserProfile, MacroTargets, WorkoutDay, MesocycleWeek } from '@/lib/types'
@@ -159,6 +160,26 @@ function chipsForTip(key: string | null): { label: string; prefill: string }[] {
   return key ? (TIP_CHIPS[key] ?? []) : []
 }
 
+/**
+ * The day's macro figures re-derived from the meal store's own snapshot.
+ *
+ * Returns the input untouched when there is nothing to say — no data yet, or
+ * the store has not heard from the server for this day, in which case
+ * inventing "nothing eaten" would be worse than a stale number.
+ */
+function withMealSnapshot(d: DashboardData | null, profileId: string | undefined, date: string | undefined): DashboardData | null {
+  if (!d || !profileId || !date) return d
+  const snap = getLedgerSnapshot(profileId, date)
+  if (!snap) return d
+  return {
+    ...d,
+    caloriesEaten: snap.eaten.kcal,
+    proteinEaten: snap.eaten.protein,
+    carbsEaten: snap.eaten.carbs,
+    fatEaten: snap.eaten.fat,
+  }
+}
+
 export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreatedAt, onWeightLogged, logsVersion, trainerNudge, stepsVersion, onStepsLogged }: DashboardProps) {
   const stepsTarget = stepsTargetFor(profile)
   const activeSession = useActiveSession()
@@ -172,8 +193,16 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
   // It does NOT skip the fetch. See dashboard-cache.ts: the effect below runs
   // unconditionally and swaps the fresh data in, so the stale window is no
   // longer than the blank window it replaces.
+  //
+  // AND THE CACHED CALORIES ARE CORRECTED ON THE WAY IN. The cache is written
+  // by this screen; a meal logged on the Nutrition tab happens while this
+  // screen is unmounted, so nothing here was around to update it. Home then
+  // opened on the pre-meal figure and sat on it for the length of its own
+  // load — showing a wrong number rather than a missing one, which is worse.
+  // withMealSnapshot re-derives that one figure from what the meal store
+  // already knows, with no request.
   const [data, setData] = useState<DashboardData | null>(
-    () => loadDashboardCache(profile.id, activeSession.date),
+    () => withMealSnapshot(loadDashboardCache(profile.id, activeSession.date), profile.id, activeSession.date),
   )
   const [loading, setLoading] = useState(true)
 
@@ -188,6 +217,10 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
   // weight is logged (session logs, date) already triggers this effect, and
   // a chat-side log_weight only refreshes App.tsx's own latestWeightKg, not
   // this component's independently-fetched weightSeries/weightTrend/goal.
+  // A STRING, not the array: week.moves is a fresh array every render, and an
+  // array in the dependency list below would re-run the whole aggregate on
+  // every one of them. This changes only when a move actually does.
+  const movesKey = week.moves.map(m => `${m.fromDate}>${m.toDate}`).join('|')
   const [weighInVersion, setWeighInVersion] = useState(0)
   const [loadError, setLoadError] = useState(false)
   /** Bumping this re-runs the load effect — the Retry button's whole mechanism. */
@@ -205,16 +238,25 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
     let cancelled = false
     setLoading(true)
     loadDashboardData({
-      profile, macros, exercisePlan, mesocycle, planCreatedAt,
+      profile, macros, exercisePlan, mesocycle, planCreatedAt, moves: week.moves,
       todayLogs: activeSession.logs, liveWeek: activeSession.liveWeek,
       dayName: activeSession.dayName, todayStr: activeSession.date,
       now: getAppNow(profile.id),
     })
       .then(d => {
         if (cancelled) return
-        setData(d)
+        // Through the snapshot as well: this promise was started before any
+        // meal logged while it was in flight, so its ledger half can already
+        // be out of date by the time it resolves.
+        const fresh = withMealSnapshot(d, profile.id, activeSession.date) ?? d
+        setData(fresh)
         setLoadError(false)
-        saveDashboardCache(profile.id, activeSession.date, d)
+        // NOT CACHED WHEN THE PLAN WAS ABSENT. `data` initialises from this
+        // cache, so a day derived from an empty plan would be the FIRST thing
+        // the next cold open draws — the wrong answer, instantly, with no
+        // network to blame. A day we could not compute is not a day worth
+        // remembering; the re-run below replaces it within the same visit.
+        if (fresh.session.status !== 'unknown') saveDashboardCache(profile.id, activeSession.date, fresh)
       })
       // WITHOUT THIS, A FAILED LOAD IS INDISTINGUISHABLE FROM A SLOW ONE —
       // forever. `finally` cleared `loading`, but `data` stayed null and the
@@ -228,7 +270,40 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeSession.ready, activeSession.date, activeSession.logs.length, profile.id, weighInVersion, macros, retryVersion])
+    // exercisePlan AND mesocycle ARE DEPENDENCIES. They were not, and that is
+    // what made the wrong answer permanent rather than momentary: the effect
+    // ran once at mount with [] for both, decided a rest day, and had no
+    // reason to look again when the plan landed a second later. Home then sat
+    // on "Rest day" beside its own week strip showing four sessions. Both are
+    // App.tsx useState arrays, so the identity is stable and this re-runs when
+    // the plan actually changes, not on every render.
+  }, [activeSession.ready, activeSession.date, activeSession.logs.length, profile.id, weighInVersion, macros, retryVersion, exercisePlan, mesocycle, movesKey])
+
+  // THE CALORIE CELL FOLLOWS THE MEAL LIST ON THE OTHER TAB.
+  //
+  // It had no subscription at all: its number comes from loadDashboardData,
+  // whose effect depends on the date, the profile, the logged sets and the
+  // macros — none of which change when a meal is logged. Leaving Home and
+  // coming back re-mounts this component and so did eventually correct it,
+  // but only after another await on the network, and the cached figure it
+  // renders first is the pre-meal one. Ashley, 8 Sep 2026: the counter needed
+  // an app restart. The snapshot is the store's own totals with no request,
+  // so this cell moves the moment a meal is logged anywhere in the app —
+  // including from the coach.
+  //
+  // PATCHED, NOT RELOADED: `data` carries the whole day (session, streak,
+  // PRs, weight trend) and none of that changed because a meal did. Re-running
+  // the full load here would be several queries to move one number.
+  useEffect(() => subscribeMealStore(() => {
+    if (!profile.id || !activeSession.date) return
+    setData(prev => {
+      const next = withMealSnapshot(prev, profile.id, activeSession.date)
+      // The cache is what this screen renders on its next cold open, so it
+      // carries the correction too.
+      if (next && next !== prev) saveDashboardCache(profile.id, activeSession.date, next)
+      return next
+    })
+  }), [profile.id, activeSession.date])
 
   // WATER AND STEPS ARE LOGGED HERE NOW — design_handoff_app_polish, the
   // "Today so far" grid. Both keep their store as the owner of the number:
@@ -459,12 +534,21 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
         <div data-tour="hero">
           <div className="flex items-baseline justify-between gap-3">
             <p className="ds-label">Today&apos;s session</p>
-            {data.session.status !== 'rest' && data.session.estimatedMinutes != null && (
+            {data.session.status !== 'rest' && data.session.status !== 'unknown' && data.session.estimatedMinutes != null && (
               <span className="text-[0.6875rem] text-muted-foreground">~{data.session.estimatedMinutes} min</span>
             )}
           </div>
 
-          {data.session.status === 'rest' ? (
+          {data.session.status === 'unknown' ? (
+            /* THE PLAN IS NOT HERE YET — and it is not a rest day. Ashley's
+               ruling, 8 Sep 2026, offered "Checking your plan…" here vs
+               holding the whole screen on its loading line vs drawing the
+               last-known session: she chose this one, so everything Home does
+               know (streak, calories, water, steps, weight, PRs) stays on
+               screen and only the block that needs the plan waits for it.
+               No CTA: there is nothing yet to start. */
+            <p className="mt-1.5 text-[0.78125rem] text-muted-foreground">Checking your plan…</p>
+          ) : data.session.status === 'rest' ? (
             <>
               {/* NO truncate, so the glow is not clipped — the handoff calls
                   this out and the old comment here explained why: overflow
@@ -486,6 +570,20 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
                 )}
               </div>
               <p className="mt-1.5 text-[0.78125rem] text-muted-foreground">{sessionGlance}</p>
+              {/* THE THIRD THING THAT CAN HAVE HAPPENED TO TODAY, after a swap
+                  and a chosen rest. The session stays on screen with its
+                  button — she may still do it today — and this says where it
+                  went, so Home and the Exercise tab tell her the same story. */}
+              {data.session.movedFrom && (
+                <p className="mt-1 text-[0.78125rem] text-muted-foreground">
+                  {data.session.movedFrom.dayName}&apos;s session, moved here.
+                </p>
+              )}
+              {data.session.movedTo && (
+                <p className="mt-1 text-[0.78125rem] text-muted-foreground">
+                  Moved to {data.session.movedTo.dayName} — still here if you want it today.
+                </p>
+              )}
               {data.session.status !== 'done' && (
                 <Button
                   size="cta"
@@ -703,6 +801,7 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
         )}
 
         {/* 7. TOMORROW — the one filled row on the page. */}
+        {data.tomorrowLabel != null && (
         <button
           type="button"
           onClick={() => { window.location.hash = tabHash('exercise') }}
@@ -717,6 +816,7 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
           </span>
           <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
         </button>
+        )}
       </div>
     </div>
   )

@@ -301,8 +301,26 @@ console.log('\n8. The wiring — what makes it a nudge rather than a nag')
   check('the store is persisted, not just held in memory', /saveNudgeStore\(profile\.id, next\)/.test(chat))
 
   // The opener and the nudge must describe the same day in the same words.
-  check('one lookup of today\'s session, shared by both',
-    (chat.match(/const todayPlan = liveWeekDays\.find\(/g) ?? []).length === 1)
+  //
+  // RE-ANCHORED 8 Sep 2026. This pinned the exact expression
+  // `const todayPlan = liveWeekDays.find(` — the mechanism, not the property —
+  // and broke the moment today's session started resolving through
+  // session-move.ts as well as the plan ("I'll do it tomorrow"). The property
+  // it was defending is unchanged and is now stronger: ONE resolution of
+  // today, feeding both.
+  check('today is resolved exactly once', (chat.match(/const todayPlan = /g) ?? []).length === 1)
+  check('...from the one resolver that also knows about moved sessions',
+    /const todayResolved = sessionForDate\(\{ date: activeSession\.date, plan: liveWeekDays, moves: trainingWeek\.moves \}\)/.test(chat))
+  // AND todayPlan IS THAT RESOLUTION. Without this the re-anchor above passes
+  // on a todayPlan that has gone back to a bare `liveWeekDays.find(...)` —
+  // caught by mutating exactly that, 8 Sep 2026, and the check was weaker than
+  // the one it replaced until this line was added.
+  const todayPlanAt = chat.indexOf('const todayPlan = ')
+  const todayPlanDecl = todayPlanAt >= 0 ? chat.slice(todayPlanAt, todayPlanAt + 220) : ''
+  check('...and today\'s session comes from that resolution, not a second plan lookup',
+    /todayResolved/.test(todayPlanDecl) && !/liveWeekDays\.find/.test(todayPlanDecl), todayPlanDecl.slice(0, 160))
+  check('...and the nudge reads that same value, not its own lookup',
+    /todaySession: todayPlan \? \{ focus: todayPlan\.focus, movements: movementsOf\(todayPlan\) \} : null,[\s\S]{0,200}todayLogged/.test(chat))
 
   // hasUnreadCoachMessage must be about the LAST message specifically —
   // "somewhere in the transcript" would silence the coach permanently.

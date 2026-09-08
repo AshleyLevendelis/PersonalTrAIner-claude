@@ -95,7 +95,7 @@ export interface ActiveSessionValue extends ActiveSessionIdentity, RestState {
   logs: ExerciseSetLog[]
   setsFor: (exerciseId: string, exerciseName?: string) => ExerciseSetLog[]
   refresh: () => void
-  logSet: (input: SaveSetInput) => ExerciseSetLog
+  logSet: (input: SaveSetInput) => ExerciseSetLog | null
   deleteSet: typeof deleteSet
   /** 'idle' before any session activity today; 'running' from an explicit
    * Start tap OR the first logged set (forgiving-by-design); 'finished'
@@ -155,6 +155,36 @@ export interface ActiveSessionProviderProps {
   /** Bumped by external log sources (chat, dev seeding) to trigger a refetch — same signal `logsVersion` was already used for. */
   refreshToken?: number
   children: React.ReactNode
+}
+
+/**
+ * How long "Rest complete" stays up before it takes itself away.
+ *
+ * Five minutes, and the number is chosen from the two failure modes rather
+ * than from a rest length: shorter and it could vanish while someone is
+ * genuinely still resting and glancing at their phone; longer and it stops
+ * being a prompt about now. Every rest this app prescribes is under five
+ * minutes, so past this the deadline is not something the trainee is waiting
+ * on any more.
+ *
+ * The bar is not free while it sits there: it is fixed above the tab bar on
+ * every tab and the chat composer rides above it, so a prompt nobody
+ * dismissed is a chat box permanently pushed up the screen.
+ */
+export const REST_OVERRUN_GRACE_MS = 5 * 60 * 1000
+
+/**
+ * Has this rest been over for long enough that it is no longer a prompt?
+ *
+ * A function rather than the comparison written out at its two call sites —
+ * the restore path and the live tick — because those two disagreeing is
+ * exactly how a rest comes back after a reload that the running app had
+ * already taken down.
+ */
+export function isRestOverrunExpired(restEndsAt: string, nowMs: number): boolean {
+  const endsMs = new Date(restEndsAt).getTime()
+  if (!Number.isFinite(endsMs)) return true
+  return nowMs - endsMs > REST_OVERRUN_GRACE_MS
 }
 
 export function ActiveSessionProvider({
@@ -387,8 +417,16 @@ export function ActiveSessionProvider({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [identity.profileId, identity.date, identity.dayName, identity.liveWeek])
 
-  const logSet = useCallback((input: SaveSetInput): ExerciseSetLog => {
+  const logSet = useCallback((input: SaveSetInput): ExerciseSetLog | null => {
     const result = saveSet(input)
+    // A REFUSED SET OPENS NOTHING. saveSet returns null when the weight is one
+    // nobody lifts (set-plausibility.ts) and nothing was written — so marking
+    // the session running, reopening a finished one, or refreshing every
+    // surface that reads `logs` would all be reacting to a set that does not
+    // exist. Ashley's Thursday (see finishSession) is the same lesson from
+    // the other end: the app must not record work off an action that logged
+    // nothing.
+    if (!result) return null
     // Forgiving by design: a logged set with no session open silently opens
     // one, backdated to "now" — patchRecord's own `existing?.startedAtIso ??
     // now` default IS that backdating (there's no earlier timestamp to
@@ -635,12 +673,20 @@ export function ActiveSessionProvider({
   useEffect(() => {
     if (!identity.profileId || !identity.date) return
     const record = getActiveSessionRecord(identity.profileId, identity.date)
-    if (record?.restEndsAt) {
-      setRestEndsAt(record.restEndsAt)
-      setRestLabel(record.restLabel ?? null)
-      setRestTargetSetNumber(record.restTargetSetNumber ?? null)
-      setRestTotalMs(record.restTotalMs ?? null)
+    if (!record?.restEndsAt) return
+    // A REST THAT ENDED LONG AGO IS NOT A REST. Restoring one unconditionally
+    // is how "Rest complete — ready for set 3?" came back the next morning:
+    // the deadline is persisted so it survives a reload (which is the whole
+    // point mid-rest), and nothing ever expired it, so an overrun sat in the
+    // record until someone tapped Dismiss. See REST_OVERRUN_GRACE_MS.
+    if (isRestOverrunExpired(record.restEndsAt, getAppNow(identity.profileId).getTime())) {
+      saveActiveSessionRecord({ ...record, restEndsAt: undefined, restLabel: undefined, restTargetSetNumber: undefined, restTotalMs: undefined })
+      return
     }
+    setRestEndsAt(record.restEndsAt)
+    setRestLabel(record.restLabel ?? null)
+    setRestTargetSetNumber(record.restTargetSetNumber ?? null)
+    setRestTotalMs(record.restTotalMs ?? null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [identity.profileId, identity.date])
 
@@ -692,6 +738,22 @@ export function ActiveSessionProvider({
     void restTick
     return new Date(restEndsAt).getTime() - getAppNow(identity.profileId).getTime()
   }, [restEndsAt, restTick, identity.profileId])
+
+  // AND IT CLEARS ITSELF. "Rest complete" is a prompt, not a state — it has
+  // said its piece (and the chime has played) and after that it is furniture:
+  // a fixed bar above the tab bar that the chat composer has to ride above,
+  // on every tab, until someone remembers to tap Dismiss. Ashley, 8 Sep 2026:
+  // it "does not clear after a rest period" and "clips the chat box".
+  //
+  // The tick that drives the countdown is already running while restEndsAt is
+  // set, so this needs no timer of its own.
+  useEffect(() => {
+    if (!restEndsAt || !identity.profileId) return
+    void restRemainingMs
+    if (!isRestOverrunExpired(restEndsAt, getAppNow(identity.profileId).getTime())) return
+    dismissRest()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [restEndsAt, restRemainingMs, identity.profileId])
 
   // --- Cross-tree set-focus request (BottomDock -> the matching ExerciseRow,
   // different subtrees) — transient, never persisted.

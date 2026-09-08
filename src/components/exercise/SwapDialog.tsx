@@ -161,6 +161,19 @@ export function SwapDialog({
                   Show {replacements.length - INITIAL_SHOWN} more
                 </Button>
               )}
+              {/* A SHORT LIST EXPLAINS ITSELF. The empty case has said why since
+                  it was written; one or two options said nothing, so the screen
+                  looked like a complete answer. Ashley met that on 8 Sep 2026 —
+                  one suggestion above a search box that turned up three more
+                  perfectly good ones the moment she typed. The list is honest
+                  again now; this is what keeps it honest when a movement really
+                  does have few alternatives. */}
+              {replacements.length < INITIAL_SHOWN && (
+                <p className="text-xs text-muted-foreground px-1 pt-1">
+                  {replacements.length === 1 ? "That's the only alternative" : `Only ${replacements.length} alternatives`} that fit your
+                  equipment, injuries, style and skill level for this movement. Search below for anything else in the catalog.
+                </p>
+              )}
             </div>
           )
         )}

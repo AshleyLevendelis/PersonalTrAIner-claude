@@ -24,9 +24,12 @@ import { computeSetRowNumbers, nextExtraSetNumber } from '@/lib/session-derive'
 import { checkForPR, getTopPRSet, type PRResult } from '@/lib/pr-engine'
 import { getExerciseEntry } from '@/lib/exercise-db'
 import { isExternallyLoaded } from '@/lib/load-prescription'
-import type { ExerciseSetLog } from '@/lib/types'
+import { checkLoggedSetWeight, MAX_LOGGABLE_SET_KG } from '@/lib/set-plausibility'
+import type { ExerciseSetLog, UserProfile } from '@/lib/types'
 
-const MAX_WEIGHT_KG = 9999.99
+// REPLACED 8 Sep 2026 by set-plausibility.ts's MAX_LOGGABLE_SET_KG. The old
+// constant here was 9999.99 — the width of the database column, not a claim
+// about lifting — so 500kg on a 24kg dumbbell passed it without comment.
 const MAX_REPS = 999
 
 /** Keeps the row a lifter is actively editing above the soft keyboard (LAYOUT-DESIGN.md §7.6) — scrollIntoView on focus, not on every keystroke. */
@@ -72,6 +75,22 @@ export interface SetGridProps {
   perSetLoadKg?: (number | null)[]
   /** Flips the weight input's helper copy from "here's the default" to "log what you actually lifted." */
   loadIsEstimate?: boolean
+  /**
+   * Needed only to judge a typed weight against what this trainee can
+   * actually load — see set-plausibility.ts.
+   *
+   * The PROFILE goes down rather than a pre-computed ceiling, which is the
+   * opposite of loadUnitLabel's rule above, and deliberately: the two SetGrid
+   * parents (the plan rows and Additional Work) would each have to derive the
+   * ceiling, and two copies of that derivation is the exact shape this file's
+   * other doc comment warns about. One copy lives in set-plausibility.ts and
+   * both parents hand it the same input.
+   *
+   * Absent means the check falls back to its absolute bound alone. That is
+   * the honest degradation: with no profile the app knows nothing about what
+   * this person owns.
+   */
+  profile?: UserProfile | null
   onSetCompleted?: (exerciseName: string, setNumber: number, weight: number, reps: number, rest: string, sets: number, prescribedReps: string, tier?: string) => void
   onOpenPlateCalc?: (weight: number) => void
   // REMOVED 5 Sep 2026: onFirstEverLog. It was declared here, forwarded by
@@ -100,6 +119,7 @@ export function SetGrid({
   loadUnitLabel,
   perSetLoadKg,
   loadIsEstimate,
+  profile,
   onSetCompleted,
   onOpenPlateCalc,
 }: SetGridProps) {
@@ -149,6 +169,28 @@ export function SetGrid({
 
   const [inputs, setInputs] = useState<Record<number, SetInputState>>({})
   const [rowErrors, setRowErrors] = useState<Record<number, string>>({})
+  /**
+   * A weight past what the app believes this trainee can load, said out loud
+   * on the row. Separate state from rowErrors because it is a different
+   * sentence with a different consequence: an error means the set was NOT
+   * logged, a warning means it will be if they mean it. Rendering both in the
+   * same destructive red would make "we refused this" and "are you sure?"
+   * look identical.
+   */
+  const [rowWarnings, setRowWarnings] = useState<Record<number, string>>({})
+  /**
+   * The row whose warning has been read and whose next tap logs anyway —
+   * Ashley's ruling, 8 Sep 2026: "warn, second tap logs it."
+   *
+   * NO TIMEOUT, unlike the armed delete below, and the difference is what the
+   * second tap costs. An armed delete left lying around destroys a real row,
+   * so it disarms itself after three seconds. An armed "log it anyway" only
+   * stores the number they already typed — and the warning sentence on screen
+   * says in as many words that tapping again will do that. A timer would make
+   * the visible instruction quietly untrue while it was still on screen.
+   * Disarmed by editing the weight instead: a new number is a new decision.
+   */
+  const [confirmWeightSet, setConfirmWeightSet] = useState<number | null>(null)
   const [prBadgeSet, setPrBadgeSet] = useState<{ setNumber: number; result: PRResult } | null>(null)
   const [animatingPr, setAnimatingPr] = useState(false)
   /** Armed-then-confirm delete, tap-tap within 3s — no window.confirm (themed-app clash, PWA-suppressible per the UX sweep's Clear-chat finding), but a saved set is still a real row to lose, so a bare single tap doesn't do it. */
@@ -175,6 +217,10 @@ export function SetGrid({
     setInputs(prev => ({ ...prev, [setNumber]: next }))
     saveSetDraft(exerciseId, setNumber, next)
     if (rowErrors[setNumber]) setRowErrors(prev => { const n = { ...prev }; delete n[setNumber]; return n })
+    if (field === 'weight') {
+      if (rowWarnings[setNumber]) setRowWarnings(prev => { const n = { ...prev }; delete n[setNumber]; return n })
+      if (confirmWeightSet === setNumber) setConfirmWeightSet(null)
+    }
   }
 
   const toggleBodyweight = (setNumber: number) => {
@@ -182,6 +228,10 @@ export function SetGrid({
     const next = { ...current, isBodyweight: !current.isBodyweight, weight: '' }
     setInputs(prev => ({ ...prev, [setNumber]: next }))
     saveSetDraft(exerciseId, setNumber, next)
+    // The weight this was warning about is gone, so the warning must go with
+    // it — same rule as editing the number.
+    if (rowWarnings[setNumber]) setRowWarnings(prev => { const n = { ...prev }; delete n[setNumber]; return n })
+    if (confirmWeightSet === setNumber) setConfirmWeightSet(null)
   }
 
   const defaultWeightFor = (setNumber: number): string => {
@@ -255,10 +305,6 @@ export function SetGrid({
     const weight = input.isBodyweight
       ? 0
       : parseFloat(input.weight || (ghost ? String(ghost.weight_kg) : defaultWeightFor(setNumber))) || 0
-    if (!input.isBodyweight && (!Number.isFinite(weight) || weight < 0 || weight > MAX_WEIGHT_KG)) {
-      setRowErrors(prev => ({ ...prev, [setNumber]: `Weight must be between 0 and ${MAX_WEIGHT_KG}kg` }))
-      return
-    }
     // A 0kg save without the BW flag produces exactly the "malformed
     // zero-weight" row every summary/history reader silently filters out —
     // the tap would look successful (rest timer starts) but the set vanishes.
@@ -269,6 +315,39 @@ export function SetGrid({
     if (weight === 0 && !isBodyweight) {
       setRowErrors(prev => ({ ...prev, [setNumber]: 'Enter the weight you lifted' }))
       return
+    }
+
+    // IS THIS A WEIGHT SHE ACTUALLY LIFTED?
+    //
+    // Ashley, 8 Sep 2026, choosing between four options: warn, and let a
+    // second tap log it. So this is two rules, not one — see
+    // set-plausibility.ts for both, and for why the warning is narrow.
+    //
+    // Placed AFTER the bodyweight resolution above so the number judged is
+    // the one that would be stored, and skipped entirely for a bodyweight
+    // row, which has no weight to be wrong about. The store applies the
+    // absolute bound again on its own (saveSet), so a caller that never
+    // reaches this screen is still covered; this half exists because only the
+    // screen can ask "did you mean that?" and wait for the answer.
+    if (!isBodyweight) {
+      const plausibility = checkLoggedSetWeight({ weightKg: weight, entry: catalogEntry, profile })
+      if (plausibility.verdict === 'impossible') {
+        setRowErrors(prev => ({ ...prev, [setNumber]: plausibility.message }))
+        return
+      }
+      if (plausibility.verdict === 'above_ceiling' && confirmWeightSet !== setNumber) {
+        setRowWarnings(prev => ({ ...prev, [setNumber]: `${plausibility.message} Tap ✓ again to log it anyway.` }))
+        // Never both at once: red says the set was refused, amber says it is
+        // waiting on her. A row showing the two together is telling her two
+        // different things about the same tap.
+        if (rowErrors[setNumber]) setRowErrors(prev => { const next = { ...prev }; delete next[setNumber]; return next })
+        setConfirmWeightSet(setNumber)
+        return
+      }
+    }
+    setConfirmWeightSet(null)
+    if (rowWarnings[setNumber]) {
+      setRowWarnings(prev => { const next = { ...prev }; delete next[setNumber]; return next })
     }
 
     // A weighted pull-up is bodyweight PLUS a belt: the base is always
@@ -394,17 +473,21 @@ export function SetGrid({
             <span className={`w-5 text-xs font-medium text-center ${isSaved ? 'text-primary-text' : 'text-muted-foreground'}`}>
               {setNumber}
             </span>
+            {/* `max` is a hint the browser does not enforce (see
+                saveCardioLog's comment on the same trap) — the rule is
+                checkLoggedSetWeight in handleSaveSet, and the absolute half
+                of it again in the store. */}
             <Input
               id={`setgrid-weight-${exerciseId}-${setNumber}`}
               type="number"
               min="0"
-              max={MAX_WEIGHT_KG}
+              max={MAX_LOGGABLE_SET_KG}
               step="0.5"
               placeholder={isBW ? 'BW' : (ghost ? String(ghost.weight_kg) : defaultWeightFor(setNumber))}
               value={isBW ? '' : input.weight}
               onChange={e => updateInput(setNumber, 'weight', e.target.value)}
               onFocus={scrollRowIntoView}
-              className={`h-7 border-0 bg-[color:var(--surface-raised)] text-sm shadow-none ${isSaved ? 'text-primary-text' : ''} ${isBW ? 'text-muted-foreground' : ''} ${rowErrors[setNumber] ? 'ring-1 ring-destructive' : ''}`}
+              className={`h-7 border-0 bg-[color:var(--surface-raised)] text-sm shadow-none ${isSaved ? 'text-primary-text' : ''} ${isBW ? 'text-muted-foreground' : ''} ${rowErrors[setNumber] ? 'ring-1 ring-destructive' : rowWarnings[setNumber] ? 'ring-1 ring-amber-500' : ''}`}
               disabled={isBW}
             />
             {/* The `?.` used to make this button silently inert wherever the
@@ -504,6 +587,15 @@ export function SetGrid({
           })()}
           {rowErrors[setNumber] && (
             <p className="text-[0.625rem] text-destructive px-1 -mt-0.5">{rowErrors[setNumber]}</p>
+          )}
+          {/* Amber, not red: nothing has been refused here and nothing has
+              gone wrong — the app has noticed something and is asking. Same
+              tone the plate calculator uses for "you may not own these
+              plates." */}
+          {rowWarnings[setNumber] && (
+            <p className="text-[0.625rem] text-amber-600 dark:text-amber-400 px-1 -mt-0.5" data-testid="weight-warning">
+              {rowWarnings[setNumber]}
+            </p>
           )}
           </React.Fragment>
         )

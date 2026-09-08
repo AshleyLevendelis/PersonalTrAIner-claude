@@ -325,15 +325,35 @@ console.log('\n4. The over-fire check — nothing fires for an uninjured trainee
   }
 
   // The real regression risk of the style-filter change: for someone who
-  // reported no injury, the new joints argument is an empty set, so the pool
-  // must contain exactly what it always did — every survivor on-style, no
-  // exceptions riding in through the rehab exemption.
+  // reported no injury, the joints argument is an empty set, so NOTHING may
+  // ride into the pool through the rehab exemption.
+  //
+  // RE-ANCHORED 8 Sep 2026. This asserted "every survivor is on-style", which
+  // was equivalent while the rehab exemption was the only way an off-style
+  // entry could survive. It is not any more: stageStyleFilter's per-pattern
+  // floor deliberately reinstates off-style entries when a style would
+  // otherwise leave a movement with almost no options — that is the fix for
+  // Ashley being prescribed a backpack lateral raise at a full gym. The old
+  // assertion pinned the mechanism; this one pins the property, which is that
+  // an uninjured trainee's off-style survivors are all explained by the floor
+  // and none by the exemption.
   for (const style of STYLES) {
     for (const equipment_access of EQUIP) {
-      const pool = getConstrainedPool(buildProfile({ training_style: style, equipment_access }), [])
+      const profile = buildProfile({ training_style: style, equipment_access })
+      const pool = getConstrainedPool(profile, [])
       const offStyle = pool.filter(e => !e.style_tags.includes(style))
-      check(`uninjured ${style}/${equipment_access}: pool is unchanged — every survivor on-style`,
-        offStyle.length === 0, offStyle.slice(0, 3).map(e => e.name).join(', '))
+      // Which patterns the floor is entitled to have reinstated: those whose
+      // on-style survivors fell short of a workable choice.
+      const onStyleByPattern = new Map<string, number>()
+      for (const e of pool) {
+        if (e.style_tags.includes(style)) onStyleByPattern.set(e.movement_pattern, (onStyleByPattern.get(e.movement_pattern) ?? 0) + 1)
+      }
+      const unexplained = offStyle.filter(e => (onStyleByPattern.get(e.movement_pattern) ?? 0) >= 4)
+      check(`uninjured ${style}/${equipment_access}: no off-style entry rides in through the rehab exemption`,
+        unexplained.length === 0, unexplained.slice(0, 3).map(e => `${e.name} (${e.movement_pattern})`).join(', '))
+      // And the exemption itself is genuinely inert with no injuries.
+      check(`uninjured ${style}/${equipment_access}: nothing is indicated for a joint that was never flagged`,
+        pool.every(e => !isIndicatedFor(e, new Set())))
     }
   }
 
@@ -366,11 +386,22 @@ console.log('\n5. A style preference may not delete a safety response')
     }
   }
   // Over-fire the other way: the exemption must let rehab through and nothing
-  // else. An off-style movement with no indication is still filtered out.
+  // else. RE-ANCHORED 8 Sep 2026 alongside its sibling above — an off-style
+  // movement with no indication is still filtered out UNLESS the per-pattern
+  // floor reinstated its whole movement, which is a different mechanism with
+  // its own gate (test:style-starve). Carries were what exposed the old
+  // wording: Farmer's Walk, Suitcase Carry and Overhead Carry are off-style
+  // for a bodybuilder and not rehab, and they are in the pool now because
+  // 'bodybuilding' leaves the carry pattern with almost nothing.
   const profile = buildProfile({ injuries: ['knees'], training_style: 'bodybuilding' })
   const pool = getConstrainedPool(profile, [])
+  const onStyleByPattern = new Map<string, number>()
+  for (const e of pool) {
+    if (e.style_tags.includes('bodybuilding')) onStyleByPattern.set(e.movement_pattern, (onStyleByPattern.get(e.movement_pattern) ?? 0) + 1)
+  }
   const offStyleNonRehab = pool.filter(e =>
-    !e.style_tags.includes('bodybuilding') && !isIndicatedFor(e, getFlaggedJoints(['knees'])))
+    !e.style_tags.includes('bodybuilding') && !isIndicatedFor(e, getFlaggedJoints(['knees'])) &&
+    (onStyleByPattern.get(e.movement_pattern) ?? 0) >= 4)
   check('the exemption is for rehab only — no other off-style movement rides in',
     offStyleNonRehab.length === 0, offStyleNonRehab.slice(0, 3).map(e => e.name).join(', '))
 }

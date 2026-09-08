@@ -32,6 +32,10 @@ export const GLYPH: Record<TrainingWeekDay['state'], string> = {
   // between them is history, not status, and it is carried in the label the
   // screen reader gets rather than in a mark nobody could tell apart.
   rest_chosen: '–',
+  // Moved to another day this week. An arrow like the swap's, pointing
+  // FORWARD rather than both ways: the swap says the work was traded for
+  // something else, this says the same work is still coming, later.
+  moved: '→',
 }
 
 /**
@@ -49,6 +53,7 @@ export const STATE_LABEL: Record<TrainingWeekDay['state'], string> = {
   before_plan: 'before your plan started',
   swapped: 'swapped for another activity',
   rest_chosen: 'rest day you chose',
+  moved: 'moved to another day',
 }
 
 export const SHORT_DAY: Record<string, string> = {

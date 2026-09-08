@@ -316,6 +316,8 @@ function App() {
    * a tour of a plan they already know.
    */
   const [tourArmed, setTourArmed] = useState(false)
+  /** True while AppTour's spotlight is up — see the EmailPrompt render below. */
+  const [tourRunning, setTourRunning] = useState(false)
   /**
    * The plan generated but the profile row did not save.
    *
@@ -2382,7 +2384,17 @@ function App() {
       {/* The plan exists in memory but not in the database. Says so once, in
           plain terms, and stays dismissible — the user can carry on, but
           they are never left believing it was saved. */}
-      {askForEmail && <EmailPrompt onClose={() => setAskForEmail(false)} />}
+      {/* NOT WHILE THE TOUR IS ON SCREEN. Both are armed by finishing
+          onboarding — the prompt when the app found no account to restore at
+          launch, the tour when the plan was committed — and both are
+          full-screen overlays at z-50, so the email form landed squarely on
+          top of the tour's first stop (Ashley, 8 Sep 2026).
+          THE TOUR WINS, and the prompt waits: the tour is the one-time
+          arrival and cannot be deferred, while this prompt is explicitly
+          deferrable by design — "Not now" snoozes it for a week, so a few
+          minutes is nothing to it. It appears the moment the tour finishes or
+          is skipped, with no reload needed. */}
+      {askForEmail && !tourRunning && <EmailPrompt onClose={() => setAskForEmail(false)} />}
 
       {unsavedProfileWarning && (
         <div
@@ -2612,6 +2624,7 @@ function App() {
         // stop pointing at the same nothing, and the trainee cannot tell which
         // kind of build started it.
         mealsPending={(isGeneratingMeals || initialMealBuild) && Object.keys(mealPools).length === 0}
+        onRunningChange={setTourRunning}
       />
       <ProfileScreen
         open={profileInfoOpen}

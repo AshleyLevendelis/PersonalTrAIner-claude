@@ -187,6 +187,17 @@ export interface CoachToday {
   finished: boolean
   /** The next scheduled session after today, when there is one within the week. */
   next: { dayName: string; focus: string; isTomorrow: boolean } | null
+  /**
+   * Set when today's prescribed session has been MOVED to another day, and
+   * when today IS the day another day's session was moved onto.
+   *
+   * Stated rather than left to be inferred, for the reason this whole file
+   * exists: without it a moved day reaches the model as `focus: null`, which
+   * the header below reads as a rest day — the same false claim about her own
+   * training that the plan-not-loaded case produced, from a different cause.
+   */
+  movedTo?: { dayName: string } | null
+  movedFrom?: { dayName: string } | null
 }
 
 function partOfDay(hour: number): string {
@@ -207,7 +218,11 @@ export function buildTodayHeader(today: CoachToday): string {
   const when = `It is ${today.dayName} ${partOfDay(today.hour)} (${today.clock}).`
 
   let session: string
-  if (!today.focus) {
+  if (today.movedTo) {
+    session = `Today, ${today.dayName}, had ${today.focus ?? 'a session'} on it and THEY MOVED IT TO ${today.movedTo.dayName.toUpperCase()} — they told you so. It is not a rest day and it is not missed; the session is still owed, on ${today.movedTo.dayName}. They can still do it today if they want to.`
+  } else if (today.movedFrom) {
+    session = `Today's session is ${today.movedFrom.dayName}'s ${today.focus}, MOVED TO TODAY at their request${today.finished ? ', and it is ALREADY DONE' : today.setsLogged > 0 ? `, with ${today.setsLogged} of ${today.setsPlanned} sets logged` : ', NOT LOGGED yet'}.`
+  } else if (!today.focus) {
     session = `Today, ${today.dayName}, is a REST DAY on the plan — there is no session to do today.`
   } else if (!today.isGymSession) {
     session = `Today is ${today.dayName}: ${today.focus} — not a gym session; what it prescribes is on the ${today.dayName} row below.`

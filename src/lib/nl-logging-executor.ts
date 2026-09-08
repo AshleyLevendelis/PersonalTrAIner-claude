@@ -21,7 +21,7 @@ export interface LogWorkoutContext {
   weekNumber: number
   dayName: string
   setsFor: (exerciseId: string, exerciseName?: string) => ExerciseSetLog[]
-  logSet: (input: SaveSetInput) => ExerciseSetLog
+  logSet: (input: SaveSetInput) => ExerciseSetLog | null
   declareOffPlan: (name: string) => void
   /** name -> prescribed set count, for exercises that ARE in today's plan (off-plan exercises pass 0). */
   todaysPlanSetCounts: Map<string, number>
@@ -190,9 +190,15 @@ export function executeLogWorkout(groups: ParsedSetGroup[], ctx: LogWorkoutConte
     const loggedSetNumbers = ctx.replaceExisting && ctx.deleteSet ? [] : existingLogs.map(l => l.set_number)
     const setNumbers = allocateSetNumbers(group.sets.length, prescribedSets, loggedSetNumbers)
 
+    // Counted from what the STORE accepted, never from what was parsed. The
+    // store refuses a weight nobody lifts (set-plausibility.ts), and a receipt
+    // built from group.sets.length would then read "3 x 8 @ 900kg" over three
+    // rows that do not exist — the same class of lie as the six deadlift sets
+    // above, arriving from the other direction.
+    let writtenSets = 0
     group.sets.forEach((set, i) => {
       const setNumber = setNumbers[i]
-      ctx.logSet({
+      const saved = ctx.logSet({
         userId: ctx.profileId,
         date: ctx.date,
         weekNumber: ctx.weekNumber,
@@ -207,9 +213,23 @@ export function executeLogWorkout(groups: ParsedSetGroup[], ctx: LogWorkoutConte
         unit: prescriptionUnit(),
         isBodyweight: set.isBodyweight,
       })
+      if (!saved) return
+      writtenSets++
       totalSets++
       loggedKeys.push({ exerciseId, setNumber })
     })
+
+    // Every set refused. Say so rather than dropping the exercise out of the
+    // receipt silently — a trainee who told the coach a number and sees no
+    // row for it cannot tell whether it was misheard or thrown away.
+    if (writtenSets === 0) {
+      rows.push({
+        label: exerciseName,
+        detail: 'Not logged',
+        note: "That weight is past anything I can record — tell me the number again and I'll log it.",
+      })
+      continue
+    }
 
     // "+15kg", never a bare "15kg" — the receipt is the trainee's confirmation
     // of what we recorded, and a bare figure beside a chin-up reads as the
@@ -228,7 +248,7 @@ export function executeLogWorkout(groups: ParsedSetGroup[], ctx: LogWorkoutConte
           : undefined
     rows.push({
       label: exerciseName,
-      detail: `${group.sets.length} × ${repsLabel} @ ${weightLabel}`,
+      detail: `${writtenSets} × ${repsLabel} @ ${weightLabel}`,
       note,
     })
   }

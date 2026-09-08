@@ -368,7 +368,7 @@ export function ExerciseDetailDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-w-sm max-h-[85vh]">
         <DialogHeader>
           <DialogTitle className="text-left">{exerciseName ?? 'Exercise'}</DialogTitle>
         </DialogHeader>

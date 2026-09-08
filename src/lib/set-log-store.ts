@@ -1,6 +1,7 @@
 import { supabase } from './supabase'
 import { getAppNow, getLocalDateString } from './dev-clock'
 import type { ExerciseSetLog } from './types'
+import { isLoggableSetWeight, MAX_LOGGABLE_SET_KG } from './set-plausibility'
 
 // ---------------------------------------------------------------------------
 // set-log-store — THE single write path for logged sets (C0 Part 3).
@@ -327,8 +328,31 @@ function toView(set: PendingSet): ExerciseSetLog {
  * Saves (or overwrites — upsert semantics on the natural key) one set.
  * Synchronous success: the returned view is already persisted locally when
  * this returns; network sync happens in the background.
+ *
+ * Returns null when the weight is one nobody lifts — see set-plausibility.ts.
+ * THE ABSOLUTE BOUND LIVES HERE rather than only in SetGrid, for the reason
+ * saveCardioLog's does: four writers reach this function (the set grid, the
+ * chat's log executor, the chat's undo restore, the legacy-queue migration)
+ * and a rule that matters at all of them belongs at the one thing they share.
+ * A typo that gets in does not just sit in a row — it moves every future
+ * prescription for that lift through the progression engine and reappears as
+ * a personal record.
+ *
+ * Null rather than a throw, again matching cardio: a save is a tap, and a tap
+ * must never take the screen down. The narrower "more than you told us you
+ * own" judgement is NOT made here — it needs the catalogue entry and the
+ * profile, which this input does not carry, and Ashley's ruling is that it
+ * warns rather than refuses. SetGrid holds that half.
  */
-export function saveSet(input: SaveSetInput): ExerciseSetLog {
+export function saveSet(input: SaveSetInput): ExerciseSetLog | null {
+  if (!isLoggableSetWeight(input.weightKg) || !isLoggableSetWeight(input.addedLoadKg ?? 0)) {
+    console.error(
+      `Refusing to log an implausible set weight: ${input.weightKg}kg` +
+      `${input.addedLoadKg != null ? ` (+${input.addedLoadKg}kg added)` : ''} ` +
+      `for "${input.exerciseName}" — the ceiling is ${MAX_LOGGABLE_SET_KG}kg.`
+    )
+    return null
+  }
   const set: PendingSet = {
     clientId: generateClientId(),
     userId: input.userId,
@@ -379,7 +403,7 @@ export function saveSet(input: SaveSetInput): ExerciseSetLog {
 }
 
 /** Alias for saveSet — the natural-key upsert makes update and save the same operation. */
-export function updateSet(input: SaveSetInput): ExerciseSetLog {
+export function updateSet(input: SaveSetInput): ExerciseSetLog | null {
   return saveSet(input)
 }
 

@@ -21,7 +21,7 @@
 // If App.tsx's wrapper changes, this diverges silently. `test:chat-shell`
 // is what holds the two together.
 // ---------------------------------------------------------------------------
-import { StrictMode, useState } from 'react'
+import { StrictMode, useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 
 import { setSupabaseClient } from '@/lib/supabase'
@@ -80,7 +80,18 @@ const seeded = Array.from({ length: 14 }, (_, i) => ({
 // key the chat restored nothing and the harness measured an EMPTY thread —
 // which would have reported a scroller that "doesn't need to scroll" as if
 // that were a finding about the app.
-localStorage.setItem(`chat_history_cache_${PROFILE_ID}`, JSON.stringify(seeded))
+// ?seed=opener — THE FIRST BUBBLE, ON A COLD LOAD.
+//
+// The other two modes both hand ChatAssistant a conversation and a plan that
+// are already there, which is exactly the situation the opener never runs in.
+// This one starts with NO cached thread (so the synchronous greeting is what
+// renders) and NO plan (so `exercisePlan`/`mesocycle` are the empty arrays
+// App.tsx holds until its read resolves — App.tsx:111,138). ?planDelay=N then
+// hands the plan over N ms later, which is the whole race in one knob.
+const OPENER = new URLSearchParams(location.search).get('seed') === 'opener'
+const PLAN_DELAY_MS = Number(new URLSearchParams(location.search).get('planDelay') ?? '0')
+if (!OPENER) localStorage.setItem(`chat_history_cache_${PROFILE_ID}`, JSON.stringify(seeded))
+else localStorage.removeItem(`chat_history_cache_${PROFILE_ID}`)
 
 // ---------------------------------------------------------------------------
 // ?seed=nudge — THE COACH SPEAKING FIRST INTO AN ONGOING THREAD.
@@ -99,8 +110,9 @@ localStorage.setItem(`chat_history_cache_${PROFILE_ID}`, JSON.stringify(seeded))
 // ---------------------------------------------------------------------------
 const SEED_NUDGE = new URLSearchParams(location.search).get('seed') === 'nudge'
 const todayStr = new Date().toISOString().slice(0, 10)
-const seededRows = SEED_NUDGE
-  ? seeded.map((m, i) => ({
+const OPENER_ROWS = Number(new URLSearchParams(location.search).get('rows') ?? '0')
+const seededRows = (SEED_NUDGE || (OPENER && OPENER_ROWS > 0))
+  ? (SEED_NUDGE ? seeded : seeded.slice(0, OPENER_ROWS)).map((m, i) => ({
       id: `seed-${i}`,
       profile_id: PROFILE_ID,
       role: m.role,
@@ -137,6 +149,21 @@ const noop = () => {}
 function Harness() {
   const [, setTick] = useState(0)
   const [chatAttention, setChatAttention] = useState(false)
+  // App.tsx holds [] for both of these until its plan read resolves. In every
+  // mode but ?seed=opener the harness skips that window entirely, which is
+  // why the opener has never been driven here.
+  const [planArrived, setPlanArrived] = useState(!OPENER)
+  useEffect(() => {
+    // The driver reads this rather than trusting a wall-clock sample: whether
+    // the plan had arrived when a sentence rendered is the actual question,
+    // and bundle parse time moves first paint around by hundreds of ms.
+    ;(window as unknown as Record<string, unknown>).__planArrived = planArrived
+    if (planArrived) return
+    const t = setTimeout(() => setPlanArrived(true), PLAN_DELAY_MS)
+    return () => clearTimeout(t)
+  }, [planArrived])
+  const livePlan = planArrived ? mesocycle[0].days : []
+  const liveMeso = planArrived ? mesocycle : []
   return (
     <AppearanceProvider>
     <ActiveSessionProvider profileId={PROFILE_ID} planCreatedAt={profile.created_at} totalWeeks={mesocycle.length} refreshToken={0}>
@@ -149,8 +176,8 @@ function Harness() {
             <ChatAssistant
               profile={profile}
               macros={macros}
-              exercisePlan={mesocycle[0].days}
-              mesocycle={mesocycle}
+              exercisePlan={livePlan}
+              mesocycle={liveMeso}
               planCreatedAt={profile.created_at}
               mealPlan={[]}
               exerciseExclusions={[]}

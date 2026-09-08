@@ -17,7 +17,7 @@ import { getExerciseEntry } from '@/lib/exercise-db'
 import { createPendingAction, claimPendingAction, declinePendingAction, markExecuting, resolvePendingAction, getPendingAction, expireOldPendingActions, isWithinUndoWindow, type PendingActionReceipt } from '@/lib/pending-actions-store'
 import { APPEND_PROPOSAL_KINDS, INTENT_PROPOSAL_VERB, buildIntentProposal } from '@/lib/intent-proposal'
 import { pickAccountabilityCheckIn } from '@/lib/accountability'
-import { executeExerciseSwap, executeMealSwap, executeMealAddition, undoMealAddition, undoExerciseSwap, executeInjuryAdaptation, executeLastingInjury, executeInjuryRecovered, executeEquipmentAdaptation, executeVolumeChange, executeScheduleChange, executeStyleChange, executeConcurrentActivity, executeRestDay, undoRestDay, undoWeekRangeChange, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type LastingInjuryPayload, type InjuryRecoveredPayload, type EquipmentAdaptationPayload, type VolumeChangePayload, type ScheduleChangePayload, type StyleChangePayload, type ConcurrentActivityPayload, type RestDayPayload } from '@/lib/pending-action-executor'
+import { executeExerciseSwap, executeMealSwap, executeMealAddition, undoMealAddition, undoExerciseSwap, executeInjuryAdaptation, executeLastingInjury, executeInjuryRecovered, executeEquipmentAdaptation, executeVolumeChange, executeScheduleChange, executeStyleChange, executeConcurrentActivity, executeRestDay, undoRestDay, undoWeekRangeChange, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type LastingInjuryPayload, type InjuryRecoveredPayload, type EquipmentAdaptationPayload, type VolumeChangePayload, type ScheduleChangePayload, type StyleChangePayload, type ConcurrentActivityPayload, type RestDayPayload, executeSessionMove, undoSessionMove, type SessionMovePayload } from '@/lib/pending-action-executor'
 import { STYLE_OPTIONS } from '@/lib/onboarding-slots'
 import { MOVEMENT_DEMANDS, TIMES_OF_DAY, canonicalDay, activityDays, describeActivity, reorderTracksForClassDays, HEAVY_TRACKS, activityCountsAsLoad, countWorkingSets } from '@/lib/concurrent-activity'
 import { getSplitForDays, generateMesocycle, setRandomSource, resetRandomSource } from '@/lib/exercise-plan'
@@ -41,7 +41,9 @@ import { keepsComposerFocus, refocusComposer } from '@/lib/composer-focus'
 import { TAB_BAR_HEIGHT_PX } from '@/components/BottomTabBar'
 import { useBottomDockHeight } from '@/hooks/useBottomDockHeight'
 import { cn } from '@/lib/utils'
-import { parseWorkoutEntries, type ParsedSetGroup, type WorkoutEntryInput } from '@/lib/set-parse'
+import { parseWorkoutEntries, resolveExerciseName, type ParsedSetGroup, type WorkoutEntryInput } from '@/lib/set-parse'
+import { resolveSwapTarget } from '@/lib/swap-target'
+import { sessionForDate, resolveMoveTarget } from '@/lib/session-move'
 import { executeLogWorkout, type ReplacedSetPreImage } from '@/lib/nl-logging-executor'
 import { normalizeExternalUrl } from '@/lib/chat-links'
 import { buildFirstRunIntro, planShapeFromMesocycle, type FirstRunSessionBrief } from '@/lib/first-run-intro'
@@ -68,7 +70,7 @@ import { FEEL_SCALE, type SessionFeel } from '@/lib/types'
 import { takeChatPrefill } from '@/lib/chat-prefill-store'
 import { loadFeelContext, buildFeelBrief, feelRun, recordSessionFeel, type FeelContext } from '@/lib/session-feel'
 import { useTrainingWeek } from '@/hooks/useTrainingWeek'
-import { pickOpener, missedYesterdayFrom, type Opener } from '@/lib/coach-opener'
+import { pickOpener, missedYesterdayFrom, PLAN_UNKNOWN_TEXT, type Opener } from '@/lib/coach-opener'
 import {
   pickNudge, nudgeKeys, keysCoveredByOpener, loadNudgeStore, saveNudgeStore,
   rememberNudge, rememberWithoutSpeaking, NUDGE_MIN_GAP_MS,
@@ -263,7 +265,12 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
   // answering one ClarificationCard can re-parse and continue rather than
   // losing everything already resolved in that message. Ephemeral by
   // design, same as pendingAction/receipt/clarification on ChatMessage.
-  const parseSessionsRef = useRef<Record<string, { entries: WorkoutEntryInput[]; todaysPlanExerciseNames: string[] }>>({})
+  //
+  // `correctsPrevious` rides along because answering a clarification RESUMES
+  // that turn. Without it the resumed write appended instead of replacing —
+  // so a correction that needed one extra detail silently doubled the
+  // session, which is the exact harm the executor's own comment describes.
+  const parseSessionsRef = useRef<Record<string, { entries: WorkoutEntryInput[]; todaysPlanExerciseNames: string[]; correctsPrevious: boolean }>>({})
 
   // Chat round 2, item 4 — "at most one check-in per conversation" is
   // enforced HERE, not by asking the model to remember it said something.
@@ -306,6 +313,17 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
   }
 
   const initialGreetingDetail = (): string => {
+    // THE PLAN HAS NOT ARRIVED, WHICH IS NOT THE SAME AS A REST DAY. This is
+    // the distinction coach-opener.ts made on 7 Sep and this function did not,
+    // and this is the sentence Ashley actually saw: `exercisePlan` is `[]` on
+    // every cold load (App.tsx:111), so `find` returned undefined, and the
+    // fallback below announced a rest day on a training day, at 0ms, before a
+    // single read had resolved. Measured 8 Sep in .tour-harness/opener-race.mjs.
+    //
+    // An empty plan here NEVER means "no plan": App keeps a trainee without one
+    // in onboarding, so anyone rendering this screen has one.
+    if (exercisePlan.length === 0) return PLAN_UNKNOWN_TEXT
+
     const now = new Date()
     const hour = now.getHours()
     const dayName = now.toLocaleDateString('en-US', { weekday: 'long' })
@@ -375,12 +393,25 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
   // Supabase history fetch below even starts — see chat-cache.ts for why this
   // matters (the DB write for the most recent reply can race a chat-suggested
   // external link's tab backgrounding and never land).
+  // THE SENTENCE THAT WAS SEEDED, REMEMBERED RATHER THAN RECOMPUTED.
+  //
+  // The finalize effect below has to recognise its own untouched opener before
+  // replacing it, and it did that by rebuilding the greeting and comparing.
+  // That comparison is against a MOVING STRING: buildInitialGreeting reads the
+  // plan, so the moment the plan arrives it returns something different from
+  // what is on screen, the effect bails, and its cleanup has already cancelled
+  // the timer that would have finalised. The arrival being waited for is what
+  // killed the wait — measured 8 Sep: with the plan landing at 1.2s the opener
+  // was still reading "it's a rest day on your plan" at 6.8s, and the ONLY
+  // runs that recovered were the ones where the plan missed the 2.5s deadline.
+  const seededGreetingRef = useRef<string | null>(null)
+  if (seededGreetingRef.current === null) seededGreetingRef.current = buildInitialGreeting()
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     const cached = profile.id ? loadChatCache(profile.id) : null
     return cached ?? [
       {
         role: 'assistant',
-        content: buildInitialGreeting(),
+        content: seededGreetingRef.current as string,
         status: 'complete',
       }
     ]
@@ -638,7 +669,15 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
   // opener (the first bubble) and coach-nudge.ts (everything after it) describe
   // the same day in the same words. Two copies of this lookup is exactly how
   // the two mechanisms would start disagreeing about what today is.
-  const todayPlan = liveWeekDays.find(d => d.day === activeSession.dayName && d.exercises.length > 0)
+  // TODAY, WITH MOVES TAKEN INTO ACCOUNT. Same source as the week strip's
+  // arrow and the Exercise tab's banner (trainingWeek.moves), so the three
+  // never disagree about which day holds this session.
+  const todayResolved = sessionForDate({ date: activeSession.date, plan: liveWeekDays, moves: trainingWeek.moves })
+  const todayMovedTo = todayResolved.movedTo
+  const todayMovedFrom = todayResolved.movedFrom
+  const todayPlan = todayMovedTo
+    ? undefined
+    : todayResolved.day && todayResolved.day.exercises.length > 0 ? todayResolved.day : undefined
   const movementsOf = (d: WorkoutDay) => d.exercises.map(e => e.name).slice(0, 3).join(', ') + (d.exercises.length > 3 ? '...' : '')
 
   // The next scheduled session after today, up to six days out. Hoisted for the
@@ -675,6 +714,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         : null,
       missedYesterday,
       planKnown,
+      movedTo: todayMovedTo ? { dayName: todayMovedTo.dayName } : null,
       todaySession: todayPlan ? { focus: todayPlan.focus, movements: movementsOf(todayPlan) } : null,
       todayLogged: activeSession.logs.length > 0,
       tomorrowSession,
@@ -848,7 +888,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
   const openerDeadlineRef = useRef<number | null>(null)
   useEffect(() => {
     if (openerFinalizedRef.current || !historyLoaded || isFirstEverChat == null || messages.length !== 1) return
-    if (messages[0].role !== 'assistant' || messages[0].content !== buildInitialGreeting()) return
+    if (messages[0].role !== 'assistant' || messages[0].content !== seededGreetingRef.current) return
 
     const finalize = () => {
       if (openerFinalizedRef.current) return
@@ -1134,7 +1174,12 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     // fact it needed was in the app; none of it was joined up before being
     // sent. See CoachToday in chat-plan-context.ts.
     const nowForToday = getAppNow(profile.id)
-    const todayRow = liveWeekDays.find(d => d.day === activeSession.dayName)
+    // The plan's own row for today stays the source of the FOCUS NAME even on
+    // a day whose session moved away — the header below says where it went,
+    // and a nameless "a session" would be worse than naming the one she moved.
+    const todayRow = todayMovedFrom
+      ? liveWeekDays.find(d => d.day === todayMovedFrom.dayName)
+      : liveWeekDays.find(d => d.day === activeSession.dayName)
     const upcomingSession = nextSessionAfterToday()
     const exerciseSummary = buildCoachExerciseSummary({
       days: activeWeekData,
@@ -1155,6 +1200,8 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         next: upcomingSession
           ? { dayName: upcomingSession.dayName, focus: upcomingSession.focus, isTomorrow: upcomingSession.isTomorrow }
           : null,
+        movedTo: todayMovedTo ? { dayName: todayMovedTo.dayName } : null,
+        movedFrom: todayMovedFrom ? { dayName: todayMovedFrom.dayName } : null,
       },
     })
 
@@ -1614,6 +1661,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     if (pendingAction.kind === 'propose_style_change') return "Here's your plan in the new style:"
     if (pendingAction.kind === 'propose_concurrent_activity') return "Here's the week built around it:"
     if (pendingAction.kind === 'propose_rest_day') return 'Want me to mark that as a rest day?'
+    if (pendingAction.kind === 'propose_session_move') return 'Want me to move that session?'
     const intentVerb = INTENT_PROPOSAL_VERB[pendingAction.kind]
     if (intentVerb) return `Want me to ${intentVerb} **${rows[0].after}**?`
     const headline = rows[0]
@@ -1639,26 +1687,63 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
    * time) — showing an approximate number pre-confirm risks being wrong
    * in a way "recomputed when applied" never is.
    */
+  /**
+   * @returns the built proposal, or a REASON it could not be built.
+   *
+   * Reasons, not null. This used to return null from five different places —
+   * no day argument, no such day, no such exercise, no such replacement, no
+   * mesocycle — and every one of them surfaced as the single sentence "I
+   * couldn't find that on your current plan", which is the message Ashley kept
+   * getting for exercises that were plainly on it (8 Sep 2026). Resolution now
+   * lives in swap-target.ts, tolerantly, and what comes back says which part
+   * did not resolve.
+   */
   const buildExerciseSwapProposal = (rawArgs: Record<string, unknown>): {
+    ok: true
     scopeKey: string
     preconditions: Record<string, unknown>
     payload: ExerciseSwapPayload
     preImage: MesocycleWeek[]
     diff: import('@/lib/pending-actions-store').ProposalDiff
-  } | null => {
+  } | { ok: false; reason: string } => {
     const dayArg = String(rawArgs.day ?? '')
     const oldItem = String(rawArgs.old_item ?? '')
     const newItem = String(rawArgs.new_item ?? '')
-    if (!dayArg || !oldItem || !newItem || mesocycle.length === 0) return null
+    if (mesocycle.length === 0) return { ok: false, reason: "Your plan hasn't loaded yet — give it a moment and ask me again." }
+    if (!oldItem) return { ok: false, reason: 'Which exercise did you want to change?' }
+    if (!newItem) return { ok: false, reason: `What would you like instead of ${oldItem}?` }
 
     const week = mesocycle.find(w => w.week_number === activeSession.liveWeek)
-    const day = week?.days.find(d => d.day.toLowerCase() === dayArg.toLowerCase())
-    if (!day) return null
-    const exIndex = day.exercises.findIndex(e => e.name.toLowerCase() === oldItem.toLowerCase())
-    if (exIndex === -1) return null
+    if (!week) return { ok: false, reason: "I can't see this week on your plan just now — give it a moment and ask me again." }
+
+    // An absent day means TODAY. "Swap this exercise" names no day at all, and
+    // demanding one was the commonest way into the dead end.
+    const target = resolveSwapTarget({
+      dayArg: dayArg || 'today',
+      exerciseArg: oldItem,
+      days: week.days,
+      todayName: activeSession.dayName,
+    })
+    if (!target.ok) return { ok: false, reason: target.message }
+
+    const day = week.days.find(d => d.day === target.dayName)!
+    const exIndex = target.exIndex
     const oldEx = day.exercises[exIndex]
-    const newEntry = getExerciseEntry(newItem)
-    if (!newEntry) return null
+
+    // The REPLACEMENT gets the same tolerance: "Lateral Raise" for "Lateral
+    // Raises" was a dead end too. resolveExerciseName is the resolver the set
+    // parser already uses, so the chat means the same thing by a name however
+    // it arrives.
+    const newResolved = resolveExerciseName(newItem, day.exercises.map(e => e.name))
+    const newEntry = newResolved.resolution === 'resolved' ? getExerciseEntry(newResolved.exerciseName) : undefined
+    if (!newEntry) {
+      return {
+        ok: false,
+        reason: newResolved.resolution === 'ambiguous'
+          ? `Did you mean ${newResolved.candidates.slice(0, 3).map(c => c.name).join(', ')}?`
+          : `I don't have "${newItem}" in the exercise library — try another name for it.`,
+      }
+    }
 
     const scope: SwapScope = rawArgs.scope === 'permanent' ? 'permanent' : 'today'
     const payload: ExerciseSwapPayload = {
@@ -1671,6 +1756,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     }
 
     return {
+      ok: true,
       scopeKey: `${profile.id}:propose_exercise_swap:${day.day}:${exIndex}`,
       preconditions: { day: day.day, exIndex, currentExerciseName: oldEx.name },
       payload,
@@ -2024,6 +2110,85 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         implications: [
           { severity: 'info', text: "It won't count as a missed session, and it won't count against your week." },
           { severity: 'info', text: 'The session itself stays on the plan — this marks the day, it does not delete the work.' },
+        ],
+        rationale: reason,
+        reversible: true,
+      },
+    }
+  }
+
+  /**
+   * Builds propose_session_move's card — "I'll do it tomorrow".
+   *
+   * THE SERVER NEVER PICKS THE DAY. It reports the two dates the user
+   * described; where the session may actually land is resolved HERE, against
+   * the live plan, by session-move.ts — the same discipline
+   * buildRestDayProposal states for itself, and the reason a model that has
+   * seen a stale plan cannot put two sessions on one day.
+   *
+   * Returns the refusal text rather than a bare null, because every one of
+   * these has a different answer and "I couldn't do that" for all four is the
+   * catch-all this repo spent roadmap item 6 removing.
+   */
+  const buildSessionMoveProposal = (rawArgs: Record<string, unknown>): {
+    ok: true
+    scopeKey: string
+    preconditions: Record<string, unknown>
+    payload: SessionMovePayload
+    diff: import('@/lib/pending-actions-store').ProposalDiff
+  } | { ok: false; reason: string } => {
+    const iso = (v: unknown) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null)
+    const fromDate = iso(rawArgs.from_date) ?? activeSession.date
+    const requestedDate = iso(rawArgs.to_date)
+
+    const target = resolveMoveTarget({
+      fromDate,
+      requestedDate,
+      todayDate: activeSession.date,
+      plan: liveWeekDays,
+      // The mesocycle week a date falls in, from the same function every
+      // other surface uses — so "the same week" means one thing in this app.
+      weekOf: (d: string) => getActiveMesocycleWeek(
+        planCreatedAt ?? profile.created_at,
+        new Date(`${d}T12:00:00`),
+        mesocycle.length > 0 ? mesocycle.length : 4,
+      ),
+      existing: trainingWeek.moves,
+    })
+    if (!target.ok) return { ok: false, reason: target.message }
+
+    const fromDayName = new Date(`${fromDate}T12:00:00`).toLocaleDateString('en-US', { weekday: 'long' })
+    const session = liveWeekDays.find(d => d.day === fromDayName)
+    if (!session || session.exercises.length === 0) {
+      return { ok: false, reason: `There's no session on ${fromDayName} to move.` }
+    }
+
+    const reason = typeof rawArgs.reason === 'string' && rawArgs.reason.trim() ? rawArgs.reason.trim() : undefined
+    const payload: SessionMovePayload = {
+      fromDate,
+      toDate: target.date,
+      fromDayName,
+      toDayName: target.dayName,
+      sessionFocus: session.focus,
+      ...(target.asWanted ? {} : { requestedDayName: target.requestedDayName }),
+      reason,
+    }
+    return {
+      ok: true,
+      scopeKey: `${profile.id}:propose_session_move:${fromDate}:${target.date}`,
+      preconditions: { fromDate, toDate: target.date },
+      payload,
+      diff: {
+        rows: [
+          { field: fromDayName, before: session.focus, after: `Moved to ${target.dayName}` },
+          { field: target.dayName, before: 'Nothing scheduled', after: session.focus },
+        ],
+        implications: [
+          ...(target.asWanted || !target.requestedDayName
+            ? []
+            : [{ severity: 'info' as const, text: `${target.requestedDayName} already has a session on it, so this goes to ${target.dayName} — the next day that's free.` }]),
+          { severity: 'info' as const, text: `${fromDayName} won't count as a missed session, and your week still owes the same number of sessions.` },
+          { severity: 'info' as const, text: 'The plan itself is unchanged — this moves one session, this week only.' },
         ],
         rationale: reason,
         reversible: true,
@@ -2765,7 +2930,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       const idx = parsed.groups.findIndex((g: ParsedSetGroup) => g.resolution === 'ambiguous' || !!g.ambiguity)
       const group = parsed.groups[idx]
       const resolverId = `parse_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
-      parseSessionsRef.current[resolverId] = { entries, todaysPlanExerciseNames }
+      parseSessionsRef.current[resolverId] = { entries, todaysPlanExerciseNames, correctsPrevious }
 
       const prompt = group.resolution === 'ambiguous'
         ? `Which "${group.matchedRawPhrase}" did you mean?`
@@ -2773,7 +2938,18 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       const options = group.resolution === 'ambiguous' && group.ambiguousCandidates
         ? group.ambiguousCandidates.map(c => ({ label: c.name, value: c.name }))
         : []
-      return { text: prompt, clarification: { prompt, options, resolverId } }
+      // A QUESTION WITH NO WAY TO ANSWER IT IS THE LOOP. Only the pick-one
+      // exercise-name case has buttons; a weight or a sets×reps is a number
+      // the trainee has to type, and before 8 Sep 2026 there was nowhere on
+      // the card to type it — so the answer went back through the model as a
+      // fresh turn, arrived here without the half-parsed entry it belonged
+      // to, and was asked for again.
+      const answerPlaceholder = options.length > 0
+        ? undefined
+        : group.ambiguity?.field === 'weight' ? 'e.g. 60kg'
+        : group.ambiguity?.field === 'sets_x_reps' ? 'e.g. 3x8'
+        : 'Your answer'
+      return { text: prompt, clarification: { prompt, options, answerPlaceholder, resolverId } }
     }
 
     const todaysPlanSetCounts = new Map((todaysWorkout?.exercises ?? []).map(e => [e.name, e.sets] as const))
@@ -2845,9 +3021,18 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     const priorParse = parseWorkoutEntries({ entries: session.entries, todaysPlanExerciseNames: session.todaysPlanExerciseNames })
     const idx = priorParse.groups.findIndex((g: ParsedSetGroup) => g.resolution === 'ambiguous' || !!g.ambiguity)
     if (idx === -1) return
-    const updatedEntries = session.entries.map((e, i) => (i === idx ? { ...e, exercisePhrase: value } : e))
+    // WHERE THE ANSWER GOES DEPENDS ON WHAT WAS ASKED. A name replaces the
+    // exercise phrase; a weight or a sets×reps is ADDED to the sets phrase,
+    // because everything already in there is still true — the whole point of
+    // resuming a parse rather than starting a new one.
+    const field = priorParse.groups[idx].resolution === 'ambiguous' ? 'exercise_name' : priorParse.groups[idx].ambiguity?.field
+    const updatedEntries = session.entries.map((e, i) => {
+      if (i !== idx) return e
+      if (field === 'exercise_name') return { ...e, exercisePhrase: value }
+      return { ...e, setsPhrase: `${e.setsPhrase} ${value}`.trim(), rawText: `${e.rawText} ${value}`.trim() }
+    })
 
-    const outcome = resolveAndMaybeLog(updatedEntries)
+    const outcome = resolveAndMaybeLog(updatedEntries, session.correctsPrevious)
     setMessages(prev => prev.map((m, i) => (i === msgIndex ? { ...m, clarification: outcome.clarification, receipt: outcome.receipt, content: outcome.text } : m)))
   }
 
@@ -3024,7 +3209,8 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         }
       } else if (result.proposal.kind === 'propose_exercise_swap' && result.proposal.rawArgs) {
         const swap = buildExerciseSwapProposal(result.proposal.rawArgs)
-        if (swap) built = { scopeKey: swap.scopeKey, preconditions: swap.preconditions, payload: swap.payload as unknown as Record<string, unknown>, preImage: swap.preImage, diff: swap.diff }
+        if (swap.ok) built = { scopeKey: swap.scopeKey, preconditions: swap.preconditions, payload: swap.payload as unknown as Record<string, unknown>, preImage: swap.preImage, diff: swap.diff }
+        else refusal = swap.reason
       } else if (result.proposal.kind === 'propose_injury_adaptation' && result.proposal.rawArgs) {
         const adaptation = await buildInjuryAdaptationProposal(result.proposal.rawArgs)
         if (adaptation) built = { scopeKey: adaptation.scopeKey, preconditions: adaptation.preconditions, payload: adaptation.payload as unknown as Record<string, unknown>, preImage: adaptation.preImage, diff: adaptation.diff }
@@ -3083,6 +3269,10 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         const rest = buildRestDayProposal(result.proposal.rawArgs)
         if (rest) built = { scopeKey: rest.scopeKey, preconditions: rest.preconditions, payload: rest.payload as unknown as Record<string, unknown>, diff: rest.diff }
         else refusal = "There's no session on that day to rest from — it's already a rest day on your plan."
+      } else if (result.proposal.kind === 'propose_session_move' && result.proposal.rawArgs) {
+        const move = buildSessionMoveProposal(result.proposal.rawArgs)
+        if (move.ok) built = { scopeKey: move.scopeKey, preconditions: move.preconditions, payload: move.payload as unknown as Record<string, unknown>, diff: move.diff }
+        else refusal = move.reason
       } else if (APPEND_PROPOSAL_KINDS.has(result.proposal.kind) && result.proposal.rawArgs) {
         // Structural fix: record_fact/record_goal/add_to_grocery_list/
         // check_off_grocery_item/log_water now arrive here too whenever
@@ -3385,7 +3575,14 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     }
     if (clearArmTimer.current) clearTimeout(clearArmTimer.current)
     setClearArmed(false)
-    setMessages([{ role: 'assistant', content: buildInitialGreeting(), status: 'complete' }])
+    // Re-seeded, so the ref that identifies the untouched opener follows it —
+    // and the finalize gate is re-armed, because clearing puts the conversation
+    // back in exactly the state that gate exists for.
+    const greeting = buildInitialGreeting()
+    seededGreetingRef.current = greeting
+    openerFinalizedRef.current = false
+    openerDeadlineRef.current = null
+    setMessages([{ role: 'assistant', content: greeting, status: 'complete' }])
     setHasMoreMessages(false)
     setQuickRepliesDismissed(false)
     setLastFailedInput(null)
@@ -3762,6 +3959,17 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       // touch the plan, so there is nothing to restore beyond clearing the
       // flag — which is exactly what undoRestDay does.
       onLogsUpdated?.()
+    } else if (row.kind === 'propose_session_move') {
+      const payload = row.payload as unknown as SessionMovePayload
+      const result = await executeSessionMove(profile, payload)
+      receipt = result.receipt
+      const ok = receipt.failed.length === 0
+      title = ok ? 'Session moved' : "Couldn't move that session"
+      rows = ok ? receipt.landed.map(line => ({ label: payload.toDayName, detail: line })) : []
+      undoToken = ok ? row.id : undefined
+      // Same shape as the rest day above: this marks a DAY, it does not touch
+      // the plan, so undo is clearing one column and nothing needs restoring.
+      onLogsUpdated?.()
     } else if (APPEND_PROPOSAL_KINDS.has(row.kind)) {
       // Structural fix: the confirm side of buildIntentProposal — reuses
       // the SAME resolveAndSaveMemory/Grocery/Water functions the direct
@@ -3981,6 +4189,9 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         }
       } else if (row.kind === 'propose_rest_day') {
         await undoRestDay(profile.id, row.payload as unknown as RestDayPayload)
+        onLogsUpdated?.()
+      } else if (row.kind === 'propose_session_move') {
+        await undoSessionMove(profile.id, row.payload as unknown as SessionMovePayload)
         onLogsUpdated?.()
       } else if (row.kind === 'propose_meal_swap') {
         const payload = row.payload as unknown as MealSwapPayload
@@ -4240,6 +4451,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
                         contextLines={msg.clarification.contextLines}
                         prompt={msg.clarification.prompt}
                         options={msg.clarification.options}
+                        answerPlaceholder={msg.clarification.answerPlaceholder}
                         onChoose={async value => {
                           if (navigator.vibrate) navigator.vibrate(10)
                           await handleClarificationChoice(i, value)

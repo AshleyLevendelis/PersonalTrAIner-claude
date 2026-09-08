@@ -313,12 +313,98 @@ function sumMacros(events: MealEventRecord[]): MealMacros {
   )
 }
 
+// ---------------------------------------------------------------------------
+// THE SERVER HALF, REMEMBERED — so a number that is already known does not
+// wait on a round trip to be shown.
+//
+// Ashley, 8 Sep 2026: "tapping Log this meal doesn't update the daily calorie
+// counter without an app reload." The WRITE was already local-first and
+// instant. The READ was not: getTodayLedger begins with an await on a
+// meal_events select and only merges the pending queue after it resolves, so
+// every screen showing today's calories sat on its old figure until the
+// network answered. Measured in the harness at ?slow=5000: the tap logged the
+// meal locally in the same tick and the counter stayed on 0 for five full
+// seconds. On a phone whose request hangs rather than fails — a wifi-to-cell
+// handover — that wait has no end, which is the "requires an app reload" she
+// saw.
+//
+// So the server's rows for a day are kept here after each successful read,
+// and getLedgerSnapshot recomputes the totals from them plus the pending
+// queue with NO network at all. Every write notifies, every listener can then
+// have the new number synchronously, and the authoritative re-read still runs
+// behind it and corrects anything it needs to.
+//
+// NULL UNTIL THE SERVER HAS ACTUALLY ANSWERED ONCE, and that is the whole
+// honesty of it: a cache that answered "you have eaten nothing" before it had
+// ever heard from the server would be inventing a fact about someone's day.
+// A failed read leaves the cache untouched rather than writing an empty one.
+// ---------------------------------------------------------------------------
+
+/** Server rows per `profileId|date`, from the last successful getTodayLedger. */
+const serverEventCache = new Map<string, MealEventRecord[]>()
+/** Bounded so a long-lived session that walks the history does not grow forever. */
+const MAX_CACHED_DAYS = 14
+/**
+ * Events voided since the last server read.
+ *
+ * An undo of an ALREADY-SYNCED event does not touch the pending queue, so
+ * without this the snapshot would go on counting a meal the user has just
+ * removed. Cleared wholesale by the next successful server read, deliberately:
+ * that read filters `voided_at IS NULL`, so its answer is the truth about
+ * every id at once — including a void that failed, which must put the meal
+ * back on screen (see voidMealEvent).
+ */
+const locallyVoided = new Set<string>()
+
+function cacheKey(profileId: string, date: string): string {
+  return `${profileId}|${date}`
+}
+
+/** The one merge. Both the async read and the synchronous snapshot go through it so they cannot drift apart. */
+function mergeEvents(serverEvents: MealEventRecord[], profileId: string, date: string): MealEventRecord[] {
+  const seen = new Set(serverEvents.map(e => e.clientId))
+  const localOnly = loadPending().filter(e => e.profileId === profileId && e.date === date && !seen.has(e.clientId))
+  return [...serverEvents, ...localOnly]
+    .filter(e => !locallyVoided.has(e.clientId))
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+}
+
+function eatenFrom(events: MealEventRecord[]): MealMacros {
+  return sumMacros(events.filter(e => e.eventType === 'confirmed' || e.eventType === 'swapped_in' || e.eventType === 'extra'))
+}
+
+/** What a screen can know about today without asking the network. */
+export interface LedgerSnapshot {
+  eaten: MealMacros
+  events: MealEventRecord[]
+}
+
+/**
+ * Today's eaten totals, computed with no network, or null when the server's
+ * half of the day has never been read in this session.
+ *
+ * No `targets` and so no `remaining`: a caller that needs the remaining
+ * arithmetic has a target to hand and can use getTodayLedger. Asking this
+ * function for one would mean inventing a target shape for callers that only
+ * want the eaten figure — which is how a zeroed placeholder ends up rendered
+ * as somebody's calorie goal.
+ */
+export function getLedgerSnapshot(profileId: string, date: string): LedgerSnapshot | null {
+  const serverEvents = serverEventCache.get(cacheKey(profileId, date))
+  if (!serverEvents) return null
+  const events = mergeEvents(serverEvents, profileId, date)
+  return { eaten: eatenFrom(events), events }
+}
+
 /**
  * The "remaining today" arithmetic: targets − Σ(eaten events). Local-first
  * read — merges the server's rows for the day with anything still in the
  * pending queue (deduped by client_id), so an event shows in the ledger the
  * instant it's recorded, airplane mode included. Negative remaining is
  * honest overshoot, never clamped.
+ *
+ * Also fills the snapshot cache above, which is what lets the next write move
+ * the number on screen without coming back here.
  */
 export async function getTodayLedger(
   profileId: string,
@@ -345,16 +431,24 @@ export async function getTodayLedger(
       clientId: row.client_id ?? `server_${row.created_at}`,
       createdAt: row.created_at,
     }))
+    // The server has spoken, so remember what it said — and drop every local
+    // void, since this answer already reflects the ones that landed and
+    // correctly still carries the ones that did not.
+    serverEventCache.set(cacheKey(profileId, date), serverEvents)
+    locallyVoided.clear()
+    if (serverEventCache.size > MAX_CACHED_DAYS) {
+      const oldest = serverEventCache.keys().next().value
+      if (oldest !== undefined) serverEventCache.delete(oldest)
+    }
   } catch {
-    // Offline — the pending queue below is still the truth for today.
+    // Offline — the pending queue below is still the truth for today, and the
+    // cache is LEFT ALONE. Writing an empty server half here would let
+    // getLedgerSnapshot start answering "nothing eaten" off a read that never
+    // happened.
   }
 
-  const seen = new Set(serverEvents.map(e => e.clientId))
-  const localOnly = loadPending().filter(e => e.profileId === profileId && e.date === date && !seen.has(e.clientId))
-  const events = [...serverEvents, ...localOnly].sort((a, b) => a.createdAt.localeCompare(b.createdAt))
-
-  const eatenEvents = events.filter(e => e.eventType === 'confirmed' || e.eventType === 'swapped_in' || e.eventType === 'extra')
-  const eaten = sumMacros(eatenEvents)
+  const events = mergeEvents(serverEvents, profileId, date)
+  const eaten = eatenFrom(events)
   const remaining: MealMacros = {
     kcal: targets.calories - eaten.kcal,
     protein: targets.protein - eaten.protein,
@@ -588,6 +682,12 @@ export async function voidMealEvent(clientId: string): Promise<boolean> {
   const pending = loadPending()
   const wasPendingOnly = pending.some(e => e.clientId === clientId)
   savePending(pending.filter(e => e.clientId !== clientId))
+  // A synced event is not in the queue, so dropping it there removes nothing
+  // and the snapshot would go on counting it for as long as the UPDATE below
+  // takes. Marked here instead, and cleared by the next successful server
+  // read — which is also what puts the meal BACK if the void did not land.
+  locallyVoided.add(clientId)
+  notifyListeners()
   const { error } = await supabase.from('meal_events').update({ voided_at: new Date().toISOString() }).eq('client_id', clientId)
   notifyListeners()
   // RETURNED, NOT SWALLOWED. Until 5 Sep 2026 this error went nowhere: the

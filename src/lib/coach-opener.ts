@@ -30,6 +30,7 @@ export type OpenerKind =
   | 'training_done_today'
   | 'training_today'
   | 'rest_day'
+  | 'session_moved'
   | 'plan_unknown'
 
 export interface OpenerSession {
@@ -64,6 +65,16 @@ export interface OpenerInput {
   planKnown: boolean
   /** Today's session from the LIVE week. Null on a rest day OR when planKnown is false — check that first. */
   todaySession: OpenerSession | null
+  /**
+   * Set when today's session has been MOVED to another day ("I'll do it
+   * tomorrow"), with the day it went to.
+   *
+   * A THIRD reason todaySession can be null, and the opener has to tell it
+   * apart from the other two for the same reason planKnown exists: "it's a
+   * rest day on your plan" is a claim, and on a day she moved herself it is a
+   * false one. Ranked above the rest-day fallback below.
+   */
+  movedTo?: { dayName: string } | null
   /** Any set logged today — so a fresh chat mid-session is not asked "feeling good for it?". */
   todayLogged: boolean
   /** The next scheduled session after today, from the live week, or null. */
@@ -84,8 +95,21 @@ export interface Opener {
   attention: boolean
 }
 
+/**
+ * WHAT THE COACH SAYS WHEN IT DOES NOT KNOW WHAT TODAY HOLDS.
+ *
+ * Exported because there are TWO first bubbles, not one, and until 8 Sep 2026
+ * only this one knew the difference. ChatAssistant seeds a synchronous
+ * greeting into `useState` before any read has resolved, and that greeting
+ * composed its own sentence from an `exercisePlan` that is `[]` on every cold
+ * load (App.tsx:111) — so it said "it's a rest day on your plan" while this
+ * module was carefully not saying it. Same screen, same second, opposite
+ * conclusions. One string now, read by both.
+ */
+export const PLAN_UNKNOWN_TEXT = `how's it going?`
+
 export function pickOpener(input: OpenerInput): Opener {
-  const { hour, cutoffHour, awaitingFeel, missedYesterday, planKnown, todaySession, todayLogged, tomorrowSession } = input
+  const { hour, cutoffHour, awaitingFeel, missedYesterday, planKnown, todaySession, todayLogged, tomorrowSession, movedTo } = input
 
   // 1. A finished session nobody has asked about. Outranks everything: it is
   //    the one signal the research says predicts whether they come back, and
@@ -139,9 +163,26 @@ export function pickOpener(input: OpenerInput): Opener {
   if (!planKnown) {
     return {
       kind: 'plan_unknown',
-      text: `how's it going?`,
+      text: PLAN_UNKNOWN_TEXT,
       chips: [
         "What's on for today?",
+        'How am I doing so far?',
+      ],
+      attention: false,
+    }
+  }
+
+  // 3b. TODAY'S SESSION IS ON ANOTHER DAY, because she said so. Above every
+  //     claim about today below it, and below plan_unknown because a move is
+  //     a fact about a plan we have. Without this the opener falls through to
+  //     the rest-day line, which is the same false claim step 7 removed —
+  //     "it's a rest day on your plan" on a day she rescheduled herself.
+  if (movedTo) {
+    return {
+      kind: 'session_moved',
+      text: `today's session is on ${movedTo.dayName} now. Anything you want to sort out before then?`,
+      chips: [
+        `What's on ${movedTo.dayName}?`,
         'How am I doing so far?',
       ],
       attention: false,
