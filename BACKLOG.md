@@ -2,6 +2,60 @@
 
 Newest first. One line each.
 
+- [x] **A MOVED SESSION LEAVES TODAY, THE COACH SAYS SO, AND TODAY'S MARKER
+  MOVES** — Ashley, 8 Sep 2026, 22:16, her first test of the moved-session
+  work on her phone: *"it didnt move my workout. and it doesnt give me any
+  sort of message it just gives a straight up swap confirmation."* Both true,
+  and a third thing beside them.
+  **(1) The session did not leave.** I had built the origin day to keep the
+  full session on screen under a banner ("It's still here if you want it
+  today"), copying the swapped-day precedent. `session-move.ts` already
+  blanked the origin (`day: null`) and the hook passed that through; one `??`
+  in `TodayPanel.tsx` turned the deliberate null back into the plan's row, and
+  Home did the same in `dashboard-data.ts`. She read it as "nothing happened",
+  which is what it looked like. Now the day a session LEFT shows a
+  `MovedDayCard` — "Push & Press → Wednesday · Moved to Wednesday. Nothing
+  owed here today", the week tally, tomorrow (resolved through the hook, so a
+  move onto tomorrow previews there), the activity log — and nothing of the
+  session: no list, no Start, no "Train it anyway". Home says "Moved to
+  Wednesday" with nothing to start (new status `'moved'`, ahead of rest).
+  **The one way back, "Do it today instead", UNMAKES the move** rather than
+  borrowing: with the move still recorded, training today would earn Tuesday
+  its tick (logged work outranks 'moved') while Wednesday still showed the
+  session as moved in — owed twice. Same write as the chat's Undo, then the
+  same re-reads. Decided unprompted; mechanical.
+  **(2) No message with the card.** Proposal turns render only client copy
+  (D1 — the model's prose is discarded on any proposal turn, after the
+  "Schedule updated" incident), and for a move that copy was the eleven-word
+  constant "Want me to move that session?". D1 stays: the sentence is written
+  by `buildSessionMoveProposal`, the only code that knows the day the move
+  lands on, and rides on the diff as `lead` — *"Wednesday's free, so I'll put
+  Tuesday's Push & Press there and Tuesday won't count as missed. Shall I?"*,
+  or, re-routed, *"Wednesday already has a session, so the next free day is
+  Thursday — …"*. Always a question; the gate refuses *moved / done / is now*.
+  The rest-day card got the same line. Kinds without a lead fall back to
+  today's text, never to nothing.
+  **(3) "Still not moving markers."** `HomeWeekStrip.tsx` drew a plain dot
+  for TODAY whatever its state, so a day swapped, moved or finished today
+  could never show ⇄ → ✓ on the first screen she opens; Exercise's strip
+  already had the right rule (`isToday && due ? dot : glyph`). The shared
+  glyph file existed to stop the two strips drifting and they had drifted on
+  the one cell that matters on the day. Same rule now, both strips. And the
+  Exercise tab and the chat read the week with no refresh token, so a move
+  confirmed in the chat did not reach the panel until a remount and the
+  chat's own list of moves went stale for its next proposal — `logsVersion`
+  now reaches every reader, pinned by a call-site check.
+  Gates: new `test:home-week-strip` (21 checks, rendered through React, not
+  regexed off JSX); `test:session-move` re-anchored off the three lines that
+  changed and extended to 12 sections (Home from the aggregator itself with a
+  move: `'moved'`, names what left, tomorrow's line is that session); 10
+  mutations, all caught. Browser: `verify:session-move` inverts its old
+  check 4 ("the session itself is still there") and now taps "Do it today
+  instead" and sees the ordinary day come back; `verify:swapped-day` reads ⇄
+  off Home's today cell. Its old exercise-list detector matched "the main
+  lifts" in the week note on a screen with no list — replaced with a
+  leaf-element check. **Frontend only; live on the next merge.**
+
 - [x] **A QUESTION MUST NOT PRODUCE A CARD** — Ashley, live from her phone,
   8 Sep 2026, three turns before Muay Thai. She asked *"Im going to muay thai
   tonight. What should I eat before hand to give me energy?"* and got

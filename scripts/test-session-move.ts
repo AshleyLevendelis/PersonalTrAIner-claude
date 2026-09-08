@@ -227,21 +227,67 @@ check('...and one failing read cannot blank the whole strip',
   /getSessionMovesInRange\(profileId, from, to\)\.catch\(/.test(hook))
 check('...and hands the moves to classifyDay', /classifyDay\([^)]*, moves\)/.test(hook))
 
+// A MOVED SESSION LEAVES TODAY. The first version kept it on screen under a
+// banner with "It's still here if you want it today", copying the swapped
+// day. Ashley, 8 Sep 2026, on her phone: "it didnt move my workout." The
+// resolver already blanks the origin (§8); what these pin is that neither
+// screen puts the session back.
 const panel = strip(src('src/components/exercise/TodayPanel.tsx'))
-check('the Exercise tab takes today from the same hook, not its own plan lookup',
-  /const workout = \(todayCell\?\.session \?\? undefined\) \?\?/.test(panel))
-check('...and a moved-away day keeps an honest button rather than "Start workout"',
-  /swappedToday \|\| movedAwayTo \? 'Train it anyway' : 'Start workout'/.test(panel))
-check('...and says where the session went',
-  /data-testid="moved-away"[\s\S]{0,240}You moved today&apos;s session to/.test(panel))
+check('the Exercise tab blanks a moved-away day rather than re-reading the plan',
+  /const workout = todayCell\?\.movedTo\s*\?\s*undefined\s*:/.test(panel))
+check('...and still takes an ordinary day from the same hook, not its own plan lookup',
+  /\(todayCell\?\.session \?\? undefined\) \?\? liveWeekPlan\.find/.test(panel))
+const movedBranchAt = panel.indexOf('isMovedAway && movedAwayTo ? (')
+const restBranchAt = panel.indexOf('isRestDay ? (')
+check('a moved day has its own branch, ahead of the rest-day one — it is not a rest day',
+  movedBranchAt >= 0 && restBranchAt > movedBranchAt, { movedBranchAt, restBranchAt })
+const movedBranch = panel.slice(Math.max(0, movedBranchAt), Math.max(0, restBranchAt))
+check('...which shows the moved-day card', /<MovedDayCard/.test(movedBranch))
+check('...and none of the session', movedBranch.length > 0 && !/ExerciseRow|SupersetGroup|WarmupSection|startSession/.test(movedBranch))
+check('...and no Start button at all: the CTA keeps its rest-day guard and the label no longer names a move',
+  /!isRestDay && !isActiveRecovery && workout && status === 'idle'/.test(panel) && !/movedAwayTo \? 'Train it anyway'/.test(panel))
+check('the way back UNMAKES the move, with the write the chat\'s Undo uses',
+  /await setSessionMove\(profileId, today, null\)/.test(panel))
+check('...and then re-reads the week and tells the app',
+  /weekTrain\.refresh\(\); onLogsUpdated\?\.\(\)/.test(panel))
+check('...and the panel re-reads when the CHAT writes a move — the refresh token reaches it',
+  /useTrainingWeek\(profileId, today, liveWeekPlan, planCreatedAt, logsVersion\)/.test(panel))
+check('tomorrow is previewed through the hook, so a move onto tomorrow shows there',
+  /const tomorrowCell = weekTrain\.days\.find\(d => d\.dayName === tomorrowName\)/.test(panel))
 check('...and says where an arriving one came from',
   /data-testid="moved-in"[\s\S]{0,240}s session, moved here\./.test(panel))
+check('the old "still here if you want it today" is gone', !/still here if you want it today/.test(panel))
+
+const card = strip(src('src/components/exercise/RestDayCard.tsx'))
+check('the moved-day card names the session and the day it went to',
+  /data-testid="moved-away"[\s\S]{0,160}→ \{toDayName\}/.test(card))
+check('...says nothing is owed today, so the empty screen reads as a fact rather than a bug',
+  /Nothing owed here today/.test(card))
+check('...offers the way back', /Do it today instead/.test(card))
+check('...and a failed write says the session is still where it was',
+  /still on \{toDayName\}/.test(card))
 
 const home = strip(src('src/lib/dashboard-data.ts'))
 check('Home resolves today through the same module',
   /const todayResolved = sessionForDate\(\{ date: todayStr, plan: activeWeekDays, moves \}\)/.test(home))
 check('...and tomorrow too, so a move onto tomorrow is not announced as rest',
   /const tomorrowResolved = sessionForDate\(\{ date: tomorrowStr, plan: exercisePlan, moves \}\)/.test(home))
+check('...and blanks a moved-away day rather than re-reading the plan',
+  /const todayWorkoutDay = todayResolved\.movedTo \? undefined :/.test(home))
+check('...with its own status, ahead of rest',
+  home.indexOf("status: 'moved'") >= 0 && home.indexOf("status: 'moved'") < home.indexOf("status: 'rest'"))
+
+const homeUi = strip(src('src/components/Dashboard.tsx'))
+const movedUiAt = homeUi.indexOf("data.session.status === 'moved'")
+const restUiAt = homeUi.indexOf("data.session.status === 'rest' ?")
+check('Home has a moved branch, ahead of the rest-day one',
+  movedUiAt >= 0 && restUiAt > movedUiAt, { movedUiAt, restUiAt })
+const movedUi = homeUi.slice(Math.max(0, movedUiAt), Math.max(0, restUiAt))
+check('...that says where the session went', /Moved to \{data\.session\.movedTo\.dayName\}/.test(movedUi))
+check('...and names what left', /data\.session\.focus/.test(movedUi))
+check('...and offers nothing to start', movedUi.length > 0 && !/Start session|Continue session/.test(movedUi))
+check('...and the old "still here if you want it today" is gone from Home too',
+  !/still here if you want it today/.test(homeUi))
 
 const opener = strip(src('src/lib/coach-opener.ts'))
 check('the opener has a branch for a moved session',
@@ -272,12 +318,89 @@ check('...and a refusal says which of the four things went wrong',
   /else refusal = move\.reason/.test(chat))
 check('the confirm branch writes the move', /await executeSessionMove\(profile, payload\)/.test(chat))
 check('...and undo clears it', /await undoSessionMove\(profile\.id, row\.payload/.test(chat))
+check('the chat\'s own week re-reads after a write, so a second move cannot land on the day the first just filled',
+  /useTrainingWeek\(profile\.id, activeSession\.date, liveWeekDays, planCreatedAt \?\? profile\.created_at, dataVersion \+ ownWriteVersion\)/.test(chat))
+
+// ---------------------------------------------------------------------------
+console.log('\n[11] The coach says something with the card')
+// ---------------------------------------------------------------------------
+// Ashley, 8 Sep 2026, on a move card under the eleven-word constant "Want me
+// to move that session?": "it doesnt give me any sort of message it just
+// gives a straight up swap confirmation." The bubble stays client-authored
+// (D1 — the model never writes it), but the code that resolved the day now
+// writes a sentence that names it.
+check('the bubble above a card prefers the builder\'s own sentence',
+  /if \(pendingAction\.diff\.lead\) return pendingAction\.diff\.lead/.test(chat))
+check('...and still has the per-kind fallback, so a builder without one degrades to today, never to nothing',
+  /return 'Want me to move that session\?'/.test(chat))
+const moveBuilderAt = chat.indexOf('const buildSessionMoveProposal')
+const moveBuilderEnd = chat.indexOf('\n  const build', moveBuilderAt + 10)
+const moveBuilder = chat.slice(moveBuilderAt, moveBuilderEnd > moveBuilderAt ? moveBuilderEnd : undefined)
+const leads = [...moveBuilder.matchAll(/`([^`]*Shall I\?)`/g)].map(m => m[1])
+check('the move card carries a lead for the day she asked for AND for the re-route', leads.length === 2, leads)
+for (const lead of leads) {
+  check(`"${lead.slice(0, 44)}…" names the landing day, the origin day and the session`,
+    /\$\{target\.dayName\}/.test(lead) && /\$\{fromDayName\}/.test(lead) && /\$\{session\.focus\}/.test(lead), lead)
+  check('...says the origin will not count as missed — her ruling, said out loud',
+    /won't count as missed/.test(lead), lead)
+  check('...and is a question that claims nothing has happened yet',
+    /\?$/.test(lead) && !/\b(moved|has been|is now|done)\b/.test(lead), lead)
+}
+check('the re-routed lead says why the day changed',
+  leads.some(l => /\$\{target\.requestedDayName\} already has a session/.test(l)), leads)
+check('the rest-day card got the same treatment',
+  /lead: `I'll mark \$\{dayName\} as a rest day you chose, so it won't show as missed\. Shall I\?`/.test(chat))
+const store = strip(src('src/lib/pending-actions-store.ts'))
+check('the lead rides on the diff, optional, so older rows still render', /lead\?: string/.test(store))
 
 const exec = strip(src('src/lib/pending-action-executor.ts'))
 check('the write is reported honestly — a failed save is not a moved session',
   /if \(!ok\) \{[\s\S]{0,200}Couldn't move that session/.test(exec))
 check('undo clears the column rather than writing a second fact',
   /await setSessionMove\(profileId, payload\.fromDate, null\)/.test(exec))
+
+// ---------------------------------------------------------------------------
+console.log('\n[12] Home, from the aggregator itself — a moved day is moved, not rest')
+// ---------------------------------------------------------------------------
+// The same nothing-answering client test-plan-unknown uses: what today IS is
+// decided by the plan and the moves, not by any store this reads.
+function fakeFrom(_table: string) {
+  const api: Record<string, unknown> = {
+    select: () => api, eq: () => api, gte: () => api, lte: () => api, lt: () => api,
+    gt: () => api, in: () => api, order: () => api, limit: () => api, not: () => api,
+    maybeSingle: async () => ({ data: null, error: null }),
+    single: async () => ({ data: null, error: null }),
+    then: (resolve: (v: unknown) => void) => Promise.resolve().then(() => resolve({ data: [], error: null })),
+  }
+  return api
+}
+const { setSupabaseClient } = await import('../src/lib/supabase')
+setSupabaseClient({ from: fakeFrom } as never)
+const { loadDashboardData } = await import('../src/lib/dashboard-data')
+const homeProfile = {
+  id: '00000000-0000-4000-8000-000000000001',
+  age: 30, gender: 'male', height_cm: 178, weight_kg: 80, activity_level: 'moderate',
+  primary_goal: 'strength', goal: 'strength', equipment_access: 'full_gym', injuries: [],
+  training_style: 'hybrid', training_experience: 'intermediate', session_duration_preference: '45-60',
+  training_days: [], weekly_schedule: {}, dietary_preferences: [], concurrent_activities: [],
+  macro_calculation_mode: 'STANDARD_STATIC', recovery_capacity: 'moderate',
+  created_at: '2026-09-01T00:00:00.000Z',
+} as never
+const homeOn = (dayName: string, todayStr: string, withMoves: SessionMove[]) => loadDashboardData({
+  profile: homeProfile, macros: null, exercisePlan: plan, mesocycle: [], moves: withMoves,
+  planCreatedAt: '2026-09-01T00:00:00.000Z', todayLogs: [], liveWeek: 1,
+  dayName, todayStr, now: new Date(`${todayStr}T09:00:00`),
+})
+const homeOrigin = await homeOn('Tuesday', TUE, moves)
+check('the day it left is "moved" — not rest, not a session to start', homeOrigin.session.status === 'moved', homeOrigin.session.status)
+check('...naming what left', homeOrigin.session.focus === 'Push & Press', homeOrigin.session.focus)
+check('...and where it went', homeOrigin.session.movedTo?.dayName === 'Wednesday', homeOrigin.session.movedTo)
+check('...with nothing to do today', homeOrigin.session.setsPlanned === 0 && homeOrigin.session.exerciseCount === 0 && homeOrigin.session.estimatedMinutes === null, homeOrigin.session)
+check('...and tomorrow\'s line is that session', /Tomorrow: Push & Press/.test(homeOrigin.tomorrowLabel ?? ''), homeOrigin.tomorrowLabel)
+const homeTarget = await homeOn('Wednesday', WED, moves)
+check('the day it went to is an ordinary session, from where it came', homeTarget.session.status === 'not_started' && homeTarget.session.focus === 'Push & Press' && homeTarget.session.movedFrom?.dayName === 'Tuesday', homeTarget.session)
+const homePlain = await homeOn('Tuesday', TUE, [])
+check('and with no move, Tuesday is Tuesday', homePlain.session.status === 'not_started' && homePlain.session.focus === 'Push & Press' && !homePlain.session.movedTo, homePlain.session)
 
 console.log(failures === 0 ? `\nAll session-move checks passed.\n` : `\n${failures} check(s) FAILED.\n`)
 process.exit(failures === 0 ? 0 : 1)

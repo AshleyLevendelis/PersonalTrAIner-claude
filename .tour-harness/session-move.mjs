@@ -10,8 +10,11 @@
 // workout" for a session Ashley had already replaced.
 //
 // One workout_sessions row (?moved=1 in real.tsx): today's session moved to
-// tomorrow, which in this fixture is a free day. Asserts three things on the
-// Exercise tab and one on Home, plus the ordinary day being untouched.
+// tomorrow, which in this fixture is a free day. Asserts that the session has
+// LEFT the Exercise tab (Ashley, 8 Sep 2026, on the first version, which kept
+// it under a banner: "it didnt move my workout"), that Home agrees, that both
+// strips write the move on today's cell, and that "Do it today instead"
+// brings the ordinary day back — plus the ordinary day being untouched.
 // ---------------------------------------------------------------------------
 import { createServer } from 'http'
 import { readFileSync, existsSync, writeFileSync } from 'fs'
@@ -70,7 +73,14 @@ const read = () => ev(`(() => {
     movedIn: inb ? inb.textContent.trim() : null,
     saysStartWorkout: buttons.includes('Start workout'),
     saysTrainAnyway: buttons.includes('Train it anyway'),
-    hasExerciseList: /MAIN LIFT|ACCESSORY|PRIMER/i.test(text),
+    saysDoItToday: buttons.includes('Do it today instead →'),
+    // The tier labels are leaf elements with exactly these words. Not a regex
+    // over innerText: the week note says "the main lifts" in a sentence, and
+    // /MAIN LIFT/i matched it on a screen with no list at all (8 Sep 2026).
+    hasExerciseList: [...document.querySelectorAll('*')].some(n => n.children.length === 0 && /^(Main lift|Accessory|Primer|Finisher|Superset [A-Z])$/.test(n.textContent.trim())),
+    // The Exercise strip's cell carries the day letter before the glyph
+    // ("T→"); Home's carries the glyph alone. Read the mark, not the label.
+    todayCell: (() => { const n = document.querySelector('[aria-label$="moved to another day"]'); return n ? n.textContent.trim().slice(-1) : null })(),
     strip: text,
     sample: text.replace(/\s+/g, ' ').slice(0, 240),
   }
@@ -98,10 +108,11 @@ check('1. the Exercise tab says the session moved, and names the day',
   new RegExp(tomorrowName).test(moved.movedAway ?? ''), moved.movedAway)
 check('2. the primary action stops claiming the session is still ahead today',
   !moved.saysStartWorkout, moved)
-check('3. ...and offers it as a choice instead', moved.saysTrainAnyway, moved)
-check('4. the session itself is still there, not hidden', moved.hasExerciseList, moved)
-check('5. and it is NOT reported as a swap for another activity',
-  !/swapped today for/i.test(moved.strip), moved.sample)
+check('3. ...and offers the way back instead of "Train it anyway"', moved.saysDoItToday && !moved.saysTrainAnyway, moved)
+check('4. the session itself has LEFT — no exercise list on the day it moved from', !moved.hasExerciseList, moved)
+check('5. and it is NOT reported as a swap for another activity, nor as a rest day',
+  !/swapped today for/i.test(moved.strip) && !/Rest day ·/.test(moved.strip), moved.sample)
+check('5b. the Exercise strip writes → on today\'s cell', moved.todayCell === '→', moved.todayCell)
 
 await shoot('session-move-exercise')
 
@@ -112,17 +123,34 @@ for (let i = 0; i < 16 && !/Moved to /.test(home); i++) { await wait(500); home 
 check('6. Home says the same thing, on the same day',
   new RegExp(`Moved to ${tomorrowName}`).test(home), home.replace(/\s+/g, ' ').slice(0, 300))
 check('7. ...and does NOT call it a rest day', !/Rest day/.test(home), home.replace(/\s+/g, ' ').slice(0, 300))
-// THE STRIP, read the way a screen reader reads it. Its glyphs are not all
-// plain text (today's cell is drawn, not written), so innerText cannot see
-// them — and the aria-label is the more useful assertion anyway: it is the
-// sentence a person using VoiceOver actually hears.
+check('7b. ...and offers nothing to start', !/Start session|Continue session/.test(home), home.replace(/\s+/g, ' ').slice(0, 300))
+// THE STRIP, read the way a screen reader reads it — the aria-label is the
+// sentence a person using VoiceOver actually hears — and then read as text,
+// because today's cell is WRITTEN now: until 8 Sep 2026 Home drew a plain dot
+// for today whatever had happened to it, which is the "markers not moving"
+// Ashley reported.
 const stripLabels = await ev(`(() => [...document.querySelectorAll('[aria-label]')]
   .map(n => n.getAttribute('aria-label'))
   .filter(l => /rest day|missed|due|done|moved|swapped|recovery/i.test(l)))()`)
 check('8. the week strip says the day moved, rather than that it is due or missed',
   Array.isArray(stripLabels) && stripLabels.some(l => /moved to another day/i.test(l)), stripLabels)
+const homeCell = await ev(`(() => { const n = document.querySelector('[aria-label$="moved to another day"]'); return n ? n.textContent.trim() : null })()`)
+check('9. ...and Home\'s strip writes → on today\'s cell, not the plain today dot', homeCell === '→', homeCell)
 
 await shoot('session-move-home')
+
+// --- the way back: "Do it today instead" unmakes the move -----------------
+await ev(`location.hash = '#/tab/exercise'`); await wait(1500)
+let before = await read()
+for (let i = 0; i < 12 && !before.saysDoItToday; i++) { await wait(500); before = await read() }
+await ev(`(() => { const b = [...document.querySelectorAll('button')].find(b => b.textContent.trim() === 'Do it today instead →'); if (b) b.click(); return !!b })()`)
+let back = await read()
+for (let i = 0; i < 20 && !back.saysStartWorkout; i++) { await wait(500); back = await read() }
+check('10. tapping it brings the session back — Start workout, the list, no moved card',
+  back.saysStartWorkout && back.hasExerciseList && back.movedAway === null, back)
+check('11. ...and the strip no longer says moved: the move was unmade, not hidden',
+  back.todayCell === null, back.todayCell)
+await shoot('session-move-undone')
 
 const err = await ev('window.__err ?? null')
 check('no uncaught error on the page', err === null, err)
