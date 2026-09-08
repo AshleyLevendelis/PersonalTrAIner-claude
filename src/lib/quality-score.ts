@@ -922,7 +922,14 @@ function scoreSelection(profile: UserProfile, mesocycle: MesocycleWeek[]): Dimen
   const equipmentTier = profile.equipment_access || 'full_gym'
   if (EQUIPMENT_QUALITY_TIERS.has(equipmentTier)) {
     const equipmentPool = getConstrainedPool(profile, [])
-    for (const day of week1?.days ?? []) {
+    // EVERY WEEK, not just week 1. Selection happens once and the later weeks
+    // rotate off it — but rotation had no equipment term at all until 8 Sep
+    // 2026, so the weeks this rule could not see were exactly the ones where
+    // the defect lived. Measured across the style grid that day: 310 picks
+    // used improvised kit while a better peer sat in the same pool, and 309 of
+    // them were in week 2 or later. This rule saw one of the 310.
+    for (const week of mesocycle) {
+    for (const day of week.days) {
       for (const ex of day.exercises) {
         const entry = dbEntry(ex.name)
         // Same exemptions the engine applies (rehab-indicated work, core) —
@@ -937,10 +944,11 @@ function scoreSelection(profile: UserProfile, mesocycle: MesocycleWeek[]): Dimen
         if (!betterAvailable) continue
         violatedRules.add('worse_implement_than_available')
         deductions.push({
-          rule: 'worse_implement_than_available', day: day.day, weekNumber: 1,
+          rule: 'worse_implement_than_available', day: day.day, weekNumber: week.week_number,
           detail: `"${ex.name}" uses ${entry.equipment.join('/')} when this ${equipmentTier.replace(/_/g, ' ')} profile has a better-loading option for the same pattern and tier`,
         })
       }
+    }
     }
   }
 

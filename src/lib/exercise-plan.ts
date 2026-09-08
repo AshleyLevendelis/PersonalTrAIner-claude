@@ -463,6 +463,35 @@ export function isEquipmentQualityExempt(entry: ExerciseEntry): boolean {
  */
 export const EQUIPMENT_QUALITY_TIERS = new Set<EquipmentAccess>(['full_gym', 'home_gym', 'minimalist'])
 
+/**
+ * The pool a ROTATION may move within, with improvised kit removed wherever
+ * the same movement has a properly-loading option.
+ *
+ * scoreCandidate's equipment_fit only ever runs at initial selection.
+ * rotateVariation picks by modular arithmetic over an alphabetically sorted
+ * list with no scoring at all, so on 8 Sep 2026 a full-gym plan could rotate
+ * from a dumbbell lateral raise to a BACKPACK one — "Backpack Lateral Raise"
+ * sorts to index 0 — and nothing in the rotation could see the difference.
+ * Measured across the style grid before this existed: 310 prescribed
+ * exercises used improvised kit while a better peer sat in the same pool, and
+ * 309 of them were in weeks 2 and later, where no gate was looking.
+ *
+ * Scoped by substitution_group AND tier, so it can only remove an option that
+ * has a genuine equivalent: a trainee whose only lateral raise really is a
+ * backpack keeps it. Exempt entries (core work, rehab-indicated) are left
+ * alone for the reasons isEquipmentQualityExempt records.
+ */
+export function poolForRotation(pool: ExerciseEntry[], equipmentAccess?: EquipmentAccess): ExerciseEntry[] {
+  if (!equipmentAccess || !EQUIPMENT_QUALITY_TIERS.has(equipmentAccess)) return pool
+  return pool.filter(e => {
+    if (isEquipmentQualityExempt(e) || bestEquipmentRank(e) !== 'low') return true
+    return !pool.some(o =>
+      o.substitution_group === e.substitution_group &&
+      o.mechanics_tier === e.mechanics_tier &&
+      bestEquipmentRank(o) === 'high')
+  })
+}
+
 // ---------------------------------------------------------------------------
 // Context-aware required patterns (adjusted for infeasible scenarios)
 // ---------------------------------------------------------------------------
@@ -673,6 +702,35 @@ function stageInjuryFilter(
 // sessions across a training week, and style becomes a luxury we cannot afford.
 const MIN_VIABLE_POOL = 12
 
+/**
+ * How many ways to train ONE MOVEMENT the style filter must leave behind.
+ *
+ * MIN_VIABLE_POOL above cannot see this, and 8 Sep 2026 is the day that cost
+ * something. Ashley trains 'functional' with a full gym. Of the catalogue's
+ * seven isolation_shoulder entries, exactly two carry the 'functional' tag —
+ * a resistance band and a weighted backpack — so her plan prescribed a
+ * BACKPACK lateral raise beside a barbell bench press, and tapping swap
+ * offered the band and nothing else. The whole-pool escape never fired
+ * because 151 of 199 entries carry 'functional': the pool was enormous while
+ * one movement had been starved from seven options to two.
+ *
+ * Measured before the fix: 453 starved patterns across 60 of the 64 profiles
+ * on the style grid. Not a corner case — 'combat' was worst at 163.
+ *
+ * Four is a judgement, not a measured threshold, and it is written here so it
+ * is one line to change: enough that a slot has a real choice and a swap
+ * dialog has something to say, small enough that style still shapes every
+ * movement the catalogue covers properly.
+ */
+const MIN_VIABLE_PER_PATTERN = 4
+
+/**
+ * What it costs to reach for improvised kit when the real thing is on the
+ * same shortlist. See factor 6 in scoreCandidate for why a +/-1 preference
+ * was not enough.
+ */
+const IMPROVISED_OVER_REAL_PENALTY = 8
+
 function stageStyleFilter(
   pool: ExerciseEntry[],
   style: TrainingStyle,
@@ -698,6 +756,23 @@ function stageStyleFilter(
    * another ("may this person have the work their joint needs?").
    */
   flaggedJoints: Set<string> = new Set(),
+  /**
+   * Which tier the per-pattern floor below applies at.
+   *
+   * NOT bodyweight, and that is a correction to this change rather than an
+   * afterthought. The first version applied the floor everywhere and turned a
+   * bodyweight plan from one loaded backpack item a week into five to eight:
+   * at that tier the thin patterns are thin because of KIT, and every entry
+   * the floor reinstated was a weighted backpack. Three gates caught it
+   * (test:week-note, test:loadless-notes, test:session-length) and they were
+   * right to.
+   *
+   * The line is the one EQUIPMENT_QUALITY_TIERS already draws, for the reason
+   * it already records: a bodyweight trainee's band and backpack ARE their
+   * best available tools, not a compromise. A style tag cannot be said to have
+   * starved a choice that the kit never offered.
+   */
+  equipmentAccess?: EquipmentAccess,
 ): ExerciseEntry[] {
   const result: ExerciseEntry[] = []
   const rejected: ExerciseEntry[] = []
@@ -727,7 +802,45 @@ function stageStyleFilter(
     return pool
   }
 
+  // A STYLE MAY NOT STARVE A MOVEMENT. The escape above asks whether the week
+  // can be filled at all; this asks whether each MOVEMENT still has a real
+  // choice, which is the question that was never being asked — see
+  // MIN_VIABLE_PER_PATTERN for the morning it was learned on.
+  //
+  // Reinstates only what STYLE removed. This stage runs after the equipment
+  // and injury stages, so everything in `rejected` has already cleared both:
+  // nothing unavailable or contraindicated can come back through here.
+  const availableByPattern = new Map<string, number>()
+  for (const ex of pool) availableByPattern.set(ex.movement_pattern, (availableByPattern.get(ex.movement_pattern) ?? 0) + 1)
+  const keptByPattern = new Map<string, number>()
+  for (const ex of result) keptByPattern.set(ex.movement_pattern, (keptByPattern.get(ex.movement_pattern) ?? 0) + 1)
+
+  const starved = new Set<string>()
+  const floorApplies = !!equipmentAccess && EQUIPMENT_QUALITY_TIERS.has(equipmentAccess)
+  for (const [pattern, available] of floorApplies ? availableByPattern : []) {
+    // min(floor, available): a pattern the catalogue only has two of is thin
+    // by nature, not by filtering, and reinstating there would be asking for
+    // exercises that do not exist.
+    if ((keptByPattern.get(pattern) ?? 0) < Math.min(MIN_VIABLE_PER_PATTERN, available)) starved.add(pattern)
+  }
+
   for (const ex of rejected) {
+    if (starved.has(ex.movement_pattern)) {
+      // Reinstated, NOT unfiltered: scoreCandidate's style_fit factor ranks
+      // every one of these below an on-style option, so the trainee still
+      // gets their style wherever the catalogue can serve it. Recorded in the
+      // trace so test:audit can see a reinstatement rather than infer one.
+      result.push(ex)
+      trace.style_filtered.push({
+        exercise: ex.name,
+        stage: 'style',
+        reason:
+          `style '${style}' would have left only ${keptByPattern.get(ex.movement_pattern) ?? 0} ` +
+          `${ex.movement_pattern} option(s) of ${availableByPattern.get(ex.movement_pattern) ?? 0} available ` +
+          `— reinstated, ranked below on-style options`,
+      })
+      continue
+    }
     trace.style_filtered.push({
       exercise: ex.name,
       stage: 'style',
@@ -1337,6 +1450,21 @@ interface ScoreContext {
    * call site passes it explicitly rather than defaulting to full_gym.
    */
   equipmentAccess?: EquipmentAccess
+  /**
+   * The trainee's chosen style, so an entry reinstated by
+   * stageStyleFilter's per-pattern floor can be ranked below an on-style one
+   * instead of competing with it as an equal. Omitted means the factor is
+   * off — the same convention equipmentAccess uses.
+   */
+  trainingStyle?: TrainingStyle
+  /**
+   * Names in THIS ranked list that have a better-loading peer for the same
+   * pattern and tier in the same list. Filled in by orderCandidates, never by
+   * a caller, for the same reason listHasLoadedAlternative is: "was a better
+   * tool genuinely on offer for THIS slot" is the only form of the question
+   * that cannot punish a trainee whose kit really is a backpack.
+   */
+  betterImplementInList?: Set<string>
 }
 
 /**
@@ -1357,6 +1485,8 @@ interface ScoreFactors {
   session_balance: number
   weekly_variety: number
   equipment_fit: number
+  /** Off-style entries reinstated by stageStyleFilter's per-pattern floor rank below on-style ones. */
+  style_fit: number
 }
 
 interface ScoredCandidate {
@@ -1381,7 +1511,7 @@ interface ScoredCandidate {
  * moment of the initial pick.
  */
 function scoreCandidate(candidate: ExerciseEntry, policy: GoalPolicy, rawExperience: TrainingExperience, ctx: ScoreContext): { score: number; factors: ScoreFactors } {
-  const factors: ScoreFactors = { role_support: 0, goal_fit: 0, experience_fit: 0, session_balance: 0, weekly_variety: 0, equipment_fit: 0 }
+  const factors: ScoreFactors = { role_support: 0, goal_fit: 0, experience_fit: 0, session_balance: 0, weekly_variety: 0, equipment_fit: 0, style_fit: 0 }
 
   // 1. Quality for the role: an isolation exercise that directly supports
   // today's main compound pattern (hamstring work on a hinge day) beats one
@@ -1441,9 +1571,35 @@ function scoreCandidate(candidate: ExerciseEntry, policy: GoalPolicy, rawExperie
   if (ctx.equipmentAccess && EQUIPMENT_QUALITY_TIERS.has(ctx.equipmentAccess) && !isEquipmentQualityExempt(candidate)) {
     const rank = bestEquipmentRank(candidate)
     factors.equipment_fit = rank === 'high' ? 1 : rank === 'low' ? -1 : 0
+
+    // ...AND DECISIVE when the better tool is right there. +/-1 is a
+    // tie-break, and 8 Sep 2026 showed a tie-break is not enough: two prior
+    // appearances this week (weekly_variety, factor 5) cancel it exactly, so
+    // a weighted backpack could still beat a dumbbell for the same movement.
+    // Ashley met that as a Backpack Lateral Raise beside a barbell bench
+    // press.
+    //
+    // Scoped to THIS list and to the same pattern and tier, so it can only
+    // fire when a genuinely equivalent better implement was on offer for this
+    // slot — a trainee whose only option is improvised keeps it, unpenalised.
+    // Magnitude sits above anything the five factors can swing together (~5)
+    // and far below the 30-point tier gap, so it reorders implements within a
+    // tier and never reorders the tiers themselves.
+    if (rank === 'low' && ctx.betterImplementInList?.has(candidate.name)) {
+      factors.equipment_fit -= IMPROVISED_OVER_REAL_PENALTY
+    }
   }
 
-  let score = factors.role_support + factors.goal_fit + factors.experience_fit + factors.session_balance + factors.weekly_variety + factors.equipment_fit
+  // 7. Style fit — the ranking half of stageStyleFilter's per-pattern floor.
+  // An entry reinstated there is off-style by definition, and must lose to
+  // any on-style option for the same slot; without this the floor would not
+  // widen the choice, it would erase the preference. Kept at the same
+  // magnitude as the equipment gap, and well under the tier gap.
+  if (ctx.trainingStyle && !candidate.style_tags.includes(ctx.trainingStyle)) {
+    factors.style_fit = -2
+  }
+
+  let score = factors.role_support + factors.goal_fit + factors.experience_fit + factors.session_balance + factors.weekly_variety + factors.equipment_fit + factors.style_fit
 
   // Tier preference — deliberately UNCONDITIONAL and with a much bigger gap
   // than every other factor combined can ever swing (roughly +/-10 at the
@@ -1523,9 +1679,22 @@ function orderCandidates(candidates: ExerciseEntry[], policy: GoalPolicy, rawExp
   // caller and not from the pool at large. "Was a real weight on offer for
   // THIS slot?" is the only form of the question that makes the band rule
   // safe for a trainee whose whole kit is bands.
+  // Same question, same scope, for the implement: which candidates here are
+  // improvised while an equivalent better-loading one sits in the same list?
+  const betterImplementInList = new Set<string>()
+  for (const c of candidates) {
+    if (bestEquipmentRank(c) !== 'low' || isEquipmentQualityExempt(c)) continue
+    if (candidates.some(o =>
+      o.movement_pattern === c.movement_pattern &&
+      o.mechanics_tier === c.mechanics_tier &&
+      bestEquipmentRank(o) === 'high')) {
+      betterImplementInList.add(c.name)
+    }
+  }
   const scoped: ScoreContext = {
     ...ctx,
     listHasLoadedAlternative: candidates.some(e => isExternallyLoaded(e) && !isBandEquipped(e)),
+    betterImplementInList,
   }
   return candidates
     .map(e => ({ e, ...scoreCandidate(e, policy, rawExperience, scoped) }))
@@ -1558,6 +1727,12 @@ const REASON_CLAUSES: { [K in keyof ScoreFactors]: (winner: ExerciseEntry, runne
   // equipment includes the better tool (the factor is gated on that), so it
   // can't tell a home trainee they should have used a machine.
   equipment_fit: (w, r) => `${w.name} over ${r.name} because it loads the movement better with the equipment you've got.`,
+  // Fires only when the runner-up was reinstated by the per-pattern floor —
+  // i.e. this movement had so few on-style options that off-style ones were
+  // let back in, and an on-style one still won. Says what is true and why it
+  // is not a complaint: the wider list is there so the movement has a real
+  // choice, not so the style stops meaning anything.
+  style_fit: (w, r) => `${w.name} over ${r.name} because it fits your training style — ${r.name} is only on the list because this movement has few options that do.`,
 }
 
 /**
@@ -1792,6 +1967,8 @@ function selectExercisesForTrack(
   sessionDurationPreference?: SessionDuration,
   flaggedJoints: Set<string> = new Set(),
   equipmentAccess?: EquipmentAccess,
+  /** For scoreCandidate's style_fit — see stageStyleFilter's per-pattern floor. */
+  trainingStyle?: TrainingStyle,
 ): { primer: ExerciseEntry | null; rehab: ExerciseEntry | null; main: ExerciseEntry[]; requiredNames: Set<string>; uncoveredPatterns: MovementPattern[]; selectionNotes: Map<string, string> } {
   const counts = applyIsolationSlotShift(countsIn, policy.isolationSlotShift)
   const allPatterns = new Set([...track.primary_patterns, ...track.secondary_patterns])
@@ -1892,7 +2069,7 @@ function selectExercisesForTrack(
       ),
       policy,
       rawExperience,
-      { trackPatterns: [...track.primary_patterns, ...track.secondary_patterns], selectedSoFar: selected, weeklyAppearanceCount, flaggedJoints, equipmentAccess },
+      { trackPatterns: [...track.primary_patterns, ...track.secondary_patterns], selectedSoFar: selected, weeklyAppearanceCount, flaggedJoints, equipmentAccess, trainingStyle },
     )
     const winner = candidates[0]
     if (winner) {
@@ -1952,7 +2129,7 @@ function selectExercisesForTrack(
       ),
       policy,
       rawExperience,
-      { trackPatterns: [...track.primary_patterns, ...track.secondary_patterns], selectedSoFar: selected, weeklyAppearanceCount, flaggedJoints, equipmentAccess },
+      { trackPatterns: [...track.primary_patterns, ...track.secondary_patterns], selectedSoFar: selected, weeklyAppearanceCount, flaggedJoints, equipmentAccess, trainingStyle },
     )
     for (let i = 0; i < candidates.length; i++) {
       const c = candidates[i]
@@ -2033,7 +2210,7 @@ function selectExercisesForTrack(
       ),
       policy,
       rawExperience,
-      { trackPatterns: [...track.primary_patterns, ...track.secondary_patterns], selectedSoFar: selected, weeklyAppearanceCount, flaggedJoints, equipmentAccess },
+      { trackPatterns: [...track.primary_patterns, ...track.secondary_patterns], selectedSoFar: selected, weeklyAppearanceCount, flaggedJoints, equipmentAccess, trainingStyle },
     )
     for (let i = 0; i < cardioCandidates.length; i++) {
       const c = cardioCandidates[i]
@@ -2100,7 +2277,7 @@ function selectExercisesForTrack(
         ),
         policy,
         rawExperience,
-        { trackPatterns: [...track.primary_patterns, ...track.secondary_patterns], selectedSoFar: selected, weeklyAppearanceCount, flaggedJoints, equipmentAccess },
+        { trackPatterns: [...track.primary_patterns, ...track.secondary_patterns], selectedSoFar: selected, weeklyAppearanceCount, flaggedJoints, equipmentAccess, trainingStyle },
       )
 
       for (let i = 0; i < candidates.length; i++) {
@@ -4214,7 +4391,7 @@ export function getConstrainedPool(profile: UserProfile, exclusions: string[] = 
   )
   pool = stageEquipmentFilter(pool, profile.equipment_access || 'full_gym', throwaway)
   pool = stageInjuryFilter(pool, [...pool], profile.injuries || [], throwaway)
-  pool = stageStyleFilter(pool, profile.training_style || 'hybrid', throwaway, getFlaggedJoints(profile.injuries || []))
+  pool = stageStyleFilter(pool, profile.training_style || 'hybrid', throwaway, getFlaggedJoints(profile.injuries || []), profile.equipment_access || 'full_gym')
   pool = stageSkillFilter(pool, profile.training_experience || 'novice', throwaway)
   return pool
 }
@@ -4336,7 +4513,7 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
   pool = stageInjuryFilter(pool, [...pool], profile.injuries || [], trace)
 
   // STAGE 3: Style
-  pool = stageStyleFilter(pool, trainingStyle, trace, getFlaggedJoints(profile.injuries || []))
+  pool = stageStyleFilter(pool, trainingStyle, trace, getFlaggedJoints(profile.injuries || []), profile.equipment_access || 'full_gym')
 
   // STAGE 4: Skill / experience
   pool = stageSkillFilter(pool, profile.training_experience || 'novice', trace)
@@ -4384,7 +4561,7 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
     const trackFocus = getViableTrack(rawTrack, pool)
     const track = TRACKS[trackFocus]
 
-    const { primer, rehab, main, requiredNames, uncoveredPatterns, selectionNotes } = selectExercisesForTrack(track, pool, counts, weeklyUsed, styleConfig, trace, policy, feasiblePatterns, weeklyAppearanceCount, profile.training_experience || 'novice', profile.session_duration_preference, getFlaggedJoints(profile.injuries ?? []), profile.equipment_access || 'full_gym')
+    const { primer, rehab, main, requiredNames, uncoveredPatterns, selectionNotes } = selectExercisesForTrack(track, pool, counts, weeklyUsed, styleConfig, trace, policy, feasiblePatterns, weeklyAppearanceCount, profile.training_experience || 'novice', profile.session_duration_preference, getFlaggedJoints(profile.injuries ?? []), profile.equipment_access || 'full_gym', trainingStyle)
     for (const name of requiredNames) weeklyRequiredNames.add(name)
 
     // Build exercise list with sets/reps from style config
@@ -5721,7 +5898,7 @@ export function generateMesocycle(
         const avoidFamilies = new Set(
           dayFamiliesByIndex.filter((f, i) => f && i !== exIdx) as string[]
         )
-        const rotated = rotateVariation(ex.name, blockIndex, pool, experience, profile, usedNamesThisDay, avoidFamilies)
+        const rotated = rotateVariation(ex.name, blockIndex, poolForRotation(pool, profile.equipment_access), experience, profile, usedNamesThisDay, avoidFamilies)
         usedNamesThisDay.add(rotated)
         if (rotated === ex.name) return { ...ex, name: rotated }
         // A rotation can land on an exercise with a different prescription
@@ -5950,7 +6127,7 @@ export function generateMesocycle(
               .map(e => getMovementFamily(e))
           )
           const weeklyName = rotatesWeekly
-            ? rotateVariation(ex.name, Math.floor((w - 1) / policy.accessoryRotationWeeks), pool, experience, profile, usedWeeklyNames, weeklyFamilies)
+            ? rotateVariation(ex.name, Math.floor((w - 1) / policy.accessoryRotationWeeks), poolForRotation(pool, profile.equipment_access), experience, profile, usedWeeklyNames, weeklyFamilies)
             : ex.name
           if (rotatesWeekly) usedWeeklyNames.add(weeklyName)
 

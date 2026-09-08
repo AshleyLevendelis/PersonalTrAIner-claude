@@ -1,6 +1,6 @@
 import type { MesocycleWeek, Exercise, UserProfile } from './types'
 import { getSmartReplacements, type ExerciseEntry } from './exercise-db'
-import { getConstrainedPool, getFlaggedJoints, mapMovementPattern, mapTier, deriveFatigueCost, fixedUnitPrescription } from './exercise-plan'
+import { getConstrainedPool, getFlaggedJoints, mapMovementPattern, mapTier, deriveFatigueCost, fixedUnitPrescription, bestEquipmentRank, isEquipmentQualityExempt, EQUIPMENT_QUALITY_TIERS } from './exercise-plan'
 import { prescribeLoad, type LoadPrescription } from './load-prescription'
 // Dynamically imported inside recomputeLoad(), not statically here — importing
 // progression-engine.ts pulls in supabase.ts, which reads import.meta.env at
@@ -51,7 +51,40 @@ export function getReplacementCandidates(
   // already done every bit of filtering. Without them a cross-training
   // suggestion ("a squat, instead of your bench press") arrives unexplained.
   const restingJoints = [...getFlaggedJoints(profile.injuries ?? [])]
-  const candidates = getSmartReplacements(exerciseName, pool, profile.training_experience || 'novice', exclusions, restingJoints)
+  const ranked = getSmartReplacements(exerciseName, pool, profile.training_experience || 'novice', exclusions, restingJoints)
+
+  // IMPROVISED KIT SINKS, IT DOES NOT VANISH. getSmartReplacements ranks on
+  // tier, joint stress and muscle overlap and has no equipment term at all, so
+  // on 8 Sep 2026 all five lateral raises tied exactly and the order fell out
+  // of catalogue position. Reordering here rather than in exercise-db keeps
+  // the equipment-quality table in one module and avoids an import cycle.
+  //
+  // A stable partition, like the soft preferences below and for the same
+  // reason: someone whose gym is busy may genuinely want the backpack
+  // version, so it stays on the list — just not above the dumbbell one.
+  // Scoped to peers IN THIS LIST, so the only option never gets demoted below
+  // nothing.
+  const equipment = profile.equipment_access
+  const demoted = new Set<string>()
+  if (equipment && EQUIPMENT_QUALITY_TIERS.has(equipment)) {
+    for (const c of ranked) {
+      const e = c.exercise
+      if (isEquipmentQualityExempt(e) || bestEquipmentRank(e) !== 'low') continue
+      if (ranked.some(o =>
+        o.exercise.movement_pattern === e.movement_pattern &&
+        o.exercise.mechanics_tier === e.mechanics_tier &&
+        bestEquipmentRank(o.exercise) === 'high')) {
+        demoted.add(e.name)
+      }
+    }
+  }
+  const candidates = demoted.size === 0
+    ? ranked
+    : ranked
+        .map((c, i) => ({ c, i, d: demoted.has(c.exercise.name) ? 1 : 0 }))
+        .sort((a, b) => a.d - b.d || a.i - b.i)
+        .map(x => x.c)
+
   if (!soft || (soft.liked.length === 0 && soft.disliked.length === 0)) return candidates
   // Stable partition, never a filter: a disliked movement stays offered — it
   // is a lean, and someone who asks for a swap may still want it. Order is

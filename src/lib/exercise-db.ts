@@ -5154,12 +5154,42 @@ const MOVEMENT_FAMILIES: Record<string, string> = {
   'Pull-Ups (Assisted)': 'pull_up',
   'Lat Pulldown': 'pulldown',
   'Close-Grip Lat Pulldown': 'pulldown',
-  'Cable Rows': 'cable_row',
-  'Seated Cable Row': 'cable_row',
+  // A 'cable_row' family lived here, made of 'Cable Rows' — which names nothing
+  // in the catalogue and so could never match — and 'Seated Cable Row'. Both
+  // are gone: what remained was a one-member family whose only effect was to
+  // hide Seated Cable Row from its own 'row' group, so it could share a day
+  // with Dumbbell Rows or T-Bar Rows and the duplicate guard would not see it.
+  // Back in 'row' with its siblings, which is what the guard is for.
+  // EVERY IMPLEMENT VARIANT OF THE SAME MOVEMENT, not just the two that were
+  // here. A family listing some of its members and not others is worse than
+  // no entry at all: the listed ones get a shared identity and the rest each
+  // get their own, so the dedup and rotation guards that key on
+  // getMovementFamily stop seeing them as the same movement.
+  //
+  // Found 8 Sep 2026 while fixing the style filter, and load-bearing because
+  // of it: widening a starved pattern's pool puts a dumbbell AND a backpack
+  // lateral raise in the same shortlist, and with the map as it was, nothing
+  // would have stopped both landing in one session.
+  //
+  // Scoped to the two families where the omission is unambiguous — a shrug is
+  // a shrug whatever is in your hands. The other splits this map makes are
+  // deliberate sub-families (Push-Ups apart from Dumbbell Bench Press inside
+  // 'bench_press'; single-leg calf work apart from bilateral) and are left
+  // exactly as they are; test:movement-families pins which is which.
+  // The shrugs need no entries here at all: their substitution_group IS
+  // 'shrug', so getMovementFamily's fallback already puts every one of them —
+  // dumbbell, cable, machine, band, backpack — in the same family. Four
+  // mappings were added here on 8 Sep and then removed again when a mutation
+  // test showed the gate could not tell whether they existed. Redundant data
+  // in a hand-maintained map is what caused the lateral-raise gap below; not
+  // adding more of it.
   'Shrugs': 'shrug',
   'Dumbbell Shrugs': 'shrug',
   'Lateral Raises': 'lateral_raise',
   'Cable Lateral Raises': 'lateral_raise',
+  'Backpack Lateral Raise': 'lateral_raise',
+  'Band Lateral Raise': 'lateral_raise',
+  'Machine Lateral Raise': 'lateral_raise',
   'Calf Raises': 'calf_raise',
   'Seated Calf Raises': 'calf_raise',
   'Calf Raises (Bodyweight)': 'calf_raise',

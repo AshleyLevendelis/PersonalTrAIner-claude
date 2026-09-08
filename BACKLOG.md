@@ -2,6 +2,52 @@
 
 Newest first. One line each.
 
+- [x] **A BACKPACK LATERAL RAISE AT A FULL GYM, AND A SWAP LIST OF ONE** —
+  Ashley, 8 Sep 2026, three screenshots: her Tuesday prescribed a Backpack
+  Lateral Raise beside a barbell bench press, and swapping it offered exactly
+  one alternative while the search box below turned up three more that were
+  obviously fine.
+  **One cause, both symptoms.** Her live profile (read-only from production) is
+  `full_gym` / `advanced` / no injuries / **`training_style: 'functional'`**,
+  and `stageStyleFilter` applies style as a HARD pool filter. Two of the
+  catalogue's seven `isolation_shoulder` entries carry `functional` — a
+  resistance band and a weighted backpack — so selection chose from a shortlist
+  of two and the swap had one left. `MIN_VIABLE_POOL` could not see it: it
+  counts the whole pool, and 151 of 199 entries carry `functional`. The same
+  shape that function's own comment records for knee rehab — *a tag answering
+  one question used to answer another.*
+  **Ashley's ruling: both fixes.** A per-pattern floor (a style may not leave a
+  movement fewer than four ways to train it; reinstated entries rank BELOW
+  on-style ones via a new `style_fit` term), and improvised kit never beating
+  the real thing you own — the equipment preference now reaches block rotation,
+  the weekly accessory rotation and the swap ranking, and is decisive rather
+  than a ±1 tie-break two weekly appearances cancel.
+  **A correction inside the change, caught by three gates.** The floor applied
+  everywhere turned a BODYWEIGHT plan from one loaded backpack item a week into
+  five to eight — every reinstated entry there was a backpack.
+  `test:week-note`, `test:loadless-notes` and `test:session-length` all caught
+  it and were right to. The floor is now scoped to tiers with real kit, on the
+  line `EQUIPMENT_QUALITY_TIERS` already draws.
+  **Measured** (`report:style-implement`, 4x4x4 grid, all 16 weeks): exercises
+  using improvised kit while a better peer sat in the pool **310 → 0**, of which
+  **309 were in week 2+** — invisible to `test:quality`, whose rule scanned week
+  1 only and now scans every week. Movements left with ≤2 options **329 → 53**;
+  with NO options **148 → 18**. Swap slots offering one option or none
+  **11.2% → 6.7%** (denominator moved 1199 → 1268, so the rate is the
+  comparable figure). Her own case: pool **2 → 7**, swap list **1 → 6** with
+  real kit first, Tuesday now **Cable Lateral Raises**.
+  **Residual, stated:** 64 of 84 remaining starved patterns are at bodyweight
+  where the floor deliberately does not apply; of the 20 elsewhere the worst is
+  2 of a possible 3, arising after the SKILL stage rather than the style one.
+  **Two gates re-anchored, not relaxed:** `test:rehab-prescribed` asserted
+  "every survivor is on-style", true only while the rehab exemption was the
+  sole route in. It now asserts the property — nothing rides in through the
+  exemption. Gate `test:style-starve`; 13 mutations, all caught, three after
+  strengthening checks that missed them.
+  Plan: `docs/plans/the-style-tag-that-starved-a-movement.md`.
+  **Not built:** her plan is persisted at generation time, so this reaches her
+  on a rebuild or a manual swap. Whether to rebuild mid-programme is her call.
+
 - [ ] **THE 7 SEP DEPLOY RAN AND SHIPPED STALE CODE — THIRD RECURRENCE** —
   found 8 Sep 2026 while writing the handover, by checking the live function
   instead of assuming it had not been deployed. `chat-gemini` on
