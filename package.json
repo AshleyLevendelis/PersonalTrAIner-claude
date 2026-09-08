@@ -146,6 +146,7 @@
     "test:swap-target": "tsx scripts/test-swap-target.ts",
     "test:plan-unknown": "tsx scripts/test-plan-unknown.ts",
     "test:session-move": "tsx scripts/test-session-move.ts",
+    "test:question-not-a-card": "tsx scripts/test-question-not-a-card.ts",
     "test:reply-guarantee": "tsx scripts/test-onboarding-reply-guarantee.ts",
     "test:assumed-body": "tsx scripts/test-assumed-body-loads.ts",
     "test:weight-basis": "tsx scripts/test-weight-basis-offer.ts",

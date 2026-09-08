@@ -2,6 +2,49 @@
 
 Newest first. One line each.
 
+- [x] **A QUESTION MUST NOT PRODUCE A CARD** — Ashley, live from her phone,
+  8 Sep 2026, three turns before Muay Thai. She asked *"Im going to muay thai
+  tonight. What should I eat before hand to give me energy?"* and got
+  *"I couldn't quite tell what you ate — could you list it out with
+  quantities"*. She asked again, *"What should I eat?"*, and got a **PROPOSED
+  CHANGE card** offering to make a Mexican chicken and rice bowl her lunch for
+  2026-09-08 — at 15:54, about a snack that evening. Her third message:
+  *"I dont want you ro log anything um simply asking a question."*
+  **TWO SEPARATE HOLES, both in the repo** — neither would have been closed by
+  the `chat-gemini` deploy already outstanding.
+  **(1)** `log_meal`'s no-ingredients branch **returned at line 2453, before
+  `intent` was read at line 2507**, so the question/logging split built on
+  7 Sep never reached it. She asked what she SHOULD eat and was asked to
+  itemise what she HAD.
+  **(2)** `propose_meal_addition` was **the only one of the fifteen
+  `propose_*` tools with no `origin_verbatim_quote`** — the exact substring of
+  the message that ordered the change, which is what makes "nothing was asked
+  for" checkable rather than a matter of the model's judgement. And the prompt
+  named a question as a valid trigger for it, verbatim: *"'What should I have
+  for breakfast?' is a question — answer it **or use propose_meal_addition**"*.
+  Every comparable tool says the opposite.
+  **Fixed:** intent read inside the branch; the quote required and now
+  *verified* by `classifyImperative`, which already existed server-side for the
+  append tools and was never wired to this family; the prompt clause corrected
+  and the answer-then-offer rule added. **Ashley's ruling, 8 Sep** — offered
+  "answer then one line offering to add it", "just answer", or "answer and
+  still show the card": she chose **the first**.
+  **Two things the gate caught that the change had broken.** `'put'` was
+  missing from the imperative verb list, so the new guard would have refused
+  `"put overnight oats in for breakfast"` — one of the tool's OWN documented
+  examples. And the offer line had to name the words to say (*Say "add it"*),
+  because a bare "yes please" has no imperative verb either and would have
+  been refused in turn — rebuilding the endless-question loop roadmap item 5
+  was spent removing.
+  Gate `test:question-not-a-card` (31 checks, her sentences verbatim, plus
+  **"every `propose_*` tool requires the quote, counted, no exceptions"** so a
+  tool added later without one fails here rather than in her chat); 8
+  mutations, all caught — the last only after a lockstep check between the
+  client and server copies of the classifier, since mutating the server copy
+  alone survived.
+  **NOT LIVE**: all of this is `chat-gemini`, so it reaches her only through
+  the deploy outstanding for roadmap 12.
+
 - [x] **"I'LL DO IT TOMORROW" NOW MOVES THE SESSION** (roadmap 8/12) — the one
   answer the app had no way to hear. Plan doc first:
   `docs/plans/ill-do-it-tomorrow.md`.

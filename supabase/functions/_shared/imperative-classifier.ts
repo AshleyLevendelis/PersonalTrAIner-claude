@@ -19,6 +19,13 @@ export const IMPERATIVE_VERBS = [
   'ban', 'avoid', 'set', 'adjust', 'reduce', 'increase', 'log', 'record',
   'hate', 'dislike', 'love', 'prefer', 'want', 'need', 'exclude',
   'ease', 'rest', 'give', 'feed', 'serve', 'include',
+  // 'put' joined the list on 8 Sep 2026, when propose_meal_addition started
+  // being gated on this classifier and its OWN documented examples stopped
+  // working: "can you put overnight oats in my breakfasts" and "put a curry
+  // in for Friday" are instructions by anybody's reading, and neither had a
+  // verb here. Found by the gate, not in her chat, which is the point of
+  // checking that a guard still lets real commands through.
+  'put',
 ];
 
 const INTERROGATIVE_LEAD_RE = /^\s*(what|why|how|when|where|which|who|can|could|should|would|is|are|do|does|did)\b/i;
