@@ -40,7 +40,7 @@ import { sessionForDate, type SessionMove } from './session-move'
  * A trainee without a plan cannot reach this screen (App keeps them in
  * onboarding), so an absent plan here always means "not yet", never "none".
  */
-export type SessionStatus = 'rest' | 'not_started' | 'in_progress' | 'done' | 'unknown'
+export type SessionStatus = 'rest' | 'not_started' | 'in_progress' | 'done' | 'unknown' | 'moved'
 
 export interface TodaySession {
   status: SessionStatus
@@ -66,10 +66,10 @@ export interface TodaySession {
   leadLift: { name: string; kg: number } | null
   /**
    * Set when today's session has been MOVED to another day ("I'll do it
-   * tomorrow"). The session stays on screen with its Start button — the same
-   * choice TodayPanel makes for a swapped day, and for the same reason: the
-   * work has not vanished, it is owed on a named day, and she may still do it
-   * today if she wants. This is the line that says so.
+   * tomorrow") — status is 'moved', focus names what left, and nothing else is
+   * on offer. The first version kept the session on screen under this line,
+   * copying the swapped day; Ashley, 8 Sep 2026: "it didnt move my workout."
+   * A moved session leaves today. The Exercise tab draws the same rule.
    */
   movedTo?: { date: string; dayName: string } | null
   /** Set when today IS the day another session was moved onto — where it came from. */
@@ -192,12 +192,12 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
   const liveWeekData = mesocycle.find(w => w.week_number === liveWeek)
   const activeWeekDays = liveWeekData ? liveWeekData.days : exercisePlan
   // MOVES FIRST. On the receiving end of a move this is the session that
-  // travelled in; on the origin it is the plan's own session, kept
-  // deliberately (see TodaySession.movedTo) rather than blanked.
+  // travelled in; on the origin it is NOTHING — the session has left for the
+  // named day (see TodaySession.movedTo). The plan's own row is read only to
+  // say what left, by name.
   const todayResolved = sessionForDate({ date: todayStr, plan: activeWeekDays, moves })
-  const todayWorkoutDay = todayResolved.movedTo
-    ? findWorkoutDay(activeWeekDays, dayName)
-    : todayResolved.day ?? undefined
+  const todayWorkoutDay = todayResolved.movedTo ? undefined : todayResolved.day ?? undefined
+  const movedAwayFocus = todayResolved.movedTo ? findWorkoutDay(activeWeekDays, dayName)?.focus ?? null : null
   // HAS THE PLAN ARRIVED AT ALL — see SessionStatus. Both sources empty is the
   // cold-load window, not a trainee without a plan.
   const planKnown = mesocycle.length > 0 || exercisePlan.length > 0
@@ -255,6 +255,12 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
   const session: TodaySession = !planKnown
     ? { status: 'unknown', focus: null, exerciseNames: [], setsLogged: 0, setsPlanned: 0,
         exerciseCount: 0, estimatedMinutes: null, minutesLeft: null, leadLift: null }
+    // AHEAD OF REST: a moved day has no session on it either, and the whole
+    // point is that it is not called a rest day.
+    : todayResolved.movedTo
+    ? { status: 'moved', focus: movedAwayFocus, exerciseNames: [], setsLogged: 0, setsPlanned: 0,
+        exerciseCount: 0, estimatedMinutes: null, minutesLeft: null, leadLift: null,
+        movedTo: todayResolved.movedTo }
     : isRestDay
     ? { status: 'rest', focus: null, exerciseNames: [], setsLogged: 0, setsPlanned: 0,
         exerciseCount: 0, estimatedMinutes: null, minutesLeft: null, leadLift: null }

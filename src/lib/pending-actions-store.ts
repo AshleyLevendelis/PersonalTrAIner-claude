@@ -30,6 +30,14 @@ export interface DiffRow {
 
 export interface ProposalDiff {
   rows: DiffRow[]
+  /**
+   * The coach's own sentence for the bubble above the card, written by the
+   * builder that resolved the facts — for a move, the only code that knows
+   * which day it lands on. Always a question: the write has not happened when
+   * this is read. Optional, so older rows and kinds without one fall back to
+   * the client's per-kind line (ChatAssistant's describeProposalClientSide).
+   */
+  lead?: string
   unchanged?: string[]
   implications?: { severity: 'info' | 'warn'; text: string }[]
   rationale?: string

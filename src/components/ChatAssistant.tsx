@@ -655,7 +655,11 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
   const planKnown = liveWeekDays.length > 0
   // Safe to hand a fresh array each render: the hook refetches on profile and
   // date only and uses the plan synchronously for classification.
-  const trainingWeek = useTrainingWeek(profile.id, activeSession.date, liveWeekDays, planCreatedAt ?? profile.created_at)
+  // The refresh token is the SAME one the other readers use, so a move the
+  // chat has just confirmed is in `trainingWeek.moves` by the next turn —
+  // resolveMoveTarget reads those to keep two sessions off one day, and a
+  // stale list would let it propose the day it just filled.
+  const trainingWeek = useTrainingWeek(profile.id, activeSession.date, liveWeekDays, planCreatedAt ?? profile.created_at, dataVersion + ownWriteVersion)
   const yesterdayDate = (() => {
     const d = new Date(`${activeSession.date}T12:00:00`)
     d.setDate(d.getDate() - 1)
@@ -1636,6 +1640,13 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
 
   /** Client-authored copy for a proposal turn — D1 means the model's own text for this turn is never rendered, only this. */
   const describeProposalClientSide = (pendingAction: ChatPendingActionView): string => {
+    // THE COACH'S OWN SENTENCE, when the builder wrote one. Ashley, 8 Sep 2026,
+    // on a move card under "Want me to move that session?": "it doesnt give me
+    // any sort of message it just gives a straight up swap confirmation." The
+    // builder that resolved the day is the only code that knows it, so it
+    // writes the line; everything below is the fallback for kinds without one.
+    // Still client-authored (D1): the model never writes this bubble.
+    if (pendingAction.diff.lead) return pendingAction.diff.lead
     const rows = pendingAction.diff.rows
     if (rows.length === 0) return "Here's a change I can make:"
     if (pendingAction.kind === 'propose_injury_recovered') return "Here's the injury update:"
@@ -2106,6 +2117,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       preconditions: { date: raw, dayName },
       payload: { date: raw, dayName, sessionFocus: session.focus, reason },
       diff: {
+        lead: `I'll mark ${dayName} as a rest day you chose, so it won't show as missed. Shall I?`,
         rows: [{ field: dayName, before: session.focus, after: 'Rest day' }],
         implications: [
           { severity: 'info', text: "It won't count as a missed session, and it won't count against your week." },
@@ -2179,6 +2191,11 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       preconditions: { fromDate, toDate: target.date },
       payload,
       diff: {
+        // Said out loud, in the app's words, from the day THIS code resolved.
+        // A question until she taps: nothing has moved when this is read.
+        lead: target.asWanted || !target.requestedDayName
+          ? `${target.dayName}'s free, so I'll put ${fromDayName}'s ${session.focus} there and ${fromDayName} won't count as missed. Shall I?`
+          : `${target.requestedDayName} already has a session, so the next free day is ${target.dayName} — I'll put ${fromDayName}'s ${session.focus} there and ${fromDayName} won't count as missed. Shall I?`,
         rows: [
           { field: fromDayName, before: session.focus, after: `Moved to ${target.dayName}` },
           { field: target.dayName, before: 'Nothing scheduled', after: session.focus },

@@ -93,6 +93,18 @@ check('4. the session itself is still there, not hidden', swapped.hasExerciseLis
 
 await shoot('swapped-day')
 
+// --- Home's strip: today's cell WRITES the swap ---------------------------
+// Until 8 Sep 2026 Home drew a plain dot for today whatever its state, so the
+// day she had just swapped looked like a day with nothing done — "still not
+// moving markers or marking a day as muay thai".
+await ev(`location.hash = '#/tab/dashboard'`); await wait(2500)
+let homeCell = null
+for (let i = 0; i < 16 && homeCell === null; i++) {
+  homeCell = await ev(`(() => { const n = document.querySelector('[aria-label$="swapped for another activity"]'); return n ? n.textContent.trim() : null })()`)
+  if (homeCell === null) await wait(500)
+}
+check('5. Home\'s strip marks today as swapped — ⇄, not the plain today dot', homeCell === '⇄', homeCell)
+
 const err = await ev('window.__err ?? null')
 check('no uncaught error on the page', err === null, err)
 

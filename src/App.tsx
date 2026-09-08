@@ -2515,6 +2515,8 @@ function App() {
               onDevOverrideDayChange={setDevOverrideDay}
               onDevBypassLocksChange={setDevBypassLocks}
               onLogsSeeded={() => setLogsVersion(v => v + 1)}
+              logsVersion={logsVersion}
+              onLogsUpdated={() => { setLogsVersion(v => v + 1); bumpCoachData() }}
             />
           </TabsContent>
 

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Heart, ChevronRight, Loader2 } from 'lucide-react'
+import { Heart, ChevronRight, Loader2, ArrowRight } from 'lucide-react'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { isPlausibleCardioDuration, MAX_PLAUSIBLE_CARDIO_MINUTES, saveCardioLog, deleteCardioLog } from '@/lib/cardio-log-store'
 import type { WorkoutDay, RecommendedCardio } from '@/lib/types'
@@ -194,6 +194,92 @@ export function RestDayCard({
               </Button>
             ))}
           </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+/**
+ * A day whose session has LEFT for another day this week — "I'll do it
+ * tomorrow". The first version kept the full session on screen under a
+ * banner, copying the swapped day; Ashley, 8 Sep 2026: "it didnt move my
+ * workout." So this shows the moved state and nothing of the session: where
+ * it went, the week's tally, tomorrow, the activity log, and one way back.
+ *
+ * "Do it today instead" UNMAKES the move rather than adding a second copy.
+ * With the move still recorded, training today would earn this day its tick
+ * (logged work outranks 'moved' in classifyDay) while the other day still
+ * showed the session as moved in — the same work owed twice. The caller
+ * clears the move with the write the chat's Undo uses.
+ */
+export function MovedDayCard({
+  focus,
+  toDayName,
+  weekTally,
+  tomorrow,
+  onPeek,
+  onDoItToday,
+}: {
+  /** What left — the plan's own session for this weekday. Null when the plan cannot say. */
+  focus: string | null
+  toDayName: string
+  weekTally: { done: number; planned: number }
+  tomorrow?: { dayName: string; focus: string; exerciseCount: number }
+  onPeek?: (dayName: string) => void
+  /** Resolves true when the move was cleared, false when the write failed. */
+  onDoItToday: () => Promise<boolean>
+}) {
+  const [busy, setBusy] = useState(false)
+  const [failed, setFailed] = useState(false)
+
+  const handleDoItToday = async () => {
+    setBusy(true)
+    setFailed(false)
+    try {
+      const ok = await onDoItToday()
+      if (!ok) setFailed(true)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Card className="bg-[color:var(--surface-deep)]">
+      <CardContent className="py-4 space-y-3">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center justify-center size-10 rounded-full bg-muted shrink-0">
+            <ArrowRight className="size-5 text-muted-foreground" />
+          </div>
+          <div className="space-y-0.5">
+            <p className="text-sm font-medium" data-testid="moved-away">{focus ?? "Today's session"} → {toDayName}</p>
+            <p className="text-xs text-muted-foreground">Moved to {toDayName}. Nothing owed here today.</p>
+          </div>
+        </div>
+        {weekTally.planned > 0 && (
+          <p className="text-xs text-muted-foreground">
+            This week: {weekTally.done} of {weekTally.planned} sessions done.
+          </p>
+        )}
+        {tomorrow && <TomorrowPreview tomorrow={tomorrow} onPeek={onPeek} />}
+        <ActivityLogEntry />
+        {/* Its own block, not inline after the activity link: two text links
+            on one line ran together as "Log a walk or other activityDo it
+            today instead" in the first screenshot. */}
+        <div>
+          <button
+            type="button"
+            className="text-xs text-muted-foreground underline decoration-dotted underline-offset-2 hover:text-foreground disabled:opacity-50"
+            disabled={busy}
+            onClick={handleDoItToday}
+          >
+            {busy ? 'Putting it back…' : 'Do it today instead →'}
+          </button>
+        </div>
+        {failed && (
+          <p className="text-[0.6875rem] leading-[1.4] text-[color:var(--role-warn-text)]">
+            That didn&apos;t save — the session is still on {toDayName}. Try again in a moment.
+          </p>
         )}
       </CardContent>
     </Card>

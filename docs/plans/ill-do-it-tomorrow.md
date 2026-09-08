@@ -85,6 +85,21 @@ she chose, so it stops counting against her — rather than inventing a slot.
   training day is. It therefore COUNTS toward the tally — which is what keeps
   the week's total unchanged by a move. One session owed, one session owed.
 
+**Revised the same evening (8 Sep 2026, 22:16).** The first build kept the
+origin day's full session on screen under a banner — "You moved today's
+session to Wednesday. It's still here if you want it today" — copying the
+swapped-day precedent. Ashley, from her phone: *"it didnt move my workout."*
+So the origin day now shows the moved state and nothing of the session
+(`MovedDayCard` on the Exercise tab; `status: 'moved'` on Home), with one way
+back, **"Do it today instead"**, which UNMAKES the move — the same write as the
+chat's Undo — rather than borrowing the session onto a day that still records
+it as elsewhere (that would have counted it twice: the origin's tick from
+logged work, and the target still owing it). And the bubble above the move
+card now carries the app's own sentence naming the day (`diff.lead`, written
+by the client builder that resolved it — D1 intact, the model never writes it):
+*"Wednesday's free, so I'll put Tuesday's Push & Press there and Tuesday won't
+count as missed. Shall I?"*
+
 ## The readers
 
 `useTrainingWeek` is already the single reader of `workout_sessions` for the

@@ -35,12 +35,18 @@ export function HomeWeekStrip({ days, todayName }: { days: TrainingWeekDay[]; to
               border: isToday ? '1px solid rgba(var(--glow-rgb), .45)' : '1px solid transparent',
             }}
           >
-            {isToday ? (
+            {/* TODAY'S CELL SAYS WHAT HAPPENED. This drew a plain dot for
+                today whatever its state, so a day swapped, moved or finished
+                TODAY could never show ⇄, → or ✓ here — Ashley, 8 Sep 2026:
+                "still not moving markers". The dot now means exactly what it
+                means on the Exercise strip (WeekContextRow): due, and only
+                due. Same rule, same glyph file, so the two cannot drift. */}
+            {isToday && d.state === 'due' ? (
               <span aria-hidden className="size-[6px] rounded-full bg-primary" />
             ) : (
               <span
                 aria-hidden
-                className={`leading-none ${isDone ? 'text-[0.75rem] text-primary-text' : 'text-[0.6875rem] text-muted-foreground'}`}
+                className={`leading-none ${isDone ? 'text-[0.75rem]' : 'text-[0.6875rem]'} ${isDone || isToday ? 'text-primary-text' : 'text-muted-foreground'}`}
               >
                 {GLYPH[d.state]}
               </span>

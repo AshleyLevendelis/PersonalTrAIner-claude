@@ -43,6 +43,10 @@ interface ExerciseTabProps {
   onDevOverrideDayChange: (day: string | null) => void
   onDevBypassLocksChange: (bypass: boolean) => void
   onLogsSeeded: () => void
+  /** App's logsVersion — the week strip and today's panel re-read when the chat writes a move, a swap or a rest day. */
+  logsVersion?: number
+  /** Fired when THIS tab changes a day (clearing a move from the moved-day card), so Home and the chat re-read. */
+  onLogsUpdated?: () => void
 }
 
 export function ExerciseTab({
@@ -64,6 +68,8 @@ export function ExerciseTab({
   onDevOverrideDayChange,
   onDevBypassLocksChange,
   onLogsSeeded,
+  logsVersion,
+  onLogsUpdated,
 }: ExerciseTabProps) {
   const { route } = useAppRoute()
   const { liveWeek } = useActiveSession()
@@ -155,6 +161,8 @@ export function ExerciseTab({
         profile={profile}
         profileId={profileId}
         planCreatedAt={planCreatedAt}
+        logsVersion={logsVersion}
+        onLogsUpdated={onLogsUpdated}
         devOverrideDay={devOverrideDay}
         onOpenProgram={() => { window.location.hash = programHash(liveWeek) }}
         onOpenSwap={(dayName, exIndex, exerciseName) => setSwapTarget({ dayName, exIndex, exerciseName })}

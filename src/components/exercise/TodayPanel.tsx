@@ -33,7 +33,8 @@ import { SupersetGroup } from './SupersetGroup'
 import { FinisherRow } from './FinisherRow'
 import { AdditionalWorkSection } from './AdditionalWorkSection'
 import { AddUnplannedWork } from './AddUnplannedWork'
-import { RestDayCard, ActiveRecoveryCard } from './RestDayCard'
+import { RestDayCard, ActiveRecoveryCard, MovedDayCard } from './RestDayCard'
+import { setSessionMove } from '@/lib/daily-tracking'
 import { SessionSummaryDialog, type SessionSummaryData } from './SessionSummaryDialog'
 import { InsightBanner } from '@/components/ui/insight-banner'
 import type { WorkoutDay, MesocycleWeek, UserProfile } from '@/lib/types'
@@ -56,6 +57,8 @@ export function TodayPanel({
   profile,
   profileId,
   planCreatedAt,
+  logsVersion,
+  onLogsUpdated,
   devOverrideDay,
   onOpenProgram,
   onOpenSwap,
@@ -74,6 +77,10 @@ export function TodayPanel({
   profileId?: string
   /** When this plan came into being — days before it were never prescribed. */
   planCreatedAt?: string
+  /** App's logsVersion — bumped when the chat writes a move, a swap or a rest day, so this panel re-reads the week instead of drawing a stale day. */
+  logsVersion?: number
+  /** Fired when THIS panel changes a day (clearing a move), so Home and the chat re-read. */
+  onLogsUpdated?: () => void
   /** Fired when steps are logged here, so the always-mounted chat tab re-reads them. */
   devOverrideDay?: string | null
   onOpenProgram: () => void
@@ -187,7 +194,7 @@ export function TodayPanel({
     setBorrowedDayName(null)
   }, [todayName])
 
-  const weekTrain = useTrainingWeek(profileId, today, liveWeekPlan, planCreatedAt)
+  const weekTrain = useTrainingWeek(profileId, today, liveWeekPlan, planCreatedAt, logsVersion)
 
   const effectiveDayName = borrowedDayName ?? todayName
   // TODAY'S CELL, resolved by the hook that already holds the whole week.
@@ -195,12 +202,15 @@ export function TodayPanel({
   // stays a straight plan lookup — a move is a fact about a date, and there
   // is no date being borrowed.
   const todayCell = borrowedDayName ? undefined : weekTrain.days.find(d => d.date === today)
-  // `session` is the moved-in session on the receiving end of a move, and
-  // null on the origin — where the fallback puts the plan's own session back,
-  // deliberately: a moved day keeps its session on screen exactly as a swapped
-  // day does, with an honest line above it, rather than pretending the work
-  // vanished.
-  const workout = (todayCell?.session ?? undefined) ?? liveWeekPlan.find(d => d.day === effectiveDayName)
+  // `session` is the moved-in session on the receiving end of a move, the
+  // plan's own row on an ordinary day, and null on the ORIGIN of a move — and
+  // on the origin it stays null. The first version let the plan lookup put the
+  // session back "in case she still wanted it today"; Ashley, 8 Sep 2026: "it
+  // didnt move my workout." A moved session leaves this screen. Borrowing a
+  // day still works: it blanks todayCell above, so the plan lookup answers.
+  const workout = todayCell?.movedTo
+    ? undefined
+    : (todayCell?.session ?? undefined) ?? liveWeekPlan.find(d => d.day === effectiveDayName)
   // WHAT THEY DID INSTEAD, if they told the coach. The week strip has drawn
   // this correctly all along; this panel read nothing, so on 8 Sep 2026 it
   // went on offering "Start workout" for a session Ashley had already
@@ -215,6 +225,17 @@ export function TodayPanel({
   // glyph and the swap above — never a second read of the same row.
   const movedAwayTo = todayCell?.movedTo ?? null
   const movedInFrom = todayCell?.movedFrom ?? null
+  const isMovedAway = movedAwayTo != null
+
+  // "DO IT TODAY INSTEAD" — unmakes the move (MovedDayCard says why). The same
+  // write the chat's Undo uses, then the same re-reads the chat triggers, so
+  // the strip, Home and the coach all see an ordinary day again.
+  const handleDoItToday = async (): Promise<boolean> => {
+    if (!profileId) return false
+    const ok = await setSessionMove(profileId, today, null)
+    if (ok) { weekTrain.refresh(); onLogsUpdated?.() }
+    return ok
+  }
 
   const isRestDay = !workout
   const isActiveRecovery = !!workout && workout.exercises.length === 0
@@ -277,7 +298,14 @@ export function TodayPanel({
 
   const tomorrowIdx = (DAY_ORDER.indexOf(todayName) + 1) % 7
   const tomorrowName = DAY_ORDER[tomorrowIdx]
-  const tomorrowWorkout = liveWeekPlan.find(d => d.day === tomorrowName)
+  // Through the hook first, so a session MOVED onto tomorrow previews as
+  // tomorrow's session and one moved off it previews as nothing; the plan's
+  // own row answers only when nothing has happened to that date (or when
+  // tomorrow falls outside the week the hook holds). Same source as the strip.
+  const tomorrowCell = weekTrain.days.find(d => d.dayName === tomorrowName)
+  const tomorrowWorkout = tomorrowCell?.movedTo
+    ? undefined
+    : (tomorrowCell?.session ?? undefined) ?? liveWeekPlan.find(d => d.day === tomorrowName)
   const tomorrowPreview = tomorrowWorkout && tomorrowWorkout.exercises.length > 0
     ? { dayName: tomorrowName, focus: tomorrowWorkout.focus, exerciseCount: tomorrowWorkout.exercises.length }
     : undefined
@@ -436,6 +464,15 @@ export function TodayPanel({
             banBusyName={banBusy}
           />
         )
+      ) : isMovedAway && movedAwayTo ? (
+        <MovedDayCard
+          focus={liveWeekPlan.find(d => d.day === todayName)?.focus ?? null}
+          toDayName={movedAwayTo.dayName}
+          weekTally={{ done: weekTrain.sessionsDone, planned: weekTrain.sessionsPlanned }}
+          tomorrow={tomorrowPreview}
+          onPeek={d => setPeekDay(d)}
+          onDoItToday={handleDoItToday}
+        />
       ) : isRestDay ? (
         <RestDayCard
           dayName={todayName}
@@ -459,20 +496,15 @@ export function TodayPanel({
               this panel carried on as if the session were still ahead of her.
               The list stays visible — she may still want to train — but the
               screen has to say what it knows first. */}
-          {/* Both banners use the SAME component the swap below does, so the
-              three things that can have happened to a day look like three of
-              one kind rather than one styled thing and two afterthoughts. */}
+          {/* The RECEIVING end of a move uses the same component the swap
+              below does, so the two things that can sit above a session look
+              like two of one kind. The day a session LEFT is not a banner over
+              the session any more — it is MovedDayCard, above, with nothing
+              of the session under it. */}
           {movedInFrom && (
             <InsightBanner tone="ai" data-testid="moved-in">
               <span className="text-sm">
                 This is <span className="font-semibold">{movedInFrom.dayName}</span>&apos;s session, moved here.
-              </span>
-            </InsightBanner>
-          )}
-          {movedAwayTo && (
-            <InsightBanner tone="ai" data-testid="moved-away">
-              <span className="text-sm">
-                You moved today&apos;s session to <span className="font-semibold">{movedAwayTo.dayName}</span>. It&apos;s still here if you want it today.
               </span>
             </InsightBanner>
           )}
@@ -681,10 +713,10 @@ export function TodayPanel({
               app telling her it did not hear. Same handler, honest label. */}
           <Button
             className="h-[52px] w-full text-[0.9375rem] font-semibold"
-            variant={swappedToday || movedAwayTo ? 'outline' : 'default'}
+            variant={swappedToday ? 'outline' : 'default'}
             onClick={startSession}
           >
-            {swappedToday || movedAwayTo ? 'Train it anyway' : 'Start workout'}
+            {swappedToday ? 'Train it anyway' : 'Start workout'}
           </Button>
         </div>
       )}

@@ -534,7 +534,7 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
         <div data-tour="hero">
           <div className="flex items-baseline justify-between gap-3">
             <p className="ds-label">Today&apos;s session</p>
-            {data.session.status !== 'rest' && data.session.status !== 'unknown' && data.session.estimatedMinutes != null && (
+            {data.session.status !== 'rest' && data.session.status !== 'unknown' && data.session.status !== 'moved' && data.session.estimatedMinutes != null && (
               <span className="text-[0.6875rem] text-muted-foreground">~{data.session.estimatedMinutes} min</span>
             )}
           </div>
@@ -548,6 +548,19 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
                screen and only the block that needs the plan waits for it.
                No CTA: there is nothing yet to start. */
             <p className="mt-1.5 text-[0.78125rem] text-muted-foreground">Checking your plan…</p>
+          ) : data.session.status === 'moved' && data.session.movedTo ? (
+            <>
+              {/* THE SESSION HAS LEFT. The first version kept the focus and
+                  the Start button here with a grey "still here if you want it
+                  today" under them; Ashley, 8 Sep 2026: "it didnt move my
+                  workout." Now Home says where it went and offers nothing to
+                  start — the Exercise tab draws the same rule, and its card
+                  carries the one way back. */}
+              <p className="mt-1.5 text-[1.5625rem] font-bold tracking-[-.02em] glow-text">Moved to {data.session.movedTo.dayName}</p>
+              <p className="mt-1.5 text-[0.78125rem] text-muted-foreground">
+                {data.session.focus ?? "Today's session"} is waiting for you on {data.session.movedTo.dayName} · {week.sessionsDone} of {week.sessionsPlanned} session{week.sessionsPlanned === 1 ? '' : 's'} done
+              </p>
+            </>
           ) : data.session.status === 'rest' ? (
             <>
               {/* NO truncate, so the glow is not clipped — the handoff calls
@@ -570,18 +583,13 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
                 )}
               </div>
               <p className="mt-1.5 text-[0.78125rem] text-muted-foreground">{sessionGlance}</p>
-              {/* THE THIRD THING THAT CAN HAVE HAPPENED TO TODAY, after a swap
-                  and a chosen rest. The session stays on screen with its
-                  button — she may still do it today — and this says where it
-                  went, so Home and the Exercise tab tell her the same story. */}
+              {/* THE RECEIVING END of a move: this session came from another
+                  day, and the line says so. The day it LEFT is the 'moved'
+                  branch above, not a line under a session that is no longer
+                  here. */}
               {data.session.movedFrom && (
                 <p className="mt-1 text-[0.78125rem] text-muted-foreground">
                   {data.session.movedFrom.dayName}&apos;s session, moved here.
-                </p>
-              )}
-              {data.session.movedTo && (
-                <p className="mt-1 text-[0.78125rem] text-muted-foreground">
-                  Moved to {data.session.movedTo.dayName} — still here if you want it today.
                 </p>
               )}
               {data.session.status !== 'done' && (
