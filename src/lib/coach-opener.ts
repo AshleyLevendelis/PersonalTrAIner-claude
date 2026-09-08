@@ -84,6 +84,19 @@ export interface Opener {
   attention: boolean
 }
 
+/**
+ * WHAT THE COACH SAYS WHEN IT DOES NOT KNOW WHAT TODAY HOLDS.
+ *
+ * Exported because there are TWO first bubbles, not one, and until 8 Sep 2026
+ * only this one knew the difference. ChatAssistant seeds a synchronous
+ * greeting into `useState` before any read has resolved, and that greeting
+ * composed its own sentence from an `exercisePlan` that is `[]` on every cold
+ * load (App.tsx:111) — so it said "it's a rest day on your plan" while this
+ * module was carefully not saying it. Same screen, same second, opposite
+ * conclusions. One string now, read by both.
+ */
+export const PLAN_UNKNOWN_TEXT = `how's it going?`
+
 export function pickOpener(input: OpenerInput): Opener {
   const { hour, cutoffHour, awaitingFeel, missedYesterday, planKnown, todaySession, todayLogged, tomorrowSession } = input
 
@@ -139,7 +152,7 @@ export function pickOpener(input: OpenerInput): Opener {
   if (!planKnown) {
     return {
       kind: 'plan_unknown',
-      text: `how's it going?`,
+      text: PLAN_UNKNOWN_TEXT,
       chips: [
         "What's on for today?",
         'How am I doing so far?',

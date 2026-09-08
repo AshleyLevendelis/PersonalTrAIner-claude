@@ -26,7 +26,20 @@ import { supabase } from './supabase'
 import type { UserProfile, MacroTargets, WorkoutDay, MesocycleWeek, ExerciseSetLog } from './types'
 import { estimateDaySeconds } from './session-duration'
 
-export type SessionStatus = 'rest' | 'not_started' | 'in_progress' | 'done'
+/**
+ * 'unknown' IS NOT 'rest', and conflating them is the defect this value
+ * exists to stop. Home's aggregate runs as soon as the active session is
+ * ready, which on a cold load is BEFORE App.tsx's plan read resolves
+ * (App.tsx:111,138 hold [] until then) — so `todayWorkoutDay` was undefined,
+ * `isRestDay` was true, and Home announced a rest day, with no Start button,
+ * on a day she was due to train. Measured 8 Sep 2026: with the plan landing
+ * at 1.2s, Home still read "Rest day" at 6.8s while its own week strip beside
+ * it had corrected to four sessions.
+ *
+ * A trainee without a plan cannot reach this screen (App keeps them in
+ * onboarding), so an absent plan here always means "not yet", never "none".
+ */
+export type SessionStatus = 'rest' | 'not_started' | 'in_progress' | 'done' | 'unknown'
 
 export interface TodaySession {
   status: SessionStatus
@@ -76,7 +89,8 @@ export interface DashboardData {
   today: string
   dayName: string
   session: TodaySession
-  tomorrowLabel: string
+  /** Null while the plan has not arrived — the row is dropped rather than guessed at. */
+  tomorrowLabel: string | null
   coachTip: string | null
   /** Which rule produced coachTip — drives the bubble's reply chips. */
   coachTipKey: string | null
@@ -160,6 +174,9 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
   const totalWeeks = mesocycle.length || 4
   const liveWeekData = mesocycle.find(w => w.week_number === liveWeek)
   const todayWorkoutDay = liveWeekData ? findWorkoutDay(liveWeekData.days, dayName) : findWorkoutDay(exercisePlan, dayName)
+  // HAS THE PLAN ARRIVED AT ALL — see SessionStatus. Both sources empty is the
+  // cold-load window, not a trainee without a plan.
+  const planKnown = mesocycle.length > 0 || exercisePlan.length > 0
 
   const tomorrowDate = new Date(now.getTime() + 86_400_000)
   const tomorrowName = tomorrowDate.toLocaleDateString('en-US', { weekday: 'long' })
@@ -174,14 +191,19 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
   // Counted exactly as today's own glance counts (session.exerciseCount):
   // every exercise on the day.
   const tomorrowCount = tomorrowWorkoutDay?.exercises.length ?? 0
-  const tomorrowLabel = tomorrowWorkoutDay && tomorrowWorkoutDay.exercises.length > 0
-    ? `Tomorrow: ${tomorrowWorkoutDay.focus}${tomorrowCount > 0 ? ` · ${tomorrowCount} exercise${tomorrowCount === 1 ? '' : 's'}` : ''}`
-    : 'Tomorrow: Rest'
+  // Null, not "Rest", while the plan is unknown: this row reads off the same
+  // empty array today's did, so it told her tomorrow was a rest day for the
+  // same reason and with the same confidence.
+  const tomorrowLabel = !planKnown
+    ? null
+    : tomorrowWorkoutDay && tomorrowWorkoutDay.exercises.length > 0
+      ? `Tomorrow: ${tomorrowWorkoutDay.focus}${tomorrowCount > 0 ? ` · ${tomorrowCount} exercise${tomorrowCount === 1 ? '' : 's'}` : ''}`
+      : 'Tomorrow: Rest'
 
   // ---- Today's session status --------------------------------------------
   const nonWarmupToday = todayLogs.filter(l => !l.is_warmup)
   const setsPlanned = todayWorkoutDay?.exercises.reduce((s, ex) => s + ex.sets, 0) ?? 0
-  const isRestDay = !todayWorkoutDay || todayWorkoutDay.exercises.length === 0
+  const isRestDay = planKnown && (!todayWorkoutDay || todayWorkoutDay.exercises.length === 0)
 
   let explicitlyCompleted = false
   if (!isRestDay) {
@@ -204,7 +226,10 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
     .sort((a, b) => (b.suggested_load_kg ?? 0) - (a.suggested_load_kg ?? 0))
     .map(e => ({ name: e.name, kg: e.suggested_load_kg as number }))[0] ?? null
 
-  const session: TodaySession = isRestDay
+  const session: TodaySession = !planKnown
+    ? { status: 'unknown', focus: null, exerciseNames: [], setsLogged: 0, setsPlanned: 0,
+        exerciseCount: 0, estimatedMinutes: null, minutesLeft: null, leadLift: null }
+    : isRestDay
     ? { status: 'rest', focus: null, exerciseNames: [], setsLogged: 0, setsPlanned: 0,
         exerciseCount: 0, estimatedMinutes: null, minutesLeft: null, leadLift: null }
     : {

@@ -2,6 +2,64 @@
 
 Newest first. One line each.
 
+- [x] **A REST DAY IS A CLAIM, AND A CLAIM NEEDS THE PLAN** (roadmap 7/12,
+  first half) — Ashley's report was the chat; the worse instance was Home.
+  **The 7 Sep fix hardened the wrong bubble.** It taught `coach-opener.ts` the
+  difference between "nothing scheduled" and "we don't know yet" — and the
+  sentence she saw is not composed there. `initialGreetingDetail` seeds a
+  greeting into `useState` synchronously, before any read resolves, from an
+  `exercisePlan` that is `[]` on every cold load, and its fallback was
+  "it's a rest day on your plan".
+  **And the 2.5s timer was cancelled by the very thing it waited for.** The
+  finalize effect recognised its own untouched opener by REBUILDING the
+  greeting and comparing — against a string that moves the moment the plan
+  lands. So the effect bailed, its cleanup having already cleared the timer.
+  MEASURED at `planDelay=1200` (inside the ceiling): the opener still read
+  "it's a rest day on your plan" at **6.8s**. The only runs that recovered
+  were the SLOW ones, where the plan missed the deadline and the timer fired.
+  **Home had it too, stickier.** `loadDashboardData` ran as soon as the active
+  session was ready, decided a rest day from the same empty array, and
+  `exercisePlan`/`mesocycle` were not in the effect's dependencies — so it
+  never looked again. MEASURED: at 6.8s Home read "Rest day" with no Start
+  button, beside its own week strip showing four sessions. It was also written
+  to `dashboard-cache`, which is the FIRST thing the next cold open draws.
+  **Fixed at all three:** one exported `PLAN_UNKNOWN_TEXT` both bubbles read;
+  the seeded sentence remembered in a ref instead of recomputed; a
+  `SessionStatus` of `'unknown'` distinct from `'rest'`, never cached, with
+  the plan in the effect's deps. Ashley's ruling, 8 Sep — offered a block-only
+  wait, holding the whole screen, or drawing the last-known session — chose
+  the first: **"Checking your plan…"** in that block alone, everything else
+  Home knows still on screen, and no Tomorrow row guessed from the same empty
+  plan. Gate `test:plan-unknown` (31 checks, `loadDashboardData` called for
+  real against a stubbed database rather than regexed); 9 mutations, all
+  caught. Browser gate `verify:rest-day-race` (16 checks, both screens, plan
+  landing at 1.5s) — **10 of them fail against pre-fix code**, reproducing her
+  exact sentence.
+
+- [x] **THE MACRO QUESTION ANSWERED AS AN APOLOGY** (roadmap 7/12, second
+  half) — **no code change was needed; the fix has been sitting undeployed
+  since 7 Sep.** Verified against the LIVE function rather than the note that
+  claimed it: production `chat-gemini` is **version 70, updated 2026-09-07
+  17:25 UTC**, and its `log_meal` handler still contains `daily_food_logs`
+  (the table that has never existed) and none of `args.intent === "question"`,
+  `propose_meal_log` or `humanSlot`. The sentence she gets today, verbatim
+  from the deployed source: *"Meal logging arrives in the next update — I
+  can't record **X** yet. For now, keep an eye on your `snack_1` against its
+  budget: this is …"* — a correct calculation behind a canned apology, with
+  the raw slot key in it. The repo's version answers the question and says
+  nothing about logging; `test:meal-log` (32), `test:coach-promises` (146) and
+  `test:macro-split` (57) all pin it. **This one needs the deploy in roadmap
+  12, not a patch.**
+
+- [ ] `verify:tap-targets` fails on Home — 2 of 87 controls under 44px (the
+  weigh-in button at 22px tall, a numeric input at 28px). Pre-existing, not in
+  the 146-gate list; confirmed identical against pre-step-7 code.
+
+- [ ] The last hard-coded "I can't …" reply in `chat-gemini` is
+  `ban_exercise`. Deliberate (§7.2 A0 keeps ban disabled via chat) and it
+  names the working alternative, so it is not the shape Ashley reported —
+  noted so a future sweep does not have to re-derive that.
+
 - [x] **"I COULDN'T FIND THAT ON YOUR CURRENT PLAN" — FOR THINGS THAT WERE ON
   IT** (roadmap 6/12) — Ashley, 8 Sep 2026, asking the coach to swap an
   exercise.

@@ -80,6 +80,12 @@ const availableIdx = new Set([todayIdx, (todayIdx + 2) % 7, (todayIdx + 4) % 7, 
 // weekday. Off by default, so every existing run of this harness is
 // unchanged.
 const ABSURD = new URLSearchParams(location.search).get('absurd') === '1'
+
+// ?planDelay=N — App.tsx holds exercisePlan/mesocycle at [] until its read
+// resolves (App.tsx:111,138). Every other run of this harness hands them over
+// before first paint, so the window in which Home has no plan has never been
+// on screen here. 0 (the default) keeps that behaviour exactly.
+const PLAN_DELAY_MS = Number(new URLSearchParams(location.search).get('planDelay') ?? '0')
 export const STATED_DUMBBELL_KG = 24
 
 const profile: UserProfile = {
@@ -192,6 +198,18 @@ function Harness() {
   const activeTab: Tab = route.kind === 'tab' ? route.tab : 'dashboard'
   const [ready, setReady] = useState(false)
   useEffect(() => { setReady(true) }, [])
+  const [planArrived, setPlanArrived] = useState(PLAN_DELAY_MS <= 0)
+  useEffect(() => {
+    // The driver reads this rather than trusting a wall-clock sample: whether
+    // the plan had arrived when a sentence rendered is the actual question,
+    // and bundle parse time moves first paint around by hundreds of ms.
+    ;(window as unknown as Record<string, unknown>).__planArrived = planArrived
+    if (planArrived) return
+    const t = setTimeout(() => setPlanArrived(true), PLAN_DELAY_MS)
+    return () => clearTimeout(t)
+  }, [planArrived])
+  const livePlan = planArrived ? exercisePlan : []
+  const liveMeso = planArrived ? mesocycle : []
 
   const noop = () => {}
   return (
@@ -212,8 +230,8 @@ function Harness() {
 
       <main className="mx-auto max-w-md px-4 pb-40 pt-14">
         {activeTab === 'dashboard' && (
-          <Dashboard profile={profile} macros={macros} exercisePlan={exercisePlan}
-            mesocycle={mesocycle} planCreatedAt={profile.created_at}
+          <Dashboard profile={profile} macros={macros} exercisePlan={livePlan}
+            mesocycle={liveMeso} planCreatedAt={profile.created_at}
 />
         )}
         {activeTab === 'nutrition' && (

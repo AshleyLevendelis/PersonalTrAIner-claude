@@ -69,7 +69,7 @@ import { FEEL_SCALE, type SessionFeel } from '@/lib/types'
 import { takeChatPrefill } from '@/lib/chat-prefill-store'
 import { loadFeelContext, buildFeelBrief, feelRun, recordSessionFeel, type FeelContext } from '@/lib/session-feel'
 import { useTrainingWeek } from '@/hooks/useTrainingWeek'
-import { pickOpener, missedYesterdayFrom, type Opener } from '@/lib/coach-opener'
+import { pickOpener, missedYesterdayFrom, PLAN_UNKNOWN_TEXT, type Opener } from '@/lib/coach-opener'
 import {
   pickNudge, nudgeKeys, keysCoveredByOpener, loadNudgeStore, saveNudgeStore,
   rememberNudge, rememberWithoutSpeaking, NUDGE_MIN_GAP_MS,
@@ -312,6 +312,17 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
   }
 
   const initialGreetingDetail = (): string => {
+    // THE PLAN HAS NOT ARRIVED, WHICH IS NOT THE SAME AS A REST DAY. This is
+    // the distinction coach-opener.ts made on 7 Sep and this function did not,
+    // and this is the sentence Ashley actually saw: `exercisePlan` is `[]` on
+    // every cold load (App.tsx:111), so `find` returned undefined, and the
+    // fallback below announced a rest day on a training day, at 0ms, before a
+    // single read had resolved. Measured 8 Sep in .tour-harness/opener-race.mjs.
+    //
+    // An empty plan here NEVER means "no plan": App keeps a trainee without one
+    // in onboarding, so anyone rendering this screen has one.
+    if (exercisePlan.length === 0) return PLAN_UNKNOWN_TEXT
+
     const now = new Date()
     const hour = now.getHours()
     const dayName = now.toLocaleDateString('en-US', { weekday: 'long' })
@@ -381,12 +392,25 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
   // Supabase history fetch below even starts — see chat-cache.ts for why this
   // matters (the DB write for the most recent reply can race a chat-suggested
   // external link's tab backgrounding and never land).
+  // THE SENTENCE THAT WAS SEEDED, REMEMBERED RATHER THAN RECOMPUTED.
+  //
+  // The finalize effect below has to recognise its own untouched opener before
+  // replacing it, and it did that by rebuilding the greeting and comparing.
+  // That comparison is against a MOVING STRING: buildInitialGreeting reads the
+  // plan, so the moment the plan arrives it returns something different from
+  // what is on screen, the effect bails, and its cleanup has already cancelled
+  // the timer that would have finalised. The arrival being waited for is what
+  // killed the wait — measured 8 Sep: with the plan landing at 1.2s the opener
+  // was still reading "it's a rest day on your plan" at 6.8s, and the ONLY
+  // runs that recovered were the ones where the plan missed the 2.5s deadline.
+  const seededGreetingRef = useRef<string | null>(null)
+  if (seededGreetingRef.current === null) seededGreetingRef.current = buildInitialGreeting()
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     const cached = profile.id ? loadChatCache(profile.id) : null
     return cached ?? [
       {
         role: 'assistant',
-        content: buildInitialGreeting(),
+        content: seededGreetingRef.current as string,
         status: 'complete',
       }
     ]
@@ -854,7 +878,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
   const openerDeadlineRef = useRef<number | null>(null)
   useEffect(() => {
     if (openerFinalizedRef.current || !historyLoaded || isFirstEverChat == null || messages.length !== 1) return
-    if (messages[0].role !== 'assistant' || messages[0].content !== buildInitialGreeting()) return
+    if (messages[0].role !== 'assistant' || messages[0].content !== seededGreetingRef.current) return
 
     const finalize = () => {
       if (openerFinalizedRef.current) return
@@ -3450,7 +3474,14 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     }
     if (clearArmTimer.current) clearTimeout(clearArmTimer.current)
     setClearArmed(false)
-    setMessages([{ role: 'assistant', content: buildInitialGreeting(), status: 'complete' }])
+    // Re-seeded, so the ref that identifies the untouched opener follows it —
+    // and the finalize gate is re-armed, because clearing puts the conversation
+    // back in exactly the state that gate exists for.
+    const greeting = buildInitialGreeting()
+    seededGreetingRef.current = greeting
+    openerFinalizedRef.current = false
+    openerDeadlineRef.current = null
+    setMessages([{ role: 'assistant', content: greeting, status: 'complete' }])
     setHasMoreMessages(false)
     setQuickRepliesDismissed(false)
     setLastFailedInput(null)

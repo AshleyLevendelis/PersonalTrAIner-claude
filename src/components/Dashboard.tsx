@@ -247,7 +247,12 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
         const fresh = withMealSnapshot(d, profile.id, activeSession.date) ?? d
         setData(fresh)
         setLoadError(false)
-        saveDashboardCache(profile.id, activeSession.date, fresh)
+        // NOT CACHED WHEN THE PLAN WAS ABSENT. `data` initialises from this
+        // cache, so a day derived from an empty plan would be the FIRST thing
+        // the next cold open draws — the wrong answer, instantly, with no
+        // network to blame. A day we could not compute is not a day worth
+        // remembering; the re-run below replaces it within the same visit.
+        if (fresh.session.status !== 'unknown') saveDashboardCache(profile.id, activeSession.date, fresh)
       })
       // WITHOUT THIS, A FAILED LOAD IS INDISTINGUISHABLE FROM A SLOW ONE —
       // forever. `finally` cleared `loading`, but `data` stayed null and the
@@ -261,7 +266,14 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeSession.ready, activeSession.date, activeSession.logs.length, profile.id, weighInVersion, macros, retryVersion])
+    // exercisePlan AND mesocycle ARE DEPENDENCIES. They were not, and that is
+    // what made the wrong answer permanent rather than momentary: the effect
+    // ran once at mount with [] for both, decided a rest day, and had no
+    // reason to look again when the plan landed a second later. Home then sat
+    // on "Rest day" beside its own week strip showing four sessions. Both are
+    // App.tsx useState arrays, so the identity is stable and this re-runs when
+    // the plan actually changes, not on every render.
+  }, [activeSession.ready, activeSession.date, activeSession.logs.length, profile.id, weighInVersion, macros, retryVersion, exercisePlan, mesocycle])
 
   // THE CALORIE CELL FOLLOWS THE MEAL LIST ON THE OTHER TAB.
   //
@@ -518,12 +530,21 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
         <div data-tour="hero">
           <div className="flex items-baseline justify-between gap-3">
             <p className="ds-label">Today&apos;s session</p>
-            {data.session.status !== 'rest' && data.session.estimatedMinutes != null && (
+            {data.session.status !== 'rest' && data.session.status !== 'unknown' && data.session.estimatedMinutes != null && (
               <span className="text-[0.6875rem] text-muted-foreground">~{data.session.estimatedMinutes} min</span>
             )}
           </div>
 
-          {data.session.status === 'rest' ? (
+          {data.session.status === 'unknown' ? (
+            /* THE PLAN IS NOT HERE YET — and it is not a rest day. Ashley's
+               ruling, 8 Sep 2026, offered "Checking your plan…" here vs
+               holding the whole screen on its loading line vs drawing the
+               last-known session: she chose this one, so everything Home does
+               know (streak, calories, water, steps, weight, PRs) stays on
+               screen and only the block that needs the plan waits for it.
+               No CTA: there is nothing yet to start. */
+            <p className="mt-1.5 text-[0.78125rem] text-muted-foreground">Checking your plan…</p>
+          ) : data.session.status === 'rest' ? (
             <>
               {/* NO truncate, so the glow is not clipped — the handoff calls
                   this out and the old comment here explained why: overflow
@@ -762,6 +783,7 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
         )}
 
         {/* 7. TOMORROW — the one filled row on the page. */}
+        {data.tomorrowLabel != null && (
         <button
           type="button"
           onClick={() => { window.location.hash = tabHash('exercise') }}
@@ -776,6 +798,7 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
           </span>
           <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
         </button>
+        )}
       </div>
     </div>
   )
