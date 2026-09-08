@@ -15,6 +15,7 @@ import { loadDashboardCache, saveDashboardCache } from '@/lib/dashboard-cache'
 import { stepsTargetFor } from '@/lib/steps-target'
 import { getStepsForDate, logStepsManual, isPlausibleStepCount, MAX_PLAUSIBLE_DAILY_STEPS, type DailyStepsRow } from '@/lib/steps-store'
 import { logWater, undoLog, type WaterLogRow } from '@/lib/water-store'
+import { getLedgerSnapshot, subscribeMealStore } from '@/lib/meal-store'
 import { Flame, Droplets, Footprints, Scale, ChevronRight } from 'lucide-react'
 import { WeighInCard } from '@/components/WeighInCard'
 import type { UserProfile, MacroTargets, WorkoutDay, MesocycleWeek } from '@/lib/types'
@@ -159,6 +160,26 @@ function chipsForTip(key: string | null): { label: string; prefill: string }[] {
   return key ? (TIP_CHIPS[key] ?? []) : []
 }
 
+/**
+ * The day's macro figures re-derived from the meal store's own snapshot.
+ *
+ * Returns the input untouched when there is nothing to say — no data yet, or
+ * the store has not heard from the server for this day, in which case
+ * inventing "nothing eaten" would be worse than a stale number.
+ */
+function withMealSnapshot(d: DashboardData | null, profileId: string | undefined, date: string | undefined): DashboardData | null {
+  if (!d || !profileId || !date) return d
+  const snap = getLedgerSnapshot(profileId, date)
+  if (!snap) return d
+  return {
+    ...d,
+    caloriesEaten: snap.eaten.kcal,
+    proteinEaten: snap.eaten.protein,
+    carbsEaten: snap.eaten.carbs,
+    fatEaten: snap.eaten.fat,
+  }
+}
+
 export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreatedAt, onWeightLogged, logsVersion, trainerNudge, stepsVersion, onStepsLogged }: DashboardProps) {
   const stepsTarget = stepsTargetFor(profile)
   const activeSession = useActiveSession()
@@ -172,8 +193,16 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
   // It does NOT skip the fetch. See dashboard-cache.ts: the effect below runs
   // unconditionally and swaps the fresh data in, so the stale window is no
   // longer than the blank window it replaces.
+  //
+  // AND THE CACHED CALORIES ARE CORRECTED ON THE WAY IN. The cache is written
+  // by this screen; a meal logged on the Nutrition tab happens while this
+  // screen is unmounted, so nothing here was around to update it. Home then
+  // opened on the pre-meal figure and sat on it for the length of its own
+  // load — showing a wrong number rather than a missing one, which is worse.
+  // withMealSnapshot re-derives that one figure from what the meal store
+  // already knows, with no request.
   const [data, setData] = useState<DashboardData | null>(
-    () => loadDashboardCache(profile.id, activeSession.date),
+    () => withMealSnapshot(loadDashboardCache(profile.id, activeSession.date), profile.id, activeSession.date),
   )
   const [loading, setLoading] = useState(true)
 
@@ -212,9 +241,13 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
     })
       .then(d => {
         if (cancelled) return
-        setData(d)
+        // Through the snapshot as well: this promise was started before any
+        // meal logged while it was in flight, so its ledger half can already
+        // be out of date by the time it resolves.
+        const fresh = withMealSnapshot(d, profile.id, activeSession.date) ?? d
+        setData(fresh)
         setLoadError(false)
-        saveDashboardCache(profile.id, activeSession.date, d)
+        saveDashboardCache(profile.id, activeSession.date, fresh)
       })
       // WITHOUT THIS, A FAILED LOAD IS INDISTINGUISHABLE FROM A SLOW ONE —
       // forever. `finally` cleared `loading`, but `data` stayed null and the
@@ -229,6 +262,32 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSession.ready, activeSession.date, activeSession.logs.length, profile.id, weighInVersion, macros, retryVersion])
+
+  // THE CALORIE CELL FOLLOWS THE MEAL LIST ON THE OTHER TAB.
+  //
+  // It had no subscription at all: its number comes from loadDashboardData,
+  // whose effect depends on the date, the profile, the logged sets and the
+  // macros — none of which change when a meal is logged. Leaving Home and
+  // coming back re-mounts this component and so did eventually correct it,
+  // but only after another await on the network, and the cached figure it
+  // renders first is the pre-meal one. Ashley, 8 Sep 2026: the counter needed
+  // an app restart. The snapshot is the store's own totals with no request,
+  // so this cell moves the moment a meal is logged anywhere in the app —
+  // including from the coach.
+  //
+  // PATCHED, NOT RELOADED: `data` carries the whole day (session, streak,
+  // PRs, weight trend) and none of that changed because a meal did. Re-running
+  // the full load here would be several queries to move one number.
+  useEffect(() => subscribeMealStore(() => {
+    if (!profile.id || !activeSession.date) return
+    setData(prev => {
+      const next = withMealSnapshot(prev, profile.id, activeSession.date)
+      // The cache is what this screen renders on its next cold open, so it
+      // carries the correction too.
+      if (next && next !== prev) saveDashboardCache(profile.id, activeSession.date, next)
+      return next
+    })
+  }), [profile.id, activeSession.date])
 
   // WATER AND STEPS ARE LOGGED HERE NOW — design_handoff_app_polish, the
   // "Today so far" grid. Both keep their store as the owner of the number:

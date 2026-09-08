@@ -11,7 +11,7 @@ import {
 } from 'lucide-react'
 import { InsightBanner } from '@/components/ui/insight-banner'
 import type { MacroTargets } from '@/lib/types'
-import { getTodayLedger, logMealEaten, voidMealEvents, loggedEventsBySlot, type MealSlotName, type MealEventRecord } from '@/lib/meal-store'
+import { getTodayLedger, getLedgerSnapshot, logMealEaten, voidMealEvents, loggedEventsBySlot, type MealSlotName, type MealEventRecord } from '@/lib/meal-store'
 import { checkMealAgainstRestrictions, type MealRestrictionVerdict } from '@/lib/meal-restriction-check'
 import type { PoolOption } from '@/lib/meal-generation'
 import { tabHash } from '@/lib/app-route'
@@ -131,6 +131,16 @@ export function MealPlan({
   // until the screen reflects the first tap.
   const reloadLogged = (): Promise<void> => {
     if (!profileId || !date) return Promise.resolve()
+    // THE ROW FLIPS BEFORE THE NETWORK ANSWERS. This used to be the awaited
+    // read alone, and the await starts with a request — so on a slow
+    // connection the meal was already logged locally while its row still
+    // said "Log this meal" and the totals above still read the old number
+    // (Ashley, 8 Sep 2026). getLedgerSnapshot is the same grouping over what
+    // the store already holds, no request; the read below still follows and
+    // remains the authority, and the caller still awaits it, which is what
+    // keeps the button from being tappable twice.
+    const snap = getLedgerSnapshot(profileId, date)
+    if (snap) setLoggedBySlot(loggedEventsBySlot(snap.events))
     return getTodayLedger(profileId, date, targets ?? totals)
       .then(ledger => { setLoggedBySlot(loggedEventsBySlot(ledger.events)) })
       .catch(console.error)

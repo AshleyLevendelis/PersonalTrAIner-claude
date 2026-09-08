@@ -71,9 +71,18 @@ console.log('\n1. Which surfaces never get a fresh mount\n')
   // forbidden by the check above.
   const cacheFile = 'src/lib/dashboard-cache.ts'
   const home = read('src/components/Dashboard.tsx')
+  // RE-ANCHORED 8 Sep 2026. Both of these pinned the exact call shape — the
+  // initialiser had to BE `() => loadDashboardCache(...)` and the save had to
+  // pass the literal `d`. Home now runs both through withMealSnapshot, which
+  // re-derives the day's calorie figures from the meal store so a meal logged
+  // on another tab (while Home was unmounted, so nothing here saw it) is not
+  // painted as the pre-meal number. That changes the shape and not the
+  // property, so the property is what is asserted now: the cache is read for
+  // the first paint, and written back from inside the load's own `then`.
   check('Home reads its last-known snapshot for the first paint',
-    /useState<DashboardData \| null>\(\s*\(\) => loadDashboardCache\(/.test(home))
-  check('...and writes one back after every successful load', /saveDashboardCache\(profile\.id, activeSession\.date, d\)/.test(home))
+    /useState<DashboardData \| null>\([\s\S]{0,200}?loadDashboardCache\(profile\.id, activeSession\.date\)/.test(home))
+  check('...and writes one back after every successful load',
+    /\.then\(d => \{[\s\S]{0,700}?saveDashboardCache\(profile\.id, activeSession\.date, \w+\)/.test(home))
   // AND ACTUALLY PAINTS IT. `loading` is true on every mount while the
   // aggregate re-reads, so leaving it in the render guard means the snapshot
   // is loaded, held, and never shown — the cache would exist and the screen

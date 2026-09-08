@@ -2,6 +2,47 @@
 
 Newest first. One line each.
 
+- [x] **THE CALORIE COUNTER WAITED ON THE NETWORK** (roadmap 3/12) — Ashley,
+  8 Sep 2026: tapping "Log this meal" did not move the daily calorie counter
+  without an app reload.
+  **The write was never the problem.** `recordMealEvent` persists to the
+  pending queue synchronously and notifies before it even tries to flush. The
+  READ was: `getTodayLedger` begins with an `await` on a `meal_events` select
+  and merges the pending queue only after it resolves, so every screen showing
+  today's calories re-read through a request it did not need.
+  **Reproduced on the real screens** at `?slow=5000`: the tap logged the meal
+  in the same tick and the top-level counter sat on 0 for five full seconds.
+  On a phone whose request hangs rather than fails — a wifi-to-cell handover —
+  that wait has no end, which is the restart she was doing.
+  **Fixed by remembering the server's half.** `meal-store` keeps the rows from
+  each successful read and exposes `getLedgerSnapshot`, the same arithmetic
+  with no request. One shared `mergeEvents`, so the instant answer and the
+  authoritative one cannot drift. **Null until the server has actually answered
+  once** — a failed read leaves the cache untouched, because a cache that says
+  "you have eaten nothing" off a read that never happened is worse than a slow
+  number. An undo of an already-SYNCED meal (which the queue no longer holds)
+  is tracked in `locallyVoided` so it drops instantly too, and the next
+  successful read clears it — which is what puts the meal back when the undo
+  did not land.
+  **Three screens, and Home was the worst of them.** Home's "Today so far"
+  had no meal subscription at all; worse, its paint cache is written by Home
+  itself, so a meal logged on the Nutrition tab happened while Home was
+  unmounted and it re-opened on the pre-meal figure — a wrong number rather
+  than a missing one. It now corrects the cache on the way in, on notify, and
+  on every fresh load.
+  Gate `test:meal-ledger-snapshot` (23 checks); 9 mutations, all caught, two
+  after strengthening a check (one dedupe case that only exists while a row is
+  in both places at once, and one file-wide regex an import line satisfied).
+  **Browser-verified** at 390x844 (`verify:meal-counter`, `?slow=1500`, with
+  elapsed times measured rather than assumed): counter 5ms, Home 1ms, undo 5ms
+  — against a 1500ms request, and 10.5s for Home before the fix.
+  Two checks in `test:stale-after-write` re-anchored: they pinned the exact
+  call shape (the initialiser had to BE `() => loadDashboardCache(...)`, the
+  save had to pass the literal `d`), and Home now runs both through
+  `withMealSnapshot`. The property is what they assert now — and the second is
+  stronger for it, since it requires the write to sit inside the load's own
+  `then` rather than anywhere in the file. 3 further mutations, all caught.
+
 - [x] **A WEIGHT SHE DID NOT LIFT BECAME DATA** (roadmap 2/12) — the set logger
   had no view on the number at all. The only bound anywhere on the path was
   SetGrid's `9999.99`, which is the width of the database column and not a

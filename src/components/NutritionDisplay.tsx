@@ -6,7 +6,7 @@ import { MealPlan, SLOT_ORDER, SLOT_LABEL } from '@/components/MealPlan'
 import { MacroSplitCard } from '@/components/MacroSplitCard'
 import { TrainerNudge } from '@/components/TrainerNudge'
 import { useActiveSession } from '@/hooks/useActiveSession'
-import { getTodayLedger, subscribeMealStore, loggedEventsBySlot } from '@/lib/meal-store'
+import { getTodayLedger, getLedgerSnapshot, subscribeMealStore, loggedEventsBySlot } from '@/lib/meal-store'
 import { getAllLogs as getAllWaterLogs, setWaterTargetMl, type WaterLogRow } from '@/lib/water-store'
 import type { MacroTargets, UserProfile, WorkoutDay, MacroCalculationMode } from '@/lib/types'
 import type { MealSlotName } from '@/lib/meal-store'
@@ -166,8 +166,23 @@ export function NutritionDisplay({
    * grouping out, so the shortfall nudge below names a meal off the same
    * read — one fetch, one truth about the day.
    */
+  // TWO STEPS ON PURPOSE, and the first one is the fix Ashley asked for on
+  // 8 Sep 2026. Bumping the version alone re-runs the effect below, which
+  // begins by awaiting the network — so on a slow or hanging connection the
+  // ring above the meal list stayed on its old figure for as long as that
+  // took, which on her phone meant until she restarted the app. The snapshot
+  // is the same arithmetic over what the store already holds, with no request
+  // at all, so the number moves in the same tick as the tap. The re-read
+  // still runs behind it and remains the authority.
   const [ledgerVersion, setLedgerVersion] = useState(0)
-  useEffect(() => subscribeMealStore(() => setLedgerVersion(v => v + 1)), [])
+  useEffect(() => subscribeMealStore(() => {
+    const snap = profileId && date ? getLedgerSnapshot(profileId, date) : null
+    if (snap) {
+      setEaten(snap.eaten)
+      setLoggedSlots(Object.keys(loggedEventsBySlot(snap.events)) as MealSlotName[])
+    }
+    setLedgerVersion(v => v + 1)
+  }), [profileId, date])
 
   useEffect(() => {
     if (!profileId || !date || !macros) return
