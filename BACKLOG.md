@@ -2,6 +2,41 @@
 
 Newest first. One line each.
 
+- [x] **A WEIGHT SHE DID NOT LIFT BECAME DATA** (roadmap 2/12) — the set logger
+  had no view on the number at all. The only bound anywhere on the path was
+  SetGrid's `9999.99`, which is the width of the database column and not a
+  claim about lifting, so a fat-fingered 240 on a 24kg dumbbell was stored, fed
+  the progression engine, moved every future prescription for that lift, and
+  came back as a personal record. The app already checked a *stated* lift at
+  onboarding (`lift-plausibility.ts`) and a cardio duration at its store; the
+  path a trainee touches forty times a session was the unguarded one.
+  **Ashley's ruling, 8 Sep 2026,** from four options: *"warn, second tap logs
+  it."* So new `src/lib/set-plausibility.ts` returns two verdicts, not one.
+  **Refused** — past `MAX_LOGGABLE_SET_KG` (600), enforced inside `saveSet`
+  itself so every writer passes it, exactly as `saveCardioLog` does. 600 rather
+  than plate-math's 500 because a plate-loaded leg press sled is the one
+  implement whose honest total runs past a world-record deadlift.
+  **Warned** — past 1.5x `effectiveLoadingCeilingKg`, said in the row and
+  logged on a second tap. 1.5x so a borrowed 26kg pair against a stated 24
+  passes without a word and a 240 does not. The message quotes her own number
+  only when her number is the binding one, and always in the unit the row logs
+  in (per hand, per side, total) via `labelModeForEntry` — no second copy of
+  the per-side rule.
+  The chat's log executor now counts what the store *accepted*: a receipt built
+  from what was parsed would have read "3 × 8 @ 900kg" over three rows that do
+  not exist.
+  Gate `test:set-plausibility` (45 checks); 13 mutations, all caught.
+  **Browser-verified** at 390x844 (`verify:absurd-weight`, `?absurd=1` fixture,
+  a stated 24kg ceiling and a dumbbell movement seeded as Additional Work —
+  the SetGrid parent that reaches the check by a different route): 240 warns
+  and does NOT log, the sentence fits the phone, the second tap logs it at 240,
+  900 is refused and a second tap does not talk it round.
+  **Two things deliberately left:** on a leg press the warn band is empty (its
+  400kg ceiling x1.5 lands exactly on the 600kg refusal), which is correct
+  rather than a gap — nothing under 600 on that machine is implausible; and a
+  row error still rings both the weight and the reps box, which predates this
+  and is now more visible.
+
 - [x] **THE DAY SHE SWAPPED, STILL OFFERING THE WORKOUT** (roadmap 1/12) —
   Ashley, 8 Sep 2026: she told the coach she had missed the morning session and
   done Muay Thai instead, and the Exercise tab carried on showing Push & Press

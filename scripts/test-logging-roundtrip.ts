@@ -386,10 +386,36 @@ async function main() {
   const rows3 = 'Seated Cable Row'
   const rows3Id = getExerciseId(rows3)
   // A typo'd weight (numeric(6,2) max is 9999.99) — permanently rejected by
-  // the DB on every retry. Queued directly via saveSet to simulate data that
-  // reached the store before/without the new client-side bound (e.g. a stale
-  // client, or a future caller that forgets to validate).
-  saveSet({ userId, date: W2, weekNumber: 2, day, exerciseId: squats2Id, exerciseName: squats2, setNumber: 1, weightKg: 10005, repsCompleted: 8 })
+  // the DB on every retry.
+  //
+  // PLANTED IN THE QUEUE, NOT PASSED THROUGH saveSet, since 8 Sep 2026: the
+  // store now refuses an implausible weight at the front door
+  // (set-plausibility.ts), so saveSet can no longer BUILD this fixture. That
+  // is not the behaviour under test. What is under test is the flush path's
+  // handling of a queued row the server will always reject — which is still
+  // reachable, and still matters, because localStorage survives an app
+  // update: a row queued by yesterday's client is exactly the shape below.
+  // Saved legally and then rewritten in place, so the entry is byte-for-byte
+  // what saveSet produces apart from the one poisoned number.
+  // Offline while it is queued, so saveSet's own background flush cannot send
+  // the legal weight to the server before the rewrite lands — the row must
+  // reach the network exactly once, poisoned.
+  const plantPoison = async () => {
+    fakeOffline = true
+    saveSet({ userId, date: W2, weekNumber: 2, day, exerciseId: squats2Id, exerciseName: squats2, setNumber: 1, weightKg: 100.5, repsCompleted: 8 })
+    await flushPending()
+    fakeOffline = false
+    const ops = JSON.parse(localStorage.getItem('fitplan_setlog_pending_v1') ?? '[]')
+    const op = ops.find((o: { kind: string; set?: { exerciseId: string } }) => o.kind === 'upsert' && o.set?.exerciseId === squats2Id)
+    if (!op) throw new Error('poison fixture: the legal set it is built from was not queued')
+    op.set.weightKg = 10005
+    // A row queued by an older client has never been tried, so neither has this.
+    op.set.attempts = 0
+    localStorage.setItem('fitplan_setlog_pending_v1', JSON.stringify(ops))
+  }
+  check('the store itself refuses this weight now — the fixture has to be planted',
+    saveSet({ userId, date: W2, weekNumber: 2, day, exerciseId: squats2Id, exerciseName: squats2, setNumber: 9, weightKg: 10005, repsCompleted: 8 }) === null)
+  await plantPoison()
   // A perfectly healthy set queued right after the poison item.
   saveSet({ userId, date: W2, weekNumber: 2, day, exerciseId: rows3Id, exerciseName: rows3, setNumber: 1, weightKg: 45, repsCompleted: 10 })
   await flushPending()
@@ -412,7 +438,7 @@ async function main() {
   // Retry: re-queues with a fresh id; still permanently fails (same bad
   // weight) but must dead-letter again WITHOUT blocking anything queued
   // alongside it — proves retry doesn't regress to head-of-line blocking.
-  saveSet({ userId, date: W2, weekNumber: 2, day, exerciseId: squats2Id, exerciseName: squats2, setNumber: 1, weightKg: 10005, repsCompleted: 8 })
+  await plantPoison()
   await flushPending()
   const secondDeadLetter = getDeadLetterItems()
   check('re-queued poison item dead-letters again', secondDeadLetter.length === 1, secondDeadLetter)

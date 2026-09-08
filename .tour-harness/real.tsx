@@ -37,6 +37,7 @@ import { generateMesocycle, setRandomSource, resetRandomSource } from '@/lib/exe
 import { seededRngFromKey } from '@/lib/seeded-random'
 import { computeTargets } from '@/lib/nutrition-targets'
 import { useAppRoute, tabHash, type Tab } from '@/lib/app-route'
+import { saveActiveSessionRecord } from '@/lib/active-session-store'
 import type { UserProfile, MacroTargets } from '@/lib/types'
 
 import { Dashboard } from '@/components/Dashboard'
@@ -68,6 +69,19 @@ const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 
 const todayIdx = new Date().getDay()
 const availableIdx = new Set([todayIdx, (todayIdx + 2) % 7, (todayIdx + 4) % 7, (todayIdx + 5) % 7])
 
+// ?absurd=1 — the weight-plausibility check, on the screen it argues on.
+//
+// Two things it needs that the default harness does not have: a STATED
+// dumbbell ceiling, so the warning takes its "you told me" branch rather
+// than quoting the app's own table, and a row whose implement is known and
+// small. The row is seeded as Additional Work below, which is the weakest
+// link in the wiring (it reaches SetGrid through a different parent from
+// the plan rows) and, unlike the plan, is the same exercise on every
+// weekday. Off by default, so every existing run of this harness is
+// unchanged.
+const ABSURD = new URLSearchParams(location.search).get('absurd') === '1'
+export const STATED_DUMBBELL_KG = 24
+
 const profile: UserProfile = {
   id: PROFILE_ID,
   age: 30, gender: 'male', height_cm: 178, weight_kg: 80, activity_level: 'moderate',
@@ -83,6 +97,7 @@ const profile: UserProfile = {
   // scheduled days, so the consistency score correctly shows nothing and the
   // harness could never see it render.
   created_at: new Date(Date.now() - 9 * 86400000).toISOString(),
+  ...(ABSURD ? { max_dumbbell_kg: STATED_DUMBBELL_KG } : {}),
 } as UserProfile
 
 // ALWAYS FROM THE MESOCYCLE, never generateExercisePlan directly —
@@ -136,6 +151,23 @@ const db: Db = {
   daily_nutrition_targets: [], workout_exercises: [], weight_basis_offers: [],
 }
 setSupabaseClient(makeFakeSupabase(db) as never)
+
+// The Additional Work row for ?absurd=1. Declared through the same record
+// the app itself writes, so the section renders exactly as it does for a
+// trainee who typed "I also did..." — and picked as the first dumbbell
+// movement NOT already in today's session, because a declared exercise that
+// IS in the plan is correctly filtered out of Additional Work and the row
+// would silently never appear.
+if (ABSURD) {
+  const planned = new Set((exercisePlan.find(d => d.day === DAYS[todayIdx])?.exercises ?? []).map(e => e.name))
+  const name = ['Lateral Raises', 'Hammer Curls', 'Dumbbell Curls', 'Dumbbell Flyes'].find(n => !planned.has(n))!
+  ;(window as unknown as { __absurdExercise: string }).__absurdExercise = name
+  saveActiveSessionRecord({
+    profileId: PROFILE_ID, date: today, dayName: DAYS[todayIdx], liveWeek: 1,
+    status: 'running', startedAtIso: new Date().toISOString(), lastActivityIso: new Date().toISOString(),
+    declaredOffPlan: [name],
+  })
+}
 
 // Real meals, shaped like generate-meals' output, so the `meals` stop has
 // something with real height under it rather than an empty-state card.

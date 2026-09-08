@@ -95,7 +95,7 @@ export interface ActiveSessionValue extends ActiveSessionIdentity, RestState {
   logs: ExerciseSetLog[]
   setsFor: (exerciseId: string, exerciseName?: string) => ExerciseSetLog[]
   refresh: () => void
-  logSet: (input: SaveSetInput) => ExerciseSetLog
+  logSet: (input: SaveSetInput) => ExerciseSetLog | null
   deleteSet: typeof deleteSet
   /** 'idle' before any session activity today; 'running' from an explicit
    * Start tap OR the first logged set (forgiving-by-design); 'finished'
@@ -387,8 +387,16 @@ export function ActiveSessionProvider({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [identity.profileId, identity.date, identity.dayName, identity.liveWeek])
 
-  const logSet = useCallback((input: SaveSetInput): ExerciseSetLog => {
+  const logSet = useCallback((input: SaveSetInput): ExerciseSetLog | null => {
     const result = saveSet(input)
+    // A REFUSED SET OPENS NOTHING. saveSet returns null when the weight is one
+    // nobody lifts (set-plausibility.ts) and nothing was written — so marking
+    // the session running, reopening a finished one, or refreshing every
+    // surface that reads `logs` would all be reacting to a set that does not
+    // exist. Ashley's Thursday (see finishSession) is the same lesson from
+    // the other end: the app must not record work off an action that logged
+    // nothing.
+    if (!result) return null
     // Forgiving by design: a logged set with no session open silently opens
     // one, backdated to "now" — patchRecord's own `existing?.startedAtIso ??
     // now` default IS that backdating (there's no earlier timestamp to

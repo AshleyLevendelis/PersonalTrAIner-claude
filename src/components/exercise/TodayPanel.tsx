@@ -575,6 +575,7 @@ export function TodayPanel({
             progressedLoads={progressedLoads}
             progressedAddedLoads={progressedAddedLoads}
             progressionNotes={progressionNotes}
+            profile={profile}
             onOpenSwap={onOpenSwap}
             onOpenPlateCalc={onOpenPlateCalc}
             onOpenHistory={onOpenHistory}
@@ -595,7 +596,7 @@ export function TodayPanel({
               <FinisherRow cardio={workout!.recommendedCardio} />
             </>
           )}
-          <AdditionalWorkSection plannedExercises={workout!.exercises} onOpenPlateCalc={onOpenPlateCalc} />
+          <AdditionalWorkSection plannedExercises={workout!.exercises} profile={profile} onOpenPlateCalc={onOpenPlateCalc} />
           {/* VISIBLE AGAIN, and the "⋮" menu no longer carries it. Turn 5 put
               it behind that menu; the polish handoff puts it back at the foot
               of the list, which is where someone finishing a session looks
@@ -673,6 +674,7 @@ function ExerciseList({
   progressedLoads,
   progressedAddedLoads,
   progressionNotes,
+  profile,
   onOpenSwap,
   onOpenPlateCalc,
   onOpenHistory,
@@ -687,6 +689,8 @@ function ExerciseList({
   progressedLoads: Record<string, number>
   progressedAddedLoads: Record<string, number>
   progressionNotes: Record<string, { note: string; didProgress: boolean }>
+  /** Reaches SetGrid via ExerciseRow, to judge a typed weight — see set-plausibility.ts. */
+  profile?: UserProfile
   onOpenSwap: (dayName: string, exIndex: number, exerciseName: string) => void
   onOpenPlateCalc: (weightKg: number) => void
   onOpenHistory?: (exerciseId: string, exerciseName: string) => void
@@ -757,6 +761,7 @@ function ExerciseList({
       onOpenPlateCalc,
       onOpenHistory,
       onOpenDetail,
+      profile,
       onSwap: () => onOpenSwap(dayName, exIndex, ex.name),
       onBan: () => onBan(ex.name),
       banBusy: banBusy === ex.name,

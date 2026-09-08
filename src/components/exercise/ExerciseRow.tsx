@@ -52,6 +52,8 @@ export interface ExerciseRowProps {
   onOpenHistory?: (exerciseId: string, exerciseName: string) => void
   /** Opens the technique panel — see ExerciseDetailDialog. */
   onOpenDetail?: (exerciseName: string) => void
+  /** Passed straight through to SetGrid, which needs it to judge a typed weight — see set-plausibility.ts. */
+  profile?: SetGridProps['profile']
 }
 
 export function ExerciseRow({
@@ -71,6 +73,7 @@ export function ExerciseRow({
   onToggleExpanded,
   onOpenHistory,
   onOpenDetail,
+  profile,
 }: ExerciseRowProps) {
   const { setsFor, requestedSetFocus, clearSetFocusRequest, rampTicksFor, toggleRampTick } = useActiveSession()
   const exerciseId = ex.id ?? getExerciseId(ex.name)
@@ -302,6 +305,7 @@ export function ExerciseRow({
             loadUnitLabel={(ex.suggested_load ? splitLoadDisplay(ex.suggested_load) : null)?.unit}
             perSetLoadKg={ex.per_set_load?.map(s => s.load_kg)}
             loadIsEstimate={loadIsUnverified}
+            profile={profile}
             onOpenPlateCalc={onOpenPlateCalc}
             onSetCompleted={onSetCompleted}
           />
