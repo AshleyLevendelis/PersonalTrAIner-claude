@@ -75,6 +75,16 @@ Grid: 4 equipment x 4 styles x 4 experience, all 16 weeks (`report:style-impleme
 |---|---|---|
 | exercises using improvised kit while a better peer was in the pool | **310** | **0** |
 | ...of those, in week 2+ (invisible to `test:quality`, which scanned week 1) | 309 | 0 |
+
+**That 0 is on THIS grid, and the wider one disagrees.** `test:quality` sweeps
+9,216 combinations — goals, durations, splits and injuries as well — and with
+the same rule now scanning every week it flags
+`worse_implement_than_available` on **1,314 plans (14.3%)**. There is no
+comparable before-number: the rule could not see weeks 2+ until this change, so
+this is a new and wider measurement, not a regression against an old one. But
+"310 → 0" was measured on 64 profiles that hold goal, duration, split and
+injury fixed, and it must not be read as "none left anywhere". See the open
+BACKLOG item for the mechanism.
 | movements left with 2 options or fewer | **329** | **53** |
 | movements left with NO options | **148** | **18** |
 | swap slots offering one option or none | 134/1199 (11.2%) | 85/1268 (**6.7%**) |

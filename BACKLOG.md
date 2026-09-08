@@ -2,6 +2,35 @@
 
 Newest first. One line each.
 
+- [ ] **THREE PREDICATES FOR "A BETTER IMPLEMENT", AND THEY DISAGREE** — found
+  8 Sep 2026 when `test:quality` contradicted the number in the commit right
+  before it. That commit reported improvised-kit picks going **310 → 0**; true
+  on its own 64-profile grid, and the 9,216-plan quality sweep flags
+  `worse_implement_than_available` on **1,314 plans (14.3%)**. No comparable
+  before-number exists — the rule scanned week 1 only until that same commit
+  widened it — so this is a wider measurement, not a regression. The claim was
+  still overstated and is corrected in
+  `docs/plans/the-style-tag-that-starved-a-movement.md`.
+  **The mechanism, traced.** The biggest contributor is `Band Lat Pulldown` at
+  `home_gym`. Three checks ask "was a better implement available" and none of
+  them asks it the same way: `quality-score.ts` compares pool-wide on
+  `movement_pattern` + tier; `scoreCandidate`'s `betterImplementInList` compares
+  within the SLOT'S candidate list; `poolForRotation` compares pool-wide on
+  `substitution_group` + tier. Rotation does drop the band pulldown (verified),
+  so the surviving picks come from initial selection, where the better peer was
+  not in that slot's list.
+  **And the "better peer" itself is arguable.** The peer being matched is
+  `Pull-Up Negatives`, which `bestEquipmentRank` calls `high` because its
+  equipment includes a pull-up bar. A bodyweight eccentric is not a
+  better-LOADING alternative to a band pulldown; the rank table is answering
+  "is this a real tool" and being read as "does this load the movement better".
+  The same tag-answering-the-wrong-question shape as the style filter it came
+  from.
+  **Not fixed, deliberately:** Ashley's reported defect is fixed and verified,
+  and reconciling the three predicates (or exempting bodyweight eccentrics from
+  counting as a better implement) is its own change with its own measurement.
+  Doing it inside this one would have shipped an unmeasured second fix.
+
 - [x] **A BACKPACK LATERAL RAISE AT A FULL GYM, AND A SWAP LIST OF ONE** —
   Ashley, 8 Sep 2026, three screenshots: her Tuesday prescribed a Backpack
   Lateral Raise beside a barbell bench press, and swapping it offered exactly
