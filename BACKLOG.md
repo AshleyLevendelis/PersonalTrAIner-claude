@@ -2,6 +2,41 @@
 
 Newest first. One line each.
 
+- [x] **THE CORRECTION THAT ONLY EVER ASKED QUESTIONS** (roadmap 5/12) —
+  Ashley, 8 Sep 2026: asking the coach to fix a mislogged set "repeats
+  questions endlessly without performing the update."
+  **One regex.** A weight was only ever recognised as `@60kg` —
+  `/@\s*(\d+(?:\.\d+)?)\s*kg?/i`, which needs a literal `@` AND a literal
+  `k` (the `?` sits on the g, not the k). **MEASURED: 3 of 20 phrasings a
+  person actually types parsed.** "3x8 60kg", "3x8 at 60kg", "3 sets of 8 at
+  60", "5x5 100kg", even "3x8 @ 60" — all came back with no weight, and a
+  missing weight on a loaded lift is a BLOCKING clarification.
+  **And the question had no answer.** The clarification card renders tap
+  options; a weight has none, so it drew a question and nothing else. The
+  answer went into the ordinary composer, back through the model as a fresh
+  turn, and reached the parser stripped of the half-finished entry it belonged
+  to — so it was asked for again. Forever, with nothing written.
+  **Fixed at both ends.** Three weight rules, most confident first (unit-
+  anchored, preposition-anchored, then exactly one leftover number), with the
+  reps and RPE spans claimed FIRST so a rep count can never be read as a load.
+  **19/20 now parse**; the one that does not is "3x8", which genuinely has no
+  weight. And the card now carries an answer box when there is nothing to tap,
+  with the answer merged into the entry it belongs to rather than sent as a
+  new message.
+  **Two further defects found on the way.** (1) A resumed clarification called
+  `resolveAndMaybeLog` without `correctsPrevious`, so a correction that needed
+  one more detail came back as an APPEND — the exact double-logging
+  nl-logging-executor's own comment was written about. The flag now rides in
+  the parse session. (2) With the weight parsing, "3x8 60kg" arriving with no
+  exercise would have written `custom:` with an empty name; a blank exercise is
+  now its own question, which also retires the "How many sets and reps for ?"
+  sentence.
+  Gate `test:correction-loop` (42 checks); 8 mutations, all caught.
+  **Browser-verified** end to end through the real chat (`verify:correction-loop`,
+  model stubbed at the fetch boundary, everything downstream real): log at 6kg
+  → correct → ONE question, answerable in place → "Corrected · replaced 3" at
+  3 × 8 @ 60kg, with no second call to the model.
+
 - [x] **THREE OVERLAYS IN THE WAY** (roadmap 4/12) — Ashley, 8 Sep 2026, all
   three from her own phone.
   **1. The ✕ at the bottom of every modal.** `.hit-slop-44` — the utility that

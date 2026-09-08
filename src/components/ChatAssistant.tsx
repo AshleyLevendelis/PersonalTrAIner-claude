@@ -263,7 +263,12 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
   // answering one ClarificationCard can re-parse and continue rather than
   // losing everything already resolved in that message. Ephemeral by
   // design, same as pendingAction/receipt/clarification on ChatMessage.
-  const parseSessionsRef = useRef<Record<string, { entries: WorkoutEntryInput[]; todaysPlanExerciseNames: string[] }>>({})
+  //
+  // `correctsPrevious` rides along because answering a clarification RESUMES
+  // that turn. Without it the resumed write appended instead of replacing —
+  // so a correction that needed one extra detail silently doubled the
+  // session, which is the exact harm the executor's own comment describes.
+  const parseSessionsRef = useRef<Record<string, { entries: WorkoutEntryInput[]; todaysPlanExerciseNames: string[]; correctsPrevious: boolean }>>({})
 
   // Chat round 2, item 4 — "at most one check-in per conversation" is
   // enforced HERE, not by asking the model to remember it said something.
@@ -2765,7 +2770,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       const idx = parsed.groups.findIndex((g: ParsedSetGroup) => g.resolution === 'ambiguous' || !!g.ambiguity)
       const group = parsed.groups[idx]
       const resolverId = `parse_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
-      parseSessionsRef.current[resolverId] = { entries, todaysPlanExerciseNames }
+      parseSessionsRef.current[resolverId] = { entries, todaysPlanExerciseNames, correctsPrevious }
 
       const prompt = group.resolution === 'ambiguous'
         ? `Which "${group.matchedRawPhrase}" did you mean?`
@@ -2773,7 +2778,18 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       const options = group.resolution === 'ambiguous' && group.ambiguousCandidates
         ? group.ambiguousCandidates.map(c => ({ label: c.name, value: c.name }))
         : []
-      return { text: prompt, clarification: { prompt, options, resolverId } }
+      // A QUESTION WITH NO WAY TO ANSWER IT IS THE LOOP. Only the pick-one
+      // exercise-name case has buttons; a weight or a sets×reps is a number
+      // the trainee has to type, and before 8 Sep 2026 there was nowhere on
+      // the card to type it — so the answer went back through the model as a
+      // fresh turn, arrived here without the half-parsed entry it belonged
+      // to, and was asked for again.
+      const answerPlaceholder = options.length > 0
+        ? undefined
+        : group.ambiguity?.field === 'weight' ? 'e.g. 60kg'
+        : group.ambiguity?.field === 'sets_x_reps' ? 'e.g. 3x8'
+        : 'Your answer'
+      return { text: prompt, clarification: { prompt, options, answerPlaceholder, resolverId } }
     }
 
     const todaysPlanSetCounts = new Map((todaysWorkout?.exercises ?? []).map(e => [e.name, e.sets] as const))
@@ -2845,9 +2861,18 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     const priorParse = parseWorkoutEntries({ entries: session.entries, todaysPlanExerciseNames: session.todaysPlanExerciseNames })
     const idx = priorParse.groups.findIndex((g: ParsedSetGroup) => g.resolution === 'ambiguous' || !!g.ambiguity)
     if (idx === -1) return
-    const updatedEntries = session.entries.map((e, i) => (i === idx ? { ...e, exercisePhrase: value } : e))
+    // WHERE THE ANSWER GOES DEPENDS ON WHAT WAS ASKED. A name replaces the
+    // exercise phrase; a weight or a sets×reps is ADDED to the sets phrase,
+    // because everything already in there is still true — the whole point of
+    // resuming a parse rather than starting a new one.
+    const field = priorParse.groups[idx].resolution === 'ambiguous' ? 'exercise_name' : priorParse.groups[idx].ambiguity?.field
+    const updatedEntries = session.entries.map((e, i) => {
+      if (i !== idx) return e
+      if (field === 'exercise_name') return { ...e, exercisePhrase: value }
+      return { ...e, setsPhrase: `${e.setsPhrase} ${value}`.trim(), rawText: `${e.rawText} ${value}`.trim() }
+    })
 
-    const outcome = resolveAndMaybeLog(updatedEntries)
+    const outcome = resolveAndMaybeLog(updatedEntries, session.correctsPrevious)
     setMessages(prev => prev.map((m, i) => (i === msgIndex ? { ...m, clarification: outcome.clarification, receipt: outcome.receipt, content: outcome.text } : m)))
   }
 
@@ -4240,6 +4265,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
                         contextLines={msg.clarification.contextLines}
                         prompt={msg.clarification.prompt}
                         options={msg.clarification.options}
+                        answerPlaceholder={msg.clarification.answerPlaceholder}
                         onChoose={async value => {
                           if (navigator.vibrate) navigator.vibrate(10)
                           await handleClarificationChoice(i, value)

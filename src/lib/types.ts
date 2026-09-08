@@ -634,6 +634,12 @@ export interface ChatClarificationView {
   contextLines?: string[]
   prompt: string
   options: { label: string; value: string }[]
+  /**
+   * Set when the answer is typed rather than picked — a weight, a sets×reps.
+   * A question with neither options nor this is one nobody can answer, which
+   * is what produced the endless correction loop (Ashley, 8 Sep 2026).
+   */
+  answerPlaceholder?: string
   /** Correlates the chosen answer back to the parse session awaiting it. */
   resolverId: string
 }
