@@ -68,7 +68,7 @@ export function SessionHistoryDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-w-sm max-h-[85vh]">
         <DialogHeader>
           <DialogTitle>Session history</DialogTitle>
         </DialogHeader>

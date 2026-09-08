@@ -44,7 +44,7 @@ export function SessionSummaryDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-w-sm max-h-[85vh]">
         <DialogHeader>
           <DialogTitle>{nothingLogged ? 'Nothing logged' : serverCloseFailed ? 'Session saved' : 'Session complete'}</DialogTitle>
         </DialogHeader>

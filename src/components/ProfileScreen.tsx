@@ -617,7 +617,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-w-lg max-h-[85vh]">
         <DialogHeader className="sr-only">
           <DialogTitle>Profile</DialogTitle>
           <DialogDescription>Everything the app knows about you — correct or remove anything here.</DialogDescription>

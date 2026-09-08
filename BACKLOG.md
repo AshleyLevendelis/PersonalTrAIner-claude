@@ -2,6 +2,43 @@
 
 Newest first. One line each.
 
+- [x] **THREE OVERLAYS IN THE WAY** (roadmap 4/12) — Ashley, 8 Sep 2026, all
+  three from her own phone.
+  **1. The ✕ at the bottom of every modal.** `.hit-slop-44` — the utility that
+  gives small controls a 44px tap target — sets `position: relative` to anchor
+  its `::after`. One class, declared after Tailwind's positioning utilities, so
+  `class="hit-slop-44 absolute"` silently lost its absolute and the dialog
+  close button laid out as the LAST item in the dialog's grid. Measured in the
+  harness before the fix: the ✕ at y=746 in a dialog spanning 73–771. Fixed
+  with `.hit-slop-44.absolute/.fixed/.sticky` — two classes beat one, so an
+  explicit position always wins, and every future combination is covered too.
+  **And a second half underneath it**, invisible until the first was fixed: the
+  scroll sat on the same element the ✕ was positioned against, so scrolling
+  carried it off the top (y=−259). `DialogContent` is now a non-scrolling
+  shell with a scrolling body, and it caps its own height — which also fixes
+  the two dialogs that had no cap and simply ran off the bottom of the phone.
+  The five call sites' own `overflow-y-auto` is gone; the gate keeps it gone.
+  **2. "Rest complete" that never left.** The rest deadline is persisted so it
+  survives a reload — right, mid-rest — and nothing ever expired it, so an
+  overrun sat in the record until somebody tapped Dismiss, on every tab, with
+  the chat composer riding above it. It now clears itself past
+  `REST_OVERRUN_GRACE_MS` (5 min), on the live tick and on restore, through
+  one shared `isRestOverrunExpired` so the two paths cannot disagree.
+  **3. The email form on top of the tour.** Both are armed by finishing
+  onboarding, from two code paths that had never met, and both are
+  full-screen overlays at z-50. The tour now reports when it occupies the
+  screen and App holds the prompt back until it doesn't. **The tour wins** —
+  it is the one-time arrival and cannot be deferred, while the email prompt is
+  deferrable by design ("Not now" snoozes it a week). Ashley's call to
+  overrule; the roadmap only said they must not overlap.
+  Gate `test:overlay-artifacts` (30 checks); 12 mutations, all caught, two
+  after scoping checks that a match elsewhere in the file satisfied.
+  **Browser-verified** at 390×420 (`verify:modal-close` — short on purpose, the
+  only way to make a real dialog in this harness overflow): the ✕ sits 17px
+  from the dialog top and does not move when the body is scrolled to the end,
+  and closing from there works. Swap and plate-calculator dialogs re-checked at
+  390×844 for layout: both fit, ✕ at 17px, nothing reflowed.
+
 - [x] **THE CALORIE COUNTER WAITED ON THE NETWORK** (roadmap 3/12) — Ashley,
   8 Sep 2026: tapping "Log this meal" did not move the daily calorie counter
   without an app reload.

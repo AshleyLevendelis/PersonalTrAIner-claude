@@ -850,6 +850,27 @@
   .hit-slop-44 {
     position: relative;
   }
+  /*
+   * AND IT MUST NOT STEAL A POSITION THE ELEMENT ALREADY HAD.
+   *
+   * `position: relative` above exists only to anchor the ::after tap target.
+   * It is a single-class rule declared after Tailwind's own positioning
+   * utilities, so `class="hit-slop-44 absolute"` silently lost its absolute —
+   * and the dialog close button, the one place in the app that combines them,
+   * stopped being pinned to the top-right corner and laid out as the LAST
+   * item in the dialog's grid instead. On a short dialog that is a stray ✕
+   * under the content; on a long scrolling one (Profile, "How your targets
+   * are set", exercise detail) you had to scroll to the very bottom to find
+   * the way out. Ashley reported it as the ✕ rendering at the bottom of long
+   * modals, 8 Sep 2026.
+   *
+   * Two classes beats one, so an explicit positioning utility wins wherever
+   * it is present — and the ::after still has a positioned ancestor, because
+   * absolute/fixed/sticky all establish one just as relative does.
+   */
+  .hit-slop-44.absolute { position: absolute; }
+  .hit-slop-44.fixed { position: fixed; }
+  .hit-slop-44.sticky { position: sticky; }
   .hit-slop-44::after {
     content: '';
     position: absolute;

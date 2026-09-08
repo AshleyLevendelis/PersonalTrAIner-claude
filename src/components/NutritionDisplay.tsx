@@ -448,7 +448,7 @@ export function NutritionDisplay({
           moved bodily into one sheet: the derivation strip, the water target,
           the split control, the dynamic week table and the method picker. */}
       <Dialog open={howItsSetOpen} onOpenChange={setHowItsSetOpen}>
-        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-md">
+        <DialogContent className="max-h-[85vh] sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="text-base">How your targets are set</DialogTitle>
           </DialogHeader>

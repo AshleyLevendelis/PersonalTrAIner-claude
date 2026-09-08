@@ -56,15 +56,32 @@ function DialogContent({
   return (
     <DialogPortal data-slot="dialog-portal">
       <DialogOverlay />
+      {/*
+        A SHELL THAT DOES NOT SCROLL, AND A BODY THAT DOES.
+        Until 8 Sep 2026 the scroll was on this element and the close button
+        was absolutely positioned against it — so scrolling the dialog carried
+        the ✕ off the top of the screen, and on a long modal (Profile, "How
+        your targets are set") there was no visible way out at all. `absolute`
+        inside a scroll container is measured from the scrolled content, not
+        from what you can see.
+        The height cap lives here too, rather than at each call site: a dialog
+        with no cap simply ran off the bottom of the phone with nothing to
+        scroll, which is the same bug wearing different clothes.
+      */}
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          "fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border bg-background p-6 shadow-lg duration-200 outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 sm:max-w-lg",
+          "fixed top-[50%] left-[50%] z-50 flex max-h-[calc(100dvh-2rem)] w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] flex-col overflow-hidden rounded-lg border bg-background shadow-lg duration-200 outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 sm:max-w-lg",
           className
         )}
         {...props}
       >
-        {children}
+        {/* The padding moved here with the scroll, so the ✕ above sits over it
+            rather than inside the scrolling column. `min-h-0` is what lets a
+            flex child actually shrink and scroll instead of growing the shell. */}
+        <div data-slot="dialog-body" className="grid min-h-0 flex-1 gap-4 overflow-y-auto p-6">
+          {children}
+        </div>
         {showCloseButton && (
           <DialogPrimitive.Close
             data-slot="dialog-close"
