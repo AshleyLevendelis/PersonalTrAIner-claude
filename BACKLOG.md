@@ -2,6 +2,36 @@
 
 Newest first. One line each.
 
+- [x] **THE DAY SHE SWAPPED, STILL OFFERING THE WORKOUT** (roadmap 1/12) —
+  Ashley, 8 Sep 2026: she told the coach she had missed the morning session and
+  done Muay Thai instead, and the Exercise tab carried on showing Push & Press
+  with "Start workout".
+  **Verified read-only against production: BOTH WRITES LANDED.**
+  `workout_sessions` 8 Sep carries `swapped_for_activity: 'Muay Thai'` (08:36:34Z)
+  and `cardio_logs` carries Muay Thai, 60 min, "Swapped in place of the
+  prescribed lifting session" (08:36:48Z) — one minute before her screenshot.
+  The coach told the truth; the screen did not reflect it.
+  **The gap:** `swapped_for_activity` had exactly one reader in the app,
+  `useTrainingWeek.ts:96`, which turns it into the strip's ⇄ glyph. TodayPanel
+  read nothing — no reference to the field anywhere in it — so the strip and the
+  card disagreed on the same screen.
+  **Fixed by carrying the fact, not re-reading it.** `TrainingWeekDay` now
+  carries `swappedForActivity` beside `state`, populated from the same row the
+  state comes from; TodayPanel reads that. The card names the activity, keeps
+  the session visible (she may still want it), and the primary action stops
+  saying "Start workout" — it becomes a non-accent "Train it anyway".
+  Gate `test:exercise-today` §5; 6 mutations, all caught, one after
+  strengthening a check that matched the lookup anywhere in the file and
+  survived the lookup being left on a dead variable. One existing check
+  re-anchored: it pinned the literal JSX `>Start workout<` and the label is now
+  conditional; the property — an ordinary day still offers Start workout — is
+  what it asserts now.
+  **Browser-verified** at 390x844 (`verify:swapped-day`, `?swapped=1` fixture):
+  banner names Muay Thai, no "Start workout" button, "Train it anyway" present,
+  session still listed — and an ordinary day unchanged. 140/140 gates.
+  **Still open from the same report:** "I'll do this morning's session tomorrow"
+  was dropped entirely — there is no reschedule tool. Roadmap item 8.
+
 - [ ] **THREE PREDICATES FOR "A BETTER IMPLEMENT", AND THEY DISAGREE** — found
   8 Sep 2026 when `test:quality` contradicted the number in the commit right
   before it. That commit reported improvised-kit picks going **310 → 0**; true

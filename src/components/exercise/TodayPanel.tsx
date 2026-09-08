@@ -191,6 +191,16 @@ export function TodayPanel({
 
   const effectiveDayName = borrowedDayName ?? todayName
   const workout = liveWeekPlan.find(d => d.day === effectiveDayName)
+  // WHAT THEY DID INSTEAD, if they told the coach. The week strip has drawn
+  // this correctly all along; this panel read nothing, so on 8 Sep 2026 it
+  // went on offering "Start workout" for a session Ashley had already
+  // replaced with Muay Thai — the app agreeing with itself on one screen and
+  // not the other. Same source as the glyph (useTrainingWeek), never a second
+  // read of the same row.
+  const swappedToday = weekTrain.days.find(d => d.date === today)?.state === 'swapped'
+    ? (weekTrain.days.find(d => d.date === today)?.swappedForActivity || 'something else')
+    : null
+
   const isRestDay = !workout
   const isActiveRecovery = !!workout && workout.exercises.length === 0
 
@@ -429,6 +439,18 @@ export function TodayPanel({
         />
       ) : (
         <div className="space-y-3">
+          {/* SAY IT ON THE DAY IT HAPPENED. Ashley told the coach she had done
+              Muay Thai instead; the swap was written, the strip showed it, and
+              this panel carried on as if the session were still ahead of her.
+              The list stays visible — she may still want to train — but the
+              screen has to say what it knows first. */}
+          {swappedToday && (
+            <InsightBanner tone="ai" data-testid="swapped-today">
+              <span className="text-sm">
+                You swapped today for <span className="font-semibold">{swappedToday}</span>. This session is still here if you want it.
+              </span>
+            </InsightBanner>
+          )}
           {volume && (
             <InsightBanner tone="ai" className="flex items-center justify-between gap-3" data-testid="second-sport-volume">
               <span className="text-sm">
@@ -621,8 +643,15 @@ export function TodayPanel({
             background: 'linear-gradient(to top, var(--background) 70%, transparent)',
           }}
         >
-          <Button className="h-[52px] w-full text-[0.9375rem] font-semibold" onClick={startSession}>
-            Start workout
+          {/* A swapped day keeps the escape hatch and loses the pretence:
+              "Start workout" on a session she has already replaced is the
+              app telling her it did not hear. Same handler, honest label. */}
+          <Button
+            className="h-[52px] w-full text-[0.9375rem] font-semibold"
+            variant={swappedToday ? 'outline' : 'default'}
+            onClick={startSession}
+          >
+            {swappedToday ? 'Train it anyway' : 'Start workout'}
           </Button>
         </div>
       )}

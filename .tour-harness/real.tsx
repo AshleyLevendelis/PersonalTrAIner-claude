@@ -117,7 +117,16 @@ const db: Db = {
     weight_kg: 60, reps_completed: 8, is_bodyweight: false, is_warmup: false,
     completed_at: new Date(Date.now() - (back + 1) * 86400000).toISOString(),
     date: new Date(Date.now() - (back + 1) * 86400000).toISOString().slice(0, 10),
-  })), workout_sessions: [], cardio_logs: [],
+  })),
+  // ?swapped=1 — the day Ashley told the coach she had done Muay Thai instead.
+  // Off by default so every existing run of this harness is unchanged. On, it
+  // supplies the one row the panel reads through useTrainingWeek, which is the
+  // only way to see on screen what a source check cannot show: whether the
+  // session card still offers a workout she has already replaced.
+  workout_sessions: new URLSearchParams(location.search).get('swapped') === '1'
+    ? [{ id: 'ws-swap', profile_id: PROFILE_ID, date: today, is_completed: false, swapped_for_activity: 'Muay Thai' }]
+    : [],
+  cardio_logs: [],
   // A logged step count so the new ring renders — without one the row is
   // still the input, which is a different state.
   daily_steps: [{ id: 's1', profile_id: PROFILE_ID, date: today, steps: 7400 }], meal_events: [], meal_plan_picks: [], meal_plan_slots: [],

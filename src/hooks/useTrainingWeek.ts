@@ -19,6 +19,17 @@ export interface TrainingWeekDay {
   date: string
   dayName: string
   state: DayGlyphState
+  /**
+   * What they did INSTEAD, when `state` is 'swapped' — the activity name as
+   * they gave it ("Muay Thai"), straight off workout_sessions.
+   *
+   * Carried here rather than re-read by each surface, because on 8 Sep 2026
+   * exactly that split showed: the strip drew its swap glyph correctly while
+   * TodayPanel, which read nothing, went on offering "Start workout" for a
+   * session Ashley had already replaced. Two readers of one fact is how they
+   * come to disagree; the state and the name now travel together.
+   */
+  swappedForActivity?: string | null
 }
 
 export interface TrainingWeekResult {
@@ -190,7 +201,7 @@ export function useTrainingWeek(
     const state = loading
       ? classifyLoadingSafe(dayName, plan, dateStr, planStartStr)
       : classifyDay(dayName, dateStr, sessionDate, plan, dashboardDay, planStartStr)
-    return { date: dateStr, dayName, state }
+    return { date: dateStr, dayName, state, swappedForActivity: dashboardDay?.session?.swapped_for_activity ?? null }
   })
 
   const trainingDays = days.filter(d => countsTowardWeekTally(d.state))
