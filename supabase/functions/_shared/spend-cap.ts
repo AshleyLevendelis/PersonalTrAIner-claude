@@ -46,14 +46,36 @@ export interface SpendCapConfig {
   dailyGlobal: number
 }
 
-/** Sensible defaults per surface. The chat is conversational and gets more headroom than a one-shot generator. */
+/**
+ * Sensible defaults per surface. The chat is conversational and gets more
+ * headroom than a one-shot generator.
+ *
+ * THE COUNTER COUNTS REQUESTS; A REQUEST CAN COST THREE MODEL CALLS.
+ * `checkSpendCap` runs once per HTTP request, before the model is contacted,
+ * and increments by one. Since the second pass shipped, one chat turn can be
+ * a first leg plus a round trip plus one transport retry — up to three calls
+ * for that single increment. So the ceilings below bounded requests while the
+ * bill follows calls, and the two stopped being the same number.
+ *
+ * Fixed by halving the ceilings rather than by changing the increment: the
+ * `+ 1` is hardcoded in the `increment_ai_usage` plpgsql body and its argument
+ * list is named in two REVOKE/GRANT migrations, so counting calls would be a
+ * migration — a production database change — to buy nothing the arithmetic
+ * below does not. Real use is nowhere near either number: the cap is there to
+ * stop a runaway, not to ration a day's coaching.
+ *
+ * Chat is the only surface with a second pass, so it is the only one whose
+ * numbers move. The other three still cost one call per request.
+ */
 export const CHAT_CAP: SpendCapConfig = {
   functionName: 'chat-gemini',
   maxBodyBytes: 256 * 1024,
   burstWindowMs: 60_000,
   burstMax: 20,
-  dailyPerCaller: 300,
-  dailyGlobal: 20_000,
+  // 150 requests x up to 3 calls = the 450-call ceiling the old 300 implied it
+  // was already holding. Same for the global figure below.
+  dailyPerCaller: 150,
+  dailyGlobal: 8_000,
 }
 
 export const ONBOARDING_CAP: SpendCapConfig = {

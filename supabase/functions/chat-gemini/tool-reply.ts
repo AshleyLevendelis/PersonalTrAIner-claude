@@ -43,13 +43,21 @@ import {
 export const TOOL_TURN_NUDGE =
   "(System: the app has done exactly what the result says and nothing else. Write your message as their coach texting: one to three short sentences, no lists, no bold, no field names. Say only what the result says happened — if activity_logged is false do not say logged. Never mention assumptions, tools, or what you couldn't do. At most one specific question. Plain text only on this attempt — tool calls are unavailable and anything that looks like one will be discarded.)";
 
-/** For log_meal's advice arm: they asked what to eat; nothing was computed. */
+/**
+ * For log_meal's advice arm: they asked what to eat; nothing was computed.
+ *
+ * This and EVALUATION_NUDGE are QUESTION turns, so they carry §1's relaxed
+ * length rule — say the thing and say why. TOOL_TURN_NUDGE and NUMBERS_NUDGE
+ * are confirmations and stay at one to three sentences. Keeping all four
+ * identical is what made the second pass write to the old ceiling even after
+ * the prompt moved.
+ */
 export const ADVICE_NUDGE =
-  "(System: they asked what to eat — nothing was computed and nothing was recorded. Answer as their coach texting: one to three short sentences naming one or two concrete options and when to have them. No numbers, no macros, no lists, no bold. Plain text only on this attempt — tool calls are unavailable and anything that looks like one will be discarded.)";
+  "(System: they asked what to eat — nothing was computed and nothing was recorded. Answer as their coach texting: name one or two concrete options, when to have them, and briefly WHY that works for what they are about to do. A short paragraph is fine; stop when you would start repeating yourself. No numbers, no macros, no lists, no bold. Plain text only on this attempt — tool calls are unavailable and anything that looks like one will be discarded.)";
 
 /** For log_meal's evaluation arm: they asked whether the food they named was a good choice. */
 export const EVALUATION_NUDGE =
-  "(System: they asked whether that food was a good choice. Give your honest verdict as their coach texting — one to three short sentences, the reason in plain words, and what you'd do next time if anything. Quote the numbers in the result only if they help; never invent others. No lists, no bold, no field names; never mention assumptions or the database. Plain text only on this attempt — tool calls are unavailable and anything that looks like one will be discarded.)";
+  "(System: they asked whether that food was a good choice. Give your honest verdict as their coach texting — the verdict first, then the reason in plain words, then what you'd do next time if anything. A short paragraph is fine; stop when you would start repeating yourself. Quote the numbers in the result only if they help; never invent others. No lists, no bold, no field names; never mention assumptions or the database. Plain text only on this attempt — tool calls are unavailable and anything that looks like one will be discarded.)";
 
 /** For log_meal's numbers arm: the figure has to come back in a form the guard can see. */
 export const NUMBERS_NUDGE =
@@ -154,4 +162,61 @@ export async function resolveToolReply(opts: ToolReplyOptions): Promise<ToolRepl
   }
 
   return { reply: floor, source: "floor", legs };
+}
+
+// ---------------------------------------------------------------------------
+// AND THE SAME GUARANTEE FOR A TURN WITH NO TOOL AT ALL.
+//
+// Everything above covers a turn where a tool ran. A plain question — "what
+// should I eat before training", "why is this week lighter" — has no tool, no
+// functionResponse and, until now, no second chance: if the model returned no
+// text the handler shipped "I didn't quite catch that. Could you try
+// rephrasing ...", which blames her for a turn the model simply skipped.
+//
+// THIS IS THE EXACT FAILURE THAT KILLED THE LAST TONE REWRITE. Commit fa683fc
+// fixed the voice and simultaneously stopped the model replying on 4 of 7
+// probed turns; it was caught only because onboarding-chat had a reply
+// guarantee and a probe. The coach has had neither. Changing the persona
+// without this first would be repeating that experiment with no instrument.
+//
+// One retry, tools off, then the floor. Zero extra calls in the normal case.
+// ---------------------------------------------------------------------------
+export const PLAIN_TURN_NUDGE =
+  "(System: your last turn produced no message at all, so they are still waiting. Answer them now in your own voice as their coach texting — plain text, no lists, no bold. If you genuinely cannot tell what they meant, ask one short question about the specific thing that is unclear; never ask them to rephrase.)";
+
+export interface PlainReplyOptions {
+  contents: unknown[];
+  firstParts: GeminiPart[];
+  callGemini: GeminiLegCaller;
+  /** Today's server-authored last resort. Always non-empty. */
+  floor: string;
+  log?: (...args: unknown[]) => void;
+}
+
+export async function resolvePlainReply(opts: PlainReplyOptions): Promise<ToolReplyResult> {
+  const log = opts.log ?? (() => {});
+  const own = sanitizeReply(textOf(opts.firstParts));
+  if (own) return { reply: own, source: "first_leg", legs: 0 };
+
+  let legs = 0;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    legs++;
+    const leg = await opts.callGemini(
+      [...opts.contents, { role: "user", parts: [{ text: PLAIN_TURN_NUDGE }] }],
+      false,
+    );
+    if (!leg.ok) {
+      // Transport failure is retried once; an ok-but-silent answer is a model
+      // choice that the same input would only repeat, so that is not.
+      log("plain-reply: retry failed", { status: leg.status, error: leg.errorText });
+      continue;
+    }
+    const dropped = callsOf(leg.parts);
+    if (dropped.length > 0) log("plain-reply: retry returned calls with tools off — dropped", dropped.map((c) => c.name));
+    const text = sanitizeReply(textOf(leg.parts));
+    if (text) return { reply: text, source: "round_trip", legs };
+    log("plain-reply: retry said nothing either");
+    break;
+  }
+  return { reply: opts.floor, source: "floor", legs };
 }

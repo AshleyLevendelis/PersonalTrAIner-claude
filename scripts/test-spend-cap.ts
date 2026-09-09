@@ -21,7 +21,7 @@
 // scan source with comments stripped.
 // ---------------------------------------------------------------------------
 
-import { readFileSync } from 'fs'
+import { readFileSync, readdirSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 
@@ -181,6 +181,47 @@ console.log('\n6. The two layers fail in the directions they were designed to')
     /temporarily unavailable/.test(src) && !/you.{0,20}used too much/i.test(src))
   check('the in-memory map is bounded, or a long-lived isolate leaks',
     /hits\.size > \d+/.test(src) && /hits\.delete\(k\)/.test(src))
+}
+
+
+// ---------------------------------------------------------------------------
+// 7. THE CEILING BOUNDS REQUESTS; A REQUEST CAN COST THREE CALLS.
+//
+// checkSpendCap runs once per HTTP request and increments by one, before the
+// model is contacted. Since the second pass shipped, one chat turn can be a
+// first leg plus a round trip plus one transport retry — three calls for that
+// single increment — so a ceiling written when a request meant one call was
+// quietly bounding a third of what it looked like.
+//
+// Nothing here previously held either half of that: the numbers were not
+// pinned (only that `globalCount` was compared against SOMETHING), and nothing
+// asserted the counter is touched once per request. Both are now.
+// ---------------------------------------------------------------------------
+{
+  console.log('\n7. The ceiling accounts for a turn costing more than one call')
+  const capSrc = readFileSync(join(ROOT, 'supabase/functions/_shared/spend-cap.ts'), 'utf8')
+  const chatIdx = readFileSync(join(ROOT, 'supabase/functions/chat-gemini/index.ts'), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+
+  check('chat-gemini is the surface with a second pass', /resolveToolReply\(/.test(chatIdx) && /resolvePlainReply\(/.test(chatIdx))
+  check('...and its round trip is capped at two calls beyond the first leg',
+    /attempt < 2/.test(readFileSync(join(ROOT, 'supabase/functions/chat-gemini/tool-reply.ts'), 'utf8')))
+  check('the cap is still counted ONCE per request, before any model call',
+    (chatIdx.match(/checkSpendCap\(/g) || []).length === 1 &&
+    chatIdx.indexOf('checkSpendCap(') < chatIdx.indexOf('callGemini('))
+  check('the chat ceilings were re-derived for that, not left at one-call values',
+    /dailyPerCaller: 150,\s*\n\s*dailyGlobal: 8_000,/.test(capSrc.slice(capSrc.indexOf('CHAT_CAP'), capSrc.indexOf('ONBOARDING_CAP'))), null)
+  check('...with the reason written beside them, not just the number',
+    /A REQUEST CAN COST THREE MODEL CALLS/.test(capSrc))
+  check('...and the increment itself is untouched, so this needed no migration',
+    /requests = ai_usage_daily\.requests \+ 1/.test(
+      readdirSync(join(ROOT, 'supabase/migrations'))
+        .filter(f => f.includes('ai_usage_daily'))
+        .map(f => readFileSync(join(ROOT, 'supabase/migrations', f), 'utf8')).join('\n')))
+  // The other three functions still cost one call per request, so their
+  // numbers must NOT have been swept along with chat's.
+  check('the one-call surfaces keep their own ceilings',
+    /dailyPerCaller: 200/.test(capSrc) && /dailyPerCaller: 60/.test(capSrc), null)
 }
 
 if (failures > 0) { console.error(`\n${failures} failure(s)`); process.exit(1) }

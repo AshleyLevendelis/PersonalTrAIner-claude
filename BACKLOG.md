@@ -2,6 +2,86 @@
 
 Newest first. One line each.
 
+- [x] **THE COACH GETS THE LAST WORD BACK, AND ROOM TO EXPLAIN IT** (roadmap
+  10/12, second half) — Ashley's item 10: *"Warm, empathetic, and supportive
+  persona. Relax the hard 1–3 sentence ceiling for Q&A and health advice turns
+  (allowing detailed 'why' explanations) while keeping direct tool
+  confirmations concise. End open advice turns with a natural follow-up
+  question."* She was offered measure-first and chose it, then on 9 Sep 2026
+  changed to **build it now, measure after** — one typed phrase instead of two,
+  with the risk stated: a regression would show up in the numbers afterwards
+  rather than before.
+  **Four handlers were still the app talking.** `log_workout_session` was the
+  worst §1 violator in the file — a markdown bullet list, **bold** exercise
+  names and up to three blank-line-separated paragraphs, answering a prompt
+  rule that says one to three sentences and never a list. It goes through the
+  same second pass as the rest, the old template demoted to the floor, quoting
+  the number of sets actually saved and refused if it reintroduces a list or
+  bold. Two handlers interpolated the **raw Postgres message** into her chat
+  (`the save failed: duplicate key value violates unique constraint …`) — she
+  cannot act on it and it reads as the app breaking rather than one save
+  failing; it now stays in the server log. The undeclared-tool fall-through
+  said *"Your plan has been updated."* for a tool that never ran, alongside an
+  `action` envelope the client cannot recognise; both gone, and the case is
+  logged so a hallucinated tool name is visible. And `generateConfirmation`
+  still carried a dead `ban_exercise` branch claiming *"I've permanently
+  removed X from your plan"* — unreachable, and a direct contradiction of the
+  prompt's own rule never to claim a ban. Deleted.
+  **THE SAFETY NET WENT IN FIRST, and it is the point.** A tool turn had a
+  floor; a plain question turn had none — if the model returned no text the
+  handler shipped *"I didn't quite catch that. Could you try rephrasing …"*,
+  which blames her for a turn the model skipped. **That is the exact shape that
+  killed the last tone rewrite**: `fa683fc` fixed the voice and simultaneously
+  stopped the model replying on 4 of 7 probed turns, caught only because
+  onboarding-chat had a reply guarantee and a probe. The coach had neither.
+  `resolvePlainReply` gives it onboarding's guarantee — one retry with a nudge,
+  tools off, then a floor that does not blame her — so the persona change lands
+  on top of an instrument rather than in front of one.
+  **The length rule now depends on the kind of turn**, which is what she asked
+  for. Confirming something that just happened keeps the hard one-to-three
+  ceiling; answering a question or giving advice says the thing and then says
+  WHY, with two short paragraphs as its own ceiling. The no-lists, no-headers,
+  no-bold rule survives both. **The four nudges in `tool-reply.ts` are a second
+  copy of that rule** and moved with it — the advice and evaluation nudges are
+  question turns and dropped the ceiling; the confirmation and numbers nudges
+  kept it. Left identical, the second pass would have gone on writing to the
+  old rule after the prompt had moved.
+  **Warmth, defined so it cannot become flattery.** "Warmth is attention, not
+  praise": notice that they trained when they didn't want to, not that their
+  question was great. The three *"congratulate them"* instructions are gone —
+  they were asking for exactly the grading openers the tone probe scores at
+  zero. A bad week is acknowledged before it is fixed, in a clause, with no
+  unrequested silver lining.
+  **The spending cap was counting wrong.** `checkSpendCap` runs once per
+  request and increments by one, but since the second pass a turn can be a
+  first leg plus a round trip plus a retry — three calls for one increment.
+  Halved rather than re-counted: the `+ 1` is hardcoded in the
+  `increment_ai_usage` plpgsql body and its argument list is named in two
+  REVOKE/GRANT migrations, so counting calls would be **a production database
+  change to buy nothing the arithmetic buys**. 300 → 150 per person, 20,000 →
+  8,000 overall, reasoning written beside them; the other three functions still
+  cost one call per request and keep their numbers.
+  **A DEVIATION FROM MY OWN PLAN, FLAGGED UNPROMPTED.** The plan also said
+  "three smaller canned lines in `log_meal`, `log_weight` and the swap handler
+  get the same treatment". They did not, and should not: every one of them is a
+  CLARIFYING QUESTION asked before anything ran — *"What are you doing instead?
+  I'll swap the day over to that."*, *"Which foods do you mean?"*, *"could you
+  give it to me in kilograms"*. There is no tool result to speak from, so the
+  round trip would spend a model call re-asking a question the template already
+  asks well, and `resolveToolReply` has nothing to guard the answer against.
+  The two that genuinely were the app talking over the coach — the raw database
+  errors — are fixed above.
+  Gates: `test:tool-reply` §7–§8 (the plain-turn guarantee against a mocked
+  model — silence retried, tools off, the nudge sent, two transport failures
+  capped, a leaked call dropped; plus the nudges matching the turn kind),
+  `test:coach-promises` Phase 3 (24 checks), `test:spend-cap` §7. **13
+  mutations; 2 survived the first run** — both because the check asserted a
+  call *appeared* rather than that its value was used, so a dead branch left
+  the string in place and passed. Both re-pinned on the assignment, which is
+  the same failure shape as the comment-satisfied check this file already
+  records. **NOT LIVE:** merge needs her word; `chat-gemini` needs the one
+  typed phrase → v73, now carrying Phase 2 and Phase 3 together.
+
 - [x] **THE EQUIPMENT OPTIONS NOW DESCRIBE THE EQUIPMENT** (roadmap 11/12) —
   Ashley's item 11: *"Labels: Update onboarding descriptions for 'Minimalist'
   vs. 'Home gym' to accurately reflect underlying equipment lists. Memory

@@ -10,7 +10,8 @@
 // round trip returns is dropped, never executed.
 // ---------------------------------------------------------------------------
 import {
-  resolveToolReply, guardReason, TOOL_TURN_NUDGE,
+  resolveToolReply, resolvePlainReply, guardReason,
+  TOOL_TURN_NUDGE, PLAIN_TURN_NUDGE, ADVICE_NUDGE, EVALUATION_NUDGE, NUMBERS_NUDGE,
 } from '../supabase/functions/chat-gemini/tool-reply.ts'
 import type { GeminiLegResult, GeminiPart } from '../supabase/functions/_shared/gemini-parts.ts'
 
@@ -134,6 +135,61 @@ const run = async () => {
     const r = await resolveToolReply({ contents: CONTENTS, firstParts: [call('x')], callGemini: async () => ok(text('anything')), outcome: OUTCOME, floor: '' as string })
     check('the floor is whatever the caller passed — this module does not invent text', r.source === 'round_trip' || r.reply === '')
   }
+
+  // -------------------------------------------------------------------------
+  console.log('\n[7] A PLAIN TURN — no tool at all — gets the same guarantee')
+  // The gap that killed the last tone rewrite: a question turn where the model
+  // returned no text shipped "I didn't quite catch that. Could you try
+  // rephrasing ...", which blames her for a turn the model skipped. Now it
+  // retries once with a nudge before falling back.
+  const PLAIN_FLOOR = "I'm not sure I followed that one — tell me a bit more and I'll pick it up."
+  {
+    const m = scripted([])
+    const r = await resolvePlainReply({ contents: CONTENTS, firstParts: text('Toast and honey, about an hour before.'), callGemini: m.callGemini, floor: PLAIN_FLOOR })
+    check('the model spoke — zero extra calls', r.source === 'first_leg' && r.legs === 0 && r.reply.startsWith('Toast'), r)
+    check('...and the model was not called again', m.invocations.length === 0)
+  }
+  {
+    const m = scripted([ok(text('Because week 3 is a deload — the point is to arrive fresh in week 4.'))])
+    const r = await resolvePlainReply({ contents: CONTENTS, firstParts: [], callGemini: m.callGemini, floor: PLAIN_FLOOR })
+    check('silence is retried once and the retry is used', r.source === 'round_trip' && r.legs === 1, r)
+    check('...with tools OFF', m.invocations[0]?.withTools === false)
+    check('...and the nudge is the last turn sent', JSON.stringify(m.invocations[0]?.turns).includes('produced no message at all'))
+  }
+  {
+    const m = scripted([ok(text('   '))])
+    const r = await resolvePlainReply({ contents: CONTENTS, firstParts: [], callGemini: m.callGemini, floor: PLAIN_FLOOR })
+    check('silent twice -> the floor, and the floor never blames her', r.source === 'floor' && r.reply === PLAIN_FLOOR && !/rephras/i.test(r.reply), r)
+  }
+  {
+    const m = scripted([fail(), ok(text('Half an hour is plenty.'))])
+    const r = await resolvePlainReply({ contents: CONTENTS, firstParts: [], callGemini: m.callGemini, floor: PLAIN_FLOOR })
+    check('a transport failure is retried once, then used', r.source === 'round_trip' && r.legs === 2, r)
+  }
+  {
+    const m = scripted([fail(), fail()])
+    const r = await resolvePlainReply({ contents: CONTENTS, firstParts: [], callGemini: m.callGemini, floor: PLAIN_FLOOR })
+    check('two transport failures -> the floor, never more than two calls', r.source === 'floor' && r.legs === 2, r)
+  }
+  {
+    const m = scripted([ok([call('log_meal'), { text: 'and here is the answer' }])])
+    const r = await resolvePlainReply({ contents: CONTENTS, firstParts: [], callGemini: m.callGemini, floor: PLAIN_FLOOR })
+    check('a call leaking back with tools off is dropped, its text still used', r.source === 'round_trip' && r.reply.includes('here is the answer'), r)
+  }
+
+  console.log('\n[8] Length instructions match the kind of turn')
+  // §1 of the prompt splits length by turn kind: confirmations stay at one to
+  // three sentences, questions and advice get room to explain why. The nudges
+  // are a SECOND copy of that rule, and when they disagreed the second pass
+  // kept writing to the old ceiling after the prompt had moved.
+  check('the confirmation nudge stays short', /one to three short sentences/i.test(TOOL_TURN_NUDGE))
+  check('the numbers nudge stays short', /one to three short sentences/i.test(NUMBERS_NUDGE))
+  check('the advice nudge does NOT re-impose the ceiling', !/one to three short sentences/i.test(ADVICE_NUDGE), ADVICE_NUDGE)
+  check('...and asks for the why', /why/i.test(ADVICE_NUDGE))
+  check('the evaluation nudge does NOT re-impose the ceiling', !/one to three short sentences/i.test(EVALUATION_NUDGE), EVALUATION_NUDGE)
+  check('...and still leads with the verdict', /verdict first/i.test(EVALUATION_NUDGE))
+  check('every nudge still bans lists and bold', [TOOL_TURN_NUDGE, NUMBERS_NUDGE, ADVICE_NUDGE, EVALUATION_NUDGE].every(n => /no lists/i.test(n) && /no bold/i.test(n)))
+  check('the plain-turn nudge never asks her to rephrase', /never ask them to rephrase/i.test(PLAIN_TURN_NUDGE))
 
   console.log(failures === 0 ? '\nAll tool-reply checks passed.\n' : `\n${failures} check(s) FAILED.\n`)
   process.exit(failures === 0 ? 0 : 1)

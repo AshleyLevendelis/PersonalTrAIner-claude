@@ -774,7 +774,10 @@ console.log('\nThe coach speaks after a tool runs, and the server reads the mess
   check('the Gemini call is one function, with tools optional', /const callGemini = async \(turns: unknown\[\], withTools = true\)/.test(code))
   check('...tools are attached only when asked for', /\.\.\.\(withTools \? \{ tools: \[\{ functionDeclarations: toolDeclarations \}\] \} : \{\}\)/.test(code))
   check('...and the second pass is capped short', /maxOutputTokens: withTools \? 4096 : 512/.test(code))
-  check('the second pass comes from tool-reply.ts, not an inline fetch', /import \{ resolveToolReply[^}]*\} from "\.\/tool-reply\.ts"/.test(code))
+  // Anchored on WHAT is imported, not on which name happens to come first:
+  // adding resolvePlainReply to the same import broke the old regex without
+  // changing anything it was there to protect.
+  check('the second pass comes from tool-reply.ts, not an inline fetch', /import \{[^}]*\bresolveToolReply\b[^}]*\} from "\.\/tool-reply\.ts"/.test(code))
   check('...and every use logs where the words came from', /tool-reply tool=\$\{o\.outcome\.name\} source=\$\{r\.source\} legs=\$\{r\.legs\}/.test(code))
 
   // log_meal reads the message.
@@ -820,4 +823,75 @@ if (failures > 0) {
   console.error(`\n${failures} check(s) failed`)
   process.exit(1)
 }
+
+// ---------------------------------------------------------------------------
+// PHASE 3 — the last handlers that spoke for the coach, and the voice itself.
+// ---------------------------------------------------------------------------
+{
+  console.log('\nPhase 3. The app stops talking over the coach')
+  const src = chatCode
+
+  // log_workout_session was the worst §1 violator in the file: a markdown
+  // bullet list, bold exercise names and up to three paragraphs, answering a
+  // rule that says one to three sentences and never a list.
+  const session = src.slice(src.indexOf('name === "log_workout_session"'), src.indexOf('name === "log_weight"'))
+  // Pinned as the ASSIGNMENT, not the mere presence of the call: a mutation
+  // that left `await toolReply(` in the file behind a dead branch survived the
+  // first version of this check. Same failure shape as the comment-satisfied
+  // check this file already carries a note about.
+  check('log_workout_session goes through the second pass',
+    /confirmText = insertedSets > 0\s*\n\s*\? \(await toolReply\(/.test(session), null)
+  check('...with the old template kept as the floor', /floor: sessionFloor/.test(session), null)
+  check('...quoting the number of sets it actually saved', /mustContain: \[`\$\{insertedSets\}`\]/.test(session), null)
+  check('...and refusing a reply that reintroduces a list or bold', /forbid: \[\/\^\\s\*\[-\*\]/.test(session) && /\\\*\\\*/.test(session), null)
+
+  // Two handlers interpolated the raw Postgres message into her chat.
+  check('no handler pastes a database error into the reply',
+    !/save failed\$\{dbError/.test(src) && !/failed\$\{dbError \? `: \$\{dbError\}`/.test(src), null)
+  check('...and both still log it server-side',
+    (src.match(/console\.error\("log_workout_(session|set) save failed:/g) || []).length === 2, null)
+
+  // The catch-all claimed a change for a tool that never ran.
+  check('the undeclared-tool fall-through no longer claims a change',
+    !/Your plan has been updated/.test(src), null)
+  check('...and ships no action envelope for something that did not happen',
+    !/generateConfirmation/.test(src), null)
+  check('...and is logged so a hallucinated tool name is visible',
+    /functionCall for an undeclared tool/.test(src), null)
+  check('the dead ban_exercise branch that would claim a removal is gone',
+    !/I've permanently removed/.test(src), null)
+  check('...while the real ban_exercise decline still stands',
+    /can't ban exercises through chat yet/.test(src), null)
+
+  // A plain question turn had no second chance at all.
+  check('a plain turn gets the reply guarantee',
+    /const plain = await resolvePlainReply\(\{/.test(src), null)
+  check('...and its answer is what actually ships', /reply: plain\.reply/.test(src), null)
+  check('...and no longer tells her to rephrase', !/try rephrasing/.test(src), null)
+  check('...with a floor that does not blame her',
+    /I'm not sure I followed that one/.test(src), null)
+  check('...and one log line per plain turn', /plain-reply source=/.test(src), null)
+
+  // §1's length rule now depends on the kind of turn.
+  check('confirmations keep the one-to-three-sentence ceiling',
+    /CONFIRMING SOMETHING THAT JUST HAPPENED[\s\S]{0,400}ONE to THREE short sentences/.test(src), null)
+  check('questions and advice are allowed to explain why',
+    /ANSWERING A QUESTION, OR GIVING ADVICE[\s\S]{0,400}say WHY/.test(src), null)
+  check('...with a ceiling of its own, so it cannot become an essay',
+    /ANSWERING A QUESTION, OR GIVING ADVICE[\s\S]{0,600}two is the ceiling/.test(src), null)
+  check('the no-lists rule survived the relaxation',
+    /NEVER use headers, bullet lists, numbered lists/.test(src), null)
+
+  // Warmth, as Ashley asked for it — and not as the tone probe penalises it.
+  check('warmth is defined as attention, not praise', /WARMTH IS ATTENTION, NOT PRAISE/.test(src), null)
+  check('grading openers are still banned by name',
+    /Never open by grading them/.test(src), null)
+  check('nothing tells the coach to congratulate any more',
+    !/congratulate/i.test(src), null)
+  check('a bad week is acknowledged before it is fixed',
+    /acknowledge it before you fix it/.test(src), null)
+  check('the follow-up-question rule is untouched',
+    /End most turns with a SPECIFIC question/.test(src), null)
+}
+
 console.log('\nAll coach-promise checks passed.\n')
