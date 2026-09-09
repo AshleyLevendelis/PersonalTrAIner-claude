@@ -1226,6 +1226,15 @@ function App() {
         known_squat_kg: enrichedProfile.known_squat_kg ?? null,
         known_bench_kg: enrichedProfile.known_bench_kg ?? null,
         known_deadlift_kg: enrichedProfile.known_deadlift_kg ?? null,
+        // A ceiling volunteered during setup, so the Exercise tab does not ask
+        // for something already said (roadmap item 11). Named here explicitly
+        // because this insert is column-by-column: the same shape omitted these
+        // three from restoreSession, and every plan built after someone said
+        // "my dumbbells go to 24kg" was built as though they never had — see
+        // the header of ceiling-reconcile.ts.
+        max_dumbbell_kg: enrichedProfile.max_dumbbell_kg ?? null,
+        max_single_implement_kg: enrichedProfile.max_single_implement_kg ?? null,
+        max_improvised_kg: enrichedProfile.max_improvised_kg ?? null,
         // Meal-realism round, part 3: onboarding's optional food-preference
         // answers — see the field docs on UserProfile in types.ts.
         favorite_cuisines: enrichedProfile.favorite_cuisines || [],

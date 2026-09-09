@@ -42,6 +42,9 @@ import { isEquipmentAllowed } from '../src/lib/exercise-plan'
 import type { EquipmentAccess, ExerciseEntry, UserProfile } from '../src/lib/types'
 import { getExerciseCompatibilityWarnings } from '../src/lib/exercise-plan'
 import { EXERCISE_DATABASE } from '../src/lib/exercise-db'
+import { ONBOARDING_SLOTS, NEVER_BLOCKING_SLOTS, initialSlotValues, assembleProfile } from '../src/lib/onboarding-slots'
+import { ceilingIsInUserWords } from '../src/lib/onboarding-ceiling-capture'
+import { LOAD_CEILING_MIN_KG, LOAD_CEILING_MAX_KG } from '../src/lib/load-ceiling-prompt'
 
 let failures = 0
 function check(label: string, ok: boolean, detail?: unknown) {
@@ -219,6 +222,98 @@ const ordinary = EXERCISE_DATABASE.find(e =>
 check('an ordinary exercise outside the tier still warns',
   !!ordinary && getExerciseCompatibilityWarnings(ordinary, homeGym).some(x => x.startsWith('Needs ')),
   ordinary ? getExerciseCompatibilityWarnings(ordinary, homeGym) : 'no such entry')
+
+console.log('\n10. A volunteered load ceiling is KEPT — and is never asked for')
+// Item 11's second half. The Exercise tab asks "what are your heaviest
+// dumbbells?" because setup had nowhere to put the answer; these three slots
+// are that place. They sit in NEVER_BLOCKING_SLOTS beside dislikedExercises,
+// which is the existing precedent for "recorded when volunteered, never asked".
+const CEILING_KEYS = ['maxDumbbellKg', 'maxSingleImplementKg', 'maxImprovisedKg'] as const
+const slotsSrc = fs.readFileSync('src/lib/onboarding-slots.ts', 'utf8')
+for (const k of CEILING_KEYS) {
+  const def = ONBOARDING_SLOTS.find(s2 => s2.key === k)
+  check(`${k} exists as a slot`, !!def)
+  check(`${k} never blocks a plan`, NEVER_BLOCKING_SLOTS.includes(k as never), NEVER_BLOCKING_SLOTS)
+  check(`${k} is a numeric column bounded like the Exercise-tab prompt`,
+    def?.control === 'numeric' && def?.destination === 'column' && def?.min === 1 && def?.max === 100,
+    { control: def?.control, destination: def?.destination, min: def?.min, max: def?.max })
+  check(`${k} does not apply at full_gym`,
+    def?.requiredIf?.({ ...initialSlotValues(), equipment: 'full_gym' }) === false)
+  check(`${k} DOES apply on limited kit`,
+    def?.requiredIf?.({ ...initialSlotValues(), equipment: 'minimalist' }) === true)
+  // Order tolerance: a ceiling volunteered before the equipment question is
+  // still applicable, or an early "I've only got 12kg dumbbells" is lost to
+  // whichever set_slot the model happened to emit first.
+  check(`${k} still applies before equipment is answered`,
+    def?.requiredIf?.({ ...initialSlotValues(), equipment: null }) === true)
+}
+check('the bounds match the Exercise-tab prompt exactly',
+  LOAD_CEILING_MIN_KG === 1 && LOAD_CEILING_MAX_KG === 100,
+  [LOAD_CEILING_MIN_KG, LOAD_CEILING_MAX_KG])
+
+console.log('\n11. The number has to be in HER OWN WORDS')
+// The whole safety story: statedCeilingKg treats any number it finds as a hard
+// clamp, and nothing downstream can tell an invented one from a stated one.
+const W = (t: string, v: unknown, k: (typeof CEILING_KEYS)[number] = 'maxDumbbellKg') => ceilingIsInUserWords(k, v, t)
+check('"I have only got 12kg dumbbells" -> 12 accepted', W('I have only got 12kg dumbbells', 12) === true)
+check('"my dumbbells go up to 24" -> 24 accepted', W('my dumbbells go up to 24', 24) === true)
+check('"heaviest kettlebell is 16kg" -> 16 accepted',
+  W('my heaviest kettlebell is 16kg', 16, 'maxSingleImplementKg') === true)
+check('"the bag holds about 10kg" -> 10 accepted',
+  W('the bag holds about 10kg', 10, 'maxImprovisedKg') === true)
+check('"I weigh 80kg" is NOT a dumbbell ceiling — no implement named', W('I weigh 80kg', 80) === false)
+check('"I train with dumbbells" is NOT a ceiling — no number said', W('I train with dumbbells', 20) === false)
+check('a number she never said is refused', W('I have only got 12kg dumbbells', 30) === false)
+check('a decimal is not satisfied by its whole part', W('my dumbbells are 12.5kg', 12) === false)
+check('a kettlebell sentence does not set the dumbbell ceiling',
+  W('my heaviest kettlebell is 16kg', 16) === false)
+check('zero and nonsense are refused', W('I have only got 12kg dumbbells', 0) === false && W('x', NaN) === false)
+check('a non-ceiling slot is untouched by this guard',
+  ceilingIsInUserWords('age' as never, 30, 'no numbers here') === true)
+check('the client actually applies the guard before writing',
+  /isCeilingSlot\(key\) && !ceilingIsInUserWords\(key, coerced, userText\)/.test(
+    fs.readFileSync('src/components/onboarding/ConversationalOnboarding.tsx', 'utf8')), null)
+
+console.log('\n12. The ceiling survives all the way to the database')
+const withCeiling = (equipment: 'minimalist' | 'full_gym') => assembleProfile({
+  ...initialSlotValues(),
+  displayName: 'Probe', fitnessGoal: 'fat_loss', trainingDays: ['Mon'], recoveryCapacity: 'moderate',
+  conditioningPreference: 'some', sessionDuration: '45-60', equipment, trainingStyle: 'hybrid',
+  trainingExperience: 'novice', maxDumbbellKg: '12', maxSingleImplementKg: '16', maxImprovisedKg: '10',
+} as never)
+const kept = withCeiling('minimalist')
+check('a stated ceiling reaches the profile', kept.max_dumbbell_kg === 12 && kept.max_single_implement_kg === 16 && kept.max_improvised_kg === 10,
+  [kept.max_dumbbell_kg, kept.max_single_implement_kg, kept.max_improvised_kg])
+const gym = withCeiling('full_gym')
+check('a full-gym answer discards it — the rack really does go that high',
+  gym.max_dumbbell_kg === undefined && gym.max_single_implement_kg === undefined && gym.max_improvised_kg === undefined,
+  [gym.max_dumbbell_kg, gym.max_single_implement_kg, gym.max_improvised_kg])
+const unstated = assembleProfile({
+  ...initialSlotValues(), displayName: 'Probe', fitnessGoal: 'fat_loss', trainingDays: ['Mon'],
+  recoveryCapacity: 'moderate', conditioningPreference: 'some', sessionDuration: '45-60',
+  equipment: 'minimalist', trainingStyle: 'hybrid', trainingExperience: 'novice',
+} as never)
+check('unstated stays ABSENT, never a limit of zero', unstated.max_dumbbell_kg === undefined, unstated.max_dumbbell_kg)
+// The exact shape that already bit once: a column-by-column profile write that
+// forgets these three (see the header of ceiling-reconcile.ts).
+const appSrc = fs.readFileSync('src/App.tsx', 'utf8')
+const insert = appSrc.slice(appSrc.indexOf("from('fitness_profiles')\n      .insert({"), appSrc.indexOf("from('fitness_profiles')\n      .insert({") + 4000)
+for (const col of ['max_dumbbell_kg', 'max_single_implement_kg', 'max_improvised_kg']) {
+  check(`the onboarding insert names ${col}`, insert.includes(`${col}:`), null)
+}
+
+console.log('\n13. Setup never ASKS for a ceiling')
+const onbPrompt = fs.readFileSync('supabase/functions/onboarding-chat/index.ts', 'utf8')
+check('the prompt tells the model never to ask',
+  /WHAT THEY CAN ACTUALLY LOAD[\s\S]{0,900}NEVER ASK/.test(onbPrompt), null)
+check('...and never to infer one',
+  /never infer it from their bodyweight/i.test(onbPrompt), null)
+check('...and gives the three set_slot targets',
+  /maxDumbbellKg=/.test(onbPrompt) && /maxSingleImplementKg=/.test(onbPrompt) && /maxImprovisedKg=/.test(onbPrompt), null)
+check('no ceiling slot is on the proactive question list',
+  CEILING_KEYS.every(k => NEVER_BLOCKING_SLOTS.includes(k as never)), null)
+check("Ashley's ruling is still recorded where the prompt lives",
+  /NOT IN ONBOARDING/.test(fs.readFileSync('src/lib/load-ceiling-prompt.ts', 'utf8')), null)
 
 console.log(failures === 0 ? '\nAll equipment-label checks passed.\n' : `\n${failures} check(s) failed.\n`)
 process.exit(failures === 0 ? 0 : 1)

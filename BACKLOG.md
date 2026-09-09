@@ -2,6 +2,109 @@
 
 Newest first. One line each.
 
+- [x] **THE EQUIPMENT OPTIONS NOW DESCRIBE THE EQUIPMENT** (roadmap 11/12) —
+  Ashley's item 11: *"Labels: Update onboarding descriptions for 'Minimalist'
+  vs. 'Home gym' to accurately reflect underlying equipment lists. Memory
+  Routing: Ensure specific equipment responses during onboarding populate
+  exercise filter constraints directly so the Exercise tab does not re-ask."*
+  Both halves were real.
+  **The words were a promise the plan did not keep.** "Minimalist — Bands &
+  kettlebells" in fact permitted **dumbbells**, a pull-up bar, a plyo box, an
+  ab wheel, a medicine ball, a jump rope and a weighted backpack (11
+  implements, 2 of them bands or kettlebells). "Home gym — Barbell, dumbbells,
+  bench" permitted **18**, including a squat rack, trap bar, EZ bar and dip
+  bars. "Bodyweight only — No equipment needed" prescribed pull-ups and loaded
+  a rucksack. Own only bands and a kettlebell, pick Minimalist, get dumbbell
+  work you cannot do. **Ashley's ruling, 9 Sep 2026**, from four options (fix
+  the words / fix the kit / ask what you actually own / words now and a
+  checklist later): **fix the words** — narrowing the sets would change every
+  existing plan on those tiers, and those sets are what the catalogue was
+  widened to fill. All four descriptions rewritten from `EQUIPMENT_SETS`.
+  **The Profile picker showed four bare words**, so the one screen where you
+  CHANGE the answer told you least about it. `ui/select.tsx` gains an optional
+  `hint` rendered OUTSIDE `ItemText` — Radix mirrors ItemText into the closed
+  trigger, and a description nested inside would print the whole sentence on a
+  28px inline control. No other call site passes it.
+  **Three prompt glosses disagreed with the sets and with each other**: the
+  setup coach was told *"home_gym means barbell+dumbbells+bench"*; the coach's
+  `equipment_tier` description and §3b both under-described a tier. All three
+  now match. The "closest fit, not exact" caveat stays, because it is true.
+  **Second half: "the Exercise tab re-asks" turned out to be about WEIGHT, not
+  kit.** The tier itself routes fine. What re-asks is `LoadCeilingPrompt` —
+  *"What are your heaviest dumbbells?"* — and it asks because setup had nowhere
+  to put the answer: say *"I've only got 12kg dumbbells"* and the sentence was
+  thrown away. Three slots now hold it, in `NEVER_BLOCKING_SLOTS` beside
+  `dislikedExercises` — **recorded when volunteered, never asked**, which keeps
+  Ashley's earlier ruling that onboarding must not gain a "how much can you
+  load" question. **The slot catalogue travels in the request, so the model
+  learns them with no deploy**; the prompt sentence that says never to ask, and
+  never to infer, needs the `onboarding-chat` deploy.
+  **The safety lock is client-side and deterministic**: `ceilingIsInUserWords`
+  refuses a write unless the turn's own text NAMES the implement and CONTAINS
+  the number. Both halves are load-bearing — without the implement word "I
+  weigh 80kg" becomes an 80kg dumbbell ceiling; without the number the model's
+  guess lands. This matters because `statedCeilingKg` treats any number it
+  finds as a HARD CLAMP and nothing downstream can tell an invented one from a
+  stated one, so a hallucinated "12" would quietly cap every dumbbell weight
+  for sixteen weeks. Refusing is cheap: the slot stays empty and the Exercise
+  tab asks at first use exactly as today. A full-gym answer discards a
+  volunteered ceiling wherever in the conversation it arrived. The three
+  columns were added to the onboarding INSERT explicitly — the same
+  column-by-column shape that omitted them from `restoreSession` and made every
+  plan build as though the ceiling had never been stated (see
+  `ceiling-reconcile.ts`).
+  **Found on the way:** `getExerciseCompatibilityWarnings` re-implemented the
+  equipment filter instead of calling `isEquipmentAllowed`, so an entry where
+  EITHER of two implements does the job was reported unavailable to someone who
+  owned one — a home_gym user was told "Needs t-bar" for T-Bar Rows, which
+  generation considers fully allowed. Its own doc comment claimed it reused
+  that logic; now it does.
+  Gate `test:equipment-labels`, **69 checks**: no description may name kit the
+  tier lacks, none may hide kit that matters, an "— no x" clause may only
+  exclude what the tier really lacks, a ceiling is only accepted from her own
+  words, unstated stays ABSENT rather than a limit of zero, and the insert
+  names all three columns. **18 mutations, all caught.** Browser:
+  `verify:equipment-labels` drives the Profile picker at 390×844 and asserts
+  both states — closed stays label-only, open shows every description, nothing
+  clipped — mutation-tested by moving the hint inside `ItemText`. The setup
+  card read back from a live render at phone size.
+  **Frontend on merge. `onboarding-chat` needs one typed phrase** for the
+  prompt half; `chat-gemini`'s two corrected glosses ride with the pending v73.
+
+- [x] **THE TAP-TARGET NOTE WAS WRONG, AND SO WAS MY FIRST FIX** — BACKLOG's
+  own line said *"`verify:tap-targets` fails on Home — 2 of 87 controls under
+  44px (the weigh-in button at 22px, a numeric input at 28px)"*. Re-run 9 Sep
+  2026: **5 of 87, across three tabs.** Home had **one** (the weigh-in number);
+  the "28px numeric input" is on EXERCISE — the two set-logging fields — and
+  Tools had two more. The note attributed all of it to Home. The count 87 was
+  right; nothing else was. (`BACKLOG:2485` was the accurate record all along.)
+  **Home fixed invisibly:** the 22px weigh-in number gets `hit-slop-44`, the
+  app's existing 44px `::after`. Nothing moves and nothing looks different.
+  Measured before: the probe 21px above its centre landed on the "Weight"
+  label beside it. Dashboard is now **0 of 14**.
+  **A CORRECTION I OWE, because the wrong fix nearly shipped.** I read the
+  Tools "Add item to list" button as a missing hit-slop and gave it
+  `relative z-10`, reasoning that a later sibling painted over its transparent
+  `::after`. Re-measuring said otherwise: the button already HAD a 44px slop
+  (`afterH: 44px, afterPos: absolute`) and every probe direction resolved past
+  it to an ancestor — the signature of an INERT hit area, not a small one. It
+  is `disabled` whenever the field beside it is empty, and `Button` carries
+  `disabled:pointer-events-none`, which hides the element and its `::after`
+  from `elementFromPoint`. The z-index was reverted; the real fix was in the
+  CHECK, which now skips disabled controls — measuring one asks a question with
+  no answer. How I got it wrong: I read the failing directions and the class
+  list, and inferred paint order instead of probing the element's own computed
+  `::after` and disabled state, which took one more run and settled it.
+  **The three real remainders are `<input>`s and needed a visual decision.** A
+  text field cannot carry a `::after`, so the only fix is real height.
+  **Ashley's ruling, 9 Sep 2026**, having seen the before and after at phone
+  size, from three options: **make all three 44px** — the two set fields and
+  the shopping-list field. The exercise page grows about 60px. Her reasoning
+  stands on the use: logging sets is done mid-workout, which is exactly when a
+  28px box gets missed.
+  The check ran standalone and was in no test list, which is why the note rotted
+  unnoticed.
+
 - [x] **WHAT YOU ATE IS NOT REWRITTEN BY WHAT YOU LATER DECIDE** (roadmap
   9/12) — Ashley's item 9: *"Ensure updating dietary preferences or adding
   extra items preserves historical consumed meal records instead of
@@ -327,9 +430,9 @@ Newest first. One line each.
   `test:macro-split` (57) all pin it. **This one needs the deploy in roadmap
   12, not a patch.**
 
-- [ ] `verify:tap-targets` fails on Home — 2 of 87 controls under 44px (the
+- [x] `verify:tap-targets` fails on Home — 2 of 87 controls under 44px (the
   weigh-in button at 22px tall, a numeric input at 28px). Pre-existing, not in
-  the 146-gate list; confirmed identical against pre-step-7 code.
+  the 146-gate list; confirmed identical against pre-step-7 code. **THIS LINE WAS WRONG and is superseded** — re-measured 9 Sep 2026 as 5 of 87 across three tabs, only one of them on Home. See the entry at the top of this file.
 
 - [ ] The last hard-coded "I can't …" reply in `chat-gemini` is
   `ban_exercise`. Deliberate (§7.2 A0 keeps ban disabled via chat) and it
