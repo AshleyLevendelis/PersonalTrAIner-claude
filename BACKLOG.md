@@ -2,6 +2,42 @@
 
 Newest first. One line each.
 
+- [ ] **A MOVED SESSION GETS STUCK, AND THE MOVER IS BLIND TO IT** — Ashley,
+  9 Sep 2026, 18:41, from the live app. Tuesday's Push & Press moved to
+  Wednesday, confirmed, card correct. Then on Wednesday: *"I missed todays
+  session"* → **"There's no session on Wednesday to move — that day is already
+  clear."** Three times, verbatim.
+  **REPRODUCED against the real resolver**, her exact sequence:
+  `sessionForDate(Wednesday)` → *Push & Press (moved in from Tuesday)*;
+  `hasSessionOn(plan, "Wednesday")` → **false**. The two disagree, and
+  `resolveMoveTarget` asks the second one.
+  **The cause, and it is galling.** `session-move.ts` contains BOTH answers.
+  `sessionForDate` is the move-aware one, and its own doc comment says it
+  exists because every surface used to run `plan.find(d => d.day === dayName)`
+  itself, "which is the right answer only for a day nothing has happened to".
+  `resolveMoveTarget` — twenty lines above it, in the same file — still asks
+  `hasSessionOn(plan, fromDayName)`, which is that exact naive lookup. The one
+  place that most needed the fix is the one place that never adopted it.
+  **What it costs her today:** once a session has been moved onto a day, it
+  cannot be moved again and she cannot say she missed it. It is stuck there
+  until the week rolls over. Whether marking such a day as a rest is equally
+  blind is NOT yet checked.
+  **A CORRECTION I OWE.** I first told her that sentence was not in the
+  codebase and the coach must have written it — evidence, I claimed, that the
+  second pass was working. Wrong: it is a literal string at
+  `session-move.ts:108`. I had grepped only the deployed edge function, not the
+  repo, and reported the absence as if I had searched everywhere. The right
+  claim was "not in the server function", which is a much weaker thing to know.
+  **Ashley's ruling, 9 Sep 2026**, asked as "should a twice-missed session move
+  again, or should the app offer to drop it": **ask, and let her choose** —
+  offer both moving it on and dropping it, and let her pick. Not built yet.
+  Design intended: the origin day resolves through `sessionForDate`; a session
+  that arrived by a move returns a new `moved_in` outcome carrying the original
+  move, so moving it on UPDATES that record rather than stacking a second one;
+  dropping sets `deliberate_rest` on the day it sits on, which `classifyDay`
+  already ranks as `rest_chosen` above the date judgement — so neither day
+  counts as missed and the session is not owed anywhere.
+
 - [x] **THE COACH GETS THE LAST WORD BACK, AND ROOM TO EXPLAIN IT** (roadmap
   10/12, second half) — Ashley's item 10: *"Warm, empathetic, and supportive
   persona. Relax the hard 1–3 sentence ceiling for Q&A and health advice turns
