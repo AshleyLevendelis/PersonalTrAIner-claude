@@ -27,6 +27,24 @@ These apply to every session in this repo. They exist so they stop being restate
 - Keep a decision log: every judgment call, the options, what was chosen, why, and whether she answered or it was decided unprompted.
 - Still stop and wait, even with a good default in hand: anything affecting live users, anything that changes what a metric measures, anything in the allergen or safety path.
 
+## Writing to Ashley
+
+Her ruling, 9 Sep 2026: *"at the end of each message going forwards I want a few
+short sentences summary. because you always go into too much detail that takes
+too long to read. give me short punchy answer"*.
+
+- **Every message ends with a summary**: two or three short sentences, plainly
+  headed, covering what happened, what's next, and what's needed from her. This
+  is not optional and not only for long messages.
+- Short and punchy above the summary too. Answer the question asked, then stop.
+  If the detail matters, it goes in a file she can open, not in the reply.
+- No jargon. No file names, function names, table names, or commit hashes unless
+  she asked for them. Say what changes on her phone, not what changed in the code.
+- Prefer one sentence over a paragraph, a paragraph over a table, and a table
+  only when the shape of the answer genuinely is a comparison.
+- This is about how to write, not what to check. It never shortens the
+  verification behind a claim — see **Reporting**.
+
 ## Git and deploy
 
 - Push finished work to the session's designated working branch (e.g. `claude/…`) without asking. Ashley ruled on this 29 Aug 2026, choosing "push it, and stop asking me about pushes" over keeping the old ask-every-time rule, because the interruption cost more than it protected. This replaces the previous "commit, never push" default.
