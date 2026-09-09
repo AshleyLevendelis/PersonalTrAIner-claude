@@ -2,6 +2,50 @@
 
 Newest first. One line each.
 
+- [x] **WHAT YOU ATE IS NOT REWRITTEN BY WHAT YOU LATER DECIDE** (roadmap
+  9/12) — Ashley's item 9: *"Ensure updating dietary preferences or adding
+  extra items preserves historical consumed meal records instead of
+  retroactively altering past eaten logs on the diary screen."* She asked for
+  it as a **precaution**, not from a sighting, so the gate is as much the
+  deliverable as the fix.
+  **The half that was already right, and now cannot rot:** every logged meal is
+  one append-only row carrying its own copy of the name and the macros; the
+  read maps it 1:1 with no lookup against the meal pools; undo sets a
+  `voided_at` flag rather than deleting; and no preference change touches those
+  rows. All four are now pinned.
+  **Two real gaps, both on today's screen.** (1) The **name** beside a logged
+  meal was re-read from the current plan, so swapping the slot or adding a food
+  to it after logging left the NEW meal's name sitting above the OLD meal's
+  calories — a comment in the file called that "considered and kept", and item
+  9 overrides it. The row now shows the logged name, and when the plan has
+  moved on the expanded view says whose details are underneath. (2) A meal
+  **already eaten** carried the same red "no longer fits your restrictions —
+  swap it, or regenerate" warning as an uneaten one. **Ashley's ruling, 9 Sep
+  2026**, offered a quiet note, saying nothing, or keeping the warning: she
+  chose **the quiet note**. Eaten slots leave the banner; the row gets a muted
+  line, `describeEatenBeforeChange`, naming the food and the rule in the past
+  tense: *"This had almond butter — you ate it before you added nut-free."*
+  Only claimed when the eaten meal is still that slot's option, because the
+  ledger stores no ingredients and guessing what was in a since-swapped meal
+  would be worse than silence.
+  **Third, unprompted and mechanical:** `setMealPick` refused a date in the
+  past. Nothing renders past picks today, so there is no symptom — but the
+  chat's meal-food-add path already accepts an arbitrary date, and that is the
+  loaded gun for the day a real diary exists.
+  **Worth stating plainly: there is no past-day diary screen.** Nutrition only
+  ever shows today, with no date picker, so "past eaten logs" currently means
+  "earlier today". A day-by-day diary is a separate build, not done here.
+  Gate `test:diary-preservation` (25 checks); **12 mutations, all caught**. Its
+  own first run caught two of my errors: a regex that stopped before the update
+  payload, so "the only update is the void flag" would have passed for any
+  update at all; and the browser driver caught the quiet note rendered inside
+  the expanded detail, i.e. an allergen note sitting behind a tap. Both fixed
+  and both now pinned. Browser: `verify:diary-preservation` at 390×844 with a
+  new `?ate=1` fixture — a nut meal logged under the name still shown, and a
+  lunch logged under a name the plan has moved away from — asserting the eaten
+  name over the eaten calories, the quiet note present, and the red warning
+  absent. **Frontend only; live on the next merge.**
+
 - [x] **THE COACH SPEAKS AFTER A TOOL RUNS, AND THE SERVER READS HER MESSAGE
   FIRST** (roadmap 10/12, plus the rest of 8 Sep's 22:16 report) — three
   replies in one evening, all templates that could not tell what they were
