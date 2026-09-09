@@ -23,6 +23,8 @@ import { getExerciseEntry } from './exercise-db'
 import { swapPoolMeal, clearMealPick, getMealPicksForDate, USER_REQUESTED_TAG, type MealSlotName } from './meal-store'
 import { supabase } from './supabase'
 import { setSessionMove, setDeliberateRest } from './daily-tracking'
+import { saveCardioLog } from './cardio-log-store'
+import { alsoDoingIsLoggable, type AlsoDoing } from './session-move'
 import type { MealAdditionPayload } from './meal-addition'
 import { STYLE_OPTIONS } from './onboarding-slots'
 import { substituteForInjury, substituteForEquipment, rebuildForInjury } from './plan-adaptations'
@@ -786,6 +788,13 @@ export interface SessionMovePayload {
    */
   requestedDayName?: string
   reason?: string
+  /**
+   * What they did INSTEAD on the day the session left, when the same message
+   * said so ("Muay Thai tonight"). Recorded on confirm only when it has
+   * happened and they said how long — see alsoDoingIsLoggable; a class that
+   * is still to come marks nothing, and the coach asks afterwards.
+   */
+  alsoDoing?: AlsoDoing
 }
 
 export async function executeSessionMove(
@@ -799,17 +808,37 @@ export async function executeSessionMove(
   if (!ok) {
     return { receipt: { landed: [], failed: [{ op: 'save', error: "Couldn't move that session — try again in a moment" }] } }
   }
-  return {
-    receipt: {
-      landed: [
-        `${payload.fromDayName}${payload.sessionFocus ? `'s ${payload.sessionFocus}` : ''} moved to ${payload.toDayName}`
-        + (payload.requestedDayName ? ` (${payload.requestedDayName} already had a session on it)` : ''),
-      ],
-      failed: [],
-    },
+  const landed = [
+    `${payload.fromDayName}${payload.sessionFocus ? `'s ${payload.sessionFocus}` : ''} moved to ${payload.toDayName}`
+    + (payload.requestedDayName ? ` (${payload.requestedDayName} already had a session on it)` : ''),
+  ]
+  const failed: { op: string; error: string }[] = []
+  // THE PASSENGER, through the client's own cardio path — clientId dedupe,
+  // the offline queue, the plausibility bound — never a bare insert. Only
+  // when it has happened and they said how long: a duration the model
+  // guessed never reaches here (the server drops it), and a class still to
+  // come is not a log entry.
+  if (payload.alsoDoing && alsoDoingIsLoggable(payload.alsoDoing)) {
+    const a = payload.alsoDoing
+    const view = saveCardioLog({
+      userId: profile.id,
+      date: payload.fromDate,
+      activityName: a.activity,
+      durationMinutes: a.durationMinutes as number,
+      intensityRpe: 6,
+      notes: 'Done instead of the moved session',
+    })
+    if (view) landed.push(`${a.activity} logged for ${payload.fromDayName}: ${a.durationMinutes} min`)
+    else failed.push({ op: 'log activity', error: `Couldn't log the ${a.activity} — the duration didn't look right` })
   }
+  return { receipt: { landed, failed } }
 }
 
+/**
+ * Clears the move. Deliberately leaves any activity the confirm logged: the
+ * move was a plan, the activity happened, and undoing a plan must not erase a
+ * fact. The activity has its own Undo on the Exercise tab.
+ */
 export async function undoSessionMove(profileId: string, payload: SessionMovePayload): Promise<void> {
   await setSessionMove(profileId, payload.fromDate, null)
 }

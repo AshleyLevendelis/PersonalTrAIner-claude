@@ -174,6 +174,62 @@ export interface ResolvedDay {
  * for a day nothing has happened to, and there are now four ways that can be
  * false.
  */
+// ---------------------------------------------------------------------------
+// THE PASSENGER. "I didn't train this morning but I'm going to Muay Thai
+// tonight and will do this morning's session tomorrow" — Ashley, 8 Sep 2026 —
+// is ONE move with an activity riding along. The server forwards the
+// activity, a duration only when her message stated one, and the timing read
+// from her words; these turn that into the card's row, its implication and
+// the clause in the coach's sentence. Pure, so the gate can run them.
+// ---------------------------------------------------------------------------
+export type AlsoDoingTiming = 'past' | 'future' | 'unclear'
+
+export interface AlsoDoing {
+  activity: string
+  /** Only when the message stated one; never the model's guess. */
+  durationMinutes: number | null
+  timing: AlsoDoingTiming
+}
+
+export function parseAlsoDoing(rawArgs: Record<string, unknown>): AlsoDoing | null {
+  const activity = typeof rawArgs.also_doing_activity === 'string' ? rawArgs.also_doing_activity.trim() : ''
+  if (!activity) return null
+  const n = Number(rawArgs.also_doing_duration_minutes)
+  const timing = rawArgs.also_doing_timing
+  return {
+    activity,
+    durationMinutes: Number.isFinite(n) && n > 0 && n <= 600 ? Math.round(n) : null,
+    timing: timing === 'past' || timing === 'future' ? timing : 'unclear',
+  }
+}
+
+/** True when confirming the move should also write the activity: it has happened, and she said how long. */
+export function alsoDoingIsLoggable(a: AlsoDoing): boolean {
+  return a.timing !== 'future' && a.durationMinutes != null
+}
+
+export function alsoDoingRow(a: AlsoDoing): { field: string; before: string; after: string } {
+  return {
+    field: 'Also today',
+    before: 'Nothing recorded',
+    after: `${a.activity}${a.durationMinutes != null ? ` · ${a.durationMinutes} min` : ''}${a.timing === 'future' ? ' · later today' : ''}`,
+  }
+}
+
+/** One implication per timing — what confirming will and will not record. */
+export function alsoDoingImplication(a: AlsoDoing): string {
+  if (a.timing === 'future') return `I'll count the ${a.activity} once you tell me how long it went — nothing is logged for it yet.`
+  if (a.durationMinutes != null) return `${a.activity} goes in your log at ${a.durationMinutes} min when you confirm.`
+  return `Tell me how long the ${a.activity} was and I'll log it — nothing is logged for it yet.`
+}
+
+/** The clause the coach's sentence gains, before its "Shall I?". */
+export function alsoDoingLeadClause(a: AlsoDoing): string {
+  if (a.timing === 'future') return ` ${a.activity} goes down for today too — tell me how long it went afterwards.`
+  if (a.durationMinutes != null) return ` ${a.activity} goes in your log at ${a.durationMinutes} min.`
+  return ` ${a.activity} goes down for today too.`
+}
+
 export function sessionForDate(input: {
   date: string
   plan: WorkoutDay[]

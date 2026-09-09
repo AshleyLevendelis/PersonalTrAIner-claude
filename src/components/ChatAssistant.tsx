@@ -43,7 +43,7 @@ import { useBottomDockHeight } from '@/hooks/useBottomDockHeight'
 import { cn } from '@/lib/utils'
 import { parseWorkoutEntries, resolveExerciseName, type ParsedSetGroup, type WorkoutEntryInput } from '@/lib/set-parse'
 import { resolveSwapTarget } from '@/lib/swap-target'
-import { sessionForDate, resolveMoveTarget } from '@/lib/session-move'
+import { sessionForDate, resolveMoveTarget, parseAlsoDoing, alsoDoingRow, alsoDoingImplication, alsoDoingLeadClause } from '@/lib/session-move'
 import { executeLogWorkout, type ReplacedSetPreImage } from '@/lib/nl-logging-executor'
 import { normalizeExternalUrl } from '@/lib/chat-links'
 import { buildFirstRunIntro, planShapeFromMesocycle, type FirstRunSessionBrief } from '@/lib/first-run-intro'
@@ -2176,6 +2176,10 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     }
 
     const reason = typeof rawArgs.reason === 'string' && rawArgs.reason.trim() ? rawArgs.reason.trim() : undefined
+    // What they are doing INSTEAD today, when the same message said so — the
+    // server forwards it with a duration only if stated and the timing read
+    // from their words (session-move.ts explains the shape).
+    const alsoDoing = parseAlsoDoing(rawArgs)
     const payload: SessionMovePayload = {
       fromDate,
       toDate: target.date,
@@ -2184,27 +2188,31 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       sessionFocus: session.focus,
       ...(target.asWanted ? {} : { requestedDayName: target.requestedDayName }),
       reason,
+      ...(alsoDoing ? { alsoDoing } : {}),
     }
+    // Said out loud, in the app's words, from the day THIS code resolved.
+    // A question until she taps: nothing has moved when this is read.
+    const leadBase = target.asWanted || !target.requestedDayName
+      ? `${target.dayName}'s free, so I'll put ${fromDayName}'s ${session.focus} there and ${fromDayName} won't count as missed.`
+      : `${target.requestedDayName} already has a session, so the next free day is ${target.dayName} — I'll put ${fromDayName}'s ${session.focus} there and ${fromDayName} won't count as missed.`
     return {
       ok: true,
       scopeKey: `${profile.id}:propose_session_move:${fromDate}:${target.date}`,
       preconditions: { fromDate, toDate: target.date },
       payload,
       diff: {
-        // Said out loud, in the app's words, from the day THIS code resolved.
-        // A question until she taps: nothing has moved when this is read.
-        lead: target.asWanted || !target.requestedDayName
-          ? `${target.dayName}'s free, so I'll put ${fromDayName}'s ${session.focus} there and ${fromDayName} won't count as missed. Shall I?`
-          : `${target.requestedDayName} already has a session, so the next free day is ${target.dayName} — I'll put ${fromDayName}'s ${session.focus} there and ${fromDayName} won't count as missed. Shall I?`,
+        lead: `${leadBase}${alsoDoing ? alsoDoingLeadClause(alsoDoing) : ''} Shall I?`,
         rows: [
           { field: fromDayName, before: session.focus, after: `Moved to ${target.dayName}` },
           { field: target.dayName, before: 'Nothing scheduled', after: session.focus },
+          ...(alsoDoing ? [alsoDoingRow(alsoDoing)] : []),
         ],
         implications: [
           ...(target.asWanted || !target.requestedDayName
             ? []
             : [{ severity: 'info' as const, text: `${target.requestedDayName} already has a session on it, so this goes to ${target.dayName} — the next day that's free.` }]),
           { severity: 'info' as const, text: `${fromDayName} won't count as a missed session, and your week still owes the same number of sessions.` },
+          ...(alsoDoing ? [{ severity: 'info' as const, text: alsoDoingImplication(alsoDoing) }] : []),
           { severity: 'info' as const, text: 'The plan itself is unchanged — this moves one session, this week only.' },
         ],
         rationale: reason,
@@ -3982,7 +3990,9 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       receipt = result.receipt
       const ok = receipt.failed.length === 0
       title = ok ? 'Session moved' : "Couldn't move that session"
-      rows = ok ? receipt.landed.map(line => ({ label: payload.toDayName, detail: line })) : []
+      // The first line is the move (labelled by where it went); any further
+      // line is the passenger activity, which belongs to the day it LEFT.
+      rows = ok ? receipt.landed.map((line, i) => ({ label: i === 0 ? payload.toDayName : payload.fromDayName, detail: line })) : []
       undoToken = ok ? row.id : undefined
       // Same shape as the rest day above: this marks a DAY, it does not touch
       // the plan, so undo is clearing one column and nothing needs restoring.

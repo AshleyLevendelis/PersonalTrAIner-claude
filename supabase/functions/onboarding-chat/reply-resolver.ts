@@ -20,11 +20,23 @@
 // Deno.serve handler can't be. Keep it free of Deno APIs and jsr imports.
 // ---------------------------------------------------------------------------
 
-export interface GeminiFunctionCall {
-  name: string;
-  args: Record<string, unknown>;
-}
-export type GeminiPart = { text?: string; functionCall?: GeminiFunctionCall };
+export {
+  callsOf,
+  sanitizeReply,
+  textOf,
+  type GeminiFunctionCall,
+  type GeminiLegCaller,
+  type GeminiLegResult,
+  type GeminiPart,
+} from "../_shared/gemini-parts.ts";
+import {
+  callsOf,
+  sanitizeReply,
+  textOf,
+  type GeminiLegCaller,
+  type GeminiPart,
+} from "../_shared/gemini-parts.ts";
+
 export interface ClientAction {
   name: string;
   args: Record<string, unknown>;
@@ -43,38 +55,10 @@ export interface SlotCatalogEntry {
   max?: number;
 }
 
-/** One Gemini call, already unwrapped: parts on success, status/errorText on failure. */
-export interface GeminiLegResult {
-  ok: boolean;
-  status?: number;
-  parts: GeminiPart[];
-  errorText?: string;
-}
-export type GeminiLegCaller = (turns: unknown[], withTools: boolean) => Promise<GeminiLegResult>;
-
-export const textOf = (parts: GeminiPart[]) =>
-  parts.filter((p) => typeof p.text === "string").map((p) => p.text).join("").trim();
-export const callsOf = (parts: GeminiPart[]) =>
-  parts.filter((p) => p.functionCall).map((p) => p.functionCall!);
-
-/**
- * Defense in depth against two leak shapes measured live: a trailing
- * parenthetical explaining the model's own slot logic to itself ("(Note: the
- * user didn't specify days, so I need to present the training days
- * option.)"), and a reply that IS bare tool-call/JSON syntax instead of the
- * functionCall part it should have been. Neither belongs in a text message a
- * real coach would send. The prompt says not to do either (see "NEVER LEAK
- * YOUR OWN REASONING"); this is the deterministic backstop for when it does
- * anyway. It runs on EVERY leg's output, inside the chain — a reply
- * sanitized to empty triggers the next recovery leg rather than shipping as
- * silence (which is exactly what it used to do when this ran once, after
- * the legs).
- */
-export function sanitizeReply(text: string): string {
-  const stripped = text.replace(/\s*\((?:note|internal|system)\s*[:\-][^)]*\)\s*$/i, "").trim();
-  if (/^\{[\s\S]*"(?:name|actions|slot_key|functionCall)"/.test(stripped)) return "";
-  return stripped;
-}
+// The part vocabulary, the leg shape, textOf/callsOf and sanitizeReply moved
+// to _shared/gemini-parts.ts on 8 Sep 2026 so chat-gemini's tool-reply.ts
+// shares one copy; re-exported above so nothing that imported them from
+// here has to change.
 
 const RECORDED_NUDGE =
   "(System: those are recorded and the app has already shown the user a confirmation for each. Now write your actual turn to them — pick the conversation up and carry it forward. Two to four sentences, one paragraph, no lists, no \"let me know\" ending, and do not repeat the recorded values back at them. If your turn asks a closed-set question, call present_slot for it in this same turn so the chips render.)";

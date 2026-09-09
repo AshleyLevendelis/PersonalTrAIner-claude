@@ -3,6 +3,9 @@ import { GEMINI_MODEL } from "../_shared/gemini.ts";
 import { computeMealMacros, type MealIngredientLine } from "../_shared/food-db.ts";
 import { classifyImperative } from "../_shared/imperative-classifier.ts";
 import { checkSpendCap, CHAT_CAP } from "../_shared/spend-cap.ts";
+import { resolveToolReply, ADVICE_NUDGE, EVALUATION_NUDGE, NUMBERS_NUDGE, type ToolReplyOptions } from "./tool-reply.ts";
+import type { GeminiLegResult, GeminiPart } from "../_shared/gemini-parts.ts";
+import { userNamedFood, isAdviceQuestion, isEvaluationQuestion, statedDurationsMinutes, eventTiming } from "../_shared/message-evidence.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -29,6 +32,29 @@ const corsHeaders = {
  * Returns "" for anything unrecognised rather than echoing it: an unknown key
  * printed back is the same defect with an extra step.
  */
+/**
+ * The day a message names, as a date after today — "tomorrow", or a weekday
+ * ("Thursday" → the next Thursday). Undefined when it names none, so the
+ * client takes the soonest free day. Used when the swap handler re-routes a
+ * combined sentence to propose_session_move (see there): the model's own
+ * to_date is not in hand on that path.
+ */
+function namedDateAfter(message: string, todayIso: string): string | undefined {
+  const m = (message || "").toLowerCase();
+  const base = new Date(`${todayIso}T12:00:00Z`);
+  if (Number.isNaN(base.getTime())) return undefined;
+  if (/\btomorrow\b/.test(m)) {
+    base.setUTCDate(base.getUTCDate() + 1);
+    return base.toISOString().slice(0, 10);
+  }
+  const days = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+  const hit = days.find((d) => new RegExp(`\\b${d}\\b`).test(m));
+  if (!hit) return undefined;
+  const delta = ((days.indexOf(hit) - base.getUTCDay()) + 7) % 7 || 7;
+  base.setUTCDate(base.getUTCDate() + delta);
+  return base.toISOString().slice(0, 10);
+}
+
 function humanSlot(slot: unknown): string {
   if (typeof slot !== "string") return "";
   const known: Record<string, string> = {
@@ -689,6 +715,14 @@ const toolDeclarations = [
           type: "string",
           description: "The exact substring of the user's CURRENT message asking for the move. Copied verbatim, not paraphrased.",
         },
+        also_doing_activity: {
+          type: "string",
+          description: "ONLY when the same message says what they are doing INSTEAD on the day the session leaves ('Muay Thai tonight', 'a long run this morning'): the activity, in their words. The card shows it beside the move. Omit when they named nothing.",
+        },
+        also_doing_duration_minutes: {
+          type: "number",
+          description: "How long that activity was or will be, ONLY if they said. Omit if they didn't — do not guess.",
+        },
       },
       required: ["origin_verbatim_quote"],
     },
@@ -873,7 +907,7 @@ const toolDeclarations = [
         },
         food_name: {
           type: "string",
-          description: "Short label for what was eaten, e.g. 'Post-workout shake'",
+          description: "Short label for the food, in the USER'S OWN WORDS — never a dish you invented. If they asked what to eat rather than naming food, do not call this tool at all: answer in text.",
         },
         ingredients: {
           type: "array",
@@ -1448,6 +1482,9 @@ gets asked, which is why this is your job and not a button on a screen.
   adjust anything because of how someone said they felt, and never make the
   offer sound like a verdict on them.
 
+=== 1f. AFTER A TOOL RUNS ===
+When a tool's result comes back to you, the app has done exactly what the result says and nothing else. Write ONE short message about it in your own voice — a coach texting, not a system reporting: what happened, in their terms, and at most one question. Never say a thing is logged, marked, moved or saved unless the result says it is. Never mention the tool, the database, assumptions, or what you could not do.
+
 === 2. WORKOUT & MEAL LOOKUPS (READ-ONLY) ===
 - Workout Schedule ("What are we doing Friday?"): Inspect the schedule context. Give a 1-2 sentence summary of the session focus first. Only list full exercise sets/reps if explicitly requested.
 - Meal Lookups ("What should I eat tonight?"): Check today_meal_plan first. If a meal is scheduled, reference it directly.
@@ -1667,6 +1704,7 @@ ${context.exercise_exclusions && context.exercise_exclusions.length > 0 ? `\nPER
 - A FOOD JOINING A MEAL IS NEITHER. "Add a banana to my breakfast", "put 100g of rice with my dinner", "can I have an egg with lunch" — the meal on the plan stays as it is and the food joins it: call propose_meal_food_add with the food and its amount. Do not route these to propose_meal_addition (that would try to portion "Banana" as a whole meal and refuse) or to propose_custom_meal (that replaces the meal). If no amount is stated, ask how much — one question — then call it.
 - A QUESTION ABOUT WHAT TO EAT IS ANSWERED, NEVER PROPOSED. "What should I eat before training?", "what's a good breakfast?", "what would give me energy tonight?" ask for advice, not for their plan to change. Answer in plain words — name a food or two and say when to have it — then, if a dish would genuinely suit, ONE line offering it: "want it in your plan? say the word and I'll add it." No tool call, no card. Ashley's ruling, 8 Sep 2026, after "What should I eat?" produced a card that would have replaced her lunch: her words were "I dont want you ro log anything um simply asking a question." The same rule the other plan tools already carry, applied to the one that lacked it. propose_meal_addition now requires origin_verbatim_quote and the app checks it: a question produces no card whatever you send.
 - Nor does a question about food route to log_meal. That tool is for food they NAMED — what they ate, or what a specific dish comes to. "What should I eat?" names nothing, so there is nothing to compute; answer it.
+- A question about whether something WAS or IS a good choice ("was that a good idea", "is that ok before training", "should I have skipped the toast") is a COACHING question about food they named. Call log_meal with intent 'question' so the numbers are real, then answer the question when the result comes back — your verdict first, in plain words; the numbers second, and only if they help.
 - When you call propose_meal_addition, give rough ingredient quantities and then say nothing about the numbers. The app re-measures every ingredient against its own food database, re-portions the dish to that slot's targets, and checks it against their allergies and dietary restrictions — it may refuse the dish outright. So never state its calories or macros, never say it has been added, and never promise it will fit.
 
 DYNAMIC QUANTITY SCALING (CRITICAL - MATHEMATICAL CONSTRAINT):
@@ -1895,6 +1933,8 @@ NEVER CLAIM AN ACTION YOU DID NOT TAKE:
 
 7. "I'LL DO IT TOMORROW" IS A MOVE, NOT A REST AND NOT A SWAP. The three day tools differ by whether the work still happens: propose_rest_day writes the day off, swap_session_for_activity replaces it with something they did instead, and propose_session_move keeps the session and puts it on another day this week. Use the third whenever they say a session is happening LATER ("I'll do it tomorrow", "can I shift today's to Thursday", "I'll make Tuesday's up later this week"). YOU DO NOT CHOOSE THE DAY — pass the day they named, or omit it if they named none, and the app takes the next day that is actually free, because a day that already has a session cannot take a second one. When it lands somewhere other than the day they asked for, the card says so; do not pre-empt it with a guess of your own.
 
+8. WHEN ONE SENTENCE SAYS BOTH — the session is happening LATER and they are doing something else TODAY ("I didn't train this morning but I'm going to Muay Thai tonight and will do this morning's session tomorrow") — it is a MOVE. Call propose_session_move, and pass what they are doing today as also_doing_activity (and also_doing_duration_minutes ONLY if they said how long). Do not call swap_session_for_activity for it: a swap writes the session off, and they have just told you it is still happening.
+
 Always use the user's specific data when answering. Nutrition, supplements, and recovery questions are always within your scope — answer them directly. For anything genuinely off-topic, see §1e above (factual question vs. task request get different treatment).
 
 CONTEXT: Current Time: ${context.current_time_formatted} | Preferred Training Time: ${context.profile?.preferred_time || 'morning'} | Workout Logged Today: ${context.workout_logged_today ? 'Yes' : 'No'}.
@@ -1914,30 +1954,51 @@ Keep this context in mind to ensure your greetings and questions naturally align
 
     contents.push({ role: "user", parts: [{ text: message }] });
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${geminiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          systemInstruction: {
-            parts: [{ text: systemPrompt }],
-          },
-          contents,
-          tools: [{ functionDeclarations: toolDeclarations }],
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 4096,
-            // See generate-meals/index.ts — gemini-3.5-flash's default
-            // "thinking" mode eats into maxOutputTokens and was confirmed to
-            // truncate structured JSON output there. Function-call args are
-            // exactly the kind of structured output that would silently
-            // corrupt the same way, so disabled preventively here too.
-            thinkingConfig: { thinkingBudget: 0 },
-          },
-        }),
+    // ONE FUNCTION FOR EVERY MODEL CALL THIS TURN. The first leg runs with
+    // tools. The second pass a tool handler may run afterwards (tool-reply.ts)
+    // runs the same transcript plus the tool's real result, with tools OFF
+    // and a short output cap — so the model can write the sentence about
+    // what the tool did, and cannot call a second tool the single-call
+    // executor below would never run. The spend cap above counts the
+    // request, not the calls (see _shared/spend-cap.ts).
+    const callGemini = async (turns: unknown[], withTools = true) =>
+      await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${geminiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            systemInstruction: {
+              parts: [{ text: systemPrompt }],
+            },
+            contents: turns,
+            ...(withTools ? { tools: [{ functionDeclarations: toolDeclarations }] } : {}),
+            generationConfig: {
+              temperature: 0.7,
+              maxOutputTokens: withTools ? 4096 : 512,
+              // See generate-meals/index.ts — gemini-3.5-flash's default
+              // "thinking" mode eats into maxOutputTokens and was confirmed to
+              // truncate structured JSON output there. Function-call args are
+              // exactly the kind of structured output that would silently
+              // corrupt the same way, so disabled preventively here too.
+              thinkingConfig: { thinkingBudget: 0 },
+            },
+          }),
+        }
+      );
+    /** A leg for tool-reply.ts: never throws and never returns a Response. */
+    const callLeg = async (turns: unknown[], withTools: boolean): Promise<GeminiLegResult> => {
+      try {
+        const r = await callGemini(turns, withTools);
+        if (!r.ok) return { ok: false, status: r.status, parts: [], errorText: await r.text() };
+        const legData = await r.json();
+        return { ok: true, parts: legData?.candidates?.[0]?.content?.parts ?? [] };
+      } catch (e) {
+        return { ok: false, parts: [], errorText: e instanceof Error ? e.message : String(e) };
       }
-    );
+    };
+
+    const response = await callGemini(contents);
 
     if (!response.ok) {
       const errorBody = await response.text();
@@ -1962,6 +2023,19 @@ Keep this context in mind to ensure your greetings and questions naturally align
     if (functionCallPart) {
       const { name, args } = functionCallPart.functionCall;
       const textPart = parts.find((p: { text?: string }) => p.text);
+      // THE COACH'S OWN WORDS AFTER A TOOL RUNS. Handlers below that author a
+      // sentence hand tool-reply.ts the tool's real result and today's
+      // template as the floor; it lets the model write the sentence under
+      // deterministic guards, or ships the template. The first leg's parts go
+      // under a name no handler shadows (log_meal's `parts` is its reply
+      // array). One log line per use, so the function logs say how often the
+      // model spoke and how often the floor did.
+      const firstLegParts: GeminiPart[] = parts;
+      const toolReply = async (o: Omit<ToolReplyOptions, "contents" | "firstParts" | "callGemini" | "log">) => {
+        const r = await resolveToolReply({ contents, firstParts: firstLegParts, callGemini: callLeg, log: console.error, ...o });
+        console.log(`tool-reply tool=${o.outcome.name} source=${r.source} legs=${r.legs}`);
+        return r;
+      };
 
       if (name === "propose_meal_swap") {
         // A COURIER, like propose_meal_addition and propose_exercise_swap.
@@ -2176,7 +2250,18 @@ Keep this context in mind to ensure your greetings and questions naturally align
             reply: "",
             proposal: {
               kind: "propose_session_move",
-              rawArgs: { from_date: args.from_date, to_date: args.to_date, reason: args.reason },
+              rawArgs: {
+                from_date: args.from_date, to_date: args.to_date, reason: args.reason,
+                // The activity riding along (rule 8), with its timing read
+                // from the message here rather than trusted from the model:
+                // "tonight" logs nothing yet, and the card says so.
+                also_doing_activity: typeof args.also_doing_activity === "string" && args.also_doing_activity.trim() ? args.also_doing_activity.trim() : undefined,
+                also_doing_duration_minutes: (() => {
+                  const n = Number(args.also_doing_duration_minutes);
+                  return Number.isFinite(n) && n > 0 && statedDurationsMinutes(message).some((d) => Math.abs(d - n) <= 1) ? Math.round(n) : null;
+                })(),
+                also_doing_timing: typeof args.also_doing_activity === "string" ? eventTiming(message, args.also_doing_activity) : undefined,
+              },
             },
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -2342,8 +2427,16 @@ Keep this context in mind to ensure your greetings and questions naturally align
           dbSuccess = false;
         }
 
+        const weightFloor = `Logged **${weightKg} kg** for today. Your targets recalculate from your latest weigh-in.`;
         const confirmText = dbSuccess
-          ? (textPart?.text || `Logged **${weightKg} kg** for today. Your targets recalculate from your latest weigh-in.`)
+          ? (await toolReply({
+              outcome: { name, args, response: { status: "saved", weight_kg: weightKg, date: context.current_local_date } },
+              floor: weightFloor,
+              preferFirstLegText: true,
+              // The figure she gave has to come back to her: a weigh-in reply
+              // quoting a different number is worse than the template.
+              mustContain: [`${weightKg}`],
+            })).reply
           : "I couldn't save that weigh-in — please try again in a moment.";
 
         return new Response(
@@ -2377,6 +2470,44 @@ Keep this context in mind to ensure your greetings and questions naturally align
         const swapDate = typeof args.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(args.date)
           ? args.date
           : context.current_local_date;
+
+        // ONE SENTENCE, TWO FACTS. Ashley, 8 Sep 2026: "I didn't train this
+        // morning but I'm going to Muay Thai tonight and will do this
+        // morning's session tomorrow." The model chose this tool (an
+        // activity is named) over propose_session_move (the session is
+        // happening later); the executor runs one call per turn; so the move
+        // was lost and the day was written off as a swap. When the message
+        // says the SESSION is still happening — a session word and a later
+        // day in the same breath, with a doing-verb — it is a MOVE, and the
+        // activity rides along on the move card (also_doing_activity).
+        // Nothing is written here on that path: the card asks first. A false
+        // positive costs a card that asks; a false negative writes a day off
+        // that she said she would make up — so this leans towards the card.
+        const sessionWord = /\b(session|workout|lift|lifting|weights|legs?\s+day|push\s+day|pull\s+day|upper|lower|the\s+gym|this\s+morning'?s|today'?s)\b/i;
+        const laterDay = /\b(tomorrow|later\s+(?:this|in\s+the)\s+week|another\s+day|next\s+(?:day|morning)|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i;
+        const doingVerb = /\b(do|make\s+up|make\s+it\s+up|shift|move|push|catch\s+up|get\s+to|fit\s+in|do\s+it)\b/i;
+        const sessionStillHappening = doingVerb.test(message) && sessionWord.test(message) && laterDay.test(message);
+        if (sessionStillHappening) {
+          const modelDuration = Number(args.duration_minutes);
+          const stated = statedDurationsMinutes(message);
+          return new Response(
+            JSON.stringify({
+              reply: "",
+              proposal: {
+                kind: "propose_session_move",
+                rawArgs: {
+                  from_date: swapDate,
+                  to_date: namedDateAfter(message, context.current_local_date),
+                  reason: `${activityName} today`,
+                  also_doing_activity: activityName,
+                  also_doing_duration_minutes: Number.isFinite(modelDuration) && stated.some((d) => Math.abs(d - modelDuration) <= 1) ? Math.round(modelDuration) : null,
+                  also_doing_timing: eventTiming(message, activityName),
+                },
+              },
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
 
         let dbSuccess = true;
         try {
@@ -2427,49 +2558,91 @@ Keep this context in mind to ensure your greetings and questions naturally align
           dbSuccess = false;
         }
 
-        // The activity itself, only when they gave a duration. Guessing one
-        // would put an invented number into the streak and the weekly load.
+        // The activity itself — only when THEY said how long, and only when
+        // it has happened. 8 Sep 2026, production rows: the model guessed 60
+        // minutes (its own schema says not to) for a class still hours away,
+        // and two turns about the same evening produced two rows. So the
+        // duration has to echo a figure in their own message; an activity
+        // that is still to come marks the day but logs nothing (the coach
+        // asks how long afterwards); and a row already there for this
+        // activity on this date is reused, never doubled.
         const durationMinutes = Number(args.duration_minutes);
+        const statedDurations = statedDurationsMinutes(message);
+        const durationStated = Number.isFinite(durationMinutes) && durationMinutes > 0 && durationMinutes <= 600
+          && statedDurations.some((d) => Math.abs(d - durationMinutes) <= 1);
+        const activityTiming = eventTiming(message, activityName);
+        const activityPlanned = activityTiming === "future";
         let activityLogged = false;
-        if (dbSuccess && Number.isFinite(durationMinutes) && durationMinutes > 0 && durationMinutes <= 600) {
+        if (dbSuccess && !activityPlanned) {
           const rpe = Number(args.intensity_rpe);
+          const cardioHeaders = {
+            Authorization: `Bearer ${serviceKey}`,
+            Apikey: serviceKey,
+            "Content-Type": "application/json",
+          };
           try {
-            const resp = await fetch(`${supabaseUrl}/rest/v1/cardio_logs`, {
-              method: "POST",
-              headers: {
-                Authorization: `Bearer ${serviceKey}`,
-                Apikey: serviceKey,
-                "Content-Type": "application/json",
-                Prefer: "return=minimal",
-              },
-              body: JSON.stringify({
-                user_id: profileId,
-                date: swapDate,
-                activity_name: activityName,
-                duration_minutes: Math.round(durationMinutes),
-                intensity_rpe: Number.isFinite(rpe) && rpe >= 1 && rpe <= 10 ? Math.round(rpe) : 6,
-                notes: "Swapped in place of the prescribed lifting session",
-              }),
-            });
-            activityLogged = resp.ok;
-            if (!resp.ok) console.error(`cardio_logs insert failed: ${resp.status}`, await resp.text());
+            const already = await fetch(
+              `${supabaseUrl}/rest/v1/cardio_logs?user_id=eq.${profileId}&date=eq.${swapDate}&activity_name=ilike.${encodeURIComponent(activityName)}&select=id`,
+              { headers: cardioHeaders }
+            );
+            const existingRows = already.ok ? await already.json() : [];
+            if (Array.isArray(existingRows) && existingRows.length > 0) {
+              activityLogged = true;
+            } else if (durationStated) {
+              const resp = await fetch(`${supabaseUrl}/rest/v1/cardio_logs`, {
+                method: "POST",
+                headers: { ...cardioHeaders, Prefer: "return=minimal" },
+                body: JSON.stringify({
+                  user_id: profileId,
+                  date: swapDate,
+                  activity_name: activityName,
+                  duration_minutes: Math.round(durationMinutes),
+                  intensity_rpe: Number.isFinite(rpe) && rpe >= 1 && rpe <= 10 ? Math.round(rpe) : 6,
+                  notes: "Swapped in place of the prescribed lifting session",
+                }),
+              });
+              activityLogged = resp.ok;
+              if (!resp.ok) console.error(`cardio_logs insert failed: ${resp.status}`, await resp.text());
+            }
           } catch (err) {
             console.error("swap activity log error:", err);
           }
         }
 
         // Never claims more than happened — the whole reason this tool exists
-        // is a reply that claimed more than happened.
-        const confirmText = !dbSuccess
+        // is a reply that claimed more than happened. The floor says exactly
+        // what was written; the model may say it in its own words, and may
+        // not say "logged" unless a row exists.
+        const dayWord = swapDate === context.current_local_date ? "today" : "that day";
+        const swapFloor = !dbSuccess
           ? "I couldn't update that day just now — give it another go in a moment."
-          : (textPart?.text || (activityLogged
-              ? `Done — that day is marked as ${activityName} instead of lifting, and the session is logged.`
-              : `Done — that day is marked as ${activityName} instead of lifting. Tell me how long it was and I'll log it properly.`));
+          : activityLogged
+            ? `Done — ${dayWord} is marked as ${activityName} instead of lifting, and the session is logged.`
+            : activityPlanned
+              ? `${activityName} is down for ${dayWord} instead of the lift. Tell me how long it went afterwards and I'll log it.`
+              : `Done — ${dayWord} is marked as ${activityName} instead of lifting. Tell me how long it was and I'll log it properly.`;
+        const confirmText = !dbSuccess
+          ? swapFloor
+          : (await toolReply({
+              outcome: {
+                name, args,
+                response: {
+                  status: "swapped", date: swapDate, activity: activityName,
+                  activity_logged: activityLogged, activity_planned: activityPlanned,
+                  duration_minutes: activityLogged && durationStated ? Math.round(durationMinutes) : null,
+                },
+              },
+              floor: swapFloor,
+              preferFirstLegText: true,
+              forbid: activityLogged ? [] : [/\blogged\b/i, /\brecorded\b/i],
+            })).reply;
 
         return new Response(
           JSON.stringify({
             reply: confirmText,
-            action: dbSuccess ? { type: "swap_session_for_activity", activity_name: activityName, date: swapDate } : undefined,
+            action: dbSuccess
+              ? { type: "swap_session_for_activity", activity_name: activityName, date: swapDate, activity_logged: activityLogged, activity_planned: activityPlanned }
+              : undefined,
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
@@ -2624,8 +2797,99 @@ Keep this context in mind to ensure your greetings and questions naturally align
           parts.push(`Assumptions: ${assumptions.join("; ")}.`);
         }
 
+        // TODAY'S TEMPLATE IS THE FLOOR. Everything below reads the MESSAGE
+        // before deciding whether numbers are even the answer. 8 Sep 2026,
+        // three replies in one evening: macros for a banana the model
+        // invented for "what should I eat"; "roughly 0 kcal … 0% of the meal
+        // by weight" for rice cakes the database did not know; a macro table
+        // for "was that a good idea?". Nothing in this handler had read
+        // `message` before — every one of those was a template that could
+        // not tell what it was answering.
+        const numbersTemplate = parts.join(" ");
+        const foodName = typeof args.food_name === "string" ? args.food_name : "";
+        const evidence = userNamedFood({
+          foodName,
+          ingredientNames: ingredients.map((i) => i.name),
+          message,
+          planText: typeof context.meal_summary === "string" ? context.meal_summary : "",
+        });
+        const advice = isAdviceQuestion(message);
+        const evaluation = isEvaluationQuestion(message);
+        const nothingIdentified = computed.lines.every((l) => !l.entry);
+        // The model's own arithmetic, in any shape — never allowed through.
+        const macroArithmetic = /\b\d+(?:\.\d+)?\s*(?:kcal|calories?|cals?)\b|\b\d+(?:\.\d+)?\s*g\b\s*(?:of\s+)?(?:protein|carbs?|fat)\b/i;
+        const neverSay = [/\blogged\b/i, /\bassum/i, /food database/i];
+        const mealResult = {
+          status: "computed", food: foodName, kcal: computed.kcal, protein_g: computed.protein,
+          carbs_g: computed.carbs, fat_g: computed.fat, coverage: computed.coverage,
+          unmatched: computed.unmatched, meal_slot: slot || null,
+        };
+
+        // ADVICE — she asked what to eat, or the food is the model's idea and
+        // not hers. Words, no numbers, and the one-line offer her ruling asks
+        // for: the same words propose_meal_addition uses, so "add it" gets
+        // past the imperative guard next turn.
+        if (advice || !evidence.named) {
+          const offer = foodName
+            ? `Want ${foodName} in your plan? Say "add it" and I'll put it in.`
+            : `Say "add it" and I'll put something like that in your plan.`;
+          const spoken = await toolReply({
+            outcome: { name, args, response: { status: "advice", note: "they asked what to eat; nothing was computed and nothing was recorded", suggested: foodName } },
+            nudge: ADVICE_NUDGE,
+            floor: `${foodName || "Something like that"} would work well there.`,
+            preferFirstLegText: true,
+            forbid: [macroArithmetic, ...neverSay],
+          });
+          return new Response(
+            JSON.stringify({ reply: /\badd it\b/i.test(spoken.reply) ? spoken.reply : `${spoken.reply}\n\n${offer}` }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // NOTHING IDENTIFIED — her food, but the database knows none of it.
+        // There is no number to give, so none is given: not zero, not "0%".
+        if (nothingIdentified) {
+          const missing = computed.unmatched.join(" or ") || foodName || "that";
+          const spoken = await toolReply({
+            outcome: { name, args, response: { status: "not_computed", food: foodName, unmatched: computed.unmatched, note: "no numbers are available for these" } },
+            nudge: evaluation ? EVALUATION_NUDGE : undefined,
+            floor: `I don't know ${missing} well enough to put numbers on it — tell me roughly what was in it and I will.`,
+            preferFirstLegText: true,
+            forbid: [macroArithmetic, ...neverSay],
+          });
+          return new Response(
+            JSON.stringify({ reply: spoken.reply }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // EVALUATION — "was that a good idea?" wants a verdict. The numbers
+        // ride along as evidence; the model may quote them or not, and the
+        // first leg is not used because it spoke before it had them.
+        if (evaluation) {
+          const spoken = await toolReply({
+            outcome: { name, args, response: mealResult },
+            nudge: EVALUATION_NUDGE,
+            floor: numbersTemplate,
+            forbid: neverSay,
+          });
+          return new Response(
+            JSON.stringify({ reply: spoken.reply }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // NUMBERS — she named it and asked what it comes to. The figure she
+        // asked for has to be in the answer, or the template is the answer.
+        const spoken = await toolReply({
+          outcome: { name, args, response: mealResult },
+          nudge: NUMBERS_NUDGE,
+          floor: numbersTemplate,
+          mustContain: [`${computed.kcal} kcal`],
+          forbid: neverSay,
+        });
         return new Response(
-          JSON.stringify({ reply: parts.join(" ") }),
+          JSON.stringify({ reply: spoken.reply }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
@@ -2684,7 +2948,16 @@ Keep this context in mind to ensure your greetings and questions naturally align
           const inferredNote = resolved.inferredFrom
             ? ` (used your ${resolved.inferredFrom === "history" ? "last logged" : "plan's suggested"} weight — say the actual weight if that's off)`
             : "";
-          confirmText = textPart?.text || `Logged set ${args.set_number} of **${args.exercise_name}**: ${args.reps} reps @ ${resolved.weightKg}kg${args.rpe ? ` (RPE ${args.rpe})` : ""}.${inferredNote}`;
+          const setFloor = `Logged set ${args.set_number} of **${args.exercise_name}**: ${args.reps} reps @ ${resolved.weightKg}kg${args.rpe ? ` (RPE ${args.rpe})` : ""}.${inferredNote}`;
+          confirmText = (await toolReply({
+            outcome: {
+              name, args,
+              response: { status: "logged", exercise: args.exercise_name, set_number: args.set_number, reps: args.reps, weight_kg: resolved.weightKg, weight_inferred_from: resolved.inferredFrom ?? null },
+            },
+            floor: setFloor,
+            preferFirstLegText: true,
+            mustContain: [`${resolved.weightKg}`],
+          })).reply;
         }
 
         return new Response(

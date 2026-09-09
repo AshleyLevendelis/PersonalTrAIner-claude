@@ -137,3 +137,26 @@ Two checks, and the second is the one that settles it.
   with a real fidelity risk.
 - **Weakening the typed-phrase gate.** It exists so a wrong-target command costs
   deliberate effort, and `test:deploy-path` fails if it is removed.
+
+## v73 — the coach speaks after a tool runs (Phase 2 of the 8 Sep plan)
+
+Same procedure as above; the pre-greps that must be non-zero in the checkout
+BEFORE typing the phrase, and in the live source AFTER it:
+
+| grep | what it proves is on board |
+|---|---|
+| `resolveToolReply` | the second pass exists (tool-reply.ts) |
+| `userNamedFood` | log_meal reads whether SHE named the food |
+| `isEvaluationQuestion` | "was that a good idea?" gets a verdict |
+| `nothingIdentified` | "roughly 0 kcal … 0%" is unreachable |
+| `statedDurationsMinutes` | a swap logs only a duration she stated |
+| `WHEN ONE SENTENCE SAYS BOTH` | a move-plus-activity sentence becomes a move card |
+
+Phone check, her three 8 Sep sentences verbatim: *"What should I eat before a
+big muay thai session to give me energy?"* → advice in words, no macros, one
+"Say 'add it'" line. *"I had 2 rice cakes with dark chocolate and hot chocolate
+before. Was that a good idea?"* → a verdict in words, never "0 kcal". *"I
+missed today's weight session. Move it to tomorrow"* → the coach's sentence
+naming the day above a move card. The function logs carry one line per tool
+turn, `tool-reply tool=<name> source=first_leg|round_trip|floor legs=<n>`, so
+how often the model spoke versus the template is measurable after the fact.

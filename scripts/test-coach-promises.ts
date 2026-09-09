@@ -761,6 +761,61 @@ console.log('\nA macro QUESTION is answered, not apologised for\n')
     !/snack_1|snack_2/.test(schema), schema.slice(schema.indexOf('meal_slot'), schema.indexOf('meal_slot') + 200))
 }
 
+console.log('\nThe coach speaks after a tool runs, and the server reads the message first (9 Sep 2026)\n')
+{
+  // Ashley, 8 Sep 2026, 22:16: a "what should I eat" answered with macros for
+  // a banana the model invented; "roughly 0 kcal … 0% of the meal by weight"
+  // for rice cakes the database did not know; "Done — … and the session is
+  // logged" for a class that had not happened, at a duration nobody stated.
+  // Nothing in these handlers read the message; every reply was a template.
+  const code = chatCode
+
+  // ONE FUNCTION FOR EVERY MODEL CALL, tools off on the second pass.
+  check('the Gemini call is one function, with tools optional', /const callGemini = async \(turns: unknown\[\], withTools = true\)/.test(code))
+  check('...tools are attached only when asked for', /\.\.\.\(withTools \? \{ tools: \[\{ functionDeclarations: toolDeclarations \}\] \} : \{\}\)/.test(code))
+  check('...and the second pass is capped short', /maxOutputTokens: withTools \? 4096 : 512/.test(code))
+  check('the second pass comes from tool-reply.ts, not an inline fetch', /import \{ resolveToolReply[^}]*\} from "\.\/tool-reply\.ts"/.test(code))
+  check('...and every use logs where the words came from', /tool-reply tool=\$\{o\.outcome\.name\} source=\$\{r\.source\} legs=\$\{r\.legs\}/.test(code))
+
+  // log_meal reads the message.
+  const meal = code.slice(code.indexOf('const asked = args.intent === "question"'), code.indexOf('if (name === "log_workout")'))
+  check('log_meal asks whether SHE named the food', /const evidence = userNamedFood\(\{/.test(meal))
+  check('...whether it was an advice question', /const advice = isAdviceQuestion\(message\)/.test(meal))
+  check('...whether it was a judgement question', /const evaluation = isEvaluationQuestion\(message\)/.test(meal))
+  check('...and whether the database recognised anything at all', /const nothingIdentified = computed\.lines\.every\(\(l\) => !l\.entry\)/.test(meal))
+  const adviceArm = meal.slice(meal.indexOf('if (advice || !evidence.named)'), meal.indexOf('if (nothingIdentified)'))
+  check('an advice question, or a food the model invented, gets words and the one-line offer', adviceArm.length > 0 && /Say "add it" and I'll put it in\./.test(adviceArm))
+  check('...with the model\'s own arithmetic forbidden', /forbid: \[macroArithmetic/.test(adviceArm))
+  check('...and no "Assumptions:" line', !/Assumptions/.test(adviceArm))
+  const nothingArm = meal.slice(meal.indexOf('if (nothingIdentified)'), meal.indexOf('if (evaluation)'))
+  check('nothing identified → no number at all, and a way to get one', /well enough to put numbers on it/.test(nothingArm) && !/\$\{computed\.kcal\}/.test(nothingArm) && !/%/.test(nothingArm))
+  check('...ahead of the numbers template, so "roughly 0 kcal" is unreachable', meal.indexOf('if (nothingIdentified)') < meal.lastIndexOf('mustContain: [`${computed.kcal} kcal`]'))
+  const evalArm = meal.slice(meal.indexOf('if (evaluation)'), meal.lastIndexOf('const spoken = await toolReply'))
+  check('a judgement question gets a verdict, steered by its own nudge', /nudge: EVALUATION_NUDGE/.test(evalArm) && /floor: numbersTemplate/.test(evalArm))
+  check('the numbers answer must quote the figure she asked for, or the template does', /mustContain: \[`\$\{computed\.kcal\} kcal`\]/.test(meal))
+  check('the tool no longer accepts a dish the model made up', /in the USER'S OWN WORDS — never a dish you invented/.test(code))
+  check('the prompt names the judgement question', /is a COACHING question about food they named/.test(code))
+  check('...and tells the model what a tool result is for', /=== 1f\. AFTER A TOOL RUNS ===/.test(code))
+
+  // The swap tool is honest about what it wrote.
+  const swap = code.slice(code.indexOf('name === "swap_session_for_activity"'), code.indexOf('if (name === "log_meal")'))
+  check('a combined sentence — session later, activity today — becomes a move card, not a swap', /if \(sessionStillHappening\) \{[\s\S]{0,700}kind: "propose_session_move"/.test(swap))
+  check('the activity is logged only if it has happened', /if \(dbSuccess && !activityPlanned\)/.test(swap))
+  check('...only at a duration SHE stated', /const durationStated = [\s\S]{0,200}statedDurations\.some/.test(swap) && /else if \(durationStated\)/.test(swap))
+  // MUTATION-HARDENED: a first version only saw the GET's URL, and survived
+  // a swap that fetched the rows and ignored them. What must hold is that the
+  // rows the GET returned are what decides whether the insert runs.
+  check('...and never twice: it looks before it inserts, and what it finds decides',
+    /const existingRows = already\.ok \? await already\.json\(\) : \[\];[\s\S]{0,120}if \(Array\.isArray\(existingRows\) && existingRows\.length > 0\) \{[\s\S]{0,80}activityLogged = true;[\s\S]{0,40}\} else if \(durationStated\)/.test(swap))
+  const futureFloor = /activityPlanned\s*\?\s*`([^`]*)`/.exec(swap)?.[1] ?? ''
+  check('a class still to come: the day is marked, nothing is called logged', futureFloor.length > 0 && !/\blogged\b/i.test(futureFloor) && /how long/.test(futureFloor), futureFloor)
+  check('...and the model may not say "logged" either unless a row exists', /forbid: activityLogged \? \[\] : \[\/\\blogged\\b\/i/.test(swap))
+
+  // The two other handlers that author English go through the same pass.
+  check('a weigh-in reply must quote her number', /mustContain: \[`\$\{weightKg\}`\]/.test(code))
+  check('a logged set must quote the weight it wrote', /mustContain: \[`\$\{resolved\.weightKg\}`\]/.test(code))
+}
+
 if (failures > 0) {
   console.error(`\n${failures} check(s) failed`)
   process.exit(1)
