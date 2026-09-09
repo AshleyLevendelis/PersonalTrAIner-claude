@@ -519,6 +519,17 @@ for (const entry of FOOD_DB) {
   LOOKUP.set(normalize(entry.name), entry)
   for (const alias of entry.aliases) LOOKUP.set(normalize(alias), entry)
 }
+// PLURALS ON THE STORED SIDE TOO. lookupIngredient de-pluralises the QUERY as
+// a last resort, so "scallions" reaches "scallion" — but "rice cakes" is
+// stored plural, and "chocolate rice cake" never reached it: 8 Sep 2026,
+// every ingredient in a real snack came back unmatched and the reply printed
+// "roughly 0 kcal … 0% of the meal by weight". Each key is also indexed under
+// its de-pluralised form when that form is free, so the token-overlap pass
+// can see it. Same conservative rule as the query side (depluralizeToken).
+for (const [key, entry] of [...LOOKUP]) {
+  const folded = key.split(' ').map(depluralizeToken).join(' ')
+  if (folded !== key && !LOOKUP.has(folded)) LOOKUP.set(folded, entry)
+}
 
 /** Water-density defaults for common volume units, used when an entry doesn't override them. */
 const DEFAULT_UNIT_GRAMS: Record<string, number> = {

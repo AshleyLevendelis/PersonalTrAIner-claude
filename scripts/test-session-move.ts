@@ -14,6 +14,7 @@
 // ---------------------------------------------------------------------------
 import {
   resolveMoveTarget, sessionForDate, hasSessionOn, dayNameOf, addDays, daysBetween,
+  parseAlsoDoing, alsoDoingIsLoggable, alsoDoingRow, alsoDoingImplication, alsoDoingLeadClause,
   type SessionMove,
 } from '../src/lib/session-move'
 import { classifyDay, countsTowardWeekTally } from '../src/hooks/useTrainingWeek'
@@ -305,7 +306,19 @@ check('the tool exists', /name: "propose_session_move"/.test(fn))
 check('...and PROPOSES rather than writing — nothing lands without a tap',
   /kind: "propose_session_move",[\s\S]{0,200}rawArgs:/.test(fn))
 check('...and the server does not pick the day',
-  /rawArgs: \{ from_date: args\.from_date, to_date: args\.to_date, reason: args\.reason \}/.test(fn))
+  /rawArgs: \{\s*from_date: args\.from_date, to_date: args\.to_date, reason: args\.reason,/.test(fn))
+// THE PASSENGER (Phase 2, 9 Sep 2026): "I'm going to Muay Thai tonight and
+// will do this morning's session tomorrow" is one move with an activity riding
+// along. Its timing is read from the MESSAGE on the server, never trusted from
+// the model — "tonight" logs nothing yet.
+check('...and forwards what they are doing instead, with its timing read from the message',
+  /also_doing_activity:/.test(fn) && /also_doing_timing: typeof args\.also_doing_activity === "string" \? eventTiming\(message, args\.also_doing_activity\)/.test(fn))
+check('...and a duration only when the message states it',
+  /also_doing_duration_minutes: \(\(\) => \{[\s\S]{0,300}statedDurationsMinutes\(message\)\.some/.test(fn))
+check('the swap handler re-routes a combined sentence to the move card instead of writing the day off',
+  /const sessionStillHappening = doingVerb\.test\(message\) && sessionWord\.test\(message\) && laterDay\.test\(message\)/.test(fn)
+  && /if \(sessionStillHappening\) \{[\s\S]{0,600}kind: "propose_session_move"/.test(fn))
+check('...and the prompt says the same in words', /WHEN ONE SENTENCE SAYS BOTH/.test(fn))
 check('the prompt distinguishes it from a rest and from a swap',
   /IS A MOVE, NOT A REST AND NOT A SWAP/.test(fn))
 check('...and the old "there is no tool for it" rule is corrected rather than left standing',
@@ -336,16 +349,16 @@ check('...and still has the per-kind fallback, so a builder without one degrades
 const moveBuilderAt = chat.indexOf('const buildSessionMoveProposal')
 const moveBuilderEnd = chat.indexOf('\n  const build', moveBuilderAt + 10)
 const moveBuilder = chat.slice(moveBuilderAt, moveBuilderEnd > moveBuilderAt ? moveBuilderEnd : undefined)
-const leads = [...moveBuilder.matchAll(/`([^`]*Shall I\?)`/g)].map(m => m[1])
+const leads = [...moveBuilder.matchAll(/`([^`]*won't count as missed\.)`/g)].map(m => m[1])
 check('the move card carries a lead for the day she asked for AND for the re-route', leads.length === 2, leads)
 for (const lead of leads) {
   check(`"${lead.slice(0, 44)}…" names the landing day, the origin day and the session`,
     /\$\{target\.dayName\}/.test(lead) && /\$\{fromDayName\}/.test(lead) && /\$\{session\.focus\}/.test(lead), lead)
-  check('...says the origin will not count as missed — her ruling, said out loud',
-    /won't count as missed/.test(lead), lead)
-  check('...and is a question that claims nothing has happened yet',
-    /\?$/.test(lead) && !/\b(moved|has been|is now|done)\b/.test(lead), lead)
+  check('...and claims nothing has happened yet',
+    !/\b(moved|has been|is now|done)\b/.test(lead), lead)
 }
+check('...and every lead ends as a question, after any passenger clause',
+  /lead: `\$\{leadBase\}\$\{alsoDoing \? alsoDoingLeadClause\(alsoDoing\) : ''\} Shall I\?`/.test(moveBuilder))
 check('the re-routed lead says why the day changed',
   leads.some(l => /\$\{target\.requestedDayName\} already has a session/.test(l)), leads)
 check('the rest-day card got the same treatment',
@@ -401,6 +414,41 @@ const homeTarget = await homeOn('Wednesday', WED, moves)
 check('the day it went to is an ordinary session, from where it came', homeTarget.session.status === 'not_started' && homeTarget.session.focus === 'Push & Press' && homeTarget.session.movedFrom?.dayName === 'Tuesday', homeTarget.session)
 const homePlain = await homeOn('Tuesday', TUE, [])
 check('and with no move, Tuesday is Tuesday', homePlain.session.status === 'not_started' && homePlain.session.focus === 'Push & Press' && !homePlain.session.movedTo, homePlain.session)
+
+// ---------------------------------------------------------------------------
+console.log('\n[13] The passenger: what she is doing instead rides on the move card')
+// ---------------------------------------------------------------------------
+// "I didn't train this morning but I'm going to Muay Thai tonight and will do
+// this morning's session tomorrow" (8 Sep 2026) is ONE move with an activity
+// beside it. Nothing about the activity is logged until it has happened AND
+// she said how long — the two facts the old swap tool invented.
+const tonight = parseAlsoDoing({ also_doing_activity: 'Muay Thai', also_doing_duration_minutes: null, also_doing_timing: 'future' })
+check('a class still to come is carried, with no duration', tonight?.activity === 'Muay Thai' && tonight?.durationMinutes === null && tonight?.timing === 'future', tonight)
+check('...and is NOT loggable on confirm', !!tonight && !alsoDoingIsLoggable(tonight))
+check('...its row says later today', !!tonight && alsoDoingRow(tonight).after === 'Muay Thai · later today', tonight && alsoDoingRow(tonight))
+check('...its implication says nothing is logged yet', !!tonight && /nothing is logged for it yet/.test(alsoDoingImplication(tonight)))
+check('...and the coach asks how long afterwards', !!tonight && /tell me how long it went afterwards/.test(alsoDoingLeadClause(tonight)))
+const doneClass = parseAlsoDoing({ also_doing_activity: 'Muay Thai', also_doing_duration_minutes: 60, also_doing_timing: 'past' })
+check('a class already done at a stated length IS loggable', !!doneClass && alsoDoingIsLoggable(doneClass))
+check('...its row carries the minutes', !!doneClass && alsoDoingRow(doneClass).after === 'Muay Thai · 60 min')
+check('...and its implication says it will be logged on confirm', !!doneClass && /goes in your log at 60 min when you confirm/.test(alsoDoingImplication(doneClass)))
+const vague = parseAlsoDoing({ also_doing_activity: 'a run', also_doing_timing: 'unclear' })
+check('no duration → not loggable, and the coach asks', !!vague && !alsoDoingIsLoggable(vague) && /how long/.test(alsoDoingImplication(vague)))
+check('a non-number or absurd duration is dropped, never rounded into a log',
+  parseAlsoDoing({ also_doing_activity: 'x', also_doing_duration_minutes: 'sixty' })?.durationMinutes === null
+  && parseAlsoDoing({ also_doing_activity: 'x', also_doing_duration_minutes: 900 })?.durationMinutes === null)
+check('no activity → no passenger', parseAlsoDoing({}) === null)
+check('unknown timing stays unclear — never assumed to have happened', parseAlsoDoing({ also_doing_activity: 'x' })?.timing === 'unclear')
+const exec2 = strip(src('src/lib/pending-action-executor.ts'))
+check('confirming writes the activity through the client\'s cardio path, guarded by the same rule',
+  /if \(payload\.alsoDoing && alsoDoingIsLoggable\(payload\.alsoDoing\)\) \{[\s\S]{0,400}saveCardioLog\(\{/.test(exec2))
+check('...and undo leaves a logged activity in place — a plan is undone, a fact is not',
+  !/deleteCardioLog/.test(exec2.slice(exec2.indexOf('export async function undoSessionMove'))))
+const chat2 = strip(src('src/components/ChatAssistant.tsx'))
+check('the card gets the passenger row and its implication',
+  /\.\.\.\(alsoDoing \? \[alsoDoingRow\(alsoDoing\)\] : \[\]\)/.test(chat2) && /alsoDoingImplication\(alsoDoing\)/.test(chat2))
+check('the receipt labels the activity with the day it LEFT',
+  /label: i === 0 \? payload\.toDayName : payload\.fromDayName/.test(chat2))
 
 console.log(failures === 0 ? `\nAll session-move checks passed.\n` : `\n${failures} check(s) FAILED.\n`)
 process.exit(failures === 0 ? 0 : 1)

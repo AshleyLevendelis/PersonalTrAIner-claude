@@ -2,6 +2,84 @@
 
 Newest first. One line each.
 
+- [x] **THE COACH SPEAKS AFTER A TOOL RUNS, AND THE SERVER READS HER MESSAGE
+  FIRST** (roadmap 10/12, plus the rest of 8 Sep's 22:16 report) — three
+  replies in one evening, all templates that could not tell what they were
+  answering: *"Pre-workout banana and honey is 169 kcal"* for "what should I
+  eat before Muay Thai" (the model INVENTED the banana; the handler printed its
+  macros as if she had named it); *"roughly 0 kcal (P: 0g, C: 0g, F: 0g) …
+  that's 0% of the meal by weight"* for rice cakes the food database did not
+  know (the readout keyed on "some unmatched", never on "nothing matched");
+  and *"Done — that day is marked as Muay Thai instead of lifting, and the
+  session is logged"* for a class still hours away, at 60 minutes nobody
+  stated — production rows: ONE swapped session, TWO cardio rows for the
+  same evening. `chat-gemini` made exactly one model call per turn, and
+  every handler that authored English did so from a template; nothing in
+  any of them read `message`.
+  **Built:** (1) `_shared/message-evidence.ts` — deterministic reads of her
+  own words: did SHE name the food or did the model (`userNamedFood`, content
+  words with nutrient/slot/asking words stoplisted, plurals folded, or a
+  pointer at a meal on the plan); is it advice ("what should I eat"), is it
+  a judgement ("was that a good idea"); every duration she STATED (offsets
+  like "in 30 minutes" skipped); has the thing happened, judged on the
+  clause that names it ("I didn't train this morning but I'm going to Muay
+  Thai tonight" → future about the class). Her three sentences are the
+  gate's fixtures, spelling included. (2) `chat-gemini/tool-reply.ts` — the
+  second pass: feed the tool's real result back as a `functionResponse`,
+  tools OFF (the executor is single-call; onboarding measured a third of
+  tools-on round trips re-calling and saying nothing), output capped at
+  512, one retry on transport failure only, never more than two extra calls
+  and zero when the model already spoke; two deterministic guards
+  (`mustContain` the kcal/kg she asked about, `forbid` "logged" when
+  nothing was) send a bad sentence to the floor, and the floor is today's
+  template — the worst case is exactly what shipped before. The part
+  vocabulary and `sanitizeReply` moved to `_shared/gemini-parts.ts`;
+  onboarding's resolver re-exports them (50/50 checks still pass). (3)
+  `log_meal`'s question arm now has four answers, chosen from the message:
+  advice or an invented food → words, no numbers, plus the one-line offer
+  from her 8 Sep ruling; nothing identified → no number at all ("I don't
+  know X well enough to put numbers on it — tell me roughly what was in it");
+  a judgement question → a verdict, numbers as support; a numbers question →
+  the model's sentence only if it quotes the computed kcal, else the
+  template. The 900-char and template anchors in three older gates all hold.
+  (4) `swap_session_for_activity` looks before it inserts, logs a duration
+  only when it echoes one in her message, logs nothing for a class still to
+  come (the floor: "Muay Thai is down for today instead of the lift. Tell me
+  how long it went afterwards and I'll log it."), and re-routes a combined
+  sentence — a doing-verb, a session word and a later day — to the MOVE
+  card instead of writing the day off; the activity rides along as
+  `also_doing_activity`, its timing read server-side, its duration only if
+  stated. Prompt: rule 8 ("WHEN ONE SENTENCE SAYS BOTH"), §1f ("AFTER A TOOL
+  RUNS"), the judgement-question rule, and `food_name` "in the USER'S OWN
+  WORDS — never a dish you invented". (5) Client: the move card gains an
+  "Also today" row and one implication per timing; the coach's sentence gains
+  the clause; confirm records a past, stated-length activity through the
+  client's own cardio path (clientId dedupe, bound), and Undo leaves a
+  logged activity in place — a plan is undone, a fact is not. (6) `food-db`
+  indexes each key under its de-pluralised form too, so "chocolate rice
+  cake" reaches "rice cakes" (only the query was ever de-pluralised).
+  `log_weight` and `log_workout_set` go through the same second pass, each
+  required to quote the number it wrote.
+  **Ruling folded in, decided as recommended in the approved plan:** a swap
+  announced for tonight marks the day now and counts the activity only when
+  she says it happened; one card carries the move and the activity.
+  Gates: new `test:tool-reply` (mocked model: 0 calls when the first leg
+  spoke, tools never on, transcript carries the result, misquote/false
+  "logged"/leak/another call → floor, transport → one retry), new
+  `test:message-evidence` (her sentences verbatim), Phase 2 sections in
+  `test:coach-promises`, `test:session-move` (§13, the passenger) and
+  `test:meal-log` (§5). 18 mutations; 2 survived the first run — a swap that
+  fetched the existing rows and ignored them, and a detector whose first
+  pattern could be deleted because the second still caught her exact
+  sentence — both checks hardened, both now caught. **Not done:** a browser
+  check of the passenger card — the chat harness seeds history and has no
+  fake chat function to answer with a proposal; the card's pieces are pure
+  functions in `session-move.ts` and gated there instead. **NOT LIVE:**
+  merge to `main` needs the word; `chat-gemini` needs the one typed phrase →
+  v73. Pre-greps for the live source: `resolveToolReply`, `userNamedFood`,
+  `isEvaluationQuestion`, `nothingIdentified`, `statedDurationsMinutes`,
+  `WHEN ONE SENTENCE SAYS BOTH`.
+
 - [x] **A MOVED SESSION LEAVES TODAY, THE COACH SAYS SO, AND TODAY'S MARKER
   MOVES** — Ashley, 8 Sep 2026, 22:16, her first test of the moved-session
   work on her phone: *"it didnt move my workout. and it doesnt give me any
@@ -54,7 +132,9 @@ Newest first. One line each.
   instead" and sees the ordinary day come back; `verify:swapped-day` reads ⇄
   off Home's today cell. Its old exercise-list detector matched "the main
   lifts" in the week note on a screen with no list — replaced with a
-  leaf-element check. **Frontend only; live on the next merge.**
+  leaf-element check. **Frontend only; merged to `main` as `75e3daf` and
+  live on her phone from 8 Sep 22:00 UTC** (Vercel production READY on that
+  sha, verified) — her 22:16-BST screenshots were of the code before it.
 
 - [x] **A QUESTION MUST NOT PRODUCE A CARD** — Ashley, live from her phone,
   8 Sep 2026, three turns before Muay Thai. She asked *"Im going to muay thai

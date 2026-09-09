@@ -147,6 +147,8 @@
     "test:plan-unknown": "tsx scripts/test-plan-unknown.ts",
     "test:session-move": "tsx scripts/test-session-move.ts",
     "test:home-week-strip": "tsx scripts/test-home-week-strip.ts",
+    "test:tool-reply": "tsx scripts/test-tool-reply.ts",
+    "test:message-evidence": "tsx scripts/test-message-evidence.ts",
     "test:question-not-a-card": "tsx scripts/test-question-not-a-card.ts",
     "test:reply-guarantee": "tsx scripts/test-onboarding-reply-guarantee.ts",
     "test:assumed-body": "tsx scripts/test-assumed-body-loads.ts",

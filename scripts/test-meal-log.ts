@@ -23,6 +23,7 @@ import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { buildMealLogProposal, normaliseSlot, LOGGABLE_SLOTS } from '../src/lib/meal-log-proposal'
 import { MIN_COVERAGE } from '../src/lib/meal-generation'
+import { lookupIngredient } from '../supabase/functions/_shared/food-db.ts'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const raw = (p: string) => readFileSync(join(ROOT, p), 'utf8')
@@ -149,6 +150,17 @@ console.log('\n4. The verifier refuses rather than logging a number too low to t
       const m = normaliseSlot(v)
       return m !== null && (LOGGABLE_SLOTS as readonly string[]).includes(m)
     }))
+}
+
+console.log('\n5. The food database folds plurals on the stored side too\n')
+{
+  // 8 Sep 2026: "2 rice cakes with dark chocolate" — the model sent
+  // "chocolate rice cake", the database key is "rice cakes", and only the
+  // QUERY was ever de-pluralised. Every ingredient came back unmatched and the
+  // reply printed "roughly 0 kcal … 0% of the meal by weight".
+  check('"chocolate rice cake" reaches the rice cakes entry', lookupIngredient('chocolate rice cake')?.name === 'rice cakes', lookupIngredient('chocolate rice cake')?.name)
+  check('...and the plural itself still does', lookupIngredient('rice cakes')?.name === 'rice cakes')
+  check('...while nonsense still misses — the fold widens matching, it does not invent it', lookupIngredient('xyzzy powder') === null)
 }
 
 if (failures > 0) { console.error(`\n${failures} check(s) failed\n`); process.exit(1) }
