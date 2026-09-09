@@ -68,16 +68,24 @@ function SelectContent({
   )
 }
 
+/**
+ * `hint` renders OUTSIDE ItemText on purpose. The closed trigger mirrors
+ * ItemText and nothing else, so a hint placed inside it would print the whole
+ * description on a 28px-tall inline control. Kept optional: no existing call
+ * site passes it, so every other Select renders byte-identically.
+ */
 function SelectItem({
   className,
   children,
+  hint,
   ...props
-}: React.ComponentProps<typeof SelectPrimitive.Item>) {
+}: React.ComponentProps<typeof SelectPrimitive.Item> & { hint?: React.ReactNode }) {
   return (
     <SelectPrimitive.Item
       data-slot="select-item"
       className={cn(
         "relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+        hint ? "flex-col items-start gap-0.5" : "",
         className
       )}
       {...props}
@@ -88,6 +96,11 @@ function SelectItem({
         </SelectPrimitive.ItemIndicator>
       </span>
       <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
+      {hint ? (
+        <span className="max-w-[15rem] whitespace-normal text-[0.6875rem] leading-snug text-muted-foreground">
+          {hint}
+        </span>
+      ) : null}
     </SelectPrimitive.Item>
   )
 }

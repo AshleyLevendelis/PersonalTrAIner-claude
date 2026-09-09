@@ -546,7 +546,7 @@ const toolDeclarations = [
         equipment_tier: {
           type: "string",
           enum: ["full_gym", "home_gym", "minimalist", "bodyweight"],
-          description: "The nearest fit to what's actually available. Hotel gym -> minimalist. Bodyweight only -> bodyweight. Dumbbells only -> minimalist (closest fit; say so honestly on the card, it's slightly over-inclusive). Full commercial gym -> full_gym.",
+          description: "The nearest fit to what's actually available. Hotel gym -> minimalist. Bodyweight only -> bodyweight (which still assumes a pull-up bar and a weighted bag). Dumbbells only -> minimalist (closest fit; minimalist also assumes kettlebells, bands and a pull-up bar, so say so honestly on the card rather than calling it exact). Full commercial gym -> full_gym.",
         },
         duration_days: {
           type: "number",
@@ -1514,7 +1514,7 @@ When the user says a lasting injury has resolved ("my shoulder's fine now", "kne
 When the user says they're away or at a different gym for a period ("hotel gym for a week", "only dumbbells until Friday", "I'm away from my gym"):
 - If it's unclear what's actually available, ask and offer the [QUICK_REPLIES] tag with these four options: "Hotel gym" | "Bodyweight only" | "Dumbbells only" | "Full commercial gym" — free text is always still fine too.
 - If the duration is unclear, ask one follow-up ("how many days should I plan around that?").
-- Once you know both, call propose_equipment_adaptation with equipment_tier + duration_days. Map to the nearest existing tier honestly (dumbbells only maps to minimalist, the closest fit — say so if it comes up, don't pretend it's an exact match).
+- Once you know both, call propose_equipment_adaptation with equipment_tier + duration_days. Map to the nearest existing tier honestly, and know what each one actually assumes: minimalist assumes dumbbells, kettlebells, bands, a pull-up bar and a weighted bag; bodyweight still assumes a pull-up bar and a weighted bag. So "dumbbells only" maps to minimalist as the CLOSEST fit, not an exact one — say so if it comes up, don't pretend it's exact.
 - It reverts automatically once the period ends — mention this once, not every turn.
 
 === 3d. SESSION VOLUME (propose_volume_change) ===

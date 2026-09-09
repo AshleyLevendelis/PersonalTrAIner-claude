@@ -195,10 +195,18 @@ function EditableStringField({
   )
 }
 
-/** value may be undefined — see EditableTextField. Renders unselected, still choosable. */
+/**
+ * value may be undefined — see EditableTextField. Renders unselected, still choosable.
+ *
+ * Options carrying a `description` show it under the label IN THE OPEN LIST.
+ * Roadmap item 11: changing your equipment here used to offer four bare words
+ * ("Minimalist"), while onboarding showed the same four with a description
+ * beside each — so the one screen where you CHANGE the answer was the one that
+ * told you least about it. The trigger stays label-only (see SelectItem).
+ */
 function EditableSelectField<T extends string | number>({
   value, options, onSave,
-}: { value?: T; options: { value: T; label: string }[]; onSave: (v: T) => void }) {
+}: { value?: T; options: { value: T; label: string; description?: string }[]; onSave: (v: T) => void }) {
   return (
     <Select value={value == null ? undefined : String(value)} onValueChange={v => {
       const match = options.find(o => String(o.value) === v)
@@ -208,7 +216,11 @@ function EditableSelectField<T extends string | number>({
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
-        {options.map(o => <SelectItem key={String(o.value)} value={String(o.value)}>{o.label}</SelectItem>)}
+        {options.map(o => (
+          <SelectItem key={String(o.value)} value={String(o.value)} hint={o.description}>
+            {o.label}
+          </SelectItem>
+        ))}
       </SelectContent>
     </Select>
   )

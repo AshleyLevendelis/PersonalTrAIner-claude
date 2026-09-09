@@ -101,11 +101,32 @@ export const DURATION_OPTIONS: { value: SessionDuration; icon: string; label: st
 ]
 
 
+/**
+ * THE DESCRIPTION IS A PROMISE ABOUT WHAT THE PLAN WILL ASSUME YOU OWN, so it
+ * has to name the whole of EQUIPMENT_SETS[tier] (exercise-plan.ts), not a
+ * flattering summary of it. Roadmap item 11: until 9 Sep 2026 "Minimalist"
+ * read "Bands & kettlebells" while the tier in fact permitted dumbbells, a
+ * pull-up bar, a plyo box, an ab wheel, a medicine ball and a jump rope, and
+ * "Bodyweight only" read "No equipment needed" while the tier prescribed
+ * pull-ups and loaded a rucksack. Someone who owned only bands picked
+ * Minimalist and got dumbbell work they could not do.
+ *
+ * Ashley ruled on 9 Sep 2026, from four options (fix the words / fix the kit /
+ * ask what you actually own / words now and a checklist later): FIX THE WORDS.
+ * Narrowing the equipment sets would have changed every existing plan on those
+ * tiers, and the sets are what the catalogue was deliberately widened to fill.
+ *
+ * `test:equipment-labels` holds the two halves of that promise: nothing named
+ * here may be absent from the tier's set, and nothing that MATTERS in the set
+ * may go unnamed. Add a squat rack to `minimalist` and the gate fails until
+ * this line says so. An "— no x or y" clause is read as an exclusion, not a
+ * claim, and must name things the tier genuinely lacks.
+ */
 export const EQUIPMENT_OPTIONS: { value: EquipmentAccess; icon: string; label: string; description: string }[] = [
-  { value: 'full_gym', icon: '🏢', label: 'Full gym', description: 'All machines & free weights' },
-  { value: 'home_gym', icon: '🏠', label: 'Home gym', description: 'Barbell, dumbbells, bench' },
-  { value: 'minimalist', icon: '🎒', label: 'Minimalist', description: 'Bands & kettlebells' },
-  { value: 'bodyweight', icon: '🤸', label: 'Bodyweight only', description: 'No equipment needed' },
+  { value: 'full_gym', icon: '🏢', label: 'Full gym', description: 'Everything a commercial gym has' },
+  { value: 'home_gym', icon: '🏠', label: 'Home gym', description: 'Barbell, rack, bench, dumbbells, kettlebells, bands, pull-up bar, weighted bag' },
+  { value: 'minimalist', icon: '🎒', label: 'Minimalist', description: 'Dumbbells, kettlebells, bands, pull-up bar, weighted bag — no barbell or bench' },
+  { value: 'bodyweight', icon: '🤸', label: 'Bodyweight only', description: 'Bodyweight, a pull-up bar and a weighted bag' },
 ]
 
 export const STYLE_OPTIONS: { value: TrainingStyle; icon: string; label: string; description: string }[] = [
