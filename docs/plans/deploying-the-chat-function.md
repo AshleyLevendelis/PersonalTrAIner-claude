@@ -172,7 +172,15 @@ therefore ships Phase 2 AND Phase 3. Add these to the pre-greps above:
 | `resolvePlainReply` | a plain question turn can no longer answer with silence |
 | `CONFIRMING SOMETHING THAT JUST HAPPENED` | length now depends on the kind of turn |
 | `WARMTH IS ATTENTION, NOT PRAISE` | the persona change is in the prompt |
-| `dailyPerCaller: 150` | the spend cap accounts for a turn costing three calls |
+| `CHAT_CAP` block showing `dailyPerCaller: 150` | the spend cap accounts for a turn costing three calls |
+
+**A PRE-GREP MUST BE UNIQUE TO THE CHANGE, and one here was not.** The first
+version of this table said to grep `dailyPerCaller: 150`. That string was
+ALREADY in the file — `macro-calibration` has used 150 for months — so it
+reported "present" against a deploy that did not contain the change at all,
+9 Sep 2026. A false green from the very table that exists to prevent false
+greens. Check the value inside the `CHAT_CAP` block specifically, or pick a
+string that exists nowhere else.
 
 And these must now be **zero** in the live source, because they were removed:
 
