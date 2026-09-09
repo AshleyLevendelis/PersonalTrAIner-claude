@@ -91,6 +91,33 @@ export function checkMealAgainstRestrictions(
   return { ok: false, issues, message: describeIssues(issues) }
 }
 
+/**
+ * THE LINE FOR A MEAL ALREADY EATEN — roadmap item 9, Ashley's ruling 9 Sep
+ * 2026, chosen over saying nothing and over keeping the red warning:
+ * "a quiet note".
+ *
+ * A warning is an instruction to act, and there is no action left on food
+ * that is already eaten — swapping or regenerating changes the plan, not
+ * lunch. But silence is wrong too: someone who has just added an allergen tag
+ * after a reaction is precisely the person who wants to know that this
+ * morning's meal contained it. So this states the fact, in the past tense,
+ * and asks for nothing.
+ *
+ * Returns null for an ok verdict, so a caller cannot render an empty note.
+ */
+export function describeEatenBeforeChange(verdict: MealRestrictionVerdict): string | null {
+  if (verdict.ok || verdict.issues.length === 0) return null
+  const first = verdict.issues[0]
+  const label = restrictionLabel(first)
+  // Naming the ingredient is the useful half and is not always possible —
+  // same honesty boundary as describeIssues: a tag violation can come from an
+  // ingredient the food database could not resolve, and inventing one here
+  // would be worse than the shorter sentence.
+  return first.ingredient
+    ? `This had ${first.ingredient} — you ate it before you added ${label}.`
+    : `You ate this before you added ${label}.`
+}
+
 /** Plain-English label for a restriction tag — "nut-free" reads oddly in a sentence. */
 function restrictionLabel(issue: MealRestrictionIssue): string {
   if (issue.kind === 'avoid') return issue.restriction

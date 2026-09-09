@@ -19,6 +19,7 @@
 // ---------------------------------------------------------------------------
 
 import { supabase } from './supabase'
+import { getAppNow, getLocalDateString } from './dev-clock'
 import type { MacroTargets } from './types'
 // Type-only import — meal-generation.ts only imports MealSlotName (a type)
 // from this module, so this doesn't create a real circular dependency.
@@ -803,7 +804,30 @@ export async function getMealPicksForDate(profileId: string, date: string): Prom
   return picks
 }
 
+/**
+ * THE PAST IS NOT WRITEABLE — roadmap item 9.
+ *
+ * A pick says "this is the meal for this slot on this date". Writing one onto
+ * a date that has already passed changes what the app would say you had, days
+ * after the fact — the exact thing item 9 exists to prevent. Nothing renders
+ * past picks today (the Nutrition tab only ever loads today's), so this has no
+ * visible symptom right now; it is a loaded gun for the day a real day-by-day
+ * diary is built, and the chat's meal-food-add path can already reach it with
+ * an arbitrary `date` argument.
+ *
+ * Refused rather than thrown: the callers treat this as a fire-and-forget
+ * write, and a rejection here would surface as an unhandled promise rather
+ * than as anything a user could act on. Logged loudly instead.
+ */
+export function isPastDateForPicks(date: string, profileId: string | undefined): boolean {
+  return date < getLocalDateString(getAppNow(profileId))
+}
+
 export async function setMealPick(profileId: string, date: string, slot: MealSlotName, mealName: string): Promise<void> {
+  if (isPastDateForPicks(date, profileId)) {
+    console.error(`Refused to set a meal pick on a past date (${date}) — history is not rewriteable.`)
+    return
+  }
   await supabase
     .from('meal_plan_picks')
     .upsert({ profile_id: profileId, date, slot, meal_name: mealName }, { onConflict: 'profile_id,date,slot' })

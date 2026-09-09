@@ -12,7 +12,7 @@ import {
 import { InsightBanner } from '@/components/ui/insight-banner'
 import type { MacroTargets } from '@/lib/types'
 import { getTodayLedger, getLedgerSnapshot, logMealEaten, voidMealEvents, loggedEventsBySlot, type MealSlotName, type MealEventRecord } from '@/lib/meal-store'
-import { checkMealAgainstRestrictions, type MealRestrictionVerdict } from '@/lib/meal-restriction-check'
+import { checkMealAgainstRestrictions, describeEatenBeforeChange, type MealRestrictionVerdict } from '@/lib/meal-restriction-check'
 import type { PoolOption } from '@/lib/meal-generation'
 import { tabHash } from '@/lib/app-route'
 
@@ -104,8 +104,6 @@ export function MealPlan({
     const option = chosen[slot]
     if (option) restrictionBySlot[slot] = checkMealAgainstRestrictions(option.name, option.ingredients, dietaryPreferences, avoidFoods)
   }
-  const blockedSlots = SLOT_ORDER.filter(s => restrictionBySlot[s] && !restrictionBySlot[s]!.ok)
-
   const [expandedSlot, setExpandedSlot] = useState<MealSlotName | null>(null)
 
   // Which meals are already logged eaten today, keyed by slot — reuses
@@ -147,6 +145,17 @@ export function MealPlan({
   }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { void reloadLogged() }, [profileId, date])
+
+  // A MEAL ALREADY EATEN IS NOT A WARNING — roadmap item 9. The banner tells
+  // you which of today's meals to swap or regenerate; a meal you have already
+  // eaten cannot be either, so listing it there asks for something impossible
+  // and reads as a telling-off. It still gets a line, quietly, on its own row
+  // (describeEatenBeforeChange). Declared here rather than beside
+  // restrictionBySlot above because it needs loggedBySlot, which the state
+  // hook below it owns.
+  const blockedSlots = SLOT_ORDER.filter(
+    s => restrictionBySlot[s] && !restrictionBySlot[s]!.ok && (loggedBySlot[s]?.length ?? 0) === 0,
+  )
 
   /**
    * Undo tapped, and the meal stayed logged. Local to this screen because it
@@ -506,6 +515,25 @@ function MealSlotRow({
   const blocked = restriction != null && !restriction.ok
 
   const isLogged = loggedEvents.length > 0
+  // WHAT YOU ATE, NOT WHAT THE PLAN NOW SAYS — roadmap item 9. `option` is
+  // re-derived from the current pools on every render, so swapping this slot
+  // or adding a food to it after logging used to leave the NEW meal's name
+  // sitting above the OLD meal's calories. An earlier comment below called
+  // that "considered and kept"; Ashley's item 9 overrides it — a record of
+  // what was eaten must not be rewritten by a later change of mind. The event
+  // carries its own name, copied at log time, and this is the one place the
+  // screen reads it.
+  const loggedName = loggedEvents[0]?.mealName ?? null
+  const displayName = isLogged && loggedName ? loggedName : option?.name ?? ''
+  // The plan has moved on from what was eaten. Said once, in the expanded
+  // view, so the macros and ingredients below it are attributable.
+  const planMovedOn = isLogged && loggedName != null && option != null && loggedName !== option.name
+  // Only meaningful when the eaten meal IS still this slot's option: the
+  // ledger stores no ingredients, so for anything else there is nothing to
+  // check and the honest output is silence rather than a guess.
+  const eatenNote = isLogged && !planMovedOn && restriction && !restriction.ok
+    ? describeEatenBeforeChange(restriction)
+    : null
   // Logged more than once: the ledger counts every one of these, so this is
   // the true contribution of this row to today's totals, not option.macros.
   const duplicated = loggedEvents.length > 1
@@ -550,7 +578,7 @@ function MealSlotRow({
                   stays either way — without it the flex row refuses to shrink
                   and the macros beside it get pushed off. */}
               <span className={expanded ? 'min-w-0 text-[1.1875rem] font-semibold tracking-[-.02em]' : 'min-w-0 line-clamp-2 text-[1rem] font-medium'}>
-                {option.name}
+                {displayName}
               </span>
               {!expanded && (
                 <span className="flex shrink-0 items-center gap-1">
@@ -578,6 +606,20 @@ function MealSlotRow({
           )}
         </div>
       </button>
+
+      {eatenNote && (
+        /* QUIET, AND NOT AN INSTRUCTION — Ashley's ruling, 9 Sep 2026. Muted
+           rather than warn-coloured, no icon, no "swap it": the meal is eaten
+           and there is nothing left to do about it.
+           ON THE ROW, NOT INSIDE THE EXPANDED DETAIL. The first build put it
+           behind a tap, which the browser driver caught: someone who has just
+           added an allergen tag is exactly the person who should not have to
+           go looking for the sentence that says this morning's meal contained
+           it. Collapsed and expanded both show it. */
+        <p className="mt-1.5 text-[0.71875rem] leading-snug text-muted-foreground">
+          {eatenNote}
+        </p>
+      )}
 
       {!option && (
         <Button variant="ghost" size="sm" onClick={handleRegenerate} disabled={busy} className="mt-2 h-7 px-2 text-xs">
@@ -623,10 +665,20 @@ function MealSlotRow({
             </div>
           )}
 
-          {blocked && restriction?.message && (
+          {planMovedOn && (
+            /* The heading above is what was EATEN; everything in this block —
+               calories, ingredients, tags — is the slot's CURRENT option.
+               Without this line the two silently disagree. */
+            <p className="text-[0.71875rem] leading-snug text-muted-foreground">
+              Your plan now shows {option.name} here. The details below are that meal, not the one you logged.
+            </p>
+          )}
+
+          {blocked && !isLogged && restriction?.message && (
             /* Above the buttons, not below: it explains why the one beside
                it is greyed out, and a reason that arrives after the action
-               has already been refused is not an explanation. */
+               has already been refused is not an explanation.
+               NOT for an eaten meal (item 9) — that gets eatenNote above. */
             <p className="flex items-start gap-1.5 rounded-xl bg-[color:var(--role-warn-bg)] px-3 py-2 text-[0.71875rem] leading-snug text-[color:var(--role-warn-text)]">
               <ShieldAlert className="mt-0.5 size-3.5 shrink-0" />
               <span>

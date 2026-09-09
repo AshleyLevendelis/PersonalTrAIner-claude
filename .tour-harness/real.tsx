@@ -96,7 +96,7 @@ const profile: UserProfile = {
   training_experience: 'intermediate', session_duration_preference: '45-60',
   workout_split_preference: 'upper_lower',
   training_days: DAYS.map((day, i) => ({ day, available: availableIdx.has(i) })),
-  weekly_schedule: {}, dietary_preferences: [], concurrent_activities: [],
+  weekly_schedule: {}, dietary_preferences: new URLSearchParams(location.search).get('ate') === '1' ? ['nut-free'] : [], concurrent_activities: [],
   exercise_exclusions: [] as unknown as never, macro_calculation_mode: 'STANDARD_STATIC',
   coaching_persona: 'supportive', recovery_capacity: 'moderate', conditioning_preference: 'tolerate',
   // NINE DAYS OLD, not today: a plan created today has no elapsed
@@ -161,7 +161,21 @@ const db: Db = {
   cardio_logs: [],
   // A logged step count so the new ring renders — without one the row is
   // still the input, which is a different state.
-  daily_steps: [{ id: 's1', profile_id: PROFILE_ID, date: today, steps: 7400 }], meal_events: [], meal_plan_picks: [], meal_plan_slots: [],
+  daily_steps: [{ id: 's1', profile_id: PROFILE_ID, date: today, steps: 7400 }],
+  meal_events: new URLSearchParams(location.search).get('ate') === '1'
+    ? [
+        // Eaten under the name the slot still shows — the quiet-note case.
+        { id: 'me1', profile_id: PROFILE_ID, date: today, slot: 'breakfast', event_type: 'confirmed',
+          meal_name: 'Porridge with almond butter', macros: { kcal: 480, protein: 18, carbs: 60, fat: 18 },
+          source: 'manual', client_id: 'seed-breakfast', created_at: new Date().toISOString() },
+        // Eaten under a name the plan has since moved away from — the
+        // name-preservation case. 610, deliberately not the pick's 720.
+        { id: 'me2', profile_id: PROFILE_ID, date: today, slot: 'lunch', event_type: 'confirmed',
+          meal_name: 'Leftover chilli and rice', macros: { kcal: 610, protein: 40, carbs: 70, fat: 15 },
+          source: 'manual', client_id: 'seed-lunch', created_at: new Date().toISOString() },
+      ]
+    : [],
+  meal_plan_picks: [], meal_plan_slots: [],
   favorite_meals: [], grocery_items: [], load_suggestions: [], pending_actions: [],
   plan_adaptations: [], user_facts: [], user_context_facts: [], user_goals: [],
   chat_messages: [], exercise_plans: [], mesocycle_weeks: [],
@@ -194,8 +208,22 @@ const meal = (slot: string, name: string, kcal: number) => ({
   macros: { calories: kcal, protein: 45, carbs: 60, fat: 12 },
   tags: [],
 })
+// ?ate=1 — ROADMAP ITEM 9. Two things a preference change must not do to a
+// meal already eaten. Breakfast contains almond butter and the profile below
+// turns on nut-free, so the re-check trips on a meal that is ALREADY LOGGED
+// under the same name: it must get the quiet note, not the red "swap it"
+// warning. Lunch is logged under a DIFFERENT name from today's pick, which is
+// what happens after a swap or an added food: the heading must stay the name
+// that was eaten, over the calories that were eaten.
+const ATE = new URLSearchParams(location.search).get('ate') === '1'
+const nuttyBreakfast = {
+  slot: 'breakfast', name: 'Porridge with almond butter',
+  ingredients: [{ name: 'rolled oats', quantity: 60, unit: 'g' }, { name: 'almond butter', quantity: 20, unit: 'g' }],
+  macros: { calories: 480, protein: 18, carbs: 60, fat: 18 },
+  tags: [],
+}
 const chosen = {
-  breakfast: meal('breakfast', 'Greek yoghurt, berries and honey', 480),
+  breakfast: ATE ? nuttyBreakfast : meal('breakfast', 'Greek yoghurt, berries and honey', 480),
   lunch: meal('lunch', 'Chicken, rice and roasted peppers', 720),
   dinner: meal('dinner', 'Salmon, new potatoes and green beans', 780),
 } as never
