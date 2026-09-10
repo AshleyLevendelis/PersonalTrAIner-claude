@@ -58,7 +58,10 @@ export function loadSourceLabel(source: LoadSource | undefined, calibration = fa
   // from "prescription" — and the cue two lines below was left carrying that
   // distinction alone, which is how it ended up reading as an argument with
   // the number above it (7 Sep 2026, Ashley).
-  if (source === 'estimate' && calibration) return 'starting point'
+  // "start here", not "starting point": the first names the action, the
+  // second names the number — and a number named as a point reads as a
+  // target (Ashley, 10 Sep 2026, after a session that was too light).
+  if (source === 'estimate' && calibration) return 'start here'
   if (source === 'estimate') return 'suggested'
   if (source === 'known_weight') return 'you told us'
   if (source === 'logged') return 'from your last session'
@@ -150,7 +153,11 @@ export function LoadChip({
         </span>
       )}
       <div className="flex items-center gap-1 flex-wrap">
-        {ex.per_set_load && ex.per_set_load.length > 0 ? (
+        {/* NO S1/S2/S3 IN CALIBRATION WEEK. Three identical chips are the
+            loudest "this is fixed" signal on the screen, directly above a cue
+            asking her to climb. The week's number is a probe for set 1 and
+            nothing else, so that is the one chip it gets. */}
+        {ex.per_set_load && ex.per_set_load.length > 0 && !calibration ? (
           <>
             <Dumbbell className="size-2.5 text-muted-foreground shrink-0" />
             {ex.per_set_load.map(s => (
@@ -176,8 +183,8 @@ export function LoadChip({
             })()}
           </>
         ) : ex.suggested_load && (
-          <span className={`inline-flex items-center gap-0.5 rounded border px-1 py-0 text-[0.625rem] leading-4 ${loadChipClass(source)}`}>
-            <Dumbbell className="size-2.5" />{ex.suggested_load}
+          <span className={`inline-flex items-center gap-0.5 rounded border px-1 py-0 text-[0.625rem] leading-4 ${loadChipClass(source)}`} data-testid={calibration ? 'probe-chip' : undefined}>
+            <Dumbbell className="size-2.5" />{calibration && source === 'estimate' ? `Set 1 · probe at ${ex.suggested_load}` : ex.suggested_load}
           </span>
         )}
         {label && <span className="text-[0.5625rem] italic text-muted-foreground/60">{label}</span>}

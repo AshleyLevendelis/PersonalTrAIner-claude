@@ -157,6 +157,26 @@ export function ExerciseRow({
         <>
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0 flex-1">
+              {/* THE RAMP COMES FIRST, SO IT IS DRAWN FIRST. It used to sit
+                  below the working-set chips, which is the order you would
+                  read it in if it were something you did after them. It is
+                  the warm-up to set 1 — its last rung lands just under the
+                  start weight — and the screen's order now says so without
+                  a tooltip (Ashley, 10 Sep 2026).
+                  TICKABLE HERE, AND ONLY HERE. This is today's session, so a
+                  tick means "I have done that one"; the browse and peek
+                  surfaces render the same component with no handler and get
+                  plain text, because a tick there would be marking a set on a
+                  day that is not today. Nothing is written to the database —
+                  see RampStrip's header for why recording warm-ups would
+                  change no number the app shows back. */}
+              {completedSets === 0 && ramp && (
+                <RampStrip
+                  ramp={ramp}
+                  ticked={rampTicksFor(exerciseId)}
+                  onToggle={n => toggleRampTick(exerciseId, n)}
+                />
+              )}
               {/* The unit comes from the plan's own formatted string, split
                   into parts so the number can stay large and the unit small.
                   Hard-coding "kg" here printed a per-hand number as though it
@@ -199,20 +219,6 @@ export function ExerciseRow({
                   />
                 )}
               </div>
-              {/* TICKABLE HERE, AND ONLY HERE. This is today's session, so a
-                  tick means "I have done that one"; the browse and peek
-                  surfaces render the same component with no handler and get
-                  plain text, because a tick there would be marking a set on a
-                  day that is not today. Nothing is written to the database —
-                  see RampStrip's header for why recording warm-ups would
-                  change no number the app shows back. */}
-              {completedSets === 0 && ramp && (
-                <RampStrip
-                  ramp={ramp}
-                  ticked={rampTicksFor(exerciseId)}
-                  onToggle={n => toggleRampTick(exerciseId, n)}
-                />
-              )}
               {showCalibrationCue && <CalibrationCue hasLoad={ex.suggested_load_kg != null} />}
               <p className="mt-2 text-xs text-text-tertiary">
                 {ex.sets} working sets · {completedSets} logged
@@ -305,6 +311,7 @@ export function ExerciseRow({
             loadUnitLabel={(ex.suggested_load ? splitLoadDisplay(ex.suggested_load) : null)?.unit}
             perSetLoadKg={ex.per_set_load?.map(s => s.load_kg)}
             loadIsEstimate={loadIsUnverified}
+            calibration={isCalibrationWeek}
             profile={profile}
             onOpenPlateCalc={onOpenPlateCalc}
             onSetCompleted={onSetCompleted}

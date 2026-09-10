@@ -40,6 +40,7 @@ import { checkForConsistencyHold } from '@/lib/block-consistency'
 import { checkForLoadSuggestions, confirmLoadSuggestion, declineLoadSuggestion } from '@/lib/load-suggestions'
 import { checkForWeightBasisOffer, confirmWeightBasisOffer, declineWeightBasisOffer, planHasAssumedBodyLoads } from '@/lib/weight-basis-offer'
 import { checkForBeatTargetOffer, confirmBeatTargetOffer, declineBeatTargetOffer } from '@/lib/beat-target-offer'
+import { applyCalibrationAnchors, calibrationAnchorMessage } from '@/lib/calibration-anchor'
 import { getRevealSpeed, saveRevealSpeed, DEFAULT_REVEAL_SPEED, type RevealSpeed } from '@/lib/reveal-speed-store'
 import { ensureSignedIn, claimProfile, shouldAskForEmail, findOwnedProfileId, describeSignInFailure } from '@/lib/auth'
 import { rebuildFromCurrentWeek, type PlanInvalidation } from '@/lib/plan-invalidation'
@@ -1849,6 +1850,31 @@ function App() {
     }
   }
 
+  // Calibration week's answer, written into the printed program. Her ruling,
+  // 10 Sep 2026: from a calibration week the heaviest logged set re-anchors
+  // the rest of the block AUTOMATICALLY, once — the printed number was an
+  // admitted guess and the cue promised "your heaviest set becomes next
+  // week's weight". Weeks after calibration keep the 1 Sep offer-first rule
+  // (the accelerator below). Outside a calibration week this is a no-op.
+  const handleCalibrationSessionFinished = async ({ date, dayName }: { date: string; dayName: string }) => {
+    if (!profile?.id || mesocycle.length === 0) return
+    try {
+      const r = await applyCalibrationAnchors({
+        profileId: profile.id,
+        profile,
+        mesocycle,
+        planCreatedAt: mesocycleCreatedAt ?? profile.created_at,
+        sessionDate: date,
+        dayName,
+      })
+      if (r.applied.length === 0 || r.nextWeekNumber == null) return
+      setMesocycle(r.next)
+      setAdaptationMessages(prev => [...prev, { text: calibrationAnchorMessage(r.nextWeekNumber!, r.applied) }])
+    } catch (err) {
+      console.error('[calibration-anchor] failed to re-anchor the program:', err)
+    }
+  }
+
   const handleBanExercise = async (exerciseName: string) => {
     if (!profile?.id) return
     // Fix — food/exercise preferences have two competing stores: this used
@@ -2526,6 +2552,7 @@ function App() {
               onLogsSeeded={() => setLogsVersion(v => v + 1)}
               logsVersion={logsVersion}
               onLogsUpdated={() => { setLogsVersion(v => v + 1); bumpCoachData() }}
+              onCalibrationSessionFinished={handleCalibrationSessionFinished}
             />
           </TabsContent>
 

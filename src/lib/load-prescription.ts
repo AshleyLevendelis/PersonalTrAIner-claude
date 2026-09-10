@@ -672,6 +672,17 @@ export function loadingMode(entry: ExerciseEntry): LoadingMode {
  * to know "is this exercise already as light as it can go" reads the same
  * table rather than re-deriving it.
  */
+/**
+ * A deload week's weight as a fraction of the block's last loading week —
+ * the number the trainee actually saw in week 3. generateMesocycle applies
+ * it when it builds the deload; patchBlockFromLiftedKg (beat-target-offer.ts)
+ * applies the same fraction when a lifted number re-anchors a block after
+ * the fact, so a re-anchored deload stays a deload rather than becoming the
+ * heaviest week of its block. At the equipment floor the fraction gives way
+ * to the floor and volume does the reducing (the generator's deloadAtFloor).
+ */
+export const DELOAD_LOAD_FRACTION = 0.7
+
 const LOADING_FLOOR_KG: Record<LoadingMode, number> = {
   dumbbell: 2,
   single_implement: 2,
@@ -845,22 +856,43 @@ export function effectiveLoadingCeilingKg(
   return stated == null ? table : Math.min(table, stated)
 }
 
+/**
+ * The smallest real change of weight for an implement — one pair of the
+ * lightest plates, or one rung of a dumbbell rack. roundToPlate snaps to
+ * multiples of it; anything building a LADDER of weights (the calibration
+ * week's next-set chips) needs it directly, to keep two rungs from landing
+ * on the same number.
+ */
+const PLATE_STEP_KG: Record<LoadingMode, number> = {
+  // Dumbbells and kettlebells commonly step in 2kg increments at the light end.
+  dumbbell: 2,
+  single_implement: 2,
+  // Bar plus plate pairs; cable and machine stacks in the same-sized notches.
+  barbell: 2.5,
+  ez_bar: 2.5,
+  stack: 2.5,
+}
+
+export function plateStepKg(mode: LoadingMode): number {
+  return PLATE_STEP_KG[mode]
+}
+
 /** Round to something actually loadable rather than a number like 43.7kg. */
 export function roundToPlate(kg: number, mode: LoadingMode): number {
   const floor = LOADING_FLOOR_KG[mode]
+  const step = PLATE_STEP_KG[mode]
   switch (mode) {
     case 'dumbbell':
     case 'single_implement':
-      // Dumbbells and kettlebells commonly step in 2kg increments at the light end.
-      return Math.max(floor, Math.round(kg / 2) * 2)
+      return Math.max(floor, Math.round(kg / step) * step)
     case 'barbell':
     case 'ez_bar':
-      // Bar plus plate pairs. Below bar weight, prescribe the bar itself.
-      return kg <= floor ? floor : Math.round(kg / 2.5) * 2.5
+      // Below bar weight, prescribe the bar itself.
+      return kg <= floor ? floor : Math.round(kg / step) * step
     case 'stack':
       // Cable and machine stacks have no bar to floor against — applying the
       // barbell's 20kg minimum here inflated light isolation work.
-      return Math.max(floor, Math.round(kg / 2.5) * 2.5)
+      return Math.max(floor, Math.round(kg / step) * step)
   }
 }
 

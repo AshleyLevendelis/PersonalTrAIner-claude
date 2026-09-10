@@ -10,7 +10,7 @@ import {
   type ExperienceConfig,
 } from './experience-config'
 import { buildWarmup, getWarmupReserveSeconds } from './warmup'
-import { prescribeLoad, prescribeAddedLoad, categorize, getLoadIncrementKg, isExternallyLoaded, getEquipmentFloorKg, loadingMode, roundToPlate, formatLoad, labelModeForEntry, hasKnownWorkingWeight, unverifiedRampStepKg, isolationTargetBelowFloor, resolveBodyBasis, prescribeAssistance, assistanceGuidance, isImprovisedLoadImplement, IMPROVISED_IMPLEMENT_CEILING_KG, type KnownWorkingWeights } from './load-prescription'
+import { prescribeLoad, prescribeAddedLoad, categorize, getLoadIncrementKg, isExternallyLoaded, getEquipmentFloorKg, loadingMode, roundToPlate, formatLoad, labelModeForEntry, hasKnownWorkingWeight, unverifiedRampStepKg, isolationTargetBelowFloor, resolveBodyBasis, prescribeAssistance, assistanceGuidance, isImprovisedLoadImplement, IMPROVISED_IMPLEMENT_CEILING_KG, type KnownWorkingWeights, DELOAD_LOAD_FRACTION } from './load-prescription'
 import {
   getPhaseSequence, getPhaseConfig, rotateVariation, resolveTargetRpe,
   shiftReps, adjustRest, dedupeAdjacentPhases, isRegressionFor, stepIntervalSeconds, getPhaseTempo, formatTempo, type PhaseConfig, type TrainingPhase,
@@ -6167,7 +6167,7 @@ export function generateMesocycle(
           const week3KgForFloorCheck = isDeload && dbEntry ? week3ForSlot(dayIdx, exIdx, dbEntry.name) : null
           const deloadAtFloor =
             isDeload && equipmentFloor != null && week3KgForFloorCheck != null &&
-            week3KgForFloorCheck * 0.7 < equipmentFloor
+            week3KgForFloorCheck * DELOAD_LOAD_FRACTION < equipmentFloor
 
           // Sets stay near-constant across the three loading weeks of a
           // block — load is the progression lever below, not set count. The
@@ -6514,7 +6514,7 @@ export function generateMesocycle(
                 // explicitly so the intent ("weight held at the floor,
                 // volume did the reducing") is unambiguous rather than an
                 // accident of rounding.
-                forceStartingWeightKg = deloadAtFloor ? equipmentFloor! : week3Kg * 0.7
+                forceStartingWeightKg = deloadAtFloor ? equipmentFloor! : week3Kg * DELOAD_LOAD_FRACTION
               } else if (forceStartingWeightKg == null) {
                 // NO WEEK-3 ANCHOR FOR THIS SLOT, AND A DELOAD MUST STILL
                 // BACK OFF. The anchor is name-keyed, so a slot whose
@@ -6537,13 +6537,13 @@ export function generateMesocycle(
                 // lighter deload target, so if anything that errs light.
                 const lastSeenKg = lastWeekDisplayedKgByLift.get(dbEntry.name)?.kg
                 if (lastSeenKg != null) {
-                  forceStartingWeightKg = lastSeenKg * 0.7
+                  forceStartingWeightKg = lastSeenKg * DELOAD_LOAD_FRACTION
                 } else {
                   const fresh = prescribeLoad(dbEntry, profile, {
                     targetRpeLabel: intensity, isFirstBlock: blockIndex === 0, sets, phase,
                     isCalibrationWeek, knownWorkingWeights, repRangeLabel: reps, loadIsProgressing: rampLoad,
                   })
-                  if (fresh.starting_weight_kg != null) forceStartingWeightKg = fresh.starting_weight_kg * 0.7
+                  if (fresh.starting_weight_kg != null) forceStartingWeightKg = fresh.starting_weight_kg * DELOAD_LOAD_FRACTION
                 }
               }
             }

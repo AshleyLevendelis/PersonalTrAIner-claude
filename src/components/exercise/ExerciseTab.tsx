@@ -47,6 +47,8 @@ interface ExerciseTabProps {
   logsVersion?: number
   /** Fired when THIS tab changes a day (clearing a move from the moved-day card), so Home and the chat re-read. */
   onLogsUpdated?: () => void
+  /** Fired when a session with logged sets closes — App re-anchors the printed program from a calibration week. */
+  onCalibrationSessionFinished?: (args: { date: string; dayName: string }) => void
 }
 
 export function ExerciseTab({
@@ -70,6 +72,7 @@ export function ExerciseTab({
   onLogsSeeded,
   logsVersion,
   onLogsUpdated,
+  onCalibrationSessionFinished,
 }: ExerciseTabProps) {
   const { route } = useAppRoute()
   const { liveWeek } = useActiveSession()
@@ -173,6 +176,7 @@ export function ExerciseTab({
         onOpenHistory={(id, name) => setDetailTarget({ exerciseName: name, exerciseId: id, tab: 'history' })}
         onOpenDetail={(name: string) => setDetailTarget({ exerciseName: name, tab: 'howto' })}
         onOpenSessionHistory={() => setSessionHistoryOpen(true)}
+        onCalibrationSessionFinished={onCalibrationSessionFinished}
       />
       <SwapDialog
         target={swapTarget}

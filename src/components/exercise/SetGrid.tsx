@@ -23,7 +23,7 @@ import { prescriptionUnit } from '@/lib/set-log-store'
 import { computeSetRowNumbers, nextExtraSetNumber } from '@/lib/session-derive'
 import { checkForPR, getTopPRSet, type PRResult } from '@/lib/pr-engine'
 import { getExerciseEntry } from '@/lib/exercise-db'
-import { isExternallyLoaded } from '@/lib/load-prescription'
+import { isExternallyLoaded, loadingMode, roundToPlate, plateStepKg } from '@/lib/load-prescription'
 import { checkLoggedSetWeight, MAX_LOGGABLE_SET_KG } from '@/lib/set-plausibility'
 import type { ExerciseSetLog, UserProfile } from '@/lib/types'
 
@@ -76,6 +76,17 @@ export interface SetGridProps {
   /** Flips the weight input's helper copy from "here's the default" to "log what you actually lifted." */
   loadIsEstimate?: boolean
   /**
+   * Week one, nothing verified: the week is a SEARCH for the weight, and the
+   * grid has to look like one. Set 1 keeps its pre-fill — the printed number
+   * IS the instruction for the probe. Sets 2 and beyond have NO default: an
+   * untouched box refuses instead of logging the guess, and once the
+   * previous set is logged a row of chips (same / +5% / +10%) offers the next
+   * weight off what was actually lifted. Ashley, 10 Sep 2026, after training
+   * on the old version: the weights were too light, and a tick on an
+   * untouched box had been quietly logging the guess as her working weight.
+   */
+  calibration?: boolean
+  /**
    * Needed only to judge a typed weight against what this trainee can
    * actually load — see set-plausibility.ts.
    *
@@ -119,6 +130,7 @@ export function SetGrid({
   loadUnitLabel,
   perSetLoadKg,
   loadIsEstimate,
+  calibration = false,
   profile,
   onSetCompleted,
   onOpenPlateCalc,
@@ -146,6 +158,18 @@ export function SetGrid({
   // hiding it for a movement we simply don't have catalog data for.
   const catalogEntry = getExerciseEntry(exerciseName)
   const isBodyweightCapable = catalogEntry ? !isExternallyLoaded(catalogEntry) : true
+
+  // THE CALIBRATION SEARCH ONLY APPLIES WHERE THERE IS A WEIGHT TO SEARCH
+  // FOR. Every rule below — no default on sets 2+, a refused tick on an
+  // empty box, the next-weight chips — exists because week one's number is a
+  // guess that must be replaced by a real one. On a push-up there is no
+  // guess and nothing to type, and asking for one turns a bodyweight set
+  // into a box that cannot be ticked. Caught in the browser, 10 Sep 2026:
+  // Scapular Push-Ups sitting above the bench press with "type it" in its
+  // weight column. Same test the plan re-anchor uses for what counts as
+  // evidence (calibration-anchor.ts), so the screen and the engine agree on
+  // which lifts this week is about.
+  const calibrationProbe = calibration && suggestedLoadKg != null && !!catalogEntry && isExternallyLoaded(catalogEntry)
   // On the four lifts you can hang weight from (accepts_added_load — pull-ups,
   // chin-ups, dips), the weight box means ADDED weight, not the weight of the
   // thing being lifted. Typing 15 here used to write weight_kg 15 with
@@ -235,9 +259,21 @@ export function SetGrid({
   }
 
   const defaultWeightFor = (setNumber: number): string => {
+    // CALIBRATION, SETS 2+: NO DEFAULT. This is the one deliberate exception
+    // to "a blank box logs the prescribed number". In week one the prescribed
+    // number is a guess by construction (half the estimate), and the whole
+    // week exists to replace it — so a default here is the guess writing
+    // itself into the ledger three times. Set 1 keeps its default: the probe
+    // IS the number, and one tap is right when the guess is right.
+    if (calibrationProbe && setNumber > 1) return ''
     const perSet = perSetLoadKg?.[setNumber - 1]
     if (perSet != null) return String(perSet)
     return suggestedLoadKg != null ? String(suggestedLoadKg) : '0'
+  }
+  /** What the empty box SHOWS — the default where one exists, a prompt where it does not. */
+  const weightPlaceholderFor = (setNumber: number): string => {
+    const d = defaultWeightFor(setNumber)
+    return d === '' ? 'type it' : d
   }
 
   /**
@@ -292,6 +328,16 @@ export function SetGrid({
     }
     if (reps > MAX_REPS) {
       setRowErrors(prev => ({ ...prev, [setNumber]: `Reps must be a whole number from 1 to ${MAX_REPS}` }))
+      return
+    }
+
+    // CALIBRATION, SETS 2+: AN EMPTY BOX IS REFUSED, NOT FILLED. Placed
+    // before the bodyweight resolution below, because on a bodyweight-capable
+    // lift an empty weight would otherwise resolve to "bodyweight" and be
+    // logged as a set she never did. The message names the probe so the
+    // refusal reads as the design, not a fault.
+    if (calibrationProbe && setNumber > 1 && !input.isBodyweight && !input.weight.trim() && !ghost) {
+      setRowErrors(prev => ({ ...prev, [setNumber]: 'Type the weight you lifted — set 1 was the probe' }))
       return
     }
 
@@ -490,7 +536,7 @@ export function SetGrid({
               min="0"
               max={MAX_LOGGABLE_SET_KG}
               step="0.5"
-              placeholder={isBW ? 'BW' : (ghost ? String(ghost.weight_kg) : defaultWeightFor(setNumber))}
+              placeholder={isBW ? 'BW' : (ghost ? String(ghost.weight_kg) : weightPlaceholderFor(setNumber))}
               value={isBW ? '' : input.weight}
               onChange={e => updateInput(setNumber, 'weight', e.target.value)}
               onFocus={scrollRowIntoView}
@@ -589,6 +635,55 @@ export function SetGrid({
                   <Trash2 className="size-2.5" />
                   {armed ? 'Tap to confirm' : 'Delete'}
                 </button>
+              </div>
+            )
+          })()}
+          {/* THE NEXT WEIGHT, OFF THE LAST ONE LIFTED. Only in calibration
+              week, only on an unlogged set whose predecessor is logged, and
+              only ever as a suggestion the box does not adopt by itself.
+              Computed from the previous LOGGED set, never from the
+              prescription — the prescription is the thing being replaced.
+
+              LABELLED IN KILOS, NOT PERCENT — a deviation from the plan,
+              which said `+5%` / `+10%`. Measured in the browser at 27.5kg on
+              a barbell: 5% and 10% both snap to 30kg, so the ladder collapsed
+              to a single rung AND the chip labelled "+5%" named a weight that
+              was really +9%. Percentages are the coaching intent (the cue
+              says "go up 5-10%"); what she can actually put on the bar is a
+              plate step. So the targets stay 5% and 10%, each is snapped to
+              the implement's real step, each is forced at least one step
+              above the one before it, and the chip says the kilos it adds —
+              which is true at every weight. */}
+          {calibrationProbe && setNumber > 1 && !isSaved && (() => {
+            const prev = existingLogs.find(l => l.set_number === setNumber - 1)
+            if (!prev || prev.is_bodyweight || !(Number(prev.weight_kg) > 0)) return null
+            const mode = catalogEntry ? loadingMode(catalogEntry) : 'stack'
+            const step = plateStepKg(mode)
+            const base = Number(prev.weight_kg)
+            const rungs: number[] = []
+            for (const target of [base * 1.05, base * 1.10]) {
+              const floor = (rungs[rungs.length - 1] ?? base) + step
+              rungs.push(Math.max(roundToPlate(target, mode), floor))
+            }
+            const opts = [base, ...rungs].map(kg => ({
+              kg,
+              // Trailing .0 trimmed: "+5", not "+5.0", and "+2.5" intact.
+              label: kg === base ? 'same' : `+${Number((kg - base).toFixed(2))}`,
+            }))
+            return (
+              <div className="flex items-center gap-1 flex-wrap px-1 -mt-0.5" data-testid="calibration-cascade">
+                <span className="text-[0.625rem] text-muted-foreground">After {base}kg:</span>
+                {opts.map(o => (
+                  <button
+                    key={o.label}
+                    type="button"
+                    className="hit-slop-44 rounded border border-[color:var(--role-warn)]/50 bg-[color:var(--role-warn)]/10 px-1.5 py-0.5 text-[0.625rem] text-[color:var(--role-warn-text)]"
+                    onClick={() => updateInput(setNumber, 'weight', String(o.kg))}
+                    aria-label={`Set ${setNumber} at ${o.kg}kg (${o.kg === base ? 'same as set ' + (setNumber - 1) : o.label.slice(1) + 'kg more'})`}
+                  >
+                    {o.label} · {o.kg}
+                  </button>
+                ))}
               </div>
             )
           })()}

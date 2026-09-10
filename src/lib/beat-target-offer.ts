@@ -45,7 +45,7 @@ import {
 import { getExerciseHistory } from './exercise-history'
 import { getExerciseId, getExerciseEntry } from './exercise-db'
 import { isMainLiftSlot } from './mesocycle-edit'
-import { prescribeLoad } from './load-prescription'
+import { prescribeLoad, DELOAD_LOAD_FRACTION } from './load-prescription'
 import { saveMesocycleWeek } from './mesocycle-persistence'
 import {
   createPendingAction,
@@ -242,6 +242,85 @@ export interface ConfirmBeatTargetParams {
  * at 8kg (fixed 1 Sep 2026); the fix was to stop having a second way to write
  * a weight, and this does not add one back.
  */
+/** One lift's slot, and the weight actually lifted, to re-anchor a block from. */
+export interface LiftedAnchor {
+  blockNumber: number
+  dayName: string
+  exIndex: number
+  exerciseName: string
+  liftedKg: number
+  /**
+   * The first week-in-block to touch. The accelerator re-anchors the whole
+   * block (1); a calibration-week anchor touches only the weeks AFTER the one
+   * just trained, because the calibration week itself is already logged.
+   */
+  fromWeekInBlock?: number
+}
+
+/**
+ * THE ONE PLACE A LOGGED WEIGHT IS WRITTEN INTO THE PRINTED PLAN. Shared by
+ * the accelerator's confirm and by the calibration-week anchor (10 Sep 2026),
+ * so the two cannot drift on the rule that matters: NEVER DOWNWARD. A later
+ * week of the block can legitimately sit above the lifted weight (the phase
+ * steps up within a block) and pulling it down would be this path quietly
+ * acting as a brake — the one thing it must not do, since holding back is
+ * block-review's job and its evidence bar.
+ *
+ * Pure: returns the patched plan and whether anything changed. Saving is the
+ * caller's, so a gate can run this against a generated plan with no database.
+ */
+export function patchBlockFromLiftedKg(
+  mesocycle: MesocycleWeek[],
+  profile: UserProfile,
+  anchor: LiftedAnchor,
+): { next: MesocycleWeek[]; patched: boolean } {
+  const entry = getExerciseEntry(anchor.exerciseName)
+  if (!entry) return { next: mesocycle, patched: false }
+  const fromWeek = anchor.fromWeekInBlock ?? 1
+
+  let patched = false
+  const next = mesocycle.map(week => {
+    if (week.block_number !== anchor.blockNumber) return week
+    if ((week.week_in_block ?? 1) < fromWeek) return week
+    const day = week.days.find(d => d.day === anchor.dayName)
+    const target = day?.exercises[anchor.exIndex]
+    if (!day || !target || target.name !== anchor.exerciseName) return week
+    // A DELOAD STAYS A DELOAD. The generator builds the block's deload at
+    // DELOAD_LOAD_FRACTION of week 3's number; re-anchoring it to the full
+    // lifted weight would make the recovery week the heaviest in its block
+    // — the exact "deload heavier than the week before" defect the quality
+    // grid already counts. So the deload's target is the same fraction of
+    // the anchor, and prescribeLoad's own rounding holds it at the
+    // equipment floor where that lands under it (the generator's
+    // deloadAtFloor case, reached by the same arithmetic).
+    const targetKg = week.is_deload ? anchor.liftedKg * DELOAD_LOAD_FRACTION : anchor.liftedKg
+    if (target.suggested_load_kg != null && target.suggested_load_kg >= targetKg) return week
+
+    const load = prescribeLoad(entry, profile, {
+      targetRpeLabel: target.intensity || '',
+      isFirstBlock: false,
+      sets: target.sets,
+      repRangeLabel: target.reps,
+      forceStartingWeightKg: targetKg,
+    })
+    const patchedEx: Exercise = {
+      ...target,
+      suggested_load: load.display,
+      suggested_load_kg: load.starting_weight_kg,
+      per_set_load: load.per_set,
+      load_guidance: load.basis,
+    }
+    patched = true
+    return {
+      ...week,
+      days: week.days.map(d => (d.day === anchor.dayName
+        ? { ...d, exercises: d.exercises.map((e, i) => (i === anchor.exIndex ? patchedEx : e)) }
+        : d)),
+    }
+  })
+  return { next, patched }
+}
+
 export async function confirmBeatTargetOffer(
   { offerId, mesocycle, profile, profileId }: ConfirmBeatTargetParams,
 ): Promise<MesocycleWeek[] | null> {
@@ -263,40 +342,12 @@ export async function confirmBeatTargetOffer(
   const entry = getExerciseEntry(payload.exerciseName)
   if (!entry) return null
 
-  let patched = false
-  const next = mesocycle.map(week => {
-    if (week.block_number !== payload.blockNumber) return week
-    const day = week.days.find(d => d.day === payload.dayName)
-    const target = day?.exercises[payload.exIndex]
-    if (!day || !target || target.name !== payload.exerciseName) return week
-    // NEVER DOWNWARD. The offer is only ever raised on a weight the person has
-    // already lifted, but a later week of the block can legitimately sit above
-    // it (the phase steps up within a block) and pulling those down would be
-    // this accelerator quietly acting as a brake — the one thing it must not
-    // do, since holding back is block-review's job and its evidence bar.
-    if (target.suggested_load_kg != null && target.suggested_load_kg >= payload.liftedKg) return week
-
-    const load = prescribeLoad(entry, profile, {
-      targetRpeLabel: target.intensity || '',
-      isFirstBlock: false,
-      sets: target.sets,
-      repRangeLabel: target.reps,
-      forceStartingWeightKg: payload.liftedKg,
-    })
-    const patchedEx: Exercise = {
-      ...target,
-      suggested_load: load.display,
-      suggested_load_kg: load.starting_weight_kg,
-      per_set_load: load.per_set,
-      load_guidance: load.basis,
-    }
-    patched = true
-    return {
-      ...week,
-      days: week.days.map(d => (d.day === payload.dayName
-        ? { ...d, exercises: d.exercises.map((e, i) => (i === payload.exIndex ? patchedEx : e)) }
-        : d)),
-    }
+  const { next, patched } = patchBlockFromLiftedKg(mesocycle, profile, {
+    blockNumber: payload.blockNumber,
+    dayName: payload.dayName,
+    exIndex: payload.exIndex,
+    exerciseName: payload.exerciseName,
+    liftedKg: payload.liftedKg,
   })
 
   if (!patched) {

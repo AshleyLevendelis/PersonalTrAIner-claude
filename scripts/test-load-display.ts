@@ -130,10 +130,36 @@ console.log('\n3. The column that ASKS for a number says which number')
   // Display being wrong is a misread. The input being unlabelled is a wrong
   // LOG — and exercise_set_logs carries no unit of its own to catch it.
   const grid = readFileSync(join(ROOT, 'src/components/exercise/SetGrid.tsx'), 'utf8')
+  // Comments stripped: this section asks what the grid does NOT do, and a
+  // note explaining why it must not derive its own unit names every one of
+  // the helpers below.
+  const gridSrc = grid.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
   check('the weight column accepts a unit label', /loadUnitLabel\?: string/.test(grid))
   check('...and shows it when it is not a plain kg', /loadUnitLabel !== 'kg'/.test(grid))
   check('...and does not re-derive it from the exercise name',
-    !/loadingMode\(|isPerSideLoad\(/.test(grid))
+    !/isPerSideLoad\(|labelModeForEntry\(|formatLoad\(|splitLoadDisplay\(/.test(gridSrc)
+    && !/per hand|per leg|single side/i.test(gridSrc))
+  // The grid DOES look up the loading mode — the calibration week's
+  // next-weight chips have to snap to the implement's real plate step. That
+  // is arithmetic, not vocabulary, and the distinction is the whole point of
+  // this section: pin that the mode reaches nothing but the rounding, rather
+  // than banning the lookup outright and having the next legitimate use of it
+  // quietly re-open the label question.
+  const modeVar = /const (\w+) = [^\n]*\bloadingMode\(/.exec(gridSrc)?.[1]
+  if (modeVar) {
+    // Every mention of that variable except the one that binds it, with the
+    // 40 characters in front of it — enough to see which call it is an
+    // argument to, whatever the surrounding expression looks like.
+    const uses = [...gridSrc.matchAll(new RegExp(`.{0,40}\\b${modeVar}\\b`, 'g'))]
+      .map(m => m[0])
+      .filter(u => !/\bconst\s*$/.test(u.slice(0, u.lastIndexOf(modeVar))))
+    check('...and the loading mode it does look up reaches only the plate rounding',
+      uses.length > 0 && uses.every(u => /(roundToPlate|plateStepKg)\([^)]*$/.test(u.slice(0, u.lastIndexOf(modeVar)))),
+      uses)
+  } else {
+    check('...and the loading mode it does look up reaches only the plate rounding',
+      !/\bloadingMode\(/.test(gridSrc), 'loadingMode is called without binding its result')
+  }
 }
 
 // ---------------------------------------------------------------------------

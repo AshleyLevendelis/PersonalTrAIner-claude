@@ -139,17 +139,22 @@ console.log('\n2. The coaching line: the most specific true thing, or nothing')
   // unconnected instruction.
   const loaded = calibrationCueText(true)
   const loadless = calibrationCueText(false)
-  check('the loaded cue names the printed weight as where to START',
-    /start at the weight shown/i.test(loaded), loaded)
+  // 10 Sep 2026, after she trained on it: "start at the weight shown" still
+  // read as a prescription with a contradiction underneath. The loaded cue
+  // now names the printed number as what it is — set 1's PROBE — and says
+  // what to do when the probe is light. Still one instruction, still
+  // relating the number to the effort target rather than issuing a second.
+  check('the loaded cue names the printed weight as set 1\'s probe',
+    /set 1 is a probe/i.test(loaded), loaded)
   check('...rather than sending them off to find one of their own',
     !/work up to a weight/i.test(loaded), loaded)
   check('...and still says where to finish', /3-4 reps in reserve/.test(loaded), loaded)
-  // A blank weight box logs the PRESCRIBED number (SetGrid's defaultWeightFor,
-  // which is Ashley's own ruling and the tour promises it). So a cue that says
-  // "work up" and then "log what you do" is satisfied by a tap that records
-  // 72.5 for a set performed at 100. It has to ask for the number.
-  check('...and asks them to TYPE it, because tapping the tick logs the prescription',
-    /type what you finish on/i.test(loaded), loaded)
+  // The old version asked them to TYPE what they finished on, because a
+  // blank box logged the prescription. In a calibration week that default is
+  // gone for sets 2+ (test:calibration-search), so the cue no longer has to
+  // beg for the number — it says why the number matters instead.
+  check('...and says the heaviest set becomes next week\'s weight, so the typed number is the point',
+    /heaviest set .*becomes next week/i.test(loaded), loaded)
   // One vocabulary. "3-4 more times" and "3-4 reps in reserve" were the same
   // instruction in two costumes, on two branches of one function.
   check('both variants use one effort target, worded one way',
@@ -159,8 +164,11 @@ console.log('\n2. The coaching line: the most specific true thing, or nothing')
   // like week 7 — "suggested" either way — which left the cue alone in saying
   // the number was a seed.
   const chip = read('src/components/exercise/LoadChip.tsx')
-  check('a calibration week labels its number a starting point, not a suggestion',
-    /source === 'estimate' && calibration\) return 'starting point'/.test(chip))
+  // "start here", not "starting point" (10 Sep): the first names the action,
+  // the second names the number, and a number named as a point reads as a
+  // target — which is how a probe got trusted three times.
+  check('a calibration week labels its number "start here", not a suggestion',
+    /source === 'estimate' && calibration\) return 'start here'/.test(chip))
   check('...and only a calibration week does', /if \(source === 'estimate'\) return 'suggested'/.test(chip))
   check('...with an explainer that repeats the cue rather than competing with it',
     /calibration && source === 'estimate'/.test(chip) && /3-4 reps in reserve/.test(chip))
@@ -180,7 +188,9 @@ console.log('\n2. The coaching line: the most specific true thing, or nothing')
   check('...and TodayPanel passes the week to every row',
     /isCalibrationWeek: !!currentMesoWeekObj\?\.isCalibrationWeek/.test(today))
 
-  // The default that made "log what you do" ambiguous is deliberately UNCHANGED.
+  // The default that made "log what you do" ambiguous is UNCHANGED outside a
+  // calibration week. Inside one, sets 2+ have no default at all — that
+  // exception, and the refusal behind it, are test:calibration-search's.
   const setGrid = read('src/components/exercise/SetGrid.tsx')
   // THE SAVE PATH, not merely a mention of the helper. A first version of
   // this check tested for /defaultWeightFor\(setNumber\)/ anywhere in the file
@@ -188,8 +198,11 @@ console.log('\n2. The coaching line: the most specific true thing, or nothing')
   // hundred lines below still named the function. Caught by mutation.
   check('a blank weight still logs the prescribed number, as ruled',
     /input\.weight \|\| \(ghost \? String\(ghost\.weight_kg\) : defaultWeightFor\(setNumber\)\)/.test(setGrid))
+  // The placeholder shows the SAME default the tick would log, where one
+  // exists — routed through one helper so the two cannot drift apart.
   check('...and the box shows that same number, so the tick keeps its promise',
-    /placeholder=\{isBW \? 'BW' : \(ghost \? String\(ghost\.weight_kg\) : defaultWeightFor\(setNumber\)\)\}/.test(setGrid))
+    /placeholder=\{isBW \? 'BW' : \(ghost \? String\(ghost\.weight_kg\) : weightPlaceholderFor\(setNumber\)\)\}/.test(setGrid)
+    && /const d = defaultWeightFor\(setNumber\)\s*\n\s*return d === '' \? '[^']+' : d/.test(setGrid))
 }
 
 // ---------------------------------------------------------------------------

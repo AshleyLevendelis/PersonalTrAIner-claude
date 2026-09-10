@@ -47,9 +47,26 @@ import { CornerDownRight } from 'lucide-react'
  * branch used to say "3-4 more times" while the loadless one said "in
  * reserve", which is the same instruction wearing two costumes.
  */
+/**
+ * REWRITTEN AGAIN, 10 Sep 2026, and the reason is structural rather than a
+ * word choice. The 7 Sep sentence was right and it still lost: "start at the
+ * weight shown, then add" sat above three identical S1/S2/S3 chips and three
+ * pre-filled boxes, and a tick on an untouched box logged the printed number.
+ * Three things on the screen said "hold 72.5" against one sentence saying
+ * "climb". Ashley, having trained on it: the weights were too light and it
+ * was not clear whether to follow the number or add.
+ *
+ * So the sentence now describes a SEARCH, because that is what the week is:
+ * set 1 probes the guess, the next sets climb if it was easy, and the
+ * heaviest honest set is what next week is built on. "Type what you finish
+ * on" is gone because sets 2 and 3 no longer have a default to type over —
+ * SetGrid refuses an empty box in calibration week — so the instruction no
+ * longer has to beg for the number. The last sentence is the whole "enter
+ * your real weights" feature: the box was always editable.
+ */
 export function calibrationCueText(hasLoad: boolean): string {
   return hasLoad
-    ? 'Calibration: start at the weight shown, then add until the last rep leaves 3-4 reps in reserve. Type what you finish on — week 2 builds on it.'
+    ? 'Set 1 is a probe. Too easy — 5 or more reps left? Go up 5-10% for set 2, and again if it\'s still easy. Your heaviest set at 3-4 reps in reserve becomes next week\'s weight. Know your weight already? Start there.'
     : 'Calibration: leave 3-4 reps in reserve. Log what you actually do.'
 }
 

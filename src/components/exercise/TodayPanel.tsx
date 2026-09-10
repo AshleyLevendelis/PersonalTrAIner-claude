@@ -69,6 +69,7 @@ export function TodayPanel({
   onOpenHistory,
   onOpenDetail,
   onOpenSessionHistory,
+  onCalibrationSessionFinished,
 }: {
   plan: WorkoutDay[]
   mesocycle?: MesocycleWeek[]
@@ -93,6 +94,13 @@ export function TodayPanel({
   /** Opens the technique panel — threaded to both ExerciseRow and PeekPanel. */
   onOpenDetail?: (exerciseName: string) => void
   onOpenSessionHistory?: () => void
+  /**
+   * Fired once a session with logged sets has closed. App uses it to write a
+   * calibration week's heaviest set into the printed program (Ashley, 10 Sep
+   * 2026: auto-apply from calibration week only). Fires for every closed
+   * session; the callee decides whether the week was a calibration week.
+   */
+  onCalibrationSessionFinished?: (args: { date: string; dayName: string }) => void
 }) {
   const { date: today, dayName: todayName, liveWeek, startRest, setsFor, logs, status, startSession, finishSession } = useActiveSession()
 
@@ -144,6 +152,7 @@ export function TodayPanel({
       return
     }
     setSummaryNothingLogged(false)
+    onCalibrationSessionFinished?.({ date: today, dayName: workout.day })
     const plannedExercises = workout.exercises.map(ex => ({ id: ex.id, name: ex.name, sets: ex.sets }))
     const summary = computeSessionSummary(logs, plannedExercises, result.startedAtIso, result.finishedAtIso)
     const prs = computeSessionPRs(result.prSnapshotAtStart, logs)

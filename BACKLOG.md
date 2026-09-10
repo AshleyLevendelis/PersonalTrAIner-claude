@@ -2,6 +2,97 @@
 
 Newest first. One line each.
 
+- [x] **CALIBRATION WEEK IS A SEARCH, NOT A PRESCRIPTION** — Ashley, 10 Sep
+  2026, after training on it: *"the weights were too light and the app
+  prescribs weights but also says add weight until you leave 3-4 reps in
+  reserve, but it's not clear if you should follow the prescribed or up the
+  weights... and if the prescribed wegihts are too light this week, next week
+  it may ramp up a bit but it still won't be enough."*
+  **What was actually wrong, measured, because two plausible diagnoses were
+  not:** (1) The 72.5kg was deliberately half the app's own estimate — the
+  calibration multiplier, a floor earned by a first-ever deadlift once landing
+  at 130kg. Nothing on screen said so. (2) **A tick on an untouched box logged
+  the pre-filled guess.** So trusting the screen told the app 72.5 was her
+  working weight, three times. This was the damage. (3) Next week's SESSION
+  already re-anchored to her heaviest logged set — the engine was never the
+  problem, the input was. (4) The PRINTED program did not: "see the whole
+  program" kept the formula's numbers until the accelerator had three sessions
+  to judge, so after an honest session today said 100kg and next week said
+  ~75kg. That is where "it'll take forever" came from. (5) The ramp was drawn
+  after the working-set chips, and the only words saying it came first lived in
+  a hover tooltip a phone never shows.
+  **Decided by Ashley, 10 Sep 2026**, asked whether a calibration week's
+  heaviest set should re-anchor the printed program automatically or be
+  offered like every other week: **apply it automatically, once, from
+  calibration week only**. Options put to her were (a) auto-apply from
+  calibration week and keep offer-first everywhere else — recommended,
+  because the printed number is an admitted guess and the heavier one came
+  from her own fingers answering the question the app asked; (b) offer-first
+  everywhere, consistent with the 1 Sep ruling but one more card to tap before
+  the program view is honest. She chose (a) with "build it". The 1 Sep
+  offer-first rule stands for every week after calibration.
+  **Built:** in a calibration week only — the ramp moves ABOVE the number and
+  says `Ramp up first` / `→ then set 1`; the number is labelled `START HERE`
+  and the three identical per-set chips give way to one line, `Set 1 · probe
+  at ~72.5kg`; the cue is one breath (`Set 1 is a probe. Too easy — 5 or more
+  reps left? Go up 5-10%...`); **set 1 keeps its pre-fill and sets 2+ have no
+  default at all**, so a tick on an empty box is refused rather than writing
+  the guess; once set 1 is logged, three chips offer the next weight off the
+  LAST LOGGED SET; and when a calibration session's heaviest set beats the
+  guess, the rest of that block is rewritten to it and the coach says so.
+  **Two deviations from the approved plan, both because measurement contradicted
+  it.** (1) The plan said the chips read `+5%` / `+10%`. In the browser at
+  27.5kg on a barbell both snap to 30kg — one rung wearing two labels, and a
+  chip reading "+5%" naming a weight that is really +9%. The targets stay 5%
+  and 10%, each is now floored one real plate step above the one before, and
+  the chip says the KILOS it adds, which is true at every weight. (2) The plan
+  did not say what a re-anchored DELOAD should do; left alone it would take the
+  full lifted number and become the heaviest week of its block — the exact
+  "deload heavier than the week before" defect the quality grid counts. The
+  deload now backs off from the new anchor by the same fraction the generator
+  uses, which is named once and shared rather than repeated as `0.7`.
+  **Found by reading a screenshot, not by a check:** the first browser run was
+  green while Scapular Push-Ups — a bodyweight lift in the same session — sat
+  above the bench press with `type it` in its weight column, and its tick would
+  have been refused for want of a weight nobody lifts. The three rules now key
+  on a lift that HAS a guess to replace, the same test the plan re-anchor uses
+  for evidence. Two browser checks and two source checks were added for it.
+  **Verified:** new `test:calibration-search` (56 checks) and
+  `verify:calibration-search` (21 checks in a real Chromium at 390×844 on a
+  dev-clock-pinned Monday), three screenshots read. **32 mutations tried, 32
+  caught** — 24 against the source gates, 5 against the browser driver, 3
+  against re-anchored checks elsewhere. One mutation (M20) was thrown out as a
+  bad test rather than a weak check: it moved the hook within the region that
+  is already safe, so nothing should have failed; re-run properly, it was
+  caught. Full fast sweep: 159 gates, 157 pass. `test:audit` and `test:quality`
+  re-run because load-prescription was touched. `test:meal-quality` and
+  `test:schema-parity` still fail for want of a live database (environmental).
+  **`test:audit` passes: 0 failures across 17,423 combinations.** Note for the
+  next reader — the audit-report.txt COMMITTED here is stale (last written 27
+  Aug and deliberately reverted since: 13,967 combinations, 54 load_cap
+  failures on Cable Lateral Raises and friends). Those do not reproduce. The
+  file is kept frozen by convention, so it was reverted again rather than
+  refreshed; the live numbers are recorded here instead of in it.
+  **Two gates re-anchored, both mine to fix:** `test:beat-target` pinned the
+  patch code to the line it sat on before the calibration week shared it —
+  re-anchored on the property (confirm hands the LOGGED weight to the one
+  helper; the helper rebuilds through prescribeLoad). `test:load-display`
+  banned the grid from looking up an exercise's loading mode at all, to stop it
+  inventing unit labels; the chips legitimately need it for plate arithmetic,
+  so the check now pins that the mode reaches nothing but the rounding.
+  **Corrected while here:** `test:categorize-precedence` had been failing since
+  the leg-curl commit earlier today — its whole-database snapshot is frozen at
+  200 entries and the new Iso-Lateral Kneeling Leg Curl made 201. Snapshot
+  refreshed to 201 with the new name verified against the bucket it was
+  designed for (isolation_hamstring) before being pasted in; no pre-existing
+  name moved. Plan: `docs/plans/calibration-is-a-search.md`.
+  **Not done, named:** the 0.50 calibration multiplier is unchanged — the
+  redesign makes climbing the default, so the floor stops doing damage without
+  being raised. The program view still lags after a NON-calibration week until
+  the accelerator offers, by her 1 Sep ruling. The dumbbell leg curl's 48kg
+  between-the-feet ceiling is still open and still hers.
+  Frontend only — no function deploy, no migration.
+
 - [x] **THE RAMP-UP TICKS WERE INVISIBLE, SO SHE REPORTED THE SAME BUG TWICE**
   — Ashley, 10 Sep 2026, mid-session on Deadlifts: *"theres no way to log the
   ramp up weights."* **The identical sentence she sent on 7 Sep 2026**, which

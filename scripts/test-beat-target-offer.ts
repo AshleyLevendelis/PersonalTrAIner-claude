@@ -134,8 +134,16 @@ console.log('\n5. The half that needs a database is wired to the half that does 
   // this app telling the coach 7.5kg for a lift prescribed at 8kg; the fix
   // was to stop having a second way to write a weight, and this must not add
   // one back. prescribeLoad returns number, string and per-set together.
-  check('confirm rebuilds the load through prescribeLoad, never field by field',
-    /prescribeLoad\(/.test(src) && /forceStartingWeightKg: payload\.liftedKg/.test(src))
+  // ONE PATCH PATH. The rewrite itself lives in patchBlockFromLiftedKg, shared
+  // since 10 Sep 2026 with the calibration-week re-anchor — so this pins that
+  // confirm hands the LOGGED weight to that one helper and that the helper
+  // rebuilds through prescribeLoad, rather than pinning the line the code
+  // happened to sit on before the two callers existed.
+  check('confirm hands the logged weight to the one patch helper',
+    /patchBlockFromLiftedKg\(mesocycle, profile, \{/.test(src) && /liftedKg: payload\.liftedKg/.test(src))
+  check('...which rebuilds the load through prescribeLoad, never field by field',
+    /prescribeLoad\(/.test(src) && /forceStartingWeightKg: targetKg/.test(src)
+    && /const targetKg = [^\n]*anchor\.liftedKg/.test(src))
   check('...and all three load fields are written from that one result',
     /suggested_load: load\.display/.test(src)
     && /suggested_load_kg: load\.starting_weight_kg/.test(src)

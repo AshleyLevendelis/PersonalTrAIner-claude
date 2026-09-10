@@ -118,6 +118,12 @@ console.log('\n3. TRAPDOOR: no other exercise in the database moved')
   // the catalogue reaching its implement ceiling for an ordinary body. The
   // two bodyweight single-leg calf entries stay put: the match is unilateral
   // AND hand-held, and they hold nothing.
+  //
+  // UPDATED 10 Sep 2026: ONE name added, on purpose — Iso-Lateral Kneeling
+  // Leg Curl, the per-leg machine Ashley actually uses (200 -> 201 entries).
+  // Verified against the bucket it was DESIGNED for before being pasted in:
+  // isolation_hamstring, alongside the five other leg curls. No pre-existing
+  // name moved.
   const AT_THE_FIX: Record<string, string[]> = {
     bench: ["Archer Push-Ups","Barbell Bench Press","Barbell Floor Press","Chest Dips","Chest Press Machine","Deficit Push-Ups","Dumbbell Bench Press","Dumbbell Floor Press","Incline Dumbbell Press","Incline Machine Press","Incline Push-Ups","Knee Push-Ups","Neutral-Grip Dumbbell Press","Push-Ups","Smith Machine Bench Press","Wide Push-Ups"],
     carry: ["Farmer Squat Hold (Isometric Carry)","Farmer's Walk","Loaded Backpack Walk","Suitcase Carry","Trap Bar Carry"],
@@ -128,7 +134,7 @@ console.log('\n3. TRAPDOOR: no other exercise in the database moved')
     isolation_calf: ["Bent-Knee Calf Raise (Bodyweight)","Calf Raises","Calf Raises (Bodyweight)","Seated Calf Raises","Single-Leg Calf Raise (Bodyweight)","Single-Leg Calf Raise Hold"],
     single_leg_calf: ["Single-Leg Dumbbell Calf Raise"],
     isolation_chest: ["Cable Crossover","Cable Flyes","Dumbbell Flyes","Pec Deck Machine"],
-    isolation_hamstring: ["Bodyweight Hip Hinge to Wall","Cable Pull-Through","Dumbbell Leg Curl","Glute Kickback Machine","Hip Abduction Machine","Hip Adduction Machine","Lying Leg Curl","Nordic Hamstring Curl","Prone Hamstring Curl (Bodyweight)","Seated Band Leg Curl","Seated Leg Curl","Single-Leg Sliding Leg Curl","Sliding Leg Curl"],
+    isolation_hamstring: ["Bodyweight Hip Hinge to Wall","Cable Pull-Through","Dumbbell Leg Curl","Glute Kickback Machine","Hip Abduction Machine","Hip Adduction Machine","Iso-Lateral Kneeling Leg Curl","Lying Leg Curl","Nordic Hamstring Curl","Prone Hamstring Curl (Bodyweight)","Seated Band Leg Curl","Seated Leg Curl","Single-Leg Sliding Leg Curl","Sliding Leg Curl"],
     isolation_lat: ["Dumbbell Pullover","Scapular Pull-Ups","Single-Arm Band Pulldown","Straight-Arm Pulldown"],
     isolation_quad: ["Banded Terminal Knee Extension","Chair Leg Extension","Leg Extensions","Reverse Nordic Curl","Seated Short-Arc Quad Set","Sissy Squat","Wall Sit","Wall Sit March"],
     isolation_rear_delt: ["Face Pulls","Rear Delt Flyes","Reverse Pec Deck"],

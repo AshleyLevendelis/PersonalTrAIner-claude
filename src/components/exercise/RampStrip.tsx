@@ -60,7 +60,13 @@ export function RampStrip({
         : "Ramp-up sets — build to your working weight before the sets below. These don't count toward working volume."}
     >
       <Thermometer className="size-2.5 text-[color:var(--role-warn)] shrink-0" />
-      <span className="ds-label-compact text-[color:var(--role-warn-text)]">Ramp:</span>
+      {/* "Ramp up first", not "Ramp": the order is the instruction. Until
+          10 Sep 2026 the only words saying this came before the working sets
+          lived in a title attribute, which a phone never shows, and the block
+          was drawn BELOW the working-set chips — so it read as something to
+          do afterwards (Ashley: "do you do the prescribed weights and then
+          ramp up or start ramp up from the start"). */}
+      <span className="ds-label-compact text-[color:var(--role-warn-text)]">Ramp up first:</span>
       {ramp.sets.map((s, i) => {
         const text = label(s)
         const done = isTicked(s.setNumber)
@@ -103,6 +109,9 @@ export function RampStrip({
       })}
       {ramp.kind === 'bodyweight' && (
         <span className="text-[0.5625rem] italic text-muted-foreground/60">→ bodyweight</span>
+      )}
+      {interactive && ramp.kind === 'kg' && (
+        <span className="text-[0.5625rem] italic text-[color:var(--role-warn-text)]/70">→ then set 1</span>
       )}
     </div>
   )
