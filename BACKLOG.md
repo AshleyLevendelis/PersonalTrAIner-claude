@@ -73,6 +73,16 @@ Newest first. One line each.
   failures on Cable Lateral Raises and friends). Those do not reproduce. The
   file is kept frozen by convention, so it was reverted again rather than
   refreshed; the live numbers are recorded here instead of in it.
+  **`test:quality` passes: 11.56/12 average across 9,216 profiles, 0 below the
+  7.2 floor.** The committed quality-report.txt is stale in the same way
+  (11.04/12, and an older report format), and was reverted rather than
+  refreshed for the same reason. That 11.04 -> 11.56 gap is NOT this change:
+  today's two load-prescription edits are value-identical refactors — the
+  deload's 0.7 became a named constant equal to 0.7, and the plate-step
+  literals became a table holding the same 2kg and 2.5kg — so nothing this
+  work does can move a generated plan. The gap belongs to work committed
+  between that snapshot and now. Proven by construction, not by a second
+  22-minute run on stashed code.
   **Two gates re-anchored, both mine to fix:** `test:beat-target` pinned the
   patch code to the line it sat on before the calibration week shared it —
   re-anchored on the property (confirm hands the LOGGED weight to the one
