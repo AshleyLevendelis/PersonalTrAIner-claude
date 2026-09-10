@@ -2,6 +2,57 @@
 
 Newest first. One line each.
 
+- [x] **THE MUST-HAVE CONTRACT IS IN CLAUDE.md, AND IT HAS BEEN MEASURED.**
+  Ashley, 10 Sep 2026: *"help me plan updating claude.md to be very clear
+  about what the app must have"*, then *"are we covering everything though?
+  ... we create best in class, professional meal and exercise plans which
+  can be adjusted to fit the user's needs while still aiming to keep the
+  quality. everything that can be done within the app is able to be done by
+  the user or by asking the ai chat. also the ai chat acts as a professional
+  personal trainer who gives best in class health, nutrition and fitness
+  advice."* Then: *"put it in claude.md, then do the audit."*
+  **Decided by Ashley:** the contract lives INSIDE CLAUDE.md (option A — the
+  only file every session reads unprompted), not in a linked file (B) or an
+  expansion of VISION.md (C). Draft 1 was rewritten after she pointed out it
+  covered the mechanics of her three promises and the substance of half of
+  one: meals had three bullets where exercise had a grain-by-grain anatomy;
+  "keep the quality while adjusting" was never a rule; the coach section said
+  how it behaves and nothing about how good its advice is.
+  **Built (as text, nothing else):** a new section near the top of CLAUDE.md —
+  her three promises verbatim, then one line per capability ending in the
+  gates that would fail if it went away, or `UNGUARDED` / `MISSING` /
+  `coach only` / `screen only` — plus seven rules that make it bite (a grain
+  is whole or named as not; nothing is "had" without a check; adjustment keeps
+  the bar; parity both ways; advice examined not assumed; a lead not a fact;
+  removal is hers).
+  **Audited — every mark measured, report only, in
+  `docs/audits/must-have-audit-2026-09-10.md`:** 185 gate headers mapped onto
+  the lines; existence checked capability by capability in code; the coach's
+  31 tools and the Profile's 23 editable fields tabulated against each other.
+  **Headline numbers:** 14 things MISSING on both surfaces; 7 the coach can do
+  that the screen cannot (move a session, rest day, swap for an activity, log
+  a past session, add a food, add a meal, custom meal); 7 the screen can do
+  that the coach cannot (New Plan, session length, targets/macros, meals per
+  day, cuisines/cooking time, step target, age/height); 8 onboarding answers
+  with no way to change them afterwards from the Profile screen (three known
+  lifts, exercise dislikes, three implement ceilings, starting preference);
+  5 properties UNGUARDED, two of which are the load-bearing ones — a single
+  swap or the volume toggle re-runs none of the balance / coherence /
+  hierarchy passes generation runs, and nothing anywhere grades the coach's
+  advice. What is solidly held: generation (two whole-grid harnesses), load
+  safety (six gates), logging, the coach's mechanics (eleven gates), history.
+  **Two corrections to my own drafts, recorded in the audit:** "add a food"
+  was better than I had marked (coach only, gated, not partial); activity
+  plans exist for exactly one case (the walking plan) and only that case is
+  offered.
+  **Not measured:** parity entries were confirmed in code, not tapped; no
+  existing gate was re-mutated; the quality of the coach's advice was not
+  measured because nothing in the repo can — that is finding 14.
+  **Next, all hers:** read the MISSING list and decide what becomes work.
+  Each is a product decision and gets its own plan before any build. The
+  two largest are the coach exam and re-scoring an adjusted plan — the
+  difference between claiming best-in-class and knowing it.
+
 - [x] **CALIBRATION WEEK IS A SEARCH, NOT A PRESCRIPTION** — Ashley, 10 Sep
   2026, after training on it: *"the weights were too light and the app
   prescribs weights but also says add weight until you leave 3-4 reps in

@@ -6,6 +6,195 @@ These apply to every session in this repo. They exist so they stop being restate
 
 - Full product vision, standards, and shipping bar: see [VISION.md](VISION.md). Safety-adjacent and architecture-level decisions should be checked against it.
 
+## What the app must have
+
+Ashley, 10 Sep 2026: *"we create best in class, professional meal and
+exercise plans which can be adjusted to fit the user's needs while still
+aiming to keep the quality. everything that can be done within the app is
+able to be done by the user or by asking the ai chat. also the ai chat acts
+as a professional personal trainer who gives best in class health, nutrition
+and fitness advice."* Three promises. Every line below hangs off one, and
+every line ends with how we KNOW: the gates that would fail if it went
+away, or an honest tag. `UNGUARDED` = exists, no check would notice it
+break. `MISSING` = does not exist. `coach only` / `screen only` = exists on
+one surface, not the other. Marks were MEASURED on 10 Sep 2026 — see
+`docs/audits/must-have-audit-2026-09-10.md` for how — and are leads, not
+facts: re-measure before acting on one, correct it here when it is wrong.
+
+### Promise 1 — best-in-class plans that stay that way when changed
+
+**The exercise plan, as generated**
+- Tailored to this person — goal, experience, equipment, injuries, days,
+  session length, style, recovery, other sports; never a template — `quality`
+  (9,216 profiles), `audit` (17,423), `injury-coverage`, `equipment-labels`,
+  `concurrent-activity`, `enforcement-gaps`
+- Blocks and phases; a calibration week when weights are unknown; a deload
+  lighter than the week before — `block-phases`, `frozen-weeks`,
+  `calibration-search`, `starting-out`
+- Every loaded lift has a weight, in its implement's unit, under a ceiling
+  that warns before it clamps — `load-ceilings`, `load-ceiling-units`,
+  `per-side-load`, `single-implement`, `load-display`, `loadless-notes`
+- The time cap is kept, and a shortfall says why — `session-length`,
+  `session-shortfall`, `cardio-share-score`, `main-lift-rest`
+- Chosen, not shuffled, with reasons on screen ("Why this exercise / weight")
+  — screen exists; ranking-over-shuffling itself `UNGUARDED`
+- No plan below the quality floor — `quality` (floor 7.2/12; 0 below)
+- Activity-shaped plans: only the starting-out walking plan exists, and only
+  it is offered — `starting-out`
+
+**The meal plan, as generated — the same bar, in its own terms**
+- Targets from the profile, moved by a seven-day weight average, explained
+  when they move, with an endpoint to a deficit — `fat-loss-deficit`,
+  `macro-split`; "explained" `UNGUARDED`
+- Meals hit targets from real foods, varied, dislikes honoured, allergens
+  filtered with stated limits — `food-dislike-is-a-ban`, `food-db-parity`,
+  `diet-tag-sync`, `meal-swap-rotation`, `meal-addition`, `meal-food-add`
+- Grocery list follows the meals — `grocery`
+- A measured floor for meals — `meal-quality` exists but needs a live
+  database, so it NEVER runs in a cloud sweep: `UNGUARDED` in practice
+
+**Changing one exercise** — every operation, from the screen AND the coach
+- Replace it, today or for the block; alternatives real, on other
+  equipment; a loaded lift never replaced by an unloaded one by default —
+  both surfaces; `swap-target`, `slot-replacement-hygiene`,
+  `single-implement`, `verify:swap-request`
+- Ban it from every future plan — both; `audit-fixes`, `silent-writes`
+- Add one to a session AS PART OF THE PLAN — `MISSING` (extra work can be
+  logged; it does not join the plan)
+- Remove it from one session without banning it — `MISSING`
+- Move it earlier or later within the session — `MISSING`
+- Change its sets, reps or weight for today — via logging only (extra sets,
+  typed numbers); the plan itself is not edited
+
+**Changing one workout**
+- Move it to another day; it leaves today on every screen — `coach only`;
+  `session-move`, `moved-session-stuck`, `verify:session-move`,
+  `verify:moved-session`
+- Say "I missed it" and have that recorded as fact — `MISSING` (missed is
+  inferred once the date passes; Home offers a chat prefill)
+- Say "I did it, not in the app" — `coach only` (`log_history`)
+- Make today a rest day — `coach only`; `verify:rest-day-race`
+- Swap the session for an activity — `coach only`; screen shows it
+  (`verify:swapped-day`) but cannot do it
+- Shorten or lighten TODAY only — `MISSING` (the volume toggle changes the
+  plan going forward: `coach-volume-schedule`)
+- Rebuild today's session as a whole, for today — `MISSING`
+
+**Changing one meal** — mirrored from exercise, because meals are plans too
+- Replace it, regenerate it, ask for more — both; `meal-swap-rotation`
+- Add a food to it; add a meal to the day — `coach only`; `meal-food-add`,
+  `meal-addition`
+- Remove or replace one food within it — `MISSING`
+- Build a custom meal from what is in the fridge — `coach only`; `custom-meal`
+- Log what was eaten — both; `meal-log`, `meal-ledger-snapshot`,
+  `diary-preservation`
+- Move a meal to another slot or day — `MISSING`; meals per day and snacks —
+  `screen only` (Profile)
+- Scale a portion — `MISSING` as a user action
+
+**Changing the whole plan**
+- Start again — `screen only` (New Plan; `reset-clears-draft`)
+- Days, equipment, injuries (add / lasting / recovered), goal, style,
+  volume, other sports — both surfaces, proposed and confirmed —
+  `rebuild-offer`, `profile-restore`, `coach-volume-schedule`,
+  `injury-rebuild`, `enforcement-gaps`, `concurrent-activity`
+- Session length — `screen only`; targets and macro mode — `screen only`
+- Eight onboarding answers cannot be changed afterwards from the Profile
+  screen: the three known lifts, exercise dislikes, the three implement
+  ceilings, the starting preference — `MISSING` on screen
+- Weights actually lifted flow into the printed plan — automatic from
+  calibration week, offered after — `calibration-search`,
+  `beat-target-offer`, `logged-reanchor`
+- Nothing recorded is lost by any of this — `diary-preservation`,
+  `replace-without-losing`, `memory`
+
+**Adjustable AND best-in-class is one promise, not two**
+- An adjustment keeps the plan above the floor generation had to meet —
+  full rebuilds regenerate, so their checks run; a single swap and the
+  volume toggle patch in place and re-run NONE of the balance, coherence or
+  hierarchy passes: `UNGUARDED`
+- When a request would break the bar, the app says so and offers the
+  nearest thing that keeps it — `MISSING`
+- A changed plan is re-scored like a generated one — `MISSING`
+
+### Promise 2 — everything by hand or by asking
+
+- Every screen action has a coach path and every coach tool a screen path —
+  measured 10 Sep 2026: 31 coach tools; 7 things the screen does that the
+  coach cannot, 7 the coach does that the screen cannot (table in the
+  audit) — partial
+- A written exceptions list, each with a reason, Ashley's to change —
+  `MISSING`
+- The coach acts; it never sends anyone to a control, never describes one
+  that does not exist — `chat-app-reality`, `coach-promises`,
+  `says-what-it-contains`
+- It proposes and the user confirms; nothing changes silently —
+  `pending-actions`, `proposal-expiry`, `chat-actions`
+- A change made either way shows everywhere — `stale-after-write`,
+  `one-day-one-look`, `one-today`, `tab-ownership`, `home-week-strip`,
+  `verify:swapped-day`, `verify:moved-session`
+
+### Promise 3 — the coach is a professional
+
+- It advises from THIS person — plan, today, logs, injuries, goals, targets,
+  meals — and never contradicts the app's numbers — `coach-plan-context`,
+  `coach-sees-ingredients`, `coach-sees-technique`, `coach-volume-schedule`,
+  `coach-phase-brief`, `context-is-read`, `week-load-consistency`
+- Accurate, current, specific advice at the level a qualified trainer and
+  nutritionist would sign — `UNGUARDED`: tone probes exist, no graded check
+- It asks before prescribing and uses the answer — prompt rule, kept in sync
+  by `coach-rules-sync`; whether it HAPPENS is `UNGUARDED`
+- It notices patterns and coaches to them — `block-review`,
+  `beat-target-offer`, `session-feel`, `coach-opener` (missed yesterday),
+  `coach-nudge`, `activity-streak`; a missed WEEK gets a chat prefill, not a
+  follow-up
+- It holds its scope — doctor, physio, dietitian at the right moment —
+  `starting-out` for the first-timer note; otherwise `UNGUARDED`
+- One voice, every time — tone probes only; `UNGUARDED`
+- Never claims a capability, screen or guarantee it lacks; proposes,
+  confirms, can be undone — `coach-promises`, `chat-app-reality`,
+  `pending-actions`, `log-correction`, `replace-without-losing`,
+  `question-not-a-card`, `tool-reply`, `message-evidence`
+- **The coach exam** — a fixed set of realistic conversations graded against
+  a written rubric, run against the real model whenever the prompt, model or
+  tools change, scores kept — `MISSING`. Without it, "best-in-class advice"
+  is asserted, not known.
+
+### Across all three
+- Onboarding asks each question once; every answer can be changed later —
+  `onboarding-corrections`, `profile-restore`; eight answers cannot (above)
+- Progress is visible — history, PRs, weight trend, streak —
+  `exercise-history`, `dashboard`, `activity-streak`, `home-week-strip`
+- Accountability is active — the coach opens, asks how it went, follows up
+  — `coach-opener`, `coach-nudge`, `session-feel`, `verify:coach-speaks-first`
+- History is permanent — `diary-preservation`, `replace-without-losing`
+- Every write succeeds or says it did not — `silent-writes`,
+  `queue-listeners`, `stale-after-write`
+- Nothing is offered that is not built — `equipment-labels`,
+  `says-what-it-contains`, `injury-coverage`, `enforcement-gaps`
+- Safety ships correct or not at all — `injury-adaptation-safety`,
+  `joint-tag-states`, `rehab-prescribed`, `food-db-parity`, `diet-tag-sync`,
+  `load-ceilings`, `set-plausibility`, `lift-plausibility`, `starting-out`
+- Works one-handed on a phone on a gym floor — `verify:tap-targets`,
+  `verify:chat-shell`, `composer-focus`, `session-continuity`,
+  `installable`, `a11y`, `verify:walk`
+
+### The rules that make the list bite
+1. **A grain is whole or it is named as not.** A feature touching an
+   exercise, a workout, a meal or the plan supports every operation listed
+   for that grain, or the report says which it does not and why.
+2. **A line is not "had" until a check proves it.** Anything without one is
+   `UNGUARDED` and stays so until a check exists — never quietly upgraded.
+3. **Adjustment keeps the bar.** A change path that skips the checks
+   generation runs is a defect, not a shortcut.
+4. **Parity is checked both ways**, against the written exceptions list once
+   it exists — and until it exists, every one-sided capability is a gap.
+5. **Advice quality is examined, not assumed.** The coach exam, once built,
+   runs whenever the prompt, the model or the tools change.
+6. **The list is a lead, not a fact.** When a line is wrong, correct it here
+   and say so in BACKLOG.
+7. **Adding a line is cheap; removing one is Ashley's decision, recorded.**
+
 ## Instruction handling
 
 - "Report only", "investigate", "propose", "don't build" mean exactly that. Wait for an explicit "build it". An acknowledgement, a thumbs-up, or encouraging prose around a prompt is NOT approval.
