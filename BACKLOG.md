@@ -2,6 +2,31 @@
 
 Newest first. One line each.
 
+- [ ] **PLANNED, NOT BUILT: "WHAT HAPPENED TO TODAY'S SESSION" — the five
+  verbs on the screen too.** First item Ashley picked from the must-have
+  audit's MISSING list, 10 Sep 2026. Measured: move / rest day / something
+  else instead / did it elsewhere exist as coach tools only; "missed" exists
+  nowhere — inferred once the date passes, and the coach's only offer for a
+  missed day ("call yesterday a rest day") writes `deliberate_rest`, quietly
+  rewriting a skipped session as a chosen one. Plan:
+  `docs/plans/what-happened-to-todays-session.md` — one "What happened?" sheet
+  on the Exercise tab's day menu, every verb writing through the same function
+  the coach's confirm card calls (`setSessionMove`, `setDeliberateRest`,
+  `writeHistoricalSession`, plus one new client write for the activity swap,
+  which today only the server makes); "missed" becomes a real column,
+  `workout_sessions.marked_missed` (a migration — needs her word); the coach
+  gets `record_missed_session` and its opener chips offer "Mark it missed" and
+  "Call it a rest day", not rest alone. Home's strip stays a record; feel stays
+  in chat; nothing edits the plan.
+  **Decided by Ashley, 10 Sep 2026:** a marked-missed day STAYS missed on the
+  record, with the offer to move the session to a free day (option A —
+  recommended), over (B) treating missed and rest as the same thing, or (C)
+  having the coach ask why before it counts. Reason she was given: an honest
+  record, the work still owed if she wants it, and pattern-spotting built on
+  a record that does not flatter.
+  **Costs when built:** one migration, one `chat-gemini` deploy, frontend on
+  merge. **Not started.**
+
 - [x] **THE MUST-HAVE CONTRACT IS IN CLAUDE.md, AND IT HAS BEEN MEASURED.**
   Ashley, 10 Sep 2026: *"help me plan updating claude.md to be very clear
   about what the app must have"*, then *"are we covering everything though?

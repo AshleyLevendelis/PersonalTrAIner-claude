@@ -1,6 +1,6 @@
 # What happened to today's session
 
-**Status: plan for Ashley, 10 Sep 2026. Report only. Nothing built.**
+**Status: plan approved in shape, 10 Sep 2026 — the one behaviour question is answered below. Report only. Nothing built; waiting on "build it", and on her word for the migration.**
 Picked by her from the must-have audit's MISSING list as the first piece to
 plan: *"What happened to today's session (Recommended)"*.
 
@@ -111,25 +111,19 @@ Exercise tab agree.
 - Nothing here edits the plan. Adding, removing or reordering exercises is
   the next item on the list, not this one.
 
-## The question that is hers
+## The question that was hers — answered
 
-**When someone says "I missed it", what should the week show?**
+**When someone says "I missed it", what should the week show?** Put to
+Ashley 10 Sep 2026 with three options: (A) it shows as missed and stays
+missed, with the offer to move the session to a free day; (B) missing it and
+choosing rest are the same thing — today's behaviour plus a screen path;
+(C) missed, but the coach asks why before it counts.
 
-- **A. It shows as missed, and stays missed, with the offer to move the
-  session to a free day (recommended).** Honest record; the plan keeps
-  owing the work if she wants it; the coach can coach to a real pattern
-  ("that's the third Friday"). Costs one more tap for someone who would
-  rather not see it.
-- **B. Missing it and choosing rest are the same thing** — keep today's
-  behaviour, add only the screen path. Simplest, but it means the app can
-  never tell a skipped week from a planned recovery week, and the coach's
-  pattern-noticing (Promise 3) is built on a record that lies.
-- **C. Missed, but the coach asks why before it counts.** Warmest, and the
-  most taps between a person and a fact they already know. Feel stays in
-  chat under the existing ruling; this would pull it back into a flow.
-
-Recommendation: A. It is what `useTrainingWeek` already believes and what the
-must-have contract's "history is permanent" line needs.
+**Ashley chose A**, the recommendation: an honest record, the plan still owing
+the work if she wants it, and the coach able to coach to a real pattern. So
+`marked_missed` is its own fact, never folded into `deliberate_rest`; the
+sheet offers the move after recording it; and the coach's opener and nudge
+stop offering rest as the only alternative to training.
 
 ## The guarantee
 
