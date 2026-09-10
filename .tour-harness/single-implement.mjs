@@ -205,6 +205,24 @@ check('7. ...while a one-sided lift still says so, so the column is genuinely wi
   Array.isArray(perSide) && perSide.some(h => /single side|per side/i.test(h)), perSide)
 await shoot('single-implement-logging')
 
+// --- THE SWAP DIALOG: NOT VERIFIED HERE, AND SAYING SO ---------------------
+// The ORDER of the swap list — no unloaded option offered above a loaded one —
+// is pinned in scripts/test-single-implement.ts §7 across the WHOLE catalogue,
+// which is a stronger guarantee than any single dialog could give. What is NOT
+// verified in a browser is the dialog itself rendering that order.
+//
+// Four attempts, each of which "passed" while proving something else: an
+// ancestor walk from an exercise name reaches a container holding every row,
+// so querySelectorAll returned the FIRST row's swap button and the dialog
+// opened for Clamshell, then the calf raise, then the squats — each time
+// under a check that claimed it had opened for the lift asked for. Selecting
+// by document order then found no button at all, because the row had not
+// expanded. Each fix moved the failure rather than removing it.
+//
+// Leaving it out and naming it beats a check that reports a tick for whichever
+// exercise happened to be open. If the dialog's ordering needs a live check,
+// it needs a data-testid on the row's swap control, not a cleverer selector.
+
 const err = await ev('window.__err ?? null')
 check('no uncaught error on the page', err === null, err)
 

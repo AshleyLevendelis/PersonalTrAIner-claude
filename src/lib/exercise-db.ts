@@ -1924,6 +1924,36 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   // Swap-depth fix: Lying Leg Curl (machine) had zero swap options at all --
   // a busy leg-curl station left nothing. These two give it a loaded,
   // off-machine alternative.
+  // ASHLEY, 10 SEP 2026, mid-session: she went to swap the dumbbell leg curl
+  // for the iso-lateral kneeling machine and it was not in the app. Six leg
+  // curls existed and not one of them was a PER-LEG machine — the shape she
+  // actually trains. Asked which movement she does, she chose "machine, one
+  // leg at a time".
+  //
+  // unilateral + 'machine' (which is in STACK_MACHINE_EQUIPMENT) is what makes
+  // isPerSideLoad true, so the estimate is halved and captioned per leg — the
+  // right arithmetic when one leg works at a time. Lying Leg Curl prescribes
+  // ~27.5kg for both legs, so this lands near ~14kg for one.
+  {
+    name: 'Iso-Lateral Kneeling Leg Curl',
+    id: 'iso-lateral-kneeling-leg-curl',
+    movement_pattern: 'isolation_hamstring',
+    mechanics_tier: 'tier3_isolation',
+    prescription_type: 'reps',
+    angle_vector: 'horizontal',
+    primary_muscles: ['hamstrings'],
+    equipment: ['machine'],
+    joint_stress: 'low',
+    form_cues: ['Kneel on the pad, hips against the support', 'Curl one heel toward your glute', 'Squeeze at the top', 'Lower under control, then swap legs'],
+    coach_note_swap: 'One leg at a time, so the weaker side cannot hide behind the stronger one.',
+    loads_joints: ['knee'],
+    contraindicated_joints: [],
+    indicated_joints: ['knee'],
+    style_tags: ['bodybuilding', 'hybrid'],
+    substitution_group: 'leg_curl',
+    unilateral: true,
+    avg_duration_seconds: 34,
+  },
   {
     name: 'Seated Leg Curl',
     id: 'seated-leg-curl',

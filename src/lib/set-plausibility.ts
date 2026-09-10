@@ -96,6 +96,7 @@ export type SetWeightVerdict =
  */
 const UNIT_SUFFIX: Record<LoadLabelMode, string> = {
   per_hand: ' per hand',
+  per_leg: ' per leg',
   single_side: ' per side',
   total: '',
 }

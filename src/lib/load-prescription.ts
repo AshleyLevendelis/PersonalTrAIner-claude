@@ -1160,11 +1160,28 @@ export function isPerSideLoad(entry: ExerciseEntry): boolean {
   return entry.equipment.some(e => STACK_MACHINE_EQUIPMENT.has(e))
 }
 
-export type LoadLabelMode = 'per_hand' | 'single_side' | 'total'
+export type LoadLabelMode = 'per_hand' | 'per_leg' | 'single_side' | 'total'
 
-export function loadLabelMode(isDumbbell: boolean, isSingleSide: boolean): LoadLabelMode {
+/**
+ * A per-side movement worked by the LEGS says "per leg". Ashley, 10 Sep 2026,
+ * on a leg curl captioned per hand: *"it says per hand even though it's per
+ * leg."* "(single side)" is not wrong, but it is the language of an arm — she
+ * reads the caption to decide what to load, and a caption she has to translate
+ * is a caption doing half its job.
+ *
+ * Read from the muscles the movement trains rather than a new flag on every
+ * entry: an exercise already declares what it works, and a second field saying
+ * the same thing is a second field to get out of step.
+ */
+const LOWER_BODY_MUSCLES = new Set(['hamstrings', 'quads', 'quadriceps', 'glutes', 'calves', 'adductors', 'abductors', 'hip flexors'])
+
+export function isLowerBodyMovement(entry: ExerciseEntry): boolean {
+  return (entry.primary_muscles ?? []).some(m => LOWER_BODY_MUSCLES.has(m.toLowerCase()))
+}
+
+export function loadLabelMode(isDumbbell: boolean, isSingleSide: boolean, isLowerBody = false): LoadLabelMode {
   if (isDumbbell) return 'per_hand'
-  if (isSingleSide) return 'single_side'
+  if (isSingleSide) return isLowerBody ? 'per_leg' : 'single_side'
   return 'total'
 }
 
@@ -1179,12 +1196,13 @@ export function loadLabelMode(isDumbbell: boolean, isSingleSide: boolean): LoadL
  */
 export function labelModeForEntry(entry: ExerciseEntry): LoadLabelMode {
   const mode = loadingMode(entry)
-  return loadLabelMode(mode === 'dumbbell', isPerSideLoad(entry) && mode !== 'dumbbell')
+  return loadLabelMode(mode === 'dumbbell', isPerSideLoad(entry) && mode !== 'dumbbell', isLowerBodyMovement(entry))
 }
 
 export function formatLoad(kg: number, labelMode: LoadLabelMode): string {
   switch (labelMode) {
     case 'per_hand': return `~${kg}kg per hand`
+    case 'per_leg': return `~${kg}kg per leg`
     case 'single_side': return `~${kg}kg (single side)`
     case 'total': return `~${kg}kg`
   }

@@ -2,6 +2,72 @@
 
 Newest first. One line each.
 
+- [x] **THE LEG CURL SHE ACTUALLY DOES** — Ashley, 10 Sep 2026, mid-session
+  from the gym floor, four observations on one exercise: the **Iso-Lateral
+  Kneeling Leg Curl** she wanted was not offered as a swap; the card said
+  **"26 kg per hand"** on a movement she does **per leg**; *"24kg per leg is
+  very heavy considering this is calibration week"*; and **the swap she took
+  came back with no prescribed weight at all**.
+  **Asked which movement she actually performs** — offered machine-one-leg,
+  machine-both-legs, or one dumbbell between the feet — she chose **"Machine,
+  one leg at a time"**. The app had been prescribing, labelling and offering
+  alternatives for a movement she does not do.
+  **MEASURED, and two of the four had the same cause.**
+  `getReplacementCandidates('Dumbbell Leg Curl', full_gym)` returned, in order:
+  Sliding Leg Curl (bodyweight), Single-Leg Sliding (bodyweight), Seated Band
+  (band), Lying Leg Curl (machine), Seated Leg Curl (machine). The machines
+  WERE there — fourth and fifth. At a full gym she scrolled past three options
+  that carry no weight to reach one that does, and whichever of the top three
+  she took returned `Bodyweight / kg = null` **correctly** — there was nothing
+  to prescribe. Not a null bug: a ranking that let a loaded lift be replaced by
+  an unloaded one by default.
+  **Built.** (1) `Iso-Lateral Kneeling Leg Curl` added — machine, unilateral,
+  in the `leg_curl` group; `'machine'` is in `STACK_MACHINE_EQUIPMENT`, so a
+  unilateral entry is halved and captioned per side: **~12.5kg per leg**
+  against the two-leg machine's ~27.5kg. (2) A **`per_leg` label mode**, chosen
+  when a per-side entry's primary muscles are lower-body — "(single side)" is
+  the language of an arm, and she reads the caption to decide what to load. The
+  number does not change, only the words. (3) In `getReplacementCandidates`, a
+  stable partition sinking unloaded candidates below loaded ones **when the
+  outgoing exercise is itself loaded** — never a filter, because a busy machine
+  is exactly when someone wants the slider, just not above the machine. Her
+  list is now Lying / Iso-Lateral / Seated, then the three unloaded.
+  **A CORRECTION I OWE HER.** I told her "yours is unchanged at 24kg, nowhere
+  near any cap". That was measured on a stand-in 70kg intermediate I invented,
+  not her plan. Her card reads 26kg per hand = 52kg of dumbbell; with the
+  single-implement fix merged it reads **~48kg** (the ceiling), not 24kg. I
+  quoted a number from a profile I made up and called it hers. The label fix is
+  right and does nothing whatever for the weight.
+  **Verified.** `test:single-implement` extended to 35 checks. §7's ordering
+  rule is pinned over the WHOLE catalogue — *no loaded lift anywhere is offered
+  an unloaded swap above a loaded one* — not over this one exercise's list.
+  Five mutations, all caught: the entry deleted, the label ignoring the body
+  part, every lift called lower-body, the ordering reverted, and the unloaded
+  options FILTERED rather than sunk. `test:audit` 17,423 passed / 0 failed.
+  **A MEASUREMENT MISTAKE IN MY OWN MUTATION HARNESS, worth the record.**
+  I counted mutations caught by grepping for `✗` lines. Deleting the catalogue
+  entry made the gate die on a thrown lookup — zero `✗` lines — and my counter
+  read that as SURVIVED. It had actually been caught, but by crashing. Re-run
+  on the exit code, and the existence check now uses a non-throwing lookup so
+  the failure reads "the machine she actually uses is in the catalogue" instead
+  of a stack trace. A check whose failure nobody can read is most of the way to
+  a check nobody believes.
+  **NOT VERIFIED LIVE, and named rather than glossed:** the swap DIALOG
+  rendering the new order. Four attempts each "passed" while proving something
+  else — an ancestor walk from an exercise name reaches a container holding
+  every row, so the first row's swap button was clicked and the dialog opened
+  for Clamshell, then the calf raise, then the squats, each under a check
+  claiming it had opened for the lift asked for. Selecting by document order
+  then found no button, the row having not expanded. The check was REMOVED
+  rather than shipped green. Doing it properly needs a `data-testid` on the
+  row's swap control, not a cleverer selector.
+  **Still open, hers to rule on:** the dumbbell version's weight. 48kg clamped
+  between the feet is not a thing a person can do, and `isolation_hamstring`
+  anchoring is what produces it. She is off that movement now, so it is no
+  longer her problem — but it is still wrong for anyone.
+  **Ships with:** the frontend, on merge. No function deploy, no migration.
+  Plan: `docs/plans/the-leg-curl-she-actually-does.md`.
+
 - [x] **"12kg PER HAND" ON A LIFT DONE WITH ONE DUMBBELL** — Ashley, 10 Sep
   2026, from her phone, Pull & Hinge day: `Dumbbell Leg Curl 3×15-18 · ~12kg
   per hand`. A dumbbell leg curl is done lying face down with ONE dumbbell

@@ -162,12 +162,18 @@ export function LoadChip({
                 S{s.set_number}: {s.load_kg}kg
               </span>
             ))}
-            {ex.per_set_load[0].display.includes('per hand') && (
-              <span className="text-[0.625rem] text-muted-foreground/70">per hand</span>
-            )}
-            {ex.per_set_load[0].display.includes('single side') && (
-              <span className="text-[0.625rem] text-muted-foreground/70">single side</span>
-            )}
+            {/* Read the qualifier OFF the string formatLoad already wrote,
+                rather than listing the ones this component happens to know.
+                The list-of-three version silently rendered nothing at all when
+                'per leg' was added (Ashley, 10 Sep 2026 — a leg curl captioned
+                per hand), because a new mode is invisible to a check that
+                enumerates the old ones. */}
+            {(() => {
+              const qualifier = ex.per_set_load[0].display.replace(/^~?[\d.]+kg\s*/, '').replace(/[()]/g, '').trim()
+              return qualifier
+                ? <span className="text-[0.625rem] text-muted-foreground/70">{qualifier}</span>
+                : null
+            })()}
           </>
         ) : ex.suggested_load && (
           <span className={`inline-flex items-center gap-0.5 rounded border px-1 py-0 text-[0.625rem] leading-4 ${loadChipClass(source)}`}>

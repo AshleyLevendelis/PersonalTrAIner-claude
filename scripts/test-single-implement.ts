@@ -28,10 +28,12 @@
 // too. §1 is the one that would have caught this without anybody noticing it
 // on a screen.
 // ---------------------------------------------------------------------------
-import { EXERCISE_DATABASE, type ExerciseEntry } from '../src/lib/exercise-db'
+import { EXERCISE_DATABASE, getExerciseEntry, type ExerciseEntry } from '../src/lib/exercise-db'
 import {
   prescribeLoad, loadingMode, isPerSideLoad, labelModeForEntry, statedCeilingKg,
+  isExternallyLoaded, isLowerBodyMovement,
 } from '../src/lib/load-prescription'
+import { getReplacementCandidates } from '../src/lib/mesocycle-edit'
 import type { UserProfile } from '../src/lib/types'
 
 let failures = 0
@@ -172,6 +174,79 @@ for (const name of ['Dumbbell Bench Press', 'Lateral Raises', 'Dumbbell Curls'])
     perHand !== null && asOne !== null && asOne >= perHand * 1.7 && asOne <= perHand * 2.4,
     { perHand, asOne })
 }
+
+// ---------------------------------------------------------------------------
+console.log('\n6. A leg says "per leg"')
+// ---------------------------------------------------------------------------
+// Ashley, 10 Sep 2026, on a leg curl captioned per hand: "it says per hand even
+// though it's per leg." "(single side)" is the language of an arm, and she
+// reads the caption to decide what to load.
+// A NON-THROWING LOOKUP FOR THE EXISTENCE CHECK. byName throws, so deleting
+// the entry made this gate die with a stack trace rather than report "the
+// machine she uses is missing" — caught, but unreadably. A check whose failure
+// nobody can read is most of the way to a check nobody believes.
+const kneeling = EXERCISE_DATABASE.find(e => e.name === 'Iso-Lateral Kneeling Leg Curl')
+check('the machine she actually uses is in the catalogue', !!kneeling, kneeling?.name)
+if (!kneeling) {
+  console.log(`\n${failures} check(s) failed.\n`)
+  process.exit(1)
+}
+check('...it is one leg at a time', kneeling.unilateral === true, kneeling.unilateral)
+check('...so it is priced per side', isPerSideLoad(kneeling), null)
+check('...and captioned per LEG, not per side', labelModeForEntry(kneeling) === 'per_leg', labelModeForEntry(kneeling))
+check('...which is what reaches the screen', /per leg/.test(shown(kneeling) ?? ''), shown(kneeling))
+
+// The number, not just the word: one leg working must be materially lighter
+// than the two-leg machine beside it in the same group.
+const twoLeg = kg(byName('Lying Leg Curl'))
+const oneLeg = kg(kneeling)
+check('one leg is prescribed less than two legs',
+  oneLeg !== null && twoLeg !== null && oneLeg < twoLeg * 0.75, { oneLeg, twoLeg })
+
+// The label must follow the BODY PART, not this one exercise's name.
+const upperPerSide = EXERCISE_DATABASE.filter(e => isPerSideLoad(e) && loadingMode(e) !== 'dumbbell' && !isLowerBodyMovement(e))
+check('an arm-side lift still says (single side), so this keyed on the body part',
+  upperPerSide.length > 0 && upperPerSide.every(e => labelModeForEntry(e) === 'single_side'),
+  upperPerSide.map(e => `${e.name}:${labelModeForEntry(e)}`).slice(0, 5))
+
+// ---------------------------------------------------------------------------
+console.log('\n7. Swapping a loaded lift does not silently remove the load')
+// ---------------------------------------------------------------------------
+// She swapped her leg curl and got no prescribed weight. Not a null bug: the
+// three top-ranked options were two bodyweight sliders and a band, which have
+// nothing to prescribe. At a full gym she scrolled past three unloaded options
+// to reach a loaded one.
+const GYM = {
+  id: 'x', age: 30, gender: 'female', height_cm: 168, weight_kg: 70,
+  training_experience: 'intermediate', fitness_goal: 'hypertrophy',
+  equipment_access: 'full_gym', injuries: [], training_style: 'hybrid',
+  workout_split_preference: 'push_pull_legs', session_duration_preference: '45-60',
+  recovery_capacity: 'moderate', conditioning_preference: 'tolerate',
+} as unknown as UserProfile
+
+const legCurlSwaps = getReplacementCandidates('Dumbbell Leg Curl', GYM, [])
+check('her machine is offered as a swap at all',
+  legCurlSwaps.some(c => c.exercise.name === 'Iso-Lateral Kneeling Leg Curl'),
+  legCurlSwaps.map(c => c.exercise.name))
+check('...and the first option offered carries a weight',
+  legCurlSwaps.length > 0 && isExternallyLoaded(legCurlSwaps[0].exercise),
+  legCurlSwaps[0]?.exercise.name)
+check('...while the unloaded ones stay on the list, just lower — never filtered out',
+  legCurlSwaps.some(c => !isExternallyLoaded(c.exercise)),
+  legCurlSwaps.map(c => c.exercise.name))
+
+// THE PROPERTY OVER THE WHOLE CATALOGUE, not this one exercise's list: any
+// loaded lift with a bodyweight-heavy substitution group has the same hole.
+const outOfOrder: string[] = []
+for (const e of EXERCISE_DATABASE) {
+  if (!isExternallyLoaded(e)) continue
+  const cands = getReplacementCandidates(e.name, GYM, [])
+  const firstUnloaded = cands.findIndex(c => !isExternallyLoaded(c.exercise))
+  const lastLoaded = cands.map(c => isExternallyLoaded(c.exercise)).lastIndexOf(true)
+  if (firstUnloaded !== -1 && lastLoaded > firstUnloaded) outOfOrder.push(e.name)
+}
+check('no loaded lift anywhere is offered an unloaded swap above a loaded one',
+  outOfOrder.length === 0, outOfOrder.slice(0, 8))
 
 console.log(failures === 0 ? '\nOne dumbbell is priced as one dumbbell.\n' : `\n${failures} check(s) failed.\n`)
 process.exit(failures === 0 ? 0 : 1)

@@ -1,7 +1,7 @@
 import type { MesocycleWeek, Exercise, UserProfile } from './types'
-import { getSmartReplacements, type ExerciseEntry } from './exercise-db'
+import { getSmartReplacements, type ExerciseEntry, getExerciseEntry} from './exercise-db'
 import { getConstrainedPool, getFlaggedJoints, mapMovementPattern, mapTier, deriveFatigueCost, fixedUnitPrescription, bestEquipmentRank, isEquipmentQualityExempt, EQUIPMENT_QUALITY_TIERS } from './exercise-plan'
-import { prescribeLoad, type LoadPrescription } from './load-prescription'
+import { prescribeLoad, type LoadPrescription, isExternallyLoaded} from './load-prescription'
 // Dynamically imported inside recomputeLoad(), not statically here — importing
 // progression-engine.ts pulls in supabase.ts, which reads import.meta.env at
 // module-evaluation time. That's fine in the real (Vite) app, but it means
@@ -78,11 +78,34 @@ export function getReplacementCandidates(
       }
     }
   }
-  const candidates = demoted.size === 0
+  const equipmentSorted = demoted.size === 0
     ? ranked
     : ranked
         .map((c, i) => ({ c, i, d: demoted.has(c.exercise.name) ? 1 : 0 }))
         .sort((a, b) => a.d - b.d || a.i - b.i)
+        .map(x => x.c)
+
+  // A LOADED LIFT IS NOT REPLACED BY AN UNLOADED ONE, BY DEFAULT.
+  //
+  // Ashley, 10 Sep 2026, standing in a full gym: swapping her leg curl offered
+  // two bodyweight sliders and a resistance band ABOVE the two leg-curl
+  // machines, which sat fourth and fifth. She had to scroll past three options
+  // that carry no weight at all to reach one that does — and the swap she took
+  // came back with no prescribed weight, because there was none to prescribe.
+  // getSmartReplacements ranks on tier, joint stress and muscle overlap and has
+  // no notion of whether a thing can be loaded.
+  //
+  // Only applies when the OUTGOING exercise is itself externally loaded:
+  // replacing a plank with a slider is not a downgrade. A stable partition
+  // like the two around it, never a filter — a busy machine is exactly when
+  // someone wants the slider, just not offered ahead of the machine.
+  const outgoing = getExerciseEntry(exerciseName)
+  const outgoingIsLoaded = outgoing ? isExternallyLoaded(outgoing) : false
+  const candidates = !outgoingIsLoaded
+    ? equipmentSorted
+    : equipmentSorted
+        .map((c, i) => ({ c, i, u: isExternallyLoaded(c.exercise) ? 0 : 1 }))
+        .sort((a, b) => a.u - b.u || a.i - b.i)
         .map(x => x.c)
 
   if (!soft || (soft.liked.length === 0 && soft.disliked.length === 0)) return candidates
