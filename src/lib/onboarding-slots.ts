@@ -101,11 +101,32 @@ export const DURATION_OPTIONS: { value: SessionDuration; icon: string; label: st
 ]
 
 
+/**
+ * THE DESCRIPTION IS A PROMISE ABOUT WHAT THE PLAN WILL ASSUME YOU OWN, so it
+ * has to name the whole of EQUIPMENT_SETS[tier] (exercise-plan.ts), not a
+ * flattering summary of it. Roadmap item 11: until 9 Sep 2026 "Minimalist"
+ * read "Bands & kettlebells" while the tier in fact permitted dumbbells, a
+ * pull-up bar, a plyo box, an ab wheel, a medicine ball and a jump rope, and
+ * "Bodyweight only" read "No equipment needed" while the tier prescribed
+ * pull-ups and loaded a rucksack. Someone who owned only bands picked
+ * Minimalist and got dumbbell work they could not do.
+ *
+ * Ashley ruled on 9 Sep 2026, from four options (fix the words / fix the kit /
+ * ask what you actually own / words now and a checklist later): FIX THE WORDS.
+ * Narrowing the equipment sets would have changed every existing plan on those
+ * tiers, and the sets are what the catalogue was deliberately widened to fill.
+ *
+ * `test:equipment-labels` holds the two halves of that promise: nothing named
+ * here may be absent from the tier's set, and nothing that MATTERS in the set
+ * may go unnamed. Add a squat rack to `minimalist` and the gate fails until
+ * this line says so. An "— no x or y" clause is read as an exclusion, not a
+ * claim, and must name things the tier genuinely lacks.
+ */
 export const EQUIPMENT_OPTIONS: { value: EquipmentAccess; icon: string; label: string; description: string }[] = [
-  { value: 'full_gym', icon: '🏢', label: 'Full gym', description: 'All machines & free weights' },
-  { value: 'home_gym', icon: '🏠', label: 'Home gym', description: 'Barbell, dumbbells, bench' },
-  { value: 'minimalist', icon: '🎒', label: 'Minimalist', description: 'Bands & kettlebells' },
-  { value: 'bodyweight', icon: '🤸', label: 'Bodyweight only', description: 'No equipment needed' },
+  { value: 'full_gym', icon: '🏢', label: 'Full gym', description: 'Everything a commercial gym has' },
+  { value: 'home_gym', icon: '🏠', label: 'Home gym', description: 'Barbell, rack, bench, dumbbells, kettlebells, bands, pull-up bar, weighted bag' },
+  { value: 'minimalist', icon: '🎒', label: 'Minimalist', description: 'Dumbbells, kettlebells, bands, pull-up bar, weighted bag — no barbell or bench' },
+  { value: 'bodyweight', icon: '🤸', label: 'Bodyweight only', description: 'Bodyweight, a pull-up bar and a weighted bag' },
 ]
 
 export const STYLE_OPTIONS: { value: TrainingStyle; icon: string; label: string; description: string }[] = [
@@ -405,6 +426,14 @@ export interface OnboardingSlotValues {
   dislikedFoods: string
   dislikedExercises: string
   breakfastStyle: BreakfastStyle | null
+  /**
+   * What they can actually load, IF they volunteered it. Never asked — see
+   * the slot definitions. Strings like the other numerics, converted by
+   * assembleProfile.
+   */
+  maxDumbbellKg: string
+  maxSingleImplementKg: string
+  maxImprovisedKg: string
 }
 
 /**
@@ -443,6 +472,9 @@ export function initialSlotValues(): OnboardingSlotValues {
     dislikedFoods: '',
     dislikedExercises: '',
     breakfastStyle: null,
+    maxDumbbellKg: '',
+    maxSingleImplementKg: '',
+    maxImprovisedKg: '',
   }
 }
 
@@ -529,6 +561,20 @@ const isNumberIn = (min: number, max: number) => (value: unknown) => {
 /** The three known-lift numbers only apply once someone says they know them. */
 function knowsTheirLifts(values: OnboardingSlotValues): boolean {
   return values.knowsWorkingLifts === true
+}
+
+/**
+ * A stated load ceiling only means something for someone training on their own
+ * kit. At full_gym the rack genuinely does go to the numbers the app suggests,
+ * which is why load-ceiling-prompt.ts skips full_gym too — one rule, applied at
+ * intake as well as at first use.
+ *
+ * Written to accept the unanswered case: before the equipment question is
+ * answered these slots are simply not applicable yet, and a volunteered
+ * ceiling arriving first is recorded once the tier is known.
+ */
+function ownsLimitedKit(values: OnboardingSlotValues): boolean {
+  return values.equipment !== 'full_gym'
 }
 
 /**
@@ -805,6 +851,42 @@ export const ONBOARDING_SLOTS: SlotDef[] = [
     inputHint: 'Any cuisines you love…', shortLabel: 'Cuisines', control: 'multi', required: false, options: FAVORITE_CUISINE_OPTIONS, destination: 'column', validate: isSubsetOf(FAVORITE_CUISINE_OPTIONS) },
   { key: 'breakfastStyle', question: "What's breakfast usually like for you?",
     inputHint: 'How you do breakfast…', shortLabel: 'Breakfast', control: 'single', required: false, options: BREAKFAST_STYLE_OPTIONS, destination: 'column', validate: isOneOf(BREAKFAST_STYLE_OPTIONS) },
+  // ---------------------------------------------------------------------
+  // WHAT THEY CAN ACTUALLY LOAD — recorded if volunteered, NEVER asked.
+  //
+  // Roadmap item 11, second half: "specific equipment responses during
+  // onboarding populate exercise filter constraints directly so the Exercise
+  // tab does not re-ask". The tier itself already routes fine. The thing that
+  // re-asks is WEIGHT: LoadCeilingPrompt asks "what are your heaviest
+  // dumbbells?" the first session an exercise needs one, and it asks because
+  // onboarding had nowhere to put the answer. Say "I've only got 12kg
+  // dumbbells" while setting up and that sentence was thrown away.
+  //
+  // ASHLEY'S EARLIER RULING STANDS AND IS WHY THESE ARE NEVER ASKED (see the
+  // header of load-ceiling-prompt.ts): someone who has never trained cannot
+  // answer "how much can you load", and onboarding is where people drop out.
+  // So these are in NEVER_BLOCKING_SLOTS, exactly like dislikedExercises —
+  // absent from the questioning list, present in the catalogue, so the model
+  // can record one the moment it is volunteered and never before. The client
+  // adds a second lock: the number has to appear in the user's own words that
+  // turn (see executeActions), so a model cannot invent a ceiling that would
+  // silently cap every weight prescribed for sixteen weeks.
+  //
+  // Reachable for correction by tapping the row on the review card, which is
+  // the same route every other recorded answer uses.
+  //
+  // full_gym is excluded because the ceiling never applies there — a gym's
+  // rack really does go that high, and load-ceiling-prompt.ts skips full_gym
+  // for the same reason. Bounds match LOAD_CEILING_MIN_KG/MAX_KG.
+  { key: 'maxDumbbellKg', question: 'What are your heaviest dumbbells?',
+    inputHint: 'kg per hand…', shortLabel: 'Heaviest dumbbells', control: 'numeric', required: false,
+    min: 1, max: 100, requiredIf: ownsLimitedKit, destination: 'column', validate: isNumberIn(1, 100) },
+  { key: 'maxSingleImplementKg', question: 'What is your heaviest kettlebell?',
+    inputHint: 'kg…', shortLabel: 'Heaviest kettlebell', control: 'numeric', required: false,
+    min: 1, max: 100, requiredIf: ownsLimitedKit, destination: 'column', validate: isNumberIn(1, 100) },
+  { key: 'maxImprovisedKg', question: 'How much can your bag actually hold?',
+    inputHint: 'kg, roughly…', shortLabel: 'Loaded bag', control: 'numeric', required: false,
+    min: 1, max: 100, requiredIf: ownsLimitedKit, destination: 'column', validate: isNumberIn(1, 100) },
 ]
 
 export function getSlotDef(key: string): SlotDef | undefined {
@@ -885,6 +967,11 @@ export const NEVER_BLOCKING_SLOTS: SlotKey[] = [
   'displayName', 'cookingTime', 'favoriteCuisines', 'breakfastStyle',
   // Never asked at all, only ever volunteered — see its slot def above.
   'dislikedExercises',
+  // Same treatment, and for a stronger reason: Ashley ruled that onboarding
+  // must not gain a "how much can you load" question at all. These exist so
+  // an answer she gives unprompted is not thrown away, never so one is asked
+  // for. See their slot defs above.
+  'maxDumbbellKg', 'maxSingleImplementKg', 'maxImprovisedKg',
 ]
 
 /** Required slots whose VALUE must validate before completion, per the current answers (requiredIf-aware). */
@@ -1038,6 +1125,19 @@ export function assembleProfile(data: OnboardingSlotValues): UserProfile {
     known_squat_kg: data.knowsWorkingLifts === true && data.knownSquatKg ? Number(data.knownSquatKg) : undefined,
     known_bench_kg: data.knowsWorkingLifts === true && data.knownBenchKg ? Number(data.knownBenchKg) : undefined,
     known_deadlift_kg: data.knowsWorkingLifts === true && data.knownDeadliftKg ? Number(data.knownDeadliftKg) : undefined,
+    // Volunteered during setup, never asked for. Absent stays absent: an
+    // unstated ceiling must read as "we do not know", not as a limit of zero,
+    // because statedCeilingKg treats any number it finds as a hard clamp.
+    // A FULL-GYM ANSWER DISCARDS THEM, wherever in the conversation it came.
+    // ownsLimitedKit deliberately treats an unanswered equipment question as
+    // "still applicable", so a ceiling volunteered BEFORE the tier is known is
+    // kept rather than dropped on ordering. That leaves one case to close
+    // here: someone volunteers a ceiling and then turns out to train at a full
+    // gym, where the rack really does reach these numbers. Writing it anyway
+    // would clamp a gym trainee to a home number for sixteen weeks.
+    max_dumbbell_kg: data.equipment === 'full_gym' ? undefined : numericOrUndefined(data.maxDumbbellKg),
+    max_single_implement_kg: data.equipment === 'full_gym' ? undefined : numericOrUndefined(data.maxSingleImplementKg),
+    max_improvised_kg: data.equipment === 'full_gym' ? undefined : numericOrUndefined(data.maxImprovisedKg),
     recovery_capacity: data.recoveryCapacity!,
     injuries: data.injuries,
     display_name: data.displayName.trim(),

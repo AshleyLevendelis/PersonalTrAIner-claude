@@ -24,8 +24,26 @@ These apply to every session in this repo. They exist so they stop being restate
   - Say what happens either way, in plain terms.
   - One question at a time. Don't batch several and stall.
   - If she picks something that seems wrong, say so once, then do it.
-- Keep a decision log: every judgment call, the options, what was chosen, why, and whether she answered or it was decided unprompted.
+- Keep a decision log, and keep it in TWO places so it survives: the BACKLOG.md entry for that piece of work (options, what was chosen, why, and whether she answered or it was decided unprompted), and the commit message. Not in the conversation — that dies. Not only in a code comment — nobody reads those looking for a decision. A ruling that will apply again beyond this one change goes in THIS file as well.
 - Still stop and wait, even with a good default in hand: anything affecting live users, anything that changes what a metric measures, anything in the allergen or safety path.
+
+## Writing to Ashley
+
+Her ruling, 9 Sep 2026: *"at the end of each message going forwards I want a few
+short sentences summary. because you always go into too much detail that takes
+too long to read. give me short punchy answer"*.
+
+- **Every message ends with a summary**: two or three short sentences, plainly
+  headed, covering what happened, what's next, and what's needed from her. This
+  is not optional and not only for long messages.
+- Short and punchy above the summary too. Answer the question asked, then stop.
+  If the detail matters, it goes in a file she can open, not in the reply.
+- No jargon. No file names, function names, table names, or commit hashes unless
+  she asked for them. Say what changes on her phone, not what changed in the code.
+- Prefer one sentence over a paragraph, a paragraph over a table, and a table
+  only when the shape of the answer genuinely is a comparison.
+- This is about how to write, not what to check. It never shortens the
+  verification behind a claim — see **Reporting**.
 
 ## Git and deploy
 
@@ -66,6 +84,92 @@ old — the commands were right and the context was missing.
 - Never create, modify, or delete profiles or user rows on PRODUCTION to test something. If a check needs real interaction, use TEST instead of manufacturing prod data.
 - Both projects are free-tier and pause after ~7 days with no API activity. A paused project fails every request (CLI and app alike) until restored — there is no way to wake it via traffic. Restore from the Supabase dashboard: open the project, its paused banner has a "Restore project" button. Check this first if a TEST-project command fails with a connection/timeout error after a quiet stretch.
 
+## Gates — and the habit that makes them worth having
+
+- Checks are `npm run test:*` (logic, source properties, mocked models) and
+  `npm run verify:*` (a real Chromium at 390x844 driving the actual screens).
+  Anything the user SEES gets a `verify:` driver, not just a `test:`.
+- **EVERY NEW CHECK IS MUTATION-TESTED, WITHOUT EXCEPTION.** Break the code it
+  guards — on purpose, one change at a time — and confirm the check fails.
+  Then put the code back. A check nobody has seen fail is not a check; it is a
+  line that prints a tick.
+  This is not theoretical. Two checks written on 9 Sep 2026 passed while the
+  behaviour they guarded was gutted, because they asserted a call APPEARED in
+  the file rather than that its value was used — a dead branch left the string
+  in place. Both were found by breaking them, not by reading them. Earlier
+  rounds caught a check satisfied by a COMMENT, and one whose regex stopped
+  before the payload it meant to inspect.
+- Pin the PROPERTY, not the mechanism. A check anchored on three exact lines
+  fails the next time those lines move and proves nothing when they don't.
+  Anchor on "the moved-day branch is tested before the rest-day branch", not on
+  the text of either.
+- Strip comments before asserting a string is ABSENT, or a note explaining why
+  something was removed will satisfy the check that it was removed.
+- New check → register it in `package.json` → mutation-test it → say in the
+  report how many mutations were tried and how many were caught.
+
+### What a full sweep costs, so it is neither skipped nor stumbled into
+
+- The whole suite is roughly an hour, and almost all of that is ONE check:
+  `test:quality` (the plan-quality scorer, ~22 minutes, 9,216 profiles).
+  `test:audit` is about two minutes. **Everything else runs in seconds.**
+- So: run the handful of affected checks while working — they are instant —
+  and the full sweep once, before a merge. Run it in the background and do
+  something else; do not sit and watch it.
+- **Two checks ALWAYS fail in a cloud session and are not your problem:**
+  `test:meal-quality` and `test:schema-parity`. Both need a live database this
+  machine cannot reach. Confirm by stashing your changes and re-running — they
+  fail identically on untouched code. Report them as environmental rather than
+  investigating them from scratch every session.
+- The sweep REWRITES `audit-report.txt`, `quality-report.txt` and
+  `differentiation-audit-report.txt`. Revert those three before committing
+  unless the change is genuinely about them.
+
+## Where things are
+
+Orientation, so a session does not spend its first half hour rediscovering the
+same six files. Sizes are why it matters: these are not files to read whole.
+
+- `src/lib/exercise-plan.ts` (~7k lines) — plan generation. Equipment tiers
+  (`EQUIPMENT_SETS`, `isEquipmentAllowed`), the constrained pool, load ceilings,
+  session sizing. The heart of the app.
+- `src/lib/exercise-db.ts` (~5k lines) — the exercise catalogue itself, one
+  object per movement.
+- `src/lib/load-prescription.ts` (~2k) — how much weight is prescribed, and
+  every clamp on it. Safety-adjacent: plan before building.
+- `src/lib/onboarding-slots.ts` (~1.2k) — every setup question, its options and
+  its user-facing wording, plus `assembleProfile`, the ONE place answers become
+  a profile.
+- `supabase/functions/chat-gemini/index.ts` (~3.4k) — the coach: tool
+  declarations, one handler per tool, and the entire system prompt as one
+  template literal in the middle. `_shared/` holds what the four functions
+  agree on; `tool-reply.ts` is the second pass that gives the coach its voice.
+- `src/components/ChatAssistant.tsx` (~4.6k) — the client half of the coach:
+  proposal cards, confirm and undo.
+- `src/App.tsx` (~2.7k) — profile load and restore, and the onboarding INSERT.
+  That insert is column-by-column: a new profile column MUST be named there or
+  it is written once and never read back.
+- `BACKLOG.md` — newest first, the record of what was found and decided.
+  `VISION.md` — the product bar. `docs/plans/` — one file per non-trivial build.
+- The app's coach runs on **Gemini** (`_shared/gemini.ts` names the model), not
+  on Claude. Do not confuse the model writing the code with the model in the app.
+
+## What "finished" means here
+
+Not done until all of it is true. A piece of work that stops early is worse
+than one not started, because it looks finished in the log.
+
+1. The affected checks pass, and any NEW check has been mutation-tested.
+2. `npx tsc --noEmit` is clean, and a full sweep has run before a merge.
+3. Anything visible has been driven in a real browser at phone size — a
+   screenshot read, not a build that succeeded.
+4. BACKLOG.md has an entry: what was wrong, what changed, what was decided by
+   whom, what was verified and what was not.
+5. Committed, and pushed to the working branch.
+6. The report says which deploys it needs — frontend on merge, and each edge
+   function by name — and what was proven LIVE versus proven by test.
+7. Anything left undone is named, not omitted.
+
 ## Safety-adjacent work
 
 - Dietary enforcement, injury filtering, and load prescription always get a plan before a build, even when the fix looks obvious.
@@ -74,5 +178,6 @@ old — the commands were right and the context was missing.
 
 - Report the verified state, not that a command exited 0. Say what was proven live versus proven by construction or by test.
 - Browser-harness clicks: verified working 11 Aug 2026 (field focus, typing, and two state-changing clicks all registered correctly). History: this harness failed to register synthetic clicks for an extended prior period, the cause was never root-caused, and the recovery is unexplained. Treat "working" as the current observed state, not a permanent fix — if clicks stop registering again, re-test before concluding anything, rather than assuming either "still broken" or "still fixed."
+- **A WRITTEN FINDING IS A LEAD, NOT A FACT. Re-measure before fixing from it.** BACKLOG said `verify:tap-targets` failed on Home with "2 of 87 controls under 44px". Re-run 9 Sep 2026: 5 of 87, across three tabs, only one of them on Home — the "28px numeric input" was on Exercise. Fixing from the note would have fixed the wrong screen and left three real ones. When a note turns out wrong, correct it where it sits AND say so in the new entry; a stale line that nobody contradicts gets believed twice.
 - If a metric's scale, denominator, or threshold changes, say so — prior numbers stop being comparable.
 - If you retract or correct an earlier claim, say how you reached the wrong one — which file you read, what you skimmed, what you assumed. The correction is worth more than the retraction: it tells us whether the same error shape is sitting in other conclusions.

@@ -3,7 +3,7 @@ import { GEMINI_MODEL } from "../_shared/gemini.ts";
 import { computeMealMacros, type MealIngredientLine } from "../_shared/food-db.ts";
 import { classifyImperative } from "../_shared/imperative-classifier.ts";
 import { checkSpendCap, CHAT_CAP } from "../_shared/spend-cap.ts";
-import { resolveToolReply, ADVICE_NUDGE, EVALUATION_NUDGE, NUMBERS_NUDGE, type ToolReplyOptions } from "./tool-reply.ts";
+import { resolvePlainReply, resolveToolReply, ADVICE_NUDGE, EVALUATION_NUDGE, NUMBERS_NUDGE, type ToolReplyOptions } from "./tool-reply.ts";
 import type { GeminiLegResult, GeminiPart } from "../_shared/gemini-parts.ts";
 import { userNamedFood, isAdviceQuestion, isEvaluationQuestion, statedDurationsMinutes, eventTiming } from "../_shared/message-evidence.ts";
 
@@ -546,7 +546,7 @@ const toolDeclarations = [
         equipment_tier: {
           type: "string",
           enum: ["full_gym", "home_gym", "minimalist", "bodyweight"],
-          description: "The nearest fit to what's actually available. Hotel gym -> minimalist. Bodyweight only -> bodyweight. Dumbbells only -> minimalist (closest fit; say so honestly on the card, it's slightly over-inclusive). Full commercial gym -> full_gym.",
+          description: "The nearest fit to what's actually available. Hotel gym -> minimalist. Bodyweight only -> bodyweight (which still assumes a pull-up bar and a weighted bag). Dumbbells only -> minimalist (closest fit; minimalist also assumes kettlebells, bands and a pull-up bar, so say so honestly on the card rather than calling it exact). Full commercial gym -> full_gym.",
         },
         duration_days: {
           type: "number",
@@ -1371,13 +1371,18 @@ Deno.serve(async (req: Request) => {
 
 === 1. VOICE — TEXT MESSAGES, NOT PARAGRAPHS ===
 Your register is how a good coach TEXTS. Not how a coach writes an article.
-- ONE to THREE short sentences per reply. Often less. A single line is frequently the best answer. This is a hard default, not a suggestion — if your draft is four or more sentences, cut it down before sending.
-- Breaking into consecutive messages: when a thought genuinely needs two beats, split it with a line containing only [BREAK] and the app renders them as separate messages, the way a person sends two texts in a row. Use it for rhythm (a reaction, then the substance; or the answer, then the question back) — NOT to smuggle in the same wall of text. Each side of a [BREAK] still obeys the one-to-three-sentence rule. Two messages is normal, three is the ceiling.
+- LENGTH DEPENDS ON WHAT KIND OF TURN IT IS, and there are only two kinds.
+  - CONFIRMING SOMETHING THAT JUST HAPPENED — a set logged, a day moved, a weigh-in saved, a meal recorded: ONE to THREE short sentences, often less. A single line is frequently the best answer. Hard default: if your draft is four or more sentences, cut it before sending. Nobody wants a paragraph about a saved set.
+  - ANSWERING A QUESTION, OR GIVING ADVICE — what to eat, why a week is lighter, how a lift should feel, what to do about a niggle: say the thing, then say WHY, because the why is what makes it stick and what makes you a coach instead of a lookup. Take the room that needs — a short paragraph is fine, two is the ceiling — and stop the moment you are repeating yourself. Length is never the goal; being genuinely useful is. If your answer is one sentence and complete, send one sentence.
+  In both cases you are still TEXTING, not writing. Same voice, same warmth, same no-lists rule below — the only thing that moves is how much room an explanation gets.
+- Breaking into consecutive messages: when a thought genuinely needs two beats, split it with a line containing only [BREAK] and the app renders them as separate messages, the way a person sends two texts in a row. Use it for rhythm (a reaction, then the substance; or the answer, then the question back) — NOT to smuggle in the same wall of text. Each side of a [BREAK] obeys the length rule above for the kind of turn it is. Two messages is normal, three is the ceiling.
 - NEVER use headers, bullet lists, numbered lists, or bold section titles. Not for form cues, not for meal ideas, not for "three things to try". If you catch yourself writing "1." or a bolded label followed by a colon, you are writing a document instead of talking — rewrite it as speech. The ONLY exception is when the user explicitly asks for a breakdown, a list, or a full recipe.
-- When a full answer genuinely needs length (form breakdown, programme rationale, a recipe): give the SHORT version first — the one or two cues that matter most — then offer the rest. "That's the main thing — want me to go deeper?" Let them ask. Do not pre-emptively dump the long version.
+- Lead with the answer, not the build-up. Give the thing that matters most first, then the reason, then anything else. For something genuinely long — a full form breakdown, a whole recipe, a week-by-week rationale — give the part they asked about and offer the rest ("that's the main thing — want me to go deeper?"). Answering the question and explaining it is not dumping; reciting everything you know is.
 - No AI meta-talk: never "As an AI...", "I don't have feelings...", "I'm programmed to...", "evidence-based coaching says...". You're their coach, full stop.
 - Never open with a summary of what they asked ("Great question about deadlift form!", "You're asking how to..."). Just answer, the way a person would.
-- Never lecture. One clear point beats three hedged ones. If there's a real caveat, state it in a clause, not a paragraph.
+- Never lecture, and never hedge. One clear point beats three qualified ones, and explaining WHY that point is right is not lecturing — lecturing is listing four things when they asked about one. If there's a real caveat, state it in a clause, not a paragraph.
+- WARMTH IS ATTENTION, NOT PRAISE. Being warm means noticing the person in front of you — that they trained when they didn't feel like it, that this is the third week of a hard block, that they said their back was sore on Tuesday. It does NOT mean complimenting them. Never open by grading them or what they said ("great question", "good shout", "love that", "that's a solid goal"): it is the fastest way to sound like software. If something genuinely landed, say what happened and why it matters; the fact is warmer than the adjective.
+- When they tell you something went badly — a missed session, a lift that felt awful, a week that fell apart — acknowledge it before you fix it, in a clause, and never with a silver lining they didn't ask for. Then be useful.
 - Contextual emojis only: 1 max, only when it fits genuine warmth (a PR, a greeting) — never as decoration on ordinary answers.
 - Nutrition, supplements, hydration, sleep, and recovery are always on-topic — answer directly, no deflecting to "consult a professional" for ordinary questions (that phrase is reserved for the medical-scope cases in §1c below).
 
@@ -1514,7 +1519,7 @@ When the user says a lasting injury has resolved ("my shoulder's fine now", "kne
 When the user says they're away or at a different gym for a period ("hotel gym for a week", "only dumbbells until Friday", "I'm away from my gym"):
 - If it's unclear what's actually available, ask and offer the [QUICK_REPLIES] tag with these four options: "Hotel gym" | "Bodyweight only" | "Dumbbells only" | "Full commercial gym" — free text is always still fine too.
 - If the duration is unclear, ask one follow-up ("how many days should I plan around that?").
-- Once you know both, call propose_equipment_adaptation with equipment_tier + duration_days. Map to the nearest existing tier honestly (dumbbells only maps to minimalist, the closest fit — say so if it comes up, don't pretend it's an exact match).
+- Once you know both, call propose_equipment_adaptation with equipment_tier + duration_days. Map to the nearest existing tier honestly, and know what each one actually assumes: minimalist assumes dumbbells, kettlebells, bands, a pull-up bar and a weighted bag; bodyweight still assumes a pull-up bar and a weighted bag. So "dumbbells only" maps to minimalist as the CLOSEST fit, not an exact one — say so if it comes up, don't pretend it's exact.
 - It reverts automatically once the period ends — mention this once, not every turn.
 
 === 3d. SESSION VOLUME (propose_volume_change) ===
@@ -1686,7 +1691,7 @@ PERIODIZATION COACHING RULES:
 - NEVER ASK THE SAME QUESTION TWICE IN A ROW. If you asked for a weight and their answer did not get you there, do NOT repeat the identical sentence — either the question was ambiguous or their answer was, and repeating it verbatim changes neither. Say what you have and what is missing ("got 100kg for the deadlifts — how many reps per set?"), or ask a narrower question. Measured live: "What weight did you use for Deadlifts?" three times running, answered "100kg" every time.
 - Parse exercise names, sets, reps, and weights from the user's message. If a weight isn't mentioned, do NOT guess or default to 0 — omit weight_kg from that log entry entirely and let the app resolve it from their history or plan. Only set is_bodyweight (and weight_kg: 0) when the movement is genuinely bodyweight-only (push-ups, pull-ups, dips, planks, etc.) or the user explicitly says "bodyweight"/"no weight".
 - If the day isn't mentioned, default to today.
-- After logging, congratulate them and note if they hit the top of their rep range (which triggers progressive overload).
+- After logging, react to what they actually did — one clause, in your own words — and note if they hit the top of their rep range (which triggers progressive overload). React to the WORK, never grade the person: "that top set moved" is a reaction, "great job!" is a sticker.
 - If the user asks about their progress, reference logged data to show improvement trends.
 ${context.exercise_exclusions && context.exercise_exclusions.length > 0 ? `\nPERMANENTLY EXCLUDED EXERCISES (never suggest these):\n${context.exercise_exclusions.join(", ")}` : ""}
 
@@ -1898,7 +1903,7 @@ WHAT YOU MAY SAY ABOUT A LOG, and this is an honesty rule, not a style note. Ash
 - If they say they did something these lines do not show, believe them and offer to log it. Their memory outranks this list — but this list is what YOU are allowed to assert.
 
 PERFORMANCE COACHING DIRECTIVES:
-- Use this data to track progressive overload. If the user's logged weight or reps have increased over sessions, congratulate them on their progress.
+- Use this data to track progressive overload. When their logged weight or reps have gone up across sessions, name the change and what it means — "that's 5kg on your row in three weeks" — rather than praising them for it. The number is the compliment.
 - If weight/reps have stagnated for 3+ sessions on the same exercise, proactively suggest a deload week or a variation swap to break the plateau.
 - When discussing today's session, reference their LAST logged performance for those exercises and suggest specific weight/rep targets (e.g. "Last session you hit 70kg x 8 on bench. Try 72.5kg x 8 today or push for 70kg x 10.").
 - Flag if RPE is chronically high (consistently maxing reps with no progression) — suggest backing off 10% and building back up.
@@ -1915,7 +1920,7 @@ CARDIO COACHING DIRECTIVES:
 - Adapt nutritional strategy: high-RPE or long-duration cardio increases carbohydrate needs; suggest carb timing around these sessions.
 - Recognize unconventional activities (martial arts, sports, rucking) and provide sport-specific recovery tips.
 - If cardio frequency is high (5+ sessions/week), proactively suggest a recovery day or deload.
-- Track trends in RPE over time — if the same activity at the same duration shows decreasing RPE, congratulate improved conditioning.` : ''}
+- Track trends in RPE over time — if the same activity at the same duration shows decreasing RPE, say plainly that their conditioning has improved and what it means for their training. State the finding; don't hand out praise.` : ''}
 
 SESSION PLANNING RULES:
 1. The user's session duration is "${context.session_duration_preference || '45-60'} minutes". Never exceed this window. If time is tight (30-45 min), prioritize compounds and drop accessories.
@@ -2359,9 +2364,21 @@ Keep this context in mind to ensure your greetings and questions naturally align
           db_success: dbSuccess,
         };
 
+        // THE WORST §1 VIOLATOR IN THIS FILE, until now. Logging a session
+        // answered with a markdown bullet list, bold exercise names and up to
+        // three blank-line-separated paragraphs — against a prompt rule that
+        // says one to three short sentences and never a list. The template
+        // below is kept EXACTLY as it was and demoted to the floor, so the
+        // worst case is what shipped before; the model gets to say it in its
+        // own voice first, under guards.
         let confirmText: string;
         if (!dbSuccess) {
-          confirmText = `I tried to log your workout but the save failed${dbError ? `: ${dbError}` : ""}. Your performance data was not recorded — please try again or log it manually.`;
+          // The raw Postgres message used to be interpolated straight into
+          // her chat. She cannot act on "duplicate key value violates unique
+          // constraint", and it reads as the app breaking rather than as one
+          // save failing. It stays in the server log, where it is useful.
+          console.error("log_workout_session save failed:", dbError);
+          confirmText = "I couldn't save that workout just now — the sets are not recorded. Give it another go in a moment, or log them on the exercise screen.";
         } else {
           const parts: string[] = [];
           if (insertedSets > 0) {
@@ -2373,7 +2390,33 @@ Keep this context in mind to ensure your greetings and questions naturally align
           if (needsWeight.length > 0) {
             parts.push(`I couldn't log ${needsWeight.join(", ")} — no weight stated and no history or plan suggestion to fall back on. What weight did you use?`);
           }
-          confirmText = parts.length > 0 ? parts.join("\n\n") : (textPart?.text || "Got it — no sets to log there.");
+          const sessionFloor = parts.length > 0 ? parts.join("\n\n") : (textPart?.text || "Got it — no sets to log there.");
+          confirmText = insertedSets > 0
+            ? (await toolReply({
+                outcome: {
+                  name,
+                  args,
+                  response: {
+                    status: "saved",
+                    day: dayOfWeek,
+                    sets_saved: insertedSets,
+                    exercises: loggedSummaries.map((s) => s.replace(/\*\*/g, "")),
+                    // Named so the model can mention them without inventing a
+                    // number, and so `forbid` below has something true to hold.
+                    weights_inferred_not_stated: inferredNotes,
+                    could_not_log_no_weight: needsWeight,
+                  },
+                },
+                floor: sessionFloor,
+                preferFirstLegText: true,
+                // The count she can check against her own session. A reply
+                // claiming a different number of sets is worse than the list.
+                mustContain: [`${insertedSets}`],
+                // Never let the round trip claim a weight was stated when the
+                // app inferred it, and never let it invent a list.
+                forbid: [/^\s*[-*]\s/m, /\*\*/],
+              })).reply
+            : sessionFloor;
         }
 
         return new Response(
@@ -2941,9 +2984,13 @@ Keep this context in mind to ensure your greetings and questions naturally align
 
         let confirmText: string;
         if (!dbSuccess) {
-          confirmText = `I tried to log your set but the save failed${dbError ? `: ${dbError}` : ""}. Please try again.`;
+          // Was `the save failed: ${dbError}` — a raw Postgres message in her
+          // chat. She cannot act on it and it reads as the app being broken
+          // rather than one save failing. It stays in the server log.
+          console.error("log_workout_set save failed:", dbError);
+          confirmText = "I couldn't save that set just now — it isn't recorded. Try again in a moment, or tap it in on the exercise screen.";
         } else if (!resolved) {
-          confirmText = `I couldn't log that set for **${args.exercise_name}** — no weight stated and no history or plan suggestion to fall back on. What weight did you use?`;
+          confirmText = `I couldn't log that set for ${args.exercise_name} — you didn't say the weight and there's nothing logged or planned to go on. What did you use?`;
         } else {
           const inferredNote = resolved.inferredFrom
             ? ` (used your ${resolved.inferredFrom === "history" ? "last logged" : "plan's suggested"} weight — say the actual weight if that's off)`
@@ -3319,13 +3366,21 @@ Keep this context in mind to ensure your greetings and questions naturally align
         );
       }
 
-      const confirmationText = textPart?.text || generateConfirmation(name, args);
+      // NOTHING DECLARED REACHES HERE. Every tool in toolDeclarations has an
+      // explicit branch above, so this is only entered when the model emits a
+      // call for a tool that does not exist — a hallucinated or renamed name.
+      // Nothing ran, so the old line, "Your plan has been updated.", was a
+      // claim about a change that never happened, shipped alongside an
+      // `action` envelope the client cannot recognise either.
+      console.error("chat-gemini: functionCall for an undeclared tool", { name, args });
+      const confirmationText = textPart?.text
+        || "I didn't quite follow that one — say it again in your own words and I'll sort it.";
 
       return new Response(
-        JSON.stringify({
-          reply: confirmationText,
-          action: { type: name, ...args },
-        }),
+        // No `action`: nothing happened, so nothing is reported as having
+        // happened. An unrecognised envelope only gave the client something
+        // to misread.
+        JSON.stringify({ reply: confirmationText }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -3349,12 +3404,23 @@ Keep this context in mind to ensure your greetings and questions naturally align
       );
     }
 
-    const text =
-      parts.find((p: { text?: string }) => p.text)?.text ??
-      `I didn't quite catch that. Could you try rephrasing "${message.length > 50 ? message.slice(0, 50) + '...' : message}"?`;
+    // A PLAIN TURN GETS THE SAME SECOND CHANCE A TOOL TURN DOES. The old line
+    // here — "I didn't quite catch that. Could you try rephrasing ..." — fired
+    // whenever the model returned no text, which is not her failing to be
+    // clear; it is the model skipping a turn. That is precisely the shape that
+    // made the previous tone rewrite (fa683fc) silently stop answering 4 of 7
+    // turns, so the persona work goes in behind this, not in front of it.
+    const plain = await resolvePlainReply({
+      contents,
+      firstParts: parts,
+      callGemini: callLeg,
+      floor: "I'm not sure I followed that one — tell me a bit more and I'll pick it up.",
+      log: console.error,
+    });
+    console.log(`plain-reply source=${plain.source} legs=${plain.legs}`);
 
     return new Response(
-      JSON.stringify({ reply: text }),
+      JSON.stringify({ reply: plain.reply }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {
@@ -3370,9 +3436,3 @@ Keep this context in mind to ensure your greetings and questions naturally align
   }
 });
 
-function generateConfirmation(name: string, args: Record<string, unknown>): string {
-  if (name === "ban_exercise") {
-    return `Got it — I've permanently removed **${args.exercise_name}** from your plan. It will never appear in future workout cycles. ${args.reason ? `Reason noted: ${args.reason}` : ""}`;
-  }
-  return "Your plan has been updated.";
-}

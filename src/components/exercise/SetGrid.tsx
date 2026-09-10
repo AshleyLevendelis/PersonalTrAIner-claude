@@ -477,6 +477,13 @@ export function SetGrid({
                 saveCardioLog's comment on the same trap) — the rule is
                 checkLoggedSetWeight in handleSaveSet, and the absolute half
                 of it again in the store. */}
+              {/* h-11 is 44px, the comfortable tap minimum. These two are
+                  used mid-workout and at 28px were the smallest real targets
+                  in the app. A text field cannot carry the invisible hit-slop
+                  the buttons use — there is no ::after on an <input> — so the
+                  only honest fix is real height. Ashley chose it on 9 Sep
+                  2026 from three options, having seen the before and after:
+                  the page grows about 60px and the boxes stop being missable. */}
             <Input
               id={`setgrid-weight-${exerciseId}-${setNumber}`}
               type="number"
@@ -487,7 +494,7 @@ export function SetGrid({
               value={isBW ? '' : input.weight}
               onChange={e => updateInput(setNumber, 'weight', e.target.value)}
               onFocus={scrollRowIntoView}
-              className={`h-7 border-0 bg-[color:var(--surface-raised)] text-sm shadow-none ${isSaved ? 'text-primary-text' : ''} ${isBW ? 'text-muted-foreground' : ''} ${rowErrors[setNumber] ? 'ring-1 ring-destructive' : rowWarnings[setNumber] ? 'ring-1 ring-amber-500' : ''}`}
+              className={`h-11 border-0 bg-[color:var(--surface-raised)] text-sm shadow-none ${isSaved ? 'text-primary-text' : ''} ${isBW ? 'text-muted-foreground' : ''} ${rowErrors[setNumber] ? 'ring-1 ring-destructive' : rowWarnings[setNumber] ? 'ring-1 ring-amber-500' : ''}`}
               disabled={isBW}
             />
             {/* The `?.` used to make this button silently inert wherever the
@@ -529,7 +536,7 @@ export function SetGrid({
               value={input.reps}
               onChange={e => updateInput(setNumber, 'reps', e.target.value)}
               onFocus={scrollRowIntoView}
-              className={`h-7 border-0 bg-[color:var(--surface-raised)] text-sm shadow-none ${isSaved ? 'text-primary-text' : ''} ${rowErrors[setNumber] ? 'ring-1 ring-destructive' : ''}`}
+              className={`h-11 border-0 bg-[color:var(--surface-raised)] text-sm shadow-none ${isSaved ? 'text-primary-text' : ''} ${rowErrors[setNumber] ? 'ring-1 ring-destructive' : ''}`}
             />
             <div className="flex items-center gap-1">
               {isPRSet && prBadgeSet?.result && (

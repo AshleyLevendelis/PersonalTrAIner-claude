@@ -65,6 +65,20 @@ function audit(MIN) {
     .filter(el => {
       const cs = getComputedStyle(el)
       if (cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity) === 0) return false
+      // A DISABLED CONTROL HAS NO TAP TARGET AT ALL, so measuring one asks a
+      // question with no answer. Button's base classes carry
+      // `disabled:pointer-events-none`, which makes the element AND its
+      // hit-slop ::after invisible to elementFromPoint — so a disabled button
+      // fails every probe no matter how large it is, and reports as "too
+      // small to hit" when the truth is "not hittable on purpose".
+      //
+      // This cost a wrong fix before it was found: the Tools "Add item to
+      // list" button was measured at 32x32 and read as a missing slop, when
+      // it already HAD a 44px slop and was simply disabled because the field
+      // beside it was empty in the harness. Its probe showed every direction
+      // resolving past the button to an ancestor — the signature of an inert
+      // hit area, not a small one.
+      if (cs.pointerEvents === 'none' || el.disabled === true || el.getAttribute('aria-disabled') === 'true') return false
       const b = el.getBoundingClientRect()
       return b.width > 0 && b.height > 0
     })

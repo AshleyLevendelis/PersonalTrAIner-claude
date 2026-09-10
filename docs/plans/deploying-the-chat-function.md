@@ -160,3 +160,45 @@ missed today's weight session. Move it to tomorrow"* → the coach's sentence
 naming the day above a move card. The function logs carry one line per tool
 turn, `tool-reply tool=<name> source=first_leg|round_trip|floor legs=<n>`, so
 how often the model spoke versus the template is measurable after the fact.
+
+### v73 also carries Phase 3, as of 9 Sep 2026
+
+Ashley chose "build it now, measure after" over measuring first, so the voice
+work merged before the deploy rather than after it. The same single phrase
+therefore ships Phase 2 AND Phase 3. Add these to the pre-greps above:
+
+| grep | what it proves is on board |
+|---|---|
+| `resolvePlainReply` | a plain question turn can no longer answer with silence |
+| `CONFIRMING SOMETHING THAT JUST HAPPENED` | length now depends on the kind of turn |
+| `WARMTH IS ATTENTION, NOT PRAISE` | the persona change is in the prompt |
+| `CHAT_CAP` block showing `dailyPerCaller: 150` | the spend cap accounts for a turn costing three calls |
+
+**A PRE-GREP MUST BE UNIQUE TO THE CHANGE, and one here was not.** The first
+version of this table said to grep `dailyPerCaller: 150`. That string was
+ALREADY in the file — `macro-calibration` has used 150 for months — so it
+reported "present" against a deploy that did not contain the change at all,
+9 Sep 2026. A false green from the very table that exists to prevent false
+greens. Check the value inside the `CHAT_CAP` block specifically, or pick a
+string that exists nowhere else.
+
+And these must now be **zero** in the live source, because they were removed:
+
+| grep | why it must be gone |
+|---|---|
+| `Your plan has been updated.` | claimed a change for a tool that never ran |
+| `I've permanently removed` | a dead branch that would have claimed a ban |
+| `try rephrasing` | blamed her for a turn the model skipped |
+| `congratulate` | asked for the grading openers the tone probe scores at zero |
+
+**After the deploy, run the measurement** — it is now an AFTER reading with no
+BEFORE, which is the cost of the order she chose:
+
+```
+npx tsx scripts/probe-coach-tone.mts scripts/probe-personas/coach-warmth.json after.json
+```
+
+Six turns against the live function. The number that matters most is **turns
+that produced text at all** — a tone rewrite in this repo has silently taken
+that from 7/7 to 3/7 before. `resolvePlainReply` is what should stop that
+happening again; the probe is how we find out whether it did.

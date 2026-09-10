@@ -4415,12 +4415,22 @@ export function getExerciseCompatibilityWarnings(
 ): string[] {
   const warnings: string[] = []
 
-  const allowedEquipment = EQUIPMENT_SETS[profile.equipment_access || 'full_gym']
-  if (allowedEquipment) {
+  // ASK THE GENERATOR'S OWN PREDICATE, don't re-implement it. This block used
+  // to filter every listed implement itself, which quietly disagreed with
+  // isEquipmentAllowed on `equipment_alternatives` entries — interchangeable
+  // implements, where ONE present is enough ("straddle bar or use landmine").
+  // A home_gym user browsing T-Bar Rows was told "Needs t-bar" for an exercise
+  // generation considers fully allowed, i.e. the warning contradicted the
+  // filter this function's own doc comment claims to reuse. Found 9 Sep 2026
+  // while auditing the equipment labels (roadmap item 11).
+  const tier = profile.equipment_access || 'full_gym'
+  const allowedEquipment = EQUIPMENT_SETS[tier]
+  if (allowedEquipment && !isEquipmentAllowed(exercise, tier)) {
     const missing = exercise.equipment.filter(eq => !allowedEquipment.has(eq))
-    if (missing.length > 0) {
-      warnings.push(`Needs ${missing.join(', ')} — outside your ${(profile.equipment_access || 'full_gym').replace(/_/g, ' ')} equipment.`)
-    }
+    // An alternatives entry only reaches here with NOTHING present, so listing
+    // the misses with "or" is accurate: any one of them would do.
+    const joiner = exercise.equipment_alternatives ? ' or ' : ', '
+    warnings.push(`Needs ${missing.join(joiner)} — outside your ${tier.replace(/_/g, ' ')} equipment.`)
   }
 
   const flaggedJoints = new Set<string>()

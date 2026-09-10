@@ -248,12 +248,16 @@ export function GroceryList({ profileId, mealPools, targets, softLikedFoods, tod
       </div>
       <div className="space-y-3">
         <div className="flex items-center gap-1.5">
+          {/* h-11 is 44px, the comfortable tap minimum. A text field cannot
+              carry the invisible hit-slop the buttons use — there is no
+              ::after on an <input> — so the only honest fix is real height.
+              Ashley's ruling, 9 Sep 2026, seeing the before and after. */}
           <Input
             value={quickAdd}
             onChange={e => setQuickAdd(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') void handleQuickAdd() }}
             placeholder="Add an item, e.g. 2 eggs"
-            className="h-8 text-sm"
+            className="h-11 text-sm"
           />
           <Button size="icon" aria-label="Add item to list" className="size-8 shrink-0" onClick={handleQuickAdd} disabled={!quickAdd.trim()}>
             <Plus className="size-4" />

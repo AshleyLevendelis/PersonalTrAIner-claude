@@ -32,6 +32,7 @@ import {
 } from '@/lib/onboarding-slots'
 import { measureParserFor } from '@/lib/body-units'
 import { implausibleLifts } from '@/lib/lift-plausibility'
+import { ceilingIsInUserWords, isCeilingSlot } from '@/lib/onboarding-ceiling-capture'
 import { closeOutOpenQuestions, closeOutTrailingQuestions, COMPLETE_MESSAGE } from '@/lib/onboarding-completion'
 import {
   loadOnboardingDraft,
@@ -833,6 +834,14 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
           continue
         }
         const coerced = coerceSlotValue(def, String(action.args.value ?? ''))
+        // A load ceiling is only ever recorded from what they actually said —
+        // see ceilingIsInUserWords. Silent on refusal by design: there was no
+        // question on screen, so there is nothing to re-ask, and the Exercise
+        // tab still asks at first use exactly as it does today.
+        if (isCeilingSlot(key) && !ceilingIsInUserWords(key, coerced, userText)) {
+          console.warn('onboarding: refused a load ceiling that was not in the user\'s own words', key, coerced)
+          continue
+        }
         // Compare against ws.values, not the outer (pre-turn) values: a slot
         // can already be recorded THIS turn — by the exact-label backstop's
         // immediate commit, or by an earlier action in this same list — and

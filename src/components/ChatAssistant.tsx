@@ -2105,7 +2105,14 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     if (!Number.isFinite(delta) || delta < -7 || delta > 7) return null
 
     const dayName = new Date(`${raw}T00:00:00`).toLocaleDateString('en-US', { weekday: 'long' })
-    const session = exercisePlan.find(d => d.day === dayName)
+    // THE SAME BLIND LOOKUP AS THE MOVE BUILDER HAD, failing worse: it returns
+    // null, so a day holding a session that was MOVED here could not be marked
+    // as a rest and the coach was given nothing at all to say about it. This is
+    // also the "drop it" half of Ashley's ruling — dropping a twice-missed
+    // session is exactly marking the day it sits on as a rest she chose, so
+    // neither day counts against her and the work is not owed anywhere.
+    const resolvedRest = sessionForDate({ date: raw, plan: exercisePlan, moves: trainingWeek.moves })
+    const session = resolvedRest.day
     // Nothing prescribed, or a day that is already active recovery. Resting a
     // rest day is not a change, and a card offering one would be the app
     // inventing work so it can offer to cancel it.
@@ -2167,13 +2174,51 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       ),
       existing: trainingWeek.moves,
     })
-    if (!target.ok) return { ok: false, reason: target.message }
-
     const fromDayName = new Date(`${fromDate}T12:00:00`).toLocaleDateString('en-US', { weekday: 'long' })
-    const session = liveWeekDays.find(d => d.day === fromDayName)
+    if (!target.ok) {
+      // TWO TAPS, NOT A TYPED SENTENCE. Ashley's ruling, 9 Sep 2026, on a
+      // session that has already been moved once and missed again: ask, and
+      // let her choose between moving it on and dropping it. A question with
+      // no buttons under it makes her type the answer, which is the part of
+      // the old loop that was tiring even when the words were right.
+      //
+      // These ride the same [QUICK_REPLIES] channel every other chip in this
+      // chat uses: the tag is stripped from the bubble and rendered as
+      // buttons, and tapping one sends its words as an ordinary message. That
+      // is the point — "Move it to Friday" arrives as a day she NAMED, which
+      // is what takes the move through instead of asking the same question
+      // again. The words are chosen to match the two the coach's own
+      // instructions already recognise ("shift today's to Thursday" is a
+      // move; "take today off" is a rest day), so no prompt change and no
+      // function deploy.
+      const chips = target.reason === 'moved_in'
+        ? [
+            ...(target.nextFree ? [`Move it to ${target.nextFree.dayName}`] : []),
+            `Take ${fromDate === activeSession.date ? 'today' : fromDayName} off instead`,
+          ]
+        : []
+      return {
+        ok: false,
+        reason: chips.length > 0
+          ? `${target.message}\n[QUICK_REPLIES: ${chips.map(c => `"${c}"`).join(' | ')}]`
+          : target.message,
+      }
+    }
+    // THE SECOND NAIVE LOOKUP, and it sat directly behind the first. Even once
+    // resolveMoveTarget could see a session that had been moved onto this day,
+    // `liveWeekDays.find(d => d.day === fromDayName)` could not — so the card
+    // would still have refused, and would have named the work after the day it
+    // landed on rather than the day it came from.
+    const originResolved = sessionForDate({ date: fromDate, plan: liveWeekDays, moves: trainingWeek.moves })
+    const session = originResolved.day
     if (!session || session.exercises.length === 0) {
       return { ok: false, reason: `There's no session on ${fromDayName} to move.` }
     }
+    // A re-move rewrites the ORIGINAL move rather than chaining a second one.
+    const trueFromDate = target.remapFrom ?? fromDate
+    const trueFromDayName = target.remapFrom
+      ? new Date(`${target.remapFrom}T12:00:00`).toLocaleDateString('en-US', { weekday: 'long' })
+      : fromDayName
 
     const reason = typeof rawArgs.reason === 'string' && rawArgs.reason.trim() ? rawArgs.reason.trim() : undefined
     // What they are doing INSTEAD today, when the same message said so — the
@@ -2181,9 +2226,9 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     // from their words (session-move.ts explains the shape).
     const alsoDoing = parseAlsoDoing(rawArgs)
     const payload: SessionMovePayload = {
-      fromDate,
+      fromDate: trueFromDate,
       toDate: target.date,
-      fromDayName,
+      fromDayName: trueFromDayName,
       toDayName: target.dayName,
       sessionFocus: session.focus,
       ...(target.asWanted ? {} : { requestedDayName: target.requestedDayName }),
@@ -2193,17 +2238,27 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     // Said out loud, in the app's words, from the day THIS code resolved.
     // A question until she taps: nothing has moved when this is read.
     const leadBase = target.asWanted || !target.requestedDayName
-      ? `${target.dayName}'s free, so I'll put ${fromDayName}'s ${session.focus} there and ${fromDayName} won't count as missed.`
-      : `${target.requestedDayName} already has a session, so the next free day is ${target.dayName} — I'll put ${fromDayName}'s ${session.focus} there and ${fromDayName} won't count as missed.`
+      ? `${target.dayName}'s free, so I'll put ${trueFromDayName}'s ${session.focus} there and ${trueFromDayName} won't count as missed.`
+      : `${target.requestedDayName} already has a session, so the next free day is ${target.dayName} — I'll put ${trueFromDayName}'s ${session.focus} there and ${trueFromDayName} won't count as missed.`
     return {
       ok: true,
-      scopeKey: `${profile.id}:propose_session_move:${fromDate}:${target.date}`,
+      scopeKey: `${profile.id}:propose_session_move:${trueFromDate}:${target.date}`,
       preconditions: { fromDate, toDate: target.date },
       payload,
       diff: {
         lead: `${leadBase}${alsoDoing ? alsoDoingLeadClause(alsoDoing) : ''} Shall I?`,
+        // THE TRUE ORIGIN ON THE CARD TOO, not just in the sentence above it.
+        // Caught in the browser, 10 Sep 2026: on a session that had already
+        // been moved once, the lead read "I'll put Wednesday's Upper Pull &
+        // Core there" while the row underneath said THURSDAY — the day it
+        // happened to be sitting on. Confirming rewrites the original record,
+        // so afterwards Thursday is an ordinary rest day and Wednesday is the
+        // day the session left: the row was describing a state that would
+        // never exist. A day the session merely passed through is never the
+        // day at risk of counting as missed either, which is why the
+        // implication below moved with it.
         rows: [
-          { field: fromDayName, before: session.focus, after: `Moved to ${target.dayName}` },
+          { field: trueFromDayName, before: session.focus, after: `Moved to ${target.dayName}` },
           { field: target.dayName, before: 'Nothing scheduled', after: session.focus },
           ...(alsoDoing ? [alsoDoingRow(alsoDoing)] : []),
         ],
@@ -2211,7 +2266,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
           ...(target.asWanted || !target.requestedDayName
             ? []
             : [{ severity: 'info' as const, text: `${target.requestedDayName} already has a session on it, so this goes to ${target.dayName} — the next day that's free.` }]),
-          { severity: 'info' as const, text: `${fromDayName} won't count as a missed session, and your week still owes the same number of sessions.` },
+          { severity: 'info' as const, text: `${trueFromDayName} won't count as a missed session, and your week still owes the same number of sessions.` },
           ...(alsoDoing ? [{ severity: 'info' as const, text: alsoDoingImplication(alsoDoing) }] : []),
           { severity: 'info' as const, text: 'The plan itself is unchanged — this moves one session, this week only.' },
         ],

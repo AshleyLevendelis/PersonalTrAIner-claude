@@ -2,6 +2,268 @@
 
 Newest first. One line each.
 
+- [x] **A MOVED SESSION GETS STUCK, AND THE MOVER IS BLIND TO IT** — Ashley,
+  9 Sep 2026, 18:41, from the live app. Tuesday's Push & Press moved to
+  Wednesday, confirmed, card correct. Then on Wednesday: *"I missed todays
+  session"* → **"There's no session on Wednesday to move — that day is already
+  clear."** Three times, verbatim.
+  **REPRODUCED against the real resolver**, her exact sequence:
+  `sessionForDate(Wednesday)` → *Push & Press (moved in from Tuesday)*;
+  `hasSessionOn(plan, "Wednesday")` → **false**. The two disagree, and
+  `resolveMoveTarget` asks the second one.
+  **The cause, and it is galling.** `session-move.ts` contains BOTH answers.
+  `sessionForDate` is the move-aware one, and its own doc comment says it
+  exists because every surface used to run `plan.find(d => d.day === dayName)`
+  itself, "which is the right answer only for a day nothing has happened to".
+  `resolveMoveTarget` — twenty lines above it, in the same file — still asks
+  `hasSessionOn(plan, fromDayName)`, which is that exact naive lookup. The one
+  place that most needed the fix is the one place that never adopted it.
+  **What it costs her today:** once a session has been moved onto a day, it
+  cannot be moved again and she cannot say she missed it. It is stuck there
+  until the week rolls over. Whether marking such a day as a rest is equally
+  blind is NOT yet checked.
+  **A CORRECTION I OWE.** I first told her that sentence was not in the
+  codebase and the coach must have written it — evidence, I claimed, that the
+  second pass was working. Wrong: it is a literal string at
+  `session-move.ts:108`. I had grepped only the deployed edge function, not the
+  repo, and reported the absence as if I had searched everywhere. The right
+  claim was "not in the server function", which is a much weaker thing to know.
+  **Ashley's ruling, 9 Sep 2026**, asked as "should a twice-missed session move
+  again, or should the app offer to drop it": **ask, and let her choose** —
+  offer both moving it on and dropping it, and let her pick.
+  **BUILT, 10 Sep 2026.** On the day it landed on, the app now says: *"That's
+  Wednesday's Upper Pull & Core — you already moved it once. Want it on Friday
+  instead, or shall we drop it and take today off?"* with two buttons under it,
+  **Move it to Friday** and **Take today off instead**. Naming a day IS the
+  answer — once she has said Friday, by tapping or typing, the move goes
+  through; asking again would be the same loop in a politer voice. Moving it on
+  REWRITES the original move (Wednesday → Friday) rather than stacking a second
+  one, so the app can still say which day the session belongs to. Dropping it
+  goes through the existing rest-day card, which is what stops either day
+  counting as missed. `hasSessionOn` is deleted outright, so nothing exported
+  from that file can tempt a caller back to the plan's raw row.
+  **THREE THINGS I GOT WRONG IN THE PLAN, and how.**
+  (1) I wrote that marking such a day as a rest failed **silently**. It did
+  not: the builder returns null and its one caller supplies *"There's no
+  session on that day to rest from — it's already a rest day on your plan."* —
+  the WRONG sentence, not no sentence. I read the builder's `return null` and
+  stopped without reading its caller. The fix is the same either way; the
+  claim was not.
+  (2) The plan said both chips would be handled **client-side with no trip to
+  the model**. They are not: they ride the same `[QUICK_REPLIES]` channel every
+  other chip in this chat uses, so tapping one sends its words as an ordinary
+  message. There is no client-side chip interception in this app and building
+  one for this alone would be a bespoke path past the flow everything else
+  takes. The words are chosen to match triggers the deployed prompt already
+  documents, so the half that mattered still holds: **no function deploy**.
+  (3) The plan said dropping would set `deliberate_rest` directly. It goes
+  through the existing rest-day proposal card instead — same effect, one path
+  rather than two.
+  **WHAT THE BROWSER FOUND THAT THE SOURCE CHECK COULD NOT.** With the resolver
+  gate green, the card on screen read *"I'll put Wednesday's Upper Pull & Core
+  there"* above a row that said **Thursday** — the day it was merely sitting
+  on. Confirming rewrites the original record, so afterwards Thursday is an
+  ordinary rest day and Wednesday is the day the session left: the row was
+  describing a state that would never exist. Same for the line promising which
+  day would not count as missed. Both now name the true origin.
+  **Verified.** `test:moved-session-stuck` (17 checks, replaying her transcript
+  against the real resolver) and a new `verify:moved-session` driver — the real
+  chat at 390x844, the model stubbed at the fetch boundary, on a new
+  `?movedin=1` fixture. That fixture is the reason no browser check ever caught
+  this: the existing `?moved=1` puts the move's ORIGIN on today, which is the
+  case that always worked. 14 mutations on the unit gate, 3 on the driver, all
+  caught. Screenshots read, not just exit codes.
+  **Two gate-writing traps fallen into while building this**, both worth the
+  record because both are in CLAUDE.md and one was written the same morning:
+  a `!/hasSessionOn\(/` assertion satisfied by the COMMENT explaining the
+  removal (comments now stripped from both sources), and a "no free day left"
+  fixture that proved nothing because moving a day's session away FREES that
+  day — it was rebuilt as Sunday with the week ending under it.
+  **Ships with:** the frontend, on merge. No function deploy, no migration.
+
+- [x] **THE COACH GETS THE LAST WORD BACK, AND ROOM TO EXPLAIN IT** (roadmap
+  10/12, second half) — Ashley's item 10: *"Warm, empathetic, and supportive
+  persona. Relax the hard 1–3 sentence ceiling for Q&A and health advice turns
+  (allowing detailed 'why' explanations) while keeping direct tool
+  confirmations concise. End open advice turns with a natural follow-up
+  question."* She was offered measure-first and chose it, then on 9 Sep 2026
+  changed to **build it now, measure after** — one typed phrase instead of two,
+  with the risk stated: a regression would show up in the numbers afterwards
+  rather than before.
+  **Four handlers were still the app talking.** `log_workout_session` was the
+  worst §1 violator in the file — a markdown bullet list, **bold** exercise
+  names and up to three blank-line-separated paragraphs, answering a prompt
+  rule that says one to three sentences and never a list. It goes through the
+  same second pass as the rest, the old template demoted to the floor, quoting
+  the number of sets actually saved and refused if it reintroduces a list or
+  bold. Two handlers interpolated the **raw Postgres message** into her chat
+  (`the save failed: duplicate key value violates unique constraint …`) — she
+  cannot act on it and it reads as the app breaking rather than one save
+  failing; it now stays in the server log. The undeclared-tool fall-through
+  said *"Your plan has been updated."* for a tool that never ran, alongside an
+  `action` envelope the client cannot recognise; both gone, and the case is
+  logged so a hallucinated tool name is visible. And `generateConfirmation`
+  still carried a dead `ban_exercise` branch claiming *"I've permanently
+  removed X from your plan"* — unreachable, and a direct contradiction of the
+  prompt's own rule never to claim a ban. Deleted.
+  **THE SAFETY NET WENT IN FIRST, and it is the point.** A tool turn had a
+  floor; a plain question turn had none — if the model returned no text the
+  handler shipped *"I didn't quite catch that. Could you try rephrasing …"*,
+  which blames her for a turn the model skipped. **That is the exact shape that
+  killed the last tone rewrite**: `fa683fc` fixed the voice and simultaneously
+  stopped the model replying on 4 of 7 probed turns, caught only because
+  onboarding-chat had a reply guarantee and a probe. The coach had neither.
+  `resolvePlainReply` gives it onboarding's guarantee — one retry with a nudge,
+  tools off, then a floor that does not blame her — so the persona change lands
+  on top of an instrument rather than in front of one.
+  **The length rule now depends on the kind of turn**, which is what she asked
+  for. Confirming something that just happened keeps the hard one-to-three
+  ceiling; answering a question or giving advice says the thing and then says
+  WHY, with two short paragraphs as its own ceiling. The no-lists, no-headers,
+  no-bold rule survives both. **The four nudges in `tool-reply.ts` are a second
+  copy of that rule** and moved with it — the advice and evaluation nudges are
+  question turns and dropped the ceiling; the confirmation and numbers nudges
+  kept it. Left identical, the second pass would have gone on writing to the
+  old rule after the prompt had moved.
+  **Warmth, defined so it cannot become flattery.** "Warmth is attention, not
+  praise": notice that they trained when they didn't want to, not that their
+  question was great. The three *"congratulate them"* instructions are gone —
+  they were asking for exactly the grading openers the tone probe scores at
+  zero. A bad week is acknowledged before it is fixed, in a clause, with no
+  unrequested silver lining.
+  **The spending cap was counting wrong.** `checkSpendCap` runs once per
+  request and increments by one, but since the second pass a turn can be a
+  first leg plus a round trip plus a retry — three calls for one increment.
+  Halved rather than re-counted: the `+ 1` is hardcoded in the
+  `increment_ai_usage` plpgsql body and its argument list is named in two
+  REVOKE/GRANT migrations, so counting calls would be **a production database
+  change to buy nothing the arithmetic buys**. 300 → 150 per person, 20,000 →
+  8,000 overall, reasoning written beside them; the other three functions still
+  cost one call per request and keep their numbers.
+  **A DEVIATION FROM MY OWN PLAN, FLAGGED UNPROMPTED.** The plan also said
+  "three smaller canned lines in `log_meal`, `log_weight` and the swap handler
+  get the same treatment". They did not, and should not: every one of them is a
+  CLARIFYING QUESTION asked before anything ran — *"What are you doing instead?
+  I'll swap the day over to that."*, *"Which foods do you mean?"*, *"could you
+  give it to me in kilograms"*. There is no tool result to speak from, so the
+  round trip would spend a model call re-asking a question the template already
+  asks well, and `resolveToolReply` has nothing to guard the answer against.
+  The two that genuinely were the app talking over the coach — the raw database
+  errors — are fixed above.
+  Gates: `test:tool-reply` §7–§8 (the plain-turn guarantee against a mocked
+  model — silence retried, tools off, the nudge sent, two transport failures
+  capped, a leaked call dropped; plus the nudges matching the turn kind),
+  `test:coach-promises` Phase 3 (24 checks), `test:spend-cap` §7. **13
+  mutations; 2 survived the first run** — both because the check asserted a
+  call *appeared* rather than that its value was used, so a dead branch left
+  the string in place and passed. Both re-pinned on the assignment, which is
+  the same failure shape as the comment-satisfied check this file already
+  records. **NOT LIVE:** merge needs her word; `chat-gemini` needs the one
+  typed phrase → v73, now carrying Phase 2 and Phase 3 together.
+
+- [x] **THE EQUIPMENT OPTIONS NOW DESCRIBE THE EQUIPMENT** (roadmap 11/12) —
+  Ashley's item 11: *"Labels: Update onboarding descriptions for 'Minimalist'
+  vs. 'Home gym' to accurately reflect underlying equipment lists. Memory
+  Routing: Ensure specific equipment responses during onboarding populate
+  exercise filter constraints directly so the Exercise tab does not re-ask."*
+  Both halves were real.
+  **The words were a promise the plan did not keep.** "Minimalist — Bands &
+  kettlebells" in fact permitted **dumbbells**, a pull-up bar, a plyo box, an
+  ab wheel, a medicine ball, a jump rope and a weighted backpack (11
+  implements, 2 of them bands or kettlebells). "Home gym — Barbell, dumbbells,
+  bench" permitted **18**, including a squat rack, trap bar, EZ bar and dip
+  bars. "Bodyweight only — No equipment needed" prescribed pull-ups and loaded
+  a rucksack. Own only bands and a kettlebell, pick Minimalist, get dumbbell
+  work you cannot do. **Ashley's ruling, 9 Sep 2026**, from four options (fix
+  the words / fix the kit / ask what you actually own / words now and a
+  checklist later): **fix the words** — narrowing the sets would change every
+  existing plan on those tiers, and those sets are what the catalogue was
+  widened to fill. All four descriptions rewritten from `EQUIPMENT_SETS`.
+  **The Profile picker showed four bare words**, so the one screen where you
+  CHANGE the answer told you least about it. `ui/select.tsx` gains an optional
+  `hint` rendered OUTSIDE `ItemText` — Radix mirrors ItemText into the closed
+  trigger, and a description nested inside would print the whole sentence on a
+  28px inline control. No other call site passes it.
+  **Three prompt glosses disagreed with the sets and with each other**: the
+  setup coach was told *"home_gym means barbell+dumbbells+bench"*; the coach's
+  `equipment_tier` description and §3b both under-described a tier. All three
+  now match. The "closest fit, not exact" caveat stays, because it is true.
+  **Second half: "the Exercise tab re-asks" turned out to be about WEIGHT, not
+  kit.** The tier itself routes fine. What re-asks is `LoadCeilingPrompt` —
+  *"What are your heaviest dumbbells?"* — and it asks because setup had nowhere
+  to put the answer: say *"I've only got 12kg dumbbells"* and the sentence was
+  thrown away. Three slots now hold it, in `NEVER_BLOCKING_SLOTS` beside
+  `dislikedExercises` — **recorded when volunteered, never asked**, which keeps
+  Ashley's earlier ruling that onboarding must not gain a "how much can you
+  load" question. **The slot catalogue travels in the request, so the model
+  learns them with no deploy**; the prompt sentence that says never to ask, and
+  never to infer, needs the `onboarding-chat` deploy.
+  **The safety lock is client-side and deterministic**: `ceilingIsInUserWords`
+  refuses a write unless the turn's own text NAMES the implement and CONTAINS
+  the number. Both halves are load-bearing — without the implement word "I
+  weigh 80kg" becomes an 80kg dumbbell ceiling; without the number the model's
+  guess lands. This matters because `statedCeilingKg` treats any number it
+  finds as a HARD CLAMP and nothing downstream can tell an invented one from a
+  stated one, so a hallucinated "12" would quietly cap every dumbbell weight
+  for sixteen weeks. Refusing is cheap: the slot stays empty and the Exercise
+  tab asks at first use exactly as today. A full-gym answer discards a
+  volunteered ceiling wherever in the conversation it arrived. The three
+  columns were added to the onboarding INSERT explicitly — the same
+  column-by-column shape that omitted them from `restoreSession` and made every
+  plan build as though the ceiling had never been stated (see
+  `ceiling-reconcile.ts`).
+  **Found on the way:** `getExerciseCompatibilityWarnings` re-implemented the
+  equipment filter instead of calling `isEquipmentAllowed`, so an entry where
+  EITHER of two implements does the job was reported unavailable to someone who
+  owned one — a home_gym user was told "Needs t-bar" for T-Bar Rows, which
+  generation considers fully allowed. Its own doc comment claimed it reused
+  that logic; now it does.
+  Gate `test:equipment-labels`, **69 checks**: no description may name kit the
+  tier lacks, none may hide kit that matters, an "— no x" clause may only
+  exclude what the tier really lacks, a ceiling is only accepted from her own
+  words, unstated stays ABSENT rather than a limit of zero, and the insert
+  names all three columns. **18 mutations, all caught.** Browser:
+  `verify:equipment-labels` drives the Profile picker at 390×844 and asserts
+  both states — closed stays label-only, open shows every description, nothing
+  clipped — mutation-tested by moving the hint inside `ItemText`. The setup
+  card read back from a live render at phone size.
+  **Frontend on merge. `onboarding-chat` needs one typed phrase** for the
+  prompt half; `chat-gemini`'s two corrected glosses ride with the pending v73.
+
+- [x] **THE TAP-TARGET NOTE WAS WRONG, AND SO WAS MY FIRST FIX** — BACKLOG's
+  own line said *"`verify:tap-targets` fails on Home — 2 of 87 controls under
+  44px (the weigh-in button at 22px, a numeric input at 28px)"*. Re-run 9 Sep
+  2026: **5 of 87, across three tabs.** Home had **one** (the weigh-in number);
+  the "28px numeric input" is on EXERCISE — the two set-logging fields — and
+  Tools had two more. The note attributed all of it to Home. The count 87 was
+  right; nothing else was. (`BACKLOG:2485` was the accurate record all along.)
+  **Home fixed invisibly:** the 22px weigh-in number gets `hit-slop-44`, the
+  app's existing 44px `::after`. Nothing moves and nothing looks different.
+  Measured before: the probe 21px above its centre landed on the "Weight"
+  label beside it. Dashboard is now **0 of 14**.
+  **A CORRECTION I OWE, because the wrong fix nearly shipped.** I read the
+  Tools "Add item to list" button as a missing hit-slop and gave it
+  `relative z-10`, reasoning that a later sibling painted over its transparent
+  `::after`. Re-measuring said otherwise: the button already HAD a 44px slop
+  (`afterH: 44px, afterPos: absolute`) and every probe direction resolved past
+  it to an ancestor — the signature of an INERT hit area, not a small one. It
+  is `disabled` whenever the field beside it is empty, and `Button` carries
+  `disabled:pointer-events-none`, which hides the element and its `::after`
+  from `elementFromPoint`. The z-index was reverted; the real fix was in the
+  CHECK, which now skips disabled controls — measuring one asks a question with
+  no answer. How I got it wrong: I read the failing directions and the class
+  list, and inferred paint order instead of probing the element's own computed
+  `::after` and disabled state, which took one more run and settled it.
+  **The three real remainders are `<input>`s and needed a visual decision.** A
+  text field cannot carry a `::after`, so the only fix is real height.
+  **Ashley's ruling, 9 Sep 2026**, having seen the before and after at phone
+  size, from three options: **make all three 44px** — the two set fields and
+  the shopping-list field. The exercise page grows about 60px. Her reasoning
+  stands on the use: logging sets is done mid-workout, which is exactly when a
+  28px box gets missed.
+  The check ran standalone and was in no test list, which is why the note rotted
+  unnoticed.
+
 - [x] **WHAT YOU ATE IS NOT REWRITTEN BY WHAT YOU LATER DECIDE** (roadmap
   9/12) — Ashley's item 9: *"Ensure updating dietary preferences or adding
   extra items preserves historical consumed meal records instead of
@@ -327,9 +589,9 @@ Newest first. One line each.
   `test:macro-split` (57) all pin it. **This one needs the deploy in roadmap
   12, not a patch.**
 
-- [ ] `verify:tap-targets` fails on Home — 2 of 87 controls under 44px (the
+- [x] `verify:tap-targets` fails on Home — 2 of 87 controls under 44px (the
   weigh-in button at 22px tall, a numeric input at 28px). Pre-existing, not in
-  the 146-gate list; confirmed identical against pre-step-7 code.
+  the 146-gate list; confirmed identical against pre-step-7 code. **THIS LINE WAS WRONG and is superseded** — re-measured 9 Sep 2026 as 5 of 87 across three tabs, only one of them on Home. See the entry at the top of this file.
 
 - [ ] The last hard-coded "I can't …" reply in `chat-gemini` is
   `ban_exercise`. Deliberate (§7.2 A0 keeps ban disabled via chat) and it

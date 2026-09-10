@@ -736,10 +736,16 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
               <span className="flex items-center gap-1.5 text-[0.6875rem] text-muted-foreground">
                 <Scale className="size-3" aria-hidden /> Weight
               </span>
+              {/* hit-slop-44: the number is 22px tall by design (it is the
+                  headline of this cell, not a button-shaped control), and a
+                  22px target is half the comfortable minimum. The slop is an
+                  invisible ::after — nothing moves and nothing looks
+                  different. Measured before: the probe 21px above its centre
+                  landed on the "Weight" label beside it. */}
               <button
                 type="button"
                 onClick={() => setWeighInOpen(o => !o)}
-                className="mt-1 block text-left"
+                className="mt-1 block text-left hit-slop-44"
                 aria-expanded={weighInOpen}
               >
                 <span className="block tabular-mono text-[1.375rem] font-bold leading-none">
