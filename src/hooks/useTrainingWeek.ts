@@ -35,6 +35,10 @@ export interface TrainingWeekDay {
   movedTo?: { date: string; dayName: string } | null
   /** Set on the TARGET of a move — where this day's session came from. */
   movedFrom?: { date: string; dayName: string } | null
+  /** The person SAID this day's session did not happen — as opposed to the strip inferring it from an empty past day. */
+  markedMissed?: boolean
+  /** The person said they rested this day on purpose. Surfaced so a control can offer to unsay it. */
+  deliberateRest?: boolean
   /**
    * The session actually run on this date, moves taken into account. The one
    * answer every screen used to derive for itself with
@@ -130,6 +134,14 @@ export function classifyDay(
   const loggedWork = !!dashboardDay && (dashboardDay.workoutLogs.length > 0 || (dashboardDay.cardioLogs?.length ?? 0) > 0)
   if (dashboardDay?.session?.is_completed && loggedWork) return 'done'
   if (dashboardDay && dashboardDay.workoutLogs.length > 0) return 'partial'
+
+  // SAID missed, not merely looking missed. Ranked directly under logged work
+  // — someone who marked Tuesday missed and then trained has earned the done
+  // — and above every declared state below it, because a person who says "I
+  // missed it" and then moves the work still missed the day (Ashley's ruling,
+  // 10 Sep 2026: a missed day stays missed). Above the date judgement too, so
+  // a day marked missed this evening reads missed tonight, not tomorrow.
+  if (dashboardDay?.session?.marked_missed) return 'missed'
 
   // Deliberately swapped for something else, and said so at the time. Ranked
   // BELOW the logged-work checks above on purpose: someone who announced a
@@ -270,6 +282,8 @@ export function useTrainingWeek(
       dayName,
       state,
       swappedForActivity: dashboardDay?.session?.swapped_for_activity ?? null,
+      markedMissed: !!dashboardDay?.session?.marked_missed,
+      deliberateRest: !!dashboardDay?.session?.deliberate_rest,
       movedTo: resolved.movedTo,
       movedFrom: resolved.movedFrom,
       session: resolved.day,

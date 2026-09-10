@@ -751,6 +751,29 @@ const toolDeclarations = [
     },
   },
   {
+    name: "propose_missed_session",
+    description:
+      "PROPOSES recording a prescribed training day as MISSED — the session did not happen and nothing replaced it — this does NOT apply anything, the app shows a card and the user taps Confirm. Call this when they tell you they skipped or missed a session and are not calling it a rest ('I missed yesterday', 'didn't train Monday', 'skipped it', 'mark it missed'). It is NOT propose_rest_day: that records a rest they chose, this records a miss, and the week keeps counting it — Ashley's ruling, a missed day stays missed. It is NOT swap_session_for_activity: if they name something they did instead, use that. It is NOT propose_session_move: if the session is still happening later this week, use that. Do not call it for a day with no session prescribed, for a session they already logged, for a day that has not happened yet, or for a question ('does that count as missed?' — answer it).",
+    parameters: {
+      type: "object",
+      properties: {
+        date: {
+          type: "string",
+          description: "The day that was missed, as YYYY-MM-DD, worked out from today's date in the context ('yesterday' is today minus one). Defaults to today only when they clearly mean today. Never a day they did not name.",
+        },
+        reason: {
+          type: "string",
+          description: "One short sentence on why, in their words, if they gave one — shown on the card. Omit rather than invent one.",
+        },
+        origin_verbatim_quote: {
+          type: "string",
+          description: "The exact substring of the user's CURRENT message saying they missed or skipped it. Must be copied verbatim, not paraphrased.",
+        },
+      },
+      required: ["origin_verbatim_quote"],
+    },
+  },
+  {
     name: "log_workout_session",
     description:
       "DEPRECATED for natural-language logging — prefer log_workout instead, which is the same natural-language path but with a clarification round-trip when the exercise name is ambiguous or unstated; this tool writes immediately with no chance to ask first. Only call this for the narrow case log_workout doesn't cover: explicit structured per-exercise data the user is reading off (sets_completed/reps_completed/weight_kg as separate numbers, not a natural-language description). If the message gives sets/reps/weight but names no exercise (e.g. 'I did 5x5 at 80kg'), do NOT call this tool with a guessed exercise_name — ask which exercise instead and wait for the answer.",
@@ -1763,6 +1786,7 @@ FUNCTION CALL RULES (CRITICAL):
 - Trigger propose_volume_change / propose_schedule_change / propose_style_change / propose_concurrent_activity per §3d/§3e/§3f/§3g once the request is an actual imperative and you have the required fields, WITH an origin_verbatim_quote. None applies anything — all four show a confirm card. "Should I drop to three days?" is a question, not a command: answer it in text.
 - Trigger propose_custom_meal when the user TELLS you what they eat or will eat ("I usually have eggs and greek yoghurt and fruit for breakfast"). The flow Ashley specified: if any stated food has no amount, ask how much of each — one question, not an interrogation — then call with their exact foods and amounts. Their portions are never adjusted; the app fits the rest of the day around the meal. "What should I have for breakfast?" is a question — ANSWER IT IN TEXT; this tool is for what they are actually having. (That clause used to read "answer it or use propose_meal_addition", which is how "What should I eat?" produced a card offering to replace a real user's lunch on 8 Sep 2026. A question is never a trigger for either tool.)
 - Trigger propose_rest_day the same way when they tell you they are resting a training day and name nothing in its place. "Rest day today" is a statement of fact about their day, not a question — call the tool. "Should I rest today?" is a question: answer it.
+- Trigger propose_missed_session when they tell you a session did NOT happen and they are not calling it a rest — "I missed Monday", "skipped yesterday", "mark it missed". Missed and rested are different facts and the week shows them differently; never record one as the other. If they name something they did instead, that is swap_session_for_activity; if the session is happening later this week, propose_session_move.
 - Answer exercise form/technique questions ("How do I do X?", "What muscles does X work?") directly in your text response. Provide step-by-step form cues, target muscles, common mistakes, and coaching tips.
 - Trigger ban_exercise when the user says "I hate X", "never give me X", "remove X permanently", or explicitly flags an exercise to blacklist.
 - When a food LOGGING command is given (log_meal), execute it immediately. Scale portions to the meal slot budget above. Do NOT ask for macro details.
@@ -1932,11 +1956,12 @@ NEVER CLAIM AN ACTION YOU DID NOT TAKE:
 1. Do not say a day has been marked, moved, rescheduled, skipped or set to rest unless you actually called a tool that does it. Saying "I'll make sure today is marked as a rest day" and then not calling one is a lie the user only discovers the next morning, when the day shows as missed.
 2. When the user says they are skipping their lifting for something else and names it, call swap_session_for_activity. That is the tool for exactly this, and it is the only thing that changes what the Exercise tab shows.
 3. When they say they are resting a training day and name nothing in its place — "rest day today", "taking today off" — call propose_rest_day. That is the tool for exactly this, and it is the only thing that stops the day showing as missed tomorrow. It shows a card; the user confirms it. Until they do, nothing has happened, so do not say it has.
+3b. When they say a session did NOT happen and name nothing in its place and do not call it a rest — "I missed yesterday", "didn't train Monday", "mark it missed" — call propose_missed_session. A miss is not a rest: never answer a miss with propose_rest_day unless they say it was a rest. It shows a card; until they confirm, nothing has happened, so do not say it has.
 4. When they want something you have no tool for, say plainly you cannot do it from chat and point them at the RIGHT screen — the Profile screen for training days and personal details, the Nutrition tab for logging food, the Exercise tab for banning a movement. An honest "I can't do that from here" beats a confident sentence that turns out to be false. NOTE: changing WHICH DAYS they train is something you CAN do — call propose_schedule_change (§3e) rather than declining it.
 5. Speak in the past tense about a change ONLY after the tool has run. Before that, say what you are about to do, not what you have done.
 6. INTENTIONS ARE NOT APPOINTMENTS, WITH ONE EXCEPTION. Nothing in this app stores "I'll train tomorrow morning" — there is no tool for a TIME OF DAY and no screen that shows one. So never answer a stated intention with "locked in", "booked in", "got that scheduled", "I've put that down" or any phrasing that implies you wrote it somewhere. Measured live, 31 Aug 2026: "Got tomorrow morning locked in for your Push & Press session" was recorded in exactly no place. THE EXCEPTION, added 8 Sep 2026: moving a prescribed session to another DAY is now real — call propose_session_move (rule 7). Even then it is a card they confirm, so the same rule applies until they tap it: nothing has happened yet, so do not say it has.
 
-7. "I'LL DO IT TOMORROW" IS A MOVE, NOT A REST AND NOT A SWAP. The three day tools differ by whether the work still happens: propose_rest_day writes the day off, swap_session_for_activity replaces it with something they did instead, and propose_session_move keeps the session and puts it on another day this week. Use the third whenever they say a session is happening LATER ("I'll do it tomorrow", "can I shift today's to Thursday", "I'll make Tuesday's up later this week"). YOU DO NOT CHOOSE THE DAY — pass the day they named, or omit it if they named none, and the app takes the next day that is actually free, because a day that already has a session cannot take a second one. When it lands somewhere other than the day they asked for, the card says so; do not pre-empt it with a guess of your own.
+7. "I'LL DO IT TOMORROW" IS A MOVE, NOT A REST AND NOT A SWAP. The four day tools differ by whether the work still happens and whether the day was chosen: propose_missed_session records that it did not happen and nothing replaced it, propose_rest_day writes the day off as a rest they chose, swap_session_for_activity replaces it with something they did instead, and propose_session_move keeps the session and puts it on another day this week. Use the third whenever they say a session is happening LATER ("I'll do it tomorrow", "can I shift today's to Thursday", "I'll make Tuesday's up later this week"). YOU DO NOT CHOOSE THE DAY — pass the day they named, or omit it if they named none, and the app takes the next day that is actually free, because a day that already has a session cannot take a second one. When it lands somewhere other than the day they asked for, the card says so; do not pre-empt it with a guess of your own.
 
 8. WHEN ONE SENTENCE SAYS BOTH — the session is happening LATER and they are doing something else TODAY ("I didn't train this morning but I'm going to Muay Thai tonight and will do this morning's session tomorrow") — it is a MOVE. Call propose_session_move, and pass what they are doing today as also_doing_activity (and also_doing_duration_minutes ONLY if they said how long). Do not call swap_session_for_activity for it: a swap writes the session off, and they have just told you it is still happening.
 
@@ -2284,6 +2309,24 @@ Keep this context in mind to ensure your greetings and questions naturally align
             reply: "",
             proposal: {
               kind: "propose_rest_day",
+              rawArgs: { date: args.date, reason: args.reason },
+            },
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (name === "propose_missed_session") {
+        // Proposal, not a write — the same rail as propose_rest_day and for
+        // the same reason. Ashley's ruling, 10 Sep 2026: a missed day stays
+        // missed on the record, so this is its own kind and never folds into
+        // rest. The client resolves the date against the live plan, shows
+        // the card, and confirms; the server writes nothing.
+        return new Response(
+          JSON.stringify({
+            reply: "",
+            proposal: {
+              kind: "propose_missed_session",
               rawArgs: { date: args.date, reason: args.reason },
             },
           }),

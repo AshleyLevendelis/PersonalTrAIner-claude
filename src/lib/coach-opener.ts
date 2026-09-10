@@ -140,10 +140,16 @@ export function pickOpener(input: OpenerInput): Opener {
   if (missedYesterday) {
     return {
       kind: 'missed_yesterday',
-      text: `yesterday's ${missedYesterday.focus} didn't happen — no drama. Want to run it today, or call yesterday a rest day and pick up from here?`,
+      // THREE CHIPS, THREE DIFFERENT FACTS. "Call yesterday a rest day" used
+      // to be the only alternative to training, and it wrote deliberate_rest
+      // — a skipped session quietly rewritten as a chosen one. Ashley's
+      // ruling, 10 Sep 2026: a missed day stays missed. So the honest verb
+      // is offered beside the other two, and each writes what it says.
+      text: `yesterday's ${missedYesterday.focus} didn't happen — no drama. Run it today, mark it missed, or was it a rest day?`,
       chips: [
         "I'll do it today",
-        'Call yesterday a rest day',
+        'Mark it missed',
+        'Call it a rest day',
       ],
       attention: true,
     }
@@ -243,12 +249,16 @@ export function pickOpener(input: OpenerInput): Opener {
  * rare, and the alternative is a second range read for one edge case.
  */
 export function missedYesterdayFrom(
-  days: { date: string; dayName: string; state: string }[],
+  days: { date: string; dayName: string; state: string; markedMissed?: boolean }[],
   yesterdayDate: string,
   livePlan: { day: string; focus: string }[],
 ): { dayName: string; focus: string } | null {
   const y = days.find(d => d.date === yesterdayDate)
   if (!y || y.state !== 'missed') return null
+  // A miss the person already DECLARED is a fact on the record, not a
+  // question to reopen every morning. The strip still draws it missed; the
+  // coach just does not ask about something it has been told.
+  if (y.markedMissed) return null
   const focus = livePlan.find(d => d.day === y.dayName)?.focus ?? 'session'
   return { dayName: y.dayName, focus }
 }

@@ -2,30 +2,67 @@
 
 Newest first. One line each.
 
-- [ ] **PLANNED, NOT BUILT: "WHAT HAPPENED TO TODAY'S SESSION" — the five
-  verbs on the screen too.** First item Ashley picked from the must-have
-  audit's MISSING list, 10 Sep 2026. Measured: move / rest day / something
-  else instead / did it elsewhere exist as coach tools only; "missed" exists
-  nowhere — inferred once the date passes, and the coach's only offer for a
-  missed day ("call yesterday a rest day") writes `deliberate_rest`, quietly
-  rewriting a skipped session as a chosen one. Plan:
-  `docs/plans/what-happened-to-todays-session.md` — one "What happened?" sheet
-  on the Exercise tab's day menu, every verb writing through the same function
-  the coach's confirm card calls (`setSessionMove`, `setDeliberateRest`,
-  `writeHistoricalSession`, plus one new client write for the activity swap,
-  which today only the server makes); "missed" becomes a real column,
-  `workout_sessions.marked_missed` (a migration — needs her word); the coach
-  gets `record_missed_session` and its opener chips offer "Mark it missed" and
-  "Call it a rest day", not rest alone. Home's strip stays a record; feel stays
-  in chat; nothing edits the plan.
+- [x] **"WHAT HAPPENED TO TODAY'S SESSION" — THE FIVE VERBS, ON THE SCREEN TOO.**
+  Ashley's first pick from the must-have audit, 10 Sep 2026, built on "Build
+  it, including the database column". Measured before building: move / rest
+  day / something else instead / did it elsewhere existed as coach tools only;
+  "missed" existed nowhere — the week strip inferred it once a date passed,
+  and the coach's only offer for a missed day ("call yesterday a rest day")
+  wrote `deliberate_rest`, quietly rewriting a skipped session as a chosen one.
   **Decided by Ashley, 10 Sep 2026:** a marked-missed day STAYS missed on the
-  record, with the offer to move the session to a free day (option A —
-  recommended), over (B) treating missed and rest as the same thing, or (C)
-  having the coach ask why before it counts. Reason she was given: an honest
-  record, the work still owed if she wants it, and pattern-spotting built on
-  a record that does not flatter.
-  **Costs when built:** one migration, one `chat-gemini` deploy, frontend on
-  merge. **Not started.**
+  record, with the offer to move the session to a free day (A — recommended),
+  over (B) folding missed into rest, or (C) having the coach ask why first.
+  **Built:** a "What happened?" item on the Exercise tab's day menu opens a
+  sheet for the day on screen (a peeked day, else today) offering only the
+  verbs that apply — *I did it, not in the app* (past days: one row per
+  exercise pre-filled from the plan, logged as real sets in the plan's own
+  unit, then the session completed; today points at the grid), *I missed it*
+  (recorded, then the offer to move it to the resolver's next free day),
+  *Move it* (only days the coach's own resolver would accept), *Make it a
+  rest day*, *I did something else instead* (activity + minutes → the same two
+  rows the coach's tool writes). Every declared state shows at the top with
+  Undo. One new column, `workout_sessions.marked_missed`, ranked in the week
+  hook under logged work and above every other declared state and the date
+  guess — so today marked missed reads missed tonight. One new client writer
+  for the activity swap (until now only the server wrote that column). The
+  coach gains `propose_missed_session` on the same confirm rail as rest, its
+  prompt names a miss as its own fact ("the four day tools"), and the opener
+  and nudge chips become three honest choices — *I'll do it today · Mark it
+  missed · Call it a rest day* — and the coach stops asking about a miss it
+  has been told.
+  **Deviations from the plan, both from measurement:** "I did it, not in the
+  app" is a compact per-exercise form rather than the live grid, because the
+  grid is bound to today's session and the history writer refuses today by
+  design; the form uses the same writer the coach uses and shows every
+  number. And the coach tool is named `propose_missed_session` (not
+  `record_…`) so it sits on the proposal rail like its three siblings.
+  **Found in the browser, fixed:** the form was about to log a 40-metre
+  carry as 40 reps — it now carries the prescription's unit from the same
+  helper the grid uses; and its hint claimed sets were "logged as you type",
+  which was false. **Found by mutation, fixed:** the one-writer-per-column
+  check passed while a writer's update branch wrote the wrong column, because
+  the insert branch still named the right one — a stronger check now pins
+  both branches of each writer.
+  **Verified:** `test:what-happened` (62 checks) and `verify:what-happened`
+  (33 checks in a real Chromium at 390×844, four screenshots read; the driver
+  pins a day chosen so the fixture has a free day ahead in the same programme
+  week and a real past training day behind — a first version pinned Monday
+  and found "no free day", which was the fixture's week boundary, and the
+  coach would have said the same). **32 mutations tried, 32 caught** — 28
+  against the gate, 4 against the driver. All coach gates green
+  (chat-actions, coach-promises, coach-rules-sync, chat-app-reality,
+  pending-actions, tool-reply, context-is-read); training-week, session-move,
+  moved-session-stuck, one-today, home-week-strip, coach-opener, coach-nudge
+  green. Full fast sweep re-run before push.
+  **Not proven live:** the column does not exist in either database until
+  the migration is pushed from her machine (`db:push-both`, then
+  `test:schema-parity`); the coach's new tool is not live until `chat-gemini`
+  is deployed. Until both, the screen's "I missed it" would fail its write
+  and say so ("Couldn't save that"), and the coach cannot mark a miss.
+  **Not done, named:** the missed-WEEK follow-up from the coach (this gives
+  it the fact; the follow-up is separate); the parity exceptions list; the
+  audit doc keeps its 10 Sep numbers as a record — CLAUDE.md's contract lines
+  were updated instead. Plan: `docs/plans/what-happened-to-todays-session.md`.
 
 - [x] **THE MUST-HAVE CONTRACT IS IN CLAUDE.md, AND IT HAS BEEN MEASURED.**
   Ashley, 10 Sep 2026: *"help me plan updating claude.md to be very clear

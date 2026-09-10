@@ -17,7 +17,7 @@ import { getExerciseEntry } from '@/lib/exercise-db'
 import { createPendingAction, claimPendingAction, declinePendingAction, markExecuting, resolvePendingAction, getPendingAction, expireOldPendingActions, isWithinUndoWindow, type PendingActionReceipt } from '@/lib/pending-actions-store'
 import { APPEND_PROPOSAL_KINDS, INTENT_PROPOSAL_VERB, buildIntentProposal } from '@/lib/intent-proposal'
 import { pickAccountabilityCheckIn } from '@/lib/accountability'
-import { executeExerciseSwap, executeMealSwap, executeMealAddition, undoMealAddition, undoExerciseSwap, executeInjuryAdaptation, executeLastingInjury, executeInjuryRecovered, executeEquipmentAdaptation, executeVolumeChange, executeScheduleChange, executeStyleChange, executeConcurrentActivity, executeRestDay, undoRestDay, undoWeekRangeChange, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type LastingInjuryPayload, type InjuryRecoveredPayload, type EquipmentAdaptationPayload, type VolumeChangePayload, type ScheduleChangePayload, type StyleChangePayload, type ConcurrentActivityPayload, type RestDayPayload, executeSessionMove, undoSessionMove, type SessionMovePayload } from '@/lib/pending-action-executor'
+import { executeExerciseSwap, executeMealSwap, executeMealAddition, undoMealAddition, undoExerciseSwap, executeInjuryAdaptation, executeLastingInjury, executeInjuryRecovered, executeEquipmentAdaptation, executeVolumeChange, executeScheduleChange, executeStyleChange, executeConcurrentActivity, executeRestDay, undoRestDay, executeMissedSession, undoMissedSession, type MissedSessionPayload, undoWeekRangeChange, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type LastingInjuryPayload, type InjuryRecoveredPayload, type EquipmentAdaptationPayload, type VolumeChangePayload, type ScheduleChangePayload, type StyleChangePayload, type ConcurrentActivityPayload, type RestDayPayload, executeSessionMove, undoSessionMove, type SessionMovePayload } from '@/lib/pending-action-executor'
 import { STYLE_OPTIONS } from '@/lib/onboarding-slots'
 import { MOVEMENT_DEMANDS, TIMES_OF_DAY, canonicalDay, activityDays, describeActivity, reorderTracksForClassDays, HEAVY_TRACKS, activityCountsAsLoad, countWorkingSets } from '@/lib/concurrent-activity'
 import { getSplitForDays, generateMesocycle, setRandomSource, resetRandomSource } from '@/lib/exercise-plan'
@@ -1672,6 +1672,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     if (pendingAction.kind === 'propose_style_change') return "Here's your plan in the new style:"
     if (pendingAction.kind === 'propose_concurrent_activity') return "Here's the week built around it:"
     if (pendingAction.kind === 'propose_rest_day') return 'Want me to mark that as a rest day?'
+    if (pendingAction.kind === 'propose_missed_session') return 'Want me to mark that session as missed?'
     if (pendingAction.kind === 'propose_session_move') return 'Want me to move that session?'
     const intentVerb = INTENT_PROPOSAL_VERB[pendingAction.kind]
     if (intentVerb) return `Want me to ${intentVerb} **${rows[0].after}**?`
@@ -2129,6 +2130,50 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         implications: [
           { severity: 'info', text: "It won't count as a missed session, and it won't count against your week." },
           { severity: 'info', text: 'The session itself stays on the plan — this marks the day, it does not delete the work.' },
+        ],
+        rationale: reason,
+        reversible: true,
+      },
+    }
+  }
+
+  /**
+   * Builds propose_missed_session's card — "I missed it".
+   *
+   * Its own builder, not a flag on the rest-day one: Ashley's ruling of
+   * 10 Sep 2026 is that a missed day stays missed, so the two must never
+   * share a payload or a column. Same window and same "is there a session
+   * to have missed" check as the rest card. A day that has not happened yet
+   * cannot have been missed — that is a move or a rest, and the refusal
+   * says so.
+   */
+  const buildMissedSessionProposal = (rawArgs: Record<string, unknown>): {
+    scopeKey: string
+    preconditions: Record<string, unknown>
+    payload: MissedSessionPayload
+    diff: import('@/lib/pending-actions-store').ProposalDiff
+  } | null => {
+    const raw = typeof rawArgs.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(rawArgs.date)
+      ? rawArgs.date
+      : activeSession.date
+    const dayMs = 86_400_000
+    const delta = (new Date(`${raw}T00:00:00`).getTime() - new Date(`${activeSession.date}T00:00:00`).getTime()) / dayMs
+    if (!Number.isFinite(delta) || delta < -7 || delta > 0) return null
+    const dayName = new Date(`${raw}T00:00:00`).toLocaleDateString('en-US', { weekday: 'long' })
+    const resolvedDay = sessionForDate({ date: raw, plan: exercisePlan, moves: trainingWeek.moves })
+    const session = resolvedDay.day
+    if (!session || session.exercises.length === 0) return null
+    const reason = typeof rawArgs.reason === 'string' && rawArgs.reason.trim() ? rawArgs.reason.trim() : undefined
+    return {
+      scopeKey: `${profile.id}:propose_missed_session:${raw}`,
+      preconditions: { date: raw, dayName },
+      payload: { date: raw, dayName, sessionFocus: session.focus, reason },
+      diff: {
+        lead: `I'll mark ${dayName}'s ${session.focus} as missed — it stays on your record as a session that didn't happen. Shall I?`,
+        rows: [{ field: dayName, before: session.focus, after: 'Missed' }],
+        implications: [
+          { severity: 'info', text: "It counts as a missed session this week. That's the honest record, not a punishment." },
+          { severity: 'info', text: 'The session itself stays on the plan. Want it later this week? Tell me which day and I\'ll move it.' },
         ],
         rationale: reason,
         reversible: true,
@@ -3349,6 +3394,10 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         const rest = buildRestDayProposal(result.proposal.rawArgs)
         if (rest) built = { scopeKey: rest.scopeKey, preconditions: rest.preconditions, payload: rest.payload as unknown as Record<string, unknown>, diff: rest.diff }
         else refusal = "There's no session on that day to rest from — it's already a rest day on your plan."
+      } else if (result.proposal.kind === 'propose_missed_session' && result.proposal.rawArgs) {
+        const missed = buildMissedSessionProposal(result.proposal.rawArgs)
+        if (missed) built = { scopeKey: missed.scopeKey, preconditions: missed.preconditions, payload: missed.payload as unknown as Record<string, unknown>, diff: missed.diff }
+        else refusal = "I can't mark that as missed — either there's no session on that day, or it hasn't happened yet. If it's still coming up, I can move it or rest it instead."
       } else if (result.proposal.kind === 'propose_session_move' && result.proposal.rawArgs) {
         const move = buildSessionMoveProposal(result.proposal.rawArgs)
         if (move.ok) built = { scopeKey: move.scopeKey, preconditions: move.preconditions, payload: move.payload as unknown as Record<string, unknown>, diff: move.diff }
@@ -4039,6 +4088,17 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       // touch the plan, so there is nothing to restore beyond clearing the
       // flag — which is exactly what undoRestDay does.
       onLogsUpdated?.()
+    } else if (row.kind === 'propose_missed_session') {
+      const payload = row.payload as unknown as MissedSessionPayload
+      const result = await executeMissedSession(profile, payload)
+      receipt = result.receipt
+      const ok = receipt.failed.length === 0
+      title = ok ? 'Marked as missed' : "Couldn't mark that day"
+      rows = ok ? receipt.landed.map(line => { const [label, detail] = line.split(': '); return { label, detail } }) : []
+      undoToken = ok ? row.id : undefined
+      // Marks a DAY, touches no plan — same shape as the rest day above, so
+      // undo is clearing one flag and nothing needs restoring.
+      onLogsUpdated?.()
     } else if (row.kind === 'propose_session_move') {
       const payload = row.payload as unknown as SessionMovePayload
       const result = await executeSessionMove(profile, payload)
@@ -4271,6 +4331,9 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         }
       } else if (row.kind === 'propose_rest_day') {
         await undoRestDay(profile.id, row.payload as unknown as RestDayPayload)
+        onLogsUpdated?.()
+      } else if (row.kind === 'propose_missed_session') {
+        await undoMissedSession(profile.id, row.payload as unknown as MissedSessionPayload)
         onLogsUpdated?.()
       } else if (row.kind === 'propose_session_move') {
         await undoSessionMove(profile.id, row.payload as unknown as SessionMovePayload)

@@ -22,7 +22,7 @@ import { saveMesocycle, saveMesocycleWeek } from './mesocycle-persistence'
 import { getExerciseEntry } from './exercise-db'
 import { swapPoolMeal, clearMealPick, getMealPicksForDate, USER_REQUESTED_TAG, type MealSlotName } from './meal-store'
 import { supabase } from './supabase'
-import { setSessionMove, setDeliberateRest } from './daily-tracking'
+import { setSessionMove, setDeliberateRest, setMarkedMissed } from './daily-tracking'
 import { saveCardioLog } from './cardio-log-store'
 import { alsoDoingIsLoggable, type AlsoDoing } from './session-move'
 import type { MealAdditionPayload } from './meal-addition'
@@ -768,6 +768,49 @@ export async function executeRestDay(
 /** Clears the flag. The day goes back to whatever it was — due, or missed. */
 export async function undoRestDay(profileId: string, payload: RestDayPayload): Promise<void> {
   await setDeliberateRest(profileId, payload.date, false)
+}
+
+export interface MissedSessionPayload {
+  /** ISO date of the day that was missed. */
+  date: string
+  /** The day's name, for the receipt — resolved by the caller, not re-derived here. */
+  dayName: string
+  /** What the session would have been, for the receipt. */
+  sessionFocus?: string
+  reason?: string
+}
+
+export interface MissedSessionResult {
+  receipt: PendingActionReceipt
+}
+
+/**
+ * "I missed it", confirmed. Its own executor and its own column — never a
+ * rest-day write in disguise. Ashley's ruling, 10 Sep 2026: a missed day
+ * stays missed on the record, so the week keeps counting it; the only thing
+ * this changes is that the app now KNOWS rather than infers.
+ */
+export async function executeMissedSession(
+  profile: UserProfile,
+  payload: MissedSessionPayload,
+): Promise<MissedSessionResult> {
+  if (!profile.id) {
+    return { receipt: { landed: [], failed: [{ op: 'save', error: 'No profile to save against' }] } }
+  }
+  const ok = await setMarkedMissed(profile.id, payload.date, true)
+  if (!ok) {
+    return { receipt: { landed: [], failed: [{ op: 'save', error: "Couldn't mark that day — try again in a moment" }] } }
+  }
+  return {
+    receipt: {
+      landed: [`${payload.dayName}: missed${payload.sessionFocus ? ` — ${payload.sessionFocus}` : ''}`],
+      failed: [],
+    },
+  }
+}
+
+export async function undoMissedSession(profileId: string, payload: MissedSessionPayload): Promise<void> {
+  await setMarkedMissed(profileId, payload.date, false)
 }
 
 export interface SessionMovePayload {

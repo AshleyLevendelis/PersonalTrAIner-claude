@@ -67,15 +67,21 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   typed numbers); the plan itself is not edited
 
 **Changing one workout**
-- Move it to another day; it leaves today on every screen — `coach only`;
-  `session-move`, `moved-session-stuck`, `verify:session-move`,
-  `verify:moved-session`
-- Say "I missed it" and have that recorded as fact — `MISSING` (missed is
-  inferred once the date passes; Home offers a chat prefill)
-- Say "I did it, not in the app" — `coach only` (`log_history`)
-- Make today a rest day — `coach only`; `verify:rest-day-race`
-- Swap the session for an activity — `coach only`; screen shows it
-  (`verify:swapped-day`) but cannot do it
+- Move it to another day; it leaves today on every screen — both surfaces
+  since 10 Sep 2026 ("What happened?" on the day menu); `session-move`,
+  `moved-session-stuck`, `what-happened`, `verify:session-move`,
+  `verify:moved-session`, `verify:what-happened`
+- Say "I missed it" and have that recorded as fact, distinct from a rest —
+  both surfaces since 10 Sep 2026 (her ruling: a missed day stays missed);
+  `what-happened`, `training-week`, `verify:what-happened`. Needs migration
+  `20260910160000_add_marked_missed` pushed
+- Say "I did it, not in the app" — both; the screen logs real sets for a
+  PAST day (today's grid is the path for today); `what-happened`,
+  `verify:what-happened`; coach `log_history`
+- Make today a rest day — both; `what-happened`, `verify:rest-day-race`,
+  `verify:what-happened`
+- Swap the session for an activity — both; `what-happened`,
+  `verify:swapped-day`, `verify:what-happened`
 - Shorten or lighten TODAY only — `MISSING` (the volume toggle changes the
   plan going forward: `coach-volume-schedule`)
 - Rebuild today's session as a whole, for today — `MISSING`
@@ -120,9 +126,10 @@ facts: re-measure before acting on one, correct it here when it is wrong.
 ### Promise 2 — everything by hand or by asking
 
 - Every screen action has a coach path and every coach tool a screen path —
-  measured 10 Sep 2026: 31 coach tools; 7 things the screen does that the
-  coach cannot, 7 the coach does that the screen cannot (table in the
-  audit) — partial
+  measured 10 Sep 2026: 32 coach tools; 7 things the screen does that the
+  coach cannot, 3 the coach does that the screen cannot (add a food, add a
+  meal, custom meal — the four day-level ones closed the same day; table in
+  the audit) — partial
 - A written exceptions list, each with a reason, Ashley's to change —
   `MISSING`
 - The coach acts; it never sends anyone to a control, never describes one
@@ -145,9 +152,9 @@ facts: re-measure before acting on one, correct it here when it is wrong.
 - It asks before prescribing and uses the answer — prompt rule, kept in sync
   by `coach-rules-sync`; whether it HAPPENS is `UNGUARDED`
 - It notices patterns and coaches to them — `block-review`,
-  `beat-target-offer`, `session-feel`, `coach-opener` (missed yesterday),
-  `coach-nudge`, `activity-streak`; a missed WEEK gets a chat prefill, not a
-  follow-up
+  `beat-target-offer`, `session-feel`, `coach-opener` (missed yesterday —
+  and it stops asking once a miss is declared), `coach-nudge`,
+  `activity-streak`; a missed WEEK gets a chat prefill, not a follow-up
 - It holds its scope — doctor, physio, dietitian at the right moment —
   `starting-out` for the first-timer note; otherwise `UNGUARDED`
 - One voice, every time — tone probes only; `UNGUARDED`

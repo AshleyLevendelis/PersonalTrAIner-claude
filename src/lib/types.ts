@@ -619,7 +619,7 @@ export interface ChatPendingActionView {
 }
 
 export interface ChatReceiptView {
-  kind: 'log_workout' | 'propose_exercise_swap' | 'propose_meal_swap' | 'propose_custom_meal' | 'propose_meal_food_add' | 'propose_injury_adaptation' | 'propose_injury_as_lasting' | 'propose_injury_recovered' | 'propose_equipment_adaptation' | 'propose_volume_change' | 'propose_schedule_change' | 'propose_style_change' | 'propose_concurrent_activity' | 'propose_rest_day' | 'memory_fact_saved' | 'memory_goal_saved' | 'memory_context_fact_saved' | 'display_name_saved' | 'grocery_item_added' | 'water_logged' | 'steps_logged'
+  kind: 'log_workout' | 'propose_exercise_swap' | 'propose_meal_swap' | 'propose_custom_meal' | 'propose_meal_food_add' | 'propose_injury_adaptation' | 'propose_injury_as_lasting' | 'propose_injury_recovered' | 'propose_equipment_adaptation' | 'propose_volume_change' | 'propose_schedule_change' | 'propose_style_change' | 'propose_concurrent_activity' | 'propose_rest_day' | 'propose_missed_session' | 'memory_fact_saved' | 'memory_goal_saved' | 'memory_context_fact_saved' | 'display_name_saved' | 'grocery_item_added' | 'water_logged' | 'steps_logged'
   title: string
   rows: { label: string; detail: string; note?: string }[]
   summary?: string
@@ -803,6 +803,15 @@ export interface WorkoutSession {
    * added to fix, caught again on 31 Aug 2026 in its plainer form.
    */
   deliberate_rest?: boolean | null
+  /**
+   * "I missed it" — the person said this day's session did not happen, and
+   * nothing replaced it. Distinct from deliberate_rest on purpose (Ashley,
+   * 10 Sep 2026: a missed day stays missed; it is not a rest she chose) and
+   * from the week strip's own inference, which marks a bare past day missed
+   * without anyone saying so. Column added by migration
+   * 20260910160000_add_marked_missed.
+   */
+  marked_missed?: boolean | null
   /**
    * Set when this date's prescribed session is being RUN ON ANOTHER DAY —
    * "I'll do it tomorrow". The third answer neither column above can hold:

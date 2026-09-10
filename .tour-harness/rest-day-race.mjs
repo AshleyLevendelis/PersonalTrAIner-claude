@@ -109,8 +109,14 @@ await wait(5000)
 const chatLate = await text()
 check('once the plan lands the opener is replaced, not frozen',
   !/Hey — how's it going\?/.test(chatLate) && !/rest day/i.test(chatLate), chatLate.slice(0, 200))
-check('...and it names the session it now knows about',
-  /Squat & Carry/.test(chatLate), chatLate.slice(0, 300))
+// THE PROPERTY, NOT THE NAME. This pinned "Squat & Carry" — today's session
+// on the day it was written. The fixture's plan is laid out relative to the
+// REAL weekday (real.tsx, availableIdx), so the same driver saw "Upper Pull &
+// Core" two days later and failed on a screen that was right (10 Sep 2026).
+// What the check means is "the coach now names a session, and no longer
+// says it is waiting for the plan".
+check('...and it no longer says it is waiting for the plan',
+  !/Checking your plan/i.test(chatLate), chatLate.slice(0, 300))
 await shoot('rest-day-race-chat-settled')
 
 // ---------------------------------------------------------------------------
@@ -135,7 +141,15 @@ await shoot('rest-day-race-home-waiting')
 
 await wait(5000)
 const homeLate = await text()
-check('the block fills in once the plan arrives', /Squat & Carry/.test(homeLate), homeLate.slice(0, 240))
+// Same property, same reason as the chat check above: a named session with a
+// real exercise count where "Checking your plan…" was, whichever day it is.
+check('the block fills in once the plan arrives',
+  !/Checking your plan/.test(homeLate) && /TODAY'S SESSION[\s\S]{0,200}\d+ exercises/.test(homeLate), homeLate.slice(0, 240))
+// AND THE TWO SCREENS NAME THE SAME SESSION. The strongest form of the old
+// hard-coded check: whatever Home says today's session is, the coach's first
+// bubble said the same — read off Home, not typed in by whoever wrote this.
+const homeFocus = /TODAY'S SESSION\s+~\d+ min\s+([^\n]+)/.exec(homeLate)?.[1]?.trim() ?? null
+check('...and the coach named the same session Home shows', !!homeFocus && chatLate.includes(homeFocus), { homeFocus, chat: chatLate.slice(0, 200) })
 check('...with the button to start it', /Start session/.test(homeLate), homeLate.slice(0, 240))
 check('...and it no longer says it is checking', !/Checking your plan…/.test(homeLate))
 check('the week header knows which week it is', /WEEK 2 OF 16/.test(homeLate), homeLate.slice(0, 80))

@@ -1,4 +1,4 @@
-import { ChevronDown, MoreVertical, History } from 'lucide-react'
+import { ChevronDown, MoreVertical, History, CalendarDays } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import type { TrainingWeekDay } from '@/hooks/useTrainingWeek'
@@ -46,6 +46,7 @@ export function WeekContextRow({
   shortfallNote,
   onOpenProgram,
   onOpenSessionHistory,
+  onOpenWhatHappened,
   coachNoteShownBelow,
   expanded,
   onToggleExpanded,
@@ -66,6 +67,8 @@ export function WeekContextRow({
   shortfallNote?: string
   onOpenProgram?: () => void
   onOpenSessionHistory?: () => void
+  /** Opens the "What happened?" sheet for the day on screen — the five day-level verbs, on the screen too (10 Sep 2026). */
+  onOpenWhatHappened?: () => void
   /** The TrAIner nudge below is already showing `coachNote`, so this row must not repeat it. */
   coachNoteShownBelow?: boolean
   /**
@@ -117,7 +120,7 @@ export function WeekContextRow({
               visible line at the foot of the exercise list again
               (design_handoff_app_polish, Exercise §6). Moved, not copied:
               two entry points to one dialog is how they drift apart. */}
-          {onOpenSessionHistory && (
+          {(onOpenSessionHistory || onOpenWhatHappened) && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="size-7 shrink-0 text-muted-foreground" aria-label="More options">
@@ -125,10 +128,22 @@ export function WeekContextRow({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={onOpenSessionHistory}>
-                  <History className="size-3.5" />
-                  Session history
-                </DropdownMenuItem>
+                {/* THE DAY'S OWN VERBS. Missed, moved, rested, swapped, did it
+                    elsewhere — four of which the coach could do and the screen
+                    could only display, and one of which nobody could say at
+                    all. Ashley, 10 Sep 2026. */}
+                {onOpenWhatHappened && (
+                  <DropdownMenuItem onClick={onOpenWhatHappened} data-testid="what-happened-item">
+                    <CalendarDays className="size-3.5" />
+                    What happened?
+                  </DropdownMenuItem>
+                )}
+                {onOpenSessionHistory && (
+                  <DropdownMenuItem onClick={onOpenSessionHistory}>
+                    <History className="size-3.5" />
+                    Session history
+                  </DropdownMenuItem>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           )}

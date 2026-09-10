@@ -255,6 +255,108 @@ export async function setSessionMove(
   return !error
 }
 
+/**
+ * Records — or clears — "I missed this day's session".
+ *
+ * The fourth day-flag column (see the migration), written the same way the
+ * other three are: read before write, because split_type is NOT NULL with no
+ * default and an upsert would overwrite a real session's split. Distinct from
+ * setDeliberateRest by Ashley's ruling of 10 Sep 2026 — a missed day stays
+ * missed on the record; it is never folded into a rest she chose.
+ *
+ * Returns whether the write landed, for the same reason its siblings do: a
+ * caller that says "marked as missed" on a false here is lying.
+ */
+export async function setMarkedMissed(
+  profileId: string,
+  date: string,
+  missed: boolean,
+): Promise<boolean> {
+  const { data: existing, error: readErr } = await supabase
+    .from('workout_sessions')
+    .select('id')
+    .eq('profile_id', profileId)
+    .eq('date', date)
+    .maybeSingle()
+  if (readErr) {
+    console.error('setMarkedMissed: reading the day failed', readErr)
+    return false
+  }
+
+  if (existing?.id) {
+    const { error } = await supabase
+      .from('workout_sessions')
+      .update({ marked_missed: missed, updated_at: new Date().toISOString() })
+      .eq('id', existing.id)
+    if (error) console.error('setMarkedMissed: update failed', error)
+    return !error
+  }
+
+  // Nothing to clear if there is no row — and creating one to say "not
+  // missed" would write a session that never existed.
+  if (!missed) return true
+
+  const { error } = await supabase.from('workout_sessions').insert({
+    profile_id: profileId,
+    date,
+    // Names what this row is, as the rest, swap and move paths do.
+    split_type: 'missed',
+    duration_minutes: 0,
+    is_completed: false,
+    marked_missed: true,
+  })
+  if (error) console.error('setMarkedMissed: insert failed', error)
+  return !error
+}
+
+/**
+ * Records — or clears — "I did <activity> instead of this day's session".
+ *
+ * Until 10 Sep 2026 only the edge function wrote this column, so the screen
+ * could SHOW a swap ("You swapped today for Muay Thai") but never make one.
+ * This is the client half, in the same shape as the server's write (split
+ * 'swapped', duration 0, not completed) so the two writers leave the same
+ * row. The activity's cardio log is the caller's job, as it is the server's.
+ */
+export async function setSwappedForActivity(
+  profileId: string,
+  date: string,
+  activity: string | null,
+): Promise<boolean> {
+  const { data: existing, error: readErr } = await supabase
+    .from('workout_sessions')
+    .select('id')
+    .eq('profile_id', profileId)
+    .eq('date', date)
+    .maybeSingle()
+  if (readErr) {
+    console.error('setSwappedForActivity: reading the day failed', readErr)
+    return false
+  }
+
+  if (existing?.id) {
+    const { error } = await supabase
+      .from('workout_sessions')
+      .update({ swapped_for_activity: activity, updated_at: new Date().toISOString() })
+      .eq('id', existing.id)
+    if (error) console.error('setSwappedForActivity: update failed', error)
+    return !error
+  }
+
+  if (!activity) return true
+
+  const { error } = await supabase.from('workout_sessions').insert({
+    profile_id: profileId,
+    date,
+    split_type: 'swapped',
+    duration_minutes: 0,
+    is_completed: false,
+    swapped_for_activity: activity,
+  })
+  if (error) console.error('setSwappedForActivity: insert failed', error)
+  return !error
+}
+
 export interface WeeklyDashboardDay {
   date: string
   metric: DailyMetric | null

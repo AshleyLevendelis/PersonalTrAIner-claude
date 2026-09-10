@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, lazy, Suspense } from 'react'
 import { Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useWakeLock } from '@/hooks/useWakeLock'
@@ -34,6 +34,12 @@ import { FinisherRow } from './FinisherRow'
 import { AdditionalWorkSection } from './AdditionalWorkSection'
 import { AddUnplannedWork } from './AddUnplannedWork'
 import { RestDayCard, ActiveRecoveryCard, MovedDayCard } from './RestDayCard'
+import type { WhatHappenedTarget } from './WhatHappenedSheet'
+// Split out of the app chunk, like onboarding and the dev page: a dialog
+// opened from a menu item, by a person who has something to explain about a
+// day — not a screen every load pays for. test:bundle holds the budget.
+const WhatHappenedSheet = lazy(() => import('./WhatHappenedSheet').then(m => ({ default: m.WhatHappenedSheet })))
+import { getActiveMesocycleWeek } from '@/lib/calculations'
 import { setSessionMove } from '@/lib/daily-tracking'
 import { SessionSummaryDialog, type SessionSummaryData } from './SessionSummaryDialog'
 import { InsightBanner } from '@/components/ui/insight-banner'
@@ -128,6 +134,8 @@ export function TodayPanel({
   const currentMesoWeekObj = hasMesocycle ? mesocycle.find(w => w.week_number === liveWeek) : undefined
 
   const [peekDay, setPeekDay] = useState<string | null>(null)
+  // "What happened?" — the day on screen (a peeked day, else today).
+  const [whatHappened, setWhatHappened] = useState<WhatHappenedTarget | null>(null)
   const [borrowedDayName, setBorrowedDayName] = useState<string | null>(null)
   const [expandedWarmup, setExpandedWarmup] = useState(false)
   const [banBusy, setBanBusy] = useState<string | null>(null)
@@ -239,6 +247,12 @@ export function TodayPanel({
   // "DO IT TODAY INSTEAD" — unmakes the move (MovedDayCard says why). The same
   // write the chat's Undo uses, then the same re-reads the chat triggers, so
   // the strip, Home and the coach all see an ordinary day again.
+  const openWhatHappened = () => {
+    const dayName = peekDay ?? todayName
+    const cell = weekTrain.days.find(d => d.dayName === dayName)
+    if (cell) setWhatHappened({ date: cell.date, dayName })
+  }
+
   const handleDoItToday = async (): Promise<boolean> => {
     if (!profileId) return false
     const ok = await setSessionMove(profileId, today, null)
@@ -452,10 +466,25 @@ export function TodayPanel({
         shortfallNote={sessionEstimate.shortfall?.note}
         onOpenProgram={onOpenProgram}
         onOpenSessionHistory={onOpenSessionHistory}
+        onOpenWhatHappened={profileId ? openWhatHappened : undefined}
         coachNoteShownBelow={todayNudge?.source === 'week-note'}
         expanded={weekNotesOpen}
         onToggleExpanded={setWeekNotesOpen}
       />
+      <Suspense fallback={null}>
+      <WhatHappenedSheet
+        target={whatHappened}
+        onClose={() => setWhatHappened(null)}
+        profileId={profileId}
+        today={today}
+        plan={liveWeekPlan}
+        weekDays={weekTrain.days}
+        moves={weekTrain.moves}
+        weekOf={d => getActiveMesocycleWeek(planCreatedAt, new Date(`${d}T12:00:00`), mesocycle?.length || 4)}
+        weekNumber={liveWeek}
+        onChanged={() => { weekTrain.refresh(); onLogsUpdated?.() }}
+      />
+      </Suspense>
 
       {peekWorkout ? (
         peekWorkout.exercises.length === 0 ? (
