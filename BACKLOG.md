@@ -65,6 +65,18 @@ Newest first. One line each.
   between the feet is not a thing a person can do, and `isolation_hamstring`
   anchoring is what produces it. She is off that movement now, so it is no
   longer her problem — but it is still wrong for anyone.
+  **A NUMBER THAT ROSE AND I HAVE NOT FULLY EXPLAINED.** The quality sweep's
+  clamp warnings for Dumbbell Leg Curl went **29,811 -> 44,217** between the
+  previous run and this one. It is NOT that the lift is prescribed more often:
+  measured across 27 generated plans (3 tiers x 3 splits x 3 experience
+  levels), adding the kneeling machine took the dumbbell version from **116
+  slots to 108**, with 12 kneeling slots taking its place. The most likely
+  remaining cause is which WEEKS it now lands in — later weeks carry higher
+  progressed loads and clamp more often — but I have not proved that, and a
+  20-minute sweep per hypothesis is why. Recorded as unexplained rather than
+  reasoned into sounding solved. Quality is unmoved at **11.56/12, 0 of 9,216
+  below the floor**, identical to the run before, and `test:audit` is 17,423 /
+  0. It does not block; it raises the priority of the anchor question above.
   **Ships with:** the frontend, on merge. No function deploy, no migration.
   Plan: `docs/plans/the-leg-curl-she-actually-does.md`.
 
