@@ -13,7 +13,7 @@
 // surprise as the one that lands nowhere.
 // ---------------------------------------------------------------------------
 import {
-  resolveMoveTarget, sessionForDate, hasSessionOn, dayNameOf, addDays, daysBetween,
+  resolveMoveTarget, sessionForDate, dayNameOf, addDays, daysBetween,
   parseAlsoDoing, alsoDoingIsLoggable, alsoDoingRow, alsoDoingImplication, alsoDoingLeadClause,
   type SessionMove,
 } from '../src/lib/session-move'
@@ -55,10 +55,16 @@ check('...read at midday, so no timezone can shift the day it lands on',
 check('adding days crosses a month end', addDays('2026-09-30', 1) === '2026-10-01', addDays('2026-09-30', 1))
 check('...and a year end', addDays('2026-12-31', 1) === '2027-01-01', addDays('2026-12-31', 1))
 check('the gap between two dates is signed', daysBetween(TUE, THU) === 2 && daysBetween(THU, TUE) === -2)
-check('a lifting day has a session', hasSessionOn(plan, 'Tuesday'))
-check('a walk day does NOT — nothing to move, and nothing in the way',
-  !hasSessionOn(plan, 'Wednesday'))
-check('a day the plan never mentions does not either', !hasSessionOn(plan, 'Sunday'))
+// These asked hasSessionOn, which was deleted on 10 Sep 2026 — an exported
+// naive plan lookup is what put resolveMoveTarget on the wrong answer. Same
+// three facts, asked of sessionForDate, which is now the only way to ask.
+const runsOn = (d: string) => {
+  const r = sessionForDate({ date: d, plan, moves: [] })
+  return !!r.day && r.day.exercises.length > 0
+}
+check('a lifting day has a session', runsOn(TUE))
+check('a walk day does NOT — nothing to move, and nothing in the way', !runsOn(WED))
+check('a day the plan never mentions does not either', !runsOn(SUN))
 
 // ---------------------------------------------------------------------------
 console.log('\n[2] "I\'ll do it tomorrow" when tomorrow is free')
@@ -351,9 +357,18 @@ const moveBuilderEnd = chat.indexOf('\n  const build', moveBuilderAt + 10)
 const moveBuilder = chat.slice(moveBuilderAt, moveBuilderEnd > moveBuilderAt ? moveBuilderEnd : undefined)
 const leads = [...moveBuilder.matchAll(/`([^`]*won't count as missed\.)`/g)].map(m => m[1])
 check('the move card carries a lead for the day she asked for AND for the re-route', leads.length === 2, leads)
+// The origin day is the day the session CAME FROM, which after a re-move is
+// not the day it was sitting on — `remapFrom` carries the original. So the
+// name in the lead is pinned as the remap-aware one, and the binding behind it
+// is pinned too: a lead that named the day it merely LANDED on would read as
+// "Wednesday's Push & Press" for a session that is Tuesday's, and would fail
+// here rather than passing on a variable that happens to exist.
+check('the origin name the lead uses is the TRUE origin, resolved through the remap',
+  /const trueFromDayName = target\.remapFrom\s*\n\s*\?/.test(moveBuilder), null)
 for (const lead of leads) {
   check(`"${lead.slice(0, 44)}…" names the landing day, the origin day and the session`,
-    /\$\{target\.dayName\}/.test(lead) && /\$\{fromDayName\}/.test(lead) && /\$\{session\.focus\}/.test(lead), lead)
+    /\$\{target\.dayName\}/.test(lead) && /\$\{trueFromDayName\}/.test(lead)
+      && /\$\{session\.focus\}/.test(lead), lead)
   check('...and claims nothing has happened yet',
     !/\b(moved|has been|is now|done)\b/.test(lead), lead)
 }

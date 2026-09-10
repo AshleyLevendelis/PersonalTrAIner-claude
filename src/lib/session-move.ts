@@ -60,6 +60,29 @@ export type MoveTarget =
       asWanted: boolean
       /** Set when asWanted is false — the day they asked for, so the coach can say why it moved on. */
       requestedDayName?: string
+      /**
+       * Set only when the session being moved ARRIVED here by an earlier move.
+       * The write must update THAT record — origin → the new day — rather than
+       * chain a second move off the day it happens to be sitting on, or the
+       * app can no longer say which day the session belongs to.
+       */
+      remapFrom?: string
+    }
+  | {
+      ok: false
+      /**
+       * The day already holds a session that was MOVED here. Not a refusal —
+       * a question. Ashley's ruling, 9 Sep 2026: offer both moving it on and
+       * dropping it, and let her pick.
+       */
+      reason: 'moved_in'
+      message: string
+      /** The move that put the session here, so moving it on UPDATES this rather than stacking a second one. */
+      arrivedBy: SessionMove
+      /** The day it came from — what the session is actually called. */
+      originDayName: string
+      /** Where it would go if she moves it on, or null when the week has no free day left. */
+      nextFree: { date: string; dayName: string } | null
     }
   | { ok: false; reason: 'no_session' | 'already_moved' | 'no_free_day'; message: string }
 
@@ -83,11 +106,11 @@ export interface MoveTargetInput {
   existing?: SessionMove[]
 }
 
-/** Does the plan prescribe lifting on this weekday? */
-export function hasSessionOn(plan: WorkoutDay[], dayName: string): boolean {
-  const day = plan.find(d => d.day === dayName)
-  return !!day && day.exercises.length > 0
-}
+// hasSessionOn USED TO LIVE HERE and is deliberately gone. It answered "does
+// the plan prescribe lifting on this weekday" — true only for a day nothing has
+// happened to — and resolveMoveTarget asking it is the whole of the 9 Sep 2026
+// stuck-session bug. Everything now asks sessionForDate. Nothing exported from
+// this file should tempt a caller back into the plan's raw row.
 
 /**
  * Where this session may go.
@@ -101,30 +124,51 @@ export function resolveMoveTarget(input: MoveTargetInput): MoveTarget {
   const { fromDate, requestedDate, todayDate, plan, weekOf, existing = [] } = input
 
   const fromDayName = dayNameOf(fromDate)
-  if (!hasSessionOn(plan, fromDayName)) {
+
+  // ASK WHAT ACTUALLY RUNS HERE, not what the plan prescribes for this
+  // weekday. This function used to call hasSessionOn(plan, fromDayName) — the
+  // exact naive lookup sessionForDate (below) was written to replace, and the
+  // one place that never adopted it.
+  //
+  // Ashley, 9 Sep 2026, from the live app: she moved Tuesday's Push & Press to
+  // Wednesday, then on Wednesday said "I missed todays session" and got "There's
+  // no session on Wednesday to move — that day is already clear." Three times.
+  // The plan does say Wednesday is clear; the session that travelled there is
+  // invisible to the plan's own row. So a moved session could never be moved
+  // again, and she could not say she had missed it.
+  const resolved = sessionForDate({ date: fromDate, plan, moves: existing })
+
+  if (resolved.movedTo) {
+    return {
+      ok: false,
+      reason: 'already_moved',
+      message: `${fromDayName}'s session is already moved to ${resolved.movedTo.dayName}.`,
+    }
+  }
+
+  if (!resolved.day || resolved.day.exercises.length === 0) {
     return {
       ok: false,
       reason: 'no_session',
       message: `There's no session on ${fromDayName} to move — that day is already clear.`,
     }
   }
-  if (existing.some(m => m.fromDate === fromDate)) {
-    const already = existing.find(m => m.fromDate === fromDate)!
-    return {
-      ok: false,
-      reason: 'already_moved',
-      message: `${fromDayName}'s session is already moved to ${dayNameOf(already.toDate)}.`,
-    }
-  }
 
   const originWeek = weekOf(fromDate)
-  // A day is free when the plan asks nothing of it AND nothing has been moved
-  // onto it already. Both halves matter: the second is what stops two moved
-  // sessions stacking on the one genuinely empty day of the week.
-  const isFree = (date: string) =>
-    !hasSessionOn(plan, dayNameOf(date))
-    && !existing.some(m => m.toDate === date)
-    && date !== fromDate
+  // A day is free when nothing runs on it once moves are counted, and nothing
+  // has been moved onto it already. The first half asks sessionForDate rather
+  // than the plan for the same reason the origin check above does; the second
+  // is what stops two moved sessions stacking on the one genuinely empty day.
+  const isFree = (date: string) => {
+    const r = sessionForDate({ date, plan, moves: existing })
+    // `day` is the plan's ROW, which exists for a rest day too and carries no
+    // exercises — the same distinction hasSessionOn made and the first version
+    // of this rewrite dropped, which made every rest day look occupied and
+    // refused an ordinary move outright. Caught by the probe, not by reading.
+    return (!r.day || r.day.exercises.length === 0)
+      && !existing.some(m => m.toDate === date)
+      && date !== fromDate
+  }
 
   // THE EARLIEST DAY IT COULD RUN: the day after the session was prescribed,
   // or today if that day has already gone. Yesterday's session CAN be run
@@ -135,6 +179,48 @@ export function resolveMoveTarget(input: MoveTargetInput): MoveTarget {
   // A day they named that has already gone is not worth refusing over — scan
   // from the earliest legal day and let the caller say which day it landed on.
   const start = requestedDate && daysBetween(earliest, requestedDate) >= 0 ? requestedDate : earliest
+
+  /** First free day from `from`, staying inside the origin's own week. */
+  const firstFreeFrom = (from: string): string | null => {
+    for (let d = from; daysBetween(from, d) <= 7; d = addDays(d, 1)) {
+      if (weekOf(d) !== originWeek) break
+      if (isFree(d)) return d
+    }
+    return null
+  }
+
+  // ALREADY MOVED ONCE, AND MISSED AGAIN — a question, not a refusal.
+  // Ashley's ruling, 9 Sep 2026, asked as "should a twice-missed session move
+  // again, or should the app offer to drop it": ask, and let her choose. The
+  // move that brought it here rides along so moving it on can UPDATE that
+  // record rather than stack a second one — two moves would leave the app
+  // unable to say which day the session actually belongs to.
+  //
+  // NAMING A DAY IS THE ANSWER. The question below is only asked when she has
+  // not said where it should go ("I missed today's session"). Once she says
+  // "Friday" — by tapping the offer or typing it — that IS her choice, and
+  // asking again would be the loop this whole fix exists to remove.
+  if (resolved.movedFrom && !requestedDate) {
+    const nextFreeDate = firstFreeFrom(daysBetween(todayDate, addDays(fromDate, 1)) >= 0 ? addDays(fromDate, 1) : todayDate)
+    // "today" when it is today, which it usually is — she is standing in the
+    // day. Naming the weekday to someone looking at that weekday reads like
+    // the app talking about someone else's week.
+    const sittingOn = fromDate === todayDate ? 'today' : fromDayName
+    return {
+      ok: false,
+      reason: 'moved_in',
+      originDayName: resolved.movedFrom.dayName,
+      arrivedBy: { fromDate: resolved.movedFrom.date, toDate: fromDate },
+      nextFree: nextFreeDate ? { date: nextFreeDate, dayName: dayNameOf(nextFreeDate) } : null,
+      // DROPPING IS TAKING THE DAY OFF, and the sentence says so rather than
+      // leaving "drop it" to mean whatever she reads into it. It is also what
+      // the chips beside it do — ChatAssistant builds them from this outcome —
+      // so the question and the two answers describe the same two things.
+      message: nextFreeDate
+        ? `That's ${resolved.movedFrom.dayName}'s ${resolved.day.focus} — you already moved it once. Want it on ${dayNameOf(nextFreeDate)} instead, or shall we drop it and take ${sittingOn} off?`
+        : `That's ${resolved.movedFrom.dayName}'s ${resolved.day.focus} — you already moved it once, and there's no free day left this week. Shall we drop it and take ${sittingOn} off?`,
+    }
+  }
 
   const requestedDayName = requestedDate ? dayNameOf(requestedDate) : undefined
   for (let d = start; daysBetween(start, d) <= 7; d = addDays(d, 1)) {
@@ -147,6 +233,7 @@ export function resolveMoveTarget(input: MoveTargetInput): MoveTarget {
       dayName: dayNameOf(d),
       asWanted,
       ...(asWanted ? {} : { requestedDayName }),
+      ...(resolved.movedFrom ? { remapFrom: resolved.movedFrom.date } : {}),
     }
   }
 

@@ -2,7 +2,7 @@
 
 Newest first. One line each.
 
-- [ ] **A MOVED SESSION GETS STUCK, AND THE MOVER IS BLIND TO IT** — Ashley,
+- [x] **A MOVED SESSION GETS STUCK, AND THE MOVER IS BLIND TO IT** — Ashley,
   9 Sep 2026, 18:41, from the live app. Tuesday's Push & Press moved to
   Wednesday, confirmed, card correct. Then on Wednesday: *"I missed todays
   session"* → **"There's no session on Wednesday to move — that day is already
@@ -30,13 +30,56 @@ Newest first. One line each.
   claim was "not in the server function", which is a much weaker thing to know.
   **Ashley's ruling, 9 Sep 2026**, asked as "should a twice-missed session move
   again, or should the app offer to drop it": **ask, and let her choose** —
-  offer both moving it on and dropping it, and let her pick. Not built yet.
-  Design intended: the origin day resolves through `sessionForDate`; a session
-  that arrived by a move returns a new `moved_in` outcome carrying the original
-  move, so moving it on UPDATES that record rather than stacking a second one;
-  dropping sets `deliberate_rest` on the day it sits on, which `classifyDay`
-  already ranks as `rest_chosen` above the date judgement — so neither day
-  counts as missed and the session is not owed anywhere.
+  offer both moving it on and dropping it, and let her pick.
+  **BUILT, 10 Sep 2026.** On the day it landed on, the app now says: *"That's
+  Wednesday's Upper Pull & Core — you already moved it once. Want it on Friday
+  instead, or shall we drop it and take today off?"* with two buttons under it,
+  **Move it to Friday** and **Take today off instead**. Naming a day IS the
+  answer — once she has said Friday, by tapping or typing, the move goes
+  through; asking again would be the same loop in a politer voice. Moving it on
+  REWRITES the original move (Wednesday → Friday) rather than stacking a second
+  one, so the app can still say which day the session belongs to. Dropping it
+  goes through the existing rest-day card, which is what stops either day
+  counting as missed. `hasSessionOn` is deleted outright, so nothing exported
+  from that file can tempt a caller back to the plan's raw row.
+  **THREE THINGS I GOT WRONG IN THE PLAN, and how.**
+  (1) I wrote that marking such a day as a rest failed **silently**. It did
+  not: the builder returns null and its one caller supplies *"There's no
+  session on that day to rest from — it's already a rest day on your plan."* —
+  the WRONG sentence, not no sentence. I read the builder's `return null` and
+  stopped without reading its caller. The fix is the same either way; the
+  claim was not.
+  (2) The plan said both chips would be handled **client-side with no trip to
+  the model**. They are not: they ride the same `[QUICK_REPLIES]` channel every
+  other chip in this chat uses, so tapping one sends its words as an ordinary
+  message. There is no client-side chip interception in this app and building
+  one for this alone would be a bespoke path past the flow everything else
+  takes. The words are chosen to match triggers the deployed prompt already
+  documents, so the half that mattered still holds: **no function deploy**.
+  (3) The plan said dropping would set `deliberate_rest` directly. It goes
+  through the existing rest-day proposal card instead — same effect, one path
+  rather than two.
+  **WHAT THE BROWSER FOUND THAT THE SOURCE CHECK COULD NOT.** With the resolver
+  gate green, the card on screen read *"I'll put Wednesday's Upper Pull & Core
+  there"* above a row that said **Thursday** — the day it was merely sitting
+  on. Confirming rewrites the original record, so afterwards Thursday is an
+  ordinary rest day and Wednesday is the day the session left: the row was
+  describing a state that would never exist. Same for the line promising which
+  day would not count as missed. Both now name the true origin.
+  **Verified.** `test:moved-session-stuck` (17 checks, replaying her transcript
+  against the real resolver) and a new `verify:moved-session` driver — the real
+  chat at 390x844, the model stubbed at the fetch boundary, on a new
+  `?movedin=1` fixture. That fixture is the reason no browser check ever caught
+  this: the existing `?moved=1` puts the move's ORIGIN on today, which is the
+  case that always worked. 14 mutations on the unit gate, 3 on the driver, all
+  caught. Screenshots read, not just exit codes.
+  **Two gate-writing traps fallen into while building this**, both worth the
+  record because both are in CLAUDE.md and one was written the same morning:
+  a `!/hasSessionOn\(/` assertion satisfied by the COMMENT explaining the
+  removal (comments now stripped from both sources), and a "no free day left"
+  fixture that proved nothing because moving a day's session away FREES that
+  day — it was rebuilt as Sunday with the week ending under it.
+  **Ships with:** the frontend, on merge. No function deploy, no migration.
 
 - [x] **THE COACH GETS THE LAST WORD BACK, AND ROOM TO EXPLAIN IT** (roadmap
   10/12, second half) — Ashley's item 10: *"Warm, empathetic, and supportive

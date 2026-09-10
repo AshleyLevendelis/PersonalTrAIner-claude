@@ -44,7 +44,21 @@ window.addEventListener('error', e => { (window as never as Record<string, unkno
 const PROFILE_ID = '00000000-0000-4000-8000-000000000001'
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 const todayIdx = new Date().getDay()
-const availableIdx = new Set([todayIdx, (todayIdx + 2) % 7, (todayIdx + 4) % 7, (todayIdx + 5) % 7])
+
+// ?movedin=1 — HER SITUATION, 9 Sep 2026: yesterday's session was moved onto
+// today, and today is not a training day of its own. That second half is why
+// the existing ?moved=1 fixture in real.tsx never caught this — it puts the
+// move's ORIGIN on today, which is the case that always worked. So the
+// training days shift by one: the day it came FROM trains, the day it landed
+// on does not.
+const MOVED_IN = new URLSearchParams(location.search).get('movedin') === '1'
+const availableIdx = new Set(MOVED_IN
+  ? [(todayIdx + 6) % 7, (todayIdx + 2) % 7, (todayIdx + 4) % 7, (todayIdx + 5) % 7]
+  : [todayIdx, (todayIdx + 2) % 7, (todayIdx + 4) % 7, (todayIdx + 5) % 7])
+const iso = (offsetDays: number) => {
+  const d = new Date(); d.setDate(d.getDate() + offsetDays)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
 
 const profile: UserProfile = {
   id: PROFILE_ID,
@@ -121,6 +135,16 @@ const seededRows = (SEED_NUDGE || (OPENER && OPENER_ROWS > 0))
       created_at: new Date(Date.now() - (seeded.length - i) * 60_000).toISOString(),
     }))
   : []
+// The one row that makes today a day a session ARRIVED on. Same shape as
+// real.tsx's ?moved=1 row, pointed the other way: origin yesterday, target
+// today. getSessionMovesInRange reads both ends, so a move whose origin sits
+// outside the Mon-Sun window is still seen.
+const movedInSession = MOVED_IN
+  ? [{
+      id: 'ws-movedin', profile_id: PROFILE_ID, date: iso(-1), is_completed: false,
+      split_type: 'moved', duration_minutes: 0, moved_to_date: iso(0),
+    }]
+  : []
 const finishedSession = SEED_NUDGE
   ? [{
       id: 'ws-today', profile_id: PROFILE_ID, date: todayStr,
@@ -131,7 +155,7 @@ const finishedSession = SEED_NUDGE
 
 const db: Db = {
   fitness_profiles: [{ ...profile, id: PROFILE_ID }],
-  daily_metrics: [], exercise_set_logs: [], workout_sessions: finishedSession, cardio_logs: [],
+  daily_metrics: [], exercise_set_logs: [], workout_sessions: [...finishedSession, ...movedInSession], cardio_logs: [],
   daily_steps: [], meal_events: [], meal_plan_picks: [], meal_plan_slots: [],
   favorite_meals: [], grocery_items: [], load_suggestions: [], pending_actions: [],
   plan_adaptations: [], user_facts: [], user_context_facts: [], user_goals: [],
