@@ -2,6 +2,47 @@
 
 Newest first. One line each.
 
+- [x] **THE RAMP-UP TICKS WERE INVISIBLE, SO SHE REPORTED THE SAME BUG TWICE**
+  — Ashley, 10 Sep 2026, mid-session on Deadlifts: *"theres no way to log the
+  ramp up weights."* **The identical sentence she sent on 7 Sep 2026**, which
+  was built and shipped to her own ruling: a place-keeper, not a log —
+  tappable ticks on today's session, nothing written to the database.
+  **The feature was live and working. Nobody could see it.** An untapped step
+  rendered with the same colour, size and weight as the read-only `<span>` one
+  branch above it: no border, no background, no icon. The only visual
+  difference — a check mark and a strike-through — arrived AFTER a tap nobody
+  knew was possible. The "tap one to mark it done" hint lives in a `title`
+  attribute, which a phone never shows. Her screenshot is five weights reading
+  as a printed list, which is exactly what they looked like.
+  **Fixed:** an untapped step now carries a hairline border, a faint
+  background of its own and an empty-circle icon; the tapped state is
+  unchanged. `verify:tap-targets` re-run — all 86 controls still reach 44px,
+  because the visual chip is small but `hit-slop-44` still expands the hit
+  area.
+  **THE GATE FOR THIS ALREADY EXISTED AND PASSED THE WHOLE TIME.**
+  `test:ramp-up-visibility` §4 was written for the 7 Sep fix and checks that a
+  step is a real control, carries `aria-pressed`, says "tap to mark done" in
+  its aria-label, writes no set, and survives a tab switch. Every one of those
+  was true. None of them asks whether a sighted person can TELL. Three checks
+  added for the property that was missing — an untapped step is drawn as a
+  control, carries an icon before it is tapped, and the read-only branch stays
+  plain text so the two can be told apart. All three mutation-tested, including
+  a replay of the exact bug.
+  **Verified on screen**, not only in source: a new `verify:ramp-ticks` driver
+  at 390x844 reads the COMPUTED style of a real ramp button — 1px border, a
+  non-transparent background, an icon present before tapping, and a tap that
+  flips the label to "done — tap to unmark". Restoring the original styling
+  fails 4 of its 7 checks. Today is pinned to a Monday through the dev clock,
+  because the harness's real today has no ramped lift and the ramp is tickable
+  on today's session only — the first reusable use of that override in a
+  driver.
+  **The lesson, and it is not a small one:** every check in §4 tested that the
+  control WORKED. A control that works and cannot be seen is indistinguishable,
+  to the person holding the phone, from one that does not exist. "Anything the
+  user SEES gets a `verify:` driver" was already in CLAUDE.md; this shipped
+  with a `test:` and no `verify:`, and cost her the same report twice.
+  **Ships with:** the frontend, on merge. No function deploy, no migration.
+
 - [x] **THE LEG CURL SHE ACTUALLY DOES** — Ashley, 10 Sep 2026, mid-session
   from the gym floor, four observations on one exercise: the **Iso-Lateral
   Kneeling Leg Curl** she wanted was not offered as a swap; the card said

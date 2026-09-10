@@ -204,6 +204,37 @@ async function main() {
     check('...and says so in words, not only in styling',
       /tap to unmark/.test(strip) && /tap to mark done/.test(strip))
 
+    // IT MUST LOOK TAPPABLE BEFORE IT IS TAPPED. Ashley reported "theres no
+    // way to log the ramp up weights" on 7 Sep 2026; this section was written
+    // for that fix — and she reported THE SAME SENTENCE on 10 Sep, because an
+    // untapped step rendered with the same colour, size and weight as the
+    // read-only <span> one branch above. No border, no icon, nothing. The
+    // difference only arrived after a tap nobody knew was possible, and the
+    // "tap one to mark it done" hint lives in a `title`, which a phone never
+    // shows. Everything above this passed the whole time.
+    //
+    // Pinned on the PROPERTY — an untapped step carries a visible affordance
+    // the plain-text branch does not — rather than on a class name, so a
+    // restyle moves with it and a deletion fails.
+    const untapped = (strip.match(/: '([^']*)'\s*\n?\s*\}`\}/) || [])[1] ?? ''
+    check('an UNTAPPED step is drawn as a control, not as text',
+      /border-\[/.test(untapped) && /bg-\[/.test(untapped), untapped)
+    check('...and carries an icon before it is tapped, not only after',
+      /done\s*\n?\s*\?\s*<Check[\s\S]{0,120}:\s*<Circle/.test(strip), null)
+    // Scoped to the read-only block itself. A window measured in characters
+    // after `if (!interactive)` reached past the closing brace into the
+    // interactive branch below and found its <button> — the check failed on
+    // its own regex rather than on the code.
+    const readOnlyBlock = strip.slice(
+      strip.indexOf('if (!interactive)'),
+      strip.indexOf('const done =') > strip.indexOf('if (!interactive)')
+        ? strip.indexOf('const done =')
+        : strip.indexOf('return (', strip.indexOf('if (!interactive)') + 200),
+    )
+    check('...while the read-only branch stays plain text, so the two are told apart',
+      readOnlyBlock.includes('<span') && !readOnlyBlock.includes('<button') && !/border-\[/.test(readOnlyBlock),
+      readOnlyBlock.slice(0, 160))
+
     // NOT A LOG. If a tick ever writes a set, this whole design is wrong —
     // warm-ups are excluded from volume, PRs, progression and history, so the
     // row would be invisible the moment it was written.

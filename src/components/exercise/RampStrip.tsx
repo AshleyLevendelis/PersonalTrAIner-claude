@@ -1,4 +1,4 @@
-import { Thermometer, Check } from 'lucide-react'
+import { Thermometer, Check, Circle } from 'lucide-react'
 import type { RampDisplay } from '@/lib/session-derive'
 
 // ---------------------------------------------------------------------------
@@ -78,13 +78,25 @@ export function RampStrip({
             onClick={() => onToggle!(s.setNumber)}
             aria-pressed={done}
             aria-label={done ? `${text} warm-up, done — tap to unmark` : `${text} warm-up — tap to mark done`}
-            className={`hit-slop-44 inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-[0.625rem] transition-opacity ${
+            // AN UNTAPPED STEP MUST NOT LOOK LIKE THE PLAIN-TEXT VERSION.
+            // Ashley reported "theres no way to log the ramp up weights" on
+            // 7 Sep 2026, this was built to her ruling — and she reported the
+            // SAME SENTENCE on 10 Sep, because an untapped step rendered with
+            // the identical colour, size and weight as the read-only <span>
+            // one branch above: no border, no icon, nothing. The only visual
+            // difference arrived AFTER a tap nobody knew they could make, and
+            // the "tap one to mark it done" hint lives in a `title`, which a
+            // phone never shows. A control whose affordance only appears once
+            // you have used it is not a control anyone finds.
+            className={`hit-slop-44 inline-flex items-center gap-0.5 rounded border px-1 py-0.5 text-[0.625rem] transition-opacity ${
               done
-                ? 'text-[color:var(--role-warn-text)] opacity-50 line-through decoration-[color:var(--role-warn)]'
-                : 'text-[color:var(--role-warn-text)]'
+                ? 'border-transparent text-[color:var(--role-warn-text)] opacity-50 line-through decoration-[color:var(--role-warn)]'
+                : 'border-[color:var(--role-warn)]/50 bg-[color:var(--role-warn)]/10 text-[color:var(--role-warn-text)]'
             }`}
           >
-            {done && <Check className="size-2.5 shrink-0" aria-hidden />}
+            {done
+              ? <Check className="size-2.5 shrink-0" aria-hidden />
+              : <Circle className="size-2 shrink-0 opacity-60" aria-hidden />}
             {text}
           </button>
         )

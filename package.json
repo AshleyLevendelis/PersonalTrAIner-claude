@@ -199,6 +199,7 @@
     "verify:session-move": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/session-move.mjs",
     "verify:moved-session": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/moved-session.mjs",
     "verify:single-implement": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/single-implement.mjs",
+    "verify:ramp-ticks": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/ramp-ticks.mjs",
     "verify:equipment-labels": "vite build --config .onb-harness/vite.config.ts && node .onb-harness/equipment-select.mjs",
     "verify:diary-preservation": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/diary-preservation.mjs",
     "verify:coach-speaks-first": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/coach-speaks-first.mjs",
