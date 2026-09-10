@@ -89,6 +89,31 @@ Newest first. One line each.
   ~1.3×. Lenient rather than dangerous, and `quality-score.ts` does the same
   comparison correctly — so the scorer and the enforcer measure the same
   property in different units.
+  **WHAT THE QUALITY SWEEP THEN SURFACED, and it is the better half of this
+  entry.** After the fix, `test:quality` logged **29,811 clamp warnings, all
+  for this one exercise** — "computed 58kg, above the 48kg realistic ceiling
+  for its implement". That looks like a regression and is the opposite of one.
+  Measured on both versions of the entry:
+
+  | profile | before | after |
+  |---|---|---|
+  | 70kg female intermediate | `~14kg per hand` = 28kg of dumbbell | `~28kg` = 28kg — **unchanged** |
+  | 105kg male advanced | `~38kg per hand` = **76kg of dumbbell, unclamped** | `~48kg` = **48kg, clamped** |
+
+  The per-hand split was hiding the number from its own ceiling: 38 sits under
+  the 50kg-PER-HAND cap, so 76kg of dumbbell sailed through unremarked. Read as
+  the total it actually is, it trips the 48kg single-implement cap immediately.
+  So the fix LOWERED the heaviest prescriptions (76 -> 48) and made a wrong
+  number visible instead of silently doubled. This is the shape CLAUDE.md
+  already names: a check passing *because* a clamp catches it.
+  **The residue, NOT fixed and needing its own plan:** 48kg clamped between the
+  feet is still not a thing a person can do. `isolation_hamstring` anchoring
+  produces far too much load for this movement, and the general 48kg
+  single-implement ceiling is not a between-the-feet ceiling. The clamp's own
+  warning says it: *"a safety net, not a fix — something upstream produced a
+  wrong number and should be traced."* Safety-adjacent, so it gets a plan and
+  Ashley's ruling before any build. Ashley's own screen is unaffected (28kg,
+  well under any cap), which is why this is next-up rather than blocking.
   **Ships with:** the frontend, on merge. No function deploy, no migration.
 
 - [x] **A MOVED SESSION GETS STUCK, AND THE MOVER IS BLIND TO IT** — Ashley,
