@@ -45,6 +45,23 @@ too long to read. give me short punchy answer"*.
 - This is about how to write, not what to check. It never shortens the
   verification behind a claim — see **Reporting**.
 
+## Who is using this yet
+
+Ashley, 10 Sep 2026, asked whether a corrected prescription needed a message
+explaining itself: *"No live users are using the app yet. We are still in the
+building phase. So just update the weight. No message."*
+
+- So a change that alters what the app prescribes or displays does NOT need a
+  migration path, a transition, or a coach message explaining itself. Fix it
+  and let the new value stand.
+- This is about USER-FACING transitions only. It relaxes nothing else: the
+  production database is still select-only, `main` and every production deploy
+  still need her explicit word each time, and the safety rules on allergens,
+  injuries and load prescription are unchanged — those exist because the
+  numbers must be right, not because someone is watching them change.
+- Re-ask if this ever stops being true. "No live users" is a fact about today,
+  not a permanent licence.
+
 ## Git and deploy
 
 - Push finished work to the session's designated working branch (e.g. `claude/…`) without asking. Ashley ruled on this 29 Aug 2026, choosing "push it, and stop asking me about pushes" over keeping the old ask-every-time rule, because the interruption cost more than it protected. This replaces the previous "commit, never push" default.

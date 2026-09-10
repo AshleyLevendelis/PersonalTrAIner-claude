@@ -2,6 +2,95 @@
 
 Newest first. One line each.
 
+- [x] **"12kg PER HAND" ON A LIFT DONE WITH ONE DUMBBELL** — Ashley, 10 Sep
+  2026, from her phone, Pull & Hinge day: `Dumbbell Leg Curl 3×15-18 · ~12kg
+  per hand`. A dumbbell leg curl is done lying face down with ONE dumbbell
+  clamped between the feet. No hand holds anything. She reported it as a UI
+  string mismatch.
+  **IT WAS NOT ONLY A STRING.** The per-hand property is a 2× lever on the
+  prescribed kilograms. `loadingMode` reads the PLURAL of the equipment
+  string — `'dumbbells'` is a pair (halve the estimate, caption it "per hand"),
+  `'dumbbell'` is one implement (leave it whole, no caption) — and the entry
+  declared a pair while its own form cue, two lines below, read *"Lie face
+  down, dumbbell held between feet"*. So the estimate was halved and then
+  captioned with an instruction to double it. She was shown 12kg for a lift the
+  model had priced at 24.
+  **MEASURED, not inferred.** `prescribeLoad` run against both versions of the
+  entry (intermediate, 70kg): today `~14kg per hand` (28kg of dumbbell);
+  fixed `~28kg` (28kg of dumbbell). **The physical load does not change** — the
+  app was splitting one dumbbell across two hands that hold nothing.
+  **Why it matters beyond the caption:** `exercise_set_logs.weight_kg` is
+  stored bare, with no unit of its own, and `getLastLoggedWeight` feeds it
+  straight into next week's prescription. The caption on the logging column is
+  the only thing carrying the unit — SetGrid's own comment says exactly this,
+  in the opposite direction from this bug.
+  **Blast radius, measured: one wrong entry out of 31.** 23 movements are
+  priced per hand and 19 are genuinely a pair; Dumbbell Rows is one implement
+  one arm at a time, where "per hand" is correct; Shrugs and Romanian Deadlifts
+  are barbell-or-dumbbell duals (the RDL case documented as deliberate).
+  9 are already `single_implement` and all correct — goblet squats, the
+  carries, the kettlebell work. She found the only one, by eye.
+  **A SECOND FIX THE FIRST ONE MADE NECESSARY.** `statedCeilingKg` routes by
+  MODE, and `max_single_implement_kg` is only ever captured from KETTLEBELL
+  words. So correcting the leg curl to one dumbbell would have checked a
+  DUMBBELL lift against her kettlebell answer — against nothing at all if she
+  has never owned one. Fixing the label alone would have removed a safety
+  clamp. Now a single-implement entry using a dumbbell and no kettlebell reads
+  `max_dumbbell_kg`; mixed entries keep exactly what they had. Deliberately the
+  version that can only ADD a ceiling, never raise one. It also closes the same
+  pre-existing hole on Single-Leg Dumbbell Calf Raise.
+  **Ashley's ruling, 10 Sep 2026**, asked as "the corrected line reads ~24kg,
+  which on your phone looks like the weight doubled overnight — what should the
+  app do?": **"No live users are using the app yet. We are still in the
+  building phase. So just update the weight. No message."** So no coach
+  message, no migration, no transition.
+  **A CHECK OF MINE SURVIVED ITS OWN MUTATION, and it is the exact trap this
+  file warns about.** §5 of the new gate claimed to guard "every genuine pair
+  is still a pair" — but asserted only that pairs were still LABELLED per hand
+  and still returned true from `isPerSideLoad`. Deleting the halving outright,
+  which would double every dumbbell prescription in the app, passed it cleanly:
+  every label stayed correct. Closed by pinning the ARITHMETIC — the same
+  movement priced as one implement must come out roughly double — rather than
+  the caption. A caption is not a number.
+  **Verified.** `test:single-implement` (22 checks; §1 compares each entry's
+  form cues against its equipment array, so the next entry to contradict itself
+  fails without anyone seeing it on a screen). Six mutations, all caught after
+  the fix above. A new `verify:single-implement` browser driver at 390×844 on a
+  `?legcurl=1` fixture — a home-gym push/pull/legs profile, because that is
+  where the generator actually chooses this movement; nothing hand-seeded. The
+  screenshot shows `Dumbbell Leg Curl 3×18-23 · ~20kg` directly above `Shrugs
+  2×20-25 · ~12kg per hand` and `Incline Dumbbell Curls · ~4kg per hand` — the
+  fix and the untouched pairs in one frame.
+  **What that driver could NOT reach, said rather than blurred:** the leg
+  curl's own logging-column header. That column exists only for TODAY's
+  session, and no arrangement of available days puts this lift on today (all
+  seven rotations checked). The column's wiring is verified by contrast
+  instead — a total-labelled lift shows no qualifier, a one-sided lift shows
+  `Log weight · (single side)` — and the leg curl's label is pinned at the
+  source by the unit gate.
+  **Three bugs in my own driver before it measured anything**, all of the same
+  family: it searched for day headers reading "Monday" when they read "MON";
+  it interpolated an index as `heads[${'IDX'}]`, which resolves before the
+  `.replace` that was meant to fill it, throwing a ReferenceError that made the
+  loop break on its first pass; and it read the logging header by filtering
+  leaf nodes matching /weight/, which returns "Log weight" and drops the
+  "(single side)" beside it. Each one reported the thing as missing from a
+  screen that was rendering it correctly.
+  **Found while measuring, NOT fixed, and each needs its own look:**
+  (1) **Glute Kickback Machine** is `unilateral: true` but its equipment string
+  is not in `STACK_MACHINE_EQUIPMENT`, so it is never halved — one working leg
+  handed a number derived for two. That is a 2× OVER-prescription, the
+  dangerous direction, where this one was the safe direction. Worth doing next.
+  (2) **Shrugs** is `['barbell','dumbbells']` and so is priced and captioned per
+  hand even when done with a barbell; the identical RDL case is documented as
+  deliberate, this one is not — a question, not an assumption.
+  (3) **`enforceLoadCoherence`** compares a per-hand accessory number against a
+  barbell total with no normalisation, making its 0.65 ceiling effectively
+  ~1.3×. Lenient rather than dangerous, and `quality-score.ts` does the same
+  comparison correctly — so the scorer and the enforcer measure the same
+  property in different units.
+  **Ships with:** the frontend, on merge. No function deploy, no migration.
+
 - [x] **A MOVED SESSION GETS STUCK, AND THE MOVER IS BLIND TO IT** — Ashley,
   9 Sep 2026, 18:41, from the live app. Tuesday's Push & Press moved to
   Wednesday, confirmed, card correct. Then on Wednesday: *"I missed todays

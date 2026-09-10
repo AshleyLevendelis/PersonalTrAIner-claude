@@ -1950,7 +1950,14 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     prescription_type: 'reps',
     angle_vector: 'horizontal',
     primary_muscles: ['hamstrings'],
-    equipment: ['dumbbells'],
+    // ONE dumbbell, clamped between the feet — read the form cue below, which
+    // has said so since the entry was written. The PLURAL is what loadingMode
+    // reads (load-prescription.ts:657): 'dumbbells' means a pair, so the whole
+    // estimate was halved and captioned "per hand". Ashley, 10 Sep 2026, from
+    // her phone: "~12kg per hand" on a movement where no hand holds anything.
+    // She was being shown half the weight the plan meant, under a caption
+    // telling her to double it.
+    equipment: ['dumbbell'],
     joint_stress: 'low',
     form_cues: ['Lie face down, dumbbell held between feet', 'Curl heels toward glutes', 'Squeeze at top', 'Lower with control'],
     coach_note_swap: 'A real loaded leg curl with nothing but a dumbbell and a floor — no machine required.',

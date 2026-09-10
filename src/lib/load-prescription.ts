@@ -764,6 +764,17 @@ export function getLoadingCeilingKg(entry: ExerciseEntry, category: string | nul
 }
 
 /**
+ * A single-implement movement done with a dumbbell and nothing else — so the
+ * ceiling that applies to it is "your heaviest dumbbell", not "your heaviest
+ * kettlebell". An entry offering both is excluded: it can be done with either,
+ * and narrowing it to the dumbbell answer would cap a trainee below the
+ * kettlebell they own.
+ */
+function usesDumbbellOnly(entry: ExerciseEntry): boolean {
+  return entry.equipment.includes('dumbbell') && !entry.equipment.includes('kettlebell')
+}
+
+/**
  * What this trainee says they can ACTUALLY load, if they have said.
  *
  * Returns null when unstated — which is not the same as declined, and not the
@@ -789,7 +800,23 @@ export function statedCeilingKg(entry: ExerciseEntry, profile: UserProfile): num
   if (isImprovisedLoadImplement(entry)) return p.max_improvised_kg ?? null
   switch (loadingMode(entry)) {
     case 'dumbbell': return p.max_dumbbell_kg ?? null
-    case 'single_implement': return p.max_single_implement_kg ?? null
+    // ROUTE BY THE IMPLEMENT, NOT BY THE MODE. 'single_implement' covers both
+    // a kettlebell and ONE dumbbell, but max_single_implement_kg is only ever
+    // captured from kettlebell words (onboarding-slots.ts's kettlebell slot,
+    // and ceilingIsInUserWords' matcher). So a lift performed with a dumbbell
+    // was checked against her KETTLEBELL answer — and against nothing at all
+    // if she has never owned one.
+    //
+    // That gap was harmless while every dumbbell movement in the catalogue was
+    // a pair. Correcting Dumbbell Leg Curl to one dumbbell (10 Sep 2026) moved
+    // the first real lift into it, which would have removed a clamp while
+    // fixing a label. Narrow on purpose: a mixed dumbbell/kettlebell entry
+    // (goblet squats, the carries) can be done with either, so it keeps
+    // exactly the answer it had. This can only ADD a ceiling, never raise one.
+    case 'single_implement':
+      return usesDumbbellOnly(entry)
+        ? p.max_dumbbell_kg ?? null
+        : p.max_single_implement_kg ?? null
     // A barbell trainee is already asked their squat/bench/deadlift, and a
     // cable stack means a gym. Neither is asked, so neither has an answer.
     default: return null

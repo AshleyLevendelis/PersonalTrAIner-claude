@@ -80,6 +80,7 @@ const availableIdx = new Set([todayIdx, (todayIdx + 2) % 7, (todayIdx + 4) % 7, 
 // weekday. Off by default, so every existing run of this harness is
 // unchanged.
 const ABSURD = new URLSearchParams(location.search).get('absurd') === '1'
+const LEG_CURL = new URLSearchParams(location.search).get('legcurl') === '1'
 
 // ?planDelay=N — App.tsx holds exercisePlan/mesocycle at [] until its read
 // resolves (App.tsx:111,138). Every other run of this harness hands them over
@@ -92,9 +93,17 @@ const profile: UserProfile = {
   id: PROFILE_ID,
   age: 30, gender: 'male', height_cm: 178, weight_kg: 80, activity_level: 'moderate',
   fitness_goal: 'hypertrophy', preferred_time: 'morning', bmr: 1800, tdee: 2500,
-  equipment_access: 'full_gym', injuries: [], training_style: 'hybrid',
+  // ?legcurl=1 — THE ONE-DUMBBELL LIFT, ON A REAL GENERATED PLAN.
+  //
+  // Dumbbell Leg Curl is not reachable at full_gym on an upper/lower split:
+  // a machine leg curl wins the slot. A home-gym push/pull/legs profile is
+  // where the generator actually chooses it — measured across three tiers,
+  // three splits and three seeds before picking this one, rather than
+  // hand-seeding a plan row, which would have proved only that a string I
+  // wrote myself renders.
+  equipment_access: LEG_CURL ? 'home_gym' : 'full_gym', injuries: [], training_style: 'hybrid',
   training_experience: 'intermediate', session_duration_preference: '45-60',
-  workout_split_preference: 'upper_lower',
+  workout_split_preference: LEG_CURL ? 'push_pull_legs' : 'upper_lower',
   training_days: DAYS.map((day, i) => ({ day, available: availableIdx.has(i) })),
   weekly_schedule: {}, dietary_preferences: new URLSearchParams(location.search).get('ate') === '1' ? ['nut-free'] : [], concurrent_activities: [],
   exercise_exclusions: [] as unknown as never, macro_calculation_mode: 'STANDARD_STATIC',
@@ -234,7 +243,13 @@ const mealTotals = { calories: 1980, protein: 150, carbs: 190, fat: 60 }
 
 function Harness() {
   const { route } = useAppRoute()
-  const activeTab: Tab = route.kind === 'tab' ? route.tab : 'dashboard'
+  // VERBATIM FROM App.tsx:103-104, minus the branches this harness has no
+  // screens for. The program route is not a tab of its own — it renders
+  // INSIDE the exercise tab — and mapping it to the dashboard here sent
+  // "See the whole program" to Home, which is a fact about this harness and
+  // not about the app.
+  const activeTab: Tab =
+    route.kind === 'tab' ? route.tab : route.kind === 'program' || route.kind === 'train' ? 'exercise' : 'dashboard'
   const [ready, setReady] = useState(false)
   useEffect(() => { setReady(true) }, [])
   const [planArrived, setPlanArrived] = useState(PLAN_DELAY_MS <= 0)
