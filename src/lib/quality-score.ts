@@ -1001,7 +1001,6 @@ function scoreSelection(profile: UserProfile, mesocycle: MesocycleWeek[]): Dimen
     deductions.push({ rule: 'missing_pull_pattern', weekNumber: 1, detail: 'No pull-pattern exercise anywhere in the week despite equipment allowing one' })
   }
 
-
   // Same-muscle-group accessories should stay in the same ballpark across
   // the week — a 26kg curl next to a 2kg shrug in the same week was a
   // direct review finding.
