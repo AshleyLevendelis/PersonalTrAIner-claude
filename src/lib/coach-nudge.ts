@@ -193,17 +193,17 @@ export function pickNudge(input: NudgeInput, said: string[]): CoachNudge | null 
   }
 
   // 2. Yesterday was scheduled and nothing happened. Ranked here because it
-  //    changes what she does TODAY. Two chips, not three, for the reason the
-  //    opener records: the only schedule tool the coach has rewrites the weekly
-  //    pattern permanently, so "move it to your next day" would open a
-  //    conversation the coach can only finish by doing something bigger than
-  //    was asked.
+  //    changes what she does TODAY. Three chips since 10 Sep 2026, one per
+  //    fact: run it, mark it missed, or it was a rest — the same three the
+  //    opener offers, for the reason recorded there. No "move it" chip: a
+  //    move is a conversation about WHICH day, which the coach can hold when
+  //    asked, not a one-tap answer.
   if (unsaid(keys.missed) && input.missedYesterday) {
     return {
       kind: 'missed_yesterday',
       keys: [keys.missed],
-      text: `Yesterday's ${input.missedYesterday.focus} didn't happen — no drama. Want to run it today, or call yesterday a rest day and pick up from here?`,
-      chips: ["I'll do it today", 'Call yesterday a rest day'],
+      text: `Yesterday's ${input.missedYesterday.focus} didn't happen — no drama. Run it today, mark it missed, or was it a rest day?`,
+      chips: ["I'll do it today", 'Mark it missed', 'Call it a rest day'],
     }
   }
 

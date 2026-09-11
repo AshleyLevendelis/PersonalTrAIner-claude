@@ -1,6 +1,6 @@
 import type { UserProfile, MesocycleWeek, WorkoutDay, Exercise } from './types'
-import { EXERCISE_DATABASE, getMovementFamily, getVolumeRole, isIndicatedFor, type ExerciseEntry } from './exercise-db'
-import { getConstrainedPool, generateMesocycle, primerPatternsForTrack, getAffinityPrimerPool, getFlaggedJoints, CARDIO_RESERVED_SHARE, bestEquipmentRank, EQUIPMENT_QUALITY_TIERS, isEquipmentQualityExempt } from './exercise-plan'
+import { EXERCISE_DATABASE, getMovementFamily, getVolumeRole, isIndicatedFor, type ExerciseEntry, getExerciseEntry} from './exercise-db'
+import { getConstrainedPool, generateMesocycle, primerPatternsForTrack, getAffinityPrimerPool, getFlaggedJoints, CARDIO_RESERVED_SHARE, bestEquipmentRank, EQUIPMENT_QUALITY_TIERS, isEquipmentQualityExempt, TRACKS } from './exercise-plan'
 import { getGoalPolicy, resolveConditioningFrequency, RECOVERY_SET_MULTIPLIER, MAIN_LIFT_REST_FLOOR_SECONDS } from './goal-policies'
 import { EXPERIENCE_RPE_CEILING } from './periodization'
 import { setRandomSource, resetRandomSource } from './exercise-plan'
@@ -1239,4 +1239,77 @@ export function scorePlan(profile: UserProfile, mesocycle: MesocycleWeek[], comb
   }
   const overall = DIMENSION_KEYS.reduce((sum, key) => sum + dimensions[key].points, 0)
   return { overall: Math.round(overall * 10) / 10, dimensions }
+}
+
+// ---------------------------------------------------------------------------
+// A DAY THAT LOSES A MUSCLE ITS OWN PLAN ASKED FOR — MEASURED, NOT SCORED.
+//
+// Every coverage rule in scoreSelection is WEEK-scoped: push, pull, squat and
+// hinge must appear somewhere across the seven days. The only per-day rule is
+// day_label_mismatch, and for a Push & Press day that asserts nothing beyond
+// "contains a vertical push". So a push day can ship with a lateral raise and
+// no tricep work and score full marks — which is what happened, 11 Sep 2026,
+// and no gate could have caught it.
+//
+// WHY THIS IS NOT A DEDUCTION, and the measurement that decided it. Written
+// first as a scored rule in the Selection dimension, then measured across
+// 7,200 generated days before being wired in: it fires on 23.5% of them, and
+// its dominant case is the MIRROR of the one that prompted it — Push & Press
+// days keeping tricep work and core while losing the lateral raise (1,152 of
+// 1,692), not losing the tricep (144). Narrowing it to a strict priority
+// inversion — a later slot filled while an earlier one is empty — moved the
+// rate by half a point, 24.0% to 23.5%, which says the inversion IS the normal
+// behaviour rather than the exception.
+//
+// A deduction firing on a quarter of all days would move every score, could
+// push plans under the 7.2 floor, and would encode "core must not outrank a
+// named isolation" — a coaching opinion nobody has ruled on. So this stays a
+// measurement: test:day-coverage holds the rate against a recorded baseline,
+// so a real regression (the selector starting to drop named isolation far more
+// often) turns a gate red, while today's behaviour is described rather than
+// punished. Whether any of it should cost score is Ashley's call, with these
+// numbers in front of her.
+export interface MissedIsolationDay {
+  day: string
+  focus: string
+  /** Tier-3 patterns the day's own track asked for, in the track's priority order. */
+  wanted: string[]
+  kept: string[]
+  lost: string[]
+  /** True when a LATER slot was filled while an earlier one stayed empty. */
+  inversion: boolean
+}
+
+/**
+ * Days that kept isolation work but not all of the isolation their track named.
+ *
+ * Deliberately silent about a day with NO isolation at all: that is the time
+ * cap being honest on a short session, not a selection failure, and counting
+ * it would drown the signal in every 30-minute day.
+ */
+export function daysMissingNamedIsolation(mesocycle: MesocycleWeek[], weekNumber = 1): MissedIsolationDay[] {
+  const week = mesocycle.find(w => w.week_number === weekNumber)
+  const out: MissedIsolationDay[] = []
+  for (const day of week?.days ?? []) {
+    const track = day.focus ? (TRACKS as Record<string, { slots: { tier: string; patterns: string[] }[] }>)[day.focus] : undefined
+    if (!track) continue
+    const wanted = track.slots.filter(sl => sl.tier === 'tier3_isolation').flatMap(sl => sl.patterns)
+    if (wanted.length === 0) continue
+    // THE CATALOGUE'S PATTERN, NOT THE PLAN'S. `Exercise.movement_pattern` is
+    // the coarse mesocycle vocabulary — 'push' / 'pull' / 'hinge' — which is
+    // why PUSH_PATTERNS above is `new Set(['push'])`. Track slots are written
+    // in the catalogue's fifteen-value vocabulary, and the two never
+    // intersect: reading ex.movement_pattern here would find nothing on every
+    // day forever and this would report a clean sweep it had not earned.
+    const present = new Set(
+      day.exercises.map(ex => getExerciseEntry(ex.name)?.movement_pattern).filter(Boolean) as string[],
+    )
+    const kept = wanted.filter(p => present.has(p))
+    const lost = wanted.filter(p => !present.has(p))
+    if (kept.length === 0 || lost.length === 0) continue
+    const firstLost = wanted.findIndex(p => !present.has(p))
+    const lastKept = wanted.reduce((acc, p, i) => (present.has(p) ? i : acc), -1)
+    out.push({ day: day.day, focus: day.focus!, wanted, kept, lost, inversion: lastKept > firstLost })
+  }
+  return out
 }

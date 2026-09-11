@@ -108,8 +108,19 @@ console.log('\n5. It says what it is doing, out loud and truthfully')
 {
   const field = stripComments(readFileSync(join(ROOT, 'src/components/timers/RoundField.tsx'), 'utf8'))
   // Colour alone is not a signal for everyone.
-  check('the state is announced, not only coloured', /role="status"/.test(field) && /aria-live/.test(field))
-  check('...naming the round, the phase and the time', /aria-label=\{`\$\{roundLabel\}/.test(field))
+  // RE-ANCHORED 11 Sep 2026, when the get-ready countdown arrived. These read
+  // `role="status"` and `aria-label={`${roundLabel}` as literal attributes;
+  // during the countdown the field is a BUTTON (tap anywhere to start now), so
+  // both moved into a spread and the old anchors matched nothing — a check
+  // failing because the component gained a state, not because it lost the
+  // property. Anchored on the property now: the running field still announces
+  // itself, and the countdown announces itself as something you can activate.
+  check('the state is announced, not only coloured', /role: 'status'/.test(field) && /aria-live/.test(field))
+  check('...naming the round, the phase and the time', /\$\{roundLabel\}\. \$\{phase === 'done'/.test(field))
+  check('the countdown is announced as a control, not just a colour',
+    /role: 'button'/.test(field) && /Activate to start now/.test(field))
+  check('...and is operable from a keyboard, not only a tap',
+    /tabIndex: 0/.test(field) && /e\.key === 'Enter'/.test(field))
   check('the decorative ring is hidden from assistive tech', /aria-hidden/.test(field))
 
   // THE LAST ROUND HAS NO REST AFTER IT. The prototype's copy promised one on

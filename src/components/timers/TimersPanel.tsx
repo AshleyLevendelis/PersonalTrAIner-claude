@@ -11,7 +11,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { useTimers } from '@/hooks/useTimers'
+import { useTimers, ROUND_LEAD_IN_SECONDS } from '@/hooks/useTimers'
 import { parseConditioningInterval, type RoundConfig } from '@/lib/timer-engine'
 import type { WorkoutDay } from '@/lib/types'
 
@@ -178,6 +178,12 @@ function RoundPanel({ prefill }: { prefill: RoundConfig | null }) {
         </label>
       </div>
       <Button onClick={handleStart}>Start</Button>
+      {/* SAY IT BEFORE IT HAPPENS. The countdown is a deliberate delay, and an
+          app that pauses for ten seconds without having said it would is
+          indistinguishable from one that has not started. */}
+      <p className="text-center text-xs text-muted-foreground">
+        Starts after a {ROUND_LEAD_IN_SECONDS}-second countdown — tap the screen to go sooner.
+      </p>
     </div>
   )
 }

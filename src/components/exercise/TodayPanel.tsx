@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, lazy, Suspense } from 'react'
 import { Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useWakeLock } from '@/hooks/useWakeLock'
@@ -34,6 +34,23 @@ import { FinisherRow } from './FinisherRow'
 import { AdditionalWorkSection } from './AdditionalWorkSection'
 import { AddUnplannedWork } from './AddUnplannedWork'
 import { RestDayCard, ActiveRecoveryCard, MovedDayCard } from './RestDayCard'
+import type { WhatHappenedTarget } from './WhatHappenedSheet'
+import type { RemoveTarget } from './RemoveExerciseSheet'
+// NOT LAZY, DELIBERATELY — tried and measured 11 Sep 2026. Loading these two
+// on demand saved nothing: ChatAssistant imports the same module statically
+// for the coach's side of the same two operations, so the bundler keeps it in
+// the main chunk either way, and the dynamic form only added an await between
+// the tap and the sheet's cost line. The 13 kB is recorded in test:bundle.
+import { removeExerciseFromSession, moveExerciseInSession, type SessionEditResult } from '@/lib/session-edit'
+import { describeBalanceCost } from '@/lib/session-balance-cost'
+import { saveScopedEdit } from '@/lib/mesocycle-persistence'
+import type { SwapScope } from '@/lib/mesocycle-edit'
+// Split out of the app chunk, like onboarding and the dev page: a dialog
+// opened from a menu item, by a person who has something to explain about a
+// day — not a screen every load pays for. test:bundle holds the budget.
+const WhatHappenedSheet = lazy(() => import('./WhatHappenedSheet').then(m => ({ default: m.WhatHappenedSheet })))
+const RemoveExerciseSheet = lazy(() => import('./RemoveExerciseSheet').then(m => ({ default: m.RemoveExerciseSheet })))
+import { getActiveMesocycleWeek } from '@/lib/calculations'
 import { setSessionMove } from '@/lib/daily-tracking'
 import { SessionSummaryDialog, type SessionSummaryData } from './SessionSummaryDialog'
 import { InsightBanner } from '@/components/ui/insight-banner'
@@ -128,6 +145,10 @@ export function TodayPanel({
   const currentMesoWeekObj = hasMesocycle ? mesocycle.find(w => w.week_number === liveWeek) : undefined
 
   const [peekDay, setPeekDay] = useState<string | null>(null)
+  // "What happened?" — the day on screen (a peeked day, else today).
+  const [whatHappened, setWhatHappened] = useState<WhatHappenedTarget | null>(null)
+  // Taking one exercise out — the drop-or-swap sheet (her ruling, 11 Sep 2026).
+  const [removeTarget, setRemoveTarget] = useState<RemoveTarget | null>(null)
   const [borrowedDayName, setBorrowedDayName] = useState<string | null>(null)
   const [expandedWarmup, setExpandedWarmup] = useState(false)
   const [banBusy, setBanBusy] = useState<string | null>(null)
@@ -239,6 +260,74 @@ export function TodayPanel({
   // "DO IT TODAY INSTEAD" — unmakes the move (MovedDayCard says why). The same
   // write the chat's Undo uses, then the same re-reads the chat triggers, so
   // the strip, Home and the coach all see an ordinary day again.
+  /**
+   * The two session edits that change the plan's SHAPE. Both run session-edit's
+   * pure core, persist exactly the weeks the scope touched through the one
+   * shared saver, and hand the result to App so every surface re-reads. A
+   * refusal comes back as a sentence, not an exception — the sheet shows it and
+   * nothing was written.
+   */
+  const applySessionEdit = async (
+    next: SessionEditResult,
+    scope: SwapScope,
+  ): Promise<string | null> => {
+    if (!profileId || !mesocycle) return 'No plan to edit.'
+    if (!next.changed) return next.refusal ?? "That couldn't be changed."
+    onMesocycleUpdated?.(next.mesocycle)
+    try {
+      await saveScopedEdit(profileId, next.mesocycle, liveWeek, scope)
+    } catch (err) {
+      console.error('[session-edit] save failed', err)
+      onMesocycleUpdated?.(mesocycle)
+      return "That didn't save — try again in a moment."
+    }
+    weekTrain.refresh()
+    onLogsUpdated?.()
+    return null
+  }
+
+  const dropExercise = async (exIndex: number, scope: SwapScope): Promise<string | null> => {
+    if (!profile || !mesocycle) return 'No plan to edit.'
+    return applySessionEdit(
+      removeExerciseFromSession({ mesocycle, profile, weekNumber: liveWeek, dayName: effectiveDayName, exIndex, scope }),
+      scope,
+    )
+  }
+
+  const [moveError, setMoveError] = useState<string | null>(null)
+  const moveExercise = async (exIndex: number, direction: -1 | 1) => {
+    if (!profile || !mesocycle) return
+    // Reordering is a today-shaped act: it is about how THIS session runs, not
+    // about the block. The coach takes the wider scope when asked for it.
+    // A REFUSAL HAS TO LAND SOMEWHERE. Removing has a sheet to show it in;
+    // moving is one tap on a menu item and then the menu is gone, so without
+    // this a failed save would look exactly like a move that happened and
+    // then un-happened — the silent write the app is not allowed to have.
+    setMoveError(
+      await applySessionEdit(
+        moveExerciseInSession({ mesocycle, profile, weekNumber: liveWeek, dayName: effectiveDayName, fromIndex: exIndex, toIndex: exIndex + direction, scope: 'today' }),
+        'today',
+      ),
+    )
+  }
+
+  /** What dropping this one costs the week's balance — read-only, shown before the tap. */
+  const removalBalanceCost = (exIndex: number, scope: SwapScope): string | null => {
+    if (!profile || !mesocycle) return null
+    const result = removeExerciseFromSession({ mesocycle, profile, weekNumber: liveWeek, dayName: effectiveDayName, exIndex, scope })
+    if (!result.changed) return null
+    return describeBalanceCost(
+      mesocycle.find(w => w.week_number === liveWeek),
+      result.mesocycle.find(w => w.week_number === liveWeek),
+    )
+  }
+
+  const openWhatHappened = () => {
+    const dayName = peekDay ?? todayName
+    const cell = weekTrain.days.find(d => d.dayName === dayName)
+    if (cell) setWhatHappened({ date: cell.date, dayName })
+  }
+
   const handleDoItToday = async (): Promise<boolean> => {
     if (!profileId) return false
     const ok = await setSessionMove(profileId, today, null)
@@ -377,7 +466,24 @@ export function TodayPanel({
     }
   }
 
-  const peekWorkout = peekDay ? liveWeekPlan.find(d => d.day === peekDay) : null
+  // THE PEEK ASKS THE SAME SOURCE AS EVERYTHING ELSE. It used to be
+  // `liveWeekPlan.find(d => d.day === peekDay)` — the plan's raw weekday row,
+  // which is the right answer only for a day nothing has happened to. It was
+  // the one surface that never adopted the shared "what actually runs on this
+  // date" answer (session-move.ts says so in its own header: "Everything now
+  // asks sessionForDate").
+  //
+  // Ashley, 11 Sep 2026, from the live app: she moved Tuesday's session to
+  // Wednesday, the week strip drew Tuesday as moved — correctly — and then
+  // tapping Tuesday opened a card headed "TUESDAY · Push & Press" listing the
+  // whole session, so she reported the move had not worked. It had. One day
+  // was giving two answers, which is the one thing the strip and the day view
+  // may never do.
+  const peekCell = peekDay ? weekTrain.days.find(d => d.dayName === peekDay) : null
+  const peekMovedTo = peekCell?.movedTo ?? null
+  const peekWorkout = peekDay && !peekMovedTo
+    ? (peekCell?.session ?? liveWeekPlan.find(d => d.day === peekDay))
+    : null
 
   // Turn 5: session-progress 2px line — total sets logged today across every
   // exercise on the live day, over total sets planned. Only meaningful (and
@@ -452,13 +558,50 @@ export function TodayPanel({
         shortfallNote={sessionEstimate.shortfall?.note}
         onOpenProgram={onOpenProgram}
         onOpenSessionHistory={onOpenSessionHistory}
+        onOpenWhatHappened={profileId ? openWhatHappened : undefined}
         coachNoteShownBelow={todayNudge?.source === 'week-note'}
         expanded={weekNotesOpen}
         onToggleExpanded={setWeekNotesOpen}
       />
+      <Suspense fallback={null}>
+      <WhatHappenedSheet
+        target={whatHappened}
+        onClose={() => setWhatHappened(null)}
+        profileId={profileId}
+        today={today}
+        plan={liveWeekPlan}
+        weekDays={weekTrain.days}
+        moves={weekTrain.moves}
+        weekOf={d => getActiveMesocycleWeek(planCreatedAt, new Date(`${d}T12:00:00`), mesocycle?.length || 4)}
+        weekNumber={liveWeek}
+        onChanged={() => { weekTrain.refresh(); onLogsUpdated?.() }}
+      />
+      </Suspense>
+      <Suspense fallback={null}>
+      <RemoveExerciseSheet
+        target={removeTarget}
+        onClose={() => setRemoveTarget(null)}
+        onDrop={scope => dropExercise(removeTarget!.exIndex, scope)}
+        onSwapInstead={() => removeTarget && onOpenSwap(removeTarget.dayName, removeTarget.exIndex, removeTarget.exerciseName)}
+        balanceCost={scope => (removeTarget ? removalBalanceCost(removeTarget.exIndex, scope) : null)}
+      />
+      </Suspense>
 
-      {peekWorkout ? (
-        peekWorkout.exercises.length === 0 ? (
+      {peekDay ? (
+        peekMovedTo ? (
+          /* The day's session has LEFT. Says where, and offers to go there —
+             the answer she needed and could not get from any screen. */
+          <div className="rounded-xl bg-[color:var(--surface-deep)] p-4 text-center text-sm" data-testid="peek-moved-away">
+            <p className="text-muted-foreground">{peekDay}'s session is on {peekMovedTo.dayName} now.</p>
+            <button
+              className="mt-2 text-xs font-semibold text-primary-text underline"
+              onClick={() => setPeekDay(peekMovedTo.dayName)}
+            >
+              See {peekMovedTo.dayName} →
+            </button>
+            <button className="block mx-auto mt-2 text-xs underline text-muted-foreground" onClick={() => setPeekDay(null)}>Back to today</button>
+          </div>
+        ) : !peekWorkout || peekWorkout.exercises.length === 0 ? (
           <div className="rounded-xl bg-[color:var(--surface-deep)] p-4 text-center text-sm text-muted-foreground">
             {peekDay} is a rest or recovery day.
             <button className="block mx-auto mt-2 text-xs underline" onClick={() => setPeekDay(null)}>Back to today</button>
@@ -466,6 +609,8 @@ export function TodayPanel({
         ) : (
           <PeekPanel
             workout={peekWorkout}
+            dayLabel={peekDay}
+            movedFromDayName={peekCell?.movedFrom?.dayName ?? null}
             onExit={() => setPeekDay(null)}
             onSwap={(exIndex, name) => peekDay && onOpenSwap(peekDay, exIndex, name)}
             onBan={handleBan}
@@ -641,6 +786,7 @@ export function TodayPanel({
             </div>
           )}
           <WarmupSection warmup={workout!.warmup} open={expandedWarmup} onToggle={() => setExpandedWarmup(v => !v)} />
+          {moveError && <p className="text-xs text-destructive">{moveError} The order hasn’t changed.</p>}
           <ExerciseList
             workout={workout!}
             dayName={effectiveDayName}
@@ -655,6 +801,8 @@ export function TodayPanel({
             onOpenDetail={onOpenDetail}
             banBusy={banBusy}
             onBan={handleBan}
+            onRemove={profileId && mesocycle ? (exIndex, name) => setRemoveTarget({ dayName: effectiveDayName, exIndex, exerciseName: name }) : undefined}
+            onMove={profileId && mesocycle ? moveExercise : undefined}
             onSetCompleted={(exerciseName, setNumber, _weight, _reps, restStr, sets) => {
               const restSeconds = parseRestSeconds(restStr)
               if (restSeconds > 0) {
@@ -752,6 +900,8 @@ function ExerciseList({
   onOpenPlateCalc,
   onOpenHistory,
   onOpenDetail,
+  onRemove,
+  onMove,
   banBusy,
   onBan,
   onSetCompleted,
@@ -768,6 +918,10 @@ function ExerciseList({
   onOpenPlateCalc: (weightKg: number) => void
   onOpenHistory?: (exerciseId: string, exerciseName: string) => void
   onOpenDetail?: (exerciseName: string) => void
+  /** Open the take-it-out sheet for one slot. Absent when there is no plan to edit. */
+  onRemove?: (exIndex: number, exerciseName: string) => void
+  /** Reorder one slot within this session. */
+  onMove?: (exIndex: number, direction: -1 | 1) => void
   banBusy: string | null
   onBan: (name: string) => void
   onSetCompleted: (exerciseName: string, setNumber: number, weight: number, reps: number, rest: string, sets: number, prescribedReps: string, tier?: string) => void
@@ -837,6 +991,10 @@ function ExerciseList({
       profile,
       onSwap: () => onOpenSwap(dayName, exIndex, ex.name),
       onBan: () => onBan(ex.name),
+      onRemove: onRemove ? () => onRemove(exIndex, ex.name) : undefined,
+      onMove: onMove ? (direction: -1 | 1) => onMove(exIndex, direction) : undefined,
+      canMoveUp: exIndex > 0,
+      canMoveDown: exIndex < workout.exercises.length - 1,
       banBusy: banBusy === ex.name,
       onSetCompleted,
       expanded,

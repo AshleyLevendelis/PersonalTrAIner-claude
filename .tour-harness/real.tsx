@@ -262,8 +262,15 @@ function Harness() {
     const t = setTimeout(() => setPlanArrived(true), PLAN_DELAY_MS)
     return () => clearTimeout(t)
   }, [planArrived])
+  // THE PLAN IS STATE HERE, AS IT IS IN App.tsx. It used to be the module
+  // const, passed straight into ExerciseTab with no onMesocycleUpdated — so
+  // every screen that EDITS the plan (take an exercise out, move one) wrote
+  // to the database, called back, and had nowhere for the callback to land.
+  // The app was wired correctly and the harness could not show it. App.tsx
+  // owns this state and hands setMesocycle down (App.tsx:2547); so does this.
+  const [editedMeso, setEditedMeso] = useState(mesocycle)
   const livePlan = planArrived ? exercisePlan : []
-  const liveMeso = planArrived ? mesocycle : []
+  const liveMeso = planArrived ? editedMeso : []
 
   const noop = () => {}
   return (
@@ -296,8 +303,9 @@ function Harness() {
             onSwapMealSlot={noop} onRegenerateMealSlot={noop} onRegenerateAllMeals={noop} />
         )}
         {activeTab === 'exercise' && (
-          <ExerciseTab plan={exercisePlan} mesocycle={mesocycle} exclusions={[]}
+          <ExerciseTab plan={exercisePlan} mesocycle={editedMeso} exclusions={[]}
             profile={profile} profileId={PROFILE_ID} planCreatedAt={profile.created_at}
+            onMesocycleUpdated={setEditedMeso}
             onSwapExercise={noop} onBanExercise={noop}
             onDevOverrideWeekChange={noop} onDevOverrideDayChange={noop}
             onDevBypassLocksChange={noop} onLogsSeeded={noop} />

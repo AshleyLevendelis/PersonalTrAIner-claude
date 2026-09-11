@@ -37,10 +37,18 @@ const base: TimersValue = {
   isActive: true, screenOpenRequested: false,
   requestScreenOpen: () => {}, clearScreenOpenRequest: () => {},
   setMode: () => {}, start: () => {}, stop: () => {}, reset: () => {}, lap: () => {},
-  startRound: () => {}, pauseRound: () => {}, resumeRound: () => {},
+  startRound: () => {}, pauseRound: () => {}, resumeRound: () => {}, skipLeadIn: () => {},
 }
 
 const states: [string, TimersValue][] = [
+  // The countdown before round 1 (11 Sep 2026). First in the row because it
+  // is first on the clock, and because the point of rendering all five at
+  // once is telling them apart — slate, mint, amber, red.
+  ['ready', {
+    ...base,
+    roundConfig: { rounds: 8, workSeconds: 40, restSeconds: 15, leadInSeconds: 10 },
+    currentRound: 1, currentPhase: 'lead_in', phaseRemainingMs: 7000,
+  }],
   ['work', base],
   ['rest', { ...base, currentPhase: 'rest', phaseRemainingMs: 9000, currentRound: 2 }],
   ['last-round', { ...base, currentRound: 8, phaseRemainingMs: 5000 }],

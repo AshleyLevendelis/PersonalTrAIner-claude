@@ -84,7 +84,36 @@ export type MoveTarget =
       /** Where it would go if she moves it on, or null when the week has no free day left. */
       nextFree: { date: string; dayName: string } | null
     }
-  | { ok: false; reason: 'no_session' | 'already_moved' | 'no_free_day'; message: string }
+  | {
+      ok: false
+      /**
+       * THE DAY NAMED IS THE ORIGIN of a move — its session lives elsewhere
+       * now. Not a refusal since 11 Sep 2026: a question, like 'moved_in'.
+       *
+       * Ashley, from the live app: she moved Tuesday's Push & Press to
+       * Wednesday, then on Friday asked to do it today and to move it to
+       * Friday, and got "Tuesday's session is already moved to Wednesday."
+       * twice, with nothing to tap. The only wording that worked was naming
+       * WEDNESDAY — the day it had travelled to — which she had no way to
+       * know. Asked with three options (move it straight away / say where it
+       * is and then offer / keep refusing), she chose the middle: *"you
+       * always know where the session actually is before deciding."*
+       *
+       * So this outcome names the session's current home and offers a day,
+       * and the chips the client builds from it name that CURRENT home — a
+       * chip that named the origin again would come straight back here, which
+       * is the loop the 9 Sep ruling exists to prevent.
+       */
+      reason: 'already_moved'
+      message: string
+      /** Where the session actually lives now. */
+      movedTo: { date: string; dayName: string }
+      /** The day being offered — the one they named when it is free, else the next free one. Null when the week has none left. */
+      nextFree: { date: string; dayName: string } | null
+      /** Set only when they named a day that was NOT free, so the offer can say why it names another. */
+      requestedDayName?: string
+    }
+  | { ok: false; reason: 'no_session' | 'no_free_day'; message: string }
 
 export interface MoveTargetInput {
   /** The day whose session is moving. */
@@ -120,7 +149,7 @@ export interface MoveTargetInput {
  * session of its own, and nothing already moved onto it. Never returns a date
  * in the past, and never the origin itself.
  */
-export function resolveMoveTarget(input: MoveTargetInput): MoveTarget {
+export function resolveMoveTarget(input: MoveTargetInput, depth = 0): MoveTarget {
   const { fromDate, requestedDate, todayDate, plan, weekOf, existing = [] } = input
 
   const fromDayName = dayNameOf(fromDate)
@@ -139,10 +168,33 @@ export function resolveMoveTarget(input: MoveTargetInput): MoveTarget {
   const resolved = sessionForDate({ date: fromDate, plan, moves: existing })
 
   if (resolved.movedTo) {
+    const home = resolved.movedTo
+    // WHERE IT WOULD GO, asked of the day it actually sits on. That day is a
+    // move's TARGET and never its origin, so this recurses exactly once; the
+    // depth guard is for a corrupt pair (A->B and B->C) that should not exist
+    // but must not spin if it ever does.
+    const onward: MoveTarget = depth > 0
+      ? { ok: false, reason: 'no_free_day', message: '' }
+      : resolveMoveTarget({ ...input, fromDate: home.date }, depth + 1)
+    const offered = onward.ok
+      ? { date: onward.date, dayName: onward.dayName }
+      : onward.reason === 'moved_in' ? onward.nextFree : null
+    const wanted = requestedDate ? dayNameOf(requestedDate) : undefined
+    // Named only when they asked for a day they cannot have — saying "Friday
+    // already has a session" when they never mentioned Friday is noise.
+    const blocked = wanted && offered && wanted !== offered.dayName ? wanted : undefined
+    const where = `${fromDayName}'s session is on ${home.dayName} now.`
     return {
       ok: false,
       reason: 'already_moved',
-      message: `${fromDayName}'s session is already moved to ${resolved.movedTo.dayName}.`,
+      movedTo: home,
+      nextFree: offered,
+      ...(blocked ? { requestedDayName: blocked } : {}),
+      message: offered
+        ? blocked
+          ? `${where} ${blocked} already has a session on it — want it on ${offered.dayName} instead, or shall we take ${home.dayName} off?`
+          : `${where} Want it on ${offered.dayName} instead, or shall we take ${home.dayName} off?`
+        : `${where} There's no free day left this week — shall we take ${home.dayName} off?`,
     }
   }
 

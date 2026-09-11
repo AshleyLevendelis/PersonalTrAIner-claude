@@ -465,6 +465,69 @@ const toolDeclarations = [
     },
   },
   {
+    name: "propose_exercise_remove",
+    description:
+      "PROPOSES taking ONE exercise out of ONE session, leaving the rest of it alone — this does NOT apply anything, the app shows a card and the user taps Confirm. Call this when they ask to drop, skip, cut or take out a specific exercise ('drop the leg press today', 'take the calf raises out', 'I'm not doing the lunges'). It is NOT ban_exercise: a ban removes it from every week of every block and is not available from chat. It is NOT propose_exercise_swap: if they name something to do INSTEAD, swap is the tool. If removing it would leave the session with fewer than three exercises the app refuses and says so, so do not promise it first. When they clearly want the whole day off rather than one exercise, that is propose_rest_day.",
+    parameters: {
+      type: "object",
+      properties: {
+        day: {
+          type: "string",
+          description: "The day the session is on — a weekday name, or 'today'/'tomorrow'. Defaults to today when they don't say.",
+        },
+        item: {
+          type: "string",
+          description: "The exercise to take out, in their words. The app matches it against that day's actual exercises.",
+        },
+        scope: {
+          type: "string",
+          enum: ["today", "permanent"],
+          description: "'today' (default) takes it out of this one session. 'permanent' takes it out of the rest of this block. Only send 'permanent' when they say something lasting ('for the rest of the block', 'every week').",
+        },
+        reason: {
+          type: "string",
+          description: "One short sentence on why, in their words, if they gave one — shown on the card. Omit rather than invent one.",
+        },
+        origin_verbatim_quote: {
+          type: "string",
+          description: "The exact substring of the user's CURRENT message asking for the removal. Copied verbatim, not paraphrased.",
+        },
+      },
+      required: ["item", "origin_verbatim_quote"],
+    },
+  },
+  {
+    name: "propose_exercise_reorder",
+    description:
+      "PROPOSES moving ONE exercise earlier or later within its session — this does NOT apply anything, the app shows a card and the user taps Confirm. Call this when they ask for a different order ('do the rows before the bench press', 'put the curls at the end', 'squats first'). NAME THE NEIGHBOUR, never a count: pass before_item or after_item naming another exercise in that same session. If they say something you cannot pin to a named neighbour ('move it up a bit', 'two earlier'), ask which exercise they want it next to instead of guessing — a wrong order is a wrong session. Nothing about the weights or sets changes; this is order only.",
+    parameters: {
+      type: "object",
+      properties: {
+        day: {
+          type: "string",
+          description: "The day the session is on — a weekday name, or 'today'/'tomorrow'. Defaults to today.",
+        },
+        item: {
+          type: "string",
+          description: "The exercise to move, in their words.",
+        },
+        before_item: {
+          type: "string",
+          description: "Put `item` immediately BEFORE this exercise. Name another exercise in the same session. Mutually exclusive with after_item.",
+        },
+        after_item: {
+          type: "string",
+          description: "Put `item` immediately AFTER this exercise. Name another exercise in the same session. Mutually exclusive with before_item.",
+        },
+        origin_verbatim_quote: {
+          type: "string",
+          description: "The exact substring of the user's CURRENT message asking for the move. Copied verbatim, not paraphrased.",
+        },
+      },
+      required: ["item", "origin_verbatim_quote"],
+    },
+  },
+  {
     name: "propose_injury_adaptation",
     description:
       "PROPOSES a time-bounded plan adaptation for a MANAGEABLE, PLAN-RELEVANT injury (soreness/pain the user wants to ease off, not ordinary soreness and not something needing a professional — see the SCOPE section for that line). This does NOT apply anything — the app shows a card with every touched exercise's before/after and the user taps Confirm. Only call this once you know BOTH the affected area (one of the eight mapped codes) AND how long to ease off for. Never call this for sharp/joint/one-sided/worsening pain — redirect to a professional instead, no tool call.",
@@ -745,6 +808,29 @@ const toolDeclarations = [
         origin_verbatim_quote: {
           type: "string",
           description: "The exact substring of the user's CURRENT message saying they are resting. Must be copied verbatim, not paraphrased.",
+        },
+      },
+      required: ["origin_verbatim_quote"],
+    },
+  },
+  {
+    name: "propose_missed_session",
+    description:
+      "PROPOSES recording a prescribed training day as MISSED — the session did not happen and nothing replaced it — this does NOT apply anything, the app shows a card and the user taps Confirm. Call this when they tell you they skipped or missed a session and are not calling it a rest ('I missed yesterday', 'didn't train Monday', 'skipped it', 'mark it missed'). It is NOT propose_rest_day: that records a rest they chose, this records a miss, and the week keeps counting it — Ashley's ruling, a missed day stays missed. It is NOT swap_session_for_activity: if they name something they did instead, use that. It is NOT propose_session_move: if the session is still happening later this week, use that. Do not call it for a day with no session prescribed, for a session they already logged, for a day that has not happened yet, or for a question ('does that count as missed?' — answer it).",
+    parameters: {
+      type: "object",
+      properties: {
+        date: {
+          type: "string",
+          description: "The day that was missed, as YYYY-MM-DD, worked out from today's date in the context ('yesterday' is today minus one). Defaults to today only when they clearly mean today. Never a day they did not name.",
+        },
+        reason: {
+          type: "string",
+          description: "One short sentence on why, in their words, if they gave one — shown on the card. Omit rather than invent one.",
+        },
+        origin_verbatim_quote: {
+          type: "string",
+          description: "The exact substring of the user's CURRENT message saying they missed or skipped it. Must be copied verbatim, not paraphrased.",
         },
       },
       required: ["origin_verbatim_quote"],
@@ -1643,6 +1729,8 @@ SESSION-WINDOW REASONING (do this comparison yourself, every turn): weigh the cu
 - You understand exercise taxonomy: movement_pattern (push/pull/hinge/squat/carry/rotation/isolation), tier (tier_0_primer through tier_4_finisher), fatigue_cost (low/moderate/high).
 - When replacing exercises, ALWAYS select from the SAME movement pattern and similar mechanics tier unless the user's condition demands otherwise (e.g., pain = lower joint stress).
 - When calling propose_exercise_swap, put the reasoning in the "reason" field (movement pattern, why it preserves stimulus, trade-offs) — the app shows the user a confirm card with the exact before/after, so do NOT also ask "Shall I make this change?" in your own text; the card IS the confirmation step, asking again is redundant and the card can be confirmed without you being told.
+- Trigger propose_exercise_remove when they want ONE exercise out of ONE session and name nothing to replace it ("drop the leg press", "take the calf raises out today"). Removing is not banning — a ban is every week of every block and you cannot do it from chat. If they name a replacement, that is propose_exercise_swap.
+- Trigger propose_exercise_reorder when they want a different ORDER ("do the rows before the bench press", "curls last"). Always pass before_item or after_item naming ANOTHER exercise in that session; never a count of positions. If you cannot pin the destination to a named exercise, ask which one it should sit next to — do not guess.
 - For ban_exercise: this tool does NOT ban anything yet. Acknowledge the preference warmly, say plainly you cannot do it from chat, and point them at the ban button in the exercise row's menu. Never say you have removed it.
 - For ban_exercise: never confirm a ban — see above; it is not wired up.
 - Reference the user's ACTUAL exercise plan below — never invent a generic split.
@@ -1763,6 +1851,7 @@ FUNCTION CALL RULES (CRITICAL):
 - Trigger propose_volume_change / propose_schedule_change / propose_style_change / propose_concurrent_activity per §3d/§3e/§3f/§3g once the request is an actual imperative and you have the required fields, WITH an origin_verbatim_quote. None applies anything — all four show a confirm card. "Should I drop to three days?" is a question, not a command: answer it in text.
 - Trigger propose_custom_meal when the user TELLS you what they eat or will eat ("I usually have eggs and greek yoghurt and fruit for breakfast"). The flow Ashley specified: if any stated food has no amount, ask how much of each — one question, not an interrogation — then call with their exact foods and amounts. Their portions are never adjusted; the app fits the rest of the day around the meal. "What should I have for breakfast?" is a question — ANSWER IT IN TEXT; this tool is for what they are actually having. (That clause used to read "answer it or use propose_meal_addition", which is how "What should I eat?" produced a card offering to replace a real user's lunch on 8 Sep 2026. A question is never a trigger for either tool.)
 - Trigger propose_rest_day the same way when they tell you they are resting a training day and name nothing in its place. "Rest day today" is a statement of fact about their day, not a question — call the tool. "Should I rest today?" is a question: answer it.
+- Trigger propose_missed_session when they tell you a session did NOT happen and they are not calling it a rest — "I missed Monday", "skipped yesterday", "mark it missed". Missed and rested are different facts and the week shows them differently; never record one as the other. If they name something they did instead, that is swap_session_for_activity; if the session is happening later this week, propose_session_move.
 - Answer exercise form/technique questions ("How do I do X?", "What muscles does X work?") directly in your text response. Provide step-by-step form cues, target muscles, common mistakes, and coaching tips.
 - Trigger ban_exercise when the user says "I hate X", "never give me X", "remove X permanently", or explicitly flags an exercise to blacklist.
 - When a food LOGGING command is given (log_meal), execute it immediately. Scale portions to the meal slot budget above. Do NOT ask for macro details.
@@ -1932,11 +2021,14 @@ NEVER CLAIM AN ACTION YOU DID NOT TAKE:
 1. Do not say a day has been marked, moved, rescheduled, skipped or set to rest unless you actually called a tool that does it. Saying "I'll make sure today is marked as a rest day" and then not calling one is a lie the user only discovers the next morning, when the day shows as missed.
 2. When the user says they are skipping their lifting for something else and names it, call swap_session_for_activity. That is the tool for exactly this, and it is the only thing that changes what the Exercise tab shows.
 3. When they say they are resting a training day and name nothing in its place — "rest day today", "taking today off" — call propose_rest_day. That is the tool for exactly this, and it is the only thing that stops the day showing as missed tomorrow. It shows a card; the user confirms it. Until they do, nothing has happened, so do not say it has.
+3b. When they say a session did NOT happen and name nothing in its place and do not call it a rest — "I missed yesterday", "didn't train Monday", "mark it missed" — call propose_missed_session. A miss is not a rest: never answer a miss with propose_rest_day unless they say it was a rest. It shows a card; until they confirm, nothing has happened, so do not say it has.
 4. When they want something you have no tool for, say plainly you cannot do it from chat and point them at the RIGHT screen — the Profile screen for training days and personal details, the Nutrition tab for logging food, the Exercise tab for banning a movement. An honest "I can't do that from here" beats a confident sentence that turns out to be false. NOTE: changing WHICH DAYS they train is something you CAN do — call propose_schedule_change (§3e) rather than declining it.
 5. Speak in the past tense about a change ONLY after the tool has run. Before that, say what you are about to do, not what you have done.
 6. INTENTIONS ARE NOT APPOINTMENTS, WITH ONE EXCEPTION. Nothing in this app stores "I'll train tomorrow morning" — there is no tool for a TIME OF DAY and no screen that shows one. So never answer a stated intention with "locked in", "booked in", "got that scheduled", "I've put that down" or any phrasing that implies you wrote it somewhere. Measured live, 31 Aug 2026: "Got tomorrow morning locked in for your Push & Press session" was recorded in exactly no place. THE EXCEPTION, added 8 Sep 2026: moving a prescribed session to another DAY is now real — call propose_session_move (rule 7). Even then it is a card they confirm, so the same rule applies until they tap it: nothing has happened yet, so do not say it has.
 
-7. "I'LL DO IT TOMORROW" IS A MOVE, NOT A REST AND NOT A SWAP. The three day tools differ by whether the work still happens: propose_rest_day writes the day off, swap_session_for_activity replaces it with something they did instead, and propose_session_move keeps the session and puts it on another day this week. Use the third whenever they say a session is happening LATER ("I'll do it tomorrow", "can I shift today's to Thursday", "I'll make Tuesday's up later this week"). YOU DO NOT CHOOSE THE DAY — pass the day they named, or omit it if they named none, and the app takes the next day that is actually free, because a day that already has a session cannot take a second one. When it lands somewhere other than the day they asked for, the card says so; do not pre-empt it with a guess of your own.
+6b. THE THREE EXERCISE-LEVEL TOOLS DIFFER BY WHAT SURVIVES. propose_exercise_swap keeps the slot and changes what fills it; propose_exercise_remove takes the slot out of that session and leaves the rest; propose_exercise_reorder changes nothing but the order. None of them bans — ban_exercise is every week of every block and is not wired to chat. Removing the LAST few exercises is refused by the app (a session keeps at least three), so never promise a removal as done before the card comes back.
+
+7. "I'LL DO IT TOMORROW" IS A MOVE, NOT A REST AND NOT A SWAP. The four day tools differ by whether the work still happens and whether the day was chosen: propose_missed_session records that it did not happen and nothing replaced it, propose_rest_day writes the day off as a rest they chose, swap_session_for_activity replaces it with something they did instead, and propose_session_move keeps the session and puts it on another day this week. Use the third whenever they say a session is happening LATER ("I'll do it tomorrow", "can I shift today's to Thursday", "I'll make Tuesday's up later this week"). YOU DO NOT CHOOSE THE DAY — pass the day they named, or omit it if they named none, and the app takes the next day that is actually free, because a day that already has a session cannot take a second one. When it lands somewhere other than the day they asked for, the card says so; do not pre-empt it with a guess of your own.
 
 8. WHEN ONE SENTENCE SAYS BOTH — the session is happening LATER and they are doing something else TODAY ("I didn't train this morning but I'm going to Muay Thai tonight and will do this morning's session tomorrow") — it is a MOVE. Call propose_session_move, and pass what they are doing today as also_doing_activity (and also_doing_duration_minutes ONLY if they said how long). Do not call swap_session_for_activity for it: a swap writes the session off, and they have just told you it is still happening.
 
@@ -2284,6 +2376,24 @@ Keep this context in mind to ensure your greetings and questions naturally align
             reply: "",
             proposal: {
               kind: "propose_rest_day",
+              rawArgs: { date: args.date, reason: args.reason },
+            },
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (name === "propose_missed_session") {
+        // Proposal, not a write — the same rail as propose_rest_day and for
+        // the same reason. Ashley's ruling, 10 Sep 2026: a missed day stays
+        // missed on the record, so this is its own kind and never folds into
+        // rest. The client resolves the date against the live plan, shows
+        // the card, and confirms; the server writes nothing.
+        return new Response(
+          JSON.stringify({
+            reply: "",
+            proposal: {
+              kind: "propose_missed_session",
               rawArgs: { date: args.date, reason: args.reason },
             },
           }),
@@ -3055,6 +3165,31 @@ Keep this context in mind to ensure your greetings and questions naturally align
         return new Response(
           JSON.stringify({
             reply: "I can't ban exercises through chat yet — that's coming in an update soon. For now, use the ban button on the exercise itself.",
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (name === "propose_exercise_remove" || name === "propose_exercise_reorder") {
+        // Proposal, not a write — the same rail propose_exercise_swap runs on,
+        // and for the same reason: this function cannot import
+        // mesocycle-edit/session-edit, so the client resolves the request
+        // against the live plan, builds the diff and confirms. I1 holds: the
+        // server writes nothing.
+        return new Response(
+          JSON.stringify({
+            reply: "",
+            proposal: {
+              kind: name,
+              rawArgs: {
+                day: args.day,
+                item: args.item,
+                scope: args.scope,
+                reason: args.reason,
+                before_item: args.before_item,
+                after_item: args.after_item,
+              },
+            },
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );

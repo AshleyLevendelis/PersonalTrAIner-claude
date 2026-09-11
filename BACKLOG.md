@@ -2,6 +2,432 @@
 
 Newest first. One line each.
 
+- [x] **AN OUTSIDE REVIEW OF ONE SESSION: ALL THREE FINDINGS WRONG, AND THE REAL
+  HOLE UNDERNEATH THEM.** Ashley asked Gemini to rate a generated Push & Press
+  session, 11 Sep 2026 (Arm Circles / Barbell Bench 3x6-8 @42.5kg / DB Shoulder
+  Press 3x9-11 @12kg per hand / Lateral Raises 3x15-18 @10kg per hand). It gave
+  7.5/10 and raised three gaps. **Re-measured, none of them reproduce** — the
+  rule that a written finding is a lead applies double to another model reading
+  a screenshot.
+  1. *"No direct tricep volume on a push day."* **132 of 132** generated push
+  days carried direct tricep work, across equipment tiers, experience levels,
+  30/45/60/90-minute sessions, goals, bodyweights, splits **and injuries**.
+  2. *"Arm circles are a minimal shoulder primer."* 8 of 8 sampled push days drew
+  a SPECIFIC shoulder-prep primer (Band Face Pulls, Band Dislocates, Scapular
+  Push-Ups, Band Pull-Aparts). And `buildWarmup` already puts a general block,
+  up to four joint-specific mobility drills and a full percentage ramp on the
+  bench AHEAD of the exercise list — Gemini was reading `day.exercises` and
+  could not see any of it.
+  3. *"Lateral raise load scaled too high."* **Backwards.** Measured across the
+  grid, laterals land at **0.07-0.12 x the bench** (2-4kg per hand). The formula
+  runs light. Acting on this would have pushed them back toward the "2kg toy"
+  numbers `load-prescription.ts:308` records were explicitly fixed away from
+  once. Her 10kg at a 42.5kg bench is 0.24 — an outlier at twice the grid's top.
+  **What was right was the OBSERVATION, not the diagnosis:** her session really
+  does look like that, and **no gate could ever have noticed.** Coverage is
+  scored at WEEK level (push/pull/squat/hinge somewhere in seven days) and the
+  only per-day rule asserts a Push & Press day contains a vertical push. A push
+  day can lose the isolation its own track named and score full marks.
+  **Built: `test:day-coverage`** and `daysMissingNamedIsolation()`, which asks a
+  day what its OWN track asked for (`TRACKS[focus].slots`, exported for this)
+  and reports what it kept versus lost.
+  **THE MEASUREMENT CHANGED THE DESIGN, which is what it was for.** Written
+  first as a scored deduction in the Selection dimension, then measured before
+  being wired in: **it fires on 23.5% of 7,200 days**, and its dominant case is
+  the MIRROR of the reported one — push days keeping tricep work and core while
+  losing the LATERAL RAISE (1,152 of 1,692), not losing the tricep (144).
+  Narrowing it to a strict priority inversion moved the rate by half a point
+  (24.0% -> 23.5%), which says the inversion IS the normal behaviour. A
+  deduction firing on a quarter of all days would move every score, could push
+  plans under the 7.2 floor, and would encode "core must not outrank a named
+  isolation" — a coaching opinion nobody has ruled on. **So it measures and does
+  not deduct.** No score moved; the 11.56/12 baseline stands.
+  **A number I carried between two populations, and the gate caught me.** The
+  first version pinned the wide sweep's 23.5% against the gate's own narrower,
+  faster grid (3 splits, one goal, no injuries, 540 days) which measures 2.8% —
+  and failed on correct code. Both numbers are now recorded against their own
+  denominators, in the gate, with a note that neither is the other's baseline.
+  Exactly the "if a denominator changes, prior numbers stop being comparable"
+  trap, walked into and then fixed.
+  **Verified:** 14 checks, **7 mutations tried, 7 caught** — including the one
+  that matters most, reading `Exercise.movement_pattern` (the coarse
+  'push'/'pull' vocabulary) instead of the catalogue's, which would have made
+  the whole thing report a clean sweep it had not earned.
+  **Still open, and Ashley's call with these numbers:** whether a push day
+  dropping its lateral raise for core work is a defect worth changing, and why
+  her specific session is an outlier — ~230 generated profiles produced no
+  4-exercise push day and no lateral near 10kg/hand at a 42.5kg bench. That
+  answer is in her stored plan, which this session cannot reach.
+  **Frontend/engine only — no migration, no function deploy.**
+
+- [x] **THE ROUND TIMER COUNTS YOU IN — TEN SECONDS BEFORE ROUND 1.** Ashley,
+  11 Sep 2026: *"The round timer starts with no countdown. As soon as you start
+  it begins."* Confirmed: Start anchored to now and elapsed 0 sat inside the
+  first work interval, so round 1 was running before the phone was back in a
+  pocket — and there was no cue at the start either, the first sound being the
+  work-to-rest tone forty seconds in.
+  **Read literally: ten seconds ONCE, before round 1.** Not between rounds —
+  the rest interval already is that.
+  **Her ruling on how it should look.** The timer floods the whole tab with the
+  phase colour so it reads from across a gym. Options put to her: (a) its own
+  colour with a big count and tap-to-start-early — my recommendation; (b) reuse
+  the rest amber; (c) numbers only, no colour change. **She chose (a).** Reasons
+  recorded in the option text: amber would then mean two things, and "numbers
+  only" looks identical to a round already running from the far side of a room,
+  which is the exact failure the colour field was built to fix. So there is a
+  fourth field state — a cool light slate reading GET READY with the count at
+  the clock's full size — and tapping anywhere starts round 1 early.
+  **The constraint that shaped it.** `timer-engine.ts` has one hard-won
+  property, stated in its own header and earned by a bug: everything derives
+  from a single immutable anchor, never from stepped state. So the countdown is
+  an OFFSET on that anchor — `elapsed = (now - start) - leadIn` — and not a
+  stored phase. There is no "counting down" flag that could disagree with the
+  clock, and skipping moves the anchor exactly as pause and resume already do.
+  **`?? 0`, never `?? 10`, and that is the whole compatibility story.** A round
+  already in flight from a persisted record carries no lead-in field;
+  defaulting it to ten would rewind a live timer by ten seconds on its very
+  next tick. New starts write 10; anything already running keeps what it
+  started with. Pinned by its own check.
+  **Two things that came free.** The lead-in sits one cue-step below round 1's
+  work, so the existing transition diffing now plays a "go" tone at the moment
+  work begins — a beep at the start the timer has never had, with no change to
+  the cue code. And `totalRoundSeconds` grows by the lead-in, which it must:
+  the completion effect banks that figure to hold the finished state, so
+  omitting it would have left a finished run ten seconds short of complete and
+  quietly un-finishing itself.
+  **A check re-anchored, and why.** `test:timer-field` §5 asserted the literal
+  attributes `role="status"` and `aria-label={`${roundLabel}`. During the
+  countdown the field is a BUTTON, so both moved into a spread and the old
+  anchors matched nothing — a check failing because the component gained a
+  state, not because it lost the property. Re-anchored on the property, with
+  the old wording recorded here, and two new checks added for the countdown's
+  own role and its keyboard operation.
+  **Verified:** `test:round-timer` §7 (20 new checks, including a half-second
+  sweep of the entire run proving the schedule after the countdown is
+  bit-for-bit the schedule that always ran, just shifted), plus `test:timers`,
+  `test:timer-field`, `test:timer-field-fills-screen`, `test:timer-intent-copy`
+  all green. New `verify:round-lead-in` drives the real Tools tab at 390x844
+  **against the real wall clock** — no dev clock, because `getAppNow` returns a
+  frozen noon whenever one is set, and a countdown that cannot move would prove
+  nothing. It presses Start, reads the count actually falling, taps the field
+  and confirms round 1 begins with its whole work interval. Screenshots read;
+  `render:timer-field` now shows all five states side by side.
+  **17 mutations tried, 17 caught.**
+  **Frontend only — no function deploy, no migration.** It reaches her phone
+  when the branch merges.
+
+- [x] **A MOVED SESSION WAS A DEAD END, AND THE SCREEN SAID IT HAD NOT MOVED.**
+  Ashley, 11 Sep 2026, from the LIVE app, with screenshots. She moved Tuesday's
+  Push & Press to Wednesday, did not do it, and on Friday asked the coach to do
+  it today and then to move it to Friday. Both answered *"Tuesday's session is
+  already moved to Wednesday."* and stopped. She reported the move had not
+  worked at all.
+  **The move HAD worked** — reproduced against the real resolver with her exact
+  week. The week strip was right: Tuesday drawn as moved, Wednesday drawn as
+  missed. Two separate defects sat on top of that truth.
+  **1. The screen contradicted the strip.** Tapping a day on the Exercise strip
+  looked the day up in the plan's raw weekday row — the one naive lookup that
+  never adopted the shared "what actually runs on this date" answer, even
+  though `session-move.ts`'s own header says *"Everything now asks
+  sessionForDate"* and the 9 Sep fix removed the other three. So the day the
+  session LEFT still listed the whole session under its own name (exactly what
+  she photographed), and the day it ARRIVED on called itself a rest day. One
+  day, two answers — the thing `one-day-one-look` exists to forbid. Now both
+  resolve through the same week the strip is drawn from: the origin says
+  *"Tuesday's session is on Wednesday now"* with a link to that day, and the
+  destination shows the session headed by the day being looked at, *"· moved
+  from Tuesday"*.
+  **2. Naming the day it left was a refusal with nothing to tap.** The only
+  wording that worked was naming WEDNESDAY — the day it had travelled to —
+  which she had no way to know. **Asked with three options** — (a) move it
+  straight away, treating a named day as the answer, which is her own 9 Sep
+  ruling (my recommendation); (b) say where it is, then offer; (c) keep
+  refusing — **she chose (b)**: *"you always know where the session actually is
+  before deciding."* So the refusal became a question that names the session's
+  current home, offers a day, and carries both answers as chips.
+  **The subtlety that decides whether it loops:** the chips name the day the
+  session SITS on, not the day she asked about. A chip reading "Move Tuesday's
+  session to Saturday" would arrive as the same request that produced the
+  question and ask it again — the loop the 9 Sep ruling exists to remove.
+  Naming Wednesday takes the ordinary path, which already rewrites the original
+  move rather than stacking a second one.
+  **Also now honest about a day it cannot give her:** she asked for Friday,
+  which already had Squat & Carry on it. It offers Saturday and says why,
+  instead of silently sliding.
+  **A check re-anchored, and why it had to be:** `test:moved-session-stuck` §3
+  asserted the exact sentence *"already moved to Wednesday"*, so it failed when
+  the behaviour got better rather than when it got worse. Re-anchored on the
+  property — it still says where the session went, and now also offers a day
+  and a way out — with the old wording recorded here.
+  **Verified:** `test:moved-session-stuck` (now 44 checks) and `test:session-move`
+  green, plus `what-happened`, `one-day-one-look`, `training-week`,
+  `home-week-strip`, `one-today`, `chat-actions`, `coach-promises`. Four new
+  browser checks inside `verify:what-happened` drive a real move at 390x844 and
+  read the arrival day's peek. **10 mutations tried, 10 caught.**
+  **Ships on the frontend only — NO function deploy.** It reaches her when the
+  branch merges to `main`.
+  **Named, not fixed:** the origin-side peek ("Tuesday's session is on
+  Wednesday now") is pinned by source checks and mutation-tested, but not
+  driven in a browser — the harness can only make TODAY an origin, and today
+  already has its own card for that. Worth a driver that advances the clock
+  past a move.
+
+- [x] **SLICE 1 BUILT: TAKE ONE EXERCISE OUT, AND MOVE ONE.** 11 Sep 2026, from
+  the plan below. Two of the three MISSING operations in CLAUDE.md's "Changing
+  one exercise" block now exist, on BOTH surfaces. Adding one (slice 2) is
+  still not built.
+  **What changed on her phone:** the "⋮" on any exercise in today's session now
+  offers *Move earlier*, *Move later* and *Take out of this session*, above the
+  ban and with only the ban styled destructive. Taking one out ASKS rather than
+  decides — *Drop it — the session gets shorter* or *Put something else there*,
+  which opens the swap list for the same slot — and then asks *Today only* or
+  *Rest of block*, in the swap dialog's own words. The coach can do both too:
+  "drop the flyes today", "do the rows before the bench press".
+  **Her two rulings, both against my recommendation, both implemented as
+  chosen:** (1) removing ASKS each time what fills the gap — options were (A)
+  shorten and be honest about the time (my recommendation, its cost stated),
+  (B) fill it automatically, (C) ask each time; **she chose (C)**. (2)
+  reordering is available BY ASKING as well as by tapping — options were (a)
+  screen-only with a written reason (my recommendation, dragging being a touch
+  job), (b) both surfaces, (c) not yet; **she chose (b)**, so parity stays
+  absolute and this build adds nothing to the (still MISSING) exceptions list.
+  **The design constraint, measured before building:** of the passes that keep
+  a generated day sane, `enforceSetHierarchy` (exported for this),
+  `enforceOneWeightPerPrescription` and `enforceLoadCoherence` are reachable
+  from outside `generateMesocycle` and are RE-ASSERTED after every edit, in the
+  order generation itself documents. `enforceWeeklyPatternBalance` and
+  `balanceWeeklyStructure` are welded inside it and need the whole generation
+  context, so re-running them would mean regenerating and discarding every
+  other change the person has made. Instead `session-balance-cost.ts` MEASURES
+  what they would have objected to, read-only, and the confirm card says it —
+  which is the audit's "when a request would break the bar, say so" line,
+  partially answered.
+  **A gap this closes that the swap path also had:** an edited day's warm-up is
+  now rebuilt from the exercises the session actually holds. A swap still
+  clears its own ramp and leaves the day-level warm-up pointing at the old
+  list; the same `settleWeek` tail would fix it, and that is worth doing next.
+  **Two defects found while building, both fixed here:**
+  (a) moving an exercise swallowed a failed save silently — the refusal now
+  shows on the panel ("The order hasn't changed"), because unlike removing
+  there is no sheet left open to put it in;
+  (b) the browser harness passed the plan to the exercise screen as a module
+  constant with no update callback, so EVERY plan-editing screen wrote to the
+  database and had nowhere for the callback to land. The app was wired
+  correctly and the harness could not show it. The harness now holds the plan
+  in state as App.tsx does. Worth knowing: any future check of a screen that
+  edits the plan would have silently passed against a frozen fixture;
+  (c) the coach's receipt for a move read "before"/"after" off the index
+  arithmetic, so asking for something to go BEFORE a lift further down the list
+  was confirmed back as "after" it. The side asked for now travels with the
+  request.
+  **A check I had to rewrite before trusting it.** §3 first asserted the three
+  reachable passes by running each again on the result and finding nothing to
+  change. It read well and proved nothing: a well-formed day satisfies all
+  three whether or not the edit re-runs them, and all four mutations that
+  DELETED a pass went uncaught. Rewritten to hand the edit a day that already
+  violates the rule — 9 sets on an accessory, one prescription carrying two
+  weights, a 20x weight — and assert the violation is gone afterwards, with
+  each forge itself checked for being real. Same shape as the two checks caught
+  on 9 Sep: an assertion that a call APPEARS is not an assertion that it runs.
+  **Verified:** `test:session-edit` 70 checks, `verify:session-edit` 28 checks
+  in a real Chromium at 390x844 — the menu, the order visibly changing and
+  surviving a tab round trip, the remove-or-swap choice, the scope step, the
+  exercise gone. Screenshots read, and one phone-width defect fixed from them
+  (a long exercise name ran under the sheet's close button). 33 other gates
+  run and green, `test:audit` clean, and the bundle budgets moved 975 -> 1,005
+  kB and 1,720 -> 1,740 kB with the before and after measured on a clean
+  checkout and recorded in the gate. **24 mutations tried, 24 caught.**
+  `test:quality` finished after that commit and is GREEN: 9,216 profiles,
+  overall average 11.56/12, **0 below the 7.2 floor** (distribution: 8,386 at
+  11-12, 701 at 10-11, 128 at 9-10, one at 8-9). So the full sweep has run and
+  the branch is clear for a merge on her word.
+  **Deploys needed:** frontend on merge, and **`chat-gemini`** for
+  `propose_exercise_remove` and `propose_exercise_reorder`. Slice 2 (adding an
+  exercise) will need its own.
+  **NOT MINE, BUT FOUND AND NAMED:** four browser drivers are red —
+  `verify:ramp-ticks`, `verify:calibration-search`, `verify:single-implement`
+  and `verify:six`. Proven pre-existing: they fail IDENTICALLY on untouched
+  HEAD in a throwaway worktree. The cause is fixture brittleness in the checks,
+  not a defect in the app — three of them pin the dev clock to Monday and then
+  look for "Barbell Bench Press", and the harness profile's Monday is now an
+  ACTIVE RECOVERY day with no exercises at all (read off the screen, not
+  inferred). `single-implement` hard-codes "Dumbbell Leg Curl" the same way.
+  The fix is to find the week-1 day that HAS a ramped main lift rather than
+  naming one — pin the property, not the mechanism, the same re-anchoring
+  `verify:rest-day-race` needed on 9 Sep. Its own piece of work: four drivers,
+  each re-run and mutation-tested. **Not done here.**
+
+
+- [ ] **PLANNED, NOT BUILT: ADD, REMOVE AND MOVE ONE EXERCISE.** Ashley's
+  second pick from the must-have audit, 11 Sep 2026 — the last large gap in
+  "Changing one exercise". Plan:
+  `docs/plans/add-remove-move-one-exercise.md`.
+  **Two rulings, both hers, both against my recommendation and both recorded
+  here because they shape the build:**
+  (1) *What happens to the gap a removal leaves.* Options put to her: (A)
+  shorten the session and be honest about the time — recommended; (B) fill the
+  gap automatically with the best alternative; (C) ask each time. **She chose
+  (C)**, with (A)'s cost stated in the option ("an extra tap on a decision
+  you've usually already made"). So Remove is one entry point with two
+  outcomes — drop it, or put something else there (the existing swap list),
+  which also makes swapping discoverable from the remove flow.
+  (2) *Whether the coach can reorder exercises.* Options: (a) screen-only with
+  a written reason — recommended, dragging being a touch job; (b) both
+  surfaces; (c) don't build reordering yet. **She chose (b)**, so parity stays
+  absolute and this build creates no entry on the (still MISSING) exceptions
+  list. The reorder tool takes `item` + `before_item`/`after_item` rather than
+  counting positions, so both ends resolve through the name resolver the swap
+  already trusts.
+  **The measurement that shapes the design:** of the passes a single
+  add/remove can break, `enforceLoadCoherence`,
+  `enforceOneWeightPerPrescription`, the role set floors/ceilings,
+  `sizeBlockToRestBudget` and `estimateDaySeconds` are reusable from outside
+  `generateMesocycle` — but `enforceSetHierarchy` (one word from exported),
+  `enforceWeeklyPatternBalance`, `balanceWeeklyStructure`,
+  `trimWeekRestForBudget` and the tier sort are locked inside it. So the rule
+  is: re-assert everything reusable; for what is locked, measure the cost
+  read-only and SAY it on the confirm card. `volume-adjust.ts` is the existing
+  precedent — the one production path that already edits a session outside
+  generation, and it refuses to add when the time cap would break.
+  **A gap this closes that the swap path also has:** `buildWarmup` is exported
+  and its context is reconstructible, so an edited day's warm-up can be
+  rebuilt. Today a swap clears its own ramp and leaves the day-level warm-up
+  pointing at the old exercise list.
+  **Costs when built:** two slices (remove+move, then add), one `chat-gemini`
+  deploy each, no migration. **Not started.**
+
+- [x] **A CORRECTION TO YESTERDAY'S AUDIT: BANNING AN EXERCISE IS SCREEN-ONLY.**
+  CLAUDE.md line 61 said banning works on "both" surfaces. It does not: the
+  coach's `ban_exercise` is a deliberate, honest decline — *"NOT WIRED UP YET
+  — calling this returns a decline pointing the user at the ban button"*
+  (chat-gemini `:598`, handler `:3087-3104`) — because a ban touches every
+  week of every block and can drop a slot entirely, the highest-blast-radius
+  mutation in the app.
+  **How I got it wrong:** I built the parity table from the tool DECLARATION
+  list and did not read the handlers. A declared tool and a working tool are
+  different things, and the decline even says so in its own description — I
+  never opened it. The exact "a written finding is a lead, not a fact" error,
+  committed while writing the file that states the rule.
+  **Corrected where it sits** (CLAUDE.md, with the reason inline) and the
+  screen-only count goes 7 → 8. **The deeper finding:** no gate distinguishes
+  a live coach tool from a declining stub. `test:coach-promises` knows the
+  concept — it maintains a `decliningStubs` list — but only applies it to
+  reply chips (`:266`, `:282`). That check is worth generalising; named here,
+  not built.
+
+- [x] **"WHAT HAPPENED TO TODAY'S SESSION" — THE FIVE VERBS, ON THE SCREEN TOO.**
+  Ashley's first pick from the must-have audit, 10 Sep 2026, built on "Build
+  it, including the database column". Measured before building: move / rest
+  day / something else instead / did it elsewhere existed as coach tools only;
+  "missed" existed nowhere — the week strip inferred it once a date passed,
+  and the coach's only offer for a missed day ("call yesterday a rest day")
+  wrote `deliberate_rest`, quietly rewriting a skipped session as a chosen one.
+  **Decided by Ashley, 10 Sep 2026:** a marked-missed day STAYS missed on the
+  record, with the offer to move the session to a free day (A — recommended),
+  over (B) folding missed into rest, or (C) having the coach ask why first.
+  **Built:** a "What happened?" item on the Exercise tab's day menu opens a
+  sheet for the day on screen (a peeked day, else today) offering only the
+  verbs that apply — *I did it, not in the app* (past days: one row per
+  exercise pre-filled from the plan, logged as real sets in the plan's own
+  unit, then the session completed; today points at the grid), *I missed it*
+  (recorded, then the offer to move it to the resolver's next free day),
+  *Move it* (only days the coach's own resolver would accept), *Make it a
+  rest day*, *I did something else instead* (activity + minutes → the same two
+  rows the coach's tool writes). Every declared state shows at the top with
+  Undo. One new column, `workout_sessions.marked_missed`, ranked in the week
+  hook under logged work and above every other declared state and the date
+  guess — so today marked missed reads missed tonight. One new client writer
+  for the activity swap (until now only the server wrote that column). The
+  coach gains `propose_missed_session` on the same confirm rail as rest, its
+  prompt names a miss as its own fact ("the four day tools"), and the opener
+  and nudge chips become three honest choices — *I'll do it today · Mark it
+  missed · Call it a rest day* — and the coach stops asking about a miss it
+  has been told.
+  **Deviations from the plan, both from measurement:** "I did it, not in the
+  app" is a compact per-exercise form rather than the live grid, because the
+  grid is bound to today's session and the history writer refuses today by
+  design; the form uses the same writer the coach uses and shows every
+  number. And the coach tool is named `propose_missed_session` (not
+  `record_…`) so it sits on the proposal rail like its three siblings.
+  **Found in the browser, fixed:** the form was about to log a 40-metre
+  carry as 40 reps — it now carries the prescription's unit from the same
+  helper the grid uses; and its hint claimed sets were "logged as you type",
+  which was false. **Found by mutation, fixed:** the one-writer-per-column
+  check passed while a writer's update branch wrote the wrong column, because
+  the insert branch still named the right one — a stronger check now pins
+  both branches of each writer.
+  **Verified:** `test:what-happened` (62 checks) and `verify:what-happened`
+  (33 checks in a real Chromium at 390×844, four screenshots read; the driver
+  pins a day chosen so the fixture has a free day ahead in the same programme
+  week and a real past training day behind — a first version pinned Monday
+  and found "no free day", which was the fixture's week boundary, and the
+  coach would have said the same). **32 mutations tried, 32 caught** — 28
+  against the gate, 4 against the driver. All coach gates green
+  (chat-actions, coach-promises, coach-rules-sync, chat-app-reality,
+  pending-actions, tool-reply, context-is-read); training-week, session-move,
+  moved-session-stuck, one-today, home-week-strip, coach-opener, coach-nudge
+  green. Full fast sweep re-run before push.
+  **Not proven live:** the column does not exist in either database until
+  the migration is pushed from her machine (`db:push-both`, then
+  `test:schema-parity`); the coach's new tool is not live until `chat-gemini`
+  is deployed. Until both, the screen's "I missed it" would fail its write
+  and say so ("Couldn't save that"), and the coach cannot mark a miss.
+  **Not done, named:** the missed-WEEK follow-up from the coach (this gives
+  it the fact; the follow-up is separate); the parity exceptions list; the
+  audit doc keeps its 10 Sep numbers as a record — CLAUDE.md's contract lines
+  were updated instead. Plan: `docs/plans/what-happened-to-todays-session.md`.
+
+- [x] **THE MUST-HAVE CONTRACT IS IN CLAUDE.md, AND IT HAS BEEN MEASURED.**
+  Ashley, 10 Sep 2026: *"help me plan updating claude.md to be very clear
+  about what the app must have"*, then *"are we covering everything though?
+  ... we create best in class, professional meal and exercise plans which
+  can be adjusted to fit the user's needs while still aiming to keep the
+  quality. everything that can be done within the app is able to be done by
+  the user or by asking the ai chat. also the ai chat acts as a professional
+  personal trainer who gives best in class health, nutrition and fitness
+  advice."* Then: *"put it in claude.md, then do the audit."*
+  **Decided by Ashley:** the contract lives INSIDE CLAUDE.md (option A — the
+  only file every session reads unprompted), not in a linked file (B) or an
+  expansion of VISION.md (C). Draft 1 was rewritten after she pointed out it
+  covered the mechanics of her three promises and the substance of half of
+  one: meals had three bullets where exercise had a grain-by-grain anatomy;
+  "keep the quality while adjusting" was never a rule; the coach section said
+  how it behaves and nothing about how good its advice is.
+  **Built (as text, nothing else):** a new section near the top of CLAUDE.md —
+  her three promises verbatim, then one line per capability ending in the
+  gates that would fail if it went away, or `UNGUARDED` / `MISSING` /
+  `coach only` / `screen only` — plus seven rules that make it bite (a grain
+  is whole or named as not; nothing is "had" without a check; adjustment keeps
+  the bar; parity both ways; advice examined not assumed; a lead not a fact;
+  removal is hers).
+  **Audited — every mark measured, report only, in
+  `docs/audits/must-have-audit-2026-09-10.md`:** 185 gate headers mapped onto
+  the lines; existence checked capability by capability in code; the coach's
+  31 tools and the Profile's 23 editable fields tabulated against each other.
+  **Headline numbers:** 14 things MISSING on both surfaces; 7 the coach can do
+  that the screen cannot (move a session, rest day, swap for an activity, log
+  a past session, add a food, add a meal, custom meal); 7 the screen can do
+  that the coach cannot (New Plan, session length, targets/macros, meals per
+  day, cuisines/cooking time, step target, age/height); 8 onboarding answers
+  with no way to change them afterwards from the Profile screen (three known
+  lifts, exercise dislikes, three implement ceilings, starting preference);
+  5 properties UNGUARDED, two of which are the load-bearing ones — a single
+  swap or the volume toggle re-runs none of the balance / coherence /
+  hierarchy passes generation runs, and nothing anywhere grades the coach's
+  advice. What is solidly held: generation (two whole-grid harnesses), load
+  safety (six gates), logging, the coach's mechanics (eleven gates), history.
+  **Two corrections to my own drafts, recorded in the audit:** "add a food"
+  was better than I had marked (coach only, gated, not partial); activity
+  plans exist for exactly one case (the walking plan) and only that case is
+  offered.
+  **Not measured:** parity entries were confirmed in code, not tapped; no
+  existing gate was re-mutated; the quality of the coach's advice was not
+  measured because nothing in the repo can — that is finding 14.
+  **Next, all hers:** read the MISSING list and decide what becomes work.
+  Each is a product decision and gets its own plan before any build. The
+  two largest are the coach exam and re-scoring an adjusted plan — the
+  difference between claiming best-in-class and knowing it.
+
 - [x] **CALIBRATION WEEK IS A SEARCH, NOT A PRESCRIPTION** — Ashley, 10 Sep
   2026, after training on it: *"the weights were too light and the app
   prescribs weights but also says add weight until you leave 3-4 reps in

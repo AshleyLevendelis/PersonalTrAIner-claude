@@ -15,6 +15,7 @@ import {
   computeStopwatchElapsedMs,
   computeRoundState,
   roundPhaseIndex,
+  leadInMsOf,
   type RoundConfig,
   type RoundPhase,
   totalRoundSeconds,
@@ -31,6 +32,16 @@ import {
 
 /** computeRoundState only ever uses (now - start), so a zero anchor plus an elapsed figure is exactly equivalent to a real one — and works identically whether the clock is running, paused or finished. */
 const EPOCH_ISO = new Date(0).toISOString()
+
+/**
+ * The get-ready countdown every NEW round run gets — Ashley, 11 Sep 2026:
+ * "Add a 10 second countdown to the beginning of the round timer."
+ *
+ * Written into the stored config at startRound rather than defaulted inside
+ * the engine, so a round already in flight from a persisted record keeps the
+ * behaviour it started with instead of jumping backwards ten seconds.
+ */
+export const ROUND_LEAD_IN_SECONDS = 10
 
 export interface TimersValue {
   mode: TimerMode
@@ -58,6 +69,8 @@ export interface TimersValue {
   pauseRound: () => void
   /** Round mode only — re-anchors to `now - banked` so the schedule continues where it stopped. */
   resumeRound: () => void
+  /** Round mode only — ends the get-ready countdown early and starts round 1 now. No-op once work has begun. */
+  skipLeadIn: () => void
 }
 
 const TimersContext = createContext<TimersValue | null>(null)
@@ -169,13 +182,38 @@ export function TimersProvider({ profileId, children }: { profileId: string | un
     persist({
       ...defaultTimerRecord('round'),
       running: true,
-      roundConfig: config,
+      // The lead-in is stored ON the config, so the whole schedule — including
+      // a reload part-way through the countdown — stays derivable from the one
+      // anchor. A config arriving from elsewhere (a conditioning prefill) is
+      // given the same ten seconds unless it has already asked for its own.
+      roundConfig: { ...config, leadInSeconds: config.leadInSeconds ?? ROUND_LEAD_IN_SECONDS },
       startedAtIso: now.toISOString(),
       currentRound: 1,
-      currentPhase: 'work',
+      currentPhase: 'lead_in',
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profileId, persist])
+
+  /**
+   * "I'm ready now" — ends the countdown rather than waiting it out.
+   *
+   * Moves the ANCHOR, the same move pauseRound/resumeRound make and for the
+   * same reason: the anchor is the only thing the derivation reads, so
+   * re-anchoring to `now - leadInMs` lands the schedule on the first tick of
+   * round 1 with its full work interval. Nothing about computeRoundState
+   * changes, and there is no "skipped" flag to disagree with the clock.
+   */
+  const skipLeadIn = useCallback(() => {
+    if (!profileId || !record.running || !record.startedAtIso || !record.roundConfig) return
+    const leadInMs = leadInMsOf(record.roundConfig)
+    if (leadInMs <= 0) return
+    const now = getAppNow(profileId).getTime()
+    // Already working — nothing to skip, and re-anchoring here would rewind
+    // the run to the top of round 1.
+    if (now - new Date(record.startedAtIso).getTime() >= leadInMs) return
+    persist({ ...record, startedAtIso: new Date(now - leadInMs).toISOString() })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profileId, persist, record])
 
   const elapsedMs = useMemo(() => {
     if (!profileId) return record.accumulatedMs
@@ -270,6 +308,7 @@ export function TimersProvider({ profileId, children }: { profileId: string | un
     reset,
     pauseRound,
     resumeRound,
+    skipLeadIn,
     lap,
     startRound,
   }

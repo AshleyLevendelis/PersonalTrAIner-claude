@@ -113,6 +113,19 @@
   --phase-rest-ink: #3A2205;
   --phase-done-ink: #4A0716;
 
+  /* GET READY — the fourth phase, added 11 Sep 2026 with the ten-second
+   * countdown before round 1. Ashley chose it having its OWN colour over
+   * reusing rest amber ("amber would then mean two things") or leaving the
+   * field unchanged ("from across a room that looks like a round already
+   * running", which is the failure this field exists to fix).
+   *
+   * A cool light slate: nowhere near mint, amber or red in hue, and still
+   * clearly separated from all three under deuteranopia and protanopia
+   * simulation, where amber and mint are the pair most at risk of merging.
+   * Theme-independent like its three siblings, for the reason written above. */
+  --phase-ready: #C7D2DD;
+  --phase-ready-ink: #12202E;
+
   /* Glow axis — ONE unitless multiplier, consumed via calc() in both the
    * blur radius and the alpha of every halo, so strength 0 collapses each
    * one to nothing without a single conditional rule. The keyframe

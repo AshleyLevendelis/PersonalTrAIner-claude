@@ -106,13 +106,38 @@ console.log('\n3. Nothing has crept back up')
   // undo. That is the feature's real cost, not creep, and 975 leaves the same
   // ~20 kB of headroom the old number did rather than moving the line to just
   // above wherever the build happens to sit today.
-  const APP_CHUNK_BUDGET_KB = 975
+  // AND AGAIN, 11 Sep 2026: 975 kB -> 1,005 kB. MEASURED on a clean checkout of
+  // the commit before "take one exercise out, and move one": app chunk 971 kB.
+  // After: 984 kB. +13 kB for two new pure modules (the edit itself and the
+  // read-only balance cost it reports), the row menu's three items, and two
+  // coach tools with their cards, confirm and undo. Splitting the two modules
+  // out was TRIED and measured: it saved nothing, because ChatAssistant
+  // imports the same edit module statically for the coach's half of the same
+  // operations, so the bundler keeps it in the main chunk either way — the
+  // dynamic form only added an await between the tap and the sheet. 1,005
+  // leaves ~20 kB of headroom, the same margin the last two moves left, rather
+  // than drawing the line at wherever today's build happens to sit.
+  const APP_CHUNK_BUDGET_KB = 1005
   const app = find('index-')
   check(`the app chunk is ${app ? kb(app.raw) : '?'} kB, under the ${APP_CHUNK_BUDGET_KB} kB budget`,
     !!app && app.raw < APP_CHUNK_BUDGET_KB * 1024, app ? kb(app.raw) : null)
 
+  // THE TOTAL MOVED, 10 Sep 2026: 1,700 kB -> 1,720 kB. MEASURED on a clean
+  // checkout of the commit before: app chunk 966 kB, everything 1,689 kB.
+  // After "what happened to today's session": app chunk 971 kB (the sheet is
+  // split into its own 10 kB chunk, 3 kB gzipped, loaded only when opened —
+  // so the app chunk stays under 975 without moving that line), everything
+  // 1,704 kB. +15 kB total for a fifth day state read by four surfaces, two
+  // new day-flag writers, a coach tool with its card, confirm and undo, and
+  // the sheet itself. Feature cost, recorded here, not creep; 1,720 leaves
+  // ~16 kB of headroom rather than a line drawn at today's number.
+  // AND AGAIN, 11 Sep 2026: 1,720 kB -> 1,740 kB. Clean checkout before "take
+  // one exercise out, and move one": 1,704 kB; after: 1,719 kB — +15 kB, the
+  // same feature as the app-chunk note above plus its lazy sheet. 1,740 keeps
+  // the ~20 kB of headroom.
+  const TOTAL_BUDGET_KB = 1740
   const total = chunks.reduce((s, c) => s + c.raw, 0)
-  check(`everything together is ${kb(total)} kB, under the 1,700 kB budget`, total < 1700 * 1024, kb(total))
+  check(`everything together is ${kb(total)} kB, under the ${TOTAL_BUDGET_KB.toLocaleString()} kB budget`, total < TOTAL_BUDGET_KB * 1024, kb(total))
 
   // A first load fetches the app and the vendors, but neither lazy screen.
   const deferred = ['ConversationalOnboarding', 'DevTestPage']
