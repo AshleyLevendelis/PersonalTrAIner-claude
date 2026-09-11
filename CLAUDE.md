@@ -58,7 +58,12 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   equipment; a loaded lift never replaced by an unloaded one by default —
   both surfaces; `swap-target`, `slot-replacement-hygiene`,
   `single-implement`, `verify:swap-request`
-- Ban it from every future plan — both; `audit-fixes`, `silent-writes`
+- Ban it from every future plan — `screen only`; `audit-fixes`,
+  `silent-writes`. CORRECTED 11 Sep 2026: this said "both". The coach's
+  `ban_exercise` is a deliberate decline — "NOT WIRED UP YET… point the user at
+  the ban button" (chat-gemini `:598`, handler `:3087`) — because a ban is the
+  highest-blast-radius mutation in the app. I wrote "both" from the tool list
+  without reading the handler
 - Add one to a session AS PART OF THE PLAN — `MISSING` (extra work can be
   logged; it does not join the plan)
 - Remove it from one session without banning it — `MISSING`
@@ -126,10 +131,12 @@ facts: re-measure before acting on one, correct it here when it is wrong.
 ### Promise 2 — everything by hand or by asking
 
 - Every screen action has a coach path and every coach tool a screen path —
-  measured 10 Sep 2026: 32 coach tools; 7 things the screen does that the
-  coach cannot, 3 the coach does that the screen cannot (add a food, add a
-  meal, custom meal — the four day-level ones closed the same day; table in
-  the audit) — partial
+  measured 10 Sep 2026, corrected 11 Sep: 32 coach tools; **8** things the
+  screen does that the coach cannot (banning an exercise is the eighth — see
+  the correction above), 3 the coach does that the screen cannot (add a food,
+  add a meal, custom meal — the four day-level ones closed 10 Sep; table in the
+  audit) — partial. **No gate distinguishes a declared coach tool from a
+  declining stub**, which is the hole the ban error fell through
 - A written exceptions list, each with a reason, Ashley's to change —
   `MISSING`
 - The coach acts; it never sends anyone to a control, never describes one

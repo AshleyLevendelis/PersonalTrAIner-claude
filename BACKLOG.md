@@ -2,6 +2,63 @@
 
 Newest first. One line each.
 
+- [ ] **PLANNED, NOT BUILT: ADD, REMOVE AND MOVE ONE EXERCISE.** Ashley's
+  second pick from the must-have audit, 11 Sep 2026 — the last large gap in
+  "Changing one exercise". Plan:
+  `docs/plans/add-remove-move-one-exercise.md`.
+  **Two rulings, both hers, both against my recommendation and both recorded
+  here because they shape the build:**
+  (1) *What happens to the gap a removal leaves.* Options put to her: (A)
+  shorten the session and be honest about the time — recommended; (B) fill the
+  gap automatically with the best alternative; (C) ask each time. **She chose
+  (C)**, with (A)'s cost stated in the option ("an extra tap on a decision
+  you've usually already made"). So Remove is one entry point with two
+  outcomes — drop it, or put something else there (the existing swap list),
+  which also makes swapping discoverable from the remove flow.
+  (2) *Whether the coach can reorder exercises.* Options: (a) screen-only with
+  a written reason — recommended, dragging being a touch job; (b) both
+  surfaces; (c) don't build reordering yet. **She chose (b)**, so parity stays
+  absolute and this build creates no entry on the (still MISSING) exceptions
+  list. The reorder tool takes `item` + `before_item`/`after_item` rather than
+  counting positions, so both ends resolve through the name resolver the swap
+  already trusts.
+  **The measurement that shapes the design:** of the passes a single
+  add/remove can break, `enforceLoadCoherence`,
+  `enforceOneWeightPerPrescription`, the role set floors/ceilings,
+  `sizeBlockToRestBudget` and `estimateDaySeconds` are reusable from outside
+  `generateMesocycle` — but `enforceSetHierarchy` (one word from exported),
+  `enforceWeeklyPatternBalance`, `balanceWeeklyStructure`,
+  `trimWeekRestForBudget` and the tier sort are locked inside it. So the rule
+  is: re-assert everything reusable; for what is locked, measure the cost
+  read-only and SAY it on the confirm card. `volume-adjust.ts` is the existing
+  precedent — the one production path that already edits a session outside
+  generation, and it refuses to add when the time cap would break.
+  **A gap this closes that the swap path also has:** `buildWarmup` is exported
+  and its context is reconstructible, so an edited day's warm-up can be
+  rebuilt. Today a swap clears its own ramp and leaves the day-level warm-up
+  pointing at the old exercise list.
+  **Costs when built:** two slices (remove+move, then add), one `chat-gemini`
+  deploy each, no migration. **Not started.**
+
+- [x] **A CORRECTION TO YESTERDAY'S AUDIT: BANNING AN EXERCISE IS SCREEN-ONLY.**
+  CLAUDE.md line 61 said banning works on "both" surfaces. It does not: the
+  coach's `ban_exercise` is a deliberate, honest decline — *"NOT WIRED UP YET
+  — calling this returns a decline pointing the user at the ban button"*
+  (chat-gemini `:598`, handler `:3087-3104`) — because a ban touches every
+  week of every block and can drop a slot entirely, the highest-blast-radius
+  mutation in the app.
+  **How I got it wrong:** I built the parity table from the tool DECLARATION
+  list and did not read the handlers. A declared tool and a working tool are
+  different things, and the decline even says so in its own description — I
+  never opened it. The exact "a written finding is a lead, not a fact" error,
+  committed while writing the file that states the rule.
+  **Corrected where it sits** (CLAUDE.md, with the reason inline) and the
+  screen-only count goes 7 → 8. **The deeper finding:** no gate distinguishes
+  a live coach tool from a declining stub. `test:coach-promises` knows the
+  concept — it maintains a `decliningStubs` list — but only applies it to
+  reply chips (`:266`, `:282`). That check is worth generalising; named here,
+  not built.
+
 - [x] **"WHAT HAPPENED TO TODAY'S SESSION" — THE FIVE VERBS, ON THE SCREEN TOO.**
   Ashley's first pick from the must-have audit, 10 Sep 2026, built on "Build
   it, including the database column". Measured before building: move / rest
