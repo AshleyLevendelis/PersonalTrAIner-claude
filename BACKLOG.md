@@ -2,6 +2,64 @@
 
 Newest first. One line each.
 
+- [x] **AN OUTSIDE REVIEW OF ONE SESSION: ALL THREE FINDINGS WRONG, AND THE REAL
+  HOLE UNDERNEATH THEM.** Ashley asked Gemini to rate a generated Push & Press
+  session, 11 Sep 2026 (Arm Circles / Barbell Bench 3x6-8 @42.5kg / DB Shoulder
+  Press 3x9-11 @12kg per hand / Lateral Raises 3x15-18 @10kg per hand). It gave
+  7.5/10 and raised three gaps. **Re-measured, none of them reproduce** — the
+  rule that a written finding is a lead applies double to another model reading
+  a screenshot.
+  1. *"No direct tricep volume on a push day."* **132 of 132** generated push
+  days carried direct tricep work, across equipment tiers, experience levels,
+  30/45/60/90-minute sessions, goals, bodyweights, splits **and injuries**.
+  2. *"Arm circles are a minimal shoulder primer."* 8 of 8 sampled push days drew
+  a SPECIFIC shoulder-prep primer (Band Face Pulls, Band Dislocates, Scapular
+  Push-Ups, Band Pull-Aparts). And `buildWarmup` already puts a general block,
+  up to four joint-specific mobility drills and a full percentage ramp on the
+  bench AHEAD of the exercise list — Gemini was reading `day.exercises` and
+  could not see any of it.
+  3. *"Lateral raise load scaled too high."* **Backwards.** Measured across the
+  grid, laterals land at **0.07-0.12 x the bench** (2-4kg per hand). The formula
+  runs light. Acting on this would have pushed them back toward the "2kg toy"
+  numbers `load-prescription.ts:308` records were explicitly fixed away from
+  once. Her 10kg at a 42.5kg bench is 0.24 — an outlier at twice the grid's top.
+  **What was right was the OBSERVATION, not the diagnosis:** her session really
+  does look like that, and **no gate could ever have noticed.** Coverage is
+  scored at WEEK level (push/pull/squat/hinge somewhere in seven days) and the
+  only per-day rule asserts a Push & Press day contains a vertical push. A push
+  day can lose the isolation its own track named and score full marks.
+  **Built: `test:day-coverage`** and `daysMissingNamedIsolation()`, which asks a
+  day what its OWN track asked for (`TRACKS[focus].slots`, exported for this)
+  and reports what it kept versus lost.
+  **THE MEASUREMENT CHANGED THE DESIGN, which is what it was for.** Written
+  first as a scored deduction in the Selection dimension, then measured before
+  being wired in: **it fires on 23.5% of 7,200 days**, and its dominant case is
+  the MIRROR of the reported one — push days keeping tricep work and core while
+  losing the LATERAL RAISE (1,152 of 1,692), not losing the tricep (144).
+  Narrowing it to a strict priority inversion moved the rate by half a point
+  (24.0% -> 23.5%), which says the inversion IS the normal behaviour. A
+  deduction firing on a quarter of all days would move every score, could push
+  plans under the 7.2 floor, and would encode "core must not outrank a named
+  isolation" — a coaching opinion nobody has ruled on. **So it measures and does
+  not deduct.** No score moved; the 11.56/12 baseline stands.
+  **A number I carried between two populations, and the gate caught me.** The
+  first version pinned the wide sweep's 23.5% against the gate's own narrower,
+  faster grid (3 splits, one goal, no injuries, 540 days) which measures 2.8% —
+  and failed on correct code. Both numbers are now recorded against their own
+  denominators, in the gate, with a note that neither is the other's baseline.
+  Exactly the "if a denominator changes, prior numbers stop being comparable"
+  trap, walked into and then fixed.
+  **Verified:** 14 checks, **7 mutations tried, 7 caught** — including the one
+  that matters most, reading `Exercise.movement_pattern` (the coarse
+  'push'/'pull' vocabulary) instead of the catalogue's, which would have made
+  the whole thing report a clean sweep it had not earned.
+  **Still open, and Ashley's call with these numbers:** whether a push day
+  dropping its lateral raise for core work is a defect worth changing, and why
+  her specific session is an outlier — ~230 generated profiles produced no
+  4-exercise push day and no lateral near 10kg/hand at a 42.5kg bench. That
+  answer is in her stored plan, which this session cannot reach.
+  **Frontend/engine only — no migration, no function deploy.**
+
 - [x] **THE ROUND TIMER COUNTS YOU IN — TEN SECONDS BEFORE ROUND 1.** Ashley,
   11 Sep 2026: *"The round timer starts with no countdown. As soon as you start
   it begins."* Confirmed: Start anchored to now and elapsed 0 sat inside the

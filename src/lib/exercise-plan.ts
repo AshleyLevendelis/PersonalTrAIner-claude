@@ -75,7 +75,14 @@ interface TrackSlot {
   required: boolean
 }
 
-const TRACKS: Record<TrackFocus, TrackDefinition> = {
+// EXPORTED 11 Sep 2026 so the quality scorer can ask a day what its OWN track
+// asked for. Until now the scorer checked coverage only at week level (push /
+// pull / squat / hinge somewhere in the week), so a day could quietly lose the
+// isolation slot its track named and still score full marks — which is how a
+// Push & Press day shipped with a lateral raise and no tricep work at all,
+// unnoticed. The definition is the honest source for "what should be on this
+// day"; a second muscle table in quality-score.ts would be a copy to drift.
+export const TRACKS: Record<TrackFocus, TrackDefinition> = {
   'Push & Press': {
     label: 'Push & Press',
     primary_patterns: ['horizontal_push', 'vertical_push'],
