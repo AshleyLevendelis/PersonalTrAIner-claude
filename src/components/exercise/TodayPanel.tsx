@@ -466,7 +466,24 @@ export function TodayPanel({
     }
   }
 
-  const peekWorkout = peekDay ? liveWeekPlan.find(d => d.day === peekDay) : null
+  // THE PEEK ASKS THE SAME SOURCE AS EVERYTHING ELSE. It used to be
+  // `liveWeekPlan.find(d => d.day === peekDay)` — the plan's raw weekday row,
+  // which is the right answer only for a day nothing has happened to. It was
+  // the one surface that never adopted the shared "what actually runs on this
+  // date" answer (session-move.ts says so in its own header: "Everything now
+  // asks sessionForDate").
+  //
+  // Ashley, 11 Sep 2026, from the live app: she moved Tuesday's session to
+  // Wednesday, the week strip drew Tuesday as moved — correctly — and then
+  // tapping Tuesday opened a card headed "TUESDAY · Push & Press" listing the
+  // whole session, so she reported the move had not worked. It had. One day
+  // was giving two answers, which is the one thing the strip and the day view
+  // may never do.
+  const peekCell = peekDay ? weekTrain.days.find(d => d.dayName === peekDay) : null
+  const peekMovedTo = peekCell?.movedTo ?? null
+  const peekWorkout = peekDay && !peekMovedTo
+    ? (peekCell?.session ?? liveWeekPlan.find(d => d.day === peekDay))
+    : null
 
   // Turn 5: session-progress 2px line — total sets logged today across every
   // exercise on the live day, over total sets planned. Only meaningful (and
@@ -570,8 +587,21 @@ export function TodayPanel({
       />
       </Suspense>
 
-      {peekWorkout ? (
-        peekWorkout.exercises.length === 0 ? (
+      {peekDay ? (
+        peekMovedTo ? (
+          /* The day's session has LEFT. Says where, and offers to go there —
+             the answer she needed and could not get from any screen. */
+          <div className="rounded-xl bg-[color:var(--surface-deep)] p-4 text-center text-sm" data-testid="peek-moved-away">
+            <p className="text-muted-foreground">{peekDay}'s session is on {peekMovedTo.dayName} now.</p>
+            <button
+              className="mt-2 text-xs font-semibold text-primary-text underline"
+              onClick={() => setPeekDay(peekMovedTo.dayName)}
+            >
+              See {peekMovedTo.dayName} →
+            </button>
+            <button className="block mx-auto mt-2 text-xs underline text-muted-foreground" onClick={() => setPeekDay(null)}>Back to today</button>
+          </div>
+        ) : !peekWorkout || peekWorkout.exercises.length === 0 ? (
           <div className="rounded-xl bg-[color:var(--surface-deep)] p-4 text-center text-sm text-muted-foreground">
             {peekDay} is a rest or recovery day.
             <button className="block mx-auto mt-2 text-xs underline" onClick={() => setPeekDay(null)}>Back to today</button>
@@ -579,6 +609,8 @@ export function TodayPanel({
         ) : (
           <PeekPanel
             workout={peekWorkout}
+            dayLabel={peekDay}
+            movedFromDayName={peekCell?.movedFrom?.dayName ?? null}
             onExit={() => setPeekDay(null)}
             onSwap={(exIndex, name) => peekDay && onOpenSwap(peekDay, exIndex, name)}
             onBan={handleBan}

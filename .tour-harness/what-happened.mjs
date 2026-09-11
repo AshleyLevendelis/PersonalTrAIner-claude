@@ -114,6 +114,23 @@ check('8a. "Move it to another day" lists real destinations', (await openSheet()
 const dest = await ev(`document.querySelector('[data-move-to]')?.getAttribute('data-move-to')`)
 check('8b. ...tapping one moves it', await clickSel('[data-move-to]') && await untilClosed() && /moved to another day/.test(await untilCell(TODAY_NAME, /moved/) || ''), { dest, cell: await cell(TODAY_NAME) })
 check('8c. ...and the moved-day card offers to do it today instead', await ev(`[...document.querySelectorAll('button')].some(b => /Do it today instead/.test(b.textContent))`))
+
+// THE DAY THAT RECEIVED IT, on the strip. Ashley, 11 Sep 2026: after moving a
+// session she tapped days on the strip and the screens disagreed with the
+// glyphs — the peek read the plan's raw weekday row, so the day the session
+// LEFT still listed the whole session and the day it ARRIVED on called itself
+// a rest day. Both halves are the same defect; this drives the arrival half.
+await tap(`[aria-label^="${dest}:"]`); await wait(900)
+const peekText = await ev(`document.body.innerText`)
+check('8c2. peeking the day it moved TO shows the session, not "a rest day"',
+  !new RegExp(`${dest} is a rest or recovery day`).test(peekText), peekText.slice(0, 200))
+check('8c3. ...headed by the day being looked at, and saying where it came from',
+  new RegExp(`${dest}[\\s\\S]{0,60}moved from ${TODAY_NAME}`, 'i').test(peekText),
+  (peekText.match(/moved from [A-Za-z]+/) || ['no "moved from" anywhere'])[0])
+await tap('button[aria-label="Close"]'); await wait(700)
+check('8c4. ...and closing the peek returns to the moved-day card',
+  await ev(`[...document.querySelectorAll('button')].some(b => /Do it today instead/.test(b.textContent))`))
+
 await clickText('/Do it today instead/'); check('8d. ...which brings it back', new RegExp(`^${TODAY_NAME}: due$`).test(await untilCell(TODAY_NAME, /due/) || ''), await cell(TODAY_NAME))
 
 // --- something else --------------------------------------------------------

@@ -2,6 +2,62 @@
 
 Newest first. One line each.
 
+- [x] **A MOVED SESSION WAS A DEAD END, AND THE SCREEN SAID IT HAD NOT MOVED.**
+  Ashley, 11 Sep 2026, from the LIVE app, with screenshots. She moved Tuesday's
+  Push & Press to Wednesday, did not do it, and on Friday asked the coach to do
+  it today and then to move it to Friday. Both answered *"Tuesday's session is
+  already moved to Wednesday."* and stopped. She reported the move had not
+  worked at all.
+  **The move HAD worked** — reproduced against the real resolver with her exact
+  week. The week strip was right: Tuesday drawn as moved, Wednesday drawn as
+  missed. Two separate defects sat on top of that truth.
+  **1. The screen contradicted the strip.** Tapping a day on the Exercise strip
+  looked the day up in the plan's raw weekday row — the one naive lookup that
+  never adopted the shared "what actually runs on this date" answer, even
+  though `session-move.ts`'s own header says *"Everything now asks
+  sessionForDate"* and the 9 Sep fix removed the other three. So the day the
+  session LEFT still listed the whole session under its own name (exactly what
+  she photographed), and the day it ARRIVED on called itself a rest day. One
+  day, two answers — the thing `one-day-one-look` exists to forbid. Now both
+  resolve through the same week the strip is drawn from: the origin says
+  *"Tuesday's session is on Wednesday now"* with a link to that day, and the
+  destination shows the session headed by the day being looked at, *"· moved
+  from Tuesday"*.
+  **2. Naming the day it left was a refusal with nothing to tap.** The only
+  wording that worked was naming WEDNESDAY — the day it had travelled to —
+  which she had no way to know. **Asked with three options** — (a) move it
+  straight away, treating a named day as the answer, which is her own 9 Sep
+  ruling (my recommendation); (b) say where it is, then offer; (c) keep
+  refusing — **she chose (b)**: *"you always know where the session actually is
+  before deciding."* So the refusal became a question that names the session's
+  current home, offers a day, and carries both answers as chips.
+  **The subtlety that decides whether it loops:** the chips name the day the
+  session SITS on, not the day she asked about. A chip reading "Move Tuesday's
+  session to Saturday" would arrive as the same request that produced the
+  question and ask it again — the loop the 9 Sep ruling exists to remove.
+  Naming Wednesday takes the ordinary path, which already rewrites the original
+  move rather than stacking a second one.
+  **Also now honest about a day it cannot give her:** she asked for Friday,
+  which already had Squat & Carry on it. It offers Saturday and says why,
+  instead of silently sliding.
+  **A check re-anchored, and why it had to be:** `test:moved-session-stuck` §3
+  asserted the exact sentence *"already moved to Wednesday"*, so it failed when
+  the behaviour got better rather than when it got worse. Re-anchored on the
+  property — it still says where the session went, and now also offers a day
+  and a way out — with the old wording recorded here.
+  **Verified:** `test:moved-session-stuck` (now 44 checks) and `test:session-move`
+  green, plus `what-happened`, `one-day-one-look`, `training-week`,
+  `home-week-strip`, `one-today`, `chat-actions`, `coach-promises`. Four new
+  browser checks inside `verify:what-happened` drive a real move at 390x844 and
+  read the arrival day's peek. **10 mutations tried, 10 caught.**
+  **Ships on the frontend only — NO function deploy.** It reaches her when the
+  branch merges to `main`.
+  **Named, not fixed:** the origin-side peek ("Tuesday's session is on
+  Wednesday now") is pinned by source checks and mutation-tested, but not
+  driven in a browser — the harness can only make TODAY an origin, and today
+  already has its own card for that. Worth a driver that advances the clock
+  past a move.
+
 - [x] **SLICE 1 BUILT: TAKE ONE EXERCISE OUT, AND MOVE ONE.** 11 Sep 2026, from
   the plan below. Two of the three MISSING operations in CLAUDE.md's "Changing
   one exercise" block now exist, on BOTH surfaces. Adding one (slice 2) is

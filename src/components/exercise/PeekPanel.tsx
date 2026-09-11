@@ -39,6 +39,8 @@ export function PeekPanel({
   onBan,
   onOpenDetail,
   banBusyName,
+  dayLabel,
+  movedFromDayName,
 }: {
   workout: WorkoutDay
   onExit: () => void
@@ -47,6 +49,15 @@ export function PeekPanel({
   /** Same technique panel the day view opens — one dialog, two entry points. */
   onOpenDetail?: (exerciseName: string) => void
   banBusyName: string | null
+  /**
+   * The day being LOOKED AT, which is not always the day the session is named
+   * after. A session that moved carries its origin's weekday inside it, so
+   * peeking Wednesday used to be headed "TUESDAY". Passed explicitly rather
+   * than read off the workout for that reason.
+   */
+  dayLabel?: string
+  /** Where a moved-in session came from, so the header can say so. */
+  movedFromDayName?: string | null
 }) {
   return (
     <div className="rounded-xl bg-card">
@@ -75,7 +86,8 @@ export function PeekPanel({
       <div className="flex items-start justify-between gap-2.5 px-4 pt-3.5 pb-3 border-b">
         <div className="min-w-0">
           <span className="text-[0.65625rem] uppercase tracking-[.2em] text-muted-foreground">
-            {workout.day}
+            {dayLabel ?? workout.day}
+            {movedFromDayName && <span className="normal-case tracking-normal"> · moved from {movedFromDayName}</span>}
           </span>
           <p className="mt-1.5 text-[1.875rem] font-bold leading-[1.05] tracking-[-.03em]">{workout.focus}</p>
         </div>

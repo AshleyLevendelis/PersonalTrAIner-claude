@@ -2360,6 +2360,21 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
             ...(target.nextFree ? [`Move it to ${target.nextFree.dayName}`] : []),
             `Take ${fromDate === activeSession.date ? 'today' : fromDayName} off instead`,
           ]
+        // THE SAME TWO ANSWERS, for the day the session LEFT. Ashley, 11 Sep
+        // 2026, from the live app: naming Tuesday after Tuesday's session had
+        // gone to Wednesday was a flat refusal with nothing to tap, twice.
+        //
+        // THE CHIPS NAME WEDNESDAY, NOT TUESDAY, and that is the whole trick.
+        // A chip reading "Move Tuesday's session to Saturday" would arrive as
+        // the same request that produced this question and ask it again —
+        // the loop the 9 Sep ruling exists to remove. Naming the day it
+        // actually sits on takes the ordinary path, which already rewrites
+        // the original move rather than stacking a second one.
+        : target.reason === 'already_moved'
+        ? [
+            ...(target.nextFree ? [`Move ${target.movedTo.dayName}'s session to ${target.nextFree.dayName}`] : []),
+            `Take ${target.movedTo.dayName} off instead`,
+          ]
         : []
       return {
         ok: false,

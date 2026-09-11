@@ -98,10 +98,43 @@ check('a day the plan never asked for still says "already clear"',
   genuinelyClear.ok === false && genuinelyClear.reason === 'no_session'
     && /already clear/.test(genuinelyClear.message), genuinelyClear)
 
+// THE DAY THE SESSION LEFT — a question since 11 Sep 2026, not a dead end.
+// It used to answer "Tuesday's session is already moved to Wednesday." and
+// stop there. Ashley hit that on the live app: naming Tuesday refused twice,
+// with nothing to tap, and the only wording that worked was naming WEDNESDAY,
+// which she had no way to know. Asked to choose, she picked "tell me where it
+// is, then offer" over moving it straight away.
+//
+// The property, not the sentence: it still says where the session went, and
+// it now also offers a day and a way out. Anchoring on the old words is what
+// made this check fail rather than pass when the behaviour improved.
 const leftAlready = move({ fromDate: TUE, requestedDate: null, todayDate: TUE, existing: AFTER })
 check('a day whose session has LEFT still says where it went',
   leftAlready.ok === false && leftAlready.reason === 'already_moved'
-    && /already moved to Wednesday/.test(leftAlready.message), leftAlready)
+    && /Wednesday/.test(leftAlready.message), leftAlready)
+check('...and names it in a field, not only in prose',
+  leftAlready.ok === false && leftAlready.reason === 'already_moved'
+    && leftAlready.movedTo.dayName === 'Wednesday', leftAlready)
+check('...and is a question now — it offers a day to move it to',
+  leftAlready.ok === false && leftAlready.reason === 'already_moved'
+    && !!leftAlready.nextFree && leftAlready.nextFree.dayName !== 'Tuesday', leftAlready)
+check('...and offers taking the day it SITS on off, not the day it left',
+  leftAlready.ok === false && /take Wednesday off/i.test(leftAlready.message), leftAlready)
+
+// Naming a day that is already taken is answered, not silently redirected.
+const wantsTakenDay = move({ fromDate: TUE, requestedDate: MON, todayDate: TUE, existing: AFTER })
+check('naming a day that already has a session says so',
+  wantsTakenDay.ok === false && wantsTakenDay.reason === 'already_moved'
+    && wantsTakenDay.requestedDayName === 'Monday'
+    && /Monday already has a session/.test(wantsTakenDay.message), wantsTakenDay)
+
+// AND THE WAY OUT ACTUALLY WORKS. The chip the client builds names the day
+// the session SITS on; sending that must go through rather than ask again,
+// and must rewrite the original move rather than chain a second one.
+const viaChip = move({ fromDate: WED, requestedDate: FRI, todayDate: TUE, existing: AFTER })
+check('the day it sits on, with a day named, goes straight through', viaChip.ok, viaChip)
+check('...rewriting the original move rather than stacking one',
+  viaChip.ok && viaChip.remapFrom === TUE, viaChip)
 
 console.log('\n4. An ordinary move still works — the rest-day rows are not "occupied"')
 // The first rewrite of the free-day scan asked `!resolved.day`, which is TRUE
@@ -188,6 +221,30 @@ check('...and one takes the day off, which is what dropping it does',
   /off instead`/.test(moveBuilder), null)
 check('...while every other refusal stays a plain sentence, with nothing to tap',
   /chips\.length > 0[\s\S]{0,120}: target\.message/.test(moveBuilder), null)
+
+// THE SAME TWO ANSWERS FOR THE DAY THE SESSION LEFT — 11 Sep 2026. Pinned on
+// the property that matters: the chips name the day the session SITS on, not
+// the day being asked about. A chip naming the origin would come straight
+// back to this same question, which is the loop the 9 Sep ruling removed.
+check('the day-it-left question carries its answers as chips too',
+  /target\.reason === 'already_moved'/.test(moveBuilder), null)
+check('...and the move chip names where the session SITS, not the day asked about',
+  /Move \$\{target\.movedTo\.dayName\}'s session to \$\{target\.nextFree\.dayName\}/.test(moveBuilder), null)
+check('...and the other takes that same day off',
+  /Take \$\{target\.movedTo\.dayName\} off instead/.test(moveBuilder), null)
+
+// THE PEEK, which is what actually told Ashley the move had not worked. The
+// property: it resolves the day through the same week the strip is drawn
+// from, and never straight off the plan's weekday row.
+const panel = strip(readFileSync('src/components/exercise/TodayPanel.tsx', 'utf8'))
+check('the peek asks the resolved week, not the plan row',
+  /weekTrain\.days\.find\(d => d\.dayName === peekDay\)/.test(panel), null)
+check('...and shows where the session went when the day is a move ORIGIN',
+  /peekMovedTo/.test(panel) && /peek-moved-away/.test(panel), null)
+check('...and labels a peeked day by the day peeked, not by the session it holds',
+  /dayLabel=\{peekDay\}/.test(panel), null)
+check('...saying which day a moved-in session came from',
+  /movedFromDayName=\{peekCell\?\.movedFrom\?\.dayName \?\? null\}/.test(panel), null)
 
 console.log(failures === 0 ? '\nA moved session can still be moved, or dropped.\n' : `\n${failures} check(s) failed.\n`)
 process.exit(failures === 0 ? 0 : 1)
