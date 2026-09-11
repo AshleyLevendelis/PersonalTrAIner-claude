@@ -2796,7 +2796,14 @@ export function clampToVolumeRole(sets: number, role: VolumeRole | null, isLongS
  * main lift at all (pure carry/core sessions) are left alone; there is
  * nothing to hold the hierarchy against.
  */
-function enforceSetHierarchy(exercises: Exercise[]): Exercise[] {
+// EXPORTED 11 Sep 2026 so an edit made OUTSIDE generation can re-assert it.
+// session-edit.ts removes and reorders exercises in a live plan; of the passes
+// that keep a day sane this is the one a removal most obviously breaks (drop
+// the only main lift and every accessory's ceiling vanishes with it). It was
+// already the right shape — Exercise[] in, Exercise[] out, no pool, no
+// profile, no trace — so exporting it costs nothing and stops the next caller
+// hand-reimplementing it, the way quality-score.ts:360 already had to.
+export function enforceSetHierarchy(exercises: Exercise[]): Exercise[] {
   const roles = exercises.map(ex => {
     const entry = findEntry(ex.name)
     return entry ? getVolumeRole(entry) : null

@@ -2,6 +2,91 @@
 
 Newest first. One line each.
 
+- [x] **SLICE 1 BUILT: TAKE ONE EXERCISE OUT, AND MOVE ONE.** 11 Sep 2026, from
+  the plan below. Two of the three MISSING operations in CLAUDE.md's "Changing
+  one exercise" block now exist, on BOTH surfaces. Adding one (slice 2) is
+  still not built.
+  **What changed on her phone:** the "⋮" on any exercise in today's session now
+  offers *Move earlier*, *Move later* and *Take out of this session*, above the
+  ban and with only the ban styled destructive. Taking one out ASKS rather than
+  decides — *Drop it — the session gets shorter* or *Put something else there*,
+  which opens the swap list for the same slot — and then asks *Today only* or
+  *Rest of block*, in the swap dialog's own words. The coach can do both too:
+  "drop the flyes today", "do the rows before the bench press".
+  **Her two rulings, both against my recommendation, both implemented as
+  chosen:** (1) removing ASKS each time what fills the gap — options were (A)
+  shorten and be honest about the time (my recommendation, its cost stated),
+  (B) fill it automatically, (C) ask each time; **she chose (C)**. (2)
+  reordering is available BY ASKING as well as by tapping — options were (a)
+  screen-only with a written reason (my recommendation, dragging being a touch
+  job), (b) both surfaces, (c) not yet; **she chose (b)**, so parity stays
+  absolute and this build adds nothing to the (still MISSING) exceptions list.
+  **The design constraint, measured before building:** of the passes that keep
+  a generated day sane, `enforceSetHierarchy` (exported for this),
+  `enforceOneWeightPerPrescription` and `enforceLoadCoherence` are reachable
+  from outside `generateMesocycle` and are RE-ASSERTED after every edit, in the
+  order generation itself documents. `enforceWeeklyPatternBalance` and
+  `balanceWeeklyStructure` are welded inside it and need the whole generation
+  context, so re-running them would mean regenerating and discarding every
+  other change the person has made. Instead `session-balance-cost.ts` MEASURES
+  what they would have objected to, read-only, and the confirm card says it —
+  which is the audit's "when a request would break the bar, say so" line,
+  partially answered.
+  **A gap this closes that the swap path also had:** an edited day's warm-up is
+  now rebuilt from the exercises the session actually holds. A swap still
+  clears its own ramp and leaves the day-level warm-up pointing at the old
+  list; the same `settleWeek` tail would fix it, and that is worth doing next.
+  **Two defects found while building, both fixed here:**
+  (a) moving an exercise swallowed a failed save silently — the refusal now
+  shows on the panel ("The order hasn't changed"), because unlike removing
+  there is no sheet left open to put it in;
+  (b) the browser harness passed the plan to the exercise screen as a module
+  constant with no update callback, so EVERY plan-editing screen wrote to the
+  database and had nowhere for the callback to land. The app was wired
+  correctly and the harness could not show it. The harness now holds the plan
+  in state as App.tsx does. Worth knowing: any future check of a screen that
+  edits the plan would have silently passed against a frozen fixture;
+  (c) the coach's receipt for a move read "before"/"after" off the index
+  arithmetic, so asking for something to go BEFORE a lift further down the list
+  was confirmed back as "after" it. The side asked for now travels with the
+  request.
+  **A check I had to rewrite before trusting it.** §3 first asserted the three
+  reachable passes by running each again on the result and finding nothing to
+  change. It read well and proved nothing: a well-formed day satisfies all
+  three whether or not the edit re-runs them, and all four mutations that
+  DELETED a pass went uncaught. Rewritten to hand the edit a day that already
+  violates the rule — 9 sets on an accessory, one prescription carrying two
+  weights, a 20x weight — and assert the violation is gone afterwards, with
+  each forge itself checked for being real. Same shape as the two checks caught
+  on 9 Sep: an assertion that a call APPEARS is not an assertion that it runs.
+  **Verified:** `test:session-edit` 70 checks, `verify:session-edit` 28 checks
+  in a real Chromium at 390x844 — the menu, the order visibly changing and
+  surviving a tab round trip, the remove-or-swap choice, the scope step, the
+  exercise gone. Screenshots read, and one phone-width defect fixed from them
+  (a long exercise name ran under the sheet's close button). 33 other gates
+  run and green, `test:audit` clean, and the bundle budgets moved 975 -> 1,005
+  kB and 1,720 -> 1,740 kB with the before and after measured on a clean
+  checkout and recorded in the gate. **24 mutations tried, 24 caught.**
+  `test:quality` (9,216 profiles) was still running when this was committed —
+  its result is recorded below when it lands, and it must be green before any
+  merge to `main`.
+  **Deploys needed:** frontend on merge, and **`chat-gemini`** for
+  `propose_exercise_remove` and `propose_exercise_reorder`. Slice 2 (adding an
+  exercise) will need its own.
+  **NOT MINE, BUT FOUND AND NAMED:** four browser drivers are red —
+  `verify:ramp-ticks`, `verify:calibration-search`, `verify:single-implement`
+  and `verify:six`. Proven pre-existing: they fail IDENTICALLY on untouched
+  HEAD in a throwaway worktree. The cause is fixture brittleness in the checks,
+  not a defect in the app — three of them pin the dev clock to Monday and then
+  look for "Barbell Bench Press", and the harness profile's Monday is now an
+  ACTIVE RECOVERY day with no exercises at all (read off the screen, not
+  inferred). `single-implement` hard-codes "Dumbbell Leg Curl" the same way.
+  The fix is to find the week-1 day that HAS a ramped main lift rather than
+  naming one — pin the property, not the mechanism, the same re-anchoring
+  `verify:rest-day-race` needed on 9 Sep. Its own piece of work: four drivers,
+  each re-run and mutation-tested. **Not done here.**
+
+
 - [ ] **PLANNED, NOT BUILT: ADD, REMOVE AND MOVE ONE EXERCISE.** Ashley's
   second pick from the must-have audit, 11 Sep 2026 — the last large gap in
   "Changing one exercise". Plan:

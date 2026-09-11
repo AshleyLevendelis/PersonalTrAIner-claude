@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { Ban, History, MoreVertical, BookOpen, Info } from 'lucide-react'
+import { Ban, History, MoreVertical, BookOpen, Info, Trash2, ArrowUp, ArrowDown } from 'lucide-react'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { getExerciseId } from '@/lib/exercise-db'
 import { formatRampSets, formatCompletedSummary } from '@/lib/session-derive'
@@ -52,6 +52,12 @@ export interface ExerciseRowProps {
   onOpenHistory?: (exerciseId: string, exerciseName: string) => void
   /** Opens the technique panel — see ExerciseDetailDialog. */
   onOpenDetail?: (exerciseName: string) => void
+  /** Take this one out of the session — opens the drop-or-swap sheet (Ashley's ruling, 11 Sep 2026). */
+  onRemove?: () => void
+  /** Reorder within the session. Disabled at the ends, where there is nowhere to go. */
+  onMove?: (direction: -1 | 1) => void
+  canMoveUp?: boolean
+  canMoveDown?: boolean
   /** Passed straight through to SetGrid, which needs it to judge a typed weight — see set-plausibility.ts. */
   profile?: SetGridProps['profile']
 }
@@ -73,6 +79,10 @@ export function ExerciseRow({
   onToggleExpanded,
   onOpenHistory,
   onOpenDetail,
+  onRemove,
+  onMove,
+  canMoveUp,
+  canMoveDown,
   profile,
 }: ExerciseRowProps) {
   const { setsFor, requestedSetFocus, clearSetFocusRequest, rampTicksFor, toggleRampTick } = useActiveSession()
@@ -118,6 +128,11 @@ export function ExerciseRow({
   // where the ~10% row-width gain comes from: no border, no card padding.
   return (
     <div
+      // The row's identity in the DOM, so the order on screen can be read as
+      // an order — the browser gate for moving an exercise asserts the
+      // rendered sequence changed, which is unprovable from a name buried in
+      // a truncated span.
+      data-exercise-name={ex.name}
       className={
         expanded
           ? 'relative overflow-hidden rounded-[18px] pt-4 space-y-2.5'
@@ -290,6 +305,28 @@ export function ExerciseRow({
                   <DropdownMenuItem onClick={() => onOpenHistory(exerciseId, ex.name)}>
                     <History className="size-3.5" />
                     History
+                  </DropdownMenuItem>
+                )}
+                {/* ORDER, THEN REMOVAL, THEN THE BAN. Moving is the least
+                    consequential and the ban is the most — it rewrites every
+                    week of every block — so the menu runs cheap to expensive,
+                    and only the ban is styled destructive. */}
+                {onMove && (
+                  <DropdownMenuItem disabled={!canMoveUp} onClick={() => onMove(-1)} data-testid="move-up">
+                    <ArrowUp className="size-3.5" />
+                    Move earlier
+                  </DropdownMenuItem>
+                )}
+                {onMove && (
+                  <DropdownMenuItem disabled={!canMoveDown} onClick={() => onMove(1)} data-testid="move-down">
+                    <ArrowDown className="size-3.5" />
+                    Move later
+                  </DropdownMenuItem>
+                )}
+                {onRemove && (
+                  <DropdownMenuItem onClick={onRemove} data-testid="remove-exercise">
+                    <Trash2 className="size-3.5" />
+                    Take out of this session
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuItem variant="destructive" disabled={banBusy} onClick={onBan}>

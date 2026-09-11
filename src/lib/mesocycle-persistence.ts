@@ -93,6 +93,33 @@ export async function restoreMesocycle(profileId: string): Promise<RestoredMesoc
 }
 
 /** Upserts a single week — used by targeted mesocycle edits (swap/ban) so a full resave isn't needed for a one-week patch. */
+/**
+ * Save exactly the weeks a scoped plan edit touched — 'today' is one week,
+ * 'permanent' is the rest of that week's block.
+ *
+ * ONE SAVER, TWO SURFACES. The swap path grew two copies of this branch, one
+ * in App.tsx's handleSwapExercise and one in executeExerciseSwap, and the
+ * executor's comment says it "mirrors handleSwapExercise exactly" — which is
+ * a promise nothing checks. session-edit's remove and reorder call this
+ * instead, so the screen and the coach cannot drift apart about which weeks
+ * reached the database.
+ */
+export async function saveScopedEdit(
+  profileId: string,
+  mesocycle: MesocycleWeek[],
+  weekNumber: number,
+  scope: 'today' | 'permanent',
+): Promise<void> {
+  if (scope === 'today') {
+    const week = mesocycle.find(w => w.week_number === weekNumber)
+    if (week) await saveMesocycleWeek(profileId, week)
+    return
+  }
+  const block = mesocycle.find(w => w.week_number === weekNumber)?.block_number
+  const touched = mesocycle.filter(w => w.block_number === block && w.week_number >= weekNumber)
+  await Promise.all(touched.map(w => saveMesocycleWeek(profileId, w)))
+}
+
 export async function saveMesocycleWeek(profileId: string, week: MesocycleWeek): Promise<void> {
   const { error } = await supabase
     .from('mesocycle_weeks')

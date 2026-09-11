@@ -56,7 +56,7 @@ facts: re-measure before acting on one, correct it here when it is wrong.
 **Changing one exercise** — every operation, from the screen AND the coach
 - Replace it, today or for the block; alternatives real, on other
   equipment; a loaded lift never replaced by an unloaded one by default —
-  both surfaces; `swap-target`, `slot-replacement-hygiene`,
+  both surfaces; `swap-target`, `slot-replacement`,
   `single-implement`, `verify:swap-request`
 - Ban it from every future plan — `screen only`; `audit-fixes`,
   `silent-writes`. CORRECTED 11 Sep 2026: this said "both". The coach's
@@ -66,8 +66,12 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   without reading the handler
 - Add one to a session AS PART OF THE PLAN — `MISSING` (extra work can be
   logged; it does not join the plan)
-- Remove it from one session without banning it — `MISSING`
-- Move it earlier or later within the session — `MISSING`
+- Remove it from one session without banning it — both surfaces since 11 Sep
+  2026; asks whether to drop it or put something else there (her ruling);
+  `session-edit`, `verify:session-edit`
+- Move it earlier or later within the session — both surfaces since 11 Sep
+  2026, a superset's halves travelling together; `session-edit`,
+  `verify:session-edit`
 - Change its sets, reps or weight for today — via logging only (extra sets,
   typed numbers); the plan itself is not edited
 
@@ -121,11 +125,17 @@ facts: re-measure before acting on one, correct it here when it is wrong.
 
 **Adjustable AND best-in-class is one promise, not two**
 - An adjustment keeps the plan above the floor generation had to meet —
-  full rebuilds regenerate, so their checks run; a single swap and the
-  volume toggle patch in place and re-run NONE of the balance, coherence or
-  hierarchy passes: `UNGUARDED`
+  full rebuilds regenerate, so their checks run. NARROWED 11 Sep 2026:
+  removing and moving an exercise re-run set hierarchy, one-weight and load
+  coherence and rebuild the day's warm-up (`session-edit`, each pass proven by
+  handing the edit a day that already violates it). A single SWAP and the
+  volume toggle still re-run none of them, and the two weekly balance passes
+  are unreachable from any edit path: `UNGUARDED`
 - When a request would break the bar, the app says so and offers the
-  nearest thing that keeps it — `MISSING`
+  nearest thing that keeps it — PARTIAL since 11 Sep 2026: removing an
+  exercise reports what it costs the week's push:pull and chest:back balance
+  before the tap, and offers the swap list instead (`session-edit` §5).
+  Nothing else does; `MISSING` everywhere but there
 - A changed plan is re-scored like a generated one — `MISSING`
 
 ### Promise 2 — everything by hand or by asking

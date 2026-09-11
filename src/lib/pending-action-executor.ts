@@ -18,7 +18,8 @@ import { updateProfileField } from './profile-store'
 import type { MesocycleWeek, UserProfile, EquipmentAccess, TrainingStyle, ConcurrentActivity } from './types'
 import { describeActivity, activityCountsAsLoad } from './concurrent-activity'
 import { swapExerciseInMesocycle, type SwapScope } from './mesocycle-edit'
-import { saveMesocycle, saveMesocycleWeek } from './mesocycle-persistence'
+import { removeExerciseFromSession, moveExerciseInSession } from './session-edit'
+import { saveMesocycle, saveMesocycleWeek, saveScopedEdit } from './mesocycle-persistence'
 import { getExerciseEntry } from './exercise-db'
 import { swapPoolMeal, clearMealPick, getMealPicksForDate, USER_REQUESTED_TAG, type MealSlotName } from './meal-store'
 import { supabase } from './supabase'
@@ -105,6 +106,125 @@ export async function executeExerciseSwap(
     mesocycle: updatedMesocycle,
     preImage,
     receipt: { landed: [`${payload.oldExerciseName} → ${payload.newExerciseName}`], failed: [] },
+  }
+}
+
+export interface ExerciseRemovePayload {
+  weekNumber: number
+  dayName: string
+  exIndex: number
+  exerciseName: string
+  scope: SwapScope
+}
+
+export interface ExerciseReorderPayload {
+  weekNumber: number
+  dayName: string
+  fromIndex: number
+  toIndex: number
+  exerciseName: string
+  /** What it ends up next to, for the receipt — resolved by the caller. */
+  neighbourName?: string
+  /**
+   * Which side of the neighbour they ASKED for. Not derivable from the
+   * indexes: moving an exercise DOWN the list to sit before something has
+   * toIndex > fromIndex, so reading the direction off the arithmetic told a
+   * person who said "before the bench press" that it now sits after it.
+   */
+  placement?: 'before' | 'after'
+  scope: SwapScope
+}
+
+export interface SessionEditExecResult {
+  mesocycle: MesocycleWeek[]
+  preImage: MesocycleWeek[]
+  receipt: PendingActionReceipt
+}
+
+/**
+ * Take one exercise out of a session. The pure decision is session-edit's; this
+ * shell persists it and writes the receipt. Its refusals (a session that would
+ * fall below the floor, a slot that has rotated away) come back as a FAILED
+ * receipt rather than a thrown error, so the card says why.
+ */
+export async function executeExerciseRemove(
+  profile: UserProfile,
+  mesocycle: MesocycleWeek[],
+  payload: ExerciseRemovePayload,
+): Promise<SessionEditExecResult> {
+  const preImage = mesocycle
+  const result = removeExerciseFromSession({
+    mesocycle, profile,
+    weekNumber: payload.weekNumber, dayName: payload.dayName,
+    exIndex: payload.exIndex, scope: payload.scope,
+  })
+  if (!result.changed) {
+    return { mesocycle, preImage, receipt: { landed: [], failed: [{ op: 'propose_exercise_remove', error: result.refusal ?? "That couldn't be removed" }] } }
+  }
+  if (!profile.id) {
+    return { mesocycle: result.mesocycle, preImage, receipt: { landed: [], failed: [{ op: 'save', error: 'No profile to save against' }] } }
+  }
+  try {
+    await saveScopedEdit(profile.id, result.mesocycle, payload.weekNumber, payload.scope)
+  } catch (err) {
+    console.error('executeExerciseRemove: persisting failed', err)
+    return { mesocycle: result.mesocycle, preImage, receipt: { landed: [], failed: [{ op: 'save', error: 'That could not be saved — try again' }] } }
+  }
+  return {
+    mesocycle: result.mesocycle, preImage,
+    receipt: { landed: [`${payload.dayName}: ${payload.exerciseName} removed`], failed: [] },
+  }
+}
+
+/** Move one exercise earlier or later in its session. Superset partners travel together. */
+export async function executeExerciseReorder(
+  profile: UserProfile,
+  mesocycle: MesocycleWeek[],
+  payload: ExerciseReorderPayload,
+): Promise<SessionEditExecResult> {
+  const preImage = mesocycle
+  const result = moveExerciseInSession({
+    mesocycle, profile,
+    weekNumber: payload.weekNumber, dayName: payload.dayName,
+    fromIndex: payload.fromIndex, toIndex: payload.toIndex, scope: payload.scope,
+  })
+  if (!result.changed) {
+    return { mesocycle, preImage, receipt: { landed: [], failed: [{ op: 'propose_exercise_reorder', error: result.refusal ?? "That couldn't be moved" }] } }
+  }
+  if (!profile.id) {
+    return { mesocycle: result.mesocycle, preImage, receipt: { landed: [], failed: [{ op: 'save', error: 'No profile to save against' }] } }
+  }
+  try {
+    await saveScopedEdit(profile.id, result.mesocycle, payload.weekNumber, payload.scope)
+  } catch (err) {
+    console.error('executeExerciseReorder: persisting failed', err)
+    return { mesocycle: result.mesocycle, preImage, receipt: { landed: [], failed: [{ op: 'save', error: 'That could not be saved — try again' }] } }
+  }
+  const where = payload.neighbourName ? ` — now ${payload.placement ?? 'next to'} ${payload.neighbourName}` : ''
+  return {
+    mesocycle: result.mesocycle, preImage,
+    receipt: { landed: [`${payload.dayName}: ${payload.exerciseName} moved${where}`], failed: [] },
+  }
+}
+
+/**
+ * Undo for both, and for the same reason the swap's undo is shaped this way:
+ * restore the pre-image through the SAME persistence branch the forward write
+ * used, or a 'permanent' edit leaves the block's later weeks holding the new
+ * shape while week one goes back.
+ */
+export async function undoSessionEdit(
+  profileId: string,
+  preImage: MesocycleWeek[],
+  weekNumber: number,
+  scope: SwapScope,
+  mesocycleCreatedAt: string,
+): Promise<void> {
+  if (scope === 'today') {
+    const week = preImage.find(w => w.week_number === weekNumber)
+    if (week) await saveMesocycleWeek(profileId, week)
+  } else {
+    await saveMesocycle(profileId, preImage, mesocycleCreatedAt)
   }
 }
 
