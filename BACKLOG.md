@@ -123,9 +123,10 @@ Newest first. One line each.
   run and green, `test:audit` clean, and the bundle budgets moved 975 -> 1,005
   kB and 1,720 -> 1,740 kB with the before and after measured on a clean
   checkout and recorded in the gate. **24 mutations tried, 24 caught.**
-  `test:quality` (9,216 profiles) was still running when this was committed —
-  its result is recorded below when it lands, and it must be green before any
-  merge to `main`.
+  `test:quality` finished after that commit and is GREEN: 9,216 profiles,
+  overall average 11.56/12, **0 below the 7.2 floor** (distribution: 8,386 at
+  11-12, 701 at 10-11, 128 at 9-10, one at 8-9). So the full sweep has run and
+  the branch is clear for a merge on her word.
   **Deploys needed:** frontend on merge, and **`chat-gemini`** for
   `propose_exercise_remove` and `propose_exercise_reorder`. Slice 2 (adding an
   exercise) will need its own.
