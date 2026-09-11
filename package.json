@@ -206,6 +206,7 @@
     "verify:calibration-search": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/calibration-search.mjs",
     "verify:what-happened": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/what-happened.mjs",
     "verify:session-edit": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/session-edit.mjs",
+    "verify:round-lead-in": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/round-lead-in.mjs",
     "verify:equipment-labels": "vite build --config .onb-harness/vite.config.ts && node .onb-harness/equipment-select.mjs",
     "verify:diary-preservation": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/diary-preservation.mjs",
     "verify:coach-speaks-first": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/coach-speaks-first.mjs",

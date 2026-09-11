@@ -1,3 +1,4 @@
+import type React from 'react'
 import { useTimers } from '@/hooks/useTimers'
 import { TAB_BAR_HEIGHT_PX } from '@/components/BottomTabBar'
 import { tabHash } from '@/lib/app-route'
@@ -28,10 +29,11 @@ import type { RoundConfig } from '@/lib/timer-engine'
 // because useTimers is deadline-anchored at the provider.
 // ---------------------------------------------------------------------------
 
-type Phase = 'work' | 'rest' | 'done'
+type Phase = 'ready' | 'work' | 'rest' | 'done'
 
 /** Field colour and its ink, per phase. Tokens only — never the hexes. */
 const FIELD: Record<Phase, { bg: string; ink: string }> = {
+  ready: { bg: 'var(--phase-ready)', ink: 'var(--phase-ready-ink)' },
   work: { bg: 'var(--primary)', ink: 'var(--phase-work-ink)' },
   rest: { bg: 'var(--role-warn)', ink: 'var(--phase-rest-ink)' },
   done: { bg: 'var(--destructive)', ink: 'var(--phase-done-ink)' },
@@ -53,6 +55,7 @@ function formatRemaining(ms: number): string {
  * round says what actually happens instead.
  */
 function subline(phase: Phase, round: number, config: RoundConfig): string {
+  if (phase === 'ready') return `Round 1 of ${config.rounds} starts in a moment. Tap anywhere to start now.`
   if (phase === 'done') return `All ${config.rounds} rounds done — nice.`
   if (phase === 'work') {
     return round >= config.rounds
@@ -67,14 +70,25 @@ export function RoundField() {
   const config = timers.roundConfig
   if (!config) return null
 
-  const phase: Phase = timers.isRoundComplete ? 'done' : timers.currentPhase === 'rest' ? 'rest' : 'work'
+  const phase: Phase = timers.isRoundComplete
+    ? 'done'
+    : timers.currentPhase === 'lead_in' ? 'ready' : timers.currentPhase === 'rest' ? 'rest' : 'work'
   const { bg, ink } = FIELD[phase]
   const inkSoft = `color-mix(in srgb, ${ink} 72%, transparent)`
   const line = `color-mix(in srgb, ${ink} 16%, transparent)`
   const pipDim = `color-mix(in srgb, ${ink} 22%, transparent)`
 
   const remainingMs = timers.phaseRemainingMs ?? 0
-  const phaseSeconds = phase === 'rest' ? config.restSeconds : config.workSeconds
+  const phaseSeconds = phase === 'ready'
+    ? Math.max(1, config.leadInSeconds ?? 0)
+    : phase === 'rest' ? config.restSeconds : config.workSeconds
+  // A BARE COUNT DURING THE COUNTDOWN, not 0:10. `m:ss` reads as a duration —
+  // how long a thing lasts — and this is the other thing, a count down to a
+  // start. Ten big numerals falling to one is what she asked for; the work and
+  // rest phases keep the clock they have always had.
+  const clock = phase === 'ready'
+    ? String(Math.max(0, Math.ceil(remainingMs / 1000)))
+    : formatRemaining(remainingMs)
   // Elapsed fraction OF THE CURRENT PHASE — the bar fills across each phase
   // and sits full when the session ends. The pips carry overall progress;
   // one graphic, one meaning.
@@ -84,6 +98,7 @@ export function RoundField() {
 
   const roundLabel = phase === 'done'
     ? `${config.rounds} of ${config.rounds} rounds done`
+    : phase === 'ready' ? 'Get ready'
     : `Round ${timers.currentRound} of ${config.rounds}`
 
   const primaryLabel = phase === 'done' ? 'Log session' : timers.running ? 'Pause' : 'Resume'
@@ -103,10 +118,27 @@ export function RoundField() {
 
   return (
     <div
-      // The colour IS the status here, so it has to reach a screen reader too.
-      role="status"
-      aria-live="polite"
-      aria-label={`${roundLabel}. ${phase === 'done' ? 'Session complete' : phase === 'work' ? 'Work' : 'Rest'}. ${formatRemaining(remainingMs)} remaining.`}
+      // TAPPING ANYWHERE STARTS ROUND 1 during the countdown — her choice when
+      // asked how the countdown should behave. The buttons below stop their
+      // own clicks propagating, so Pause and Reset still do their own jobs.
+      // Outside the countdown this is not a control at all, so it carries the
+      // status role instead and nothing about the running field changes.
+      {...(phase === 'ready'
+        ? {
+            role: 'button' as const,
+            tabIndex: 0,
+            'aria-label': `Get ready. Round 1 starts in ${Math.max(0, Math.ceil(remainingMs / 1000))} seconds. Activate to start now.`,
+            onClick: timers.skipLeadIn,
+            onKeyDown: (e: React.KeyboardEvent) => {
+              if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); timers.skipLeadIn() }
+            },
+          }
+        : {
+            // The colour IS the status here, so it has to reach a screen reader too.
+            role: 'status' as const,
+            'aria-live': 'polite' as const,
+            'aria-label': `${roundLabel}. ${phase === 'done' ? 'Session complete' : phase === 'work' ? 'Work' : 'Rest'}. ${formatRemaining(remainingMs)} remaining.`,
+          })}
       // FIXED, NOT ABSOLUTE, and that is the whole difference between the
       // design and what shipped. An absolutely-positioned element sizes to its
       // nearest POSITIONED ancestor, and ToolsTab wrapped this in a
@@ -141,13 +173,13 @@ export function RoundField() {
             className="tabular-mono"
             style={{ fontSize: '6.5rem', fontWeight: 700, letterSpacing: '-.05em', lineHeight: .86, color: ink }}
           >
-            {formatRemaining(remainingMs)}
+            {clock}
           </span>
           <span
             className="font-semibold"
             style={{ fontSize: '0.9375rem', lineHeight: 1.2, color: inkSoft, maxWidth: '6ch' }}
           >
-            {phase === 'done' ? 'Session complete' : phase === 'work' ? 'Work' : 'Rest'}
+            {phase === 'done' ? 'Session complete' : phase === 'ready' ? 'Starting' : phase === 'work' ? 'Work' : 'Rest'}
           </span>
         </div>
         <p style={{ margin: '0.375rem 0 0', fontSize: '1.0625rem', lineHeight: 1.35, color: ink, maxWidth: '26ch' }}>
@@ -164,14 +196,14 @@ export function RoundField() {
 
       <div className="relative flex gap-2.5" style={{ marginTop: '1.375rem' }}>
         <button
-          onClick={onPrimary}
+          onClick={e => { e.stopPropagation(); onPrimary() }}
           className="flex-1 font-bold"
           style={{ height: 56, borderRadius: 14, border: 0, background: ink, color: bg, fontSize: '1.0625rem' }}
         >
           {primaryLabel}
         </button>
         <button
-          onClick={timers.reset}
+          onClick={e => { e.stopPropagation(); timers.reset() }}
           className="font-bold"
           style={{ height: 56, padding: '0 22px', borderRadius: 14, border: `2px solid ${ink}`, background: 'transparent', color: ink, fontSize: '1.0625rem' }}
         >
@@ -184,7 +216,7 @@ export function RoundField() {
           <span
             key={i}
             className="flex-1 rounded-[2px]"
-            style={{ height: 4, background: phase === 'done' || i < timers.currentRound ? ink : pipDim }}
+            style={{ height: 4, background: phase !== 'ready' && (phase === 'done' || i < timers.currentRound) ? ink : pipDim }}
           />
         ))}
       </div>

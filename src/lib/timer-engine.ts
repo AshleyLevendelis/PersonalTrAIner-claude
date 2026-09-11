@@ -11,9 +11,30 @@ export interface RoundConfig {
   rounds: number
   workSeconds: number
   restSeconds: number
+  /**
+   * A GET-READY COUNTDOWN BEFORE ROUND 1 — Ashley, 11 Sep 2026, from the app:
+   * "The round timer starts with no countdown. As soon as you start it
+   * begins." It did: startRound anchored to now and elapsed 0 sat inside the
+   * first work interval, so round 1 was running before the phone was back in
+   * a pocket.
+   *
+   * OPTIONAL, AND READ AS `?? 0` EVERYWHERE — never `?? 10`. A round already
+   * in flight from a persisted record has no such field, and defaulting it to
+   * ten would make a live timer jump BACKWARDS ten seconds on its next tick.
+   * New starts write 10; anything already running keeps what it started with.
+   *
+   * Once only, before round 1. Not between rounds — the rest interval is
+   * already that.
+   */
+  leadInSeconds?: number
 }
 
-export type RoundPhase = 'work' | 'rest'
+export type RoundPhase = 'lead_in' | 'work' | 'rest'
+
+/** Ms of lead-in this config asks for. The one place the `?? 0` rule lives. */
+export function leadInMsOf(config: RoundConfig): number {
+  return Math.max(0, config.leadInSeconds ?? 0) * 1000
+}
 
 export interface RoundState {
   currentRound: number
@@ -53,7 +74,20 @@ export function computeRoundState(config: RoundConfig, roundStartedAtIso: string
   const start = new Date(roundStartedAtIso).getTime()
   const workMs = config.workSeconds * 1000
   const cycleMs = workMs + config.restSeconds * 1000
-  const elapsed = Math.max(0, now - start)
+
+  // THE LEAD-IN IS AN OFFSET ON THE SAME ANCHOR, not a phase of its own that
+  // something has to step into. This file's one hard-won property, stated in
+  // its header and earned by a bug, is that everything derives from a single
+  // immutable anchor; a stored "counting down" flag would be exactly the
+  // second source of truth that made the old per-phase deadline drift. So the
+  // schedule simply begins leadInMs after the anchor, and a negative elapsed
+  // means it has not begun.
+  const leadInMs = leadInMsOf(config)
+  const sinceAnchor = Math.max(0, now - start)
+  if (sinceAnchor < leadInMs) {
+    return { currentRound: 1, currentPhase: 'lead_in', phaseRemainingMs: leadInMs - sinceAnchor, isComplete: false }
+  }
+  const elapsed = sinceAnchor - leadInMs
 
   // THE FINAL REST DOES NOT EXIST (design handoff v2 §6, build note 3):
   // "Six rounds means six work intervals and five rests."
@@ -82,7 +116,11 @@ export function computeRoundState(config: RoundConfig, roundStartedAtIso: string
  */
 export function totalRoundSeconds(config: RoundConfig): number {
   const rounds = Math.max(0, config.rounds)
-  return rounds * config.workSeconds + Math.max(0, rounds - 1) * config.restSeconds
+  // The lead-in counts. This figure is what useTimers banks into accumulatedMs
+  // to hold the finished state once a run completes; leave the countdown out
+  // and a finished round lands ten seconds short of complete and un-finishes
+  // itself.
+  return leadInMsOf(config) / 1000 + rounds * config.workSeconds + Math.max(0, rounds - 1) * config.restSeconds
 }
 
 /**
@@ -95,7 +133,10 @@ export function totalRoundSeconds(config: RoundConfig): number {
 export function roundPips(state: RoundState, config: RoundConfig): ('done' | 'current' | 'upcoming')[] {
   const out: ('done' | 'current' | 'upcoming')[] = []
   for (let r = 1; r <= Math.max(0, config.rounds); r++) {
-    if (state.isComplete || r < state.currentRound) out.push('done')
+    // Nothing is current during the lead-in: round 1 has not started, and a
+    // lit first pip would say it had.
+    if (state.currentPhase === 'lead_in') out.push('upcoming')
+    else if (state.isComplete || r < state.currentRound) out.push('done')
     else if (r === state.currentRound) out.push('current')
     else out.push('upcoming')
   }
@@ -105,7 +146,9 @@ export function roundPips(state: RoundState, config: RoundConfig): ('done' | 'cu
 /** 0..1 through the CURRENT interval — what the ring draws, and nothing else. */
 export function intervalProgress(state: RoundState, config: RoundConfig): number {
   if (state.isComplete) return 1
-  const span = (state.currentPhase === 'work' ? config.workSeconds : config.restSeconds) * 1000
+  const span = (state.currentPhase === 'lead_in'
+    ? Math.max(0, config.leadInSeconds ?? 0)
+    : state.currentPhase === 'work' ? config.workSeconds : config.restSeconds) * 1000
   if (span <= 0) return 0
   return Math.min(1, Math.max(0, 1 - state.phaseRemainingMs / span))
 }
@@ -119,6 +162,12 @@ export function intervalProgress(state: RoundState, config: RoundConfig): number
  */
 export function roundPhaseIndex(state: RoundState, config: RoundConfig): number {
   if (state.isComplete) return config.rounds * 2
+  // -1, so round 1's work stays 0 and the lead-in -> work step is a diff of
+  // exactly 1. That makes the existing cue diffing fire its "go" tone at the
+  // moment work begins — a beep at the start the timer has never had — with
+  // no change to the cue effect at all, and a return from the background
+  // still skips the stale ones because the jump is larger than 1.
+  if (state.currentPhase === 'lead_in') return -1
   return (state.currentRound - 1) * 2 + (state.currentPhase === 'rest' ? 1 : 0)
 }
 

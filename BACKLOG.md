@@ -2,6 +2,62 @@
 
 Newest first. One line each.
 
+- [x] **THE ROUND TIMER COUNTS YOU IN — TEN SECONDS BEFORE ROUND 1.** Ashley,
+  11 Sep 2026: *"The round timer starts with no countdown. As soon as you start
+  it begins."* Confirmed: Start anchored to now and elapsed 0 sat inside the
+  first work interval, so round 1 was running before the phone was back in a
+  pocket — and there was no cue at the start either, the first sound being the
+  work-to-rest tone forty seconds in.
+  **Read literally: ten seconds ONCE, before round 1.** Not between rounds —
+  the rest interval already is that.
+  **Her ruling on how it should look.** The timer floods the whole tab with the
+  phase colour so it reads from across a gym. Options put to her: (a) its own
+  colour with a big count and tap-to-start-early — my recommendation; (b) reuse
+  the rest amber; (c) numbers only, no colour change. **She chose (a).** Reasons
+  recorded in the option text: amber would then mean two things, and "numbers
+  only" looks identical to a round already running from the far side of a room,
+  which is the exact failure the colour field was built to fix. So there is a
+  fourth field state — a cool light slate reading GET READY with the count at
+  the clock's full size — and tapping anywhere starts round 1 early.
+  **The constraint that shaped it.** `timer-engine.ts` has one hard-won
+  property, stated in its own header and earned by a bug: everything derives
+  from a single immutable anchor, never from stepped state. So the countdown is
+  an OFFSET on that anchor — `elapsed = (now - start) - leadIn` — and not a
+  stored phase. There is no "counting down" flag that could disagree with the
+  clock, and skipping moves the anchor exactly as pause and resume already do.
+  **`?? 0`, never `?? 10`, and that is the whole compatibility story.** A round
+  already in flight from a persisted record carries no lead-in field;
+  defaulting it to ten would rewind a live timer by ten seconds on its very
+  next tick. New starts write 10; anything already running keeps what it
+  started with. Pinned by its own check.
+  **Two things that came free.** The lead-in sits one cue-step below round 1's
+  work, so the existing transition diffing now plays a "go" tone at the moment
+  work begins — a beep at the start the timer has never had, with no change to
+  the cue code. And `totalRoundSeconds` grows by the lead-in, which it must:
+  the completion effect banks that figure to hold the finished state, so
+  omitting it would have left a finished run ten seconds short of complete and
+  quietly un-finishing itself.
+  **A check re-anchored, and why.** `test:timer-field` §5 asserted the literal
+  attributes `role="status"` and `aria-label={`${roundLabel}`. During the
+  countdown the field is a BUTTON, so both moved into a spread and the old
+  anchors matched nothing — a check failing because the component gained a
+  state, not because it lost the property. Re-anchored on the property, with
+  the old wording recorded here, and two new checks added for the countdown's
+  own role and its keyboard operation.
+  **Verified:** `test:round-timer` §7 (20 new checks, including a half-second
+  sweep of the entire run proving the schedule after the countdown is
+  bit-for-bit the schedule that always ran, just shifted), plus `test:timers`,
+  `test:timer-field`, `test:timer-field-fills-screen`, `test:timer-intent-copy`
+  all green. New `verify:round-lead-in` drives the real Tools tab at 390x844
+  **against the real wall clock** — no dev clock, because `getAppNow` returns a
+  frozen noon whenever one is set, and a countdown that cannot move would prove
+  nothing. It presses Start, reads the count actually falling, taps the field
+  and confirms round 1 begins with its whole work interval. Screenshots read;
+  `render:timer-field` now shows all five states side by side.
+  **17 mutations tried, 17 caught.**
+  **Frontend only — no function deploy, no migration.** It reaches her phone
+  when the branch merges.
+
 - [x] **A MOVED SESSION WAS A DEAD END, AND THE SCREEN SAID IT HAD NOT MOVED.**
   Ashley, 11 Sep 2026, from the LIVE app, with screenshots. She moved Tuesday's
   Push & Press to Wednesday, did not do it, and on Friday asked the coach to do
