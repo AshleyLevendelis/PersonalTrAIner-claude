@@ -54,7 +54,11 @@ console.log('\n1. A confirm card never asks you to approve a placeholder')
 console.log('\n2. Pause does not throw you off the timer screen')
 {
   const tools = stripComments(readFileSync(join(ROOT, 'src/components/ToolsTab.tsx'), 'utf8'))
-  const at = tools.indexOf('const roundHoldsScreen')
+  // RENAMED 12 Sep 2026 with the redesign: `roundHoldsScreen` became
+  // `roundLive`, because a live round no longer holds the screen — it holds a
+  // card. The property this section is about is untouched: pausing must not
+  // lose your place.
+  const at = tools.indexOf('const roundLive')
   check('the condition exists to check', at !== -1)
   const cond = tools.slice(at, tools.indexOf('\n\n', at))
   // `running` alone is what caused it: pauseRound sets running:false.

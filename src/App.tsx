@@ -2693,6 +2693,7 @@ function App() {
         onRunningChange={setTourRunning}
       />
       <ProfileScreen
+        exercisePlan={exercisePlan}
         open={profileInfoOpen}
         onOpenChange={setProfileInfoOpen}
         profile={profile}

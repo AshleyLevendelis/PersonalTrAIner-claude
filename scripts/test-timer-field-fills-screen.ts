@@ -117,7 +117,11 @@ console.log('\n4. The other half of the bug: nothing may re-capture the field')
   // a card. The geometry checks above cannot see that on their own — they
   // render the field without ToolsTab — so the wrapper is asserted directly.
   const tools = readFileSync(join(ROOT, 'src/components/ToolsTab.tsx'), 'utf8')
-  const at = tools.indexOf('<RoundField />')
+  // MATCHED ON THE TAG, not on the self-closing string. RoundField gained an
+  // onLogSession prop when the finished round started actually logging, and
+  // this check went red for the punctuation rather than for the geometry it
+  // is about.
+  const at = tools.indexOf('<RoundField')
   check('ToolsTab still renders the field', at !== -1)
   const wrapperOpen = tools.lastIndexOf('<div', at)
   const wrapper = at === -1 ? '' : tools.slice(wrapperOpen, at)

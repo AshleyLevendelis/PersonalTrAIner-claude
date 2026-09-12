@@ -192,16 +192,19 @@ export function GroceryList({ profileId, mealPools, targets, softLikedFoods, tod
     })
   }
 
+  // CHECKED ITEMS LEAVE THE AISLES — design handoff 2b ›. A list you are
+  // shopping from should shorten as you go; a struck-through line still
+  // occupying its slot in "Produce" is a thing you have to read past every
+  // time you look down. They collect in one row at the bottom instead, which
+  // is also where you go to undo a mis-tap.
+  const inTrolley = items.filter(i => i.checked)
   const grouped = CATEGORY_ORDER
-    .map(cat => ({ category: cat, items: items.filter(i => i.category === cat).sort((a, b) => Number(a.checked) - Number(b.checked)) }))
+    .map(cat => ({ category: cat, items: items.filter(i => i.category === cat && !i.checked) }))
     .filter(g => g.items.length > 0)
 
-  // Collapsed: the first three in the order the full list would show them, as
-  // one unheaded group. Categories are a way to shop, not a way to preview.
-  const COLLAPSED_COUNT = 3
-  const COLLAPSED_GROUPS = grouped.length > 0
-    ? [{ category: grouped[0].category, items: grouped.flatMap(g => g.items).slice(0, COLLAPSED_COUNT) }]
-    : []
+  // THE THREE-ITEM PREVIEW IS GONE with the Tools section it existed for. The
+  // list is a screen of its own now, so there is nothing above it to preview
+  // for and nothing below it to be pushed off the page.
 
   return (
     // BORDERLESS, like every other surface in the app. Tools was the last tab
@@ -274,15 +277,21 @@ export function GroceryList({ profileId, mealPools, targets, softLikedFoods, tod
           </div>
         )}
 
-        {(showAll ? grouped : COLLAPSED_GROUPS).map(({ category, items: catItems }, idx) => (
-          <div key={category} className={showAll ? 'space-y-1.5' : ''}>
-            {showAll && idx > 0 && <Separator />}
-            {showAll && <h3 className="ds-label pt-1">{CATEGORY_LABEL[category]}</h3>}
+        {grouped.map(({ category, items: catItems }, idx) => (
+          <div key={category} className="space-y-1.5">
+            {idx > 0 && <Separator />}
+            {/* THE AISLE, AND HOW MUCH OF IT IS LEFT. The count is what makes
+                a heading worth its line in a shop: it says whether this is a
+                detour worth making. */}
+            <h3 className="ds-label flex items-baseline justify-between pt-1">
+              <span>{CATEGORY_LABEL[category]}</span>
+              <span className="tabular-mono opacity-70">{catItems.length}</span>
+            </h3>
             {catItems.map(item => (
               <div key={item.id} className="flex items-start gap-2.5 py-2.5" style={{ borderBottom: '1px solid var(--hairline)' }}>
                 <button
                   onClick={() => toggleChecked(item)}
-                  className="hit-slop-44 mt-px size-5 shrink-0 rounded-md flex items-center justify-center transition-colors"
+                  className="hit-slop-44 mt-px size-6 shrink-0 rounded-md flex items-center justify-center transition-colors"
                   style={{
                     background: item.checked ? 'var(--primary)' : 'transparent',
                     border: item.checked ? '1.5px solid var(--primary)' : '1.5px solid var(--border)',
@@ -337,14 +346,36 @@ export function GroceryList({ profileId, mealPools, targets, softLikedFoods, tod
           </div>
         ))}
 
-        {items.length > COLLAPSED_COUNT && (
-          <button
-            type="button"
-            onClick={() => setShowAll(v => !v)}
-            className="hit-slop-44 pt-2.5 text-[0.75rem] font-semibold text-primary-text"
-          >
-            {showAll ? 'Show fewer' : `All ${items.length} items ›`}
-          </button>
+        {inTrolley.length > 0 && (
+          <div className="mt-3 rounded-xl" style={{ background: 'var(--surface-raised)' }} data-trolley>
+            <button
+              type="button"
+              onClick={() => setShowAll(v => !v)}
+              aria-expanded={showAll}
+              className="flex min-h-[44px] w-full items-center justify-between gap-2 px-3 text-left text-[0.8125rem]"
+            >
+              <span>In the trolley · {inTrolley.length}</span>
+              {showAll ? <ChevronUp className="size-4 text-muted-foreground" /> : <ChevronDown className="size-4 text-muted-foreground" />}
+            </button>
+            {showAll && (
+              <ul className="px-3 pb-2">
+                {inTrolley.map(item => (
+                  <li key={item.id} className="flex items-center justify-between gap-2 py-1.5">
+                    <span className="min-w-0 truncate text-[0.8125rem] line-through opacity-60">{item.display_name}</span>
+                    <button
+                      type="button"
+                      onClick={() => toggleChecked(item)}
+                      className="hit-slop-44 shrink-0 text-[0.6875rem] font-semibold"
+                      style={{ color: 'var(--primary-text)' }}
+                      aria-label={`Put ${item.display_name} back on the list`}
+                    >
+                      Put back
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         )}
       </div>
     </div>

@@ -14,7 +14,7 @@ import type { MacroTargets } from '@/lib/types'
 import { getTodayLedger, getLedgerSnapshot, logMealEaten, voidMealEvents, loggedEventsBySlot, type MealSlotName, type MealEventRecord } from '@/lib/meal-store'
 import { checkMealAgainstRestrictions, describeEatenBeforeChange, type MealRestrictionVerdict } from '@/lib/meal-restriction-check'
 import type { PoolOption } from '@/lib/meal-generation'
-import { tabHash } from '@/lib/app-route'
+import { groceryHash } from '@/lib/app-route'
 import { MealFoodEditSheet, type MealFoodEditContext } from '@/components/nutrition/MealFoodEditSheet'
 
 /** Exported so NutritionDisplay's shortfall nudge names slots in the same order this list renders them, rather than keeping a second copy that can drift. */
@@ -310,7 +310,11 @@ export function MealPlan({
           </button>
           <button
             type="button"
-            onClick={() => { window.location.hash = tabHash('tools') }}
+            // THE LIST LEFT TOOLS on 12 Sep 2026 and this link did not follow
+            // it — it went on pointing at a tab that no longer has a grocery
+            // section on it. Found by test:nutrition-layout's sanity check,
+            // which asks whether the destination really holds the list.
+            onClick={() => { window.location.hash = groceryHash() }}
             className="hit-slop-44 text-[0.6875rem] font-semibold text-primary-text"
           >
             Grocery list ›

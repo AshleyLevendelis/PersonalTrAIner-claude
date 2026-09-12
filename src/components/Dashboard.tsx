@@ -23,6 +23,7 @@ import { useTrainingWeek } from '@/hooks/useTrainingWeek'
 import { HomeWeekStrip, HomeWeekStripLabels } from '@/components/HomeWeekStrip'
 import { setChatPrefill } from '@/lib/chat-prefill-store'
 import { TrainerNudge, type TrainerNudgeProps } from '@/components/TrainerNudge'
+import { ShopDayCard } from '@/components/ShopDayCard'
 
 interface DashboardProps {
   profile: UserProfile
@@ -527,6 +528,18 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
             )}
           </div>
         )}
+
+        {/* SHOPPING, ON THE DAY SHE SHOPS — design handoff 2d. Between the
+            nudge and today's session, and only on that day: the list is
+            built from the week's meals and is a weekly errand, so it comes
+            to her rather than waiting behind a tile. The card decides for
+            itself whether to render; there is nothing to show most days. */}
+        <ShopDayCard
+          profileId={profile.id}
+          exercisePlan={exercisePlan}
+          todayName={activeSession.dayName}
+          nowMs={Date.now()}
+        />
 
         {/* 3. TODAY'S SESSION — label, focus, one glance line, CTA, then the
             week strip UNDER the button. The strip's own label row is dropped:

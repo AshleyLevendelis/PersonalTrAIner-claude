@@ -165,9 +165,18 @@ console.log('\n5. Undo removes the row it added, not every row with that name\n'
   check('...and otherwise the highest-indexed row of that name',
     /\.order\('pool_index', \{ ascending: false \}\)[\s\S]{0,80}\.limit\(1\)/.test(body))
   check('...and reports whether the row really went', /Promise<boolean>/.test(body))
-  const chat = read('src/components/ChatAssistant.tsx')
+  // THE ROLLBACK MOVED, 12 Sep 2026, out of ChatAssistant and into
+  // applyMealOptionToSlot beside executeMealAddition — the Nutrition screen
+  // runs the same pool-write-then-pick sequence now and a second copy of
+  // "undo it if the pick fails" is exactly the divergence this file exists to
+  // prevent. Checked where it lives, not where it used to.
+  // `body` is the slice from undoMealAddition onwards, and the caller sits
+  // ABOVE it in the file — so these two read the whole module.
   check('the rollback passes the index it was just given',
-    /undoMealAddition\(profile\.id, payload, result\.poolIndex\)/.test(chat))
+    /undoMealAddition\(profileId, payload, result\.poolIndex\)/.test(exec))
+  check('...from the one place both surfaces go through',
+    /export async function applyMealOptionToSlot/.test(exec))
+  const chat = read('src/components/ChatAssistant.tsx')
   check('and a failed undo keeps the Undo button', /if \(!removed\) return/.test(chat))
 }
 

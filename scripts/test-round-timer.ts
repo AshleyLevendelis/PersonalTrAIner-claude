@@ -161,8 +161,11 @@ console.log('\n7. The ten-second countdown before round 1')
     /if \(now - new Date\(record\.startedAtIso\)\.getTime\(\) >= leadInMs\) return/.test(hook))
   check('a new round is started WITH the countdown',
     /leadInSeconds: config\.leadInSeconds \?\? ROUND_LEAD_IN_SECONDS/.test(hook))
+  // THE SENTENCE MOVED ONTO THE BUTTON, 12 Sep 2026: the setup is chips now
+  // and "Start · 10s countdown" says it where the tap happens rather than in
+  // a line under it. Still before you press, which is the whole point.
   check('...and the app says so before you press it',
-    /Starts after a \{ROUND_LEAD_IN_SECONDS\}-second countdown/.test(
+    /Start · \{ROUND_LEAD_IN_SECONDS\}s countdown/.test(
       readFileSync(join(ROOT, 'src/components/timers/TimersPanel.tsx'), 'utf8')))
 }
 

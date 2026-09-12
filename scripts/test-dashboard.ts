@@ -334,8 +334,15 @@ async function main() {
     // (b) Meal addition. mealPools was refilled on load/generate/regenerate/
     // reset but never after a chat addition, so the pick pointed at a meal the
     // component did not have and the slot rendered its old dinner.
-    const swapHandler = app.slice(app.indexOf('onMealSwapApplied={async'), app.indexOf('onFindMoreMealOptions='))
+    // NAMED, NOT INLINE, since 12 Sep 2026 — the Nutrition screen needed the
+    // same follow-through when an ingredient became editable, so the handler
+    // came out of the JSX and both surfaces call it. Its own sanity check is
+    // what caught the move, which is the check earning its place.
+    const handlerStart = app.indexOf('const handleMealPickApplied')
+    const swapHandler = handlerStart === -1 ? '' : app.slice(handlerStart, app.indexOf('\n  }', handlerStart))
     check('the chat meal handler exists to be checked (sanity check on this check)', swapHandler.length > 300, swapHandler.length)
+    check('...and both the chat and the Nutrition screen are given it',
+      /onMealSwapApplied=\{handleMealPickApplied\}/.test(app) && /onMealPickApplied=\{handleMealPickApplied\}/.test(app))
     check('...and it re-reads the pool, so an added meal can actually render',
       /setMealPools\(await getPools\(profile\.id\)\)/.test(swapHandler))
 

@@ -162,10 +162,14 @@ check('the caption says what is left, not only what is eaten', /kcal · <span cl
 console.log('\n4. The meal list points at the list it fills')
 // ---------------------------------------------------------------------------
 check('the header links to the grocery list', /Grocery list ›/.test(meals))
-check('...at the real Tools route, not a hand-written hash',
-  /tabHash\('tools'\)/.test(meals) && !/'#\/tab\/tools'/.test(meals))
-check('...and Tools really is where the list lives (sanity check on this check)',
-  /GroceryList/.test(read('src/components/ToolsTab.tsx')))
+// THE LIST MOVED OFF TOOLS, 12 Sep 2026 (design handoff 2b ›). It has a
+// screen of its own under Nutrition — where it is built from — so the link
+// goes there and the sanity check follows it. The property is unchanged: the
+// header must point at somewhere the list actually is.
+check('...at the real grocery route, not a hand-written hash',
+  /window\.location\.hash = groceryHash\(\)/.test(meals) && !/'#\/nutrition\/grocery'/.test(meals))
+check('...and that route really is where the list lives (sanity check on this check)',
+  /groceryHash\(\)/.test(read('src/App.tsx')) && /<GroceryList/.test(read('src/components/GroceryScreen.tsx')))
 check('regenerating all the meals is still reachable', /onClick=\{onRegenerateAll\}/.test(meals))
 check('a collapsed row ends in a chevron', /<ChevronRight className="size-3\.5/.test(meals))
 check('...with the logged tick after the number, not before',

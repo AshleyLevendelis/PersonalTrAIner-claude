@@ -42,6 +42,13 @@ const KEYS: Record<string, { clear: boolean; why: string }> = {
 
   fitplan_appearance_v1: { clear: false, why: 'a theme choice is not plan data; resetting it would be a surprise' },
   fitplan_appearance_v2: { clear: false, why: 'same — appearance survives a new plan on purpose' },
+  // WHICH DAY SHE SHOPS is a habit, not plan data — the same kind of device
+  // preference as the theme above. A new training block can change the
+  // DERIVED default (it is the day before the week's first training day), and
+  // that recomputes on its own; an explicit choice she made should not be
+  // silently forgotten because she rebuilt her week. The snooze inside it
+  // expires in 24 hours regardless.
+  fitplan_shop_day_v1: { clear: false, why: 'a shopping habit is not plan data; the derived default moves with the plan on its own' },
   fitplan_dev_mode: { clear: false, why: 'developer tooling, not user data' },
   fitplan_voice_debug: { clear: false, why: 'a debug toggle the user turned on deliberately' },
 

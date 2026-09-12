@@ -166,8 +166,15 @@ console.log('\n6. The dock is never covered, and a live round owns the tab')
     /bottom: TAB_BAR_HEIGHT_PX/.test(field))
 
   const tools = stripComments(readFileSync(join(ROOT, 'src/components/ToolsTab.tsx'), 'utf8'))
-  check('a running round replaces the tab content', /if \(roundHoldsScreen\)/.test(tools))
-  check('...and so does a finished one, so the red state holds the screen',
+  // RE-ANCHORED 12 Sep 2026 (design handoff 2a). A running round no longer
+  // replaces the tab — that was the behaviour being removed, because it made
+  // everything else on Tools unreachable mid-session. What holds now: the
+  // round is always visible while it runs, as a card, and the flooded field
+  // is what she opts into. The dock rule above is untouched.
+  check('a running round is always visible', /\{roundLive && <RoundCard/.test(tools))
+  check('...and the field takes the tab only when she asks for it',
+    /if \(roundLive && timers\.roundFullScreen\)/.test(tools))
+  check('...and a finished one still holds, so the red state does not vanish',
     /timers\.running \|\| timers\.isRoundComplete/.test(tools))
 
   // The old text-colour view would otherwise sit underneath as a second,

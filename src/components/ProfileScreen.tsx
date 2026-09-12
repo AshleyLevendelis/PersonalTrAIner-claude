@@ -42,7 +42,8 @@ import {
   DAYS_FULL, partitionInjuries, GOAL_OPTIONS,
 } from '@/lib/onboarding-slots'
 import { detectPlanInvalidation, type PlanInvalidation } from '@/lib/plan-invalidation'
-import type { UserProfile, TrainingDay, TrainingExperience, EquipmentAccess, TrainingStyle } from '@/lib/types'
+import { getShopDay, setShopDay, defaultShopDay, DAY_NAMES, type DayName } from '@/lib/shop-day-store'
+import type { UserProfile, TrainingDay, TrainingExperience, EquipmentAccess, TrainingStyle, WorkoutDay } from '@/lib/types'
 import { describeActivity } from '@/lib/concurrent-activity'
 import { buildDataExport, downloadExport, summariseExport, deleteAllUserData } from '@/lib/user-data'
 
@@ -55,10 +56,33 @@ const GENDER_OPTIONS = [{ value: 'male', label: 'Male' }, { value: 'female', lab
 // than a second hand-typed copy that could drift.
 const DAY_ORDER = DAYS_FULL
 
+/**
+ * "Work it out for me" is a real option, not a null wearing a label: it is the
+ * derived default (the day before the week's first training day), and it moves
+ * with the plan. Naming the day it currently resolves to means the row says
+ * what will actually happen rather than only what the setting is.
+ */
+const SHOP_DAY_OPTIONS = (plan: WorkoutDay[] | undefined) => [
+  { value: 'auto', label: 'Work it out for me', description: `Currently ${defaultShopDay(plan)} — the day before your week starts` },
+  ...DAY_NAMES.map(d => ({ value: d, label: d, description: `Shop on ${d}` })),
+]
+
+/** Her stored choice, or 'auto' when she has not made one. */
+function readShopDayChoice(): string {
+  // getShopDay falls back to the derived day, which is indistinguishable from
+  // a choice — so the picker asks whether a choice EXISTS by comparing the two
+  // against a plan-less derivation. Cheap, and it keeps the store's own
+  // "unset" meaning in one place rather than exporting a second reader.
+  const stored = getShopDay(undefined)
+  return stored === defaultShopDay(undefined) ? 'auto' : stored
+}
+
 interface ProfileScreenProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   profile: UserProfile
+  /** For the shopping-day picker's automatic option — the day before the week's first training day. */
+  exercisePlan?: WorkoutDay[]
   latestWeightKg?: number | null
   /** Fired after any profile-field edit — App.tsx merges the patch into its own profile state, no refetch needed. */
   onProfileChanged: (patch: Partial<UserProfile>) => void
@@ -352,7 +376,10 @@ function factEffect(fact: UserFactRow): string {
   return 'recorded — not yet applied (takes effect on your next plan regeneration)'
 }
 
-export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onProfileChanged, onPlanInvalidated, onMemoryChanged, initialSection, revealSpeed, onRevealSpeedChange, onNewPlan }: ProfileScreenProps) {
+export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onProfileChanged, onPlanInvalidated, onMemoryChanged, initialSection, revealSpeed, onRevealSpeedChange, onNewPlan, exercisePlan }: ProfileScreenProps) {
+  // Read once on mount: the store is the owner, this is the control's echo of
+  // it. `null` means she has not chosen, which the picker shows as automatic.
+  const [shopDayChoice, setShopDayChoice] = useState<string>(() => readShopDayChoice())
   const [facts, setFacts] = useState<UserFactRow[]>([])
   const [goals, setGoals] = useState<UserGoalRow[]>([])
   const [contextFacts, setContextFacts] = useState<UserContextFactRow[]>([])
@@ -816,6 +843,20 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
               <Button size="sm" variant={profile.include_snacks ? 'default' : 'outline'} className="h-7 text-xs" onClick={() => savePatch({ include_snacks: !profile.include_snacks })}>
                 {profile.include_snacks ? 'Yes' : 'No'}
               </Button>
+            </Row>
+            {/* WHICH DAY SHE SHOPS — design handoff 2d. The Home card is
+                driven by it, and a card that appears on a day the app chose
+                for her with no way to move it is the app being confidently
+                wrong on the screen she opens first. Local, like the theme:
+                see shop-day-store for why it is not a profile column.
+                "Work it out for me" is a real option, not a null hiding as
+                one — it is the derived default, and it moves with the plan. */}
+            <Row label="Shopping day">
+              <EditableSelectField
+                value={shopDayChoice}
+                options={SHOP_DAY_OPTIONS(exercisePlan)}
+                onSave={v => { setShopDay(v === 'auto' ? null : v as DayName); setShopDayChoice(v as string) }}
+              />
             </Row>
             <Row label="Breakfast style"><EditableSelectField value={profile.breakfast_style ?? 'cooked'} options={BREAKFAST_STYLE_OPTIONS} onSave={v => savePatch({ breakfast_style: v })} /></Row>
           </div>

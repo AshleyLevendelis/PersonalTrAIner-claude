@@ -139,18 +139,28 @@ console.log('\n3. Grocery has left this tab\n')
   check('the screen wraps the same list component, not a copy', /<GroceryList/.test(screen))
 }
 
-console.log('\n4. The grocery preview is three rows, and the rest is one tap away\n')
+console.log('\n4. The list is a screen, grouped by aisle, and the trolley is out of the way\n')
 {
-  check('collapsed to three by default', /const COLLAPSED_COUNT = 3/.test(grocery) && /useState\(false\)/.test(grocery.slice(grocery.indexOf('const [showAll'), grocery.indexOf('const [showAll') + 80)))
-  check('...as a flat slice, not the first category', /grouped\.flatMap\(g => g\.items\)\.slice\(0, COLLAPSED_COUNT\)/.test(grocery))
-  check('the expander says how many there are', /All \$\{items\.length\} items/.test(grocery))
-  check('...and it expands in place rather than navigating', /setShowAll\(v => !v\)/.test(grocery))
-  check('...and only when there is more to show', /items\.length > COLLAPSED_COUNT &&/.test(grocery))
-  // Restyled rows: hairline, not a bordered box.
+  // REWRITTEN 12 Sep 2026 with the section it guarded. The three-row preview
+  // existed because the list sat at the bottom of the Tools tab and could not
+  // have the page; it has the page now, so previewing three of it and hiding
+  // the rest behind "All 14 items" is a step that no longer buys anything.
+  // What is still worth guarding is the shopping behaviour underneath.
+  check('the preview and its expander are gone', !/COLLAPSED_COUNT/.test(grocery))
+  check('items are grouped by aisle', /CATEGORY_ORDER/.test(grocery) && /CATEGORY_LABEL\[category\]/.test(grocery))
+  check('...with a count on each heading, so a detour can be judged', /\{catItems\.length\}/.test(grocery))
+  // CHECKED ITEMS LEAVE THE AISLES. A struck-through line still occupying its
+  // slot is a thing you read past every time you look down.
+  check('a checked item leaves its group', /i\.category === cat && !i\.checked/.test(grocery))
+  check('...and collects in one trolley row', /data-trolley/.test(grocery) && /In the trolley · \{inTrolley\.length\}/.test(grocery))
+  check('...which can be opened to undo a mis-tap', /Put back/.test(grocery) && /toggleChecked\(item\)/.test(grocery))
+  // Rows and checkbox, unchanged in kind: hairline, not a bordered box.
   check('rows are hairline-separated', /borderBottom: '1px solid var\(--hairline\)'/.test(grocery))
-  check('...and the checkbox is a token-coloured 20px box', /border: item\.checked \? '1\.5px solid var\(--primary\)' : '1\.5px solid var\(--border\)'/.test(grocery))
+  check('...and the checkbox is a token-coloured 24px box',
+    /size-6 shrink-0 rounded-md/.test(grocery)
+    && /border: item\.checked \? '1\.5px solid var\(--primary\)' : '1\.5px solid var\(--border\)'/.test(grocery))
   check('a checked row reads as done', /line-through opacity-60/.test(grocery))
-  // The section label above it names the list, so the component must not.
+  // The screen above it names the list, so the component must not.
   check('the component does not repeat the section heading', !/>\s*Grocery List\s*</.test(grocery))
 }
 
