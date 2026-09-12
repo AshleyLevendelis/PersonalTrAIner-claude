@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { useTimers, ROUND_LEAD_IN_SECONDS } from '@/hooks/useTimers'
-import { parseConditioningInterval, type RoundConfig } from '@/lib/timer-engine'
+import { parseConditioningInterval, ROUND_PRESETS, describeRoundPreset, roundStyleOf, type RoundConfig, type RoundPreset } from '@/lib/timer-engine'
 import type { WorkoutDay } from '@/lib/types'
 
 function formatMs(ms: number, withTenths = false): string {
@@ -127,6 +127,13 @@ function RoundPanel({ prefill }: { prefill: RoundConfig | null }) {
   const [rounds, setRounds] = useState(String(prefill?.rounds ?? timers.roundConfig?.rounds ?? 8))
   const [workSeconds, setWorkSeconds] = useState(String(prefill?.workSeconds ?? timers.roundConfig?.workSeconds ?? 30))
   const [restSeconds, setRestSeconds] = useState(String(prefill?.restSeconds ?? timers.roundConfig?.restSeconds ?? 30))
+  // WHICH WORDS THIS SETUP IS FOR. Only the presets set it — an EMOM is a
+  // named protocol, not a rest box someone happened to empty — and any
+  // non-EMOM preset sets it back, which is the way out and is visibly on
+  // screen rather than hidden in a menu.
+  const [style, setStyle] = useState<'intervals' | 'emom'>(
+    prefill ? 'intervals' : roundStyleOf(timers.roundConfig ?? { rounds: 0, workSeconds: 0, restSeconds: 0 }))
+  const isEmom = style === 'emom'
 
   const applyPrefill = () => {
     if (!prefill) return
@@ -135,11 +142,24 @@ function RoundPanel({ prefill }: { prefill: RoundConfig | null }) {
     setRestSeconds(String(prefill.restSeconds))
   }
 
+  const applyPreset = (p: RoundPreset) => {
+    setRounds(String(p.config.rounds))
+    setWorkSeconds(String(p.config.workSeconds))
+    setRestSeconds(String(p.config.restSeconds))
+    setStyle(roundStyleOf(p.config))
+  }
+
   const handleStart = () => {
     const config: RoundConfig = {
       rounds: Math.max(1, parseInt(rounds, 10) || 1),
       workSeconds: Math.max(1, parseInt(workSeconds, 10) || 1),
-      restSeconds: Math.max(1, parseInt(restSeconds, 10) || 1),
+      // ZERO IS THE WHOLE POINT OF AN EMOM, and this `Math.max(1, ...)` is
+      // what actually stopped one being built for months — not the engine,
+      // which runs a zero-rest cycle correctly and always did. Non-EMOM
+      // intervals keep their floor of 1: a two-phase timer whose rest is zero
+      // would show a REST screen that lasts no time.
+      restSeconds: isEmom ? 0 : Math.max(1, parseInt(restSeconds, 10) || 1),
+      ...(isEmom ? { style: 'emom' as const } : {}),
     }
     timers.startRound(config)
   }
@@ -163,20 +183,49 @@ function RoundPanel({ prefill }: { prefill: RoundConfig | null }) {
           Load from today's session ({prefill.rounds}× {prefill.workSeconds}s/{prefill.restSeconds}s)
         </Button>
       )}
-      <div className="grid grid-cols-3 gap-2">
+      {/* THEY FILL THE FIELDS, THEY DO NOT START. Same shape as the prefill
+          button above, and deliberately: the numbers stay on screen and stay
+          editable, so a preset is a shortcut rather than a black box that
+          runs something you cannot see. */}
+      <div className="grid grid-cols-2 gap-2">
+        {ROUND_PRESETS.map(p => (
+          <Button
+            key={p.key}
+            variant="outline"
+            data-preset={p.key}
+            className="h-auto min-h-11 flex-col items-start gap-0.5 py-2"
+            onClick={() => applyPreset(p)}
+          >
+            <span className="text-sm font-medium">{p.label}</span>
+            <span className="text-xs font-normal text-muted-foreground">{describeRoundPreset(p)}</span>
+          </Button>
+        ))}
+      </div>
+      {/* TWO BOXES FOR AN EMOM, NOT THREE WITH A ZERO IN ONE. A "Rest (s)"
+          field reading 0 invites someone to type into it, and the protocol
+          has no rest to set — the interval is the whole of it. The labels
+          change with it: an EMOM is counted in minutes, not rounds. */}
+      <div className={isEmom ? 'grid grid-cols-2 gap-2' : 'grid grid-cols-3 gap-2'}>
         <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-          Rounds
+          {isEmom ? (workSeconds === '60' ? 'Minutes' : 'Intervals') : 'Rounds'}
           <Input type="number" min="1" value={rounds} onChange={e => setRounds(e.target.value)} />
         </label>
         <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-          Work (s)
+          {isEmom ? 'Every (s)' : 'Work (s)'}
           <Input type="number" min="1" value={workSeconds} onChange={e => setWorkSeconds(e.target.value)} />
         </label>
-        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-          Rest (s)
-          <Input type="number" min="1" value={restSeconds} onChange={e => setRestSeconds(e.target.value)} />
-        </label>
+        {!isEmom && (
+          <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+            Rest (s)
+            <Input type="number" min="1" value={restSeconds} onChange={e => setRestSeconds(e.target.value)} />
+          </label>
+        )}
       </div>
+      {isEmom && (
+        <p className="text-xs text-muted-foreground">
+          Every {workSeconds || '60'} seconds a new one starts. Finish the work, and whatever is left is your rest.
+        </p>
+      )}
       <Button onClick={handleStart}>Start</Button>
       {/* SAY IT BEFORE IT HAPPENS. The countdown is a deliberate delay, and an
           app that pauses for ten seconds without having said it would is

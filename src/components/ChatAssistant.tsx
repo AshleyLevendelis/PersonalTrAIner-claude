@@ -49,7 +49,7 @@ import { sessionForDate, resolveMoveTarget, parseAlsoDoing, alsoDoingRow, alsoDo
 import { executeLogWorkout, type ReplacedSetPreImage } from '@/lib/nl-logging-executor'
 import { normalizeExternalUrl } from '@/lib/chat-links'
 import { buildFirstRunIntro, planShapeFromMesocycle, type FirstRunSessionBrief } from '@/lib/first-run-intro'
-import { buildCoachExerciseSummary, buildCoachPhaseBrief } from '@/lib/chat-plan-context'
+import { buildCoachExerciseSummary, buildCoachPhaseBrief, nextSessionAfter } from '@/lib/chat-plan-context'
 import { createFact, createGoal, createContextFact, retireFact, retireContextFact, abandonGoal, type UserFactRow, type UserGoalRow, type UserContextFactRow } from '@/lib/memory-store'
 import { resolveExerciseTarget, resolveFoodTarget } from '@/lib/fact-compiler'
 import { checkFactConflict, checkGoalConflict } from '@/lib/memory-reconcile'
@@ -690,20 +690,14 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
   // same reason todayPlan was: the opener, the unprompted message and the
   // coach's own context must not each walk the week their own way and then
   // disagree about which session is next.
-  const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-  const nextSessionAfterToday = (): { dayName: string; focus: string; lead: string | null; isTomorrow: boolean } | null => {
-    const base = new Date(`${activeSession.date}T12:00:00`)
-    for (let ahead = 1; ahead <= 6; ahead++) {
-      const d = new Date(base); d.setDate(d.getDate() + ahead)
-      const name = DAY_NAMES[d.getDay()]
-      const day = liveWeekDays.find(x => x.day === name && x.exercises.length > 0)
-      if (day) {
-        const lead = day.exercises.find(e => e.tier === 'tier_1_primary')?.name ?? day.exercises[0]?.name ?? null
-        return { dayName: name, focus: day.focus, lead, isTomorrow: ahead === 1 }
-      }
-    }
-    return null
-  }
+  // THROUGH THE RESOLVER, not the plan's weekday row. This walked
+  // `liveWeekDays.find(x => x.day === name)` until 12 Sep 2026, so on the day
+  // Ashley moved her Sunday session to Monday it skipped Monday — a rest row
+  // in the plan — and told the coach the next session was Tuesday's, two
+  // clauses after the header had said the session was owed on Monday. The walk
+  // itself now lives in chat-plan-context.ts where a gate can call it.
+  const nextSessionAfterToday = () =>
+    nextSessionAfter({ date: activeSession.date, plan: liveWeekDays, moves: trainingWeek.moves })
 
   const composeOpener = (): Opener => {
     // Named "tomorrow" when it is, otherwise by its day — the opener's own
@@ -1189,6 +1183,12 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     const upcomingSession = nextSessionAfterToday()
     const exerciseSummary = buildCoachExerciseSummary({
       days: activeWeekData,
+      // THE SEVEN DATED CELLS, already resolved through sessionForDate by the
+      // hook the week strip is drawn from — so the coach's rows and the strip
+      // cannot disagree about which day holds this session. Withheld while the
+      // read is still in flight: `moves` is empty until it resolves, and a week
+      // that claims no moves is the exact wrong answer this is here to stop.
+      week: trainingWeek.loading ? null : trainingWeek.days,
       coachNote: activeMesoWeek?.coach_note,
       pendingLoadSuggestions,
       today: {

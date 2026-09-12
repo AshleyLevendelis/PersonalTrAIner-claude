@@ -391,5 +391,175 @@ console.log('\n7. WHICH DAY IT IS')
   }
 }
 
+// ---------------------------------------------------------------------------
+// A MOVED SESSION MUST LEAVE THE COACH'S WEEK, NOT JUST ITS HEADER.
+//
+// Ashley, 12 Sep 2026: she moved today's session, the card confirmed it, and
+// the coach kept talking about "today's deadlifts". MEASURED before any fix —
+// the payload she was actually handed, all of it:
+//
+//   ...THEY MOVED IT TO MONDAY... The next session after today is Tuesday's...
+//   Monday (tomorrow): Rest - no session prescribed
+//   Sunday (TODAY): Pull & Hinge - Deadlift (3x5), Barbell Row (3x8-10)
+//
+// One sentence knew; three statements contradicted it, and the deployed prompt
+// tells the model to trust the ROWS over the prose ("A session on a row that is
+// not tagged (TODAY) is NOT today's"). So the checks below are about agreement,
+// not wording: nothing tagged (TODAY) may list exercises while the header says
+// the session left.
+// ---------------------------------------------------------------------------
+console.log('\n8. A MOVED SESSION LEAVES THE WEEK')
+{
+  const { buildCoachExerciseSummary: build, nextSessionAfter } = await import('../src/lib/chat-plan-context')
+  const { sessionForDate } = await import('../src/lib/session-move')
+  type Row = NonNullable<Parameters<typeof build>[0]['week']>[number]
+  type Day = import('../src/lib/types').WorkoutDay
+
+  const lift = (name: string) => ({ name, sets: 3, reps: '5', rest: '2 min' }) as unknown as Exercise
+  // Sunday trains (deadlifts). Monday is a rest row — the shape that made the
+  // naive lookup skip the day the session had just landed on.
+  const PLAN = [
+    { day: 'Monday', focus: 'Rest', exercises: [] },
+    { day: 'Tuesday', focus: 'Push & Press', exercises: [lift('Barbell Bench Press')] },
+    { day: 'Sunday', focus: 'Pull & Hinge', exercises: [lift('Deadlift'), lift('Barbell Row')] },
+  ] as unknown as Day[]
+
+  const NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+  /** The Mon-Sun window the hook builds, resolved exactly as useTrainingWeek resolves it. */
+  const windowOf = (dates: string[], moves: { fromDate: string; toDate: string }[]): Row[] =>
+    dates.map(date => {
+      const r = sessionForDate({ date, plan: PLAN, moves })
+      return { date, dayName: NAMES[new Date(`${date}T12:00:00`).getDay()], session: r.day, movedTo: r.movedTo, movedFrom: r.movedFrom }
+    })
+
+  const MON_TO_SUN = ['2026-09-07', '2026-09-08', '2026-09-09', '2026-09-10', '2026-09-11', '2026-09-12', '2026-09-13']
+  const TUE = '2026-09-08', WED = '2026-09-09', SUN = '2026-09-13', MON_NEXT = '2026-09-14'
+
+  const todayFor = (dayName: string, focus: string, movedTo: { dayName: string } | null, next: ReturnType<typeof nextSessionAfter>) => ({
+    dayName, hour: 10, clock: '10:05 AM', focus, isGymSession: true,
+    setsLogged: 0, setsPlanned: 6, finished: false,
+    next: next ? { dayName: next.dayName, focus: next.focus, isTomorrow: next.isTomorrow } : null,
+    movedTo, movedFrom: null,
+  })
+
+  /** Every row that carries the (TODAY) tag. */
+  const todayRows = (s: string) => s.split('\n').filter(l => l.includes('(TODAY)'))
+
+  // --- Tuesday -> Wednesday, both ends inside the window --------------------
+  {
+    const moves = [{ fromDate: TUE, toDate: WED }]
+    const out = build({
+      days: PLAN,
+      week: windowOf(MON_TO_SUN, moves),
+      today: todayFor('Tuesday', 'Push & Press', { dayName: 'Wednesday' }, nextSessionAfter({ date: TUE, plan: PLAN, moves })),
+    })
+    const rows = out.split('\n')
+    const tue = rows.find(l => l.startsWith('Tuesday')) ?? ''
+    const wed = rows.find(l => l.startsWith('Wednesday')) ?? ''
+
+    check('the day it LEFT says where the session went', /MOVED TO WEDNESDAY/.test(tue), tue)
+    check('...and no longer lists the exercises as if they were still there',
+      !/Barbell Bench Press/.test(tue), tue)
+    check('the day it LANDED ON carries the session', /Barbell Bench Press/.test(wed), wed)
+    check("...named by the day it came from, never renamed to the day it landed on",
+      /Tuesday's Push & Press/.test(wed) && !/Wednesday's Push & Press/.test(wed), wed)
+
+    // THE PROPERTY THAT ACTUALLY FAILED. The header and the rows are one
+    // payload and must not contradict each other; the prompt points the model
+    // at the rows.
+    check('nothing tagged (TODAY) lists a session while the header says it moved',
+      /THEY MOVED IT TO WEDNESDAY/.test(out) && todayRows(out).length === 1 && !/Barbell Bench Press/.test(todayRows(out)[0]),
+      todayRows(out))
+    // Counted in the DAY ROWS only: the technique block at the foot of the
+    // payload names every exercise once more, by design.
+    const dayRows = rows.filter(l => /^[A-Z][a-z]+( \((TODAY|tomorrow)\))?: /.test(l))
+    // A destination can sit EARLIER in the week than its origin, so the row
+    // that points at it must not tell the coach to look "below". Placed in
+    // THIS block deliberately: the off-window branch never renders that
+    // sentence, so a copy of this check over there passed a mutation that put
+    // "below" straight back — found by breaking it, which is the only way it
+    // ever is.
+    check('the moved row points at the destination without claiming a direction',
+      /it is listed on the Wednesday row$/.test(tue), tue)
+    check('...and the session appears on exactly one day row',
+      dayRows.filter(l => /Barbell Bench Press/.test(l)).length === 1, dayRows)
+  }
+
+  // --- Sunday -> the FOLLOWING Monday, destination outside the window -------
+  // The case that exposed a name-vs-date bug while this was being built:
+  // matching the destination by weekday name found Monday the 7th, three rows
+  // ABOVE, and the exercises vanished from the payload entirely.
+  {
+    const moves = [{ fromDate: SUN, toDate: MON_NEXT }]
+    const out = build({
+      days: PLAN,
+      week: windowOf(MON_TO_SUN, moves),
+      today: todayFor('Sunday', 'Pull & Hinge', { dayName: 'Monday' }, nextSessionAfter({ date: SUN, plan: PLAN, moves })),
+    })
+    const rows = out.split('\n')
+    const sun = rows.find(l => l.startsWith('Sunday')) ?? ''
+    const mon = rows.find(l => l.startsWith('Monday')) ?? ''
+
+    check('a destination past the last row keeps the exercises on the origin',
+      /Deadlift/.test(sun) && /Barbell Row/.test(sun), sun)
+    check('...and says the destination is outside the week, not that a row holds it',
+      /outside the week listed here/.test(sun) && !/it is listed on/.test(sun), sun)
+    check('...and does NOT claim the Monday three rows up holds it',
+      !/Deadlift/.test(mon), mon)
+    check('...while still saying the session is not to be trained today',
+      /MOVED TO MONDAY/.test(sun) && /nothing to train here/.test(sun), sun)
+  }
+
+  // --- nextSessionAfter, the walk that named the wrong day ------------------
+  {
+    const moves = [{ fromDate: SUN, toDate: MON_NEXT }]
+    const next = nextSessionAfter({ date: SUN, plan: PLAN, moves })
+    check('the next session is the day the moved session landed on',
+      next?.dayName === 'Monday' && next?.isTomorrow === true && next?.focus === 'Pull & Hinge', next)
+    check("...and it is NOT the plan's own next training row", next?.focus !== 'Push & Press', next)
+
+    const away = nextSessionAfter({ date: '2026-09-07', plan: PLAN, moves: [{ fromDate: TUE, toDate: WED }] })
+    check('a day whose session has left is skipped, and the day it went to is found',
+      away?.dayName === 'Wednesday' && away?.focus === 'Push & Press', away)
+
+    check('with no moves at all it still finds the plain next training day',
+      nextSessionAfter({ date: '2026-09-07', plan: PLAN, moves: [] })?.dayName === 'Tuesday')
+    check('and null when nothing trains in the next six days',
+      nextSessionAfter({ date: '2026-09-08', plan: [{ day: 'Tuesday', focus: 'Push', exercises: [lift('Bench')] }] as unknown as Day[], moves: [] }) === null)
+  }
+
+  // --- the contract every other gate leans on -------------------------------
+  {
+    const plainToday = todayFor('Tuesday', 'Push & Press', null, null)
+    const onlyPlanRows = (s: string) =>
+      s.split('\n').filter(l => /^(Monday|Tuesday|Sunday)( \(TODAY\)| \(tomorrow\))?: /.test(l)).join('\n')
+    check('a week with no moves renders the same rows it did before the week was passed',
+      onlyPlanRows(build({ days: PLAN, week: windowOf(MON_TO_SUN, []), today: plainToday }))
+      === onlyPlanRows(build({ days: PLAN, today: plainToday })))
+    check('an empty plan is still exactly the empty string, week or no week',
+      build({ days: [], week: windowOf(MON_TO_SUN, []), today: plainToday }) === '')
+  }
+
+  // The wiring, on the property rather than the line: the component hands over
+  // the week the strip is drawn from, withholds it while that read is in
+  // flight, and no longer walks the plan by weekday name to find what is next.
+  {
+    const { readFileSync } = await import('fs')
+    const { join, dirname } = await import('path')
+    const { fileURLToPath } = await import('url')
+    const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
+    // Comments stripped: a note SAYING the naive lookup is gone would
+    // otherwise satisfy the check that it is gone.
+    const chat = readFileSync(join(ROOT, 'src/components/ChatAssistant.tsx'), 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+    check('the coach gets the resolved week, not just the plan rows',
+      /week: trainingWeek\.loading \? null : trainingWeek\.days/.test(chat))
+    check('...and the next-session walk goes through the resolver',
+      /nextSessionAfter\(\{ date: activeSession\.date, plan: liveWeekDays, moves: trainingWeek\.moves \}\)/.test(chat))
+    check('...with the naive weekday walk gone from the component',
+      !/liveWeekDays\.find\(x => x\.day === name/.test(chat))
+  }
+}
+
 if (failures > 0) { console.error(`\n${failures} check(s) failed`); process.exit(1) }
 console.log('\nAll coach plan-context checks passed.\n')

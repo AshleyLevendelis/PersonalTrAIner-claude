@@ -2,6 +2,267 @@
 
 Newest first. One line each.
 
+- [x] **FULL PROGRAM SHOWED THE SESSION ON THE DAY IT HAD LEFT.** Ashley,
+  12 Sep 2026, with a screenshot: she moved Saturday's session to Sunday from
+  the chat, the card confirmed it — and Full Program went on showing
+  "Full Body Power" on Saturday with the TODAY badge, and "Rest" on Sunday.
+  **THE PRESCRIBED CAUSE WAS WRONG AGAIN.** The report said the chat action
+  "does not trigger a global cache invalidation or state update across the
+  FullProgram / WeeklySchedule components". There was no cache: `ProgramBrowse`
+  had never read a move in its life — no `sessionForDate`, no move rows, nothing
+  to invalidate. `days.find(d => d.day === dayName)` decided every row: the
+  **SIXTH** surviving instance of the naive weekday lookup `session-move.ts`'s
+  header says was eliminated everywhere. Re-rendering it any number of times
+  would have drawn the same week. (Second report in a row to name staleness and
+  be wrong about it; the first was the coach's week, two entries down.)
+  **A SECOND, SMALLER TRUTH IN IT THOUGH:** `ExerciseTab` has had App's
+  `logsVersion` all along and never passed it down, so even once the screen
+  could read a move it would not have re-read one confirmed while it was open.
+  Both fixed.
+  **Fixed:** the rows resolve through `useTrainingWeek` — the same seven dated
+  cells the week strip is drawn from. The day a session left keeps its name,
+  gains a MOVED chip and says "Moved to Sunday — nothing to train here"; the day
+  it landed on carries the session with a SATURDAY'S chip.
+  **ONLY ON THE LIVE WEEK, and that is not a shortcut.** A move is a one-off
+  against real dates — "Saturday the 12th happens on Sunday the 13th" — not an
+  edit to the plan, so paging to week 9 must show the template untouched.
+  **THE TODAY BADGE DOES NOT TRAVEL.** The report asked for it to shift to
+  Sunday. It must not: the SESSION moved, the DATE did not, and Home and the
+  week strip already hold that line. Pinned as its own check.
+  **Verified:** `verify:program-move` — the real screen at 390×844 against a
+  real move row, reading the rows back, and checking the BEFORE state in the
+  same run so a screen that always says "Moved" fails too. Four property checks
+  added to `test:moved-session-stuck` §7. **6 mutations tried, 6 caught.**
+  **THREE PROCESS FAILURES WORTH MORE THAN THE FIX.**
+  (1) A mutation came back MISSED on an `AssertionError` — it had never applied.
+  Second time today; the lesson is that a mutation script must assert its own
+  edit landed, and mine now does.
+  (2) That same mutation, once applied, was caught only by the SOURCE check
+  while the browser driver sailed past it — because the driver had never left
+  the live week and structurally could not see it. Closed by paging the driver
+  to another week and asserting no move appears there.
+  (3) And the check I added for it passed while proving nothing: it asserted a
+  next-week button had been CLICKED, not that the week had CHANGED. Re-anchored
+  on the week number read off the screen. Along the way I spent several minutes
+  chasing a phantom bug that was my own stale bundle — running the driver with
+  `node` directly skips the vite build, so it was testing a mutated build I had
+  restored the source of but never rebuilt.
+  **A THIRD GATE CAUGHT THE SUBTITLE, from the opposite side.** With EMOM real,
+  the tile was set to "Tabata, EMOM, boxing rounds" — and `test:tools-grid`
+  failed it at 27 characters against a 23-character one-line limit, which is
+  exactly the tile-growth hazard the plate-calculator comment beside it already
+  records. Two gates now hold that one string from opposite directions: it may
+  not name a timer that does not exist, and it may not be long enough to wrap.
+  Settled at "Tabata, EMOM, rounds" (21).
+  **Frontend only.** No migration, no function deploy.
+
+- [x] **EMOM, BUILT — AND THE REASON I GAVE FOR NOT BUILDING IT WAS WRONG.**
+  Ashley, 12 Sep 2026: *"finish the emom clock"*. Earlier the same day I had
+  told her, in the app, in a code comment and in the entry below, that EMOM
+  *"needs a different kind of clock — its rest is whatever remains of the
+  minute, which this engine has no way to express"*.
+  **IT EXPRESSES IT EXACTLY, AND ALWAYS DID.** First thing done here was to run
+  `computeRoundState` with `{ rounds: 10, workSeconds: 60, restSeconds: 0 }`:
+  the cycle IS the interval, the phase never leaves 'work', a new minute begins
+  at every boundary, and it completes at exactly 600s. **How I got it wrong:** I
+  reasoned about the PROTOCOL — "you rest whatever is left of the minute" — and
+  concluded from that sentence that the engine needed a variable rest phase.
+  The timer never tracks that rest; the athlete does. I asserted an engine
+  limitation without running the engine, which is the same shape of error as
+  fixing from a written finding without re-measuring, one rule over.
+  **What actually blocked EMOM was two lines of UI:** `handleStart` clamped rest
+  with `Math.max(1, ...)`, so zero was untypeable; and nothing called an
+  interval a minute.
+  **Built:** `RoundConfig.style?: 'intervals' | 'emom'`, read as
+  `?? 'intervals'` everywhere for the same reason `leadInSeconds` is — a round
+  already in flight from a persisted record must keep behaving as it started.
+  The flag decides ONLY the words, which is why it exists rather than inferring
+  from `restSeconds === 0`: "Minute 3 of 10" is right for a 60-second EMOM and
+  wrong for eight continuous 40-second intervals, and the numbers cannot tell
+  those apart. Two presets (EMOM 10×60s, E2MOM 10×120s — the second is there so
+  the table proves the interval is not always sixty). The setup form drops to
+  two boxes for an EMOM (Minutes / Every (s)) rather than showing a Rest box
+  with a zero in it, and says what the protocol is in a line underneath.
+  **ONE WORDING RULE, ONE PLACE.** `roundSubline`, `roundHeadline`,
+  `roundDoneLabel` and `intervalNoun` moved into `timer-engine.ts` because an
+  EMOM needed a second version of every sentence, and two copies is how the
+  dock's chip and the full-screen field come to call one running timer by two
+  different names. The phase word ("Work") is dropped for an EMOM on BOTH — it
+  implies a Rest it alternates with.
+  **Three `test:timer-field` checks failed on improved code** and were
+  re-anchored on the property, old anchors recorded in place: they pinned the
+  literal ternary that built the phase word and the literal
+  `${config.restSeconds}s rest next` inside RoundField, both of which moved.
+  **The tile says EMOM again, and this time there is one.** The §4 check that
+  forbade the word is keyed on the ENGINE, not a hardcoded no — building the
+  preset is what let the word back, exactly as that check's comment promised.
+  Its claim-matcher also had to learn all-caps: `[A-Z][a-z]+` cannot see
+  "EMOM", so the one claim that started this would have slipped through the
+  check written to catch it.
+  **9 mutations tried, 9 caught**, including deleting the preset while leaving
+  the word on the tile, and restoring the `Math.max(1, ...)` clamp that was the
+  real blocker. Driven live at 390×844: EMOM tapped, started, countdown
+  skipped, and the running screen read "MINUTE 1 OF 10" with no rest phase and
+  no rest promised underneath — screenshot read.
+  **Frontend only.** No migration, no function deploy.
+
+- [x] **THE TOOLS TILE NAMED THREE TIMERS AND THE APP HAD NONE OF THEM.**
+  Ashley, 12 Sep 2026, from the live app: *"under rest timers the app shows
+  emom and tabata but these timers dont exist"*. Measured: behind
+  "Rounds & intervals — EMOM, Tabata, laps" were three number inputs (Rounds,
+  Work, Rest) and no presets whatsoever.
+  - **EMOM** — absent, and not typeable either: its rest is whatever is LEFT of
+    the minute, and this engine only has a fixed work/rest pair.
+  - **Tabata** — reachable only by already knowing to type 8 / 20 / 10.
+  - **laps** — see the correction below.
+  **WHY NOTHING CAUGHT IT.** `test:says-what-it-contains` reads prose GENERATED
+  FROM A PLAN — week notes, the coach's summary, the first-run intro. Every word
+  on that tile is a hardcoded string in a component, generated from nothing, so
+  it sat outside that gate by construction. It is the THIRD subtitle in
+  `ToolsTab.tsx` to have promised something absent; the other two ("your plates",
+  a rest-timer settings screen) were caught by reading, which is not a method.
+  **HER RULING, 12 Sep 2026.** Offered three shapes — correct the label only;
+  add one-tap presets; or add presets AND build EMOM properly — she chose the
+  middle: **add the presets.** So `ROUND_PRESETS` now holds Tabata (8×20/10),
+  40/20, 30/30 and Boxing rounds (3×3min/1min), in `timer-engine.ts` rather than
+  in the component so a gate can call the table. Tapping one FILLS the three
+  fields and does not start the timer — a preset that ran on tap would launch
+  four minutes of work from one mis-tap with the numbers never shown. EMOM stays
+  out and stays unnamed.
+  **CORRECTION, same day, from reading the screenshot I had just taken.** I
+  wrote that laps "live on the STOPWATCH tab". They do not: **Lap is its own
+  tab in the same sheet**, one across from Round. I reached the wrong version by
+  grepping `lap` in the timers hook, finding `laps: LapEntry[]` beside the
+  stopwatch state, and stopping — `TimersPanel.tsx:44` renders
+  `['stopwatch', 'lap', 'round']` and settles it, and I had had that line on
+  screen earlier and read past it. So laps were never the EMOM case: the tile
+  was advertising the tab NEXT DOOR. Still wrong to say on a tile named for this
+  one, so the check stayed and only its reasoning changed.
+  **A CHECK OF MINE THAT WAS WRONG, not the code.** The first version asserted
+  Tabata is 240 seconds — the published four minutes. The engine returns 230,
+  because `totalRoundSeconds` is `rounds*work + (rounds-1)*rest`: it never runs
+  a trailing rest, deliberately, so a boxing session does not end with a minute
+  of sitting down. The app displays no duration for a preset at all, so nothing
+  false was shipping. Re-anchored on the engine's rule rather than on 230, so
+  changing the lead-in does not fail it and changing the RULE does.
+  **Gate: `test:round-presets`** — every preset driven through `computeRoundState`
+  (starts, and completes after its own stated length); each sub-line's three
+  numbers asserted to BE its config; Tabata pinned as Tabata; and the tile's
+  subtitle checked against the preset table BOTH WAYS — no protocol named that
+  has no preset, and no EMOM while nothing implements it. That last one is
+  pinned on the ENGINE, not on a hardcoded "no": build a real EMOM preset and
+  the check stops objecting. Plus **`verify:round-presets`**, a real mount at
+  390×844 that taps Tabata and reads 8 / 20 / 10 back out of the actual inputs,
+  proves the form is still up afterwards, and measures every preset button
+  against the 44px floor.
+  **12 mutations tried, 12 caught** (8 logic, 4 browser), including the original
+  defect restored verbatim — EMOM and laps back on the tile with nothing behind
+  them.
+  **Frontend only.** No migration, no function deploy.
+  **Named, not done:** EMOM itself, which needs a second timing model in
+  `timer-engine.ts` (fixed interval, rest = remainder) rather than a preset. And
+  the wider hole this came from — **no gate reads static UI labels for claims at
+  all**; `test:round-presets` covers this one tile because its claims happen to
+  be checkable against a table. The general case is open.
+
+- [x] **THE COACH KEPT TALKING ABOUT A SESSION THAT HAD MOVED — AND THE APP WAS
+  TELLING IT TO.** Ashley, 12 Sep 2026: she moved today's session to another day
+  from chat, the card confirmed it, the screens updated, and the next turns still
+  referenced "today's deadlifts".
+  **THE PRESCRIBED CAUSE WAS WRONG, AND SAYING SO IS THE POINT.** The report
+  asked for the context builder to "dynamically re-query the schedule on every
+  message turn rather than relying on cached or default day-of-week templates"
+  and to "ensure state is fresh after any tool/action execution". Traced end to
+  end: it already does both. `buildContext()` is called inline at the request's
+  `context:` field, never memoised; there is no day-of-week template anywhere in
+  it; confirming a move calls `onLogsUpdated`, which App wires to a version
+  counter that is the refresh token on the week read; and `getSessionMovesInRange`
+  queries BOTH ends, so a session moved out of the Mon-Sun window is still found
+  by its origin. Re-querying was never the problem. Building that fix would have
+  changed nothing and closed the ticket.
+  **WHAT WAS ACTUALLY WRONG, measured before touching anything** by running the
+  two pure builders over her exact state and printing the string the coach was
+  handed. All of it, in one payload:
+      It is Sunday morning. Today, Sunday, had Pull & Hinge on it and THEY MOVED
+      IT TO MONDAY... The next session after today is Tuesday's Push & Press.
+      Monday (tomorrow): Rest - no session prescribed
+      Sunday (TODAY): Pull & Hinge - Deadlift (3x5), Barbell Row (3x8-10)
+  Four statements. **One knew about the move; three said today was a deadlift
+  day and Monday was rest** — including a self-contradiction two clauses into
+  the same sentence. And the deployed prompt points the model at the ROWS over
+  the prose: *"every day row is tagged (TODAY) or (tomorrow). Read those and use
+  them verbatim. A session on a row that is not tagged (TODAY) is NOT today's."*
+  So "today's deadlifts" was the app's own last line, read back to her.
+  `buildTodayHeader` was the only part of the coach's week that had ever heard of
+  a move. The seven rows under it were the plan's raw weekday list, and the
+  "next session" walk was `liveWeekDays.find(x => x.day === name)` — **the FIFTH
+  surviving instance** of the naive lookup `session-move.ts`'s own header says
+  was eliminated everywhere ("Everything now asks sessionForDate"). That walk
+  also feeds the chat opener and the unprompted nudge, so all three named the
+  wrong day.
+  **Fixed:** the rows now come from the seven dated cells `useTrainingWeek` has
+  already resolved (reused, not resolved a second time — two readers of one fact
+  is how they come to disagree). The day a session left says where it went and
+  lists nothing; the day it landed on carries it, named by the day it came from,
+  never renamed to the weekday it landed on. `nextSessionAfter` moved out of the
+  component into `chat-plan-context.ts` and walks dates through `sessionForDate`,
+  so a gate can drive it.
+  **TWO BUGS THE MEASUREMENT CAUGHT IN MY OWN FIX, both after it "worked".**
+  (1) Whether the destination was one of the seven rows was decided by WEEKDAY
+  NAME — so a Sunday session moved to the FOLLOWING Monday matched Monday the
+  7th, three rows above, the origin said "it is listed on Monday" while that
+  Monday said "Rest", and the exercises vanished from the payload entirely. Now
+  compared on dates; an off-window destination keeps the list on the origin and
+  says the destination is past the rows. (2) The rows rendered from the resolved
+  week even when the plan itself had not loaded, printing seven invented
+  "Rest - no session prescribed" lines — the same cold-load defect Home and the
+  opener have each been fixed for, and it broke the load-bearing
+  `buildCoachExerciseSummary({ days: [] }) === ''` contract a prompt rule keys on.
+  Both were found by a check failing, not by reading.
+  **Verified:** `test:coach-plan-context` §8, 20 behavioural checks on the real
+  builders (the load-bearing one: nothing tagged (TODAY) may list exercises while
+  the header says the session left); two property checks added to
+  `test:moved-session-stuck` §7, whose title said "all three naive lookups" and
+  was already out of date. **`verify:coach-week-move`** is the half no pure
+  function can prove: a real mount at 390x844, whose `useTrainingWeek` reads a
+  real move row out of the database, with the model stubbed at the fetch boundary
+  and THE REQUEST BODY KEPT — the payload itself is the measurement, not anything
+  a model then says about it. 8 checks, screenshot read.
+  **15 mutations tried, 15 caught** (11 against the logic gates, 4 against the
+  browser driver) — but only after two of them were re-done, and both re-dos are
+  the point. One came back MISSED because the MUTATION had not applied:
+  whitespace had drifted under an earlier edit, so the string replace matched
+  nothing. Re-run with the edit asserted, it failed 7 checks including the
+  original defect line verbatim. The other came back MISSED because the CHECK
+  was in the wrong block — it asserted that no moved row says "look below" but
+  sat in the off-window case, which never renders that sentence, so it could not
+  have failed. Moved into the branch it guards, it catches. A mutation that
+  silently no-ops and a check that cannot fail look identical from the outside:
+  both print a tick.
+  **Decided without asking** (mechanical, per CLAUDE.md): making the coach's week
+  agree with the week strip, Home and the Exercise tab is data consistency, and
+  the behaviour it now matches is Ashley's own 10 Sep ruling that a moved day
+  leaves today on every screen. No new wording decision was taken.
+  **Full sweep: 166 gates, 164 pass.** The two failures are `test:meal-quality`
+  and `test:schema-parity`, which need a live database this machine cannot reach
+  — environmental, as CLAUDE.md records, not this change. Seven browser drivers
+  around moves and chat re-run and green (`moved-session`, `session-move`,
+  `what-happened`, `rest-day-race`, `chat-shell`, `coach-speaks-first`,
+  `session-edit`). `npx tsc --noEmit` clean.
+  **Frontend only — NO function deploy.** `exercise_summary` is interpolated
+  verbatim by the already-deployed function, which is why that module exists.
+  Once the rows are honest the prompt rule quoted above becomes correct rather
+  than harmful, so the prompt is untouched.
+  **Not covered, named:** the rows still say nothing about a day being missed,
+  swapped for an activity, or a chosen rest — `useTrainingWeek` already carries
+  all three, so it is cheap, but each is a wording decision. And a move whose
+  ORIGIN is in a later week is invisible to the six-day lookahead, because the
+  move read covers this Mon-Sun window only.
+  **Still outstanding on Ashley's machine, unconfirmed:** the `marked_missed`
+  migration (`npm run db:push-both`) and `npm run deploy:functions:prod --
+  chat-gemini` for `propose_missed_session`, `propose_exercise_remove` and
+  `propose_exercise_reorder`. Neither is needed by this change.
+
 - [x] **AN OUTSIDE REVIEW OF ONE SESSION: ALL THREE FINDINGS WRONG, AND THE REAL
   HOLE UNDERNEATH THEM.** Ashley asked Gemini to rate a generated Push & Press
   session, 11 Sep 2026 (Arm Circles / Barbell Bench 3x6-8 @42.5kg / DB Shoulder

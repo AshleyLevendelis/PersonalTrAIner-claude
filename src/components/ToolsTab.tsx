@@ -99,7 +99,40 @@ export function ToolsTab({ profileId, mealPools, targets, softLikedFoods, todays
       label: 'Rest timer', sub: 'Auto-starts after a set', icon: Timer,
       onClick: () => { timers.setMode('stopwatch'); setTimerOpen(true) },
     },
-    { label: 'Rounds & intervals', sub: 'EMOM, Tabata, laps', icon: TimerReset, onClick: () => { timers.setMode('round'); setTimerOpen(true) } },
+    {
+      // NAMED THREE THINGS, HAD NONE OF THEM. Ashley, 12 Sep 2026, from the
+      // app: "under rest timers the app shows emom and tabata but these
+      // timers dont exist". Measured — the round tab offers exactly three
+      // inputs (Rounds, Work, Rest) and no presets at all:
+      //   EMOM   — not built, and not typeable either: its rest is whatever
+      //            is LEFT of the minute, which this engine has no notion of.
+      //   Tabata — reachable only if you already know to type 8 / 20 / 10.
+      //   laps   — real, and its own tab in this same sheet, one tap sideways
+      //            from Round. So not a false claim like EMOM: a claim about
+      //            the tab NEXT DOOR, on a tile named for this one. (Corrected
+      //            12 Sep 2026: first written here as "on the stopwatch tab",
+      //            from grepping `lap` in the timers hook and finding it beside
+      //            the stopwatch state. TimersPanel.tsx renders three tabs —
+      //            stopwatch, lap, round — which is the line that settles it.)
+      // The third subtitle in this file to have promised something absent
+      // (see the two below), and the first anyone reported from the live app.
+      // Asked whether to correct the label or build the timers, she chose
+      // BUILD (12 Sep 2026): the presets are real now — ROUND_PRESETS in
+      // timer-engine.ts — so this subtitle names two of them and is true.
+      // EMOM followed on the same day, on her "finish the emom clock" — and
+      // needed no new engine at all: with rest 0 the cycle IS the interval,
+      // which computeRoundState always handled. See RoundConfig.style for the
+      // wrong reason I gave for leaving it out. So the word is back on this
+      // tile, and this time there is one behind it.
+      // AND IT HAS TO FIT ONE LINE — 23 characters, enforced by
+      // test:tools-grid, which caught "Tabata, EMOM, boxing rounds" at 27.
+      // Two gates now hold this one string from opposite sides: it may not
+      // name a timer that does not exist, and it may not be long enough to
+      // wrap the tile. "boxing rounds" was the half that went; EMOM and
+      // Tabata are the named protocols, and "rounds" covers the rest.
+      label: 'Rounds & intervals', sub: 'Tabata, EMOM, rounds', icon: TimerReset,
+      onClick: () => { timers.setMode('round'); setTimerOpen(true) },
+    },
     {
       // "your plates" promised a plate inventory that has never existed —
       // equipment is a four-value enum and nothing anywhere records what is
