@@ -127,6 +127,11 @@ export function ExerciseTab({
           mesocycle={mesocycle}
           profileId={profileId}
           initialWeek={route.kind === 'program' ? route.week : undefined}
+          // WIRED, not merely available. ExerciseTab has had logsVersion since
+          // the week strip needed it and never passed it down, so the program
+          // view could not learn about a move confirmed in chat while it was on
+          // screen. Same prop, same signal, one more reader.
+          refreshToken={logsVersion}
           onOpenSwap={setSwapTarget}
           onBanExercise={onBanExercise}
           onOpenHistory={(id, name) => setDetailTarget({ exerciseName: name, exerciseId: id, tab: 'history' })}

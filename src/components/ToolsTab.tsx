@@ -124,7 +124,13 @@ export function ToolsTab({ profileId, mealPools, targets, softLikedFoods, todays
       // which computeRoundState always handled. See RoundConfig.style for the
       // wrong reason I gave for leaving it out. So the word is back on this
       // tile, and this time there is one behind it.
-      label: 'Rounds & intervals', sub: 'Tabata, EMOM, boxing rounds', icon: TimerReset,
+      // AND IT HAS TO FIT ONE LINE — 23 characters, enforced by
+      // test:tools-grid, which caught "Tabata, EMOM, boxing rounds" at 27.
+      // Two gates now hold this one string from opposite sides: it may not
+      // name a timer that does not exist, and it may not be long enough to
+      // wrap the tile. "boxing rounds" was the half that went; EMOM and
+      // Tabata are the named protocols, and "rounds" covers the rest.
+      label: 'Rounds & intervals', sub: 'Tabata, EMOM, rounds', icon: TimerReset,
       onClick: () => { timers.setMode('round'); setTimerOpen(true) },
     },
     {

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { ChevronDown, ChevronLeft, ChevronRight, Check } from 'lucide-react'
 import { tabHash } from '@/lib/app-route'
 import { useActiveSession } from '@/hooks/useActiveSession'
+import { useTrainingWeek } from '@/hooks/useTrainingWeek'
 import { estimateDaySeconds } from '@/lib/session-duration'
 import { groupExercises, mainLiftGroupIndex } from '@/lib/session-derive'
 import { getLoggedPlanDays } from '@/lib/exercise-history'
@@ -52,6 +53,13 @@ interface ProgramBrowseProps {
   profileId?: string
   /** From the route hash (`#/exercise/program/{n}`) — where paging starts. */
   initialWeek?: number
+  /**
+   * App's logsVersion. ExerciseTab has had it all along and did not pass it
+   * on, which is half of why this screen never showed a move: with no refresh
+   * token the week read keys on profile and date only, so a move confirmed in
+   * chat while this screen was mounted could not reach it.
+   */
+  refreshToken?: number
   /** Swaps carry the BROWSED week — a swap made while reading week 9 must land on week 9, not the live week. */
   onOpenSwap: (target: { weekNumber: number; dayName: string; exIndex: number; exerciseName: string }) => void
   onBanExercise: (exerciseName: string) => void | Promise<void>
@@ -107,6 +115,7 @@ export function ProgramBrowse({
   mesocycle,
   profileId,
   initialWeek,
+  refreshToken,
   onOpenSwap,
   onBanExercise,
   onOpenHistory,
@@ -114,7 +123,7 @@ export function ProgramBrowse({
 }: ProgramBrowseProps) {
   // The only session-identity values this browse surface needs: where paging
   // starts and which row is "today". No logs facade, no write path.
-  const { liveWeek, dayName: todayName } = useActiveSession()
+  const { liveWeek, dayName: todayName, date: todayDate } = useActiveSession()
   const hasMesocycle = !!mesocycle && mesocycle.length > 0
   // 4 weeks PER BLOCK, not 4 total — mesocycle.length is the truth.
   const totalWeeks = hasMesocycle ? mesocycle.length : 4
@@ -127,6 +136,30 @@ export function ProgramBrowse({
 
   const weekObj = hasMesocycle ? mesocycle.find(w => w.week_number === browseWeek) : undefined
   const days = weekObj?.days ?? plan
+
+  // ---------------------------------------------------------------------------
+  // MOVES. Ashley, 12 Sep 2026: she moved Saturday's session to Sunday from the
+  // chat, the card confirmed it, and this screen went on showing Full Body
+  // Power on Saturday with the TODAY badge and "Rest" on Sunday.
+  //
+  // THE REPORT SAID IT WAS A CACHE THAT NEEDED INVALIDATING. It was not: this
+  // component had never read a move in its life — no sessionForDate, no move
+  // rows, nothing to invalidate. Re-rendering it any number of times would draw
+  // the same week. `days.find(d => d.day === dayName)` below was the SIXTH
+  // surviving instance of the naive weekday lookup that session-move.ts's
+  // header says was eliminated everywhere.
+  //
+  // ONLY ON THE LIVE WEEK, and that is not a shortcut. A move is a one-off
+  // against real dates — "Saturday the 12th happens on Sunday the 13th" — not
+  // an edit to the plan. Applying it while browsing week 9 would rewrite a
+  // template from a fact about this week, which is the opposite of true.
+  const liveDays = hasMesocycle ? mesocycle.find(w => w.week_number === liveWeek)?.days ?? plan : plan
+  const trainingWeek = useTrainingWeek(profileId, todayDate, liveDays, undefined, refreshToken)
+  const browsingLiveWeek = browseWeek === liveWeek
+  const cellFor = (dayName: string) =>
+    browsingLiveWeek && !trainingWeek.loading
+      ? trainingWeek.days.find(d => d.dayName === dayName) ?? null
+      : null
 
   // Completion is real data this view used to throw away. One read-only
   // fetch; a `${week}|${day}` set is the whole contract (§7.3).
@@ -350,7 +383,16 @@ export function ProgramBrowse({
       {/* Day list */}
       <div className="mt-5 flex flex-col">
         {DAY_ORDER.map((dayName, di) => {
-          const workout = days.find(d => d.day === dayName)
+          // WHAT ACTUALLY RUNS HERE. On a move ORIGIN that is nothing — the
+          // session has left — and on the day it landed on it is the session
+          // that travelled in, still called by the day it came from.
+          const cell = cellFor(dayName)
+          const movedTo = cell?.movedTo ?? null
+          const movedFrom = cell?.movedFrom ?? null
+          const workout = movedTo ? undefined : (cell?.session ?? days.find(d => d.day === dayName))
+          // The plan's own row, read deliberately raw, so the origin can still
+          // NAME what left after the resolver has correctly emptied the day.
+          const leftBehind = movedTo ? days.find(d => d.day === dayName) : undefined
           const isRest = !workout
           const isActiveRecovery = !!workout && workout.exercises.length === 0
           const trains = !!workout && workout.exercises.length > 0
@@ -361,7 +403,9 @@ export function ProgramBrowse({
           const sets = daySets(workout)
           const mins = trains ? Math.round(estimateDaySeconds(workout) / 60) : 0
           const main = trains ? mainLiftLine(workout) : null
-          const restNote = isRest
+          const restNote = movedTo
+            ? `Moved to ${movedTo.dayName} — nothing to train here.`
+            : isRest
             ? 'Sleep, hydration, and your baseline nutrition targets.'
             : isActiveRecovery
               ? (workout?.recommendedCardio
@@ -424,8 +468,21 @@ export function ProgramBrowse({
                       className={trains ? 'text-[0.96875rem] font-semibold tracking-[-.012em]' : 'text-[0.8125rem]'}
                       style={trains ? undefined : { color: 'color-mix(in srgb, var(--muted-foreground) 70%, transparent)' }}
                     >
-                      {workout?.focus ?? 'Rest'}
+                      {movedTo ? (leftBehind?.focus ?? 'Rest') : (workout?.focus ?? 'Rest')}
                     </span>
+                    {/* SAID ON THE ROW, not left to be inferred from an empty
+                        day. The badge is the same shape the week strip uses,
+                        so the two screens describe one move the same way. */}
+                    {movedTo && (
+                      <span className="text-[0.5625rem] font-bold uppercase tracking-[.12em] rounded px-[5px] py-[2px] border" style={{ color: 'var(--muted-foreground)', borderColor: 'color-mix(in srgb, var(--border) 80%, transparent)' }}>
+                        Moved
+                      </span>
+                    )}
+                    {movedFrom && (
+                      <span className="text-[0.5625rem] font-bold uppercase tracking-[.12em] rounded px-[5px] py-[2px] border" style={{ color: 'var(--primary)', borderColor: 'color-mix(in srgb, var(--primary) 45%, transparent)' }}>
+                        {movedFrom.dayName}&rsquo;s
+                      </span>
+                    )}
                     {isToday && (
                       <span className="text-[0.5625rem] font-bold uppercase tracking-[.12em] rounded px-[5px] py-[2px] bg-primary text-primary-foreground">
                         Today

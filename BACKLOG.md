@@ -2,6 +2,60 @@
 
 Newest first. One line each.
 
+- [x] **FULL PROGRAM SHOWED THE SESSION ON THE DAY IT HAD LEFT.** Ashley,
+  12 Sep 2026, with a screenshot: she moved Saturday's session to Sunday from
+  the chat, the card confirmed it — and Full Program went on showing
+  "Full Body Power" on Saturday with the TODAY badge, and "Rest" on Sunday.
+  **THE PRESCRIBED CAUSE WAS WRONG AGAIN.** The report said the chat action
+  "does not trigger a global cache invalidation or state update across the
+  FullProgram / WeeklySchedule components". There was no cache: `ProgramBrowse`
+  had never read a move in its life — no `sessionForDate`, no move rows, nothing
+  to invalidate. `days.find(d => d.day === dayName)` decided every row: the
+  **SIXTH** surviving instance of the naive weekday lookup `session-move.ts`'s
+  header says was eliminated everywhere. Re-rendering it any number of times
+  would have drawn the same week. (Second report in a row to name staleness and
+  be wrong about it; the first was the coach's week, two entries down.)
+  **A SECOND, SMALLER TRUTH IN IT THOUGH:** `ExerciseTab` has had App's
+  `logsVersion` all along and never passed it down, so even once the screen
+  could read a move it would not have re-read one confirmed while it was open.
+  Both fixed.
+  **Fixed:** the rows resolve through `useTrainingWeek` — the same seven dated
+  cells the week strip is drawn from. The day a session left keeps its name,
+  gains a MOVED chip and says "Moved to Sunday — nothing to train here"; the day
+  it landed on carries the session with a SATURDAY'S chip.
+  **ONLY ON THE LIVE WEEK, and that is not a shortcut.** A move is a one-off
+  against real dates — "Saturday the 12th happens on Sunday the 13th" — not an
+  edit to the plan, so paging to week 9 must show the template untouched.
+  **THE TODAY BADGE DOES NOT TRAVEL.** The report asked for it to shift to
+  Sunday. It must not: the SESSION moved, the DATE did not, and Home and the
+  week strip already hold that line. Pinned as its own check.
+  **Verified:** `verify:program-move` — the real screen at 390×844 against a
+  real move row, reading the rows back, and checking the BEFORE state in the
+  same run so a screen that always says "Moved" fails too. Four property checks
+  added to `test:moved-session-stuck` §7. **6 mutations tried, 6 caught.**
+  **THREE PROCESS FAILURES WORTH MORE THAN THE FIX.**
+  (1) A mutation came back MISSED on an `AssertionError` — it had never applied.
+  Second time today; the lesson is that a mutation script must assert its own
+  edit landed, and mine now does.
+  (2) That same mutation, once applied, was caught only by the SOURCE check
+  while the browser driver sailed past it — because the driver had never left
+  the live week and structurally could not see it. Closed by paging the driver
+  to another week and asserting no move appears there.
+  (3) And the check I added for it passed while proving nothing: it asserted a
+  next-week button had been CLICKED, not that the week had CHANGED. Re-anchored
+  on the week number read off the screen. Along the way I spent several minutes
+  chasing a phantom bug that was my own stale bundle — running the driver with
+  `node` directly skips the vite build, so it was testing a mutated build I had
+  restored the source of but never rebuilt.
+  **A THIRD GATE CAUGHT THE SUBTITLE, from the opposite side.** With EMOM real,
+  the tile was set to "Tabata, EMOM, boxing rounds" — and `test:tools-grid`
+  failed it at 27 characters against a 23-character one-line limit, which is
+  exactly the tile-growth hazard the plate-calculator comment beside it already
+  records. Two gates now hold that one string from opposite directions: it may
+  not name a timer that does not exist, and it may not be long enough to wrap.
+  Settled at "Tabata, EMOM, rounds" (21).
+  **Frontend only.** No migration, no function deploy.
+
 - [x] **EMOM, BUILT — AND THE REASON I GAVE FOR NOT BUILDING IT WAS WRONG.**
   Ashley, 12 Sep 2026: *"finish the emom clock"*. Earlier the same day I had
   told her, in the app, in a code comment and in the entry below, that EMOM

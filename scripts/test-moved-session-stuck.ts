@@ -220,6 +220,26 @@ check('the next-session walk asks the resolver rather than the plan row',
 check("the coach's week rows are the resolved ones, so a moved day cannot list a session",
   /week: trainingWeek\.loading \? null : trainingWeek\.days/.test(chatSrc), null)
 
+// THE SIXTH, found 12 Sep 2026 from a screenshot: Full Program showed the
+// session on Saturday with the TODAY badge and Rest on Sunday, after a move
+// the chat had confirmed. ProgramBrowse had never read a move at all — the
+// report called it a stale cache, and there was no cache: just
+// `days.find(d => d.day === dayName)` deciding every row. What it RENDERS is
+// driven by verify:program-move; these pin that it asks at all, and that it
+// only asks for the LIVE week (a move is a fact about dates, not an edit to
+// week 9's template).
+const programSrc = strip(readFileSync('src/components/exercise/ProgramBrowse.tsx', 'utf8'))
+check('the program view resolves its days through the training week',
+  /useTrainingWeek\(profileId, todayDate, liveDays/.test(programSrc), null)
+check('...and only applies moves while browsing the LIVE week',
+  /browsingLiveWeek = browseWeek === liveWeek/.test(programSrc)
+  && /browsingLiveWeek && !trainingWeek\.loading/.test(programSrc), null)
+check('...taking the session from the resolver before the plan row',
+  /movedTo \? undefined : \(cell\?\.session \?\? days\.find/.test(programSrc), null)
+check('...and it is fed a refresh token, so a move made in chat reaches it',
+  /refreshToken\?: number/.test(programSrc)
+  && /refreshToken=\{logsVersion\}/.test(strip(readFileSync('src/components/exercise/ExerciseTab.tsx', 'utf8'))), null)
+
 check('the move card writes the TRUE origin, not the day it was sitting on',
   /fromDate: trueFromDate/.test(chatSrc) && /const trueFromDate = target\.remapFrom \?\? fromDate/.test(chatSrc), null)
 // The chips, at their source. Pinned as "the moved-in refusal carries a
