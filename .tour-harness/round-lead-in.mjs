@@ -49,17 +49,28 @@ console.log('\nTHE COUNTDOWN BEFORE ROUND 1 — on the screen, real clock\n')
 await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off#/tab/tools` })
 await wait(4000)
 
-// The timer surface opens from its tile — it is not on the tab by default,
-// which is a fact about Tools, not about this feature.
-check('0. Tools offers a rounds-and-intervals tile', await clickText('/Rounds & intervals/'))
+// The setup opens from the one row that changes the intervals — it is not on
+// the tab by default, which is a fact about Tools, not about this feature.
+// RE-ANCHORED 12 Sep 2026 (design handoff 2a): this used to tap a tile in a
+// six-tile grid, and the grid is gone. What is being checked — that a
+// countdown is announced before it happens and that it really falls — has not
+// changed at all.
+check('0. Tools offers a row to change the intervals',
+  await ev(`(() => { const b = document.querySelector('[data-change-intervals]'); if (!b) return false; b.click(); return true })()`))
 await wait(900)
-check('0b. ...which opens the round timer', await ev(`[...document.querySelectorAll('[role="tab"]')].some(n => /round/i.test(n.textContent))`))
+check('0b. ...which opens the round setup', await ev(`[...document.querySelectorAll('[role="tab"]')].some(n => /round/i.test(n.textContent))`))
 const panelText = await ev(`document.body.innerText`)
-check('1. the setup form says a countdown is coming, before you press anything',
-  /10-second countdown/.test(panelText), (panelText.match(/Starts after[^\n]*/) || ['no such line'])[0])
+check('1. the setup says a countdown is coming, before you press anything',
+  /10s countdown/.test(panelText), (panelText.match(/Start · [^\n]*/) || ['no such line'])[0])
 
-check('2. Start is pressed', await clickText('/^Start$/'))
+check('2. Start is pressed',
+  await ev(`(() => { const b = [...document.querySelectorAll('button')].find(x => /^Start · /.test((x.textContent||'').trim())); if (!b) return false; b.click(); return true })()`))
 await wait(900)
+// FULL SCREEN IS OPT-IN NOW, so the flooded field this run measures has to be
+// asked for. The countdown itself starts with the round, not with the view.
+check('2b. the field is opened from the card',
+  await ev(`(() => { const b = document.querySelector('[data-round-card-fullscreen]'); if (!b) return false; b.click(); return true })()`))
+await wait(600)
 
 const first = await field()
 check('3. it is COUNTING DOWN, not already working', /^Get ready/.test(first?.label ?? ''), first)

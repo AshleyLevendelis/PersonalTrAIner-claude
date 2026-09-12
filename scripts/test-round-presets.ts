@@ -234,11 +234,24 @@ console.log('\n7. Zero rest survives the setup form, which is what blocked it')
   const panel = strip(readFileSync('src/components/timers/TimersPanel.tsx', 'utf8'))
   // THE ACTUAL BLOCKER, pinned. `Math.max(1, ...)` on rest made an EMOM
   // untypeable no matter what the engine could do.
+  //
+  // RE-ANCHORED 12 Sep 2026 (design handoff 2a): the three number boxes became
+  // chips, so the clamp, the two-vs-three layout and the separate `style`
+  // state are all gone. The PROPERTY is unchanged and is what is checked —
+  // zero rest reaches startRound, and an EMOM is marked as one — but it now
+  // has to survive a different form, which is exactly why the check is
+  // rewritten rather than deleted.
   check('an EMOM start sends rest 0 rather than clamping it up to 1',
-    /restSeconds: isEmom \? 0 : Math\.max\(1,/.test(panel), null)
+    /restSeconds: Math\.max\(0, restSeconds\)/.test(panel), null)
+  check('...and nothing clamps the rest up to one on the way', !/Math\.max\(1, parseInt\(restSeconds/.test(panel), null)
   check('...and marks the style, so the words follow', /style: 'emom' as const/.test(panel), null)
-  check('the rest box is not shown for an EMOM at all', /\{!isEmom && \(/.test(panel), null)
-  check('...and the presets are what set the style', /setStyle\(roundStyleOf\(p\.config\)\)/.test(panel), null)
+  // ONE FACT, NOT TWO. "Is this an EMOM" used to be a `style` state kept in
+  // step with a rest of zero; it is now derived from that zero, so the two
+  // cannot disagree.
+  check('an EMOM is derived from its rest, not stored beside it',
+    /const isEmom = restSeconds === 0/.test(panel), null)
+  check('None is on the rest row, and it is what sets zero',
+    /const REST_CHOICES = \[0,/.test(panel) && /sec === 0 \? 'None'/.test(panel), null)
 
   const dock = strip(readFileSync('src/components/BottomDock.tsx', 'utf8'))
   check('the dock chip uses the same noun as the full-screen field',

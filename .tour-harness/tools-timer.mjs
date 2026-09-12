@@ -110,32 +110,46 @@ await shoot('tools-timer-settled')
 // --- 2. start a real round --------------------------------------------------
 check('2a. the setup opens', await tapSel('[data-change-intervals]'))
 await wait(700)
-const filled = await ev(`(() => {
-  const out = {}
-  for (const l of document.querySelectorAll('label')) {
-    const key = (l.textContent || '').trim().toLowerCase()
-    const i = l.parentElement?.querySelector('input')
-    if (!i) continue
-    if (/round/.test(key)) { i.value = ''; out.rounds = true }
-  }
-  return out
+// THE SETUP IS CHIPS NOW, not three number boxes (design handoff 2a). The
+// short work and rest this run needs are not on the chip rows — they are
+// deliberately human values — so it goes through the Custom escape hatch,
+// which is the part of the redesign most likely to be quietly dropped.
+const hatches = await ev(`(() => {
+  const tap = sel => { const el = document.querySelector(sel); if (!el) return false; el.click(); return true }
+  if (!tap('[data-work="custom"]')) return 'no work custom'
+  if (!tap('[data-rest="custom"]')) return 'no rest custom'
+  return 'chips'
 })()`)
-void filled
-// Drive the inputs through React's own setter so the component sees them.
-const setInputs = await ev(`(() => {
+check('2b. work and rest have a custom escape hatch', hatches === 'chips', hatches)
+await wait(300)
+const typed = await ev(`(() => {
   const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set
-  const nums = [...document.querySelectorAll('input[type=number], input[inputmode=numeric]')]
-  if (nums.length < 3) return nums.length
-  const want = [2, 4, 2]
-  nums.slice(0, 3).forEach((el, i) => {
-    setter.call(el, String(want[i]))
-    el.dispatchEvent(new Event('input', { bubbles: true }))
-  })
+  const nums = [...document.querySelectorAll('input[type=number]')]
+  if (nums.length < 2) return nums.length
+  ;[4, 2].forEach((v, i) => { setter.call(nums[i], String(v)); nums[i].dispatchEvent(new Event('input', { bubbles: true })) })
   return 'set'
 })()`)
-check('2b. a 2 x 4s / 2s round can be typed', setInputs === 'set', setInputs)
-const started = await tapText('Start')
-check('2c. ...and started', started)
+check('2c. a 4s work / 2s rest can be typed into them', typed === 'set', typed)
+// EIGHT ROUNDS BY DEFAULT, STEPPED DOWN TO TWO — the stepper is the only way
+// to set the count now, so the run exercises it rather than routing round it.
+const stepped = await ev(`(() => {
+  const b = document.querySelector('[data-rounds-down]')
+  if (!b) return 'no stepper'
+  for (let i = 0; i < 6; i++) b.click()
+  return 'stepped'
+})()`)
+check('2d. the rounds stepper takes it down to two', stepped === 'stepped', stepped)
+await wait(300)
+const summaryLine = await ev(`(() => {
+  const el = [...document.querySelectorAll('span')].find(s => /work · /.test(s.textContent || ''))
+  return el ? el.textContent.trim() : null
+})()`)
+check('2e. the summary states what is about to run', /^2 × 4s work · 2s rest$/.test(summaryLine || ''), summaryLine)
+const started = await ev(`(() => {
+  const b = [...document.querySelectorAll('button')].find(x => /^Start · /.test((x.textContent||'').trim()))
+  if (!b) return false; b.click(); return true
+})()`)
+check('2f. ...and it starts', started)
 await wait(1500)
 
 // --- 3. the card, not the flood ---------------------------------------------

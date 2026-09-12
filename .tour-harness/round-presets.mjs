@@ -62,9 +62,24 @@ await wait(4000)
 
 // The tile says EMOM again — and now there is one. Checked as "says it AND
 // has it", so deleting the preset while leaving the word fails here too.
-const tileText = (await ev(`document.body.innerText`)).match(/Rounds & intervals[^\n]*\n[^\n]*/)?.[0] ?? ''
-check('0. the Tools tile names EMOM', /EMOM/.test(tileText), tileText)
-check('1. the rounds tile opens', await clickText('/Rounds & intervals/'))
+// RE-ANCHORED 12 Sep 2026 (design handoff 2a). The six-tile grid became one
+// timer surface and the three number inputs became chips, so every read below
+// that used to go through `fields()` now goes through the SUMMARY LINE — the
+// one place the chosen numbers appear together, and the line she actually
+// reads before tapping Start. The properties are unchanged: a preset fills
+// the setup without starting it, a second preset replaces the first, and the
+// words on the tab name only protocols that exist.
+// THE SUMMARY ROW, by its own marker. Matching on the text instead found the
+// EMOM PRESET CHIP — describeRoundPreset writes "10 × every 60s" too — so the
+// reader returned the button it was about to tap rather than the state that
+// tap produced, and three checks compared a string with itself.
+const setupSummary = () => ev(`(() => {
+  const el = document.querySelector('[data-round-summary]')
+  return el ? el.textContent.trim() : null
+})()`)
+const rowText = (await ev(`document.body.innerText`)).match(/Change the intervals[^\n]*\n[^\n]*/)?.[0] ?? ''
+check('0. the Tools interval row names EMOM', /EMOM/.test(rowText), rowText)
+check('1. the round setup opens', await tap('[data-change-intervals]'))
 await wait(900)
 
 const text = await ev(`document.body.innerText`)
@@ -72,27 +87,27 @@ check('2. Tabata is on the screen as a button', /Tabata/.test(text), text.slice(
 check('3. ...with its numbers under it, so nothing is opaque', /8 × 20s \/ 10s/.test(text),
   (text.match(/Tabata[^\n]*\n[^\n]*/) || ['not found'])[0])
 
-const before = await fields()
+const before = await setupSummary()
 await shoot('round-presets')
 
 check('4. tapping Tabata registers', await tap('[data-preset="tabata"]'))
 await wait(600)
-const after = await fields()
-check('5. ...and it filled the real inputs with 8 / 20 / 10',
-  after.rounds === '8' && after.work === '20' && after.rest === '10', { before, after })
+const after = await setupSummary()
+check('5. ...and it filled the setup with 8 / 20s / 10s',
+  after === '8 × 20s work · 10s rest', { before, after })
 
 // THE THING THAT WOULD BE WORST TO GET WRONG. A preset that STARTS on tap
 // runs four minutes of work from one mis-tap, with the numbers never shown.
-check('6. ...without starting the timer — the setup form is still up',
-  await ev(`!!document.querySelector('input[type="number"]')`)
+check('6. ...without starting the timer — the setup is still up',
+  await ev(`!!document.querySelector('[data-preset]')`)
   && !(await ev(`/GET READY|Round 1 of/i.test(document.body.innerText)`)), null)
 
 check('7. a second preset overwrites the first rather than merging with it',
   await tap('[data-preset="boxing"]'))
 await wait(600)
-const boxing = await fields()
-check('8. ...boxing rounds reads 3 / 180 / 60',
-  boxing.rounds === '3' && boxing.work === '180' && boxing.rest === '60', boxing)
+const boxing = await setupSummary()
+check('8. ...boxing rounds reads 3 × 3 min / 1 min',
+  boxing === '3 × 3 min work · 1 min rest', boxing)
 
 // ONE-HANDED ON A GYM FLOOR. 44px is the floor the rest of this app is held to.
 const small = await ev(`(() => [...document.querySelectorAll('[data-preset]')]
@@ -110,13 +125,19 @@ await shoot('round-presets-tabata')
 console.log('\n  EMOM')
 check('10. there is an EMOM button now', await tap('[data-preset="emom"]'))
 await wait(600)
-const emomFields = await fields()
-check('11. ...and it is ten sixty-second intervals', emomFields.rounds === '10' && emomFields.every === '60', emomFields)
-check('12. ...with NO rest box to fill in, because an EMOM has no rest',
-  emomFields.rest === undefined, emomFields)
+const emomSummary = await setupSummary()
+check('11. ...and it is ten sixty-second intervals', emomSummary === '10 × every 1 min', emomSummary)
+// AN EMOM HAS NO REST TO FILL IN, and with chips that is "None is the one
+// selected" rather than "the box is absent".
+const restChip = await ev(`(() => {
+  const el = document.querySelector('[data-rest="0"]')
+  return el ? { label: el.textContent.trim(), on: el.getAttribute('aria-pressed') } : null
+})()`)
+check('12. ...with None chosen on the rest row, because an EMOM has no rest',
+  restChip?.label === 'None' && restChip?.on === 'true', restChip)
 const emomText = await ev(`document.body.innerText`)
 check('13. the form counts them in MINUTES, not rounds',
-  /\bMinutes\b/.test(emomText) && !/Work \(s\)/.test(emomText),
+  /\bminutes\b/i.test(emomText) && !/Work \(s\)/.test(emomText),
   (emomText.match(/Minutes[\s\S]{0,60}/) || ['not found'])[0])
 check('14. ...and says plainly what the protocol is',
   /whatever is left is your rest/i.test(emomText), null)
@@ -124,10 +145,12 @@ await shoot('round-presets-emom')
 
 // A ten-minute EMOM with a ten-second lead-in: start it, skip the countdown,
 // and read what the running screen calls the interval.
-check('15. Start is pressed', await clickText('/^Start$/'))
+check('15. Start is pressed', await ev(`(() => { const b = [...document.querySelectorAll('button')].find(x => /^Start · /.test((x.textContent||'').trim())); if (!b) return false; b.click(); return true })()`))
 await wait(1200)
 check('16. it counts you in first, same as any round', await ev(`/GET READY/i.test(document.body.innerText)`),
   (await ev(`document.body.innerText`)).slice(0, 120))
+await tap('[data-round-card-fullscreen]')
+await wait(500)
 check('17. tapping skips the countdown', await tap('[role="button"][aria-label^="Get ready"]'))
 await wait(1200)
 const running = await ev(`(() => { const n = document.querySelector('[role="status"][aria-label*="inute"], [role="status"][aria-label*="Round"]'); return n ? n.getAttribute('aria-label') : document.body.innerText.slice(0, 200) })()`)
@@ -153,20 +176,32 @@ await ev(`(() => { const b = [...document.querySelectorAll('button')].find(x => 
 await wait(1200)
 await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off#/tab/tools` })
 await wait(3500)
-const gridUp = await ev(`/Rounds & intervals/.test(document.body.innerText)`)
-check('20b. the round released the tab, so the tiles are back', gridUp === true,
+const gridUp = await ev(`/Change the intervals/.test(document.body.innerText)`)
+check('20b. the round released the tab, so the interval row is back', gridUp === true,
   (await ev(`document.body.innerText`)).slice(0, 120))
-check('21. the rounds tile opens again', await clickText('/Rounds & intervals/'))
+check('21. the round setup opens again', await tap('[data-change-intervals]'))
 await wait(800)
 // 2 rounds x 1s work / 1s rest, and skip the ten-second countdown.
+// The short round this section needs is not on the chip rows — they hold
+// human values — so it goes through the Custom escape hatch on both, then
+// steps the count down from eight to two.
+await ev(`(() => {
+  const tap = sel => { const el = document.querySelector(sel); if (el) el.click(); return !!el }
+  tap('[data-work="custom"]'); tap('[data-rest="custom"]')
+})()`)
+await wait(300)
 await ev(`(() => {
   const set = (el, v) => { Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(el, v); el.dispatchEvent(new Event('input', { bubbles: true })) }
   const ins = [...document.querySelectorAll('input[type=number]')]
-  if (ins.length >= 3) { set(ins[0], '2'); set(ins[1], '1'); set(ins[2], '1') }
+  if (ins.length >= 2) { set(ins[0], '1'); set(ins[1], '1') }
+  const down = document.querySelector('[data-rounds-down]')
+  if (down) for (let i = 0; i < 6; i++) down.click()
 })()`)
 await wait(500)
-check('22. Start is pressed', await clickText('/^Start$/'))
+check('22. Start is pressed', await ev(`(() => { const b = [...document.querySelectorAll('button')].find(x => /^Start · /.test((x.textContent||'').trim())); if (!b) return false; b.click(); return true })()`))
 await wait(1000)
+await tap('[data-round-card-fullscreen]')
+await wait(500)
 check('23. tapping skips the countdown', await tap('[role="button"][aria-label^="Get ready"]'))
 // 2x1s work + 1x1s rest = 3s, plus slack.
 await wait(6000)

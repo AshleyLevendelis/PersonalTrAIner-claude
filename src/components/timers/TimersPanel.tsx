@@ -7,12 +7,12 @@
 // rest timer uses) — this component is presentation only.
 // ---------------------------------------------------------------------------
 
-import { useState } from 'react'
+import { useState, type CSSProperties, type ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { useTimers, ROUND_LEAD_IN_SECONDS } from '@/hooks/useTimers'
-import { parseConditioningInterval, ROUND_PRESETS, describeRoundPreset, roundStyleOf, type RoundConfig, type RoundPreset } from '@/lib/timer-engine'
+import { parseConditioningInterval, ROUND_PRESETS, describeRoundPreset, type RoundConfig, type RoundPreset } from '@/lib/timer-engine'
 import type { WorkoutDay } from '@/lib/types'
 
 function formatMs(ms: number, withTenths = false): string {
@@ -122,117 +122,214 @@ function LapPanel() {
   )
 }
 
+// ---------------------------------------------------------------------------
+// ROUND SETUP AS CHIPS — design handoff 2a, 12 Sep 2026.
+//
+// It was three number inputs. On a phone, in a gym, "how long is a work
+// interval" is a question with about seven real answers and typing is the
+// worst way to give any of them. So the answers are chips, and the numbers
+// stay reachable behind a Custom chip for the protocol nobody anticipated.
+//
+// REST "NONE" IS THE EMOM PATH, not a new one. Zero rest with style 'emom' is
+// exactly what the engine already runs and what the labels already switch on
+// — the chip just makes the door visible.
+// ---------------------------------------------------------------------------
+
+/** Selected and unselected chip, in tokens. */
+function chipStyle(on: boolean): CSSProperties {
+  return on
+    ? { background: 'rgba(var(--glow-rgb), .14)', border: '1px solid rgba(var(--glow-rgb), .45)', color: 'var(--primary-text)' }
+    : { background: 'var(--surface-raised)', border: '1px solid transparent', color: 'var(--text-tertiary)' }
+}
+
+function Chip({ on, onClick, children, ...rest }: {
+  on: boolean
+  onClick: () => void
+  children: ReactNode
+} & Record<string, unknown>) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={on}
+      className="min-h-[44px] rounded-xl px-3 text-[0.875rem] font-medium"
+      style={chipStyle(on)}
+      {...rest}
+    >
+      {children}
+    </button>
+  )
+}
+
+/** The seconds a work interval can be, as people say them. */
+const WORK_CHOICES = [20, 30, 45, 60, 120, 180, 300]
+/** And the rest, with None first because it is a protocol, not an absence. */
+const REST_CHOICES = [0, 10, 15, 20, 30, 60]
+
+const secondsLabel = (s: number) => s < 60 ? `${s}s` : s === 60 ? '1 min' : `${s / 60} min`
+
 function RoundPanel({ prefill }: { prefill: RoundConfig | null }) {
   const timers = useTimers()
-  const [rounds, setRounds] = useState(String(prefill?.rounds ?? timers.roundConfig?.rounds ?? 8))
-  const [workSeconds, setWorkSeconds] = useState(String(prefill?.workSeconds ?? timers.roundConfig?.workSeconds ?? 30))
-  const [restSeconds, setRestSeconds] = useState(String(prefill?.restSeconds ?? timers.roundConfig?.restSeconds ?? 30))
-  // WHICH WORDS THIS SETUP IS FOR. Only the presets set it — an EMOM is a
-  // named protocol, not a rest box someone happened to empty — and any
-  // non-EMOM preset sets it back, which is the way out and is visibly on
-  // screen rather than hidden in a menu.
-  const [style, setStyle] = useState<'intervals' | 'emom'>(
-    prefill ? 'intervals' : roundStyleOf(timers.roundConfig ?? { rounds: 0, workSeconds: 0, restSeconds: 0 }))
-  const isEmom = style === 'emom'
+  const [rounds, setRounds] = useState(prefill?.rounds ?? timers.roundConfig?.rounds ?? 8)
+  const [workSeconds, setWorkSeconds] = useState(prefill?.workSeconds ?? timers.roundConfig?.workSeconds ?? 30)
+  const [restSeconds, setRestSeconds] = useState(prefill?.restSeconds ?? timers.roundConfig?.restSeconds ?? 30)
+  // CUSTOM IS REACHABLE, both sides. The handoff names it for Work; Rest gets
+  // one for the same reason — a 45-second rest is an ordinary prescription
+  // and a chip row that cannot express it would send someone back to a screen
+  // that no longer exists.
+  const [customWork, setCustomWork] = useState(false)
+  const [customRest, setCustomRest] = useState(false)
+
+  // AN EMOM IS REST = NONE, and nothing else. One fact, derived, rather than a
+  // `style` flag kept in step with a number that already says the same thing.
+  const isEmom = restSeconds === 0
+
+  const applyPreset = (p: RoundPreset) => {
+    setRounds(p.config.rounds)
+    setWorkSeconds(p.config.workSeconds)
+    setRestSeconds(p.config.restSeconds)
+    setCustomWork(!WORK_CHOICES.includes(p.config.workSeconds))
+    setCustomRest(!REST_CHOICES.includes(p.config.restSeconds))
+  }
 
   const applyPrefill = () => {
     if (!prefill) return
-    setRounds(String(prefill.rounds))
-    setWorkSeconds(String(prefill.workSeconds))
-    setRestSeconds(String(prefill.restSeconds))
-  }
-
-  const applyPreset = (p: RoundPreset) => {
-    setRounds(String(p.config.rounds))
-    setWorkSeconds(String(p.config.workSeconds))
-    setRestSeconds(String(p.config.restSeconds))
-    setStyle(roundStyleOf(p.config))
+    setRounds(prefill.rounds)
+    setWorkSeconds(prefill.workSeconds)
+    setRestSeconds(prefill.restSeconds)
+    setCustomWork(!WORK_CHOICES.includes(prefill.workSeconds))
+    setCustomRest(!REST_CHOICES.includes(prefill.restSeconds))
   }
 
   const handleStart = () => {
-    const config: RoundConfig = {
-      rounds: Math.max(1, parseInt(rounds, 10) || 1),
-      workSeconds: Math.max(1, parseInt(workSeconds, 10) || 1),
-      // ZERO IS THE WHOLE POINT OF AN EMOM, and this `Math.max(1, ...)` is
-      // what actually stopped one being built for months — not the engine,
-      // which runs a zero-rest cycle correctly and always did. Non-EMOM
-      // intervals keep their floor of 1: a two-phase timer whose rest is zero
-      // would show a REST screen that lasts no time.
-      restSeconds: isEmom ? 0 : Math.max(1, parseInt(restSeconds, 10) || 1),
+    timers.startRound({
+      rounds: Math.max(1, rounds),
+      workSeconds: Math.max(1, workSeconds),
+      restSeconds: Math.max(0, restSeconds),
       ...(isEmom ? { style: 'emom' as const } : {}),
-    }
-    timers.startRound(config)
+    })
   }
 
-  // NO RUNNING VIEW HERE ANY MORE. A live round is rendered by RoundField,
-  // which takes the whole Tools tab content area (design handoff 2a) — so
-  // this panel is reached only while there is no round to show, and it is
-  // purely the setup form.
-  //
-  // What was here read the phase from a text colour and nothing else, and its
-  // "All rounds complete" line was unreachable: the completion effect sets
-  // running false, which used to collapse the derived round state, so the
-  // branch unmounted on the very tick that line existed for. Both the cause
-  // and this duplicate are gone rather than left as a second copy of a view
-  // that can no longer render.
+  // The block's own length, by the engine's rule: no rest hangs off the end.
+  const totalSeconds = isEmom
+    ? rounds * workSeconds
+    : rounds * workSeconds + (rounds - 1) * restSeconds
+  const totalLabel = `${Math.floor(totalSeconds / 60)}:${String(totalSeconds % 60).padStart(2, '0')}`
+  const summary = isEmom
+    ? `${rounds} × every ${secondsLabel(workSeconds)}`
+    : `${rounds} × ${secondsLabel(workSeconds)} work · ${secondsLabel(restSeconds)} rest`
 
   return (
-    <div className="flex flex-col gap-3 py-4">
+    <div className="flex flex-col gap-5 py-4">
       {prefill && (
-        <Button variant="outline" size="sm" onClick={applyPrefill}>
-          Load from today's session ({prefill.rounds}× {prefill.workSeconds}s/{prefill.restSeconds}s)
+        <Button variant="outline" size="sm" className="min-h-11" onClick={applyPrefill}>
+          Use today's · {prefill.rounds} × {prefill.workSeconds}/{prefill.restSeconds}
         </Button>
       )}
-      {/* THEY FILL THE FIELDS, THEY DO NOT START. Same shape as the prefill
-          button above, and deliberately: the numbers stay on screen and stay
-          editable, so a preset is a shortcut rather than a black box that
-          runs something you cannot see. */}
-      <div className="grid grid-cols-2 gap-2">
-        {ROUND_PRESETS.map(p => (
-          <Button
-            key={p.key}
-            variant="outline"
-            data-preset={p.key}
-            className="h-auto min-h-11 flex-col items-start gap-0.5 py-2"
-            onClick={() => applyPreset(p)}
-          >
-            <span className="text-sm font-medium">{p.label}</span>
-            <span className="text-xs font-normal text-muted-foreground">{describeRoundPreset(p)}</span>
-          </Button>
-        ))}
+
+      <div>
+        <p className="ds-label">Start from a protocol</p>
+        {/* THEY FILL THE CHIPS, THEY DO NOT START. Unchanged behaviour, and
+            deliberately: the choice stays on screen and stays editable, so a
+            preset is a shortcut rather than a black box. */}
+        <div className="mt-1.5 grid grid-cols-2 gap-2">
+          {ROUND_PRESETS.map(p => (
+            <Chip
+              key={p.key}
+              data-preset={p.key}
+              on={p.config.rounds === rounds && p.config.workSeconds === workSeconds && p.config.restSeconds === restSeconds}
+              onClick={() => applyPreset(p)}
+            >
+              <span className="block text-left">{p.label}</span>
+              <span className="block text-left text-[0.6875rem] font-normal opacity-70">{describeRoundPreset(p)}</span>
+            </Chip>
+          ))}
+        </div>
       </div>
-      {/* TWO BOXES FOR AN EMOM, NOT THREE WITH A ZERO IN ONE. A "Rest (s)"
-          field reading 0 invites someone to type into it, and the protocol
-          has no rest to set — the interval is the whole of it. The labels
-          change with it: an EMOM is counted in minutes, not rounds. */}
-      <div className={isEmom ? 'grid grid-cols-2 gap-2' : 'grid grid-cols-3 gap-2'}>
-        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-          {isEmom ? (workSeconds === '60' ? 'Minutes' : 'Intervals') : 'Rounds'}
-          <Input type="number" min="1" value={rounds} onChange={e => setRounds(e.target.value)} />
-        </label>
-        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-          {isEmom ? 'Every (s)' : 'Work (s)'}
-          <Input type="number" min="1" value={workSeconds} onChange={e => setWorkSeconds(e.target.value)} />
-        </label>
-        {!isEmom && (
-          <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-            Rest (s)
-            <Input type="number" min="1" value={restSeconds} onChange={e => setRestSeconds(e.target.value)} />
+
+      <div>
+        <p className="ds-label">Work</p>
+        <div className="mt-1.5 flex flex-wrap gap-2">
+          {WORK_CHOICES.map(sec => (
+            <Chip key={sec} data-work={sec} on={!customWork && workSeconds === sec} onClick={() => { setCustomWork(false); setWorkSeconds(sec) }}>
+              {secondsLabel(sec)}
+            </Chip>
+          ))}
+          <Chip data-work="custom" on={customWork} onClick={() => setCustomWork(true)}>Custom</Chip>
+        </div>
+        {customWork && (
+          <label className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+            Seconds
+            <Input type="number" min="1" className="w-24" value={String(workSeconds)} onChange={e => setWorkSeconds(parseInt(e.target.value, 10) || 0)} />
           </label>
         )}
       </div>
-      {isEmom && (
-        <p className="text-xs text-muted-foreground">
-          Every {workSeconds || '60'} seconds a new one starts. Finish the work, and whatever is left is your rest.
+
+      <div>
+        <p className="ds-label">Rest</p>
+        <div className="mt-1.5 flex flex-wrap gap-2">
+          {REST_CHOICES.map(sec => (
+            <Chip key={sec} data-rest={sec} on={!customRest && restSeconds === sec} onClick={() => { setCustomRest(false); setRestSeconds(sec) }}>
+              {sec === 0 ? 'None' : secondsLabel(sec)}
+            </Chip>
+          ))}
+          <Chip data-rest="custom" on={customRest} onClick={() => setCustomRest(true)}>Custom</Chip>
+        </div>
+        {customRest && (
+          <label className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+            Seconds
+            <Input type="number" min="0" className="w-24" value={String(restSeconds)} onChange={e => setRestSeconds(parseInt(e.target.value, 10) || 0)} />
+          </label>
+        )}
+        {isEmom && (
+          <p className="mt-2 text-xs text-muted-foreground">
+            Every {workSeconds} seconds a new one starts. Finish the work, and whatever is left is your rest.
+          </p>
+        )}
+      </div>
+
+      <div>
+        <p className="ds-label">{isEmom ? (workSeconds === 60 ? 'Minutes' : 'Intervals') : 'Rounds'}</p>
+        <div className="mt-1.5 flex items-center gap-3">
+          <button
+            type="button"
+            data-rounds-down
+            aria-label="One fewer round"
+            onClick={() => setRounds(r => Math.max(1, r - 1))}
+            className="rounded-xl text-xl"
+            style={{ width: 52, height: 52, ...chipStyle(false) }}
+          >
+            −
+          </button>
+          <span className="tabular-mono" style={{ fontSize: '2.125rem', fontWeight: 700, minWidth: '2.5ch', textAlign: 'center' }}>{rounds}</span>
+          <button
+            type="button"
+            data-rounds-up
+            aria-label="One more round"
+            onClick={() => setRounds(r => r + 1)}
+            className="rounded-xl text-xl"
+            style={{ width: 52, height: 52, ...chipStyle(false) }}
+          >
+            +
+          </button>
+        </div>
+      </div>
+
+      <div style={{ borderTop: '1px solid var(--hairline)' }} className="pt-3">
+        <div className="flex items-baseline justify-between gap-3">
+          <span data-round-summary className="text-[0.8125rem] text-muted-foreground">{summary}</span>
+          <span className="tabular-mono text-[0.9375rem] font-semibold" style={{ color: 'var(--primary-text)' }}>{totalLabel}</span>
+        </div>
+        <Button className="mt-3 w-full" style={{ height: 56 }} onClick={handleStart}>
+          Start · {ROUND_LEAD_IN_SECONDS}s countdown
+        </Button>
+        {/* SAY IT BEFORE IT HAPPENS. The countdown is a deliberate delay, and
+            an app that pauses for ten seconds without having said it would is
+            indistinguishable from one that has not started. */}
+        <p className="mt-2 text-center text-xs text-muted-foreground">
+          Tap the screen to go sooner.
         </p>
-      )}
-      <Button onClick={handleStart}>Start</Button>
-      {/* SAY IT BEFORE IT HAPPENS. The countdown is a deliberate delay, and an
-          app that pauses for ten seconds without having said it would is
-          indistinguishable from one that has not started. */}
-      <p className="text-center text-xs text-muted-foreground">
-        Starts after a {ROUND_LEAD_IN_SECONDS}-second countdown — tap the screen to go sooner.
-      </p>
+      </div>
     </div>
   )
 }
