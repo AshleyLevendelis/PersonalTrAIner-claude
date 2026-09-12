@@ -27,6 +27,33 @@ export interface RoundConfig {
    * already that.
    */
   leadInSeconds?: number
+  /**
+   * EMOM — every minute on the minute. Ashley, 12 Sep 2026: build it.
+   *
+   * A SINGLE-PHASE CLOCK, and that is the whole of it: N intervals of
+   * `workSeconds`, `restSeconds` zero, nothing alternating. The athlete rests
+   * whatever is left of the interval after their reps; the TIMER never tracks
+   * that and never needs to.
+   *
+   * WHICH IS WHY THE ENGINE NEEDED NO NEW MATH. I told Ashley on 12 Sep that
+   * EMOM "needs a different kind of clock — its rest is the remainder of the
+   * minute, which this engine has no way to express", and that was wrong. I
+   * reasoned about the protocol instead of running computeRoundState: with
+   * restSeconds 0 the cycle IS the interval, the phase never leaves 'work',
+   * and 10 x 60/0 completes at exactly 600s. What actually blocked EMOM was
+   * the setup form clamping rest to a minimum of 1, and nothing calling an
+   * interval a minute. Both were UI.
+   *
+   * SO WHY A FLAG AT ALL, rather than inferring it from `restSeconds === 0`?
+   * Because it decides only the WORDS. "Minute 3 of 10" is right for a
+   * 60-second EMOM and wrong for eight continuous 40-second intervals, and
+   * the numbers cannot tell those apart.
+   *
+   * OPTIONAL AND READ AS `?? 'intervals'` EVERYWHERE, for the same reason
+   * leadInSeconds is: a round already in flight from a persisted record has
+   * no such field and must keep behaving exactly as it started.
+   */
+  style?: 'intervals' | 'emom'
 }
 
 export type RoundPhase = 'lead_in' | 'work' | 'rest'
@@ -227,9 +254,77 @@ export const ROUND_PRESETS: RoundPreset[] = [
   // already knows some people train a combat sport alongside their lifting
   // (concurrent_activities), and "rounds" is what that word means to them.
   { key: 'boxing', label: 'Boxing rounds', config: { rounds: 3, workSeconds: 180, restSeconds: 60 } },
+  // EMOM, built 12 Sep 2026 after Ashley reported the tile advertising it.
+  // Ten minutes is the common prescription; E2MOM is here because the whole
+  // point of naming the style separately is that the interval is not always
+  // sixty seconds, and a table with only the 60s case would not prove that.
+  { key: 'emom', label: 'EMOM', config: { rounds: 10, workSeconds: 60, restSeconds: 0, style: 'emom' } },
+  { key: 'e2mom', label: 'E2MOM', config: { rounds: 10, workSeconds: 120, restSeconds: 0, style: 'emom' } },
 ]
 
-/** "8 × 20s / 10s" — the numbers under a preset's name, so nothing is opaque. */
+/**
+ * "8 × 20s / 10s" — the numbers under a preset's name, so nothing is opaque.
+ *
+ * An EMOM has no rest to show, and "10 × 60s / 0s" would put a rest interval
+ * on screen that the protocol does not have. It states its interval instead.
+ */
 export function describeRoundPreset(p: RoundPreset): string {
-  return `${p.config.rounds} × ${p.config.workSeconds}s / ${p.config.restSeconds}s`
+  return roundStyleOf(p.config) === 'emom'
+    ? `${p.config.rounds} × every ${p.config.workSeconds}s`
+    : `${p.config.rounds} × ${p.config.workSeconds}s / ${p.config.restSeconds}s`
+}
+
+// ---------------------------------------------------------------------------
+// WHAT TO CALL AN INTERVAL — the only thing `style` decides.
+//
+// Kept here rather than in RoundField so the wording can be driven by a gate
+// and so the dock's one-line summary and the full-screen field cannot drift
+// into calling the same interval two different things.
+// ---------------------------------------------------------------------------
+
+/** The `?? 'intervals'` rule, in one place. */
+export function roundStyleOf(config: RoundConfig): 'intervals' | 'emom' {
+  return config.style === 'emom' ? 'emom' : 'intervals'
+}
+
+/**
+ * "Minute" only when it really is one. A 90-second EMOM is a common
+ * prescription and calling its intervals minutes would be a small, confident
+ * lie of exactly the kind the tile that started this was telling.
+ */
+export function intervalNoun(config: RoundConfig): 'minute' | 'interval' | 'round' {
+  if (roundStyleOf(config) !== 'emom') return 'round'
+  return config.workSeconds === 60 ? 'minute' : 'interval'
+}
+
+/** "Round 3 of 10" / "Minute 3 of 10" — the headline over the clock. */
+export function roundHeadline(config: RoundConfig, currentRound: number): string {
+  const noun = intervalNoun(config)
+  return `${noun[0].toUpperCase()}${noun.slice(1)} ${currentRound} of ${config.rounds}`
+}
+
+/** "10 of 10 minutes done" — the same noun, at the end. */
+export function roundDoneLabel(config: RoundConfig): string {
+  return `${config.rounds} of ${config.rounds} ${intervalNoun(config)}s done`
+}
+
+/**
+ * The line under the clock. EMOM has no rest to promise, so it says what
+ * actually happens next instead — the same rule the interval version already
+ * follows on its final round, where "20s rest next" was untrue.
+ */
+export function roundSubline(config: RoundConfig, phase: 'ready' | 'work' | 'rest' | 'done', round: number): string {
+  const noun = intervalNoun(config)
+  const Noun = `${noun[0].toUpperCase()}${noun.slice(1)}`
+  if (phase === 'ready') return `${Noun} 1 of ${config.rounds} starts in a moment. Tap anywhere to start now.`
+  if (phase === 'done') return `All ${config.rounds} ${noun}s done — nice.`
+  if (phase === 'work') {
+    if (round >= config.rounds) return `Last ${noun} — finish this one and you’re done.`
+    return roundStyleOf(config) === 'emom'
+      // NO REST TO NAME. The next interval starts the moment this one ends —
+      // that IS the protocol, and promising a rest here would invent one.
+      ? `${Noun} ${round} of ${config.rounds} — the next one starts as this hits zero.`
+      : `${Noun} ${round} of ${config.rounds} — ${config.restSeconds}s rest next.`
+  }
+  return `${Noun} ${Math.min(round + 1, config.rounds)} of ${config.rounds} starts when this hits zero.`
 }

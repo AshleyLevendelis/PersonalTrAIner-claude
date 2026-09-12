@@ -24,6 +24,7 @@ import { useBottomDockHeight } from '@/hooks/useBottomDockHeight'
 import { tabHash, useAppRoute } from '@/lib/app-route'
 import { getAppNow } from '@/lib/dev-clock'
 import { playTimerCue } from '@/lib/timer-cues'
+import { roundHeadline, roundStyleOf } from '@/lib/timer-engine'
 
 function formatDuration(ms: number): string {
   const totalSeconds = Math.round(Math.abs(ms) / 1000)
@@ -138,7 +139,13 @@ export function BottomDock() {
   if (hasStandaloneTimer) {
     const chipLabel = timers.mode === 'round'
       ? (timers.roundConfig
-        ? `Round ${timers.currentRound}/${timers.roundConfig.rounds} · ${timers.currentPhase === 'work' ? 'Work' : 'Rest'} · ${formatDuration(timers.phaseRemainingMs ?? 0)}`
+        // THE SAME NOUN THE FULL-SCREEN FIELD USES, from the same helper. An
+        // EMOM has no rest phase, so the "Work / Rest" half is dropped for one
+        // — a chip reading "Minute 3/10 · Work" would name a phase that has
+        // no opposite.
+        ? `${roundHeadline(timers.roundConfig, timers.currentRound).replace(' of ', '/')}${
+            roundStyleOf(timers.roundConfig) === 'emom' ? '' : ` · ${timers.currentPhase === 'work' ? 'Work' : 'Rest'}`
+          } · ${formatDuration(timers.phaseRemainingMs ?? 0)}`
         : 'Round timer')
       : `${timers.mode === 'lap' ? 'Lap' : 'Stopwatch'} · ${formatDuration(timers.elapsedMs)}`
     return (

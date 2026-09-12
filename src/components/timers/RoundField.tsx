@@ -2,7 +2,7 @@ import type React from 'react'
 import { useTimers } from '@/hooks/useTimers'
 import { TAB_BAR_HEIGHT_PX } from '@/components/BottomTabBar'
 import { tabHash } from '@/lib/app-route'
-import type { RoundConfig } from '@/lib/timer-engine'
+import { roundSubline, roundHeadline, roundDoneLabel, roundStyleOf, type RoundConfig } from '@/lib/timer-engine'
 
 // ---------------------------------------------------------------------------
 // THE ROUND TIMER AS A FIELD — design handoff "Timer colour states", 2a.
@@ -54,16 +54,13 @@ function formatRemaining(ms: number): string {
  * next" on every work phase, which is untrue on the final one — so the last
  * round says what actually happens instead.
  */
-function subline(phase: Phase, round: number, config: RoundConfig): string {
-  if (phase === 'ready') return `Round 1 of ${config.rounds} starts in a moment. Tap anywhere to start now.`
-  if (phase === 'done') return `All ${config.rounds} rounds done — nice.`
-  if (phase === 'work') {
-    return round >= config.rounds
-      ? 'Last round — finish this one and you’re done.'
-      : `Round ${round} of ${config.rounds} — ${config.restSeconds}s rest next.`
-  }
-  return `Round ${Math.min(round + 1, config.rounds)} of ${config.rounds} starts when this hits zero.`
-}
+// MOVED INTO THE ENGINE, 12 Sep 2026, when EMOM arrived. An EMOM has no rest
+// to promise, so every sentence here needed a second version — and two copies
+// of the wording is how the dock's one-line summary and this field would come
+// to call the same interval by two different names. roundSubline keeps the
+// rule this function was written for (the final round says what actually
+// happens, because "20s rest next" was untrue there) and adds the EMOM case.
+const subline = roundSubline
 
 export function RoundField() {
   const timers = useTimers()
@@ -97,9 +94,20 @@ export function RoundField() {
     : Math.min(1, Math.max(0, 1 - remainingMs / Math.max(1, phaseSeconds * 1000)))
 
   const roundLabel = phase === 'done'
-    ? `${config.rounds} of ${config.rounds} rounds done`
+    ? roundDoneLabel(config)
     : phase === 'ready' ? 'Get ready'
-    : `Round ${timers.currentRound} of ${config.rounds}`
+    : roundHeadline(config, timers.currentRound)
+
+  // NO PHASE WORD FOR AN EMOM. "Work" beside the clock implies a Rest it
+  // alternates with, and an EMOM has none — the interval is the whole of it.
+  // Dropped on the screen AND in the dock's chip from the same rule, because
+  // the two saying different things about one running timer is how this
+  // codebase's timer bugs have always started.
+  const phaseWord = phase === 'done'
+    ? 'Session complete'
+    : phase === 'ready' ? 'Starting'
+    : roundStyleOf(config) === 'emom' ? ''
+    : phase === 'work' ? 'Work' : 'Rest'
 
   const primaryLabel = phase === 'done' ? 'Log session' : timers.running ? 'Pause' : 'Resume'
   const onPrimary = () => {
@@ -137,7 +145,7 @@ export function RoundField() {
             // The colour IS the status here, so it has to reach a screen reader too.
             role: 'status' as const,
             'aria-live': 'polite' as const,
-            'aria-label': `${roundLabel}. ${phase === 'done' ? 'Session complete' : phase === 'work' ? 'Work' : 'Rest'}. ${formatRemaining(remainingMs)} remaining.`,
+            'aria-label': `${roundLabel}.${phaseWord ? ` ${phaseWord}.` : ''} ${formatRemaining(remainingMs)} remaining.`,
           })}
       // FIXED, NOT ABSOLUTE, and that is the whole difference between the
       // design and what shipped. An absolutely-positioned element sizes to its
@@ -179,11 +187,11 @@ export function RoundField() {
             className="font-semibold"
             style={{ fontSize: '0.9375rem', lineHeight: 1.2, color: inkSoft, maxWidth: '6ch' }}
           >
-            {phase === 'done' ? 'Session complete' : phase === 'ready' ? 'Starting' : phase === 'work' ? 'Work' : 'Rest'}
+            {phaseWord}
           </span>
         </div>
         <p style={{ margin: '0.375rem 0 0', fontSize: '1.0625rem', lineHeight: 1.35, color: ink, maxWidth: '26ch' }}>
-          {subline(phase, timers.currentRound, config)}
+          {subline(config, phase, timers.currentRound)}
         </p>
       </div>
 

@@ -2,6 +2,56 @@
 
 Newest first. One line each.
 
+- [x] **EMOM, BUILT — AND THE REASON I GAVE FOR NOT BUILDING IT WAS WRONG.**
+  Ashley, 12 Sep 2026: *"finish the emom clock"*. Earlier the same day I had
+  told her, in the app, in a code comment and in the entry below, that EMOM
+  *"needs a different kind of clock — its rest is whatever remains of the
+  minute, which this engine has no way to express"*.
+  **IT EXPRESSES IT EXACTLY, AND ALWAYS DID.** First thing done here was to run
+  `computeRoundState` with `{ rounds: 10, workSeconds: 60, restSeconds: 0 }`:
+  the cycle IS the interval, the phase never leaves 'work', a new minute begins
+  at every boundary, and it completes at exactly 600s. **How I got it wrong:** I
+  reasoned about the PROTOCOL — "you rest whatever is left of the minute" — and
+  concluded from that sentence that the engine needed a variable rest phase.
+  The timer never tracks that rest; the athlete does. I asserted an engine
+  limitation without running the engine, which is the same shape of error as
+  fixing from a written finding without re-measuring, one rule over.
+  **What actually blocked EMOM was two lines of UI:** `handleStart` clamped rest
+  with `Math.max(1, ...)`, so zero was untypeable; and nothing called an
+  interval a minute.
+  **Built:** `RoundConfig.style?: 'intervals' | 'emom'`, read as
+  `?? 'intervals'` everywhere for the same reason `leadInSeconds` is — a round
+  already in flight from a persisted record must keep behaving as it started.
+  The flag decides ONLY the words, which is why it exists rather than inferring
+  from `restSeconds === 0`: "Minute 3 of 10" is right for a 60-second EMOM and
+  wrong for eight continuous 40-second intervals, and the numbers cannot tell
+  those apart. Two presets (EMOM 10×60s, E2MOM 10×120s — the second is there so
+  the table proves the interval is not always sixty). The setup form drops to
+  two boxes for an EMOM (Minutes / Every (s)) rather than showing a Rest box
+  with a zero in it, and says what the protocol is in a line underneath.
+  **ONE WORDING RULE, ONE PLACE.** `roundSubline`, `roundHeadline`,
+  `roundDoneLabel` and `intervalNoun` moved into `timer-engine.ts` because an
+  EMOM needed a second version of every sentence, and two copies is how the
+  dock's chip and the full-screen field come to call one running timer by two
+  different names. The phase word ("Work") is dropped for an EMOM on BOTH — it
+  implies a Rest it alternates with.
+  **Three `test:timer-field` checks failed on improved code** and were
+  re-anchored on the property, old anchors recorded in place: they pinned the
+  literal ternary that built the phase word and the literal
+  `${config.restSeconds}s rest next` inside RoundField, both of which moved.
+  **The tile says EMOM again, and this time there is one.** The §4 check that
+  forbade the word is keyed on the ENGINE, not a hardcoded no — building the
+  preset is what let the word back, exactly as that check's comment promised.
+  Its claim-matcher also had to learn all-caps: `[A-Z][a-z]+` cannot see
+  "EMOM", so the one claim that started this would have slipped through the
+  check written to catch it.
+  **9 mutations tried, 9 caught**, including deleting the preset while leaving
+  the word on the tile, and restoring the `Math.max(1, ...)` clamp that was the
+  real blocker. Driven live at 390×844: EMOM tapped, started, countdown
+  skipped, and the running screen read "MINUTE 1 OF 10" with no rest phase and
+  no rest promised underneath — screenshot read.
+  **Frontend only.** No migration, no function deploy.
+
 - [x] **THE TOOLS TILE NAMED THREE TIMERS AND THE APP HAD NONE OF THEM.**
   Ashley, 12 Sep 2026, from the live app: *"under rest timers the app shows
   emom and tabata but these timers dont exist"*. Measured: behind

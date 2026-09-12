@@ -23,7 +23,7 @@
 import { readFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import { computeRoundState, totalRoundSeconds } from '../src/lib/timer-engine'
+import { computeRoundState, totalRoundSeconds, roundSubline } from '../src/lib/timer-engine'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 let failures = 0
@@ -107,6 +107,7 @@ console.log('\n4. The field is coloured from tokens, never from hexes')
 console.log('\n5. It says what it is doing, out loud and truthfully')
 {
   const field = stripComments(readFileSync(join(ROOT, 'src/components/timers/RoundField.tsx'), 'utf8'))
+  const engine = stripComments(readFileSync(join(ROOT, 'src/lib/timer-engine.ts'), 'utf8'))
   // Colour alone is not a signal for everyone.
   // RE-ANCHORED 11 Sep 2026, when the get-ready countdown arrived. These read
   // `role="status"` and `aria-label={`${roundLabel}` as literal attributes;
@@ -116,7 +117,18 @@ console.log('\n5. It says what it is doing, out loud and truthfully')
   // property. Anchored on the property now: the running field still announces
   // itself, and the countdown announces itself as something you can activate.
   check('the state is announced, not only coloured', /role: 'status'/.test(field) && /aria-live/.test(field))
-  check('...naming the round, the phase and the time', /\$\{roundLabel\}\. \$\{phase === 'done'/.test(field))
+  // RE-ANCHORED AGAIN 12 Sep 2026, when EMOM arrived. This read
+  // `${roundLabel}. ${phase === 'done'` — the exact inline ternary that built
+  // the phase word. An EMOM has no Work/Rest to name, so that word became a
+  // `phaseWord` computed above and the ternary went; the check failed on a
+  // component that had gained a state, not lost the property. The property is
+  // that the announcement carries the round, the phase (when there is one) and
+  // the remaining time — pinned on the three parts, not on how they are joined.
+  check('...naming the round, the phase and the time',
+    /aria-label': `\$\{roundLabel\}/.test(field) && /\$\{phaseWord/.test(field)
+    && /formatRemaining\(remainingMs\)\} remaining/.test(field))
+  check('...and an EMOM announces no phase, because it has none',
+    /roundStyleOf\(config\) === 'emom' \? ''/.test(field))
   check('the countdown is announced as a control, not just a colour',
     /role: 'button'/.test(field) && /Activate to start now/.test(field))
   check('...and is operable from a keyboard, not only a tap',
@@ -125,10 +137,24 @@ console.log('\n5. It says what it is doing, out loud and truthfully')
 
   // THE LAST ROUND HAS NO REST AFTER IT. The prototype's copy promised one on
   // every work phase, which is untrue on the final round.
+  // MOVED INTO THE ENGINE 12 Sep 2026 — an EMOM needed a second version of
+  // every one of these sentences, and two copies of the wording is how the
+  // dock's chip and this field would come to disagree about one running
+  // timer. So the property is now checked where it lives, behaviourally,
+  // rather than by regex over the component: roundSubline is a pure function
+  // and test:round-presets §6 drives it. These two keep watch on the same
+  // rule from here — the last interval promises nothing after it, and an
+  // earlier one names the REAL rest length. (Previously anchored on the
+  // literals `Last round` and `${config.restSeconds}s rest next` inside
+  // RoundField.)
+  const eight = { rounds: 8, workSeconds: 20, restSeconds: 10 }
   check('the final round does not promise a rest that never comes',
-    /round >= config\.rounds/.test(field) && /Last round/.test(field))
+    /Last \$\{noun\}/.test(engine) && !/rest next/.test(roundSubline(eight, 'work', 8)),
+    roundSubline(eight, 'work', 8))
   check('...and earlier rounds name the REAL rest length, not a fixed number',
-    /\$\{config\.restSeconds\}s rest next/.test(field))
+    roundSubline(eight, 'work', 3).includes('10s rest next'), roundSubline(eight, 'work', 3))
+  check('...and the field takes that wording from the engine, not a second copy',
+    /const subline = roundSubline/.test(field))
   check('the clock ceils, so it never reads 0:00 with time left',
     /Math\.ceil\(ms \/ 1000\)/.test(field))
 }

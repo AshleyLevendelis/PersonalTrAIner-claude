@@ -119,8 +119,12 @@ export function ToolsTab({ profileId, mealPools, targets, softLikedFoods, todays
       // Asked whether to correct the label or build the timers, she chose
       // BUILD (12 Sep 2026): the presets are real now — ROUND_PRESETS in
       // timer-engine.ts — so this subtitle names two of them and is true.
-      // EMOM is deliberately still absent and deliberately still unnamed.
-      label: 'Rounds & intervals', sub: 'Tabata, boxing rounds, your own', icon: TimerReset,
+      // EMOM followed on the same day, on her "finish the emom clock" — and
+      // needed no new engine at all: with rest 0 the cycle IS the interval,
+      // which computeRoundState always handled. See RoundConfig.style for the
+      // wrong reason I gave for leaving it out. So the word is back on this
+      // tile, and this time there is one behind it.
+      label: 'Rounds & intervals', sub: 'Tabata, EMOM, boxing rounds', icon: TimerReset,
       onClick: () => { timers.setMode('round'); setTimerOpen(true) },
     },
     {

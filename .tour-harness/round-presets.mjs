@@ -47,7 +47,11 @@ const fields = () => ev(`(() => {
   for (const l of document.querySelectorAll('label')) {
     const key = l.textContent.replace(/\\s*\\(s\\)/, '').trim().toLowerCase()
     const i = l.querySelector('input')
-    if (i && /rounds|work|rest/.test(key)) out[key] = i.value
+    if (i && /rounds|work|rest|minutes|intervals|every/.test(key)) {
+      // Normalised to the interval-timer names so one reader covers both
+      // layouts: an EMOM calls them Minutes and Every (s).
+      out[key === 'minutes' || key === 'intervals' ? 'rounds' : key] = i.value
+    }
   }
   return out
 })()`)
@@ -56,8 +60,10 @@ console.log('\nONE-TAP PRESETS, ON THE REAL SCREEN\n')
 await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off#/tab/tools` })
 await wait(4000)
 
-check('0. the Tools tile no longer advertises EMOM',
-  !/EMOM/i.test(await ev(`document.body.innerText`)), (await ev(`document.body.innerText`)).match(/Rounds & intervals[^\n]*\n[^\n]*/)?.[0])
+// The tile says EMOM again — and now there is one. Checked as "says it AND
+// has it", so deleting the preset while leaving the word fails here too.
+const tileText = (await ev(`document.body.innerText`)).match(/Rounds & intervals[^\n]*\n[^\n]*/)?.[0] ?? ''
+check('0. the Tools tile names EMOM', /EMOM/.test(tileText), tileText)
 check('1. the rounds tile opens', await clickText('/Rounds & intervals/'))
 await wait(900)
 
@@ -95,6 +101,44 @@ const small = await ev(`(() => [...document.querySelectorAll('[data-preset]')]
 check('9. every preset button is big enough to hit', Array.isArray(small) && small.length === 0, small)
 
 await shoot('round-presets-tabata')
+
+// --- EMOM, THE ONE THAT WAS ADVERTISED AND ABSENT ---------------------------
+// Run for real against the wall clock. No dev clock: getAppNow returns a
+// FROZEN noon whenever an override is set, so a pinned harness would show a
+// countdown that never moves and prove nothing (the lead-in driver records
+// the same trap).
+console.log('\n  EMOM')
+check('10. there is an EMOM button now', await tap('[data-preset="emom"]'))
+await wait(600)
+const emomFields = await fields()
+check('11. ...and it is ten sixty-second intervals', emomFields.rounds === '10' && emomFields.every === '60', emomFields)
+check('12. ...with NO rest box to fill in, because an EMOM has no rest',
+  emomFields.rest === undefined, emomFields)
+const emomText = await ev(`document.body.innerText`)
+check('13. the form counts them in MINUTES, not rounds',
+  /\bMinutes\b/.test(emomText) && !/Work \(s\)/.test(emomText),
+  (emomText.match(/Minutes[\s\S]{0,60}/) || ['not found'])[0])
+check('14. ...and says plainly what the protocol is',
+  /whatever is left is your rest/i.test(emomText), null)
+await shoot('round-presets-emom')
+
+// A ten-minute EMOM with a ten-second lead-in: start it, skip the countdown,
+// and read what the running screen calls the interval.
+check('15. Start is pressed', await clickText('/^Start$/'))
+await wait(1200)
+check('16. it counts you in first, same as any round', await ev(`/GET READY/i.test(document.body.innerText)`),
+  (await ev(`document.body.innerText`)).slice(0, 120))
+check('17. tapping skips the countdown', await tap('[role="button"][aria-label^="Get ready"]'))
+await wait(1200)
+const running = await ev(`(() => { const n = document.querySelector('[role="status"][aria-label*="inute"], [role="status"][aria-label*="Round"]'); return n ? n.getAttribute('aria-label') : document.body.innerText.slice(0, 200) })()`)
+check('18. the running screen says MINUTE, not Round', /Minute 1 of 10/.test(running ?? ''), running)
+check('19. ...and never shows a REST phase', !/rest/i.test(running ?? ''), running)
+const sub = await ev(`document.body.innerText`)
+check('20. the line under it promises no rest either',
+  /next one starts/i.test(sub) && !/\ds rest next/.test(sub),
+  (sub.match(/Minute 1 of 10[^\n]*/) || sub.match(/next one starts[^\n]*/) || ['not found'])[0])
+await shoot('round-presets-emom-running')
+
 const err = await ev(`window.__lastError ?? null`)
 check('no uncaught error on the page', err === null || err === undefined, err)
 
