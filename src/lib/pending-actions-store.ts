@@ -42,6 +42,19 @@ export interface ProposalDiff {
   implications?: { severity: 'info' | 'warn'; text: string }[]
   rationale?: string
   editable?: { field: string; options: string[] }[]
+  /**
+   * NEAREST THINGS THAT KEEP THE BAR, offered beside the change rather than
+   * instead of it. Ashley's ruling, 12 Sep 2026: taking a food out of a meal
+   * says what it costs AND offers 2-3 specific swaps, because on a phone the
+   * alternative is typing a food name into a box. Declining is a first-class
+   * outcome — these are an offer, never a correction.
+   *
+   * `prompt` is what tapping one asks for, in her words, so the same list
+   * works on the card (send it as a message) and on the screen (open the
+   * replace flow with it). Every entry here has already passed the same
+   * verification the confirm will run — see meal-food-edit.ts.
+   */
+  alternatives?: { label: string; note: string; prompt: string }[]
   reversible?: boolean
 }
 

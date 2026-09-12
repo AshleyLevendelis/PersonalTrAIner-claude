@@ -38,6 +38,27 @@ export function isScaleFactorAbsurd(scaleFactor: number): boolean {
 }
 
 /**
+ * THE SAME LINE, A DIFFERENT AMOUNT — "122g chicken" with 90 becomes
+ * "90g chicken". Everything after the number is preserved verbatim, and that
+ * is the point.
+ *
+ * The first version of this went the other way: parse the line to
+ * {name, quantity, unit} and render it back. It loses her words. The parser
+ * normalises "3 slices wholemeal bread" to unit "slice", so the round trip
+ * returned "3 slice wholemeal bread" — the macros were identical, but the
+ * ingredient list she reads is written in the app's grammar instead of hers.
+ * Resizing only ever changes the number, so only the number is touched.
+ *
+ * Returns null when there is no leading amount to replace, which is the
+ * honest outcome for a line like "salt to taste": there is nothing to resize.
+ */
+export function withQuantity(line: string, quantity: number): string | null {
+  const m = /^(\s*)(\d+(?:\.\d+)?)/.exec(line)
+  if (!m) return null
+  return `${m[1]}${quantity}${line.slice(m[0].length)}`
+}
+
+/**
  * Scales every ingredient line's quantity by scaleFactor, using the same
  * per-unit rounding conventions as macro-calibration's string scaler: gram/ml
  * quantities round to the nearest whole unit, tbsp/tsp round to one decimal,
