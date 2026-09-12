@@ -2,6 +2,73 @@
 
 Newest first. One line each.
 
+- [x] **ONE FOOD IN A MEAL: TAKE IT OUT, SWAP IT, RESIZE IT — BOTH SURFACES.**
+  Ashley, asked on 12 Sep 2026 what to build next, chose *"make meals as
+  adjustable as workouts"*. A workout could have an exercise swapped, banned,
+  removed or moved. A meal could be swapped whole, regenerated, or have a food
+  added — and nothing else. CLAUDE.md's own must-have list marked all three of
+  these `MISSING`, which breaks its rule 1.
+  **ONE PIPELINE, NOT A NEW ONE.** `meal-food-add.ts` established it and all
+  three operations are that pipeline with a different ingredient array: remove
+  is the lines minus one, replace is minus one plus one, resize is one line's
+  number changed. Everything goes through `verifyProposal` in keepPortions mode
+  — food-DB resolution, the coverage floor, the dislike filter,
+  `validateMealAgainstDiet` — and out as a `PoolOption` confirmed through the
+  same executor with the same undo. The module makes exactly ONE call to that
+  verifier and all three builders reach it through one `settle()`.
+  **DECISION (Ashley, 12 Sep 2026) — what a removal says.** Options put to her:
+  remove quietly; say what it costs and offer to replace it; or grow the other
+  meals to cover the gap. She chose the middle; the third is *"the one thing the
+  app has always refused to do"*. Decline the offer and the day comes in lighter
+  and the rings show that honestly.
+  **DECISION (Ashley, 12 Sep 2026) — what the offer contains.** Options: two or
+  three specific foods; a generic "tell me what you'd like instead"; or specific
+  on screen and generic in chat. She chose **specific in both** — on a phone the
+  generic version means typing a food name into a box.
+  So the swaps are named, and they are built out of the existing pipeline rather
+  than beside it: **each candidate is run through the replace builder and kept
+  only if it comes back accepted.** An offer is a claim that the confirm will
+  succeed; the only honest way to make it is to run the confirmation. No second
+  filter to be wrong. Ranked by what she is already being served first, then by
+  whole-macro-profile distance — ranking on the dominant macro alone offered
+  anchovies and beef jerky in place of a chicken breast. Portions held to half
+  to two-and-a-half times the amount removed, because within one category the
+  densities span fourteen-fold and 870g of silken tofu is an arithmetically
+  perfect match for a scoop of whey.
+  **BOTH SURFACES, and neither a stub.** Coach: three courier tools with prompt
+  rules separating them from the three doors that already existed; client: three
+  propose branches, one executor, one undo. Screen: every ingredient line is now
+  a control, with the same three verbs, the same card and the same offer.
+  **THE BROWSER FOUND WHAT NOTHING ELSE COULD.** Every unit check was green
+  while the edit did not reach the screen at all: an edited meal kept the
+  ORIGINAL's name, a pick is stored and resolved by name, so the new option was
+  indistinguishable from the old one and the tab went on rendering the old one.
+  The write landed in the database and nowhere else. `meal-food-add` had it
+  right all along — "Chicken & Rice + banana" — and the three edits now name
+  themselves the same way. Also lifted the pool-write → pick →
+  roll-back-on-failure sequence out of the chat into `applyMealOptionToSlot` so
+  the screen runs the identical one.
+  **Gates:** `test:meal-food-edit` (69 checks) — **10 mutations tried, 10
+  caught**, and TWO of those were missed on the first pass, both real holes: a
+  flat 10g portion floor was doing the same job as the trace-ingredient guard so
+  breaking the guard changed nothing, and the portion check only looked at cases
+  the ranking already keeps in range. Both re-pinned with fixtures that force
+  the far candidate to the front. `verify:meal-food-edit` — a real Chromium at
+  390x844 opens a meal, takes a food out, reads the cost and the offered swaps
+  off the screen, applies, and asserts the meal AND the day moved by the number
+  the card promised and nothing else on the tab moved with them: **6 mutations
+  tried, 6 caught**.
+  **DEVIATION FROM THE PLAN, stated:** the plan said extend
+  `test:food-dislike-is-a-ban` and `test:diet-tag-sync` to the new entry points.
+  Re-measured: neither guards entry points — one is about the dislike matcher
+  and the other about the food database's tags. The entry-point behaviour is
+  covered in `test:meal-food-edit` §6 instead.
+  **NOT BUILT, named:** moving a meal to another slot or day. Different
+  mechanism, and it carries a question only Ashley can answer — a dinner in a
+  breakfast slot does not fit breakfast's budget.
+  **NEEDS: a `chat-gemini` deploy** for the coach half, and a merge to `main`
+  for the screen half.
+
 - [x] **"LOG SESSION" LOGGED NOTHING — A BUTTON THAT LIED, AND ITS OWN COMMENT
   SAID SO.** Ashley, 12 Sep 2026, from the live app: *"I started a round timer
   and did 3 rounds 120s each with 30s rest. When I finished, the app asked me

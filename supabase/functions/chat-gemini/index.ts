@@ -429,6 +429,95 @@ const toolDeclarations = [
     },
   },
   {
+    name: "propose_meal_food_remove",
+    description:
+      "PROPOSES taking ONE food OUT of a meal that is already on the plan — this does NOT apply the change, they tap Confirm. Call this for 'take the chicken out of my lunch', 'I don't want the olive oil in that', 'lose the rice'. Everything else in the meal keeps its exact amount and NOTHING is re-portioned to cover the gap. The card states what leaves with the food — protein, calories, the lot — and offers two or three specific swaps that would close it, each already checked against their allergies, restrictions and dislikes. Declining the swaps is a perfectly good answer: the day simply comes in lighter and the rings show that. NOT for removing a whole meal (that is propose_meal_swap or a regenerate) and NOT for a food they never want again (that is a dislike, set in Profile). Never state the macro cost yourself — the card carries the app's own verified numbers.",
+    parameters: {
+      type: "object",
+      properties: {
+        meal_slot: {
+          type: "string",
+          description: "Which of today's meals is being changed: breakfast, lunch, dinner or snack.",
+        },
+        food: {
+          type: "string",
+          description: "The food ALREADY IN that meal the user is talking about, in their words — 'the chicken', 'rice', 'the olive oil'. The app matches it against the meal's own ingredient list and asks which one they mean rather than guessing if two could match. Do not include an amount here.",
+        },
+        date: {
+          type: "string",
+          description: "The date the meal is for, as YYYY-MM-DD. Omit for today.",
+        },
+        origin_verbatim_quote: {
+          type: "string",
+          description: "The exact substring of the user's CURRENT message asking for the food to come out. Must be copied verbatim, not paraphrased.",
+        },
+      },
+      required: ["meal_slot", "food", "origin_verbatim_quote"],
+    },
+  },
+  {
+    name: "propose_meal_food_replace",
+    description:
+      "PROPOSES swapping ONE food inside a meal for a different one, at the amount the user states — this does NOT apply the change, they tap Confirm. Call this for 'swap the rice for potato', 'use turkey instead of the chicken', 'can I have sweet potato there instead'. Everything else in the meal is untouched. THE NEW FOOD NEEDS AN AMOUNT: if they didn't say one, ask ('How much — grams, or a count like 2 eggs') and call the tool only once you have it. Never guess the amount. The whole meal is re-checked against their allergies, restrictions and dislikes, and the app refuses rather than confirms if the new food clashes — so never promise it will work before the card says so, and never state macros yourself.",
+    parameters: {
+      type: "object",
+      properties: {
+        meal_slot: {
+          type: "string",
+          description: "Which of today's meals is being changed: breakfast, lunch, dinner or snack.",
+        },
+        food: {
+          type: "string",
+          description: "The food ALREADY IN that meal the user is talking about, in their words — 'the chicken', 'rice', 'the olive oil'. The app matches it against the meal's own ingredient list and asks which one they mean rather than guessing if two could match. Do not include an amount here.",
+        },
+        with_food: {
+          type: "string",
+          description: "What goes in instead, WITH THE USER'S STATED AMOUNT — '150g sweet potato', '2 eggs', '30g cheddar'. Everyday food names; the app matches them against its food database and refuses rather than guessing. Do not choose the food or the amount for them.",
+        },
+        date: {
+          type: "string",
+          description: "The date the meal is for, as YYYY-MM-DD. Omit for today.",
+        },
+        origin_verbatim_quote: {
+          type: "string",
+          description: "The exact substring of the user's CURRENT message asking for the swap. Must be copied verbatim, not paraphrased.",
+        },
+      },
+      required: ["meal_slot", "food", "with_food", "origin_verbatim_quote"],
+    },
+  },
+  {
+    name: "propose_meal_food_resize",
+    description:
+      "PROPOSES changing HOW MUCH of one food is in a meal, keeping the food itself — this does NOT apply the change, they tap Confirm. Call this for 'make it 150g of rice', 'halve the chicken', 'I only had 60g of that'. Only the amount moves; everything else in the meal stays exactly as it is. Pass the NEW amount as a number in the line's own units — if they said 'halve it' or 'double it', work out the number from the amount currently in the meal and pass that, never the words. A food with no amount on it (a pinch of salt) cannot be resized and the app will say so and offer to swap it instead. Never state the new macros yourself; the card carries the app's own.",
+    parameters: {
+      type: "object",
+      properties: {
+        meal_slot: {
+          type: "string",
+          description: "Which of today's meals is being changed: breakfast, lunch, dinner or snack.",
+        },
+        food: {
+          type: "string",
+          description: "The food ALREADY IN that meal the user is talking about, in their words — 'the chicken', 'rice', 'the olive oil'. The app matches it against the meal's own ingredient list and asks which one they mean rather than guessing if two could match. Do not include an amount here.",
+        },
+        amount: {
+          type: "number",
+          description: "The NEW amount, as a plain number in the same unit the line already uses — 150 for '150g rice', 2 for '2 eggs'. Not a delta, not a multiplier, not a string with the unit in it.",
+        },
+        date: {
+          type: "string",
+          description: "The date the meal is for, as YYYY-MM-DD. Omit for today.",
+        },
+        origin_verbatim_quote: {
+          type: "string",
+          description: "The exact substring of the user's CURRENT message asking for the amount to change. Must be copied verbatim, not paraphrased.",
+        },
+      },
+      required: ["meal_slot", "food", "amount", "origin_verbatim_quote"],
+    },
+  },
+  {
     name: "propose_exercise_swap",
     description:
       "PROPOSES swapping an exercise in the user's workout plan for a biomechanically similar alternative — this does NOT apply the change. Call this when the user gives an explicit command to modify their plan (e.g. 'swap bench press for push-ups', 'replace squats with leg press') OR proposes a swap due to pain/fatigue that the user has confirmed. The app shows the user a card with the exact before/after and they tap Confirm themselves — do not describe the swap as already done, and do not ask for a SEPARATE confirmation in your own text (the card IS the confirmation step). origin_verbatim_quote must be the exact substring of the user's message that makes this an imperative request, not a paraphrase.",
@@ -1651,7 +1740,7 @@ When the user tells you about something they do OUTSIDE this plan on a regular w
   - Feel/effort check-ins: "how did that feel?" / "how's the shoulder holding up?" -> "Easy" | "About right" | "Hard" (adapt wording to what was actually asked)
   - A named choice between two or more specific things you just mentioned (exercises, meals, days) — the options ARE the names, e.g. asking whether they meant Front Squat or Back Squat -> "Front Squat" | "Back Squat"
   - Scope questions: "just today, or the rest of the block?" -> "Today only" | "Rest of block"
-  Do NOT add the tag when the question is genuinely open-ended — asks for a number, a description, a reason, or anything where the honest answer space isn't a short known set (e.g. "how much did you lift?", "what's been going on?"). When in doubt: if you could plausibly render the answer as 2-4 short buttons without stripping out anything the user might actually want to say, add it — free text is always still available underneath either way. Plan-mutation proposals (propose_exercise_swap, propose_meal_swap, propose_meal_addition, propose_injury_adaptation, propose_equipment_adaptation, propose_volume_change, propose_schedule_change, propose_style_change, propose_concurrent_activity, propose_rest_day, propose_custom_meal, propose_meal_food_add) already render their own Confirm/Not-now buttons via the card — never add a redundant [QUICK_REPLIES] tag to those turns. The one exception is the equipment-clarifying question itself (§3b) — that's asked BEFORE the tool call, not on the proposal turn, so it gets a normal [QUICK_REPLIES] tag.
+  Do NOT add the tag when the question is genuinely open-ended — asks for a number, a description, a reason, or anything where the honest answer space isn't a short known set (e.g. "how much did you lift?", "what's been going on?"). When in doubt: if you could plausibly render the answer as 2-4 short buttons without stripping out anything the user might actually want to say, add it — free text is always still available underneath either way. Plan-mutation proposals (propose_exercise_swap, propose_meal_swap, propose_meal_addition, propose_injury_adaptation, propose_equipment_adaptation, propose_volume_change, propose_schedule_change, propose_style_change, propose_concurrent_activity, propose_rest_day, propose_custom_meal, propose_meal_food_add, propose_meal_food_remove, propose_meal_food_replace, propose_meal_food_resize) already render their own Confirm/Not-now buttons via the card — never add a redundant [QUICK_REPLIES] tag to those turns. The one exception is the equipment-clarifying question itself (§3b) — that's asked BEFORE the tool call, not on the proposal turn, so it gets a normal [QUICK_REPLIES] tag.
 
 === FEW-SHOT EXAMPLES ===
 User: "Hey"
@@ -1795,6 +1884,11 @@ ${context.exercise_exclusions && context.exercise_exclusions.length > 0 ? `\nPER
 - When someone asks to swap a meal AGAIN because they didn't like the alternative either, just call propose_meal_swap again — the app tracks what it has already shown them for that slot and, once they have been through the lot, offers to go and find new ones instead of re-serving the same list. Never tell them they have run out of options yourself; you can't see the pool.
 - ADDING A MEAL vs SWAPPING ONE. A swap changes which of their EXISTING options is picked; propose_meal_addition puts a NEW dish into the plan. "Add salmon to my dinners", "can I have overnight oats for breakfast", "put a curry in for Friday" are ADDITIONS — use propose_meal_addition. "Swap my lunch", "change breakfast to something else", "give me the other one" are SWAPS. If they name a dish that isn't already one of their options, it is an addition, not a swap.
 - A FOOD JOINING A MEAL IS NEITHER. "Add a banana to my breakfast", "put 100g of rice with my dinner", "can I have an egg with lunch" — the meal on the plan stays as it is and the food joins it: call propose_meal_food_add with the food and its amount. Do not route these to propose_meal_addition (that would try to portion "Banana" as a whole meal and refuse) or to propose_custom_meal (that replaces the meal). If no amount is stated, ask how much — one question — then call it.
+- CHANGING ONE FOOD ALREADY IN A MEAL IS A FOURTH THING, and there are three of them. The meal keeps its place on the plan and everything else in it keeps its exact amount; only the one food moves. "Take the chicken out of my lunch", "I don't want the olive oil in that" is propose_meal_food_remove. "Swap the rice for potato", "use turkey instead" is propose_meal_food_replace. "Make it 150g of rice", "halve the chicken" is propose_meal_food_resize. Say which food they mean in THEIR words — "the chicken", not "122g raw chicken breast" — and the app finds the line; if two things in the meal could match it will come back and ask, which is the right answer, not a failure.
+- WHICH OF THE FOUR. Joining = propose_meal_food_add. Leaving = remove. One for another = replace. Same food, different amount = resize. If they say "swap X for Y" they mean replace, NOT remove followed by add: two cards for one change is the app arguing with itself.
+- A REMOVAL COSTS SOMETHING AND THE CARD SAYS SO, so you must not. Never state what comes out in protein or calories, and never reassure them it "won't make much difference" — you cannot see the number and the card can. It also offers two or three specific swaps that would close the gap, already checked against their allergies and dislikes, so do not list alternatives of your own beside it. If they take none of them the day comes in lighter and that is a fine outcome; say so plainly if they ask, without talking them into a replacement.
+- A RESIZE NEEDS A NUMBER, not the word. "Halve the rice" is a resize, but the tool takes the new amount: read what is in the meal, work out the half, and pass that. If you cannot see the amount, ask what they want it to be rather than guessing at a multiplier.
+- NOT EVERY "I don't want X" IS A REMOVAL. Once, in this meal, is a removal. Never again, in anything is a DISLIKE — you cannot set those, so say the Profile screen holds their foods-to-avoid list and that adding it there keeps it out of every future plan.
 - A QUESTION ABOUT WHAT TO EAT IS ANSWERED, NEVER PROPOSED. "What should I eat before training?", "what's a good breakfast?", "what would give me energy tonight?" ask for advice, not for their plan to change. Answer in plain words — name a food or two and say when to have it — then, if a dish would genuinely suit, ONE line offering it: "want it in your plan? say the word and I'll add it." No tool call, no card. Ashley's ruling, 8 Sep 2026, after "What should I eat?" produced a card that would have replaced her lunch: her words were "I dont want you ro log anything um simply asking a question." The same rule the other plan tools already carry, applied to the one that lacked it. propose_meal_addition now requires origin_verbatim_quote and the app checks it: a question produces no card whatever you send.
 - Nor does a question about food route to log_meal. That tool is for food they NAMED — what they ate, or what a specific dish comes to. "What should I eat?" names nothing, so there is nothing to compute; answer it.
 - A question about whether something WAS or IS a good choice ("was that a good idea", "is that ok before training", "should I have skipped the toast") is a COACHING question about food they named. Call log_meal with intent 'question' so the numbers are real, then answer the question when the result comes back — your verdict first, in plain words; the numbers second, and only if they help.
@@ -2322,6 +2416,72 @@ Keep this context in mind to ensure your greetings and questions naturally align
               rawArgs: {
                 meal_slot: args.meal_slot,
                 food_lines: args.food_lines,
+                date: args.date,
+                origin_verbatim_quote: args.origin_verbatim_quote,
+              },
+            },
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // CHANGING ONE FOOD INSIDE A MEAL — couriers, all three, exactly like
+      // propose_meal_food_add above. The client holds the meal that is
+      // actually in the slot, edits its ingredient list, and runs the result
+      // through verifyProposal in keepPortions mode. I1 holds: the server
+      // writes nothing and forwards raw args untouched.
+      //
+      // THREE TOOLS RATHER THAN ONE WITH A MODE, because the model picks a
+      // tool far more reliably than it fills an enum, and because each one
+      // has genuinely different required arguments — a replacement needs the
+      // food going in, a resize needs a number, a removal needs neither.
+      if (name === "propose_meal_food_remove") {
+        return new Response(
+          JSON.stringify({
+            reply: "",
+            proposal: {
+              kind: "propose_meal_food_remove",
+              rawArgs: {
+                meal_slot: args.meal_slot,
+                food: args.food,
+                date: args.date,
+                origin_verbatim_quote: args.origin_verbatim_quote,
+              },
+            },
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (name === "propose_meal_food_replace") {
+        return new Response(
+          JSON.stringify({
+            reply: "",
+            proposal: {
+              kind: "propose_meal_food_replace",
+              rawArgs: {
+                meal_slot: args.meal_slot,
+                food: args.food,
+                with_food: args.with_food,
+                date: args.date,
+                origin_verbatim_quote: args.origin_verbatim_quote,
+              },
+            },
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (name === "propose_meal_food_resize") {
+        return new Response(
+          JSON.stringify({
+            reply: "",
+            proposal: {
+              kind: "propose_meal_food_resize",
+              rawArgs: {
+                meal_slot: args.meal_slot,
+                food: args.food,
+                amount: args.amount,
                 date: args.date,
                 origin_verbatim_quote: args.origin_verbatim_quote,
               },

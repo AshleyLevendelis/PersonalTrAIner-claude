@@ -15,10 +15,18 @@ export function ProposalCard({
   pendingAction,
   onConfirm,
   onReject,
+  onAlternative,
 }: {
   pendingAction: ChatPendingActionView
   onConfirm: (editedScope?: string) => Promise<void>
   onReject: () => Promise<void>
+  /**
+   * Ask for one of the nearest things instead. Sends the alternative's own
+   * wording as a message, so it comes back as an ordinary proposal with its
+   * own card and its own Confirm — a swap is a different change, not a
+   * variant of this one, and must not ride in on this card's tap.
+   */
+  onAlternative?: (prompt: string) => void
 }) {
   const { diff, status } = pendingAction
   const [scope, setScope] = useState<string | undefined>(diff.editable?.find(e => e.field === 'scope')?.options[0])
@@ -97,6 +105,33 @@ export function ProposalCard({
           <span>{imp.text}</span>
         </p>
       ))}
+
+      {diff.alternatives && diff.alternatives.length > 0 && onAlternative && !isTerminal && !isStale && (
+        /* THE NEAREST THINGS THAT KEEP THE BAR. Ashley's ruling, 12 Sep 2026:
+           taking a food out of a meal names two or three specific swaps
+           rather than inviting her to type one, because on a phone typing a
+           food name into a box is the thing that does not happen. Every entry
+           here has already been verified against her allergies and dislikes
+           by the builder that produced it.
+           Below the implications and above the buttons: it is an offer that
+           goes with the cost, and it must not look like the primary action —
+           declining is a perfectly good answer. */
+        <div className="flex flex-col gap-1.5 pt-0.5">
+          <span className="text-[0.59375rem] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Or put in instead</span>
+          {diff.alternatives.map(alt => (
+            <button
+              key={alt.label}
+              type="button"
+              className="flex min-h-[44px] items-center justify-between gap-3 rounded-xl bg-[color:var(--surface-raised)] px-3 text-left disabled:opacity-60"
+              onClick={() => onAlternative(alt.prompt)}
+              disabled={busyOverall}
+            >
+              <span className="text-[0.84375rem] font-medium">{alt.label}</span>
+              <span className="shrink-0 text-[0.625rem] text-muted-foreground">{alt.note}</span>
+            </button>
+          ))}
+        </div>
+      )}
 
       {diff.rationale && <p className="text-xs italic text-muted-foreground">"{diff.rationale}"</p>}
 

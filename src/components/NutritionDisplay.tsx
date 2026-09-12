@@ -99,6 +99,8 @@ export interface NutritionDisplayProps {
   onDismissRegenerateError?: () => void
   /** The compiled avoid-list — the same value generation is given, so the meals shown are judged by the rule that produced them. */
   avoidFoods?: string[]
+  /** Makes a verified option the slot's meal and says whether it landed — the one pick path, shared with the coach. */
+  onMealPickApplied?: (slot: MealSlotName, chosenName: string) => Promise<boolean>
   /** Surfacing round — a dietary_preferences value the app can't enforce. Distinct from mealRegenerateError: not dismissable, routes to Profile instead of offering a retry. */
   unrecognisedDietaryRestrictions?: string[] | null
   onFixDietaryRestrictions?: () => void
@@ -111,7 +113,7 @@ export interface NutritionDisplayProps {
 
 export function NutritionDisplay({
   profile, macros, exercisePlan = [], latestWeightKg, onMacroModeChange, onMacroSplitChange,
-  profileId, date, pools, chosen, mealTotals, isGeneratingMeals, mealRegenerateError, onDismissRegenerateError, avoidFoods = [],
+  profileId, date, pools, chosen, mealTotals, isGeneratingMeals, mealRegenerateError, onDismissRegenerateError, avoidFoods = [], onMealPickApplied,
   unrecognisedDietaryRestrictions, onFixDietaryRestrictions,
   onSwapMealSlot, onRegenerateMealSlot, onFindMoreOptions, onRegenerateAllMeals,
 }: NutritionDisplayProps) {
@@ -401,6 +403,9 @@ export function NutritionDisplay({
         onFixDietaryRestrictions={onFixDietaryRestrictions}
         dietaryPreferences={profile.dietary_preferences}
         avoidFoods={avoidFoods}
+        mealsPerDay={profile.meals_per_day}
+        includeSnacks={profile.include_snacks}
+        onMealPickApplied={onMealPickApplied}
         onSwapSlot={onSwapMealSlot}
         onRegenerateSlot={onRegenerateMealSlot}
         onFindMoreOptions={onFindMoreOptions}

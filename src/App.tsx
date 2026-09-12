@@ -1553,6 +1553,62 @@ function App() {
     }
   }
 
+  /**
+   * A MEAL OPTION BECOMES TODAY'S PICK — one path, whoever asked for it.
+   *
+   * Was an inline prop on ChatAssistant until 12 Sep 2026, when the Nutrition
+   * screen gained the ability to change one food inside a meal and needed the
+   * identical follow-through: persist the pick, and only then move what is on
+   * screen. Returning a boolean is the point — the caller rolls its own write
+   * back when this comes back false rather than claiming a change that did
+   * not land.
+   */
+  const handleMealPickApplied = async (slot: MealSlotName, chosenName: string): Promise<boolean> => {
+    // Persist chat-confirmed swaps (and their undo, which calls
+    // this with the restored previous name) BEFORE updating the
+    // on-screen pick — awaited and checked by the caller, which
+    // downgrades the receipt to "Couldn't apply" on failure
+    // instead of claiming a swap that didn't actually land.
+    if (!profile?.id) return true
+    // An empty name means "no pick" — undoing a meal ADDITION,
+    // where the slot goes back to whatever assembleDay chose
+    // rather than to a named previous option. undoMealAddition
+    // has already cleared the stored pick, so this only has to
+    // drop the on-screen override; writing '' as a meal_name
+    // here would persist a pick for a meal that doesn't exist.
+    if (!chosenName) {
+      setManualMealPicks(prev => { const next = { ...prev }; delete next[slot]; return next })
+      return true
+    }
+    const todayDate = getSessionDateContext(profile.id).date
+    try {
+      await setMealPick(profile.id, todayDate, slot, chosenName)
+    } catch (err) {
+      console.error('onMealSwapApplied: setMealPick failed', err)
+      return false
+    }
+    setManualMealPicks(prev => ({ ...prev, [slot]: chosenName }))
+    // RE-READ THE POOL. A chat meal ADDITION inserts a brand-new
+    // option into meal_plan_slots, and mealPools was only ever
+    // refilled on load, generation, regenerate or reset — never
+    // here. So the pick pointed at a meal this component did not
+    // have (see the `mealPools[slot]?.find(...)` lookup above),
+    // it resolved to undefined, and the slot went on rendering
+    // the old dinner. Ashley, 3 Sep 2026: the coach said "Added"
+    // and the Nutrition tab did not change. The row HAD been
+    // written — only a full reload would have shown it.
+    //
+    // Re-reading rather than splicing the option in from the
+    // payload keeps one source of truth: what renders is exactly
+    // what was stored, and cannot drift from it. Harmless for a
+    // plain swap, where the pool is unchanged.
+    try {
+      setMealPools(await getPools(profile.id))
+    } catch (err) {
+      console.error('onMealSwapApplied: pool re-read failed — the write landed, the screen may lag until reload', err)
+    }
+    return true
+  }
   // ONE meal-mutation layer (M1): the UI swap goes through
   // meal-store.swapPoolMeal — the same call the chat's replace_food handler
   // makes (App.tsx handlePlanUpdate is unaffected; that path was already
@@ -2524,6 +2580,7 @@ function App() {
               unrecognisedDietaryRestrictions={unrecognisedDietaryRestrictions}
               onFixDietaryRestrictions={() => { setProfileInfoSection('dietary'); setProfileInfoOpen(true) }}
               onSwapMealSlot={handleSwapMealSlot}
+              onMealPickApplied={handleMealPickApplied}
               onRegenerateMealSlot={handleRegenerateMealSlot}
               onFindMoreOptions={handleFindMoreMealOptions}
               onRegenerateAllMeals={handleRegenerateAllMeals}
@@ -2575,52 +2632,7 @@ function App() {
               onWeightLogged={handleWeightLogged}
               onMesocycleUpdated={setMesocycle}
               onProfileChanged={patch => setProfile(prev => prev ? { ...prev, ...patch } : prev)}
-              onMealSwapApplied={async (slot, chosenName) => {
-                // Persist chat-confirmed swaps (and their undo, which calls
-                // this with the restored previous name) BEFORE updating the
-                // on-screen pick — awaited and checked by the caller, which
-                // downgrades the receipt to "Couldn't apply" on failure
-                // instead of claiming a swap that didn't actually land.
-                if (!profile?.id) return true
-                // An empty name means "no pick" — undoing a meal ADDITION,
-                // where the slot goes back to whatever assembleDay chose
-                // rather than to a named previous option. undoMealAddition
-                // has already cleared the stored pick, so this only has to
-                // drop the on-screen override; writing '' as a meal_name
-                // here would persist a pick for a meal that doesn't exist.
-                if (!chosenName) {
-                  setManualMealPicks(prev => { const next = { ...prev }; delete next[slot]; return next })
-                  return true
-                }
-                const todayDate = getSessionDateContext(profile.id).date
-                try {
-                  await setMealPick(profile.id, todayDate, slot, chosenName)
-                } catch (err) {
-                  console.error('onMealSwapApplied: setMealPick failed', err)
-                  return false
-                }
-                setManualMealPicks(prev => ({ ...prev, [slot]: chosenName }))
-                // RE-READ THE POOL. A chat meal ADDITION inserts a brand-new
-                // option into meal_plan_slots, and mealPools was only ever
-                // refilled on load, generation, regenerate or reset — never
-                // here. So the pick pointed at a meal this component did not
-                // have (see the `mealPools[slot]?.find(...)` lookup above),
-                // it resolved to undefined, and the slot went on rendering
-                // the old dinner. Ashley, 3 Sep 2026: the coach said "Added"
-                // and the Nutrition tab did not change. The row HAD been
-                // written — only a full reload would have shown it.
-                //
-                // Re-reading rather than splicing the option in from the
-                // payload keeps one source of truth: what renders is exactly
-                // what was stored, and cannot drift from it. Harmless for a
-                // plain swap, where the pool is unchanged.
-                try {
-                  setMealPools(await getPools(profile.id))
-                } catch (err) {
-                  console.error('onMealSwapApplied: pool re-read failed — the write landed, the screen may lag until reload', err)
-                }
-                return true
-              }}
+              onMealSwapApplied={handleMealPickApplied}
               onFindMoreMealOptions={handleFindMoreMealOptions}
               memoryFacts={memoryFacts}
               memoryGoals={memoryGoals}

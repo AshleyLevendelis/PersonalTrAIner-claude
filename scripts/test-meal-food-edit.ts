@@ -260,5 +260,46 @@ console.log('\n7. Nothing is written without a confirm')
     r.ok === true && r.diff.implications.some(i => /original stays/i.test(i.text)))
 }
 
+console.log('\n8. BOTH SURFACES, and neither of them a stub')
+{
+  const chat = readFileSync('supabase/functions/chat-gemini/index.ts', 'utf8')
+  const ui = readFileSync('src/components/ChatAssistant.tsx', 'utf8')
+  const card = readFileSync('src/components/chat/ProposalCard.tsx', 'utf8')
+  const types = readFileSync('src/lib/types.ts', 'utf8')
+  const KINDS = ['propose_meal_food_remove', 'propose_meal_food_replace', 'propose_meal_food_resize'] as const
+
+  for (const k of KINDS) {
+    check(`${k}: declared to the coach`, new RegExp(`name: "${k}"`).test(chat))
+    // A DECLARED TOOL THAT DECLINES IS THE HOLE ban_exercise FELL THROUGH —
+    // CLAUDE.md records that no gate tells the two apart. A courier is proved
+    // by the handler forwarding the kind back for the client to build; a stub
+    // has no such line.
+    check(`${k}: a courier, not a declining stub`,
+      new RegExp(`name === "${k}"`).test(chat) && new RegExp(`kind: "${k}"`).test(chat))
+    check(`${k}: the client builds it`, ui.includes(`'${k}'`))
+    check(`${k}: the receipt kind exists`, types.includes(`'${k}'`))
+  }
+
+  // ONE EXECUTOR AND ONE UNDO, shared with the three doors that came before.
+  // Counted rather than located: what matters is that the confirm path and
+  // the undo path each know all three, not which line they sit on.
+  for (const k of KINDS) {
+    check(`${k}: reaches the executor and the undo`, (ui.match(new RegExp(`row\\.kind === '${k}'`, 'g')) ?? []).length >= 2)
+  }
+  check('all three build through the meal-food-edit module',
+    /buildMealFoodRemoveProposal/.test(ui) && /buildMealFoodReplaceProposal/.test(ui) && /buildMealFoodResizeProposal/.test(ui))
+
+  // THE COACH IS TOLD WHICH DOOR IS WHICH. Four now share a slot and a meal,
+  // and the failure mode is a removal routed to a swap.
+  const rules = chat.slice(chat.indexOf('A FOOD JOINING A MEAL IS NEITHER'))
+  for (const k of KINDS) check(`${k}: named in the routing rules`, rules.includes(k))
+  check('...and told not to state the cost itself', /never state what comes out in protein or calories/i.test(chat))
+
+  // THE OFFER IS TAPPABLE, not a sentence. Pinned on the card reading the
+  // alternatives and calling back with the entry's own prompt.
+  check('the card renders the swaps it is given', /diff\.alternatives/.test(card) && /onAlternative\(alt\.prompt\)/.test(card))
+  check('...and the chat hands it a way to ask for one', /onAlternative=\{handleQuickReply\}/.test(ui))
+}
+
 if (failures > 0) { console.error(`\n${failures} check(s) failed`); process.exit(1) }
 console.log('\nOne food in a meal can be taken out, swapped or resized — through the same checks as everything else.\n')

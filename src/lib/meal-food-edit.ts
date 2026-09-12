@@ -59,11 +59,12 @@ export interface BuildMealFoodEditInput {
   dietaryPreferences: string[]
   dislikedFoods?: string[]
   /**
-   * Food names the app is already serving this person — every ingredient
-   * across her current meal pool. Used ONLY to order the swaps offered when a
-   * food is removed, never to filter or to verify: a suggestion still has to
-   * pass the same build as any other. Optional, and the offer degrades to
-   * macro-similarity alone without it rather than going quiet.
+   * What the app is already serving this person — the ingredient lines across
+   * her current meals, passed as they are written. Used ONLY to order the
+   * swaps offered when a food is removed, never to filter and never to
+   * verify: a suggestion still has to pass the same build as any other.
+   * Optional, and the offer degrades to macro-similarity alone without it
+   * rather than going quiet.
    */
   pantryFoods?: string[]
 }
@@ -73,6 +74,15 @@ export type MealFoodEditResult =
   | { ok: false; reason: string }
 
 const signed = (n: number, unit: string) => `${n > 0 ? '+' : ''}${n}${unit}`
+
+/**
+ * "today", not "2026-09-12". A date she can read off her own phone's clock is
+ * not information; it is the app talking to itself in front of her.
+ */
+const whenFor = (input: BuildMealFoodEditInput) => {
+  const date = normaliseDate(input.rawArgs.date, input.todayDate)
+  return date === input.todayDate ? 'today' : date
+}
 
 /**
  * The fewest foods a meal may be reduced to. One: a meal of a single food is
@@ -90,6 +100,11 @@ export const MIN_FOODS_PER_MEAL = 1
  * Ambiguity is reported, never guessed: two lines containing "chicken" is a
  * question, and picking one would silently change the wrong food.
  */
+/** Just the food, without its amount — for naming, never for matching. */
+function foodNameOf(line: string): string {
+  return parseIngredientLines([line])[0]?.name ?? line
+}
+
 export function matchIngredient(lines: string[], phrase: string):
   | { ok: true; index: number }
   | { ok: false; reason: 'not_found' | 'ambiguous'; candidates: string[] } {
@@ -147,6 +162,17 @@ function settle(
   input: BuildMealFoodEditInput,
   ctx: { slot: MealSlotName; budget: MacroTargets; meal: CurrentMealForSlot },
   ingredients: string[],
+  /**
+   * WHAT THE EDITED MEAL IS CALLED, and it must not be what the original is
+   * called. A pick is stored and resolved by meal NAME, so an edit that kept
+   * the name inserted a second option indistinguishable from the first and
+   * the screen went on rendering the original — the change landed in the
+   * database and nowhere else. Found by the browser driver, which is the only
+   * check that could have found it: every unit check here was green.
+   * meal-food-add had it right all along with "<meal> + <food>"; this is the
+   * same grammar for the other three directions.
+   */
+  name: string,
   verb: 'propose_meal_food_remove' | 'propose_meal_food_replace' | 'propose_meal_food_resize',
   headline: { field: string; before: string; after: string },
   implications: { severity: 'info' | 'warn'; text: string }[],
@@ -154,7 +180,7 @@ function settle(
   alternatives?: ProposalDiff['alternatives'],
 ): MealFoodEditResult {
   const { slot, budget, meal } = ctx
-  const proposal: RawProposal = { slot: slot as MealSlotName, name: meal.name, ingredients, prep: '', cuisine: '' }
+  const proposal: RawProposal = { slot: slot as MealSlotName, name, ingredients, prep: '', cuisine: '' }
   const rejectLog: string[] = []
   // keepPortions: every amount here is a fact — the meal's as it was served,
   // and hers wherever she has restated one.
@@ -259,9 +285,11 @@ function suggestReplacements(input: BuildMealFoodEditInput, slot: MealSlotName, 
   // passed her dietary settings and her dislikes, and she has been served
   // them. Absent that list the order is macro-similarity alone, which is
   // weaker but never wrong.
-  const pantry = new Set((input.pantryFoods ?? []).map(n => n.toLowerCase()))
+  // Substring, not equality, so a caller can hand over the ingredient LINES
+  // it already has ("122g raw chicken breast") without parsing them first.
+  const pantry = (input.pantryFoods ?? []).map(n => n.toLowerCase())
   const inPantry = (f: FoodEntry) =>
-    pantry.has(f.name.toLowerCase()) || f.aliases.some(a => pantry.has(a.toLowerCase()))
+    [f.name, ...f.aliases].some(n => pantry.some(entry => entry.includes(n.toLowerCase())))
   // Distance across ALL THREE macros in calorie terms, not just the dominant
   // one: beef jerky matches a chicken breast's protein and carries 26g of fat
   // with it, and only a whole-profile comparison notices.
@@ -319,7 +347,7 @@ export function buildMealFoodRemoveProposal(input: BuildMealFoodEditInput): Meal
   }
   const ingredients = meal.ingredients.filter((_, i) => i !== index)
   const alternatives = suggestReplacements(input, slot, removed)
-  return settle(input, c, ingredients, 'propose_meal_food_remove',
+  return settle(input, c, ingredients, `${meal.name} without ${foodNameOf(removed)}`, 'propose_meal_food_remove',
     { field: 'Taking out', before: removed, after: '—' },
     [
       // HER RULING, IN THE CARD. The numbers are on the rows above; this is
@@ -330,7 +358,7 @@ export function buildMealFoodRemoveProposal(input: BuildMealFoodEditInput): Meal
         ? { severity: 'info', text: `Tap one of the swaps below to put it in instead — or leave it out and your day just comes in lighter.` }
         : { severity: 'info', text: `Say the word and I'll put something else in its place instead — otherwise your day just comes in lighter.` },
       { severity: 'info', text: `The rest of your ${slot} keeps its amounts exactly; nothing is re-portioned to cover the gap.` },
-      { severity: 'info', text: `Becomes your ${slot} for ${normaliseDate(input.rawArgs.date, input.todayDate)}; the original stays in your ${slot} options.` },
+      { severity: 'info', text: `Becomes your ${slot} for ${whenFor(input)}; the original stays in your ${slot} options.` },
     ],
     removed,
     alternatives)
@@ -349,12 +377,12 @@ export function buildMealFoodReplaceProposal(input: BuildMealFoodEditInput): Mea
     return { ok: false, reason: `How much ${vague.join(', ')}? Grams, or counts like "2 eggs", both work.` }
   }
   const ingredients = [...meal.ingredients.slice(0, index), ...withLines, ...meal.ingredients.slice(index + 1)]
-  return settle(input, c, ingredients, 'propose_meal_food_replace',
+  return settle(input, c, ingredients, `${meal.name} with ${withLines.map(foodNameOf).join(', ')} instead of ${foodNameOf(removed)}`, 'propose_meal_food_replace',
     { field: 'Swapping', before: removed, after: withLines.join(', ') },
     [
       { severity: 'info', text: `Everything else in your ${slot} stays exactly as it is.` },
       { severity: 'info', text: `Checked against your dietary settings the same way any new meal is.` },
-      { severity: 'info', text: `Becomes your ${slot} for ${normaliseDate(input.rawArgs.date, input.todayDate)}; the original stays in your ${slot} options.` },
+      { severity: 'info', text: `Becomes your ${slot} for ${whenFor(input)}; the original stays in your ${slot} options.` },
     ],
     withLines.join(', '))
 }
@@ -375,11 +403,11 @@ export function buildMealFoodResizeProposal(input: BuildMealFoodEditInput): Meal
   }
   if (after === before) return { ok: false, reason: `Your ${slot} already has ${before}.` }
   const ingredients = [...meal.ingredients.slice(0, index), after, ...meal.ingredients.slice(index + 1)]
-  return settle(input, c, ingredients, 'propose_meal_food_resize',
+  return settle(input, c, ingredients, `${meal.name} with ${after}`, 'propose_meal_food_resize',
     { field: 'Changing', before, after },
     [
       { severity: 'info', text: `Only the amount changes — everything else in your ${slot} stays as it is.` },
-      { severity: 'info', text: `Becomes your ${slot} for ${normaliseDate(input.rawArgs.date, input.todayDate)}; the original stays in your ${slot} options.` },
+      { severity: 'info', text: `Becomes your ${slot} for ${whenFor(input)}; the original stays in your ${slot} options.` },
     ],
     after)
 }

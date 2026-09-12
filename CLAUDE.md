@@ -99,13 +99,18 @@ facts: re-measure before acting on one, correct it here when it is wrong.
 - Replace it, regenerate it, ask for more — both; `meal-swap-rotation`
 - Add a food to it; add a meal to the day — `coach only`; `meal-food-add`,
   `meal-addition`
-- Remove or replace one food within it — `MISSING`
+- Remove or replace one food within it — both surfaces since 12 Sep 2026;
+  a removal states what it costs and offers 2-3 verified swaps (her ruling);
+  `meal-food-edit`, `verify:meal-food-edit`
 - Build a custom meal from what is in the fridge — `coach only`; `custom-meal`
 - Log what was eaten — both; `meal-log`, `meal-ledger-snapshot`,
   `diary-preservation`
-- Move a meal to another slot or day — `MISSING`; meals per day and snacks —
-  `screen only` (Profile)
-- Scale a portion — `MISSING` as a user action
+- Move a meal to another slot or day — `MISSING`, and deliberately: a dinner
+  dropped into a breakfast slot does not fit breakfast's budget, and refuse /
+  refit / rescale is Ashley's call. Meals per day and snacks — `screen only`
+  (Profile)
+- Scale a portion — both surfaces since 12 Sep 2026, the same row menu;
+  `meal-food-edit`, `verify:meal-food-edit`
 
 **Changing the whole plan**
 - Start again — `screen only` (New Plan; `reset-clears-draft`)
@@ -145,8 +150,10 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   screen does that the coach cannot (banning an exercise is the eighth — see
   the correction above), 3 the coach does that the screen cannot (add a food,
   add a meal, custom meal — the four day-level ones closed 10 Sep; table in the
-  audit) — partial. **No gate distinguishes a declared coach tool from a
-  declining stub**, which is the hole the ban error fell through
+  audit) — partial. **No GENERAL gate distinguishes a declared coach tool from
+  a declining stub**, which is the hole the ban error fell through;
+  `meal-food-edit` §8 does it for its own three tools and is the shape the
+  general one should take
 - A written exceptions list, each with a reason, Ashley's to change —
   `MISSING`
 - The coach acts; it never sends anyone to a control, never describes one

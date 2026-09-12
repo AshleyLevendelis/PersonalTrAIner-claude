@@ -352,6 +352,40 @@ export async function executeMealAddition(
 }
 
 /**
+ * A VERIFIED MEAL BECOMES THE SLOT'S MEAL — pool write, then pick, and the
+ * pool write rolled back if the pick doesn't land.
+ *
+ * Lifted out of ChatAssistant so the Nutrition screen can run the identical
+ * sequence rather than growing a second copy of it. The same reason
+ * verifyProposal has one caller in meal-food-edit: an edit made by tapping a
+ * row and the same edit made by asking the coach have to leave the plan in
+ * the same state, and two implementations of "and then it becomes the meal"
+ * is exactly how they stop doing that.
+ *
+ * `pick` is the caller's half, because who owns the on-screen state differs:
+ * the chat routes today through the same callback a confirmed swap uses, the
+ * screen through its own. It returns false if the pick failed.
+ */
+export async function applyMealOptionToSlot(
+  profileId: string,
+  payload: MealAdditionPayload,
+  pick: (payload: MealAdditionPayload) => Promise<boolean>,
+): Promise<{ receipt: PendingActionReceipt; poolIndex: number | null }> {
+  const result = await executeMealAddition(profileId, payload)
+  if (result.receipt.failed.length > 0) return result
+
+  const picked = await pick(payload)
+  if (picked) return result
+
+  // Roll the pool write back rather than leaving a meal in the plan that the
+  // receipt is about to say couldn't be added. The exact pool_index came back
+  // from the insert, so this removes the row it wrote and never a same-named
+  // meal that was already there.
+  await undoMealAddition(profileId, payload, result.poolIndex)
+  return { receipt: { landed: [], failed: [{ op: 'save', error: "The meal didn't save — try again" }] }, poolIndex: null }
+}
+
+/**
  * Removes an added option from the pool and clears the pick it set — both
  * halves. This is the undo, and also the rollback when the pool write lands
  * but the pick doesn't: a meal left in the pool after a receipt said

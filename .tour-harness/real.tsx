@@ -36,6 +36,8 @@ import { makeFakeSupabase, type Db } from './fake-supabase'
 import { generateMesocycle, setRandomSource, resetRandomSource } from '@/lib/exercise-plan'
 import { seededRngFromKey } from '@/lib/seeded-random'
 import { computeTargets } from '@/lib/nutrition-targets'
+import { getPools, setMealPick } from '@/lib/meal-store'
+import type { PoolOption } from '@/lib/meal-generation'
 import { useAppRoute, tabHash, type Tab } from '@/lib/app-route'
 import { saveActiveSessionRecord } from '@/lib/active-session-store'
 import type { UserProfile, MacroTargets } from '@/lib/types'
@@ -239,10 +241,49 @@ const chosen = {
 const pools = {
   breakfast: [chosen.breakfast], lunch: [chosen.lunch], dinner: [chosen.dinner],
 } as never
-const mealTotals = { calories: 1980, protein: 150, carbs: 190, fat: 60 }
+
+/**
+ * SEED THE FAKE POOL TABLE TOO, not just the props.
+ *
+ * The three meals above were passed straight into NutritionDisplay and never
+ * existed as rows, which was fine while the screen only ever READ them. It
+ * stopped being fine when an ingredient became editable: the edit inserts a
+ * new option beside the ones already in the slot and then picks it, and both
+ * halves go through meal-store against this database. A screen whose meals
+ * live only in a prop cannot be edited by the code that ships.
+ */
+for (const [slot, option] of Object.entries(chosen as Record<string, { name: string; ingredients: { name: string; quantity: number; unit: string }[]; macros: { calories: number; protein: number; carbs: number; fat: number } }>)) {
+  db.meal_plan_slots.push({
+    profile_id: PROFILE_ID, slot, pool_index: 0, name: option.name,
+    ingredients: option.ingredients,
+    macros: { kcal: option.macros.calories, protein: option.macros.protein, carbs: option.macros.carbs, fat: option.macros.fat },
+    tags: [],
+  })
+}
 
 function Harness() {
   const { route } = useAppRoute()
+  // WHAT THE SCREEN IS SHOWING RIGHT NOW, so an edit can move it. App.tsx
+  // holds the same two pieces of state and updates them in the same order:
+  // persist the pick, re-read the pool, then move what is on screen.
+  const [liveChosen, setLiveChosen] = useState(chosen as Record<string, PoolOption>)
+  const [livePools, setLivePools] = useState(pools as Record<string, PoolOption[]>)
+  const handleMealPickApplied = async (slot: string, chosenName: string) => {
+    try { await setMealPick(PROFILE_ID, today, slot as never, chosenName) } catch { return false }
+    const fresh = await getPools(PROFILE_ID)
+    const option = (fresh[slot as never] as PoolOption[] | undefined)?.find(o => o.name === chosenName)
+    if (!option) return false
+    setLivePools(prev => ({ ...prev, [slot]: (fresh[slot as never] as PoolOption[] | undefined) ?? prev[slot] }))
+    setLiveChosen(prev => ({ ...prev, [slot]: option }))
+    return true
+  }
+  const liveTotals = (['breakfast', 'lunch', 'dinner', 'snack'] as const).reduce(
+    (acc, sl) => {
+      const m = liveChosen[sl]?.macros
+      return m ? { calories: acc.calories + m.calories, protein: acc.protein + m.protein, carbs: acc.carbs + m.carbs, fat: acc.fat + m.fat } : acc
+    },
+    { calories: 0, protein: 0, carbs: 0, fat: 0 },
+  )
   // VERBATIM FROM App.tsx:103-104, minus the branches this harness has no
   // screens for. The program route is not a tab of its own — it renders
   // INSIDE the exercise tab — and mapping it to the dashboard here sent
@@ -298,8 +339,9 @@ function Harness() {
         {activeTab === 'nutrition' && (
           <NutritionDisplay profile={profile} macros={macros} exercisePlan={exercisePlan}
             latestWeightKg={80} profileId={PROFILE_ID} date={today}
-            pools={pools} chosen={chosen} mealTotals={mealTotals}
+            pools={livePools as never} chosen={liveChosen as never} mealTotals={liveTotals}
             isGeneratingMeals={false} mealRegenerateError={null}
+            onMealPickApplied={handleMealPickApplied as never}
             onSwapMealSlot={noop} onRegenerateMealSlot={noop} onRegenerateAllMeals={noop} />
         )}
         {activeTab === 'exercise' && (

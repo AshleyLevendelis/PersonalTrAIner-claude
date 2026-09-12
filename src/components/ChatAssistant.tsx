@@ -17,7 +17,7 @@ import { getExerciseEntry } from '@/lib/exercise-db'
 import { createPendingAction, claimPendingAction, declinePendingAction, markExecuting, resolvePendingAction, getPendingAction, expireOldPendingActions, isWithinUndoWindow, type PendingActionReceipt } from '@/lib/pending-actions-store'
 import { APPEND_PROPOSAL_KINDS, INTENT_PROPOSAL_VERB, buildIntentProposal } from '@/lib/intent-proposal'
 import { pickAccountabilityCheckIn } from '@/lib/accountability'
-import { executeExerciseSwap, executeExerciseRemove, executeExerciseReorder, undoSessionEdit, type ExerciseRemovePayload, type ExerciseReorderPayload, executeMealSwap, executeMealAddition, undoMealAddition, undoExerciseSwap, executeInjuryAdaptation, executeLastingInjury, executeInjuryRecovered, executeEquipmentAdaptation, executeVolumeChange, executeScheduleChange, executeStyleChange, executeConcurrentActivity, executeRestDay, undoRestDay, executeMissedSession, undoMissedSession, type MissedSessionPayload, undoWeekRangeChange, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type LastingInjuryPayload, type InjuryRecoveredPayload, type EquipmentAdaptationPayload, type VolumeChangePayload, type ScheduleChangePayload, type StyleChangePayload, type ConcurrentActivityPayload, type RestDayPayload, executeSessionMove, undoSessionMove, type SessionMovePayload } from '@/lib/pending-action-executor'
+import { executeExerciseSwap, executeExerciseRemove, executeExerciseReorder, undoSessionEdit, type ExerciseRemovePayload, type ExerciseReorderPayload, executeMealSwap, executeMealAddition, applyMealOptionToSlot, undoMealAddition, undoExerciseSwap, executeInjuryAdaptation, executeLastingInjury, executeInjuryRecovered, executeEquipmentAdaptation, executeVolumeChange, executeScheduleChange, executeStyleChange, executeConcurrentActivity, executeRestDay, undoRestDay, executeMissedSession, undoMissedSession, type MissedSessionPayload, undoWeekRangeChange, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type LastingInjuryPayload, type InjuryRecoveredPayload, type EquipmentAdaptationPayload, type VolumeChangePayload, type ScheduleChangePayload, type StyleChangePayload, type ConcurrentActivityPayload, type RestDayPayload, executeSessionMove, undoSessionMove, type SessionMovePayload } from '@/lib/pending-action-executor'
 import { STYLE_OPTIONS } from '@/lib/onboarding-slots'
 import { MOVEMENT_DEMANDS, TIMES_OF_DAY, canonicalDay, activityDays, describeActivity, reorderTracksForClassDays, HEAVY_TRACKS, activityCountsAsLoad, countWorkingSets } from '@/lib/concurrent-activity'
 import { getSplitForDays, generateMesocycle, setRandomSource, resetRandomSource } from '@/lib/exercise-plan'
@@ -28,6 +28,7 @@ import { buildMealAdditionProposal, type MealAdditionPayload } from '@/lib/meal-
 import { buildMealLogProposal, type MealLogPayload, type MealLogComputed } from '@/lib/meal-log-proposal'
 import { buildCustomMealProposal } from '@/lib/custom-meal'
 import { buildMealFoodAddProposal } from '@/lib/meal-food-add'
+import { buildMealFoodRemoveProposal, buildMealFoodReplaceProposal, buildMealFoodResizeProposal } from '@/lib/meal-food-edit'
 import { buildMealSwapProposal } from '@/lib/meal-swap-proposal'
 import { compileFoodDislikes } from '@/lib/fact-compiler'
 import type { SwapScope } from '@/lib/mesocycle-edit'
@@ -1659,6 +1660,12 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     // amounts, and the day bends around it rather than the other way.
     if (pendingAction.kind === 'propose_custom_meal') return `Here's **${rows[0].after}**, exactly as you have it:`
     if (pendingAction.kind === 'propose_meal_food_add') return `I can add **${rows[0].after}** to your ${rows[0].before}, at the amount you said:`
+    // CHANGING ONE FOOD, THREE WAYS. Each names the food and nothing else —
+    // what it costs is on the rows underneath, in the app's own numbers, and
+    // saying it twice in different words is how the two come to disagree.
+    if (pendingAction.kind === 'propose_meal_food_remove') return `I can take **${rows[0].before}** out — here's what goes with it:`
+    if (pendingAction.kind === 'propose_meal_food_replace') return `I can put **${rows[0].after}** in place of ${rows[0].before}:`
+    if (pendingAction.kind === 'propose_meal_food_resize') return `I can make that **${rows[0].after}**:`
     // Asks; never announces. The write happens on the tap, so the wording has
     // to be a question right up until it does.
     if (pendingAction.kind === 'propose_meal_log') return `Log this to your ${rows[0].before}?`
@@ -3444,6 +3451,45 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
           if (foodAdd.ok) built = { scopeKey: foodAdd.scopeKey, preconditions: foodAdd.preconditions, payload: foodAdd.payload as unknown as Record<string, unknown>, diff: foodAdd.diff }
           else refusal = foodAdd.reason
         }
+      } else if (
+        result.proposal.kind === 'propose_meal_food_remove'
+        || result.proposal.kind === 'propose_meal_food_replace'
+        || result.proposal.kind === 'propose_meal_food_resize'
+      ) {
+        // CHANGING ONE FOOD ALREADY IN THE MEAL — the same door as the add
+        // above, opening the other way. One branch for all three because the
+        // only thing that differs is which builder runs: they take the same
+        // input, return the same shape, and share one verification.
+        if (!macros) {
+          refusal = "I need your height, weight, age and sex before I can change a meal around — you can add them in Profile."
+        } else {
+          const rawArgs = result.proposal.rawArgs ?? {}
+          const slotName = String(rawArgs.meal_slot ?? '').trim().toLowerCase()
+          const current = mealPlan.find(m => m.meal.toLowerCase() === slotName)?.items[0]
+          const build =
+            result.proposal.kind === 'propose_meal_food_remove' ? buildMealFoodRemoveProposal
+            : result.proposal.kind === 'propose_meal_food_replace' ? buildMealFoodReplaceProposal
+            : buildMealFoodResizeProposal
+          const edit = build({
+            rawArgs,
+            currentMeal: current
+              ? { name: current.name, ingredients: current.ingredients ?? [], macros: { calories: current.calories, protein: current.protein, carbs: current.carbs, fat: current.fat } }
+              : null,
+            profileId: profile.id,
+            targets: macros,
+            mealsPerDay: profile.meals_per_day,
+            includeSnacks: profile.include_snacks,
+            dietaryPreferences: profile.dietary_preferences ?? [],
+            dislikedFoods: profile.disliked_foods ?? [],
+            // WHAT SHE IS ALREADY BEING SERVED, so the swaps offered when a
+            // food comes out lead with foods from her own plan rather than
+            // whatever the database happens to match on macros.
+            pantryFoods: mealPlan.flatMap(m => m.items.flatMap(i => i.ingredients ?? [])),
+            todayDate: getSessionDateContext(profile.id).date,
+          })
+          if (edit.ok) built = { scopeKey: edit.scopeKey, preconditions: edit.preconditions, payload: edit.payload as unknown as Record<string, unknown>, diff: edit.diff }
+          else refusal = edit.reason
+        }
       } else if (result.proposal.kind === 'propose_custom_meal' && result.proposal.rawArgs) {
         // Same gate as an addition — verifyProposal, in keepPortions mode.
         // The stated amounts are facts; what gets checked is whether the
@@ -4062,38 +4108,37 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       // this component subscribes, so the coach's own view of the day updates
       // without a refetch.
       bumpOwnWrites()
-    } else if (row.kind === 'propose_meal_addition' || row.kind === 'propose_custom_meal' || row.kind === 'propose_meal_food_add') {
+    } else if (row.kind === 'propose_meal_addition' || row.kind === 'propose_custom_meal' || row.kind === 'propose_meal_food_add'
+               || row.kind === 'propose_meal_food_remove' || row.kind === 'propose_meal_food_replace' || row.kind === 'propose_meal_food_resize') {
       // ONE executor for all three, on purpose: a custom meal IS an addition once
       // verified — same pool insert, same pick, same rollback — the only
       // difference was upstream, in how the option's portions were derived.
       const payload = row.payload as unknown as MealAdditionPayload
-      const result = await executeMealAddition(profile.id, payload)
+      // Pool write, pick, and roll back the pool write if the pick fails —
+      // all of it in applyMealOptionToSlot, which the Nutrition screen calls
+      // too so an edit made by tapping and the same edit made by asking land
+      // identically. Today goes through onMealSwapApplied, the same path a
+      // confirmed swap uses and the only one that also updates what the
+      // Nutrition tab is rendering right now; a future date has no on-screen
+      // state to update, so it writes the pick directly.
+      // Captured, not read through `profile` inside the callback: the
+      // narrowing that makes profile.id a string here does not survive into
+      // a closure, and the id is the same one either way.
+      const editProfileId = profile.id
+      const result = await applyMealOptionToSlot(editProfileId, payload, async p => {
+        if (p.date === getSessionDateContext(editProfileId).date) return await onMealSwapApplied(p.slot, p.option.name)
+        try { await setMealPick(editProfileId, p.date, p.slot, p.option.name); return true } catch { return false }
+      })
       receipt = result.receipt
-      let ok = receipt.failed.length === 0
-      if (ok) {
-        // The pool write landed; now make it the pick. Today goes through
-        // onMealSwapApplied — the same path a confirmed swap uses, and the
-        // only one that also updates what the Nutrition tab is rendering
-        // right now. A future date has no on-screen state to update, so it
-        // writes the pick directly.
-        const todayDate = getSessionDateContext(profile.id).date
-        let picked = true
-        if (payload.date === todayDate) {
-          picked = await onMealSwapApplied(payload.slot, payload.option.name)
-        } else {
-          try { await setMealPick(profile.id, payload.date, payload.slot, payload.option.name) } catch { picked = false }
-        }
-        if (!picked) {
-          // Roll the pool write back rather than leaving a meal in the plan
-          // that the receipt is about to say couldn't be added. The exact
-          // pool_index came back from the insert, so this removes the row it
-          // wrote and never a same-named meal that was already there.
-          await undoMealAddition(profile.id, payload, result.poolIndex)
-          receipt = { landed: [], failed: [{ op: 'save', error: "The meal didn't save — try again" }] }
-          ok = false
-        }
+      const ok = receipt.failed.length === 0
+      const EDIT_TITLES: Partial<Record<typeof row.kind, string>> = {
+        propose_custom_meal: 'Set as your meal',
+        propose_meal_food_add: 'Added to your meal',
+        propose_meal_food_remove: 'Taken out',
+        propose_meal_food_replace: 'Swapped',
+        propose_meal_food_resize: 'Amount changed',
       }
-      title = ok ? (row.kind === 'propose_custom_meal' ? 'Set as your meal' : row.kind === 'propose_meal_food_add' ? 'Added to your meal' : 'Added') : "Couldn't add the meal"
+      title = ok ? (EDIT_TITLES[row.kind] ?? 'Added') : "Couldn't change the meal"
       rows = ok ? [{ label: payload.slot, detail: `+ ${payload.option.name}` }] : []
       undoToken = ok ? row.id : undefined
     } else if (row.kind === 'propose_injury_adaptation') {
@@ -4502,7 +4547,8 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         if (!payload.currentName) return
         const persisted = await onMealSwapApplied(payload.slot, payload.currentName)
         if (!persisted) return // leave the Undo button in place so the user can retry
-      } else if (row.kind === 'propose_meal_addition' || row.kind === 'propose_custom_meal' || row.kind === 'propose_meal_food_add') {
+      } else if (row.kind === 'propose_meal_addition' || row.kind === 'propose_custom_meal' || row.kind === 'propose_meal_food_add'
+                 || row.kind === 'propose_meal_food_remove' || row.kind === 'propose_meal_food_replace' || row.kind === 'propose_meal_food_resize') {
         // Removes the option from the pool AND clears the pick, both — an
         // undo that only dropped the pick would leave the meal sitting in
         // the slot's options forever, which is not what "undo" said.
@@ -4728,6 +4774,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
                         pendingAction={msg.pendingAction}
                         onConfirm={scope => handleConfirmProposal(i, scope)}
                         onReject={() => handleRejectProposal(i)}
+                        onAlternative={handleQuickReply}
                       />
                     )}
                     {msg.receipt && msg.status !== 'failed' && (

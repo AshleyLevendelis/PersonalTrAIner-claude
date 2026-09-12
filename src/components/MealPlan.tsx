@@ -15,6 +15,7 @@ import { getTodayLedger, getLedgerSnapshot, logMealEaten, voidMealEvents, logged
 import { checkMealAgainstRestrictions, describeEatenBeforeChange, type MealRestrictionVerdict } from '@/lib/meal-restriction-check'
 import type { PoolOption } from '@/lib/meal-generation'
 import { tabHash } from '@/lib/app-route'
+import { MealFoodEditSheet, type MealFoodEditContext } from '@/components/nutrition/MealFoodEditSheet'
 
 /** Exported so NutritionDisplay's shortfall nudge names slots in the same order this list renders them, rather than keeping a second copy that can drift. */
 export const SLOT_ORDER: MealSlotName[] = ['breakfast', 'lunch', 'dinner', 'snack']
@@ -63,6 +64,17 @@ interface MealPlanProps {
    */
   dietaryPreferences?: string[]
   avoidFoods?: string[]
+  mealsPerDay?: number
+  includeSnacks?: boolean
+  /**
+   * Makes a verified option the slot's meal and says whether it landed. The
+   * per-ingredient edits below need the boolean: they roll their own pool
+   * write back when the pick fails, rather than leaving a meal in the plan
+   * that nothing on screen claims to have added. Absent, the row menu simply
+   * doesn't render — a control that cannot finish its job is worse than no
+   * control.
+   */
+  onMealPickApplied?: (slot: MealSlotName, chosenName: string) => Promise<boolean>
   onSwapSlot: (slot: MealSlotName, chooseName: string) => Promise<void>
   onRegenerateSlot: (slot: MealSlotName) => Promise<void>
   onFindMoreOptions?: (slot: MealSlotName) => Promise<{ added: string[]; error?: string }>
@@ -81,6 +93,7 @@ interface MealPlanProps {
 export function MealPlan({
   profileId, date, pools, chosen, totals, targets, isGenerating, regenerateError, onDismissRegenerateError,
   unrecognisedDietaryRestrictions, onFixDietaryRestrictions, dietaryPreferences = [], avoidFoods = [],
+  mealsPerDay, includeSnacks, onMealPickApplied,
   onSwapSlot, onRegenerateSlot, onFindMoreOptions, onRegenerateAll,
 }: MealPlanProps) {
   const activeSlots = SLOT_ORDER.filter(s => (pools[s]?.length ?? 0) > 0)
@@ -321,6 +334,19 @@ export function MealPlan({
             expanded={expandedSlot === slot}
             onToggle={() => setExpandedSlot(prev => (prev === slot ? null : slot))}
             onSwap={onSwapSlot}
+            onMealPickApplied={onMealPickApplied}
+            editContextFor={o => (profileId && targets && onMealPickApplied)
+              ? {
+                  profileId, date, slot, targets,
+                  mealsPerDay, includeSnacks,
+                  dietaryPreferences: dietaryPreferences ?? [],
+                  dislikedFoods: avoidFoods ?? [],
+                  meal: { name: o.name, ingredients: o.ingredients.map(formatIngredient), macros: o.macros },
+                  // WHAT SHE IS ALREADY BEING SERVED, across every slot, so a
+                  // removal's swaps lead with foods from her own plan.
+                  pantryFoods: SLOT_ORDER.flatMap(sl => (chosen[sl]?.ingredients ?? []).map(formatIngredient)),
+                }
+              : null}
             onRegenerate={onRegenerateSlot}
             onFindMore={onFindMoreOptions}
             checkAlternative={alt => checkMealAgainstRestrictions(alt.name, alt.ingredients, dietaryPreferences, avoidFoods)}
@@ -447,6 +473,8 @@ function MealSlotRow({
   restriction,
   onLog,
   onUnlog,
+  editContextFor,
+  onMealPickApplied,
 }: {
   slot: MealSlotName
   isFirst: boolean
@@ -473,9 +501,15 @@ function MealSlotRow({
   restriction: MealRestrictionVerdict | null
   onLog: (option: PoolOption) => Promise<void>
   onUnlog: (clientIds: string[]) => Promise<void>
+  /** Null when the screen cannot finish an edit (no profile, no targets, no pick path) — the row menu then doesn't render at all. */
+  editContextFor: (option: PoolOption) => MealFoodEditContext | null
+  onMealPickApplied?: (slot: MealSlotName, chosenName: string) => Promise<boolean>
 }) {
   const [busy, setBusy] = useState(false)
   const [swapOpen, setSwapOpen] = useState(false)
+  /** Which ingredient line has its edit open, by index. One at a time. */
+  const [editingLine, setEditingLine] = useState<number | null>(null)
+  const [editNote, setEditNote] = useState<string | null>(null)
   const [findingMore, setFindingMore] = useState(false)
   const [findMoreNote, setFindMoreNote] = useState<string | null>(null)
   // Fix 4.3 (ux-sweep) — generateMealPools now rejects a same-named
@@ -640,13 +674,53 @@ function MealSlotRow({
           </div>
 
           {option.ingredients.length > 0 && (
+            /* EVERY LINE IS A CONTROL, not a readout. Until 12 Sep 2026 the
+               coach could take a food out of a meal, swap it or resize it and
+               this screen could not — one of the parity gaps CLAUDE.md counts.
+               Tapping a line opens the same three verbs the coach has, built
+               by the same builders and applied through the same executor.
+               The lines are re-rendered from formatIngredient so the string
+               handed to the builder is exactly the one on screen. */
             <div className="flex flex-col gap-2">
               <span className="ds-label-compact">{option.ingredients.length} ingredients</span>
               <div className="flex flex-col gap-1.5">
-                {option.ingredients.map((ing, i) => (
-                  <span key={i} className="tabular-mono text-xs text-[color:var(--text-tertiary)]">{formatIngredient(ing)}</span>
-                ))}
+                {option.ingredients.map((ing, i) => {
+                  const line = formatIngredient(ing)
+                  const editable = editContextFor(option) !== null
+                  return (
+                    <div key={i}>
+                      {editable ? (
+                        <button
+                          type="button"
+                          className="flex min-h-[44px] w-full items-center justify-between gap-3 text-left"
+                          data-ingredient-row={line}
+                          aria-expanded={editingLine === i}
+                          onClick={() => { setEditNote(null); setEditingLine(prev => (prev === i ? null : i)) }}
+                        >
+                          <span className="tabular-mono text-xs text-[color:var(--text-tertiary)]">{line}</span>
+                          <span className="shrink-0 text-[0.625rem] text-muted-foreground">Change</span>
+                        </button>
+                      ) : (
+                        <span className="tabular-mono text-xs text-[color:var(--text-tertiary)]">{line}</span>
+                      )}
+                      {editingLine === i && (() => {
+                        const ctx = editContextFor(option)
+                        if (!ctx || !onMealPickApplied) return null
+                        return (
+                          <MealFoodEditSheet
+                            ctx={ctx}
+                            line={line}
+                            onPick={onMealPickApplied}
+                            onDone={summary => { setEditingLine(null); setEditNote(summary) }}
+                            onCancel={() => setEditingLine(null)}
+                          />
+                        )
+                      })()}
+                    </div>
+                  )
+                })}
               </div>
+              {editNote && <p className="text-[0.71875rem] text-muted-foreground">{editNote}. Your day has been re-fitted around it.</p>}
             </div>
           )}
 
