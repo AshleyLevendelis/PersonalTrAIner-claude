@@ -1,56 +1,58 @@
-import { useEffect, useRef, useState } from 'react'
-import { Timer, TimerReset, Disc, List, History, BookOpen } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { TimerReset, Disc, History, BookOpen, Timer, ChevronRight } from 'lucide-react'
 import { TimersPanel } from '@/components/timers/TimersPanel'
 import { PlateCalculator } from '@/components/PlateCalculator'
 import { SessionHistoryDialog } from '@/components/exercise/SessionHistoryDialog'
-import { getAllItems } from '@/lib/grocery-store'
 import { getSessionHistory } from '@/lib/exercise-history'
 import { getPRCache } from '@/lib/pr-engine'
 import { programHash } from '@/lib/app-route'
 import { RoundField } from '@/components/timers/RoundField'
+import { RoundCard } from '@/components/timers/RoundCard'
 import { useTimers } from '@/hooks/useTimers'
-import { GroceryList } from '@/components/GroceryList'
 import { useActiveSession } from '@/hooks/useActiveSession'
-import type { MacroTargets, WorkoutDay, MesocycleWeek } from '@/lib/types'
-import type { MealSlotName } from '@/lib/meal-store'
-import type { PoolOption } from '@/lib/meal-generation'
+import type { WorkoutDay, MesocycleWeek } from '@/lib/types'
 import type { RoundLogSummary } from '@/lib/timer-engine'
 import { AddUnplannedWork } from '@/components/exercise/AddUnplannedWork'
 
 // ---------------------------------------------------------------------------
-// Turn 12 ("one owner per fact") — the retired Meals tab's grocery section
-// and the Exercise tab's dialog-only timers now share one "Tools" tab:
-// neither owns daily-plan content (that's Nutrition/Exercise's job), they're
-// both ephemeral utilities reached from wherever, so a shared utility tab is
-// the honest home for both rather than two separate dialog entry points.
+// TOOLS IS ONE TIMER SURFACE — design handoff 2a ("Tools becomes one timer
+// surface"), 12 Sep 2026.
+//
+// What was here: six tiles, of which two opened the same panel in different
+// modes, one ("Rest timer") could not do what its name said, and a grocery
+// section sat BELOW the grid that a tile scrolled you down to. A grid of six
+// where two are the same thing and one is a lie is a menu of nine possible
+// wrong taps.
+//
+// What is here now: the round timer IS the tab's content — a live card that
+// colour-codes its phase — plus one row to change the intervals, then a short
+// "Also here" list for the things that genuinely are utilities. The stopwatch
+// loses its tile: it has no running state worth a card.
+//
+// GROCERY LEFT THIS TAB ENTIRELY. It is built from the week's meals and it is
+// a weekly errand, so it surfaces as a Home card on shop day and otherwise
+// opens full screen from the link Nutrition already has. It was never a
+// utility; it was filed as one because this tab existed.
+//
+// FULL SCREEN IS OPT-IN. A running round no longer seizes the tab — the card
+// is the default and RoundField renders only after "Full screen" (the flag
+// lives in useTimers, so a tab switch does not silently drop her out of it).
 // ---------------------------------------------------------------------------
 
 export interface ToolsTabProps {
   profileId?: string
-  mealPools: Partial<Record<MealSlotName, PoolOption[]>>
-  targets: MacroTargets | null
-  /** Passed straight through to GroceryList — the shopping list assembles the same days the Nutrition tab shows, so it needs the same preferences or the two diverge. */
-  softLikedFoods: string[]
-  /** And today's actual picks, for the same reason: a swapped dinner has to reach the shopping list too (audit §5.1). */
-  todaysPicks?: Partial<Record<MealSlotName, PoolOption>>
   /**
    * The training week, so the round timer can offer today's conditioning as a
    * one-tap prefill.
-   *
-   * Added 5 Sep 2026. TimersPanel has always accepted `todaysConditioning` and
-   * this screen — its only mount — never passed one, so `prefill` was
-   * permanently null: the "Load from today's session" button could not render
-   * on any device, in any state, and the round defaults stayed at a generic
-   * 8x30/30 on the day the plan actually prescribed 10x40/20.
    */
   exercisePlan?: WorkoutDay[]
-  /** For the "Your program" tile's subtitle — how many weeks, which block. */
+  /** For the "Your program" row's subtitle — how many weeks, which block. */
   mesocycle?: MesocycleWeek[]
   /** Which mesocycle week is live, so the block number is the one they are in. */
   liveWeek?: number
 }
 
-export function ToolsTab({ profileId, mealPools, targets, softLikedFoods, todaysPicks, exercisePlan, mesocycle, liveWeek }: ToolsTabProps) {
+export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek }: ToolsTabProps) {
   const timers = useTimers()
   // The session facade already owns "which day is it" (frozen at session
   // start, dev-clock aware). Deriving it again here from a fresh Date would
@@ -58,28 +60,19 @@ export function ToolsTab({ profileId, mealPools, targets, softLikedFoods, todays
   const { dayName } = useActiveSession()
   const todaysConditioning = (exercisePlan ?? []).find(d => d.day === dayName)?.recommendedCardio
 
-  // LIVE SUBTITLES — design_handoff_app_polish. A tile whose caption is a
-  // fixed string is a label; these say what is actually in there, so the grid
-  // answers "is there anything for me here" without six taps. Each reads a
-  // store that already exists; nothing new is computed or cached.
-  const [groceryCount, setGroceryCount] = useState<{ total: number; checked: number } | null>(null)
   const [historyCount, setHistoryCount] = useState<{ sessions: number; prs: number } | null>(null)
   const [plateOpen, setPlateOpen] = useState(false)
-  const [timerOpen, setTimerOpen] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [setupOpen, setSetupOpen] = useState(false)
   // The finished round waiting to be written down, and the line that says it
   // was. Ashley, 12 Sep 2026: "I logged it but it doesn't show anywhere on the
   // app" — it never wrote anything, and it never said so either.
   const [roundToLog, setRoundToLog] = useState<RoundLogSummary | null>(null)
   const [loggedNote, setLoggedNote] = useState<string | null>(null)
-  const [historyOpen, setHistoryOpen] = useState(false)
-  const grocerySectionRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     if (!profileId) return
     let cancelled = false
-    void getAllItems(profileId)
-      .then(items => { if (!cancelled) setGroceryCount({ total: items.length, checked: items.filter(i => i.checked).length }) })
-      .catch(() => { if (!cancelled) setGroceryCount(null) })
     void getSessionHistory(profileId, 100)
       .then(rows => {
         if (cancelled) return
@@ -96,71 +89,63 @@ export function ToolsTab({ profileId, mealPools, targets, softLikedFoods, todays
     ? `${mesocycle.length} weeks · block ${blockOf(liveWeek ?? 1)} of ${Math.max(1, Math.ceil(mesocycle.length / 4))}`
     : 'Your whole plan, week by week'
 
-  const TILES: { label: string; sub: string; icon: typeof Timer; onClick: () => void }[] = [
+  // STARTED AND NOT RESET — the condition the card renders on. Paused counts:
+  // pauseRound sets running:false, and a round that only checked `running`
+  // used to make the whole timer vanish the moment you tapped Pause. You
+  // pause to catch your breath, not to lose your place.
+  const roundLive =
+    timers.mode === 'round' && !!timers.roundConfig
+    && (timers.running || timers.isRoundComplete || timers.isActive)
+
+  // THE SHEET WHERE THE FINISHED ROUND IS WRITTEN DOWN. Rendered once, beside
+  // both branches, because the full-screen branch returns early and a sheet
+  // mounted only in the normal layout could never open from the field.
+  const logSheet = (
+    <AddUnplannedWork
+      open={!!roundToLog}
+      onOpenChange={o => { if (!o) setRoundToLog(null) }}
+      hideTrigger
+      prefill={roundToLog
+        ? { activityName: roundToLog.activityName, durationMinutes: roundToLog.durationMinutes, notes: roundToLog.detail }
+        : undefined}
+      onCardioLogged={() => {
+        // ONLY NOW. The round is released after the write, not before it —
+        // resetting first is what threw the session away last time.
+        setLoggedNote(`Logged · ${roundToLog?.activityName} · ${roundToLog?.durationMinutes} min`)
+        setRoundToLog(null)
+        timers.reset()
+      }}
+    />
+  )
+
+  if (roundLive && timers.roundFullScreen) {
+    // NO `relative` AND NO minHeight HERE. Both used to be, and together they
+    // were the bug: they made this wrapper the containing block for
+    // RoundField's positioning, so the full-bleed field became a card sitting
+    // in the page's padding. RoundField is `fixed` and belongs to the
+    // viewport, so this wrapper must stay unpositioned or it captures it again.
+    return (
+      <div data-tour="toolsall">
+        <RoundField onLogSession={setRoundToLog} />
+        {logSheet}
+      </div>
+    )
+  }
+
+  const alsoHere: { label: string; sub: string; icon: typeof Timer; onClick: () => void }[] = [
     {
-      // NO REST-TIMER SETTINGS SCREEN EXISTS. The handoff points this tile at
-      // one; the rest timer is automatic (it starts itself when a set is
-      // logged and lives in the dock), and there is nothing to configure. So
-      // this opens the timer surface that does exist rather than a control
-      // that opens nothing — recorded in the commit message.
-      label: 'Rest timer', sub: 'Auto-starts after a set', icon: Timer,
-      onClick: () => { timers.setMode('stopwatch'); setTimerOpen(true) },
-    },
-    {
-      // NAMED THREE THINGS, HAD NONE OF THEM. Ashley, 12 Sep 2026, from the
-      // app: "under rest timers the app shows emom and tabata but these
-      // timers dont exist". Measured — the round tab offers exactly three
-      // inputs (Rounds, Work, Rest) and no presets at all:
-      //   EMOM   — not built, and not typeable either: its rest is whatever
-      //            is LEFT of the minute, which this engine has no notion of.
-      //   Tabata — reachable only if you already know to type 8 / 20 / 10.
-      //   laps   — real, and its own tab in this same sheet, one tap sideways
-      //            from Round. So not a false claim like EMOM: a claim about
-      //            the tab NEXT DOOR, on a tile named for this one. (Corrected
-      //            12 Sep 2026: first written here as "on the stopwatch tab",
-      //            from grepping `lap` in the timers hook and finding it beside
-      //            the stopwatch state. TimersPanel.tsx renders three tabs —
-      //            stopwatch, lap, round — which is the line that settles it.)
-      // The third subtitle in this file to have promised something absent
-      // (see the two below), and the first anyone reported from the live app.
-      // Asked whether to correct the label or build the timers, she chose
-      // BUILD (12 Sep 2026): the presets are real now — ROUND_PRESETS in
-      // timer-engine.ts — so this subtitle names two of them and is true.
-      // EMOM followed on the same day, on her "finish the emom clock" — and
-      // needed no new engine at all: with rest 0 the cycle IS the interval,
-      // which computeRoundState always handled. See RoundConfig.style for the
-      // wrong reason I gave for leaving it out. So the word is back on this
-      // tile, and this time there is one behind it.
-      // AND IT HAS TO FIT ONE LINE — 23 characters, enforced by
-      // test:tools-grid, which caught "Tabata, EMOM, boxing rounds" at 27.
-      // Two gates now hold this one string from opposite sides: it may not
-      // name a timer that does not exist, and it may not be long enough to
-      // wrap the tile. "boxing rounds" was the half that went; EMOM and
-      // Tabata are the named protocols, and "rounds" covers the rest.
-      label: 'Rounds & intervals', sub: 'Tabata, EMOM, rounds', icon: TimerReset,
-      onClick: () => { timers.setMode('round'); setTimerOpen(true) },
+      // NO TILE OF ITS OWN. A stopwatch has no state worth a card — it is a
+      // number that goes up — so it sits in the list with the rest.
+      label: 'Stopwatch', sub: 'With laps', icon: Timer,
+      onClick: () => { timers.setMode('stopwatch'); setSetupOpen(true) },
     },
     {
       // "your plates" promised a plate inventory that has never existed —
       // equipment is a four-value enum and nothing anywhere records what is
       // on your gym floor. The calculator offers every standard loading and
-      // lets you pick; the subtitle says that instead of implying it already
-      // knows. A real inventory is in BACKLOG, not here.
-      //
-      // AND IT HAS TO FIT ON ONE LINE. The first replacement ("20 kg bar ·
-      // every way to load it") wrapped to a second, which grew this tile, grew
-      // the grid, and pushed the app tour's spotlight hole 12px past the
-      // bottom of a 390x844 screen — caught by verify:tour-real, invisible to
-      // all 136 gates. Keep it at or under the length of the string it
-      // replaced.
+      // lets you pick; the subtitle says that instead of implying it knows.
       label: 'Plate calculator', sub: 'Options for any weight', icon: Disc,
       onClick: () => setPlateOpen(true),
-    },
-    {
-      label: 'Grocery list',
-      sub: groceryCount ? `${groceryCount.total} item${groceryCount.total === 1 ? '' : 's'} · ${groceryCount.checked} checked` : 'This week\u2019s shopping',
-      icon: List,
-      onClick: () => grocerySectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
     },
     {
       label: 'Session history',
@@ -171,63 +156,12 @@ export function ToolsTab({ profileId, mealPools, targets, softLikedFoods, todays
     { label: 'Your program', sub: programSub, icon: BookOpen, onClick: () => { window.location.hash = programHash() } },
   ]
 
-  // A RUNNING ROUND IS A SINGLE-PURPOSE SCREEN (design handoff 2a). While one
-  // is live the field takes the whole tab content area rather than sitting as
-  // a card above the rest — a flooded surface is legible across a gym, a card
-  // is not. The stopwatch, lap and grocery sections are intentionally out of
-  // reach until it is reset.
-  //
-  // `isRoundComplete` holds the screen too, so the red finished state stays
-  // until the user acts instead of vanishing the moment the clock stops.
-  // PAUSED COUNTS AS HOLDING THE SCREEN, and leaving it out was a real bug.
-  // pauseRound sets running:false, so a round that only required `running`
-  // made the entire full-bleed timer vanish the moment you tapped Pause,
-  // dropping you back to the setup form mid-workout. You pause to catch your
-  // breath, not to lose your place. `isActive` is true while there is
-  // accumulated time, which is exactly "started and not reset".
-  const roundHoldsScreen =
-    timers.mode === 'round' && !!timers.roundConfig
-    && (timers.running || timers.isRoundComplete || timers.isActive)
-
-  if (roundHoldsScreen) {
-    // NO `relative` AND NO minHeight HERE. Both used to be, and together they
-    // were the bug: they made this wrapper the containing block for
-    // RoundField's absolute positioning, so the full-bleed field became a
-    // 60vh card sitting in the page's padding. RoundField is `fixed` now and
-    // belongs to the viewport, so this wrapper must stay unpositioned or it
-    // will capture it again.
-    return (
-      <div data-tour="toolsall">
-        <RoundField onLogSession={setRoundToLog} />
-        {/* WHERE THE FINISHED ROUND GOES. Mounted inside this branch too,
-            because this branch returns early and a sheet rendered only in the
-            normal layout below could never open from the field. */}
-        <AddUnplannedWork
-          open={!!roundToLog}
-          onOpenChange={o => { if (!o) setRoundToLog(null) }}
-          hideTrigger
-          prefill={roundToLog
-            ? { activityName: roundToLog.activityName, durationMinutes: roundToLog.durationMinutes, notes: roundToLog.detail }
-            : undefined}
-          onCardioLogged={() => {
-            // ONLY NOW. The round is released after the write, not before it —
-            // resetting first is what threw the session away last time.
-            setLoggedNote(`Logged · ${roundToLog?.activityName} · ${roundToLog?.durationMinutes} min`)
-            setRoundToLog(null)
-            timers.reset()
-          }}
-        />
-      </div>
-    )
-  }
-
   return (
     <div data-tour="toolsall" className="flex flex-col gap-[26px]">
       {/* SAY THE WRITE HAPPENED. A cardio log is local-first and queued, so
           the round leaves the screen the instant it saves and there would
           otherwise be nothing at all to show for it — which is
-          indistinguishable from the button that never logged. Dismissible,
-          and gone on the next thing she does. */}
+          indistinguishable from the button that never logged. */}
       {loggedNote && (
         <button
           type="button"
@@ -238,49 +172,81 @@ export function ToolsTab({ profileId, mealPools, targets, softLikedFoods, todays
           {loggedNote} — it's on your week and the coach can see it. Tap to dismiss.
         </button>
       )}
+
+      <p className="text-[1.75rem] font-bold leading-none">Tools</p>
+
       <div>
-        <p className="ds-label">Tools</p>
-        <div className="mt-1.5 grid grid-cols-2 gap-2.5">
-          {TILES.map(tile => (
-            <button
-              key={tile.label}
-              type="button"
-              onClick={tile.onClick}
-              className="flex min-h-[104px] flex-col justify-between gap-3 rounded-2xl p-3.5 text-left"
-              style={{ background: 'var(--surface-raised)' }}
-            >
-              <tile.icon className="size-5 shrink-0" style={{ color: 'var(--primary-text)' }} aria-hidden />
-              <span>
-                <span className="block text-[0.9375rem] font-semibold">{tile.label}</span>
-                <span className="mt-0.5 block text-[0.71875rem] leading-[1.3] text-muted-foreground">{tile.sub}</span>
+        <p className="ds-label">Timers</p>
+        <div className="mt-1.5 flex flex-col gap-2.5">
+          {roundLive && <RoundCard onLogSession={setRoundToLog} />}
+
+          {/* THE ONE ROW THAT CHANGES THE INTERVALS — and the whole Timers
+              section when nothing is running. */}
+          <button
+            type="button"
+            data-change-intervals
+            onClick={() => { timers.setMode('round'); setSetupOpen(true) }}
+            className="flex w-full items-center gap-3 rounded-2xl p-4 text-left"
+            style={{ background: 'var(--surface-raised)' }}
+          >
+            <TimerReset className="size-5 shrink-0" style={{ color: 'var(--primary-text)' }} aria-hidden />
+            <span className="min-w-0 flex-1">
+              <span className="block text-[0.9375rem] font-semibold">Change the intervals</span>
+              <span className="mt-0.5 block text-[0.71875rem] leading-[1.3] text-muted-foreground">
+                Tabata, EMOM, rounds · 20s to 5 min
               </span>
+            </span>
+            <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+          </button>
+
+          {/* THE TILE THAT LIED, REPLACED BY THE TRUTH. There was a "Rest
+              timer" tile pointing at a settings screen that has never
+              existed — the rest timer is automatic and lives in the session
+              dock. One sentence says so, and nothing pretends to configure it. */}
+          <p className="text-[0.71875rem] leading-[1.35] text-muted-foreground">
+            Your rest timer isn't here because it runs itself — it starts the moment you log a set, in the session dock.
+          </p>
+        </div>
+      </div>
+
+      <div>
+        <p className="ds-label">Also here</p>
+        <div className="mt-1.5">
+          {alsoHere.map((row, i) => (
+            <button
+              key={row.label}
+              type="button"
+              onClick={row.onClick}
+              className="flex min-h-[44px] w-full items-center gap-3 py-3 text-left"
+              style={i > 0 ? { borderTop: '1px solid var(--hairline)' } : undefined}
+            >
+              <row.icon className="size-[18px] shrink-0" style={{ color: 'var(--primary-text)' }} aria-hidden />
+              <span className="min-w-0 flex-1">
+                <span className="block text-[0.9375rem] font-medium">{row.label}</span>
+                <span className="mt-0.5 block text-[0.71875rem] leading-[1.3] text-muted-foreground">{row.sub}</span>
+              </span>
+              <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
             </button>
           ))}
         </div>
       </div>
 
-      {/* The timer surface opens from its two tiles and stays open while
-          something is running. Always-on it duplicated the tiles above it;
-          unmountable it is still safe, because the running state lives in the
-          useTimers provider, not in this panel. */}
-      {(timerOpen || timers.running || timers.isActive) && (
+      {/* SETUP ONLY, and only when asked for. It used to stay mounted for as
+          long as anything was running, which under the old design was how you
+          reached the round at all. The card is that now, so leaving the panel
+          up put a Stopwatch / Lap / Round tab strip under a running round —
+          exactly the junk-drawer stacking this redesign removes. Unmounting is
+          safe because the running state lives in the useTimers provider, not
+          in this panel. */}
+      {setupOpen && (
         <div>
-          <p className="ds-label">Timer</p>
-          <div className="mt-1.5">
-            <TimersPanel todaysConditioning={todaysConditioning} />
-          </div>
+          <TimersPanel todaysConditioning={todaysConditioning} />
         </div>
       )}
 
-      <div ref={grocerySectionRef}>
-        <p className="ds-label">Grocery · this week</p>
-        <div className="mt-1.5">
-          <GroceryList profileId={profileId} mealPools={mealPools} targets={targets} softLikedFoods={softLikedFoods} todaysPicks={todaysPicks} />
-        </div>
-      </div>
-
       <PlateCalculator open={plateOpen} onOpenChange={setPlateOpen} />
       <SessionHistoryDialog open={historyOpen} onOpenChange={setHistoryOpen} profileId={profileId} />
+      {logSheet}
     </div>
   )
 }

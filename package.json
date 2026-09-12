@@ -213,6 +213,7 @@
     "verify:session-edit": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/session-edit.mjs",
     "verify:program-move": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/program-move.mjs",
     "verify:meal-food-edit": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/meal-food-edit.mjs",
+    "verify:tools-timer": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/tools-timer.mjs",
     "verify:round-presets": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/round-presets.mjs",
     "verify:round-lead-in": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/round-lead-in.mjs",
     "verify:equipment-labels": "vite build --config .onb-harness/vite.config.ts && node .onb-harness/equipment-select.mjs",

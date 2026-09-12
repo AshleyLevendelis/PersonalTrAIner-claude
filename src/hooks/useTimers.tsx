@@ -71,6 +71,18 @@ export interface TimersValue {
   resumeRound: () => void
   /** Round mode only — ends the get-ready countdown early and starts round 1 now. No-op once work has begun. */
   skipLeadIn: () => void
+  /**
+   * TRUE ONLY WHEN SHE ASKED FOR IT — design handoff 2a, "full screen is now
+   * opt-in". A running round used to seize the whole Tools tab; now the card
+   * is the default and the flooded field renders after "Full screen".
+   *
+   * Provider state rather than the screen's own, so switching tabs and coming
+   * back does not silently drop her out of the view she chose. Cleared
+   * whenever a round starts or is reset, because a NEW round has not been
+   * asked to flood anything.
+   */
+  roundFullScreen: boolean
+  setRoundFullScreen: (on: boolean) => void
 }
 
 const TimersContext = createContext<TimersValue | null>(null)
@@ -135,6 +147,10 @@ export function TimersProvider({ profileId, children }: { profileId: string | un
 
   const reset = useCallback(() => {
     if (profileId) clearTimerRecord(profileId)
+    // BACK TO THE CARD. Full screen is a view she asked for on ONE round;
+    // carrying it into the next one would flood the tab for a round nobody
+    // asked to flood it with.
+    setRoundFullScreen(false)
     setRecord(defaultTimerRecord(record.mode))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profileId, record.mode])
@@ -174,6 +190,7 @@ export function TimersProvider({ profileId, children }: { profileId: string | un
 
   const startRound = useCallback((config: RoundConfig) => {
     if (!profileId) return
+    setRoundFullScreen(false)
     const now = getAppNow(profileId)
     // startedAtIso is the round timer's single source of truth: round, phase
     // and remaining are all derived from (now - startedAt) against the
@@ -285,6 +302,7 @@ export function TimersProvider({ profileId, children }: { profileId: string | un
   const isActive = record.running || record.accumulatedMs > 0 || record.laps.length > 0
 
   const [screenOpenRequested, setScreenOpenRequested] = useState(false)
+  const [roundFullScreen, setRoundFullScreen] = useState(false)
   const requestScreenOpen = useCallback(() => setScreenOpenRequested(true), [])
   const clearScreenOpenRequest = useCallback(() => setScreenOpenRequested(false), [])
 
@@ -302,6 +320,8 @@ export function TimersProvider({ profileId, children }: { profileId: string | un
     screenOpenRequested,
     requestScreenOpen,
     clearScreenOpenRequest,
+    roundFullScreen,
+    setRoundFullScreen,
     setMode,
     start,
     stop,

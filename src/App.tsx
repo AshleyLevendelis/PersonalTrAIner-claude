@@ -19,7 +19,7 @@ import { TimersProvider } from '@/hooks/useTimers'
 import { BottomDockHeightProvider } from '@/hooks/useBottomDockHeight'
 import { AppTour, replayAppTour } from '@/components/AppTour'
 import { isDevAccount, getSessionDateContext, getAppNow } from '@/lib/dev-clock'
-import { useAppRoute, tabHash, isTab, isKnownTabHash, type Tab } from '@/lib/app-route'
+import { useAppRoute, tabHash, groceryHash, isTab, isKnownTabHash, type Tab } from '@/lib/app-route'
 
 import { calculateCalories, getActiveMesocycleWeek } from '@/lib/calculations'
 import { computeBMR, computeStaticTDEE, resolveBodyMetrics } from '@/lib/macro-calculator'
@@ -28,6 +28,7 @@ import { describeGoalProximity, isGoalProximityDismissed, dismissGoalProximity }
 import { upsertDailyMetric } from '@/lib/daily-tracking'
 import { generateExercisePlan, generateMesocycle, MESOCYCLE_WEEK_LABELS } from '@/lib/exercise-plan'
 import { getPools, readPools, swapPoolMeal, getMealPicksForDate, setMealPick, clearMealPick, clearAllMealPicksForDate, type MealSlotName } from '@/lib/meal-store'
+import { GroceryScreen } from '@/components/GroceryScreen'
 import { generateMealPools, assembleDay, chosenToMealPlanDays, type PoolOption } from '@/lib/meal-generation'
 import { supabase } from '@/lib/supabase'
 import { saveMesocycle, saveMesocycleWeek, restoreMesocycle } from '@/lib/mesocycle-persistence'
@@ -103,6 +104,10 @@ function App() {
   // §5.3) — only an unrecognised/empty hash falls back to nutrition.
   const activeTab: Tab =
     route.kind === 'tab' ? route.tab : route.kind === 'program' || route.kind === 'train' ? 'exercise' : 'nutrition'
+  // The shopping list, full screen (design handoff 2b ›). A sub-route of the
+  // Nutrition tab, because that is what it is built from — it stopped being a
+  // section of Tools on 12 Sep 2026.
+  const groceryFullScreen = route.kind === 'grocery'
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [macros, setMacros] = useState<MacroTargets | null>(null)
   /** Latest daily_metrics weigh-in — DISPLAY only ("your current weight is X"). Null until the user first weighs in. Target computation uses targetWeightAnchorKg instead (see its own doc comment) — the two intentionally diverge: this always shows the real latest reading, the anchor only moves once that reading's 7-day average has shifted enough to matter. */
@@ -2561,6 +2566,16 @@ function App() {
           </TabsContent>
 
           <TabsContent value="nutrition" className="space-y-6">
+            {groceryFullScreen ? (
+              <GroceryScreen
+                profileId={profile.id}
+                mealPools={mealPools}
+                targets={macros}
+                softLikedFoods={compiledSoftFoodPreferences}
+                todaysPicks={chosenMeals}
+                onClose={() => { window.location.hash = tabHash('nutrition') }}
+              />
+            ) : (
             <NutritionDisplay
               profile={profile}
               macros={macros}
@@ -2585,6 +2600,7 @@ function App() {
               onFindMoreOptions={handleFindMoreMealOptions}
               onRegenerateAllMeals={handleRegenerateAllMeals}
             />
+            )}
           </TabsContent>
 
           <TabsContent value="exercise">
@@ -2614,7 +2630,7 @@ function App() {
           </TabsContent>
 
           <TabsContent value="tools">
-            <ToolsTab profileId={profile.id} mealPools={mealPools} targets={macros} softLikedFoods={compiledSoftFoodPreferences} todaysPicks={chosenMeals} exercisePlan={exercisePlan} mesocycle={mesocycle} liveWeek={getActiveMesocycleWeek(mesocycleCreatedAt ?? profile.created_at, undefined, mesocycle.length || 4)} />
+            <ToolsTab profileId={profile.id} exercisePlan={exercisePlan} mesocycle={mesocycle} liveWeek={getActiveMesocycleWeek(mesocycleCreatedAt ?? profile.created_at, undefined, mesocycle.length || 4)} />
           </TabsContent>
 
           <TabsContent value="chat" forceMount className="data-[state=inactive]:hidden">
@@ -2641,7 +2657,7 @@ function App() {
               onOpenProfile={section => { setProfileInfoSection(section); setProfileInfoOpen(true) }}
               groceryItems={groceryItems}
               onGroceryChanged={() => { if (profile?.id) return reloadGrocery(profile.id) }}
-              onOpenGrocery={() => { window.location.hash = tabHash('tools') }}
+              onOpenGrocery={() => { window.location.hash = groceryHash() }}
               onOpenDashboard={() => { window.location.hash = tabHash('dashboard') }}
               onStepsChanged={() => { setStepsVersion(v => v + 1); bumpCoachData() }}
               // WIRED, not merely declared. This prop existed, was awaited in

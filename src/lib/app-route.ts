@@ -18,6 +18,11 @@ export type Route =
   | { kind: 'tab'; tab: Tab }
   | { kind: 'devtest' }
   | { kind: 'program'; week?: number }
+  // The shopping list, full screen. It stopped being a section of the Tools
+  // tab on 12 Sep 2026 (design handoff 2b ›): it is built from the week's
+  // meals and it is a weekly errand, so it belongs beside Nutrition and on
+  // Home on shop day — not filed under utilities.
+  | { kind: 'grocery' }
   // Reserved for P3 (`#/train`) — not produced by parseRoute yet; declared
   // here so the union is stable across phases and callers can already
   // switch on `kind` exhaustively.
@@ -31,6 +36,11 @@ export function tabHash(tab: Tab): string {
   return `#/tab/${tab}`
 }
 
+/** The shopping list, full screen. */
+export function groceryHash(): string {
+  return '#/nutrition/grocery'
+}
+
 /** `#/exercise/program` (week list — no week number yet) or `#/exercise/program/{n}` (week detail). */
 export function programHash(week?: number): string {
   return week != null ? `#/exercise/program/${week}` : '#/exercise/program'
@@ -38,6 +48,7 @@ export function programHash(week?: number): string {
 
 export function parseRoute(hash: string): Route {
   if (hash === '#/dev-test') return { kind: 'devtest' }
+  if (hash === '#/nutrition/grocery') return { kind: 'grocery' }
   const programMatch = /^#\/exercise\/program(?:\/(\d+))?$/.exec(hash)
   if (programMatch) return { kind: 'program', week: programMatch[1] ? parseInt(programMatch[1], 10) : undefined }
   const tabMatch = /^#\/tab\/([a-z]+)$/.exec(hash)

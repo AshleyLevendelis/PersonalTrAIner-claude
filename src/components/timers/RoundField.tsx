@@ -1,4 +1,5 @@
 import type React from 'react'
+import { ChevronDown } from 'lucide-react'
 import { useTimers } from '@/hooks/useTimers'
 import { TAB_BAR_HEIGHT_PX } from '@/components/BottomTabBar'
 import { roundSubline, roundHeadline, roundDoneLabel, roundStyleOf, roundLogSummary, type RoundConfig, type RoundLogSummary } from '@/lib/timer-engine'
@@ -28,18 +29,35 @@ import { roundSubline, roundHeadline, roundDoneLabel, roundStyleOf, roundLogSumm
 // because useTimers is deadline-anchored at the provider.
 // ---------------------------------------------------------------------------
 
-type Phase = 'ready' | 'work' | 'rest' | 'done'
+export type Phase = 'ready' | 'work' | 'rest' | 'done'
 
-/** Field colour and its ink, per phase. Tokens only — never the hexes. */
-const FIELD: Record<Phase, { bg: string; ink: string }> = {
+/**
+ * Field colour and its ink, per phase. Tokens only — never the hexes.
+ *
+ * EXPORTED, because RoundCard paints the same four states on the Tools tab
+ * (design handoff 2a) and the card and the flooded screen disagreeing about
+ * what "rest" looks like would be worse than either being wrong on its own.
+ * One map, two surfaces.
+ */
+export const FIELD: Record<Phase, { bg: string; ink: string }> = {
   ready: { bg: 'var(--phase-ready)', ink: 'var(--phase-ready-ink)' },
   work: { bg: 'var(--primary)', ink: 'var(--phase-work-ink)' },
   rest: { bg: 'var(--role-warn)', ink: 'var(--phase-rest-ink)' },
   done: { bg: 'var(--destructive)', ink: 'var(--phase-done-ink)' },
 }
 
+/**
+ * WHICH PHASE THE ROUND IS IN, derived from the engine's own two facts and
+ * nothing else. Exported for the same reason FIELD is: the card must reach
+ * this answer by the identical route, not by a second reading of the clock.
+ */
+export function roundPhaseOf(t: { isRoundComplete: boolean; currentPhase: string }): Phase {
+  if (t.isRoundComplete) return 'done'
+  return t.currentPhase === 'lead_in' ? 'ready' : t.currentPhase === 'rest' ? 'rest' : 'work'
+}
+
 /** `m:ss`, ceiled — so it never reads 0:00 while there is still time on the clock. */
-function formatRemaining(ms: number): string {
+export function formatRemaining(ms: number): string {
   const total = Math.max(0, Math.ceil(ms / 1000))
   return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`
 }
@@ -74,9 +92,7 @@ export function RoundField({ onLogSession }: {
   const config = timers.roundConfig
   if (!config) return null
 
-  const phase: Phase = timers.isRoundComplete
-    ? 'done'
-    : timers.currentPhase === 'lead_in' ? 'ready' : timers.currentPhase === 'rest' ? 'rest' : 'work'
+  const phase: Phase = roundPhaseOf(timers)
   const { bg, ink } = FIELD[phase]
   const inkSoft = `color-mix(in srgb, ${ink} 72%, transparent)`
   const line = `color-mix(in srgb, ${ink} 16%, transparent)`
@@ -225,6 +241,22 @@ export function RoundField({ onLogSession }: {
       >
         <div className="h-full rounded-full" style={{ width: `${progress * 100}%`, background: ink }} />
       </div>
+
+      {/* THE WAY BACK. Full screen is opt-in now (design handoff 2a), and a
+          view you can enter but not leave is a dead end — the round would
+          hold the whole tab until it was reset, which is the behaviour the
+          handoff is removing. Deliberate addition to an otherwise unchanged
+          RoundField; noted in the commit. Top-right, out of the way of the
+          controls, and it only ends the VIEW: the round keeps running and the
+          card on the tab keeps showing it. */}
+      <button
+        onClick={e => { e.stopPropagation(); timers.setRoundFullScreen(false) }}
+        aria-label="Leave full screen — the round keeps running"
+        className="absolute right-4 top-4 flex items-center justify-center rounded-full"
+        style={{ width: 44, height: 44, border: 0, background: line, color: ink }}
+      >
+        <ChevronDown className="size-5" aria-hidden />
+      </button>
 
       <div className="relative flex gap-2.5" style={{ marginTop: '1.375rem' }}>
         <button

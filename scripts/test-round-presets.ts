@@ -93,12 +93,18 @@ console.log('\n3. Tabata is Tabata')
     tabata ? totalRoundSeconds(tabata.config) : null)
 }
 
-console.log('\n4. The Tools tile and the presets agree, both ways')
+console.log('\n4. The Tools interval row and the presets agree, both ways')
 {
   const strip = (t: string) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
   const tools = strip(readFileSync('src/components/ToolsTab.tsx', 'utf8'))
-  const sub = /label: 'Rounds & intervals', sub: '([^']*)'/.exec(tools)?.[1] ?? ''
-  check('the tile still has a subtitle to check', sub.length > 0, sub)
+  // RE-ANCHORED 12 Sep 2026 (design handoff 2a). The claim used to live on a
+  // tile in a six-tile grid; the grid is gone and the same claim now sits
+  // under the one row that changes the intervals. What is being checked is
+  // unchanged — the words on the Tools tab must name only protocols that
+  // exist — so the check moved with the words rather than being deleted with
+  // the tile.
+  const sub = /Tabata, EMOM, rounds · [^<\n]*/.exec(tools)?.[0] ?? ''
+  check('the interval row still has a subtitle to check', sub.length > 0, sub)
 
   // EMOM IS THE NAMED ABSENCE. Ashley's decision, 12 Sep 2026: presets yes,
   // EMOM no, because its rest is the remainder of the minute and this engine
@@ -106,7 +112,7 @@ console.log('\n4. The Tools tile and the presets agree, both ways')
   // tile until something implements it — pinned on the ENGINE, not on a
   // hardcoded "no": add a real emom preset and this check stops objecting.
   const hasEmomBehind = ROUND_PRESETS.some(p => /emom/i.test(p.key) || /emom/i.test(p.label))
-  check('the tile does not say EMOM while nothing implements it',
+  check('the row does not say EMOM while nothing implements it',
     hasEmomBehind || !/emom/i.test(sub), sub)
 
   // Every protocol NAME on the tile must be a preset that exists. Words that
@@ -120,7 +126,7 @@ console.log('\n4. The Tools tile and the presets agree, both ways')
   // slipped straight through the check written to catch it.
   const claims = (sub.match(/[A-Z][a-z]+|[A-Z]{3,}|\d+\/\d+/g) ?? []).map(w => w.toLowerCase())
   const unbacked = claims.filter(c => !labels.some(l => l.includes(c)))
-  check('every protocol the tile names is a preset that exists', unbacked.length === 0, { sub, unbacked, labels })
+  check('every protocol the row names is a preset that exists', unbacked.length === 0, { sub, unbacked, labels })
 
   // AND THE OTHER DIRECTION. Laps are REAL — their own tab in the same sheet,
   // one across from Round — so this is not the EMOM case. It is a tile named
