@@ -28,6 +28,7 @@
  */
 import type { Exercise, WorkoutDay } from './types'
 import { buildCoachTechniqueSummary } from './exercise-technique'
+import { sessionForDate, dayNameOf, addDays, type SessionMove } from './session-move'
 import { describeTempo } from './periodization'
 import { ceilingNoteForCoach } from './progression-ceiling'
 
@@ -243,6 +244,61 @@ export function buildTodayHeader(today: CoachToday): string {
   return `${when} ${session}${next}`
 }
 
+// ---------------------------------------------------------------------------
+// THE ROWS HAVE TO KNOW ABOUT MOVES TOO.
+//
+// Ashley, 12 Sep 2026, from the live app: she moved today's session to another
+// day, the card confirmed it, and the coach went on talking about "today's
+// deadlifts". Measured before touching anything — the payload she got, in one
+// piece:
+//
+//   It is Sunday morning. Today, Sunday, had Pull & Hinge on it and THEY MOVED
+//   IT TO MONDAY ... The next session after today is Tuesday's Push & Press.
+//
+//   Monday (tomorrow): Rest - no session prescribed
+//   Sunday (TODAY): Pull & Hinge - Deadlift (3x5), Barbell Row (3x8-10)
+//
+// Four statements; three of them say today is a deadlift day and Monday is
+// rest. buildTodayHeader was the only part of this file that had ever heard of
+// a move. The rows underneath were the plan's raw weekday list — the naive
+// `plan.find(d => d.day === name)` that session-move.ts's own header says was
+// eliminated everywhere — so the origin still printed its full session tagged
+// (TODAY) and the day it landed on printed "Rest".
+//
+// And the deployed prompt points the model AT the rows, over the header:
+// "every day row is tagged (TODAY) or (tomorrow). Read those and use them
+// verbatim. A session on a row that is not tagged (TODAY) is NOT today's."
+// So "today's deadlifts" was the app's own last line, read back.
+//
+// The week arrives already resolved rather than being resolved a second time
+// here: useTrainingWeek has asked sessionForDate for all seven dates before
+// this is called, and two readers of one fact is exactly how they come to
+// disagree (the comment that hook already carries, for the same reason).
+// ---------------------------------------------------------------------------
+export interface CoachWeekRow {
+  /**
+   * THE DATE, and it is not decoration. Deciding whether a move's destination
+   * is one of these rows by WEEKDAY NAME gets Monday the 7th confused with
+   * Monday the 14th — measured while building this: a Sunday session moved to
+   * the following Monday reported "it is listed on Monday" while the Monday
+   * row three lines above said "Rest", and the exercises vanished from the
+   * payload altogether. A weekday name is exactly the ambiguity this whole
+   * file is here to remove, so the comparison is on dates.
+   */
+  date: string
+  /** The weekday this row IS — Monday..Sunday, by date, not by whose session sits on it. */
+  dayName: string
+  /**
+   * What actually runs here, moves taken into account. Null (or absent, which
+   * TrainingWeekDay uses) on a move origin and on a true rest day.
+   */
+  session?: WorkoutDay | null
+  /** Set when THIS day's session has gone elsewhere. */
+  movedTo?: { date: string; dayName: string } | null
+  /** Set when another day's session has arrived here. */
+  movedFrom?: { date: string; dayName: string } | null
+}
+
 export interface CoachWeekBrief {
   days: WorkoutDay[]
   /** The active mesocycle week's own note — where a block-boundary load-hold or a deload explains itself. */
@@ -251,10 +307,22 @@ export interface CoachWeekBrief {
   pendingLoadSuggestions?: string[] | null
   /** Which day it is and what is true of it — see CoachToday. Omitted only when the caller genuinely does not know yet. */
   today?: CoachToday | null
+  /**
+   * The seven dated cells of the week the trainee is actually in, already
+   * resolved through sessionForDate — see CoachWeekRow.
+   *
+   * OPTIONAL, and absent means "render exactly as before". Every existing
+   * caller and gate passes only `days`, including the load-bearing
+   * `buildCoachExerciseSummary({ days: [] }) === ''` contract that a prompt
+   * rule keys on. The caller also withholds it while the week read is still
+   * in flight: a half-loaded week claims no moves, which is the very thing
+   * this exists to stop it claiming.
+   */
+  week?: CoachWeekRow[] | null
 }
 
 /** The whole `exercise_summary` payload sent to chat-gemini. */
-export function buildCoachExerciseSummary({ days, coachNote, pendingLoadSuggestions, today }: CoachWeekBrief): string {
+export function buildCoachExerciseSummary({ days, coachNote, pendingLoadSuggestions, today, week }: CoachWeekBrief): string {
   // HOW TO DO THEM, not just what they are. Added 5 Sep 2026 on Ashley's
   // "fix it": the app's 801 curated form cues had one reader in the whole
   // repo (the Exercise tab's How-to panel) and the coach was not it, so it
@@ -287,12 +355,61 @@ export function buildCoachExerciseSummary({ days, coachNote, pendingLoadSuggesti
     return idx === (todayIdx + 1) % 7 ? ' (tomorrow)' : ''
   }
 
+  const listOf = (d: WorkoutDay): string =>
+    d.exercises.length > 0 ? d.exercises.map(describeExerciseForCoach).join(', ') : describeNonLiftingDay(d)
+
+  // WHICH ROWS ARE VISIBLE, BY DATE, so a session moved out of this window is
+  // not simply lost. Ashley's Sunday moving to the following Monday is the
+  // case: the destination is not one of the seven cells, so the origin keeps
+  // the exercise list and says where it has gone. Dropping the list there
+  // would trade one silent wrong answer for another — and matching on the
+  // weekday NAME instead would find the wrong Monday (see CoachWeekRow.date).
+  const shownDates = new Set((week ?? []).map(r => r.date))
+
+  const rowFor = (r: CoachWeekRow): string => {
+    const label = `${r.dayName}${tag(r.dayName)}`
+    if (r.movedTo) {
+      // The plan's OWN row for this weekday, read deliberately raw: it is the
+      // only thing that can still say what the session is called now that
+      // sessionForDate has (correctly) resolved this date to nothing.
+      const own = days.find(d => d.day === r.dayName)
+      const name = own?.focus ?? 'The session'
+      // Off-window means no other row carries it, so this one has to. Neither
+      // sentence says "below": a destination can sit EARLIER in the week than
+      // its origin, and a row that points the wrong way is a fresh wrong
+      // answer of the kind this whole change is removing.
+      const offWindow = !shownDates.has(r.movedTo.date)
+      if (offWindow) {
+        return `${label}: ${name} - MOVED TO ${r.movedTo.dayName.toUpperCase()} ${r.movedTo.date}, which is outside the week listed here, so there is nothing to train here`
+          + (own && own.exercises.length > 0 ? `. What moved: ${listOf(own)}` : '')
+      }
+      return `${label}: ${name} - MOVED TO ${r.movedTo.dayName.toUpperCase()}, so there is nothing to train here; it is listed on the ${r.movedTo.dayName} row`
+    }
+    if (r.movedFrom && r.session) {
+      // Named by where it came from, never by the weekday it landed on —
+      // calling it Monday's session would quietly rename the work, which is
+      // the same rule sessionForDate states and buildTodayHeader already uses.
+      return `${label}: ${r.movedFrom.dayName}'s ${r.session.focus}, MOVED HERE - ${listOf(r.session)}`
+    }
+    if (!r.session) return `${label}: Rest - no session prescribed`
+    return `${label}: ${r.session.focus} - ${listOf(r.session)}`
+  }
+
+  // `days.length > 0` GUARDS THE ROWS, not just the header. An empty `days`
+  // means the plan has not arrived — App holds [] until its read resolves —
+  // and the resolved week is seven cells regardless, so rendering from it
+  // would print seven "Rest - no session prescribed" lines and hand the coach
+  // a rest week it invented. That is the same cold-load defect Home and the
+  // opener have each been fixed for, and it is what keeps
+  // `buildCoachExerciseSummary({ days: [] }) === ''` true with a week attached.
+  const rows = days.length === 0
+    ? ''
+    : week && week.length > 0
+      ? week.map(rowFor).join('\n')
+      : days.map(d => `${d.day}${tag(d.day)}: ${d.focus} - ${listOf(d)}`).join('\n')
+
   return (today && days.length > 0 ? `${buildTodayHeader(today)}\n\n` : '')
-    + days
-      .map(d => `${d.day}${tag(d.day)}: ${d.focus} - ${d.exercises.length > 0
-        ? d.exercises.map(describeExerciseForCoach).join(', ')
-        : describeNonLiftingDay(d)}`)
-      .join('\n')
+    + rows
     + (coachNote ? `\nThis week's coaching note: ${coachNote}` : '')
     + (pendingLoadSuggestions && pendingLoadSuggestions.length > 0
       ? `\nPending suggestion(s) waiting on the dashboard, not yet answered: ${pendingLoadSuggestions.join(' | ')}`
@@ -303,6 +420,49 @@ export function buildCoachExerciseSummary({ days, coachNote, pendingLoadSuggesti
     // their prescribed weights"). An unconditional header here would make the
     // coach think it had a plan it does not have.
     + (technique ? `\nHOW TO PERFORM THESE (the app's own cues, the same words shown on the Exercise tab):\n${technique}` : '')
+}
+
+/**
+ * THE NEXT SESSION AFTER A GIVEN DATE, moves taken into account.
+ *
+ * Lifted out of ChatAssistant on 12 Sep 2026, where it was
+ * `liveWeekDays.find(x => x.day === name && x.exercises.length > 0)` — the
+ * fifth surviving instance of the naive weekday lookup session-move.ts's
+ * header says was eliminated everywhere. On the day Ashley moved her Sunday
+ * session to Monday it skipped Monday (a rest row in the plan) and announced
+ * "the next session after today is Tuesday's Push & Press" — in the same
+ * paragraph that had just said the session was owed on Monday.
+ *
+ * Pure, and here rather than in the component, so a gate can drive it
+ * directly: a regex over a 4.6k-line component would prove nothing about what
+ * it returns. One call site, three readers fixed at once — this sentence in
+ * the coach's header, the chat opener, and the unprompted nudge.
+ *
+ * `dayName` is the weekday the session is actually DONE on, not the weekday it
+ * was prescribed for: a session that travelled to Monday is reached by turning
+ * up on Monday. `focus` still names the session itself, which is why a moved
+ * session keeps the name it had.
+ */
+export function nextSessionAfter(input: {
+  /** The day to look forward FROM — today, in YYYY-MM-DD. */
+  date: string
+  plan: WorkoutDay[]
+  moves: SessionMove[]
+  /** How far to look. Six keeps it inside the week the moves were read for. */
+  lookaheadDays?: number
+}): { dayName: string; focus: string; lead: string | null; isTomorrow: boolean } | null {
+  const { date, plan, moves, lookaheadDays = 6 } = input
+  for (let ahead = 1; ahead <= lookaheadDays; ahead++) {
+    const on = addDays(date, ahead)
+    const resolved = sessionForDate({ date: on, plan, moves })
+    // A move ORIGIN resolves to nothing, which is the point: the session is
+    // not run there, so it is not the next session.
+    const day = resolved.movedTo ? null : resolved.day
+    if (!day || day.exercises.length === 0) continue
+    const lead = day.exercises.find(e => e.tier === 'tier_1_primary')?.name ?? day.exercises[0]?.name ?? null
+    return { dayName: dayNameOf(on), focus: day.focus, lead, isTomorrow: ahead === 1 }
+  }
+  return null
 }
 
 // ---------------------------------------------------------------------------

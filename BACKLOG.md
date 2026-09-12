@@ -2,6 +2,104 @@
 
 Newest first. One line each.
 
+- [x] **THE COACH KEPT TALKING ABOUT A SESSION THAT HAD MOVED — AND THE APP WAS
+  TELLING IT TO.** Ashley, 12 Sep 2026: she moved today's session to another day
+  from chat, the card confirmed it, the screens updated, and the next turns still
+  referenced "today's deadlifts".
+  **THE PRESCRIBED CAUSE WAS WRONG, AND SAYING SO IS THE POINT.** The report
+  asked for the context builder to "dynamically re-query the schedule on every
+  message turn rather than relying on cached or default day-of-week templates"
+  and to "ensure state is fresh after any tool/action execution". Traced end to
+  end: it already does both. `buildContext()` is called inline at the request's
+  `context:` field, never memoised; there is no day-of-week template anywhere in
+  it; confirming a move calls `onLogsUpdated`, which App wires to a version
+  counter that is the refresh token on the week read; and `getSessionMovesInRange`
+  queries BOTH ends, so a session moved out of the Mon-Sun window is still found
+  by its origin. Re-querying was never the problem. Building that fix would have
+  changed nothing and closed the ticket.
+  **WHAT WAS ACTUALLY WRONG, measured before touching anything** by running the
+  two pure builders over her exact state and printing the string the coach was
+  handed. All of it, in one payload:
+      It is Sunday morning. Today, Sunday, had Pull & Hinge on it and THEY MOVED
+      IT TO MONDAY... The next session after today is Tuesday's Push & Press.
+      Monday (tomorrow): Rest - no session prescribed
+      Sunday (TODAY): Pull & Hinge - Deadlift (3x5), Barbell Row (3x8-10)
+  Four statements. **One knew about the move; three said today was a deadlift
+  day and Monday was rest** — including a self-contradiction two clauses into
+  the same sentence. And the deployed prompt points the model at the ROWS over
+  the prose: *"every day row is tagged (TODAY) or (tomorrow). Read those and use
+  them verbatim. A session on a row that is not tagged (TODAY) is NOT today's."*
+  So "today's deadlifts" was the app's own last line, read back to her.
+  `buildTodayHeader` was the only part of the coach's week that had ever heard of
+  a move. The seven rows under it were the plan's raw weekday list, and the
+  "next session" walk was `liveWeekDays.find(x => x.day === name)` — **the FIFTH
+  surviving instance** of the naive lookup `session-move.ts`'s own header says
+  was eliminated everywhere ("Everything now asks sessionForDate"). That walk
+  also feeds the chat opener and the unprompted nudge, so all three named the
+  wrong day.
+  **Fixed:** the rows now come from the seven dated cells `useTrainingWeek` has
+  already resolved (reused, not resolved a second time — two readers of one fact
+  is how they come to disagree). The day a session left says where it went and
+  lists nothing; the day it landed on carries it, named by the day it came from,
+  never renamed to the weekday it landed on. `nextSessionAfter` moved out of the
+  component into `chat-plan-context.ts` and walks dates through `sessionForDate`,
+  so a gate can drive it.
+  **TWO BUGS THE MEASUREMENT CAUGHT IN MY OWN FIX, both after it "worked".**
+  (1) Whether the destination was one of the seven rows was decided by WEEKDAY
+  NAME — so a Sunday session moved to the FOLLOWING Monday matched Monday the
+  7th, three rows above, the origin said "it is listed on Monday" while that
+  Monday said "Rest", and the exercises vanished from the payload entirely. Now
+  compared on dates; an off-window destination keeps the list on the origin and
+  says the destination is past the rows. (2) The rows rendered from the resolved
+  week even when the plan itself had not loaded, printing seven invented
+  "Rest - no session prescribed" lines — the same cold-load defect Home and the
+  opener have each been fixed for, and it broke the load-bearing
+  `buildCoachExerciseSummary({ days: [] }) === ''` contract a prompt rule keys on.
+  Both were found by a check failing, not by reading.
+  **Verified:** `test:coach-plan-context` §8, 20 behavioural checks on the real
+  builders (the load-bearing one: nothing tagged (TODAY) may list exercises while
+  the header says the session left); two property checks added to
+  `test:moved-session-stuck` §7, whose title said "all three naive lookups" and
+  was already out of date. **`verify:coach-week-move`** is the half no pure
+  function can prove: a real mount at 390x844, whose `useTrainingWeek` reads a
+  real move row out of the database, with the model stubbed at the fetch boundary
+  and THE REQUEST BODY KEPT — the payload itself is the measurement, not anything
+  a model then says about it. 8 checks, screenshot read.
+  **15 mutations tried, 15 caught** (11 against the logic gates, 4 against the
+  browser driver) — but only after two of them were re-done, and both re-dos are
+  the point. One came back MISSED because the MUTATION had not applied:
+  whitespace had drifted under an earlier edit, so the string replace matched
+  nothing. Re-run with the edit asserted, it failed 7 checks including the
+  original defect line verbatim. The other came back MISSED because the CHECK
+  was in the wrong block — it asserted that no moved row says "look below" but
+  sat in the off-window case, which never renders that sentence, so it could not
+  have failed. Moved into the branch it guards, it catches. A mutation that
+  silently no-ops and a check that cannot fail look identical from the outside:
+  both print a tick.
+  **Decided without asking** (mechanical, per CLAUDE.md): making the coach's week
+  agree with the week strip, Home and the Exercise tab is data consistency, and
+  the behaviour it now matches is Ashley's own 10 Sep ruling that a moved day
+  leaves today on every screen. No new wording decision was taken.
+  **Full sweep: 166 gates, 164 pass.** The two failures are `test:meal-quality`
+  and `test:schema-parity`, which need a live database this machine cannot reach
+  — environmental, as CLAUDE.md records, not this change. Seven browser drivers
+  around moves and chat re-run and green (`moved-session`, `session-move`,
+  `what-happened`, `rest-day-race`, `chat-shell`, `coach-speaks-first`,
+  `session-edit`). `npx tsc --noEmit` clean.
+  **Frontend only — NO function deploy.** `exercise_summary` is interpolated
+  verbatim by the already-deployed function, which is why that module exists.
+  Once the rows are honest the prompt rule quoted above becomes correct rather
+  than harmful, so the prompt is untouched.
+  **Not covered, named:** the rows still say nothing about a day being missed,
+  swapped for an activity, or a chosen rest — `useTrainingWeek` already carries
+  all three, so it is cheap, but each is a wording decision. And a move whose
+  ORIGIN is in a later week is invisible to the six-day lookahead, because the
+  move read covers this Mon-Sun window only.
+  **Still outstanding on Ashley's machine, unconfirmed:** the `marked_missed`
+  migration (`npm run db:push-both`) and `npm run deploy:functions:prod --
+  chat-gemini` for `propose_missed_session`, `propose_exercise_remove` and
+  `propose_exercise_reorder`. Neither is needed by this change.
+
 - [x] **AN OUTSIDE REVIEW OF ONE SESSION: ALL THREE FINDINGS WRONG, AND THE REAL
   HOLE UNDERNEATH THEM.** Ashley asked Gemini to rate a generated Push & Press
   session, 11 Sep 2026 (Arm Circles / Barbell Bench 3x6-8 @42.5kg / DB Shoulder

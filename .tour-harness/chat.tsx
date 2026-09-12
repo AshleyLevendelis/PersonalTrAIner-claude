@@ -52,6 +52,12 @@ const todayIdx = new Date().getDay()
 // training days shift by one: the day it came FROM trains, the day it landed
 // on does not.
 const MOVED_IN = new URLSearchParams(location.search).get('movedin') === '1'
+// ?movedaway=1 — THE OTHER END, and Ashley's 12 Sep case: TODAY is a training
+// day and its session has been moved to tomorrow. The point of the fixture is
+// what the coach is TOLD, not what is drawn: the payload used to carry a
+// (TODAY) row with the full session on it while the header said the session
+// had left.
+const MOVED_AWAY = new URLSearchParams(location.search).get('movedaway') === '1'
 const availableIdx = new Set(MOVED_IN
   ? [(todayIdx + 6) % 7, (todayIdx + 2) % 7, (todayIdx + 4) % 7, (todayIdx + 5) % 7]
   : [todayIdx, (todayIdx + 2) % 7, (todayIdx + 4) % 7, (todayIdx + 5) % 7])
@@ -145,6 +151,13 @@ const movedInSession = MOVED_IN
       split_type: 'moved', duration_minutes: 0, moved_to_date: iso(0),
     }]
   : []
+// Origin TODAY, target tomorrow — the mirror of the row above.
+const movedAwaySession = MOVED_AWAY
+  ? [{
+      id: 'ws-movedaway', profile_id: PROFILE_ID, date: iso(0), is_completed: false,
+      split_type: 'moved', duration_minutes: 0, moved_to_date: iso(1),
+    }]
+  : []
 const finishedSession = SEED_NUDGE
   ? [{
       id: 'ws-today', profile_id: PROFILE_ID, date: todayStr,
@@ -155,7 +168,7 @@ const finishedSession = SEED_NUDGE
 
 const db: Db = {
   fitness_profiles: [{ ...profile, id: PROFILE_ID }],
-  daily_metrics: [], exercise_set_logs: [], workout_sessions: [...finishedSession, ...movedInSession], cardio_logs: [],
+  daily_metrics: [], exercise_set_logs: [], workout_sessions: [...finishedSession, ...movedInSession, ...movedAwaySession], cardio_logs: [],
   daily_steps: [], meal_events: [], meal_plan_picks: [], meal_plan_slots: [],
   favorite_meals: [], grocery_items: [], load_suggestions: [], pending_actions: [],
   plan_adaptations: [], user_facts: [], user_context_facts: [], user_goals: [],

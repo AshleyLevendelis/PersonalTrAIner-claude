@@ -206,6 +206,20 @@ check('the rest-day card resolves its day through sessionForDate',
 check('...and no longer looks the day up in the plan directly',
   restBuilder.length > 200 && !/exercisePlan\.find\(d => d\.day === dayName\)/.test(restBuilder),
   restBuilder.length)
+// THE FIFTH ONE, found 12 Sep 2026. The header of this section says "all
+// three", and there were more: the component's own walk for "what is the next
+// session" was `liveWeekDays.find(x => x.day === name && x.exercises.length > 0)`,
+// so on the day Ashley moved her Sunday session to Monday it skipped Monday —
+// a rest row in the plan — and told the coach the next session was Tuesday's,
+// in the same paragraph that said the session was owed on Monday. Pinned as a
+// property here; what it RETURNS is driven directly in test:coach-plan-context
+// §8, because the walk now lives in a module a gate can call.
+check('the next-session walk asks the resolver rather than the plan row',
+  /nextSessionAfter\(\{ date: activeSession\.date, plan: liveWeekDays, moves: trainingWeek\.moves \}\)/.test(chatSrc)
+  && !/liveWeekDays\.find\(x => x\.day === name/.test(chatSrc), null)
+check("the coach's week rows are the resolved ones, so a moved day cannot list a session",
+  /week: trainingWeek\.loading \? null : trainingWeek\.days/.test(chatSrc), null)
+
 check('the move card writes the TRUE origin, not the day it was sitting on',
   /fromDate: trueFromDate/.test(chatSrc) && /const trueFromDate = target\.remapFrom \?\? fromDate/.test(chatSrc), null)
 // The chips, at their source. Pinned as "the moved-in refusal carries a

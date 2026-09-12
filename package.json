@@ -202,6 +202,7 @@
     "verify:rest-day-race": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/rest-day-race.mjs",
     "verify:session-move": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/session-move.mjs",
     "verify:moved-session": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/moved-session.mjs",
+    "verify:coach-week-move": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/coach-week-move.mjs",
     "verify:single-implement": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/single-implement.mjs",
     "verify:ramp-ticks": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/ramp-ticks.mjs",
     "verify:calibration-search": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/calibration-search.mjs",
