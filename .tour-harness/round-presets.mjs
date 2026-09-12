@@ -139,6 +139,83 @@ check('20. the line under it promises no rest either',
   (sub.match(/Minute 1 of 10[^\n]*/) || sub.match(/next one starts[^\n]*/) || ['not found'])[0])
 await shoot('round-presets-emom-running')
 
+// --- FINISH A ROUND AND LOG IT ---------------------------------------------
+// Ashley, 12 Sep 2026: "I logged it but it doesn't show anywhere on the app
+// and the coach has no knowledge of it." It never logged — the button reset
+// the timer and changed tab. Driven here end to end against the real clock
+// with the shortest round the form allows, so the finished state is reachable
+// in seconds rather than minutes.
+console.log('\n  LOGGING A FINISHED ROUND')
+// CLEAR THE EMOM STILL RUNNING FROM THE SECTION ABOVE. A live round holds the
+// whole tab, so without this the tile grid is never on screen and every check
+// below fails for the wrong reason — which is exactly what the first run did.
+await ev(`(() => { const b = [...document.querySelectorAll('button')].find(x => /^Reset$/.test(x.textContent.trim())); if (b) b.click(); return !!b })()`)
+await wait(1200)
+await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off#/tab/tools` })
+await wait(3500)
+const gridUp = await ev(`/Rounds & intervals/.test(document.body.innerText)`)
+check('20b. the round released the tab, so the tiles are back', gridUp === true,
+  (await ev(`document.body.innerText`)).slice(0, 120))
+check('21. the rounds tile opens again', await clickText('/Rounds & intervals/'))
+await wait(800)
+// 2 rounds x 1s work / 1s rest, and skip the ten-second countdown.
+await ev(`(() => {
+  const set = (el, v) => { Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(el, v); el.dispatchEvent(new Event('input', { bubbles: true })) }
+  const ins = [...document.querySelectorAll('input[type=number]')]
+  if (ins.length >= 3) { set(ins[0], '2'); set(ins[1], '1'); set(ins[2], '1') }
+})()`)
+await wait(500)
+check('22. Start is pressed', await clickText('/^Start$/'))
+await wait(1000)
+check('23. tapping skips the countdown', await tap('[role="button"][aria-label^="Get ready"]'))
+// 2x1s work + 1x1s rest = 3s, plus slack.
+await wait(6000)
+const finished = await ev(`/Log session/.test(document.body.innerText)`)
+check('24. the finished round offers to log it', finished === true,
+  (await ev(`document.body.innerText`)).slice(0, 160))
+
+check('25. tapping Log session opens something that can actually write',
+  await clickText('/^Log session$/'))
+await wait(1200)
+const sheet = await ev(`document.body.innerText`)
+// AN INPUT'S VALUE IS NOT PAGE TEXT, which is what the first version of this
+// looked for — it searched innerText for "Intervals" and found nothing while
+// the field held it. The property here is which FORM opened: conditioning,
+// with an effort to pick, rather than the lift form the sheet defaults to.
+// The values themselves are read straight off the inputs in 27.
+check('26. ...on the conditioning side, with an effort still to answer',
+  /RPE/.test(sheet) && /Save/.test(sheet), sheet.slice(0, 200))
+const filled = await ev(`(() => {
+  const out = {}
+  for (const i of document.querySelectorAll('input')) {
+    const l = (i.closest('label') || {}).textContent || i.getAttribute('aria-label') || ''
+    if (i.value) out[l.trim().slice(0, 24) || i.type] = i.value
+  }
+  return out
+})()`)
+check('27. ...with the activity and the minutes already in it',
+  JSON.stringify(filled).includes('Intervals') && /"1"/.test(JSON.stringify(filled)), filled)
+await shoot('round-log-sheet')
+
+// THE WRITE ITSELF. The queue is local-first, so the row exists the moment it
+// saves — read it back out of the fake database rather than trusting the UI.
+const saveClicked = await ev(`(() => {
+  const b = [...document.querySelectorAll('button')].find(x => /^(Save|Log it|Add)$/i.test(x.textContent.trim()))
+  if (!b || b.disabled) return [...document.querySelectorAll('button')].map(x => x.textContent.trim()).filter(Boolean)
+  b.click(); return true
+})()`)
+check('28. the save button is found and pressed', saveClicked === true, saveClicked)
+await wait(1500)
+const logged = await ev(`document.body.innerText`)
+check('29. the app says it was logged, rather than going quiet',
+  /Logged ·/.test(logged), logged.slice(0, 200))
+// ONLY MEANINGFUL IF THE LOG HAPPENED. Asserted against the confirmation, not
+// on its own: mid-round there is no "Log session" either, so this passed once
+// while every check around it failed.
+check('30. ...and the timer released the screen only after that',
+  /Logged ·/.test(logged) && !/Log session/.test(logged), logged.slice(0, 160))
+await shoot('round-logged')
+
 const err = await ev(`window.__lastError ?? null`)
 check('no uncaught error on the page', err === null || err === undefined, err)
 

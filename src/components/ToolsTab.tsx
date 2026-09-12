@@ -14,6 +14,8 @@ import { useActiveSession } from '@/hooks/useActiveSession'
 import type { MacroTargets, WorkoutDay, MesocycleWeek } from '@/lib/types'
 import type { MealSlotName } from '@/lib/meal-store'
 import type { PoolOption } from '@/lib/meal-generation'
+import type { RoundLogSummary } from '@/lib/timer-engine'
+import { AddUnplannedWork } from '@/components/exercise/AddUnplannedWork'
 
 // ---------------------------------------------------------------------------
 // Turn 12 ("one owner per fact") — the retired Meals tab's grocery section
@@ -64,6 +66,11 @@ export function ToolsTab({ profileId, mealPools, targets, softLikedFoods, todays
   const [historyCount, setHistoryCount] = useState<{ sessions: number; prs: number } | null>(null)
   const [plateOpen, setPlateOpen] = useState(false)
   const [timerOpen, setTimerOpen] = useState(false)
+  // The finished round waiting to be written down, and the line that says it
+  // was. Ashley, 12 Sep 2026: "I logged it but it doesn't show anywhere on the
+  // app" — it never wrote anything, and it never said so either.
+  const [roundToLog, setRoundToLog] = useState<RoundLogSummary | null>(null)
+  const [loggedNote, setLoggedNote] = useState<string | null>(null)
   const [historyOpen, setHistoryOpen] = useState(false)
   const grocerySectionRef = useRef<HTMLDivElement | null>(null)
 
@@ -191,13 +198,46 @@ export function ToolsTab({ profileId, mealPools, targets, softLikedFoods, todays
     // will capture it again.
     return (
       <div data-tour="toolsall">
-        <RoundField />
+        <RoundField onLogSession={setRoundToLog} />
+        {/* WHERE THE FINISHED ROUND GOES. Mounted inside this branch too,
+            because this branch returns early and a sheet rendered only in the
+            normal layout below could never open from the field. */}
+        <AddUnplannedWork
+          open={!!roundToLog}
+          onOpenChange={o => { if (!o) setRoundToLog(null) }}
+          hideTrigger
+          prefill={roundToLog
+            ? { activityName: roundToLog.activityName, durationMinutes: roundToLog.durationMinutes, notes: roundToLog.detail }
+            : undefined}
+          onCardioLogged={() => {
+            // ONLY NOW. The round is released after the write, not before it —
+            // resetting first is what threw the session away last time.
+            setLoggedNote(`Logged · ${roundToLog?.activityName} · ${roundToLog?.durationMinutes} min`)
+            setRoundToLog(null)
+            timers.reset()
+          }}
+        />
       </div>
     )
   }
 
   return (
     <div data-tour="toolsall" className="flex flex-col gap-[26px]">
+      {/* SAY THE WRITE HAPPENED. A cardio log is local-first and queued, so
+          the round leaves the screen the instant it saves and there would
+          otherwise be nothing at all to show for it — which is
+          indistinguishable from the button that never logged. Dismissible,
+          and gone on the next thing she does. */}
+      {loggedNote && (
+        <button
+          type="button"
+          onClick={() => setLoggedNote(null)}
+          className="rounded-xl px-3.5 py-2.5 text-left text-[0.8125rem]"
+          style={{ background: 'color-mix(in srgb, var(--primary) 14%, transparent)', color: 'var(--foreground)' }}
+        >
+          {loggedNote} — it's on your week and the coach can see it. Tap to dismiss.
+        </button>
+      )}
       <div>
         <p className="ds-label">Tools</p>
         <div className="mt-1.5 grid grid-cols-2 gap-2.5">

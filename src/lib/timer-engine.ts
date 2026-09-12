@@ -328,3 +328,60 @@ export function roundSubline(config: RoundConfig, phase: 'ready' | 'work' | 'res
   }
   return `${Noun} ${Math.min(round + 1, config.rounds)} of ${config.rounds} starts when this hits zero.`
 }
+
+// ---------------------------------------------------------------------------
+// WHAT A FINISHED ROUND IS, AS A THING TO LOG.
+//
+// Ashley, 12 Sep 2026, from the live app: "I started a round timer and did 3
+// rounds 120s each with 30s rest. When I finished, the app asked me if i
+// wanted to log the workout. I logged it but it doesn't show anywhere on the
+// app and the coach has no knowledge of it."
+//
+// IT NEVER LOGGED ANYTHING. The finished field's button said "Log session"
+// and its handler called timers.reset() and changed the tab — nothing was
+// written, and the reset destroyed the round on the way out, so by the time
+// she arrived on the Exercise tab the app no longer knew what she had done.
+// Its own comment claimed "A REAL ACTION, not a decoration ... a button that
+// only dismissed itself would be lying about what it does". Navigating away
+// IS dismissing itself, with extra steps.
+//
+// A round is CONDITIONING, not sets and reps, so it belongs in the cardio log
+// — which the week strip already counts as work done, the streak already
+// reads, and the coach already receives as cardio_log_history. One honest
+// write lands in all three.
+//
+// THE COUNTDOWN IS NOT TRAINING, so it is not in the duration: the figure is
+// the schedule the person actually worked, rounds x work + (rounds-1) x rest,
+// which is totalRoundSeconds minus the lead-in. Same no-trailing-rest rule as
+// everywhere else in this file.
+//
+// WHAT THIS DELIBERATELY DOES NOT INVENT: how hard it was. saveCardioLog
+// requires an RPE and this module has no way to know one, so the caller asks
+// — the same question AddUnplannedWork already asks for any other unplanned
+// conditioning. A default effort would be a number the app made up about her
+// training, which is the class of thing this codebase keeps finding and
+// removing.
+// ---------------------------------------------------------------------------
+export interface RoundLogSummary {
+  /** What to call it in the log — the noun a person would use. */
+  activityName: string
+  /** Whole minutes of work+rest, countdown excluded. At least 1. */
+  durationMinutes: number
+  /** "3 rounds · 120s work / 30s rest" — the detail line, for the note. */
+  detail: string
+}
+
+export function roundLogSummary(config: RoundConfig): RoundLogSummary {
+  const emom = roundStyleOf(config) === 'emom'
+  const workedSeconds = config.rounds * config.workSeconds
+    + Math.max(0, config.rounds - 1) * config.restSeconds
+  return {
+    activityName: emom ? 'EMOM' : 'Intervals',
+    // Rounded, never floored to zero: a 40-second round is still a thing that
+    // happened, and a log reading "0 min" would be the app disbelieving her.
+    durationMinutes: Math.max(1, Math.round(workedSeconds / 60)),
+    detail: emom
+      ? `${config.rounds} × every ${config.workSeconds}s`
+      : `${config.rounds} rounds · ${config.workSeconds}s work / ${config.restSeconds}s rest`,
+  }
+}

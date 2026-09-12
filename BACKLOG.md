@@ -2,6 +2,58 @@
 
 Newest first. One line each.
 
+- [x] **"LOG SESSION" LOGGED NOTHING — A BUTTON THAT LIED, AND ITS OWN COMMENT
+  SAID SO.** Ashley, 12 Sep 2026, from the live app: *"I started a round timer
+  and did 3 rounds 120s each with 30s rest. When I finished, the app asked me
+  if i wanted to log the workout. I logged it but it doesn't show anywhere on
+  the app and the coach has no knowledge of it."*
+  **It never logged.** The finished round field's button read "Log session" and
+  its whole handler was `timers.reset(); window.location.hash =
+  tabHash('exercise')` — no write of any kind, and the reset destroyed the
+  round on the way out, so nothing downstream could have recovered what she
+  did. She landed on the Exercise tab and reasonably assumed it was done.
+  **THE COMMENT DIRECTLY ABOVE IT READ:** *"A REAL ACTION, not a decoration.
+  ... the design named the button 'Log session' and a button that only
+  dismissed itself would be lying about what it does."* Navigating away IS
+  dismissing itself. The sentence was correct and the code did not obey it, and
+  nothing checked, so it shipped and stayed. Kept in the record because being
+  convinced by your own comment is the actual failure here — not the missing
+  write.
+  **A ROUND IS CONDITIONING**, so it belongs in the cardio log, which the week
+  strip already counts as work done, the streak already reads, and the coach
+  already receives as `cardio_log_history`. One honest write reaches all three
+  places she looked. `roundLogSummary` (timer-engine.ts, pure and gateable)
+  turns her session into "Intervals · 7 min · 3 rounds · 120s work / 30s rest";
+  the finished button hands that to the existing `AddUnplannedWork` sheet,
+  pre-filled, which saves through the existing `saveCardioLog` queue.
+  **THE COUNTDOWN IS NOT TRAINING** so it is not in the duration, and **the
+  effort is never invented**: `saveCardioLog` demands an RPE, the app cannot
+  know one, so the sheet asks — the same question it already asks for any other
+  unplanned conditioning. A default RPE would be the app making up a fact about
+  her training.
+  **THE RESET MOVED TO AFTER THE WRITE.** Cancel and the finished round is
+  still on screen to log again; previously the reset ran first, which is
+  precisely how the session was thrown away.
+  **Gate `test:round-logging` + `verify:round-presets` §21-30**, which runs a
+  real 2×1s/1s round to completion in a browser at 390×844, taps Log session,
+  reads "Intervals" and the minutes back out of the actual inputs, saves, and
+  asserts the confirmation appears. **8 mutations tried, 8 caught — but only
+  after three came back MISSED and each was my check, not the code:**
+  (1) the countdown check recomputed the same expression the code uses, and on
+  a 7-minute round a 10-second countdown cannot move the rounding either way,
+  so it was arithmetically incapable of failing — re-pinned as invariance (two
+  configs differing only in lead-in must agree, with a 10-minute lead-in to
+  make it bite); (2) the detail-line check tested that ToolsTab HANDED OVER the
+  notes, never that the save used them, and a mutation dropping them at the
+  writing end passed; (3) the confirmation check tested that the banner's
+  render existed, so deleting the line that sets it left the check green and
+  the banner permanently invisible.
+  **Two more can't-fail checks found in the browser driver the same way:** one
+  asserted a next-week button had been CLICKED rather than that anything
+  changed, and one looked for an input's VALUE in page text, where values never
+  appear.
+  **Frontend only.** No migration, no function deploy.
+
 - [x] **FULL PROGRAM SHOWED THE SESSION ON THE DAY IT HAD LEFT.** Ashley,
   12 Sep 2026, with a screenshot: she moved Saturday's session to Sunday from
   the chat, the card confirmed it — and Full Program went on showing

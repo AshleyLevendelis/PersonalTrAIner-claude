@@ -1,8 +1,7 @@
 import type React from 'react'
 import { useTimers } from '@/hooks/useTimers'
 import { TAB_BAR_HEIGHT_PX } from '@/components/BottomTabBar'
-import { tabHash } from '@/lib/app-route'
-import { roundSubline, roundHeadline, roundDoneLabel, roundStyleOf, type RoundConfig } from '@/lib/timer-engine'
+import { roundSubline, roundHeadline, roundDoneLabel, roundStyleOf, roundLogSummary, type RoundConfig, type RoundLogSummary } from '@/lib/timer-engine'
 
 // ---------------------------------------------------------------------------
 // THE ROUND TIMER AS A FIELD — design handoff "Timer colour states", 2a.
@@ -62,7 +61,15 @@ function formatRemaining(ms: number): string {
 // happens, because "20s rest next" was untrue there) and adds the EMOM case.
 const subline = roundSubline
 
-export function RoundField() {
+export function RoundField({ onLogSession }: {
+  /**
+   * Hands the finished round to whoever can write it down. Optional only
+   * because the type says so; when it is absent the button below stops
+   * offering to log, rather than offering and doing nothing — which is the
+   * exact defect this prop exists to fix.
+   */
+  onLogSession?: (summary: RoundLogSummary) => void
+} = {}) {
   const timers = useTimers()
   const config = timers.roundConfig
   if (!config) return null
@@ -109,15 +116,32 @@ export function RoundField() {
     : roundStyleOf(config) === 'emom' ? ''
     : phase === 'work' ? 'Work' : 'Rest'
 
-  const primaryLabel = phase === 'done' ? 'Log session' : timers.running ? 'Pause' : 'Resume'
+  // "Done" when nothing can record it — a button must not offer what the
+  // screen it is on cannot do.
+  const primaryLabel = phase === 'done'
+    ? (onLogSession ? 'Log session' : 'Done')
+    : timers.running ? 'Pause' : 'Resume'
   const onPrimary = () => {
     if (phase === 'done') {
-      // A REAL ACTION, not a decoration. Sets are logged on the Exercise tab,
-      // so this goes there and releases the field on the way — the design
-      // named the button "Log session" and a button that only dismissed
-      // itself would be lying about what it does.
-      timers.reset()
-      window.location.hash = tabHash('exercise')
+      // IT NOW LOGS. Ashley, 12 Sep 2026: "I logged it but it doesn't show
+      // anywhere on the app and the coach has no knowledge of it." It never
+      // did — this called timers.reset() and changed the tab, writing nothing,
+      // and the reset destroyed the round on the way out so nothing downstream
+      // could have recovered what she did.
+      //
+      // The comment that used to sit here said "A REAL ACTION, not a
+      // decoration ... a button that only dismissed itself would be lying
+      // about what it does". Navigating away IS dismissing itself, so the
+      // sentence was true and the code did not obey it. Kept in the record
+      // because being convinced by your own comment is the failure here.
+      //
+      // NO RESET UNTIL THE LOG LANDS. The caller resets once the write is
+      // saved; cancel and the finished round is still on screen to log again.
+      // Without a handler this is a plain dismiss, and the label below says
+      // "Done" to match. A button that neither logs nor clears would be the
+      // same lie in a quieter voice.
+      if (!onLogSession) { timers.reset(); return }
+      onLogSession(roundLogSummary(config))
       return
     }
     if (timers.running) timers.pauseRound()

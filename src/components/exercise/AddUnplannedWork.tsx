@@ -29,6 +29,7 @@ export function AddUnplannedWork({
   open,
   onOpenChange,
   hideTrigger,
+  prefill,
 }: {
   onLiftAdded?: () => void
   onCardioLogged?: () => void
@@ -40,6 +41,17 @@ export function AddUnplannedWork({
   /** Suppresses the standalone "Add unplanned work" trigger button — the
    * caller owns opening this via `open` instead (their own menu item). */
   hideTrigger?: boolean
+  /**
+   * OPEN STRAIGHT INTO CONDITIONING, ALREADY FILLED IN. Added 12 Sep 2026 for
+   * the finished round timer, which knows exactly what was just done and had
+   * no way to say so — its "Log session" button navigated here and wrote
+   * nothing.
+   *
+   * Everything except the effort, which the app cannot know and must not
+   * invent, so the one thing left to answer is the one thing only she can.
+   * The fields stay editable: a prefill is a head start, not a claim.
+   */
+  prefill?: { activityName: string; durationMinutes: number; notes?: string }
 }) {
   const { profileId, date, declareOffPlan } = useActiveSession()
   const [mode, setMode] = useState<null | 'lift' | 'cardio'>(null)
@@ -51,10 +63,19 @@ export function AddUnplannedWork({
   const [saving, setSaving] = useState(false)
 
   // Controlled mode: opening from outside (the day-level menu) needs a
-  // default sub-tab, since nothing here set `mode` yet.
+  // default sub-tab, since nothing here set `mode` yet. A prefill says which
+  // one and fills it — conditioning, because that is the only shape a prefill
+  // currently arrives in.
   useEffect(() => {
-    if (hideTrigger && open && mode === null) setMode('lift')
-  }, [hideTrigger, open, mode])
+    if (!hideTrigger || !open || mode !== null) return
+    if (prefill) {
+      setMode('cardio')
+      setActivity(prefill.activityName)
+      setDuration(String(prefill.durationMinutes))
+      return
+    }
+    setMode('lift')
+  }, [hideTrigger, open, mode, prefill])
 
   const reset = () => {
     setMode(null)
@@ -90,6 +111,9 @@ export function AddUnplannedWork({
       activityName: activity.trim(),
       durationMinutes: minutes,
       intensityRpe: rpe,
+      // "3 rounds · 120s work / 30s rest" — what the timer actually ran, so
+      // the log says more than "Intervals, 7 min" when she reads it back.
+      notes: prefill?.notes ?? null,
     })
     setSaving(false)
     if (!view) {

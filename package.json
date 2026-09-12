@@ -28,6 +28,7 @@
     "test:grocery": "tsx scripts/test-grocery.ts",
     "test:profile-restore": "tsx scripts/test-profile-restore.ts",
     "test:dashboard": "tsx scripts/test-dashboard.ts",
+    "test:round-logging": "tsx scripts/test-round-logging.ts",
     "test:round-presets": "tsx scripts/test-round-presets.ts",
     "test:timers": "tsx scripts/test-timers.ts",
     "test:cardio-log": "tsx scripts/test-cardio-log.ts",
