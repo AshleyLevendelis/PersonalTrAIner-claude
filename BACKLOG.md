@@ -2,6 +2,65 @@
 
 Newest first. One line each.
 
+- [x] **THE TOOLS TILE NAMED THREE TIMERS AND THE APP HAD NONE OF THEM.**
+  Ashley, 12 Sep 2026, from the live app: *"under rest timers the app shows
+  emom and tabata but these timers dont exist"*. Measured: behind
+  "Rounds & intervals — EMOM, Tabata, laps" were three number inputs (Rounds,
+  Work, Rest) and no presets whatsoever.
+  - **EMOM** — absent, and not typeable either: its rest is whatever is LEFT of
+    the minute, and this engine only has a fixed work/rest pair.
+  - **Tabata** — reachable only by already knowing to type 8 / 20 / 10.
+  - **laps** — see the correction below.
+  **WHY NOTHING CAUGHT IT.** `test:says-what-it-contains` reads prose GENERATED
+  FROM A PLAN — week notes, the coach's summary, the first-run intro. Every word
+  on that tile is a hardcoded string in a component, generated from nothing, so
+  it sat outside that gate by construction. It is the THIRD subtitle in
+  `ToolsTab.tsx` to have promised something absent; the other two ("your plates",
+  a rest-timer settings screen) were caught by reading, which is not a method.
+  **HER RULING, 12 Sep 2026.** Offered three shapes — correct the label only;
+  add one-tap presets; or add presets AND build EMOM properly — she chose the
+  middle: **add the presets.** So `ROUND_PRESETS` now holds Tabata (8×20/10),
+  40/20, 30/30 and Boxing rounds (3×3min/1min), in `timer-engine.ts` rather than
+  in the component so a gate can call the table. Tapping one FILLS the three
+  fields and does not start the timer — a preset that ran on tap would launch
+  four minutes of work from one mis-tap with the numbers never shown. EMOM stays
+  out and stays unnamed.
+  **CORRECTION, same day, from reading the screenshot I had just taken.** I
+  wrote that laps "live on the STOPWATCH tab". They do not: **Lap is its own
+  tab in the same sheet**, one across from Round. I reached the wrong version by
+  grepping `lap` in the timers hook, finding `laps: LapEntry[]` beside the
+  stopwatch state, and stopping — `TimersPanel.tsx:44` renders
+  `['stopwatch', 'lap', 'round']` and settles it, and I had had that line on
+  screen earlier and read past it. So laps were never the EMOM case: the tile
+  was advertising the tab NEXT DOOR. Still wrong to say on a tile named for this
+  one, so the check stayed and only its reasoning changed.
+  **A CHECK OF MINE THAT WAS WRONG, not the code.** The first version asserted
+  Tabata is 240 seconds — the published four minutes. The engine returns 230,
+  because `totalRoundSeconds` is `rounds*work + (rounds-1)*rest`: it never runs
+  a trailing rest, deliberately, so a boxing session does not end with a minute
+  of sitting down. The app displays no duration for a preset at all, so nothing
+  false was shipping. Re-anchored on the engine's rule rather than on 230, so
+  changing the lead-in does not fail it and changing the RULE does.
+  **Gate: `test:round-presets`** — every preset driven through `computeRoundState`
+  (starts, and completes after its own stated length); each sub-line's three
+  numbers asserted to BE its config; Tabata pinned as Tabata; and the tile's
+  subtitle checked against the preset table BOTH WAYS — no protocol named that
+  has no preset, and no EMOM while nothing implements it. That last one is
+  pinned on the ENGINE, not on a hardcoded "no": build a real EMOM preset and
+  the check stops objecting. Plus **`verify:round-presets`**, a real mount at
+  390×844 that taps Tabata and reads 8 / 20 / 10 back out of the actual inputs,
+  proves the form is still up afterwards, and measures every preset button
+  against the 44px floor.
+  **12 mutations tried, 12 caught** (8 logic, 4 browser), including the original
+  defect restored verbatim — EMOM and laps back on the tile with nothing behind
+  them.
+  **Frontend only.** No migration, no function deploy.
+  **Named, not done:** EMOM itself, which needs a second timing model in
+  `timer-engine.ts` (fixed interval, rest = remainder) rather than a preset. And
+  the wider hole this came from — **no gate reads static UI labels for claims at
+  all**; `test:round-presets` covers this one tile because its claims happen to
+  be checkable against a table. The general case is open.
+
 - [x] **THE COACH KEPT TALKING ABOUT A SESSION THAT HAD MOVED — AND THE APP WAS
   TELLING IT TO.** Ashley, 12 Sep 2026: she moved today's session to another day
   from chat, the card confirmed it, the screens updated, and the next turns still

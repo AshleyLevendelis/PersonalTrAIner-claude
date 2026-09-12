@@ -187,3 +187,49 @@ export function parseConditioningInterval(activityText: string | undefined | nul
   if (rounds <= 0 || workSeconds <= 0 || restSeconds <= 0) return null
   return { rounds, workSeconds, restSeconds }
 }
+
+// ---------------------------------------------------------------------------
+// THE PRESETS THAT WERE ADVERTISED BEFORE THEY EXISTED.
+//
+// Ashley, 12 Sep 2026, from the live app: "under rest timers the app shows
+// emom and tabata but these timers dont exist". They did not: the round tab
+// had three number inputs and nothing else, so Tabata was reachable only by
+// already knowing to type 8 / 20 / 10, and EMOM was not reachable at all.
+//
+// Asked whether to correct the label or build the timers, she chose BUILD:
+// one-tap presets now, EMOM left out because it is a different clock — its
+// rest is whatever remains of the minute after the work is done, which this
+// engine, built on a fixed work/rest pair, has no way to express. Faking it
+// as 60s work / 0s rest would be the same kind of claim this list exists to
+// stop making.
+//
+// HERE RATHER THAN IN THE PANEL because a table inside a component is not
+// something a gate can call — the same reason chat-plan-context.ts exists.
+// Each entry is checked against the engine's own arithmetic by
+// test:round-presets, so a preset whose label disagrees with its numbers
+// cannot ship.
+// ---------------------------------------------------------------------------
+export interface RoundPreset {
+  /** Stable id — what a gate and a test click name it by. */
+  key: string
+  /** What the button says. */
+  label: string
+  config: RoundConfig
+}
+
+export const ROUND_PRESETS: RoundPreset[] = [
+  // The canonical protocol, and the one that was named on the tile: eight
+  // rounds of twenty seconds hard against ten seconds off, four minutes total.
+  { key: 'tabata', label: 'Tabata', config: { rounds: 8, workSeconds: 20, restSeconds: 10 } },
+  { key: '40-20', label: '40/20', config: { rounds: 8, workSeconds: 40, restSeconds: 20 } },
+  { key: '30-30', label: '30/30', config: { rounds: 10, workSeconds: 30, restSeconds: 30 } },
+  // Three three-minute rounds with a minute between them. Here because the app
+  // already knows some people train a combat sport alongside their lifting
+  // (concurrent_activities), and "rounds" is what that word means to them.
+  { key: 'boxing', label: 'Boxing rounds', config: { rounds: 3, workSeconds: 180, restSeconds: 60 } },
+]
+
+/** "8 × 20s / 10s" — the numbers under a preset's name, so nothing is opaque. */
+export function describeRoundPreset(p: RoundPreset): string {
+  return `${p.config.rounds} × ${p.config.workSeconds}s / ${p.config.restSeconds}s`
+}

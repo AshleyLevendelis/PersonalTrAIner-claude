@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { useTimers, ROUND_LEAD_IN_SECONDS } from '@/hooks/useTimers'
-import { parseConditioningInterval, type RoundConfig } from '@/lib/timer-engine'
+import { parseConditioningInterval, ROUND_PRESETS, describeRoundPreset, type RoundConfig, type RoundPreset } from '@/lib/timer-engine'
 import type { WorkoutDay } from '@/lib/types'
 
 function formatMs(ms: number, withTenths = false): string {
@@ -135,6 +135,12 @@ function RoundPanel({ prefill }: { prefill: RoundConfig | null }) {
     setRestSeconds(String(prefill.restSeconds))
   }
 
+  const applyPreset = (p: RoundPreset) => {
+    setRounds(String(p.config.rounds))
+    setWorkSeconds(String(p.config.workSeconds))
+    setRestSeconds(String(p.config.restSeconds))
+  }
+
   const handleStart = () => {
     const config: RoundConfig = {
       rounds: Math.max(1, parseInt(rounds, 10) || 1),
@@ -163,6 +169,24 @@ function RoundPanel({ prefill }: { prefill: RoundConfig | null }) {
           Load from today's session ({prefill.rounds}× {prefill.workSeconds}s/{prefill.restSeconds}s)
         </Button>
       )}
+      {/* THEY FILL THE FIELDS, THEY DO NOT START. Same shape as the prefill
+          button above, and deliberately: the numbers stay on screen and stay
+          editable, so a preset is a shortcut rather than a black box that
+          runs something you cannot see. */}
+      <div className="grid grid-cols-2 gap-2">
+        {ROUND_PRESETS.map(p => (
+          <Button
+            key={p.key}
+            variant="outline"
+            data-preset={p.key}
+            className="h-auto min-h-11 flex-col items-start gap-0.5 py-2"
+            onClick={() => applyPreset(p)}
+          >
+            <span className="text-sm font-medium">{p.label}</span>
+            <span className="text-xs font-normal text-muted-foreground">{describeRoundPreset(p)}</span>
+          </Button>
+        ))}
+      </div>
       <div className="grid grid-cols-3 gap-2">
         <label className="flex flex-col gap-1 text-xs text-muted-foreground">
           Rounds
