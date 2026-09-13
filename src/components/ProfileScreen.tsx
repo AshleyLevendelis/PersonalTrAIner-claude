@@ -193,7 +193,18 @@ function EditableTextField({
         onBlur={commit}
         onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
         placeholder={placeholder}
-        className={placeholder ? 'h-7 w-44 text-sm text-right' : 'h-7 w-20 text-sm text-right'}
+        // 44px, NOT 28px, AND AN INPUT IS THE ONE CONTROL THAT CANNOT CHEAT
+        // THIS. The app's tap-target bar is a 44px thumb reach, and 68
+        // controls meet it with `hit-slop-44`, which expands the touch area
+        // via ::after without changing the layout. ::after does not render on
+        // a replaced element, so an input has no such escape: its reach IS
+        // its height. Probed at 390x844 on the three weight-cap rows, all
+        // three were 28px and two of the three lost a tap to the dead space
+        // of a neighbouring row. Lifts every numeric Profile row — age,
+        // height, onboarding weight, daily steps — which had the same defect
+        // and had never been measured, because ProfileScreen was mounted in
+        // no browser harness until 13 Sep 2026.
+        className={placeholder ? 'h-11 w-44 text-sm text-right' : 'h-11 w-20 text-sm text-right'}
       />
       {unit && <span className="text-xs text-muted-foreground">{unit}</span>}
     </div>
@@ -674,7 +685,17 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
   // blank where the third should be.
   const identitySummary = [
     GOAL_OPTIONS.find(o => o.value === profile.fitness_goal)?.label,
-    profile.training_days?.length ? `${profile.training_days.length} days/week` : null,
+    // THE DAYS SHE TRAINS, NOT THE LENGTH OF THE ARRAY. training_days is
+    // contractually ALWAYS seven entries with an `available` flag —
+    // assembleProfile says so in as many words ("ALWAYS a 7-entry array, both
+    // formats") — so `.length` is the constant 7 and this line read
+    // "7 days/week" for every user in the app, whatever they actually train.
+    // Found 13 Sep 2026 by reading a screenshot of a four-day profile.
+    // ChatAssistant already counts it correctly; this was the copy that
+    // didn't. Zero available still drops the clause, which is the existing
+    // rule for a fact we don't have.
+    profile.training_days?.filter(d => d.available).length
+      ? `${profile.training_days.filter(d => d.available).length} days/week` : null,
     EQUIPMENT_OPTIONS.find(o => o.value === profile.equipment_access)?.label,
   ].filter(Boolean).join(' · ')
 

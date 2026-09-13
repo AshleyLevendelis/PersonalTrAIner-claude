@@ -107,6 +107,14 @@ export function headlineReprice(changes: RepricedLoad[]): RepricedLoad | null {
  * Deliberately names ONE lift and its two numbers rather than summarising:
  * "your weights changed" is not something anyone can check, and the receipt
  * exists so she can see the correction landed.
+ *
+ * THE NAME IS NEVER THE SUBJECT OF A VERB, and that is not fussiness. The
+ * first version read "<name> goes down from 14kg to 4kg", which is fine for
+ * "Goblet Squat" and wrong for most of the catalogue — read off a real plan
+ * it printed "Romanian Deadlifts goes down from 14kg to 4kg". Plural names
+ * are the norm here (Push-Ups, Lateral Raises, Face Pulls), so a singular
+ * verb would be wrong more often than right. Naming the lift and then stating
+ * the move reads correctly whichever it is.
  */
 export function describeReprice(changes: RepricedLoad[]): string | null {
   const headline = headlineReprice(changes)
@@ -114,9 +122,9 @@ export function describeReprice(changes: RepricedLoad[]): string | null {
   const direction = headline.toKg > headline.fromKg ? 'up' : 'down'
   const others = changes.length - 1
   const tail = others > 0
-    ? ` and ${others} other ${others === 1 ? 'weight' : 'weights'} moved with it.`
+    ? ` ${others} other ${others === 1 ? 'weight' : 'weights'} moved with it.`
     : ''
-  return `I've redone your weights from this week: ${headline.exerciseName} goes `
+  return `I've redone your weights from this week — ${headline.exerciseName}: `
     + `${direction} from ${headline.fromKg}kg to ${headline.toKg}kg.${tail}`
 }
 

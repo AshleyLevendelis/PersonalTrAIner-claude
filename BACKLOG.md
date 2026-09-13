@@ -2,6 +2,81 @@
 
 Newest first. One line each.
 
+- [x] **THE WEIGHT-CAP ROWS, DRIVEN IN A REAL BROWSER — AND IT FOUND THREE
+  DEFECTS NO SOURCE CHECK COULD SEE.** The outstanding half of the entry below,
+  which named itself as not done rather than omitting it. `verify:setup-answers`
+  (25 checks, new) mounts the real Profile screen at 390x844 over the fourth
+  harness page, `profile.tsx`. **ProfileScreen had never been mounted in any
+  harness** — every Profile row the app has ever shipped was verified by source
+  check alone, which is why the three below survived.
+  **1. EVERY NUMBER FIELD ON PROFILE WAS 28px, AND TWO OF THREE CAP ROWS COULD
+  NOT BE TAPPED.** The app's bar is a 44px thumb reach and 68 controls meet it
+  with `hit-slop-44`, which expands the touch area invisibly. That trick does
+  not work on an input — `::after` does not render on a replaced element — so
+  for a field the reach IS the height. Probed the way `verify:tap-targets`
+  probes: the top cap row lost the tap above it to the row's dead space, the
+  bottom one lost the tap below. Fixed at the shared field, so age, height,
+  onboarding weight and daily steps come up with them.
+  **2. THE PROFILE HEADER TOLD EVERY USER THEY TRAIN 7 DAYS A WEEK.** It read
+  the LENGTH of `training_days`, which `assembleProfile` guarantees is always
+  seven entries carrying an `available` flag — so it was the constant 7 for
+  everybody. A four-day fixture printed "7 days/week" beside a picker showing
+  four. `ChatAssistant` already counted it correctly; this was the copy that
+  did not. Found by reading a screenshot, not by a check.
+  **3. THE RECEIPT SAID "Romanian Deadlifts goes down".** Plural exercise names
+  are the norm in the catalogue (Push-Ups, Lateral Raises, Face Pulls), so a
+  singular verb reads wrong more often than right. The lift is now named and
+  then the move stated, which is correct either way.
+  **THE BUG THAT MADE THE DRIVER LOOK LIKE A BROKEN APP, worth writing down
+  because it will happen again.** Six checks failed on a typed correction that
+  never took. A headless page is not "focused", so `el.focus()` moves
+  `document.activeElement` but Chromium dispatches NO focus or blur events —
+  measured: a `focusout` listener on the very element being blurred never
+  fired. The field commits on blur, React's `onBlur` is a delegated `focusout`,
+  so every correction was silently discarded. `Emulation.setFocusEmulationEnabled`
+  makes the page really focused. Dispatching a synthetic `FocusEvent` would also
+  have gone green and would have proved only that React's delegation works.
+  **A MUTATION FOUND A HOLE IN BOTH GATES, and closing it is the most valuable
+  thing here.** Forcing the re-price's ratio to a constant 1 — gutting the
+  mechanism the whole module is built around — left EVERY downward check green,
+  in the browser and in `test:setup-answers` alike. `prescribeLoad` clamps the
+  forced weight to the corrected ceiling on the way out, so the clamp ALONE
+  brings weights down and the ratio's absence is invisible. The ratio is the
+  only thing that can move a weight UP, because nothing clamps upward — and
+  that is the case Ashley's ruling opens with ("40kg not 30kg"). Measured on the
+  fixture: lowering the cap moves 91 weights, raising it moves 5. The driver now
+  raises one too, and under the mutation the raise produced a DOWNWARD receipt
+  for 72 weights.
+  **MUTATIONS: 9 tried, 9 caught — but only 8 on the first pass.** The ninth is
+  the one above, caught only after the driver was strengthened. Reported this
+  way deliberately: "9/9" alone would hide that the gate had to be fixed.
+  **FOUND AND NOT FIXED, named rather than omitted.** (a) The Daily steps
+  placeholder is cut off mid-word — "10,000 (from activity" in a 176px box.
+  Pre-existing; the fix is either a wording change or a wider box, and the
+  wording is Ashley's. (b) The dialog's ✕ sits over the top row's unit label
+  when the sheet is scrolled; the ✕ staying visible is deliberate (an earlier
+  bug had it scrolling out of reach of long sheets), the collision is not.
+  (c) **The receipt can say "from this week" and quote a weight from week 7.**
+  `headlineReprice` restricts to the earliest week TOUCHED, not the earliest
+  week re-priced. Measured: raising the cap 30→40 touches weeks 7, 9, 10 and 15
+  only, so the sentence opens with "this week" and names a number she cannot see
+  on this week's screen. This is the same defect the function's own comment says
+  it fixed, one step narrower. Mine, from 13 Sep. **A question for Ashley**
+  rather than a silent reword — it is what the app tells her.
+  (d) `test:bundle` fails on "a deploy re-downloads 292 kB, not 444" —
+  pre-existing and identical with the changes stashed, and it fails because the
+  number got BETTER than the check expects. A stale expectation, not a
+  regression.
+  **VERIFIED:** `verify:setup-answers` 25/25 with all three screenshots read;
+  `test:setup-answers`, `test:profile-groups`, `test:a11y`, `npx tsc --noEmit`
+  clean. Proven live in a browser: the rows, their labels, their gating for a
+  full-gym profile, the thumb reach, the typed correction, the receipt, and the
+  receipt's numbers matching the plan read out of the page. Proven by source
+  only: App's own persistence — saving just the weeks that moved, and reverting
+  a failed save — because the harness page reproduces that plumbing and a
+  verdict on it would be a verdict on the harness.
+  **Deploys:** frontend on merge. No migration, no function deploy.
+
 - [x] **THE THREE WEIGHT CAPS YOU GAVE AT SETUP CAN NOW BE CORRECTED, AND THE
   PLAN REACTS.** Ashley chose "unlock the locked setup answers" on 13 Sep 2026.
   Six of the eight are numbers that feed prescribed weight, and none could be
@@ -56,9 +131,10 @@ Newest first. One line each.
   So was deleting the loadless-slot guard, twice: the natural fixture has no
   loadable movement the plan leaves unweighted, and the first forge picked a
   slot already under the ceiling, so it was never re-priced at all.
-  **VERIFIED:** `test:setup-answers` (43 checks, new). **NOT yet verified in a
-  browser** — the `verify:` driver for the new rows is outstanding, which the
-  standing rule requires for anything visible.
+  **VERIFIED:** `test:setup-answers` (43 checks, new). ~~NOT yet verified in a
+  browser~~ — CORRECTED 13 Sep 2026: it is now, by `verify:setup-answers`, and
+  the browser found three things this entry claimed were fine. See the entry
+  above.
   **Deploys:** frontend on merge. No migration — every column already exists.
 
 - [x] **YOU CAN NOW PUT AN EXERCISE INTO A SESSION.** The last `MISSING` line in
