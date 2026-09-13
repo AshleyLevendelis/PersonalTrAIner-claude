@@ -79,7 +79,17 @@ check(`0. today (${TODAY_NAME}) is a due training day`, new RegExp(`^${TODAY_NAM
 // --- open ---------------------------------------------------------------
 check('1. the day menu opens the sheet', (await openSheet()) === 'open')
 const v0 = await verbs()
-check('2. today offers exactly: missed, move, rest, something else — and NOT "did it elsewhere"', JSON.stringify(v0) === JSON.stringify(['missed', 'move', 'rest', 'something_else']), v0)
+// THE PROPERTY, NOT THE EXACT LIST. This asserted set equality against four
+// verbs and went red on 13 Sep 2026 the moment "shorten" and "lighter" were
+// added to the day menu — a deliberate feature built on Ashley's ruling that
+// day, not a regression. A check that forbids ever adding an option is
+// pinned to the mechanism; what it actually exists to protect is at both ends
+// of its own sentence: the four ways out of today are all offered, and "I did
+// it elsewhere" is NOT, because for TODAY the logging grid is the path and
+// offering both would be two doors to one thing.
+const REQUIRED_TODAY_VERBS = ['missed', 'move', 'rest', 'something_else']
+check('2. today offers missed, move, rest and something else — and NOT "did it elsewhere"',
+  REQUIRED_TODAY_VERBS.every(verb => (v0 ?? []).includes(verb)) && !(v0 ?? []).includes('did_elsewhere'), v0)
 check('3. ...and points at the grid for a session done today', (await ev(`document.querySelector('[data-testid="what-happened-sheet"]').innerText`)).includes('Tick the sets below'))
 await shoot('what-happened-menu')
 

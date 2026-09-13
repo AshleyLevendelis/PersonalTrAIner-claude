@@ -2,6 +2,65 @@
 
 Newest first. One line each.
 
+- [x] **A FULL SWEEP, AND THE FIRST HONEST COUNT OF WHAT IS ACTUALLY RED.**
+  Ashley opened the app on her phone on 13 Sep and saw the old Tools tab. She
+  was right and nothing was broken: production is `main`, `main` was twelve
+  commits behind the working branch, and `main`'s `ToolsTab.tsx:194` still held
+  the literal string "Change the intervals" from her screenshot. Also measured,
+  so it is not guessed at again: the service worker is network-first for
+  navigations with Vite-hashed assets, so a stale cache is NOT a cause and no
+  hard refresh will be needed after a merge; and no migration is pending for
+  these twelve, though `chat-gemini` did change and needs its own deploy.
+  **THE PREVIEW LINK DID NOT WORK, and that is worth writing down.** Vercel
+  builds a preview per branch push, so it looked like a way to see the work
+  without merging. It died on "supabaseUrl is required" — preview deployments
+  carry no database settings. I sent it without being able to test it: the
+  sandbox's network policy blocks every `vercel.app` host (403 on CONNECT), so
+  I could not open my own link. Send an untestable link with the caveat stated,
+  or not at all. The app itself behaved correctly — it refused to load and
+  named the exact reason rather than showing a half-empty plan.
+  **THE SWEEP: 213 checks, 200 passed, 13 failed.** No aggregate runner exists
+  in `package.json`, so this ran every `test:*` and `verify:*` in turn. Quality
+  re-confirmed at **9,216 profiles, 0 below the 7.2 floor, average 11.56/12**,
+  and the engine audit at **17,423 combinations, 0 failures** — against a
+  committed `audit-report.txt` recording 13,967 tested and 54 failures, 51 of
+  them load-cap. Different denominators, so that is "0 of 17,423", not a
+  like-for-like drop from 54; the committed report is simply stale.
+  **THE THIRTEEN, TRIAGED BY MEASUREMENT RATHER THAN BY READING.** Three are
+  known: `meal-quality` and `schema-parity` need a live database this machine
+  cannot reach, and `test:bundle` fails because a deploy re-downloads 292 kB
+  where it expects 444 — a stale expectation, and the number got BETTER.
+  `verify:rls` is the same class: it says so itself, "28 of 28 tables never
+  answered, so this run proves nothing."
+  **NINE BROWSER DRIVERS WERE RED. EIGHT OF THEM ARE RED ON `main` TOO —
+  measured, not assumed.** A worktree at `9449087` ran the same nine; the set
+  of failing check names is byte-identical for `tour`, `swap-request`,
+  `coach-week-move`, `single-implement`, `ramp-ticks`, `calibration-search`,
+  `program-move` and `six`. So this session's twelve commits did not cause them
+  — but they are real, they are red today, and three of them (`ramp-ticks`,
+  `calibration-search`, `six`) fail the same way, on a ramp block that is not
+  on screen at all. That cluster is one lead, not three. **Named here as a gap
+  rather than fixed**, because it is a separate piece of work and merging does
+  not make it worse.
+  **THE NINTH WAS MINE, AND IT IS THE INSTRUCTIVE ONE.** `verify:what-happened`
+  §2 asserted the day menu offers EXACTLY four ways out of today. Adding
+  "shorten" and "lighter" on 13 Sep — Ashley's own ruling that day — made it
+  six, and the check went red on a deliberate feature. It is the exact hazard
+  CLAUDE.md describes: a check pinned to the mechanism, which a correct change
+  then trips. Re-anchored on the property, which is both halves of its own
+  sentence: the four ways out are all present, and "I did it, not in the app"
+  is absent for TODAY, because for today the logging grid is the path and two
+  doors to one thing is the bug. **Mutations: 2 tried, 2 caught** — removing
+  "rest" from today, and letting "did it elsewhere" leak onto today. It is back
+  to 5 failures, matching the pre-session baseline exactly.
+  **WHAT THIS SAYS ABOUT THE PROCESS, not just the code:** the shorten/lighten
+  work is recorded as having run a browser sweep. It left a driver red. Either
+  the sweep was not run or its failure was not acted on, and nothing since
+  noticed, because there is no aggregate runner and nobody counts.
+  **VERIFIED:** the re-anchored check green and mutation-tested; the other 12
+  failures triaged by re-running against pre-session code in a worktree rather
+  than by reading them. **Deploys:** none from this entry.
+
 - [x] **THE WEIGHT-CAP ROWS, DRIVEN IN A REAL BROWSER — AND IT FOUND THREE
   DEFECTS NO SOURCE CHECK COULD SEE.** The outstanding half of the entry below,
   which named itself as not done rather than omitting it. `verify:setup-answers`
