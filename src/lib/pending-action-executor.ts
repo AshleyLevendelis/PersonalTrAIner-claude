@@ -19,6 +19,7 @@ import type { MesocycleWeek, UserProfile, EquipmentAccess, TrainingStyle, Concur
 import { describeActivity, activityCountsAsLoad } from './concurrent-activity'
 import { swapExerciseInMesocycle, type SwapScope } from './mesocycle-edit'
 import { removeExerciseFromSession, moveExerciseInSession } from './session-edit'
+import { settleWeek } from './settle-week'
 import { saveMesocycle, saveMesocycleWeek, saveScopedEdit } from './mesocycle-persistence'
 import { getExerciseEntry } from './exercise-db'
 import { swapPoolMeal, clearMealPick, getMealPicksForDate, USER_REQUESTED_TAG, type MealSlotName } from './meal-store'
@@ -722,13 +723,23 @@ export async function executeVolumeChange(
   const next = mesocycle.map(week => {
     if (!payload.weekNumbers.includes(week.week_number)) return week
     if (!isVolumeAdjustable(week)) return week
+    let touched: string | null = null
     const days = (week.days ?? []).map(day => {
       if (day.day.toLowerCase() !== payload.dayName.toLowerCase()) return day
       const result = adjustDayVolume(day, payload.direction, profile)
-      if (result.changed) landed.push(`Week ${week.week_number}: ${describeVolumeChange(result, day.day)}`)
+      if (result.changed) {
+        landed.push(`Week ${week.week_number}: ${describeVolumeChange(result, day.day)}`)
+        touched = day.day
+      }
       return result.day
     })
-    return { ...week, days }
+    // THE SHARED TAIL, 13 Sep 2026. This path changes SET COUNTS and re-ran
+    // nothing — while enforceSetHierarchy exists precisely to stop an accessory
+    // out-setting its day's main lift, and the week balance pass exists to stop
+    // the week's pushing and pulling drifting apart. Both are exactly what
+    // adding a set to every eligible exercise on one day can break.
+    if (!touched) return { ...week, days }
+    return settleWeek({ ...week, days }, touched, profile).week
   })
 
   if (landed.length === 0) {

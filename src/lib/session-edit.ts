@@ -6,19 +6,19 @@
 // (mesocycle-edit.ts:353), so "not today" did not exist; neither did moving
 // one earlier or later.
 //
-// THE CONSTRAINT THAT SHAPES THIS FILE. Of the passes that keep a generated
-// day sane, some are reachable from outside generateMesocycle and some are
-// welded inside it. Reachable, and therefore RE-ASSERTED here after every
-// edit: enforceSetHierarchy (exported for this), enforceOneWeightPerPrescription,
-// enforceLoadCoherence — in that order, which is the order generateMesocycle
-// itself documents (exercise-plan.ts:6893-6895). Not reachable, because they
-// need the candidate pool and the whole generation context:
-// enforceWeeklyPatternBalance (push:pull, chest:back) and
-// balanceWeeklyStructure (six-pattern coverage). Re-running the generator to
-// get them would discard every other edit the person has made, so this file
-// does not try. session-balance-cost.ts MEASURES what those passes would have
-// objected to, read-only, so the app can SAY it on the confirm card instead of
-// breaking it silently.
+// THE TAIL MOVED OUT, 13 Sep 2026. Everything that must hold after a day's
+// exercise list changes shape now lives in settle-week.ts, because this file
+// was the only caller and every OTHER in-place edit — swap, ban, volume —
+// re-ran none of it. See that file's header for what each edit was missing.
+//
+// CORRECTED AT THE SAME TIME, and worth knowing because the wrong version was
+// written down here and in the must-have list: this header used to say
+// enforceWeeklyPatternBalance was unreachable "because it needs the candidate
+// pool and the whole generation context". It does not. Its signature is
+// (days: WorkoutDay[]) => void — the same shape as the two passes already
+// called here. Only balanceWeeklyStructure genuinely needs the pool and the
+// trace, and it swaps exercise IDENTITIES, which would overwrite the edit
+// somebody just made. The reachable half is now part of the tail.
 //
 // The precedent is volume-adjust.ts — the one production path that already
 // mutates a session outside generation. It touches sets only, clamps through
@@ -29,16 +29,9 @@
 // (week, day), 'permanent' the rest of THIS block. A third meaning would be a
 // third thing for someone to get wrong.
 // ---------------------------------------------------------------------------
-import type { MesocycleWeek, Exercise, UserProfile, WorkoutDay } from './types'
-import { getExerciseEntry } from './exercise-db'
-import {
-  enforceSetHierarchy,
-  enforceLoadCoherence,
-  enforceOneWeightPerPrescription,
-} from './exercise-plan'
-import { buildWarmup, getWarmupReserveSeconds } from './warmup'
-import { getDurationBudgetSeconds } from './session-duration'
-import { clearOrphanedSupersetLabels, type SwapScope } from './mesocycle-edit'
+import type { MesocycleWeek, Exercise, UserProfile } from './types'
+import { settleWeek } from './settle-week'
+import { type SwapScope } from './mesocycle-edit'
 
 /**
  * The fewest exercises a session may be reduced to. The same floor
@@ -63,71 +56,6 @@ function targetWeekNumbers(mesocycle: MesocycleWeek[], weekNumber: number, scope
   return mesocycle
     .filter(w => w.block_number === current.block_number && w.week_number >= weekNumber)
     .map(w => w.week_number)
-}
-
-/**
- * THE SHARED TAIL. Everything that must hold after a day's exercise list
- * changes shape, applied to one week in the order generation applies it.
- *
- * The warm-up rebuild is the part a swap never got: buildWarmup derives the
- * session's preparation FROM its exercises (exercise-plan.ts:4666-4700), and
- * nothing re-derived it after an edit, so a day whose squat was swapped out
- * kept ramping for a squat. Removing an exercise makes that worse — an orphan
- * ramp for a lift that is no longer there. Rebuilt here, and each surviving
- * exercise's own `ramp_up` re-stamped from it.
- */
-function settleWeek(week: MesocycleWeek, dayName: string, profile: UserProfile): MesocycleWeek {
-  const days = week.days.map(d => {
-    if (d.day !== dayName) return d
-    let exercises = enforceSetHierarchy(clearOrphanedSupersetLabels(d.exercises))
-    return { ...d, exercises }
-  })
-
-  // Both of these take the whole week and mutate in place — the week's other
-  // days are part of what they check (one weight per prescription is a WEEK
-  // rule, and load coherence's fourth clamp spans the week too).
-  enforceOneWeightPerPrescription(days)
-  enforceLoadCoherence(days)
-
-  return { ...week, days: days.map(d => (d.day === dayName ? rebuildWarmup(d, profile) : d)) }
-}
-
-/** The day's warm-up, re-derived from the exercises it now actually contains. */
-function rebuildWarmup(day: WorkoutDay, profile: UserProfile): WorkoutDay {
-  const entries = day.exercises
-    .map(ex => ({ ex, entry: getExerciseEntry(ex.name) }))
-    .filter((p): p is { ex: Exercise; entry: NonNullable<ReturnType<typeof getExerciseEntry>> } => !!p.entry)
-  // An unresolvable exercise list means the warm-up would be derived from
-  // less than the session really holds. Leaving the old one is the honest
-  // failure: it is stale, but it was built from a real session.
-  if (entries.length === 0 || entries.length !== day.exercises.length) return day
-
-  const budgetSeconds = getDurationBudgetSeconds(profile.session_duration_preference)
-  try {
-    const warmup = buildWarmup({
-      patterns: entries.map(p => p.entry.movement_pattern),
-      compounds: entries.map(p => ({
-        entry: p.entry,
-        suggestedLoadKg: p.ex.suggested_load_kg ?? null,
-        loadSource: p.ex.load_source,
-      })),
-      equipment: profile.equipment_access || 'full_gym',
-      injuries: profile.injuries || [],
-      experience: profile.training_experience || 'novice',
-      budgetSeconds: getWarmupReserveSeconds(budgetSeconds),
-    })
-    const rampByName = new Map(warmup.ramp_ups.map(r => [r.exercise, r]))
-    return {
-      ...day,
-      warmup,
-      exercises: day.exercises.map(ex =>
-        rampByName.has(ex.name) ? { ...ex, ramp_up: rampByName.get(ex.name) } : { ...ex, ramp_up: undefined },
-      ),
-    }
-  } catch (err) {
-    console.error('[session-edit] warm-up rebuild failed; keeping the previous one', err)
-    return day
-  }
 }
 
 export interface RemoveExerciseParams {
@@ -176,7 +104,7 @@ export function removeExerciseFromSession(params: RemoveExerciseParams): Session
     if (d.exercises.length - 1 < MIN_EXERCISES_PER_SESSION) return w
     changed = true
     const trimmed = { ...d, exercises: d.exercises.filter((_, i) => i !== exIndex) }
-    return settleWeek({ ...w, days: w.days.map(x => (x.day === dayName ? trimmed : x)) }, dayName, profile)
+    return settleWeek({ ...w, days: w.days.map(x => (x.day === dayName ? trimmed : x)) }, dayName, profile).week
   })
   return changed
     ? { mesocycle: next, changed: true }
@@ -229,12 +157,17 @@ export function moveExerciseInSession(params: MoveExerciseParams): SessionEditRe
     const reordered = reorderWithSupersets(d.exercises, fromIndex, toIndex)
     if (!reordered) return w
     changed = true
-    // No load or volume changed, so the coherence passes have nothing to say —
-    // but the warm-up lists its ramps in session order, so it is rebuilt.
-    return {
-      ...w,
-      days: w.days.map(x => (x.day === dayName ? rebuildWarmup({ ...d, exercises: reordered }, profile) : x)),
-    }
+    // THE SHARED TAIL, 13 Sep 2026, replacing a warm-up-only rebuild.
+    //
+    // The old comment here argued the coherence passes had nothing to say
+    // because no load or volume changed, and on its own terms that is right.
+    // But the must-have list stated that moving re-ran them, no check would
+    // have noticed either way, and "this particular edit happens not to need
+    // three of the four" is a claim that has to stay true as both sides change.
+    // The passes preserve order (enforceSetHierarchy is a map, not a sort) and
+    // are no-ops on a week they have nothing to fix, so running them costs the
+    // move nothing and makes one rule true of every edit instead of most.
+    return settleWeek({ ...w, days: w.days.map(x => (x.day === dayName ? { ...d, exercises: reordered } : x)) }, dayName, profile).week
   })
   return changed
     ? { mesocycle: next, changed: true }

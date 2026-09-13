@@ -45,7 +45,8 @@ import { cn } from '@/lib/utils'
 import { parseWorkoutEntries, resolveExerciseName, type ParsedSetGroup, type WorkoutEntryInput } from '@/lib/set-parse'
 import { resolveSwapTarget } from '@/lib/swap-target'
 import { removeExerciseFromSession, moveExerciseInSession } from '@/lib/session-edit'
-import { describeBalanceCost } from '@/lib/session-balance-cost'
+import { describeEditImpact } from '@/lib/session-balance-cost'
+import { settleWeek } from '@/lib/settle-week'
 import { sessionForDate, resolveMoveTarget, parseAlsoDoing, alsoDoingRow, alsoDoingImplication, alsoDoingLeadClause } from '@/lib/session-move'
 import { executeLogWorkout, type ReplacedSetPreImage } from '@/lib/nl-logging-executor'
 import { normalizeExternalUrl } from '@/lib/chat-links'
@@ -1799,8 +1800,10 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
    * Deliberately NOT a swap with a null replacement: removal changes the
    * session's shape, so the diff says a slot is leaving rather than changing
    * hands, and the implications carry what the person cannot see — the load
-   * passes re-running, and any cost to the week's balance, measured read-only
-   * by session-balance-cost because the weekly passes cannot be re-run here.
+   * passes re-running, what the week-level balancing will even out on other
+   * days, and any imbalance it could NOT fix. Corrected 13 Sep 2026: this
+   * used to say the weekly passes could not be re-run here. One of the two
+   * could all along, and now does, on every edit.
    */
   const buildExerciseRemoveProposal = (rawArgs: Record<string, unknown>): {
     ok: true
@@ -1829,7 +1832,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     const trial = removeExerciseFromSession({ mesocycle, profile, weekNumber: activeSession.liveWeek, dayName: day.day, exIndex: target.exIndex, scope })
     if (!trial.changed) return { ok: false, reason: trial.refusal ?? "I couldn't take that one out." }
 
-    const cost = describeBalanceCost(week, trial.mesocycle.find(w => w.week_number === activeSession.liveWeek))
+    const impact = describeEditImpact(week, trial.mesocycle.find(w => w.week_number === activeSession.liveWeek), day.day)
     return {
       ok: true,
       scopeKey: `${profile.id}:propose_exercise_remove:${day.day}:${target.exIndex}`,
@@ -1842,7 +1845,11 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         unchanged: [`Everything else on ${day.day}`],
         implications: [
           { severity: 'info', text: 'The session gets shorter. Weights on the rest of it are re-checked when you confirm.' },
-          ...(cost ? [{ severity: 'warn' as const, text: cost }] : []),
+          // Her ruling, 13 Sep 2026: the balancing may touch another day, and
+          // the card says so before she confirms. Info, not warn — it is the
+          // app doing its job, not a cost she is being asked to accept.
+          ...(impact.balancing ? [{ severity: 'info' as const, text: impact.balancing }] : []),
+          ...(impact.cost ? [{ severity: 'warn' as const, text: impact.cost }] : []),
         ],
         rationale: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined,
         editable: [{ field: 'scope', options: ['today', 'permanent'] }],
@@ -2190,6 +2197,22 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     if (preview.blocked.length > 0) {
       const n = preview.blocked.length
       implications.push({ severity: 'warn', text: `${n} exercise${n === 1 ? '' : 's'} won\'t move — ${preview.blocked[0].reason}.` })
+    }
+
+    // WHAT THE WEEK DOES ABOUT IT — added 13 Sep 2026, when the volume change
+    // started running the shared settling tail. Changing every eligible set on
+    // one day is exactly what tips a week's pushing and pulling apart, and
+    // until now this card said nothing about the week at all. Trialled through
+    // the real tail rather than predicted: settleWeek is what confirm will run.
+    if (liveWeek) {
+      const trial = settleWeek(
+        { ...liveWeek, days: liveWeek.days.map(d => (d.day === day.day ? preview.day : d)) },
+        day.day,
+        profile,
+      )
+      const impact = describeEditImpact(liveWeek, trial.week, day.day)
+      if (impact.balancing) implications.push({ severity: 'info', text: impact.balancing })
+      if (impact.cost) implications.push({ severity: 'warn', text: impact.cost })
     }
 
     return {

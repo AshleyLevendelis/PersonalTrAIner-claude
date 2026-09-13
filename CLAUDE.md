@@ -71,7 +71,9 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   `session-edit`, `verify:session-edit`
 - Move it earlier or later within the session — both surfaces since 11 Sep
   2026, a superset's halves travelling together; `session-edit`,
-  `verify:session-edit`
+  `verify:session-edit`. CORRECTED 13 Sep 2026: the line below used to say
+  moving re-ran the coherence passes. It did not — it rebuilt the warm-up and
+  nothing else. It does now, through the shared tail
 - Change its sets, reps or weight for today — via logging only (extra sets,
   typed numbers); the plan itself is not edited
 
@@ -130,18 +132,42 @@ facts: re-measure before acting on one, correct it here when it is wrong.
 
 **Adjustable AND best-in-class is one promise, not two**
 - An adjustment keeps the plan above the floor generation had to meet —
-  full rebuilds regenerate, so their checks run. NARROWED 11 Sep 2026:
-  removing and moving an exercise re-run set hierarchy, one-weight and load
-  coherence and rebuild the day's warm-up (`session-edit`, each pass proven by
-  handing the edit a day that already violates it). A single SWAP and the
-  volume toggle still re-run none of them, and the two weekly balance passes
-  are unreachable from any edit path: `UNGUARDED`
+  **CLOSED 13 Sep 2026.** One shared tail (`settle-week.ts`) now runs on every
+  in-place edit — remove, move, swap, ban and the coach's volume change — and
+  it carries set hierarchy, one-weight, load coherence, a warm-up rebuilt from
+  the exercises the day actually holds, and the week-level push:pull and
+  chest:back balance pass. `edit-keeps-the-bar` proves each by handing every
+  path a day that already violates the rule; `session-edit` does the same for
+  removal.
+  THREE THINGS THE OLD LINE GOT WRONG, each measured: moving re-ran only the
+  warm-up, not the three passes; `enforceWeeklyPatternBalance` was never
+  unreachable — its signature is the same shape as the two passes edits
+  already called, and the "needs the whole generation context" reasoning was
+  only ever true of `balanceWeeklyStructure`, which stays inside because it
+  swaps exercise IDENTITIES; and "the volume toggle" is two different toggles
+  — the coach's re-ran nothing, the workout card's regenerates everything
 - When a request would break the bar, the app says so and offers the
-  nearest thing that keeps it — PARTIAL since 11 Sep 2026: removing an
-  exercise reports what it costs the week's push:pull and chest:back balance
-  before the tap, and offers the swap list instead (`session-edit` §5).
-  Nothing else does; `MISSING` everywhere but there
-- A changed plan is re-scored like a generated one — `MISSING`
+  nearest thing that keeps it — since 13 Sep 2026 the app first FIXES what it
+  can (the balance pass, above) and says so before the tap — Ashley's ruling
+  that day: a change to one day may touch another to keep the week balanced,
+  and it is stated, never silent. What it could not fix is still reported as a
+  cost, now on remove, swap and volume rather than remove alone
+  (`edit-keeps-the-bar` §5, `session-edit` §5, `verify:session-edit` §6 reading
+  it off a real screen). ONE SURFACE STILL SILENT, named: the COACH's swap card
+  — its builder is synchronous and a faithful trial needs the async load
+  recompute, so it says nothing rather than something that might not match what
+  confirm does.
+  CORRECTED: this said removal reported push:pull **and chest:back**. It never
+  measured chest:back — `session-balance-cost.ts` defined push and pull and
+  nothing else, while its own header cited the 1.25 chest:back band. It does
+  now
+- A changed plan is re-scored like a generated one — `edit-keeps-the-bar`
+  §7 since 13 Sep 2026: four profiles across the goal/experience/equipment
+  spread, every edit path applied to each, re-scored with the same `scorePlan`
+  and held to the same 7.2 floor `quality` holds generated plans to. Her
+  ruling the same day: the score stays behind the scenes as a guarantee we
+  check, never a number on screen — what a person reads is the specific thing
+  that changed, in plain words
 
 ### Promise 2 — everything by hand or by asking
 

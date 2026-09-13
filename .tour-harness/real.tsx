@@ -122,8 +122,29 @@ const profile: UserProfile = {
 // panel fed one shows a state no user can reach (a squat under an ACCESSORY
 // label, no MAIN LIFT anywhere). Seeded so a re-run is comparable.
 setRandomSource(seededRngFromKey('tour-real-screens'))
-const mesocycle = generateMesocycle(profile)
+const generated = generateMesocycle(profile)
 resetRandomSource()
+
+// ?tilt=lopsided — A DELIBERATELY UNBALANCED WEEK, for one driver only.
+//
+// The sentences an edit shows before the tap ("that leaves your week
+// push-heavy", "I'll also add a set of rows on Thursday to keep your week
+// balanced") only appear when there is something to say, and a healthy
+// generated plan never has anything to say. Without a way to tilt the
+// fixture, the only honest browser check would be "the paragraph is absent",
+// which is what it would also say if the feature were deleted.
+//
+// So: triple every set on the days OTHER than the first training day, which
+// is what test:edit-keeps-the-bar §5 found actually forces the week-level
+// balance pass to change a day the person did not edit. Off by default and
+// reachable only from the query string, so no other driver sees it.
+const tilt = new URLSearchParams(location.search).get('tilt')
+const firstTrainingDay = generated[0].days.find(d => d.exercises.length > 0)?.day
+const mesocycle = tilt !== 'lopsided' ? generated : generated.map(w => ({
+  ...w,
+  days: w.days.map(d => d.day === firstTrainingDay ? d
+    : { ...d, exercises: d.exercises.map(e => ({ ...e, sets: e.sets * 3 })) }),
+}))
 const exercisePlan = mesocycle[0].days
 const macros: MacroTargets | null = computeTargets(profile)
 

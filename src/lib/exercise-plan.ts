@@ -9,7 +9,7 @@ import {
   getExperienceConfig, getSkillDemand, isSkillAppropriate, applyRepFloor,
   type ExperienceConfig,
 } from './experience-config'
-import { buildWarmup, getWarmupReserveSeconds } from './warmup'
+import { buildWarmup, getWarmupReserveSeconds, rebuildWarmup } from './warmup'
 import { prescribeLoad, prescribeAddedLoad, categorize, getLoadIncrementKg, isExternallyLoaded, getEquipmentFloorKg, loadingMode, roundToPlate, formatLoad, labelModeForEntry, hasKnownWorkingWeight, unverifiedRampStepKg, isolationTargetBelowFloor, resolveBodyBasis, prescribeAssistance, assistanceGuidance, isImprovisedLoadImplement, IMPROVISED_IMPLEMENT_CEILING_KG, type KnownWorkingWeights, DELOAD_LOAD_FRACTION } from './load-prescription'
 import {
   getPhaseSequence, getPhaseConfig, rotateVariation, resolveTargetRpe,
@@ -3744,7 +3744,19 @@ function balanceWeeklyStructure(
 // runs under plain tsx for scripts) — reach through globalThis rather than
 // referencing `process` directly so this compiles in both contexts without
 // pulling in Node's type definitions project-wide.
-const BALANCE_DEV_LOGGING = (globalThis as { process?: { env?: { NODE_ENV?: string } } }).process?.env?.NODE_ENV !== 'production'
+/**
+ * DEV ONLY, IN BOTH RUNTIMES. The NODE_ENV half alone was silently true in the
+ * shipped browser bundle: Vite defines no `process`, so `process?.env?.NODE_ENV`
+ * is undefined and `undefined !== 'production'` passes. That only ever spilled
+ * a few lines per plan generation, which is why nobody noticed; from 13 Sep
+ * 2026 this pass also runs on every edit, so it would have become chatter on a
+ * user's console. `import.meta.env.PROD` is Vite's own answer and is undefined
+ * under tsx, where NODE_ENV still governs — the same dual-context resolution
+ * supabase.ts already needed.
+ */
+const BALANCE_DEV_LOGGING =
+  (import.meta as unknown as { env?: { PROD?: boolean } }).env?.PROD !== true
+  && (globalThis as { process?: { env?: { NODE_ENV?: string } } }).process?.env?.NODE_ENV !== 'production'
 
 function logWeeklyBalanceDecision(message: string): void {
   if (BALANCE_DEV_LOGGING) console.debug(`[weekly-pattern-balance] ${message}`)
@@ -4039,6 +4051,79 @@ function enforceWeeklyPatternBalance(days: WorkoutDay[]): void {
       logWeeklyBalanceDecision(`only ${legDayCount} of ${trainingDays.length} training day(s) carry a real leg pattern (knee/hip-dominant, main or accessory role)`)
     }
   }
+}
+
+/**
+ * THE WEEK-LEVEL BALANCE PASS, MADE REACHABLE FROM AN EDIT — 13 Sep 2026.
+ *
+ * Ashley's promise is that a plan can be adjusted "while still aiming to keep
+ * the quality", and her ruling of the same day: a change to one day MAY touch
+ * another day to even the week out, and the app says so before the tap.
+ *
+ * WHY THIS IS AN EXPORT AND enforceWeeklyPatternBalance IS NOT. Two things had
+ * to travel together or not at all. The pass BUMPS SETS, and sets cost
+ * minutes; generation therefore follows it immediately with a safety trim
+ * against the session MAXIMUM (see the call site's comment, which records the
+ * 45.8-minute overrun that made the trim necessary). trimWeekRestForBudget and
+ * the goal policy it needs are private to this module. Exporting the pass
+ * alone would have handed every caller a way to blow the time cap, and
+ * exporting three pieces would have let the edit path and generation drift
+ * apart on the order. One export, doing the pair, in generation's order.
+ *
+ * The note this replaces claimed the pass "needs the candidate pool and the
+ * whole generation context". It does not — its signature is
+ * (days: WorkoutDay[]) => void, the same shape as enforceLoadCoherence and
+ * enforceOneWeightPerPrescription, which edits have re-run for two days.
+ * balanceWeeklyStructure genuinely does need the pool and the trace, and it
+ * swaps exercise IDENTITIES, which would overwrite the change somebody just
+ * made — that one stays inside.
+ *
+ * DELOAD WEEKS ARE EXEMPT, exactly as at the generation call site: a deload's
+ * volume is deliberately and uniformly cut, and nudging set counts to balance
+ * it would fight the taper. The flag is read from the week rather than passed,
+ * so no caller can forget it.
+ *
+ * Returns what it changed, so the confirm card can say it. Diffed from set
+ * counts before and after rather than instrumented inside the pass: the diff
+ * is true whatever the pass does next, and an instrumented pass would be one
+ * more thing to keep in step.
+ */
+export interface BalanceSettlement {
+  /** One entry per exercise whose set count moved. Empty when nothing moved. */
+  changes: { day: string; exercise: string; from: number; to: number }[]
+  /** Set when the pass was deliberately not run, and why. */
+  skipped: 'deload' | null
+}
+
+export function settleWeekBalance(week: MesocycleWeek, profile: UserProfile): BalanceSettlement {
+  if (week.is_deload) return { changes: [], skipped: 'deload' }
+
+  const before = new Map<string, number>()
+  for (const day of week.days) {
+    for (const ex of day.exercises) before.set(`${day.day}\u0000${ex.name}`, ex.sets)
+  }
+
+  enforceWeeklyPatternBalance(week.days)
+
+  // THE SAME BACKSTOP GENERATION RUNS, against the stated maximum rather than
+  // the midpoint budget — rest is the only lever it is allowed to pull, since
+  // trimming sets here would fight the pass that just set them.
+  const policy = getGoalPolicy(profile.fitness_goal || 'hypertrophy')
+  trimWeekRestForBudget(
+    week.days,
+    getSessionMaximumSeconds(profile.session_duration_preference || '45-60'),
+    undefined,
+    policy.minLoadedMainLiftRestSeconds,
+  )
+
+  const changes: BalanceSettlement['changes'] = []
+  for (const day of week.days) {
+    for (const ex of day.exercises) {
+      const was = before.get(`${day.day}\u0000${ex.name}`)
+      if (was !== undefined && was !== ex.sets) changes.push({ day: day.day, exercise: ex.name, from: was, to: ex.sets })
+    }
+  }
+  return { changes, skipped: null }
 }
 
 /**
@@ -7117,6 +7202,23 @@ export function generateMesocycle(
         if (current > 0 && current < MAIN_LIFT_REST_FLOOR_SECONDS) {
           day.exercises[i] = { ...day.exercises[i], rest: `${MAIN_LIFT_REST_FLOOR_SECONDS}s` }
         }
+      }
+
+      // THE WARM-UP LAST, BECAUSE THE DAY IS ONLY NOW FINAL — added 13 Sep 2026.
+      //
+      // buildWarmup ran early, off the day as it stood then. Weekly accessory
+      // rotation and periodization both reshape the day afterwards, and
+      // nothing re-derived the warm-up from the result. MEASURED across 64
+      // plans and 4,096 training days: 7.0% of days shipped ramping an
+      // exercise the session no longer contained — a Tuesday whose Deadlifts
+      // had rotated to a Trap Bar Deadlift still said "ramp up on Deadlifts".
+      // No check compared the two, so it had never been seen.
+      //
+      // Runs BEFORE the trims below, so they price the warm-up the day will
+      // actually ship with, and outside the !isDeload guard because a deload's
+      // warm-up goes just as stale as a loading week's.
+      for (let i = 0; i < days.length; i++) {
+        if (days[i].exercises.length > 0) days[i] = rebuildWarmup(days[i], profile)
       }
 
       // Deload weeks are SUPPOSED to run short (half volume, by design) — a

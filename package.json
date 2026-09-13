@@ -169,6 +169,7 @@
     "test:calibration-search": "tsx scripts/test-calibration-search.ts",
     "test:what-happened": "tsx scripts/test-what-happened.ts",
     "test:session-edit": "tsx scripts/test-session-edit.ts",
+    "test:edit-keeps-the-bar": "tsx scripts/test-edit-keeps-the-bar.ts",
     "test:day-coverage": "tsx scripts/test-day-coverage.ts",
     "test:pattern-tags": "tsx scripts/test-movement-pattern-tags.ts",
     "test:rehab-prescribed": "tsx scripts/test-rehab-prescribed.ts",

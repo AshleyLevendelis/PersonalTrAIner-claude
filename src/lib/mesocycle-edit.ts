@@ -255,21 +255,12 @@ export function applyReplacement(slot: Exercise, entry: ExerciseEntry, load: Loa
   }
 }
 
-/** A superset pair with one side removed/changed is no longer a pair — clears the label on whichever side is now alone rather than leaving it pointing at a partner that no longer matches. */
-export function clearOrphanedSupersetLabels(exercises: Exercise[]): Exercise[] {
-  const letterCounts = new Map<string, number>()
-  for (const ex of exercises) {
-    if (!ex.superset_label) continue
-    const letter = ex.superset_label[0]
-    letterCounts.set(letter, (letterCounts.get(letter) ?? 0) + 1)
-  }
-  return exercises.map(ex => {
-    if (!ex.superset_label) return ex
-    const letter = ex.superset_label[0]
-    if ((letterCounts.get(letter) ?? 0) < 2) return { ...ex, superset_label: undefined, rest: ex.rest === 'alternate' ? '60s' : ex.rest }
-    return ex
-  })
-}
+// clearOrphanedSupersetLabels MOVED to settle-week.ts on 13 Sep 2026 and is
+// re-exported here so its several importers did not all have to change. It had
+// to move: the shared tail calls it, and this file now calls the shared tail,
+// which would otherwise be an import cycle between the two.
+export { clearOrphanedSupersetLabels } from './settle-week'
+import { clearOrphanedSupersetLabels, settleWeek } from './settle-week'
 
 export function isMainLiftSlot(ex: Exercise | undefined): boolean {
   return ex?.tier === 'tier_1_primary'
@@ -329,7 +320,12 @@ export async function swapExerciseInMesocycle(params: SwapExerciseParams): Promi
       day.exercises.map((e, i) => (i === exIndex ? replaced : e))
     )
     const days = week.days.map(d => (d.day === dayName ? { ...d, exercises } : d))
-    return { ...week, days }
+    // THE SHARED TAIL, added 13 Sep 2026. A swap used to end here, re-running
+    // none of the passes that keep a day sane — and applyReplacement above
+    // CLEARS the incoming lift's ramp (see its comment), so the day shipped
+    // with a warm-up still preparing for the exercise that just left. BACKLOG's
+    // 11 Sep entry named this as the next job and it sat open until now.
+    return settleWeek({ ...week, days }, dayName, profile).week
   }))
 }
 
@@ -355,9 +351,14 @@ export async function banExerciseFromMesocycle(params: BanExerciseParams): Promi
   const lowerBanned = bannedName.toLowerCase()
 
   return Promise.all(mesocycle.map(async week => {
+    // WHICH DAYS THIS WEEK ACTUALLY CHANGED. A ban can land on several days of
+    // one week, and the shared tail settles one day at a time, so the names are
+    // collected rather than assumed to be a single day.
+    const touched: string[] = []
     const days = await Promise.all(week.days.map(async day => {
       const idx = day.exercises.findIndex(e => e.name.toLowerCase() === lowerBanned)
       if (idx === -1) return day
+      touched.push(day.day)
 
       const oldSlot = day.exercises[idx]
       const alreadyUsedInDay = new Set(day.exercises.filter((_, i) => i !== idx).map(e => e.name))
@@ -376,7 +377,12 @@ export async function banExerciseFromMesocycle(params: BanExerciseParams): Promi
       )
       return { ...day, exercises }
     }))
-    return { ...week, days }
+    // Same tail as the swap, and for the same reason: a ban is a swap that
+    // happens everywhere. Dropping a slot outright (the no-candidate branch
+    // above) makes the warm-up rebuild matter more, not less.
+    let settled: MesocycleWeek = { ...week, days }
+    for (const dayName of touched) settled = settleWeek(settled, dayName, profile).week
+    return settled
   }))
 }
 

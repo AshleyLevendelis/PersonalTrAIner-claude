@@ -1,6 +1,9 @@
 import type { EquipmentAccess, TrainingExperience } from './types'
 import type { ExerciseEntry, MovementPattern } from './exercise-db'
 import { isExternallyLoaded, type PrescribedLoadSource } from './load-prescription'
+import { getExerciseEntry } from './exercise-db'
+import { getDurationBudgetSeconds } from './session-duration'
+import type { UserProfile, WorkoutDay } from './types'
 
 // ---------------------------------------------------------------------------
 // WARM-UPS
@@ -488,3 +491,58 @@ export function getWarmupReserveSeconds(budgetSeconds: number): number {
   // session does not need proportionally more.
   return Math.max(390, Math.min(840, Math.round(budgetSeconds * 0.20)))
 }
+
+// ---------------------------------------------------------------------------
+// RE-DERIVING A DAY'S WARM-UP FROM THE DAY IT ACTUALLY IS
+//
+// Lives here, next to buildWarmup, rather than in the edit tail, because both
+// generation and every edit path need it and neither can import the other.
+//
+// MEASURED 13 Sep 2026, and this is why generation calls it too: across 64
+// generated plans and 4,096 training days, **7.0% of days shipped a warm-up
+// that ramps an exercise the session no longer contains**. The warm-up is
+// built once, and the weekly accessory rotation swaps exercises afterwards
+// with nothing re-deriving it — so a Tuesday whose Deadlifts had rotated to a
+// Trap Bar Deadlift still told the trainee to ramp up on Deadlifts. Nothing
+// caught it because no check ever compared the warm-up against the exercise
+// list it was supposed to describe.
+// ---------------------------------------------------------------------------
+
+/** The day's warm-up, re-derived from the exercises it now actually contains. */
+export function rebuildWarmup(day: WorkoutDay, profile: UserProfile): WorkoutDay {
+  const entries = day.exercises
+    .map(ex => ({ ex, entry: getExerciseEntry(ex.name) }))
+    .filter((p): p is { ex: typeof day.exercises[number]; entry: NonNullable<ReturnType<typeof getExerciseEntry>> } => !!p.entry)
+  // An unresolvable exercise list means the warm-up would be derived from
+  // less than the session really holds. Leaving the old one is the honest
+  // failure: it is stale, but it was built from a real session.
+  if (entries.length === 0 || entries.length !== day.exercises.length) return day
+
+  const budgetSeconds = getDurationBudgetSeconds(profile.session_duration_preference)
+  try {
+    const warmup = buildWarmup({
+      patterns: entries.map(p => p.entry.movement_pattern),
+      compounds: entries.map(p => ({
+        entry: p.entry,
+        suggestedLoadKg: p.ex.suggested_load_kg ?? null,
+        loadSource: p.ex.load_source,
+      })),
+      equipment: profile.equipment_access || 'full_gym',
+      injuries: profile.injuries || [],
+      experience: profile.training_experience || 'novice',
+      budgetSeconds: getWarmupReserveSeconds(budgetSeconds),
+    })
+    const rampByName = new Map(warmup.ramp_ups.map(r => [r.exercise, r]))
+    return {
+      ...day,
+      warmup,
+      exercises: day.exercises.map(ex =>
+        rampByName.has(ex.name) ? { ...ex, ramp_up: rampByName.get(ex.name) } : { ...ex, ramp_up: undefined },
+      ),
+    }
+  } catch (err) {
+    console.error('[settle-week] warm-up rebuild failed; keeping the previous one', err)
+    return day
+  }
+}
+

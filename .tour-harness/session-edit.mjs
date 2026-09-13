@@ -135,6 +135,35 @@ await ev(`location.hash = '#/tab/exercise'`); await wait(2500)
 const finalOrder = await untilOrder(o => o.length === dropped.length)
 check('5h. the removal survives leaving the tab and coming back', finalOrder.join('|') === dropped.join('|'), { dropped, finalOrder })
 
-console.log(failures === 0 ? '\nRemoving asks, moving moves, and both stick.\n' : `\n${failures} check(s) FAILED.\n`)
+// --- 6. WHAT IT COSTS, AND WHAT THE APP WILL DO ABOUT IT --------------------
+//
+// Ashley's ruling, 13 Sep 2026: a change to one day may touch another day to
+// keep the week balanced, and the app SAYS SO before the tap. That sentence
+// only appears when there is something to say, and a healthy generated plan
+// never has anything to say — so this reloads the harness with ?tilt=lopsided,
+// which triples the sets on every day but the first. Without the tilt the only
+// browser check available would be "the paragraph is absent", which is exactly
+// what it would also report if the feature had been deleted.
+console.log('\n  on a deliberately lopsided week')
+await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off&tilt=lopsided#/tab/exercise` })
+await wait(4500)
+const tilted = await order()
+check('6a. the tilted week still renders a session', Array.isArray(tilted) && tilted.length >= 4, tilted)
+const tiltVictim = tilted[tilted.length - 1]
+check('6b. the remove sheet opens on it', (await openRowMenu(tiltVictim)) === 'open' && await tap('[data-testid="remove-exercise"]') && (await wait(700), await clickSel('[data-verb="drop"]')))
+await wait(500)
+check('6c. ...and reaches the scope step', await has('[data-testid="remove-scope"]'))
+const balancing = await ev(`document.querySelector('[data-testid="remove-balancing"]')?.textContent?.trim() || ''`)
+const costLine = await ev(`document.querySelector('[data-testid="remove-balance-cost"]')?.textContent?.trim() || ''`)
+check('6d. the app says what it will even out on other days, before the tap',
+  balancing.startsWith("I'll also ") && /\bto keep your week balanced\.$/.test(balancing), { balancing, costLine })
+// It has to name a day that is NOT the one being edited — the whole point of
+// the sentence is the reach of the change.
+const editedDay = await ev(`document.querySelector('[data-today-day-name]')?.getAttribute('data-today-day-name') || ''`)
+check('6e. ...naming a real weekday', /\b(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b/.test(balancing), balancing)
+check('6f. ...and it is not the day being edited', !editedDay || !balancing.includes(`on ${editedDay}`), { editedDay, balancing })
+await shoot('session-edit-balancing')
+
+console.log(failures === 0 ? '\nRemoving asks, moving moves, both stick, and the reach of a change is stated.\n' : `\n${failures} check(s) FAILED.\n`)
 ws.close(); chrome.kill(); server.close()
 process.exit(failures === 0 ? 0 : 1)

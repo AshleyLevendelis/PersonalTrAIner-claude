@@ -1,5 +1,5 @@
 import { FailedCardioNotice } from '@/components/exercise/FailedCardioNotice'
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { useAppRoute, programHash } from '@/lib/app-route'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { ProgramBrowse } from './ProgramBrowse'
@@ -11,7 +11,8 @@ import { SwapDialog, type SwapTarget } from './SwapDialog'
 import { ExerciseDetailDialog, type ExerciseDetailTab } from './ExerciseDetailDialog'
 import { SessionHistoryDialog } from './SessionHistoryDialog'
 import type { ExerciseEntry } from '@/lib/exercise-db'
-import type { SwapScope } from '@/lib/mesocycle-edit'
+import { swapExerciseInMesocycle, type SwapScope } from '@/lib/mesocycle-edit'
+import { describeEditImpact } from '@/lib/session-balance-cost'
 import type { WorkoutDay, MesocycleWeek, UserProfile } from '@/lib/types'
 
 // ---------------------------------------------------------------------------
@@ -103,6 +104,33 @@ export function ExerciseTab({
     await onSwapExercise(swapTarget?.weekNumber ?? liveWeek, dayName, exIndex, newExercise, scope)
   }
 
+  /**
+   * WHAT A SWAP WOULD DO TO THE WEEK — run as a real trial, never modelled.
+   *
+   * swapExerciseInMesocycle carries the shared settling tail from 13 Sep 2026,
+   * so trialling the actual call is the only honest way to know what the
+   * balancing will change on other days. The same reason TodayPanel trials the
+   * real removal rather than predicting it.
+   *
+   * Scoped to 'today': the sentence is about the week in front of the person,
+   * and the block-wide scope does the same thing to each of its weeks.
+   */
+  const swapImpact = useCallback(async (candidate: ExerciseEntry) => {
+    const nothing = { cost: null, balancing: null }
+    if (!swapTarget || !profile || !mesocycle) return nothing
+    const weekNumber = swapTarget.weekNumber ?? liveWeek
+    const after = await swapExerciseInMesocycle({
+      mesocycle, profile, currentWeekNumber: weekNumber,
+      dayName: swapTarget.dayName, exIndex: swapTarget.exIndex,
+      newExercise: candidate, scope: 'today',
+    })
+    return describeEditImpact(
+      mesocycle.find(w => w.week_number === weekNumber),
+      after.find(w => w.week_number === weekNumber),
+      swapTarget.dayName,
+    )
+  }, [swapTarget, profile, mesocycle, liveWeek])
+
   if (isProgramView) {
     // DevTestPanel mounts here — program surface, dev-gated — never above
     // the today hero (LAYOUT-DESIGN.md §2.4).
@@ -144,6 +172,7 @@ export function ExerciseTab({
           exclusions={exclusions}
           softExercisePreferences={softExercisePreferences}
           onConfirm={handleConfirmSwap}
+          impactFor={swapImpact}
         />
         <ExerciseDetailDialog
           open={!!detailTarget}
@@ -190,6 +219,7 @@ export function ExerciseTab({
         exclusions={exclusions}
         softExercisePreferences={softExercisePreferences}
         onConfirm={handleConfirmSwap}
+        impactFor={swapImpact}
       />
       <PlateCalculator
         open={plateCalcOpen}

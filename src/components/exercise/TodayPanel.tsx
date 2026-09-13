@@ -42,7 +42,7 @@ import type { RemoveTarget } from './RemoveExerciseSheet'
 // the main chunk either way, and the dynamic form only added an await between
 // the tap and the sheet's cost line. The 13 kB is recorded in test:bundle.
 import { removeExerciseFromSession, moveExerciseInSession, type SessionEditResult } from '@/lib/session-edit'
-import { describeBalanceCost } from '@/lib/session-balance-cost'
+import { describeEditImpact } from '@/lib/session-balance-cost'
 import { saveScopedEdit } from '@/lib/mesocycle-persistence'
 import type { SwapScope } from '@/lib/mesocycle-edit'
 // Split out of the app chunk, like onboarding and the dev page: a dialog
@@ -311,14 +311,20 @@ export function TodayPanel({
     )
   }
 
-  /** What dropping this one costs the week's balance — read-only, shown before the tap. */
-  const removalBalanceCost = (exIndex: number, scope: SwapScope): string | null => {
-    if (!profile || !mesocycle) return null
+  /**
+   * What dropping this one costs the week, and what the app will even out on
+   * other days — both read off a TRIAL of the real edit, never a second
+   * model of what the edit would do.
+   */
+  const removalBalanceCost = (exIndex: number, scope: SwapScope): { cost: string | null; balancing: string | null } => {
+    const nothing = { cost: null, balancing: null }
+    if (!profile || !mesocycle) return nothing
     const result = removeExerciseFromSession({ mesocycle, profile, weekNumber: liveWeek, dayName: effectiveDayName, exIndex, scope })
-    if (!result.changed) return null
-    return describeBalanceCost(
+    if (!result.changed) return nothing
+    return describeEditImpact(
       mesocycle.find(w => w.week_number === liveWeek),
       result.mesocycle.find(w => w.week_number === liveWeek),
+      effectiveDayName,
     )
   }
 
@@ -419,7 +425,20 @@ export function TodayPanel({
   // differ only in keep_full_volume, so the gap is the notch and nothing else.
   // Costs nothing for anyone without a qualifying sport — the memo returns
   // before generating.
-  const volume = profile ? volumeNotice(profile) : null
+  // MEMOISED, and the reason is two full plan generations. volumeNotice builds
+  // a fresh object every call, and volumeReduction below lists `volume` in its
+  // dependencies — so for anyone with a qualifying second sport the memo was
+  // busted on EVERY render and regenerated the whole mesocycle twice, at
+  // roughly 80-190ms each, purely to render one percentage in a banner. Keyed
+  // on the two things volumeNotice actually reads.
+  // KEYED ON THE PROFILE OBJECT, not on the fields volumeNotice reads. Naming
+  // recovery_capacity here was a raw read, and test:concurrent-activity refuses
+  // one anywhere in this file for a good reason: a second sport has to reach
+  // every reader of that field through effectiveRecoveryCapacity, or it reaches
+  // some and not others. The profile reference is stable between renders, which
+  // is all this needs — the churn came from `volume` being rebuilt each time,
+  // not from the profile.
+  const volume = useMemo(() => (profile ? volumeNotice(profile) : null), [profile])
   const volumeNames = volume ? volume.names.join(' and ') : ''
   const [volumeBusy, setVolumeBusy] = useState(false)
   const [volumeError, setVolumeError] = useState<string | null>(null)
@@ -583,7 +602,7 @@ export function TodayPanel({
         onClose={() => setRemoveTarget(null)}
         onDrop={scope => dropExercise(removeTarget!.exIndex, scope)}
         onSwapInstead={() => removeTarget && onOpenSwap(removeTarget.dayName, removeTarget.exIndex, removeTarget.exerciseName)}
-        balanceCost={scope => (removeTarget ? removalBalanceCost(removeTarget.exIndex, scope) : null)}
+        balanceCost={scope => (removeTarget ? removalBalanceCost(removeTarget.exIndex, scope) : { cost: null, balancing: null })}
       />
       </Suspense>
 

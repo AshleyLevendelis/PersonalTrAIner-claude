@@ -2,6 +2,111 @@
 
 Newest first. One line each.
 
+- [x] **ADJUSTMENT KEEPS THE BAR — ONE SETTLING TAIL FOR EVERY EDIT.**
+  Ashley chose this on 13 Sep 2026 from four remaining gaps. Her promise has a
+  conjunction in the middle — plans "which can be adjusted to fit the user's
+  needs **while still aiming to keep the quality**" — and until today the
+  second half only held at generation.
+  **HER TWO RULINGS, both asked and both answered this session.** (1) On what a
+  person sees when a change makes the plan worse: options were plain words with
+  no number (my recommendation), showing the score move, or a soft band; **she
+  chose plain words** — the 0-12 score stays behind the scenes as a guarantee
+  we check. (2) On whether changing one day may touch another to keep the week
+  balanced: options were yes-and-say-so (my recommendation), only-touch-the-day
+  -I-changed, or ask-a-second-time; **she chose yes, and it says so.**
+  **FOUR THINGS THE MUST-HAVE LIST HAD WRONG**, each measured against the
+  source before building, each corrected in CLAUDE.md:
+  (a) it said removing AND MOVING re-ran the three coherence passes — moving
+  rebuilt the warm-up and nothing else;
+  (b) it said both weekly balance passes were unreachable because they need the
+  whole generation context — true of `balanceWeeklyStructure`, **false of
+  `enforceWeeklyPatternBalance`**, whose signature is the same shape as the two
+  passes edits already called. That one word was the whole reason this looked
+  hard;
+  (c) it said removal reports what it costs push:pull **and chest:back** —
+  `session-balance-cost.ts` counted push and pull and nothing else, while its
+  own header cited the 1.25 chest:back band it never implemented;
+  (d) "the volume toggle" is two different toggles that behave oppositely — the
+  coach's re-ran nothing, the workout card's regenerates the entire plan.
+  **WHAT IS BUILT.** `settle-week.ts` holds one tail — set hierarchy, one
+  weight per prescription, load coherence, a warm-up rebuilt from the exercises
+  the day actually holds, and now the week-level balance pass with the same
+  safety trim generation runs after it. Remove, move, swap, ban and the coach's
+  volume change all call it. Deload weeks are exempt from the balance half,
+  exactly as generation exempts them.
+  **THREE REAL DEFECTS FOUND ON THE WAY, all fixed here.**
+  1. **A swap left the warm-up preparing for the exercise that had gone.**
+     Named as the next job in the 11 Sep entry and open since.
+  2. **Generation itself shipped a stale warm-up on 7.0% of training days** —
+     286 of 4,096 across 64 plans. The warm-up is built early; weekly accessory
+     rotation swaps exercises afterwards and nothing re-derived it, so a Tuesday
+     whose Deadlifts had rotated to a Trap Bar Deadlift still said "ramp up on
+     Deadlifts". Nothing compared the warm-up against the exercise list it
+     described. Now re-derived last, before the duration trims. **0 of 4,096
+     after.**
+  3. **THE EDIT WROTE TO THE PLAN IT WAS HANDED.** The passes mutate in place,
+     and the tail passed the caller's own day objects for every day it was not
+     editing. That matters most exactly where it is worst: every confirm card
+     runs the real edit as a TRIAL against the live plan to work out what to
+     say, so a trial corrupted the plan before anything was tapped, and the
+     before/after diff then compared an object with itself and reported nothing.
+     The sharing pre-dates the balance pass — load coherence and one-weight have
+     always mutated through — but they only write when they find a fault, so on
+     a healthy plan it almost never showed. Found by a check that would not go
+     green on a week the balancing had visibly changed.
+  **ALSO FIXED IN PASSING:** the workout card ran **two full plan generations on
+  every render** for anyone with a qualifying second sport (80-190ms each) to
+  show one percentage in a banner — the memo listed a freshly-built object in
+  its dependencies. And the balance pass's dev logging was on in the shipped
+  browser bundle, because Vite defines no `process` and `undefined !==
+  'production'` passes; harmless at a few lines per generation, chatter once it
+  runs on every edit.
+  **NEW GATE `test:edit-keeps-the-bar`** — eight sections: every path repairs a
+  forged set-hierarchy and load-coherence violation; no edit leaves a warm-up
+  describing a session that is not there; generation ships none either; the
+  balancing reports itself truthfully; deload weeks are left alone; **an edited
+  plan is re-scored** across four goal/experience/equipment profiles and held to
+  the same 7.2 floor `test:quality` holds generated plans to (the line the
+  must-have list marked MISSING); and no edit writes to its input.
+  **MUTATIONS: 16 tried, 16 caught — six MISSED on the first pass**, and the
+  misses are the value. Two invented guards covered for each other in
+  `balancingChanges`, so deleting either left the gate green — collapsed to one
+  expression. Asserting "fewer than 40 sets" passed with the hierarchy pass
+  deleted, because the balance pass nudged 40 to 20 on its own — re-anchored on
+  the invariant. §5 passed vacuously on a balanced fixture, and two successive
+  attempts to forge an imbalance ALSO failed (tripling push everywhere let the
+  pass absorb it on the edited day; tripling push on the other days changed
+  nothing, because this split puts every pushing exercise on the edited day).
+  §3 edited a primer with no ramp, so deleting the warm-up rebuild went
+  unnoticed — the same trap `test:session-edit`'s own comment records falling
+  into. (13 on the new gate, 3 on the browser driver.)
+  **BROWSER-VERIFIED at 390x844** and the screenshot read: `verify:session-edit`
+  gains a lopsided-week pass that reads the sentence off the real confirm card —
+  *"I'll also trim 4 sets of overhead carry on Tuesday and trim 7 sets of
+  chest-supported row on Thursday, and 2 other small changes, to keep your week
+  balanced."* The harness gained a `?tilt=lopsided` switch for it: a healthy
+  plan never has anything to say, so without it the only available browser check
+  would be "the paragraph is absent" — which is what it would also report if the
+  feature were deleted.
+  **A NOTE ON MY OWN SWEEP.** `test:edit-keeps-the-bar` shows FAILED in the
+  first full run and is not a real failure: I ran the mutation script
+  concurrently with the sweep, so the sweep caught the gate against mutated
+  source. Re-run on a settled tree: green. Do not run mutations and a sweep at
+  the same time.
+  **NOT DONE, AND WHY — the coach's SWAP card.** It is the one surface of the
+  five that does not carry the two sentences. Its proposal builder is
+  synchronous and a faithful trial needs the async load recompute the real swap
+  does; a synchronous approximation would carry the OUTGOING lift's weight into
+  load coherence and could describe balancing that confirm then does not do.
+  A card that describes something other than what will happen is the exact
+  defect this whole change is about, so it says nothing rather than something
+  shaky. The screen's swap dialog has the accurate async trial and does show
+  them. Closing it means making the proposal builder async, which reaches the
+  proposal pipeline — its own piece of work.
+  **Deploys:** frontend on merge. **`chat-gemini`** is NOT needed for this — the
+  coach's cards are built client-side — but it is still outstanding from the
+  meal work and the 13 Sep shopping-list correction.
+
 - [x] **THE COACH EXAM — "BEST-IN-CLASS ADVICE" STOPS BEING AN ASSERTION.**
   Ashley asked what was next on 13 Sep 2026 and chose "prove the coach is
   actually good" over three other gaps. CLAUDE.md's must-have list had this at
